@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import type { Translator } from '../../game/i18n';
 import type { ContentBundle, ContributionDraft, LocaleDictionary } from '../../game/types';
 import { collectLocalizationKeys } from '../../game/validators';
 
@@ -6,12 +7,13 @@ type LocalizationEditorProps = {
   bundle: ContentBundle;
   draft: ContributionDraft;
   onChange: (locales: Record<string, LocaleDictionary>) => void;
+  t: Translator;
 };
 
 const uniqueLocales = (bundle: ContentBundle, draft: ContributionDraft) =>
   Array.from(new Set([...bundle.manifest.locales, ...Object.keys(bundle.locales), ...Object.keys(draft.locales)]));
 
-export const LocalizationEditor = ({ bundle, draft, onChange }: LocalizationEditorProps) => {
+export const LocalizationEditor = ({ bundle, draft, onChange, t }: LocalizationEditorProps) => {
   const locales = uniqueLocales(bundle, draft);
   const [lang1, setLang1] = useState(locales.includes('en') ? 'en' : locales[0] ?? 'en');
   const [lang2, setLang2] = useState(locales.find((locale) => locale !== lang1) ?? '');
@@ -57,15 +59,15 @@ export const LocalizationEditor = ({ bundle, draft, onChange }: LocalizationEdit
   return (
     <section className="grid gap-3 rounded border border-slate-700 p-3">
       <div>
-        <h3 className="text-sm font-semibold text-slate-100">Localization</h3>
-        <p className="text-xs text-slate-400">Fill display text for keys used by locations, actions, skills, and universes.</p>
+        <h3 className="text-sm font-semibold text-slate-100">{t('contribution.localization.title')}</h3>
+        <p className="text-xs text-slate-400">{t('contribution.localization.description')}</p>
       </div>
 
       <div className="grid gap-2 md:grid-cols-[1fr_auto_auto_auto]">
         <input
           className="rounded bg-slate-950 px-3 py-2 text-sm"
           onChange={(event) => setSearch(event.target.value)}
-          placeholder="Search localization keys"
+          placeholder={t('contribution.localization.search')}
           value={search}
         />
         <select className="rounded bg-slate-950 px-3 py-2 text-sm" onChange={(event) => setLang1(event.target.value)} value={lang1}>
@@ -79,12 +81,12 @@ export const LocalizationEditor = ({ bundle, draft, onChange }: LocalizationEdit
           className="rounded bg-slate-950 px-3 py-2 text-sm"
           list="locales"
           onChange={(event) => setLang2(event.target.value)}
-          placeholder="lang2"
+          placeholder={t('contribution.localization.lang2')}
           value={lang2}
         />
         <label className="flex items-center gap-2 rounded bg-slate-950 px-3 py-2 text-sm">
           <input checked={missingOnly} onChange={(event) => setMissingOnly(event.target.checked)} type="checkbox" />
-          Missing only
+          {t('contribution.localization.missingOnly')}
         </label>
       </div>
 
@@ -98,7 +100,7 @@ export const LocalizationEditor = ({ bundle, draft, onChange }: LocalizationEdit
         <table className="min-w-full border-collapse text-sm">
           <thead className="bg-slate-950 text-left text-xs uppercase text-slate-400">
             <tr>
-              <th className="w-64 border-b border-slate-800 px-3 py-2">id</th>
+              <th className="w-64 border-b border-slate-800 px-3 py-2">{t('contribution.localization.id')}</th>
               <th className="border-b border-slate-800 px-3 py-2">{lang1}</th>
               {lang2 && <th className="border-b border-slate-800 px-3 py-2">{lang2}</th>}
             </tr>

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import type { Translator } from '../../game/i18n';
 import type { ContentBundle, ContributionDraft, ValidationIssue } from '../../game/types';
 import { useContributionState } from '../../stores/contributionState';
 import { useUniverseState } from '../../stores/universeState';
@@ -10,6 +11,7 @@ import { SubmitToGitHub } from './SubmitToGitHub';
 type ContributionModeProps = {
   bundle: ContentBundle;
   validationIssues: ValidationIssue[];
+  t: Translator;
 };
 
 type ContributionTab = 'content' | 'localization' | 'submit';
@@ -26,7 +28,7 @@ const emptyDraft = (universeId: string): ContributionDraft => ({
   locales: {},
 });
 
-export const ContributionMode = ({ bundle, validationIssues }: ContributionModeProps) => {
+export const ContributionMode = ({ bundle, validationIssues, t }: ContributionModeProps) => {
   const [activeTab, setActiveTab] = useState<ContributionTab>('content');
   const draft = useContributionState((state) => state.drafts[bundle.manifest.id] ?? emptyDraft(bundle.manifest.id));
   const updateDraft = useContributionState((state) => state.updateDraft);
@@ -42,8 +44,8 @@ export const ContributionMode = ({ bundle, validationIssues }: ContributionModeP
     <section className="grid gap-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="text-lg font-semibold text-slate-100">Contribution Mode</h2>
-          <p className="text-sm text-slate-400">Local draft changes are merged into the current universe preview.</p>
+          <h2 className="text-lg font-semibold text-slate-100">{t('contribution.title')}</h2>
+          <p className="text-sm text-slate-400">{t('contribution.description')}</p>
         </div>
         <button
           className="rounded border border-slate-600 px-3 py-2 text-sm font-semibold text-slate-100"
@@ -53,7 +55,7 @@ export const ContributionMode = ({ bundle, validationIssues }: ContributionModeP
           }}
           type="button"
         >
-          Reset draft
+          {t('contribution.resetDraft')}
         </button>
       </div>
 
@@ -67,30 +69,30 @@ export const ContributionMode = ({ bundle, validationIssues }: ContributionModeP
             onClick={() => setActiveTab(tab)}
             type="button"
           >
-            {tab}
+            {t(`contribution.tab.${tab}`)}
           </button>
         ))}
       </div>
 
       {activeTab === 'content' && (
-        <ContentDataEditor bundle={bundle} draft={draft} onPatch={patchDraft} />
+        <ContentDataEditor bundle={bundle} draft={draft} onPatch={patchDraft} t={t} />
       )}
 
       {activeTab === 'localization' && (
-        <LocalizationEditor bundle={bundle} draft={draft} onChange={(locales) => patchDraft({ locales })} />
+        <LocalizationEditor bundle={bundle} draft={draft} onChange={(locales) => patchDraft({ locales })} t={t} />
       )}
 
       {activeTab === 'submit' && (
         <>
           <section className="grid gap-2 rounded border border-slate-700 p-3">
-            <h3 className="text-sm font-semibold text-slate-100">Validation</h3>
+            <h3 className="text-sm font-semibold text-slate-100">{t('contribution.validation.title')}</h3>
             {validationIssues.length === 0 ? (
-              <p className="text-sm text-emerald-300">No validation issues.</p>
+              <p className="text-sm text-emerald-300">{t('contribution.validation.empty')}</p>
             ) : (
               <ul className="grid gap-1 text-sm">
                 {validationIssues.map((issue) => (
                   <li className={issue.severity === 'error' ? 'text-rose-300' : 'text-amber-300'} key={`${issue.path}-${issue.message}`}>
-                    {issue.severity}: {issue.path} - {issue.message}
+                    {issue.severity}: {issue.path} - {t(issue.message, issue.params)}
                   </li>
                 ))}
               </ul>
@@ -99,11 +101,11 @@ export const ContributionMode = ({ bundle, validationIssues }: ContributionModeP
           <textarea
             className="min-h-24 rounded bg-slate-950 p-3 text-sm text-slate-200"
             onChange={(event) => patchDraft({ notes: event.target.value })}
-            placeholder="Contributor notes"
+            placeholder={t('contribution.notesPlaceholder')}
             value={draft.notes}
           />
-          <LocalUniverseManager bundle={bundle} />
-          <SubmitToGitHub appVersion="0.1.0" draft={draft} validationIssues={validationIssues} />
+          <LocalUniverseManager bundle={bundle} t={t} />
+          <SubmitToGitHub appVersion="0.1.0" draft={draft} validationIssues={validationIssues} t={t} />
         </>
       )}
     </section>

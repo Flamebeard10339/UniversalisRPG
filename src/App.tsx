@@ -99,7 +99,7 @@ export default function App() {
     void fetch('/changelog.txt')
       .then((response) => response.text())
       .then(setChangelogText)
-      .catch(() => setChangelogText('Unable to load changelog.txt.'));
+      .catch(() => setChangelogText(t('dialog.changelogUnavailable')));
   }, [changelogText, showChangelog]);
 
   const startingLocationId = useMemo(() => (bundle ? getStartingLocationId(bundle) : ''), [bundle]);
@@ -153,7 +153,7 @@ export default function App() {
     }
 
     setSaveExport(encodeSave(playState));
-    setSaveMessage('Save exported.');
+    setSaveMessage(t('settings.save.exported'));
     await navigator.clipboard.writeText(encodeSave(playState));
   };
 
@@ -165,14 +165,14 @@ export default function App() {
     try {
       const imported = decodeSave(saveImport);
       if (imported.universeId !== bundle.manifest.id) {
-        setSaveMessage(`Import belongs to "${imported.universeId}", not "${bundle.manifest.id}".`);
+        setSaveMessage(t('settings.save.importWrongUniverse', { source: imported.universeId, target: bundle.manifest.id }));
         return;
       }
       await importUniverseState(imported);
-      setSaveMessage('Save imported.');
+      setSaveMessage(t('settings.save.imported'));
       setSaveImport('');
     } catch {
-      setSaveMessage('Import failed. Check the serialized save string.');
+      setSaveMessage(t('settings.save.importFailed'));
     }
   };
 
@@ -183,7 +183,7 @@ export default function App() {
 
     await resetUniverse(bundle.manifest.id, startingLocationId);
     setConfirmReset(false);
-    setSaveMessage('Universe save reset.');
+    setSaveMessage(t('settings.save.resetComplete'));
   };
 
   useEffect(() => {
@@ -213,15 +213,15 @@ export default function App() {
   }, [bundle, playState, resolveDue]);
 
   if (loading && !bundle) {
-    return <main className="grid min-h-screen place-items-center bg-slate-950 text-slate-100">Loading universe...</main>;
+    return <main className="grid min-h-screen place-items-center bg-slate-950 text-slate-100">{t('app.loadingUniverse')}</main>;
   }
 
   if (error || !bundle || !playState || !currentLocation) {
     return (
       <main className="grid min-h-screen place-items-center bg-slate-950 p-6 text-slate-100">
         <section className="max-w-xl rounded border border-rose-800 bg-rose-950/30 p-5">
-          <h1 className="text-lg font-semibold">Unable to start UniversalisRPG</h1>
-          <p className="mt-2 text-sm text-rose-100">{error ?? 'No playable universe content was found.'}</p>
+          <h1 className="text-lg font-semibold">{t('app.startErrorTitle')}</h1>
+          <p className="mt-2 text-sm text-rose-100">{error ? t(error, error) : t('app.noPlayableUniverse')}</p>
         </section>
       </main>
     );
@@ -232,7 +232,7 @@ export default function App() {
       <header className="border-b border-slate-800 bg-slate-900/70 px-4 py-3">
         <div className="mx-auto max-w-7xl">
           <div>
-            <h1 className="text-xl font-semibold">UniversalisRPG</h1>
+            <h1 className="text-xl font-semibold">{t('app.title')}</h1>
             <p className="text-sm text-slate-400">{t(bundle.manifest.titleKey)} - {t(bundle.manifest.descriptionKey ?? '')}</p>
           </div>
         </div>
@@ -289,7 +289,7 @@ export default function App() {
           />
             </section>
 
-            <ChatPanel locationName={t(currentLocation.titleKey ?? locationTitleKey(currentLocation.id))} />
+            <ChatPanel locationName={t(currentLocation.titleKey ?? locationTitleKey(currentLocation.id))} t={t} />
           </section>
         )}
 
@@ -305,7 +305,7 @@ export default function App() {
                   onClick={() => setCharacterTopTab(tab)}
                   type="button"
                 >
-                  {tab}
+                  {t(`character.tab.${tab}`)}
                 </button>
               ))}
             </div>
@@ -318,9 +318,9 @@ export default function App() {
 
             {characterTab === 'inventory' && (
               <section className="grid gap-2 rounded border border-slate-800 bg-slate-900 p-4">
-                <h2 className="text-base font-semibold text-slate-100">Inventory</h2>
+                <h2 className="text-base font-semibold text-slate-100">{t('inventory.title')}</h2>
                 {Object.keys(playState.resources).length === 0 ? (
-                  <p className="text-sm text-slate-500">No items yet.</p>
+                  <p className="text-sm text-slate-500">{t('inventory.empty')}</p>
                 ) : (
                   <dl className="grid gap-2 text-sm">
                     {Object.entries(playState.resources).map(([resourceId, amount]) => (
@@ -339,12 +339,12 @@ export default function App() {
         {activeTab === 'settings' && (
           <section className="grid gap-4">
             <section className="grid gap-4 rounded border border-slate-800 bg-slate-900 p-4">
-              <h2 className="text-lg font-semibold text-slate-100">Settings</h2>
+              <h2 className="text-lg font-semibold text-slate-100">{t('settings.title')}</h2>
 
               <section className="grid gap-3 rounded border border-slate-800 bg-slate-950 p-3">
-                <h3 className="text-sm font-semibold text-slate-100">Universe</h3>
+                <h3 className="text-sm font-semibold text-slate-100">{t('settings.universe.title')}</h3>
                 <label className="flex items-center justify-between gap-4">
-                  <span className="text-sm text-slate-300">Universe</span>
+                  <span className="text-sm text-slate-300">{t('settings.universe.title')}</span>
                   <select
                     className="w-56 rounded border border-slate-700 bg-slate-900 px-3 py-2 text-sm"
                     onChange={(event) => {
@@ -363,44 +363,44 @@ export default function App() {
               </section>
 
               <section className="grid gap-3 rounded border border-slate-800 bg-slate-950 p-3">
-                <h3 className="text-sm font-semibold text-slate-100">Appearance</h3>
+                <h3 className="text-sm font-semibold text-slate-100">{t('settings.appearance.title')}</h3>
                 <label className="flex items-center justify-between gap-4">
-                  <span className="text-sm text-slate-300">Theme</span>
+                  <span className="text-sm text-slate-300">{t('settings.appearance.theme')}</span>
                   <select
                     className="w-56 rounded border border-slate-700 bg-slate-900 px-3 py-2 text-sm"
                     onChange={(event) => setThemePreference(event.target.value as ThemePreference)}
                     value={themePreference}
                   >
-                    <option value="system">System</option>
-                    <option value="dark">Dark</option>
-                    <option value="light">Light</option>
+                    <option value="system">{t('settings.theme.system')}</option>
+                    <option value="dark">{t('settings.theme.dark')}</option>
+                    <option value="light">{t('settings.theme.light')}</option>
                   </select>
                 </label>
                 <label className="flex items-center justify-between gap-4">
-                  <span className="text-sm text-slate-300">Font size</span>
+                  <span className="text-sm text-slate-300">{t('settings.appearance.fontSize')}</span>
                   <select
                     className="w-56 rounded border border-slate-700 bg-slate-900 px-3 py-2 text-sm"
                     onChange={(event) => setFontSizePreference(event.target.value as FontSizePreference)}
                     value={fontSizePreference}
                   >
-                    <option value="tiny">Tiny</option>
-                    <option value="small">Small</option>
-                    <option value="normal">Normal</option>
-                    <option value="large">Large</option>
-                    <option value="huge">Huge</option>
+                    <option value="tiny">{t('settings.fontSize.tiny')}</option>
+                    <option value="small">{t('settings.fontSize.small')}</option>
+                    <option value="normal">{t('settings.fontSize.normal')}</option>
+                    <option value="large">{t('settings.fontSize.large')}</option>
+                    <option value="huge">{t('settings.fontSize.huge')}</option>
                   </select>
                 </label>
                 <label className="flex items-center justify-between gap-4">
-                  <span className="text-sm text-slate-300">Language</span>
+                  <span className="text-sm text-slate-300">{t('settings.appearance.language')}</span>
                   <select
                     className="w-56 rounded border border-slate-700 bg-slate-900 px-3 py-2 text-sm"
                     onChange={(event) => void setLocalePreference(event.target.value)}
                     value={localePreference}
                   >
-                    <option value="system">System</option>
+                    <option value="system">{t('settings.language.system')}</option>
                     {bundle.manifest.locales.map((locale) => (
                       <option key={locale} value={locale}>
-                        {locale === 'en' ? 'English' : locale}
+                      {t(`settings.language.${locale}`, locale)}
                       </option>
                     ))}
                   </select>
@@ -410,18 +410,18 @@ export default function App() {
               <section className="grid gap-3 rounded border border-slate-800 bg-slate-950 p-3">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
-                    <h3 className="text-sm font-semibold text-slate-100">Export/import save</h3>
-                    <p className="text-xs text-slate-400">Serialized current-universe save for easy sharing.</p>
+                    <h3 className="text-sm font-semibold text-slate-100">{t('settings.save.title')}</h3>
+                    <p className="text-xs text-slate-400">{t('settings.save.description')}</p>
                   </div>
                   <button className="rounded bg-cyan-400 px-3 py-2 text-sm font-semibold text-slate-950" onClick={() => void exportSave()} type="button">
-                    Export
+                    {t('settings.save.export')}
                   </button>
                 </div>
-                <textarea className="min-h-20 rounded bg-slate-900 p-3 text-xs text-slate-300" onChange={(event) => setSaveExport(event.target.value)} placeholder="Exported save string" value={saveExport} />
+                <textarea className="min-h-20 rounded bg-slate-900 p-3 text-xs text-slate-300" onChange={(event) => setSaveExport(event.target.value)} placeholder={t('settings.save.exportPlaceholder')} value={saveExport} />
                 <div className="grid gap-2 md:grid-cols-[1fr_auto]">
-                  <textarea className="min-h-20 rounded bg-slate-900 p-3 text-xs text-slate-300" onChange={(event) => setSaveImport(event.target.value)} placeholder="Paste save string to import" value={saveImport} />
+                  <textarea className="min-h-20 rounded bg-slate-900 p-3 text-xs text-slate-300" onChange={(event) => setSaveImport(event.target.value)} placeholder={t('settings.save.importPlaceholder')} value={saveImport} />
                   <button className="rounded border border-slate-600 px-3 py-2 text-sm font-semibold text-slate-100" onClick={() => void importSave()} type="button">
-                    Import
+                    {t('settings.save.import')}
                   </button>
                 </div>
                 {saveMessage && <p className="text-xs text-slate-400">{saveMessage}</p>}
@@ -429,22 +429,22 @@ export default function App() {
 
               <div className="flex items-center justify-between gap-4 rounded border border-slate-800 bg-slate-950 p-3">
                 <span>
-                  <span className="block text-sm font-semibold text-slate-100">What's new</span>
-                  <span className="block text-xs text-slate-400">View changelog.txt.</span>
+                  <span className="block text-sm font-semibold text-slate-100">{t('settings.whatsNew.title')}</span>
+                  <span className="block text-xs text-slate-400">{t('settings.whatsNew.description')}</span>
                 </span>
                 <button className="rounded border border-slate-600 px-3 py-2 text-sm font-semibold text-slate-100" onClick={() => setShowChangelog(true)} type="button">
-                  Open
+                  {t('settings.whatsNew.open')}
                 </button>
               </div>
 
               <div className="grid gap-2 rounded border border-slate-800 bg-slate-950 p-3 text-sm">
-                <h3 className="font-semibold text-slate-100">About</h3>
+                <h3 className="font-semibold text-slate-100">{t('settings.about.title')}</h3>
                 <div className="flex justify-between gap-4">
-                  <span className="text-slate-400">Version</span>
+                  <span className="text-slate-400">{t('settings.about.version')}</span>
                   <span className="text-slate-200">{APP_VERSION}</span>
                 </div>
                 <div className="flex justify-between gap-4">
-                  <span className="text-slate-400">Source code</span>
+                  <span className="text-slate-400">{t('settings.about.sourceCode')}</span>
                   <a className="text-cyan-300" href={SOURCE_URL} rel="noreferrer" target="_blank">
                     github.com/Flamebeard10339/UniversalisRPG
                   </a>
@@ -452,11 +452,11 @@ export default function App() {
               </div>
 
               <section className="grid gap-3 rounded border border-slate-800 bg-slate-950 p-3">
-                <h3 className="text-sm font-semibold text-slate-100">Debug</h3>
+                <h3 className="text-sm font-semibold text-slate-100">{t('settings.debug.title')}</h3>
                 <label className="flex items-center justify-between gap-4">
                   <span>
-                    <span className="block text-sm text-slate-300">Contribution mode</span>
-                    <span className="block text-xs text-slate-500">Enable local JSON editing and GitHub issue packaging.</span>
+                    <span className="block text-sm text-slate-300">{t('settings.debug.contributionMode')}</span>
+                    <span className="block text-xs text-slate-500">{t('settings.debug.contributionDescription')}</span>
                   </span>
                   <input
                     checked={contributionMode}
@@ -470,8 +470,8 @@ export default function App() {
                 </label>
                 <label className="flex items-center justify-between gap-4">
                   <span>
-                    <span className="block text-sm text-slate-300">Debug mode</span>
-                    <span className="block text-xs text-slate-500">Log user actions for troubleshooting.</span>
+                    <span className="block text-sm text-slate-300">{t('settings.debug.debugMode')}</span>
+                    <span className="block text-xs text-slate-500">{t('settings.debug.debugDescription')}</span>
                   </span>
                   <input
                     checked={debugEnabled}
@@ -484,17 +484,17 @@ export default function App() {
                 {debugEnabled && (
                   <section className="grid gap-3 rounded border border-slate-800 bg-slate-900 p-3">
                     <div className="flex items-center justify-between gap-3">
-                      <h4 className="text-sm font-semibold text-slate-100">Debug log</h4>
+                      <h4 className="text-sm font-semibold text-slate-100">{t('settings.debug.log')}</h4>
                       <button
                         className="rounded border border-slate-600 px-3 py-2 text-sm font-semibold text-slate-100"
                         onClick={clearDebugLog}
                         type="button"
                       >
-                        Clear
+                        {t('settings.debug.clear')}
                       </button>
                     </div>
                     {debugEntries.length === 0 ? (
-                      <p className="text-sm text-slate-500">No actions logged yet.</p>
+                      <p className="text-sm text-slate-500">{t('settings.debug.empty')}</p>
                     ) : (
                       <ol className="grid max-h-80 gap-2 overflow-auto text-xs">
                         {debugEntries.map((entry) => (
@@ -516,15 +516,15 @@ export default function App() {
                 )}
               </section>
 
-              {contributionMode && <ContributionMode bundle={bundle} validationIssues={validationIssues} />}
+              {contributionMode && <ContributionMode bundle={bundle} validationIssues={validationIssues} t={t} />}
 
               <div className="flex items-center justify-between gap-4 rounded border border-rose-900 bg-rose-950/30 p-3">
                 <span>
-                  <span className="block text-sm font-semibold text-rose-100">Reset universe</span>
-                  <span className="block text-xs text-rose-200/80">Clears skills, inventory, location progress, and active timers.</span>
+                  <span className="block text-sm font-semibold text-rose-100">{t('settings.reset.title')}</span>
+                  <span className="block text-xs text-rose-200/80">{t('settings.reset.description')}</span>
                 </span>
                 <button className="rounded border border-rose-500 px-3 py-2 text-sm font-semibold text-rose-100" onClick={() => setConfirmReset(true)} type="button">
-                  Reset
+                  {t('settings.reset.button')}
                 </button>
               </div>
             </section>
@@ -536,13 +536,13 @@ export default function App() {
         <div className="fixed inset-0 z-20 grid place-items-center bg-slate-950/80 p-4">
           <section className="w-full max-w-lg rounded border border-slate-700 bg-slate-900 p-5 shadow-xl">
             <div className="flex items-start justify-between gap-4">
-              <h2 className="text-lg font-semibold text-slate-100">What's New</h2>
+              <h2 className="text-lg font-semibold text-slate-100">{t('settings.whatsNew.title')}</h2>
               <button className="rounded border border-slate-600 px-3 py-1 text-sm text-slate-100" onClick={() => setShowChangelog(false)} type="button">
-                Close
+                {t('dialog.close')}
               </button>
             </div>
             <pre className="mt-4 max-h-[60vh] overflow-auto whitespace-pre-wrap rounded bg-slate-950 p-3 text-sm text-slate-300">
-              {changelogText || 'Loading changelog.txt...'}
+              {changelogText || t('dialog.loadingChangelog')}
             </pre>
           </section>
         </div>
@@ -551,14 +551,14 @@ export default function App() {
       {confirmReset && (
         <div className="fixed inset-0 z-20 grid place-items-center bg-slate-950/80 p-4">
           <section className="w-full max-w-md rounded border border-rose-800 bg-slate-900 p-5 shadow-xl">
-            <h2 className="text-lg font-semibold text-rose-100">Reset this universe?</h2>
-            <p className="mt-2 text-sm text-slate-300">This clears all progress for {t(bundle.manifest.titleKey, bundle.manifest.id)}.</p>
+            <h2 className="text-lg font-semibold text-rose-100">{t('dialog.resetTitle')}</h2>
+            <p className="mt-2 text-sm text-slate-300">{t('dialog.resetDescription', { universe: t(bundle.manifest.titleKey, bundle.manifest.id) })}</p>
             <div className="mt-4 flex justify-end gap-2">
               <button className="rounded border border-slate-600 px-3 py-2 text-sm font-semibold text-slate-100" onClick={() => setConfirmReset(false)} type="button">
-                Cancel
+                {t('dialog.cancel')}
               </button>
               <button className="rounded bg-rose-500 px-3 py-2 text-sm font-semibold text-white" onClick={() => void resetActiveUniverse()} type="button">
-                Reset universe
+                {t('dialog.resetConfirm')}
               </button>
             </div>
           </section>
@@ -576,7 +576,7 @@ export default function App() {
               onClick={() => setTab(tab)}
               type="button"
             >
-              {tab}
+              {t(`app.tab.${tab}`)}
             </button>
           ))}
         </div>

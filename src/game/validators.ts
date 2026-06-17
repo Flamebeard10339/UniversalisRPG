@@ -33,16 +33,18 @@ const hasNumber = (value: Record<string, unknown>, key: string) =>
 
 const isKebabCaseId = (id: string) => id === toKebabCase(id);
 
-const error = (path: string, message: string): ValidationIssue => ({
+const error = (path: string, message: string, params?: Record<string, string | number>): ValidationIssue => ({
   severity: 'error',
   path,
   message,
+  params,
 });
 
-const warning = (path: string, message: string): ValidationIssue => ({
+const warning = (path: string, message: string, params?: Record<string, string | number>): ValidationIssue => ({
   severity: 'warning',
   path,
   message,
+  params,
 });
 
 export const validateManifest = (value: unknown): value is UniverseManifest =>
@@ -112,27 +114,27 @@ export const validateContentShape = (bundle: Partial<ContentBundle>) => {
   const issues: ValidationIssue[] = [];
 
   if (!bundle.manifest || !validateManifest(bundle.manifest)) {
-    issues.push(error('universe.json', 'Universe manifest is missing required fields.'));
+    issues.push(error('universe.json', 'validation.universeManifestMissing'));
   }
 
   if (!validateLocationsShape(bundle.locations)) {
-    issues.push(error('locations.json', 'Locations must be an array of location objects.'));
+    issues.push(error('locations.json', 'validation.locationsShape'));
   }
 
   if (!validateEdgesShape(bundle.edges)) {
-    issues.push(error('edges.json', 'Edges must be an array of travel edge objects.'));
+    issues.push(error('edges.json', 'validation.edgesShape'));
   }
 
   if (!validateActionsShape(bundle.actions)) {
-    issues.push(error('actions.json', 'Actions must be an array of action objects.'));
+    issues.push(error('actions.json', 'validation.actionsShape'));
   }
 
   if (!validateSkillsShape(bundle.skills)) {
-    issues.push(error('skills.json', 'Skills must be an array of skill objects.'));
+    issues.push(error('skills.json', 'validation.skillsShape'));
   }
 
   if (!validateItemsShape(bundle.items)) {
-    issues.push(error('items.json', 'Items must be an array of item objects.'));
+    issues.push(error('items.json', 'validation.itemsShape'));
   }
 
   return issues;
@@ -144,7 +146,7 @@ const findDuplicateIds = <T extends { id: string }>(items: T[], path: string) =>
 
   for (const item of items) {
     if (seen.has(item.id)) {
-      issues.push(error(`${path}.${item.id}`, `Duplicate id "${item.id}".`));
+      issues.push(error(`${path}.${item.id}`, 'validation.duplicateId', { id: item.id }));
     }
     seen.add(item.id);
   }
@@ -167,7 +169,7 @@ export const validateContentReferences = (bundle: ContentBundle) => {
   const locale = bundle.locales[bundle.manifest.locales[0]] ?? {};
 
   if (!bundle.locations.some((location) => location.starting)) {
-    issues.push(error('locations', 'At least one location must be marked as starting.'));
+    issues.push(error('locations', 'validation.startingLocationMissing'));
   }
 
   for (const edge of bundle.edges) {
@@ -179,63 +181,63 @@ export const validateContentReferences = (bundle: ContentBundle) => {
     );
 
     if (duplicatePair) {
-      issues.push(error(`edges.${edge.id}`, `Duplicate edge between "${edge.source}" and "${edge.target}".`));
+      issues.push(error(`edges.${edge.id}`, 'validation.duplicateEdge', { source: edge.source, target: edge.target }));
     }
     if (!locationIds.has(edge.source)) {
-      issues.push(error(`edges.${edge.id}.source`, `Unknown source location "${edge.source}".`));
+      issues.push(error(`edges.${edge.id}.source`, 'validation.unknownSourceLocation', { id: edge.source }));
     }
     if (!locationIds.has(edge.target)) {
-      issues.push(error(`edges.${edge.id}.target`, `Unknown target location "${edge.target}".`));
+      issues.push(error(`edges.${edge.id}.target`, 'validation.unknownTargetLocation', { id: edge.target }));
     }
     if (edge.travelTimeSeconds <= 0) {
-      issues.push(error(`edges.${edge.id}.travelTimeSeconds`, 'Travel time must be positive.'));
+      issues.push(error(`edges.${edge.id}.travelTimeSeconds`, 'validation.travelTimePositive'));
     }
   }
 
   for (const action of bundle.actions) {
     if (!isKebabCaseId(action.id)) {
-      issues.push(error(`actions.${action.id}.id`, 'Action ids must be kebab-case.'));
+      issues.push(error(`actions.${action.id}.id`, 'validation.actionIdKebab'));
     }
     if (!locationIds.has(action.locationId)) {
-      issues.push(error(`actions.${action.id}.locationId`, `Unknown location "${action.locationId}".`));
+      issues.push(error(`actions.${action.id}.locationId`, 'validation.unknownLocation', { id: action.locationId }));
     }
     if (action.durationSeconds <= 0) {
-      issues.push(error(`actions.${action.id}.durationSeconds`, 'Action duration must be positive.'));
+      issues.push(error(`actions.${action.id}.durationSeconds`, 'validation.actionDurationPositive'));
     }
     for (const reward of action.rewards) {
       if (reward.kind === 'skillXp' && !skillIds.has(reward.skillId)) {
-        issues.push(error(`actions.${action.id}.rewards`, `Unknown skill "${reward.skillId}".`));
+        issues.push(error(`actions.${action.id}.rewards`, 'validation.unknownSkill', { id: reward.skillId }));
       }
       if (reward.kind === 'resource' && itemIds.size > 0 && !itemIds.has(reward.resourceId)) {
-        issues.push(error(`actions.${action.id}.rewards`, `Unknown item "${reward.resourceId}".`));
+        issues.push(error(`actions.${action.id}.rewards`, 'validation.unknownItem', { id: reward.resourceId }));
       }
       if (reward.amount <= 0) {
-        issues.push(error(`actions.${action.id}.rewards`, 'Reward amounts must be positive.'));
+        issues.push(error(`actions.${action.id}.rewards`, 'validation.rewardAmountPositive'));
       }
     }
   }
 
   for (const location of bundle.locations) {
     if (!isKebabCaseId(location.id)) {
-      issues.push(error(`locations.${location.id}.id`, 'Location ids must be kebab-case.'));
+      issues.push(error(`locations.${location.id}.id`, 'validation.locationIdKebab'));
     }
   }
 
   for (const skill of bundle.skills) {
     if (!isKebabCaseId(skill.id)) {
-      issues.push(error(`skills.${skill.id}.id`, 'Skill ids must be kebab-case.'));
+      issues.push(error(`skills.${skill.id}.id`, 'validation.skillIdKebab'));
     }
   }
 
   for (const item of bundle.items ?? []) {
     if (!isKebabCaseId(item.id)) {
-      issues.push(error(`items.${item.id}.id`, 'Item ids must be kebab-case.'));
+      issues.push(error(`items.${item.id}.id`, 'validation.itemIdKebab'));
     }
   }
 
   for (const key of collectLocalizationKeys(bundle)) {
     if (!locale[key]) {
-      issues.push(warning(`locales.${bundle.manifest.locales[0]}.${key}`, 'Missing localization string.'));
+      issues.push(warning(`locales.${bundle.manifest.locales[0]}.${key}`, 'validation.missingLocalization'));
     }
   }
 
@@ -271,7 +273,7 @@ export const collectLocalizationKeys = (bundle: ContentBundle) => [
 export const validateLocaleDictionary = (locale: LocaleDictionary) =>
   Object.entries(locale).flatMap(([key, value]) =>
     key.trim().length === 0 || value.trim().length === 0
-      ? [error(`locales.${key}`, 'Locale keys and values cannot be empty.')]
+      ? [error(`locales.${key}`, 'validation.localeEmpty')]
       : [],
   );
 

@@ -14,12 +14,14 @@ import ReactFlow, {
   type NodeProps,
 } from 'reactflow';
 import { edgeId } from '../../game/contentIds';
+import type { Translator } from '../../game/i18n';
 import type { ContentBundle, LocationNode, TravelEdgeDefinition } from '../../game/types';
 
 type ContributionMapEditorProps = {
   bundle: ContentBundle;
   onLocationsChange: (locations: LocationNode[]) => void;
   onEdgesChange: (edges: TravelEdgeDefinition[]) => void;
+  t: Translator;
 };
 
 type Selection =
@@ -74,7 +76,7 @@ const upsertById = <T extends { id: string }>(items: T[], item: T) =>
     ? items.map((candidate) => (candidate.id === item.id ? item : candidate))
     : [...items, item];
 
-export const ContributionMapEditor = ({ bundle, onLocationsChange, onEdgesChange }: ContributionMapEditorProps) => {
+export const ContributionMapEditor = ({ bundle, onLocationsChange, onEdgesChange, t }: ContributionMapEditorProps) => {
   const [nodes, setNodes] = useState<Node<SimpleNodeData>[]>(() => toFlowNodes(bundle.locations));
   const [selection, setSelection] = useState<Selection>(null);
   const [snapSize, setSnapSize] = useState(8);
@@ -177,12 +179,12 @@ export const ContributionMapEditor = ({ bundle, onLocationsChange, onEdgesChange
   return (
     <section className="grid gap-3 rounded border border-slate-700 p-3">
       <div>
-        <h3 className="text-sm font-semibold text-slate-100">Map layout</h3>
-        <p className="text-xs text-slate-400">Drag nodes to reposition them. Drag from a handle to another node to add an edge.</p>
+        <h3 className="text-sm font-semibold text-slate-100">{t('contribution.mapLayout.title')}</h3>
+        <p className="text-xs text-slate-400">{t('contribution.mapLayout.description')}</p>
       </div>
 
       <label className="flex max-w-48 items-center gap-2 text-xs text-slate-400">
-        Grid snap
+        {t('contribution.mapLayout.gridSnap')}
         <input
           className="w-20 rounded bg-slate-950 px-2 py-1 text-sm text-slate-100"
           min="1"
@@ -235,19 +237,19 @@ export const ContributionMapEditor = ({ bundle, onLocationsChange, onEdgesChange
         </div>
 
         <aside className="grid min-w-0 content-start gap-3 rounded border border-slate-800 bg-slate-950 p-3">
-          <h4 className="text-sm font-semibold text-slate-100">Selection</h4>
+          <h4 className="text-sm font-semibold text-slate-100">{t('contribution.selection.title')}</h4>
 
-          {!selectedLocation && !selectedEdge && <p className="text-sm text-slate-500">Select a node or edge to edit it.</p>}
+          {!selectedLocation && !selectedEdge && <p className="text-sm text-slate-500">{t('contribution.selection.empty')}</p>}
 
           {selectedLocation && (
             <div className="grid gap-3">
               <label className="grid min-w-0 gap-1 text-xs text-slate-400">
-                id
+                {t('contribution.field.id')}
                 <input className="min-w-0 rounded bg-slate-900 px-3 py-2 text-sm text-slate-100" readOnly value={selectedLocation.id} />
               </label>
               <div className="grid min-w-0 grid-cols-2 gap-2">
                 <label className="grid min-w-0 gap-1 text-xs text-slate-400">
-                  x
+                  {t('contribution.field.x')}
                   <input
                     className="min-w-0 rounded bg-slate-900 px-2 py-2 text-sm text-slate-100"
                     onChange={(event) => updateLocation({ position: { ...selectedLocation.position, x: Number(event.target.value) } })}
@@ -256,7 +258,7 @@ export const ContributionMapEditor = ({ bundle, onLocationsChange, onEdgesChange
                   />
                 </label>
                 <label className="grid min-w-0 gap-1 text-xs text-slate-400">
-                  y
+                  {t('contribution.field.y')}
                   <input
                     className="min-w-0 rounded bg-slate-900 px-2 py-2 text-sm text-slate-100"
                     onChange={(event) => updateLocation({ position: { ...selectedLocation.position, y: Number(event.target.value) } })}
@@ -266,7 +268,7 @@ export const ContributionMapEditor = ({ bundle, onLocationsChange, onEdgesChange
                 </label>
               </div>
               <label className="grid min-w-0 gap-1 text-xs text-slate-400">
-                tags
+                {t('contribution.field.tags')}
                 <input
                   className="min-w-0 rounded bg-slate-900 px-3 py-2 text-sm text-slate-100"
                   onChange={(event) => updateLocation({ tags: event.target.value.split(',').map((tag) => tag.trim()).filter(Boolean) })}
@@ -275,10 +277,10 @@ export const ContributionMapEditor = ({ bundle, onLocationsChange, onEdgesChange
               </label>
               <label className="flex items-center gap-2 text-sm text-slate-200">
                 <input checked={Boolean(selectedLocation.starting)} onChange={(event) => updateLocation({ starting: event.target.checked })} type="checkbox" />
-                Starting location
+                {t('contribution.field.startingLocation')}
               </label>
               <button className="rounded border border-rose-500 px-3 py-2 text-sm font-semibold text-rose-200" onClick={removeLocation} type="button">
-                Remove node
+                {t('contribution.removeNode')}
               </button>
             </div>
           )}
@@ -286,19 +288,19 @@ export const ContributionMapEditor = ({ bundle, onLocationsChange, onEdgesChange
           {selectedEdge && (
             <div className="grid gap-3">
               <label className="grid min-w-0 gap-1 text-xs text-slate-400">
-                id
+                {t('contribution.field.id')}
                 <input className="min-w-0 rounded bg-slate-900 px-3 py-2 text-sm text-slate-100" readOnly value={selectedEdge.id} />
               </label>
               <label className="grid min-w-0 gap-1 text-xs text-slate-400">
-                source
+                {t('contribution.field.source')}
                 <input className="min-w-0 rounded bg-slate-900 px-3 py-2 text-sm text-slate-100" readOnly value={selectedEdge.source} />
               </label>
               <label className="grid min-w-0 gap-1 text-xs text-slate-400">
-                target
+                {t('contribution.field.target')}
                 <input className="min-w-0 rounded bg-slate-900 px-3 py-2 text-sm text-slate-100" readOnly value={selectedEdge.target} />
               </label>
               <label className="grid min-w-0 gap-1 text-xs text-slate-400">
-                duration seconds
+                {t('contribution.field.durationSeconds')}
                 <input
                   className="min-w-0 rounded bg-slate-900 px-3 py-2 text-sm text-slate-100"
                   min="1"
@@ -308,7 +310,7 @@ export const ContributionMapEditor = ({ bundle, onLocationsChange, onEdgesChange
                 />
               </label>
               <button className="rounded border border-rose-500 px-3 py-2 text-sm font-semibold text-rose-200" onClick={removeEdge} type="button">
-                Remove edge
+                {t('contribution.removeEdge')}
               </button>
             </div>
           )}

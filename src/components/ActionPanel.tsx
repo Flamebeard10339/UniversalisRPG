@@ -1,12 +1,13 @@
 import type { ContentBundle, GameAction, UniversePlayState } from '../game/types';
 import { actionDescriptionKey, actionTitleKey } from '../game/contentIds';
+import type { Translator } from '../game/i18n';
 import { useNow } from '../hooks/useNow';
 
 type ActionPanelProps = {
   bundle: ContentBundle;
   playState: UniversePlayState;
   onStartAction: (action: GameAction) => void;
-  t: (key: string, fallback?: string) => string;
+  t: Translator;
 };
 
 export const ActionPanel = ({ bundle, playState, onStartAction, t }: ActionPanelProps) => {
@@ -21,13 +22,13 @@ export const ActionPanel = ({ bundle, playState, onStartAction, t }: ActionPanel
   return (
     <section className="grid gap-3">
       <div>
-        <h2 className="text-base font-semibold text-slate-100">Actions</h2>
+        <h2 className="text-base font-semibold text-slate-100">{t('actionPanel.title')}</h2>
         <p className="text-sm text-slate-400">
           {isTravelling
-            ? 'Travelling. Actions will be available when you arrive.'
+            ? t('actionPanel.travelling')
             : activeAction
-              ? `Working on ${t(activeAction.titleKey ?? actionTitleKey(activeAction.id))}.`
-              : 'Choose what to work on here.'}
+              ? t('actionPanel.working', { action: t(activeAction.titleKey ?? actionTitleKey(activeAction.id)) })
+              : t('actionPanel.choose')}
         </p>
       </div>
 

@@ -1,16 +1,17 @@
 import type { ContentBundle, UniversePlayState } from '../game/types';
 import { skillTitleKey } from '../game/contentIds';
+import type { Translator } from '../game/i18n';
 import { skillLevelFromXp } from '../game/timers';
 
 type SkillBarsProps = {
   bundle: ContentBundle;
   playState: UniversePlayState;
-  t: (key: string, fallback?: string) => string;
+  t: Translator;
 };
 
 export const SkillBars = ({ bundle, playState, t }: SkillBarsProps) => (
   <section className="grid gap-3">
-    <h2 className="text-base font-semibold text-slate-100">Skills</h2>
+    <h2 className="text-base font-semibold text-slate-100">{t('skillBars.title')}</h2>
     <div className="grid gap-3">
       {bundle.skills.map((skill) => {
         const xp = playState.skillXp[skill.id] ?? 0;

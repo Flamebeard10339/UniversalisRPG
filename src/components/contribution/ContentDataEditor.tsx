@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { edgeId, toKebabInput } from '../../game/contentIds';
+import type { Translator } from '../../game/i18n';
 import type { ContentBundle, ContributionDraft, GameAction, ItemDefinition, LocationNode, Reward, SkillDefinition, TravelEdgeDefinition } from '../../game/types';
 import { ContributionMapEditor } from './ContributionMapEditor';
 
@@ -7,6 +8,7 @@ type ContentDataEditorProps = {
   bundle: ContentBundle;
   draft: ContributionDraft;
   onPatch: (patch: Partial<Omit<ContributionDraft, 'universeId'>>) => void;
+  t: Translator;
 };
 
 type ContentDataTab = 'map' | 'actions' | 'skills' | 'items' | 'json';
@@ -39,7 +41,7 @@ const allSkills = (bundle: ContentBundle, draft: ContributionDraft) => uniqueByI
 const allItems = (bundle: ContentBundle, draft: ContributionDraft) => uniqueById([...(bundle.items ?? []), ...draft.items]);
 const defaultRewardDraft = (): RewardDraft => ({ kind: 'skillXp', targetId: '', amount: '1' });
 
-export const ContentDataEditor = ({ bundle, draft, onPatch }: ContentDataEditorProps) => {
+export const ContentDataEditor = ({ bundle, draft, onPatch, t }: ContentDataEditorProps) => {
   const [activeTab, setActiveTab] = useState<ContentDataTab>('map');
   const [rewardDrafts, setRewardDrafts] = useState<Record<string, RewardDraft>>({});
   const [selectedActionId, setSelectedActionId] = useState<string | null>(null);
@@ -180,7 +182,7 @@ export const ContentDataEditor = ({ bundle, draft, onPatch }: ContentDataEditorP
             onClick={() => setActiveTab(tab)}
             type="button"
           >
-            {tab}
+            {t(`contribution.tab.${tab}`)}
           </button>
         ))}
       </div>
@@ -191,25 +193,26 @@ export const ContentDataEditor = ({ bundle, draft, onPatch }: ContentDataEditorP
             bundle={bundle}
             onEdgesChange={(edges) => onPatch({ edges })}
             onLocationsChange={(locations) => onPatch({ locations })}
+            t={t}
           />
 
           <div className="grid gap-1 rounded border border-slate-700 p-2">
             <div className="flex items-center justify-between gap-3">
-              <h3 className="text-sm font-semibold text-slate-100">Locations</h3>
+              <h3 className="text-sm font-semibold text-slate-100">{t('contribution.data.locations')}</h3>
               <button className="rounded bg-cyan-400 px-3 py-2 text-sm font-semibold text-slate-950" onClick={addLocation} type="button">
-                Add location
+                {t('contribution.data.addLocation')}
               </button>
             </div>
             <div className="hidden grid-cols-[1.2fr_7rem_7rem_1fr_5rem_6rem] gap-2 px-2 text-xs font-semibold uppercase tracking-wide text-slate-500 lg:grid">
-              <span>Id</span>
-              <span>X</span>
-              <span>Y</span>
-              <span>Tags</span>
-              <span>Start</span>
-              <span>Remove</span>
+              <span>{t('contribution.column.id')}</span>
+              <span>{t('contribution.column.x')}</span>
+              <span>{t('contribution.column.y')}</span>
+              <span>{t('contribution.column.tags')}</span>
+              <span>{t('contribution.column.start')}</span>
+              <span>{t('contribution.column.remove')}</span>
             </div>
             {draft.locations.length === 0 ? (
-              <p className="px-2 py-1 text-sm text-slate-500">No location changes.</p>
+              <p className="px-2 py-1 text-sm text-slate-500">{t('contribution.data.noLocationChanges')}</p>
             ) : (
               <div className="grid gap-1">
                 {draft.locations.map((location, index) => (
@@ -217,13 +220,13 @@ export const ContentDataEditor = ({ bundle, draft, onPatch }: ContentDataEditorP
                     <input aria-label="Location id" className="min-w-0 rounded bg-slate-900 px-2 py-1.5 text-sm" onChange={(event) => updateLocation(index, { id: toKebabInput(event.target.value) })} value={location.id} />
                     <input aria-label="Location x" className="min-w-0 rounded bg-slate-900 px-2 py-1.5 text-sm" onChange={(event) => updateLocation(index, { position: { ...location.position, x: Number(event.target.value) } })} type="number" value={Math.round(location.position.x)} />
                     <input aria-label="Location y" className="min-w-0 rounded bg-slate-900 px-2 py-1.5 text-sm" onChange={(event) => updateLocation(index, { position: { ...location.position, y: Number(event.target.value) } })} type="number" value={Math.round(location.position.y)} />
-                    <input aria-label="Location tags" className="min-w-0 rounded bg-slate-900 px-2 py-1.5 text-sm" onChange={(event) => updateLocation(index, { tags: event.target.value.split(',').map((tag) => tag.trim()).filter(Boolean) })} placeholder="tags" value={(location.tags ?? []).join(', ')} />
+                    <input aria-label="Location tags" className="min-w-0 rounded bg-slate-900 px-2 py-1.5 text-sm" onChange={(event) => updateLocation(index, { tags: event.target.value.split(',').map((tag) => tag.trim()).filter(Boolean) })} placeholder={t('contribution.placeholder.tags')} value={(location.tags ?? []).join(', ')} />
                     <label className="flex items-center gap-2 text-sm text-slate-300">
                       <input checked={Boolean(location.starting)} onChange={(event) => updateLocation(index, { starting: event.target.checked })} type="checkbox" />
-                      <span className="lg:hidden">Start</span>
+                      <span className="lg:hidden">{t('contribution.column.start')}</span>
                     </label>
                     <button className="rounded border border-rose-500 px-2 py-1.5 text-sm font-semibold text-rose-200" onClick={() => onPatch({ locations: removeAt(draft.locations, index) })} type="button">
-                      Remove
+                      {t('contribution.column.remove')}
                     </button>
                   </div>
                 ))}
@@ -233,20 +236,20 @@ export const ContentDataEditor = ({ bundle, draft, onPatch }: ContentDataEditorP
 
           <div className="grid gap-1 rounded border border-slate-700 p-2">
             <div className="flex items-center justify-between gap-3">
-              <h3 className="text-sm font-semibold text-slate-100">Edges</h3>
+              <h3 className="text-sm font-semibold text-slate-100">{t('contribution.data.edges')}</h3>
               <button className="rounded bg-cyan-400 px-3 py-2 text-sm font-semibold text-slate-950" onClick={addEdge} type="button">
-                Add edge
+                {t('contribution.data.addEdge')}
               </button>
             </div>
             <div className="hidden grid-cols-[1fr_1fr_1fr_8rem_6rem] gap-2 px-2 text-xs font-semibold uppercase tracking-wide text-slate-500 lg:grid">
-              <span>Id</span>
-              <span>Source</span>
-              <span>Target</span>
-              <span>Seconds</span>
-              <span>Remove</span>
+              <span>{t('contribution.column.id')}</span>
+              <span>{t('contribution.column.source')}</span>
+              <span>{t('contribution.column.target')}</span>
+              <span>{t('contribution.column.seconds')}</span>
+              <span>{t('contribution.column.remove')}</span>
             </div>
             {draft.edges.length === 0 ? (
-              <p className="px-2 py-1 text-sm text-slate-500">No edge changes.</p>
+              <p className="px-2 py-1 text-sm text-slate-500">{t('contribution.data.noEdgeChanges')}</p>
             ) : (
               <div className="grid gap-1">
                 {draft.edges.map((edge, index) => (
@@ -256,7 +259,7 @@ export const ContentDataEditor = ({ bundle, draft, onPatch }: ContentDataEditorP
                     <input aria-label="Edge target" className="min-w-0 rounded bg-slate-900 px-2 py-1.5 text-sm" list="content-location-ids" onChange={(event) => updateEdge(index, { target: toKebabInput(event.target.value) })} value={edge.target} />
                     <input aria-label="Edge duration" className="min-w-0 rounded bg-slate-900 px-2 py-1.5 text-sm" min="1" onChange={(event) => updateEdge(index, { travelTimeSeconds: Number(event.target.value) })} type="number" value={edge.travelTimeSeconds} />
                     <button className="rounded border border-rose-500 px-2 py-1.5 text-sm font-semibold text-rose-200" onClick={() => onPatch({ edges: removeAt(draft.edges, index) })} type="button">
-                      Remove
+                      {t('contribution.column.remove')}
                     </button>
                   </div>
                 ))}
@@ -269,19 +272,19 @@ export const ContentDataEditor = ({ bundle, draft, onPatch }: ContentDataEditorP
       {activeTab === 'actions' && (
         <section className="grid gap-1 rounded border border-slate-700 p-2">
           <div className="flex items-center justify-between gap-3">
-            <h3 className="text-sm font-semibold text-slate-100">Actions</h3>
+            <h3 className="text-sm font-semibold text-slate-100">{t('contribution.data.actions')}</h3>
             <button className="rounded bg-cyan-400 px-3 py-2 text-sm font-semibold text-slate-950" onClick={addAction} type="button">
-              Add action
+              {t('contribution.data.addAction')}
             </button>
           </div>
           <div className="hidden grid-cols-[1fr_1fr_8rem_6rem] gap-2 px-2 text-xs font-semibold uppercase tracking-wide text-slate-500 lg:grid">
-            <span>Id</span>
-            <span>Location</span>
-            <span>Seconds</span>
-            <span>Remove</span>
+            <span>{t('contribution.column.id')}</span>
+            <span>{t('contribution.column.location')}</span>
+            <span>{t('contribution.column.seconds')}</span>
+            <span>{t('contribution.column.remove')}</span>
           </div>
           {draft.actions.length === 0 ? (
-            <p className="px-2 py-1 text-sm text-slate-500">No action changes.</p>
+            <p className="px-2 py-1 text-sm text-slate-500">{t('contribution.data.noActionChanges')}</p>
           ) : (
             <div className="grid gap-1">
               {draft.actions.map((action, index) => {
@@ -314,25 +317,25 @@ export const ContentDataEditor = ({ bundle, draft, onPatch }: ContentDataEditorP
                         }}
                         type="button"
                       >
-                        Remove
+                        {t('contribution.column.remove')}
                       </button>
                     </div>
                     {selected && (
                       <div className="ml-3 grid gap-2 border-l border-slate-800 pl-3 pt-1 lg:grid-cols-[9rem_1fr_7rem_auto]">
                         <select className="rounded bg-slate-900 px-2 py-1.5 text-sm" onChange={(event) => updateRewardDraft(action.id, { kind: event.target.value as Reward['kind'], targetId: '' })} value={rewardDraft.kind}>
-                          <option value="skillXp">Skill XP</option>
-                          <option value="resource">Item</option>
+                          <option value="skillXp">{t('contribution.reward.skillXp')}</option>
+                          <option value="resource">{t('contribution.reward.item')}</option>
                         </select>
                         <input
                           className="min-w-0 rounded bg-slate-900 px-2 py-1.5 text-sm"
                           list={rewardDraft.kind === 'skillXp' ? 'content-skill-ids' : 'content-item-ids'}
                           onChange={(event) => updateRewardDraft(action.id, { targetId: toKebabInput(event.target.value) })}
-                          placeholder={rewardDraft.kind === 'skillXp' ? 'skill-id' : 'item-id'}
+                          placeholder={rewardDraft.kind === 'skillXp' ? t('contribution.placeholder.skillId') : t('contribution.placeholder.itemId')}
                           value={rewardDraft.targetId}
                         />
                         <input className="min-w-0 rounded bg-slate-900 px-2 py-1.5 text-sm" min="1" onChange={(event) => updateRewardDraft(action.id, { amount: event.target.value })} type="number" value={rewardDraft.amount} />
                         <button className="rounded border border-slate-600 px-2 py-1.5 text-sm font-semibold text-slate-100" onClick={() => addReward(index)} type="button">
-                          Add reward
+                          {t('contribution.reward.add')}
                         </button>
                       </div>
                     )}
@@ -356,18 +359,18 @@ export const ContentDataEditor = ({ bundle, draft, onPatch }: ContentDataEditorP
       {activeTab === 'skills' && (
         <section className="grid gap-1 rounded border border-slate-700 p-2">
           <div className="flex items-center justify-between gap-3">
-            <h3 className="text-sm font-semibold text-slate-100">Skills</h3>
+            <h3 className="text-sm font-semibold text-slate-100">{t('contribution.data.skills')}</h3>
             <button className="rounded bg-cyan-400 px-3 py-2 text-sm font-semibold text-slate-950" onClick={addSkill} type="button">
-              Add skill
+              {t('contribution.data.addSkill')}
             </button>
           </div>
           <div className="hidden grid-cols-[1fr_8rem_6rem] gap-2 px-2 text-xs font-semibold uppercase tracking-wide text-slate-500 lg:grid">
-            <span>Id</span>
-            <span>Max level</span>
-            <span>Remove</span>
+            <span>{t('contribution.column.id')}</span>
+            <span>{t('contribution.column.maxLevel')}</span>
+            <span>{t('contribution.column.remove')}</span>
           </div>
           {draft.skills.length === 0 ? (
-            <p className="px-2 py-1 text-sm text-slate-500">No skill changes.</p>
+            <p className="px-2 py-1 text-sm text-slate-500">{t('contribution.data.noSkillChanges')}</p>
           ) : (
             <div className="grid gap-1">
               {draft.skills.map((skill, index) => (
@@ -375,7 +378,7 @@ export const ContentDataEditor = ({ bundle, draft, onPatch }: ContentDataEditorP
                   <input aria-label="Skill id" className="min-w-0 rounded bg-slate-900 px-2 py-1.5 text-sm" onChange={(event) => updateSkill(index, { id: toKebabInput(event.target.value) })} value={skill.id} />
                   <input aria-label="Skill max level" className="min-w-0 rounded bg-slate-900 px-2 py-1.5 text-sm" min="1" onChange={(event) => updateSkill(index, { maxLevel: Number(event.target.value) })} type="number" value={skill.maxLevel} />
                   <button className="rounded border border-rose-500 px-2 py-1.5 text-sm font-semibold text-rose-200" onClick={() => onPatch({ skills: removeAt(draft.skills, index) })} type="button">
-                    Remove
+                    {t('contribution.column.remove')}
                   </button>
                 </div>
               ))}
@@ -387,24 +390,24 @@ export const ContentDataEditor = ({ bundle, draft, onPatch }: ContentDataEditorP
       {activeTab === 'items' && (
         <section className="grid gap-1 rounded border border-slate-700 p-2">
           <div className="flex items-center justify-between gap-3">
-            <h3 className="text-sm font-semibold text-slate-100">Items</h3>
+            <h3 className="text-sm font-semibold text-slate-100">{t('contribution.data.items')}</h3>
             <button className="rounded bg-cyan-400 px-3 py-2 text-sm font-semibold text-slate-950" onClick={addItem} type="button">
-              Add item
+              {t('contribution.data.addItem')}
             </button>
           </div>
           <div className="hidden grid-cols-[1fr_6rem] gap-2 px-2 text-xs font-semibold uppercase tracking-wide text-slate-500 lg:grid">
-            <span>Id</span>
-            <span>Remove</span>
+            <span>{t('contribution.column.id')}</span>
+            <span>{t('contribution.column.remove')}</span>
           </div>
           {draft.items.length === 0 ? (
-            <p className="px-2 py-1 text-sm text-slate-500">No item changes.</p>
+            <p className="px-2 py-1 text-sm text-slate-500">{t('contribution.data.noItemChanges')}</p>
           ) : (
             <div className="grid gap-1">
               {draft.items.map((item, index) => (
                 <div className="grid gap-2 rounded bg-slate-950 p-2 lg:grid-cols-[1fr_6rem]" key={`${item.id}-${index}`}>
                   <input aria-label="Item id" className="min-w-0 rounded bg-slate-900 px-2 py-1.5 text-sm" onChange={(event) => updateItem(index, { id: toKebabInput(event.target.value) })} value={item.id} />
                   <button className="rounded border border-rose-500 px-2 py-1.5 text-sm font-semibold text-rose-200" onClick={() => onPatch({ items: removeAt(draft.items, index) })} type="button">
-                    Remove
+                    {t('contribution.column.remove')}
                   </button>
                 </div>
               ))}
@@ -415,7 +418,7 @@ export const ContentDataEditor = ({ bundle, draft, onPatch }: ContentDataEditorP
 
       {activeTab === 'json' && (
         <section className="grid gap-2 rounded border border-slate-700 p-2">
-          <h3 className="text-sm font-semibold text-slate-100">JSON files</h3>
+          <h3 className="text-sm font-semibold text-slate-100">{t('contribution.data.jsonFiles')}</h3>
           {jsonFiles.map((file) => (
             <details className="rounded bg-slate-950 p-2" key={file.path}>
               <summary className="cursor-pointer text-sm font-semibold text-slate-100">{file.path}</summary>
@@ -443,3 +446,4 @@ export const ContentDataEditor = ({ bundle, draft, onPatch }: ContentDataEditorP
     </section>
   );
 };
+

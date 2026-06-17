@@ -100,6 +100,7 @@ export type ValidationIssue = {
   severity: ValidationSeverity;
   path: string;
   message: string;
+  params?: Record<string, string | number>;
 };
 
 export type ActiveAction = {
@@ -144,6 +145,7 @@ export type ContributionPackage = {
   targetUniverseId: string;
   validationIssues: ValidationIssue[];
   notes: string;
+  t?: (key: string, fallbackOrParams?: string | Record<string, string | number>, params?: Record<string, string | number>) => string;
   changedFiles: {
     path: string;
     json: unknown;

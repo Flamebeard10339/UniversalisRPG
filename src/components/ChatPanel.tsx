@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import type { Translator } from '../game/i18n';
 
 type ChatMessage = {
   id: number;
@@ -8,15 +9,16 @@ type ChatMessage = {
 
 type ChatPanelProps = {
   locationName: string;
+  t: Translator;
 };
 
-export const ChatPanel = ({ locationName }: ChatPanelProps) => {
+export const ChatPanel = ({ locationName, t }: ChatPanelProps) => {
   const [draft, setDraft] = useState('');
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: 1,
       author: 'system',
-      text: `You settle in at ${locationName}.`,
+      text: t('chat.systemGreeting', { location: locationName }),
     },
   ]);
 
@@ -41,7 +43,7 @@ export const ChatPanel = ({ locationName }: ChatPanelProps) => {
   return (
     <section className="grid min-h-0 flex-1 grid-rows-[auto_1fr_auto] gap-3 rounded border border-slate-800 bg-slate-900 p-4">
       <div>
-        <h2 className="text-base font-semibold text-slate-100">Chat</h2>
+        <h2 className="text-base font-semibold text-slate-100">{t('chat.title')}</h2>
         <p className="text-sm text-slate-400">{locationName}</p>
       </div>
 
@@ -70,11 +72,11 @@ export const ChatPanel = ({ locationName }: ChatPanelProps) => {
         <input
           className="min-w-0 flex-1 rounded border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100"
           onChange={(event) => setDraft(event.target.value)}
-          placeholder="Say something..."
+          placeholder={t('chat.placeholder', { location: locationName })}
           value={draft}
         />
         <button className="rounded bg-cyan-400 px-4 py-2 text-sm font-semibold text-slate-950" type="submit">
-          Send
+          {t('chat.send')}
         </button>
       </form>
     </section>

@@ -16,6 +16,7 @@ export type LocalePreference = 'system' | string;
 type UniverseStateStore = {
   activeUniverseId: string;
   manifests: UniverseManifest[];
+  guiLocales: Record<string, Record<string, string>>;
   baseBundle: ContentBundle | null;
   bundle: ContentBundle | null;
   validationIssues: ValidationIssue[];
@@ -28,10 +29,24 @@ type UniverseStateStore = {
   importLocalUniverse: (bundle: ContentBundle) => Promise<void>;
   removeLocalUniverse: (universeId: string) => Promise<void>;
   refreshContributionPreview: () => void;
-  t: (key: string, fallback?: string) => string;
+  t: (key: string, fallbackOrParams?: string | Record<string, string | number>, params?: Record<string, string | number>) => string;
 };
 
 const localePreferenceKey = 'universalis:settings:locale';
+const GUI_LOCALE_PATH = '/content/gui/locales';
+
+const loadGuiLocale = async (locale: string) => {
+  const response = await fetch(`${GUI_LOCALE_PATH}/${locale}.json`);
+  if (!response.ok) {
+    throw new Error(`gui-locale:${locale}`);
+  }
+  return response.json() as Promise<Record<string, string>>;
+};
+
+const formatText = (value: string, params?: Record<string, string | number>) =>
+  params
+    ? value.replace(/\{([^}]+)\}/g, (match, key) => String(params[key] ?? match))
+    : value;
 
 const resolveLocale = (bundle: ContentBundle, preference: LocalePreference) => {
   if (preference !== 'system' && bundle.manifest.locales.includes(preference)) {
@@ -62,6 +77,7 @@ const applyDraft = (bundle: ContentBundle | null) => {
 export const useUniverseState = create<UniverseStateStore>((set, get) => ({
   activeUniverseId: 'base',
   manifests: [],
+  guiLocales: {},
   baseBundle: null,
   bundle: null,
   validationIssues: [],
@@ -73,10 +89,11 @@ export const useUniverseState = create<UniverseStateStore>((set, get) => ({
     set({ loading: true, error: null });
 
     try {
-      const [bundledManifests, localLibrary, savedLocalePreference] = await Promise.all([
+      const [bundledManifests, localLibrary, savedLocalePreference, guiEn] = await Promise.all([
         listBundledUniverses(),
         loadLocalUniverseLibrary(),
         load<LocalePreference>(localePreferenceKey),
+        loadGuiLocale('en'),
       ]);
       const manifests = [...bundledManifests, ...Object.values(localLibrary).map((bundle) => bundle.manifest)];
       const activeUniverseId = get().activeUniverseId;
@@ -85,6 +102,7 @@ export const useUniverseState = create<UniverseStateStore>((set, get) => ({
       const preview = applyDraft(baseBundle);
       set({
         manifests,
+        guiLocales: { en: guiEn },
         activeUniverseId,
         baseBundle,
         localePreference: savedLocalePreference ?? 'system',
@@ -93,7 +111,7 @@ export const useUniverseState = create<UniverseStateStore>((set, get) => ({
       });
     } catch (error) {
       set({
-        error: error instanceof Error ? error.message : 'Unable to load universe.',
+        error: error instanceof Error ? error.message : 'error.universeLoadFailed',
         loading: false,
       });
     }
@@ -114,7 +132,7 @@ export const useUniverseState = create<UniverseStateStore>((set, get) => ({
       });
     } catch (error) {
       set({
-        error: error instanceof Error ? error.message : 'Unable to load universe.',
+        error: error instanceof Error ? error.message : 'error.universeLoadFailed',
         loading: false,
       });
     }
@@ -130,7 +148,7 @@ export const useUniverseState = create<UniverseStateStore>((set, get) => ({
     const hasErrors = validationIssues.some((issue) => issue.severity === 'error');
 
     if (hasErrors) {
-      set({ validationIssues, error: 'Imported universe has validation errors.' });
+      set({ validationIssues, error: 'error.importedUniverseInvalid' });
       return;
     }
 
@@ -165,9 +183,13 @@ export const useUniverseState = create<UniverseStateStore>((set, get) => ({
     set(preview);
   },
 
-  t: (key, fallback) => {
+  t: (key, fallbackOrParams, params) => {
     const bundle = get().bundle;
     const locale = bundle ? resolveLocale(bundle, get().localePreference) : 'en';
-    return bundle?.locales[locale]?.[key] ?? fallback ?? key;
+    const fallback = typeof fallbackOrParams === 'string' ? fallbackOrParams : undefined;
+    const interpolation = typeof fallbackOrParams === 'object' ? fallbackOrParams : params;
+    const guiLocales = get().guiLocales;
+    const value = bundle?.locales[locale]?.[key] ?? guiLocales[locale]?.[key] ?? guiLocales.en?.[key] ?? fallback ?? key;
+    return formatText(value, interpolation);
   },
 }));

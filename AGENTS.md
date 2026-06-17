@@ -13,8 +13,11 @@ Android via Capacitor, and open source community content contributions.
 ## Content Rules
 
 - Do not hard-code game content in TypeScript.
+- Never hard-code English UI strings in the codebase. Use localization ids in
+  code and put display text in JSON localization files, including GUI text.
 - Locations, edges, actions, skills, and localizations live under
   `public/content/universes/*`.
+- Shared app/UI localization lives under `public/content/gui/locales/`.
 - Add or update schemas in `src/game/schema/` when changing JSON shape.
 - Keep saves and contribution drafts isolated by universe id.
 

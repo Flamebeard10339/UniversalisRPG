@@ -1,5 +1,6 @@
 import type { ActiveTravel, ContentBundle } from '../game/types';
 import { locationDescriptionKey, locationTitleKey } from '../game/contentIds';
+import type { Translator } from '../game/i18n';
 import { useNow } from '../hooks/useNow';
 
 type TravelStatusProps = {
@@ -8,7 +9,7 @@ type TravelStatusProps = {
   currentLocationId: string;
   onCancel?: () => void;
   titleWhenIdle?: boolean;
-  t: (key: string, fallback?: string) => string;
+  t: Translator;
 };
 
 const formatRemainingTime = (milliseconds: number) => {
@@ -57,12 +58,14 @@ export const TravelStatus = ({
     <section className="grid gap-3 rounded border border-cyan-900 bg-slate-900 p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="text-base font-semibold text-cyan-100">Travelling...</h2>
+          <h2 className="text-base font-semibold text-cyan-100">{t('travelStatus.title')}</h2>
           <p className="text-sm text-slate-300">
-            {fromLocation ? t(fromLocation.titleKey ?? locationTitleKey(fromLocation.id)) : activeTravel.fromLocationId} to{' '}
-            {toLocation ? t(toLocation.titleKey ?? locationTitleKey(toLocation.id)) : activeTravel.toLocationId}
+            {t('travelStatus.to', {
+              from: fromLocation ? t(fromLocation.titleKey ?? locationTitleKey(fromLocation.id)) : activeTravel.fromLocationId,
+              to: toLocation ? t(toLocation.titleKey ?? locationTitleKey(toLocation.id)) : activeTravel.toLocationId,
+            })}
           </p>
-          <p className="mt-1 text-xs text-cyan-200">{remainingTime} remaining</p>
+          <p className="mt-1 text-xs text-cyan-200">{t('travelStatus.arrival', { seconds: remainingTime })}</p>
         </div>
         {onCancel && (
           <button
@@ -70,7 +73,7 @@ export const TravelStatus = ({
             onClick={onCancel}
             type="button"
           >
-            Cancel travel
+            {t('travelStatus.cancel')}
           </button>
         )}
       </div>

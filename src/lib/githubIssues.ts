@@ -5,25 +5,27 @@ const REPOSITORY_URL = 'https://github.com/Flamebeard10339/UniversalisRPG';
 export const createContributionPackage = (pack: ContributionPackage) => pack;
 
 export const formatContributionIssueBody = (pack: ContributionPackage) => {
+  const t = pack.t ?? ((key: string, fallbackOrParams?: string | Record<string, string | number>) =>
+    typeof fallbackOrParams === 'string' ? fallbackOrParams : key);
   const validationSummary =
     pack.validationIssues.length === 0
-      ? 'No validation issues.'
-      : pack.validationIssues.map((issue) => `- ${issue.severity}: ${issue.path} - ${issue.message}`).join('\n');
+      ? t('github.noValidationIssues')
+      : pack.validationIssues.map((issue) => `- ${issue.severity}: ${issue.path} - ${t(issue.message, issue.params)}`).join('\n');
 
   return [
-    `## Target universe`,
+    `## ${t('github.targetUniverse')}`,
     pack.targetUniverseId,
     '',
-    '## Notes',
-    pack.notes.trim() || 'No contributor notes provided.',
+    `## ${t('github.notes')}`,
+    pack.notes.trim() || t('github.noContributorNotes'),
     '',
-    '## Validation',
+    `## ${t('github.validation')}`,
     validationSummary,
     '',
-    '## App version',
+    `## ${t('github.appVersion')}`,
     pack.appVersion,
     '',
-    '## Changed JSON',
+    `## ${t('github.changedJson')}`,
     '```json',
     JSON.stringify(pack.changedFiles, null, 2),
     '```',
@@ -31,8 +33,10 @@ export const formatContributionIssueBody = (pack: ContributionPackage) => {
 };
 
 export const createPrefilledIssueUrl = (pack: ContributionPackage) => {
+  const t = pack.t ?? ((key: string, fallbackOrParams?: string | Record<string, string | number>) =>
+    typeof fallbackOrParams === 'string' ? fallbackOrParams : key);
   const params = new URLSearchParams({
-    title: `[Content]: ${pack.targetUniverseId} contribution`,
+    title: t('github.issueTitle', { universe: pack.targetUniverseId }),
     labels: 'content,community',
     body: formatContributionIssueBody(pack),
   });
