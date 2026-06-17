@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import type { GameAction, TravelEdgeDefinition, UniversePlayState } from '../game/types';
 import { createInitialPlayState, normalizePlayState, resolveDueTimers, startAction, startTravel } from '../game/timers';
-import { load, save } from '../lib/storage';
+import { load, remove, save } from '../lib/storage';
 
 type GameStateStore = {
   states: Record<string, UniversePlayState>;
@@ -12,6 +12,8 @@ type GameStateStore = {
   cancelTravel: (universeId: string) => void;
   startAction: (universeId: string, action: GameAction) => void;
   resolveDue: (universeId: string, actions: GameAction[]) => void;
+  importUniverseState: (playState: UniversePlayState) => Promise<void>;
+  resetUniverse: (universeId: string, startingLocationId: string) => Promise<void>;
 };
 
 const storageKey = (universeId: string) => `universalis:play:${universeId}`;
@@ -149,5 +151,27 @@ export const useGameState = create<GameStateStore>((set, get) => ({
         },
       };
     });
+  },
+
+  importUniverseState: async (playState) => {
+    await save(storageKey(playState.universeId), playState);
+    set((state) => ({
+      states: {
+        ...state.states,
+        [playState.universeId]: playState,
+      },
+    }));
+  },
+
+  resetUniverse: async (universeId, startingLocationId) => {
+    const next = createInitialPlayState(universeId, startingLocationId);
+    await remove(storageKey(universeId));
+    await save(storageKey(universeId), next);
+    set((state) => ({
+      states: {
+        ...state.states,
+        [universeId]: next,
+      },
+    }));
   },
 }));

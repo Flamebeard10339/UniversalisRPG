@@ -8,7 +8,10 @@ import {
   saveLocalUniverseBundle,
 } from '../game/loader';
 import { mergeDraftIntoBundle, validateContentBundle } from '../game/validators';
+import { load, save } from '../lib/storage';
 import { useContributionState } from './contributionState';
+
+export type LocalePreference = 'system' | string;
 
 type UniverseStateStore = {
   activeUniverseId: string;
@@ -16,14 +19,27 @@ type UniverseStateStore = {
   baseBundle: ContentBundle | null;
   bundle: ContentBundle | null;
   validationIssues: ValidationIssue[];
+  localePreference: LocalePreference;
   loading: boolean;
   error: string | null;
   initialize: () => Promise<void>;
   setActiveUniverse: (universeId: string) => Promise<void>;
+  setLocalePreference: (locale: LocalePreference) => Promise<void>;
   importLocalUniverse: (bundle: ContentBundle) => Promise<void>;
   removeLocalUniverse: (universeId: string) => Promise<void>;
   refreshContributionPreview: () => void;
   t: (key: string, fallback?: string) => string;
+};
+
+const localePreferenceKey = 'universalis:settings:locale';
+
+const resolveLocale = (bundle: ContentBundle, preference: LocalePreference) => {
+  if (preference !== 'system' && bundle.manifest.locales.includes(preference)) {
+    return preference;
+  }
+
+  const systemLocale = navigator.language.split('-')[0];
+  return bundle.manifest.locales.includes(systemLocale) ? systemLocale : bundle.manifest.locales[0] ?? 'en';
 };
 
 const applyDraft = (bundle: ContentBundle | null) => {
@@ -49,6 +65,7 @@ export const useUniverseState = create<UniverseStateStore>((set, get) => ({
   baseBundle: null,
   bundle: null,
   validationIssues: [],
+  localePreference: 'system',
   loading: false,
   error: null,
 
@@ -56,9 +73,10 @@ export const useUniverseState = create<UniverseStateStore>((set, get) => ({
     set({ loading: true, error: null });
 
     try {
-      const [bundledManifests, localLibrary] = await Promise.all([
+      const [bundledManifests, localLibrary, savedLocalePreference] = await Promise.all([
         listBundledUniverses(),
         loadLocalUniverseLibrary(),
+        load<LocalePreference>(localePreferenceKey),
       ]);
       const manifests = [...bundledManifests, ...Object.values(localLibrary).map((bundle) => bundle.manifest)];
       const activeUniverseId = get().activeUniverseId;
@@ -69,6 +87,7 @@ export const useUniverseState = create<UniverseStateStore>((set, get) => ({
         manifests,
         activeUniverseId,
         baseBundle,
+        localePreference: savedLocalePreference ?? 'system',
         ...preview,
         loading: false,
       });
@@ -99,6 +118,11 @@ export const useUniverseState = create<UniverseStateStore>((set, get) => ({
         loading: false,
       });
     }
+  },
+
+  setLocalePreference: async (locale) => {
+    await save(localePreferenceKey, locale);
+    set({ localePreference: locale });
   },
 
   importLocalUniverse: async (bundle) => {
@@ -143,7 +167,7 @@ export const useUniverseState = create<UniverseStateStore>((set, get) => ({
 
   t: (key, fallback) => {
     const bundle = get().bundle;
-    const locale = bundle?.manifest.locales[0] ?? 'en';
+    const locale = bundle ? resolveLocale(bundle, get().localePreference) : 'en';
     return bundle?.locales[locale]?.[key] ?? fallback ?? key;
   },
 }));
