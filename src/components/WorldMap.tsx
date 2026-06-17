@@ -67,9 +67,9 @@ export const WorldMap = ({ bundle, playState, onTravel, t }: WorldMapProps) => {
       edges={edges}
       edgeTypes={edgeTypes}
       fitView
-      nodesDraggable={false}
+      nodesDraggable
       nodesConnectable={false}
-      elementsSelectable={false}
+      elementsSelectable
       proOptions={{ hideAttribution: true }}
     >
       <Background color="#334155" gap={24} />
