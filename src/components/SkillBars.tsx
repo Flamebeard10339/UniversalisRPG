@@ -1,5 +1,5 @@
 import type { ContentBundle, UniversePlayState } from '../game/types';
-import { skillLevelFromXp } from '../game/tick';
+import { skillLevelFromXp } from '../game/timers';
 
 type SkillBarsProps = {
   bundle: ContentBundle;

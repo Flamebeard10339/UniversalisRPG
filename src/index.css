@@ -27,3 +27,7 @@ textarea {
 .react-flow__node {
   border-radius: 8px;
 }
+
+.react-flow__handle {
+  display: none;
+}

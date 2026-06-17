@@ -1,27 +1,27 @@
-import { BaseEdge, EdgeLabelRenderer, type EdgeProps, getBezierPath } from 'reactflow';
+import { BaseEdge, type EdgeProps, getStraightPath } from 'reactflow';
 
 type TravelEdgeData = {
-  label: string;
+  active: boolean;
+  progress: number;
+  sourcePoint: { x: number; y: number };
+  targetPoint: { x: number; y: number };
 };
 
 export const TravelEdge = ({
   id,
-  sourceX,
-  sourceY,
-  targetX,
-  targetY,
-  sourcePosition,
-  targetPosition,
   markerEnd,
   data,
 }: EdgeProps<TravelEdgeData>) => {
-  const [edgePath, labelX, labelY] = getBezierPath({
-    sourceX,
-    sourceY,
-    sourcePosition,
-    targetX,
-    targetY,
-    targetPosition,
+  const sourcePoint = data?.sourcePoint ?? { x: 0, y: 0 };
+  const targetPoint = data?.targetPoint ?? { x: 0, y: 0 };
+  const progress = data?.progress ?? 0;
+  const dotX = sourcePoint.x + (targetPoint.x - sourcePoint.x) * progress;
+  const dotY = sourcePoint.y + (targetPoint.y - sourcePoint.y) * progress;
+  const [edgePath] = getStraightPath({
+    sourceX: sourcePoint.x,
+    sourceY: sourcePoint.y,
+    targetX: targetPoint.x,
+    targetY: targetPoint.y,
   });
 
   return (
@@ -30,21 +30,11 @@ export const TravelEdge = ({
         id={id}
         path={edgePath}
         markerEnd={markerEnd}
-        style={{ stroke: '#64748b', strokeWidth: 2 }}
+        style={{ stroke: data?.active ? '#67e8f9' : '#64748b', strokeWidth: data?.active ? 3 : 2 }}
       />
-      <circle r="4" className="fill-cyan-300">
-        <animateMotion dur="2.8s" repeatCount="indefinite" path={edgePath} />
-      </circle>
-      <EdgeLabelRenderer>
-        <div
-          className="pointer-events-none absolute rounded bg-slate-950/85 px-2 py-1 text-xs text-slate-200 shadow"
-          style={{
-            transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`,
-          }}
-        >
-          {data?.label}
-        </div>
-      </EdgeLabelRenderer>
+      {data?.active && (
+        <circle cx={dotX} cy={dotY} r="5" className="fill-cyan-200 drop-shadow" />
+      )}
     </>
   );
 };

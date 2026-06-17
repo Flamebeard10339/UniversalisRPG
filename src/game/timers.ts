@@ -1,13 +1,25 @@
-import type { GameAction, UniversePlayState } from './types';
+import type { GameAction, TravelEdgeDefinition, UniversePlayState } from './types';
 
 export const createInitialPlayState = (universeId: string, startingLocationId: string): UniversePlayState => ({
   universeId,
   currentLocationId: startingLocationId,
   discoveredLocationIds: [startingLocationId],
   activeAction: null,
+  activeTravel: null,
   resources: {},
   skillXp: {},
   lastTickAt: Date.now(),
+});
+
+export const normalizePlayState = (
+  state: UniversePlayState,
+  universeId: string,
+  startingLocationId: string,
+): UniversePlayState => ({
+  ...createInitialPlayState(universeId, startingLocationId),
+  ...state,
+  activeAction: state.activeAction ?? null,
+  activeTravel: state.activeTravel ?? null,
 });
 
 export const startAction = (
@@ -21,6 +33,24 @@ export const startAction = (
     startedAt: now,
     completesAt: now + action.durationSeconds * 1000,
   },
+  lastTickAt: now,
+});
+
+export const startTravel = (
+  state: UniversePlayState,
+  edge: TravelEdgeDefinition,
+  destinationLocationId: string,
+  now = Date.now(),
+): UniversePlayState => ({
+  ...state,
+  activeTravel: {
+    edgeId: edge.id,
+    fromLocationId: state.currentLocationId,
+    toLocationId: destinationLocationId,
+    startedAt: now,
+    completesAt: now + edge.travelTimeSeconds * 1000,
+  },
+  activeAction: null,
   lastTickAt: now,
 });
 
@@ -50,11 +80,26 @@ export const completeAction = (
   };
 };
 
-export const advanceTick = (
+export const resolveDueTimers = (
   state: UniversePlayState,
   actions: GameAction[],
   now = Date.now(),
 ): UniversePlayState => {
+  if (state.activeTravel && state.activeTravel.completesAt <= now) {
+    const destinationLocationId = state.activeTravel.toLocationId;
+    const discoveredLocationIds = state.discoveredLocationIds.includes(destinationLocationId)
+      ? state.discoveredLocationIds
+      : [...state.discoveredLocationIds, destinationLocationId];
+
+    return {
+      ...state,
+      currentLocationId: destinationLocationId,
+      discoveredLocationIds,
+      activeTravel: null,
+      lastTickAt: now,
+    };
+  }
+
   if (!state.activeAction || state.activeAction.completesAt > now) {
     return {
       ...state,

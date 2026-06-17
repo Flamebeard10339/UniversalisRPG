@@ -101,11 +101,20 @@ export type ActiveAction = {
   completesAt: number;
 };
 
+export type ActiveTravel = {
+  edgeId: string;
+  fromLocationId: string;
+  toLocationId: string;
+  startedAt: number;
+  completesAt: number;
+};
+
 export type UniversePlayState = {
   universeId: string;
   currentLocationId: string;
   discoveredLocationIds: string[];
   activeAction: ActiveAction | null;
+  activeTravel: ActiveTravel | null;
   resources: Record<string, number>;
   skillXp: Record<string, number>;
   lastTickAt: number;

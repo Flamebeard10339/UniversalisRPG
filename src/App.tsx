@@ -3,7 +3,9 @@ import { ActionPanel } from './components/ActionPanel';
 import { ChatPanel } from './components/ChatPanel';
 import { ContributionMode } from './components/contribution/ContributionMode';
 import { SkillBars } from './components/SkillBars';
+import { TravelStatus } from './components/TravelStatus';
 import { WorldMap } from './components/WorldMap';
+import { useDebugState } from './stores/debugState';
 import { useGameState } from './stores/gameState';
 import { useUniverseState } from './stores/universeState';
 
@@ -31,17 +33,67 @@ export default function App() {
   } = useUniverseState();
   const hydratePlayState = useGameState((state) => state.hydrate);
   const getUniverseState = useGameState((state) => state.getUniverseState);
-  const setCurrentLocation = useGameState((state) => state.setCurrentLocation);
+  const gameStates = useGameState((state) => state.states);
+  const travelTo = useGameState((state) => state.travelTo);
+  const cancelTravel = useGameState((state) => state.cancelTravel);
   const startAction = useGameState((state) => state.startAction);
-  const tick = useGameState((state) => state.tick);
+  const resolveDue = useGameState((state) => state.resolveDue);
+  const debugEnabled = useDebugState((state) => state.enabled);
+  const debugEntries = useDebugState((state) => state.entries);
+  const hydrateDebug = useDebugState((state) => state.hydrate);
+  const setDebugEnabled = useDebugState((state) => state.setEnabled);
+  const logAction = useDebugState((state) => state.logAction);
+  const clearDebugLog = useDebugState((state) => state.clear);
 
   useEffect(() => {
     void initialize();
-  }, [initialize]);
+    void hydrateDebug();
+  }, [hydrateDebug, initialize]);
 
   const startingLocationId = useMemo(() => (bundle ? getStartingLocationId(bundle) : ''), [bundle]);
-  const playState = bundle ? getUniverseState(bundle.manifest.id, startingLocationId) : null;
+  const playState = bundle ? gameStates[bundle.manifest.id] ?? getUniverseState(bundle.manifest.id, startingLocationId) : null;
   const currentLocation = bundle?.locations.find((location) => location.id === playState?.currentLocationId);
+  const beginTravel = (locationId: string) => {
+    logAction('map.nodeClick', {
+      locationId,
+      currentLocationId: playState?.currentLocationId,
+      activeTravel: Boolean(playState?.activeTravel),
+    });
+
+    if (!bundle || !playState || playState.activeTravel || locationId === playState.currentLocationId) {
+      return;
+    }
+
+    const edge = bundle.edges.find(
+      (candidate) =>
+        (candidate.source === playState.currentLocationId && candidate.target === locationId) ||
+        (candidate.target === playState.currentLocationId && candidate.source === locationId),
+    );
+
+    if (edge) {
+      logAction('travel.start', {
+        edgeId: edge.id,
+        fromLocationId: playState.currentLocationId,
+        toLocationId: locationId,
+      });
+      travelTo(bundle.manifest.id, edge, locationId);
+    } else {
+      logAction('travel.noEdge', {
+        fromLocationId: playState.currentLocationId,
+        toLocationId: locationId,
+      });
+    }
+  };
+
+  const setTab = (tab: AppTab) => {
+    logAction('navigation.tab', { tab });
+    setActiveTab(tab);
+  };
+
+  const setCharacterTopTab = (tab: CharacterTab) => {
+    logAction('navigation.characterTab', { tab });
+    setCharacterTab(tab);
+  };
 
   useEffect(() => {
     if (bundle && startingLocationId) {
@@ -50,13 +102,24 @@ export default function App() {
   }, [bundle, hydratePlayState, startingLocationId]);
 
   useEffect(() => {
-    if (!bundle) {
+    if (!bundle || !playState) {
       return undefined;
     }
 
-    const interval = window.setInterval(() => tick(bundle.manifest.id, bundle.actions), 1000);
-    return () => window.clearInterval(interval);
-  }, [bundle, tick]);
+    const nextCompletionAt = [playState.activeTravel?.completesAt, playState.activeAction?.completesAt]
+      .filter((time): time is number => typeof time === 'number')
+      .sort((a, b) => a - b)[0];
+
+    if (!nextCompletionAt) {
+      return undefined;
+    }
+
+    const timeout = window.setTimeout(
+      () => resolveDue(bundle.manifest.id, bundle.actions),
+      Math.max(0, nextCompletionAt - Date.now()),
+    );
+    return () => window.clearTimeout(timeout);
+  }, [bundle, playState, resolveDue]);
 
   if (loading && !bundle) {
     return <main className="grid min-h-screen place-items-center bg-slate-950 text-slate-100">Loading universe...</main>;
@@ -86,27 +149,50 @@ export default function App() {
 
       <div className="mx-auto max-w-7xl px-4 py-4">
         {activeTab === 'map' && (
-        <section className="h-[calc(100vh-150px)] min-h-[480px] overflow-hidden rounded border border-slate-800 bg-slate-900">
-          <WorldMap
-            bundle={bundle}
-            onTravel={(locationId) => setCurrentLocation(bundle.manifest.id, locationId)}
-            playState={playState}
-            t={t}
-          />
-        </section>
+          <section className="grid h-[calc(100vh-150px)] min-h-[560px] grid-rows-[auto_1fr] gap-4">
+            <TravelStatus
+              activeTravel={playState.activeTravel}
+              bundle={bundle}
+              currentLocationId={playState.currentLocationId}
+              onCancel={() => {
+                logAction('travel.cancel', { universeId: bundle.manifest.id });
+                cancelTravel(bundle.manifest.id);
+              }}
+              titleWhenIdle
+              t={t}
+            />
+            <section className="min-h-0 overflow-hidden rounded border border-slate-800 bg-slate-900">
+              <WorldMap
+                bundle={bundle}
+                onTravel={beginTravel}
+                playState={playState}
+                t={t}
+              />
+            </section>
+          </section>
         )}
 
         {activeTab === 'home' && (
           <section className="grid h-[calc(100vh-150px)] min-h-[560px] gap-4">
-            <section className="rounded border border-slate-800 bg-slate-900 p-4">
-              <h2 className="text-lg font-semibold">{t(currentLocation.titleKey)}</h2>
-              <p className="mt-1 text-sm text-slate-400">{t(currentLocation.descriptionKey)}</p>
-            </section>
+            <TravelStatus
+              activeTravel={playState.activeTravel}
+              bundle={bundle}
+              currentLocationId={playState.currentLocationId}
+              titleWhenIdle
+              t={t}
+            />
 
             <section className="rounded border border-slate-800 bg-slate-900 p-4">
           <ActionPanel
             bundle={bundle}
-            onStartAction={(action) => startAction(bundle.manifest.id, action)}
+            onStartAction={(action) => {
+              logAction('action.start', {
+                actionId: action.id,
+                locationId: action.locationId,
+                universeId: bundle.manifest.id,
+              });
+              startAction(bundle.manifest.id, action);
+            }}
             playState={playState}
             t={t}
           />
@@ -125,7 +211,7 @@ export default function App() {
                     characterTab === tab ? 'bg-cyan-300 text-slate-950' : 'bg-slate-950 text-slate-300'
                   }`}
                   key={tab}
-                  onClick={() => setCharacterTab(tab)}
+                  onClick={() => setCharacterTopTab(tab)}
                   type="button"
                 >
                   {tab}
@@ -172,7 +258,23 @@ export default function App() {
                 <input
                   checked={contributionMode}
                   className="h-5 w-5"
-                  onChange={(event) => setContributionMode(event.target.checked)}
+                  onChange={(event) => {
+                    logAction('settings.contributionMode', { enabled: event.target.checked });
+                    setContributionMode(event.target.checked);
+                  }}
+                  type="checkbox"
+                />
+              </label>
+
+              <label className="flex items-center justify-between gap-4 rounded border border-slate-800 bg-slate-950 p-3">
+                <span>
+                  <span className="block text-sm font-semibold text-slate-100">Debug mode</span>
+                  <span className="block text-xs text-slate-400">Log user actions for troubleshooting.</span>
+                </span>
+                <input
+                  checked={debugEnabled}
+                  className="h-5 w-5"
+                  onChange={(event) => setDebugEnabled(event.target.checked)}
                   type="checkbox"
                 />
               </label>
@@ -186,7 +288,10 @@ export default function App() {
                 <span className="text-sm font-semibold text-slate-100">Universe</span>
                 <select
                   className="rounded border border-slate-700 bg-slate-900 px-3 py-2 text-sm"
-                  onChange={(event) => void setActiveUniverse(event.target.value)}
+                  onChange={(event) => {
+                    logAction('settings.universe', { universeId: event.target.value });
+                    void setActiveUniverse(event.target.value);
+                  }}
                   value={activeUniverseId}
                 >
                   {manifests.map((manifest) => (
@@ -197,6 +302,40 @@ export default function App() {
                 </select>
               </label>
             </section>
+
+            {debugEnabled && (
+              <section className="grid gap-3 rounded border border-slate-800 bg-slate-900 p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <h2 className="text-base font-semibold text-slate-100">Debug log</h2>
+                  <button
+                    className="rounded border border-slate-600 px-3 py-2 text-sm font-semibold text-slate-100"
+                    onClick={clearDebugLog}
+                    type="button"
+                  >
+                    Clear
+                  </button>
+                </div>
+                {debugEntries.length === 0 ? (
+                  <p className="text-sm text-slate-500">No actions logged yet.</p>
+                ) : (
+                  <ol className="grid max-h-80 gap-2 overflow-auto text-xs">
+                    {debugEntries.map((entry) => (
+                      <li className="rounded bg-slate-950 p-3" key={entry.id}>
+                        <div className="flex flex-wrap justify-between gap-2 text-slate-300">
+                          <span className="font-semibold text-cyan-200">{entry.action}</span>
+                          <time>{new Date(entry.timestamp).toLocaleTimeString()}</time>
+                        </div>
+                        {entry.details && (
+                          <pre className="mt-2 overflow-auto text-slate-400">
+                            {JSON.stringify(entry.details, null, 2)}
+                          </pre>
+                        )}
+                      </li>
+                    ))}
+                  </ol>
+                )}
+              </section>
+            )}
 
             {contributionMode && <ContributionMode bundle={bundle} validationIssues={validationIssues} />}
           </section>
@@ -211,7 +350,7 @@ export default function App() {
                 activeTab === tab ? 'bg-cyan-300 text-slate-950' : 'bg-slate-900 text-slate-300'
               }`}
               key={tab}
-              onClick={() => setActiveTab(tab)}
+              onClick={() => setTab(tab)}
               type="button"
             >
               {tab}
