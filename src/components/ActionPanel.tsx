@@ -1,4 +1,5 @@
 import type { ContentBundle, GameAction, UniversePlayState } from '../game/types';
+import { actionDescriptionKey, actionTitleKey } from '../game/contentIds';
 import { useNow } from '../hooks/useNow';
 
 type ActionPanelProps = {
@@ -25,7 +26,7 @@ export const ActionPanel = ({ bundle, playState, onStartAction, t }: ActionPanel
           {isTravelling
             ? 'Travelling. Actions will be available when you arrive.'
             : activeAction
-              ? `Working on ${t(activeAction.titleKey)}.`
+              ? `Working on ${t(activeAction.titleKey ?? actionTitleKey(activeAction.id))}.`
               : 'Choose what to work on here.'}
         </p>
       </div>
@@ -45,8 +46,8 @@ export const ActionPanel = ({ bundle, playState, onStartAction, t }: ActionPanel
             onClick={() => onStartAction(action)}
             type="button"
           >
-            <span className="block text-sm font-semibold text-slate-100">{t(action.titleKey)}</span>
-            <span className="mt-1 block text-xs text-slate-400">{t(action.descriptionKey)}</span>
+            <span className="block text-sm font-semibold text-slate-100">{t(action.titleKey ?? actionTitleKey(action.id))}</span>
+            <span className="mt-1 block text-xs text-slate-400">{t(action.descriptionKey ?? actionDescriptionKey(action.id))}</span>
             <span className="mt-2 block text-xs text-cyan-200">{action.durationSeconds}s</span>
           </button>
         ))}

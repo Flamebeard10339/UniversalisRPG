@@ -22,8 +22,8 @@ export type UniverseManifest = {
 
 export type LocationNode = {
   id: string;
-  titleKey: string;
-  descriptionKey: string;
+  titleKey?: string;
+  descriptionKey?: string;
   position: Position;
   starting?: boolean;
   tags?: string[];
@@ -64,8 +64,8 @@ export type Requirement =
 export type GameAction = {
   id: string;
   locationId: string;
-  titleKey: string;
-  descriptionKey: string;
+  titleKey?: string;
+  descriptionKey?: string;
   durationSeconds: number;
   rewards: Reward[];
   requirements?: Requirement[];
@@ -73,9 +73,15 @@ export type GameAction = {
 
 export type SkillDefinition = {
   id: string;
-  titleKey: string;
-  descriptionKey: string;
+  titleKey?: string;
+  descriptionKey?: string;
   maxLevel: number;
+};
+
+export type ItemDefinition = {
+  id: string;
+  titleKey?: string;
+  descriptionKey?: string;
 };
 
 export type ContentBundle = {
@@ -84,6 +90,7 @@ export type ContentBundle = {
   edges: TravelEdgeDefinition[];
   actions: GameAction[];
   skills: SkillDefinition[];
+  items: ItemDefinition[];
   locales: Record<string, LocaleDictionary>;
 };
 
@@ -128,6 +135,7 @@ export type ContributionDraft = {
   edges: TravelEdgeDefinition[];
   actions: GameAction[];
   skills: SkillDefinition[];
+  items: ItemDefinition[];
   locales: Record<string, LocaleDictionary>;
 };
 

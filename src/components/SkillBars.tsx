@@ -1,4 +1,5 @@
 import type { ContentBundle, UniversePlayState } from '../game/types';
+import { skillTitleKey } from '../game/contentIds';
 import { skillLevelFromXp } from '../game/timers';
 
 type SkillBarsProps = {
@@ -19,7 +20,7 @@ export const SkillBars = ({ bundle, playState, t }: SkillBarsProps) => (
         return (
           <div className="grid gap-1" key={skill.id}>
             <div className="flex items-baseline justify-between gap-3">
-              <span className="text-sm font-medium text-slate-100">{t(skill.titleKey)}</span>
+              <span className="text-sm font-medium text-slate-100">{t(skill.titleKey ?? skillTitleKey(skill.id))}</span>
               <span className="text-xs text-slate-400">Lv {level}</span>
             </div>
             <div className="h-2 overflow-hidden rounded bg-slate-800">

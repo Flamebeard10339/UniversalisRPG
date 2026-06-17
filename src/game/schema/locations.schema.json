@@ -4,7 +4,7 @@
   "type": "array",
   "items": {
     "type": "object",
-    "required": ["id", "titleKey", "descriptionKey", "position"],
+    "required": ["id", "position"],
     "additionalProperties": false,
     "properties": {
       "id": { "type": "string", "minLength": 1 },

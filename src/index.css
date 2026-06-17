@@ -31,3 +31,7 @@ textarea {
 .react-flow__handle {
   display: none;
 }
+
+.contribution-map .react-flow__handle {
+  display: block;
+}

@@ -4,13 +4,11 @@
   "type": "array",
   "items": {
     "type": "object",
-    "required": ["id", "locationId", "titleKey", "descriptionKey", "durationSeconds", "rewards"],
+    "required": ["id", "locationId", "durationSeconds", "rewards"],
     "additionalProperties": false,
     "properties": {
       "id": { "type": "string", "minLength": 1 },
       "locationId": { "type": "string", "minLength": 1 },
-      "titleKey": { "type": "string", "minLength": 1 },
-      "descriptionKey": { "type": "string", "minLength": 1 },
       "durationSeconds": { "type": "number", "exclusiveMinimum": 0 },
       "rewards": {
         "type": "array",

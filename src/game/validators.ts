@@ -2,6 +2,7 @@ import type {
   ContentBundle,
   ContributionDraft,
   GameAction,
+  ItemDefinition,
   LocaleDictionary,
   LocationNode,
   SkillDefinition,
@@ -9,6 +10,17 @@ import type {
   UniverseManifest,
   ValidationIssue,
 } from './types';
+import {
+  actionDescriptionKey,
+  actionTitleKey,
+  itemDescriptionKey,
+  itemTitleKey,
+  locationDescriptionKey,
+  locationTitleKey,
+  skillDescriptionKey,
+  skillTitleKey,
+  toKebabCase,
+} from './contentIds';
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -18,6 +30,8 @@ const hasString = (value: Record<string, unknown>, key: string) =>
 
 const hasNumber = (value: Record<string, unknown>, key: string) =>
   typeof value[key] === 'number' && Number.isFinite(value[key]);
+
+const isKebabCaseId = (id: string) => id === toKebabCase(id);
 
 const error = (path: string, message: string): ValidationIssue => ({
   severity: 'error',
@@ -49,8 +63,6 @@ const validateLocationsShape = (locations: unknown): locations is LocationNode[]
     (location) =>
       isRecord(location) &&
       hasString(location, 'id') &&
-      hasString(location, 'titleKey') &&
-      hasString(location, 'descriptionKey') &&
       isRecord(location.position) &&
       typeof location.position.x === 'number' &&
       typeof location.position.y === 'number',
@@ -74,8 +86,6 @@ const validateActionsShape = (actions: unknown): actions is GameAction[] =>
       isRecord(action) &&
       hasString(action, 'id') &&
       hasString(action, 'locationId') &&
-      hasString(action, 'titleKey') &&
-      hasString(action, 'descriptionKey') &&
       hasNumber(action, 'durationSeconds') &&
       Array.isArray(action.rewards),
   );
@@ -86,10 +96,17 @@ const validateSkillsShape = (skills: unknown): skills is SkillDefinition[] =>
     (skill) =>
       isRecord(skill) &&
       hasString(skill, 'id') &&
-      hasString(skill, 'titleKey') &&
-      hasString(skill, 'descriptionKey') &&
       hasNumber(skill, 'maxLevel'),
   );
+
+const validateItemsShape = (items: unknown): items is ItemDefinition[] =>
+  items === undefined ||
+  (Array.isArray(items) &&
+    items.every(
+      (item) =>
+        isRecord(item) &&
+        hasString(item, 'id'),
+    ));
 
 export const validateContentShape = (bundle: Partial<ContentBundle>) => {
   const issues: ValidationIssue[] = [];
@@ -112,6 +129,10 @@ export const validateContentShape = (bundle: Partial<ContentBundle>) => {
 
   if (!validateSkillsShape(bundle.skills)) {
     issues.push(error('skills.json', 'Skills must be an array of skill objects.'));
+  }
+
+  if (!validateItemsShape(bundle.items)) {
+    issues.push(error('items.json', 'Items must be an array of item objects.'));
   }
 
   return issues;
@@ -137,10 +158,12 @@ export const validateContentReferences = (bundle: ContentBundle) => {
     ...findDuplicateIds(bundle.edges, 'edges'),
     ...findDuplicateIds(bundle.actions, 'actions'),
     ...findDuplicateIds(bundle.skills, 'skills'),
+    ...findDuplicateIds(bundle.items ?? [], 'items'),
   ];
 
   const locationIds = new Set(bundle.locations.map((location) => location.id));
   const skillIds = new Set(bundle.skills.map((skill) => skill.id));
+  const itemIds = new Set((bundle.items ?? []).map((item) => item.id));
   const locale = bundle.locales[bundle.manifest.locales[0]] ?? {};
 
   if (!bundle.locations.some((location) => location.starting)) {
@@ -148,6 +171,16 @@ export const validateContentReferences = (bundle: ContentBundle) => {
   }
 
   for (const edge of bundle.edges) {
+    const duplicatePair = bundle.edges.find(
+      (candidate) =>
+        candidate.id !== edge.id &&
+        ((candidate.source === edge.source && candidate.target === edge.target) ||
+          (candidate.source === edge.target && candidate.target === edge.source)),
+    );
+
+    if (duplicatePair) {
+      issues.push(error(`edges.${edge.id}`, `Duplicate edge between "${edge.source}" and "${edge.target}".`));
+    }
     if (!locationIds.has(edge.source)) {
       issues.push(error(`edges.${edge.id}.source`, `Unknown source location "${edge.source}".`));
     }
@@ -160,6 +193,9 @@ export const validateContentReferences = (bundle: ContentBundle) => {
   }
 
   for (const action of bundle.actions) {
+    if (!isKebabCaseId(action.id)) {
+      issues.push(error(`actions.${action.id}.id`, 'Action ids must be kebab-case.'));
+    }
     if (!locationIds.has(action.locationId)) {
       issues.push(error(`actions.${action.id}.locationId`, `Unknown location "${action.locationId}".`));
     }
@@ -170,9 +206,30 @@ export const validateContentReferences = (bundle: ContentBundle) => {
       if (reward.kind === 'skillXp' && !skillIds.has(reward.skillId)) {
         issues.push(error(`actions.${action.id}.rewards`, `Unknown skill "${reward.skillId}".`));
       }
+      if (reward.kind === 'resource' && itemIds.size > 0 && !itemIds.has(reward.resourceId)) {
+        issues.push(error(`actions.${action.id}.rewards`, `Unknown item "${reward.resourceId}".`));
+      }
       if (reward.amount <= 0) {
         issues.push(error(`actions.${action.id}.rewards`, 'Reward amounts must be positive.'));
       }
+    }
+  }
+
+  for (const location of bundle.locations) {
+    if (!isKebabCaseId(location.id)) {
+      issues.push(error(`locations.${location.id}.id`, 'Location ids must be kebab-case.'));
+    }
+  }
+
+  for (const skill of bundle.skills) {
+    if (!isKebabCaseId(skill.id)) {
+      issues.push(error(`skills.${skill.id}.id`, 'Skill ids must be kebab-case.'));
+    }
+  }
+
+  for (const item of bundle.items ?? []) {
+    if (!isKebabCaseId(item.id)) {
+      issues.push(error(`items.${item.id}.id`, 'Item ids must be kebab-case.'));
     }
   }
 
@@ -193,9 +250,22 @@ export const validateContentBundle = (bundle: ContentBundle): ValidationIssue[] 
 export const collectLocalizationKeys = (bundle: ContentBundle) => [
   bundle.manifest.titleKey,
   bundle.manifest.descriptionKey,
-  ...bundle.locations.flatMap((location) => [location.titleKey, location.descriptionKey]),
-  ...bundle.actions.flatMap((action) => [action.titleKey, action.descriptionKey]),
-  ...bundle.skills.flatMap((skill) => [skill.titleKey, skill.descriptionKey]),
+  ...bundle.locations.flatMap((location) => [
+    location.titleKey ?? locationTitleKey(location.id),
+    location.descriptionKey ?? locationDescriptionKey(location.id),
+  ]),
+  ...bundle.actions.flatMap((action) => [
+    action.titleKey ?? actionTitleKey(action.id),
+    action.descriptionKey ?? actionDescriptionKey(action.id),
+  ]),
+  ...bundle.skills.flatMap((skill) => [
+    skill.titleKey ?? skillTitleKey(skill.id),
+    skill.descriptionKey ?? skillDescriptionKey(skill.id),
+  ]),
+  ...(bundle.items ?? []).flatMap((item) => [
+    item.titleKey ?? itemTitleKey(item.id),
+    item.descriptionKey ?? itemDescriptionKey(item.id),
+  ]),
 ].filter((key): key is string => Boolean(key));
 
 export const validateLocaleDictionary = (locale: LocaleDictionary) =>
@@ -216,6 +286,7 @@ export const mergeDraftIntoBundle = (bundle: ContentBundle, draft: ContributionD
     edges: mergeById(bundle.edges, draft.edges),
     actions: mergeById(bundle.actions, draft.actions),
     skills: mergeById(bundle.skills, draft.skills),
+    items: mergeById(bundle.items ?? [], draft.items),
     locales: mergeLocales(bundle.locales, draft.locales),
   };
 };

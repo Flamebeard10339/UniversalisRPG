@@ -20,7 +20,14 @@ const createEmptyDraft = (universeId: string): ContributionDraft => ({
   edges: [],
   actions: [],
   skills: [],
+  items: [],
   locales: {},
+});
+
+const normalizeDraft = (draft: ContributionDraft): ContributionDraft => ({
+  ...createEmptyDraft(draft.universeId),
+  ...draft,
+  items: draft.items ?? [],
 });
 
 export const useContributionState = create<ContributionStateStore>((set, get) => ({
@@ -36,7 +43,7 @@ export const useContributionState = create<ContributionStateStore>((set, get) =>
     set((state) => ({
       drafts: {
         ...state.drafts,
-        [universeId]: saved,
+        [universeId]: normalizeDraft(saved),
       },
     }));
   },
@@ -45,7 +52,7 @@ export const useContributionState = create<ContributionStateStore>((set, get) =>
 
   updateDraft: (universeId, patch) => {
     set((state) => {
-      const draft = state.drafts[universeId] ?? createEmptyDraft(universeId);
+      const draft = normalizeDraft(state.drafts[universeId] ?? createEmptyDraft(universeId));
       const next = {
         ...draft,
         ...patch,
@@ -65,10 +72,14 @@ export const useContributionState = create<ContributionStateStore>((set, get) =>
 
   resetDraft: (universeId) => {
     set((state) => {
-      const nextDrafts = { ...state.drafts };
-      delete nextDrafts[universeId];
-      void save(storageKey(universeId), createEmptyDraft(universeId));
-      return { drafts: nextDrafts };
+      const emptyDraft = createEmptyDraft(universeId);
+      void save(storageKey(universeId), emptyDraft);
+      return {
+        drafts: {
+          ...state.drafts,
+          [universeId]: emptyDraft,
+        },
+      };
     });
   },
 }));

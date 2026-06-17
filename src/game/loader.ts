@@ -1,6 +1,7 @@
 import type {
   ContentBundle,
   GameAction,
+  ItemDefinition,
   LocalUniverseLibrary,
   LocaleDictionary,
   LocationNode,
@@ -37,11 +38,14 @@ export const loadUniverseManifest = async (universeId: string) => {
 export const loadUniverse = async (universeId: string): Promise<ContentBundle> => {
   const basePath = `${BASE_CONTENT_PATH}/${universeId}`;
   const manifest = await loadUniverseManifest(universeId);
-  const [locations, edges, actions, skills] = await Promise.all([
+  const [locations, edges, actions, skills, items] = await Promise.all([
     loadJson<LocationNode[]>(`${basePath}/locations.json`),
     loadJson<TravelEdgeDefinition[]>(`${basePath}/edges.json`),
     loadJson<GameAction[]>(`${basePath}/actions.json`),
     loadJson<SkillDefinition[]>(`${basePath}/skills.json`),
+    manifest.files.includes('items.json')
+      ? loadJson<ItemDefinition[]>(`${basePath}/items.json`)
+      : Promise.resolve([]),
   ]);
 
   const locales = await manifest.locales.reduce<Promise<Record<string, LocaleDictionary>>>(
@@ -59,6 +63,7 @@ export const loadUniverse = async (universeId: string): Promise<ContentBundle> =
     edges,
     actions,
     skills,
+    items,
     locales,
   };
   const issues = validateContentShape(bundle);

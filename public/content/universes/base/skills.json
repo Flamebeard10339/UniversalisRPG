@@ -1,20 +1,14 @@
 [
   {
     "id": "lore",
-    "titleKey": "skill.lore.title",
-    "descriptionKey": "skill.lore.description",
     "maxLevel": 100
   },
   {
     "id": "survival",
-    "titleKey": "skill.survival.title",
-    "descriptionKey": "skill.survival.description",
     "maxLevel": 100
   },
   {
     "id": "craft",
-    "titleKey": "skill.craft.title",
-    "descriptionKey": "skill.craft.description",
     "maxLevel": 100
   }
 ]

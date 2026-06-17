@@ -1,4 +1,5 @@
 import type { ActiveTravel, ContentBundle } from '../game/types';
+import { locationDescriptionKey, locationTitleKey } from '../game/contentIds';
 import { useNow } from '../hooks/useNow';
 
 type TravelStatusProps = {
@@ -40,8 +41,8 @@ export const TravelStatus = ({
 
     return (
       <section className="rounded border border-slate-800 bg-slate-900 p-4">
-        <h2 className="text-lg font-semibold">{t(currentLocation.titleKey)}</h2>
-        <p className="mt-1 text-sm text-slate-400">{t(currentLocation.descriptionKey)}</p>
+        <h2 className="text-lg font-semibold">{t(currentLocation.titleKey ?? locationTitleKey(currentLocation.id))}</h2>
+        <p className="mt-1 text-sm text-slate-400">{t(currentLocation.descriptionKey ?? locationDescriptionKey(currentLocation.id))}</p>
       </section>
     );
   }
@@ -58,8 +59,8 @@ export const TravelStatus = ({
         <div>
           <h2 className="text-base font-semibold text-cyan-100">Travelling...</h2>
           <p className="text-sm text-slate-300">
-            {fromLocation ? t(fromLocation.titleKey) : activeTravel.fromLocationId} to{' '}
-            {toLocation ? t(toLocation.titleKey) : activeTravel.toLocationId}
+            {fromLocation ? t(fromLocation.titleKey ?? locationTitleKey(fromLocation.id)) : activeTravel.fromLocationId} to{' '}
+            {toLocation ? t(toLocation.titleKey ?? locationTitleKey(toLocation.id)) : activeTravel.toLocationId}
           </p>
           <p className="mt-1 text-xs text-cyan-200">{remainingTime} remaining</p>
         </div>

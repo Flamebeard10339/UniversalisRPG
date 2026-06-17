@@ -5,6 +5,7 @@ import { ContributionMode } from './components/contribution/ContributionMode';
 import { SkillBars } from './components/SkillBars';
 import { TravelStatus } from './components/TravelStatus';
 import { WorldMap } from './components/WorldMap';
+import { locationTitleKey } from './game/contentIds';
 import { useDebugState } from './stores/debugState';
 import { useGameState } from './stores/gameState';
 import { useUniverseState } from './stores/universeState';
@@ -137,7 +138,7 @@ export default function App() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-950 pb-20 text-slate-100">
+    <main className="min-h-screen bg-slate-950 pb-[45vh] text-slate-100">
       <header className="border-b border-slate-800 bg-slate-900/70 px-4 py-3">
         <div className="mx-auto max-w-7xl">
           <div>
@@ -198,7 +199,7 @@ export default function App() {
           />
             </section>
 
-            <ChatPanel locationName={t(currentLocation.titleKey)} />
+            <ChatPanel locationName={t(currentLocation.titleKey ?? locationTitleKey(currentLocation.id))} />
           </section>
         )}
 

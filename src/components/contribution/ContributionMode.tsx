@@ -1,18 +1,18 @@
+import { useState } from 'react';
 import type { ContentBundle, ContributionDraft, ValidationIssue } from '../../game/types';
 import { useContributionState } from '../../stores/contributionState';
 import { useUniverseState } from '../../stores/universeState';
-import { ActionEditor } from './ActionEditor';
-import { EdgeEditor } from './EdgeEditor';
+import { ContentDataEditor } from './ContentDataEditor';
 import { LocalUniverseManager } from './LocalUniverseManager';
-import { LocaleEditor } from './LocaleEditor';
-import { LocationEditor } from './LocationEditor';
-import { SkillEditor } from './SkillEditor';
+import { LocalizationEditor } from './LocalizationEditor';
 import { SubmitToGitHub } from './SubmitToGitHub';
 
 type ContributionModeProps = {
   bundle: ContentBundle;
   validationIssues: ValidationIssue[];
 };
+
+type ContributionTab = 'content' | 'localization' | 'submit';
 
 const emptyDraft = (universeId: string): ContributionDraft => ({
   universeId,
@@ -22,10 +22,12 @@ const emptyDraft = (universeId: string): ContributionDraft => ({
   edges: [],
   actions: [],
   skills: [],
+  items: [],
   locales: {},
 });
 
 export const ContributionMode = ({ bundle, validationIssues }: ContributionModeProps) => {
+  const [activeTab, setActiveTab] = useState<ContributionTab>('content');
   const draft = useContributionState((state) => state.drafts[bundle.manifest.id] ?? emptyDraft(bundle.manifest.id));
   const updateDraft = useContributionState((state) => state.updateDraft);
   const resetDraft = useContributionState((state) => state.resetDraft);
@@ -43,41 +45,67 @@ export const ContributionMode = ({ bundle, validationIssues }: ContributionModeP
           <h2 className="text-lg font-semibold text-slate-100">Contribution Mode</h2>
           <p className="text-sm text-slate-400">Local draft changes are merged into the current universe preview.</p>
         </div>
-        <button className="rounded border border-slate-600 px-3 py-2 text-sm font-semibold text-slate-100" onClick={() => resetDraft(bundle.manifest.id)} type="button">
+        <button
+          className="rounded border border-slate-600 px-3 py-2 text-sm font-semibold text-slate-100"
+          onClick={() => {
+            resetDraft(bundle.manifest.id);
+            queueMicrotask(refreshContributionPreview);
+          }}
+          type="button"
+        >
           Reset draft
         </button>
       </div>
 
-      <textarea
-        className="min-h-24 rounded bg-slate-950 p-3 text-sm text-slate-200"
-        onChange={(event) => patchDraft({ notes: event.target.value })}
-        placeholder="Contributor notes"
-        value={draft.notes}
-      />
+      <div className="grid grid-cols-3 gap-2 rounded border border-slate-800 bg-slate-900 p-2">
+        {(['content', 'localization', 'submit'] as ContributionTab[]).map((tab) => (
+          <button
+            className={`rounded px-3 py-2 text-sm font-semibold capitalize ${
+              activeTab === tab ? 'bg-cyan-300 text-slate-950' : 'bg-slate-950 text-slate-300'
+            }`}
+            key={tab}
+            onClick={() => setActiveTab(tab)}
+            type="button"
+          >
+            {tab}
+          </button>
+        ))}
+      </div>
 
-      <LocationEditor draft={draft} onChange={(locations) => patchDraft({ locations })} />
-      <EdgeEditor draft={draft} onChange={(edges) => patchDraft({ edges })} />
-      <ActionEditor draft={draft} onChange={(actions) => patchDraft({ actions })} />
-      <SkillEditor draft={draft} onChange={(skills) => patchDraft({ skills })} />
-      <LocaleEditor draft={draft} locale={bundle.manifest.locales[0] ?? 'en'} onChange={(locales) => patchDraft({ locales })} />
-      <LocalUniverseManager bundle={bundle} />
+      {activeTab === 'content' && (
+        <ContentDataEditor bundle={bundle} draft={draft} onPatch={patchDraft} />
+      )}
 
-      <section className="grid gap-2 rounded border border-slate-700 p-3">
-        <h3 className="text-sm font-semibold text-slate-100">Validation</h3>
-        {validationIssues.length === 0 ? (
-          <p className="text-sm text-emerald-300">No validation issues.</p>
-        ) : (
-          <ul className="grid gap-1 text-sm">
-            {validationIssues.map((issue) => (
-              <li className={issue.severity === 'error' ? 'text-rose-300' : 'text-amber-300'} key={`${issue.path}-${issue.message}`}>
-                {issue.severity}: {issue.path} - {issue.message}
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+      {activeTab === 'localization' && (
+        <LocalizationEditor bundle={bundle} draft={draft} onChange={(locales) => patchDraft({ locales })} />
+      )}
 
-      <SubmitToGitHub appVersion="0.1.0" draft={draft} validationIssues={validationIssues} />
+      {activeTab === 'submit' && (
+        <>
+          <section className="grid gap-2 rounded border border-slate-700 p-3">
+            <h3 className="text-sm font-semibold text-slate-100">Validation</h3>
+            {validationIssues.length === 0 ? (
+              <p className="text-sm text-emerald-300">No validation issues.</p>
+            ) : (
+              <ul className="grid gap-1 text-sm">
+                {validationIssues.map((issue) => (
+                  <li className={issue.severity === 'error' ? 'text-rose-300' : 'text-amber-300'} key={`${issue.path}-${issue.message}`}>
+                    {issue.severity}: {issue.path} - {issue.message}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+          <textarea
+            className="min-h-24 rounded bg-slate-950 p-3 text-sm text-slate-200"
+            onChange={(event) => patchDraft({ notes: event.target.value })}
+            placeholder="Contributor notes"
+            value={draft.notes}
+          />
+          <LocalUniverseManager bundle={bundle} />
+          <SubmitToGitHub appVersion="0.1.0" draft={draft} validationIssues={validationIssues} />
+        </>
+      )}
     </section>
   );
 };

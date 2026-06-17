@@ -11,6 +11,7 @@
     "edges.json",
     "actions.json",
     "skills.json",
+    "items.json",
     "locales/en.json"
   ],
   "compatibility": {

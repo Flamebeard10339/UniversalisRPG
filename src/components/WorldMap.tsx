@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import ReactFlow, { Background, Controls, type Edge, type Node } from 'reactflow';
 import type { ContentBundle, UniversePlayState } from '../game/types';
+import { locationTitleKey } from '../game/contentIds';
 import { useNow } from '../hooks/useNow';
 import { TravelEdge } from './TravelEdge';
 
@@ -85,7 +86,7 @@ export const WorldMap = ({ bundle, playState, onTravel, t }: WorldMapProps) => {
                 }}
                 type="button"
               >
-                <span className="text-sm font-semibold">{t(location.titleKey)}</span>
+                <span className="text-sm font-semibold">{t(location.titleKey ?? locationTitleKey(location.id))}</span>
               </button>
             ),
           },
