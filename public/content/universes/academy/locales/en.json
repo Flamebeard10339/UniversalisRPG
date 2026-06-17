@@ -1,0 +1,22 @@
+{
+  "universe.academy.title": "The Quiet Academy",
+  "universe.academy.description": "A compact training universe for proving that separate JSON content sets keep separate progress.",
+  "location.archiveHall.title": "Archive Hall",
+  "location.archiveHall.description": "Long tables, bright lamps, and books that remember who opened them.",
+  "location.sparringCourt.title": "Sparring Court",
+  "location.sparringCourt.description": "A chalk-lined court where patient drills matter more than spectacle.",
+  "location.glasshouse.title": "Glasshouse",
+  "location.glasshouse.description": "Silver panes shelter herbs that bloom under moonlight.",
+  "action.copyMarginalia.title": "Copy Marginalia",
+  "action.copyMarginalia.description": "Transcribe useful notes from the edges of older texts.",
+  "action.practiceForms.title": "Practice Forms",
+  "action.practiceForms.description": "Repeat clean movements until they settle into the body.",
+  "action.tendMoonvines.title": "Tend Moonvines",
+  "action.tendMoonvines.description": "Trim moonvines and collect viable cuttings.",
+  "skill.lore.title": "Lore",
+  "skill.lore.description": "Memory, myth, and the patience to connect old clues.",
+  "skill.discipline.title": "Discipline",
+  "skill.discipline.description": "Focus, repetition, and calm under pressure.",
+  "skill.survival.title": "Survival",
+  "skill.survival.description": "Practical knowledge for harsh country and stranger weather."
+}

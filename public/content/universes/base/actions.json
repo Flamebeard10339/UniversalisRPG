@@ -1,0 +1,29 @@
+[
+  {
+    "id": "gather-rumors",
+    "locationId": "crossroads",
+    "titleKey": "action.gatherRumors.title",
+    "descriptionKey": "action.gatherRumors.description",
+    "durationSeconds": 5,
+    "rewards": [{ "kind": "skillXp", "skillId": "lore", "amount": 2 }]
+  },
+  {
+    "id": "forage-embers",
+    "locationId": "emberwood",
+    "titleKey": "action.forageEmbers.title",
+    "descriptionKey": "action.forageEmbers.description",
+    "durationSeconds": 8,
+    "rewards": [
+      { "kind": "resource", "resourceId": "emberleaf", "amount": 1 },
+      { "kind": "skillXp", "skillId": "survival", "amount": 3 }
+    ]
+  },
+  {
+    "id": "survey-stonework",
+    "locationId": "old-quarry",
+    "titleKey": "action.surveyStonework.title",
+    "descriptionKey": "action.surveyStonework.description",
+    "durationSeconds": 10,
+    "rewards": [{ "kind": "skillXp", "skillId": "craft", "amount": 4 }]
+  }
+]

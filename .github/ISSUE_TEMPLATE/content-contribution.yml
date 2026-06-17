@@ -1,0 +1,35 @@
+name: Content contribution
+description: Submit a UniversalisRPG universe, location, action, skill, or localization change.
+title: "[Content]: "
+labels: ["content", "community"]
+body:
+  - type: input
+    id: universe
+    attributes:
+      label: Target universe
+      description: Which universe should this content change?
+      placeholder: base
+    validations:
+      required: true
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What does this contribution add or change?
+    validations:
+      required: true
+  - type: textarea
+    id: validation
+    attributes:
+      label: Validation status
+      description: Paste the validation result shown by contribution mode.
+    validations:
+      required: true
+  - type: textarea
+    id: json
+    attributes:
+      label: Generated JSON
+      description: Paste the generated contribution JSON.
+      render: json
+    validations:
+      required: true

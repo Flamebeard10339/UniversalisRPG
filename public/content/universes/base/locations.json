@@ -1,0 +1,24 @@
+[
+  {
+    "id": "crossroads",
+    "titleKey": "location.crossroads.title",
+    "descriptionKey": "location.crossroads.description",
+    "position": { "x": 0, "y": 80 },
+    "starting": true,
+    "tags": ["settlement"]
+  },
+  {
+    "id": "emberwood",
+    "titleKey": "location.emberwood.title",
+    "descriptionKey": "location.emberwood.description",
+    "position": { "x": 260, "y": 0 },
+    "tags": ["forest"]
+  },
+  {
+    "id": "old-quarry",
+    "titleKey": "location.oldQuarry.title",
+    "descriptionKey": "location.oldQuarry.description",
+    "position": { "x": 300, "y": 190 },
+    "tags": ["ruin"]
+  }
+]

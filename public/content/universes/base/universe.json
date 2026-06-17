@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "id": "base",
+  "titleKey": "universe.base.title",
+  "descriptionKey": "universe.base.description",
+  "version": "0.1.0",
+  "author": "UniversalisRPG",
+  "locales": ["en"],
+  "files": [
+    "locations.json",
+    "edges.json",
+    "actions.json",
+    "skills.json",
+    "locales/en.json"
+  ],
+  "compatibility": {
+    "minAppVersion": "0.1.0"
+  }
+}

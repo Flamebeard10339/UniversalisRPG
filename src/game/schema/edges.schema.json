@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://universalis-rpg.local/schema/edges.schema.json",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "required": ["id", "source", "target", "travelTimeSeconds"],
+    "additionalProperties": false,
+    "properties": {
+      "id": { "type": "string", "minLength": 1 },
+      "source": { "type": "string", "minLength": 1 },
+      "target": { "type": "string", "minLength": 1 },
+      "travelTimeSeconds": { "type": "number", "exclusiveMinimum": 0 },
+      "requirementIds": {
+        "type": "array",
+        "items": { "type": "string", "minLength": 1 },
+        "uniqueItems": true
+      }
+    }
+  }
+}

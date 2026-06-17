@@ -1,0 +1,74 @@
+import { create } from 'zustand';
+import type { ContributionDraft } from '../game/types';
+import { load, save } from '../lib/storage';
+
+type ContributionStateStore = {
+  drafts: Record<string, ContributionDraft>;
+  hydrate: (universeId: string) => Promise<void>;
+  getDraft: (universeId: string) => ContributionDraft | null;
+  updateDraft: (universeId: string, patch: Partial<Omit<ContributionDraft, 'universeId'>>) => void;
+  resetDraft: (universeId: string) => void;
+};
+
+const storageKey = (universeId: string) => `universalis:contribution:${universeId}`;
+
+const createEmptyDraft = (universeId: string): ContributionDraft => ({
+  universeId,
+  updatedAt: Date.now(),
+  notes: '',
+  locations: [],
+  edges: [],
+  actions: [],
+  skills: [],
+  locales: {},
+});
+
+export const useContributionState = create<ContributionStateStore>((set, get) => ({
+  drafts: {},
+
+  hydrate: async (universeId) => {
+    const saved = await load<ContributionDraft>(storageKey(universeId));
+
+    if (!saved) {
+      return;
+    }
+
+    set((state) => ({
+      drafts: {
+        ...state.drafts,
+        [universeId]: saved,
+      },
+    }));
+  },
+
+  getDraft: (universeId) => get().drafts[universeId] ?? null,
+
+  updateDraft: (universeId, patch) => {
+    set((state) => {
+      const draft = state.drafts[universeId] ?? createEmptyDraft(universeId);
+      const next = {
+        ...draft,
+        ...patch,
+        updatedAt: Date.now(),
+      };
+
+      void save(storageKey(universeId), next);
+
+      return {
+        drafts: {
+          ...state.drafts,
+          [universeId]: next,
+        },
+      };
+    });
+  },
+
+  resetDraft: (universeId) => {
+    set((state) => {
+      const nextDrafts = { ...state.drafts };
+      delete nextDrafts[universeId];
+      void save(storageKey(universeId), createEmptyDraft(universeId));
+      return { drafts: nextDrafts };
+    });
+  },
+}));

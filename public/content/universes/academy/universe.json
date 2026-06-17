@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "id": "academy",
+  "titleKey": "universe.academy.title",
+  "descriptionKey": "universe.academy.description",
+  "version": "0.1.0",
+  "author": "UniversalisRPG",
+  "locales": ["en"],
+  "files": [
+    "locations.json",
+    "edges.json",
+    "actions.json",
+    "skills.json",
+    "locales/en.json"
+  ],
+  "compatibility": {
+    "minAppVersion": "0.1.0"
+  }
+}

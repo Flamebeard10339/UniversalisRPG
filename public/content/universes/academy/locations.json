@@ -1,0 +1,24 @@
+[
+  {
+    "id": "archive-hall",
+    "titleKey": "location.archiveHall.title",
+    "descriptionKey": "location.archiveHall.description",
+    "position": { "x": 0, "y": 90 },
+    "starting": true,
+    "tags": ["academy"]
+  },
+  {
+    "id": "sparring-court",
+    "titleKey": "location.sparringCourt.title",
+    "descriptionKey": "location.sparringCourt.description",
+    "position": { "x": 260, "y": 0 },
+    "tags": ["training"]
+  },
+  {
+    "id": "glasshouse",
+    "titleKey": "location.glasshouse.title",
+    "descriptionKey": "location.glasshouse.description",
+    "position": { "x": 270, "y": 190 },
+    "tags": ["garden"]
+  }
+]

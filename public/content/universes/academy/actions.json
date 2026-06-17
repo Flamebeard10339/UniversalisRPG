@@ -1,0 +1,29 @@
+[
+  {
+    "id": "copy-marginalia",
+    "locationId": "archive-hall",
+    "titleKey": "action.copyMarginalia.title",
+    "descriptionKey": "action.copyMarginalia.description",
+    "durationSeconds": 6,
+    "rewards": [{ "kind": "skillXp", "skillId": "lore", "amount": 3 }]
+  },
+  {
+    "id": "practice-forms",
+    "locationId": "sparring-court",
+    "titleKey": "action.practiceForms.title",
+    "descriptionKey": "action.practiceForms.description",
+    "durationSeconds": 9,
+    "rewards": [{ "kind": "skillXp", "skillId": "discipline", "amount": 4 }]
+  },
+  {
+    "id": "tend-moonvines",
+    "locationId": "glasshouse",
+    "titleKey": "action.tendMoonvines.title",
+    "descriptionKey": "action.tendMoonvines.description",
+    "durationSeconds": 8,
+    "rewards": [
+      { "kind": "resource", "resourceId": "moonvine-cutting", "amount": 1 },
+      { "kind": "skillXp", "skillId": "survival", "amount": 2 }
+    ]
+  }
+]

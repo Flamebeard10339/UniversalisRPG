@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">UniversalisRPG</string>
+    <string name="title_activity_main">UniversalisRPG</string>
+    <string name="package_name">org.universalis.rpg</string>
+    <string name="custom_url_scheme">org.universalis.rpg</string>
+</resources>

@@ -1,0 +1,22 @@
+{
+  "universe.base.title": "The First Road",
+  "universe.base.description": "A small starter universe for testing JSON content, travel, actions, and contribution flow.",
+  "location.crossroads.title": "Wayside Crossroads",
+  "location.crossroads.description": "A lantern-lit meeting place where rumors arrive before travelers do.",
+  "location.emberwood.title": "Emberwood",
+  "location.emberwood.description": "A warm forest of red-barked trees and low-burning leaves.",
+  "location.oldQuarry.title": "Old Quarry",
+  "location.oldQuarry.description": "Weather-cut stone terraces hum faintly after sunset.",
+  "action.gatherRumors.title": "Gather Rumors",
+  "action.gatherRumors.description": "Listen for useful fragments of old stories and current trouble.",
+  "action.forageEmbers.title": "Forage Emberleaf",
+  "action.forageEmbers.description": "Gather emberleaf without waking the ash mites.",
+  "action.surveyStonework.title": "Survey Stonework",
+  "action.surveyStonework.description": "Study old tool marks and salvageable masonry.",
+  "skill.lore.title": "Lore",
+  "skill.lore.description": "Memory, myth, and the patience to connect old clues.",
+  "skill.survival.title": "Survival",
+  "skill.survival.description": "Practical knowledge for harsh country and stranger weather.",
+  "skill.craft.title": "Craft",
+  "skill.craft.description": "Making, repairing, and improving useful things."
+}

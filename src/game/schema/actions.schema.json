@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://universalis-rpg.local/schema/actions.schema.json",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "required": ["id", "locationId", "titleKey", "descriptionKey", "durationSeconds", "rewards"],
+    "additionalProperties": false,
+    "properties": {
+      "id": { "type": "string", "minLength": 1 },
+      "locationId": { "type": "string", "minLength": 1 },
+      "titleKey": { "type": "string", "minLength": 1 },
+      "descriptionKey": { "type": "string", "minLength": 1 },
+      "durationSeconds": { "type": "number", "exclusiveMinimum": 0 },
+      "rewards": {
+        "type": "array",
+        "items": {
+          "oneOf": [
+            {
+              "type": "object",
+              "required": ["kind", "skillId", "amount"],
+              "additionalProperties": false,
+              "properties": {
+                "kind": { "const": "skillXp" },
+                "skillId": { "type": "string", "minLength": 1 },
+                "amount": { "type": "number", "exclusiveMinimum": 0 }
+              }
+            },
+            {
+              "type": "object",
+              "required": ["kind", "resourceId", "amount"],
+              "additionalProperties": false,
+              "properties": {
+                "kind": { "const": "resource" },
+                "resourceId": { "type": "string", "minLength": 1 },
+                "amount": { "type": "number", "exclusiveMinimum": 0 }
+              }
+            }
+          ]
+        }
+      },
+      "requirements": {
+        "type": "array",
+        "items": {
+          "oneOf": [
+            {
+              "type": "object",
+              "required": ["kind", "skillId", "level"],
+              "additionalProperties": false,
+              "properties": {
+                "kind": { "const": "skillLevel" },
+                "skillId": { "type": "string", "minLength": 1 },
+                "level": { "type": "number", "minimum": 1 }
+              }
+            },
+            {
+              "type": "object",
+              "required": ["kind", "resourceId", "amount"],
+              "additionalProperties": false,
+              "properties": {
+                "kind": { "const": "resource" },
+                "resourceId": { "type": "string", "minLength": 1 },
+                "amount": { "type": "number", "exclusiveMinimum": 0 }
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
+}
