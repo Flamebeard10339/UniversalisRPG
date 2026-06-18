@@ -12,6 +12,8 @@ import type {
 } from './types';
 import {
   actionDescriptionKey,
+  actionFailureKey,
+  actionSuccessKey,
   actionTitleKey,
   itemDescriptionKey,
   itemTitleKey,
@@ -259,6 +261,8 @@ export const collectLocalizationKeys = (bundle: ContentBundle) => [
   ...bundle.actions.flatMap((action) => [
     action.titleKey ?? actionTitleKey(action.id),
     action.descriptionKey ?? actionDescriptionKey(action.id),
+    actionSuccessKey(action.id),
+    actionFailureKey(action.id),
   ]),
   ...bundle.skills.flatMap((skill) => [
     skill.titleKey ?? skillTitleKey(skill.id),

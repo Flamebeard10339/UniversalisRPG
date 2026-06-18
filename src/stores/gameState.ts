@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import type { GameAction, TravelEdgeDefinition, UniversePlayState } from '../game/types';
-import { createInitialPlayState, normalizePlayState, resolveDueTimers, startAction, startTravel } from '../game/timers';
+import { appendChatMessage, createInitialPlayState, normalizePlayState, resolveDueTimers, startAction, startTravel } from '../game/timers';
 import { load, remove, save } from '../lib/storage';
 
 type GameStateStore = {
@@ -11,7 +11,8 @@ type GameStateStore = {
   travelTo: (universeId: string, edge: TravelEdgeDefinition, destinationLocationId: string) => void;
   cancelTravel: (universeId: string) => void;
   startAction: (universeId: string, action: GameAction) => void;
-  resolveDue: (universeId: string, actions: GameAction[]) => void;
+  resolveDue: (universeId: string, actions: GameAction[], options?: { debugEnabled?: boolean }) => void;
+  sendChatMessage: (universeId: string, text: string) => void;
   importUniverseState: (playState: UniversePlayState) => Promise<void>;
   resetUniverse: (universeId: string, startingLocationId: string) => Promise<void>;
 };
@@ -114,7 +115,7 @@ export const useGameState = create<GameStateStore>((set, get) => ({
     set((state) => {
       const current = state.states[universeId];
 
-      if (!current || current.activeAction || current.activeTravel) {
+      if (!current || current.activeTravel) {
         return state;
       }
 
@@ -130,7 +131,7 @@ export const useGameState = create<GameStateStore>((set, get) => ({
     });
   },
 
-  resolveDue: (universeId, actions) => {
+  resolveDue: (universeId, actions, options) => {
     set((state) => {
       const current = state.states[universeId];
 
@@ -138,10 +139,34 @@ export const useGameState = create<GameStateStore>((set, get) => ({
         return state;
       }
 
-      const next = resolveDueTimers(current, actions);
+      const next = resolveDueTimers(current, actions, options);
       if (next === current) {
         return state;
       }
+      void save(storageKey(universeId), next);
+
+      return {
+        states: {
+          ...state.states,
+          [universeId]: next,
+        },
+      };
+    });
+  },
+
+  sendChatMessage: (universeId, text) => {
+    set((state) => {
+      const current = state.states[universeId];
+      const trimmed = text.trim();
+
+      if (!current || !trimmed) {
+        return state;
+      }
+
+      const next = appendChatMessage(current, {
+        author: 'player',
+        text: trimmed,
+      });
       void save(storageKey(universeId), next);
 
       return {

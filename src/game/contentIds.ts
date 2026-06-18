@@ -18,6 +18,8 @@ export const locationTitleKey = (id: string) => `location.${toKebabCase(id)}.tit
 export const locationDescriptionKey = (id: string) => `location.${toKebabCase(id)}.description`;
 export const actionTitleKey = (id: string) => `action.${toKebabCase(id)}.title`;
 export const actionDescriptionKey = (id: string) => `action.${toKebabCase(id)}.description`;
+export const actionSuccessKey = (id: string) => `action.${toKebabCase(id)}.success`;
+export const actionFailureKey = (id: string) => `action.${toKebabCase(id)}.failure`;
 export const skillTitleKey = (id: string) => `skill.${toKebabCase(id)}.title`;
 export const skillDescriptionKey = (id: string) => `skill.${toKebabCase(id)}.description`;
 export const itemTitleKey = (id: string) => `item.${toKebabCase(id)}.title`;

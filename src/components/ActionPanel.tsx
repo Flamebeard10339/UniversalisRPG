@@ -15,9 +15,11 @@ export const ActionPanel = ({ bundle, playState, onStartAction, t }: ActionPanel
   const activeAction = actions.find((action) => action.id === playState.activeAction?.actionId);
   const isTravelling = Boolean(playState.activeTravel);
   const now = useNow(Boolean(playState.activeAction));
-  const progress = playState.activeAction
-    ? Math.min(100, Math.max(0, ((now - playState.activeAction.startedAt) / (playState.activeAction.completesAt - playState.activeAction.startedAt)) * 100))
-    : 0;
+  const getActionProgress = (action: GameAction) => {
+    const progress = playState.actionProgress[action.id];
+    const elapsedMs = (progress?.elapsedMs ?? 0) + (progress?.runningSince ? Math.max(0, now - progress.runningSince) : 0);
+    return Math.min(100, Math.max(0, (elapsedMs / (action.durationSeconds * 1000)) * 100));
+  };
 
   return (
     <section className="grid gap-3">
@@ -32,26 +34,30 @@ export const ActionPanel = ({ bundle, playState, onStartAction, t }: ActionPanel
         </p>
       </div>
 
-      {playState.activeAction && (
-        <div className="h-2 overflow-hidden rounded bg-slate-800">
-          <div className="h-full bg-cyan-300 transition-all" style={{ width: `${progress}%` }} />
-        </div>
-      )}
-
       <div className="grid gap-2">
-        {actions.map((action) => (
-          <button
-            className="rounded border border-slate-700 bg-slate-900 p-3 text-left transition hover:border-cyan-500 disabled:cursor-not-allowed disabled:opacity-50"
-            disabled={Boolean(playState.activeAction) || isTravelling}
-            key={action.id}
-            onClick={() => onStartAction(action)}
-            type="button"
-          >
-            <span className="block text-sm font-semibold text-slate-100">{t(action.titleKey ?? actionTitleKey(action.id))}</span>
-            <span className="mt-1 block text-xs text-slate-400">{t(action.descriptionKey ?? actionDescriptionKey(action.id))}</span>
-            <span className="mt-2 block text-xs text-cyan-200">{action.durationSeconds}s</span>
-          </button>
-        ))}
+        {actions.map((action) => {
+          const active = playState.activeAction?.actionId === action.id;
+
+          return (
+            <button
+              className="relative overflow-hidden rounded border border-slate-700 bg-slate-900 p-3 text-left transition hover:border-cyan-500 disabled:cursor-not-allowed disabled:opacity-50"
+              disabled={isTravelling}
+              key={action.id}
+              onClick={() => onStartAction(action)}
+              type="button"
+            >
+              {(active || getActionProgress(action) > 0) && (
+                <span
+                  className={`absolute inset-y-0 left-0 transition-all ${active ? 'bg-cyan-400/25' : 'bg-slate-700/60'}`}
+                  style={{ width: `${getActionProgress(action)}%` }}
+                />
+              )}
+              <span className="relative block text-sm font-semibold text-slate-100">{t(action.titleKey ?? actionTitleKey(action.id))}</span>
+              <span className="relative mt-1 block text-xs text-slate-400">{t(action.descriptionKey ?? actionDescriptionKey(action.id))}</span>
+              <span className="relative mt-2 block text-xs text-cyan-200">{action.durationSeconds}s</span>
+            </button>
+          );
+        })}
       </div>
     </section>
   );

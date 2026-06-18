@@ -1,84 +1,63 @@
-import { useState } from 'react';
+import { useEffect, useRef } from 'react';
 import type { Translator } from '../game/i18n';
-
-type ChatMessage = {
-  id: number;
-  author: 'system' | 'player';
-  text: string;
-};
+import type { ChatMessage } from '../game/types';
 
 type ChatPanelProps = {
-  locationName: string;
+  messages: ChatMessage[];
   t: Translator;
 };
 
-export const ChatPanel = ({ locationName, t }: ChatPanelProps) => {
-  const [draft, setDraft] = useState('');
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    {
-      id: 1,
-      author: 'system',
-      text: t('chat.systemGreeting', { location: locationName }),
-    },
-  ]);
+export const ChatPanel = ({ messages, t }: ChatPanelProps) => {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const stickToBottomRef = useRef(true);
 
-  const sendMessage = () => {
-    const text = draft.trim();
+  useEffect(() => {
+    const element = scrollRef.current;
 
-    if (!text) {
+    if (!element || !stickToBottomRef.current) {
       return;
     }
 
-    setMessages((current) => [
-      ...current,
-      {
-        id: Date.now(),
-        author: 'player',
-        text,
-      },
-    ]);
-    setDraft('');
+    element.scrollTop = element.scrollHeight;
+  }, [messages.length, messages[messages.length - 1]?.count]);
+
+  const updateStickiness = () => {
+    const element = scrollRef.current;
+
+    if (!element) {
+      return;
+    }
+
+    stickToBottomRef.current = element.scrollHeight - element.scrollTop - element.clientHeight < 24;
+  };
+
+  const renderMessage = (message: ChatMessage) => {
+    const text = message.key ? t(message.key, message.params) : message.text ?? '';
+    return message.count > 1 ? `(${message.count}) ${text}` : text;
   };
 
   return (
-    <section className="grid min-h-0 flex-1 grid-rows-[auto_1fr_auto] gap-3 rounded border border-slate-800 bg-slate-900 p-4">
-      <div>
-        <h2 className="text-base font-semibold text-slate-100">{t('chat.title')}</h2>
-        <p className="text-sm text-slate-400">{locationName}</p>
-      </div>
-
-      <div className="grid content-start gap-2 overflow-auto rounded bg-slate-950 p-3">
+    <section className="grid min-h-0 rounded border border-slate-800 bg-slate-900 p-4">
+      <div
+        className="grid content-start gap-2 overflow-auto rounded bg-slate-950 p-3"
+        onScroll={updateStickiness}
+        ref={scrollRef}
+      >
         {messages.map((message) => (
           <div
             className={`max-w-[85%] rounded px-3 py-2 text-sm ${
               message.author === 'player'
                 ? 'ml-auto bg-cyan-400 text-slate-950'
-                : 'bg-slate-800 text-slate-200'
+                : message.author === 'debug'
+                  ? 'bg-amber-950 text-amber-100'
+                  : 'bg-slate-800 text-slate-200'
             }`}
             key={message.id}
           >
-            {message.text}
+            {renderMessage(message)}
           </div>
         ))}
       </div>
-
-      <form
-        className="flex gap-2"
-        onSubmit={(event) => {
-          event.preventDefault();
-          sendMessage();
-        }}
-      >
-        <input
-          className="min-w-0 flex-1 rounded border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100"
-          onChange={(event) => setDraft(event.target.value)}
-          placeholder={t('chat.placeholder', { location: locationName })}
-          value={draft}
-        />
-        <button className="rounded bg-cyan-400 px-4 py-2 text-sm font-semibold text-slate-950" type="submit">
-          {t('chat.send')}
-        </button>
-      </form>
     </section>
   );
 };

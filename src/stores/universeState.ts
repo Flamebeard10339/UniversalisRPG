@@ -74,6 +74,25 @@ const applyDraft = (bundle: ContentBundle | null) => {
   };
 };
 
+const loadBaseBundle = async (
+  universeId: string,
+  bundledManifests: UniverseManifest[],
+  localLibrary: Record<string, ContentBundle>,
+) => {
+  const bundled = bundledManifests.some((manifest) => manifest.id === universeId);
+  return bundled ? loadUniverse(universeId) : localLibrary[universeId] ?? loadUniverse(universeId);
+};
+
+const mergeManifests = (bundledManifests: UniverseManifest[], localLibrary: Record<string, ContentBundle>) => {
+  const bundledIds = new Set(bundledManifests.map((manifest) => manifest.id));
+  return [
+    ...bundledManifests,
+    ...Object.values(localLibrary)
+      .map((bundle) => bundle.manifest)
+      .filter((manifest) => !bundledIds.has(manifest.id)),
+  ];
+};
+
 export const useUniverseState = create<UniverseStateStore>((set, get) => ({
   activeUniverseId: 'base',
   manifests: [],
@@ -95,10 +114,10 @@ export const useUniverseState = create<UniverseStateStore>((set, get) => ({
         load<LocalePreference>(localePreferenceKey),
         loadGuiLocale('en'),
       ]);
-      const manifests = [...bundledManifests, ...Object.values(localLibrary).map((bundle) => bundle.manifest)];
+      const manifests = mergeManifests(bundledManifests, localLibrary);
       const activeUniverseId = get().activeUniverseId;
       await useContributionState.getState().hydrate(activeUniverseId);
-      const baseBundle = localLibrary[activeUniverseId] ?? (await loadUniverse(activeUniverseId));
+      const baseBundle = await loadBaseBundle(activeUniverseId, bundledManifests, localLibrary);
       const preview = applyDraft(baseBundle);
       set({
         manifests,
@@ -122,8 +141,11 @@ export const useUniverseState = create<UniverseStateStore>((set, get) => ({
 
     try {
       await useContributionState.getState().hydrate(universeId);
-      const localLibrary = await loadLocalUniverseLibrary();
-      const baseBundle = localLibrary[universeId] ?? (await loadUniverse(universeId));
+      const [bundledManifests, localLibrary] = await Promise.all([
+        listBundledUniverses(),
+        loadLocalUniverseLibrary(),
+      ]);
+      const baseBundle = await loadBaseBundle(universeId, bundledManifests, localLibrary);
       const preview = applyDraft(baseBundle);
       set({
         baseBundle,
@@ -158,7 +180,7 @@ export const useUniverseState = create<UniverseStateStore>((set, get) => ({
       loadLocalUniverseLibrary(),
     ]);
     set({
-      manifests: [...bundledManifests, ...Object.values(localLibrary).map((localBundle) => localBundle.manifest)],
+      manifests: mergeManifests(bundledManifests, localLibrary),
       error: null,
     });
     await get().setActiveUniverse(bundle.manifest.id);
@@ -170,7 +192,7 @@ export const useUniverseState = create<UniverseStateStore>((set, get) => ({
       listBundledUniverses(),
       loadLocalUniverseLibrary(),
     ]);
-    const manifests = [...bundledManifests, ...Object.values(localLibrary).map((bundle) => bundle.manifest)];
+    const manifests = mergeManifests(bundledManifests, localLibrary);
     set({ manifests });
 
     if (get().activeUniverseId === universeId) {

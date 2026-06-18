@@ -206,11 +206,11 @@ export default function App() {
     }
 
     const timeout = window.setTimeout(
-      () => resolveDue(bundle.manifest.id, bundle.actions),
+      () => resolveDue(bundle.manifest.id, bundle.actions, { debugEnabled }),
       Math.max(0, nextCompletionAt - Date.now()),
     );
     return () => window.clearTimeout(timeout);
-  }, [bundle, playState, resolveDue]);
+  }, [bundle, debugEnabled, playState, resolveDue]);
 
   if (loading && !bundle) {
     return <main className="grid min-h-screen place-items-center bg-slate-950 text-slate-100">{t('app.loadingUniverse')}</main>;
@@ -264,7 +264,7 @@ export default function App() {
         )}
 
         {activeTab === 'home' && (
-          <section className="grid h-[calc(100vh-150px)] min-h-[560px] gap-4">
+          <section className="grid h-[calc(100vh-150px)] min-h-[560px] grid-rows-[auto_auto_minmax(0,1fr)] gap-4">
             <TravelStatus
               activeTravel={playState.activeTravel}
               bundle={bundle}
@@ -289,7 +289,10 @@ export default function App() {
           />
             </section>
 
-            <ChatPanel locationName={t(currentLocation.titleKey ?? locationTitleKey(currentLocation.id))} t={t} />
+            <ChatPanel
+              messages={playState.chatMessages}
+              t={t}
+            />
           </section>
         )}
 

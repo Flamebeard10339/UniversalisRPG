@@ -109,6 +109,11 @@ export type ActiveAction = {
   completesAt: number;
 };
 
+export type ActionProgress = {
+  elapsedMs: number;
+  runningSince: number | null;
+};
+
 export type ActiveTravel = {
   edgeId: string;
   fromLocationId: string;
@@ -117,14 +122,26 @@ export type ActiveTravel = {
   completesAt: number;
 };
 
+export type ChatMessage = {
+  id: number;
+  author: 'system' | 'player' | 'debug';
+  key?: string;
+  params?: Record<string, string | number>;
+  text?: string;
+  count: number;
+  createdAt: number;
+};
+
 export type UniversePlayState = {
   universeId: string;
   currentLocationId: string;
   discoveredLocationIds: string[];
   activeAction: ActiveAction | null;
+  actionProgress: Record<string, ActionProgress>;
   activeTravel: ActiveTravel | null;
   resources: Record<string, number>;
   skillXp: Record<string, number>;
+  chatMessages: ChatMessage[];
   lastTickAt: number;
 };
 
