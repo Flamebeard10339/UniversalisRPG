@@ -1,0 +1,15 @@
+[
+  {
+    "id": "health",
+    "minValue": 0,
+    "baseMaxValue": 100,
+    "initialValue": 100,
+    "maxSkillId": "health",
+    "onEmpty": [
+      { "kind": "stop-action" },
+      { "kind": "refill", "value": "max" },
+      { "kind": "relocate", "locationId": "starting-location" },
+      { "kind": "chat", "messageKey": "resource.health.empty" }
+    ]
+  }
+]

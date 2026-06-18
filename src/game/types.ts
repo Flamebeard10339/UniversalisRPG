@@ -99,6 +99,42 @@ export type InteractionTypeDefinition = {
   targetPlayerHealth: boolean;
 };
 
+export type ResourceBoundaryBehavior =
+  | {
+      kind: 'stop-action';
+    }
+  | {
+      kind: 'refill';
+      value: 'min' | 'max' | number;
+    }
+  | {
+      kind: 'relocate';
+      locationId: string;
+    }
+  | {
+      kind: 'chat';
+      messageKey: string;
+    };
+
+export type ResourceDefinition = {
+  id: string;
+  minValue: number;
+  baseMaxValue: number;
+  initialValue?: number;
+  maxSkillId?: string;
+  onEmpty?: ResourceBoundaryBehavior[];
+  onFull?: ResourceBoundaryBehavior[];
+};
+
+export type EffectDefinition = {
+  id: string;
+  resourceId: string;
+  ratePerMinute: number;
+  rateSkillId?: string;
+  source: 'player' | 'location';
+  locationId?: string;
+};
+
 export type EnemyDefinition = {
   id: string;
   interactionTypeId: string;
@@ -116,6 +152,8 @@ export type ContentBundle = {
   actions: GameAction[];
   skills: SkillDefinition[];
   items: ItemDefinition[];
+  resourceDefinitions: ResourceDefinition[];
+  effects: EffectDefinition[];
   interactionTypes: InteractionTypeDefinition[];
   enemies: EnemyDefinition[];
   locales: Record<string, LocaleDictionary>;
@@ -228,8 +266,17 @@ export type SkillTotals = {
 export type ActionResolutionContext = {
   actions: GameAction[];
   skills: SkillDefinition[];
+  locations?: LocationNode[];
+  resourceDefinitions?: ResourceDefinition[];
+  effects?: EffectDefinition[];
   interactionTypes: InteractionTypeDefinition[];
   enemies: EnemyDefinition[];
+};
+
+export type ResourcePool = {
+  current: number;
+  min: number;
+  max: number;
 };
 
 export type UniversePlayState = {
@@ -240,6 +287,7 @@ export type UniversePlayState = {
   actionProgress: Record<string, ActionProgress>;
   activeTravel: ActiveTravel | null;
   resources: Record<string, number>;
+  resourcePools: Record<string, ResourcePool>;
   skillXp: Record<string, number>;
   equipmentSkillBonuses: Record<string, SkillEquipmentBonuses>;
   actionLoopingEnabled: boolean;

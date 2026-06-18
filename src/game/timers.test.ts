@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { GameAction } from './types';
+import type { ActionResolutionContext, GameAction } from './types';
 import { createInitialPlayState, resolveIdleTimers, startAction } from './timers';
 
 describe('resolveIdleTimers', () => {
@@ -96,5 +96,106 @@ describe('resolveIdleTimers', () => {
     expect(repeated.state.resources['boundary-resource']).toBe(7);
     expect(repeated.state.chatMessages).toHaveLength(1);
     expect(repeated.report).toEqual({ kind: 'none' });
+  });
+
+  it('does not apply resource effects when no action is active', () => {
+    const context: ActionResolutionContext = {
+      actions: [],
+      skills: [{ id: 'regeneration', maxLevel: 100 }],
+      resourceDefinitions: [{ id: 'health', minValue: 0, baseMaxValue: 100, initialValue: 100 }],
+      effects: [{ id: 'health-regeneration', resourceId: 'health', ratePerMinute: 60, source: 'player' }],
+      interactionTypes: [],
+      enemies: [],
+    };
+    const state = {
+      ...createInitialPlayState('test-universe', 'test-location'),
+      lastTickAt: 1_000,
+      resourcePools: {
+        health: { current: 50, min: 0, max: 100 },
+      },
+      playerHealth: 50,
+    };
+
+    const resolved = resolveIdleTimers(state, context, { showReport: true }, 61_000);
+
+    expect(resolved.state.resourcePools.health.current).toBe(50);
+    expect(resolved.state.playerHealth).toBe(50);
+  });
+
+  it('applies resource effects only for the active action window during idle catch-up', () => {
+    const startedAt = 1_000;
+    const rejoinedAt = startedAt + 60_000;
+    const action: GameAction = {
+      id: 'rest-action',
+      locationId: 'test-location',
+      durationSeconds: 10,
+      rewards: [],
+    };
+    const context: ActionResolutionContext = {
+      actions: [action],
+      skills: [{ id: 'regeneration', maxLevel: 100 }],
+      resourceDefinitions: [{ id: 'health', minValue: 0, baseMaxValue: 100, initialValue: 100 }],
+      effects: [{ id: 'health-regeneration', resourceId: 'health', ratePerMinute: 60, source: 'player' }],
+      interactionTypes: [],
+      enemies: [],
+    };
+    const state = {
+      ...startAction(createInitialPlayState('test-universe', 'test-location'), action, context, startedAt),
+      resourcePools: {
+        health: { current: 50, min: 0, max: 100 },
+      },
+      playerHealth: 50,
+    };
+
+    const resolved = resolveIdleTimers(state, context, { showReport: true }, rejoinedAt);
+
+    expect(resolved.state.activeAction).toBeNull();
+    expect(resolved.state.resourcePools.health.current).toBe(60);
+    expect(resolved.state.playerHealth).toBe(60);
+  });
+
+  it('fires resource empty behaviors when an effect drains health during an action', () => {
+    const startedAt = 1_000;
+    const action: GameAction = {
+      id: 'danger-action',
+      locationId: 'test-location',
+      durationSeconds: 60,
+      rewards: [],
+    };
+    const context: ActionResolutionContext = {
+      actions: [action],
+      skills: [],
+      locations: [{ id: 'test-location', position: { x: 0, y: 0 }, starting: true }],
+      resourceDefinitions: [{
+        id: 'health',
+        minValue: 0,
+        baseMaxValue: 100,
+        initialValue: 100,
+        onEmpty: [
+          { kind: 'stop-action' },
+          { kind: 'refill', value: 'max' },
+          { kind: 'relocate', locationId: 'starting-location' },
+          { kind: 'chat', messageKey: 'resource.health.empty' },
+        ],
+      }],
+      effects: [{ id: 'poison', resourceId: 'health', ratePerMinute: -60, source: 'player' }],
+      interactionTypes: [],
+      enemies: [],
+    };
+    const state = {
+      ...startAction(createInitialPlayState('test-universe', 'test-location'), action, context, startedAt),
+      resourcePools: {
+        health: { current: 10, min: 0, max: 100 },
+      },
+      playerHealth: 10,
+    };
+
+    const resolved = resolveIdleTimers(state, context, { showReport: true }, startedAt + 30_000);
+
+    expect(resolved.state.activeAction).toBeNull();
+    expect(resolved.state.resourcePools.health.current).toBe(100);
+    expect(resolved.state.playerHealth).toBe(100);
+    expect(resolved.state.actionProgress['danger-action'].elapsedMs).toBe(10_000);
+    expect(resolved.state.chatMessages[0].key).toBe('resource.health.empty');
   });
 });

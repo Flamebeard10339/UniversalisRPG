@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://universalis-rpg.local/schema/effects.schema.json",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "required": ["id", "resourceId", "ratePerMinute", "source"],
+    "additionalProperties": false,
+    "properties": {
+      "id": { "type": "string", "minLength": 1 },
+      "resourceId": { "type": "string", "minLength": 1 },
+      "ratePerMinute": { "type": "number" },
+      "rateSkillId": { "type": "string", "minLength": 1 },
+      "source": { "enum": ["player", "location"] },
+      "locationId": { "type": "string", "minLength": 1 }
+    }
+  }
+}

@@ -21,6 +21,9 @@ export const ActionPanel = ({ bundle, debugEnabled, onSetLooping, playState, onS
   const actionContext = {
     actions: bundle.actions,
     skills: bundle.skills,
+    locations: bundle.locations,
+    resourceDefinitions: bundle.resourceDefinitions,
+    effects: bundle.effects,
     interactionTypes: bundle.interactionTypes,
     enemies: bundle.enemies,
   };

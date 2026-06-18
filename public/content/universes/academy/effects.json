@@ -1,0 +1,9 @@
+[
+  {
+    "id": "health-regeneration",
+    "resourceId": "health",
+    "ratePerMinute": 0,
+    "rateSkillId": "regeneration",
+    "source": "player"
+  }
+]

@@ -9,6 +9,24 @@ const context: ActionResolutionContext = {
     { id: 'attack', maxLevel: 100, imprecision: 70 },
     { id: 'defense', maxLevel: 100, imprecision: 70 },
   ],
+  locations: [
+    { id: 'arena', position: { x: 0, y: 0 }, starting: true },
+  ],
+  resourceDefinitions: [
+    {
+      id: 'health',
+      minValue: 0,
+      baseMaxValue: 100,
+      initialValue: 100,
+      onEmpty: [
+        { kind: 'stop-action' },
+        { kind: 'refill', value: 'max' },
+        { kind: 'relocate', locationId: 'starting-location' },
+        { kind: 'chat', messageKey: 'resource.health.empty' },
+      ],
+    },
+  ],
+  effects: [],
   interactionTypes: [
     {
       id: 'melee-combat',
@@ -198,7 +216,10 @@ describe('adversarial actions', () => {
     }, startedAt + 1_000);
 
     expect(resolved.state.activeAction).toBeNull();
-    expect(resolved.state.playerHealth).toBe(0);
+    expect(resolved.state.playerHealth).toBe(100);
+    expect(resolved.state.resourcePools.health.current).toBe(100);
+    expect(resolved.state.currentLocationId).toBe('arena');
+    expect(resolved.state.chatMessages[0].key).toBe('resource.health.empty');
     expect(resolved.state.actionProgress['test-fight'].elapsedMs).toBe(1_000);
     expect(resolved.state.resources.fang).toBeUndefined();
     expect(resolved.state.resources.trophy).toBeUndefined();

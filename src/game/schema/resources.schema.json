@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://universalis-rpg.local/schema/resources.schema.json",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "required": ["id", "minValue", "baseMaxValue"],
+    "additionalProperties": false,
+    "properties": {
+      "id": { "type": "string", "minLength": 1 },
+      "minValue": { "type": "number" },
+      "baseMaxValue": { "type": "number" },
+      "initialValue": { "type": "number" },
+      "maxSkillId": { "type": "string", "minLength": 1 },
+      "onEmpty": {
+        "type": "array",
+        "items": { "$ref": "#/$defs/behavior" }
+      },
+      "onFull": {
+        "type": "array",
+        "items": { "$ref": "#/$defs/behavior" }
+      }
+    }
+  },
+  "$defs": {
+    "behavior": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["kind"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "const": "stop-action" }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["kind", "value"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "const": "refill" },
+            "value": {
+              "oneOf": [
+                { "const": "min" },
+                { "const": "max" },
+                { "type": "number" }
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["kind", "locationId"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "const": "relocate" },
+            "locationId": { "type": "string", "minLength": 1 }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["kind", "messageKey"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "const": "chat" },
+            "messageKey": { "type": "string", "minLength": 1 }
+          }
+        }
+      ]
+    }
+  }
+}

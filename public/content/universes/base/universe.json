@@ -12,6 +12,8 @@
     "actions.json",
     "skills.json",
     "items.json",
+    "resources.json",
+    "effects.json",
     "interaction-types.json",
     "enemies.json",
     "locales/en.json"

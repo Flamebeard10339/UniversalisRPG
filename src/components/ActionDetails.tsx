@@ -22,6 +22,9 @@ export const ActionDetails = ({ bundle, onStopAction, playState, t }: ActionDeta
   const actionContext = {
     actions: bundle.actions,
     skills: bundle.skills,
+    locations: bundle.locations,
+    resourceDefinitions: bundle.resourceDefinitions,
+    effects: bundle.effects,
     interactionTypes: bundle.interactionTypes,
     enemies: bundle.enemies,
   };

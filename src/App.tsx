@@ -137,6 +137,9 @@ export default function App() {
   const actionContext = useMemo(() => ({
     actions: bundle?.actions ?? [],
     skills: bundle?.skills ?? [],
+    locations: bundle?.locations ?? [],
+    resourceDefinitions: bundle?.resourceDefinitions ?? [],
+    effects: bundle?.effects ?? [],
     interactionTypes: bundle?.interactionTypes ?? [],
     enemies: bundle?.enemies ?? [],
   }), [bundle]);
@@ -241,6 +244,9 @@ export default function App() {
         const report = useGameState.getState().resolveIdle(activeBundleId, {
           actions: currentBundle.actions,
           skills: currentBundle.skills,
+          locations: currentBundle.locations,
+          resourceDefinitions: currentBundle.resourceDefinitions,
+          effects: currentBundle.effects,
           interactionTypes: currentBundle.interactionTypes,
           enemies: currentBundle.enemies,
         }, {

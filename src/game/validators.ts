@@ -2,11 +2,13 @@ import type {
   ContentBundle,
   ContributionDraft,
   EnemyDefinition,
+  EffectDefinition,
   GameAction,
   InteractionTypeDefinition,
   ItemDefinition,
   LocaleDictionary,
   LocationNode,
+  ResourceDefinition,
   SkillDefinition,
   TravelEdgeDefinition,
   UniverseManifest,
@@ -115,6 +117,29 @@ const validateItemsShape = (items: unknown): items is ItemDefinition[] =>
         hasString(item, 'id'),
     ));
 
+const validateResourceDefinitionsShape = (resources: unknown): resources is ResourceDefinition[] =>
+  resources === undefined ||
+  (Array.isArray(resources) &&
+    resources.every(
+      (resource) =>
+        isRecord(resource) &&
+        hasString(resource, 'id') &&
+        hasNumber(resource, 'minValue') &&
+        hasNumber(resource, 'baseMaxValue'),
+    ));
+
+const validateEffectsShape = (effects: unknown): effects is EffectDefinition[] =>
+  effects === undefined ||
+  (Array.isArray(effects) &&
+    effects.every(
+      (effect) =>
+        isRecord(effect) &&
+        hasString(effect, 'id') &&
+        hasString(effect, 'resourceId') &&
+        hasNumber(effect, 'ratePerMinute') &&
+        (effect.source === 'player' || effect.source === 'location'),
+    ));
+
 const validateInteractionTypesShape = (interactionTypes: unknown): interactionTypes is InteractionTypeDefinition[] =>
   interactionTypes === undefined ||
   (Array.isArray(interactionTypes) &&
@@ -168,6 +193,14 @@ export const validateContentShape = (bundle: Partial<ContentBundle>) => {
     issues.push(error('items.json', 'validation.itemsShape'));
   }
 
+  if (!validateResourceDefinitionsShape(bundle.resourceDefinitions)) {
+    issues.push(error('resources.json', 'validation.resourcesShape'));
+  }
+
+  if (!validateEffectsShape(bundle.effects)) {
+    issues.push(error('effects.json', 'validation.effectsShape'));
+  }
+
   if (!validateInteractionTypesShape(bundle.interactionTypes)) {
     issues.push(error('interaction-types.json', 'validation.interactionTypesShape'));
   }
@@ -200,6 +233,8 @@ export const validateContentReferences = (bundle: ContentBundle) => {
     ...findDuplicateIds(bundle.actions, 'actions'),
     ...findDuplicateIds(bundle.skills, 'skills'),
     ...findDuplicateIds(bundle.items ?? [], 'items'),
+    ...findDuplicateIds(bundle.resourceDefinitions ?? [], 'resources'),
+    ...findDuplicateIds(bundle.effects ?? [], 'effects'),
     ...findDuplicateIds(bundle.interactionTypes ?? [], 'interactionTypes'),
     ...findDuplicateIds(bundle.enemies ?? [], 'enemies'),
   ];
@@ -207,6 +242,7 @@ export const validateContentReferences = (bundle: ContentBundle) => {
   const locationIds = new Set(bundle.locations.map((location) => location.id));
   const skillIds = new Set(bundle.skills.map((skill) => skill.id));
   const itemIds = new Set((bundle.items ?? []).map((item) => item.id));
+  const resourceIds = new Set((bundle.resourceDefinitions ?? []).map((resource) => resource.id));
   const interactionTypeIds = new Set((bundle.interactionTypes ?? []).map((interactionType) => interactionType.id));
   const enemyIds = new Set((bundle.enemies ?? []).map((enemy) => enemy.id));
   const locale = bundle.locales[bundle.manifest.locales[0]] ?? {};
@@ -293,6 +329,36 @@ export const validateContentReferences = (bundle: ContentBundle) => {
     }
     if (skill.imprecision !== undefined && skill.imprecision <= 0) {
       issues.push(error(`skills.${skill.id}.imprecision`, 'validation.imprecisionPositive'));
+    }
+  }
+
+  for (const resource of bundle.resourceDefinitions ?? []) {
+    if (!isKebabCaseId(resource.id)) {
+      issues.push(error(`resources.${resource.id}.id`, 'validation.resourceIdKebab'));
+    }
+    if (resource.minValue >= resource.baseMaxValue) {
+      issues.push(error(`resources.${resource.id}.minValue`, 'validation.resourceMinLessThanMax'));
+    }
+    if (resource.initialValue !== undefined && (resource.initialValue < resource.minValue || resource.initialValue > resource.baseMaxValue)) {
+      issues.push(error(`resources.${resource.id}.initialValue`, 'validation.resourceInitialInBounds'));
+    }
+    if (resource.maxSkillId && !skillIds.has(resource.maxSkillId)) {
+      issues.push(error(`resources.${resource.id}.maxSkillId`, 'validation.unknownSkill', { id: resource.maxSkillId }));
+    }
+  }
+
+  for (const effect of bundle.effects ?? []) {
+    if (!isKebabCaseId(effect.id)) {
+      issues.push(error(`effects.${effect.id}.id`, 'validation.effectIdKebab'));
+    }
+    if (!resourceIds.has(effect.resourceId)) {
+      issues.push(error(`effects.${effect.id}.resourceId`, 'validation.unknownResource', { id: effect.resourceId }));
+    }
+    if (effect.rateSkillId && !skillIds.has(effect.rateSkillId)) {
+      issues.push(error(`effects.${effect.id}.rateSkillId`, 'validation.unknownSkill', { id: effect.rateSkillId }));
+    }
+    if (effect.source === 'location' && effect.locationId && !locationIds.has(effect.locationId)) {
+      issues.push(error(`effects.${effect.id}.locationId`, 'validation.unknownLocation', { id: effect.locationId }));
     }
   }
 
@@ -390,6 +456,10 @@ export const collectLocalizationKeys = (bundle: ContentBundle) => [
     item.titleKey ?? itemTitleKey(item.id),
     item.descriptionKey ?? itemDescriptionKey(item.id),
   ]),
+  ...(bundle.resourceDefinitions ?? []).flatMap((resource) => [
+    ...(resource.onEmpty ?? []),
+    ...(resource.onFull ?? []),
+  ].flatMap((behavior) => behavior.kind === 'chat' ? [behavior.messageKey] : [])),
 ].filter((key): key is string => Boolean(key));
 
 export const validateLocaleDictionary = (locale: LocaleDictionary) =>
@@ -411,6 +481,8 @@ export const mergeDraftIntoBundle = (bundle: ContentBundle, draft: ContributionD
     actions: mergeById(removeById(bundle.actions, draft.removed?.actions ?? []), draft.actions),
     skills: mergeById(removeById(bundle.skills, draft.removed?.skills ?? []), draft.skills),
     items: mergeById(removeById(bundle.items ?? [], draft.removed?.items ?? []), draft.items),
+    resourceDefinitions: bundle.resourceDefinitions ?? [],
+    effects: bundle.effects ?? [],
     interactionTypes: mergeById(removeById(bundle.interactionTypes ?? [], draft.removed?.interactionTypes ?? []), draft.interactionTypes ?? []),
     enemies: mergeById(removeById(bundle.enemies ?? [], draft.removed?.enemies ?? []), draft.enemies ?? []),
     locales: mergeLocales(bundle.locales, draft.locales),

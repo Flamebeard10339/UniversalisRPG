@@ -48,6 +48,7 @@
   "skill.regeneration.description": "Recovered health per minute while time passes.",
   "skill.health.title": "Health",
   "skill.health.description": "Maximum player health.",
+  "resource.health.empty": "You died.",
   "item.emberleaf.title": "Emberleaf",
   "item.emberleaf.description": "A warm leaf that keeps a coal-like glow after it falls."
 }

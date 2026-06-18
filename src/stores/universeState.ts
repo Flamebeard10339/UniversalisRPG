@@ -74,13 +74,28 @@ const applyDraft = (bundle: ContentBundle | null) => {
   };
 };
 
+const normalizeContentBundle = (bundle: ContentBundle): ContentBundle => ({
+  ...bundle,
+  items: bundle.items ?? [],
+  resourceDefinitions: bundle.resourceDefinitions ?? [],
+  effects: bundle.effects ?? [],
+  interactionTypes: bundle.interactionTypes ?? [],
+  enemies: bundle.enemies ?? [],
+});
+
 const loadBaseBundle = async (
   universeId: string,
   bundledManifests: UniverseManifest[],
   localLibrary: Record<string, ContentBundle>,
 ) => {
   const bundled = bundledManifests.some((manifest) => manifest.id === universeId);
-  return bundled ? loadUniverse(universeId) : localLibrary[universeId] ?? loadUniverse(universeId);
+  if (bundled) {
+    return normalizeContentBundle(await loadUniverse(universeId));
+  }
+
+  const localBundle = localLibrary[universeId];
+  const bundle = localBundle ?? (await loadUniverse(universeId));
+  return normalizeContentBundle(bundle);
 };
 
 const mergeManifests = (bundledManifests: UniverseManifest[], localLibrary: Record<string, ContentBundle>) => {
@@ -166,7 +181,8 @@ export const useUniverseState = create<UniverseStateStore>((set, get) => ({
   },
 
   importLocalUniverse: async (bundle) => {
-    const validationIssues = validateContentBundle(bundle);
+    const normalizedBundle = normalizeContentBundle(bundle);
+    const validationIssues = validateContentBundle(normalizedBundle);
     const hasErrors = validationIssues.some((issue) => issue.severity === 'error');
 
     if (hasErrors) {
@@ -174,7 +190,7 @@ export const useUniverseState = create<UniverseStateStore>((set, get) => ({
       return;
     }
 
-    await saveLocalUniverseBundle(bundle);
+    await saveLocalUniverseBundle(normalizedBundle);
     const [bundledManifests, localLibrary] = await Promise.all([
       listBundledUniverses(),
       loadLocalUniverseLibrary(),
@@ -183,7 +199,7 @@ export const useUniverseState = create<UniverseStateStore>((set, get) => ({
       manifests: mergeManifests(bundledManifests, localLibrary),
       error: null,
     });
-    await get().setActiveUniverse(bundle.manifest.id);
+    await get().setActiveUniverse(normalizedBundle.manifest.id);
   },
 
   removeLocalUniverse: async (universeId) => {
