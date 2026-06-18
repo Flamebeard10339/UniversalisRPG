@@ -34,7 +34,7 @@ describe('resolveIdleTimers', () => {
     expect(setIntervalSpy).not.toHaveBeenCalled();
     expect(resolved.state.activeAction).toBeNull();
     expect(resolved.state.resources['test-resource']).toBe(3);
-    expect(resolved.state.actionProgress['closed-app-action']).toEqual({
+    expect(resolved.state.actionProgress['closed-app-action']).toMatchObject({
       elapsedMs: 0,
       runningSince: null,
     });

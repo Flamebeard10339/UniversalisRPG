@@ -1,6 +1,7 @@
 import type {
   ContentBundle,
   ContributionDraft,
+  EnemyDefinition,
   GameAction,
   InteractionTypeDefinition,
   ItemDefinition,
@@ -14,6 +15,7 @@ import type {
 import {
   actionDescriptionKey,
   actionFailureKey,
+  actionKillKey,
   actionSuccessKey,
   actionTitleKey,
   itemDescriptionKey,
@@ -125,6 +127,20 @@ const validateInteractionTypesShape = (interactionTypes: unknown): interactionTy
         typeof interactionType.targetPlayerHealth === 'boolean',
     ));
 
+const validateEnemiesShape = (enemies: unknown): enemies is EnemyDefinition[] =>
+  enemies === undefined ||
+  (Array.isArray(enemies) &&
+    enemies.every(
+      (enemy) =>
+        isRecord(enemy) &&
+        hasString(enemy, 'id') &&
+        hasString(enemy, 'interactionTypeId') &&
+        hasNumber(enemy, 'health') &&
+        hasNumber(enemy, 'rate') &&
+        isRecord(enemy.skills) &&
+        Array.isArray(enemy.rewards),
+    ));
+
 export const validateContentShape = (bundle: Partial<ContentBundle>) => {
   const issues: ValidationIssue[] = [];
 
@@ -156,6 +172,10 @@ export const validateContentShape = (bundle: Partial<ContentBundle>) => {
     issues.push(error('interaction-types.json', 'validation.interactionTypesShape'));
   }
 
+  if (!validateEnemiesShape(bundle.enemies)) {
+    issues.push(error('enemies.json', 'validation.enemiesShape'));
+  }
+
   return issues;
 };
 
@@ -181,12 +201,14 @@ export const validateContentReferences = (bundle: ContentBundle) => {
     ...findDuplicateIds(bundle.skills, 'skills'),
     ...findDuplicateIds(bundle.items ?? [], 'items'),
     ...findDuplicateIds(bundle.interactionTypes ?? [], 'interactionTypes'),
+    ...findDuplicateIds(bundle.enemies ?? [], 'enemies'),
   ];
 
   const locationIds = new Set(bundle.locations.map((location) => location.id));
   const skillIds = new Set(bundle.skills.map((skill) => skill.id));
   const itemIds = new Set((bundle.items ?? []).map((item) => item.id));
   const interactionTypeIds = new Set((bundle.interactionTypes ?? []).map((interactionType) => interactionType.id));
+  const enemyIds = new Set((bundle.enemies ?? []).map((enemy) => enemy.id));
   const locale = bundle.locales[bundle.manifest.locales[0]] ?? {};
 
   if (!bundle.locations.some((location) => location.starting)) {
@@ -227,6 +249,9 @@ export const validateContentReferences = (bundle: ContentBundle) => {
     }
     if (action.interactionTypeId && !interactionTypeIds.has(action.interactionTypeId)) {
       issues.push(error(`actions.${action.id}.interactionTypeId`, 'validation.unknownInteractionType', { id: action.interactionTypeId }));
+    }
+    if (action.enemyId && !enemyIds.has(action.enemyId)) {
+      issues.push(error(`actions.${action.id}.enemyId`, 'validation.unknownEnemy', { id: action.enemyId }));
     }
     if (action.sourceSkillId && !skillIds.has(action.sourceSkillId)) {
       issues.push(error(`actions.${action.id}.sourceSkillId`, 'validation.unknownSkill', { id: action.sourceSkillId }));
@@ -283,6 +308,46 @@ export const validateContentReferences = (bundle: ContentBundle) => {
     }
   }
 
+  for (const enemy of bundle.enemies ?? []) {
+    if (!isKebabCaseId(enemy.id)) {
+      issues.push(error(`enemies.${enemy.id}.id`, 'validation.enemyIdKebab'));
+    }
+    if (!interactionTypeIds.has(enemy.interactionTypeId)) {
+      issues.push(error(`enemies.${enemy.id}.interactionTypeId`, 'validation.unknownInteractionType', { id: enemy.interactionTypeId }));
+    }
+    if (enemy.health <= 0) {
+      issues.push(error(`enemies.${enemy.id}.health`, 'validation.healthPositive'));
+    }
+    if (enemy.rate < 0) {
+      issues.push(error(`enemies.${enemy.id}.rate`, 'validation.rateNonNegative'));
+    }
+    for (const [skillId, skill] of Object.entries(enemy.skills)) {
+      if (!skillIds.has(skillId)) {
+        issues.push(error(`enemies.${enemy.id}.skills.${skillId}`, 'validation.unknownSkill', { id: skillId }));
+      }
+      if (skill.base !== undefined && skill.base < 1) {
+        issues.push(error(`enemies.${enemy.id}.skills.${skillId}.base`, 'validation.skillBasePositive'));
+      }
+      if (skill.imprecision !== undefined && skill.imprecision <= 0) {
+        issues.push(error(`enemies.${enemy.id}.skills.${skillId}.imprecision`, 'validation.imprecisionPositive'));
+      }
+      if (skill.rate !== undefined && skill.rate < 0) {
+        issues.push(error(`enemies.${enemy.id}.skills.${skillId}.rate`, 'validation.rateNonNegative'));
+      }
+    }
+    for (const reward of enemy.rewards) {
+      if (reward.kind === 'skillXp' && !skillIds.has(reward.skillId)) {
+        issues.push(error(`enemies.${enemy.id}.rewards`, 'validation.unknownSkill', { id: reward.skillId }));
+      }
+      if (reward.kind === 'resource' && itemIds.size > 0 && !itemIds.has(reward.resourceId)) {
+        issues.push(error(`enemies.${enemy.id}.rewards`, 'validation.unknownItem', { id: reward.resourceId }));
+      }
+      if (reward.amount <= 0) {
+        issues.push(error(`enemies.${enemy.id}.rewards`, 'validation.rewardAmountPositive'));
+      }
+    }
+  }
+
   for (const item of bundle.items ?? []) {
     if (!isKebabCaseId(item.id)) {
       issues.push(error(`items.${item.id}.id`, 'validation.itemIdKebab'));
@@ -315,6 +380,7 @@ export const collectLocalizationKeys = (bundle: ContentBundle) => [
     action.descriptionKey ?? actionDescriptionKey(action.id),
     actionSuccessKey(action.id),
     actionFailureKey(action.id),
+    action.enemyId ? actionKillKey(action.id) : null,
   ]),
   ...bundle.skills.flatMap((skill) => [
     skill.titleKey ?? skillTitleKey(skill.id),
@@ -340,14 +406,20 @@ export const mergeDraftIntoBundle = (bundle: ContentBundle, draft: ContributionD
 
   return {
     ...bundle,
-    locations: mergeById(bundle.locations, draft.locations),
-    edges: mergeById(bundle.edges, draft.edges),
-    actions: mergeById(bundle.actions, draft.actions),
-    skills: mergeById(bundle.skills, draft.skills),
-    items: mergeById(bundle.items ?? [], draft.items),
-    interactionTypes: mergeById(bundle.interactionTypes ?? [], draft.interactionTypes ?? []),
+    locations: mergeById(removeById(bundle.locations, draft.removed?.locations ?? []), draft.locations),
+    edges: mergeById(removeById(bundle.edges, draft.removed?.edges ?? []), draft.edges),
+    actions: mergeById(removeById(bundle.actions, draft.removed?.actions ?? []), draft.actions),
+    skills: mergeById(removeById(bundle.skills, draft.removed?.skills ?? []), draft.skills),
+    items: mergeById(removeById(bundle.items ?? [], draft.removed?.items ?? []), draft.items),
+    interactionTypes: mergeById(removeById(bundle.interactionTypes ?? [], draft.removed?.interactionTypes ?? []), draft.interactionTypes ?? []),
+    enemies: mergeById(removeById(bundle.enemies ?? [], draft.removed?.enemies ?? []), draft.enemies ?? []),
     locales: mergeLocales(bundle.locales, draft.locales),
   };
+};
+
+const removeById = <T extends { id: string }>(items: T[], removedIds: string[]) => {
+  const removed = new Set(removedIds);
+  return items.filter((item) => !removed.has(item.id));
 };
 
 const mergeById = <T extends { id: string }>(base: T[], draft: T[]) => {

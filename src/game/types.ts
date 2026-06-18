@@ -69,6 +69,7 @@ export type GameAction = {
   durationSeconds: number;
   rewards: Reward[];
   requirements?: Requirement[];
+  enemyId?: string;
   interactionTypeId?: string;
   sourceSkillId?: string;
   targetSkillId?: string;
@@ -98,6 +99,15 @@ export type InteractionTypeDefinition = {
   targetPlayerHealth: boolean;
 };
 
+export type EnemyDefinition = {
+  id: string;
+  interactionTypeId: string;
+  health: number;
+  rate: number;
+  skills: Record<string, SkillEquipmentBonuses>;
+  rewards: Reward[];
+};
+
 export type ContentBundle = {
   manifest: UniverseManifest;
   locations: LocationNode[];
@@ -106,6 +116,7 @@ export type ContentBundle = {
   skills: SkillDefinition[];
   items: ItemDefinition[];
   interactionTypes: InteractionTypeDefinition[];
+  enemies: EnemyDefinition[];
   locales: Record<string, LocaleDictionary>;
 };
 
@@ -123,12 +134,16 @@ export type ActiveAction = {
   startedAt: number;
   completesAt: number;
   targetHealth: number | null;
+  enemyAttackStartedAt: number | null;
+  enemyAttackCompletesAt: number | null;
 };
 
 export type ActionProgress = {
   elapsedMs: number;
   runningSince: number | null;
   targetHealth?: number | null;
+  enemyAttackStartedAt?: number | null;
+  enemyAttackCompletesAt?: number | null;
 };
 
 export type ActiveTravel = {
@@ -213,6 +228,7 @@ export type ActionResolutionContext = {
   actions: GameAction[];
   skills: SkillDefinition[];
   interactionTypes: InteractionTypeDefinition[];
+  enemies: EnemyDefinition[];
 };
 
 export type UniversePlayState = {
@@ -242,7 +258,19 @@ export type ContributionDraft = {
   skills: SkillDefinition[];
   items: ItemDefinition[];
   interactionTypes: InteractionTypeDefinition[];
+  enemies: EnemyDefinition[];
   locales: Record<string, LocaleDictionary>;
+  removed: ContributionRemovedIds;
+};
+
+export type ContributionRemovedIds = {
+  locations: string[];
+  edges: string[];
+  actions: string[];
+  skills: string[];
+  items: string[];
+  interactionTypes: string[];
+  enemies: string[];
 };
 
 export type ContributionPackage = {

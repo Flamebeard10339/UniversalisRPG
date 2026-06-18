@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://universalis-rpg.local/schema/enemies.schema.json",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "required": ["id", "interactionTypeId", "health", "rate", "skills", "rewards"],
+    "additionalProperties": false,
+    "properties": {
+      "id": { "type": "string", "minLength": 1 },
+      "interactionTypeId": { "type": "string", "minLength": 1 },
+      "health": { "type": "number", "exclusiveMinimum": 0 },
+      "rate": { "type": "number", "minimum": 0 },
+      "skills": {
+        "type": "object",
+        "additionalProperties": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "base": { "type": "number", "minimum": 1 },
+            "added": { "type": "number" },
+            "increased": { "type": "number" },
+            "rate": { "type": "number", "minimum": 0 },
+            "imprecision": { "type": "number", "exclusiveMinimum": 0 }
+          }
+        }
+      },
+      "rewards": {
+        "type": "array",
+        "items": {
+          "oneOf": [
+            {
+              "type": "object",
+              "required": ["kind", "skillId", "amount"],
+              "additionalProperties": false,
+              "properties": {
+                "kind": { "const": "skillXp" },
+                "skillId": { "type": "string", "minLength": 1 },
+                "amount": { "type": "number", "exclusiveMinimum": 0 }
+              }
+            },
+            {
+              "type": "object",
+              "required": ["kind", "resourceId", "amount"],
+              "additionalProperties": false,
+              "properties": {
+                "kind": { "const": "resource" },
+                "resourceId": { "type": "string", "minLength": 1 },
+                "amount": { "type": "number", "exclusiveMinimum": 0 }
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
+}

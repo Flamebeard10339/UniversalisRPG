@@ -13,6 +13,7 @@
     "skills.json",
     "items.json",
     "interaction-types.json",
+    "enemies.json",
     "locales/en.json"
   ],
   "compatibility": {

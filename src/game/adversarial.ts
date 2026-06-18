@@ -1,7 +1,9 @@
 import type {
   ActionResolutionContext,
+  EnemyDefinition,
   GameAction,
   InteractionTypeDefinition,
+  SkillEquipmentBonuses,
   SkillDefinition,
   SkillTotals,
   UniversePlayState,
@@ -45,10 +47,12 @@ export const actionDps = (sourceTotal: number, sourceImprecision: number, target
 export const getSkillTotals = (
   state: UniversePlayState,
   skill: SkillDefinition | undefined,
+  override?: SkillEquipmentBonuses,
 ): SkillTotals => {
   const skillId = skill?.id ?? '';
-  const bonuses = state.equipmentSkillBonuses[skillId] ?? {};
-  const base = Math.max(1, skill ? skillLevelFromXp(state.skillXp[skill.id] ?? 0) : 1) + (bonuses.base ?? 0);
+  const bonuses = override ?? state.equipmentSkillBonuses[skillId] ?? {};
+  const learnedBase = skill ? skillLevelFromXp(state.skillXp[skill.id] ?? 0) : 1;
+  const base = Math.max(1, override?.base ?? learnedBase) + (override ? 0 : bonuses.base ?? 0);
   const added = bonuses.added ?? 0;
   const increased = bonuses.increased ?? 0;
   const rawTotal = 7 * base + added;
@@ -66,12 +70,18 @@ export const getSkillTotals = (
   };
 };
 
+export const getEnemy = (
+  action: GameAction,
+  context: ActionResolutionContext,
+): EnemyDefinition | null =>
+  action.enemyId ? context.enemies.find((enemy) => enemy.id === action.enemyId) ?? null : null;
+
 export const getInteractionType = (
   action: GameAction,
   context: ActionResolutionContext,
 ): InteractionTypeDefinition | null =>
-  action.interactionTypeId
-    ? context.interactionTypes.find((interactionType) => interactionType.id === action.interactionTypeId) ?? null
+  (getEnemy(action, context)?.interactionTypeId ?? action.interactionTypeId)
+    ? context.interactionTypes.find((interactionType) => interactionType.id === (getEnemy(action, context)?.interactionTypeId ?? action.interactionTypeId)) ?? null
     : null;
 
 export const getActionSkills = (
@@ -89,6 +99,12 @@ export const getActionSkills = (
   };
 };
 
+export const getEnemySkillTotals = (
+  state: UniversePlayState,
+  enemy: EnemyDefinition,
+  skill: SkillDefinition | undefined,
+) => getSkillTotals(state, skill, enemy.skills[skill?.id ?? ''] ?? {});
+
 export const getActionDurationMs = (
   state: UniversePlayState,
   action: GameAction,
@@ -105,14 +121,15 @@ export const getActionDps = (
   action: GameAction,
   context: ActionResolutionContext,
 ) => {
+  const enemy = getEnemy(action, context);
   const { sourceSkill, targetSkill } = getActionSkills(action, context);
 
-  if (!sourceSkill || !targetSkill || !action.health) {
+  if (!sourceSkill || !targetSkill || !enemy) {
     return null;
   }
 
   const source = getSkillTotals(state, sourceSkill);
-  const target = getSkillTotals(state, targetSkill);
+  const target = getEnemySkillTotals(state, enemy, targetSkill);
 
   return actionDps(source.effectiveTotal, source.imprecision, target.effectiveTotal, getActionDurationMs(state, action, context) / 1000);
 };
@@ -131,13 +148,45 @@ export const sampleAdversarialDamage = (
   context: ActionResolutionContext,
   random = Math.random,
 ) => {
+  const enemy = getEnemy(action, context);
   const { sourceSkill, targetSkill } = getActionSkills(action, context);
 
-  if (!sourceSkill || !targetSkill) {
+  if (!sourceSkill || !targetSkill || !enemy) {
     return null;
   }
 
   const source = getSkillTotals(state, sourceSkill);
+  const target = getEnemySkillTotals(state, enemy, targetSkill);
+  const sample = sampleNormal(source.effectiveTotal, source.imprecision, random);
+
+  return {
+    sample,
+    damage: sample >= target.effectiveTotal ? sample - target.effectiveTotal : 0,
+    source,
+    target,
+  };
+};
+
+export const getEnemyAttackDurationMs = (
+  enemy: EnemyDefinition | null,
+) => enemy && enemy.rate > 0 ? 1000 / enemy.rate : null;
+
+export const sampleEnemyAttackDamage = (
+  state: UniversePlayState,
+  action: GameAction,
+  context: ActionResolutionContext,
+  random = Math.random,
+) => {
+  const enemy = getEnemy(action, context);
+  const interactionType = getInteractionType(action, context);
+  const sourceSkill = context.skills.find((skill) => skill.id === interactionType?.sourceSkillId);
+  const targetSkill = context.skills.find((skill) => skill.id === interactionType?.targetSkillId);
+
+  if (!enemy || !interactionType?.targetPlayerHealth || enemy.rate <= 0 || !sourceSkill || !targetSkill) {
+    return null;
+  }
+
+  const source = getEnemySkillTotals(state, enemy, sourceSkill);
   const target = getSkillTotals(state, targetSkill);
   const sample = sampleNormal(source.effectiveTotal, source.imprecision, random);
 

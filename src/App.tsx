@@ -129,10 +129,12 @@ export default function App() {
   }, [changelogText, showChangelog]);
 
   const startingLocationId = useMemo(() => (bundle ? getStartingLocationId(bundle) : ''), [bundle]);
+  const activeBundleId = bundle?.manifest.id;
   const actionContext = useMemo(() => ({
     actions: bundle?.actions ?? [],
     skills: bundle?.skills ?? [],
     interactionTypes: bundle?.interactionTypes ?? [],
+    enemies: bundle?.enemies ?? [],
   }), [bundle]);
   const playState = bundle ? gameStates[bundle.manifest.id] ?? getUniverseState(bundle.manifest.id, startingLocationId) : null;
   const currentLocation = bundle?.locations.find((location) => location.id === playState?.currentLocationId);
@@ -224,12 +226,19 @@ export default function App() {
   };
 
   useEffect(() => {
-    if (bundle && startingLocationId) {
-      void hydratePlayState(bundle.manifest.id, startingLocationId).then(() => {
-        const report = useGameState.getState().resolveIdle(bundle.manifest.id, {
-          actions: bundle.actions,
-          skills: bundle.skills,
-          interactionTypes: bundle.interactionTypes,
+    if (activeBundleId && startingLocationId) {
+      void hydratePlayState(activeBundleId, startingLocationId).then(() => {
+        const currentBundle = useUniverseState.getState().bundle;
+
+        if (!currentBundle || currentBundle.manifest.id !== activeBundleId) {
+          return;
+        }
+
+        const report = useGameState.getState().resolveIdle(activeBundleId, {
+          actions: currentBundle.actions,
+          skills: currentBundle.skills,
+          interactionTypes: currentBundle.interactionTypes,
+          enemies: currentBundle.enemies,
         }, {
           debugEnabled: useDebugState.getState().enabled,
           showReport: true,
@@ -237,7 +246,7 @@ export default function App() {
         showIdleReport(report);
       });
     }
-  }, [bundle, hydratePlayState, startingLocationId]);
+  }, [activeBundleId, hydratePlayState, startingLocationId]);
 
   useEffect(() => {
     if (!bundle) {
@@ -290,7 +299,11 @@ export default function App() {
       return undefined;
     }
 
-    const nextCompletionAt = [playState.activeTravel?.completesAt, playState.activeAction?.completesAt]
+    const nextCompletionAt = [
+      playState.activeTravel?.completesAt,
+      playState.activeAction?.completesAt,
+      playState.activeAction?.enemyAttackCompletesAt,
+    ]
       .filter((time): time is number => typeof time === 'number')
       .sort((a, b) => a - b)[0];
 
@@ -312,7 +325,11 @@ export default function App() {
       return;
     }
 
-    const nextCompletionAt = [playState.activeTravel?.completesAt, playState.activeAction?.completesAt]
+    const nextCompletionAt = [
+      playState.activeTravel?.completesAt,
+      playState.activeAction?.completesAt,
+      playState.activeAction?.enemyAttackCompletesAt,
+    ]
       .filter((time): time is number => typeof time === 'number')
       .sort((a, b) => a - b)[0];
 

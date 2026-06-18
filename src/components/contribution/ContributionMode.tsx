@@ -26,7 +26,17 @@ const emptyDraft = (universeId: string): ContributionDraft => ({
   skills: [],
   items: [],
   interactionTypes: [],
+  enemies: [],
   locales: {},
+  removed: {
+    locations: [],
+    edges: [],
+    actions: [],
+    skills: [],
+    items: [],
+    interactionTypes: [],
+    enemies: [],
+  },
 });
 
 export const ContributionMode = ({ bundle, validationIssues, t }: ContributionModeProps) => {
@@ -34,6 +44,7 @@ export const ContributionMode = ({ bundle, validationIssues, t }: ContributionMo
   const draft = useContributionState((state) => state.drafts[bundle.manifest.id] ?? emptyDraft(bundle.manifest.id));
   const updateDraft = useContributionState((state) => state.updateDraft);
   const resetDraft = useContributionState((state) => state.resetDraft);
+  const baseBundle = useUniverseState((state) => state.baseBundle);
   const refreshContributionPreview = useUniverseState((state) => state.refreshContributionPreview);
 
   const patchDraft = (patch: Partial<Omit<ContributionDraft, 'universeId'>>) => {
@@ -76,7 +87,7 @@ export const ContributionMode = ({ bundle, validationIssues, t }: ContributionMo
       </div>
 
       {activeTab === 'content' && (
-        <ContentDataEditor bundle={bundle} draft={draft} onPatch={patchDraft} t={t} />
+        <ContentDataEditor baseBundle={baseBundle ?? bundle} bundle={bundle} draft={draft} onPatch={patchDraft} t={t} />
       )}
 
       {activeTab === 'localization' && (

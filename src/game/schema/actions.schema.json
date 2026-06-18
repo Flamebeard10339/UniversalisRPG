@@ -10,11 +10,7 @@
       "id": { "type": "string", "minLength": 1 },
       "locationId": { "type": "string", "minLength": 1 },
       "durationSeconds": { "type": "number", "exclusiveMinimum": 0 },
-      "interactionTypeId": { "type": "string", "minLength": 1 },
-      "sourceSkillId": { "type": "string", "minLength": 1 },
-      "targetSkillId": { "type": "string", "minLength": 1 },
-      "health": { "type": "number", "exclusiveMinimum": 0 },
-      "rate": { "type": "number", "minimum": 0 },
+      "enemyId": { "type": "string", "minLength": 1 },
       "rewards": {
         "type": "array",
         "items": {

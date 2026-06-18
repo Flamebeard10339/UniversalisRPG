@@ -25,10 +25,15 @@ export const SubmitToGitHub = ({ appVersion, draft, validationIssues, t }: Submi
         { path: 'skills.json', json: draft.skills },
         { path: 'items.json', json: draft.items },
         { path: 'interaction-types.json', json: draft.interactionTypes },
+        { path: 'enemies.json', json: draft.enemies },
+        { path: 'removed.json', json: draft.removed },
         { path: 'locales.json', json: draft.locales },
       ].filter((file) => {
         if (Array.isArray(file.json)) {
           return file.json.length > 0;
+        }
+        if (file.path === 'removed.json') {
+          return Object.values(file.json as Record<string, unknown[]>).some((items) => items.length > 0);
         }
         return Object.keys(file.json as Record<string, unknown>).length > 0;
       }),

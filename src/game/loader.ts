@@ -1,5 +1,6 @@
 import type {
   ContentBundle,
+  EnemyDefinition,
   GameAction,
   InteractionTypeDefinition,
   ItemDefinition,
@@ -39,7 +40,7 @@ export const loadUniverseManifest = async (universeId: string) => {
 export const loadUniverse = async (universeId: string): Promise<ContentBundle> => {
   const basePath = `${BASE_CONTENT_PATH}/${universeId}`;
   const manifest = await loadUniverseManifest(universeId);
-  const [locations, edges, actions, skills, items, interactionTypes] = await Promise.all([
+  const [locations, edges, actions, skills, items, interactionTypes, enemies] = await Promise.all([
     loadJson<LocationNode[]>(`${basePath}/locations.json`),
     loadJson<TravelEdgeDefinition[]>(`${basePath}/edges.json`),
     loadJson<GameAction[]>(`${basePath}/actions.json`),
@@ -49,6 +50,9 @@ export const loadUniverse = async (universeId: string): Promise<ContentBundle> =
       : Promise.resolve([]),
     manifest.files.includes('interaction-types.json')
       ? loadJson<InteractionTypeDefinition[]>(`${basePath}/interaction-types.json`)
+      : Promise.resolve([]),
+    manifest.files.includes('enemies.json')
+      ? loadJson<EnemyDefinition[]>(`${basePath}/enemies.json`)
       : Promise.resolve([]),
   ]);
 
@@ -69,6 +73,7 @@ export const loadUniverse = async (universeId: string): Promise<ContentBundle> =
     skills,
     items,
     interactionTypes,
+    enemies,
     locales,
   };
   const issues = validateContentShape(bundle);

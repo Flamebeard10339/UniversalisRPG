@@ -1,6 +1,6 @@
 import type { ActionResolutionContext, ChatMessage, GameAction, IdleReport, IdleResolution, Reward, TravelEdgeDefinition, UniversePlayState } from './types';
-import { getActionDurationMs, getInteractionType, sampleAdversarialDamage } from './adversarial';
-import { actionFailureKey, actionSuccessKey } from './contentIds';
+import { getActionDurationMs, getEnemy, getEnemyAttackDurationMs, sampleAdversarialDamage, sampleEnemyAttackDamage } from './adversarial';
+import { actionKillKey, actionSuccessKey } from './contentIds';
 import { skillLevelFromXp } from './skills';
 
 const MAX_CHAT_MESSAGES = 80;
@@ -9,6 +9,7 @@ const EMPTY_CONTEXT: ActionResolutionContext = {
   actions: [],
   skills: [],
   interactionTypes: [],
+  enemies: [],
 };
 
 const sameMessage = (left: ChatMessage, right: ChatMessage) =>
@@ -78,6 +79,8 @@ export const normalizePlayState = (
       ? {
           ...state.activeAction,
           targetHealth: state.activeAction.targetHealth ?? null,
+          enemyAttackStartedAt: state.activeAction.enemyAttackStartedAt ?? null,
+          enemyAttackCompletesAt: state.activeAction.enemyAttackCompletesAt ?? null,
         }
       : null,
     actionProgress: state.activeAction && !actionProgress[state.activeAction.actionId]
@@ -87,6 +90,8 @@ export const normalizePlayState = (
             elapsedMs: 0,
             runningSince: state.activeAction.startedAt,
             targetHealth: state.activeAction.targetHealth ?? null,
+            enemyAttackStartedAt: state.activeAction.enemyAttackStartedAt ?? null,
+            enemyAttackCompletesAt: state.activeAction.enemyAttackCompletesAt ?? null,
           },
         }
       : actionProgress,
@@ -114,6 +119,8 @@ const pauseRunningAction = (state: UniversePlayState, now: number) => {
         elapsedMs: progress.elapsedMs + Math.max(0, now - (progress.runningSince ?? state.activeAction.startedAt)),
         runningSince: null,
         targetHealth: state.activeAction.targetHealth ?? progress.targetHealth ?? null,
+        enemyAttackStartedAt: state.activeAction.enemyAttackStartedAt ?? progress.enemyAttackStartedAt ?? null,
+        enemyAttackCompletesAt: state.activeAction.enemyAttackCompletesAt ?? progress.enemyAttackCompletesAt ?? null,
       },
     },
     lastTickAt: now,
@@ -137,6 +144,10 @@ export const startAction = (
   const progress = pausedState.actionProgress[action.id] ?? { elapsedMs: 0, runningSince: null };
   const durationMs = getActionDurationMs(pausedState, action, context);
   const remainingMs = Math.max(0, durationMs - progress.elapsedMs);
+  const enemy = getEnemy(action, context);
+  const enemyAttackDurationMs = getEnemyAttackDurationMs(enemy);
+  const enemyAttackStartedAt = progress.enemyAttackStartedAt ?? (enemyAttackDurationMs ? now : null);
+  const enemyAttackCompletesAt = progress.enemyAttackCompletesAt ?? (enemyAttackDurationMs ? now + enemyAttackDurationMs : null);
 
   return {
     ...pausedState,
@@ -144,14 +155,18 @@ export const startAction = (
       actionId: action.id,
       startedAt: now,
       completesAt: now + remainingMs,
-      targetHealth: progress.targetHealth ?? action.health ?? null,
+      targetHealth: progress.targetHealth ?? enemy?.health ?? action.health ?? null,
+      enemyAttackStartedAt,
+      enemyAttackCompletesAt,
     },
     actionProgress: {
       ...pausedState.actionProgress,
       [action.id]: {
         ...progress,
         runningSince: now,
-        targetHealth: progress.targetHealth ?? action.health ?? null,
+        targetHealth: progress.targetHealth ?? enemy?.health ?? action.health ?? null,
+        enemyAttackStartedAt,
+        enemyAttackCompletesAt,
       },
     },
     lastTickAt: now,
@@ -164,24 +179,34 @@ const restartAction = (
   context: ActionResolutionContext,
   now: number,
   targetHealth: number | null,
-) => ({
-  ...state,
-  activeAction: {
-    actionId: action.id,
-    startedAt: now,
-    completesAt: now + getActionDurationMs(state, action, context),
-    targetHealth,
-  },
-  actionProgress: {
-    ...state.actionProgress,
-    [action.id]: {
-      elapsedMs: 0,
-      runningSince: now,
+) => {
+  const enemyAttackDurationMs = getEnemyAttackDurationMs(getEnemy(action, context));
+  const enemyAttackStartedAt = state.activeAction?.enemyAttackStartedAt ?? (enemyAttackDurationMs ? now : null);
+  const enemyAttackCompletesAt = state.activeAction?.enemyAttackCompletesAt ?? (enemyAttackDurationMs ? now + enemyAttackDurationMs : null);
+
+  return {
+    ...state,
+    activeAction: {
+      actionId: action.id,
+      startedAt: now,
+      completesAt: now + getActionDurationMs(state, action, context),
       targetHealth,
+      enemyAttackStartedAt,
+      enemyAttackCompletesAt,
     },
-  },
-  lastTickAt: now,
-});
+    actionProgress: {
+      ...state.actionProgress,
+      [action.id]: {
+        elapsedMs: 0,
+        runningSince: now,
+        targetHealth,
+        enemyAttackStartedAt,
+        enemyAttackCompletesAt,
+      },
+    },
+    lastTickAt: now,
+  };
+};
 
 export const startTravel = (
   state: UniversePlayState,
@@ -208,8 +233,30 @@ export const startTravel = (
 type ActionCompletionResult = {
   state: UniversePlayState;
   finished: boolean;
+  outcome: 'basicSuccess' | 'hit' | 'miss' | 'kill';
   damage: number;
   remainingHealth: number | null;
+  rewards: Reward[];
+};
+
+const applyRewards = (state: UniversePlayState, rewards: Reward[]) => {
+  const resources = { ...state.resources };
+  const skillXp = { ...state.skillXp };
+
+  for (const reward of rewards) {
+    if (reward.kind === 'resource') {
+      resources[reward.resourceId] = (resources[reward.resourceId] ?? 0) + reward.amount;
+    }
+    if (reward.kind === 'skillXp') {
+      skillXp[reward.skillId] = (skillXp[reward.skillId] ?? 0) + reward.amount;
+    }
+  }
+
+  return {
+    ...state,
+    resources,
+    skillXp,
+  };
 };
 
 const completeActionWithResult = (
@@ -221,67 +268,67 @@ const completeActionWithResult = (
 ): ActionCompletionResult => {
   let damage = 0;
   let remainingHealth: number | null = null;
-  const interactionType = getInteractionType(action, context);
+  const enemy = getEnemy(action, context);
 
-  if (interactionType && action.health) {
+  if (enemy) {
     const result = sampleAdversarialDamage(state, action, context, options.random);
     damage = result?.damage ?? 0;
-    const targetHealth = Math.max(0, (state.activeAction?.targetHealth ?? action.health) - damage);
+    const currentHealth = state.activeAction?.targetHealth ?? enemy.health;
+    const targetHealth = Math.max(0, currentHealth - damage);
     remainingHealth = targetHealth;
-    const nextPlayerHealth = interactionType.targetPlayerHealth && (action.rate ?? 0) > 0
-      ? Math.max(0, state.playerHealth - (action.rate ?? 0))
-      : state.playerHealth;
 
-    if (targetHealth > 0) {
+    if (damage <= 0) {
       return {
-        state: restartAction({
-          ...state,
-          playerHealth: nextPlayerHealth,
-        }, action, context, now, targetHealth),
+        state: restartAction(state, action, context, now, currentHealth),
         finished: false,
+        outcome: 'miss',
         damage,
-        remainingHealth,
+        remainingHealth: currentHealth,
+        rewards: [],
       };
     }
 
-    state = {
-      ...state,
-      playerHealth: nextPlayerHealth,
-    };
-  }
+    const hitState = applyRewards(state, action.rewards);
 
-  const resources = { ...state.resources };
-  const skillXp = { ...state.skillXp };
+    if (targetHealth > 0) {
+      return {
+        state: restartAction(hitState, action, context, now, targetHealth),
+        finished: false,
+        outcome: 'hit',
+        damage,
+        remainingHealth,
+        rewards: action.rewards,
+      };
+    }
 
-  for (const reward of action.rewards) {
-    if (reward.kind === 'resource') {
-      resources[reward.resourceId] = (resources[reward.resourceId] ?? 0) + reward.amount;
-    }
-    if (reward.kind === 'skillXp') {
-      skillXp[reward.skillId] = (skillXp[reward.skillId] ?? 0) + reward.amount;
-    }
+    state = applyRewards(hitState, enemy.rewards);
   }
 
   const completedState = {
-    ...state,
+    ...(enemy ? state : applyRewards(state, action.rewards)),
     activeAction: null,
     actionProgress: {
       ...state.actionProgress,
       [action.id]: {
         elapsedMs: 0,
         runningSince: null,
+        targetHealth: null,
+        enemyAttackStartedAt: null,
+        enemyAttackCompletesAt: null,
       },
     },
-    resources,
-    skillXp,
     lastTickAt: now,
   };
+  const shouldLoop = state.actionLoopingEnabled;
+  const restartTargetHealth = enemy ? enemy.health : null;
 
   return {
-    state: state.actionLoopingEnabled ? restartAction(completedState, action, context, now, action.health ?? null) : completedState,
+    state: shouldLoop ? restartAction(completedState, action, context, now, restartTargetHealth) : completedState,
     finished: true,
+    outcome: enemy ? 'kill' : 'basicSuccess',
     damage,
     remainingHealth,
+    rewards: enemy ? [...action.rewards, ...enemy.rewards] : action.rewards,
   };
 };
 
@@ -303,6 +350,56 @@ const actionRequirementsMet = (state: UniversePlayState, action: GameAction) =>
     }
     return true;
   });
+
+const resolveDueEnemyAttacks = (
+  state: UniversePlayState,
+  action: GameAction,
+  context: ActionResolutionContext,
+  options: { random?: () => number },
+  now: number,
+) => {
+  const enemyAttackDurationMs = getEnemyAttackDurationMs(getEnemy(action, context));
+
+  if (!state.activeAction?.enemyAttackCompletesAt || !enemyAttackDurationMs) {
+    return state;
+  }
+
+  let nextState = state;
+  let nextAttackAt = state.activeAction.enemyAttackCompletesAt;
+  const latestAttackAt = Math.min(now, state.activeAction.completesAt);
+  let processed = 0;
+
+  while (nextAttackAt <= latestAttackAt && processed < 100) {
+    const attack = sampleEnemyAttackDamage(nextState, action, context, options.random);
+    nextState = {
+      ...nextState,
+      playerHealth: Math.max(0, nextState.playerHealth - (attack?.damage ?? 0)),
+    };
+    nextAttackAt += enemyAttackDurationMs;
+    processed += 1;
+  }
+
+  return {
+    ...nextState,
+    activeAction: nextState.activeAction
+      ? {
+          ...nextState.activeAction,
+          enemyAttackStartedAt: nextAttackAt - enemyAttackDurationMs,
+          enemyAttackCompletesAt: nextAttackAt,
+        }
+      : null,
+    actionProgress: nextState.activeAction
+      ? {
+          ...nextState.actionProgress,
+          [nextState.activeAction.actionId]: {
+            ...(nextState.actionProgress[nextState.activeAction.actionId] ?? { elapsedMs: 0, runningSince: nextState.activeAction.startedAt }),
+            enemyAttackStartedAt: nextAttackAt - enemyAttackDurationMs,
+            enemyAttackCompletesAt: nextAttackAt,
+          },
+        }
+      : nextState.actionProgress,
+  };
+};
 
 const rewardLabelId = (reward: Reward) => (reward.kind === 'resource' ? reward.resourceId : reward.skillId);
 
@@ -368,7 +465,7 @@ export const resolveIdleTimers = (
     };
   }
 
-  if (!state.activeAction || state.activeAction.completesAt > now) {
+  if (!state.activeAction) {
     const nextState = {
       ...state,
       lastTickAt: now,
@@ -386,16 +483,6 @@ export const resolveIdleTimers = (
       };
     }
 
-    if (reportEnabled && state.activeAction) {
-      report = {
-        kind: 'inProgress',
-        inactiveMs,
-        timerKind: 'action',
-        actionId: state.activeAction.actionId,
-        remainingMs: Math.max(0, state.activeAction.completesAt - now),
-      };
-    }
-
     return {
       state: options.debugEnabled && report.kind !== 'none' ? appendIdleDebugMessage(nextState, report, now) : nextState,
       report,
@@ -406,15 +493,11 @@ export const resolveIdleTimers = (
 
   if (!action) {
     const actionId = state.activeAction.actionId;
-    const failed = appendChatMessage({
+    const failed = {
       ...state,
       activeAction: null,
       lastTickAt: now,
-    }, {
-      author: 'system',
-      key: 'chat.actionFailure',
-      params: { actionId },
-    }, now);
+    };
     const withDebug = options.debugEnabled
       ? appendChatMessage(failed, {
           author: 'debug',
@@ -437,16 +520,35 @@ export const resolveIdleTimers = (
     };
   }
 
+  state = resolveDueEnemyAttacks(state, action, context, { random: options.random }, now);
+
+  if (!state.activeAction || state.activeAction.completesAt > now) {
+    const nextState = {
+      ...state,
+      lastTickAt: now,
+    };
+    const report: IdleReport = reportEnabled && state.activeAction
+      ? {
+          kind: 'inProgress',
+          inactiveMs,
+          timerKind: 'action',
+          actionId: state.activeAction.actionId,
+          remainingMs: Math.max(0, state.activeAction.completesAt - now),
+        }
+      : noIdleReport();
+
+    return {
+      state: options.debugEnabled && report.kind !== 'none' ? appendIdleDebugMessage(nextState, report, now) : nextState,
+      report,
+    };
+  }
+
   if (!actionRequirementsMet(state, action)) {
-    const failed = appendChatMessage({
+    const failed = {
       ...state,
       activeAction: null,
       lastTickAt: now,
-    }, {
-      author: 'system',
-      key: actionFailureKey(action.id),
-      params: { actionId: action.id },
-    }, now);
+    };
     const failedWithDebug = options.debugEnabled
       ? appendChatMessage(failed, {
           author: 'debug',
@@ -470,12 +572,17 @@ export const resolveIdleTimers = (
   }
 
   const completion = completeActionWithResult(state, action, context, { random: options.random }, now);
-  const completed = completion.finished
+  const messageKey = completion.outcome === 'kill'
+    ? actionKillKey(action.id)
+    : completion.outcome === 'hit' || completion.outcome === 'basicSuccess'
+      ? actionSuccessKey(action.id)
+      : null;
+  const completed = messageKey
     ? appendChatMessage(completion.state, {
-    author: 'system',
-    key: actionSuccessKey(action.id),
-    params: { actionId: action.id },
-  }, now)
+        author: 'system',
+        key: messageKey,
+        params: { actionId: action.id },
+      }, now)
     : completion.state;
   const completedWithDebug = options.debugEnabled
     ? appendChatMessage(completed, {
@@ -483,7 +590,8 @@ export const resolveIdleTimers = (
         key: 'chat.debug.actionCompleted',
         params: {
           actionId: action.id,
-          rewardCount: action.rewards.length,
+          outcome: completion.outcome,
+          rewardCount: completion.rewards.length,
           damage: Math.round(completion.damage * 100) / 100,
           remainingHealth: Math.round((completion.remainingHealth ?? 0) * 100) / 100,
           now,
@@ -496,7 +604,7 @@ export const resolveIdleTimers = (
         inactiveMs,
         actionId: action.id,
         completedAt: state.activeAction.completesAt,
-        rewards: action.rewards.map((reward) => ({
+        rewards: completion.rewards.map((reward) => ({
           ...reward,
           labelId: rewardLabelId(reward),
         })),
