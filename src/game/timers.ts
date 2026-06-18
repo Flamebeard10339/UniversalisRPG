@@ -1,6 +1,16 @@
 import type { ActionResolutionContext, ChatMessage, GameAction, IdleReport, IdleResolution, ResourceBoundaryBehavior, Reward, TravelEdgeDefinition, UniversePlayState } from './types';
-import { getActionDurationMs, getEnemy, getEnemyAttackDurationMs, getSkillTotals, sampleAdversarialDamage, sampleEnemyAttackDamage } from './adversarial';
-import { actionFailureKey, actionKillKey, actionSuccessKey } from './contentIds';
+import { getActionDurationMs, getEnemy, getEnemyAttackDurationMs, getInteractionType, getSkillTotals, sampleAdversarialDamage, sampleEnemyAttackDamage } from './adversarial';
+import {
+  actionFailureKey,
+  actionKillKey,
+  actionSuccessKey,
+  interactionEntityHitKey,
+  interactionEntityKillKey,
+  interactionEntityMissKey,
+  interactionPlayerHitKey,
+  interactionPlayerKillKey,
+  interactionPlayerMissKey,
+} from './contentIds';
 import { skillLevelFromXp } from './skills';
 
 const MAX_CHAT_MESSAGES = 80;
@@ -133,7 +143,27 @@ const pauseRunningAction = (state: UniversePlayState, now: number) => {
   };
 };
 
-const stopRunningAction = (state: UniversePlayState, now: number) => pauseRunningAction(state, now);
+const stopRunningAction = (state: UniversePlayState, now: number) => {
+  if (!state.activeAction) {
+    return state;
+  }
+
+  return {
+    ...state,
+    activeAction: null,
+    actionProgress: {
+      ...state.actionProgress,
+      [state.activeAction.actionId]: {
+        elapsedMs: 0,
+        runningSince: null,
+        targetHealth: null,
+        enemyAttackStartedAt: null,
+        enemyAttackCompletesAt: null,
+      },
+    },
+    lastTickAt: now,
+  };
+};
 
 const getResourceDefinitions = (context: ActionResolutionContext) => context.resourceDefinitions ?? [];
 
@@ -384,8 +414,17 @@ export const startAction = (
   }
 
   const pausedState = pauseRunningAction(state, now);
-  const progress = pausedState.actionProgress[action.id] ?? { elapsedMs: 0, runningSince: null };
   const durationMs = getActionDurationMs(pausedState, action, context);
+  const savedProgress = pausedState.actionProgress[action.id] ?? { elapsedMs: 0, runningSince: null };
+  const progress = savedProgress.elapsedMs >= durationMs
+    ? {
+        elapsedMs: 0,
+        runningSince: null,
+        targetHealth: null,
+        enemyAttackStartedAt: null,
+        enemyAttackCompletesAt: null,
+      }
+    : savedProgress;
   const remainingMs = Math.max(0, durationMs - progress.elapsedMs);
   const enemy = getEnemy(action, context);
   const enemyAttackDurationMs = getEnemyAttackDurationMs(enemy);
@@ -614,8 +653,30 @@ const resolveDueEnemyAttacks = (
 
   while (nextAttackAt <= latestAttackAt && processed < 100) {
     const attackAt = nextAttackAt;
+    const enemy = getEnemy(action, context);
+    const interactionType = getInteractionType(action, context);
     const attack = sampleEnemyAttackDamage(nextState, action, context, options.random);
-    nextState = applyResourceDelta(nextState, context, HEALTH_RESOURCE_ID, -(attack?.damage ?? 0), attackAt);
+    const damage = attack?.damage ?? 0;
+    const health = nextState.resourcePools[HEALTH_RESOURCE_ID];
+    const isKill = Boolean(health && damage > 0 && health.current - damage <= health.min);
+
+    if (enemy && interactionType) {
+      nextState = appendChatMessage(nextState, {
+        author: 'system',
+        key: isKill
+          ? interactionEntityKillKey(interactionType.id)
+          : damage > 0
+            ? interactionEntityHitKey(interactionType.id)
+            : interactionEntityMissKey(interactionType.id),
+        params: {
+          source: enemy.id,
+          target: 'you',
+          damage: roundCombatNumber(damage),
+        },
+      }, attackAt);
+    }
+
+    nextState = applyResourceDelta(nextState, context, HEALTH_RESOURCE_ID, -damage, attackAt);
 
     nextAttackAt += enemyAttackDurationMs;
     processed += 1;
@@ -648,6 +709,37 @@ const resolveDueEnemyAttacks = (
 };
 
 const rewardLabelId = (reward: Reward) => (reward.kind === 'resource' ? reward.resourceId : reward.skillId);
+
+const roundCombatNumber = (value: number) => Math.round(value * 100) / 100;
+
+const getActionMessage = (
+  action: GameAction,
+  context: ActionResolutionContext,
+  outcome: ActionCompletionResult['outcome'],
+) => {
+  const enemy = getEnemy(action, context);
+  const interactionType = getInteractionType(action, context);
+
+  if (enemy && interactionType) {
+    if (outcome === 'kill') {
+      return interactionPlayerKillKey(interactionType.id);
+    }
+    if (outcome === 'hit') {
+      return interactionPlayerHitKey(interactionType.id);
+    }
+    if (outcome === 'miss') {
+      return interactionPlayerMissKey(interactionType.id);
+    }
+  }
+
+  if (outcome === 'kill') {
+    return actionKillKey(action.id);
+  }
+
+  return outcome === 'hit' || outcome === 'basicSuccess'
+    ? actionSuccessKey(action.id)
+    : actionFailureKey(action.id);
+};
 
 const noIdleReport = (): IdleReport => ({ kind: 'none' });
 
@@ -820,16 +912,17 @@ export const resolveIdleTimers = (
   }
 
   const completion = completeActionWithResult(state, action, context, { random: options.random }, now);
-  const messageKey = completion.outcome === 'kill'
-    ? actionKillKey(action.id)
-    : completion.outcome === 'hit' || completion.outcome === 'basicSuccess'
-      ? actionSuccessKey(action.id)
-      : actionFailureKey(action.id);
+  const enemy = getEnemy(action, context);
+  const messageKey = getActionMessage(action, context, completion.outcome);
   const completed = messageKey
     ? appendChatMessage(completion.state, {
         author: 'system',
         key: messageKey,
-        params: { actionId: action.id },
+        params: {
+          actionId: action.id,
+          target: enemy?.id ?? action.id,
+          damage: roundCombatNumber(completion.damage),
+        },
       }, now)
     : completion.state;
   const completedWithDebug = options.debugEnabled
@@ -840,8 +933,9 @@ export const resolveIdleTimers = (
           actionId: action.id,
           outcome: completion.outcome,
           rewardCount: completion.rewards.length,
-          damage: Math.round(completion.damage * 100) / 100,
-          remainingHealth: Math.round((completion.remainingHealth ?? 0) * 100) / 100,
+          damage: roundCombatNumber(completion.damage),
+          remainingHealth: roundCombatNumber(completion.remainingHealth ?? 0),
+          playerHealth: roundCombatNumber(completed.playerHealth),
           now,
         },
       }, now + 1)

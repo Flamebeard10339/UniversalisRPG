@@ -195,7 +195,11 @@ describe('resolveIdleTimers', () => {
     expect(resolved.state.activeAction).toBeNull();
     expect(resolved.state.resourcePools.health.current).toBe(100);
     expect(resolved.state.playerHealth).toBe(100);
-    expect(resolved.state.actionProgress['danger-action'].elapsedMs).toBe(10_000);
+    expect(resolved.state.actionProgress['danger-action']).toMatchObject({
+      elapsedMs: 0,
+      runningSince: null,
+      targetHealth: null,
+    });
     expect(resolved.state.chatMessages[0].key).toBe('resource.health.empty');
   });
 });

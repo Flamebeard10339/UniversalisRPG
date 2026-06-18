@@ -21,6 +21,12 @@ export const actionDescriptionKey = (id: string) => `action.${toKebabCase(id)}.d
 export const actionSuccessKey = (id: string) => `action.${toKebabCase(id)}.success`;
 export const actionFailureKey = (id: string) => `action.${toKebabCase(id)}.failure`;
 export const actionKillKey = (id: string) => `action.${toKebabCase(id)}.kill`;
+export const interactionPlayerHitKey = (id: string) => `interaction.${toKebabCase(id)}.player.hit`;
+export const interactionPlayerMissKey = (id: string) => `interaction.${toKebabCase(id)}.player.miss`;
+export const interactionPlayerKillKey = (id: string) => `interaction.${toKebabCase(id)}.player.kill`;
+export const interactionEntityHitKey = (id: string) => `interaction.${toKebabCase(id)}.entity.hit`;
+export const interactionEntityMissKey = (id: string) => `interaction.${toKebabCase(id)}.entity.miss`;
+export const interactionEntityKillKey = (id: string) => `interaction.${toKebabCase(id)}.entity.kill`;
 export const skillTitleKey = (id: string) => `skill.${toKebabCase(id)}.title`;
 export const skillDescriptionKey = (id: string) => `skill.${toKebabCase(id)}.description`;
 export const resourceTitleKey = (id: string) => `resource.${toKebabCase(id)}.title`;

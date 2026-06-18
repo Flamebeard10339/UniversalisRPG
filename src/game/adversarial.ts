@@ -134,6 +134,27 @@ export const getActionDps = (
   return actionDps(source.effectiveTotal, source.imprecision, target.effectiveTotal, getActionDurationMs(state, action, context) / 1000);
 };
 
+export const getEnemyAttackDps = (
+  state: UniversePlayState,
+  action: GameAction,
+  context: ActionResolutionContext,
+) => {
+  const enemy = getEnemy(action, context);
+  const interactionType = getInteractionType(action, context);
+  const attackDurationMs = getEnemyAttackDurationMs(enemy);
+  const sourceSkill = context.skills.find((skill) => skill.id === interactionType?.sourceSkillId);
+  const targetSkill = context.skills.find((skill) => skill.id === interactionType?.targetSkillId);
+
+  if (!enemy || !interactionType?.targetPlayerHealth || !attackDurationMs || !sourceSkill || !targetSkill) {
+    return null;
+  }
+
+  const source = getEnemySkillTotals(state, enemy, sourceSkill);
+  const target = getSkillTotals(state, targetSkill);
+
+  return actionDps(source.effectiveTotal, source.imprecision, target.effectiveTotal, attackDurationMs / 1000);
+};
+
 export const sampleNormal = (mean: number, standardDeviation: number, random = Math.random) => {
   const u1 = Math.max(Number.EPSILON, random());
   const u2 = random();
