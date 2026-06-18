@@ -18,5 +18,13 @@
   {
     "id": "defense",
     "maxLevel": 100
+  },
+  {
+    "id": "regeneration",
+    "maxLevel": 100
+  },
+  {
+    "id": "health",
+    "maxLevel": 100
   }
 ]

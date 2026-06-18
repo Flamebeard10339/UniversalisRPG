@@ -66,7 +66,7 @@ describe('adversarial actions', () => {
     expect(resolved.report).toEqual({ kind: 'none' });
   });
 
-  it('does nothing on miss', () => {
+  it('logs a miss and keeps combat running without rewards', () => {
     const startedAt = 1_000;
     const state = {
       ...startAction(createInitialPlayState('test', 'arena'), action, context, startedAt),
@@ -86,7 +86,8 @@ describe('adversarial actions', () => {
     });
     expect(resolved.state.resources.fang).toBeUndefined();
     expect(resolved.state.resources.trophy).toBeUndefined();
-    expect(resolved.state.chatMessages).toHaveLength(0);
+    expect(resolved.state.chatMessages).toHaveLength(1);
+    expect(resolved.state.chatMessages[0].key).toBe('action.test-fight.failure');
     expect(resolved.report).toEqual({ kind: 'none' });
   });
 
@@ -149,7 +150,7 @@ describe('adversarial actions', () => {
       ...context,
       enemies: [{
         ...context.enemies[0],
-        rate: 1,
+        rate: 60,
         skills: {
           attack: { base: 2, imprecision: 70 },
           defense: { base: 1, imprecision: 70 },
@@ -171,5 +172,35 @@ describe('adversarial actions', () => {
     });
     expect(resolved.state.playerHealth).toBe(93);
     expect(resolved.state.chatMessages).toHaveLength(0);
+  });
+
+  it('stops the active action when enemy damage drops player health to zero', () => {
+    const startedAt = 1_000;
+    const dangerousContext: ActionResolutionContext = {
+      ...context,
+      enemies: [{
+        ...context.enemies[0],
+        rate: 60,
+        skills: {
+          attack: { base: 20, imprecision: 70 },
+          defense: { base: 1, imprecision: 70 },
+        },
+      }],
+    };
+    const state = {
+      ...startAction(createInitialPlayState('test', 'arena'), action, dangerousContext, startedAt),
+      playerHealth: 10,
+    };
+
+    const resolved = resolveIdleTimers(state, { ...dangerousContext, actions: [action] }, {
+      random: () => 1,
+      showReport: true,
+    }, startedAt + 1_000);
+
+    expect(resolved.state.activeAction).toBeNull();
+    expect(resolved.state.playerHealth).toBe(0);
+    expect(resolved.state.actionProgress['test-fight'].elapsedMs).toBe(1_000);
+    expect(resolved.state.resources.fang).toBeUndefined();
+    expect(resolved.state.resources.trophy).toBeUndefined();
   });
 });

@@ -104,6 +104,7 @@ export type EnemyDefinition = {
   interactionTypeId: string;
   health: number;
   rate: number;
+  showHealthBar?: boolean;
   skills: Record<string, SkillEquipmentBonuses>;
   rewards: Reward[];
 };

@@ -1,6 +1,6 @@
 import type { ActionResolutionContext, ChatMessage, GameAction, IdleReport, IdleResolution, Reward, TravelEdgeDefinition, UniversePlayState } from './types';
-import { getActionDurationMs, getEnemy, getEnemyAttackDurationMs, sampleAdversarialDamage, sampleEnemyAttackDamage } from './adversarial';
-import { actionKillKey, actionSuccessKey } from './contentIds';
+import { getActionDurationMs, getEnemy, getEnemyAttackDurationMs, getSkillTotals, sampleAdversarialDamage, sampleEnemyAttackDamage } from './adversarial';
+import { actionFailureKey, actionKillKey, actionSuccessKey } from './contentIds';
 import { skillLevelFromXp } from './skills';
 
 const MAX_CHAT_MESSAGES = 80;
@@ -124,6 +124,40 @@ const pauseRunningAction = (state: UniversePlayState, now: number) => {
       },
     },
     lastTickAt: now,
+  };
+};
+
+const stopRunningAction = (state: UniversePlayState, now: number) => pauseRunningAction(state, now);
+
+const getPlayerMaxHealth = (state: UniversePlayState, context: ActionResolutionContext) => {
+  const healthSkill = context.skills.find((skill) => skill.id === 'health');
+
+  if (!healthSkill) {
+    return Math.max(1, state.playerMaxHealth ?? 100);
+  }
+
+  return Math.max(100, Math.round(getSkillTotals(state, healthSkill).effectiveTotal));
+};
+
+const getPlayerRegenerationPerMinute = (state: UniversePlayState, context: ActionResolutionContext) => {
+  const regenerationSkill = context.skills.find((skill) => skill.id === 'regeneration');
+
+  return regenerationSkill ? Math.max(0, getSkillTotals(state, regenerationSkill).effectiveTotal) : 0;
+};
+
+const applyPlayerVitals = (
+  state: UniversePlayState,
+  context: ActionResolutionContext,
+  now: number,
+) => {
+  const playerMaxHealth = getPlayerMaxHealth(state, context);
+  const elapsedMinutes = Math.max(0, now - (state.lastTickAt ?? now)) / 60_000;
+  const regeneratedHealth = getPlayerRegenerationPerMinute(state, context) * elapsedMinutes;
+
+  return {
+    ...state,
+    playerMaxHealth,
+    playerHealth: Math.min(playerMaxHealth, Math.max(0, state.playerHealth ?? playerMaxHealth) + regeneratedHealth),
   };
 };
 
@@ -370,11 +404,17 @@ const resolveDueEnemyAttacks = (
   let processed = 0;
 
   while (nextAttackAt <= latestAttackAt && processed < 100) {
+    const attackAt = nextAttackAt;
     const attack = sampleEnemyAttackDamage(nextState, action, context, options.random);
     nextState = {
       ...nextState,
       playerHealth: Math.max(0, nextState.playerHealth - (attack?.damage ?? 0)),
     };
+
+    if (nextState.playerHealth <= 0) {
+      return stopRunningAction(nextState, attackAt);
+    }
+
     nextAttackAt += enemyAttackDurationMs;
     processed += 1;
   }
@@ -435,6 +475,12 @@ export const resolveIdleTimers = (
     : contextOrActions;
   const inactiveMs = Math.max(0, now - (state.lastTickAt ?? now));
   const reportEnabled = shouldReportIdle(inactiveMs, options.showReport);
+
+  if (state.activeAction && state.playerHealth <= 0) {
+    state = stopRunningAction(state, now);
+  }
+
+  state = applyPlayerVitals(state, context, now);
 
   if (state.activeTravel && state.activeTravel.completesAt <= now) {
     const activeTravel = state.activeTravel;
@@ -576,7 +622,7 @@ export const resolveIdleTimers = (
     ? actionKillKey(action.id)
     : completion.outcome === 'hit' || completion.outcome === 'basicSuccess'
       ? actionSuccessKey(action.id)
-      : null;
+      : actionFailureKey(action.id);
   const completed = messageKey
     ? appendChatMessage(completion.state, {
         author: 'system',

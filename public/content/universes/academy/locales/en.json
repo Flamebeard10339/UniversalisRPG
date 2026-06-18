@@ -29,6 +29,10 @@
   "skill.attack.description": "Accuracy, timing, and pressure in direct conflict.",
   "skill.defense.title": "Defense",
   "skill.defense.description": "Guard, positioning, and staying intact under pressure.",
+  "skill.regeneration.title": "Regeneration",
+  "skill.regeneration.description": "Recovered health per minute while time passes.",
+  "skill.health.title": "Health",
+  "skill.health.description": "Maximum player health.",
   "item.moonvine-cutting.title": "Moonvine Cutting",
   "item.moonvine-cutting.description": "A viable silver-green cutting from the academy glasshouse."
 }

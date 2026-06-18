@@ -47,6 +47,15 @@ const upsertById = <T extends { id: string }>(items: T[], item: T) =>
     : [item, ...items];
 const withoutId = <T extends { id: string }>(items: T[], id: string) => items.filter((item) => item.id !== id);
 const uniqueStrings = (items: string[]) => Array.from(new Set(items));
+const emptyRemoved = (): ContributionRemovedIds => ({
+  locations: [],
+  edges: [],
+  actions: [],
+  skills: [],
+  items: [],
+  interactionTypes: [],
+  enemies: [],
+});
 const matchesFilter = (value: unknown, filter: string) =>
   filter.trim().length === 0 || JSON.stringify(value).toLowerCase().includes(filter.trim().toLowerCase());
 const layeredRows = <T extends { id: string }>(
@@ -148,7 +157,7 @@ export const ContentDataEditor = ({ baseBundle, bundle, draft, onPatch, t }: Con
   const [rewardDrafts, setRewardDrafts] = useState<Record<string, RewardDraft>>({});
   const [selectedActionId, setSelectedActionId] = useState<string | null>(null);
   const [selectedEnemyId, setSelectedEnemyId] = useState<string | null>(null);
-  const removed = draft.removed;
+  const removed = { ...emptyRemoved(), ...(draft.removed ?? {}) };
   const removeButtonClass = 'rounded border border-rose-500 px-2 py-1.5 text-sm font-semibold text-rose-200';
   const locations = layeredRows(draft.locations, baseBundle.locations, removed.locations, filter);
   const edges = layeredRows(draft.edges, baseBundle.edges, removed.edges, filter);
@@ -342,6 +351,7 @@ export const ContentDataEditor = ({ baseBundle, bundle, draft, onPatch, t }: Con
           interactionTypeId,
           health: 10,
           rate: 0,
+          showHealthBar: true,
           skills: skillsForInteraction(interactionTypeId, {}),
           rewards: [],
         },
@@ -476,7 +486,7 @@ export const ContentDataEditor = ({ baseBundle, bundle, draft, onPatch, t }: Con
             ) : (
               <div className="grid gap-1">
                 {locations.map((row) => (
-                  <div className="grid gap-2 rounded bg-slate-950 p-2 lg:grid-cols-[1.2fr_7rem_7rem_1fr_5rem_6rem]" key={`${row.source}-${row.item.id}-${row.index}`}>
+                  <div className="grid gap-2 rounded bg-slate-950 p-2 lg:grid-cols-[1.2fr_7rem_7rem_1fr_5rem_6rem]" key={`${row.source}-${row.index}`}>
                     <input aria-label="Location id" className="min-w-0 rounded bg-slate-900 px-2 py-1.5 text-sm" onChange={(event) => updateLocation(row, { id: toKebabInput(event.target.value) })} value={row.item.id} />
                     <input aria-label="Location x" className="min-w-0 rounded bg-slate-900 px-2 py-1.5 text-sm" onChange={(event) => updateLocation(row, { position: { ...row.item.position, x: Number(event.target.value) } })} type="number" value={Math.round(row.item.position.x)} />
                     <input aria-label="Location y" className="min-w-0 rounded bg-slate-900 px-2 py-1.5 text-sm" onChange={(event) => updateLocation(row, { position: { ...row.item.position, y: Number(event.target.value) } })} type="number" value={Math.round(row.item.position.y)} />
@@ -513,7 +523,7 @@ export const ContentDataEditor = ({ baseBundle, bundle, draft, onPatch, t }: Con
             ) : (
               <div className="grid gap-1">
                 {edges.map((row) => (
-                  <div className="grid gap-2 rounded bg-slate-950 p-2 lg:grid-cols-[1fr_1fr_1fr_8rem_6rem]" key={`${row.source}-${row.item.id}-${row.index}`}>
+                  <div className="grid gap-2 rounded bg-slate-950 p-2 lg:grid-cols-[1fr_1fr_1fr_8rem_6rem]" key={`${row.source}-${row.index}`}>
                     <input aria-label="Edge id" className="min-w-0 rounded bg-slate-900 px-2 py-1.5 text-sm" readOnly value={row.item.id} />
                     <input aria-label="Edge source" className="min-w-0 rounded bg-slate-900 px-2 py-1.5 text-sm" list="content-location-ids" onChange={(event) => updateEdge(row, { source: toKebabInput(event.target.value) })} value={row.item.source} />
                     <input aria-label="Edge target" className="min-w-0 rounded bg-slate-900 px-2 py-1.5 text-sm" list="content-location-ids" onChange={(event) => updateEdge(row, { target: toKebabInput(event.target.value) })} value={row.item.target} />
@@ -554,7 +564,7 @@ export const ContentDataEditor = ({ baseBundle, bundle, draft, onPatch, t }: Con
                 const selected = selectedActionId === action.id;
 
                 return (
-                  <div className="grid gap-1 rounded bg-slate-950 p-2" key={`action-row-${row.source}-${action.id}-${row.index}`}>
+                  <div className="grid gap-1 rounded bg-slate-950 p-2" key={`action-row-${row.source}-${row.index}`}>
                     <div className="grid gap-2 lg:grid-cols-[1fr_1fr_7rem_1fr_6rem]">
                       <input
                         aria-label="Action id"
@@ -622,7 +632,7 @@ export const ContentDataEditor = ({ baseBundle, bundle, draft, onPatch, t }: Con
           ) : (
             <div className="grid gap-1">
               {skills.map((row) => (
-                <div className="grid gap-2 rounded bg-slate-950 p-2 lg:grid-cols-[1fr_8rem_6rem]" key={`${row.source}-${row.item.id}-${row.index}`}>
+                <div className="grid gap-2 rounded bg-slate-950 p-2 lg:grid-cols-[1fr_8rem_6rem]" key={`${row.source}-${row.index}`}>
                   <input aria-label="Skill id" className="min-w-0 rounded bg-slate-900 px-2 py-1.5 text-sm" onChange={(event) => updateSkill(row, { id: toKebabInput(event.target.value) })} value={row.item.id} />
                   <input aria-label="Skill max level" className="min-w-0 rounded bg-slate-900 px-2 py-1.5 text-sm" min="1" onChange={(event) => updateSkill(row, { maxLevel: Number(event.target.value) })} type="number" value={row.item.maxLevel} />
                   <button className={removeButtonClass} onClick={() => removeRow('skills', row)} type="button">
@@ -655,7 +665,7 @@ export const ContentDataEditor = ({ baseBundle, bundle, draft, onPatch, t }: Con
           ) : (
             <div className="grid gap-1">
               {interactionTypes.map((row) => (
-                <div className="grid gap-2 rounded bg-slate-950 p-2 lg:grid-cols-[1fr_1fr_1fr_8rem_6rem]" key={`${row.source}-${row.item.id}-${row.index}`}>
+                <div className="grid gap-2 rounded bg-slate-950 p-2 lg:grid-cols-[1fr_1fr_1fr_8rem_6rem]" key={`${row.source}-${row.index}`}>
                   <input aria-label="Interaction id" className="min-w-0 rounded bg-slate-900 px-2 py-1.5 text-sm" onChange={(event) => updateInteractionType(row, { id: toKebabInput(event.target.value) })} value={row.item.id} />
                   <input aria-label="Interaction source skill" className="min-w-0 rounded bg-slate-900 px-2 py-1.5 text-sm" list="content-skill-ids" onChange={(event) => updateInteractionType(row, { sourceSkillId: toKebabInput(event.target.value) })} value={row.item.sourceSkillId} />
                   <input aria-label="Interaction target skill" className="min-w-0 rounded bg-slate-900 px-2 py-1.5 text-sm" list="content-skill-ids" onChange={(event) => updateInteractionType(row, { targetSkillId: toKebabInput(event.target.value) })} value={row.item.targetSkillId} />
@@ -681,11 +691,12 @@ export const ContentDataEditor = ({ baseBundle, bundle, draft, onPatch, t }: Con
               {t('contribution.data.addEnemy')}
             </button>
           </div>
-          <div className="hidden grid-cols-[1fr_1fr_7rem_7rem_6rem] gap-2 px-2 text-xs font-semibold uppercase tracking-wide text-slate-500 lg:grid">
+          <div className="hidden grid-cols-[1fr_1fr_7rem_7rem_7rem_6rem] gap-2 px-2 text-xs font-semibold uppercase tracking-wide text-slate-500 lg:grid">
             <span>{t('contribution.column.id')}</span>
             <span>{t('contribution.column.interaction')}</span>
             <span>{t('contribution.column.health')}</span>
             <span>{t('contribution.column.ratePerMinute')}</span>
+            <span>{t('contribution.column.showHealth')}</span>
             <span>{t('contribution.column.remove')}</span>
           </div>
           {enemies.length === 0 ? (
@@ -699,8 +710,8 @@ export const ContentDataEditor = ({ baseBundle, bundle, draft, onPatch, t }: Con
                 const skillEntries = enemySkillRowsForInteraction(enemy.interactionTypeId, enemy.skills);
 
                 return (
-                  <div className="grid gap-2 rounded bg-slate-950 p-2" key={`enemy-row-${row.source}-${enemy.id}-${row.index}`}>
-                    <div className="grid gap-2 lg:grid-cols-[1fr_1fr_7rem_7rem_6rem]">
+                  <div className="grid gap-2 rounded bg-slate-950 p-2" key={`enemy-row-${row.source}-${row.index}`}>
+                    <div className="grid gap-2 lg:grid-cols-[1fr_1fr_7rem_7rem_7rem_6rem]">
                       <input
                         aria-label="Enemy id"
                         className="min-w-0 rounded bg-slate-900 px-2 py-1.5 text-sm"
@@ -716,6 +727,10 @@ export const ContentDataEditor = ({ baseBundle, bundle, draft, onPatch, t }: Con
                       <input aria-label="Enemy interaction" className="min-w-0 rounded bg-slate-900 px-2 py-1.5 text-sm" list="content-interaction-ids" onChange={(event) => updateEnemyInteraction(row, toKebabInput(event.target.value))} onFocus={() => setSelectedEnemyId(enemy.id)} value={enemy.interactionTypeId} />
                       <input aria-label="Enemy health" className="min-w-0 rounded bg-slate-900 px-2 py-1.5 text-sm" min="1" onChange={(event) => updateEnemy(row, { health: Number(event.target.value) })} onFocus={() => setSelectedEnemyId(enemy.id)} type="number" value={enemy.health} />
                       <input aria-label="Enemy rate per minute" className="min-w-0 rounded bg-slate-900 px-2 py-1.5 text-sm" min="0" onChange={(event) => updateEnemy(row, { rate: Number(event.target.value) })} onFocus={() => setSelectedEnemyId(enemy.id)} type="number" value={enemy.rate} />
+                      <label className="flex items-center gap-2 text-sm text-slate-300">
+                        <input checked={enemy.showHealthBar ?? true} onChange={(event) => updateEnemy(row, { showHealthBar: event.target.checked })} type="checkbox" />
+                        <span className="lg:hidden">{t('contribution.column.showHealth')}</span>
+                      </label>
                       <button
                         className={removeButtonClass}
                         onClick={() => {
@@ -782,7 +797,7 @@ export const ContentDataEditor = ({ baseBundle, bundle, draft, onPatch, t }: Con
           ) : (
             <div className="grid gap-1">
               {items.map((row) => (
-                <div className="grid gap-2 rounded bg-slate-950 p-2 lg:grid-cols-[1fr_6rem]" key={`${row.source}-${row.item.id}-${row.index}`}>
+                <div className="grid gap-2 rounded bg-slate-950 p-2 lg:grid-cols-[1fr_6rem]" key={`${row.source}-${row.index}`}>
                   <input aria-label="Item id" className="min-w-0 rounded bg-slate-900 px-2 py-1.5 text-sm" onChange={(event) => updateItem(row, { id: toKebabInput(event.target.value) })} value={row.item.id} />
                   <button className={removeButtonClass} onClick={() => removeRow('items', row)} type="button">
                     {t('contribution.column.remove')}

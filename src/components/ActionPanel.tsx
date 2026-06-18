@@ -1,6 +1,6 @@
 import type { ContentBundle, GameAction, UniversePlayState } from '../game/types';
 import { actionDescriptionKey, actionTitleKey } from '../game/contentIds';
-import { getActionDps, getActionDurationMs, getEnemy } from '../game/adversarial';
+import { getActionDps, getActionDurationMs } from '../game/adversarial';
 import type { Translator } from '../game/i18n';
 import { useNow } from '../hooks/useNow';
 
@@ -28,16 +28,6 @@ export const ActionPanel = ({ bundle, debugEnabled, onSetLooping, playState, onS
     const progress = playState.actionProgress[action.id];
     const elapsedMs = (progress?.elapsedMs ?? 0) + (progress?.runningSince ? Math.max(0, now - progress.runningSince) : 0);
     return Math.min(100, Math.max(0, (elapsedMs / getActionDurationMs(playState, action, actionContext)) * 100));
-  };
-  const getEnemyAttackProgress = () => {
-    const active = playState.activeAction;
-
-    if (!active?.enemyAttackStartedAt || !active.enemyAttackCompletesAt) {
-      return null;
-    }
-
-    const duration = active.enemyAttackCompletesAt - active.enemyAttackStartedAt;
-    return Math.min(100, Math.max(0, ((now - active.enemyAttackStartedAt) / duration) * 100));
   };
 
   return (
@@ -68,9 +58,7 @@ export const ActionPanel = ({ bundle, debugEnabled, onSetLooping, playState, onS
         {actions.map((action) => {
           const active = playState.activeAction?.actionId === action.id;
           const dps = debugEnabled ? getActionDps(playState, action, actionContext) : null;
-          const enemy = getEnemy(action, actionContext);
-          const targetHealth = active ? playState.activeAction?.targetHealth : playState.actionProgress[action.id]?.targetHealth;
-          const enemyAttackProgress = active ? getEnemyAttackProgress() : null;
+          const actionProgress = getActionProgress(action);
 
           return (
             <button
@@ -80,25 +68,15 @@ export const ActionPanel = ({ bundle, debugEnabled, onSetLooping, playState, onS
               onClick={() => onStartAction(action)}
               type="button"
             >
-              {(active || getActionProgress(action) > 0) && (
+              {(active || actionProgress > 0) && (
                 <span
                   className={`absolute inset-y-0 left-0 ${active ? 'bg-cyan-400/25' : 'bg-slate-700/60'}`}
-                  style={{ width: `${getActionProgress(action)}%` }}
+                  style={{ width: `${actionProgress}%` }}
                 />
               )}
               <span className="relative block text-sm font-semibold text-slate-100">{t(action.titleKey ?? actionTitleKey(action.id))}</span>
               <span className="relative mt-1 block text-xs text-slate-400">{t(action.descriptionKey ?? actionDescriptionKey(action.id))}</span>
               <span className="relative mt-2 block text-xs text-cyan-200">{action.durationSeconds}s</span>
-              {enemy && (
-                <span className="relative mt-1 block text-xs text-rose-200">
-                  {t('actionPanel.enemyHealth', { current: Math.ceil(targetHealth ?? enemy.health), max: enemy.health })}
-                </span>
-              )}
-              {enemyAttackProgress !== null && (
-                <span className="relative mt-2 block h-1 overflow-hidden rounded bg-rose-950">
-                  <span className="block h-full bg-rose-400" style={{ width: `${enemyAttackProgress}%` }} />
-                </span>
-              )}
               {debugEnabled && dps !== null && (
                 <span className="relative mt-1 block text-xs text-amber-200">{t('actionPanel.debugDps', { dps: dps.toFixed(2) })}</span>
               )}

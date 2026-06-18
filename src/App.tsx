@@ -1,5 +1,6 @@
 import { App as CapacitorApp } from '@capacitor/app';
 import { useEffect, useLayoutEffect, useMemo, useState } from 'react';
+import { ActionDetails } from './components/ActionDetails';
 import { ActionPanel } from './components/ActionPanel';
 import { ChatPanel } from './components/ChatPanel';
 import { ContributionMode } from './components/contribution/ContributionMode';
@@ -17,6 +18,7 @@ const getStartingLocationId = (bundle: NonNullable<ReturnType<typeof useUniverse
   bundle.locations.find((location) => location.starting)?.id ?? bundle.locations[0]?.id ?? '';
 
 type AppTab = 'map' | 'home' | 'character' | 'settings';
+type HomeTab = 'actions' | 'details';
 type CharacterTab = 'skills' | 'inventory';
 type ThemePreference = 'system' | 'dark' | 'light';
 type FontSizePreference = 'tiny' | 'small' | 'normal' | 'large' | 'huge';
@@ -54,6 +56,7 @@ const formatDuration = (
 export default function App() {
   const [contributionMode, setContributionMode] = useState(false);
   const [activeTab, setActiveTab] = useState<AppTab>('home');
+  const [homeTab, setHomeTab] = useState<HomeTab>('actions');
   const [characterTab, setCharacterTab] = useState<CharacterTab>('skills');
   const [themePreference, setThemePreference] = useState<ThemePreference>('dark');
   const [fontSizePreference, setFontSizePreference] = useState<FontSizePreference>('normal');
@@ -84,6 +87,7 @@ export default function App() {
   const travelTo = useGameState((state) => state.travelTo);
   const cancelTravel = useGameState((state) => state.cancelTravel);
   const startAction = useGameState((state) => state.startAction);
+  const stopAction = useGameState((state) => state.stopAction);
   const resolveIdle = useGameState((state) => state.resolveIdle);
   const markInactive = useGameState((state) => state.markInactive);
   const setActionLooping = useGameState((state) => state.setActionLooping);
@@ -399,28 +403,61 @@ export default function App() {
               t={t}
             />
 
-            <section className="rounded border border-slate-800 bg-slate-900 p-4">
-            <ActionPanel
-            debugEnabled={debugEnabled}
-            bundle={bundle}
-            onSetLooping={(enabled) => setActionLooping(bundle.manifest.id, enabled)}
-            onStartAction={(action) => {
-              logAction('action.start', {
-                actionId: action.id,
-                locationId: action.locationId,
-                universeId: bundle.manifest.id,
-              });
-              startAction(bundle.manifest.id, action, actionContext);
-            }}
-            playState={playState}
-            t={t}
-          />
-            </section>
+            <div className="grid grid-cols-2 gap-2 rounded border border-slate-800 bg-slate-900 p-2">
+              {(['actions', 'details'] as HomeTab[]).map((tab) => (
+                <button
+                  className={`rounded px-3 py-2 text-sm font-semibold capitalize ${
+                    homeTab === tab ? 'bg-cyan-300 text-slate-950' : 'bg-slate-950 text-slate-300'
+                  }`}
+                  key={tab}
+                  onClick={() => setHomeTab(tab)}
+                  type="button"
+                >
+                  {t(`home.tab.${tab}`)}
+                </button>
+              ))}
+            </div>
 
-            <ChatPanel
-              messages={playState.chatMessages}
-              t={t}
-            />
+            {homeTab === 'actions' && (
+              <section className="grid min-h-0 grid-rows-[auto_minmax(0,1fr)] gap-4">
+                <section className="rounded border border-slate-800 bg-slate-900 p-4">
+                  <ActionPanel
+                    debugEnabled={debugEnabled}
+                    bundle={bundle}
+                    onSetLooping={(enabled) => setActionLooping(bundle.manifest.id, enabled)}
+                    onStartAction={(action) => {
+                      logAction('action.start', {
+                        actionId: action.id,
+                        locationId: action.locationId,
+                        universeId: bundle.manifest.id,
+                      });
+                      startAction(bundle.manifest.id, action, actionContext);
+                    }}
+                    playState={playState}
+                    t={t}
+                  />
+                </section>
+                <ChatPanel
+                  messages={playState.chatMessages}
+                  t={t}
+                />
+              </section>
+            )}
+
+            {homeTab === 'details' && (
+              <ActionDetails
+                bundle={bundle}
+                onStopAction={() => {
+                  logAction('action.stop', {
+                    actionId: playState.activeAction?.actionId ?? '',
+                    universeId: bundle.manifest.id,
+                  });
+                  stopAction(bundle.manifest.id);
+                }}
+                playState={playState}
+                t={t}
+              />
+            )}
           </section>
         )}
 
@@ -680,18 +717,15 @@ export default function App() {
       )}
 
       {idleReport.kind !== 'none' && (
-        <div className="fixed inset-0 z-30 grid place-items-center bg-slate-950/80 p-4">
+        <div className="fixed inset-0 z-30 grid place-items-center bg-slate-950/80 p-4" onClick={() => setIdleReport(emptyIdleReport)}>
           <section className="w-full max-w-md rounded border border-cyan-800 bg-slate-900 p-5 shadow-xl">
-            <div className="flex items-start justify-between gap-4">
+            <div>
               <div>
                 <h2 className="text-lg font-semibold text-cyan-100">{t('welcomeBack.title')}</h2>
                 <p className="mt-1 text-sm text-slate-300">
                   {t('welcomeBack.awayFor', { duration: formatDuration(idleReport.inactiveMs, t) })}
                 </p>
               </div>
-              <button className="rounded border border-slate-600 px-3 py-1 text-sm text-slate-100" onClick={() => setIdleReport(emptyIdleReport)} type="button">
-                {t('dialog.close')}
-              </button>
             </div>
 
             <div className="mt-4 grid gap-3 text-sm text-slate-200">

@@ -33,7 +33,7 @@ export const SubmitToGitHub = ({ appVersion, draft, validationIssues, t }: Submi
           return file.json.length > 0;
         }
         if (file.path === 'removed.json') {
-          return Object.values(file.json as Record<string, unknown[]>).some((items) => items.length > 0);
+          return Object.values(file.json as Record<string, unknown[] | undefined>).some((items) => (items?.length ?? 0) > 0);
         }
         return Object.keys(file.json as Record<string, unknown>).length > 0;
       }),

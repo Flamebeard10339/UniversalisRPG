@@ -11,6 +11,7 @@
       "interactionTypeId": { "type": "string", "minLength": 1 },
       "health": { "type": "number", "exclusiveMinimum": 0 },
       "rate": { "type": "number", "minimum": 0 },
+      "showHealthBar": { "type": "boolean" },
       "skills": {
         "type": "object",
         "additionalProperties": {

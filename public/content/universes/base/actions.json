@@ -6,6 +6,27 @@
     "rewards": [{ "kind": "skillXp", "skillId": "lore", "amount": 2 }]
   },
   {
+    "id": "fight-goblin",
+    "locationId": "crossroads",
+    "durationSeconds": 1,
+    "enemyId": "goblin",
+    "rewards": [{ "kind": "skillXp", "skillId": "attack", "amount": 1 }]
+  },
+  {
+    "id": "fight-ork",
+    "locationId": "crossroads",
+    "durationSeconds": 1,
+    "enemyId": "ork",
+    "rewards": [{ "kind": "skillXp", "skillId": "attack", "amount": 1 }]
+  },
+  {
+    "id": "fight-troll",
+    "locationId": "crossroads",
+    "durationSeconds": 1,
+    "enemyId": "troll",
+    "rewards": [{ "kind": "skillXp", "skillId": "attack", "amount": 1 }]
+  },
+  {
     "id": "forage-embers",
     "locationId": "emberwood",
     "durationSeconds": 8,

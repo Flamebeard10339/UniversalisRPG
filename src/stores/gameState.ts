@@ -11,6 +11,7 @@ type GameStateStore = {
   travelTo: (universeId: string, edge: TravelEdgeDefinition, destinationLocationId: string) => void;
   cancelTravel: (universeId: string) => void;
   startAction: (universeId: string, action: GameAction, context: ActionResolutionContext) => void;
+  stopAction: (universeId: string) => void;
   resolveIdle: (universeId: string, context: ActionResolutionContext, options?: { debugEnabled?: boolean; showReport?: boolean }) => IdleReport;
   setActionLooping: (universeId: string, enabled: boolean) => void;
   markInactive: (universeId: string) => void;
@@ -123,6 +124,44 @@ export const useGameState = create<GameStateStore>((set, get) => ({
       }
 
       const next = startAction(current, action, context);
+      void save(storageKey(universeId), next);
+
+      return {
+        states: {
+          ...state.states,
+          [universeId]: next,
+        },
+      };
+    });
+  },
+
+  stopAction: (universeId) => {
+    set((state) => {
+      const current = state.states[universeId];
+
+      if (!current?.activeAction) {
+        return state;
+      }
+
+      const now = Date.now();
+      const actionId = current.activeAction.actionId;
+      const progress = current.actionProgress[actionId] ?? { elapsedMs: 0, runningSince: current.activeAction.startedAt };
+      const next = {
+        ...current,
+        activeAction: null,
+        actionProgress: {
+          ...current.actionProgress,
+          [actionId]: {
+            ...progress,
+            elapsedMs: progress.elapsedMs + Math.max(0, now - (progress.runningSince ?? current.activeAction.startedAt)),
+            runningSince: null,
+            targetHealth: current.activeAction.targetHealth ?? progress.targetHealth ?? null,
+            enemyAttackStartedAt: current.activeAction.enemyAttackStartedAt ?? progress.enemyAttackStartedAt ?? null,
+            enemyAttackCompletesAt: current.activeAction.enemyAttackCompletesAt ?? progress.enemyAttackCompletesAt ?? null,
+          },
+        },
+        lastTickAt: now,
+      };
       void save(storageKey(universeId), next);
 
       return {

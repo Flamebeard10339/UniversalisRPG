@@ -169,7 +169,7 @@ export const sampleAdversarialDamage = (
 
 export const getEnemyAttackDurationMs = (
   enemy: EnemyDefinition | null,
-) => enemy && enemy.rate > 0 ? 1000 / enemy.rate : null;
+) => enemy && enemy.rate > 0 ? 60_000 / enemy.rate : null;
 
 export const sampleEnemyAttackDamage = (
   state: UniversePlayState,
