@@ -24,6 +24,7 @@ export const SubmitToGitHub = ({ appVersion, draft, validationIssues, t }: Submi
         { path: 'actions.json', json: draft.actions },
         { path: 'skills.json', json: draft.skills },
         { path: 'items.json', json: draft.items },
+        { path: 'interaction-types.json', json: draft.interactionTypes },
         { path: 'locales.json', json: draft.locales },
       ].filter((file) => {
         if (Array.isArray(file.json)) {

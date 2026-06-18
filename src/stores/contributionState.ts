@@ -21,6 +21,7 @@ const createEmptyDraft = (universeId: string): ContributionDraft => ({
   actions: [],
   skills: [],
   items: [],
+  interactionTypes: [],
   locales: {},
 });
 
@@ -28,6 +29,7 @@ const normalizeDraft = (draft: ContributionDraft): ContributionDraft => ({
   ...createEmptyDraft(draft.universeId),
   ...draft,
   items: draft.items ?? [],
+  interactionTypes: draft.interactionTypes ?? [],
 });
 
 export const useContributionState = create<ContributionStateStore>((set, get) => ({

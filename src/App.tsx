@@ -1,12 +1,13 @@
-import { useEffect, useMemo, useState } from 'react';
+import { App as CapacitorApp } from '@capacitor/app';
+import { useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import { ActionPanel } from './components/ActionPanel';
 import { ChatPanel } from './components/ChatPanel';
 import { ContributionMode } from './components/contribution/ContributionMode';
 import { SkillBars } from './components/SkillBars';
 import { TravelStatus } from './components/TravelStatus';
 import { WorldMap } from './components/WorldMap';
-import { locationTitleKey } from './game/contentIds';
-import type { UniversePlayState } from './game/types';
+import { actionTitleKey, itemTitleKey, locationTitleKey, skillTitleKey } from './game/contentIds';
+import type { IdleReport, UniversePlayState } from './game/types';
 import { load, save } from './lib/storage';
 import { useDebugState } from './stores/debugState';
 import { useGameState } from './stores/gameState';
@@ -22,12 +23,33 @@ type FontSizePreference = 'tiny' | 'small' | 'normal' | 'large' | 'huge';
 const APP_VERSION = '0.1.0';
 const SOURCE_URL = 'https://github.com/Flamebeard10339/UniversalisRPG';
 const appearanceKey = 'universalis:settings:appearance';
+const emptyIdleReport: IdleReport = { kind: 'none' };
 
 const encodeSave = (playState: UniversePlayState) =>
   btoa(unescape(encodeURIComponent(JSON.stringify(playState))));
 
 const decodeSave = (value: string) =>
   JSON.parse(decodeURIComponent(escape(atob(value.trim())))) as UniversePlayState;
+
+const formatDuration = (
+  milliseconds: number,
+  t: ReturnType<typeof useUniverseState.getState>['t'],
+) => {
+  const totalSeconds = Math.max(0, Math.floor(milliseconds / 1000));
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+
+  if (hours > 0) {
+    return t('time.duration.hoursMinutes', { hours, minutes });
+  }
+
+  if (minutes > 0) {
+    return t('time.duration.minutesSeconds', { minutes, seconds });
+  }
+
+  return t('time.duration.seconds', { seconds });
+};
 
 export default function App() {
   const [contributionMode, setContributionMode] = useState(false);
@@ -41,6 +63,8 @@ export default function App() {
   const [saveExport, setSaveExport] = useState('');
   const [saveImport, setSaveImport] = useState('');
   const [saveMessage, setSaveMessage] = useState('');
+  const [idleReport, setIdleReport] = useState<IdleReport>(emptyIdleReport);
+  const [appActive, setAppActive] = useState(() => typeof document === 'undefined' || !document.hidden);
   const {
     activeUniverseId,
     bundle,
@@ -60,7 +84,9 @@ export default function App() {
   const travelTo = useGameState((state) => state.travelTo);
   const cancelTravel = useGameState((state) => state.cancelTravel);
   const startAction = useGameState((state) => state.startAction);
-  const resolveDue = useGameState((state) => state.resolveDue);
+  const resolveIdle = useGameState((state) => state.resolveIdle);
+  const markInactive = useGameState((state) => state.markInactive);
+  const setActionLooping = useGameState((state) => state.setActionLooping);
   const importUniverseState = useGameState((state) => state.importUniverseState);
   const resetUniverse = useGameState((state) => state.resetUniverse);
   const debugEnabled = useDebugState((state) => state.enabled);
@@ -103,6 +129,11 @@ export default function App() {
   }, [changelogText, showChangelog]);
 
   const startingLocationId = useMemo(() => (bundle ? getStartingLocationId(bundle) : ''), [bundle]);
+  const actionContext = useMemo(() => ({
+    actions: bundle?.actions ?? [],
+    skills: bundle?.skills ?? [],
+    interactionTypes: bundle?.interactionTypes ?? [],
+  }), [bundle]);
   const playState = bundle ? gameStates[bundle.manifest.id] ?? getUniverseState(bundle.manifest.id, startingLocationId) : null;
   const currentLocation = bundle?.locations.find((location) => location.id === playState?.currentLocationId);
   const beginTravel = (locationId: string) => {
@@ -186,14 +217,76 @@ export default function App() {
     setSaveMessage(t('settings.save.resetComplete'));
   };
 
+  const showIdleReport = (report: IdleReport) => {
+    if (report.kind !== 'none') {
+      setIdleReport(report);
+    }
+  };
+
   useEffect(() => {
     if (bundle && startingLocationId) {
-      void hydratePlayState(bundle.manifest.id, startingLocationId);
+      void hydratePlayState(bundle.manifest.id, startingLocationId).then(() => {
+        const report = useGameState.getState().resolveIdle(bundle.manifest.id, {
+          actions: bundle.actions,
+          skills: bundle.skills,
+          interactionTypes: bundle.interactionTypes,
+        }, {
+          debugEnabled: useDebugState.getState().enabled,
+          showReport: true,
+        });
+        showIdleReport(report);
+      });
     }
   }, [bundle, hydratePlayState, startingLocationId]);
 
   useEffect(() => {
-    if (!bundle || !playState) {
+    if (!bundle) {
+      return undefined;
+    }
+
+    const universeId = bundle.manifest.id;
+    const markAway = () => {
+      setAppActive(false);
+      markInactive(universeId);
+    };
+    const resolveReturn = () => {
+      setAppActive(true);
+      const report = resolveIdle(universeId, actionContext, {
+        debugEnabled,
+        showReport: true,
+      });
+      showIdleReport(report);
+    };
+    const appStateHandle = CapacitorApp.addListener('appStateChange', ({ isActive }) => {
+      if (isActive) {
+        resolveReturn();
+      } else {
+        markAway();
+      }
+    });
+
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        markAway();
+      } else {
+        resolveReturn();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('pagehide', markAway);
+    window.addEventListener('pageshow', resolveReturn);
+
+    return () => {
+      void appStateHandle.then((handle) => handle.remove());
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('pagehide', markAway);
+      window.removeEventListener('pageshow', resolveReturn);
+    };
+  }, [actionContext, bundle, debugEnabled, markInactive, resolveIdle]);
+
+  useEffect(() => {
+    if (!appActive || !bundle || !playState) {
       return undefined;
     }
 
@@ -206,11 +299,27 @@ export default function App() {
     }
 
     const timeout = window.setTimeout(
-      () => resolveDue(bundle.manifest.id, bundle.actions, { debugEnabled }),
+      () => {
+        resolveIdle(bundle.manifest.id, actionContext, { debugEnabled });
+      },
       Math.max(0, nextCompletionAt - Date.now()),
     );
     return () => window.clearTimeout(timeout);
-  }, [bundle, debugEnabled, playState, resolveDue]);
+  }, [actionContext, appActive, bundle, debugEnabled, playState, resolveIdle]);
+
+  useLayoutEffect(() => {
+    if (!appActive || !bundle || !playState) {
+      return;
+    }
+
+    const nextCompletionAt = [playState.activeTravel?.completesAt, playState.activeAction?.completesAt]
+      .filter((time): time is number => typeof time === 'number')
+      .sort((a, b) => a - b)[0];
+
+    if (nextCompletionAt && nextCompletionAt <= Date.now()) {
+      resolveIdle(bundle.manifest.id, actionContext, { debugEnabled });
+    }
+  }, [actionContext, appActive, bundle, debugEnabled, playState, resolveIdle]);
 
   if (loading && !bundle) {
     return <main className="grid min-h-screen place-items-center bg-slate-950 text-slate-100">{t('app.loadingUniverse')}</main>;
@@ -274,15 +383,17 @@ export default function App() {
             />
 
             <section className="rounded border border-slate-800 bg-slate-900 p-4">
-          <ActionPanel
+            <ActionPanel
+            debugEnabled={debugEnabled}
             bundle={bundle}
+            onSetLooping={(enabled) => setActionLooping(bundle.manifest.id, enabled)}
             onStartAction={(action) => {
               logAction('action.start', {
                 actionId: action.id,
                 locationId: action.locationId,
                 universeId: bundle.manifest.id,
               });
-              startAction(bundle.manifest.id, action);
+              startAction(bundle.manifest.id, action, actionContext);
             }}
             playState={playState}
             t={t}
@@ -547,6 +658,75 @@ export default function App() {
             <pre className="mt-4 max-h-[60vh] overflow-auto whitespace-pre-wrap rounded bg-slate-950 p-3 text-sm text-slate-300">
               {changelogText || t('dialog.loadingChangelog')}
             </pre>
+          </section>
+        </div>
+      )}
+
+      {idleReport.kind !== 'none' && (
+        <div className="fixed inset-0 z-30 grid place-items-center bg-slate-950/80 p-4">
+          <section className="w-full max-w-md rounded border border-cyan-800 bg-slate-900 p-5 shadow-xl">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h2 className="text-lg font-semibold text-cyan-100">{t('welcomeBack.title')}</h2>
+                <p className="mt-1 text-sm text-slate-300">
+                  {t('welcomeBack.awayFor', { duration: formatDuration(idleReport.inactiveMs, t) })}
+                </p>
+              </div>
+              <button className="rounded border border-slate-600 px-3 py-1 text-sm text-slate-100" onClick={() => setIdleReport(emptyIdleReport)} type="button">
+                {t('dialog.close')}
+              </button>
+            </div>
+
+            <div className="mt-4 grid gap-3 text-sm text-slate-200">
+              {idleReport.kind === 'travelCompleted' && (
+                <p>
+                  {t('welcomeBack.travelCompleted', {
+                    from: t(locationTitleKey(idleReport.fromLocationId), idleReport.fromLocationId),
+                    to: t(locationTitleKey(idleReport.toLocationId), idleReport.toLocationId),
+                  })}
+                </p>
+              )}
+
+              {idleReport.kind === 'actionCompleted' && (
+                <section className="grid gap-2">
+                  <p>{t('welcomeBack.actionCompleted', { action: t(actionTitleKey(idleReport.actionId), idleReport.actionId) })}</p>
+                  {idleReport.rewards.length > 0 && (
+                    <ul className="grid gap-1 rounded bg-slate-950 p-3 text-xs text-slate-300">
+                      {idleReport.rewards.map((reward, index) => (
+                        <li key={`${reward.kind}-${reward.labelId}-${index}`}>
+                          {reward.kind === 'resource'
+                            ? t('welcomeBack.reward.resource', { amount: reward.amount, item: t(itemTitleKey(reward.labelId), reward.labelId) })
+                            : t('welcomeBack.reward.skillXp', { amount: reward.amount, skill: t(skillTitleKey(reward.labelId), reward.labelId) })}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </section>
+              )}
+
+              {idleReport.kind === 'actionFailed' && (
+                <p>{t('welcomeBack.actionFailed', { action: t(actionTitleKey(idleReport.actionId), idleReport.actionId) })}</p>
+              )}
+
+              {idleReport.kind === 'inProgress' && idleReport.timerKind === 'action' && (
+                <p>
+                  {t('welcomeBack.actionInProgress', {
+                    action: t(actionTitleKey(idleReport.actionId ?? ''), idleReport.actionId ?? ''),
+                    remaining: formatDuration(idleReport.remainingMs, t),
+                  })}
+                </p>
+              )}
+
+              {idleReport.kind === 'inProgress' && idleReport.timerKind === 'travel' && (
+                <p>
+                  {t('welcomeBack.travelInProgress', {
+                    from: t(locationTitleKey(idleReport.fromLocationId ?? ''), idleReport.fromLocationId ?? ''),
+                    to: t(locationTitleKey(idleReport.toLocationId ?? ''), idleReport.toLocationId ?? ''),
+                    remaining: formatDuration(idleReport.remainingMs, t),
+                  })}
+                </p>
+              )}
+            </div>
           </section>
         </div>
       )}

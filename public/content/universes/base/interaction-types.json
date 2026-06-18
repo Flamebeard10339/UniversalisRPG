@@ -1,0 +1,8 @@
+[
+  {
+    "id": "melee-combat",
+    "sourceSkillId": "attack",
+    "targetSkillId": "defense",
+    "targetPlayerHealth": true
+  }
+]

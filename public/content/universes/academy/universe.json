@@ -12,6 +12,7 @@
     "actions.json",
     "skills.json",
     "items.json",
+    "interaction-types.json",
     "locales/en.json"
   ],
   "compatibility": {

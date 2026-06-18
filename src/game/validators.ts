@@ -2,6 +2,7 @@ import type {
   ContentBundle,
   ContributionDraft,
   GameAction,
+  InteractionTypeDefinition,
   ItemDefinition,
   LocaleDictionary,
   LocationNode,
@@ -112,6 +113,18 @@ const validateItemsShape = (items: unknown): items is ItemDefinition[] =>
         hasString(item, 'id'),
     ));
 
+const validateInteractionTypesShape = (interactionTypes: unknown): interactionTypes is InteractionTypeDefinition[] =>
+  interactionTypes === undefined ||
+  (Array.isArray(interactionTypes) &&
+    interactionTypes.every(
+      (interactionType) =>
+        isRecord(interactionType) &&
+        hasString(interactionType, 'id') &&
+        hasString(interactionType, 'sourceSkillId') &&
+        hasString(interactionType, 'targetSkillId') &&
+        typeof interactionType.targetPlayerHealth === 'boolean',
+    ));
+
 export const validateContentShape = (bundle: Partial<ContentBundle>) => {
   const issues: ValidationIssue[] = [];
 
@@ -139,6 +152,10 @@ export const validateContentShape = (bundle: Partial<ContentBundle>) => {
     issues.push(error('items.json', 'validation.itemsShape'));
   }
 
+  if (!validateInteractionTypesShape(bundle.interactionTypes)) {
+    issues.push(error('interaction-types.json', 'validation.interactionTypesShape'));
+  }
+
   return issues;
 };
 
@@ -163,11 +180,13 @@ export const validateContentReferences = (bundle: ContentBundle) => {
     ...findDuplicateIds(bundle.actions, 'actions'),
     ...findDuplicateIds(bundle.skills, 'skills'),
     ...findDuplicateIds(bundle.items ?? [], 'items'),
+    ...findDuplicateIds(bundle.interactionTypes ?? [], 'interactionTypes'),
   ];
 
   const locationIds = new Set(bundle.locations.map((location) => location.id));
   const skillIds = new Set(bundle.skills.map((skill) => skill.id));
   const itemIds = new Set((bundle.items ?? []).map((item) => item.id));
+  const interactionTypeIds = new Set((bundle.interactionTypes ?? []).map((interactionType) => interactionType.id));
   const locale = bundle.locales[bundle.manifest.locales[0]] ?? {};
 
   if (!bundle.locations.some((location) => location.starting)) {
@@ -206,6 +225,21 @@ export const validateContentReferences = (bundle: ContentBundle) => {
     if (action.durationSeconds <= 0) {
       issues.push(error(`actions.${action.id}.durationSeconds`, 'validation.actionDurationPositive'));
     }
+    if (action.interactionTypeId && !interactionTypeIds.has(action.interactionTypeId)) {
+      issues.push(error(`actions.${action.id}.interactionTypeId`, 'validation.unknownInteractionType', { id: action.interactionTypeId }));
+    }
+    if (action.sourceSkillId && !skillIds.has(action.sourceSkillId)) {
+      issues.push(error(`actions.${action.id}.sourceSkillId`, 'validation.unknownSkill', { id: action.sourceSkillId }));
+    }
+    if (action.targetSkillId && !skillIds.has(action.targetSkillId)) {
+      issues.push(error(`actions.${action.id}.targetSkillId`, 'validation.unknownSkill', { id: action.targetSkillId }));
+    }
+    if (action.health !== undefined && action.health <= 0) {
+      issues.push(error(`actions.${action.id}.health`, 'validation.healthPositive'));
+    }
+    if (action.rate !== undefined && action.rate < 0) {
+      issues.push(error(`actions.${action.id}.rate`, 'validation.rateNonNegative'));
+    }
     for (const reward of action.rewards) {
       if (reward.kind === 'skillXp' && !skillIds.has(reward.skillId)) {
         issues.push(error(`actions.${action.id}.rewards`, 'validation.unknownSkill', { id: reward.skillId }));
@@ -228,6 +262,24 @@ export const validateContentReferences = (bundle: ContentBundle) => {
   for (const skill of bundle.skills) {
     if (!isKebabCaseId(skill.id)) {
       issues.push(error(`skills.${skill.id}.id`, 'validation.skillIdKebab'));
+    }
+    if (skill.rate !== undefined && skill.rate <= 0) {
+      issues.push(error(`skills.${skill.id}.rate`, 'validation.ratePositive'));
+    }
+    if (skill.imprecision !== undefined && skill.imprecision <= 0) {
+      issues.push(error(`skills.${skill.id}.imprecision`, 'validation.imprecisionPositive'));
+    }
+  }
+
+  for (const interactionType of bundle.interactionTypes ?? []) {
+    if (!isKebabCaseId(interactionType.id)) {
+      issues.push(error(`interactionTypes.${interactionType.id}.id`, 'validation.interactionTypeIdKebab'));
+    }
+    if (!skillIds.has(interactionType.sourceSkillId)) {
+      issues.push(error(`interactionTypes.${interactionType.id}.sourceSkillId`, 'validation.unknownSkill', { id: interactionType.sourceSkillId }));
+    }
+    if (!skillIds.has(interactionType.targetSkillId)) {
+      issues.push(error(`interactionTypes.${interactionType.id}.targetSkillId`, 'validation.unknownSkill', { id: interactionType.targetSkillId }));
     }
   }
 
@@ -293,6 +345,7 @@ export const mergeDraftIntoBundle = (bundle: ContentBundle, draft: ContributionD
     actions: mergeById(bundle.actions, draft.actions),
     skills: mergeById(bundle.skills, draft.skills),
     items: mergeById(bundle.items ?? [], draft.items),
+    interactionTypes: mergeById(bundle.interactionTypes ?? [], draft.interactionTypes ?? []),
     locales: mergeLocales(bundle.locales, draft.locales),
   };
 };

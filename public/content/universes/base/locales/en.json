@@ -25,6 +25,10 @@
   "skill.survival.description": "Practical knowledge for harsh country and stranger weather.",
   "skill.craft.title": "Craft",
   "skill.craft.description": "Making, repairing, and improving useful things.",
+  "skill.attack.title": "Attack",
+  "skill.attack.description": "Accuracy, timing, and pressure in direct conflict.",
+  "skill.defense.title": "Defense",
+  "skill.defense.description": "Guard, positioning, and staying intact under pressure.",
   "item.emberleaf.title": "Emberleaf",
   "item.emberleaf.description": "A warm leaf that keeps a coal-like glow after it falls."
 }

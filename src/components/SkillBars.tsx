@@ -1,7 +1,7 @@
 import type { ContentBundle, UniversePlayState } from '../game/types';
 import { skillTitleKey } from '../game/contentIds';
 import type { Translator } from '../game/i18n';
-import { skillLevelFromXp } from '../game/timers';
+import { skillLevelFromXp } from '../game/skills';
 
 type SkillBarsProps = {
   bundle: ContentBundle;

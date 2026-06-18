@@ -25,6 +25,10 @@
   "skill.discipline.description": "Focus, repetition, and calm under pressure.",
   "skill.survival.title": "Survival",
   "skill.survival.description": "Practical knowledge for harsh country and stranger weather.",
+  "skill.attack.title": "Attack",
+  "skill.attack.description": "Accuracy, timing, and pressure in direct conflict.",
+  "skill.defense.title": "Defense",
+  "skill.defense.description": "Guard, positioning, and staying intact under pressure.",
   "item.moonvine-cutting.title": "Moonvine Cutting",
   "item.moonvine-cutting.description": "A viable silver-green cutting from the academy glasshouse."
 }

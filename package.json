@@ -8,10 +8,12 @@
     "dev:android": "concurrently \"vite --configLoader runner\" \"wait-on http://localhost:5173 && cap run android --livereload\"",
     "build": "tsc && vite build --configLoader runner",
     "preview": "vite preview --configLoader runner",
-    "sync": "npm run build && cap sync"
+    "sync": "npm run build && cap sync",
+    "test": "vitest run --configLoader runner"
   },
   "dependencies": {
     "@capacitor/android": "^6.2.1",
+    "@capacitor/app": "^6.0.3",
     "@capacitor/core": "^6.2.1",
     "@capacitor/preferences": "^6.0.3",
     "react": "^18.3.1",
@@ -30,6 +32,7 @@
     "tailwindcss": "^3.4.15",
     "typescript": "^5.7.2",
     "vite": "^6.0.1",
+    "vitest": "^4.1.9",
     "wait-on": "^8.0.1"
   }
 }

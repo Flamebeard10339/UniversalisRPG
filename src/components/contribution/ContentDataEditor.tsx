@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { edgeId, toKebabInput } from '../../game/contentIds';
 import type { Translator } from '../../game/i18n';
-import type { ContentBundle, ContributionDraft, GameAction, ItemDefinition, LocationNode, Reward, SkillDefinition, TravelEdgeDefinition } from '../../game/types';
+import type { ContentBundle, ContributionDraft, GameAction, InteractionTypeDefinition, ItemDefinition, LocationNode, Reward, SkillDefinition, TravelEdgeDefinition } from '../../game/types';
 import { ContributionMapEditor } from './ContributionMapEditor';
 
 type ContentDataEditorProps = {
@@ -11,14 +11,14 @@ type ContentDataEditorProps = {
   t: Translator;
 };
 
-type ContentDataTab = 'map' | 'actions' | 'skills' | 'items' | 'json';
+type ContentDataTab = 'map' | 'actions' | 'skills' | 'interactions' | 'items' | 'json';
 type RewardDraft = {
   kind: Reward['kind'];
   targetId: string;
   amount: string;
 };
 
-const contentTabs: ContentDataTab[] = ['map', 'actions', 'skills', 'items', 'json'];
+const contentTabs: ContentDataTab[] = ['map', 'actions', 'skills', 'interactions', 'items', 'json'];
 
 const uniqueId = (baseId: string, existingIds: string[]) => {
   let index = 1;
@@ -39,6 +39,7 @@ const uniqueById = <T extends { id: string }>(items: T[]) => [...new Map(items.m
 const allLocations = (bundle: ContentBundle, draft: ContributionDraft) => uniqueById([...bundle.locations, ...draft.locations]);
 const allSkills = (bundle: ContentBundle, draft: ContributionDraft) => uniqueById([...bundle.skills, ...draft.skills]);
 const allItems = (bundle: ContentBundle, draft: ContributionDraft) => uniqueById([...(bundle.items ?? []), ...draft.items]);
+const allInteractionTypes = (bundle: ContentBundle, draft: ContributionDraft) => uniqueById([...(bundle.interactionTypes ?? []), ...draft.interactionTypes]);
 const defaultRewardDraft = (): RewardDraft => ({ kind: 'skillXp', targetId: '', amount: '1' });
 
 export const ContentDataEditor = ({ bundle, draft, onPatch, t }: ContentDataEditorProps) => {
@@ -66,6 +67,10 @@ export const ContentDataEditor = ({ bundle, draft, onPatch, t }: ContentDataEdit
 
   const updateItem = (index: number, patch: Partial<ItemDefinition>) => {
     onPatch({ items: replaceAt(draft.items, index, { ...draft.items[index], ...patch }) });
+  };
+
+  const updateInteractionType = (index: number, patch: Partial<InteractionTypeDefinition>) => {
+    onPatch({ interactionTypes: replaceAt(draft.interactionTypes, index, { ...draft.interactionTypes[index], ...patch }) });
   };
 
   const addLocation = () => {
@@ -125,6 +130,13 @@ export const ContentDataEditor = ({ bundle, draft, onPatch, t }: ContentDataEdit
     onPatch({ items: [...draft.items, { id }] });
   };
 
+  const addInteractionType = () => {
+    const id = uniqueId('new-interaction', draft.interactionTypes.map((interactionType) => interactionType.id));
+    const sourceSkillId = allSkills(bundle, draft)[0]?.id ?? '';
+    const targetSkillId = allSkills(bundle, draft)[1]?.id ?? sourceSkillId;
+    onPatch({ interactionTypes: [...draft.interactionTypes, { id, sourceSkillId, targetSkillId, targetPlayerHealth: false }] });
+  };
+
   const updateRewardDraft = (actionId: string, patch: Partial<RewardDraft>) => {
     setRewardDrafts((current) => ({
       ...current,
@@ -167,12 +179,13 @@ export const ContentDataEditor = ({ bundle, draft, onPatch, t }: ContentDataEdit
     { path: 'actions.json', json: draft.actions },
     { path: 'skills.json', json: draft.skills },
     { path: 'items.json', json: draft.items },
+    { path: 'interaction-types.json', json: draft.interactionTypes },
     { path: 'locales.json', json: draft.locales },
   ];
 
   return (
     <section className="grid gap-3">
-      <div className="grid grid-cols-5 gap-2 rounded border border-slate-800 bg-slate-900 p-2">
+      <div className="grid grid-cols-6 gap-2 rounded border border-slate-800 bg-slate-900 p-2">
         {contentTabs.map((tab) => (
           <button
             className={`rounded px-3 py-2 text-sm font-semibold capitalize ${
@@ -277,10 +290,15 @@ export const ContentDataEditor = ({ bundle, draft, onPatch, t }: ContentDataEdit
               {t('contribution.data.addAction')}
             </button>
           </div>
-          <div className="hidden grid-cols-[1fr_1fr_8rem_6rem] gap-2 px-2 text-xs font-semibold uppercase tracking-wide text-slate-500 lg:grid">
+          <div className="hidden grid-cols-[1fr_1fr_6rem_1fr_1fr_1fr_6rem_6rem_6rem] gap-2 px-2 text-xs font-semibold uppercase tracking-wide text-slate-500 lg:grid">
             <span>{t('contribution.column.id')}</span>
             <span>{t('contribution.column.location')}</span>
             <span>{t('contribution.column.seconds')}</span>
+            <span>{t('contribution.column.interaction')}</span>
+            <span>{t('contribution.column.sourceSkill')}</span>
+            <span>{t('contribution.column.targetSkill')}</span>
+            <span>{t('contribution.column.health')}</span>
+            <span>{t('contribution.column.rate')}</span>
             <span>{t('contribution.column.remove')}</span>
           </div>
           {draft.actions.length === 0 ? (
@@ -293,7 +311,7 @@ export const ContentDataEditor = ({ bundle, draft, onPatch, t }: ContentDataEdit
 
                 return (
                   <div className="grid gap-1 rounded bg-slate-950 p-2" key={`${action.id}-${index}`}>
-                    <div className="grid gap-2 lg:grid-cols-[1fr_1fr_8rem_6rem]">
+                    <div className="grid gap-2 lg:grid-cols-[1fr_1fr_6rem_1fr_1fr_1fr_6rem_6rem_6rem]">
                       <input
                         aria-label="Action id"
                         className="min-w-0 rounded bg-slate-900 px-2 py-1.5 text-sm"
@@ -307,6 +325,11 @@ export const ContentDataEditor = ({ bundle, draft, onPatch, t }: ContentDataEdit
                       />
                       <input aria-label="Action location" className="min-w-0 rounded bg-slate-900 px-2 py-1.5 text-sm" list="content-location-ids" onChange={(event) => updateAction(index, { locationId: toKebabInput(event.target.value) })} onFocus={() => setSelectedActionId(action.id)} value={action.locationId} />
                       <input aria-label="Action duration" className="min-w-0 rounded bg-slate-900 px-2 py-1.5 text-sm" min="1" onChange={(event) => updateAction(index, { durationSeconds: Number(event.target.value) })} onFocus={() => setSelectedActionId(action.id)} type="number" value={action.durationSeconds} />
+                      <input aria-label="Action interaction" className="min-w-0 rounded bg-slate-900 px-2 py-1.5 text-sm" list="content-interaction-ids" onChange={(event) => updateAction(index, { interactionTypeId: toKebabInput(event.target.value) || undefined })} onFocus={() => setSelectedActionId(action.id)} value={action.interactionTypeId ?? ''} />
+                      <input aria-label="Action source skill" className="min-w-0 rounded bg-slate-900 px-2 py-1.5 text-sm" list="content-skill-ids" onChange={(event) => updateAction(index, { sourceSkillId: toKebabInput(event.target.value) || undefined })} onFocus={() => setSelectedActionId(action.id)} value={action.sourceSkillId ?? ''} />
+                      <input aria-label="Action target skill" className="min-w-0 rounded bg-slate-900 px-2 py-1.5 text-sm" list="content-skill-ids" onChange={(event) => updateAction(index, { targetSkillId: toKebabInput(event.target.value) || undefined })} onFocus={() => setSelectedActionId(action.id)} value={action.targetSkillId ?? ''} />
+                      <input aria-label="Action health" className="min-w-0 rounded bg-slate-900 px-2 py-1.5 text-sm" min="1" onChange={(event) => updateAction(index, { health: event.target.value ? Number(event.target.value) : undefined })} onFocus={() => setSelectedActionId(action.id)} type="number" value={action.health ?? ''} />
+                      <input aria-label="Action rate" className="min-w-0 rounded bg-slate-900 px-2 py-1.5 text-sm" min="0" onChange={(event) => updateAction(index, { rate: event.target.value ? Number(event.target.value) : undefined })} onFocus={() => setSelectedActionId(action.id)} type="number" value={action.rate ?? ''} />
                       <button
                         className="rounded border border-rose-500 px-2 py-1.5 text-sm font-semibold text-rose-200"
                         onClick={() => {
@@ -364,9 +387,11 @@ export const ContentDataEditor = ({ bundle, draft, onPatch, t }: ContentDataEdit
               {t('contribution.data.addSkill')}
             </button>
           </div>
-          <div className="hidden grid-cols-[1fr_8rem_6rem] gap-2 px-2 text-xs font-semibold uppercase tracking-wide text-slate-500 lg:grid">
+          <div className="hidden grid-cols-[1fr_8rem_8rem_8rem_6rem] gap-2 px-2 text-xs font-semibold uppercase tracking-wide text-slate-500 lg:grid">
             <span>{t('contribution.column.id')}</span>
             <span>{t('contribution.column.maxLevel')}</span>
+            <span>{t('contribution.column.rate')}</span>
+            <span>{t('contribution.column.imprecision')}</span>
             <span>{t('contribution.column.remove')}</span>
           </div>
           {draft.skills.length === 0 ? (
@@ -374,10 +399,50 @@ export const ContentDataEditor = ({ bundle, draft, onPatch, t }: ContentDataEdit
           ) : (
             <div className="grid gap-1">
               {draft.skills.map((skill, index) => (
-                <div className="grid gap-2 rounded bg-slate-950 p-2 lg:grid-cols-[1fr_8rem_6rem]" key={`${skill.id}-${index}`}>
+                <div className="grid gap-2 rounded bg-slate-950 p-2 lg:grid-cols-[1fr_8rem_8rem_8rem_6rem]" key={`${skill.id}-${index}`}>
                   <input aria-label="Skill id" className="min-w-0 rounded bg-slate-900 px-2 py-1.5 text-sm" onChange={(event) => updateSkill(index, { id: toKebabInput(event.target.value) })} value={skill.id} />
                   <input aria-label="Skill max level" className="min-w-0 rounded bg-slate-900 px-2 py-1.5 text-sm" min="1" onChange={(event) => updateSkill(index, { maxLevel: Number(event.target.value) })} type="number" value={skill.maxLevel} />
+                  <input aria-label="Skill rate" className="min-w-0 rounded bg-slate-900 px-2 py-1.5 text-sm" min="0.01" onChange={(event) => updateSkill(index, { rate: event.target.value ? Number(event.target.value) : undefined })} type="number" value={skill.rate ?? ''} />
+                  <input aria-label="Skill imprecision" className="min-w-0 rounded bg-slate-900 px-2 py-1.5 text-sm" min="0.01" onChange={(event) => updateSkill(index, { imprecision: event.target.value ? Number(event.target.value) : undefined })} type="number" value={skill.imprecision ?? ''} />
                   <button className="rounded border border-rose-500 px-2 py-1.5 text-sm font-semibold text-rose-200" onClick={() => onPatch({ skills: removeAt(draft.skills, index) })} type="button">
+                    {t('contribution.column.remove')}
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
+
+      {activeTab === 'interactions' && (
+        <section className="grid gap-1 rounded border border-slate-700 p-2">
+          <div className="flex items-center justify-between gap-3">
+            <h3 className="text-sm font-semibold text-slate-100">{t('contribution.data.interactions')}</h3>
+            <button className="rounded bg-cyan-400 px-3 py-2 text-sm font-semibold text-slate-950" onClick={addInteractionType} type="button">
+              {t('contribution.data.addInteraction')}
+            </button>
+          </div>
+          <div className="hidden grid-cols-[1fr_1fr_1fr_8rem_6rem] gap-2 px-2 text-xs font-semibold uppercase tracking-wide text-slate-500 lg:grid">
+            <span>{t('contribution.column.id')}</span>
+            <span>{t('contribution.column.sourceSkill')}</span>
+            <span>{t('contribution.column.targetSkill')}</span>
+            <span>{t('contribution.column.targetPlayerHealth')}</span>
+            <span>{t('contribution.column.remove')}</span>
+          </div>
+          {draft.interactionTypes.length === 0 ? (
+            <p className="px-2 py-1 text-sm text-slate-500">{t('contribution.data.noInteractionChanges')}</p>
+          ) : (
+            <div className="grid gap-1">
+              {draft.interactionTypes.map((interactionType, index) => (
+                <div className="grid gap-2 rounded bg-slate-950 p-2 lg:grid-cols-[1fr_1fr_1fr_8rem_6rem]" key={`${interactionType.id}-${index}`}>
+                  <input aria-label="Interaction id" className="min-w-0 rounded bg-slate-900 px-2 py-1.5 text-sm" onChange={(event) => updateInteractionType(index, { id: toKebabInput(event.target.value) })} value={interactionType.id} />
+                  <input aria-label="Interaction source skill" className="min-w-0 rounded bg-slate-900 px-2 py-1.5 text-sm" list="content-skill-ids" onChange={(event) => updateInteractionType(index, { sourceSkillId: toKebabInput(event.target.value) })} value={interactionType.sourceSkillId} />
+                  <input aria-label="Interaction target skill" className="min-w-0 rounded bg-slate-900 px-2 py-1.5 text-sm" list="content-skill-ids" onChange={(event) => updateInteractionType(index, { targetSkillId: toKebabInput(event.target.value) })} value={interactionType.targetSkillId} />
+                  <label className="flex items-center gap-2 text-sm text-slate-300">
+                    <input checked={interactionType.targetPlayerHealth} onChange={(event) => updateInteractionType(index, { targetPlayerHealth: event.target.checked })} type="checkbox" />
+                    <span className="lg:hidden">{t('contribution.column.targetPlayerHealth')}</span>
+                  </label>
+                  <button className="rounded border border-rose-500 px-2 py-1.5 text-sm font-semibold text-rose-200" onClick={() => onPatch({ interactionTypes: removeAt(draft.interactionTypes, index) })} type="button">
                     {t('contribution.column.remove')}
                   </button>
                 </div>
@@ -441,6 +506,11 @@ export const ContentDataEditor = ({ bundle, draft, onPatch, t }: ContentDataEdit
       <datalist id="content-item-ids">
         {allItems(bundle, draft).map((item) => (
           <option key={item.id} value={item.id} />
+        ))}
+      </datalist>
+      <datalist id="content-interaction-ids">
+        {allInteractionTypes(bundle, draft).map((interactionType) => (
+          <option key={interactionType.id} value={interactionType.id} />
         ))}
       </datalist>
     </section>

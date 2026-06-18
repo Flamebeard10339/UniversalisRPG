@@ -1,6 +1,6 @@
 import { create } from 'zustand';
-import type { GameAction, TravelEdgeDefinition, UniversePlayState } from '../game/types';
-import { appendChatMessage, createInitialPlayState, normalizePlayState, resolveDueTimers, startAction, startTravel } from '../game/timers';
+import type { ActionResolutionContext, GameAction, IdleReport, TravelEdgeDefinition, UniversePlayState } from '../game/types';
+import { appendChatMessage, createInitialPlayState, normalizePlayState, resolveIdleTimers, startAction, startTravel } from '../game/timers';
 import { load, remove, save } from '../lib/storage';
 
 type GameStateStore = {
@@ -10,14 +10,17 @@ type GameStateStore = {
   setCurrentLocation: (universeId: string, locationId: string) => void;
   travelTo: (universeId: string, edge: TravelEdgeDefinition, destinationLocationId: string) => void;
   cancelTravel: (universeId: string) => void;
-  startAction: (universeId: string, action: GameAction) => void;
-  resolveDue: (universeId: string, actions: GameAction[], options?: { debugEnabled?: boolean }) => void;
+  startAction: (universeId: string, action: GameAction, context: ActionResolutionContext) => void;
+  resolveIdle: (universeId: string, context: ActionResolutionContext, options?: { debugEnabled?: boolean; showReport?: boolean }) => IdleReport;
+  setActionLooping: (universeId: string, enabled: boolean) => void;
+  markInactive: (universeId: string) => void;
   sendChatMessage: (universeId: string, text: string) => void;
   importUniverseState: (playState: UniversePlayState) => Promise<void>;
   resetUniverse: (universeId: string, startingLocationId: string) => Promise<void>;
 };
 
 const storageKey = (universeId: string) => `universalis:play:${universeId}`;
+const noIdleReport = (): IdleReport => ({ kind: 'none' });
 
 export const useGameState = create<GameStateStore>((set, get) => ({
   states: {},
@@ -111,7 +114,7 @@ export const useGameState = create<GameStateStore>((set, get) => ({
     });
   },
 
-  startAction: (universeId, action) => {
+  startAction: (universeId, action, context) => {
     set((state) => {
       const current = state.states[universeId];
 
@@ -119,7 +122,7 @@ export const useGameState = create<GameStateStore>((set, get) => ({
         return state;
       }
 
-      const next = startAction(current, action);
+      const next = startAction(current, action, context);
       void save(storageKey(universeId), next);
 
       return {
@@ -131,7 +134,9 @@ export const useGameState = create<GameStateStore>((set, get) => ({
     });
   },
 
-  resolveDue: (universeId, actions, options) => {
+  resolveIdle: (universeId, context, options) => {
+    let report = noIdleReport();
+
     set((state) => {
       const current = state.states[universeId];
 
@@ -139,10 +144,58 @@ export const useGameState = create<GameStateStore>((set, get) => ({
         return state;
       }
 
-      const next = resolveDueTimers(current, actions, options);
-      if (next === current) {
+      const resolved = resolveIdleTimers(current, context, options);
+      report = resolved.report;
+      const next = resolved.state;
+      void save(storageKey(universeId), next);
+
+      return {
+        states: {
+          ...state.states,
+          [universeId]: next,
+        },
+      };
+    });
+
+    return report;
+  },
+
+  setActionLooping: (universeId, enabled) => {
+    set((state) => {
+      const current = state.states[universeId];
+
+      if (!current) {
         return state;
       }
+
+      const next = {
+        ...current,
+        actionLoopingEnabled: enabled,
+        lastTickAt: Date.now(),
+      };
+      void save(storageKey(universeId), next);
+
+      return {
+        states: {
+          ...state.states,
+          [universeId]: next,
+        },
+      };
+    });
+  },
+
+  markInactive: (universeId) => {
+    set((state) => {
+      const current = state.states[universeId];
+
+      if (!current) {
+        return state;
+      }
+
+      const next = {
+        ...current,
+        lastTickAt: Date.now(),
+      };
       void save(storageKey(universeId), next);
 
       return {

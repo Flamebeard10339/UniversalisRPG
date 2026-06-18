@@ -8,7 +8,9 @@
     "additionalProperties": false,
     "properties": {
       "id": { "type": "string", "minLength": 1 },
-      "maxLevel": { "type": "integer", "minimum": 1 }
+      "maxLevel": { "type": "integer", "minimum": 1 },
+      "rate": { "type": "number", "exclusiveMinimum": 0 },
+      "imprecision": { "type": "number", "exclusiveMinimum": 0 }
     }
   }
 }

@@ -10,5 +10,13 @@
   {
     "id": "survival",
     "maxLevel": 100
+  },
+  {
+    "id": "attack",
+    "maxLevel": 100
+  },
+  {
+    "id": "defense",
+    "maxLevel": 100
   }
 ]

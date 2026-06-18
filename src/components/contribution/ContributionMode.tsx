@@ -25,6 +25,7 @@ const emptyDraft = (universeId: string): ContributionDraft => ({
   actions: [],
   skills: [],
   items: [],
+  interactionTypes: [],
   locales: {},
 });
 

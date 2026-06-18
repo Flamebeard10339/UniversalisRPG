@@ -69,6 +69,11 @@ export type GameAction = {
   durationSeconds: number;
   rewards: Reward[];
   requirements?: Requirement[];
+  interactionTypeId?: string;
+  sourceSkillId?: string;
+  targetSkillId?: string;
+  health?: number;
+  rate?: number;
 };
 
 export type SkillDefinition = {
@@ -76,12 +81,21 @@ export type SkillDefinition = {
   titleKey?: string;
   descriptionKey?: string;
   maxLevel: number;
+  rate?: number;
+  imprecision?: number;
 };
 
 export type ItemDefinition = {
   id: string;
   titleKey?: string;
   descriptionKey?: string;
+};
+
+export type InteractionTypeDefinition = {
+  id: string;
+  sourceSkillId: string;
+  targetSkillId: string;
+  targetPlayerHealth: boolean;
 };
 
 export type ContentBundle = {
@@ -91,6 +105,7 @@ export type ContentBundle = {
   actions: GameAction[];
   skills: SkillDefinition[];
   items: ItemDefinition[];
+  interactionTypes: InteractionTypeDefinition[];
   locales: Record<string, LocaleDictionary>;
 };
 
@@ -107,11 +122,13 @@ export type ActiveAction = {
   actionId: string;
   startedAt: number;
   completesAt: number;
+  targetHealth: number | null;
 };
 
 export type ActionProgress = {
   elapsedMs: number;
   runningSince: number | null;
+  targetHealth?: number | null;
 };
 
 export type ActiveTravel = {
@@ -132,6 +149,72 @@ export type ChatMessage = {
   createdAt: number;
 };
 
+export type IdleRewardSummary = Reward & {
+  labelId: string;
+};
+
+export type IdleReport =
+  | {
+      kind: 'none';
+    }
+  | {
+      kind: 'travelCompleted';
+      inactiveMs: number;
+      fromLocationId: string;
+      toLocationId: string;
+      completedAt: number;
+    }
+  | {
+      kind: 'actionCompleted';
+      inactiveMs: number;
+      actionId: string;
+      completedAt: number;
+      rewards: IdleRewardSummary[];
+    }
+  | {
+      kind: 'actionFailed';
+      inactiveMs: number;
+      actionId: string;
+      completedAt: number;
+    }
+  | {
+      kind: 'inProgress';
+      inactiveMs: number;
+      timerKind: 'action' | 'travel';
+      actionId?: string;
+      fromLocationId?: string;
+      toLocationId?: string;
+      remainingMs: number;
+    };
+
+export type IdleResolution = {
+  state: UniversePlayState;
+  report: IdleReport;
+};
+
+export type SkillEquipmentBonuses = {
+  base?: number;
+  added?: number;
+  increased?: number;
+  rate?: number;
+  imprecision?: number;
+};
+
+export type SkillTotals = {
+  base: number;
+  added: number;
+  increased: number;
+  effectiveTotal: number;
+  rate: number;
+  imprecision: number;
+};
+
+export type ActionResolutionContext = {
+  actions: GameAction[];
+  skills: SkillDefinition[];
+  interactionTypes: InteractionTypeDefinition[];
+};
+
 export type UniversePlayState = {
   universeId: string;
   currentLocationId: string;
@@ -141,6 +224,10 @@ export type UniversePlayState = {
   activeTravel: ActiveTravel | null;
   resources: Record<string, number>;
   skillXp: Record<string, number>;
+  equipmentSkillBonuses: Record<string, SkillEquipmentBonuses>;
+  actionLoopingEnabled: boolean;
+  playerHealth: number;
+  playerMaxHealth: number;
   chatMessages: ChatMessage[];
   lastTickAt: number;
 };
@@ -154,6 +241,7 @@ export type ContributionDraft = {
   actions: GameAction[];
   skills: SkillDefinition[];
   items: ItemDefinition[];
+  interactionTypes: InteractionTypeDefinition[];
   locales: Record<string, LocaleDictionary>;
 };
 

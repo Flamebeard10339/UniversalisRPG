@@ -1,6 +1,7 @@
 import type {
   ContentBundle,
   GameAction,
+  InteractionTypeDefinition,
   ItemDefinition,
   LocalUniverseLibrary,
   LocaleDictionary,
@@ -38,13 +39,16 @@ export const loadUniverseManifest = async (universeId: string) => {
 export const loadUniverse = async (universeId: string): Promise<ContentBundle> => {
   const basePath = `${BASE_CONTENT_PATH}/${universeId}`;
   const manifest = await loadUniverseManifest(universeId);
-  const [locations, edges, actions, skills, items] = await Promise.all([
+  const [locations, edges, actions, skills, items, interactionTypes] = await Promise.all([
     loadJson<LocationNode[]>(`${basePath}/locations.json`),
     loadJson<TravelEdgeDefinition[]>(`${basePath}/edges.json`),
     loadJson<GameAction[]>(`${basePath}/actions.json`),
     loadJson<SkillDefinition[]>(`${basePath}/skills.json`),
     manifest.files.includes('items.json')
       ? loadJson<ItemDefinition[]>(`${basePath}/items.json`)
+      : Promise.resolve([]),
+    manifest.files.includes('interaction-types.json')
+      ? loadJson<InteractionTypeDefinition[]>(`${basePath}/interaction-types.json`)
       : Promise.resolve([]),
   ]);
 
@@ -64,6 +68,7 @@ export const loadUniverse = async (universeId: string): Promise<ContentBundle> =
     actions,
     skills,
     items,
+    interactionTypes,
     locales,
   };
   const issues = validateContentShape(bundle);

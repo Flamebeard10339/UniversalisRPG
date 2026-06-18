@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://universalis-rpg.local/schema/interaction-types.schema.json",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "required": ["id", "sourceSkillId", "targetSkillId", "targetPlayerHealth"],
+    "additionalProperties": false,
+    "properties": {
+      "id": { "type": "string", "minLength": 1 },
+      "sourceSkillId": { "type": "string", "minLength": 1 },
+      "targetSkillId": { "type": "string", "minLength": 1 },
+      "targetPlayerHealth": { "type": "boolean" }
+    }
+  }
+}
