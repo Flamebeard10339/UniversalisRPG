@@ -9,6 +9,8 @@ Android via Capacitor, and open source community content contributions.
 - `npm run build` type-checks and builds the web app.
 - `npm run dev:android` starts Vite and launches Capacitor Android live reload.
 - `npm run sync` builds and syncs Capacitor assets.
+- Vite commands use `--configLoader runner` so sandboxed builds do not trigger
+  esbuild config-bundling reads outside the workspace.
 
 ## Content Rules
 

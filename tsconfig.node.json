@@ -6,5 +6,5 @@
     "moduleResolution": "Node",
     "allowSyntheticDefaultImports": true
   },
-  "include": ["vite.config.ts", "capacitor.config.ts"]
+  "include": ["capacitor.config.ts"]
 }

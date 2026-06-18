@@ -4,10 +4,10 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite --open",
-    "dev:android": "concurrently \"vite\" \"wait-on http://localhost:5173 && cap run android --livereload\"",
-    "build": "tsc && vite build",
-    "preview": "vite preview",
+    "dev": "vite --open --configLoader runner",
+    "dev:android": "concurrently \"vite --configLoader runner\" \"wait-on http://localhost:5173 && cap run android --livereload\"",
+    "build": "tsc && vite build --configLoader runner",
+    "preview": "vite preview --configLoader runner",
     "sync": "npm run build && cap sync"
   },
   "dependencies": {
