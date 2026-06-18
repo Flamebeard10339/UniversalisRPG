@@ -33,6 +33,8 @@
   "skill.regeneration.description": "Recovered health per minute while time passes.",
   "skill.health.title": "Health",
   "skill.health.description": "Maximum player health.",
+  "resource.health.title": "Health",
+  "effect.health-regeneration.title": "Health regeneration",
   "resource.health.empty": "You died.",
   "item.moonvine-cutting.title": "Moonvine Cutting",
   "item.moonvine-cutting.description": "A viable silver-green cutting from the academy glasshouse."

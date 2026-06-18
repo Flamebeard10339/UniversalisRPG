@@ -3,6 +3,7 @@ import { useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import { ActionDetails } from './components/ActionDetails';
 import { ActionPanel } from './components/ActionPanel';
 import { ChatPanel } from './components/ChatPanel';
+import { CharacterStats } from './components/CharacterStats';
 import { ContributionMode } from './components/contribution/ContributionMode';
 import { SkillBars } from './components/SkillBars';
 import { TravelStatus } from './components/TravelStatus';
@@ -19,7 +20,7 @@ const getStartingLocationId = (bundle: NonNullable<ReturnType<typeof useUniverse
 
 type AppTab = 'map' | 'home' | 'character' | 'settings';
 type HomeTab = 'actions' | 'details';
-type CharacterTab = 'skills' | 'inventory';
+type CharacterTab = 'skills' | 'inventory' | 'stats';
 type ThemePreference = 'system' | 'dark' | 'light';
 type FontSizePreference = 'tiny' | 'small' | 'normal' | 'large' | 'huge';
 const APP_VERSION = '0.1.0';
@@ -469,8 +470,8 @@ export default function App() {
 
         {activeTab === 'character' && (
           <section className="grid gap-4">
-            <div className="grid grid-cols-2 gap-2 rounded border border-slate-800 bg-slate-900 p-2">
-              {(['skills', 'inventory'] as CharacterTab[]).map((tab) => (
+            <div className="grid grid-cols-3 gap-2 rounded border border-slate-800 bg-slate-900 p-2">
+              {(['skills', 'inventory', 'stats'] as CharacterTab[]).map((tab) => (
                 <button
                   className={`rounded px-3 py-2 text-sm font-semibold capitalize ${
                     characterTab === tab ? 'bg-cyan-300 text-slate-950' : 'bg-slate-950 text-slate-300'
@@ -506,6 +507,10 @@ export default function App() {
                   </dl>
                 )}
               </section>
+            )}
+
+            {characterTab === 'stats' && (
+              <CharacterStats bundle={bundle} playState={playState} t={t} />
             )}
           </section>
         )}

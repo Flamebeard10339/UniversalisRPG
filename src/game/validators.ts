@@ -24,6 +24,8 @@ import {
   itemTitleKey,
   locationDescriptionKey,
   locationTitleKey,
+  effectTitleKey,
+  resourceTitleKey,
   skillDescriptionKey,
   skillTitleKey,
   toKebabCase,
@@ -456,6 +458,8 @@ export const collectLocalizationKeys = (bundle: ContentBundle) => [
     item.titleKey ?? itemTitleKey(item.id),
     item.descriptionKey ?? itemDescriptionKey(item.id),
   ]),
+  ...(bundle.resourceDefinitions ?? []).map((resource) => resourceTitleKey(resource.id)),
+  ...(bundle.effects ?? []).map((effect) => effectTitleKey(effect.id)),
   ...(bundle.resourceDefinitions ?? []).flatMap((resource) => [
     ...(resource.onEmpty ?? []),
     ...(resource.onFull ?? []),
