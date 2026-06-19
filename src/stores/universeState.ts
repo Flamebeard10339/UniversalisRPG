@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import type { ContentBundle, UniverseManifest, ValidationIssue } from '../game/types';
+import { normalizeEnemyDefinition } from '../game/enemies';
 import {
   listBundledUniverses,
   loadLocalUniverseLibrary,
@@ -80,7 +81,7 @@ const normalizeContentBundle = (bundle: ContentBundle): ContentBundle => ({
   resourceDefinitions: bundle.resourceDefinitions ?? [],
   effects: bundle.effects ?? [],
   interactionTypes: bundle.interactionTypes ?? [],
-  enemies: bundle.enemies ?? [],
+  enemies: (bundle.enemies ?? []).map((enemy) => normalizeEnemyDefinition(enemy)),
 });
 
 const loadBaseBundle = async (

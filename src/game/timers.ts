@@ -400,6 +400,45 @@ const applyActiveEffects = (
   }, state);
 };
 
+const applyEnemyRegeneration = (
+  state: UniversePlayState,
+  context: ActionResolutionContext,
+  now: number,
+) => {
+  if (!state.activeAction || state.activeAction.targetHealth === null) {
+    return state;
+  }
+
+  const action = context.actions.find((candidate) => candidate.id === state.activeAction?.actionId);
+  const enemy = action ? getEnemy(action, context) : null;
+
+  if (!enemy || enemy.regeneration <= 0) {
+    return state;
+  }
+
+  const effectUntil = Math.min(now, state.activeAction.completesAt);
+  const elapsedMinutes = Math.max(0, effectUntil - (state.lastTickAt ?? effectUntil)) / 60_000;
+  const targetHealth = Math.min(enemy.health, state.activeAction.targetHealth + enemy.regeneration * elapsedMinutes);
+
+  return {
+    ...state,
+    activeAction: {
+      ...state.activeAction,
+      targetHealth,
+    },
+    actionProgress: {
+      ...state.actionProgress,
+      [state.activeAction.actionId]: {
+        ...(state.actionProgress[state.activeAction.actionId] ?? {
+          elapsedMs: 0,
+          runningSince: state.activeAction.startedAt,
+        }),
+        targetHealth,
+      },
+    },
+  };
+};
+
 export const startAction = (
   state: UniversePlayState,
   action: GameAction,
@@ -774,7 +813,9 @@ export const resolveIdleTimers = (
   const inactiveMs = Math.max(0, now - (state.lastTickAt ?? now));
   const reportEnabled = shouldReportIdle(inactiveMs, options.showReport);
 
-  state = applyActiveEffects(ensureResourcePools(state, context), context, now);
+  state = ensureResourcePools(state, context);
+  state = applyActiveEffects(state, context, now);
+  state = applyEnemyRegeneration(state, context, now);
 
   if (state.activeTravel && state.activeTravel.completesAt <= now) {
     const activeTravel = state.activeTravel;

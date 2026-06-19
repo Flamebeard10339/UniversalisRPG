@@ -8,41 +8,25 @@ import type {
   SkillTotals,
   UniversePlayState,
 } from './types';
+import {
+  COMBAT_CV,
+  DAMAGE_SCALE,
+  effectiveCombatStats,
+  expectedCombatDamage,
+} from './combatBalance';
 import { skillLevelFromXp } from './skills';
 
 const DEFAULT_RATE = 1;
-const DEFAULT_IMPRECISION = 70;
-const MIN_IMPRECISION = 0.000001;
+const EPSILON = 0.000001;
 
-const normalPdf = (x: number) => Math.exp(-0.5 * x * x) / Math.sqrt(2 * Math.PI);
+export const expectedDamage = (attackerPower: number, defenderPower: number) =>
+  expectedCombatDamage(attackerPower, defenderPower).damage;
 
-const erf = (value: number) => {
-  const sign = value < 0 ? -1 : 1;
-  const x = Math.abs(value);
-  const a1 = 0.254829592;
-  const a2 = -0.284496736;
-  const a3 = 1.421413741;
-  const a4 = -1.453152027;
-  const a5 = 1.061405429;
-  const p = 0.3275911;
-  const t = 1 / (1 + p * x);
-  const y = 1 - (((((a5 * t + a4) * t) + a3) * t + a2) * t + a1) * t * Math.exp(-x * x);
-
-  return sign * y;
-};
-
-const normalCdf = (x: number) => 0.5 * (1 + erf(x / Math.sqrt(2)));
-
-export const expectedDamage = (sourceTotal: number, sourceImprecision: number, targetTotal: number) => {
-  const sigma = Math.max(MIN_IMPRECISION, sourceImprecision);
-  const delta = sourceTotal - targetTotal;
-  const z = delta / sigma;
-
-  return delta * normalCdf(z) + sigma * normalPdf(z);
-};
-
-export const actionDps = (sourceTotal: number, sourceImprecision: number, targetTotal: number, actionTimeSeconds: number) =>
-  expectedDamage(sourceTotal, sourceImprecision, targetTotal) / Math.max(MIN_IMPRECISION, actionTimeSeconds);
+export const actionDps = (
+  attackerPower: number,
+  defenderPower: number,
+  actionTimeSeconds: number,
+) => expectedDamage(attackerPower, defenderPower) / Math.max(EPSILON, actionTimeSeconds);
 
 export const getSkillTotals = (
   state: UniversePlayState,
@@ -50,9 +34,28 @@ export const getSkillTotals = (
   override?: SkillEquipmentBonuses,
 ): SkillTotals => {
   const skillId = skill?.id ?? '';
-  const bonuses = override ?? state.equipmentSkillBonuses[skillId] ?? {};
   const learnedBase = skill ? skillLevelFromXp(state.skillXp[skill.id] ?? 0) : 1;
-  const base = Math.max(1, override?.base ?? learnedBase) + (override ? 0 : bonuses.base ?? 0);
+
+  if (override) {
+    const base = Math.max(1, override.base ?? learnedBase);
+    const added = override.added ?? 0;
+    const increased = override.increased ?? 0;
+    const rawTotal = 7 * base + added;
+    const effectiveTotal = increased < 0
+      ? rawTotal / (1 - increased)
+      : rawTotal * (1 + increased);
+
+    return {
+      base,
+      added,
+      increased,
+      effectiveTotal,
+      rate: Math.max(0, override.rate ?? skill?.rate ?? DEFAULT_RATE),
+    };
+  }
+
+  const bonuses = state.equipmentSkillBonuses[skillId] ?? {};
+  const base = Math.max(1, learnedBase) + (bonuses.base ?? 0);
   const added = bonuses.added ?? 0;
   const increased = bonuses.increased ?? 0;
   const rawTotal = 7 * base + added;
@@ -66,7 +69,6 @@ export const getSkillTotals = (
     increased,
     effectiveTotal,
     rate: Math.max(0, (skill?.rate ?? DEFAULT_RATE) + (bonuses.rate ?? 0)),
-    imprecision: Math.max(MIN_IMPRECISION, (skill?.imprecision ?? DEFAULT_IMPRECISION) + (bonuses.imprecision ?? 0)),
   };
 };
 
@@ -99,12 +101,6 @@ export const getActionSkills = (
   };
 };
 
-export const getEnemySkillTotals = (
-  state: UniversePlayState,
-  enemy: EnemyDefinition,
-  skill: SkillDefinition | undefined,
-) => getSkillTotals(state, skill, enemy.skills[skill?.id ?? ''] ?? {});
-
 export const getActionDurationMs = (
   state: UniversePlayState,
   action: GameAction,
@@ -113,7 +109,7 @@ export const getActionDurationMs = (
   const { sourceSkill } = getActionSkills(action, context);
   const rate = sourceSkill ? getSkillTotals(state, sourceSkill).rate : DEFAULT_RATE;
 
-  return (action.durationSeconds * 1000) / Math.max(MIN_IMPRECISION, rate);
+  return (action.durationSeconds * 1000) / Math.max(EPSILON, rate);
 };
 
 export const getActionDps = (
@@ -122,17 +118,20 @@ export const getActionDps = (
   context: ActionResolutionContext,
 ) => {
   const enemy = getEnemy(action, context);
-  const { sourceSkill, targetSkill } = getActionSkills(action, context);
+  const { sourceSkill } = getActionSkills(action, context);
 
-  if (!sourceSkill || !targetSkill || !enemy) {
+  if (!sourceSkill || !enemy) {
     return null;
   }
 
   const source = getSkillTotals(state, sourceSkill);
-  const target = getEnemySkillTotals(state, enemy, targetSkill);
-
-  return actionDps(source.effectiveTotal, source.imprecision, target.effectiveTotal, getActionDurationMs(state, action, context) / 1000);
+  return expectedCombatDamage(source.effectiveTotal, enemy.defense).damage /
+    (getActionDurationMs(state, action, context) / 1000);
 };
+
+export const getEnemyAttackDurationMs = (
+  enemy: EnemyDefinition | null,
+) => enemy && enemy.rate > 0 ? 60_000 / enemy.rate : null;
 
 export const getEnemyAttackDps = (
   state: UniversePlayState,
@@ -142,17 +141,19 @@ export const getEnemyAttackDps = (
   const enemy = getEnemy(action, context);
   const interactionType = getInteractionType(action, context);
   const attackDurationMs = getEnemyAttackDurationMs(enemy);
-  const sourceSkill = context.skills.find((skill) => skill.id === interactionType?.sourceSkillId);
   const targetSkill = context.skills.find((skill) => skill.id === interactionType?.targetSkillId);
 
-  if (!enemy || !interactionType?.targetPlayerHealth || !attackDurationMs || !sourceSkill || !targetSkill) {
+  if (!enemy || !interactionType?.targetPlayerHealth || !attackDurationMs || !targetSkill) {
     return null;
   }
 
-  const source = getEnemySkillTotals(state, enemy, sourceSkill);
   const target = getSkillTotals(state, targetSkill);
-
-  return actionDps(source.effectiveTotal, source.imprecision, target.effectiveTotal, attackDurationMs / 1000);
+  return expectedCombatDamage(enemy.attack, target.effectiveTotal, {
+    armorPenetration: enemy.armorPenetration,
+    torpidity: enemy.torpidity,
+    critChance: enemy.critChance,
+    critMultiplier: enemy.critMultiplier,
+  }).damage / (attackDurationMs / 1000);
 };
 
 export const sampleNormal = (mean: number, standardDeviation: number, random = Math.random) => {
@@ -170,27 +171,25 @@ export const sampleAdversarialDamage = (
   random = Math.random,
 ) => {
   const enemy = getEnemy(action, context);
-  const { sourceSkill, targetSkill } = getActionSkills(action, context);
+  const { sourceSkill } = getActionSkills(action, context);
 
-  if (!sourceSkill || !targetSkill || !enemy) {
+  if (!sourceSkill || !enemy) {
     return null;
   }
 
   const source = getSkillTotals(state, sourceSkill);
-  const target = getEnemySkillTotals(state, enemy, targetSkill);
-  const sample = sampleNormal(source.effectiveTotal, source.imprecision, random);
+  const sigma = COMBAT_CV * source.effectiveTotal;
+  const sample = sampleNormal(source.effectiveTotal, sigma, random);
+  const rawDamage = Math.max(0, sample - enemy.defense);
 
   return {
     sample,
-    damage: sample >= target.effectiveTotal ? sample - target.effectiveTotal : 0,
+    rawDamage,
+    damage: rawDamage * DAMAGE_SCALE,
     source,
-    target,
+    target: enemy.defense,
   };
 };
-
-export const getEnemyAttackDurationMs = (
-  enemy: EnemyDefinition | null,
-) => enemy && enemy.rate > 0 ? 60_000 / enemy.rate : null;
 
 export const sampleEnemyAttackDamage = (
   state: UniversePlayState,
@@ -200,21 +199,30 @@ export const sampleEnemyAttackDamage = (
 ) => {
   const enemy = getEnemy(action, context);
   const interactionType = getInteractionType(action, context);
-  const sourceSkill = context.skills.find((skill) => skill.id === interactionType?.sourceSkillId);
   const targetSkill = context.skills.find((skill) => skill.id === interactionType?.targetSkillId);
 
-  if (!enemy || !interactionType?.targetPlayerHealth || enemy.rate <= 0 || !sourceSkill || !targetSkill) {
+  if (!enemy || !interactionType?.targetPlayerHealth || enemy.rate <= 0 || !targetSkill) {
     return null;
   }
 
-  const source = getEnemySkillTotals(state, enemy, sourceSkill);
   const target = getSkillTotals(state, targetSkill);
-  const sample = sampleNormal(source.effectiveTotal, source.imprecision, random);
+  const effective = effectiveCombatStats(enemy.attack, target.effectiveTotal, {
+    armorPenetration: enemy.armorPenetration,
+    torpidity: enemy.torpidity,
+  });
+  const sigma = COMBAT_CV * effective.attack;
+  const sample = sampleNormal(effective.attack, sigma, random);
+  const rawDamage = Math.max(0, sample - effective.defense);
+  const critChance = Math.min(1, Math.max(0, enemy.critChance / 100));
+  const critical = rawDamage > 0 && random() < critChance;
+  const critMultiplier = critical ? Math.max(1, enemy.critMultiplier) : 1;
 
   return {
     sample,
-    damage: sample >= target.effectiveTotal ? sample - target.effectiveTotal : 0,
-    source,
+    rawDamage,
+    damage: rawDamage * DAMAGE_SCALE * critMultiplier,
+    critical,
+    source: effective.attack,
     target,
   };
 };

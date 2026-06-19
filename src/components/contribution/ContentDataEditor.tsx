@@ -1,8 +1,9 @@
-import { useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { edgeId, toKebabInput } from '../../game/contentIds';
 import type { Translator } from '../../game/i18n';
-import type { ContentBundle, ContributionDraft, ContributionRemovedIds, EnemyDefinition, GameAction, InteractionTypeDefinition, ItemDefinition, LocationNode, Reward, SkillDefinition, SkillEquipmentBonuses, TravelEdgeDefinition } from '../../game/types';
+import type { ContentBundle, ContributionDraft, ContributionRemovedIds, EnemyDefinition, GameAction, InteractionTypeDefinition, ItemDefinition, LocationNode, Reward, SkillDefinition, TravelEdgeDefinition } from '../../game/types';
 import { ContributionMapEditor } from './ContributionMapEditor';
+import { EnemyDiagnostics } from './EnemyDiagnostics';
 
 type ContentDataEditorProps = {
   baseBundle: ContentBundle;
@@ -81,18 +82,8 @@ const allItems = (bundle: ContentBundle, draft: ContributionDraft) => uniqueById
 const allInteractionTypes = (bundle: ContentBundle, draft: ContributionDraft) => uniqueById([...(bundle.interactionTypes ?? []), ...draft.interactionTypes]);
 const allEnemies = (bundle: ContentBundle, draft: ContributionDraft) => uniqueById([...(bundle.enemies ?? []), ...draft.enemies]);
 const defaultRewardDraft = (): RewardDraft => ({ kind: 'skillXp', targetId: '', amount: '1' });
-const defaultEnemySkillStats = (): SkillEquipmentBonuses => ({ base: 1, added: 0, increased: 0, imprecision: 70 });
 const rewardTargetId = (reward: Reward) => reward.kind === 'skillXp' ? reward.skillId : reward.resourceId;
 const formatReward = (reward: Reward, t: Translator) => `${reward.kind === 'skillXp' ? t('contribution.reward.skillXp') : t('contribution.reward.item')}: ${rewardTargetId(reward)} x${reward.amount}`;
-const numberOrUndefined = (value: string) => {
-  if (value === '') {
-    return undefined;
-  }
-
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : undefined;
-};
-
 type RewardListEditorProps = {
   draft: RewardDraft;
   label: string;
@@ -109,6 +100,46 @@ type NestedListSectionProps = {
   children: ReactNode;
   label: string;
   onActivate: () => void;
+};
+
+type NumericEditorProps = {
+  max?: number;
+  min?: number;
+  onChange: (value: number) => void;
+  step?: number;
+  value: number;
+};
+
+const NumericEditor = ({ max, min = 0, onChange, step = 1, value }: NumericEditorProps) => {
+  const [draftValue, setDraftValue] = useState(String(value));
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (document.activeElement !== inputRef.current) {
+      setDraftValue(String(value));
+    }
+  }, [value]);
+
+  return (
+    <input
+      className="rounded bg-slate-950 px-2 py-1.5 text-sm text-slate-100"
+      max={max}
+      min={min}
+      onBlur={() => setDraftValue(String(value))}
+      onChange={(event) => {
+        const nextDraft = event.target.value;
+        const nextValue = Number(nextDraft);
+        setDraftValue(nextDraft);
+        if (nextDraft !== '' && Number.isFinite(nextValue)) {
+          onChange(nextValue);
+        }
+      }}
+      ref={inputRef}
+      step={step}
+      type="number"
+      value={draftValue}
+    />
+  );
 };
 
 const NestedListSection = ({ children, label, onActivate }: NestedListSectionProps) => (
@@ -156,7 +187,8 @@ export const ContentDataEditor = ({ baseBundle, bundle, draft, onPatch, t }: Con
   const [filter, setFilter] = useState('');
   const [rewardDrafts, setRewardDrafts] = useState<Record<string, RewardDraft>>({});
   const [selectedActionId, setSelectedActionId] = useState<string | null>(null);
-  const [selectedEnemyId, setSelectedEnemyId] = useState<string | null>(null);
+  const [selectedEnemyKey, setSelectedEnemyKey] = useState<string | null>(null);
+  const enemyEditorKeys = useRef<Record<string, string>>({});
   const removed = { ...emptyRemoved(), ...(draft.removed ?? {}) };
   const removeButtonClass = 'rounded border border-rose-500 px-2 py-1.5 text-sm font-semibold text-rose-200';
   const locations = layeredRows(draft.locations, baseBundle.locations, removed.locations, filter);
@@ -223,43 +255,21 @@ export const ContentDataEditor = ({ baseBundle, bundle, draft, onPatch, t }: Con
     promote('enemies', { ...row.item, ...patch }, row.item.id);
   };
 
-  const enemySkillRowsForInteraction = (interactionTypeId: string, currentSkills: EnemyDefinition['skills']) => {
-    const interactionType = allInteractionTypes(bundle, draft).find((candidate) => candidate.id === interactionTypeId);
-    const skillIds = interactionType
-      ? Array.from(new Set([interactionType.sourceSkillId, interactionType.targetSkillId].filter(Boolean)))
-      : Object.keys(currentSkills);
-
-    return skillIds.map((skillId) => {
-      const { rate: _rate, ...currentStats } = currentSkills[skillId] ?? {};
-
-      return {
-        skillId,
-        stats: {
-          ...defaultEnemySkillStats(),
-          ...currentStats,
-          added: 0,
-          increased: 0,
-        },
-      };
-    });
+  const updateEnemyInteraction = (row: LayeredRow<EnemyDefinition>, interactionTypeId: string) => {
+    updateEnemy(row, { interactionTypeId });
   };
 
-  const skillsForInteraction = (interactionTypeId: string, currentSkills: EnemyDefinition['skills']) =>
-    Object.fromEntries(
-      enemySkillRowsForInteraction(interactionTypeId, currentSkills).map(({ skillId, stats }) => [skillId, stats]),
-    );
-
-  const updateEnemyInteraction = (row: LayeredRow<EnemyDefinition>, interactionTypeId: string) => {
-    updateEnemy(row, {
-      interactionTypeId,
-      skills: skillsForInteraction(interactionTypeId, row.item.skills),
-    });
+  const enemyEditorKey = (enemyId: string) => {
+    enemyEditorKeys.current[enemyId] ??= `enemy-${Object.keys(enemyEditorKeys.current).length + 1}`;
+    return enemyEditorKeys.current[enemyId];
   };
 
   const renameEnemyEditorState = (previousId: string, nextId: string) => {
     if (previousId === nextId) {
       return;
     }
+
+    enemyEditorKeys.current[nextId] = enemyEditorKey(previousId);
 
     setRewardDrafts((current) => {
       if (!current[previousId]) {
@@ -272,6 +282,8 @@ export const ContentDataEditor = ({ baseBundle, bundle, draft, onPatch, t }: Con
       };
     });
   };
+
+  const selectedEnemyRow = enemies.find((row) => enemyEditorKey(row.item.id) === selectedEnemyKey) ?? null;
 
   const addLocation = () => {
     const allLocationItems = locations.map((row) => row.item);
@@ -343,16 +355,22 @@ export const ContentDataEditor = ({ baseBundle, bundle, draft, onPatch, t }: Con
   const addEnemy = () => {
     const id = uniqueId('new-enemy', enemies.map((row) => row.item.id));
     const interactionTypeId = interactionTypes[0]?.item.id ?? '';
-    setSelectedEnemyId(id);
+    setSelectedEnemyKey(enemyEditorKey(id));
     onPatch({
       enemies: [
         {
           id,
           interactionTypeId,
-          health: 10,
-          rate: 0,
+          attack: 10,
+          defense: 10,
+          health: 100,
+          rate: 25,
+          regeneration: 0,
+          armorPenetration: 0,
+          torpidity: 0,
+          critChance: 0,
+          critMultiplier: 2,
           showHealthBar: true,
-          skills: skillsForInteraction(interactionTypeId, {}),
           rewards: [],
         },
         ...draft.enemies,
@@ -390,21 +408,6 @@ export const ContentDataEditor = ({ baseBundle, bundle, draft, onPatch, t }: Con
     }));
   };
 
-  const updateEnemySkillStat = (row: LayeredRow<EnemyDefinition>, skillId: string, patch: Partial<SkillEquipmentBonuses>) => {
-    const { rate: _rate, ...currentStats } = row.item.skills[skillId] ?? {};
-    updateEnemy(row, {
-      skills: {
-        ...row.item.skills,
-        [skillId]: {
-          ...currentStats,
-          ...patch,
-          added: 0,
-          increased: 0,
-        },
-      },
-    });
-  };
-
   const addActionReward = (row: LayeredRow<GameAction>) => {
     addRewardToList(row.item.id, row.item.rewards, (rewards) => updateAction(row, { rewards }));
   };
@@ -435,10 +438,10 @@ export const ContentDataEditor = ({ baseBundle, bundle, draft, onPatch, t }: Con
 
   return (
     <section className="grid gap-3">
-      <div className="grid grid-cols-7 gap-2 rounded border border-slate-800 bg-slate-900 p-2">
+      <div className="flex gap-2 overflow-x-auto rounded border border-slate-800 bg-slate-900 p-2">
         {contentTabs.map((tab) => (
           <button
-            className={`rounded px-3 py-2 text-sm font-semibold capitalize ${
+            className={`min-w-28 flex-1 rounded px-3 py-2 text-sm font-semibold capitalize ${
               activeTab === tab ? 'bg-cyan-300 text-slate-950' : 'bg-slate-950 text-slate-300'
             }`}
             key={tab}
@@ -684,94 +687,118 @@ export const ContentDataEditor = ({ baseBundle, bundle, draft, onPatch, t }: Con
       )}
 
       {activeTab === 'enemies' && (
-        <section className="grid gap-1 rounded border border-slate-700 p-2">
+        <section className="grid gap-3 rounded border border-slate-700 p-2">
           <div className="flex items-center justify-between gap-3">
             <h3 className="text-sm font-semibold text-slate-100">{t('contribution.data.enemies')}</h3>
             <button className="rounded bg-cyan-400 px-3 py-2 text-sm font-semibold text-slate-950" onClick={addEnemy} type="button">
               {t('contribution.data.addEnemy')}
             </button>
           </div>
-          <div className="hidden grid-cols-[1fr_1fr_7rem_7rem_7rem_6rem] gap-2 px-2 text-xs font-semibold uppercase tracking-wide text-slate-500 lg:grid">
-            <span>{t('contribution.column.id')}</span>
-            <span>{t('contribution.column.interaction')}</span>
-            <span>{t('contribution.column.health')}</span>
-            <span>{t('contribution.column.ratePerMinute')}</span>
-            <span>{t('contribution.column.showHealth')}</span>
-            <span>{t('contribution.column.remove')}</span>
-          </div>
+
+          {selectedEnemyRow && (() => {
+            const row = selectedEnemyRow;
+            const enemy = row.item;
+            const rowKey = enemyEditorKey(enemy.id);
+            const rewardDraft = rewardDrafts[enemy.id] ?? defaultRewardDraft();
+            const numberField = (
+              labelKey: string,
+              value: number,
+              patchKey: keyof EnemyDefinition,
+              options: { min?: number; max?: number; step?: number } = {},
+            ) => (
+              <label className="grid gap-1 text-xs text-slate-400">
+                <span>{t(labelKey)}</span>
+                <NumericEditor
+                  max={options.max}
+                  min={options.min ?? 0}
+                  onChange={(value) => updateEnemy(row, { [patchKey]: value })}
+                  step={options.step ?? 1}
+                  value={value}
+                />
+              </label>
+            );
+
+            return (
+              <section className="grid gap-y-4 border-y border-slate-700 bg-slate-900 p-3 xl:grid-cols-[minmax(20rem,0.8fr)_minmax(28rem,1.2fr)] xl:gap-x-8">
+                <div className="grid min-w-0 content-start gap-3">
+                  <h4 className="font-semibold text-slate-100">{enemy.id}</h4>
+                  <label className="grid gap-1 text-xs text-slate-400">
+                    <span>{t('contribution.column.id')}</span>
+                    <input
+                      className="rounded bg-slate-950 px-2 py-1.5 text-sm text-slate-100"
+                      onChange={(event) => {
+                        const nextId = toKebabInput(event.target.value);
+                        renameEnemyEditorState(enemy.id, nextId);
+                        setSelectedEnemyKey(enemyEditorKey(nextId));
+                        updateEnemy(row, { id: nextId });
+                      }}
+                      value={enemy.id}
+                    />
+                  </label>
+                  <label className="grid gap-1 text-xs text-slate-400">
+                    <span>{t('contribution.column.interaction')}</span>
+                    <input className="rounded bg-slate-950 px-2 py-1.5 text-sm text-slate-100" list="content-interaction-ids" onChange={(event) => updateEnemyInteraction(row, toKebabInput(event.target.value))} value={enemy.interactionTypeId} />
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {numberField('contribution.column.attack', enemy.attack, 'attack', { min: 0.01 })}
+                    {numberField('contribution.column.defense', enemy.defense, 'defense')}
+                    {numberField('contribution.column.health', enemy.health, 'health', { min: 0.01 })}
+                    {numberField('contribution.column.ratePerMinute', enemy.rate, 'rate')}
+                    {numberField('contribution.column.regeneration', enemy.regeneration, 'regeneration', { step: 0.1 })}
+                    {numberField('contribution.column.armorPenetration', enemy.armorPenetration, 'armorPenetration', { step: 0.1 })}
+                    {numberField('contribution.column.torpidity', enemy.torpidity, 'torpidity', { step: 0.1 })}
+                    {numberField('contribution.column.critChance', enemy.critChance, 'critChance', { max: 100, step: 0.1 })}
+                    {numberField('contribution.column.critMultiplier', enemy.critMultiplier, 'critMultiplier', { min: 1, step: 0.1 })}
+                  </div>
+                  <label className="flex items-center justify-between gap-3 text-sm text-slate-300">
+                    <span>{t('contribution.column.showHealth')}</span>
+                    <input checked={enemy.showHealthBar ?? true} onChange={(event) => updateEnemy(row, { showHealthBar: event.target.checked })} type="checkbox" />
+                  </label>
+                  <RewardListEditor
+                    draft={rewardDraft}
+                    label={t('contribution.column.rewards')}
+                    onAdd={() => addEnemyReward(row)}
+                    onActivate={() => setSelectedEnemyKey(rowKey)}
+                    onDraftChange={(patch) => updateRewardDraft(enemy.id, patch)}
+                    onRemove={(rewardIndex) => removeEnemyReward(row, rewardIndex)}
+                    rewards={enemy.rewards}
+                    showAdd
+                    t={t}
+                  />
+                  <button className={`${removeButtonClass} justify-self-end`} onClick={() => { setSelectedEnemyKey(null); removeRow('enemies', row); }} type="button">
+                    {t('contribution.column.remove')}
+                  </button>
+                </div>
+                <EnemyDiagnostics enemy={enemy} t={t} />
+              </section>
+            );
+          })()}
+
           {enemies.length === 0 ? (
             <p className="px-2 py-1 text-sm text-slate-500">{t('contribution.data.noEnemyChanges')}</p>
           ) : (
-            <div className="grid gap-1">
+            <div className="overflow-x-auto overscroll-x-contain">
+              <div className="grid min-w-[40rem] grid-cols-[5rem_1fr_6rem_6rem_6rem_8rem_6rem] gap-2 border-b border-slate-700 px-2 py-1 text-xs font-semibold uppercase text-slate-500">
+                <span>{t('contribution.column.edit')}</span>
+                <span>{t('contribution.column.id')}</span>
+                <span>{t('contribution.column.attack')}</span>
+                <span>{t('contribution.column.defense')}</span>
+                <span>{t('contribution.column.health')}</span>
+                <span>{t('contribution.column.ratePerMinute')}</span>
+                <span>{t('contribution.column.remove')}</span>
+              </div>
               {enemies.map((row) => {
                 const enemy = row.item;
-                const rewardDraft = rewardDrafts[enemy.id] ?? defaultRewardDraft();
-                const selected = selectedEnemyId === enemy.id;
-                const skillEntries = enemySkillRowsForInteraction(enemy.interactionTypeId, enemy.skills);
-
+                const rowKey = enemyEditorKey(enemy.id);
                 return (
-                  <div className="grid gap-2 rounded bg-slate-950 p-2" key={`enemy-row-${row.source}-${row.index}`}>
-                    <div className="grid gap-2 lg:grid-cols-[1fr_1fr_7rem_7rem_7rem_6rem]">
-                      <input
-                        aria-label="Enemy id"
-                        className="min-w-0 rounded bg-slate-900 px-2 py-1.5 text-sm"
-                        onChange={(event) => {
-                          const nextId = toKebabInput(event.target.value);
-                          renameEnemyEditorState(enemy.id, nextId);
-                          setSelectedEnemyId(nextId);
-                          updateEnemy(row, { id: nextId });
-                        }}
-                        onFocus={() => setSelectedEnemyId(enemy.id)}
-                        value={enemy.id}
-                      />
-                      <input aria-label="Enemy interaction" className="min-w-0 rounded bg-slate-900 px-2 py-1.5 text-sm" list="content-interaction-ids" onChange={(event) => updateEnemyInteraction(row, toKebabInput(event.target.value))} onFocus={() => setSelectedEnemyId(enemy.id)} value={enemy.interactionTypeId} />
-                      <input aria-label="Enemy health" className="min-w-0 rounded bg-slate-900 px-2 py-1.5 text-sm" min="1" onChange={(event) => updateEnemy(row, { health: Number(event.target.value) })} onFocus={() => setSelectedEnemyId(enemy.id)} type="number" value={enemy.health} />
-                      <input aria-label="Enemy rate per minute" className="min-w-0 rounded bg-slate-900 px-2 py-1.5 text-sm" min="0" onChange={(event) => updateEnemy(row, { rate: Number(event.target.value) })} onFocus={() => setSelectedEnemyId(enemy.id)} type="number" value={enemy.rate} />
-                      <label className="flex items-center gap-2 text-sm text-slate-300">
-                        <input checked={enemy.showHealthBar ?? true} onChange={(event) => updateEnemy(row, { showHealthBar: event.target.checked })} type="checkbox" />
-                        <span className="lg:hidden">{t('contribution.column.showHealth')}</span>
-                      </label>
-                      <button
-                        className={removeButtonClass}
-                        onClick={() => {
-                          if (selectedEnemyId === enemy.id) {
-                            setSelectedEnemyId(null);
-                          }
-                          removeRow('enemies', row);
-                        }}
-                        type="button"
-                      >
-                        {t('contribution.column.remove')}
-                      </button>
-                    </div>
-                    <NestedListSection label={t('contribution.column.skillStats')} onActivate={() => setSelectedEnemyId(enemy.id)}>
-                      <div className="grid gap-2 border-b border-slate-800 pb-1 text-xs font-semibold uppercase tracking-wide text-slate-500 lg:grid-cols-[1fr_7rem_7rem]">
-                        <span>{t('contribution.column.skill')}</span>
-                        <span>{t('contribution.column.stat')}</span>
-                        <span>{t('contribution.column.imprecision')}</span>
-                      </div>
-                      {skillEntries.length === 0 && <p className="py-1 text-sm text-slate-500">{t('contribution.skillStat.empty')}</p>}
-                      {skillEntries.map(({ skillId, stats }) => (
-                        <div className="grid gap-2 border-b border-slate-800 py-1.5 last:border-0 lg:grid-cols-[1fr_7rem_7rem]" key={skillId}>
-                          <input aria-label="Enemy skill" className="min-w-0 rounded bg-slate-900 px-2 py-1.5 text-sm" list="content-skill-ids" readOnly value={skillId} />
-                          <input aria-label="Enemy skill stat" className="min-w-0 rounded bg-slate-900 px-2 py-1.5 text-sm" onChange={(event) => updateEnemySkillStat(row, skillId, { base: numberOrUndefined(event.target.value), added: 0, increased: 0 })} type="number" value={stats.base ?? ''} />
-                          <input aria-label="Enemy skill imprecision" className="min-w-0 rounded bg-slate-900 px-2 py-1.5 text-sm" min="0.01" onChange={(event) => updateEnemySkillStat(row, skillId, { imprecision: numberOrUndefined(event.target.value) })} step="0.01" type="number" value={stats.imprecision ?? ''} />
-                        </div>
-                      ))}
-                    </NestedListSection>
-                    {(selected || enemy.rewards.length > 0) && (
-                      <RewardListEditor
-                        draft={rewardDraft}
-                        label={t('contribution.column.rewards')}
-                        onAdd={() => addEnemyReward(row)}
-                        onActivate={() => setSelectedEnemyId(enemy.id)}
-                        onDraftChange={(patch) => updateRewardDraft(enemy.id, patch)}
-                        onRemove={(rewardIndex) => removeEnemyReward(row, rewardIndex)}
-                        rewards={enemy.rewards}
-                        showAdd={selected}
-                        t={t}
-                      />
-                    )}
+                  <div className={`grid min-w-[40rem] grid-cols-[5rem_1fr_6rem_6rem_6rem_8rem_6rem] items-center gap-2 border-b border-slate-800 px-2 py-2 text-sm ${selectedEnemyKey === rowKey ? 'bg-slate-800/70' : 'bg-slate-950'}`} key={rowKey}>
+                    <button className="rounded border border-slate-600 px-2 py-1 text-xs font-semibold text-slate-100" onClick={() => setSelectedEnemyKey(rowKey)} type="button">{t('contribution.column.edit')}</button>
+                    <span className="truncate text-slate-100">{enemy.id}</span>
+                    <span className="text-slate-300">{enemy.attack}</span>
+                    <span className="text-slate-300">{enemy.defense}</span>
+                    <span className="text-slate-300">{enemy.health}</span>
+                    <span className="text-slate-300">{enemy.rate}</span>
+                    <button className={removeButtonClass} onClick={() => { if (selectedEnemyKey === rowKey) setSelectedEnemyKey(null); removeRow('enemies', row); }} type="button">{t('contribution.column.remove')}</button>
                   </div>
                 );
               })}

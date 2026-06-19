@@ -2,13 +2,16 @@
   {
     "id": "goblin",
     "interactionTypeId": "melee-combat",
+    "attack": 1,
+    "defense": 1,
     "health": 20,
     "rate": 30,
+    "regeneration": 0,
+    "armorPenetration": 0,
+    "torpidity": 0,
+    "critChance": 0,
+    "critMultiplier": 2,
     "showHealthBar": true,
-    "skills": {
-      "attack": { "base": 1, "imprecision": 35 },
-      "defense": { "base": 1, "imprecision": 35 }
-    },
     "rewards": [
       { "kind": "skillXp", "skillId": "attack", "amount": 2 },
       { "kind": "skillXp", "skillId": "defense", "amount": 1 }
@@ -17,13 +20,16 @@
   {
     "id": "ork",
     "interactionTypeId": "melee-combat",
+    "attack": 21,
+    "defense": 21,
     "health": 40,
     "rate": 24,
+    "regeneration": 0,
+    "armorPenetration": 0,
+    "torpidity": 0,
+    "critChance": 0,
+    "critMultiplier": 2,
     "showHealthBar": true,
-    "skills": {
-      "attack": { "base": 2, "imprecision": 35 },
-      "defense": { "base": 2, "imprecision": 35 }
-    },
     "rewards": [
       { "kind": "skillXp", "skillId": "attack", "amount": 4 },
       { "kind": "skillXp", "skillId": "defense", "amount": 2 }
@@ -32,13 +38,16 @@
   {
     "id": "troll",
     "interactionTypeId": "melee-combat",
+    "attack": 31,
+    "defense": 31,
     "health": 80,
     "rate": 18,
+    "regeneration": 0,
+    "armorPenetration": 0,
+    "torpidity": 0,
+    "critChance": 0,
+    "critMultiplier": 2,
     "showHealthBar": true,
-    "skills": {
-      "attack": { "base": 3, "imprecision": 35 },
-      "defense": { "base": 3, "imprecision": 35 }
-    },
     "rewards": [
       { "kind": "skillXp", "skillId": "attack", "amount": 8 },
       { "kind": "skillXp", "skillId": "defense", "amount": 4 }

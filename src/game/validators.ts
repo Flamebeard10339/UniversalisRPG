@@ -168,9 +168,15 @@ const validateEnemiesShape = (enemies: unknown): enemies is EnemyDefinition[] =>
         isRecord(enemy) &&
         hasString(enemy, 'id') &&
         hasString(enemy, 'interactionTypeId') &&
+        hasNumber(enemy, 'attack') &&
+        hasNumber(enemy, 'defense') &&
         hasNumber(enemy, 'health') &&
         hasNumber(enemy, 'rate') &&
-        isRecord(enemy.skills) &&
+        hasNumber(enemy, 'regeneration') &&
+        hasNumber(enemy, 'armorPenetration') &&
+        hasNumber(enemy, 'torpidity') &&
+        hasNumber(enemy, 'critChance') &&
+        hasNumber(enemy, 'critMultiplier') &&
         Array.isArray(enemy.rewards),
     ));
 
@@ -335,9 +341,6 @@ export const validateContentReferences = (bundle: ContentBundle) => {
     if (skill.rate !== undefined && skill.rate <= 0) {
       issues.push(error(`skills.${skill.id}.rate`, 'validation.ratePositive'));
     }
-    if (skill.imprecision !== undefined && skill.imprecision <= 0) {
-      issues.push(error(`skills.${skill.id}.imprecision`, 'validation.imprecisionPositive'));
-    }
   }
 
   for (const resource of bundle.resourceDefinitions ?? []) {
@@ -392,22 +395,23 @@ export const validateContentReferences = (bundle: ContentBundle) => {
     if (enemy.health <= 0) {
       issues.push(error(`enemies.${enemy.id}.health`, 'validation.healthPositive'));
     }
+    if (enemy.attack <= 0) {
+      issues.push(error(`enemies.${enemy.id}.attack`, 'validation.attackPositive'));
+    }
+    if (enemy.defense < 0) {
+      issues.push(error(`enemies.${enemy.id}.defense`, 'validation.defenseNonNegative'));
+    }
     if (enemy.rate < 0) {
       issues.push(error(`enemies.${enemy.id}.rate`, 'validation.rateNonNegative'));
     }
-    for (const [skillId, skill] of Object.entries(enemy.skills)) {
-      if (!skillIds.has(skillId)) {
-        issues.push(error(`enemies.${enemy.id}.skills.${skillId}`, 'validation.unknownSkill', { id: skillId }));
-      }
-      if (skill.base !== undefined && skill.base < 1) {
-        issues.push(error(`enemies.${enemy.id}.skills.${skillId}.base`, 'validation.skillBasePositive'));
-      }
-      if (skill.imprecision !== undefined && skill.imprecision <= 0) {
-        issues.push(error(`enemies.${enemy.id}.skills.${skillId}.imprecision`, 'validation.imprecisionPositive'));
-      }
-      if (skill.rate !== undefined && skill.rate < 0) {
-        issues.push(error(`enemies.${enemy.id}.skills.${skillId}.rate`, 'validation.rateNonNegative'));
-      }
+    if (enemy.regeneration < 0 || enemy.armorPenetration < 0 || enemy.torpidity < 0) {
+      issues.push(error(`enemies.${enemy.id}`, 'validation.enemyModifiersNonNegative'));
+    }
+    if (enemy.critChance < 0 || enemy.critChance > 100) {
+      issues.push(error(`enemies.${enemy.id}.critChance`, 'validation.critChanceRange'));
+    }
+    if (enemy.critMultiplier < 1) {
+      issues.push(error(`enemies.${enemy.id}.critMultiplier`, 'validation.critMultiplierMinimum'));
     }
     for (const reward of enemy.rewards) {
       if (reward.kind === 'skillXp' && !skillIds.has(reward.skillId)) {

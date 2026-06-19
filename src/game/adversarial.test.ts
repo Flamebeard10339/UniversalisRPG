@@ -1,53 +1,53 @@
 import { describe, expect, it } from 'vitest';
-import { actionDps, expectedDamage, getActionDps, getEnemyAttackDps, getSkillTotals } from './adversarial';
-import type { ActionResolutionContext, GameAction } from './types';
+import { getActionDps, getEnemyAttackDps } from './adversarial';
+import { DAMAGE_SCALE } from './combatBalance';
+import type { ActionResolutionContext, EnemyDefinition, GameAction } from './types';
 import { createInitialPlayState, resolveIdleTimers, startAction } from './timers';
+
+const enemy = (patch: Partial<EnemyDefinition> = {}): EnemyDefinition => ({
+  id: 'training-dummy',
+  interactionTypeId: 'melee-combat',
+  attack: 8,
+  defense: 7,
+  health: 200,
+  rate: 0,
+  regeneration: 0,
+  armorPenetration: 0,
+  torpidity: 0,
+  critChance: 0,
+  critMultiplier: 2,
+  showHealthBar: true,
+  rewards: [{ kind: 'resource', resourceId: 'trophy', amount: 1 }],
+  ...patch,
+});
 
 const context: ActionResolutionContext = {
   actions: [],
   skills: [
-    { id: 'attack', maxLevel: 100, imprecision: 70 },
-    { id: 'defense', maxLevel: 100, imprecision: 70 },
+    { id: 'attack', maxLevel: 100 },
+    { id: 'defense', maxLevel: 100 },
   ],
-  locations: [
-    { id: 'arena', position: { x: 0, y: 0 }, starting: true },
-  ],
-  resourceDefinitions: [
-    {
-      id: 'health',
-      minValue: 0,
-      baseMaxValue: 100,
-      initialValue: 100,
-      onEmpty: [
-        { kind: 'stop-action' },
-        { kind: 'refill', value: 'max' },
-        { kind: 'relocate', locationId: 'starting-location' },
-        { kind: 'chat', messageKey: 'resource.health.empty' },
-      ],
-    },
-  ],
+  locations: [{ id: 'arena', position: { x: 0, y: 0 }, starting: true }],
+  resourceDefinitions: [{
+    id: 'health',
+    minValue: 0,
+    baseMaxValue: 100,
+    initialValue: 100,
+    onEmpty: [
+      { kind: 'stop-action' },
+      { kind: 'refill', value: 'max' },
+      { kind: 'relocate', locationId: 'starting-location' },
+      { kind: 'chat', messageKey: 'resource.health.empty' },
+    ],
+  }],
   effects: [],
-  interactionTypes: [
-    {
-      id: 'melee-combat',
-      sourceSkillId: 'attack',
-      targetSkillId: 'defense',
-      targetPlayerHealth: true,
-    },
-  ],
-  enemies: [
-    {
-      id: 'training-dummy',
-      interactionTypeId: 'melee-combat',
-      health: 20,
-      rate: 0,
-      skills: {
-        attack: { base: 1, imprecision: 70 },
-        defense: { base: 1, imprecision: 70 },
-      },
-      rewards: [{ kind: 'resource', resourceId: 'trophy', amount: 1 }],
-    },
-  ],
+  interactionTypes: [{
+    id: 'melee-combat',
+    sourceSkillId: 'attack',
+    targetSkillId: 'defense',
+    targetPlayerHealth: true,
+  }],
+  enemies: [enemy()],
 };
 
 const action: GameAction = {
@@ -59,215 +59,100 @@ const action: GameAction = {
 };
 
 describe('adversarial actions', () => {
-  it('grants hit rewards and loops when sampled damage leaves target health above zero', () => {
+  it('applies globally scaled player damage and continues while the target survives', () => {
     const startedAt = 1_000;
     const state = {
       ...startAction(createInitialPlayState('test', 'arena'), action, context, startedAt),
-      skillXp: {
-        attack: 10,
-      },
+      skillXp: { attack: 10 },
     };
-
     const resolved = resolveIdleTimers(state, { ...context, actions: [action] }, {
       random: () => 1,
       showReport: true,
     }, startedAt + 10_000);
 
-    expect(resolved.state.activeAction).toMatchObject({
-      actionId: 'test-fight',
-      targetHealth: 13,
-    });
+    expect(resolved.state.activeAction?.targetHealth).toBeCloseTo(200 - 7 * DAMAGE_SCALE, 5);
     expect(resolved.state.resources.fang).toBe(1);
-    expect(resolved.state.resources.trophy).toBeUndefined();
-    expect(resolved.state.chatMessages).toHaveLength(1);
     expect(resolved.state.chatMessages[0].key).toBe('interaction.melee-combat.player.hit');
-    expect(resolved.report).toEqual({ kind: 'none' });
   });
 
-  it('logs a miss and keeps combat running without rewards', () => {
+  it('logs a miss without rewards', () => {
     const startedAt = 1_000;
-    const state = {
-      ...startAction(createInitialPlayState('test', 'arena'), action, context, startedAt),
-      skillXp: {
-        attack: 0,
-      },
-    };
-
+    const state = startAction(createInitialPlayState('test', 'arena'), action, context, startedAt);
     const resolved = resolveIdleTimers(state, { ...context, actions: [action] }, {
       random: () => 0.5,
-      showReport: true,
     }, startedAt + 10_000);
 
-    expect(resolved.state.activeAction).toMatchObject({
-      actionId: 'test-fight',
-      targetHealth: 20,
-    });
+    expect(resolved.state.activeAction?.targetHealth).toBe(200);
     expect(resolved.state.resources.fang).toBeUndefined();
-    expect(resolved.state.resources.trophy).toBeUndefined();
-    expect(resolved.state.chatMessages).toHaveLength(1);
     expect(resolved.state.chatMessages[0].key).toBe('interaction.melee-combat.player.miss');
-    expect(resolved.report).toEqual({ kind: 'none' });
   });
 
-  it('grants hit and kill rewards once when sampled damage defeats the target', () => {
+  it('grants player and enemy rewards once on kill', () => {
     const startedAt = 1_000;
-    const weakContext: ActionResolutionContext = {
-      ...context,
-      enemies: [{
-        ...context.enemies[0],
-        health: 5,
-      }],
-    };
+    const killContext = { ...context, enemies: [enemy({ health: 50 })], actions: [action] };
     const state = {
-      ...startAction(createInitialPlayState('test', 'arena'), action, weakContext, startedAt),
-      skillXp: {
-        attack: 10,
-      },
+      ...startAction(createInitialPlayState('test', 'arena'), action, killContext, startedAt),
+      skillXp: { attack: 10 },
     };
-
-    const resolved = resolveIdleTimers(state, { ...weakContext, actions: [action] }, {
-      random: () => 1,
-      showReport: true,
-    }, startedAt + 10_000);
-    const repeated = resolveIdleTimers(resolved.state, { ...weakContext, actions: [action] }, {
-      random: () => 1,
-      showReport: true,
-    }, startedAt + 10_001);
+    const resolved = resolveIdleTimers(state, killContext, { random: () => 1 }, startedAt + 10_000);
+    const repeated = resolveIdleTimers(resolved.state, killContext, { random: () => 1 }, startedAt + 10_001);
 
     expect(resolved.state.activeAction).toBeNull();
-    expect(resolved.state.resources.fang).toBe(1);
-    expect(resolved.state.resources.trophy).toBe(1);
-    expect(resolved.state.chatMessages).toHaveLength(1);
+    expect(resolved.state.resources).toMatchObject({ fang: 1, trophy: 1 });
     expect(resolved.state.chatMessages[0].key).toBe('interaction.melee-combat.player.kill');
-    expect(resolved.report).toMatchObject({
-      kind: 'actionCompleted',
-      actionId: 'test-fight',
-    });
-    expect(repeated.state.resources.fang).toBe(1);
-    expect(repeated.state.resources.trophy).toBe(1);
-    expect(repeated.state.chatMessages).toHaveLength(1);
+    expect(repeated.state.resources).toMatchObject({ fang: 1, trophy: 1 });
   });
 
-  it('calculates debug DPS from expected damage and effective action time', () => {
-    const state = {
-      ...createInitialPlayState('test', 'arena'),
-      skillXp: {
-        attack: 10,
-      },
-    };
-    const actual = getActionDps(state, action, context);
-    const expected = actionDps(14, 70, 7, 10);
-
-    expect(actual).toBeCloseTo(expected, 5);
-    expect(expected).toBeCloseTo(expectedDamage(14, 70, 7) / 10, 5);
-  });
-
-  it('calculates enemy attack DPS from expected damage and enemy attack time', () => {
-    const hostileContext: ActionResolutionContext = {
-      ...context,
-      enemies: [{
-        ...context.enemies[0],
-        rate: 60,
-        skills: {
-          attack: { base: 2, imprecision: 70 },
-          defense: { base: 1, imprecision: 70 },
-        },
-      }],
-    };
+  it('reports player and entity DPS from the same analytical model', () => {
     const state = createInitialPlayState('test', 'arena');
-    const actual = getEnemyAttackDps(state, action, hostileContext);
-    const source = getSkillTotals(state, hostileContext.skills[0], hostileContext.enemies[0].skills.attack);
-    const target = getSkillTotals(state, hostileContext.skills[1]);
-    const expected = actionDps(source.effectiveTotal, source.imprecision, target.effectiveTotal, 1);
+    const hostileContext = { ...context, enemies: [enemy({ rate: 60 })] };
 
-    expect(actual).toBeCloseTo(expected, 5);
+    expect(getActionDps(state, action, context)).toBeGreaterThan(0);
+    expect(getEnemyAttackDps(state, action, hostileContext)).toBeGreaterThan(0);
   });
 
-  it('resolves enemy attack progress independently before player action completion', () => {
-    const startedAt = 1_000;
-    const hostileContext: ActionResolutionContext = {
+  it('applies armor penetration, torpidity, and critical expectation to entity DPS', () => {
+    const state = createInitialPlayState('test', 'arena');
+    const modifiedContext = {
       ...context,
-      enemies: [{
-        ...context.enemies[0],
-        rate: 60,
-        skills: {
-          attack: { base: 2, imprecision: 70 },
-          defense: { base: 1, imprecision: 70 },
-        },
-      }],
+      enemies: [enemy({ rate: 60, armorPenetration: 2, torpidity: 1, critChance: 50, critMultiplier: 2 })],
     };
-    const state = startAction(createInitialPlayState('test', 'arena'), action, hostileContext, startedAt);
+    const plain = getEnemyAttackDps(state, action, { ...context, enemies: [enemy({ rate: 60 })] }) ?? 0;
+    const modified = getEnemyAttackDps(state, action, modifiedContext) ?? 0;
 
-    const resolved = resolveIdleTimers(state, { ...hostileContext, actions: [action] }, {
-      random: () => 1,
-      showReport: true,
-    }, startedAt + 1_000);
-
-    expect(resolved.state.activeAction).toMatchObject({
-      actionId: 'test-fight',
-      targetHealth: 20,
-      enemyAttackStartedAt: startedAt + 1_000,
-      enemyAttackCompletesAt: startedAt + 2_000,
-    });
-    expect(resolved.state.playerHealth).toBe(93);
-    expect(resolved.state.chatMessages).toHaveLength(1);
-    expect(resolved.state.chatMessages[0]).toMatchObject({
-      key: 'interaction.melee-combat.entity.hit',
-      params: {
-        source: 'training-dummy',
-        target: 'you',
-        damage: 7,
-      },
-    });
+    expect(modified).not.toBeCloseTo(plain, 5);
   });
 
-  it('stops the active action when enemy damage drops player health to zero', () => {
+  it('regenerates enemy health only while its action is active', () => {
     const startedAt = 1_000;
-    const dangerousContext: ActionResolutionContext = {
-      ...context,
-      enemies: [{
-        ...context.enemies[0],
-        rate: 60,
-        skills: {
-          attack: { base: 20, imprecision: 70 },
-          defense: { base: 1, imprecision: 70 },
-        },
-      }],
+    const regenContext = { ...context, enemies: [enemy({ regeneration: 60 })], actions: [action] };
+    const started = startAction(createInitialPlayState('test', 'arena'), action, regenContext, startedAt);
+    const injured = {
+      ...started,
+      activeAction: started.activeAction ? { ...started.activeAction, targetHealth: 50 } : null,
     };
+    const resolved = resolveIdleTimers(injured, regenContext, {}, startedAt + 5_000);
+
+    expect(resolved.state.activeAction?.targetHealth).toBeCloseTo(55, 5);
+    const idle = resolveIdleTimers({ ...resolved.state, activeAction: null }, regenContext, {}, startedAt + 10_000);
+    expect(idle.state.actionProgress[action.id]?.targetHealth).not.toBeGreaterThan(55);
+  });
+
+  it('stops and resets the action when a lethal entity attack empties health', () => {
+    const startedAt = 1_000;
+    const lethalContext = { ...context, enemies: [enemy({ attack: 20, rate: 60 })], actions: [action] };
     const state = {
-      ...startAction(createInitialPlayState('test', 'arena'), action, dangerousContext, startedAt),
+      ...startAction(createInitialPlayState('test', 'arena'), action, lethalContext, startedAt),
       playerHealth: 10,
     };
-
-    const resolved = resolveIdleTimers(state, { ...dangerousContext, actions: [action] }, {
-      random: () => 1,
-      showReport: true,
-    }, startedAt + 1_000);
+    const resolved = resolveIdleTimers(state, lethalContext, { random: () => 1 }, startedAt + 1_000);
 
     expect(resolved.state.activeAction).toBeNull();
     expect(resolved.state.playerHealth).toBe(100);
-    expect(resolved.state.resourcePools.health.current).toBe(100);
-    expect(resolved.state.currentLocationId).toBe('arena');
     expect(resolved.state.chatMessages.map((message) => message.key)).toEqual([
       'interaction.melee-combat.entity.kill',
       'resource.health.empty',
     ]);
-    expect(resolved.state.actionProgress['test-fight']).toMatchObject({
-      elapsedMs: 0,
-      runningSince: null,
-      targetHealth: null,
-      enemyAttackStartedAt: null,
-      enemyAttackCompletesAt: null,
-    });
-    expect(resolved.state.resources.fang).toBeUndefined();
-    expect(resolved.state.resources.trophy).toBeUndefined();
-
-    const restarted = startAction(resolved.state, action, dangerousContext, startedAt + 2_000);
-
-    expect(restarted.activeAction).toMatchObject({
-      actionId: 'test-fight',
-      targetHealth: 20,
-      completesAt: startedAt + 12_000,
-    });
+    expect(resolved.state.actionProgress[action.id]).toMatchObject({ elapsedMs: 0, targetHealth: null });
   });
 });

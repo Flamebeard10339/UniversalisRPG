@@ -83,7 +83,6 @@ export type SkillDefinition = {
   descriptionKey?: string;
   maxLevel: number;
   rate?: number;
-  imprecision?: number;
 };
 
 export type ItemDefinition = {
@@ -138,10 +137,16 @@ export type EffectDefinition = {
 export type EnemyDefinition = {
   id: string;
   interactionTypeId: string;
+  attack: number;
+  defense: number;
   health: number;
   rate: number;
+  regeneration: number;
+  armorPenetration: number;
+  torpidity: number;
+  critChance: number;
+  critMultiplier: number;
   showHealthBar?: boolean;
-  skills: Record<string, SkillEquipmentBonuses>;
   rewards: Reward[];
 };
 
@@ -251,7 +256,6 @@ export type SkillEquipmentBonuses = {
   added?: number;
   increased?: number;
   rate?: number;
-  imprecision?: number;
 };
 
 export type SkillTotals = {
@@ -260,7 +264,6 @@ export type SkillTotals = {
   increased: number;
   effectiveTotal: number;
   rate: number;
-  imprecision: number;
 };
 
 export type ActionResolutionContext = {
