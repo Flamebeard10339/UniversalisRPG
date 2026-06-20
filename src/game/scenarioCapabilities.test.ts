@@ -175,8 +175,8 @@ describe('Derelict Extant scenario capabilities', () => {
       type: 'gm-update',
       turnId: 'turn-1',
       milestoneId: 'first-life',
-      operations: [{ op: 'upsert-action', id: wait.id }],
-      removeActionIds: [],
+      runStatus: 'continue',
+      operations: [{ op: 'upsert', contentType: 'actions', value: { id: wait.id } }],
       capabilityRequests: [],
       privateNotes: 'Air loss remains legible.',
     }, 90_000);

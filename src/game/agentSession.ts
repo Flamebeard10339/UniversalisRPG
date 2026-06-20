@@ -17,11 +17,26 @@ export type GmUpdateMessage = {
   type: 'gm-update';
   turnId: string;
   milestoneId: string;
-  operations: unknown[];
-  removeActionIds: string[];
-  capabilityRequests: unknown[];
+  runStatus: 'continue' | 'part-complete' | 'blocked';
+  operations: GmOperation[];
+  capabilityRequests: Array<{
+    id: string;
+    neededFor: string;
+    requiredSemantics: string;
+    blocking: boolean;
+  }>;
   privateNotes: string;
 };
+
+export type GmContentType = 'locations' | 'edges' | 'actions' | 'skills' | 'items'
+  | 'flags' | 'resources' | 'effects' | 'interaction-types' | 'enemies';
+
+export type GmOperation =
+  | { op: 'upsert'; contentType: GmContentType; value: Record<string, unknown> }
+  | { op: 'remove'; contentType: GmContentType; id: string }
+  | { op: 'localize'; locale: string; values: Record<string, string> }
+  | { op: 'set-manifest'; value: Record<string, unknown> }
+  | { op: 'set-death-reset'; value: Record<string, unknown> };
 
 export type AgentSessionMessage = PlayerChoiceMessage | GmUpdateMessage;
 

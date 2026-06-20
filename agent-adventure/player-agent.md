@@ -12,6 +12,10 @@ You receive only a public snapshot containing:
 - narration produced by completed actions,
 - previously discovered information available to the character.
 
+Actions resolve immediately under a virtual clock. Never wait, sleep, poll, or
+ask whether an action has finished. Duration still matters because resources
+and hostile rates are applied across that amount of simulated time.
+
 ## Hard Interface Rule
 
 Interact with the world solely by selecting one available action id. Do not
@@ -55,4 +59,3 @@ Use an empty `expectedActions` array when the available choices feel complete.
   unless the character has a compelling observed reason not to.
 - Do not assume supplies are renewable, consumed, persistent, or reset until the
   game demonstrates that behavior.
-

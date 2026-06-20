@@ -8,6 +8,8 @@ UniversalisRPG universe without allowing either agent to bypass the game UI.
 - `gm-agent.md`: reusable system instructions for the GM agent.
 - `player-agent.md`: reusable system instructions for the player agent.
 - `protocol.md`: controller-owned turn order and JSON message envelopes.
+- `preflight.md`: required controller settings and first-run checklist.
+- `schemas/*.schema.json`: strict validators for both agent response envelopes.
 - `scenarios/derelict-extant-part-1.md`: the private Part 1 brief supplied only
   to the GM.
 
@@ -25,6 +27,19 @@ UniversalisRPG universe without allowing either agent to bypass the game UI.
 
 The controller is deliberately not a third creative agent. It is ordinary
 program code responsible for sequencing, validation, simulation, and logs.
+
+## Simulation Mode
+
+Agent runs use an instant virtual clock. The controller never sleeps, starts a
+real timer, waits for wall-clock duration, or backgrounds the application. When
+the player chooses an action, the controller advances virtual time directly to
+the next relevant boundary and resolves the action, effects, combat, death, and
+relocation synchronously. Durations still matter fictionally and mechanically.
+
+Before a run, complete every item in `preflight.md`.
+
+Run `powershell -ExecutionPolicy Bypass -File agent-adventure/precheck.ps1`
+from the project root for the automated precheck.
 
 ## Engine Capability Mapping
 

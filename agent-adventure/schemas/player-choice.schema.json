@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://universalis-rpg.local/agent/player-choice.schema.json",
+  "type": "object",
+  "required": ["protocolVersion", "type", "turnId", "actionId", "feedback"],
+  "additionalProperties": false,
+  "properties": {
+    "protocolVersion": { "const": 1 },
+    "type": { "const": "player-choice" },
+    "turnId": { "type": "string", "minLength": 1 },
+    "actionId": { "type": "string", "minLength": 1 },
+    "feedback": {
+      "type": "object",
+      "required": ["expectedActions", "confusion"],
+      "additionalProperties": false,
+      "properties": {
+        "expectedActions": {
+          "type": "array",
+          "maxItems": 3,
+          "items": {
+            "type": "object",
+            "required": ["label", "reason"],
+            "additionalProperties": false,
+            "properties": {
+              "label": { "type": "string", "minLength": 1 },
+              "reason": { "type": "string", "minLength": 1 }
+            }
+          }
+        },
+        "confusion": {
+          "oneOf": [
+            { "type": "string", "minLength": 1 },
+            { "type": "null" }
+          ]
+        }
+      }
+    }
+  }
+}

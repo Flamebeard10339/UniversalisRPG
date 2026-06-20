@@ -1,0 +1,93 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://universalis-rpg.local/agent/gm-update.schema.json",
+  "type": "object",
+  "required": ["protocolVersion", "type", "turnId", "milestoneId", "runStatus", "operations", "capabilityRequests", "privateNotes"],
+  "additionalProperties": false,
+  "properties": {
+    "protocolVersion": { "const": 1 },
+    "type": { "const": "gm-update" },
+    "turnId": { "type": "string", "minLength": 1 },
+    "milestoneId": { "type": "string", "minLength": 1 },
+    "runStatus": { "enum": ["continue", "part-complete", "blocked"] },
+    "operations": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/operation" }
+    },
+    "capabilityRequests": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "neededFor", "requiredSemantics", "blocking"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "neededFor": { "type": "string", "minLength": 1 },
+          "requiredSemantics": { "type": "string", "minLength": 1 },
+          "blocking": { "type": "boolean" }
+        }
+      }
+    },
+    "privateNotes": { "type": "string" }
+  },
+  "$defs": {
+    "contentType": {
+      "enum": ["locations", "edges", "actions", "skills", "items", "flags", "resources", "effects", "interaction-types", "enemies"]
+    },
+    "operation": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["op", "contentType", "value"],
+          "additionalProperties": false,
+          "properties": {
+            "op": { "const": "upsert" },
+            "contentType": { "$ref": "#/$defs/contentType" },
+            "value": { "type": "object" }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["op", "contentType", "id"],
+          "additionalProperties": false,
+          "properties": {
+            "op": { "const": "remove" },
+            "contentType": { "$ref": "#/$defs/contentType" },
+            "id": { "type": "string", "minLength": 1 }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["op", "locale", "values"],
+          "additionalProperties": false,
+          "properties": {
+            "op": { "const": "localize" },
+            "locale": { "type": "string", "minLength": 2 },
+            "values": {
+              "type": "object",
+              "additionalProperties": { "type": "string" }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["op", "value"],
+          "additionalProperties": false,
+          "properties": {
+            "op": { "const": "set-manifest" },
+            "value": { "type": "object" }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["op", "value"],
+          "additionalProperties": false,
+          "properties": {
+            "op": { "const": "set-death-reset" },
+            "value": { "type": "object" }
+          }
+        }
+      ]
+    }
+  }
+}
