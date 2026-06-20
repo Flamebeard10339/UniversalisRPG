@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://universalis-rpg.local/schema/items.schema.json",
+  "$id": "https://universalis-rpg.local/schema/flags.schema.json",
   "type": "array",
   "items": {
     "type": "object",
@@ -8,8 +8,7 @@
     "additionalProperties": false,
     "properties": {
       "id": { "type": "string", "minLength": 1 },
-      "initialQuantity": { "type": "integer", "minimum": 0 },
-      "maxQuantity": { "type": "integer", "minimum": 1 }
+      "initialValue": { "type": "boolean" }
     }
   }
 }

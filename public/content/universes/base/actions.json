@@ -31,7 +31,7 @@
     "locationId": "emberwood",
     "durationSeconds": 8,
     "rewards": [
-      { "kind": "resource", "resourceId": "emberleaf", "amount": 1 },
+      { "kind": "item", "itemId": "emberleaf", "amount": 1 },
       { "kind": "skillXp", "skillId": "survival", "amount": 3 }
     ]
   },

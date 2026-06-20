@@ -10,6 +10,7 @@ import type {
   LocationNode,
   ResourceDefinition,
   SkillDefinition,
+  StateFlagDefinition,
   TravelEdgeDefinition,
   UniverseManifest,
 } from './types';
@@ -42,13 +43,16 @@ export const loadUniverseManifest = async (universeId: string) => {
 export const loadUniverse = async (universeId: string): Promise<ContentBundle> => {
   const basePath = `${BASE_CONTENT_PATH}/${universeId}`;
   const manifest = await loadUniverseManifest(universeId);
-  const [locations, edges, actions, skills, items, resourceDefinitions, effects, interactionTypes, enemies] = await Promise.all([
+  const [locations, edges, actions, skills, items, flags, resourceDefinitions, effects, interactionTypes, enemies] = await Promise.all([
     loadJson<LocationNode[]>(`${basePath}/locations.json`),
     loadJson<TravelEdgeDefinition[]>(`${basePath}/edges.json`),
     loadJson<GameAction[]>(`${basePath}/actions.json`),
     loadJson<SkillDefinition[]>(`${basePath}/skills.json`),
     manifest.files.includes('items.json')
       ? loadJson<ItemDefinition[]>(`${basePath}/items.json`)
+      : Promise.resolve([]),
+    manifest.files.includes('flags.json')
+      ? loadJson<StateFlagDefinition[]>(`${basePath}/flags.json`)
       : Promise.resolve([]),
     manifest.files.includes('resources.json')
       ? loadJson<ResourceDefinition[]>(`${basePath}/resources.json`)
@@ -80,6 +84,7 @@ export const loadUniverse = async (universeId: string): Promise<ContentBundle> =
     actions,
     skills,
     items,
+    flags,
     resourceDefinitions,
     effects,
     interactionTypes,

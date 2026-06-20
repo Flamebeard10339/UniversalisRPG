@@ -78,14 +78,47 @@ try {
         && first.y + first.height > second.y && second.y + second.height > first.y
       : true;
     const editorColumnsOverlap = overlaps(attackBox, referenceHealthBox) || overlaps(removeBox, referenceHealthBox);
+    const attackValue = await attack.inputValue();
+    const defenseValue = await defense.inputValue();
+    const actionsGridVisible = await actionsGrid.isVisible();
+    const fightsGridVisible = await fightsGrid.isVisible();
+
+    console.log(`[${viewport.name}] action capabilities`);
+    await page.getByRole('button', { name: 'Actions', exact: true }).last().click();
+    const actionDuration = page.getByLabel('Action duration').first();
+    await actionDuration.fill('6.5');
+    await actionDuration.press('Tab');
+    const maxCompletions = page.getByLabel('Maximum completions', { exact: true }).first();
+    await maxCompletions.fill('5');
+    const resultsEditor = page.getByLabel('Completion results (JSON)', { exact: true }).first();
+    await resultsEditor.fill('[{"kind":"relocate","locationId":"crossroads"}]');
+    await resultsEditor.press('Tab');
+    const actionDurationValue = await actionDuration.inputValue();
+    const maxCompletionsValue = await maxCompletions.inputValue();
+    const resultsValue = await resultsEditor.inputValue();
+
+    console.log(`[${viewport.name}] resource capabilities`);
+    await page.getByRole('button', { name: 'Resources', exact: true }).last().click();
+    const deathResetEditor = page.getByLabel('Death reset policy (JSON)', { exact: true });
+    const onEmptyEditor = page.getByLabel('When empty (JSON)', { exact: true }).first();
+    await deathResetEditor.scrollIntoViewIfNeeded();
+    await page.screenshot({ fullPage: true, path: path.join(os.tmpdir(), `universalis-capabilities-${viewport.name}.png`) });
+
+    const runTranscript = page.getByText('Run transcript', { exact: true });
 
     results.push({
       viewport: viewport.name,
-      attack: await attack.inputValue(),
-      defense: await defense.inputValue(),
-      actionsGrid: await actionsGrid.isVisible(),
-      fightsGrid: await fightsGrid.isVisible(),
+      attack: attackValue,
+      defense: defenseValue,
+      actionsGrid: actionsGridVisible,
+      fightsGrid: fightsGridVisible,
       editorColumnsOverlap,
+      actionDuration: actionDurationValue,
+      maxCompletions: maxCompletionsValue,
+      results: resultsValue,
+      deathResetEditor: await deathResetEditor.isVisible(),
+      onEmptyEditor: await onEmptyEditor.isVisible(),
+      runTranscript: await runTranscript.isVisible(),
       editorGeometry: { attackBox, removeBox, referenceHealthBox },
       errors,
     });
@@ -102,6 +135,12 @@ const failed = results.some((result) =>
   !result.actionsGrid ||
   !result.fightsGrid ||
   result.editorColumnsOverlap ||
+  result.actionDuration !== '6.5' ||
+  result.maxCompletions !== '5' ||
+  !result.results.includes('relocate') ||
+  !result.deathResetEditor ||
+  !result.onEmptyEditor ||
+  !result.runTranscript ||
   result.errors.length > 0
 );
 

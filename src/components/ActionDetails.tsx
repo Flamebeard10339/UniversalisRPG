@@ -21,9 +21,12 @@ const HealthBar = ({ color, current, max }: { color: string; current: number; ma
 export const ActionDetails = ({ bundle, onStopAction, playState, t }: ActionDetailsProps) => {
   const activeAction = bundle.actions.find((action) => action.id === playState.activeAction?.actionId);
   const actionContext = {
+    manifest: bundle.manifest,
     actions: bundle.actions,
     skills: bundle.skills,
     locations: bundle.locations,
+    items: bundle.items,
+    flags: bundle.flags,
     resourceDefinitions: bundle.resourceDefinitions,
     effects: bundle.effects,
     interactionTypes: bundle.interactionTypes,

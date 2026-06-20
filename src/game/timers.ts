@@ -1,4 +1,4 @@
-import type { ActionResolutionContext, ChatMessage, GameAction, IdleReport, IdleResolution, ResourceBoundaryBehavior, Reward, TravelEdgeDefinition, UniversePlayState } from './types';
+import type { ActionResolutionContext, ActionResult, ChatMessage, GameAction, IdleReport, IdleResolution, ResourceBoundaryBehavior, Reward, RunLogEntry, TravelEdgeDefinition, UniversePlayState } from './types';
 import { getActionDurationMs, getEnemy, getEnemyAttackDurationMs, getInteractionType, getSkillTotals, sampleAdversarialDamage, sampleEnemyAttackDamage } from './adversarial';
 import {
   actionFailureKey,
@@ -11,7 +11,7 @@ import {
   interactionPlayerKillKey,
   interactionPlayerMissKey,
 } from './contentIds';
-import { skillLevelFromXp } from './skills';
+import { areActionRequirementsMet, canStartAction, isActionExhausted } from './conditions';
 
 const MAX_CHAT_MESSAGES = 80;
 const MIN_REPORT_INACTIVE_MS = 1000;
@@ -20,11 +20,35 @@ const EMPTY_CONTEXT: ActionResolutionContext = {
   actions: [],
   skills: [],
   locations: [],
+  items: [],
+  flags: [],
   resourceDefinitions: [],
   effects: [],
   interactionTypes: [],
   enemies: [],
 };
+
+export const appendRunLog = (
+  state: UniversePlayState,
+  actor: RunLogEntry['actor'],
+  event: string,
+  data?: Record<string, unknown>,
+  now = Date.now(),
+): UniversePlayState => ({
+  ...state,
+  runLog: [
+    ...(state.runLog ?? []),
+    {
+      runId: state.runId,
+      sequence: state.nextRunLogSequence ?? 1,
+      createdAt: now,
+      actor,
+      event,
+      ...(data ? { data } : {}),
+    },
+  ],
+  nextRunLogSequence: (state.nextRunLogSequence ?? 1) + 1,
+});
 
 const sameMessage = (left: ChatMessage, right: ChatMessage) =>
   left.author === right.author &&
@@ -64,12 +88,17 @@ export const appendChatMessage = (
 
 export const createInitialPlayState = (universeId: string, startingLocationId: string): UniversePlayState => ({
   universeId,
+  runId: `run-${Date.now().toString(36)}`,
   currentLocationId: startingLocationId,
   discoveredLocationIds: [startingLocationId],
   activeAction: null,
   actionProgress: {},
   activeTravel: null,
   resources: {},
+  inventory: {},
+  flags: {},
+  actionCompletions: {},
+  deathCount: 0,
   resourcePools: {},
   skillXp: {},
   equipmentSkillBonuses: {},
@@ -77,6 +106,8 @@ export const createInitialPlayState = (universeId: string, startingLocationId: s
   playerHealth: 100,
   playerMaxHealth: 100,
   chatMessages: [],
+  runLog: [],
+  nextRunLogSequence: 1,
   lastTickAt: Date.now(),
 });
 
@@ -86,10 +117,12 @@ export const normalizePlayState = (
   startingLocationId: string,
 ): UniversePlayState => {
   const actionProgress = state.actionProgress ?? {};
+  const runId = state.runId ?? `run-${Date.now().toString(36)}`;
 
   return {
     ...createInitialPlayState(universeId, startingLocationId),
     ...state,
+    runId,
     activeAction: state.activeAction
       ? {
           ...state.activeAction,
@@ -112,11 +145,17 @@ export const normalizePlayState = (
       : actionProgress,
     activeTravel: state.activeTravel ?? null,
     resourcePools: state.resourcePools ?? {},
+    inventory: { ...(state.resources ?? {}), ...(state.inventory ?? {}) },
+    flags: state.flags ?? {},
+    actionCompletions: state.actionCompletions ?? {},
+    deathCount: state.deathCount ?? 0,
     equipmentSkillBonuses: state.equipmentSkillBonuses ?? {},
     actionLoopingEnabled: state.actionLoopingEnabled ?? false,
     playerHealth: state.playerHealth ?? 100,
     playerMaxHealth: state.playerMaxHealth ?? 100,
     chatMessages: state.chatMessages ?? [],
+    runLog: (state.runLog ?? []).map((entry) => ({ ...entry, runId: entry.runId ?? runId })),
+    nextRunLogSequence: state.nextRunLogSequence ?? ((state.runLog?.length ?? 0) + 1),
   };
 };
 
@@ -230,6 +269,27 @@ const ensureResourcePools = (
   });
 };
 
+const ensureWorldState = (
+  state: UniversePlayState,
+  context: ActionResolutionContext,
+) => {
+  const inventory = { ...state.inventory };
+  const flags = { ...state.flags };
+
+  for (const item of context.items ?? []) {
+    if (inventory[item.id] === undefined) {
+      inventory[item.id] = Math.max(0, item.initialQuantity ?? 0);
+    }
+  }
+  for (const flag of context.flags ?? []) {
+    if (flags[flag.id] === undefined) {
+      flags[flag.id] = flag.initialValue ?? false;
+    }
+  }
+
+  return ensureResourcePools({ ...state, inventory, flags }, context);
+};
+
 const setResourceCurrent = (
   state: UniversePlayState,
   resourceId: string,
@@ -260,6 +320,58 @@ const resolveLocationId = (
 ) => locationId === 'starting-location'
   ? context.locations?.find((location) => location.starting)?.id ?? state.currentLocationId
   : locationId;
+
+const selectKeys = <T>(values: Record<string, T>, ids: string[] = []) =>
+  Object.fromEntries(ids.filter((id) => values[id] !== undefined).map((id) => [id, values[id]]));
+
+export const applyDeathReset = (
+  state: UniversePlayState,
+  context: ActionResolutionContext,
+  now = Date.now(),
+) => {
+  const policy = context.manifest?.deathReset;
+  const startingLocationId = resolveLocationId(state, context, policy?.locationId ?? 'starting-location');
+  const preserve = policy?.preserve ?? {};
+  const initial = ensureWorldState(createInitialPlayState(state.universeId, startingLocationId), context);
+  const next = {
+    ...initial,
+    inventory: {
+      ...initial.inventory,
+      ...selectKeys(state.inventory, preserve.inventoryIds),
+    },
+    resourcePools: {
+      ...initial.resourcePools,
+      ...selectKeys(state.resourcePools, preserve.resourceIds),
+    },
+    flags: {
+      ...initial.flags,
+      ...selectKeys(state.flags, preserve.flagIds),
+    },
+    skillXp: preserve.skillXp ? state.skillXp : initial.skillXp,
+    discoveredLocationIds: preserve.discoveredLocations
+      ? Array.from(new Set([...state.discoveredLocationIds, startingLocationId]))
+      : initial.discoveredLocationIds,
+    actionCompletions: {
+      ...initial.actionCompletions,
+      ...selectKeys(state.actionCompletions, preserve.actionCompletionIds),
+    },
+    chatMessages: state.chatMessages,
+    runLog: state.runLog,
+    nextRunLogSequence: state.nextRunLogSequence,
+    actionLoopingEnabled: state.actionLoopingEnabled,
+    runId: state.runId,
+    deathCount: (state.deathCount ?? 0) + 1,
+    lastTickAt: now,
+  };
+
+  return appendRunLog(syncLegacyHealth(next), 'engine', 'death.reset', {
+    deathCount: next.deathCount,
+    locationId: startingLocationId,
+    preservedInventoryIds: preserve.inventoryIds ?? [],
+    preservedResourceIds: preserve.resourceIds ?? [],
+    preservedFlagIds: preserve.flagIds ?? [],
+  }, now);
+};
 
 const applyResourceBehaviors = (
   state: UniversePlayState,
@@ -307,6 +419,10 @@ const applyResourceBehaviors = (
         key: behavior.messageKey,
       }, now);
     }
+
+    if (behavior.kind === 'death-reset') {
+      nextState = applyDeathReset(nextState, context, now);
+    }
   }
 
   return nextState;
@@ -329,6 +445,12 @@ const applyResourceDelta = (
   const previous = resource.current;
   const nextValue = Math.min(resource.max, Math.max(resource.min, previous + delta));
   let nextState = setResourceCurrent(state, resourceId, nextValue);
+  nextState = appendRunLog(nextState, 'engine', 'resource.change', {
+    resourceId,
+    requestedDelta: delta,
+    previous,
+    current: nextValue,
+  }, now);
 
   if (previous > resource.min && nextValue <= resource.min) {
     nextState = applyResourceBehaviors(nextState, context, resourceId, definition.onEmpty ?? [], now);
@@ -447,9 +569,17 @@ export const startAction = (
 ): UniversePlayState => {
   const context = typeof contextOrNow === 'number' ? EMPTY_CONTEXT : contextOrNow;
   const now = typeof contextOrNow === 'number' ? contextOrNow : maybeNow;
+  state = ensureWorldState(state, context);
 
   if (state.activeAction?.actionId === action.id) {
-    return pauseRunningAction(state, now);
+    return appendRunLog(pauseRunningAction(state, now), 'player', 'action.pause', { actionId: action.id }, now);
+  }
+
+  if (!canStartAction(state, action, context)) {
+    return appendRunLog(state, 'player', 'action.rejected', {
+      actionId: action.id,
+      exhausted: isActionExhausted(state, action),
+    }, now);
   }
 
   const pausedState = pauseRunningAction(state, now);
@@ -470,7 +600,7 @@ export const startAction = (
   const enemyAttackStartedAt = progress.enemyAttackStartedAt ?? (enemyAttackDurationMs ? now : null);
   const enemyAttackCompletesAt = progress.enemyAttackCompletesAt ?? (enemyAttackDurationMs ? now + enemyAttackDurationMs : null);
 
-  return {
+  return appendRunLog({
     ...pausedState,
     activeAction: {
       actionId: action.id,
@@ -491,7 +621,7 @@ export const startAction = (
       },
     },
     lastTickAt: now,
-  };
+  }, 'player', 'action.start', { actionId: action.id, locationId: action.locationId }, now);
 };
 
 const restartAction = (
@@ -537,7 +667,7 @@ export const startTravel = (
 ): UniversePlayState => {
   const pausedState = pauseRunningAction(state, now);
 
-  return {
+  return appendRunLog({
     ...pausedState,
     activeTravel: {
       edgeId: edge.id,
@@ -548,7 +678,11 @@ export const startTravel = (
     },
     activeAction: null,
     lastTickAt: now,
-  };
+  }, 'player', 'travel.start', {
+    edgeId: edge.id,
+    fromLocationId: state.currentLocationId,
+    toLocationId: destinationLocationId,
+  }, now);
 };
 
 type ActionCompletionResult = {
@@ -560,24 +694,99 @@ type ActionCompletionResult = {
   rewards: Reward[];
 };
 
-const applyRewards = (state: UniversePlayState, rewards: Reward[]) => {
-  const resources = { ...state.resources };
-  const skillXp = { ...state.skillXp };
-
-  for (const reward of rewards) {
-    if (reward.kind === 'resource') {
-      resources[reward.resourceId] = (resources[reward.resourceId] ?? 0) + reward.amount;
-    }
-    if (reward.kind === 'skillXp') {
-      skillXp[reward.skillId] = (skillXp[reward.skillId] ?? 0) + reward.amount;
-    }
-  }
-
+const applyItemDelta = (
+  state: UniversePlayState,
+  context: ActionResolutionContext,
+  itemId: string,
+  amount: number,
+) => {
+  const definition = context.items?.find((item) => item.id === itemId);
+  const current = state.inventory[itemId] ?? 0;
+  const next = Math.max(0, Math.min(definition?.maxQuantity ?? Number.POSITIVE_INFINITY, current + amount));
   return {
     ...state,
-    resources,
-    skillXp,
+    inventory: { ...state.inventory, [itemId]: next },
+    resources: { ...state.resources, [itemId]: next },
   };
+};
+
+const applyActionResult = (
+  state: UniversePlayState,
+  result: ActionResult,
+  context: ActionResolutionContext,
+  now: number,
+) => {
+  if (result.kind === 'item') {
+    return applyItemDelta(state, context, result.itemId, result.amount);
+  }
+  if (result.kind === 'resource') {
+    return applyResourceDelta(state, context, result.resourceId, result.amount, now);
+  }
+  if (result.kind === 'skill-xp') {
+    return {
+      ...state,
+      skillXp: {
+        ...state.skillXp,
+        [result.skillId]: Math.max(0, (state.skillXp[result.skillId] ?? 0) + result.amount),
+      },
+    };
+  }
+  if (result.kind === 'flag') {
+    return { ...state, flags: { ...state.flags, [result.flagId]: result.value } };
+  }
+  if (result.kind === 'relocate') {
+    const locationId = resolveLocationId(state, context, result.locationId);
+    return {
+      ...state,
+      currentLocationId: locationId,
+      discoveredLocationIds: Array.from(new Set([...state.discoveredLocationIds, locationId])),
+      activeTravel: null,
+    };
+  }
+  return appendChatMessage(state, { author: 'system', key: result.messageKey }, now);
+};
+
+const applyRewards = (
+  state: UniversePlayState,
+  rewards: Reward[],
+  context: ActionResolutionContext,
+  now: number,
+) => rewards.reduce((nextState, reward) => {
+  if (reward.kind === 'skillXp') {
+    return applyActionResult(nextState, { kind: 'skill-xp', skillId: reward.skillId, amount: reward.amount }, context, now);
+  }
+  if (reward.kind === 'item') {
+    return applyActionResult(nextState, { kind: 'item', itemId: reward.itemId, amount: reward.amount }, context, now);
+  }
+  const resourceExists = context.resourceDefinitions?.some((resource) => resource.id === reward.resourceId);
+  return applyActionResult(nextState, resourceExists
+    ? { kind: 'resource', resourceId: reward.resourceId, amount: reward.amount }
+    : { kind: 'item', itemId: reward.resourceId, amount: reward.amount }, context, now);
+}, state);
+
+const applyActionCompletion = (
+  state: UniversePlayState,
+  action: GameAction,
+  context: ActionResolutionContext,
+  now: number,
+) => {
+  const rewarded = applyRewards(state, action.rewards, context, now);
+  const changed = (action.results ?? []).reduce(
+    (nextState, result) => applyActionResult(nextState, result, context, now),
+    rewarded,
+  );
+  return appendRunLog({
+    ...changed,
+    actionCompletions: {
+      ...changed.actionCompletions,
+      [action.id]: (changed.actionCompletions[action.id] ?? 0) + 1,
+    },
+  }, 'engine', 'action.complete', {
+    actionId: action.id,
+    completion: (changed.actionCompletions[action.id] ?? 0) + 1,
+    results: action.results ?? [],
+    rewards: action.rewards,
+  }, now);
 };
 
 const completeActionWithResult = (
@@ -609,7 +818,7 @@ const completeActionWithResult = (
       };
     }
 
-    const hitState = applyRewards(state, action.rewards);
+    const hitState = applyRewards(state, action.rewards, context, now);
 
     if (targetHealth > 0) {
       return {
@@ -622,14 +831,15 @@ const completeActionWithResult = (
       };
     }
 
-    state = applyRewards(hitState, enemy.rewards);
+    state = applyRewards(applyActionCompletion(state, action, context, now), enemy.rewards, context, now);
   }
 
+  const resolvedState = enemy ? state : applyActionCompletion(state, action, context, now);
   const completedState = {
-    ...(enemy ? state : applyRewards(state, action.rewards)),
+    ...resolvedState,
     activeAction: null,
     actionProgress: {
-      ...state.actionProgress,
+      ...resolvedState.actionProgress,
       [action.id]: {
         elapsedMs: 0,
         runningSince: null,
@@ -640,7 +850,9 @@ const completeActionWithResult = (
     },
     lastTickAt: now,
   };
-  const shouldLoop = state.actionLoopingEnabled;
+  const shouldLoop = completedState.actionLoopingEnabled
+    && completedState.currentLocationId === action.locationId
+    && canStartAction(completedState, action, context);
   const restartTargetHealth = enemy ? enemy.health : null;
 
   return {
@@ -660,17 +872,6 @@ export const completeAction = (
   options: { random?: () => number } = {},
   now = Date.now(),
 ): UniversePlayState => completeActionWithResult(state, action, context, options, now).state;
-
-const actionRequirementsMet = (state: UniversePlayState, action: GameAction) =>
-  (action.requirements ?? []).every((requirement) => {
-    if (requirement.kind === 'resource') {
-      return (state.resources[requirement.resourceId] ?? 0) >= requirement.amount;
-    }
-    if (requirement.kind === 'skillLevel') {
-      return skillLevelFromXp(state.skillXp[requirement.skillId] ?? 0) >= requirement.level;
-    }
-    return true;
-  });
 
 const resolveDueEnemyAttacks = (
   state: UniversePlayState,
@@ -747,7 +948,11 @@ const resolveDueEnemyAttacks = (
   };
 };
 
-const rewardLabelId = (reward: Reward) => (reward.kind === 'resource' ? reward.resourceId : reward.skillId);
+const rewardLabelId = (reward: Reward) => reward.kind === 'resource'
+  ? reward.resourceId
+  : reward.kind === 'item'
+    ? reward.itemId
+    : reward.skillId;
 
 const roundCombatNumber = (value: number) => Math.round(value * 100) / 100;
 
@@ -813,7 +1018,7 @@ export const resolveIdleTimers = (
   const inactiveMs = Math.max(0, now - (state.lastTickAt ?? now));
   const reportEnabled = shouldReportIdle(inactiveMs, options.showReport);
 
-  state = ensureResourcePools(state, context);
+  state = ensureWorldState(state, context);
   state = applyActiveEffects(state, context, now);
   state = applyEnemyRegeneration(state, context, now);
 
@@ -823,13 +1028,17 @@ export const resolveIdleTimers = (
     const discoveredLocationIds = state.discoveredLocationIds.includes(destinationLocationId)
       ? state.discoveredLocationIds
       : [...state.discoveredLocationIds, destinationLocationId];
-    const nextState = {
+    const nextState = appendRunLog({
       ...state,
       currentLocationId: destinationLocationId,
       discoveredLocationIds,
       activeTravel: null,
       lastTickAt: now,
-    };
+    }, 'engine', 'travel.complete', {
+      edgeId: activeTravel.edgeId,
+      fromLocationId: activeTravel.fromLocationId,
+      toLocationId: activeTravel.toLocationId,
+    }, activeTravel.completesAt);
     const report: IdleReport = reportEnabled
       ? {
           kind: 'travelCompleted',
@@ -924,12 +1133,8 @@ export const resolveIdleTimers = (
     };
   }
 
-  if (!actionRequirementsMet(state, action)) {
-    const failed = {
-      ...state,
-      activeAction: null,
-      lastTickAt: now,
-    };
+  if (!areActionRequirementsMet(state, action, context)) {
+    const failed = appendRunLog(stopRunningAction(state, now), 'engine', 'action.requirements-failed', { actionId: action.id }, now);
     const failedWithDebug = options.debugEnabled
       ? appendChatMessage(failed, {
           author: 'debug',

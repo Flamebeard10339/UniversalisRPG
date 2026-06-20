@@ -1,7 +1,8 @@
 import { create } from 'zustand';
-import type { ActionResolutionContext, GameAction, IdleReport, TravelEdgeDefinition, UniversePlayState } from '../game/types';
-import { appendChatMessage, createInitialPlayState, normalizePlayState, resolveIdleTimers, startAction, startTravel } from '../game/timers';
+import type { ActionResolutionContext, GameAction, IdleReport, RunLogEntry, TravelEdgeDefinition, UniversePlayState } from '../game/types';
+import { appendChatMessage, appendRunLog, createInitialPlayState, normalizePlayState, resolveIdleTimers, startAction, startTravel } from '../game/timers';
 import { load, remove, save } from '../lib/storage';
+import { recordAgentSessionMessage, type AgentSessionMessage } from '../game/agentSession';
 
 type GameStateStore = {
   states: Record<string, UniversePlayState>;
@@ -16,6 +17,9 @@ type GameStateStore = {
   setActionLooping: (universeId: string, enabled: boolean) => void;
   markInactive: (universeId: string) => void;
   sendChatMessage: (universeId: string, text: string) => void;
+  recordRunEvent: (universeId: string, actor: RunLogEntry['actor'], event: string, data?: Record<string, unknown>) => void;
+  recordAgentMessage: (universeId: string, message: AgentSessionMessage) => void;
+  clearRunLog: (universeId: string) => void;
   importUniverseState: (playState: UniversePlayState) => Promise<void>;
   resetUniverse: (universeId: string, startingLocationId: string) => Promise<void>;
 };
@@ -270,18 +274,57 @@ export const useGameState = create<GameStateStore>((set, get) => ({
     });
   },
 
+  recordRunEvent: (universeId, actor, event, data) => {
+    set((state) => {
+      const current = state.states[universeId];
+      if (!current) return state;
+      const next = appendRunLog(current, actor, event, data);
+      void save(storageKey(universeId), next);
+      return { states: { ...state.states, [universeId]: next } };
+    });
+  },
+
+  recordAgentMessage: (universeId, message) => {
+    set((state) => {
+      const current = state.states[universeId];
+      if (!current) return state;
+      const next = recordAgentSessionMessage(current, message);
+      void save(storageKey(universeId), next);
+      return { states: { ...state.states, [universeId]: next } };
+    });
+  },
+
+  clearRunLog: (universeId) => {
+    set((state) => {
+      const current = state.states[universeId];
+      if (!current) return state;
+      const next = { ...current, runLog: [], nextRunLogSequence: 1 };
+      void save(storageKey(universeId), next);
+      return { states: { ...state.states, [universeId]: next } };
+    });
+  },
+
   importUniverseState: async (playState) => {
-    await save(storageKey(playState.universeId), playState);
+    const normalized = normalizePlayState(playState, playState.universeId, playState.currentLocationId);
+    await save(storageKey(playState.universeId), normalized);
     set((state) => ({
       states: {
         ...state.states,
-        [playState.universeId]: playState,
+        [playState.universeId]: normalized,
       },
     }));
   },
 
   resetUniverse: async (universeId, startingLocationId) => {
-    const next = createInitialPlayState(universeId, startingLocationId);
+    const current = get().states[universeId];
+    const initial = createInitialPlayState(universeId, startingLocationId);
+    const next = current
+      ? appendRunLog({
+          ...initial,
+          runLog: current.runLog,
+          nextRunLogSequence: current.nextRunLogSequence,
+        }, 'player', 'run.start', { reason: 'manual-reset', previousRunId: current.runId, startingLocationId })
+      : initial;
     await remove(storageKey(universeId));
     await save(storageKey(universeId), next);
     set((state) => ({

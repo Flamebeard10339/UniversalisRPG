@@ -3,6 +3,7 @@ import { actionDescriptionKey, actionTitleKey } from '../game/contentIds';
 import { getActionDps, getActionDurationMs, getEnemyAttackDps } from '../game/adversarial';
 import type { Translator } from '../game/i18n';
 import { useNow } from '../hooks/useNow';
+import { canStartAction, isActionVisible } from '../game/conditions';
 
 type ActionPanelProps = {
   bundle: ContentBundle;
@@ -14,19 +15,22 @@ type ActionPanelProps = {
 };
 
 export const ActionPanel = ({ bundle, debugEnabled, onSetLooping, playState, onStartAction, t }: ActionPanelProps) => {
-  const actions = bundle.actions.filter((action) => action.locationId === playState.currentLocationId);
-  const activeAction = actions.find((action) => action.id === playState.activeAction?.actionId);
   const isTravelling = Boolean(playState.activeTravel);
   const now = useNow(Boolean(playState.activeAction), 16);
   const actionContext = {
+    manifest: bundle.manifest,
     actions: bundle.actions,
     skills: bundle.skills,
     locations: bundle.locations,
+    items: bundle.items,
+    flags: bundle.flags,
     resourceDefinitions: bundle.resourceDefinitions,
     effects: bundle.effects,
     interactionTypes: bundle.interactionTypes,
     enemies: bundle.enemies,
   };
+  const actions = bundle.actions.filter((action) => action.locationId === playState.currentLocationId && isActionVisible(playState, action, actionContext));
+  const activeAction = actions.find((action) => action.id === playState.activeAction?.actionId);
   const getActionProgress = (action: GameAction) => {
     const progress = playState.actionProgress[action.id];
     const elapsedMs = (progress?.elapsedMs ?? 0) + (progress?.runningSince ? Math.max(0, now - progress.runningSince) : 0);
@@ -63,11 +67,14 @@ export const ActionPanel = ({ bundle, debugEnabled, onSetLooping, playState, onS
           const playerDps = debugEnabled ? getActionDps(playState, action, actionContext) : null;
           const entityDps = debugEnabled ? getEnemyAttackDps(playState, action, actionContext) : null;
           const actionProgress = getActionProgress(action);
+          const requirementsMet = canStartAction(playState, action, actionContext);
+          const completions = playState.actionCompletions[action.id] ?? 0;
+          const remaining = action.maxCompletions === undefined ? null : Math.max(0, action.maxCompletions - completions);
 
           return (
             <button
               className="relative overflow-hidden rounded border border-slate-700 bg-slate-900 p-3 text-left transition hover:border-cyan-500 disabled:cursor-not-allowed disabled:opacity-50"
-              disabled={isTravelling}
+              disabled={isTravelling || !requirementsMet}
               key={action.id}
               onClick={() => onStartAction(action)}
               type="button"
@@ -81,6 +88,11 @@ export const ActionPanel = ({ bundle, debugEnabled, onSetLooping, playState, onS
               <span className="relative block text-sm font-semibold text-slate-100">{t(action.titleKey ?? actionTitleKey(action.id))}</span>
               <span className="relative mt-1 block text-xs text-slate-400">{t(action.descriptionKey ?? actionDescriptionKey(action.id))}</span>
               <span className="relative mt-2 block text-xs text-cyan-200">{action.durationSeconds}s</span>
+              {remaining !== null && (
+                <span className="relative mt-1 block text-xs text-slate-300">
+                  {t('actionPanel.remaining', { remaining, total: action.maxCompletions ?? 0 })}
+                </span>
+              )}
               {debugEnabled && (playerDps !== null || entityDps !== null) && (
                 <span className="relative mt-1 block text-xs text-amber-200">
                   {t('actionPanel.debugDps', {

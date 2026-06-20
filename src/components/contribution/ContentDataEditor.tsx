@@ -1,7 +1,7 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type MutableRefObject, type ReactNode } from 'react';
 import { edgeId, toKebabInput } from '../../game/contentIds';
 import type { Translator } from '../../game/i18n';
-import type { ContentBundle, ContributionDraft, ContributionRemovedIds, EnemyDefinition, GameAction, InteractionTypeDefinition, ItemDefinition, LocationNode, Reward, SkillDefinition, TravelEdgeDefinition } from '../../game/types';
+import type { ActionResult, Condition, ContentBundle, ContributionDraft, ContributionRemovedIds, DeathResetPolicy, EffectDefinition, EnemyDefinition, GameAction, InteractionTypeDefinition, ItemDefinition, LocationNode, ResourceBoundaryBehavior, ResourceDefinition, Reward, SkillDefinition, StateFlagDefinition, TravelEdgeDefinition } from '../../game/types';
 import { ContributionMapEditor } from './ContributionMapEditor';
 import { EnemyDiagnostics } from './EnemyDiagnostics';
 
@@ -13,8 +13,8 @@ type ContentDataEditorProps = {
   t: Translator;
 };
 
-type ContentDataTab = 'map' | 'actions' | 'skills' | 'interactions' | 'enemies' | 'items' | 'json';
-type DraftListKey = Exclude<keyof ContributionRemovedIds, never>;
+type ContentDataTab = 'map' | 'actions' | 'skills' | 'interactions' | 'enemies' | 'items' | 'resources' | 'json';
+type DraftListKey = Exclude<keyof ContributionRemovedIds, 'resources'>;
 type LayeredRow<T> = {
   index: number;
   item: T;
@@ -26,7 +26,7 @@ type RewardDraft = {
   amount: string;
 };
 
-const contentTabs: ContentDataTab[] = ['map', 'actions', 'skills', 'interactions', 'enemies', 'items', 'json'];
+const contentTabs: ContentDataTab[] = ['map', 'actions', 'skills', 'interactions', 'enemies', 'items', 'resources', 'json'];
 
 const uniqueId = (baseId: string, existingIds: string[]) => {
   let index = 1;
@@ -54,6 +54,9 @@ const emptyRemoved = (): ContributionRemovedIds => ({
   actions: [],
   skills: [],
   items: [],
+  flags: [],
+  resources: [],
+  effects: [],
   interactionTypes: [],
   enemies: [],
 });
@@ -79,11 +82,20 @@ const uniqueById = <T extends { id: string }>(items: T[]) => [...new Map(items.m
 const allLocations = (bundle: ContentBundle, draft: ContributionDraft) => uniqueById([...bundle.locations, ...draft.locations]);
 const allSkills = (bundle: ContentBundle, draft: ContributionDraft) => uniqueById([...bundle.skills, ...draft.skills]);
 const allItems = (bundle: ContentBundle, draft: ContributionDraft) => uniqueById([...(bundle.items ?? []), ...draft.items]);
+const allFlags = (bundle: ContentBundle, draft: ContributionDraft) => uniqueById([...(bundle.flags ?? []), ...draft.flags]);
 const allInteractionTypes = (bundle: ContentBundle, draft: ContributionDraft) => uniqueById([...(bundle.interactionTypes ?? []), ...draft.interactionTypes]);
 const allEnemies = (bundle: ContentBundle, draft: ContributionDraft) => uniqueById([...(bundle.enemies ?? []), ...draft.enemies]);
 const defaultRewardDraft = (): RewardDraft => ({ kind: 'skillXp', targetId: '', amount: '1' });
-const rewardTargetId = (reward: Reward) => reward.kind === 'skillXp' ? reward.skillId : reward.resourceId;
-const formatReward = (reward: Reward, t: Translator) => `${reward.kind === 'skillXp' ? t('contribution.reward.skillXp') : t('contribution.reward.item')}: ${rewardTargetId(reward)} x${reward.amount}`;
+const rewardTargetId = (reward: Reward) => reward.kind === 'skillXp'
+  ? reward.skillId
+  : reward.kind === 'item'
+    ? reward.itemId
+    : reward.resourceId;
+const formatReward = (reward: Reward, t: Translator) => `${reward.kind === 'skillXp'
+  ? t('contribution.reward.skillXp')
+  : reward.kind === 'item'
+    ? t('contribution.reward.item')
+    : t('contribution.reward.resource')}: ${rewardTargetId(reward)} x${reward.amount}`;
 type RewardListEditorProps = {
   draft: RewardDraft;
   label: string;
@@ -142,6 +154,44 @@ const NumericEditor = ({ max, min = 0, onChange, step = 1, value }: NumericEdito
   );
 };
 
+const JsonEditor = <T,>({ label, onChange, value }: { label: string; onChange: (value: T | undefined) => void; value: T | undefined }) => {
+  const [text, setText] = useState(value === undefined ? '' : JSON.stringify(value, null, 2));
+  const [invalid, setInvalid] = useState(false);
+
+  useEffect(() => {
+    setText(value === undefined ? '' : JSON.stringify(value, null, 2));
+    setInvalid(false);
+  }, [value]);
+
+  const commit = () => {
+    if (!text.trim()) {
+      setInvalid(false);
+      onChange(undefined);
+      return;
+    }
+    try {
+      onChange(JSON.parse(text) as T);
+      setInvalid(false);
+    } catch {
+      setInvalid(true);
+    }
+  };
+
+  return (
+    <label className="grid min-w-0 gap-1 text-xs text-slate-400">
+      <span>{label}</span>
+      <textarea
+        aria-invalid={invalid}
+        aria-label={label}
+        className={`min-h-28 rounded border bg-slate-900 p-2 font-mono text-xs text-slate-100 ${invalid ? 'border-rose-500' : 'border-slate-800'}`}
+        onBlur={commit}
+        onChange={(event) => { setText(event.target.value); setInvalid(false); }}
+        value={text}
+      />
+    </label>
+  );
+};
+
 const NestedListSection = ({ children, label, onActivate }: NestedListSectionProps) => (
   <div className="ml-3 grid grid-cols-[5rem_1fr] gap-2" onFocusCapture={onActivate} onPointerDown={onActivate}>
     <div className="pt-2 text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</div>
@@ -155,13 +205,14 @@ const RewardListEditor = ({ draft, label, onAdd, onActivate, onDraftChange, onRe
       <div className="grid gap-2 border-b border-slate-800 bg-slate-900/60 p-2 lg:grid-cols-[9rem_1fr_7rem_auto]">
         <select className="rounded bg-slate-900 px-2 py-1.5 text-sm" onChange={(event) => onDraftChange({ kind: event.target.value as Reward['kind'], targetId: '' })} value={draft.kind}>
           <option value="skillXp">{t('contribution.reward.skillXp')}</option>
-          <option value="resource">{t('contribution.reward.item')}</option>
+          <option value="item">{t('contribution.reward.item')}</option>
+          <option value="resource">{t('contribution.reward.resource')}</option>
         </select>
         <input
           className="min-w-0 rounded bg-slate-900 px-2 py-1.5 text-sm"
-          list={draft.kind === 'skillXp' ? 'content-skill-ids' : 'content-item-ids'}
+          list={draft.kind === 'skillXp' ? 'content-skill-ids' : draft.kind === 'item' ? 'content-item-ids' : 'content-resource-ids'}
           onChange={(event) => onDraftChange({ targetId: toKebabInput(event.target.value) })}
-          placeholder={draft.kind === 'skillXp' ? t('contribution.placeholder.skillId') : t('contribution.placeholder.itemId')}
+          placeholder={draft.kind === 'skillXp' ? t('contribution.placeholder.skillId') : draft.kind === 'item' ? t('contribution.placeholder.itemId') : t('contribution.placeholder.resourceId')}
           value={draft.targetId}
         />
         <input className="min-w-0 rounded bg-slate-900 px-2 py-1.5 text-sm" min="1" onChange={(event) => onDraftChange({ amount: event.target.value })} type="number" value={draft.amount} />
@@ -187,6 +238,9 @@ export const ContentDataEditor = ({ baseBundle, bundle, draft, onPatch, t }: Con
   const [filter, setFilter] = useState('');
   const [rewardDrafts, setRewardDrafts] = useState<Record<string, RewardDraft>>({});
   const [selectedActionId, setSelectedActionId] = useState<string | null>(null);
+  const actionEditorKeys = useRef<Record<string, string>>({});
+  const resourceEditorKeys = useRef<Record<string, string>>({});
+  const effectEditorKeys = useRef<Record<string, string>>({});
   const [selectedEnemyKey, setSelectedEnemyKey] = useState<string | null>(null);
   const enemyEditorKeys = useRef<Record<string, string>>({});
   const removed = { ...emptyRemoved(), ...(draft.removed ?? {}) };
@@ -196,6 +250,9 @@ export const ContentDataEditor = ({ baseBundle, bundle, draft, onPatch, t }: Con
   const actions = layeredRows(draft.actions, baseBundle.actions, removed.actions, filter);
   const skills = layeredRows(draft.skills, baseBundle.skills, removed.skills, filter);
   const items = layeredRows(draft.items, baseBundle.items ?? [], removed.items, filter);
+  const flags = layeredRows(draft.flags, baseBundle.flags ?? [], removed.flags, filter);
+  const resources = layeredRows(draft.resourceDefinitions, baseBundle.resourceDefinitions ?? [], removed.resources, filter);
+  const effects = layeredRows(draft.effects, baseBundle.effects ?? [], removed.effects, filter);
   const interactionTypes = layeredRows(draft.interactionTypes, baseBundle.interactionTypes ?? [], removed.interactionTypes, filter);
   const enemies = layeredRows(draft.enemies, baseBundle.enemies ?? [], removed.enemies, filter);
   const contributionBundle = {
@@ -247,6 +304,32 @@ export const ContentDataEditor = ({ baseBundle, bundle, draft, onPatch, t }: Con
     promote('items', { ...row.item, ...patch }, row.item.id);
   };
 
+  const updateFlag = (row: LayeredRow<StateFlagDefinition>, patch: Partial<StateFlagDefinition>) => {
+    promote('flags', { ...row.item, ...patch }, row.item.id);
+  };
+
+  const updateResource = (row: LayeredRow<ResourceDefinition>, patch: Partial<ResourceDefinition>) => {
+    const item = { ...row.item, ...patch };
+    onPatch({
+      resourceDefinitions: upsertById(withoutId(draft.resourceDefinitions, row.item.id), item),
+      removed: row.item.id === item.id
+        ? { ...removed, resources: removed.resources.filter((id) => id !== item.id) }
+        : { ...removed, resources: uniqueStrings([...removed.resources.filter((id) => id !== item.id), row.item.id]) },
+    });
+  };
+
+  const removeResource = (row: LayeredRow<ResourceDefinition>) => {
+    if (row.source === 'draft') {
+      onPatch({ resourceDefinitions: removeAt(draft.resourceDefinitions, row.index) });
+    } else {
+      onPatch({ removed: { ...removed, resources: uniqueStrings([...removed.resources, row.item.id]) } });
+    }
+  };
+
+  const updateEffect = (row: LayeredRow<EffectDefinition>, patch: Partial<EffectDefinition>) => {
+    promote('effects', { ...row.item, ...patch }, row.item.id);
+  };
+
   const updateInteractionType = (row: LayeredRow<InteractionTypeDefinition>, patch: Partial<InteractionTypeDefinition>) => {
     promote('interactionTypes', { ...row.item, ...patch }, row.item.id);
   };
@@ -284,6 +367,31 @@ export const ContentDataEditor = ({ baseBundle, bundle, draft, onPatch, t }: Con
   };
 
   const selectedEnemyRow = enemies.find((row) => enemyEditorKey(row.item.id) === selectedEnemyKey) ?? null;
+
+  const actionEditorKey = (actionId: string) => {
+    actionEditorKeys.current[actionId] ??= `action-${Object.keys(actionEditorKeys.current).length + 1}`;
+    return actionEditorKeys.current[actionId];
+  };
+
+  const stableEditorKey = (keys: MutableRefObject<Record<string, string>>, prefix: string, id: string) => {
+    keys.current[id] ??= `${prefix}-${Object.keys(keys.current).length + 1}`;
+    return keys.current[id];
+  };
+
+  const renameStableEditorKey = (keys: MutableRefObject<Record<string, string>>, prefix: string, previousId: string, nextId: string) => {
+    if (previousId !== nextId) keys.current[nextId] = stableEditorKey(keys, prefix, previousId);
+  };
+
+  const renameActionEditorState = (previousId: string, nextId: string) => {
+    if (previousId === nextId) return;
+    actionEditorKeys.current[nextId] = actionEditorKey(previousId);
+    setRewardDrafts((current) => current[previousId]
+      ? {
+          ...Object.fromEntries(Object.entries(current).filter(([ownerId]) => ownerId !== previousId)),
+          [nextId]: current[previousId],
+        }
+      : current);
+  };
 
   const addLocation = () => {
     const allLocationItems = locations.map((row) => row.item);
@@ -342,7 +450,29 @@ export const ContentDataEditor = ({ baseBundle, bundle, draft, onPatch, t }: Con
 
   const addItem = () => {
     const id = uniqueId('new-item', items.map((row) => row.item.id));
-    onPatch({ items: [{ id }, ...draft.items] });
+    onPatch({ items: [{ id, initialQuantity: 0 }, ...draft.items] });
+  };
+
+  const addFlag = () => {
+    const id = uniqueId('new-flag', flags.map((row) => row.item.id));
+    onPatch({ flags: [{ id, initialValue: false }, ...draft.flags] });
+  };
+
+  const addResource = () => {
+    const id = uniqueId('new-resource', resources.map((row) => row.item.id));
+    onPatch({ resourceDefinitions: [{ id, minValue: 0, baseMaxValue: 100, initialValue: 100 }, ...draft.resourceDefinitions] });
+  };
+
+  const addEffect = () => {
+    const id = uniqueId('new-effect', effects.map((row) => row.item.id));
+    onPatch({
+      effects: [{
+        id,
+        resourceId: resources[0]?.item.id ?? '',
+        ratePerMinute: 0,
+        source: 'player',
+      }, ...draft.effects],
+    });
   };
 
   const addInteractionType = () => {
@@ -399,7 +529,9 @@ export const ContentDataEditor = ({ baseBundle, bundle, draft, onPatch, t }: Con
 
     const reward: Reward = rewardDraft.kind === 'skillXp'
       ? { kind: 'skillXp', skillId: rewardDraft.targetId, amount }
-      : { kind: 'resource', resourceId: rewardDraft.targetId, amount };
+      : rewardDraft.kind === 'item'
+        ? { kind: 'item', itemId: rewardDraft.targetId, amount }
+        : { kind: 'resource', resourceId: rewardDraft.targetId, amount };
 
     onUpdate([...rewards, reward]);
     setRewardDrafts((current) => ({
@@ -430,6 +562,10 @@ export const ContentDataEditor = ({ baseBundle, bundle, draft, onPatch, t }: Con
     { path: 'actions.json', json: actions.map((row) => row.item) },
     { path: 'skills.json', json: skills.map((row) => row.item) },
     { path: 'items.json', json: items.map((row) => row.item) },
+    { path: 'flags.json', json: flags.map((row) => row.item) },
+    { path: 'resources.json', json: resources.map((row) => row.item) },
+    { path: 'effects.json', json: effects.map((row) => row.item) },
+    { path: 'universe.json', json: { deathReset: draft.deathReset ?? baseBundle.manifest.deathReset } },
     { path: 'interaction-types.json', json: interactionTypes.map((row) => row.item) },
     { path: 'enemies.json', json: enemies.map((row) => row.item) },
     { path: 'removed.json', json: draft.removed },
@@ -567,13 +703,14 @@ export const ContentDataEditor = ({ baseBundle, bundle, draft, onPatch, t }: Con
                 const selected = selectedActionId === action.id;
 
                 return (
-                  <div className="grid gap-1 rounded bg-slate-950 p-2" key={`action-row-${row.source}-${row.index}`}>
+                  <div className="grid gap-2 rounded bg-slate-950 p-2" key={actionEditorKey(action.id)}>
                     <div className="grid gap-2 lg:grid-cols-[1fr_1fr_7rem_1fr_6rem]">
                       <input
                         aria-label="Action id"
                         className="min-w-0 rounded bg-slate-900 px-2 py-1.5 text-sm"
                         onChange={(event) => {
                           const nextId = toKebabInput(event.target.value);
+                          renameActionEditorState(action.id, nextId);
                           setSelectedActionId(nextId);
                           updateAction(row, { id: nextId });
                         }}
@@ -596,6 +733,39 @@ export const ContentDataEditor = ({ baseBundle, bundle, draft, onPatch, t }: Con
                         {t('contribution.column.remove')}
                       </button>
                     </div>
+                    {selected && (
+                      <section className="grid gap-3 border-l border-slate-800 bg-slate-900/50 p-3 lg:grid-cols-2">
+                        <label className="grid gap-1 text-xs text-slate-400">
+                          <span>{t('contribution.column.maxCompletions')}</span>
+                          <input
+                            aria-label={t('contribution.column.maxCompletions')}
+                            className="rounded bg-slate-900 px-2 py-1.5 text-sm text-slate-100"
+                            min="1"
+                            onChange={(event) => updateAction(row, { maxCompletions: event.target.value ? Number(event.target.value) : undefined })}
+                            type="number"
+                            value={action.maxCompletions ?? ''}
+                          />
+                        </label>
+                        <div />
+                        <JsonEditor<Condition>
+                          label={t('contribution.column.visibleWhen')}
+                          onChange={(visibleWhen) => updateAction(row, { visibleWhen })}
+                          value={action.visibleWhen}
+                        />
+                        <JsonEditor<Condition>
+                          label={t('contribution.column.requirements')}
+                          onChange={(requirements) => updateAction(row, { requirements })}
+                          value={Array.isArray(action.requirements) ? undefined : action.requirements}
+                        />
+                        <div className="lg:col-span-2">
+                          <JsonEditor<ActionResult[]>
+                            label={t('contribution.column.results')}
+                            onChange={(results) => updateAction(row, { results })}
+                            value={action.results}
+                          />
+                        </div>
+                      </section>
+                    )}
                     {(selected || action.rewards.length > 0) && (
                       <RewardListEditor
                         draft={rewardDraft}
@@ -815,8 +985,10 @@ export const ContentDataEditor = ({ baseBundle, bundle, draft, onPatch, t }: Con
               {t('contribution.data.addItem')}
             </button>
           </div>
-          <div className="hidden grid-cols-[1fr_6rem] gap-2 px-2 text-xs font-semibold uppercase tracking-wide text-slate-500 lg:grid">
+          <div className="hidden grid-cols-[1fr_8rem_8rem_6rem] gap-2 px-2 text-xs font-semibold uppercase tracking-wide text-slate-500 lg:grid">
             <span>{t('contribution.column.id')}</span>
+            <span>{t('contribution.column.initialQuantity')}</span>
+            <span>{t('contribution.column.maxQuantity')}</span>
             <span>{t('contribution.column.remove')}</span>
           </div>
           {items.length === 0 ? (
@@ -824,8 +996,10 @@ export const ContentDataEditor = ({ baseBundle, bundle, draft, onPatch, t }: Con
           ) : (
             <div className="grid gap-1">
               {items.map((row) => (
-                <div className="grid gap-2 rounded bg-slate-950 p-2 lg:grid-cols-[1fr_6rem]" key={`${row.source}-${row.index}`}>
+                <div className="grid gap-2 rounded bg-slate-950 p-2 lg:grid-cols-[1fr_8rem_8rem_6rem]" key={`${row.source}-${row.index}`}>
                   <input aria-label="Item id" className="min-w-0 rounded bg-slate-900 px-2 py-1.5 text-sm" onChange={(event) => updateItem(row, { id: toKebabInput(event.target.value) })} value={row.item.id} />
+                  <input aria-label={t('contribution.column.initialQuantity')} className="min-w-0 rounded bg-slate-900 px-2 py-1.5 text-sm" min="0" onChange={(event) => updateItem(row, { initialQuantity: Number(event.target.value) })} type="number" value={row.item.initialQuantity ?? 0} />
+                  <input aria-label={t('contribution.column.maxQuantity')} className="min-w-0 rounded bg-slate-900 px-2 py-1.5 text-sm" min="1" onChange={(event) => updateItem(row, { maxQuantity: event.target.value ? Number(event.target.value) : undefined })} type="number" value={row.item.maxQuantity ?? ''} />
                   <button className={removeButtonClass} onClick={() => removeRow('items', row)} type="button">
                     {t('contribution.column.remove')}
                   </button>
@@ -833,6 +1007,91 @@ export const ContentDataEditor = ({ baseBundle, bundle, draft, onPatch, t }: Con
               ))}
             </div>
           )}
+
+          <div className="mt-4 flex items-center justify-between gap-3 border-t border-slate-700 pt-3">
+            <h3 className="text-sm font-semibold text-slate-100">{t('contribution.data.flags')}</h3>
+            <button className="rounded bg-cyan-400 px-3 py-2 text-sm font-semibold text-slate-950" onClick={addFlag} type="button">
+              {t('contribution.data.addFlag')}
+            </button>
+          </div>
+          {flags.length === 0 ? (
+            <p className="px-2 py-1 text-sm text-slate-500">{t('contribution.data.noFlagChanges')}</p>
+          ) : (
+            <div className="grid gap-1">
+              {flags.map((row) => (
+                <div className="grid gap-2 rounded bg-slate-950 p-2 lg:grid-cols-[1fr_8rem_6rem]" key={`${row.source}-${row.index}`}>
+                  <input aria-label={t('contribution.column.id')} className="min-w-0 rounded bg-slate-900 px-2 py-1.5 text-sm" onChange={(event) => updateFlag(row, { id: toKebabInput(event.target.value) })} value={row.item.id} />
+                  <label className="flex items-center gap-2 text-sm text-slate-300">
+                    <input checked={row.item.initialValue ?? false} onChange={(event) => updateFlag(row, { initialValue: event.target.checked })} type="checkbox" />
+                    {t('contribution.column.initialValue')}
+                  </label>
+                  <button className={removeButtonClass} onClick={() => removeRow('flags', row)} type="button">{t('contribution.column.remove')}</button>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
+
+      {activeTab === 'resources' && (
+        <section className="grid gap-4 rounded border border-slate-700 p-2">
+          <section className="grid gap-2">
+            <div className="flex items-center justify-between gap-3">
+              <h3 className="text-sm font-semibold text-slate-100">{t('contribution.data.resources')}</h3>
+              <button className="rounded bg-cyan-400 px-3 py-2 text-sm font-semibold text-slate-950" onClick={addResource} type="button">{t('contribution.data.addResource')}</button>
+            </div>
+            {resources.map((row) => (
+              <div className="grid gap-2 rounded bg-slate-950 p-2" key={stableEditorKey(resourceEditorKeys, 'resource', row.item.id)}>
+                <div className="grid gap-2 lg:grid-cols-[1fr_7rem_7rem_7rem_6rem]">
+                  <label className="grid gap-1 text-xs text-slate-400"><span>{t('contribution.column.id')}</span><input className="rounded bg-slate-900 px-2 py-1.5 text-sm text-slate-100" onChange={(event) => {
+                    const id = toKebabInput(event.target.value);
+                    renameStableEditorKey(resourceEditorKeys, 'resource', row.item.id, id);
+                    updateResource(row, { id });
+                  }} value={row.item.id} /></label>
+                  <label className="grid gap-1 text-xs text-slate-400"><span>{t('contribution.column.minimum')}</span><NumericEditor min={-1000000} onChange={(minValue) => updateResource(row, { minValue })} value={row.item.minValue} /></label>
+                  <label className="grid gap-1 text-xs text-slate-400"><span>{t('contribution.column.maximum')}</span><NumericEditor onChange={(baseMaxValue) => updateResource(row, { baseMaxValue })} value={row.item.baseMaxValue} /></label>
+                  <label className="grid gap-1 text-xs text-slate-400"><span>{t('contribution.column.initialValue')}</span><NumericEditor min={-1000000} onChange={(initialValue) => updateResource(row, { initialValue })} value={row.item.initialValue ?? row.item.baseMaxValue} /></label>
+                  <button className={`${removeButtonClass} self-end`} onClick={() => removeResource(row)} type="button">{t('contribution.column.remove')}</button>
+                </div>
+                <div className="grid gap-2 lg:grid-cols-2">
+                  <JsonEditor<ResourceBoundaryBehavior[]> label={t('contribution.column.onEmpty')} onChange={(onEmpty) => updateResource(row, { onEmpty })} value={row.item.onEmpty} />
+                  <JsonEditor<ResourceBoundaryBehavior[]> label={t('contribution.column.onFull')} onChange={(onFull) => updateResource(row, { onFull })} value={row.item.onFull} />
+                </div>
+              </div>
+            ))}
+          </section>
+
+          <section className="grid gap-2 border-t border-slate-700 pt-4">
+            <div className="flex items-center justify-between gap-3">
+              <h3 className="text-sm font-semibold text-slate-100">{t('contribution.data.effects')}</h3>
+              <button className="rounded bg-cyan-400 px-3 py-2 text-sm font-semibold text-slate-950" onClick={addEffect} type="button">{t('contribution.data.addEffect')}</button>
+            </div>
+            {effects.map((row) => (
+              <div className="grid gap-2 rounded bg-slate-950 p-2 lg:grid-cols-[1fr_1fr_8rem_8rem_1fr_6rem]" key={stableEditorKey(effectEditorKeys, 'effect', row.item.id)}>
+                <label className="grid gap-1 text-xs text-slate-400"><span>{t('contribution.column.id')}</span><input className="rounded bg-slate-900 px-2 py-1.5 text-sm text-slate-100" onChange={(event) => {
+                  const id = toKebabInput(event.target.value);
+                  renameStableEditorKey(effectEditorKeys, 'effect', row.item.id, id);
+                  updateEffect(row, { id });
+                }} value={row.item.id} /></label>
+                <label className="grid gap-1 text-xs text-slate-400"><span>{t('contribution.column.resource')}</span><input className="rounded bg-slate-900 px-2 py-1.5 text-sm text-slate-100" list="content-resource-ids" onChange={(event) => updateEffect(row, { resourceId: toKebabInput(event.target.value) })} value={row.item.resourceId} /></label>
+                <label className="grid gap-1 text-xs text-slate-400"><span>{t('contribution.column.ratePerMinute')}</span><NumericEditor min={-1000000} onChange={(ratePerMinute) => updateEffect(row, { ratePerMinute })} step={0.1} value={row.item.ratePerMinute} /></label>
+                <label className="grid gap-1 text-xs text-slate-400"><span>{t('contribution.column.source')}</span><select className="rounded bg-slate-900 px-2 py-1.5 text-sm text-slate-100" onChange={(event) => updateEffect(row, { source: event.target.value as EffectDefinition['source'] })} value={row.item.source}>
+                  <option value="player">{t('contribution.effectSource.player')}</option>
+                  <option value="location">{t('contribution.effectSource.location')}</option>
+                </select></label>
+                <label className="grid gap-1 text-xs text-slate-400"><span>{t('contribution.column.location')}</span><input className="rounded bg-slate-900 px-2 py-1.5 text-sm text-slate-100" disabled={row.item.source !== 'location'} list="content-location-ids" onChange={(event) => updateEffect(row, { locationId: toKebabInput(event.target.value) || undefined })} value={row.item.locationId ?? ''} /></label>
+                <button className={`${removeButtonClass} self-end`} onClick={() => removeRow('effects', row)} type="button">{t('contribution.column.remove')}</button>
+              </div>
+            ))}
+          </section>
+
+          <section className="border-t border-slate-700 pt-4">
+            <JsonEditor<DeathResetPolicy>
+              label={t('contribution.column.deathReset')}
+              onChange={(deathReset) => onPatch({ deathReset })}
+              value={draft.deathReset ?? baseBundle.manifest.deathReset}
+            />
+          </section>
         </section>
       )}
 
@@ -861,6 +1120,11 @@ export const ContentDataEditor = ({ baseBundle, bundle, draft, onPatch, t }: Con
       <datalist id="content-item-ids">
         {allItems(bundle, draft).map((item) => (
           <option key={item.id} value={item.id} />
+        ))}
+      </datalist>
+      <datalist id="content-resource-ids">
+        {bundle.resourceDefinitions.map((resource) => (
+          <option key={resource.id} value={resource.id} />
         ))}
       </datalist>
       <datalist id="content-interaction-ids">

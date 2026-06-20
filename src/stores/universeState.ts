@@ -78,6 +78,7 @@ const applyDraft = (bundle: ContentBundle | null) => {
 const normalizeContentBundle = (bundle: ContentBundle): ContentBundle => ({
   ...bundle,
   items: bundle.items ?? [],
+  flags: bundle.flags ?? [],
   resourceDefinitions: bundle.resourceDefinitions ?? [],
   effects: bundle.effects ?? [],
   interactionTypes: bundle.interactionTypes ?? [],

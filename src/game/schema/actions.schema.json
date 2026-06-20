@@ -10,61 +10,202 @@
       "id": { "type": "string", "minLength": 1 },
       "locationId": { "type": "string", "minLength": 1 },
       "durationSeconds": { "type": "number", "exclusiveMinimum": 0 },
+      "maxCompletions": { "type": "integer", "minimum": 1 },
       "enemyId": { "type": "string", "minLength": 1 },
+      "interactionTypeId": { "type": "string", "minLength": 1 },
+      "sourceSkillId": { "type": "string", "minLength": 1 },
+      "targetSkillId": { "type": "string", "minLength": 1 },
+      "health": { "type": "number", "exclusiveMinimum": 0 },
+      "rate": { "type": "number", "minimum": 0 },
       "rewards": {
         "type": "array",
-        "items": {
-          "oneOf": [
-            {
-              "type": "object",
-              "required": ["kind", "skillId", "amount"],
-              "additionalProperties": false,
-              "properties": {
-                "kind": { "const": "skillXp" },
-                "skillId": { "type": "string", "minLength": 1 },
-                "amount": { "type": "number", "exclusiveMinimum": 0 }
-              }
-            },
-            {
-              "type": "object",
-              "required": ["kind", "resourceId", "amount"],
-              "additionalProperties": false,
-              "properties": {
-                "kind": { "const": "resource" },
-                "resourceId": { "type": "string", "minLength": 1 },
-                "amount": { "type": "number", "exclusiveMinimum": 0 }
-              }
-            }
-          ]
-        }
+        "items": { "$ref": "#/$defs/reward" }
       },
-      "requirements": {
+      "results": {
         "type": "array",
-        "items": {
-          "oneOf": [
-            {
-              "type": "object",
-              "required": ["kind", "skillId", "level"],
-              "additionalProperties": false,
-              "properties": {
-                "kind": { "const": "skillLevel" },
-                "skillId": { "type": "string", "minLength": 1 },
-                "level": { "type": "number", "minimum": 1 }
-              }
-            },
-            {
-              "type": "object",
-              "required": ["kind", "resourceId", "amount"],
-              "additionalProperties": false,
-              "properties": {
-                "kind": { "const": "resource" },
-                "resourceId": { "type": "string", "minLength": 1 },
-                "amount": { "type": "number", "exclusiveMinimum": 0 }
-              }
-            }
-          ]
-        }
+        "items": { "$ref": "#/$defs/result" }
+      },
+      "visibleWhen": { "$ref": "#/$defs/condition" },
+      "requirements": {
+        "oneOf": [
+          { "$ref": "#/$defs/condition" },
+          {
+            "type": "array",
+            "items": { "$ref": "#/$defs/legacyRequirement" }
+          }
+        ]
       }
+    }
+  },
+  "$defs": {
+    "comparison": {
+      "enum": ["equal", "at-least", "at-most", "greater-than", "less-than"]
+    },
+    "condition": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["kind", "itemId", "comparison", "value"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "const": "item" },
+            "itemId": { "type": "string", "minLength": 1 },
+            "comparison": { "$ref": "#/$defs/comparison" },
+            "value": { "type": "number" }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["kind", "resourceId", "comparison", "value"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "const": "resource" },
+            "resourceId": { "type": "string", "minLength": 1 },
+            "comparison": { "$ref": "#/$defs/comparison" },
+            "value": { "type": "number" }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["kind", "skillId", "comparison", "value"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "const": "skill-level" },
+            "skillId": { "type": "string", "minLength": 1 },
+            "comparison": { "$ref": "#/$defs/comparison" },
+            "value": { "type": "number" }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["kind", "actionId", "comparison", "value"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "const": "action-completions" },
+            "actionId": { "type": "string", "minLength": 1 },
+            "comparison": { "$ref": "#/$defs/comparison" },
+            "value": { "type": "number" }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["kind", "flagId", "value"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "const": "flag" },
+            "flagId": { "type": "string", "minLength": 1 },
+            "value": { "type": "boolean" }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["kind", "conditions"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "enum": ["all", "any"] },
+            "conditions": { "type": "array", "items": { "$ref": "#/$defs/condition" } }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["kind", "condition"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "const": "not" },
+            "condition": { "$ref": "#/$defs/condition" }
+          }
+        }
+      ]
+    },
+    "reward": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["kind", "skillId", "amount"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "const": "skillXp" },
+            "skillId": { "type": "string", "minLength": 1 },
+            "amount": { "type": "number", "exclusiveMinimum": 0 }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["kind", "resourceId", "amount"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "const": "resource" },
+            "resourceId": { "type": "string", "minLength": 1 },
+            "amount": { "type": "number", "exclusiveMinimum": 0 }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["kind", "itemId", "amount"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "const": "item" },
+            "itemId": { "type": "string", "minLength": 1 },
+            "amount": { "type": "number", "exclusiveMinimum": 0 }
+          }
+        }
+      ]
+    },
+    "result": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["kind", "itemId", "amount"],
+          "additionalProperties": false,
+          "properties": { "kind": { "const": "item" }, "itemId": { "type": "string", "minLength": 1 }, "amount": { "type": "number", "not": { "const": 0 } } }
+        },
+        {
+          "type": "object",
+          "required": ["kind", "resourceId", "amount"],
+          "additionalProperties": false,
+          "properties": { "kind": { "const": "resource" }, "resourceId": { "type": "string", "minLength": 1 }, "amount": { "type": "number", "not": { "const": 0 } } }
+        },
+        {
+          "type": "object",
+          "required": ["kind", "skillId", "amount"],
+          "additionalProperties": false,
+          "properties": { "kind": { "const": "skill-xp" }, "skillId": { "type": "string", "minLength": 1 }, "amount": { "type": "number", "not": { "const": 0 } } }
+        },
+        {
+          "type": "object",
+          "required": ["kind", "flagId", "value"],
+          "additionalProperties": false,
+          "properties": { "kind": { "const": "flag" }, "flagId": { "type": "string", "minLength": 1 }, "value": { "type": "boolean" } }
+        },
+        {
+          "type": "object",
+          "required": ["kind", "locationId"],
+          "additionalProperties": false,
+          "properties": { "kind": { "const": "relocate" }, "locationId": { "type": "string", "minLength": 1 } }
+        },
+        {
+          "type": "object",
+          "required": ["kind", "messageKey"],
+          "additionalProperties": false,
+          "properties": { "kind": { "const": "chat" }, "messageKey": { "type": "string", "minLength": 1 } }
+        }
+      ]
+    },
+    "legacyRequirement": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["kind", "skillId", "level"],
+          "additionalProperties": false,
+          "properties": { "kind": { "const": "skillLevel" }, "skillId": { "type": "string", "minLength": 1 }, "level": { "type": "number", "minimum": 1 } }
+        },
+        {
+          "type": "object",
+          "required": ["kind", "resourceId", "amount"],
+          "additionalProperties": false,
+          "properties": { "kind": { "const": "resource" }, "resourceId": { "type": "string", "minLength": 1 }, "amount": { "type": "number", "exclusiveMinimum": 0 } }
+        }
+      ]
     }
   }
 }

@@ -75,17 +75,18 @@ resolve the larger mystery.
 - Do not introduce the powered alien ziggurat, object ejection, loop boundary,
   accumulated debt, or the eventual 287-year rescue delay in Part 1.
 
-## Required Capability Check
+## Required Capability Configuration
 
-Before treating Part 1 as export-ready, verify support for:
+Part 1 must configure and validate all of the following before export:
 
-- finite inventory and item consumption,
-- finite actions (pick up water bottle (3/5)) tied to locations. 
-- negative/positive resource changes from actions,
-- conditional action visibility or unlocking (should be a general purpose requirement system),
-- action-driven relocation or an equivalent choice-only travel mechanism (should be equivalent to map navigation),
-- death reset with per-state persistence policies,
-- a torn-suit state that can persist across the first reset.
-- verbose log of each GM/Player run that can be reviewed after the fact. 
+- finite inventory and item consumption through item action results,
+- finite pickups through `maxCompletions`,
+- positive and negative resource action results,
+- recursive visibility and start requirements,
+- relocation results for choice-only movement,
+- an explicit `deathReset` persistence policy,
+- a `torn-suit` flag included in `deathReset.preserve.flagIds`,
+- a retained run transcript containing GM updates, player choices and feedback,
+  engine outcomes, resource changes, and death resets.
 
-Report missing support through protocol capability requests.
+Report only additional missing support through protocol capability requests.

@@ -16,7 +16,7 @@
     "locationId": "glasshouse",
     "durationSeconds": 8,
     "rewards": [
-      { "kind": "resource", "resourceId": "moonvine-cutting", "amount": 1 },
+      { "kind": "item", "itemId": "moonvine-cutting", "amount": 1 },
       { "kind": "skillXp", "skillId": "survival", "amount": 2 }
     ]
   }

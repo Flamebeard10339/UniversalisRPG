@@ -8,7 +8,7 @@ import { ContributionMode } from './components/contribution/ContributionMode';
 import { SkillBars } from './components/SkillBars';
 import { TravelStatus } from './components/TravelStatus';
 import { WorldMap } from './components/WorldMap';
-import { actionTitleKey, itemTitleKey, locationTitleKey, skillTitleKey } from './game/contentIds';
+import { actionTitleKey, itemTitleKey, locationTitleKey, resourceTitleKey, skillTitleKey } from './game/contentIds';
 import type { IdleReport, UniversePlayState } from './game/types';
 import { load, save } from './lib/storage';
 import { useDebugState } from './stores/debugState';
@@ -94,6 +94,8 @@ export default function App() {
   const setActionLooping = useGameState((state) => state.setActionLooping);
   const importUniverseState = useGameState((state) => state.importUniverseState);
   const resetUniverse = useGameState((state) => state.resetUniverse);
+  const recordRunEvent = useGameState((state) => state.recordRunEvent);
+  const clearRunLog = useGameState((state) => state.clearRunLog);
   const debugEnabled = useDebugState((state) => state.enabled);
   const debugEntries = useDebugState((state) => state.entries);
   const hydrateDebug = useDebugState((state) => state.hydrate);
@@ -136,9 +138,12 @@ export default function App() {
   const startingLocationId = useMemo(() => (bundle ? getStartingLocationId(bundle) : ''), [bundle]);
   const activeBundleId = bundle?.manifest.id;
   const actionContext = useMemo(() => ({
+    manifest: bundle?.manifest,
     actions: bundle?.actions ?? [],
     skills: bundle?.skills ?? [],
     locations: bundle?.locations ?? [],
+    items: bundle?.items ?? [],
+    flags: bundle?.flags ?? [],
     resourceDefinitions: bundle?.resourceDefinitions ?? [],
     effects: bundle?.effects ?? [],
     interactionTypes: bundle?.interactionTypes ?? [],
@@ -146,8 +151,12 @@ export default function App() {
   }), [bundle]);
   const playState = bundle ? gameStates[bundle.manifest.id] ?? getUniverseState(bundle.manifest.id, startingLocationId) : null;
   const currentLocation = bundle?.locations.find((location) => location.id === playState?.currentLocationId);
+  const logPlayerAction = (event: string, data?: Record<string, unknown>) => {
+    logAction(event, data);
+    if (bundle) recordRunEvent(bundle.manifest.id, 'player', event, data);
+  };
   const beginTravel = (locationId: string) => {
-    logAction('map.nodeClick', {
+    logPlayerAction('map.nodeClick', {
       locationId,
       currentLocationId: playState?.currentLocationId,
       activeTravel: Boolean(playState?.activeTravel),
@@ -164,14 +173,14 @@ export default function App() {
     );
 
     if (edge) {
-      logAction('travel.start', {
+      logPlayerAction('travel.start', {
         edgeId: edge.id,
         fromLocationId: playState.currentLocationId,
         toLocationId: locationId,
       });
       travelTo(bundle.manifest.id, edge, locationId);
     } else {
-      logAction('travel.noEdge', {
+      logPlayerAction('travel.noEdge', {
         fromLocationId: playState.currentLocationId,
         toLocationId: locationId,
       });
@@ -179,12 +188,12 @@ export default function App() {
   };
 
   const setTab = (tab: AppTab) => {
-    logAction('navigation.tab', { tab });
+    logPlayerAction('navigation.tab', { tab });
     setActiveTab(tab);
   };
 
   const setCharacterTopTab = (tab: CharacterTab) => {
-    logAction('navigation.characterTab', { tab });
+    logPlayerAction('navigation.characterTab', { tab });
     setCharacterTab(tab);
   };
 
@@ -243,9 +252,12 @@ export default function App() {
         }
 
         const report = useGameState.getState().resolveIdle(activeBundleId, {
+          manifest: currentBundle.manifest,
           actions: currentBundle.actions,
           skills: currentBundle.skills,
           locations: currentBundle.locations,
+          items: currentBundle.items,
+          flags: currentBundle.flags,
           resourceDefinitions: currentBundle.resourceDefinitions,
           effects: currentBundle.effects,
           interactionTypes: currentBundle.interactionTypes,
@@ -383,7 +395,7 @@ export default function App() {
               bundle={bundle}
               currentLocationId={playState.currentLocationId}
               onCancel={() => {
-                logAction('travel.cancel', { universeId: bundle.manifest.id });
+                logPlayerAction('travel.cancel', { universeId: bundle.manifest.id });
                 cancelTravel(bundle.manifest.id);
               }}
               titleWhenIdle
@@ -433,7 +445,7 @@ export default function App() {
                     bundle={bundle}
                     onSetLooping={(enabled) => setActionLooping(bundle.manifest.id, enabled)}
                     onStartAction={(action) => {
-                      logAction('action.start', {
+                      logPlayerAction('action.start', {
                         actionId: action.id,
                         locationId: action.locationId,
                         universeId: bundle.manifest.id,
@@ -455,7 +467,7 @@ export default function App() {
               <ActionDetails
                 bundle={bundle}
                 onStopAction={() => {
-                  logAction('action.stop', {
+                  logPlayerAction('action.stop', {
                     actionId: playState.activeAction?.actionId ?? '',
                     universeId: bundle.manifest.id,
                   });
@@ -494,13 +506,13 @@ export default function App() {
             {characterTab === 'inventory' && (
               <section className="grid gap-2 rounded border border-slate-800 bg-slate-900 p-4">
                 <h2 className="text-base font-semibold text-slate-100">{t('inventory.title')}</h2>
-                {Object.keys(playState.resources).length === 0 ? (
+                {Object.values(playState.inventory).every((amount) => amount <= 0) ? (
                   <p className="text-sm text-slate-500">{t('inventory.empty')}</p>
                 ) : (
                   <dl className="grid gap-2 text-sm">
-                    {Object.entries(playState.resources).map(([resourceId, amount]) => (
-                      <div className="flex justify-between gap-3 rounded border border-slate-800 bg-slate-950 p-3" key={resourceId}>
-                        <dt className="text-slate-300">{resourceId}</dt>
+                    {Object.entries(playState.inventory).filter(([, amount]) => amount > 0).map(([itemId, amount]) => (
+                      <div className="flex justify-between gap-3 rounded border border-slate-800 bg-slate-950 p-3" key={itemId}>
+                        <dt className="text-slate-300">{t(itemTitleKey(itemId), itemId)}</dt>
                         <dd className="font-semibold text-slate-100">{amount}</dd>
                       </div>
                     ))}
@@ -527,7 +539,7 @@ export default function App() {
                   <select
                     className="w-56 rounded border border-slate-700 bg-slate-900 px-3 py-2 text-sm"
                     onChange={(event) => {
-                      logAction('settings.universe', { universeId: event.target.value });
+                      logPlayerAction('settings.universe', { universeId: event.target.value });
                       void setActiveUniverse(event.target.value);
                     }}
                     value={activeUniverseId}
@@ -631,6 +643,46 @@ export default function App() {
               </div>
 
               <section className="grid gap-3 rounded border border-slate-800 bg-slate-950 p-3">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <h3 className="text-sm font-semibold text-slate-100">{t('settings.runLog.title')}</h3>
+                    <p className="text-xs text-slate-400">{t('settings.runLog.description', { count: playState.runLog.length })}</p>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      className="rounded border border-slate-600 px-3 py-2 text-sm font-semibold text-slate-100"
+                      onClick={() => void navigator.clipboard.writeText(JSON.stringify(playState.runLog, null, 2))}
+                      type="button"
+                    >
+                      {t('settings.runLog.copy')}
+                    </button>
+                    <button
+                      className="rounded border border-rose-700 px-3 py-2 text-sm font-semibold text-rose-100"
+                      onClick={() => clearRunLog(bundle.manifest.id)}
+                      type="button"
+                    >
+                      {t('settings.runLog.clear')}
+                    </button>
+                  </div>
+                </div>
+                {playState.runLog.length === 0 ? (
+                  <p className="text-sm text-slate-500">{t('settings.runLog.empty')}</p>
+                ) : (
+                  <ol className="grid max-h-80 gap-2 overflow-auto text-xs">
+                    {[...playState.runLog].reverse().map((entry) => (
+                      <li className="rounded bg-slate-900 p-3" key={entry.sequence}>
+                        <div className="flex flex-wrap justify-between gap-2 text-slate-300">
+                          <span className="font-semibold text-cyan-200">{entry.runId} / {entry.sequence}. {entry.actor}: {entry.event}</span>
+                          <time>{new Date(entry.createdAt).toLocaleString()}</time>
+                        </div>
+                        {entry.data && <pre className="mt-2 overflow-auto text-slate-400">{JSON.stringify(entry.data, null, 2)}</pre>}
+                      </li>
+                    ))}
+                  </ol>
+                )}
+              </section>
+
+              <section className="grid gap-3 rounded border border-slate-800 bg-slate-950 p-3">
                 <h3 className="text-sm font-semibold text-slate-100">{t('settings.debug.title')}</h3>
                 <label className="flex items-center justify-between gap-4">
                   <span>
@@ -641,7 +693,7 @@ export default function App() {
                     checked={contributionMode}
                     className="h-5 w-5"
                     onChange={(event) => {
-                      logAction('settings.contributionMode', { enabled: event.target.checked });
+                      logPlayerAction('settings.contributionMode', { enabled: event.target.checked });
                       setContributionMode(event.target.checked);
                     }}
                     type="checkbox"
@@ -756,9 +808,11 @@ export default function App() {
                     <ul className="grid gap-1 rounded bg-slate-950 p-3 text-xs text-slate-300">
                       {idleReport.rewards.map((reward, index) => (
                         <li key={`${reward.kind}-${reward.labelId}-${index}`}>
-                          {reward.kind === 'resource'
-                            ? t('welcomeBack.reward.resource', { amount: reward.amount, item: t(itemTitleKey(reward.labelId), reward.labelId) })
-                            : t('welcomeBack.reward.skillXp', { amount: reward.amount, skill: t(skillTitleKey(reward.labelId), reward.labelId) })}
+                          {reward.kind === 'skillXp'
+                            ? t('welcomeBack.reward.skillXp', { amount: reward.amount, skill: t(skillTitleKey(reward.labelId), reward.labelId) })
+                            : reward.kind === 'item'
+                              ? t('welcomeBack.reward.item', { amount: reward.amount, item: t(itemTitleKey(reward.labelId), reward.labelId) })
+                              : t('welcomeBack.reward.resource', { amount: reward.amount, resource: t(resourceTitleKey(reward.labelId), reward.labelId) })}
                         </li>
                       ))}
                     </ul>

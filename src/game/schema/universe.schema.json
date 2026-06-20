@@ -30,6 +30,25 @@
         "minAppVersion": { "type": "string" },
         "maxAppVersion": { "type": "string" }
       }
+    },
+    "deathReset": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "locationId": { "type": "string", "minLength": 1 },
+        "preserve": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "inventoryIds": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+            "resourceIds": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+            "flagIds": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+            "skillXp": { "type": "boolean" },
+            "discoveredLocations": { "type": "boolean" },
+            "actionCompletionIds": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true }
+          }
+        }
+      }
     }
   }
 }

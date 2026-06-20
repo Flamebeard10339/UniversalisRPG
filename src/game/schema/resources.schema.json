@@ -30,6 +30,14 @@
           "required": ["kind"],
           "additionalProperties": false,
           "properties": {
+            "kind": { "const": "death-reset" }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["kind"],
+          "additionalProperties": false,
+          "properties": {
             "kind": { "const": "stop-action" }
           }
         },

@@ -18,6 +18,19 @@ export type UniverseManifest = {
     minAppVersion?: string;
     maxAppVersion?: string;
   };
+  deathReset?: DeathResetPolicy;
+};
+
+export type DeathResetPolicy = {
+  locationId?: string;
+  preserve?: {
+    inventoryIds?: string[];
+    resourceIds?: string[];
+    flagIds?: string[];
+    skillXp?: boolean;
+    discoveredLocations?: boolean;
+    actionCompletionIds?: string[];
+  };
 };
 
 export type LocationNode = {
@@ -47,6 +60,11 @@ export type Reward =
       kind: 'resource';
       resourceId: string;
       amount: number;
+    }
+  | {
+      kind: 'item';
+      itemId: string;
+      amount: number;
     };
 
 export type Requirement =
@@ -61,6 +79,26 @@ export type Requirement =
       amount: number;
     };
 
+export type NumericComparison = 'equal' | 'at-least' | 'at-most' | 'greater-than' | 'less-than';
+
+export type Condition =
+  | { kind: 'item'; itemId: string; comparison: NumericComparison; value: number }
+  | { kind: 'resource'; resourceId: string; comparison: NumericComparison; value: number }
+  | { kind: 'skill-level'; skillId: string; comparison: NumericComparison; value: number }
+  | { kind: 'action-completions'; actionId: string; comparison: NumericComparison; value: number }
+  | { kind: 'flag'; flagId: string; value: boolean }
+  | { kind: 'all'; conditions: Condition[] }
+  | { kind: 'any'; conditions: Condition[] }
+  | { kind: 'not'; condition: Condition };
+
+export type ActionResult =
+  | { kind: 'item'; itemId: string; amount: number }
+  | { kind: 'resource'; resourceId: string; amount: number }
+  | { kind: 'skill-xp'; skillId: string; amount: number }
+  | { kind: 'flag'; flagId: string; value: boolean }
+  | { kind: 'relocate'; locationId: string }
+  | { kind: 'chat'; messageKey: string };
+
 export type GameAction = {
   id: string;
   locationId: string;
@@ -68,7 +106,10 @@ export type GameAction = {
   descriptionKey?: string;
   durationSeconds: number;
   rewards: Reward[];
-  requirements?: Requirement[];
+  requirements?: Requirement[] | Condition;
+  visibleWhen?: Condition;
+  results?: ActionResult[];
+  maxCompletions?: number;
   enemyId?: string;
   interactionTypeId?: string;
   sourceSkillId?: string;
@@ -89,6 +130,13 @@ export type ItemDefinition = {
   id: string;
   titleKey?: string;
   descriptionKey?: string;
+  initialQuantity?: number;
+  maxQuantity?: number;
+};
+
+export type StateFlagDefinition = {
+  id: string;
+  initialValue?: boolean;
 };
 
 export type InteractionTypeDefinition = {
@@ -113,6 +161,9 @@ export type ResourceBoundaryBehavior =
   | {
       kind: 'chat';
       messageKey: string;
+    }
+  | {
+      kind: 'death-reset';
     };
 
 export type ResourceDefinition = {
@@ -157,6 +208,7 @@ export type ContentBundle = {
   actions: GameAction[];
   skills: SkillDefinition[];
   items: ItemDefinition[];
+  flags: StateFlagDefinition[];
   resourceDefinitions: ResourceDefinition[];
   effects: EffectDefinition[];
   interactionTypes: InteractionTypeDefinition[];
@@ -270,6 +322,9 @@ export type ActionResolutionContext = {
   actions: GameAction[];
   skills: SkillDefinition[];
   locations?: LocationNode[];
+  manifest?: UniverseManifest;
+  items?: ItemDefinition[];
+  flags?: StateFlagDefinition[];
   resourceDefinitions?: ResourceDefinition[];
   effects?: EffectDefinition[];
   interactionTypes: InteractionTypeDefinition[];
@@ -284,12 +339,17 @@ export type ResourcePool = {
 
 export type UniversePlayState = {
   universeId: string;
+  runId: string;
   currentLocationId: string;
   discoveredLocationIds: string[];
   activeAction: ActiveAction | null;
   actionProgress: Record<string, ActionProgress>;
   activeTravel: ActiveTravel | null;
   resources: Record<string, number>;
+  inventory: Record<string, number>;
+  flags: Record<string, boolean>;
+  actionCompletions: Record<string, number>;
+  deathCount: number;
   resourcePools: Record<string, ResourcePool>;
   skillXp: Record<string, number>;
   equipmentSkillBonuses: Record<string, SkillEquipmentBonuses>;
@@ -297,7 +357,18 @@ export type UniversePlayState = {
   playerHealth: number;
   playerMaxHealth: number;
   chatMessages: ChatMessage[];
+  runLog: RunLogEntry[];
+  nextRunLogSequence: number;
   lastTickAt: number;
+};
+
+export type RunLogEntry = {
+  runId: string;
+  sequence: number;
+  createdAt: number;
+  actor: 'gm' | 'player' | 'engine';
+  event: string;
+  data?: Record<string, unknown>;
 };
 
 export type ContributionDraft = {
@@ -309,6 +380,10 @@ export type ContributionDraft = {
   actions: GameAction[];
   skills: SkillDefinition[];
   items: ItemDefinition[];
+  flags: StateFlagDefinition[];
+  resourceDefinitions: ResourceDefinition[];
+  effects: EffectDefinition[];
+  deathReset?: DeathResetPolicy;
   interactionTypes: InteractionTypeDefinition[];
   enemies: EnemyDefinition[];
   locales: Record<string, LocaleDictionary>;
@@ -321,6 +396,9 @@ export type ContributionRemovedIds = {
   actions: string[];
   skills: string[];
   items: string[];
+  flags: string[];
+  resources: string[];
+  effects: string[];
   interactionTypes: string[];
   enemies: string[];
 };

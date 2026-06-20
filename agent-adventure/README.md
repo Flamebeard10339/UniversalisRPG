@@ -26,17 +26,20 @@ UniversalisRPG universe without allowing either agent to bypass the game UI.
 The controller is deliberately not a third creative agent. It is ordinary
 program code responsible for sequencing, validation, simulation, and logs.
 
-## Current Engine Boundary
+## Engine Capability Mapping
 
-The existing content model supports locations, travel edges, timed actions,
-localized action narration, positive resource rewards, action requirements,
-and resource effects while an action is active.
+The content model supports the Part 1 primitives directly:
 
-Part 1 also needs mechanics that are not currently expressible in loadable
-content: one-use inventory, consuming or subtracting resources, flags and
-conditional action visibility, action-driven relocation, and explicit
-loop-persistence policies. The GM must identify these as capability requests in
-its private update instead of encoding fake fields or silently weakening the
-scenario. Those capabilities should be added to the engine before a final Part
-1 universe is exported.
+- Items use `initialQuantity` and optional `maxQuantity`.
+- Actions use `maxCompletions` for finite location interactions.
+- Ordered `results` can add or consume items, change resources positively or
+  negatively, set flags, relocate the player, grant skill XP, and emit chat.
+- Recursive `visibleWhen` and `requirements` conditions support items,
+  resources, skills, flags, prior action completions, and `all`/`any`/`not`.
+- `flags.json` defines boolean world state such as `torn-suit`.
+- `universe.json.deathReset` controls which state survives death by id.
+- The Settings run transcript records player, GM, and engine events and can be
+  reviewed or copied as JSON after a run.
 
+Capability requests remain part of the protocol for future mechanics. The GM
+must never invent schema fields.

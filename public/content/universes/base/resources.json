@@ -6,9 +6,7 @@
     "initialValue": 100,
     "maxSkillId": "health",
     "onEmpty": [
-      { "kind": "stop-action" },
-      { "kind": "refill", "value": "max" },
-      { "kind": "relocate", "locationId": "starting-location" },
+      { "kind": "death-reset" },
       { "kind": "chat", "messageKey": "resource.health.empty" }
     ]
   }
