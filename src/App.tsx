@@ -4,12 +4,14 @@ import { ActionDetails } from './components/ActionDetails';
 import { ActionPanel } from './components/ActionPanel';
 import { ChatPanel } from './components/ChatPanel';
 import { CharacterStats } from './components/CharacterStats';
+import { InventoryPanel } from './components/InventoryPanel';
 import { ContributionMode } from './components/contribution/ContributionMode';
 import { SkillBars } from './components/SkillBars';
 import { TravelStatus } from './components/TravelStatus';
 import { WorldMap } from './components/WorldMap';
 import { actionTitleKey, itemTitleKey, locationTitleKey, resourceTitleKey, skillTitleKey } from './game/contentIds';
 import type { IdleReport, UniversePlayState } from './game/types';
+import { getNextResourceBoundaryAt } from './game/resources';
 import { load, save } from './lib/storage';
 import { useDebugState } from './stores/debugState';
 import { useGameState } from './stores/gameState';
@@ -155,6 +157,25 @@ export default function App() {
     logAction(event, data);
     if (bundle) recordRunEvent(bundle.manifest.id, 'player', event, data);
   };
+  const beginAction = (action: (typeof actionContext.actions)[number]) => {
+    if (!bundle) return;
+    logPlayerAction('action.start', {
+      actionId: action.id,
+      locationId: action.locationId,
+      universeId: bundle.manifest.id,
+    });
+    startAction(bundle.manifest.id, action, actionContext);
+  };
+  const nextTimerAt = bundle && playState
+    ? [
+        playState.activeTravel?.completesAt,
+        playState.activeAction?.completesAt,
+        playState.activeAction?.enemyAttackCompletesAt,
+        getNextResourceBoundaryAt(bundle, playState),
+      ]
+        .filter((time): time is number => typeof time === 'number')
+        .sort((a, b) => a - b)[0]
+    : undefined;
   const beginTravel = (locationId: string) => {
     logPlayerAction('map.nodeClick', {
       locationId,
@@ -322,15 +343,7 @@ export default function App() {
       return undefined;
     }
 
-    const nextCompletionAt = [
-      playState.activeTravel?.completesAt,
-      playState.activeAction?.completesAt,
-      playState.activeAction?.enemyAttackCompletesAt,
-    ]
-      .filter((time): time is number => typeof time === 'number')
-      .sort((a, b) => a - b)[0];
-
-    if (!nextCompletionAt) {
+    if (!nextTimerAt) {
       return undefined;
     }
 
@@ -338,28 +351,20 @@ export default function App() {
       () => {
         resolveIdle(bundle.manifest.id, actionContext, { debugEnabled });
       },
-      Math.max(0, nextCompletionAt - Date.now()),
+      Math.max(0, nextTimerAt - Date.now()),
     );
     return () => window.clearTimeout(timeout);
-  }, [actionContext, appActive, bundle, debugEnabled, playState, resolveIdle]);
+  }, [actionContext, appActive, bundle, debugEnabled, nextTimerAt, playState, resolveIdle]);
 
   useLayoutEffect(() => {
     if (!appActive || !bundle || !playState) {
       return;
     }
 
-    const nextCompletionAt = [
-      playState.activeTravel?.completesAt,
-      playState.activeAction?.completesAt,
-      playState.activeAction?.enemyAttackCompletesAt,
-    ]
-      .filter((time): time is number => typeof time === 'number')
-      .sort((a, b) => a - b)[0];
-
-    if (nextCompletionAt && nextCompletionAt <= Date.now()) {
+    if (nextTimerAt && nextTimerAt <= Date.now()) {
       resolveIdle(bundle.manifest.id, actionContext, { debugEnabled });
     }
-  }, [actionContext, appActive, bundle, debugEnabled, playState, resolveIdle]);
+  }, [actionContext, appActive, bundle, debugEnabled, nextTimerAt, playState, resolveIdle]);
 
   if (loading && !bundle) {
     return <main className="grid min-h-screen place-items-center bg-slate-950 text-slate-100">{t('app.loadingUniverse')}</main>;
@@ -438,20 +443,13 @@ export default function App() {
             </div>
 
             {homeTab === 'actions' && (
-              <section className="grid min-h-0 grid-rows-[auto_minmax(0,1fr)] gap-4">
-                <section className="rounded border border-slate-800 bg-slate-900 p-4">
+              <section className="grid min-h-0 grid-rows-2 gap-4">
+                <section className="min-h-0 overflow-auto rounded border border-slate-800 bg-slate-900 p-4" data-testid="home-action-panel">
                   <ActionPanel
                     debugEnabled={debugEnabled}
                     bundle={bundle}
                     onSetLooping={(enabled) => setActionLooping(bundle.manifest.id, enabled)}
-                    onStartAction={(action) => {
-                      logPlayerAction('action.start', {
-                        actionId: action.id,
-                        locationId: action.locationId,
-                        universeId: bundle.manifest.id,
-                      });
-                      startAction(bundle.manifest.id, action, actionContext);
-                    }}
+                    onStartAction={beginAction}
                     playState={playState}
                     t={t}
                   />
@@ -471,7 +469,7 @@ export default function App() {
                     actionId: playState.activeAction?.actionId ?? '',
                     universeId: bundle.manifest.id,
                   });
-                  stopAction(bundle.manifest.id);
+                  stopAction(bundle.manifest.id, actionContext);
                 }}
                 playState={playState}
                 t={t}
@@ -504,21 +502,7 @@ export default function App() {
             )}
 
             {characterTab === 'inventory' && (
-              <section className="grid gap-2 rounded border border-slate-800 bg-slate-900 p-4">
-                <h2 className="text-base font-semibold text-slate-100">{t('inventory.title')}</h2>
-                {Object.values(playState.inventory).every((amount) => amount <= 0) ? (
-                  <p className="text-sm text-slate-500">{t('inventory.empty')}</p>
-                ) : (
-                  <dl className="grid gap-2 text-sm">
-                    {Object.entries(playState.inventory).filter(([, amount]) => amount > 0).map(([itemId, amount]) => (
-                      <div className="flex justify-between gap-3 rounded border border-slate-800 bg-slate-950 p-3" key={itemId}>
-                        <dt className="text-slate-300">{t(itemTitleKey(itemId), itemId)}</dt>
-                        <dd className="font-semibold text-slate-100">{amount}</dd>
-                      </div>
-                    ))}
-                  </dl>
-                )}
-              </section>
+              <InventoryPanel bundle={bundle} onStartAction={beginAction} playState={playState} t={t} />
             )}
 
             {characterTab === 'stats' && (

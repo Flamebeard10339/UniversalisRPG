@@ -16,6 +16,7 @@ export const toKebabInput = (value: string) =>
 
 export const locationTitleKey = (id: string) => `location.${toKebabCase(id)}.title`;
 export const locationDescriptionKey = (id: string) => `location.${toKebabCase(id)}.description`;
+export const locationExhaustedKey = (id: string) => `location.${toKebabCase(id)}.exhausted`;
 export const actionTitleKey = (id: string) => `action.${toKebabCase(id)}.title`;
 export const actionDescriptionKey = (id: string) => `action.${toKebabCase(id)}.description`;
 export const actionSuccessKey = (id: string) => `action.${toKebabCase(id)}.success`;

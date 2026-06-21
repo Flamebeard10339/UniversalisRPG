@@ -1,0 +1,1450 @@
+{
+  "protocolVersion": 1,
+  "runId": "derelict-extant-part-1-2026-06-20T22-33-00-923Z",
+  "turnNumber": 12,
+  "virtualNow": 67000,
+  "rngState": 1731,
+  "randomSeed": 1731,
+  "transcriptSequence": 62,
+  "milestoneId": "establish-life-support-pressure",
+  "status": "continue",
+  "bundle": {
+    "manifest": {
+      "schemaVersion": 1,
+      "id": "derelict-extant-part-1",
+      "titleKey": "universe.derelict-extant-part-1.title",
+      "descriptionKey": "universe.derelict-extant-part-1.description",
+      "version": "0.1.0",
+      "author": "UniversalisRPG GM",
+      "locales": [
+        "en"
+      ],
+      "files": [
+        "locations.json",
+        "actions.json",
+        "locales/en.json"
+      ]
+    },
+    "locations": [
+      {
+        "id": "cryopod",
+        "position": {
+          "x": 0,
+          "y": 0
+        },
+        "starting": true
+      },
+      {
+        "id": "cryobay",
+        "position": {
+          "x": 1,
+          "y": 0
+        }
+      },
+      {
+        "id": "main-intersection",
+        "position": {
+          "x": 2,
+          "y": 0
+        }
+      }
+    ],
+    "edges": [],
+    "actions": [
+      {
+        "id": "open-your-eyes",
+        "locationId": "cryopod",
+        "durationSeconds": 2,
+        "maxCompletions": 1,
+        "rewards": []
+      },
+      {
+        "id": "wipe-frost-from-window",
+        "locationId": "cryopod",
+        "durationSeconds": 3,
+        "maxCompletions": 1,
+        "rewards": []
+      },
+      {
+        "id": "inspect-status-lamp",
+        "locationId": "cryopod",
+        "durationSeconds": 4,
+        "maxCompletions": 1,
+        "rewards": []
+      },
+      {
+        "id": "listen-to-pod-machinery",
+        "locationId": "cryopod",
+        "durationSeconds": 5,
+        "maxCompletions": 1,
+        "rewards": []
+      },
+      {
+        "id": "feel-along-lid-seam",
+        "locationId": "cryopod",
+        "durationSeconds": 6,
+        "maxCompletions": 1,
+        "rewards": []
+      },
+      {
+        "id": "force-pod-lid",
+        "locationId": "cryopod",
+        "durationSeconds": 12,
+        "maxCompletions": 1,
+        "visibleWhen": {
+          "kind": "action-completions",
+          "actionId": "wipe-frost-from-window",
+          "comparison": "at-least",
+          "value": 1
+        },
+        "rewards": [],
+        "results": [
+          {
+            "kind": "relocate",
+            "locationId": "cryobay"
+          }
+        ]
+      },
+      {
+        "id": "work-manual-release",
+        "locationId": "cryopod",
+        "durationSeconds": 6,
+        "maxCompletions": 1,
+        "visibleWhen": {
+          "kind": "action-completions",
+          "actionId": "feel-along-lid-seam",
+          "comparison": "at-least",
+          "value": 1
+        },
+        "rewards": [],
+        "results": [
+          {
+            "kind": "relocate",
+            "locationId": "cryobay"
+          }
+        ]
+      },
+      {
+        "id": "open-emergency-locker",
+        "locationId": "cryobay",
+        "durationSeconds": 8,
+        "maxCompletions": 1,
+        "rewards": [],
+        "results": [
+          {
+            "kind": "item",
+            "itemId": "space-suit",
+            "amount": 1
+          },
+          {
+            "kind": "item",
+            "itemId": "air-canister",
+            "amount": 2
+          },
+          {
+            "kind": "item",
+            "itemId": "water-pouch",
+            "amount": 1
+          },
+          {
+            "kind": "item",
+            "itemId": "food-ration",
+            "amount": 1
+          }
+        ]
+      },
+      {
+        "id": "inspect-cryobay-airlock",
+        "locationId": "cryobay",
+        "durationSeconds": 5,
+        "maxCompletions": 1,
+        "rewards": []
+      },
+      {
+        "id": "watch-the-stars",
+        "locationId": "cryobay",
+        "durationSeconds": 7,
+        "maxCompletions": 1,
+        "rewards": []
+      },
+      {
+        "id": "check-cryobay-console",
+        "locationId": "cryobay",
+        "durationSeconds": 6,
+        "maxCompletions": 1,
+        "rewards": []
+      },
+      {
+        "id": "inspect-other-cryopods",
+        "locationId": "cryobay",
+        "durationSeconds": 7,
+        "maxCompletions": 1,
+        "rewards": [],
+        "results": [
+          {
+            "kind": "flag",
+            "flagId": "cryopods-inspected",
+            "value": true
+          }
+        ]
+      },
+      {
+        "id": "put-on-space-suit",
+        "locationId": "cryobay",
+        "durationSeconds": 8,
+        "maxCompletions": 1,
+        "visibleWhen": {
+          "kind": "all",
+          "conditions": [
+            {
+              "kind": "item",
+              "itemId": "space-suit",
+              "comparison": "at-least",
+              "value": 1
+            },
+            {
+              "kind": "flag",
+              "flagId": "wearing-space-suit",
+              "value": false
+            }
+          ]
+        },
+        "requirements": {
+          "kind": "item",
+          "itemId": "space-suit",
+          "comparison": "at-least",
+          "value": 1
+        },
+        "rewards": [],
+        "results": [
+          {
+            "kind": "flag",
+            "flagId": "wearing-space-suit",
+            "value": true
+          },
+          {
+            "kind": "resource",
+            "resourceId": "air",
+            "amount": 100
+          }
+        ]
+      },
+      {
+        "id": "open-cryobay-airlock",
+        "locationId": "cryobay",
+        "durationSeconds": 6,
+        "maxCompletions": 1,
+        "visibleWhen": {
+          "kind": "all",
+          "conditions": [
+            {
+              "kind": "flag",
+              "flagId": "wearing-space-suit",
+              "value": true
+            },
+            {
+              "kind": "flag",
+              "flagId": "airlock-open",
+              "value": false
+            }
+          ]
+        },
+        "requirements": {
+          "kind": "all",
+          "conditions": [
+            {
+              "kind": "flag",
+              "flagId": "wearing-space-suit",
+              "value": true
+            },
+            {
+              "kind": "resource",
+              "resourceId": "air",
+              "comparison": "greater-than",
+              "value": 5
+            }
+          ]
+        },
+        "rewards": [],
+        "results": [
+          {
+            "kind": "flag",
+            "flagId": "airlock-open",
+            "value": true
+          },
+          {
+            "kind": "resource",
+            "resourceId": "air",
+            "amount": -5
+          }
+        ]
+      },
+      {
+        "id": "replace-air-canister",
+        "locationId": "cryobay",
+        "durationSeconds": 5,
+        "maxCompletions": 2,
+        "visibleWhen": {
+          "kind": "flag",
+          "flagId": "wearing-space-suit",
+          "value": true
+        },
+        "requirements": {
+          "kind": "all",
+          "conditions": [
+            {
+              "kind": "item",
+              "itemId": "air-canister",
+              "comparison": "at-least",
+              "value": 1
+            },
+            {
+              "kind": "resource",
+              "resourceId": "air",
+              "comparison": "at-most",
+              "value": 50
+            }
+          ]
+        },
+        "rewards": [],
+        "results": [
+          {
+            "kind": "item",
+            "itemId": "air-canister",
+            "amount": -1
+          },
+          {
+            "kind": "resource",
+            "resourceId": "air",
+            "amount": 50
+          }
+        ]
+      },
+      {
+        "id": "cross-cryobay-airlock",
+        "locationId": "cryobay",
+        "durationSeconds": 10,
+        "maxCompletions": 1,
+        "visibleWhen": {
+          "kind": "flag",
+          "flagId": "airlock-open",
+          "value": true
+        },
+        "requirements": {
+          "kind": "all",
+          "conditions": [
+            {
+              "kind": "flag",
+              "flagId": "wearing-space-suit",
+              "value": true
+            },
+            {
+              "kind": "resource",
+              "resourceId": "air",
+              "comparison": "greater-than",
+              "value": 10
+            }
+          ]
+        },
+        "rewards": [],
+        "results": [
+          {
+            "kind": "resource",
+            "resourceId": "air",
+            "amount": -10
+          },
+          {
+            "kind": "relocate",
+            "locationId": "main-intersection"
+          }
+        ]
+      },
+      {
+        "id": "read-junction-map",
+        "locationId": "main-intersection",
+        "durationSeconds": 5,
+        "maxCompletions": 1,
+        "requirements": {
+          "kind": "resource",
+          "resourceId": "air",
+          "comparison": "greater-than",
+          "value": 5
+        },
+        "rewards": [],
+        "results": [
+          {
+            "kind": "resource",
+            "resourceId": "air",
+            "amount": -5
+          },
+          {
+            "kind": "flag",
+            "flagId": "junction-map-read",
+            "value": true
+          }
+        ]
+      },
+      {
+        "id": "trace-captain-deck-route",
+        "locationId": "main-intersection",
+        "durationSeconds": 7,
+        "maxCompletions": 1,
+        "requirements": {
+          "kind": "resource",
+          "resourceId": "air",
+          "comparison": "greater-than",
+          "value": 7
+        },
+        "rewards": [],
+        "results": [
+          {
+            "kind": "resource",
+            "resourceId": "air",
+            "amount": -7
+          },
+          {
+            "kind": "flag",
+            "flagId": "captain-route-found",
+            "value": true
+          }
+        ]
+      },
+      {
+        "id": "inspect-intersection-damage",
+        "locationId": "main-intersection",
+        "durationSeconds": 6,
+        "maxCompletions": 1,
+        "requirements": {
+          "kind": "resource",
+          "resourceId": "air",
+          "comparison": "greater-than",
+          "value": 6
+        },
+        "rewards": [],
+        "results": [
+          {
+            "kind": "resource",
+            "resourceId": "air",
+            "amount": -6
+          }
+        ]
+      }
+    ],
+    "skills": [],
+    "items": [
+      {
+        "id": "space-suit",
+        "maxQuantity": 1
+      },
+      {
+        "id": "air-canister",
+        "maxQuantity": 2
+      },
+      {
+        "id": "water-pouch",
+        "maxQuantity": 1
+      },
+      {
+        "id": "food-ration",
+        "maxQuantity": 1
+      }
+    ],
+    "flags": [
+      {
+        "id": "wearing-space-suit",
+        "initialValue": false
+      },
+      {
+        "id": "airlock-open",
+        "initialValue": false
+      },
+      {
+        "id": "cryopods-inspected",
+        "initialValue": false
+      },
+      {
+        "id": "junction-map-read",
+        "initialValue": false
+      },
+      {
+        "id": "captain-route-found",
+        "initialValue": false
+      },
+      {
+        "id": "torn-suit",
+        "initialValue": false
+      }
+    ],
+    "resourceDefinitions": [
+      {
+        "id": "air",
+        "minValue": 0,
+        "baseMaxValue": 100,
+        "initialValue": 0
+      }
+    ],
+    "effects": [],
+    "interactionTypes": [],
+    "enemies": [],
+    "locales": {
+      "en": {
+        "universe.derelict-extant-part-1.title": "Derelict Extant",
+        "universe.derelict-extant-part-1.description": "A survival-horror mystery aboard a ruined vessel.",
+        "location.cryopod.title": "Cryopod",
+        "location.cryopod.description": "Darkness presses against the narrow pressure shell.",
+        "action.open-your-eyes.title": "Open Your Eyes",
+        "action.open-your-eyes.description": "Force your eyes open against the cold.",
+        "action.open-your-eyes.success": "Frost webs the pod window inches from your face. A damaged status lamp pulses beyond it, and the machinery beneath you misses every third beat.",
+        "action.open-your-eyes.failure": "Your eyelids lift briefly. Cold and darkness close over the glimpse.",
+        "action.wipe-frost-from-window.title": "Wipe the Frost",
+        "action.wipe-frost-from-window.description": "Clear a patch of the pod window with your hand.",
+        "action.wipe-frost-from-window.success": "The frost smears beneath your palm. Beyond the glass, loose cables hang over a dark compartment, and a strip of stars shows through a breach in the far wall.",
+        "action.wipe-frost-from-window.failure": "The frost softens but will not clear. Only a few fixed points of light show through it.",
+        "action.inspect-status-lamp.title": "Inspect the Status Lamp",
+        "action.inspect-status-lamp.description": "Study the damaged indicator beside the window.",
+        "action.inspect-status-lamp.success": "Three symbols cycle beneath cracked plastic: temperature failure, memory interface offline, lid actuator fault. The last symbol remains lit longer than the others.",
+        "action.inspect-status-lamp.failure": "The lamp gutters while you watch. Its fractured symbols do not hold long enough to read.",
+        "action.listen-to-pod-machinery.title": "Listen to the Machinery",
+        "action.listen-to-pod-machinery.description": "Hold still and separate the pod's sounds from the vessel around it.",
+        "action.listen-to-pod-machinery.success": "A pump knocks twice, pauses, then fails to catch on the third stroke. Behind it, metal ticks slowly as the hull loses heat.",
+        "action.listen-to-pod-machinery.failure": "Your breathing fills the shell. The machinery beneath it remains uneven and indistinct.",
+        "action.feel-along-lid-seam.title": "Search the Lid Seam",
+        "action.feel-along-lid-seam.description": "Trace the edge of the lid for a latch or manual release.",
+        "action.feel-along-lid-seam.success": "Your fingers find a recessed lever below your left shoulder. Its cover is missing, and frozen lubricant binds the exposed hinge.",
+        "action.feel-along-lid-seam.failure": "The seam is numbingly cold. Your fingers slip before they find purchase.",
+        "location.cryobay.title": "Cryobay",
+        "location.cryobay.description": "Dead cryopods line a compartment open to the star field beyond a fractured outer wall.",
+        "action.force-pod-lid.title": "Force the Pod Lid",
+        "action.force-pod-lid.description": "Brace against the shell and drive the failed lid actuator open.",
+        "action.force-pod-lid.success": "The actuator chatters, catches, and tears free with a metal snap. The lid rises far enough to crawl beneath, spilling cold vapor across the deck.",
+        "action.force-pod-lid.failure": "The lid lifts a finger's width before the actuator slips. Frost closes over the gap.",
+        "action.work-manual-release.title": "Work the Manual Release",
+        "action.work-manual-release.description": "Rock the exposed lever until the frozen hinge gives.",
+        "action.work-manual-release.success": "The lubricant fractures like thin glass. The lever drops, bolts withdraw around the shell, and the lid rises on exhausted springs.",
+        "action.work-manual-release.failure": "The lever moves once, then freezes against its housing. The lid bolts remain seated.",
+        "item.space-suit.title": "Spacesuit",
+        "item.space-suit.description": "A sealed utility suit with an integral air system.",
+        "item.air-canister.title": "Air Canister",
+        "item.air-canister.description": "A compact replacement canister for the suit recycler.",
+        "item.water-pouch.title": "Water Pouch",
+        "item.water-pouch.description": "A small sealed pouch of drinking water.",
+        "item.food-ration.title": "Food Ration",
+        "item.food-ration.description": "A dense emergency ration in foil packaging.",
+        "action.open-emergency-locker.title": "Open the Emergency Locker",
+        "action.open-emergency-locker.description": "Force open the marked locker beside the airlock.",
+        "action.open-emergency-locker.success": "The warped door yields. A folded spacesuit hangs inside beside two air canisters, one water pouch, and a single foil ration.",
+        "action.open-emergency-locker.failure": "The locker door flexes against its bent frame but does not release.",
+        "action.inspect-cryobay-airlock.title": "Inspect the Airlock",
+        "action.inspect-cryobay-airlock.description": "Check the only intact exit and its pressure controls.",
+        "action.inspect-cryobay-airlock.success": "The inner door still seals. Its panel shows vacuum beyond and warns that opening it will vent the cryobay through damaged equalization valves.",
+        "action.inspect-cryobay-airlock.failure": "The pressure display flickers between unreadable values. The inner door remains locked in its frame.",
+        "action.watch-the-stars.title": "Watch the Stars",
+        "action.watch-the-stars.description": "Study the strip of star field visible through the fractured outer wall.",
+        "action.watch-the-stars.success": "The stars drift with the vessel, stop, then retrace several seconds of motion before continuing. Loose frost on the glass does not move with them.",
+        "action.watch-the-stars.failure": "Reflections from the failing status lights cross the glass. The stars remain difficult to track.",
+        "action.check-cryobay-console.title": "Check the Cryobay Console",
+        "action.check-cryobay-console.description": "Wake the room console and review the remaining ship systems.",
+        "action.check-cryobay-console.success": "Most compartments return no signal. A main intersection and the captain's deck still answer, but the route begins beyond the airlock.",
+        "action.check-cryobay-console.failure": "The console wakes to a field of dead compartment indicators, then loses power.",
+        "resource.air.title": "Suit Air",
+        "resource.air.description": "Breathable air remaining in the spacesuit system.",
+        "action.inspect-other-cryopods.title": "Inspect the Other Cryopods",
+        "action.inspect-other-cryopods.description": "Check the remaining pods for occupants, records, or usable equipment.",
+        "action.inspect-other-cryopods.success": "The other lids stand open. Their restraints retain human-shaped pressure marks, but the shells contain only brittle sensor leads and a film of gray dust.",
+        "action.inspect-other-cryopods.failure": "Clouded windows and dead displays conceal whatever remains inside the other pods.",
+        "action.put-on-space-suit.title": "Put On the Spacesuit",
+        "action.put-on-space-suit.description": "Seal the utility suit and start its air system.",
+        "action.put-on-space-suit.success": "The neck ring locks after two attempts. The suit stiffens under pressure, and its air gauge climbs to full.",
+        "action.put-on-space-suit.failure": "The neck seal folds beneath the locking ring. The suit refuses to pressurize.",
+        "action.open-cryobay-airlock.title": "Open the Airlock",
+        "action.open-cryobay-airlock.description": "Cycle the inner door and expose the cryobay to vacuum.",
+        "action.open-cryobay-airlock.success": "The damaged valves open together. Vapor tears across the deck, the room falls silent, and the airlock indicator turns green.",
+        "action.open-cryobay-airlock.failure": "The valves shudder without opening. The inner door remains sealed.",
+        "location.main-intersection.title": "Main Intersection",
+        "location.main-intersection.description": "Four unlit corridors meet beneath a cracked navigation panel. Loose wiring hangs motionless in the vacuum.",
+        "action.replace-air-canister.title": "Replace an Air Canister",
+        "action.replace-air-canister.description": "Consume one spare canister to restore 50 suit air. The gauge must be half empty or lower.",
+        "action.replace-air-canister.success": "The empty canister releases with a hard twist. The replacement seats, and the suit gauge climbs by half its full range.",
+        "action.replace-air-canister.failure": "The coupling refuses to unlock. No air transfers from the spare canister.",
+        "action.cross-cryobay-airlock.title": "Cross the Airlock",
+        "action.cross-cryobay-airlock.description": "Leave the vented cryobay and spend suit air crossing into the dark junction.",
+        "action.cross-cryobay-airlock.success": "Your boots lock and release across the threshold. Ten points vanish from the air gauge before you reach the main intersection.",
+        "action.cross-cryobay-airlock.failure": "The outer hatch binds before you clear it. You retreat into the cryobay with the passage still blocked.",
+        "action.read-junction-map.title": "Read the Junction Map",
+        "action.read-junction-map.description": "Spend suit air tracing the surviving labels on the navigation panel.",
+        "action.read-junction-map.success": "Emergency power reveals four routes: engineering, crew quarters, communications, and the captain's deck. Several intermediate compartments no longer answer.",
+        "action.read-junction-map.failure": "The panel dies before its route labels stabilize.",
+        "action.trace-captain-deck-route.title": "Trace the Captain's Route",
+        "action.trace-captain-deck-route.description": "Follow physical deck markings toward the captain's section while suit air falls.",
+        "action.trace-captain-deck-route.success": "A faded command stripe turns into the starboard corridor. Scraped handprints continue along it where the gravity plating failed.",
+        "action.trace-captain-deck-route.failure": "Broken wall panels interrupt the command stripe before its direction becomes clear.",
+        "action.inspect-intersection-damage.title": "Inspect the Hull Damage",
+        "action.inspect-intersection-damage.description": "Use suit air checking the junction for the cause and direction of the breach.",
+        "action.inspect-intersection-damage.success": "The wall plates bend outward, away from the vessel's center. A narrow impact groove continues toward communications.",
+        "action.inspect-intersection-damage.failure": "Layers of torn insulation conceal the damage beneath the outer plating."
+      }
+    }
+  },
+  "state": {
+    "universeId": "derelict-extant-part-1-2026-06-20T22-33-00-923Z",
+    "runId": "derelict-extant-part-1-2026-06-20T22-33-00-923Z",
+    "currentLocationId": "main-intersection",
+    "discoveredLocationIds": [
+      "cryopod",
+      "cryobay",
+      "main-intersection"
+    ],
+    "activeAction": null,
+    "actionProgress": {
+      "open-your-eyes": {
+        "elapsedMs": 0,
+        "runningSince": null,
+        "targetHealth": null,
+        "enemyAttackStartedAt": null,
+        "enemyAttackCompletesAt": null
+      },
+      "wipe-frost-from-window": {
+        "elapsedMs": 0,
+        "runningSince": null,
+        "targetHealth": null,
+        "enemyAttackStartedAt": null,
+        "enemyAttackCompletesAt": null
+      },
+      "feel-along-lid-seam": {
+        "elapsedMs": 0,
+        "runningSince": null,
+        "targetHealth": null,
+        "enemyAttackStartedAt": null,
+        "enemyAttackCompletesAt": null
+      },
+      "work-manual-release": {
+        "elapsedMs": 0,
+        "runningSince": null,
+        "targetHealth": null,
+        "enemyAttackStartedAt": null,
+        "enemyAttackCompletesAt": null
+      },
+      "open-emergency-locker": {
+        "elapsedMs": 0,
+        "runningSince": null,
+        "targetHealth": null,
+        "enemyAttackStartedAt": null,
+        "enemyAttackCompletesAt": null
+      },
+      "put-on-space-suit": {
+        "elapsedMs": 0,
+        "runningSince": null,
+        "targetHealth": null,
+        "enemyAttackStartedAt": null,
+        "enemyAttackCompletesAt": null
+      },
+      "check-cryobay-console": {
+        "elapsedMs": 0,
+        "runningSince": null,
+        "targetHealth": null,
+        "enemyAttackStartedAt": null,
+        "enemyAttackCompletesAt": null
+      },
+      "inspect-cryobay-airlock": {
+        "elapsedMs": 0,
+        "runningSince": null,
+        "targetHealth": null,
+        "enemyAttackStartedAt": null,
+        "enemyAttackCompletesAt": null
+      },
+      "inspect-other-cryopods": {
+        "elapsedMs": 0,
+        "runningSince": null,
+        "targetHealth": null,
+        "enemyAttackStartedAt": null,
+        "enemyAttackCompletesAt": null
+      },
+      "open-cryobay-airlock": {
+        "elapsedMs": 0,
+        "runningSince": null,
+        "targetHealth": null,
+        "enemyAttackStartedAt": null,
+        "enemyAttackCompletesAt": null
+      },
+      "cross-cryobay-airlock": {
+        "elapsedMs": 0,
+        "runningSince": null,
+        "targetHealth": null,
+        "enemyAttackStartedAt": null,
+        "enemyAttackCompletesAt": null
+      }
+    },
+    "activeTravel": null,
+    "resources": {
+      "space-suit": 1,
+      "air-canister": 2,
+      "water-pouch": 1,
+      "food-ration": 1
+    },
+    "inventory": {
+      "space-suit": 1,
+      "air-canister": 2,
+      "water-pouch": 1,
+      "food-ration": 1
+    },
+    "flags": {
+      "wearing-space-suit": true,
+      "airlock-open": true,
+      "cryopods-inspected": true,
+      "junction-map-read": false,
+      "captain-route-found": false,
+      "torn-suit": false
+    },
+    "actionCompletions": {
+      "open-your-eyes": 1,
+      "wipe-frost-from-window": 1,
+      "feel-along-lid-seam": 1,
+      "work-manual-release": 1,
+      "open-emergency-locker": 1,
+      "put-on-space-suit": 1,
+      "check-cryobay-console": 1,
+      "inspect-cryobay-airlock": 1,
+      "inspect-other-cryopods": 1,
+      "open-cryobay-airlock": 1,
+      "cross-cryobay-airlock": 1
+    },
+    "deathCount": 0,
+    "resourcePools": {
+      "air": {
+        "current": 85,
+        "min": 0,
+        "max": 100
+      }
+    },
+    "skillXp": {},
+    "equipmentSkillBonuses": {},
+    "actionLoopingEnabled": false,
+    "playerHealth": 100,
+    "playerMaxHealth": 100,
+    "chatMessages": [
+      {
+        "author": "system",
+        "key": "action.open-your-eyes.success",
+        "params": {
+          "actionId": "open-your-eyes",
+          "target": "open-your-eyes",
+          "damage": 0
+        },
+        "id": 2000,
+        "count": 1,
+        "createdAt": 2000
+      },
+      {
+        "author": "system",
+        "key": "action.wipe-frost-from-window.success",
+        "params": {
+          "actionId": "wipe-frost-from-window",
+          "target": "wipe-frost-from-window",
+          "damage": 0
+        },
+        "id": 5000,
+        "count": 1,
+        "createdAt": 5000
+      },
+      {
+        "author": "system",
+        "key": "action.feel-along-lid-seam.success",
+        "params": {
+          "actionId": "feel-along-lid-seam",
+          "target": "feel-along-lid-seam",
+          "damage": 0
+        },
+        "id": 11000,
+        "count": 1,
+        "createdAt": 11000
+      },
+      {
+        "author": "system",
+        "key": "action.work-manual-release.success",
+        "params": {
+          "actionId": "work-manual-release",
+          "target": "work-manual-release",
+          "damage": 0
+        },
+        "id": 17000,
+        "count": 1,
+        "createdAt": 17000
+      },
+      {
+        "author": "system",
+        "key": "action.open-emergency-locker.success",
+        "params": {
+          "actionId": "open-emergency-locker",
+          "target": "open-emergency-locker",
+          "damage": 0
+        },
+        "id": 25000,
+        "count": 1,
+        "createdAt": 25000
+      },
+      {
+        "author": "system",
+        "key": "action.put-on-space-suit.success",
+        "params": {
+          "actionId": "put-on-space-suit",
+          "target": "put-on-space-suit",
+          "damage": 0
+        },
+        "id": 33000,
+        "count": 1,
+        "createdAt": 33000
+      },
+      {
+        "author": "system",
+        "key": "action.check-cryobay-console.success",
+        "params": {
+          "actionId": "check-cryobay-console",
+          "target": "check-cryobay-console",
+          "damage": 0
+        },
+        "id": 39000,
+        "count": 1,
+        "createdAt": 39000
+      },
+      {
+        "author": "system",
+        "key": "action.inspect-cryobay-airlock.success",
+        "params": {
+          "actionId": "inspect-cryobay-airlock",
+          "target": "inspect-cryobay-airlock",
+          "damage": 0
+        },
+        "id": 44000,
+        "count": 1,
+        "createdAt": 44000
+      },
+      {
+        "author": "system",
+        "key": "action.inspect-other-cryopods.success",
+        "params": {
+          "actionId": "inspect-other-cryopods",
+          "target": "inspect-other-cryopods",
+          "damage": 0
+        },
+        "id": 51000,
+        "count": 1,
+        "createdAt": 51000
+      },
+      {
+        "author": "system",
+        "key": "action.open-cryobay-airlock.success",
+        "params": {
+          "actionId": "open-cryobay-airlock",
+          "target": "open-cryobay-airlock",
+          "damage": 0
+        },
+        "id": 57000,
+        "count": 1,
+        "createdAt": 57000
+      },
+      {
+        "author": "system",
+        "key": "action.cross-cryobay-airlock.success",
+        "params": {
+          "actionId": "cross-cryobay-airlock",
+          "target": "cross-cryobay-airlock",
+          "damage": 0
+        },
+        "id": 67000,
+        "count": 1,
+        "createdAt": 67000
+      }
+    ],
+    "runLog": [
+      {
+        "runId": "derelict-extant-part-1-2026-06-20T22-33-00-923Z",
+        "sequence": 1,
+        "createdAt": 0,
+        "actor": "player",
+        "event": "player.choice",
+        "data": {
+          "protocolVersion": 1,
+          "type": "player-choice",
+          "turnId": "turn-0001",
+          "actionId": "open-your-eyes",
+          "feedback": {
+            "expectedActions": [],
+            "confusion": null
+          }
+        }
+      },
+      {
+        "runId": "derelict-extant-part-1-2026-06-20T22-33-00-923Z",
+        "sequence": 2,
+        "createdAt": 0,
+        "actor": "player",
+        "event": "action.start",
+        "data": {
+          "actionId": "open-your-eyes",
+          "locationId": "cryopod"
+        }
+      },
+      {
+        "runId": "derelict-extant-part-1-2026-06-20T22-33-00-923Z",
+        "sequence": 3,
+        "createdAt": 2000,
+        "actor": "engine",
+        "event": "action.complete",
+        "data": {
+          "actionId": "open-your-eyes",
+          "completion": 1,
+          "results": [],
+          "rewards": []
+        }
+      },
+      {
+        "runId": "derelict-extant-part-1-2026-06-20T22-33-00-923Z",
+        "sequence": 4,
+        "createdAt": 2000,
+        "actor": "player",
+        "event": "player.choice",
+        "data": {
+          "protocolVersion": 1,
+          "type": "player-choice",
+          "turnId": "turn-0002",
+          "actionId": "wipe-frost-from-window",
+          "feedback": {
+            "expectedActions": [],
+            "confusion": null
+          }
+        }
+      },
+      {
+        "runId": "derelict-extant-part-1-2026-06-20T22-33-00-923Z",
+        "sequence": 5,
+        "createdAt": 2000,
+        "actor": "player",
+        "event": "action.start",
+        "data": {
+          "actionId": "wipe-frost-from-window",
+          "locationId": "cryopod"
+        }
+      },
+      {
+        "runId": "derelict-extant-part-1-2026-06-20T22-33-00-923Z",
+        "sequence": 6,
+        "createdAt": 5000,
+        "actor": "engine",
+        "event": "action.complete",
+        "data": {
+          "actionId": "wipe-frost-from-window",
+          "completion": 1,
+          "results": [],
+          "rewards": []
+        }
+      },
+      {
+        "runId": "derelict-extant-part-1-2026-06-20T22-33-00-923Z",
+        "sequence": 7,
+        "createdAt": 5000,
+        "actor": "player",
+        "event": "player.choice",
+        "data": {
+          "protocolVersion": 1,
+          "type": "player-choice",
+          "turnId": "turn-0003",
+          "actionId": "feel-along-lid-seam",
+          "feedback": {
+            "expectedActions": [],
+            "confusion": null
+          }
+        }
+      },
+      {
+        "runId": "derelict-extant-part-1-2026-06-20T22-33-00-923Z",
+        "sequence": 8,
+        "createdAt": 5000,
+        "actor": "player",
+        "event": "action.start",
+        "data": {
+          "actionId": "feel-along-lid-seam",
+          "locationId": "cryopod"
+        }
+      },
+      {
+        "runId": "derelict-extant-part-1-2026-06-20T22-33-00-923Z",
+        "sequence": 9,
+        "createdAt": 11000,
+        "actor": "engine",
+        "event": "action.complete",
+        "data": {
+          "actionId": "feel-along-lid-seam",
+          "completion": 1,
+          "results": [],
+          "rewards": []
+        }
+      },
+      {
+        "runId": "derelict-extant-part-1-2026-06-20T22-33-00-923Z",
+        "sequence": 10,
+        "createdAt": 11000,
+        "actor": "player",
+        "event": "player.choice",
+        "data": {
+          "protocolVersion": 1,
+          "type": "player-choice",
+          "turnId": "turn-0004",
+          "actionId": "work-manual-release",
+          "feedback": {
+            "expectedActions": [],
+            "confusion": null
+          }
+        }
+      },
+      {
+        "runId": "derelict-extant-part-1-2026-06-20T22-33-00-923Z",
+        "sequence": 11,
+        "createdAt": 11000,
+        "actor": "player",
+        "event": "action.start",
+        "data": {
+          "actionId": "work-manual-release",
+          "locationId": "cryopod"
+        }
+      },
+      {
+        "runId": "derelict-extant-part-1-2026-06-20T22-33-00-923Z",
+        "sequence": 12,
+        "createdAt": 17000,
+        "actor": "engine",
+        "event": "action.complete",
+        "data": {
+          "actionId": "work-manual-release",
+          "completion": 1,
+          "results": [
+            {
+              "kind": "relocate",
+              "locationId": "cryobay"
+            }
+          ],
+          "rewards": []
+        }
+      },
+      {
+        "runId": "derelict-extant-part-1-2026-06-20T22-33-00-923Z",
+        "sequence": 13,
+        "createdAt": 17000,
+        "actor": "player",
+        "event": "player.choice",
+        "data": {
+          "protocolVersion": 1,
+          "type": "player-choice",
+          "turnId": "turn-0005",
+          "actionId": "open-emergency-locker",
+          "feedback": {
+            "expectedActions": [
+              {
+                "label": "Inspect the other cryopods",
+                "reason": "Dead cryopods line the room, so checking them for survivors or useful information seems natural."
+              }
+            ],
+            "confusion": null
+          }
+        }
+      },
+      {
+        "runId": "derelict-extant-part-1-2026-06-20T22-33-00-923Z",
+        "sequence": 14,
+        "createdAt": 17000,
+        "actor": "player",
+        "event": "action.start",
+        "data": {
+          "actionId": "open-emergency-locker",
+          "locationId": "cryobay"
+        }
+      },
+      {
+        "runId": "derelict-extant-part-1-2026-06-20T22-33-00-923Z",
+        "sequence": 15,
+        "createdAt": 25000,
+        "actor": "engine",
+        "event": "action.complete",
+        "data": {
+          "actionId": "open-emergency-locker",
+          "completion": 1,
+          "results": [
+            {
+              "kind": "item",
+              "itemId": "space-suit",
+              "amount": 1
+            },
+            {
+              "kind": "item",
+              "itemId": "air-canister",
+              "amount": 2
+            },
+            {
+              "kind": "item",
+              "itemId": "water-pouch",
+              "amount": 1
+            },
+            {
+              "kind": "item",
+              "itemId": "food-ration",
+              "amount": 1
+            }
+          ],
+          "rewards": []
+        }
+      },
+      {
+        "runId": "derelict-extant-part-1-2026-06-20T22-33-00-923Z",
+        "sequence": 16,
+        "createdAt": 25000,
+        "actor": "player",
+        "event": "player.choice",
+        "data": {
+          "protocolVersion": 1,
+          "type": "player-choice",
+          "turnId": "turn-0006",
+          "actionId": "put-on-space-suit",
+          "feedback": {
+            "expectedActions": [],
+            "confusion": "It is unclear whether putting on the suit will automatically use one of the air canisters."
+          }
+        }
+      },
+      {
+        "runId": "derelict-extant-part-1-2026-06-20T22-33-00-923Z",
+        "sequence": 17,
+        "createdAt": 25000,
+        "actor": "player",
+        "event": "action.start",
+        "data": {
+          "actionId": "put-on-space-suit",
+          "locationId": "cryobay"
+        }
+      },
+      {
+        "runId": "derelict-extant-part-1-2026-06-20T22-33-00-923Z",
+        "sequence": 18,
+        "createdAt": 33000,
+        "actor": "engine",
+        "event": "resource.change",
+        "data": {
+          "resourceId": "air",
+          "requestedDelta": 100,
+          "previous": 0,
+          "current": 100
+        }
+      },
+      {
+        "runId": "derelict-extant-part-1-2026-06-20T22-33-00-923Z",
+        "sequence": 19,
+        "createdAt": 33000,
+        "actor": "engine",
+        "event": "action.complete",
+        "data": {
+          "actionId": "put-on-space-suit",
+          "completion": 1,
+          "results": [
+            {
+              "kind": "flag",
+              "flagId": "wearing-space-suit",
+              "value": true
+            },
+            {
+              "kind": "resource",
+              "resourceId": "air",
+              "amount": 100
+            }
+          ],
+          "rewards": []
+        }
+      },
+      {
+        "runId": "derelict-extant-part-1-2026-06-20T22-33-00-923Z",
+        "sequence": 20,
+        "createdAt": 33000,
+        "actor": "player",
+        "event": "player.choice",
+        "data": {
+          "protocolVersion": 1,
+          "type": "player-choice",
+          "turnId": "turn-0007",
+          "actionId": "check-cryobay-console",
+          "feedback": {
+            "expectedActions": [],
+            "confusion": null
+          }
+        }
+      },
+      {
+        "runId": "derelict-extant-part-1-2026-06-20T22-33-00-923Z",
+        "sequence": 21,
+        "createdAt": 33000,
+        "actor": "player",
+        "event": "action.start",
+        "data": {
+          "actionId": "check-cryobay-console",
+          "locationId": "cryobay"
+        }
+      },
+      {
+        "runId": "derelict-extant-part-1-2026-06-20T22-33-00-923Z",
+        "sequence": 22,
+        "createdAt": 39000,
+        "actor": "engine",
+        "event": "action.complete",
+        "data": {
+          "actionId": "check-cryobay-console",
+          "completion": 1,
+          "results": [],
+          "rewards": []
+        }
+      },
+      {
+        "runId": "derelict-extant-part-1-2026-06-20T22-33-00-923Z",
+        "sequence": 23,
+        "createdAt": 39000,
+        "actor": "player",
+        "event": "player.choice",
+        "data": {
+          "protocolVersion": 1,
+          "type": "player-choice",
+          "turnId": "turn-0008",
+          "actionId": "inspect-cryobay-airlock",
+          "feedback": {
+            "expectedActions": [],
+            "confusion": null
+          }
+        }
+      },
+      {
+        "runId": "derelict-extant-part-1-2026-06-20T22-33-00-923Z",
+        "sequence": 24,
+        "createdAt": 39000,
+        "actor": "player",
+        "event": "action.start",
+        "data": {
+          "actionId": "inspect-cryobay-airlock",
+          "locationId": "cryobay"
+        }
+      },
+      {
+        "runId": "derelict-extant-part-1-2026-06-20T22-33-00-923Z",
+        "sequence": 25,
+        "createdAt": 44000,
+        "actor": "engine",
+        "event": "action.complete",
+        "data": {
+          "actionId": "inspect-cryobay-airlock",
+          "completion": 1,
+          "results": [],
+          "rewards": []
+        }
+      },
+      {
+        "runId": "derelict-extant-part-1-2026-06-20T22-33-00-923Z",
+        "sequence": 26,
+        "createdAt": 44000,
+        "actor": "player",
+        "event": "player.choice",
+        "data": {
+          "protocolVersion": 1,
+          "type": "player-choice",
+          "turnId": "turn-0009",
+          "actionId": "inspect-other-cryopods",
+          "feedback": {
+            "expectedActions": [],
+            "confusion": null
+          }
+        }
+      },
+      {
+        "runId": "derelict-extant-part-1-2026-06-20T22-33-00-923Z",
+        "sequence": 27,
+        "createdAt": 44000,
+        "actor": "player",
+        "event": "action.start",
+        "data": {
+          "actionId": "inspect-other-cryopods",
+          "locationId": "cryobay"
+        }
+      },
+      {
+        "runId": "derelict-extant-part-1-2026-06-20T22-33-00-923Z",
+        "sequence": 28,
+        "createdAt": 51000,
+        "actor": "engine",
+        "event": "action.complete",
+        "data": {
+          "actionId": "inspect-other-cryopods",
+          "completion": 1,
+          "results": [
+            {
+              "kind": "flag",
+              "flagId": "cryopods-inspected",
+              "value": true
+            }
+          ],
+          "rewards": []
+        }
+      },
+      {
+        "runId": "derelict-extant-part-1-2026-06-20T22-33-00-923Z",
+        "sequence": 29,
+        "createdAt": 51000,
+        "actor": "player",
+        "event": "player.choice",
+        "data": {
+          "protocolVersion": 1,
+          "type": "player-choice",
+          "turnId": "turn-0010",
+          "actionId": "open-cryobay-airlock",
+          "feedback": {
+            "expectedActions": [],
+            "confusion": null
+          }
+        }
+      },
+      {
+        "runId": "derelict-extant-part-1-2026-06-20T22-33-00-923Z",
+        "sequence": 30,
+        "createdAt": 51000,
+        "actor": "player",
+        "event": "action.start",
+        "data": {
+          "actionId": "open-cryobay-airlock",
+          "locationId": "cryobay"
+        }
+      },
+      {
+        "runId": "derelict-extant-part-1-2026-06-20T22-33-00-923Z",
+        "sequence": 31,
+        "createdAt": 57000,
+        "actor": "engine",
+        "event": "resource.change",
+        "data": {
+          "resourceId": "air",
+          "requestedDelta": -5,
+          "previous": 100,
+          "current": 95
+        }
+      },
+      {
+        "runId": "derelict-extant-part-1-2026-06-20T22-33-00-923Z",
+        "sequence": 32,
+        "createdAt": 57000,
+        "actor": "engine",
+        "event": "action.complete",
+        "data": {
+          "actionId": "open-cryobay-airlock",
+          "completion": 1,
+          "results": [
+            {
+              "kind": "flag",
+              "flagId": "airlock-open",
+              "value": true
+            },
+            {
+              "kind": "resource",
+              "resourceId": "air",
+              "amount": -5
+            }
+          ],
+          "rewards": []
+        }
+      },
+      {
+        "runId": "derelict-extant-part-1-2026-06-20T22-33-00-923Z",
+        "sequence": 33,
+        "createdAt": 57000,
+        "actor": "player",
+        "event": "player.choice",
+        "data": {
+          "protocolVersion": 1,
+          "type": "player-choice",
+          "turnId": "turn-0011",
+          "actionId": "cross-cryobay-airlock",
+          "feedback": {
+            "expectedActions": [],
+            "confusion": null
+          }
+        }
+      },
+      {
+        "runId": "derelict-extant-part-1-2026-06-20T22-33-00-923Z",
+        "sequence": 34,
+        "createdAt": 57000,
+        "actor": "player",
+        "event": "action.start",
+        "data": {
+          "actionId": "cross-cryobay-airlock",
+          "locationId": "cryobay"
+        }
+      },
+      {
+        "runId": "derelict-extant-part-1-2026-06-20T22-33-00-923Z",
+        "sequence": 35,
+        "createdAt": 67000,
+        "actor": "engine",
+        "event": "resource.change",
+        "data": {
+          "resourceId": "air",
+          "requestedDelta": -10,
+          "previous": 95,
+          "current": 85
+        }
+      },
+      {
+        "runId": "derelict-extant-part-1-2026-06-20T22-33-00-923Z",
+        "sequence": 36,
+        "createdAt": 67000,
+        "actor": "engine",
+        "event": "action.complete",
+        "data": {
+          "actionId": "cross-cryobay-airlock",
+          "completion": 1,
+          "results": [
+            {
+              "kind": "resource",
+              "resourceId": "air",
+              "amount": -10
+            },
+            {
+              "kind": "relocate",
+              "locationId": "main-intersection"
+            }
+          ],
+          "rewards": []
+        }
+      }
+    ],
+    "nextRunLogSequence": 37,
+    "lastTickAt": 67000
+  },
+  "latestOutcome": {
+    "actionId": "cross-cryobay-airlock",
+    "outcome": "completed",
+    "durationMs": 10000,
+    "narration": [
+      "Your boots lock and release across the threshold. Ten points vanish from the air gauge before you reach the main intersection."
+    ],
+    "stateDelta": {
+      "location": {
+        "from": "cryobay",
+        "to": "main-intersection"
+      },
+      "inventory": {},
+      "resources": {
+        "air": {
+          "before": 95,
+          "after": 85
+        }
+      },
+      "flags": {}
+    },
+    "internalBoundaries": 1
+  },
+  "lastPlayerFeedback": {
+    "expectedActions": [],
+    "confusion": null
+  },
+  "validationIssues": []
+}

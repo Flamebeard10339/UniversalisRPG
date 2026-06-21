@@ -1,0 +1,61 @@
+{
+  "protocolVersion": 1,
+  "type": "gm-update",
+  "turnId": "turn-0001",
+  "milestoneId": "wake-in-cryopod",
+  "runStatus": "continue",
+  "operations": [
+    {
+      "op": "set-manifest",
+      "value": {
+        "id": "derelict-extant-part-1",
+        "version": "0.1.0",
+        "author": "UniversalisRPG GM",
+        "defaultLocale": "en",
+        "locales": ["en"],
+        "startingLocationId": "cryopod",
+        "files": {
+          "locations": "locations.json",
+          "edges": "edges.json",
+          "actions": "actions.json",
+          "skills": "skills.json",
+          "items": "items.json",
+          "flags": "flags.json",
+          "resources": "resources.json",
+          "effects": "effects.json",
+          "interactionTypes": "interaction-types.json",
+          "enemies": "enemies.json",
+          "localizations": { "en": "locales/en.json" }
+        },
+        "compatibility": { "protocolVersion": 1 }
+      }
+    },
+    { "op": "upsert", "contentType": "locations", "value": { "id": "cryopod" } },
+    {
+      "op": "upsert",
+      "contentType": "actions",
+      "value": {
+        "id": "open-your-eyes",
+        "locationId": "cryopod",
+        "durationSeconds": 2,
+        "maxCompletions": 1,
+        "rewards": []
+      }
+    },
+    {
+      "op": "localize",
+      "locale": "en",
+      "values": {
+        "universe.derelict-extant-part-1.title": "Derelict Extant",
+        "location.cryopod.title": "Cryopod",
+        "location.cryopod.description": "Darkness presses against the narrow pressure shell.",
+        "action.open-your-eyes.title": "Open Your Eyes",
+        "action.open-your-eyes.description": "Force your eyes open against the cold.",
+        "action.open-your-eyes.success": "Frost webs the pod window inches from your face. A damaged status lamp pulses beyond it, and the machinery beneath you misses every third beat.",
+        "action.open-your-eyes.failure": "Your eyelids lift briefly. Cold and darkness close over the glimpse."
+      }
+    }
+  ],
+  "capabilityRequests": [],
+  "privateNotes": "Bootstrapped the smallest playable draft with a single short waking action; further confinement choices will follow its resolved sensory outcome."
+}

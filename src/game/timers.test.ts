@@ -202,4 +202,37 @@ describe('resolveIdleTimers', () => {
     });
     expect(resolved.state.chatMessages[0].key).toBe('resource.health.empty');
   });
+
+  it('timestamps delayed narration and announces when the last optional action is exhausted', () => {
+    const startedAt = 1_000;
+    const action: GameAction = {
+      id: 'look-around',
+      locationId: 'room',
+      durationSeconds: 1,
+      maxCompletions: 1,
+      role: 'optional',
+      rewards: [],
+      results: [{ kind: 'chat', messageKey: 'event.second-beat', delaySeconds: 1 }],
+    };
+    const context: ActionResolutionContext = {
+      actions: [action],
+      skills: [],
+      locations: [{ id: 'room', position: { x: 0, y: 0 }, starting: true }],
+      interactionTypes: [],
+      enemies: [],
+    };
+    const state = startAction(createInitialPlayState('test-universe', 'room'), action, context, startedAt);
+
+    const resolved = resolveIdleTimers(state, context, {}, startedAt + 1_000);
+    const messages = resolved.state.chatMessages;
+
+    expect(messages.map((message) => message.key)).toEqual([
+      'event.second-beat',
+      'action.look-around.success',
+      'location.room.exhausted',
+    ]);
+    expect(messages.find((message) => message.key === 'action.look-around.success')?.createdAt).toBe(2_000);
+    expect(messages.find((message) => message.key === 'location.room.exhausted')?.createdAt).toBe(2_001);
+    expect(messages.find((message) => message.key === 'event.second-beat')?.createdAt).toBe(3_000);
+  });
 });

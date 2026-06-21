@@ -1,0 +1,8 @@
+[
+  {
+    "id": "suit-air-loss",
+    "resourceId": "air",
+    "ratePerMinute": -105,
+    "source": "player"
+  }
+]

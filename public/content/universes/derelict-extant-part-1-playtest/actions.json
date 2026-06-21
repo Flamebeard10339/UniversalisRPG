@@ -1,0 +1,219 @@
+[
+  {
+    "id": "open-your-eyes",
+    "locationId": "cryopod",
+    "durationSeconds": 2,
+    "maxCompletions": 1,
+    "role": "progression",
+    "rewards": [],
+    "results": [
+      { "kind": "chat", "messageKey": "event.cryopod.memory", "delaySeconds": 1 },
+      { "kind": "chat", "messageKey": "event.cryopod.choices", "delaySeconds": 2 }
+    ]
+  },
+  {
+    "id": "force-pod-lid",
+    "locationId": "cryopod",
+    "durationSeconds": 12,
+    "maxCompletions": 1,
+    "role": "progression",
+    "visibleWhen": { "kind": "action-completions", "actionId": "open-your-eyes", "comparison": "at-least", "value": 1 },
+    "rewards": [],
+    "results": [{ "kind": "relocate", "locationId": "cryobay" }]
+  },
+  {
+    "id": "work-manual-release",
+    "locationId": "cryopod",
+    "durationSeconds": 6,
+    "maxCompletions": 1,
+    "role": "progression",
+    "visibleWhen": { "kind": "action-completions", "actionId": "open-your-eyes", "comparison": "at-least", "value": 1 },
+    "rewards": [],
+    "results": [{ "kind": "relocate", "locationId": "cryobay" }]
+  },
+  {
+    "id": "open-emergency-locker",
+    "locationId": "cryobay",
+    "durationSeconds": 8,
+    "maxCompletions": 1,
+    "role": "progression",
+    "rewards": [],
+    "results": [
+      { "kind": "item", "itemId": "space-suit", "amount": 1 },
+      { "kind": "item", "itemId": "air-canister", "amount": 2 },
+      { "kind": "item", "itemId": "water-pouch", "amount": 1 },
+      { "kind": "item", "itemId": "food-ration", "amount": 1 }
+    ]
+  },
+  {
+    "id": "inspect-cryobay-airlock",
+    "locationId": "cryobay",
+    "durationSeconds": 5,
+    "maxCompletions": 1,
+    "role": "optional",
+    "rewards": []
+  },
+  {
+    "id": "watch-the-stars",
+    "locationId": "cryobay",
+    "durationSeconds": 7,
+    "maxCompletions": 1,
+    "role": "optional",
+    "rewards": []
+  },
+  {
+    "id": "check-cryobay-console",
+    "locationId": "cryobay",
+    "durationSeconds": 6,
+    "maxCompletions": 1,
+    "role": "optional",
+    "rewards": []
+  },
+  {
+    "id": "inspect-other-cryopods",
+    "locationId": "cryobay",
+    "durationSeconds": 7,
+    "maxCompletions": 1,
+    "role": "optional",
+    "rewards": [],
+    "results": [{ "kind": "flag", "flagId": "cryopods-inspected", "value": true }]
+  },
+  {
+    "id": "put-on-space-suit",
+    "locationId": "cryobay",
+    "durationSeconds": 8,
+    "maxCompletions": 1,
+    "role": "progression",
+    "visibleWhen": {
+      "kind": "all",
+      "conditions": [
+        { "kind": "item", "itemId": "space-suit", "comparison": "at-least", "value": 1 },
+        { "kind": "flag", "flagId": "wearing-space-suit", "value": false }
+      ]
+    },
+    "requirements": { "kind": "item", "itemId": "space-suit", "comparison": "at-least", "value": 1 },
+    "rewards": [],
+    "results": [
+      { "kind": "flag", "flagId": "wearing-space-suit", "value": true },
+      { "kind": "resource", "resourceId": "air", "amount": 100 }
+    ]
+  },
+  {
+    "id": "open-cryobay-airlock",
+    "locationId": "cryobay",
+    "durationSeconds": 6,
+    "maxCompletions": 1,
+    "role": "progression",
+    "visibleWhen": {
+      "kind": "all",
+      "conditions": [
+        { "kind": "flag", "flagId": "wearing-space-suit", "value": true },
+        { "kind": "flag", "flagId": "airlock-open", "value": false }
+      ]
+    },
+    "requirements": { "kind": "resource", "resourceId": "air", "comparison": "greater-than", "value": 0 },
+    "rewards": [],
+    "results": [{ "kind": "flag", "flagId": "airlock-open", "value": true }]
+  },
+  {
+    "id": "replace-air-canister",
+    "locationId": "cryobay",
+    "inventoryItemId": "air-canister",
+    "durationSeconds": 5,
+    "maxCompletions": 2,
+    "role": "utility",
+    "visibleWhen": { "kind": "flag", "flagId": "wearing-space-suit", "value": true },
+    "requirements": {
+      "kind": "all",
+      "conditions": [
+        { "kind": "item", "itemId": "air-canister", "comparison": "at-least", "value": 1 },
+        { "kind": "resource", "resourceId": "air", "comparison": "at-most", "value": 50 }
+      ]
+    },
+    "rewards": [],
+    "results": [
+      { "kind": "item", "itemId": "air-canister", "amount": -1 },
+      { "kind": "resource", "resourceId": "air", "amount": 50 }
+    ]
+  },
+  {
+    "id": "cross-cryobay-airlock",
+    "locationId": "cryobay",
+    "durationSeconds": 10,
+    "maxCompletions": 1,
+    "role": "progression",
+    "visibleWhen": { "kind": "flag", "flagId": "airlock-open", "value": true },
+    "requirements": { "kind": "resource", "resourceId": "air", "comparison": "greater-than", "value": 0 },
+    "rewards": [],
+    "results": [{ "kind": "relocate", "locationId": "main-intersection" }]
+  },
+  {
+    "id": "read-junction-map",
+    "locationId": "main-intersection",
+    "durationSeconds": 5,
+    "maxCompletions": 1,
+    "role": "optional",
+    "requirements": { "kind": "resource", "resourceId": "air", "comparison": "greater-than", "value": 0 },
+    "rewards": [],
+    "results": [{ "kind": "flag", "flagId": "junction-map-read", "value": true }]
+  },
+  {
+    "id": "inspect-intersection-damage",
+    "locationId": "main-intersection",
+    "durationSeconds": 6,
+    "maxCompletions": 1,
+    "role": "optional",
+    "requirements": { "kind": "resource", "resourceId": "air", "comparison": "greater-than", "value": 0 },
+    "rewards": []
+  },
+  {
+    "id": "trace-captain-deck-route",
+    "locationId": "main-intersection",
+    "durationSeconds": 7,
+    "maxCompletions": 1,
+    "role": "progression",
+    "requirements": { "kind": "resource", "resourceId": "air", "comparison": "greater-than", "value": 0 },
+    "rewards": [],
+    "results": [{ "kind": "flag", "flagId": "captain-route-found", "value": true }]
+  },
+  {
+    "id": "follow-captain-route",
+    "locationId": "main-intersection",
+    "durationSeconds": 12,
+    "maxCompletions": 1,
+    "role": "progression",
+    "visibleWhen": { "kind": "flag", "flagId": "captain-route-found", "value": true },
+    "requirements": { "kind": "resource", "resourceId": "air", "comparison": "greater-than", "value": 0 },
+    "rewards": [],
+    "results": [{ "kind": "relocate", "locationId": "captain-quarters" }]
+  },
+  {
+    "id": "review-captains-terminal",
+    "locationId": "captain-quarters",
+    "durationSeconds": 8,
+    "maxCompletions": 1,
+    "role": "optional",
+    "requirements": { "kind": "resource", "resourceId": "air", "comparison": "greater-than", "value": 0 },
+    "rewards": []
+  },
+  {
+    "id": "inspect-communications-console",
+    "locationId": "captain-quarters",
+    "durationSeconds": 7,
+    "maxCompletions": 1,
+    "role": "progression",
+    "requirements": { "kind": "resource", "resourceId": "air", "comparison": "greater-than", "value": 0 },
+    "rewards": [],
+    "results": [{ "kind": "flag", "flagId": "communications-ready", "value": true }]
+  },
+  {
+    "id": "send-distress-beacon",
+    "locationId": "captain-quarters",
+    "durationSeconds": 15,
+    "maxCompletions": 1,
+    "role": "progression",
+    "visibleWhen": { "kind": "flag", "flagId": "communications-ready", "value": true },
+    "requirements": { "kind": "resource", "resourceId": "air", "comparison": "greater-than", "value": 0 },
+    "rewards": []
+  }
+]

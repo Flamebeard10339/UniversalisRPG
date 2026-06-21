@@ -12,7 +12,7 @@ type GameStateStore = {
   travelTo: (universeId: string, edge: TravelEdgeDefinition, destinationLocationId: string) => void;
   cancelTravel: (universeId: string) => void;
   startAction: (universeId: string, action: GameAction, context: ActionResolutionContext) => void;
-  stopAction: (universeId: string) => void;
+  stopAction: (universeId: string, context: ActionResolutionContext) => void;
   resolveIdle: (universeId: string, context: ActionResolutionContext, options?: { debugEnabled?: boolean; showReport?: boolean }) => IdleReport;
   setActionLooping: (universeId: string, enabled: boolean) => void;
   markInactive: (universeId: string) => void;
@@ -127,7 +127,9 @@ export const useGameState = create<GameStateStore>((set, get) => ({
         return state;
       }
 
-      const next = startAction(current, action, context);
+      const now = Date.now();
+      const resolved = resolveIdleTimers(current, context, {}, now).state;
+      const next = startAction(resolved, action, context, now);
       void save(storageKey(universeId), next);
 
       return {
@@ -139,7 +141,7 @@ export const useGameState = create<GameStateStore>((set, get) => ({
     });
   },
 
-  stopAction: (universeId) => {
+  stopAction: (universeId, context) => {
     set((state) => {
       const current = state.states[universeId];
 
@@ -148,20 +150,25 @@ export const useGameState = create<GameStateStore>((set, get) => ({
       }
 
       const now = Date.now();
-      const actionId = current.activeAction.actionId;
-      const progress = current.actionProgress[actionId] ?? { elapsedMs: 0, runningSince: current.activeAction.startedAt };
+      const resolved = resolveIdleTimers(current, context, {}, now).state;
+      if (!resolved.activeAction) {
+        void save(storageKey(universeId), resolved);
+        return { states: { ...state.states, [universeId]: resolved } };
+      }
+      const actionId = resolved.activeAction.actionId;
+      const progress = resolved.actionProgress[actionId] ?? { elapsedMs: 0, runningSince: resolved.activeAction.startedAt };
       const next = {
-        ...current,
+        ...resolved,
         activeAction: null,
         actionProgress: {
-          ...current.actionProgress,
+          ...resolved.actionProgress,
           [actionId]: {
             ...progress,
-            elapsedMs: progress.elapsedMs + Math.max(0, now - (progress.runningSince ?? current.activeAction.startedAt)),
+            elapsedMs: progress.elapsedMs + Math.max(0, now - (progress.runningSince ?? resolved.activeAction.startedAt)),
             runningSince: null,
-            targetHealth: current.activeAction.targetHealth ?? progress.targetHealth ?? null,
-            enemyAttackStartedAt: current.activeAction.enemyAttackStartedAt ?? progress.enemyAttackStartedAt ?? null,
-            enemyAttackCompletesAt: current.activeAction.enemyAttackCompletesAt ?? progress.enemyAttackCompletesAt ?? null,
+            targetHealth: resolved.activeAction.targetHealth ?? progress.targetHealth ?? null,
+            enemyAttackStartedAt: resolved.activeAction.enemyAttackStartedAt ?? progress.enemyAttackStartedAt ?? null,
+            enemyAttackCompletesAt: resolved.activeAction.enemyAttackCompletesAt ?? progress.enemyAttackCompletesAt ?? null,
           },
         },
         lastTickAt: now,

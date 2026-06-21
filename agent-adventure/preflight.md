@@ -14,10 +14,18 @@ Complete this checklist before sending the first message to either agent.
 - Crossing the internal-boundary limit ends the run as a controller error. It
   must not be presented as story failure.
 
+## Planning Approval
+
+- Complete a private Markdown plan before turn one.
+- Review and edit the plan before running controller `begin`.
+- Require explicit resource arithmetic for every planned depletion/death path.
+- Verify action requirements permit the final resource boundary to be reached.
+- Define death persistence and the authoritative Part endpoint in advance.
+
 ## Isolation
 
-- The GM receives the scenario brief, protocol, GM instructions, canonical
-  draft, private snapshot, and validation errors.
+- The GM receives the scenario brief, protocol, GM instructions, approved plan,
+  focused content window, compact content index, and validation errors.
 - The player receives only the player instructions, protocol, and current
   public snapshot.
 - The player context contains no story brief, milestone names, GM notes,
@@ -39,6 +47,11 @@ Complete this checklist before sending the first message to either agent.
   accepted batch and after each resolved player action.
 - Ensure at least one enabled action is available before sending a player
   snapshot, unless the run has ended.
+- Normalize the manifest file list from accepted content rather than asking the
+  GM to maintain it manually.
+- Export accepted checkpoints as normal playtest universes for human review.
+- For follow-up runs, initialize from the reviewed universe and include its
+  `PLAYTEST.md` notes in the GM planning snapshot.
 
 ## Instant Resolution
 

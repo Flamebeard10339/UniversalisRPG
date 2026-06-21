@@ -8,6 +8,8 @@ $requiredFiles = @(
   'player-agent.md',
   'protocol.md',
   'preflight.md',
+  'planning-template.md',
+  'authoring-reference.json',
   'scenarios/derelict-extant-part-1.md',
   'schemas/gm-update.schema.json',
   'schemas/player-choice.schema.json'
@@ -51,6 +53,9 @@ foreach ($term in $staleTerms) {
 
 Push-Location $projectRoot
 try {
+  & node --check scripts/agent-run-controller.mjs
+  if ($LASTEXITCODE -ne 0) { throw 'Agent run controller syntax check failed.' }
+
   & npm exec tsc -- --noEmit
   if ($LASTEXITCODE -ne 0) { throw 'TypeScript precheck failed.' }
 

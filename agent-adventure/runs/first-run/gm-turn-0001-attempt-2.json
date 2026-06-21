@@ -1,0 +1,54 @@
+{
+  "protocolVersion": 1,
+  "type": "gm-update",
+  "turnId": "turn-0001",
+  "milestoneId": "wake-in-cryopod",
+  "runStatus": "continue",
+  "operations": [
+    {
+      "op": "set-manifest",
+      "value": {
+        "schemaVersion": 1,
+        "id": "derelict-extant-part-1",
+        "titleKey": "universe.derelict-extant-part-1.title",
+        "descriptionKey": "universe.derelict-extant-part-1.description",
+        "version": "0.1.0",
+        "author": "UniversalisRPG GM",
+        "locales": ["en"],
+        "files": ["locations.json", "actions.json", "locales/en.json"]
+      }
+    },
+    {
+      "op": "upsert",
+      "contentType": "locations",
+      "value": { "id": "cryopod", "position": { "x": 0, "y": 0 }, "starting": true }
+    },
+    {
+      "op": "upsert",
+      "contentType": "actions",
+      "value": {
+        "id": "open-your-eyes",
+        "locationId": "cryopod",
+        "durationSeconds": 2,
+        "maxCompletions": 1,
+        "rewards": []
+      }
+    },
+    {
+      "op": "localize",
+      "locale": "en",
+      "values": {
+        "universe.derelict-extant-part-1.title": "Derelict Extant",
+        "universe.derelict-extant-part-1.description": "A survival-horror mystery aboard a ruined vessel.",
+        "location.cryopod.title": "Cryopod",
+        "location.cryopod.description": "Darkness presses against the narrow pressure shell.",
+        "action.open-your-eyes.title": "Open Your Eyes",
+        "action.open-your-eyes.description": "Force your eyes open against the cold.",
+        "action.open-your-eyes.success": "Frost webs the pod window inches from your face. A damaged status lamp pulses beyond it, and the machinery beneath you misses every third beat.",
+        "action.open-your-eyes.failure": "Your eyelids lift briefly. Cold and darkness close over the glimpse."
+      }
+    }
+  ],
+  "capabilityRequests": [],
+  "privateNotes": "Corrected the rejected manifest and starting-location shapes while preserving the focused opening action."
+}

@@ -1,7 +1,8 @@
 import { effectTitleKey, resourceTitleKey, skillTitleKey } from '../game/contentIds';
-import { getSkillTotals } from '../game/adversarial';
-import type { ContentBundle, EffectDefinition, ResourceDefinition, ResourcePool, UniversePlayState } from '../game/types';
+import type { ContentBundle, UniversePlayState } from '../game/types';
 import type { Translator } from '../game/i18n';
+import { getEffectRatePerMinute, isEffectApplicable, projectResourcePool } from '../game/resources';
+import { useNow } from '../hooks/useNow';
 
 type ResourceStatusProps = {
   bundle: ContentBundle;
@@ -13,46 +14,9 @@ type ResourceStatusProps = {
 const formatNumber = (value: number) =>
   Number.isInteger(value) ? String(value) : value.toFixed(1);
 
-const getPool = (
-  playState: UniversePlayState,
-  resource: ResourceDefinition,
-): ResourcePool => {
-  const existing = playState.resourcePools[resource.id];
-
-  if (existing) {
-    return existing;
-  }
-
-  const max = resource.id === 'health' ? playState.playerMaxHealth : resource.baseMaxValue;
-
-  return {
-    current: resource.id === 'health' ? playState.playerHealth : resource.initialValue ?? max,
-    min: resource.minValue,
-    max,
-  };
-};
-
-const getEffectRate = (
-  bundle: ContentBundle,
-  playState: UniversePlayState,
-  effect: EffectDefinition,
-) => {
-  const skill = effect.rateSkillId
-    ? bundle.skills.find((candidate) => candidate.id === effect.rateSkillId)
-    : undefined;
-
-  return effect.ratePerMinute + (skill ? getSkillTotals(playState, skill).effectiveTotal : 0);
-};
-
-const isEffectApplicable = (
-  playState: UniversePlayState,
-  effect: EffectDefinition,
-) =>
-  effect.source === 'player' ||
-  (effect.source === 'location' && (!effect.locationId || effect.locationId === playState.currentLocationId));
-
 export const ResourceStatus = ({ bundle, playState, showEffects = false, t }: ResourceStatusProps) => {
   const resources = bundle.resourceDefinitions ?? [];
+  const now = useNow(Boolean(playState.activeAction), 100);
 
   return (
     <section className="grid gap-3">
@@ -63,7 +27,7 @@ export const ResourceStatus = ({ bundle, playState, showEffects = false, t }: Re
       ) : (
         <div className="grid gap-3">
           {resources.map((resource) => {
-            const pool = getPool(playState, resource);
+            const pool = projectResourcePool(bundle, playState, resource, now);
             const percent = ((pool.current - pool.min) / Math.max(1, pool.max - pool.min)) * 100;
             const effects = (bundle.effects ?? []).filter((effect) => effect.resourceId === resource.id);
 
@@ -89,7 +53,7 @@ export const ResourceStatus = ({ bundle, playState, showEffects = false, t }: Re
                       <p className="text-slate-500">{t('resources.effects.empty')}</p>
                     ) : (
                       effects.map((effect) => {
-                        const rate = getEffectRate(bundle, playState, effect);
+                        const rate = getEffectRatePerMinute(bundle, playState, effect);
                         const active = Boolean(playState.activeAction) && isEffectApplicable(playState, effect);
 
                         return (

@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "id": "derelict-extant-part-1-playtest",
+  "titleKey": "universe.derelict-extant-part-1-playtest.title",
+  "descriptionKey": "universe.derelict-extant-part-1-playtest.description",
+  "version": "0.1.0",
+  "author": "UniversalisRPG GM",
+  "locales": [
+    "en"
+  ],
+  "files": [
+    "locations.json",
+    "edges.json",
+    "actions.json",
+    "skills.json",
+    "items.json",
+    "flags.json",
+    "resources.json",
+    "effects.json",
+    "interaction-types.json",
+    "enemies.json",
+    "locales/en.json"
+  ]
+}

@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import type { Translator } from '../game/i18n';
 import type { ChatMessage } from '../game/types';
+import { useNow } from '../hooks/useNow';
 
 type ChatPanelProps = {
   messages: ChatMessage[];
@@ -10,6 +11,11 @@ type ChatPanelProps = {
 export const ChatPanel = ({ messages, t }: ChatPanelProps) => {
   const scrollRef = useRef<HTMLDivElement>(null);
   const stickToBottomRef = useRef(true);
+  const hasPendingMessages = messages.some((message) => message.createdAt > Date.now());
+  const now = useNow(hasPendingMessages, 100);
+  const visibleMessages = [...messages]
+    .filter((message) => message.createdAt <= now)
+    .sort((left, right) => left.createdAt - right.createdAt);
 
   useEffect(() => {
     const element = scrollRef.current;
@@ -19,7 +25,7 @@ export const ChatPanel = ({ messages, t }: ChatPanelProps) => {
     }
 
     element.scrollTop = element.scrollHeight;
-  }, [messages.length, messages[messages.length - 1]?.count]);
+  }, [visibleMessages.length, visibleMessages[visibleMessages.length - 1]?.count]);
 
   const updateStickiness = () => {
     const element = scrollRef.current;
@@ -37,13 +43,13 @@ export const ChatPanel = ({ messages, t }: ChatPanelProps) => {
   };
 
   return (
-    <section className="grid min-h-0 rounded border border-slate-800 bg-slate-900 p-4">
+    <section className="grid min-h-0 rounded border border-slate-800 bg-slate-900 p-4" data-testid="chat-panel">
       <div
         className="grid content-start gap-2 overflow-auto rounded bg-slate-950 p-3"
         onScroll={updateStickiness}
         ref={scrollRef}
       >
-        {messages.map((message) => (
+        {visibleMessages.map((message) => (
           <div
             className={`max-w-[85%] rounded px-3 py-2 text-sm ${
               message.author === 'player'

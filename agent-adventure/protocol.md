@@ -6,22 +6,35 @@ The controller is the only authority allowed to mutate runtime state. The GM
 authors choices and content changes. The player selects choices. Agents never
 send free-form messages to each other.
 
+## Pre-Play Planning
+
+Before turn one, the GM receives a private `planning-snapshot` and writes
+`planning.md` in natural Markdown using `planning-template.md`. The
+supervisor may edit this file. Controller `begin` is an explicit approval
+gate; no GM update or player choice is accepted before it.
+
+The plan is design context, not canonical game state. Only validated
+`gm-update` operations mutate the universe. This lets the GM reason about
+pacing, resource arithmetic, death/reset behavior, and endpoints naturally
+while retaining an atomic machine boundary for implementation.
+
 ## Turn Order
 
-1. The controller resolves all due virtual-time events and creates a new turn
+1. The controller loads the approved plan and current milestone.
+2. The controller resolves all due virtual-time events and creates a new turn
    id.
-2. The controller sends the GM one private `gm-snapshot`.
-3. The GM returns one `gm-update`.
-4. The controller applies operations to a draft, validates it, and either:
+3. The controller sends the GM one private `gm-snapshot`.
+4. The GM returns one `gm-update`.
+5. The controller applies operations to a draft, validates it, and either:
    - accepts it and produces a public player snapshot, or
    - rejects it and returns validation errors to the GM without involving the
      player.
-5. Unless `runStatus` ended the run, the controller sends one public
+6. Unless `runStatus` ended the run, the controller sends one public
    `player-snapshot`; the player returns one `player-choice`.
-6. The controller verifies that the action is currently available, stores the
+7. The controller verifies that the action is currently available, stores the
    expectation feedback privately, starts the action, and resolves it with the
    instant virtual clock.
-7. The controller records the complete outcome and repeats from step 1 without
+8. The controller records the complete outcome and repeats from step 1 without
    wall-clock delay.
 
 This ordering prevents stale choices, double execution, fabricated resources,
@@ -83,9 +96,10 @@ The player never receives this object.
 }
 ```
 
-The snapshot also includes the canonical draft or a content revision id plus a
-controller-provided way to inspect that exact revision. The GM must never infer
-state from an older turn.
+The snapshot also includes the approved plan, a focused `contentWindow` for
+the current location, a compact `contentIndex`, and paths to the exact full
+draft and authoring reference. The complete growing draft is intentionally not
+repeated in every turn. The GM must never infer state from an older snapshot.
 
 ## Player Message
 
@@ -165,6 +179,8 @@ Rules:
 - Supported `contentType` values are `locations`, `edges`, `actions`, `skills`,
   `items`, `flags`, `resources`, `effects`, `interaction-types`, and `enemies`.
 - The controller translates operations into the existing split JSON files.
+- The controller derives the manifest `files` list automatically. The GM does
+  not maintain it by hand.
 - `set-manifest` supplies manifest identity, version, author, locales, file
   list, and compatibility. Death persistence remains a separate atomic
   operation so it can be revised without replacing manifest metadata.
@@ -178,6 +194,9 @@ Rules:
 Actions always include `id`, `locationId`, `durationSeconds`, and `rewards`.
 Use `maxCompletions` for finite interactions. A completion increments the
 action's authoritative counter; exhausted actions are no longer available.
+`role` is `optional`, `progression`, or `utility`. An
+`inventoryItemId` action is launched from that item's Inventory entry and is
+not restricted to its authoring location.
 
 Ordered action `results` use only these forms:
 
@@ -188,9 +207,12 @@ Ordered action `results` use only these forms:
   { "kind": "skill-xp", "skillId": "engineering", "amount": 2 },
   { "kind": "flag", "flagId": "torn-suit", "value": true },
   { "kind": "relocate", "locationId": "main-intersection" },
-  { "kind": "chat", "messageKey": "event.bulkhead-opened" }
+  { "kind": "chat", "messageKey": "event.bulkhead-opened", "delaySeconds": 1 }
 ]
 ```
+
+An action may contain at most two delayed chat results; together with its
+completion message this creates a maximum three-message sequence.
 
 Item, resource, and skill-XP amounts may be positive or negative but not zero.
 Item quantities clamp at zero and optional `maxQuantity`. Consumption actions
@@ -217,7 +239,8 @@ Movement chosen through the action-only interface uses a `relocate` result.
 The action duration is its travel time. Resource effects remain active across
 that simulated duration. Do not ask the player to click the map.
 
-Death is triggered by a resource boundary containing `{"kind":"death-reset"}`.
+Death is triggered by a resource definition whose `onEmpty` array contains
+`{"kind":"death-reset"}`.
 The `deathReset.preserve` lists in `universe.json` explicitly name inventory,
 resources, flags, and action counters that survive; skill XP and discovered
 locations use booleans. `torn-suit` must be a declared flag before it can be
@@ -285,6 +308,7 @@ notes, capability requests, or the story brief.
 
 ## Bootstrap and Termination
 
+- Planning approval is required before bootstrap.
 - If no valid playable draft exists, the first GM snapshot sets
   `bootstrapRequired: true`. The first accepted GM update must create a manifest,
   one starting location, required state definitions, English localizations, and

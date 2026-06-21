@@ -10,8 +10,9 @@ import {
   interactionPlayerHitKey,
   interactionPlayerKillKey,
   interactionPlayerMissKey,
+  locationExhaustedKey,
 } from './contentIds';
-import { areActionRequirementsMet, canStartAction, isActionExhausted } from './conditions';
+import { areActionRequirementsMet, canStartAction, isActionExhausted, isActionVisible } from './conditions';
 
 const MAX_CHAT_MESSAGES = 80;
 const MIN_REPORT_INACTIVE_MS = 1000;
@@ -743,7 +744,28 @@ const applyActionResult = (
       activeTravel: null,
     };
   }
-  return appendChatMessage(state, { author: 'system', key: result.messageKey }, now);
+  return appendChatMessage(
+    state,
+    { author: 'system', key: result.messageKey },
+    now + (result.delaySeconds ?? 0) * 1000,
+  );
+};
+
+const appendExhaustedLocationMessage = (
+  state: UniversePlayState,
+  action: GameAction,
+  context: ActionResolutionContext,
+  now: number,
+) => {
+  if (action.role !== 'optional') return state;
+  const hasRemainingOptionalAction = context.actions.some((candidate) =>
+    candidate.locationId === action.locationId
+    && candidate.role === 'optional'
+    && isActionVisible(state, candidate, context)
+    && !isActionExhausted(state, candidate));
+  return hasRemainingOptionalAction
+    ? state
+    : appendChatMessage(state, { author: 'system', key: locationExhaustedKey(action.locationId) }, now + 1);
 };
 
 const applyRewards = (
@@ -1171,8 +1193,11 @@ export const resolveIdleTimers = (
         },
       }, now)
     : completion.state;
+  const completedWithExhaustion = completion.finished
+    ? appendExhaustedLocationMessage(completed, action, context, now)
+    : completed;
   const completedWithDebug = options.debugEnabled
-    ? appendChatMessage(completed, {
+    ? appendChatMessage(completedWithExhaustion, {
         author: 'debug',
         key: 'chat.debug.actionCompleted',
         params: {
@@ -1185,7 +1210,7 @@ export const resolveIdleTimers = (
           now,
         },
       }, now + 1)
-    : completed;
+      : completedWithExhaustion;
   const report: IdleReport = reportEnabled && completion.finished
     ? {
         kind: 'actionCompleted',

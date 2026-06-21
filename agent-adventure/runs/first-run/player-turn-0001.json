@@ -1,0 +1,10 @@
+{
+  "protocolVersion": 1,
+  "type": "player-choice",
+  "turnId": "turn-0001",
+  "actionId": "open-your-eyes",
+  "feedback": {
+    "expectedActions": [],
+    "confusion": null
+  }
+}

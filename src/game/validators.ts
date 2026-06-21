@@ -25,6 +25,7 @@ import {
   itemDescriptionKey,
   itemTitleKey,
   locationDescriptionKey,
+  locationExhaustedKey,
   locationTitleKey,
   effectTitleKey,
   interactionEntityHitKey,
@@ -144,7 +145,9 @@ const validateActionResultShape = (value: unknown) => {
   if (value.kind === 'skill-xp') return hasString(value, 'skillId') && hasNumber(value, 'amount');
   if (value.kind === 'flag') return hasString(value, 'flagId') && typeof value.value === 'boolean';
   if (value.kind === 'relocate') return hasString(value, 'locationId');
-  return value.kind === 'chat' && hasString(value, 'messageKey');
+  return value.kind === 'chat'
+    && hasString(value, 'messageKey')
+    && (value.delaySeconds === undefined || (typeof value.delaySeconds === 'number' && value.delaySeconds >= 0 && value.delaySeconds <= 2));
 };
 
 const validateLegacyRequirementShape = (value: unknown) => isRecord(value)
@@ -158,6 +161,8 @@ const validateActionsShape = (actions: unknown): actions is GameAction[] =>
       isRecord(action) &&
       hasString(action, 'id') &&
       hasString(action, 'locationId') &&
+      (action.inventoryItemId === undefined || typeof action.inventoryItemId === 'string') &&
+      (action.role === undefined || action.role === 'optional' || action.role === 'progression' || action.role === 'utility') &&
       hasNumber(action, 'durationSeconds') &&
       Array.isArray(action.rewards) && action.rewards.every(validateRewardShape) &&
       (action.results === undefined || (Array.isArray(action.results) && action.results.every(validateActionResultShape))) &&
@@ -392,6 +397,12 @@ export const validateContentReferences = (bundle: ContentBundle) => {
     if (!locationIds.has(action.locationId)) {
       issues.push(error(`actions.${action.id}.locationId`, 'validation.unknownLocation', { id: action.locationId }));
     }
+    if (action.inventoryItemId && !itemIds.has(action.inventoryItemId)) {
+      issues.push(error(`actions.${action.id}.inventoryItemId`, 'validation.unknownItem', { id: action.inventoryItemId }));
+    }
+    if ((action.results ?? []).filter((result) => result.kind === 'chat').length > 2) {
+      issues.push(error(`actions.${action.id}.results`, 'validation.tooManySequentialMessages'));
+    }
     if (action.durationSeconds <= 0) {
       issues.push(error(`actions.${action.id}.durationSeconds`, 'validation.actionDurationPositive'));
     }
@@ -606,6 +617,9 @@ export const collectLocalizationKeys = (bundle: ContentBundle) => [
   ...bundle.locations.flatMap((location) => [
     location.titleKey ?? locationTitleKey(location.id),
     location.descriptionKey ?? locationDescriptionKey(location.id),
+    bundle.actions.some((action) => action.locationId === location.id && action.role === 'optional')
+      ? locationExhaustedKey(location.id)
+      : null,
   ]),
   ...bundle.actions.flatMap((action) => [
     action.titleKey ?? actionTitleKey(action.id),

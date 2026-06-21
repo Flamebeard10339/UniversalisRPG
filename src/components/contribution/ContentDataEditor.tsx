@@ -746,7 +746,28 @@ export const ContentDataEditor = ({ baseBundle, bundle, draft, onPatch, t }: Con
                             value={action.maxCompletions ?? ''}
                           />
                         </label>
-                        <div />
+                        <label className="grid gap-1 text-xs text-slate-400">
+                          <span>{t('contribution.column.actionRole')}</span>
+                          <select
+                            className="rounded bg-slate-900 px-2 py-1.5 text-sm text-slate-100"
+                            onChange={(event) => updateAction(row, { role: (event.target.value || undefined) as GameAction['role'] })}
+                            value={action.role ?? ''}
+                          >
+                            <option value="">{t('contribution.actionRole.unset')}</option>
+                            <option value="optional">{t('contribution.actionRole.optional')}</option>
+                            <option value="progression">{t('contribution.actionRole.progression')}</option>
+                            <option value="utility">{t('contribution.actionRole.utility')}</option>
+                          </select>
+                        </label>
+                        <label className="grid gap-1 text-xs text-slate-400 lg:col-span-2">
+                          <span>{t('contribution.column.inventoryItem')}</span>
+                          <input
+                            className="rounded bg-slate-900 px-2 py-1.5 text-sm text-slate-100"
+                            list="content-item-ids"
+                            onChange={(event) => updateAction(row, { inventoryItemId: toKebabInput(event.target.value) || undefined })}
+                            value={action.inventoryItemId ?? ''}
+                          />
+                        </label>
                         <JsonEditor<Condition>
                           label={t('contribution.column.visibleWhen')}
                           onChange={(visibleWhen) => updateAction(row, { visibleWhen })}

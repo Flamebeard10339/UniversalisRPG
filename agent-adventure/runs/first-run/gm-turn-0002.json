@@ -1,0 +1,37 @@
+{
+  "protocolVersion": 1,
+  "type": "gm-update",
+  "turnId": "turn-0002",
+  "milestoneId": "wake-in-cryopod",
+  "runStatus": "continue",
+  "operations": [
+    { "op": "upsert", "contentType": "actions", "value": { "id": "wipe-frost-from-window", "locationId": "cryopod", "durationSeconds": 3, "maxCompletions": 1, "rewards": [] } },
+    { "op": "upsert", "contentType": "actions", "value": { "id": "inspect-status-lamp", "locationId": "cryopod", "durationSeconds": 4, "maxCompletions": 1, "rewards": [] } },
+    { "op": "upsert", "contentType": "actions", "value": { "id": "listen-to-pod-machinery", "locationId": "cryopod", "durationSeconds": 5, "maxCompletions": 1, "rewards": [] } },
+    { "op": "upsert", "contentType": "actions", "value": { "id": "feel-along-lid-seam", "locationId": "cryopod", "durationSeconds": 6, "maxCompletions": 1, "rewards": [] } },
+    {
+      "op": "localize",
+      "locale": "en",
+      "values": {
+        "action.wipe-frost-from-window.title": "Wipe the Frost",
+        "action.wipe-frost-from-window.description": "Clear a patch of the pod window with your hand.",
+        "action.wipe-frost-from-window.success": "The frost smears beneath your palm. Beyond the glass, loose cables hang over a dark compartment, and a strip of stars shows through a breach in the far wall.",
+        "action.wipe-frost-from-window.failure": "The frost softens but will not clear. Only a few fixed points of light show through it.",
+        "action.inspect-status-lamp.title": "Inspect the Status Lamp",
+        "action.inspect-status-lamp.description": "Study the damaged indicator beside the window.",
+        "action.inspect-status-lamp.success": "Three symbols cycle beneath cracked plastic: temperature failure, memory interface offline, lid actuator fault. The last symbol remains lit longer than the others.",
+        "action.inspect-status-lamp.failure": "The lamp gutters while you watch. Its fractured symbols do not hold long enough to read.",
+        "action.listen-to-pod-machinery.title": "Listen to the Machinery",
+        "action.listen-to-pod-machinery.description": "Hold still and separate the pod's sounds from the vessel around it.",
+        "action.listen-to-pod-machinery.success": "A pump knocks twice, pauses, then fails to catch on the third stroke. Behind it, metal ticks slowly as the hull loses heat.",
+        "action.listen-to-pod-machinery.failure": "Your breathing fills the shell. The machinery beneath it remains uneven and indistinct.",
+        "action.feel-along-lid-seam.title": "Search the Lid Seam",
+        "action.feel-along-lid-seam.description": "Trace the edge of the lid for a latch or manual release.",
+        "action.feel-along-lid-seam.success": "Your fingers find a recessed lever below your left shoulder. Its cover is missing, and frozen lubricant binds the exposed hinge.",
+        "action.feel-along-lid-seam.failure": "The seam is numbingly cold. Your fingers slip before they find purchase."
+      }
+    }
+  ],
+  "capabilityRequests": [],
+  "privateNotes": "The opening choices establish the exposed room, pod failure, and a discoverable manual escape route without front-loading an explanation."
+}

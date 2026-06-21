@@ -1,0 +1,7 @@
+{
+  "protocolVersion": 1,
+  "type": "player-choice",
+  "turnId": "turn-0002",
+  "actionId": "wipe-frost-from-window",
+  "feedback": { "expectedActions": [], "confusion": null }
+}

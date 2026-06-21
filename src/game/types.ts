@@ -97,11 +97,13 @@ export type ActionResult =
   | { kind: 'skill-xp'; skillId: string; amount: number }
   | { kind: 'flag'; flagId: string; value: boolean }
   | { kind: 'relocate'; locationId: string }
-  | { kind: 'chat'; messageKey: string };
+  | { kind: 'chat'; messageKey: string; delaySeconds?: number };
 
 export type GameAction = {
   id: string;
   locationId: string;
+  inventoryItemId?: string;
+  role?: 'optional' | 'progression' | 'utility';
   titleKey?: string;
   descriptionKey?: string;
   durationSeconds: number;

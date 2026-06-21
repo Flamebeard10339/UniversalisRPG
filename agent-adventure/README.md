@@ -9,21 +9,42 @@ UniversalisRPG universe without allowing either agent to bypass the game UI.
 - `player-agent.md`: reusable system instructions for the player agent.
 - `protocol.md`: controller-owned turn order and JSON message envelopes.
 - `preflight.md`: required controller settings and first-run checklist.
+- `planning-template.md`: editable natural-language design pass completed
+  before turn one.
+- `authoring-reference.json`: compact exact field reference for GM updates.
+- `first-run-retrospective.md`: assessment of the first supervised run and
+  the workflow changes made before run two.
 - `schemas/*.schema.json`: strict validators for both agent response envelopes.
 - `scenarios/derelict-extant-part-1.md`: the private Part 1 brief supplied only
   to the GM.
 
 ## Recommended Session
 
-1. Give `gm-agent.md`, `protocol.md`, the current universe draft, and the
-   scenario brief to the GM.
-2. Give `player-agent.md`, `protocol.md`, and only the public player snapshot to
+1. Run controller `init`, then give the GM its planning snapshot, the scenario
+   brief, and `planning-template.md`.
+2. Save the GM's Markdown plan with `set-plan`. Review or edit
+   `planning.md`, then explicitly run `begin`.
+3. Give the GM `gm-agent.md`, `protocol.md`, the compact GM snapshot, and
+   `authoring-reference.json`.
+4. Give `player-agent.md`, `protocol.md`, and only the public player snapshot to
    the player.
-3. Use a deterministic controller to validate messages, execute selected
+5. Use a deterministic controller to validate messages, execute selected
    actions, advance resources, and maintain the canonical draft.
-4. Retain the player's expectation feedback in the session transcript. Use it
+6. Retain the player's expectation feedback in the session transcript. Use it
    to revise the universe after the run.
-5. Export only after UniversalisRPG validation reports no errors.
+7. Run controller `export` after any accepted turn to produce a normal,
+   selectable universe for human playtesting. Incomplete exports must be
+   labeled as playtests.
+8. Record human notes in the exported universe's `PLAYTEST.md`. After editing
+   its JSON directly or through the contribution workflow, use
+   `init-from-universe <run-directory> <universe-id>` for the next paired run.
+   The next planning snapshot includes those notes and the edited content index.
+
+Per-turn mutation remains structured JSON because atomic validation prevented
+state corruption during the first run. Story planning is Markdown, and GM
+snapshots contain only current-location content, state definitions, identity
+indexes, and paths to the full draft. This keeps the creative context natural
+without weakening the engine boundary.
 
 The controller is deliberately not a third creative agent. It is ordinary
 program code responsible for sequencing, validation, simulation, and logs.

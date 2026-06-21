@@ -1,0 +1,72 @@
+{
+  "protocolVersion": 1,
+  "type": "player-snapshot",
+  "turnId": "turn-0012",
+  "virtualNow": 67000,
+  "location": {
+    "id": "main-intersection",
+    "title": "Main Intersection",
+    "description": "Four unlit corridors meet beneath a cracked navigation panel. Loose wiring hangs motionless in the vacuum."
+  },
+  "narration": [
+    "Your boots lock and release across the threshold. Ten points vanish from the air gauge before you reach the main intersection."
+  ],
+  "resources": [
+    {
+      "id": "air",
+      "label": "Suit Air",
+      "current": 85,
+      "min": 0,
+      "max": 100,
+      "ratePerMinute": 0
+    }
+  ],
+  "inventory": [
+    {
+      "id": "space-suit",
+      "label": "Spacesuit",
+      "quantity": 1
+    },
+    {
+      "id": "air-canister",
+      "label": "Air Canister",
+      "quantity": 2
+    },
+    {
+      "id": "water-pouch",
+      "label": "Water Pouch",
+      "quantity": 1
+    },
+    {
+      "id": "food-ration",
+      "label": "Food Ration",
+      "quantity": 1
+    }
+  ],
+  "actions": [
+    {
+      "id": "read-junction-map",
+      "title": "Read the Junction Map",
+      "description": "Spend suit air tracing the surviving labels on the navigation panel.",
+      "durationSeconds": 5,
+      "remainingCompletions": 1,
+      "enabled": true
+    },
+    {
+      "id": "trace-captain-deck-route",
+      "title": "Trace the Captain's Route",
+      "description": "Follow physical deck markings toward the captain's section while suit air falls.",
+      "durationSeconds": 7,
+      "remainingCompletions": 1,
+      "enabled": true
+    },
+    {
+      "id": "inspect-intersection-damage",
+      "title": "Inspect the Hull Damage",
+      "description": "Use suit air checking the junction for the cause and direction of the breach.",
+      "durationSeconds": 6,
+      "remainingCompletions": 1,
+      "enabled": true
+    }
+  ]
+}

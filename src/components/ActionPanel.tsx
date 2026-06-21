@@ -29,7 +29,10 @@ export const ActionPanel = ({ bundle, debugEnabled, onSetLooping, playState, onS
     interactionTypes: bundle.interactionTypes,
     enemies: bundle.enemies,
   };
-  const actions = bundle.actions.filter((action) => action.locationId === playState.currentLocationId && isActionVisible(playState, action, actionContext));
+  const actions = bundle.actions.filter((action) =>
+    !action.inventoryItemId
+    && action.locationId === playState.currentLocationId
+    && isActionVisible(playState, action, actionContext));
   const activeAction = actions.find((action) => action.id === playState.activeAction?.actionId);
   const getActionProgress = (action: GameAction) => {
     const progress = playState.actionProgress[action.id];
@@ -88,7 +91,7 @@ export const ActionPanel = ({ bundle, debugEnabled, onSetLooping, playState, onS
               <span className="relative block text-sm font-semibold text-slate-100">{t(action.titleKey ?? actionTitleKey(action.id))}</span>
               <span className="relative mt-1 block text-xs text-slate-400">{t(action.descriptionKey ?? actionDescriptionKey(action.id))}</span>
               <span className="relative mt-2 block text-xs text-cyan-200">{action.durationSeconds}s</span>
-              {remaining !== null && (
+              {remaining !== null && (action.maxCompletions ?? 0) > 1 && (
                 <span className="relative mt-1 block text-xs text-slate-300">
                   {t('actionPanel.remaining', { remaining, total: action.maxCompletions ?? 0 })}
                 </span>

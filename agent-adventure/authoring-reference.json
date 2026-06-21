@@ -1,0 +1,81 @@
+{
+  "manifest": {
+    "schemaVersion": 1,
+    "id": "universe-id",
+    "titleKey": "universe.universe-id.title",
+    "descriptionKey": "universe.universe-id.description",
+    "version": "0.1.0",
+    "author": "Author",
+    "locales": ["en"],
+    "files": [],
+    "compatibility": {
+      "minAppVersion": "0.1.0"
+    }
+  },
+  "location": {
+    "id": "location-id",
+    "position": { "x": 0, "y": 0 },
+    "starting": false
+  },
+  "action": {
+    "id": "action-id",
+    "locationId": "location-id",
+    "durationSeconds": 5,
+    "maxCompletions": 1,
+    "role": "progression",
+    "inventoryItemId": "optional-carried-item-id",
+    "rewards": [],
+    "results": [
+      { "kind": "chat", "messageKey": "event.next-beat", "delaySeconds": 1 }
+    ]
+  },
+  "item": {
+    "id": "item-id",
+    "initialQuantity": 0,
+    "maxQuantity": 1
+  },
+  "flag": {
+    "id": "flag-id",
+    "initialValue": false
+  },
+  "resource": {
+    "id": "air",
+    "minValue": 0,
+    "baseMaxValue": 100,
+    "initialValue": 100,
+    "onEmpty": [
+      { "kind": "death-reset" }
+    ]
+  },
+  "effect": {
+    "id": "air-loss",
+    "resourceId": "air",
+    "ratePerMinute": -30,
+    "source": "player"
+  },
+  "locationEffect": {
+    "id": "poison-gas",
+    "resourceId": "health",
+    "ratePerMinute": -10,
+    "source": "location",
+    "locationId": "gas-chamber"
+  },
+  "deathReset": {
+    "locationId": "starting-location",
+    "preserve": {
+      "inventoryIds": [],
+      "resourceIds": [],
+      "flagIds": ["torn-suit"],
+      "actionIds": [],
+      "skillXp": false,
+      "discoveredLocations": false
+    }
+  },
+  "condition": {
+    "kind": "all",
+    "conditions": [
+      { "kind": "item", "itemId": "space-suit", "comparison": "at-least", "value": 1 },
+      { "kind": "flag", "flagId": "airlock-open", "value": true }
+    ]
+  }
+}

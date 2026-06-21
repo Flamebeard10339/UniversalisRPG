@@ -1,0 +1,13 @@
+[
+  {
+    "id": "air",
+    "minValue": 0,
+    "baseMaxValue": 100,
+    "initialValue": 0,
+    "onEmpty": [
+      {
+        "kind": "stop-action"
+      }
+    ]
+  }
+]

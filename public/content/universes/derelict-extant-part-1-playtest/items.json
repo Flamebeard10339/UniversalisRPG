@@ -1,0 +1,18 @@
+[
+  {
+    "id": "space-suit",
+    "maxQuantity": 1
+  },
+  {
+    "id": "air-canister",
+    "maxQuantity": 2
+  },
+  {
+    "id": "water-pouch",
+    "maxQuantity": 1
+  },
+  {
+    "id": "food-ration",
+    "maxQuantity": 1
+  }
+]
