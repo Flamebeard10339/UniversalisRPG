@@ -1,0 +1,218 @@
+{
+  "protocolVersion": 1,
+  "type": "planning-snapshot",
+  "runId": "derelict-extant-part-1-2026-06-21T14-48-46-773Z",
+  "phase": "planning",
+  "scenarioPath": "agent-adventure/scenarios/derelict-extant-part-1.md",
+  "authoringReferencePath": "agent-adventure/authoring-reference.json",
+  "outputPath": "agent-adventure/runs/second-run/planning.md",
+  "requiredSections": [
+    "Premise and player experience",
+    "Milestones and exit conditions",
+    "Action and narration design",
+    "World and choice graph",
+    "Resource budget",
+    "First death arithmetic",
+    "Death reset and persistence",
+    "Part endpoint",
+    "Risks and fallback routes"
+  ],
+  "instructions": "Write a concise Markdown plan. Show numeric resource arithmetic proving the first death can occur. Revise freely before the supervisor runs begin.",
+  "existingContent": {
+    "revision": "r1",
+    "manifest": {
+      "schemaVersion": 1,
+      "id": "derelict-extant-part-1-playtest",
+      "titleKey": "universe.derelict-extant-part-1-playtest.title",
+      "descriptionKey": "universe.derelict-extant-part-1-playtest.description",
+      "version": "0.1.0",
+      "author": "UniversalisRPG GM",
+      "locales": [
+        "en"
+      ],
+      "files": [
+        "locations.json",
+        "edges.json",
+        "actions.json",
+        "skills.json",
+        "items.json",
+        "flags.json",
+        "resources.json",
+        "effects.json",
+        "interaction-types.json",
+        "enemies.json",
+        "locales/en.json"
+      ]
+    },
+    "locations": [
+      {
+        "id": "cryopod",
+        "position": {
+          "x": 0,
+          "y": 0
+        },
+        "starting": true
+      },
+      {
+        "id": "cryobay",
+        "position": {
+          "x": 1,
+          "y": 0
+        }
+      },
+      {
+        "id": "main-intersection",
+        "position": {
+          "x": 2,
+          "y": 0
+        }
+      },
+      {
+        "id": "captain-quarters",
+        "position": {
+          "x": 3,
+          "y": 0
+        }
+      }
+    ],
+    "actions": [
+      {
+        "id": "open-your-eyes",
+        "locationId": "cryopod"
+      },
+      {
+        "id": "force-pod-lid",
+        "locationId": "cryopod"
+      },
+      {
+        "id": "work-manual-release",
+        "locationId": "cryopod"
+      },
+      {
+        "id": "open-emergency-locker",
+        "locationId": "cryobay"
+      },
+      {
+        "id": "inspect-cryobay-airlock",
+        "locationId": "cryobay"
+      },
+      {
+        "id": "watch-the-stars",
+        "locationId": "cryobay"
+      },
+      {
+        "id": "check-cryobay-console",
+        "locationId": "cryobay"
+      },
+      {
+        "id": "inspect-other-cryopods",
+        "locationId": "cryobay"
+      },
+      {
+        "id": "put-on-space-suit",
+        "locationId": "cryobay"
+      },
+      {
+        "id": "open-cryobay-airlock",
+        "locationId": "cryobay"
+      },
+      {
+        "id": "replace-air-canister",
+        "locationId": "cryobay"
+      },
+      {
+        "id": "cross-cryobay-airlock",
+        "locationId": "cryobay"
+      },
+      {
+        "id": "read-junction-map",
+        "locationId": "main-intersection"
+      },
+      {
+        "id": "inspect-intersection-damage",
+        "locationId": "main-intersection"
+      },
+      {
+        "id": "trace-captain-deck-route",
+        "locationId": "main-intersection"
+      },
+      {
+        "id": "follow-captain-route",
+        "locationId": "main-intersection"
+      },
+      {
+        "id": "review-captains-terminal",
+        "locationId": "captain-quarters"
+      },
+      {
+        "id": "inspect-communications-console",
+        "locationId": "captain-quarters"
+      },
+      {
+        "id": "send-distress-beacon",
+        "locationId": "captain-quarters"
+      }
+    ],
+    "skills": [],
+    "items": [
+      "space-suit",
+      "air-canister",
+      "water-pouch",
+      "food-ration"
+    ],
+    "flags": [
+      {
+        "id": "wearing-space-suit",
+        "initialValue": false
+      },
+      {
+        "id": "airlock-open",
+        "initialValue": false
+      },
+      {
+        "id": "cryopods-inspected",
+        "initialValue": false
+      },
+      {
+        "id": "junction-map-read",
+        "initialValue": false
+      },
+      {
+        "id": "captain-route-found",
+        "initialValue": false
+      },
+      {
+        "id": "torn-suit",
+        "initialValue": false
+      },
+      {
+        "id": "communications-ready",
+        "initialValue": false
+      }
+    ],
+    "resources": [
+      {
+        "id": "air",
+        "minValue": 0,
+        "baseMaxValue": 100,
+        "initialValue": 0,
+        "onEmpty": [
+          {
+            "kind": "stop-action"
+          }
+        ]
+      }
+    ],
+    "effects": [
+      {
+        "id": "suit-air-loss",
+        "resourceId": "air",
+        "ratePerMinute": -105,
+        "source": "player"
+      }
+    ],
+    "interactionTypes": [],
+    "enemies": []
+  },
+  "humanFeedback": "# Playtest Feedback\n\n## What Worked\n\n- Curious opening-room pacing is appropriate.\n\n## Bugs or Confusion\n\n- Passive observations were presented as too many separate actions.\n- One-use actions displayed redundant 1/1 counts.\n- Suit Air changed only when actions completed.\n- Home chat became too small when several actions were visible.\n- Air canisters could not be used from Inventory.\n- Tracing the captain's route left no next action or stated motivation.\n\n## Desired Edits\n\n- Use one orientation action followed by up to three short narrative beats.\n- Reserve buttons for concrete choices and explicitly state when a room is\n  exhausted.\n- Consume Suit Air continuously and tune its rate from measured route duration.\n- Keep action and chat panels equal height with independent scrolling.\n- Give carried items globally usable Inventory actions.\n- Keep every revealed route playable and state the character's immediate goal.\n\nThe first run spent about 53 acting seconds between pressurizing the suit and\nthe newly completed captain's-quarters arrival route. At -105/min, that path\nuses 92.75 air and arrives with 7.25 before optional canister use.\n"
+}
