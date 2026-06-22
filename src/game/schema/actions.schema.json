@@ -47,6 +47,16 @@
       "oneOf": [
         {
           "type": "object",
+          "required": ["kind", "comparison", "value"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "const": "death-count" },
+            "comparison": { "$ref": "#/$defs/comparison" },
+            "value": { "type": "number", "minimum": 0 }
+          }
+        },
+        {
+          "type": "object",
           "required": ["kind", "itemId", "comparison", "value"],
           "additionalProperties": false,
           "properties": {

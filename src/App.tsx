@@ -6,14 +6,17 @@ import { ChatPanel } from './components/ChatPanel';
 import { CharacterStats } from './components/CharacterStats';
 import { InventoryPanel } from './components/InventoryPanel';
 import { ContributionMode } from './components/contribution/ContributionMode';
+import { ContributionWorkbench } from './components/contribution/ContributionWorkbench';
 import { SkillBars } from './components/SkillBars';
 import { TravelStatus } from './components/TravelStatus';
 import { WorldMap } from './components/WorldMap';
 import { actionTitleKey, itemTitleKey, locationTitleKey, resourceTitleKey, skillTitleKey } from './game/contentIds';
-import type { IdleReport, UniversePlayState } from './game/types';
+import type { ContributionDraft, IdleReport, UniversePlayState } from './game/types';
 import { getNextResourceBoundaryAt } from './game/resources';
 import { load, save } from './lib/storage';
 import { useDebugState } from './stores/debugState';
+import { useContributionState } from './stores/contributionState';
+import { contributionRuntimeId } from './stores/contributionPlayState';
 import { useGameState } from './stores/gameState';
 import { useUniverseState } from './stores/universeState';
 
@@ -21,7 +24,7 @@ const getStartingLocationId = (bundle: NonNullable<ReturnType<typeof useUniverse
   bundle.locations.find((location) => location.starting)?.id ?? bundle.locations[0]?.id ?? '';
 
 type AppTab = 'map' | 'home' | 'character' | 'settings';
-type HomeTab = 'actions' | 'details';
+type HomeTab = 'actions' | 'details' | 'workbench';
 type CharacterTab = 'skills' | 'inventory' | 'stats';
 type ThemePreference = 'system' | 'dark' | 'light';
 type FontSizePreference = 'tiny' | 'small' | 'normal' | 'large' | 'huge';
@@ -29,6 +32,10 @@ const APP_VERSION = '0.1.0';
 const SOURCE_URL = 'https://github.com/Flamebeard10339/UniversalisRPG';
 const appearanceKey = 'universalis:settings:appearance';
 const emptyIdleReport: IdleReport = { kind: 'none' };
+const emptyContributionDraft = (universeId: string): ContributionDraft => ({
+  universeId, updatedAt: Date.now(), notes: '', locations: [], edges: [], actions: [], skills: [], items: [], flags: [], resourceDefinitions: [], effects: [], interactionTypes: [], enemies: [], locales: {},
+  removed: { locations: [], edges: [], actions: [], skills: [], items: [], flags: [], resources: [], effects: [], interactionTypes: [], enemies: [] },
+});
 
 const encodeSave = (playState: UniversePlayState) =>
   btoa(unescape(encodeURIComponent(JSON.stringify(playState))));
@@ -95,6 +102,7 @@ export default function App() {
   const markInactive = useGameState((state) => state.markInactive);
   const setActionLooping = useGameState((state) => state.setActionLooping);
   const importUniverseState = useGameState((state) => state.importUniverseState);
+  const replaceUniverseState = useGameState((state) => state.replaceUniverseState);
   const resetUniverse = useGameState((state) => state.resetUniverse);
   const recordRunEvent = useGameState((state) => state.recordRunEvent);
   const clearRunLog = useGameState((state) => state.clearRunLog);
@@ -104,6 +112,9 @@ export default function App() {
   const setDebugEnabled = useDebugState((state) => state.setEnabled);
   const logAction = useDebugState((state) => state.logAction);
   const clearDebugLog = useDebugState((state) => state.clear);
+  const contributionDrafts = useContributionState((state) => state.drafts);
+  const updateContributionDraft = useContributionState((state) => state.updateDraft);
+  const refreshContributionPreview = useUniverseState((state) => state.refreshContributionPreview);
 
   useEffect(() => {
     void initialize();
@@ -139,6 +150,7 @@ export default function App() {
 
   const startingLocationId = useMemo(() => (bundle ? getStartingLocationId(bundle) : ''), [bundle]);
   const activeBundleId = bundle?.manifest.id;
+  const runtimeUniverseId = bundle ? (contributionMode ? contributionRuntimeId(bundle.manifest.id) : bundle.manifest.id) : '';
   const actionContext = useMemo(() => ({
     manifest: bundle?.manifest,
     actions: bundle?.actions ?? [],
@@ -151,11 +163,11 @@ export default function App() {
     interactionTypes: bundle?.interactionTypes ?? [],
     enemies: bundle?.enemies ?? [],
   }), [bundle]);
-  const playState = bundle ? gameStates[bundle.manifest.id] ?? getUniverseState(bundle.manifest.id, startingLocationId) : null;
+  const playState = bundle ? gameStates[runtimeUniverseId] ?? getUniverseState(runtimeUniverseId, startingLocationId) : null;
   const currentLocation = bundle?.locations.find((location) => location.id === playState?.currentLocationId);
   const logPlayerAction = (event: string, data?: Record<string, unknown>) => {
     logAction(event, data);
-    if (bundle) recordRunEvent(bundle.manifest.id, 'player', event, data);
+    if (bundle) recordRunEvent(runtimeUniverseId, 'player', event, data);
   };
   const beginAction = (action: (typeof actionContext.actions)[number]) => {
     if (!bundle) return;
@@ -164,7 +176,7 @@ export default function App() {
       locationId: action.locationId,
       universeId: bundle.manifest.id,
     });
-    startAction(bundle.manifest.id, action, actionContext);
+    startAction(runtimeUniverseId, action, actionContext);
   };
   const nextTimerAt = bundle && playState
     ? [
@@ -199,7 +211,7 @@ export default function App() {
         fromLocationId: playState.currentLocationId,
         toLocationId: locationId,
       });
-      travelTo(bundle.manifest.id, edge, locationId);
+      travelTo(runtimeUniverseId, edge, locationId);
     } else {
       logPlayerAction('travel.noEdge', {
         fromLocationId: playState.currentLocationId,
@@ -239,7 +251,8 @@ export default function App() {
         setSaveMessage(t('settings.save.importWrongUniverse', { source: imported.universeId, target: bundle.manifest.id }));
         return;
       }
-      await importUniverseState(imported);
+      if (contributionMode) await replaceUniverseState(runtimeUniverseId, imported);
+      else await importUniverseState(imported);
       setSaveMessage(t('settings.save.imported'));
       setSaveImport('');
     } catch {
@@ -252,7 +265,7 @@ export default function App() {
       return;
     }
 
-    await resetUniverse(bundle.manifest.id, startingLocationId);
+    await resetUniverse(runtimeUniverseId, startingLocationId);
     setConfirmReset(false);
     setSaveMessage(t('settings.save.resetComplete'));
   };
@@ -264,15 +277,15 @@ export default function App() {
   };
 
   useEffect(() => {
-    if (activeBundleId && startingLocationId) {
-      void hydratePlayState(activeBundleId, startingLocationId).then(() => {
+    if (runtimeUniverseId && startingLocationId) {
+      void hydratePlayState(runtimeUniverseId, startingLocationId).then(() => {
         const currentBundle = useUniverseState.getState().bundle;
 
         if (!currentBundle || currentBundle.manifest.id !== activeBundleId) {
           return;
         }
 
-        const report = useGameState.getState().resolveIdle(activeBundleId, {
+        const report = useGameState.getState().resolveIdle(runtimeUniverseId, {
           manifest: currentBundle.manifest,
           actions: currentBundle.actions,
           skills: currentBundle.skills,
@@ -290,14 +303,14 @@ export default function App() {
         showIdleReport(report);
       });
     }
-  }, [activeBundleId, hydratePlayState, startingLocationId]);
+  }, [activeBundleId, hydratePlayState, runtimeUniverseId, startingLocationId]);
 
   useEffect(() => {
     if (!bundle) {
       return undefined;
     }
 
-    const universeId = bundle.manifest.id;
+    const universeId = runtimeUniverseId;
     const markAway = () => {
       setAppActive(false);
       markInactive(universeId);
@@ -336,7 +349,7 @@ export default function App() {
       window.removeEventListener('pagehide', markAway);
       window.removeEventListener('pageshow', resolveReturn);
     };
-  }, [actionContext, bundle, debugEnabled, markInactive, resolveIdle]);
+  }, [actionContext, bundle, debugEnabled, markInactive, resolveIdle, runtimeUniverseId]);
 
   useEffect(() => {
     if (!appActive || !bundle || !playState) {
@@ -349,12 +362,12 @@ export default function App() {
 
     const timeout = window.setTimeout(
       () => {
-        resolveIdle(bundle.manifest.id, actionContext, { debugEnabled });
+        resolveIdle(runtimeUniverseId, actionContext, { debugEnabled });
       },
       Math.max(0, nextTimerAt - Date.now()),
     );
     return () => window.clearTimeout(timeout);
-  }, [actionContext, appActive, bundle, debugEnabled, nextTimerAt, playState, resolveIdle]);
+  }, [actionContext, appActive, bundle, debugEnabled, nextTimerAt, playState, resolveIdle, runtimeUniverseId]);
 
   useLayoutEffect(() => {
     if (!appActive || !bundle || !playState) {
@@ -362,9 +375,9 @@ export default function App() {
     }
 
     if (nextTimerAt && nextTimerAt <= Date.now()) {
-      resolveIdle(bundle.manifest.id, actionContext, { debugEnabled });
+      resolveIdle(runtimeUniverseId, actionContext, { debugEnabled });
     }
-  }, [actionContext, appActive, bundle, debugEnabled, nextTimerAt, playState, resolveIdle]);
+  }, [actionContext, appActive, bundle, debugEnabled, nextTimerAt, playState, resolveIdle, runtimeUniverseId]);
 
   if (loading && !bundle) {
     return <main className="grid min-h-screen place-items-center bg-slate-950 text-slate-100">{t('app.loadingUniverse')}</main>;
@@ -401,7 +414,7 @@ export default function App() {
               currentLocationId={playState.currentLocationId}
               onCancel={() => {
                 logPlayerAction('travel.cancel', { universeId: bundle.manifest.id });
-                cancelTravel(bundle.manifest.id);
+                cancelTravel(runtimeUniverseId);
               }}
               titleWhenIdle
               t={t}
@@ -428,7 +441,7 @@ export default function App() {
             />
 
             <div className="grid grid-cols-2 gap-2 rounded border border-slate-800 bg-slate-900 p-2">
-              {(['actions', 'details'] as HomeTab[]).map((tab) => (
+              {(['actions', 'details', ...(contributionMode ? ['workbench' as const] : [])] as HomeTab[]).map((tab) => (
                 <button
                   className={`rounded px-3 py-2 text-sm font-semibold capitalize ${
                     homeTab === tab ? 'bg-cyan-300 text-slate-950' : 'bg-slate-950 text-slate-300'
@@ -448,7 +461,7 @@ export default function App() {
                   <ActionPanel
                     debugEnabled={debugEnabled}
                     bundle={bundle}
-                    onSetLooping={(enabled) => setActionLooping(bundle.manifest.id, enabled)}
+                    onSetLooping={(enabled) => setActionLooping(runtimeUniverseId, enabled)}
                     onStartAction={beginAction}
                     playState={playState}
                     t={t}
@@ -469,8 +482,24 @@ export default function App() {
                     actionId: playState.activeAction?.actionId ?? '',
                     universeId: bundle.manifest.id,
                   });
-                  stopAction(bundle.manifest.id, actionContext);
+                  stopAction(runtimeUniverseId, actionContext);
                 }}
+                playState={playState}
+                t={t}
+              />
+            )}
+
+            {homeTab === 'workbench' && contributionMode && (
+              <ContributionWorkbench
+                baseBundle={useUniverseState.getState().baseBundle ?? bundle}
+                bundle={bundle}
+                draft={contributionDrafts[bundle.manifest.id] ?? emptyContributionDraft(bundle.manifest.id)}
+                onPatchDraft={(patch) => {
+                  updateContributionDraft(bundle.manifest.id, patch);
+                  queueMicrotask(refreshContributionPreview);
+                }}
+                onPlayAction={beginAction}
+                onReplaceState={(state) => { void replaceUniverseState(runtimeUniverseId, state); }}
                 playState={playState}
                 t={t}
               />
@@ -642,7 +671,7 @@ export default function App() {
                     </button>
                     <button
                       className="rounded border border-rose-700 px-3 py-2 text-sm font-semibold text-rose-100"
-                      onClick={() => clearRunLog(bundle.manifest.id)}
+                      onClick={() => clearRunLog(runtimeUniverseId)}
                       type="button"
                     >
                       {t('settings.runLog.clear')}
@@ -679,6 +708,7 @@ export default function App() {
                     onChange={(event) => {
                       logPlayerAction('settings.contributionMode', { enabled: event.target.checked });
                       setContributionMode(event.target.checked);
+                      if (!event.target.checked) setHomeTab('actions');
                     }}
                     type="checkbox"
                   />

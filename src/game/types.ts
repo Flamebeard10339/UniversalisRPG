@@ -82,6 +82,7 @@ export type Requirement =
 export type NumericComparison = 'equal' | 'at-least' | 'at-most' | 'greater-than' | 'less-than';
 
 export type Condition =
+  | { kind: 'death-count'; comparison: NumericComparison; value: number }
   | { kind: 'item'; itemId: string; comparison: NumericComparison; value: number }
   | { kind: 'resource'; resourceId: string; comparison: NumericComparison; value: number }
   | { kind: 'skill-level'; skillId: string; comparison: NumericComparison; value: number }

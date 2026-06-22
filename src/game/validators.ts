@@ -126,6 +126,7 @@ const validateConditionShape = (value: unknown): value is Condition => {
   if (value.kind === 'not') return validateConditionShape(value.condition);
   if (value.kind === 'flag') return hasString(value, 'flagId') && typeof value.value === 'boolean';
   if (!hasNumber(value, 'value') || !comparisons.has(String(value.comparison))) return false;
+  if (value.kind === 'death-count') return true;
   if (value.kind === 'item') return hasString(value, 'itemId');
   if (value.kind === 'resource') return hasString(value, 'resourceId');
   if (value.kind === 'skill-level') return hasString(value, 'skillId');

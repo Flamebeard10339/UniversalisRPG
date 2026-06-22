@@ -21,6 +21,7 @@ type GameStateStore = {
   recordAgentMessage: (universeId: string, message: AgentSessionMessage) => void;
   clearRunLog: (universeId: string) => void;
   importUniverseState: (playState: UniversePlayState) => Promise<void>;
+  replaceUniverseState: (universeId: string, playState: UniversePlayState) => Promise<void>;
   resetUniverse: (universeId: string, startingLocationId: string) => Promise<void>;
 };
 
@@ -318,6 +319,17 @@ export const useGameState = create<GameStateStore>((set, get) => ({
       states: {
         ...state.states,
         [playState.universeId]: normalized,
+      },
+    }));
+  },
+
+  replaceUniverseState: async (universeId, playState) => {
+    const normalized = normalizePlayState({ ...playState, universeId }, universeId, playState.currentLocationId);
+    await save(storageKey(universeId), normalized);
+    set((state) => ({
+      states: {
+        ...state.states,
+        [universeId]: normalized,
       },
     }));
   },

@@ -32,6 +32,9 @@ export const evaluateCondition = (
   if (condition.kind === 'flag') {
     return (state.flags[condition.flagId] ?? false) === condition.value;
   }
+  if (condition.kind === 'death-count') {
+    return compare(state.deathCount, condition.comparison, condition.value);
+  }
   if (condition.kind === 'item') {
     return compare(getItemQuantity(state, condition.itemId), condition.comparison, condition.value);
   }
