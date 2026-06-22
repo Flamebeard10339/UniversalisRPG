@@ -1,9 +1,12 @@
-import { useEffect, useRef, useState, type MutableRefObject, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type MutableRefObject } from 'react';
 import { edgeId, toKebabInput } from '../../game/contentIds';
 import type { Translator } from '../../game/i18n';
-import type { ActionResult, Condition, ContentBundle, ContributionDraft, ContributionRemovedIds, DeathResetPolicy, EffectDefinition, EnemyDefinition, GameAction, InteractionTypeDefinition, ItemDefinition, LocationNode, ResourceBoundaryBehavior, ResourceDefinition, Reward, SkillDefinition, StateFlagDefinition, TravelEdgeDefinition } from '../../game/types';
+import type { ContentBundle, ContributionDraft, ContributionRemovedIds, EffectDefinition, EnemyDefinition, GameAction, InteractionTypeDefinition, ItemDefinition, LocationNode, ResourceDefinition, SkillDefinition, StateFlagDefinition, TravelEdgeDefinition } from '../../game/types';
 import { ContributionMapEditor } from './ContributionMapEditor';
 import { EnemyDiagnostics } from './EnemyDiagnostics';
+import { EdgeFields, LocationFields } from './MapContentFields';
+import { StructuredDataDisplay, StructuredDataEditor, type StructuredValue } from '../structuredData/StructuredData';
+import { actionSchema, boundarySchema, deathResetSchema, rewardSchema } from '../structuredData/contentSchemas';
 
 type ContentDataEditorProps = {
   baseBundle: ContentBundle;
@@ -19,11 +22,6 @@ type LayeredRow<T> = {
   index: number;
   item: T;
   source: 'draft' | 'base';
-};
-type RewardDraft = {
-  kind: Reward['kind'];
-  targetId: string;
-  amount: string;
 };
 
 const contentTabs: ContentDataTab[] = ['map', 'actions', 'skills', 'interactions', 'enemies', 'items', 'resources', 'json'];
@@ -85,34 +83,6 @@ const allItems = (bundle: ContentBundle, draft: ContributionDraft) => uniqueById
 const allFlags = (bundle: ContentBundle, draft: ContributionDraft) => uniqueById([...(bundle.flags ?? []), ...draft.flags]);
 const allInteractionTypes = (bundle: ContentBundle, draft: ContributionDraft) => uniqueById([...(bundle.interactionTypes ?? []), ...draft.interactionTypes]);
 const allEnemies = (bundle: ContentBundle, draft: ContributionDraft) => uniqueById([...(bundle.enemies ?? []), ...draft.enemies]);
-const defaultRewardDraft = (): RewardDraft => ({ kind: 'skillXp', targetId: '', amount: '1' });
-const rewardTargetId = (reward: Reward) => reward.kind === 'skillXp'
-  ? reward.skillId
-  : reward.kind === 'item'
-    ? reward.itemId
-    : reward.resourceId;
-const formatReward = (reward: Reward, t: Translator) => `${reward.kind === 'skillXp'
-  ? t('contribution.reward.skillXp')
-  : reward.kind === 'item'
-    ? t('contribution.reward.item')
-    : t('contribution.reward.resource')}: ${rewardTargetId(reward)} x${reward.amount}`;
-type RewardListEditorProps = {
-  draft: RewardDraft;
-  label: string;
-  onAdd: () => void;
-  onActivate: () => void;
-  onDraftChange: (patch: Partial<RewardDraft>) => void;
-  onRemove: (index: number) => void;
-  rewards: Reward[];
-  showAdd: boolean;
-  t: Translator;
-};
-
-type NestedListSectionProps = {
-  children: ReactNode;
-  label: string;
-  onActivate: () => void;
-};
 
 type NumericEditorProps = {
   max?: number;
@@ -154,89 +124,9 @@ const NumericEditor = ({ max, min = 0, onChange, step = 1, value }: NumericEdito
   );
 };
 
-const JsonEditor = <T,>({ label, onChange, value }: { label: string; onChange: (value: T | undefined) => void; value: T | undefined }) => {
-  const [text, setText] = useState(value === undefined ? '' : JSON.stringify(value, null, 2));
-  const [invalid, setInvalid] = useState(false);
-
-  useEffect(() => {
-    setText(value === undefined ? '' : JSON.stringify(value, null, 2));
-    setInvalid(false);
-  }, [value]);
-
-  const commit = () => {
-    if (!text.trim()) {
-      setInvalid(false);
-      onChange(undefined);
-      return;
-    }
-    try {
-      onChange(JSON.parse(text) as T);
-      setInvalid(false);
-    } catch {
-      setInvalid(true);
-    }
-  };
-
-  return (
-    <label className="grid min-w-0 gap-1 text-xs text-slate-400">
-      <span>{label}</span>
-      <textarea
-        aria-invalid={invalid}
-        aria-label={label}
-        className={`min-h-28 rounded border bg-slate-900 p-2 font-mono text-xs text-slate-100 ${invalid ? 'border-rose-500' : 'border-slate-800'}`}
-        onBlur={commit}
-        onChange={(event) => { setText(event.target.value); setInvalid(false); }}
-        value={text}
-      />
-    </label>
-  );
-};
-
-const NestedListSection = ({ children, label, onActivate }: NestedListSectionProps) => (
-  <div className="ml-3 grid grid-cols-[5rem_1fr] gap-2" onFocusCapture={onActivate} onPointerDown={onActivate}>
-    <div className="pt-2 text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</div>
-    <div className="grid gap-1 border-l border-slate-800 pl-3">{children}</div>
-  </div>
-);
-
-const RewardListEditor = ({ draft, label, onAdd, onActivate, onDraftChange, onRemove, rewards, showAdd, t }: RewardListEditorProps) => (
-  <NestedListSection label={label} onActivate={onActivate}>
-    {showAdd && (
-      <div className="grid gap-2 border-b border-slate-800 bg-slate-900/60 p-2 lg:grid-cols-[9rem_1fr_7rem_auto]">
-        <select className="rounded bg-slate-900 px-2 py-1.5 text-sm" onChange={(event) => onDraftChange({ kind: event.target.value as Reward['kind'], targetId: '' })} value={draft.kind}>
-          <option value="skillXp">{t('contribution.reward.skillXp')}</option>
-          <option value="item">{t('contribution.reward.item')}</option>
-          <option value="resource">{t('contribution.reward.resource')}</option>
-        </select>
-        <input
-          className="min-w-0 rounded bg-slate-900 px-2 py-1.5 text-sm"
-          list={draft.kind === 'skillXp' ? 'content-skill-ids' : draft.kind === 'item' ? 'content-item-ids' : 'content-resource-ids'}
-          onChange={(event) => onDraftChange({ targetId: toKebabInput(event.target.value) })}
-          placeholder={draft.kind === 'skillXp' ? t('contribution.placeholder.skillId') : draft.kind === 'item' ? t('contribution.placeholder.itemId') : t('contribution.placeholder.resourceId')}
-          value={draft.targetId}
-        />
-        <input className="min-w-0 rounded bg-slate-900 px-2 py-1.5 text-sm" min="1" onChange={(event) => onDraftChange({ amount: event.target.value })} type="number" value={draft.amount} />
-        <button className="rounded border border-slate-600 px-2 py-1.5 text-sm font-semibold text-slate-100" onClick={onAdd} type="button">
-          {t('contribution.reward.add')}
-        </button>
-      </div>
-    )}
-    {rewards.length > 0 && (
-      <div className="grid">
-        {rewards.map((reward, rewardIndex) => (
-          <button className="border-b border-slate-800 px-2 py-1.5 text-left text-xs text-slate-300 last:border-0 hover:bg-slate-900" key={`${reward.kind}-${rewardIndex}`} onClick={() => onRemove(rewardIndex)} type="button">
-            {formatReward(reward, t)}
-          </button>
-        ))}
-      </div>
-    )}
-  </NestedListSection>
-);
-
 export const ContentDataEditor = ({ baseBundle, bundle, draft, onPatch, t }: ContentDataEditorProps) => {
   const [activeTab, setActiveTab] = useState<ContentDataTab>('map');
   const [filter, setFilter] = useState('');
-  const [rewardDrafts, setRewardDrafts] = useState<Record<string, RewardDraft>>({});
   const [selectedActionId, setSelectedActionId] = useState<string | null>(null);
   const actionEditorKeys = useRef<Record<string, string>>({});
   const resourceEditorKeys = useRef<Record<string, string>>({});
@@ -290,10 +180,6 @@ export const ContentDataEditor = ({ baseBundle, bundle, draft, onPatch, t }: Con
     const edge = { ...row.item, ...patch };
     const nextEdge = patch.source || patch.target ? { ...edge, id: edgeId(edge.source, edge.target) } : edge;
     promote('edges', nextEdge, row.item.id);
-  };
-
-  const updateAction = (row: LayeredRow<GameAction>, patch: Partial<GameAction>) => {
-    promote('actions', { ...row.item, ...patch }, row.item.id);
   };
 
   const updateSkill = (row: LayeredRow<SkillDefinition>, patch: Partial<SkillDefinition>) => {
@@ -353,17 +239,6 @@ export const ContentDataEditor = ({ baseBundle, bundle, draft, onPatch, t }: Con
     }
 
     enemyEditorKeys.current[nextId] = enemyEditorKey(previousId);
-
-    setRewardDrafts((current) => {
-      if (!current[previousId]) {
-        return current;
-      }
-
-      return {
-        ...Object.fromEntries(Object.entries(current).filter(([ownerId]) => ownerId !== previousId)),
-        [nextId]: current[previousId],
-      };
-    });
   };
 
   const selectedEnemyRow = enemies.find((row) => enemyEditorKey(row.item.id) === selectedEnemyKey) ?? null;
@@ -380,17 +255,6 @@ export const ContentDataEditor = ({ baseBundle, bundle, draft, onPatch, t }: Con
 
   const renameStableEditorKey = (keys: MutableRefObject<Record<string, string>>, prefix: string, previousId: string, nextId: string) => {
     if (previousId !== nextId) keys.current[nextId] = stableEditorKey(keys, prefix, previousId);
-  };
-
-  const renameActionEditorState = (previousId: string, nextId: string) => {
-    if (previousId === nextId) return;
-    actionEditorKeys.current[nextId] = actionEditorKey(previousId);
-    setRewardDrafts((current) => current[previousId]
-      ? {
-          ...Object.fromEntries(Object.entries(current).filter(([ownerId]) => ownerId !== previousId)),
-          [nextId]: current[previousId],
-        }
-      : current);
   };
 
   const addLocation = () => {
@@ -508,54 +372,6 @@ export const ContentDataEditor = ({ baseBundle, bundle, draft, onPatch, t }: Con
     });
   };
 
-  const updateRewardDraft = (ownerId: string, patch: Partial<RewardDraft>) => {
-    setRewardDrafts((current) => ({
-      ...current,
-      [ownerId]: {
-        ...defaultRewardDraft(),
-        ...current[ownerId],
-        ...patch,
-      },
-    }));
-  };
-
-  const addRewardToList = (ownerId: string, rewards: Reward[], onUpdate: (rewards: Reward[]) => void) => {
-    const rewardDraft = rewardDrafts[ownerId] ?? defaultRewardDraft();
-    const amount = Number(rewardDraft.amount);
-
-    if (!rewardDraft.targetId || !Number.isFinite(amount) || amount <= 0) {
-      return;
-    }
-
-    const reward: Reward = rewardDraft.kind === 'skillXp'
-      ? { kind: 'skillXp', skillId: rewardDraft.targetId, amount }
-      : rewardDraft.kind === 'item'
-        ? { kind: 'item', itemId: rewardDraft.targetId, amount }
-        : { kind: 'resource', resourceId: rewardDraft.targetId, amount };
-
-    onUpdate([...rewards, reward]);
-    setRewardDrafts((current) => ({
-      ...current,
-      [ownerId]: { ...rewardDraft, targetId: '', amount: '1' },
-    }));
-  };
-
-  const addActionReward = (row: LayeredRow<GameAction>) => {
-    addRewardToList(row.item.id, row.item.rewards, (rewards) => updateAction(row, { rewards }));
-  };
-
-  const removeActionReward = (row: LayeredRow<GameAction>, rewardIndex: number) => {
-    updateAction(row, { rewards: removeAt(row.item.rewards, rewardIndex) });
-  };
-
-  const addEnemyReward = (row: LayeredRow<EnemyDefinition>) => {
-    addRewardToList(row.item.id, row.item.rewards, (rewards) => updateEnemy(row, { rewards }));
-  };
-
-  const removeEnemyReward = (row: LayeredRow<EnemyDefinition>, rewardIndex: number) => {
-    updateEnemy(row, { rewards: removeAt(row.item.rewards, rewardIndex) });
-  };
-
   const jsonFiles = [
     { path: 'locations.json', json: locations.map((row) => row.item) },
     { path: 'edges.json', json: edges.map((row) => row.item) },
@@ -625,19 +441,7 @@ export const ContentDataEditor = ({ baseBundle, bundle, draft, onPatch, t }: Con
             ) : (
               <div className="grid gap-1">
                 {locations.map((row) => (
-                  <div className="grid gap-2 rounded bg-slate-950 p-2 lg:grid-cols-[1.2fr_7rem_7rem_1fr_5rem_6rem]" key={`${row.source}-${row.index}`}>
-                    <input aria-label="Location id" className="min-w-0 rounded bg-slate-900 px-2 py-1.5 text-sm" onChange={(event) => updateLocation(row, { id: toKebabInput(event.target.value) })} value={row.item.id} />
-                    <input aria-label="Location x" className="min-w-0 rounded bg-slate-900 px-2 py-1.5 text-sm" onChange={(event) => updateLocation(row, { position: { ...row.item.position, x: Number(event.target.value) } })} type="number" value={Math.round(row.item.position.x)} />
-                    <input aria-label="Location y" className="min-w-0 rounded bg-slate-900 px-2 py-1.5 text-sm" onChange={(event) => updateLocation(row, { position: { ...row.item.position, y: Number(event.target.value) } })} type="number" value={Math.round(row.item.position.y)} />
-                    <input aria-label="Location tags" className="min-w-0 rounded bg-slate-900 px-2 py-1.5 text-sm" onChange={(event) => updateLocation(row, { tags: event.target.value.split(',').map((tag) => tag.trim()).filter(Boolean) })} placeholder={t('contribution.placeholder.tags')} value={(row.item.tags ?? []).join(', ')} />
-                    <label className="flex items-center gap-2 text-sm text-slate-300">
-                      <input checked={Boolean(row.item.starting)} onChange={(event) => updateLocation(row, { starting: event.target.checked })} type="checkbox" />
-                      <span className="lg:hidden">{t('contribution.column.start')}</span>
-                    </label>
-                    <button className={removeButtonClass} onClick={() => removeRow('locations', row)} type="button">
-                      {t('contribution.column.remove')}
-                    </button>
-                  </div>
+                  <LocationFields key={`${row.source}-${row.index}`} location={row.item} onChange={(location) => updateLocation(row, location)} onRemove={() => removeRow('locations', row)} t={t} />
                 ))}
               </div>
             )}
@@ -662,15 +466,7 @@ export const ContentDataEditor = ({ baseBundle, bundle, draft, onPatch, t }: Con
             ) : (
               <div className="grid gap-1">
                 {edges.map((row) => (
-                  <div className="grid gap-2 rounded bg-slate-950 p-2 lg:grid-cols-[1fr_1fr_1fr_8rem_6rem]" key={`${row.source}-${row.index}`}>
-                    <input aria-label="Edge id" className="min-w-0 rounded bg-slate-900 px-2 py-1.5 text-sm" readOnly value={row.item.id} />
-                    <input aria-label="Edge source" className="min-w-0 rounded bg-slate-900 px-2 py-1.5 text-sm" list="content-location-ids" onChange={(event) => updateEdge(row, { source: toKebabInput(event.target.value) })} value={row.item.source} />
-                    <input aria-label="Edge target" className="min-w-0 rounded bg-slate-900 px-2 py-1.5 text-sm" list="content-location-ids" onChange={(event) => updateEdge(row, { target: toKebabInput(event.target.value) })} value={row.item.target} />
-                    <input aria-label="Edge duration" className="min-w-0 rounded bg-slate-900 px-2 py-1.5 text-sm" min="1" onChange={(event) => updateEdge(row, { travelTimeSeconds: Number(event.target.value) })} type="number" value={row.item.travelTimeSeconds} />
-                    <button className={removeButtonClass} onClick={() => removeRow('edges', row)} type="button">
-                      {t('contribution.column.remove')}
-                    </button>
-                  </div>
+                  <EdgeFields bundle={bundle} edge={row.item} key={`${row.source}-${row.index}`} onChange={(edge) => updateEdge(row, edge)} onRemove={() => removeRow('edges', row)} t={t} />
                 ))}
               </div>
             )}
@@ -686,40 +482,22 @@ export const ContentDataEditor = ({ baseBundle, bundle, draft, onPatch, t }: Con
               {t('contribution.data.addAction')}
             </button>
           </div>
-          <div className="hidden grid-cols-[1fr_1fr_7rem_1fr_6rem] gap-2 px-2 text-xs font-semibold uppercase tracking-wide text-slate-500 lg:grid">
-            <span>{t('contribution.column.id')}</span>
-            <span>{t('contribution.column.location')}</span>
-            <span>{t('contribution.column.seconds')}</span>
-            <span>{t('contribution.column.enemy')}</span>
-            <span>{t('contribution.column.remove')}</span>
-          </div>
           {actions.length === 0 ? (
             <p className="px-2 py-1 text-sm text-slate-500">{t('contribution.data.noActionChanges')}</p>
           ) : (
             <div className="grid gap-1">
               {actions.map((row) => {
                 const action = row.item;
-                const rewardDraft = rewardDrafts[action.id] ?? { kind: 'skillXp', targetId: '', amount: '1' };
                 const selected = selectedActionId === action.id;
 
                 return (
                   <div className="grid gap-2 rounded bg-slate-950 p-2" key={actionEditorKey(action.id)}>
-                    <div className="grid gap-2 lg:grid-cols-[1fr_1fr_7rem_1fr_6rem]">
-                      <input
-                        aria-label="Action id"
-                        className="min-w-0 rounded bg-slate-900 px-2 py-1.5 text-sm"
-                        onChange={(event) => {
-                          const nextId = toKebabInput(event.target.value);
-                          renameActionEditorState(action.id, nextId);
-                          setSelectedActionId(nextId);
-                          updateAction(row, { id: nextId });
-                        }}
-                        onFocus={() => setSelectedActionId(action.id)}
-                        value={action.id}
-                      />
-                      <input aria-label="Action location" className="min-w-0 rounded bg-slate-900 px-2 py-1.5 text-sm" list="content-location-ids" onChange={(event) => updateAction(row, { locationId: toKebabInput(event.target.value) })} onFocus={() => setSelectedActionId(action.id)} value={action.locationId} />
-                      <input aria-label="Action duration" className="min-w-0 rounded bg-slate-900 px-2 py-1.5 text-sm" min="1" onChange={(event) => updateAction(row, { durationSeconds: Number(event.target.value) })} onFocus={() => setSelectedActionId(action.id)} type="number" value={action.durationSeconds} />
-                      <input aria-label="Action enemy" className="min-w-0 rounded bg-slate-900 px-2 py-1.5 text-sm" list="content-enemy-ids" onChange={(event) => updateAction(row, { enemyId: toKebabInput(event.target.value) || undefined })} onFocus={() => setSelectedActionId(action.id)} value={action.enemyId ?? ''} />
+                    <div className="grid gap-2 sm:grid-cols-[1fr_auto_auto]">
+                      <button className="min-w-0 rounded bg-slate-900 px-3 py-2 text-left" onClick={() => setSelectedActionId(selected ? null : action.id)} type="button">
+                        <span className="block truncate text-sm font-semibold text-slate-100">{action.id}</span>
+                        <span className="block truncate text-xs text-slate-400">{action.locationId} · {action.durationSeconds}s</span>
+                      </button>
+                      <button className="rounded border border-slate-600 px-3 py-2 text-sm text-slate-200" onClick={() => setSelectedActionId(selected ? null : action.id)} type="button">{selected ? t('structured.collapse') : t('contribution.column.edit')}</button>
                       <button
                         className={removeButtonClass}
                         onClick={() => {
@@ -734,71 +512,9 @@ export const ContentDataEditor = ({ baseBundle, bundle, draft, onPatch, t }: Con
                       </button>
                     </div>
                     {selected && (
-                      <section className="grid gap-3 border-l border-slate-800 bg-slate-900/50 p-3 lg:grid-cols-2">
-                        <label className="grid gap-1 text-xs text-slate-400">
-                          <span>{t('contribution.column.maxCompletions')}</span>
-                          <input
-                            aria-label={t('contribution.column.maxCompletions')}
-                            className="rounded bg-slate-900 px-2 py-1.5 text-sm text-slate-100"
-                            min="1"
-                            onChange={(event) => updateAction(row, { maxCompletions: event.target.value ? Number(event.target.value) : undefined })}
-                            type="number"
-                            value={action.maxCompletions ?? ''}
-                          />
-                        </label>
-                        <label className="grid gap-1 text-xs text-slate-400">
-                          <span>{t('contribution.column.actionRole')}</span>
-                          <select
-                            className="rounded bg-slate-900 px-2 py-1.5 text-sm text-slate-100"
-                            onChange={(event) => updateAction(row, { role: (event.target.value || undefined) as GameAction['role'] })}
-                            value={action.role ?? ''}
-                          >
-                            <option value="">{t('contribution.actionRole.unset')}</option>
-                            <option value="optional">{t('contribution.actionRole.optional')}</option>
-                            <option value="progression">{t('contribution.actionRole.progression')}</option>
-                            <option value="utility">{t('contribution.actionRole.utility')}</option>
-                          </select>
-                        </label>
-                        <label className="grid gap-1 text-xs text-slate-400 lg:col-span-2">
-                          <span>{t('contribution.column.inventoryItem')}</span>
-                          <input
-                            className="rounded bg-slate-900 px-2 py-1.5 text-sm text-slate-100"
-                            list="content-item-ids"
-                            onChange={(event) => updateAction(row, { inventoryItemId: toKebabInput(event.target.value) || undefined })}
-                            value={action.inventoryItemId ?? ''}
-                          />
-                        </label>
-                        <JsonEditor<Condition>
-                          label={t('contribution.column.visibleWhen')}
-                          onChange={(visibleWhen) => updateAction(row, { visibleWhen })}
-                          value={action.visibleWhen}
-                        />
-                        <JsonEditor<Condition>
-                          label={t('contribution.column.requirements')}
-                          onChange={(requirements) => updateAction(row, { requirements })}
-                          value={Array.isArray(action.requirements) ? undefined : action.requirements}
-                        />
-                        <div className="lg:col-span-2">
-                          <JsonEditor<ActionResult[]>
-                            label={t('contribution.column.results')}
-                            onChange={(results) => updateAction(row, { results })}
-                            value={action.results}
-                          />
-                        </div>
+                      <section className="grid gap-3 border-l border-slate-800 bg-slate-900/50 p-3">
+                        <StructuredDataEditor label="contribution.data.actionFields" onChange={(value) => { if (value) { const next = value as unknown as GameAction; if (next.id !== action.id) { actionEditorKeys.current[next.id] = actionEditorKey(action.id); setSelectedActionId(next.id); } promote('actions', next, action.id); } }} schema={actionSchema(bundle)} t={t} value={action as unknown as StructuredValue} />
                       </section>
-                    )}
-                    {(selected || action.rewards.length > 0) && (
-                      <RewardListEditor
-                        draft={rewardDraft}
-                        label={t('contribution.column.rewards')}
-                        onAdd={() => addActionReward(row)}
-                        onActivate={() => setSelectedActionId(action.id)}
-                        onDraftChange={(patch) => updateRewardDraft(action.id, patch)}
-                        onRemove={(rewardIndex) => removeActionReward(row, rewardIndex)}
-                        rewards={action.rewards}
-                        showAdd={selected}
-                        t={t}
-                      />
                     )}
                   </div>
                 );
@@ -889,8 +605,6 @@ export const ContentDataEditor = ({ baseBundle, bundle, draft, onPatch, t }: Con
           {selectedEnemyRow && (() => {
             const row = selectedEnemyRow;
             const enemy = row.item;
-            const rowKey = enemyEditorKey(enemy.id);
-            const rewardDraft = rewardDrafts[enemy.id] ?? defaultRewardDraft();
             const numberField = (
               labelKey: string,
               value: number,
@@ -945,17 +659,7 @@ export const ContentDataEditor = ({ baseBundle, bundle, draft, onPatch, t }: Con
                     <span>{t('contribution.column.showHealth')}</span>
                     <input checked={enemy.showHealthBar ?? true} onChange={(event) => updateEnemy(row, { showHealthBar: event.target.checked })} type="checkbox" />
                   </label>
-                  <RewardListEditor
-                    draft={rewardDraft}
-                    label={t('contribution.column.rewards')}
-                    onAdd={() => addEnemyReward(row)}
-                    onActivate={() => setSelectedEnemyKey(rowKey)}
-                    onDraftChange={(patch) => updateRewardDraft(enemy.id, patch)}
-                    onRemove={(rewardIndex) => removeEnemyReward(row, rewardIndex)}
-                    rewards={enemy.rewards}
-                    showAdd
-                    t={t}
-                  />
+                  <StructuredDataEditor label="contribution.column.rewards" onChange={(value) => updateEnemy(row, { rewards: (value ?? []) as unknown as EnemyDefinition['rewards'] })} schema={{ kind: 'array', item: rewardSchema(bundle), createItem: () => ({ kind: 'resource', resourceId: bundle.resourceDefinitions[0]?.id ?? '', amount: 1 }) }} t={t} value={enemy.rewards as unknown as StructuredValue} />
                   <button className={`${removeButtonClass} justify-self-end`} onClick={() => { setSelectedEnemyKey(null); removeRow('enemies', row); }} type="button">
                     {t('contribution.column.remove')}
                   </button>
@@ -1075,8 +779,8 @@ export const ContentDataEditor = ({ baseBundle, bundle, draft, onPatch, t }: Con
                   <button className={`${removeButtonClass} self-end`} onClick={() => removeResource(row)} type="button">{t('contribution.column.remove')}</button>
                 </div>
                 <div className="grid gap-2 lg:grid-cols-2">
-                  <JsonEditor<ResourceBoundaryBehavior[]> label={t('contribution.column.onEmpty')} onChange={(onEmpty) => updateResource(row, { onEmpty })} value={row.item.onEmpty} />
-                  <JsonEditor<ResourceBoundaryBehavior[]> label={t('contribution.column.onFull')} onChange={(onFull) => updateResource(row, { onFull })} value={row.item.onFull} />
+                  <StructuredDataEditor label="contribution.column.onEmpty" onChange={(value) => updateResource(row, { onEmpty: value as unknown as ResourceDefinition['onEmpty'] })} optional schema={{ kind: 'array', item: boundarySchema(bundle), createItem: () => ({ kind: 'stop-action' }) }} t={t} value={row.item.onEmpty as unknown as StructuredValue} />
+                  <StructuredDataEditor label="contribution.column.onFull" onChange={(value) => updateResource(row, { onFull: value as unknown as ResourceDefinition['onFull'] })} optional schema={{ kind: 'array', item: boundarySchema(bundle), createItem: () => ({ kind: 'stop-action' }) }} t={t} value={row.item.onFull as unknown as StructuredValue} />
                 </div>
               </div>
             ))}
@@ -1107,11 +811,7 @@ export const ContentDataEditor = ({ baseBundle, bundle, draft, onPatch, t }: Con
           </section>
 
           <section className="border-t border-slate-700 pt-4">
-            <JsonEditor<DeathResetPolicy>
-              label={t('contribution.column.deathReset')}
-              onChange={(deathReset) => onPatch({ deathReset })}
-              value={draft.deathReset ?? baseBundle.manifest.deathReset}
-            />
+            <StructuredDataEditor label="contribution.column.deathReset" onChange={(value) => onPatch({ deathReset: value as unknown as ContributionDraft['deathReset'] })} optional schema={deathResetSchema(bundle)} t={t} value={(draft.deathReset ?? baseBundle.manifest.deathReset) as unknown as StructuredValue} />
           </section>
         </section>
       )}
@@ -1122,7 +822,7 @@ export const ContentDataEditor = ({ baseBundle, bundle, draft, onPatch, t }: Con
           {jsonFiles.map((file) => (
             <details className="rounded bg-slate-950 p-2" key={file.path}>
               <summary className="cursor-pointer text-sm font-semibold text-slate-100">{file.path}</summary>
-              <pre className="mt-2 max-h-80 overflow-auto text-xs text-slate-300">{JSON.stringify(file.json, null, 2)}</pre>
+              <div className="mt-2"><StructuredDataDisplay t={t} value={file.json as unknown as StructuredValue} /></div>
             </details>
           ))}
         </section>

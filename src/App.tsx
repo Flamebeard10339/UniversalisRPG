@@ -10,7 +10,8 @@ import { ContributionWorkbench } from './components/contribution/ContributionWor
 import { SkillBars } from './components/SkillBars';
 import { TravelStatus } from './components/TravelStatus';
 import { WorldMap } from './components/WorldMap';
-import { actionTitleKey, itemTitleKey, locationTitleKey, resourceTitleKey, skillTitleKey } from './game/contentIds';
+import { StructuredDataDisplay, type StructuredValue } from './components/structuredData/StructuredData';
+import { actionTitleKey, itemTitleKey, locationDescriptionKey, locationTitleKey, resourceTitleKey, skillTitleKey } from './game/contentIds';
 import type { ContributionDraft, IdleReport, UniversePlayState } from './game/types';
 import { getNextResourceBoundaryAt } from './game/resources';
 import { load, save } from './lib/storage';
@@ -395,12 +396,19 @@ export default function App() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-950 pb-[45vh] text-slate-100">
+    <main className={`min-h-screen bg-slate-950 text-slate-100 ${activeTab === 'home' && homeTab !== 'workbench' ? 'pb-[calc(33vh+6rem)]' : 'pb-24'}`}>
       <header className="border-b border-slate-800 bg-slate-900/70 px-4 py-3">
         <div className="mx-auto max-w-7xl">
           <div>
-            <h1 className="text-xl font-semibold">{t('app.title')}</h1>
-            <p className="text-sm text-slate-400">{t(bundle.manifest.titleKey)} - {t(bundle.manifest.descriptionKey ?? '')}</p>
+            <h1 className="text-xl font-semibold">
+              {activeTab === 'settings'
+                ? t('app.title')
+                : activeTab === 'home'
+                  ? t(currentLocation.titleKey ?? locationTitleKey(currentLocation.id), currentLocation.id)
+                  : t(`app.tab.${activeTab}`)}
+            </h1>
+            {activeTab === 'settings' && <p className="text-sm text-slate-400">{t(bundle.manifest.titleKey)} - {t(bundle.manifest.descriptionKey ?? '')}</p>}
+            {activeTab === 'home' && <p className="text-sm text-slate-400">{t(currentLocation.descriptionKey ?? locationDescriptionKey(currentLocation.id), '')}</p>}
           </div>
         </div>
       </header>
@@ -431,33 +439,30 @@ export default function App() {
         )}
 
         {activeTab === 'home' && (
-          <section className="grid h-[calc(100vh-150px)] min-h-[560px] grid-rows-[auto_auto_minmax(0,1fr)] gap-4">
-            <TravelStatus
-              activeTravel={playState.activeTravel}
-              bundle={bundle}
-              currentLocationId={playState.currentLocationId}
-              titleWhenIdle
-              t={t}
-            />
-
-            <div className="grid grid-cols-2 gap-2 rounded border border-slate-800 bg-slate-900 p-2">
-              {(['actions', 'details', ...(contributionMode ? ['workbench' as const] : [])] as HomeTab[]).map((tab) => (
-                <button
-                  className={`rounded px-3 py-2 text-sm font-semibold capitalize ${
-                    homeTab === tab ? 'bg-cyan-300 text-slate-950' : 'bg-slate-950 text-slate-300'
-                  }`}
-                  key={tab}
-                  onClick={() => setHomeTab(tab)}
-                  type="button"
-                >
-                  {t(`home.tab.${tab}`)}
-                </button>
-              ))}
+          <section className="grid gap-4">
+            <div className="grid gap-4">
+              {playState.activeTravel && (
+                <TravelStatus activeTravel={playState.activeTravel} bundle={bundle} currentLocationId={playState.currentLocationId} t={t} />
+              )}
+              <div className="grid grid-flow-col auto-cols-fr gap-2 rounded border border-slate-800 bg-slate-900 p-2">
+                {(['actions', 'details', ...(contributionMode ? ['workbench' as const] : [])] as HomeTab[]).map((tab) => (
+                  <button
+                    className={`min-w-0 rounded px-2 py-2 text-sm font-semibold capitalize ${
+                      homeTab === tab ? 'bg-cyan-300 text-slate-950' : 'bg-slate-950 text-slate-300'
+                    }`}
+                    key={tab}
+                    onClick={() => setHomeTab(tab)}
+                    type="button"
+                  >
+                    {t(`home.tab.${tab}`)}
+                  </button>
+                ))}
+              </div>
             </div>
 
             {homeTab === 'actions' && (
-              <section className="grid min-h-0 grid-rows-2 gap-4">
-                <section className="min-h-0 overflow-auto rounded border border-slate-800 bg-slate-900 p-4" data-testid="home-action-panel">
+              <section className="grid gap-4">
+                <section className="rounded border border-slate-800 bg-slate-900 p-4" data-testid="home-action-panel">
                   <ActionPanel
                     debugEnabled={debugEnabled}
                     bundle={bundle}
@@ -467,10 +472,6 @@ export default function App() {
                     t={t}
                   />
                 </section>
-                <ChatPanel
-                  messages={playState.chatMessages}
-                  t={t}
-                />
               </section>
             )}
 
@@ -688,7 +689,7 @@ export default function App() {
                           <span className="font-semibold text-cyan-200">{entry.runId} / {entry.sequence}. {entry.actor}: {entry.event}</span>
                           <time>{new Date(entry.createdAt).toLocaleString()}</time>
                         </div>
-                        {entry.data && <pre className="mt-2 overflow-auto text-slate-400">{JSON.stringify(entry.data, null, 2)}</pre>}
+                        {entry.data && <div className="mt-2"><StructuredDataDisplay t={t} value={entry.data as unknown as StructuredValue} /></div>}
                       </li>
                     ))}
                   </ol>
@@ -748,11 +749,7 @@ export default function App() {
                               <span className="font-semibold text-cyan-200">{entry.action}</span>
                               <time>{new Date(entry.timestamp).toLocaleTimeString()}</time>
                             </div>
-                            {entry.details && (
-                              <pre className="mt-2 overflow-auto text-slate-400">
-                                {JSON.stringify(entry.details, null, 2)}
-                              </pre>
-                            )}
+                            {entry.details && <div className="mt-2"><StructuredDataDisplay t={t} value={entry.details as unknown as StructuredValue} /></div>}
                           </li>
                         ))}
                       </ol>
@@ -776,6 +773,14 @@ export default function App() {
           </section>
         )}
       </div>
+
+      {activeTab === 'home' && homeTab !== 'workbench' && (
+        <div className="fixed inset-x-0 bottom-[73px] z-10 h-[33vh] px-4">
+          <div className="mx-auto h-full max-w-7xl">
+            <ChatPanel messages={playState.chatMessages} t={t} />
+          </div>
+        </div>
+      )}
 
       {showChangelog && (
         <div className="fixed inset-0 z-20 grid place-items-center bg-slate-950/80 p-4">

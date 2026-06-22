@@ -19,22 +19,12 @@ export const ChatPanel = ({ messages, t }: ChatPanelProps) => {
 
   useEffect(() => {
     const element = scrollRef.current;
-
-    if (!element || !stickToBottomRef.current) {
-      return;
-    }
-
-    element.scrollTop = element.scrollHeight;
+    if (element && stickToBottomRef.current) element.scrollTop = element.scrollHeight;
   }, [visibleMessages.length, visibleMessages[visibleMessages.length - 1]?.count]);
 
   const updateStickiness = () => {
     const element = scrollRef.current;
-
-    if (!element) {
-      return;
-    }
-
-    stickToBottomRef.current = element.scrollHeight - element.scrollTop - element.clientHeight < 24;
+    if (element) stickToBottomRef.current = element.scrollHeight - element.scrollTop - element.clientHeight < 24;
   };
 
   const renderMessage = (message: ChatMessage) => {
@@ -43,15 +33,11 @@ export const ChatPanel = ({ messages, t }: ChatPanelProps) => {
   };
 
   return (
-    <section className="grid min-h-0 rounded border border-slate-800 bg-slate-900 p-4" data-testid="chat-panel">
-      <div
-        className="grid content-start gap-2 overflow-auto rounded bg-slate-950 p-3"
-        onScroll={updateStickiness}
-        ref={scrollRef}
-      >
+    <section className="grid h-full min-h-0 rounded border border-slate-800 bg-slate-900 p-4" data-testid="chat-panel">
+      <div className="flex min-h-0 flex-col gap-2 overflow-y-auto rounded bg-slate-950 p-3" onScroll={updateStickiness} ref={scrollRef}>
         {visibleMessages.map((message) => (
           <div
-            className={`max-w-[85%] rounded px-3 py-2 text-sm ${
+            className={`max-w-[85%] shrink-0 rounded px-3 py-2 text-sm ${
               message.author === 'player'
                 ? 'ml-auto bg-cyan-400 text-slate-950'
                 : message.author === 'debug'

@@ -2,7 +2,6 @@ import { actionTitleKey } from '../game/contentIds';
 import { getEnemy, getInteractionType } from '../game/adversarial';
 import type { ContentBundle, UniversePlayState } from '../game/types';
 import type { Translator } from '../game/i18n';
-import { ChatPanel } from './ChatPanel';
 import { ResourceStatus } from './ResourceStatus';
 
 type ActionDetailsProps = {
@@ -85,8 +84,6 @@ export const ActionDetails = ({ bundle, onStopAction, playState, t }: ActionDeta
       <section className="rounded border border-slate-800 bg-slate-900 p-4">
         <ResourceStatus bundle={bundle} playState={playState} t={t} />
       </section>
-
-      <ChatPanel messages={playState.chatMessages} t={t} />
     </section>
   );
 };

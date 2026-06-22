@@ -85,22 +85,32 @@ try {
 
     console.log(`[${viewport.name}] action capabilities`);
     await page.getByRole('button', { name: 'Actions', exact: true }).last().click();
+    await page.getByRole('button', { name: 'Edit', exact: true }).first().click();
     const actionDuration = page.getByLabel('Action duration').first();
     await actionDuration.fill('6.5');
     await actionDuration.press('Tab');
+    await page.waitForTimeout(100);
+    const addMaxCompletions = page.locator('button').filter({ hasText: 'Maximum completions' }).first();
+    await addMaxCompletions.click();
     const maxCompletions = page.getByLabel('Maximum completions', { exact: true }).first();
     await maxCompletions.fill('5');
-    const resultsEditor = page.getByLabel('Completion results (JSON)', { exact: true }).first();
-    await resultsEditor.fill('[{"kind":"relocate","locationId":"crossroads"}]');
-    await resultsEditor.press('Tab');
+    const addResults = page.locator('button').filter({ hasText: 'Completion results' }).first();
+    await addResults.click();
+    await page.waitForTimeout(100);
+    await page.locator('button').filter({ hasText: 'Add row' }).last().click();
+    const resultRow = page.getByText('Row 1', { exact: true }).last().locator('xpath=ancestor::section[1]');
+    const resultKind = resultRow.getByRole('combobox').first();
+    await resultKind.selectOption('relocate');
+    const resultLocation = resultRow.getByLabel('Location', { exact: true }).first();
+    await resultLocation.fill('crossroads');
     const actionDurationValue = await actionDuration.inputValue();
     const maxCompletionsValue = await maxCompletions.inputValue();
-    const resultsValue = await resultsEditor.inputValue();
+    const resultsValue = `${await resultKind.inputValue()}:${await resultLocation.inputValue()}`;
 
     console.log(`[${viewport.name}] resource capabilities`);
     await page.getByRole('button', { name: 'Resources', exact: true }).last().click();
-    const deathResetEditor = page.getByLabel('Death reset policy (JSON)', { exact: true });
-    const onEmptyEditor = page.getByLabel('When empty (JSON)', { exact: true }).first();
+    const deathResetEditor = page.getByText('Death reset policy', { exact: true }).first();
+    const onEmptyEditor = page.getByText(/When empty/, { exact: false }).first();
     await deathResetEditor.scrollIntoViewIfNeeded();
     await page.screenshot({ fullPage: true, path: path.join(os.tmpdir(), `universalis-capabilities-${viewport.name}.png`) });
 
