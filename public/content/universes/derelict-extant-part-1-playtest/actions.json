@@ -17,7 +17,7 @@
     "durationSeconds": 12,
     "maxCompletions": 1,
     "role": "progression",
-    "visibleWhen": { "kind": "action-completions", "actionId": "open-your-eyes", "comparison": "at-least", "value": 1 },
+    "visibleWhen": { "kind": "not", "condition": { "kind": "state-variable", "variable": "action-completions:open-your-eyes", "comparison": "less-than", "value": 1 } },
     "rewards": [],
     "results": [{ "kind": "relocate", "locationId": "cryobay" }]
   },
@@ -27,7 +27,7 @@
     "durationSeconds": 6,
     "maxCompletions": 1,
     "role": "progression",
-    "visibleWhen": { "kind": "action-completions", "actionId": "open-your-eyes", "comparison": "at-least", "value": 1 },
+    "visibleWhen": { "kind": "not", "condition": { "kind": "state-variable", "variable": "action-completions:open-your-eyes", "comparison": "less-than", "value": 1 } },
     "rewards": [],
     "results": [{ "kind": "relocate", "locationId": "cryobay" }]
   },
@@ -87,11 +87,11 @@
     "visibleWhen": {
       "kind": "all",
       "conditions": [
-        { "kind": "item", "itemId": "space-suit", "comparison": "at-least", "value": 1 },
-        { "kind": "flag", "flagId": "wearing-space-suit", "value": false }
+        { "kind": "not", "condition": { "kind": "state-variable", "variable": "item:space-suit", "comparison": "less-than", "value": 1 } },
+        { "kind": "state-variable", "variable": "flag:wearing-space-suit", "comparison": "equal", "value": false }
       ]
     },
-    "requirements": { "kind": "item", "itemId": "space-suit", "comparison": "at-least", "value": 1 },
+    "requirements": { "kind": "not", "condition": { "kind": "state-variable", "variable": "item:space-suit", "comparison": "less-than", "value": 1 } },
     "rewards": [],
     "results": [
       { "kind": "flag", "flagId": "wearing-space-suit", "value": true },
@@ -107,27 +107,26 @@
     "visibleWhen": {
       "kind": "all",
       "conditions": [
-        { "kind": "flag", "flagId": "wearing-space-suit", "value": true },
-        { "kind": "flag", "flagId": "airlock-open", "value": false }
+        { "kind": "state-variable", "variable": "flag:wearing-space-suit", "comparison": "equal", "value": true },
+        { "kind": "state-variable", "variable": "flag:airlock-open", "comparison": "equal", "value": false }
       ]
     },
-    "requirements": { "kind": "resource", "resourceId": "air", "comparison": "greater-than", "value": 0 },
+    "requirements": { "kind": "state-variable", "variable": "resource:air", "comparison": "greater-than", "value": 0 },
     "rewards": [],
     "results": [{ "kind": "flag", "flagId": "airlock-open", "value": true }]
   },
   {
     "id": "replace-air-canister",
     "locationId": "cryobay",
-    "inventoryItemId": "air-canister",
     "durationSeconds": 5,
     "maxCompletions": 2,
     "role": "utility",
-    "visibleWhen": { "kind": "flag", "flagId": "wearing-space-suit", "value": true },
+    "visibleWhen": { "kind": "state-variable", "variable": "flag:wearing-space-suit", "comparison": "equal", "value": true },
     "requirements": {
       "kind": "all",
       "conditions": [
-        { "kind": "item", "itemId": "air-canister", "comparison": "at-least", "value": 1 },
-        { "kind": "resource", "resourceId": "air", "comparison": "at-most", "value": 50 }
+        { "kind": "not", "condition": { "kind": "state-variable", "variable": "item:air-canister", "comparison": "less-than", "value": 1 } },
+        { "kind": "not", "condition": { "kind": "state-variable", "variable": "resource:air", "comparison": "greater-than", "value": 50 } }
       ]
     },
     "rewards": [],

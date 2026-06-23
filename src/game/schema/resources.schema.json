@@ -4,76 +4,36 @@
   "type": "array",
   "items": {
     "type": "object",
-    "required": ["id", "minValue", "baseMaxValue"],
+    "required": ["id", "sourceStat"],
     "additionalProperties": false,
     "properties": {
       "id": { "type": "string", "minLength": 1 },
-      "minValue": { "type": "number" },
-      "baseMaxValue": { "type": "number" },
-      "initialValue": { "type": "number" },
-      "maxSkillId": { "type": "string", "minLength": 1 },
-      "onEmpty": {
-        "type": "array",
-        "items": { "$ref": "#/$defs/behavior" }
-      },
-      "onFull": {
-        "type": "array",
-        "items": { "$ref": "#/$defs/behavior" }
-      }
+      "sourceStat": { "type": "string", "minLength": 1 },
+      "initialValue": { "enum": ["empty", "full"] },
+      "onEmpty": { "type": "array", "items": { "$ref": "#/$defs/behavior" } },
+      "onFull": { "type": "array", "items": { "$ref": "#/$defs/behavior" } }
     }
   },
   "$defs": {
+    "preserve": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "inventoryIds": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+        "resourceIds": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+        "flagIds": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+        "skillXp": { "type": "boolean" },
+        "discoveredLocations": { "type": "boolean" },
+        "actionCompletionIds": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true }
+      }
+    },
     "behavior": {
       "oneOf": [
-        {
-          "type": "object",
-          "required": ["kind"],
-          "additionalProperties": false,
-          "properties": {
-            "kind": { "const": "death-reset" }
-          }
-        },
-        {
-          "type": "object",
-          "required": ["kind"],
-          "additionalProperties": false,
-          "properties": {
-            "kind": { "const": "stop-action" }
-          }
-        },
-        {
-          "type": "object",
-          "required": ["kind", "value"],
-          "additionalProperties": false,
-          "properties": {
-            "kind": { "const": "refill" },
-            "value": {
-              "oneOf": [
-                { "const": "min" },
-                { "const": "max" },
-                { "type": "number" }
-              ]
-            }
-          }
-        },
-        {
-          "type": "object",
-          "required": ["kind", "locationId"],
-          "additionalProperties": false,
-          "properties": {
-            "kind": { "const": "relocate" },
-            "locationId": { "type": "string", "minLength": 1 }
-          }
-        },
-        {
-          "type": "object",
-          "required": ["kind", "messageKey"],
-          "additionalProperties": false,
-          "properties": {
-            "kind": { "const": "chat" },
-            "messageKey": { "type": "string", "minLength": 1 }
-          }
-        }
+        { "type": "object", "required": ["kind"], "additionalProperties": false, "properties": { "kind": { "const": "stop-action" } } },
+        { "type": "object", "required": ["kind", "value"], "additionalProperties": false, "properties": { "kind": { "const": "refill" }, "value": { "oneOf": [{ "const": "min" }, { "const": "max" }, { "type": "number" }] } } },
+        { "type": "object", "required": ["kind", "locationId"], "additionalProperties": false, "properties": { "kind": { "const": "relocate" }, "locationId": { "type": "string", "minLength": 1 } } },
+        { "type": "object", "required": ["kind", "messageKey"], "additionalProperties": false, "properties": { "kind": { "const": "chat" }, "messageKey": { "type": "string", "minLength": 1 } } },
+        { "type": "object", "required": ["kind"], "additionalProperties": false, "properties": { "kind": { "const": "reset-state" }, "locationId": { "type": "string", "minLength": 1 }, "incrementFlagId": { "type": "string", "minLength": 1 }, "preserve": { "$ref": "#/$defs/preserve" } } }
       ]
     }
   }

@@ -27,7 +27,6 @@ export const SubmitToGitHub = ({ appVersion, draft, validationIssues, t }: Submi
         { path: 'flags.json', json: draft.flags },
         { path: 'resources.json', json: draft.resourceDefinitions },
         { path: 'effects.json', json: draft.effects },
-        { path: 'universe.json', json: draft.deathReset ? { deathReset: draft.deathReset } : {} },
         { path: 'interaction-types.json', json: draft.interactionTypes },
         { path: 'enemies.json', json: draft.enemies },
         { path: 'removed.json', json: draft.removed },

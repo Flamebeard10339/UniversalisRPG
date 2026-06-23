@@ -1,8 +1,6 @@
 {
   "schemaVersion": 1,
   "id": "academy",
-  "titleKey": "universe.academy.title",
-  "descriptionKey": "universe.academy.description",
   "version": "0.1.0",
   "author": "UniversalisRPG",
   "locales": ["en"],
@@ -21,13 +19,5 @@
   ],
   "compatibility": {
     "minAppVersion": "0.1.0"
-  },
-  "deathReset": {
-    "locationId": "starting-location",
-    "preserve": {
-      "inventoryIds": ["moonvine-cutting"],
-      "skillXp": true,
-      "discoveredLocations": true
-    }
   }
 }

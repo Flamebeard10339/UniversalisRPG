@@ -3,9 +3,6 @@ import type {
   EnemyDefinition,
   GameAction,
   InteractionTypeDefinition,
-  SkillEquipmentBonuses,
-  SkillDefinition,
-  SkillTotals,
   UniversePlayState,
 } from './types';
 import {
@@ -14,7 +11,8 @@ import {
   effectiveCombatStats,
   expectedCombatDamage,
 } from './combatBalance';
-import { skillLevelFromXp } from './skills';
+import { getSkillTotals } from './characterStats';
+export { getSkillTotals } from './characterStats';
 
 const DEFAULT_RATE = 1;
 const EPSILON = 0.000001;
@@ -27,50 +25,6 @@ export const actionDps = (
   defenderPower: number,
   actionTimeSeconds: number,
 ) => expectedDamage(attackerPower, defenderPower) / Math.max(EPSILON, actionTimeSeconds);
-
-export const getSkillTotals = (
-  state: UniversePlayState,
-  skill: SkillDefinition | undefined,
-  override?: SkillEquipmentBonuses,
-): SkillTotals => {
-  const skillId = skill?.id ?? '';
-  const learnedBase = skill ? skillLevelFromXp(state.skillXp[skill.id] ?? 0) : 1;
-
-  if (override) {
-    const base = Math.max(1, override.base ?? learnedBase);
-    const added = override.added ?? 0;
-    const increased = override.increased ?? 0;
-    const rawTotal = 7 * base + added;
-    const effectiveTotal = increased < 0
-      ? rawTotal / (1 - increased)
-      : rawTotal * (1 + increased);
-
-    return {
-      base,
-      added,
-      increased,
-      effectiveTotal,
-      rate: Math.max(0, override.rate ?? skill?.rate ?? DEFAULT_RATE),
-    };
-  }
-
-  const bonuses = state.equipmentSkillBonuses[skillId] ?? {};
-  const base = Math.max(1, learnedBase) + (bonuses.base ?? 0);
-  const added = bonuses.added ?? 0;
-  const increased = bonuses.increased ?? 0;
-  const rawTotal = 7 * base + added;
-  const effectiveTotal = increased < 0
-    ? rawTotal / (1 - increased)
-    : rawTotal * (1 + increased);
-
-  return {
-    base,
-    added,
-    increased,
-    effectiveTotal,
-    rate: Math.max(0, (skill?.rate ?? DEFAULT_RATE) + (bonuses.rate ?? 0)),
-  };
-};
 
 export const getEnemy = (
   action: GameAction,
@@ -91,8 +45,8 @@ export const getActionSkills = (
   context: ActionResolutionContext,
 ) => {
   const interactionType = getInteractionType(action, context);
-  const sourceSkillId = action.sourceSkillId ?? interactionType?.sourceSkillId;
-  const targetSkillId = action.targetSkillId ?? interactionType?.targetSkillId;
+  const sourceSkillId = interactionType?.sourceSkillId;
+  const targetSkillId = interactionType?.targetSkillId;
 
   return {
     interactionType,

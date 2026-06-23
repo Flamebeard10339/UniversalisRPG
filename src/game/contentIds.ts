@@ -15,6 +15,8 @@ export const toKebabInput = (value: string) =>
     .replace(/-{2,}/g, '-');
 
 export const locationTitleKey = (id: string) => `location.${toKebabCase(id)}.title`;
+export const universeTitleKey = (id: string) => `universe.${toKebabCase(id)}.title`;
+export const universeDescriptionKey = (id: string) => `universe.${toKebabCase(id)}.description`;
 export const locationDescriptionKey = (id: string) => `location.${toKebabCase(id)}.description`;
 export const locationExhaustedKey = (id: string) => `location.${toKebabCase(id)}.exhausted`;
 export const actionTitleKey = (id: string) => `action.${toKebabCase(id)}.title`;

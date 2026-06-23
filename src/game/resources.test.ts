@@ -7,7 +7,6 @@ const bundle: ContentBundle = {
   manifest: {
     schemaVersion: 1,
     id: 'test',
-    titleKey: 'universe.test.title',
     version: '0.1.0',
     author: 'test',
     locales: ['en'],
@@ -16,11 +15,11 @@ const bundle: ContentBundle = {
   locations: [{ id: 'room', position: { x: 0, y: 0 }, starting: true }],
   edges: [],
   actions: [{ id: 'walk', locationId: 'room', durationSeconds: 120, rewards: [] }],
-  skills: [],
+  skills: [{ id: 'air-capacity', maxLevel: 100 }],
   items: [],
   flags: [],
-  resourceDefinitions: [{ id: 'air', minValue: 0, baseMaxValue: 100, initialValue: 100 }],
-  effects: [{ id: 'air-loss', resourceId: 'air', ratePerMinute: -60, source: 'player' }],
+  resourceDefinitions: [{ id: 'air', sourceStat: 'air-capacity', initialValue: 'full' }],
+  effects: [{ id: 'air-loss', resourceId: 'air', ratePerMinute: -60 }],
   interactionTypes: [],
   enemies: [],
   locales: { en: {} },
@@ -30,6 +29,7 @@ const runningState = () => {
   const state = createInitialPlayState('test', 'room');
   return {
     ...state,
+    equipmentSkillBonuses: { 'air-capacity': { added: 93 } },
     lastTickAt: 1_000,
     resourcePools: { air: { current: 100, min: 0, max: 100 } },
     activeAction: {

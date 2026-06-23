@@ -86,7 +86,7 @@ export const WorldMap = ({ bundle, playState, onTravel, t }: WorldMapProps) => {
                 }}
                 type="button"
               >
-                <span className="text-sm font-semibold">{t(location.titleKey ?? locationTitleKey(location.id))}</span>
+                <span className="text-sm font-semibold">{t(locationTitleKey(location.id))}</span>
               </button>
             ),
           },

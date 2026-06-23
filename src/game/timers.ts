@@ -1,5 +1,6 @@
 import type { ActionResolutionContext, ActionResult, ChatMessage, GameAction, IdleReport, IdleResolution, ResourceBoundaryBehavior, Reward, RunLogEntry, TravelEdgeDefinition, UniversePlayState } from './types';
-import { getActionDurationMs, getEnemy, getEnemyAttackDurationMs, getInteractionType, getSkillTotals, sampleAdversarialDamage, sampleEnemyAttackDamage } from './adversarial';
+import { getActionDurationMs, getEnemy, getEnemyAttackDurationMs, getInteractionType, sampleAdversarialDamage, sampleEnemyAttackDamage } from './adversarial';
+import { getEffectRatePerMinute, getResourceMax as resolveResourceMax, isEffectApplicable } from './resources';
 import {
   actionFailureKey,
   actionKillKey,
@@ -99,7 +100,6 @@ export const createInitialPlayState = (universeId: string, startingLocationId: s
   inventory: {},
   flags: {},
   actionCompletions: {},
-  deathCount: 0,
   resourcePools: {},
   skillXp: {},
   equipmentSkillBonuses: {},
@@ -149,7 +149,6 @@ export const normalizePlayState = (
     inventory: { ...(state.resources ?? {}), ...(state.inventory ?? {}) },
     flags: state.flags ?? {},
     actionCompletions: state.actionCompletions ?? {},
-    deathCount: state.deathCount ?? 0,
     equipmentSkillBonuses: state.equipmentSkillBonuses ?? {},
     actionLoopingEnabled: state.actionLoopingEnabled ?? false,
     playerHealth: state.playerHealth ?? 100,
@@ -217,16 +216,9 @@ const getResourceMax = (
 ) => {
   const definition = getResourceDefinition(context, resourceId);
 
-  if (!definition) {
-    return state.resourcePools[resourceId]?.max ?? (resourceId === HEALTH_RESOURCE_ID ? state.playerMaxHealth : 0);
-  }
-
-  const skill = definition.maxSkillId
-    ? context.skills.find((candidate) => candidate.id === definition.maxSkillId)
-    : undefined;
-  const skillMax = skill ? Math.round(getSkillTotals(state, skill).effectiveTotal) : definition.baseMaxValue;
-
-  return Math.max(definition.baseMaxValue, skillMax);
+  return definition
+    ? resolveResourceMax(state, context.skills, definition)
+    : state.resourcePools[resourceId]?.max ?? 0;
 };
 
 const syncLegacyHealth = (state: UniversePlayState) => {
@@ -251,11 +243,10 @@ const ensureResourcePools = (
 
   for (const definition of getResourceDefinitions(context)) {
     const existing = resourcePools[definition.id];
-    const min = definition.minValue;
+    const min = 0;
     const max = getResourceMax(state, context, definition.id);
-    const legacyHealth = definition.id === HEALTH_RESOURCE_ID ? state.playerHealth : undefined;
-    const initial = definition.initialValue ?? max;
-    const current = Math.min(max, Math.max(min, existing?.current ?? legacyHealth ?? initial));
+    const initial = definition.initialValue === 'empty' ? 0 : max;
+    const current = Math.min(max, Math.max(min, existing?.current ?? initial));
 
     resourcePools[definition.id] = {
       current,
@@ -279,7 +270,7 @@ const ensureWorldState = (
 
   for (const item of context.items ?? []) {
     if (inventory[item.id] === undefined) {
-      inventory[item.id] = Math.max(0, item.initialQuantity ?? 0);
+      inventory[item.id] = 0;
     }
   }
   for (const flag of context.flags ?? []) {
@@ -325,12 +316,12 @@ const resolveLocationId = (
 const selectKeys = <T>(values: Record<string, T>, ids: string[] = []) =>
   Object.fromEntries(ids.filter((id) => values[id] !== undefined).map((id) => [id, values[id]]));
 
-export const applyDeathReset = (
+export const applyStateReset = (
   state: UniversePlayState,
   context: ActionResolutionContext,
+  policy: Extract<ResourceBoundaryBehavior, { kind: 'reset-state' }>,
   now = Date.now(),
 ) => {
-  const policy = context.manifest?.deathReset;
   const startingLocationId = resolveLocationId(state, context, policy?.locationId ?? 'starting-location');
   const preserve = policy?.preserve ?? {};
   const initial = ensureWorldState(createInitialPlayState(state.universeId, startingLocationId), context);
@@ -361,12 +352,16 @@ export const applyDeathReset = (
     nextRunLogSequence: state.nextRunLogSequence,
     actionLoopingEnabled: state.actionLoopingEnabled,
     runId: state.runId,
-    deathCount: (state.deathCount ?? 0) + 1,
     lastTickAt: now,
   };
 
-  return appendRunLog(syncLegacyHealth(next), 'engine', 'death.reset', {
-    deathCount: next.deathCount,
+  if (policy?.incrementFlagId) {
+    next.flags[policy.incrementFlagId] = Number(state.flags[policy.incrementFlagId] ?? 0) + 1;
+  }
+
+  return appendRunLog(syncLegacyHealth(next), 'engine', 'state.reset', {
+    incrementFlagId: policy?.incrementFlagId ?? '',
+    incrementedValue: policy?.incrementFlagId ? next.flags[policy.incrementFlagId] : 0,
     locationId: startingLocationId,
     preservedInventoryIds: preserve.inventoryIds ?? [],
     preservedResourceIds: preserve.resourceIds ?? [],
@@ -421,8 +416,8 @@ const applyResourceBehaviors = (
       }, now);
     }
 
-    if (behavior.kind === 'death-reset') {
-      nextState = applyDeathReset(nextState, context, now);
+    if (behavior.kind === 'reset-state') {
+      nextState = applyStateReset(nextState, context, behavior, now);
     }
   }
 
@@ -462,24 +457,6 @@ const applyResourceDelta = (
   return nextState;
 };
 
-const getEffectRatePerMinute = (
-  state: UniversePlayState,
-  context: ActionResolutionContext,
-  effectId: string,
-) => {
-  const effect = (context.effects ?? []).find((candidate) => candidate.id === effectId);
-
-  if (!effect) {
-    return 0;
-  }
-
-  const skill = effect.rateSkillId
-    ? context.skills.find((candidate) => candidate.id === effect.rateSkillId)
-    : undefined;
-
-  return effect.ratePerMinute + (skill ? getSkillTotals(state, skill).effectiveTotal : 0);
-};
-
 const applyActiveEffects = (
   state: UniversePlayState,
   context: ActionResolutionContext,
@@ -499,12 +476,12 @@ const applyActiveEffects = (
   }
 
   return (context.effects ?? []).reduce((nextState, effect) => {
-    if (effect.source === 'location' && effect.locationId && effect.locationId !== nextState.currentLocationId) {
+    if (!isEffectApplicable(nextState, effect)) {
       return nextState;
     }
 
     const resource = nextState.resourcePools[effect.resourceId];
-    const delta = getEffectRatePerMinute(nextState, context, effect.id) * elapsedMinutes;
+    const delta = getEffectRatePerMinute(context.skills, nextState, effect) * elapsedMinutes;
     const crossedMin = resource && delta < 0 && resource.current > resource.min && resource.current + delta <= resource.min;
     const crossedMax = resource && delta > 0 && resource.current < resource.max && resource.current + delta >= resource.max;
     const boundaryAt = crossedMin
@@ -607,7 +584,7 @@ export const startAction = (
       actionId: action.id,
       startedAt: now,
       completesAt: now + remainingMs,
-      targetHealth: progress.targetHealth ?? enemy?.health ?? action.health ?? null,
+      targetHealth: progress.targetHealth ?? enemy?.health ?? null,
       enemyAttackStartedAt,
       enemyAttackCompletesAt,
     },
@@ -616,7 +593,7 @@ export const startAction = (
       [action.id]: {
         ...progress,
         runningSince: now,
-        targetHealth: progress.targetHealth ?? enemy?.health ?? action.health ?? null,
+        targetHealth: progress.targetHealth ?? enemy?.health ?? null,
         enemyAttackStartedAt,
         enemyAttackCompletesAt,
       },

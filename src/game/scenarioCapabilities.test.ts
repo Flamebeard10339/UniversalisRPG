@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { ActionResolutionContext, GameAction } from './types';
+import type { ActionResolutionContext, GameAction, UniversePlayState } from './types';
 import { canStartAction, isActionVisible } from './conditions';
 import { completeAction, createInitialPlayState, resolveIdleTimers, startAction } from './timers';
 import { recordAgentSessionMessage } from './agentSession';
@@ -19,31 +19,23 @@ const context: ActionResolutionContext = {
   manifest: {
     schemaVersion: 1,
     id: 'test',
-    titleKey: 'universe.test.title',
     version: '1',
     author: 'test',
     locales: ['en'],
     files: [],
-    deathReset: {
-      locationId: 'cryopod',
-      preserve: {
-        inventoryIds: ['space-suit'],
-        resourceIds: ['memory-debt'],
-        flagIds: ['torn-suit'],
-        skillXp: true,
-        discoveredLocations: true,
-        actionCompletionIds: ['pick-up-water'],
-      },
-    },
   },
   actions: [pickupWater],
-  skills: [],
+  skills: [
+    { id: 'air-capacity', maxLevel: 100 },
+    { id: 'memory-capacity', maxLevel: 100 },
+  ],
   items: [
-    { id: 'water-bottle', initialQuantity: 0, maxQuantity: 5 },
-    { id: 'space-suit', initialQuantity: 0, maxQuantity: 1 },
-    { id: 'ration', initialQuantity: 1, maxQuantity: 5 },
+    { id: 'water-bottle', maxQuantity: 5 },
+    { id: 'space-suit', maxQuantity: 1 },
+    { id: 'ration', maxQuantity: 5 },
   ],
   flags: [
+    { id: 'death-count', initialValue: 0 },
     { id: 'torn-suit', initialValue: false },
     { id: 'temporary-access', initialValue: false },
   ],
@@ -55,12 +47,23 @@ const context: ActionResolutionContext = {
   resourceDefinitions: [
     {
       id: 'air',
-      minValue: 0,
-      baseMaxValue: 100,
-      initialValue: 20,
-      onEmpty: [{ kind: 'death-reset' }, { kind: 'chat', messageKey: 'resource.air.empty' }],
+      sourceStat: 'air-capacity',
+      initialValue: 'full',
+      onEmpty: [{
+        kind: 'reset-state',
+        locationId: 'cryopod',
+        incrementFlagId: 'death-count',
+        preserve: {
+          inventoryIds: ['space-suit'],
+          resourceIds: ['memory-debt'],
+          flagIds: ['torn-suit'],
+          skillXp: true,
+          discoveredLocations: true,
+          actionCompletionIds: ['pick-up-water'],
+        },
+      }, { kind: 'chat', messageKey: 'resource.air.empty' }],
     },
-    { id: 'memory-debt', minValue: 0, baseMaxValue: 100, initialValue: 0 },
+    { id: 'memory-debt', sourceStat: 'memory-capacity', initialValue: 'empty' },
   ],
   effects: [],
   interactionTypes: [],
@@ -74,8 +77,8 @@ describe('Derelict Extant scenario capabilities', () => {
       visibleWhen: {
         kind: 'all',
         conditions: [
-          { kind: 'flag', flagId: 'torn-suit', value: false },
-          { kind: 'item', itemId: 'water-bottle', comparison: 'at-most', value: 4 },
+          { kind: 'state-variable', variable: 'flag:torn-suit', comparison: 'equal', value: false },
+          { kind: 'not', condition: { kind: 'state-variable', variable: 'item:water-bottle', comparison: 'greater-than', value: 4 } },
         ],
       },
       results: [
@@ -88,7 +91,7 @@ describe('Derelict Extant scenario capabilities', () => {
       locations: context.locations!,
       edges: [],
       actions: [conditionalAction],
-      skills: [],
+      skills: context.skills,
       items: context.items!,
       flags: context.flags!,
       resourceDefinitions: context.resourceDefinitions!,
@@ -106,7 +109,11 @@ describe('Derelict Extant scenario capabilities', () => {
   });
 
   it('supports finite location actions, inventory consumption, resource deltas, conditions, and relocation', () => {
-    let state = createInitialPlayState('test', 'storage');
+    let state: UniversePlayState = {
+      ...createInitialPlayState('test', 'storage'),
+      equipmentSkillBonuses: { 'air-capacity': { added: 93 }, 'memory-capacity': { added: 93 } },
+      resourcePools: { air: { current: 20, min: 0, max: 100 }, 'memory-debt': { current: 0, min: 0, max: 100 } },
+    };
 
     for (let completion = 1; completion <= 5; completion += 1) {
       state = startAction(state, pickupWater, context, completion * 10_000);
@@ -129,14 +136,14 @@ describe('Derelict Extant scenario capabilities', () => {
           {
             kind: 'any',
             conditions: [
-              { kind: 'item', itemId: 'water-bottle', comparison: 'at-least', value: 1 },
-              { kind: 'action-completions', actionId: 'pick-up-water', comparison: 'at-least', value: 5 },
+              { kind: 'not', condition: { kind: 'state-variable', variable: 'item:water-bottle', comparison: 'less-than', value: 1 } },
+              { kind: 'not', condition: { kind: 'state-variable', variable: 'action-completions:pick-up-water', comparison: 'less-than', value: 5 } },
             ],
           },
-          { kind: 'not', condition: { kind: 'flag', flagId: 'torn-suit', value: true } },
+          { kind: 'not', condition: { kind: 'state-variable', variable: 'flag:torn-suit', comparison: 'equal', value: true } },
         ],
       },
-      requirements: { kind: 'resource', resourceId: 'air', comparison: 'at-least', value: 10 },
+      requirements: { kind: 'not', condition: { kind: 'state-variable', variable: 'resource:air', comparison: 'less-than', value: 10 } },
       results: [
         { kind: 'item', itemId: 'water-bottle', amount: -1 },
         { kind: 'resource', resourceId: 'air', amount: 25 },
@@ -166,9 +173,13 @@ describe('Derelict Extant scenario capabilities', () => {
     const deathContext: ActionResolutionContext = {
       ...context,
       actions: [wait],
-      effects: [{ id: 'air-loss', resourceId: 'air', ratePerMinute: -30, source: 'player' }],
+      effects: [{ id: 'air-loss', resourceId: 'air', ratePerMinute: -30 }],
     };
-    let state = createInitialPlayState('test', 'storage');
+    let state: UniversePlayState = {
+      ...createInitialPlayState('test', 'storage'),
+      equipmentSkillBonuses: { 'air-capacity': { added: 93 }, 'memory-capacity': { added: 93 } },
+      resourcePools: { air: { current: 20, min: 0, max: 100 }, 'memory-debt': { current: 0, min: 0, max: 100 } },
+    };
     const runId = state.runId;
     state = recordAgentSessionMessage(state, {
       protocolVersion: 1,
@@ -197,6 +208,7 @@ describe('Derelict Extant scenario capabilities', () => {
       skillXp: { survival: 40 },
       actionCompletions: { 'pick-up-water': 3, 'temporary-action': 2 },
       resourcePools: {
+        air: { current: 20, min: 0, max: 100 },
         'memory-debt': { current: 12, min: 0, max: 100 },
       },
       discoveredLocationIds: ['cryopod', 'storage'],
@@ -204,17 +216,17 @@ describe('Derelict Extant scenario capabilities', () => {
     state = startAction(state, wait, deathContext, 100_000);
     const resolved = resolveIdleTimers(state, deathContext, {}, 160_000).state;
 
-    expect(resolved.deathCount).toBe(1);
+    expect(resolved.flags['death-count']).toBe(1);
     expect(resolved.runId).toBe(runId);
     expect(new Set(resolved.runLog.map((entry) => entry.runId))).toEqual(new Set([runId]));
     expect(resolved.currentLocationId).toBe('cryopod');
     expect(resolved.inventory['space-suit']).toBe(1);
-    expect(resolved.inventory.ration).toBe(1);
+    expect(resolved.inventory.ration).toBe(0);
     expect(resolved.flags['torn-suit']).toBe(true);
     expect(resolved.flags['temporary-access']).toBe(false);
     expect(resolved.skillXp.survival).toBe(40);
     expect(resolved.resourcePools['memory-debt'].current).toBe(12);
-    expect(resolved.resourcePools.air.current).toBe(20);
+    expect(resolved.resourcePools.air.current).toBe(7);
     expect(resolved.actionCompletions['pick-up-water']).toBe(3);
     expect(resolved.actionCompletions['temporary-action']).toBeUndefined();
     expect(resolved.discoveredLocationIds).toEqual(['cryopod', 'storage']);
@@ -222,7 +234,7 @@ describe('Derelict Extant scenario capabilities', () => {
       'gm.update',
       'player.choice',
       'action.start',
-      'death.reset',
+      'state.reset',
     ]));
     expect(resolved.runLog.find((entry) => entry.event === 'player.choice')?.data).toMatchObject({
       feedback: { expectedActions: [{ label: 'Check the pressure gauge' }] },

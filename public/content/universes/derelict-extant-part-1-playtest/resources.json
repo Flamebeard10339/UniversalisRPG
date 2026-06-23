@@ -1,9 +1,8 @@
 [
   {
     "id": "air",
-    "minValue": 0,
-    "baseMaxValue": 100,
-    "initialValue": 0,
+    "sourceStat": "air-capacity",
+    "initialValue": "empty",
     "onEmpty": [
       {
         "kind": "stop-action"

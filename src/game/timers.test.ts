@@ -102,13 +102,14 @@ describe('resolveIdleTimers', () => {
     const context: ActionResolutionContext = {
       actions: [],
       skills: [{ id: 'regeneration', maxLevel: 100 }],
-      resourceDefinitions: [{ id: 'health', minValue: 0, baseMaxValue: 100, initialValue: 100 }],
-      effects: [{ id: 'health-regeneration', resourceId: 'health', ratePerMinute: 60, source: 'player' }],
+      resourceDefinitions: [{ id: 'health', sourceStat: 'regeneration', initialValue: 'full' }],
+      effects: [{ id: 'health-regeneration', resourceId: 'health', ratePerMinute: 60 }],
       interactionTypes: [],
       enemies: [],
     };
     const state = {
       ...createInitialPlayState('test-universe', 'test-location'),
+      equipmentSkillBonuses: { regeneration: { added: 93 } },
       lastTickAt: 1_000,
       resourcePools: {
         health: { current: 50, min: 0, max: 100 },
@@ -134,13 +135,14 @@ describe('resolveIdleTimers', () => {
     const context: ActionResolutionContext = {
       actions: [action],
       skills: [{ id: 'regeneration', maxLevel: 100 }],
-      resourceDefinitions: [{ id: 'health', minValue: 0, baseMaxValue: 100, initialValue: 100 }],
-      effects: [{ id: 'health-regeneration', resourceId: 'health', ratePerMinute: 60, source: 'player' }],
+      resourceDefinitions: [{ id: 'health', sourceStat: 'regeneration', initialValue: 'full' }],
+      effects: [{ id: 'health-regeneration', resourceId: 'health', ratePerMinute: 60 }],
       interactionTypes: [],
       enemies: [],
     };
     const state = {
       ...startAction(createInitialPlayState('test-universe', 'test-location'), action, context, startedAt),
+      equipmentSkillBonuses: { regeneration: { added: 93 } },
       resourcePools: {
         health: { current: 50, min: 0, max: 100 },
       },
@@ -164,13 +166,12 @@ describe('resolveIdleTimers', () => {
     };
     const context: ActionResolutionContext = {
       actions: [action],
-      skills: [],
+      skills: [{ id: 'health-capacity', maxLevel: 100 }],
       locations: [{ id: 'test-location', position: { x: 0, y: 0 }, starting: true }],
       resourceDefinitions: [{
         id: 'health',
-        minValue: 0,
-        baseMaxValue: 100,
-        initialValue: 100,
+        sourceStat: 'health-capacity',
+        initialValue: 'full',
         onEmpty: [
           { kind: 'stop-action' },
           { kind: 'refill', value: 'max' },
@@ -178,12 +179,13 @@ describe('resolveIdleTimers', () => {
           { kind: 'chat', messageKey: 'resource.health.empty' },
         ],
       }],
-      effects: [{ id: 'poison', resourceId: 'health', ratePerMinute: -60, source: 'player' }],
+      effects: [{ id: 'poison', resourceId: 'health', ratePerMinute: -60 }],
       interactionTypes: [],
       enemies: [],
     };
     const state = {
       ...startAction(createInitialPlayState('test-universe', 'test-location'), action, context, startedAt),
+      equipmentSkillBonuses: { 'health-capacity': { added: 93 } },
       resourcePools: {
         health: { current: 10, min: 0, max: 100 },
       },

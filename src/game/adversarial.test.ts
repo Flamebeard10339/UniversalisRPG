@@ -30,9 +30,8 @@ const context: ActionResolutionContext = {
   locations: [{ id: 'arena', position: { x: 0, y: 0 }, starting: true }],
   resourceDefinitions: [{
     id: 'health',
-    minValue: 0,
-    baseMaxValue: 100,
-    initialValue: 100,
+    sourceStat: 'defense',
+    initialValue: 'full',
     onEmpty: [
       { kind: 'stop-action' },
       { kind: 'refill', value: 'max' },
@@ -148,7 +147,7 @@ describe('adversarial actions', () => {
     const resolved = resolveIdleTimers(state, lethalContext, { random: () => 1 }, startedAt + 1_000);
 
     expect(resolved.state.activeAction).toBeNull();
-    expect(resolved.state.playerHealth).toBe(100);
+    expect(resolved.state.playerHealth).toBe(7);
     expect(resolved.state.chatMessages.map((message) => message.key)).toEqual([
       'interaction.melee-combat.entity.kill',
       'resource.health.empty',

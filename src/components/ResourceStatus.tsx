@@ -53,7 +53,7 @@ export const ResourceStatus = ({ bundle, playState, showEffects = false, t }: Re
                       <p className="text-slate-500">{t('resources.effects.empty')}</p>
                     ) : (
                       effects.map((effect) => {
-                        const rate = getEffectRatePerMinute(bundle, playState, effect);
+                        const rate = getEffectRatePerMinute(bundle.skills, playState, effect);
                         const active = Boolean(playState.activeAction) && isEffectApplicable(playState, effect);
 
                         return (
@@ -63,7 +63,7 @@ export const ResourceStatus = ({ bundle, playState, showEffects = false, t }: Re
                               {t(active ? 'resources.effects.activeRate' : 'resources.effects.inactiveRate', {
                                 rate: formatNumber(rate),
                               })}
-                              {effect.rateSkillId && ` ${t('resources.effects.fromSkill', { skill: t(skillTitleKey(effect.rateSkillId), effect.rateSkillId) })}`}
+                              {effect.useStat && ` ${t('resources.effects.fromSkill', { skill: t(skillTitleKey(effect.useStat), effect.useStat) })}`}
                             </span>
                           </div>
                         );

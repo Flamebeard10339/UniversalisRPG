@@ -8,7 +8,6 @@
     "additionalProperties": false,
     "properties": {
       "id": { "type": "string", "minLength": 1 },
-      "initialQuantity": { "type": "integer", "minimum": 0 },
       "maxQuantity": { "type": "integer", "minimum": 1 }
     }
   }

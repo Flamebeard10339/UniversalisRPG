@@ -28,6 +28,7 @@ const conditions = await vite.ssrLoadModule('/src/game/conditions.ts');
 const validators = await vite.ssrLoadModule('/src/game/validators.ts');
 const contentIds = await vite.ssrLoadModule('/src/game/contentIds.ts');
 const agentSession = await vite.ssrLoadModule('/src/game/agentSession.ts');
+const resources = await vite.ssrLoadModule('/src/game/resources.ts');
 
 const readJson = async (filePath) => JSON.parse(await fs.readFile(filePath, 'utf8'));
 const writeJson = async (filePath, value) => {
@@ -129,21 +130,22 @@ const buildPlayerSnapshot = (session) => {
     virtualNow: session.virtualNow,
     location: {
       id: location.id,
-      title: localeText(session.bundle, location.titleKey ?? contentIds.locationTitleKey(location.id), location.id),
-      description: localeText(session.bundle, location.descriptionKey ?? contentIds.locationDescriptionKey(location.id), ''),
+      title: localeText(session.bundle, contentIds.locationTitleKey(location.id), location.id),
+      description: localeText(session.bundle, contentIds.locationDescriptionKey(location.id), ''),
     },
     narration: session.latestOutcome?.narration ?? [],
     resources: session.bundle.resourceDefinitions.map((resource) => {
       const pool = session.state.resourcePools[resource.id];
-      const applicableEffects = session.bundle.effects.filter((effect) => effect.resourceId === resource.id && (effect.source === 'player' || effect.locationId === session.state.currentLocationId));
+      const applicableEffects = session.bundle.effects.filter((effect) => effect.resourceId === resource.id && resources.isEffectApplicable(session.state, effect));
+      const max = resources.getResourceMax(session.state, session.bundle.skills, resource);
       return {
         id: resource.id,
         label: localeText(session.bundle, contentIds.resourceTitleKey(resource.id), resource.id),
-        current: pool?.current ?? resource.initialValue ?? resource.baseMaxValue,
-        min: pool?.min ?? resource.minValue,
-        max: pool?.max ?? resource.baseMaxValue,
+        current: pool?.current ?? (resource.initialValue === 'empty' ? 0 : max),
+        min: pool?.min ?? 0,
+        max: pool?.max ?? max,
         ratePerMinute: session.state.activeAction
-          ? applicableEffects.reduce((total, effect) => total + effect.ratePerMinute, 0)
+          ? applicableEffects.reduce((total, effect) => total + resources.getEffectRatePerMinute(session.bundle.skills, session.state, effect), 0)
           : 0,
       };
     }),
@@ -152,8 +154,8 @@ const buildPlayerSnapshot = (session) => {
       .map(([id, quantity]) => ({ id, label: localeText(session.bundle, contentIds.itemTitleKey(id), id), quantity })),
     actions: visibleActions(session).map((action) => ({
       id: action.id,
-      title: localeText(session.bundle, action.titleKey ?? contentIds.actionTitleKey(action.id), action.id),
-      description: localeText(session.bundle, action.descriptionKey ?? contentIds.actionDescriptionKey(action.id), ''),
+      title: localeText(session.bundle, contentIds.actionTitleKey(action.id), action.id),
+      description: localeText(session.bundle, contentIds.actionDescriptionKey(action.id), ''),
       durationSeconds: action.durationSeconds,
       remainingCompletions: action.maxCompletions === undefined ? null : Math.max(0, action.maxCompletions - (session.state.actionCompletions[action.id] ?? 0)),
       enabled: conditions.canStartAction(session.state, action, context),
@@ -255,9 +257,6 @@ const applyOperations = (originalBundle, operations) => {
   for (const operation of operations) {
     if (operation.op === 'set-manifest') {
       bundle.manifest = structuredClone(operation.value);
-    } else if (operation.op === 'set-death-reset') {
-      if (!bundle.manifest) throw new Error('set-death-reset requires a manifest');
-      bundle.manifest.deathReset = structuredClone(operation.value);
     } else if (operation.op === 'localize') {
       bundle.locales[operation.locale] = { ...(bundle.locales[operation.locale] ?? {}), ...operation.values };
     } else {
@@ -279,18 +278,13 @@ const applyOperations = (originalBundle, operations) => {
 
 const designWarnings = (bundle) => {
   const warnings = [];
-  if (bundle.manifest.deathReset) {
-    const deathResources = bundle.resourceDefinitions.filter((resource) => resource.onEmpty?.some((behavior) => behavior.kind === 'death-reset'));
-    if (deathResources.length === 0) {
-      warnings.push({ severity: 'warning', path: 'resources.json', message: 'agent.validation.deathResetHasNoResourceBoundary' });
-    }
-    for (const resource of deathResources) {
+  const resetResources = bundle.resourceDefinitions.filter((resource) => resource.onEmpty?.some((behavior) => behavior.kind === 'reset-state'));
+  for (const resource of resetResources) {
       const hasNegativeEffect = bundle.effects.some((effect) => effect.resourceId === resource.id && effect.ratePerMinute < 0);
       const hasNegativeResult = bundle.actions.some((action) => action.results?.some((result) => result.kind === 'resource' && result.resourceId === resource.id && result.amount < 0));
       if (!hasNegativeEffect && !hasNegativeResult) {
         warnings.push({ severity: 'warning', path: `resources.${resource.id}`, message: 'agent.validation.deathResourceHasNoDrain' });
       }
-    }
   }
   return warnings;
 };

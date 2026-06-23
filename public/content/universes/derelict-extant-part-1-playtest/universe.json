@@ -1,8 +1,6 @@
 {
   "schemaVersion": 1,
   "id": "derelict-extant-part-1-playtest",
-  "titleKey": "universe.derelict-extant-part-1-playtest.title",
-  "descriptionKey": "universe.derelict-extant-part-1-playtest.description",
   "version": "0.1.0",
   "author": "UniversalisRPG GM",
   "locales": [

@@ -1,28 +1,32 @@
-import { getSkillTotals } from './adversarial';
+import { getCharacterStatValue } from './characterStats';
 import type { ContentBundle, EffectDefinition, ResourceDefinition, ResourcePool, UniversePlayState } from './types';
 
 export const isEffectApplicable = (state: UniversePlayState, effect: EffectDefinition) =>
-  effect.source === 'player'
-  || (effect.source === 'location' && (!effect.locationId || effect.locationId === state.currentLocationId));
+  !effect.locationId || effect.locationId === state.currentLocationId;
 
 export const getEffectRatePerMinute = (
-  bundle: ContentBundle,
+  stats: ContentBundle['skills'],
   state: UniversePlayState,
   effect: EffectDefinition,
 ) => {
-  const skill = effect.rateSkillId
-    ? bundle.skills.find((candidate) => candidate.id === effect.rateSkillId)
-    : undefined;
-  return effect.ratePerMinute + (skill ? getSkillTotals(state, skill).effectiveTotal : 0);
+  return effect.useStat
+    ? getCharacterStatValue(state, stats, effect.useStat)
+    : effect.ratePerMinute;
 };
 
-const basePool = (state: UniversePlayState, resource: ResourceDefinition): ResourcePool => {
+export const getResourceMax = (
+  state: UniversePlayState,
+  stats: ContentBundle['skills'],
+  resource: ResourceDefinition,
+) => Math.max(0, getCharacterStatValue(state, stats, resource.sourceStat));
+
+const basePool = (bundle: ContentBundle, state: UniversePlayState, resource: ResourceDefinition): ResourcePool => {
   const existing = state.resourcePools[resource.id];
-  if (existing) return existing;
-  const max = resource.id === 'health' ? state.playerMaxHealth : resource.baseMaxValue;
+  const max = getResourceMax(state, bundle.skills, resource);
+  if (existing) return { current: Math.min(max, Math.max(0, existing.current)), min: 0, max };
   return {
-    current: resource.id === 'health' ? state.playerHealth : resource.initialValue ?? max,
-    min: resource.minValue,
+    current: resource.initialValue === 'empty' ? 0 : max,
+    min: 0,
     max,
   };
 };
@@ -35,7 +39,7 @@ export const getActiveResourceRate = (
   if (!state.activeAction) return 0;
   return bundle.effects
     .filter((effect) => effect.resourceId === resourceId && isEffectApplicable(state, effect))
-    .reduce((total, effect) => total + getEffectRatePerMinute(bundle, state, effect), 0);
+    .reduce((total, effect) => total + getEffectRatePerMinute(bundle.skills, state, effect), 0);
 };
 
 export const projectResourcePool = (
@@ -44,7 +48,7 @@ export const projectResourcePool = (
   resource: ResourceDefinition,
   now: number,
 ): ResourcePool => {
-  const pool = basePool(state, resource);
+  const pool = basePool(bundle, state, resource);
   if (!state.activeAction) return pool;
   const until = Math.min(now, state.activeAction.completesAt);
   const elapsedMinutes = Math.max(0, until - state.lastTickAt) / 60_000;
@@ -58,7 +62,7 @@ export const getNextResourceBoundaryAt = (
 ) => {
   if (!state.activeAction) return null;
   const boundaries = bundle.resourceDefinitions.flatMap((resource) => {
-    const pool = basePool(state, resource);
+    const pool = basePool(bundle, state, resource);
     const rate = getActiveResourceRate(bundle, state, resource.id);
     if (rate < 0 && pool.current > pool.min) {
       return [state.lastTickAt + ((pool.current - pool.min) / -rate) * 60_000];

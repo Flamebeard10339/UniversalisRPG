@@ -8,8 +8,6 @@
     "additionalProperties": false,
     "properties": {
       "id": { "type": "string", "minLength": 1 },
-      "titleKey": { "type": "string", "minLength": 1 },
-      "descriptionKey": { "type": "string", "minLength": 1 },
       "position": {
         "type": "object",
         "required": ["x", "y"],

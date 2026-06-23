@@ -39,7 +39,7 @@ export const CharacterStats = ({ bundle, playState, t }: CharacterStatsProps) =>
 
               return (
                 <tr className="border-b border-slate-800/80 text-slate-200" key={skill.id}>
-                  <td className="py-2 pr-3 font-semibold text-slate-100">{t(skill.titleKey ?? skillTitleKey(skill.id))}</td>
+                  <td className="py-2 pr-3 font-semibold text-slate-100">{t(skillTitleKey(skill.id))}</td>
                   <td className="py-2 pr-3">{formatNumber(totals.base)}</td>
                   <td className="py-2 pr-3">{formatNumber(totals.added)}</td>
                   <td className="py-2 pr-3">{formatNumber(totals.increased)}</td>

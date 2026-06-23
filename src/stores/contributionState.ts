@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import type { ContributionDraft } from '../game/types';
 import { normalizeEnemyDefinition } from '../game/enemies';
+import { normalizeGameAction } from '../game/actions';
 import { load, save } from '../lib/storage';
 
 type ContributionStateStore = {
@@ -45,6 +46,7 @@ const createEmptyDraft = (universeId: string): ContributionDraft => ({
 const normalizeDraft = (draft: ContributionDraft): ContributionDraft => ({
   ...createEmptyDraft(draft.universeId),
   ...draft,
+  actions: (draft.actions ?? []).map(normalizeGameAction),
   items: draft.items ?? [],
   flags: draft.flags ?? [],
   resourceDefinitions: draft.resourceDefinitions ?? [],

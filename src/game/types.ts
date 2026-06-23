@@ -8,8 +8,6 @@ export type Position = {
 export type UniverseManifest = {
   schemaVersion: number;
   id: string;
-  titleKey: string;
-  descriptionKey?: string;
   version: string;
   author: string;
   locales: string[];
@@ -18,25 +16,10 @@ export type UniverseManifest = {
     minAppVersion?: string;
     maxAppVersion?: string;
   };
-  deathReset?: DeathResetPolicy;
-};
-
-export type DeathResetPolicy = {
-  locationId?: string;
-  preserve?: {
-    inventoryIds?: string[];
-    resourceIds?: string[];
-    flagIds?: string[];
-    skillXp?: boolean;
-    discoveredLocations?: boolean;
-    actionCompletionIds?: string[];
-  };
 };
 
 export type LocationNode = {
   id: string;
-  titleKey?: string;
-  descriptionKey?: string;
   position: Position;
   starting?: boolean;
   tags?: string[];
@@ -47,7 +30,6 @@ export type TravelEdgeDefinition = {
   source: string;
   target: string;
   travelTimeSeconds: number;
-  requirementIds?: string[];
 };
 
 export type Reward =
@@ -67,27 +49,10 @@ export type Reward =
       amount: number;
     };
 
-export type Requirement =
-  | {
-      kind: 'skillLevel';
-      skillId: string;
-      level: number;
-    }
-  | {
-      kind: 'resource';
-      resourceId: string;
-      amount: number;
-    };
-
-export type NumericComparison = 'equal' | 'at-least' | 'at-most' | 'greater-than' | 'less-than';
+export type NumericComparison = 'equal' | 'greater-than' | 'less-than';
 
 export type Condition =
-  | { kind: 'death-count'; comparison: NumericComparison; value: number }
-  | { kind: 'item'; itemId: string; comparison: NumericComparison; value: number }
-  | { kind: 'resource'; resourceId: string; comparison: NumericComparison; value: number }
-  | { kind: 'skill-level'; skillId: string; comparison: NumericComparison; value: number }
-  | { kind: 'action-completions'; actionId: string; comparison: NumericComparison; value: number }
-  | { kind: 'flag'; flagId: string; value: boolean }
+  | { kind: 'state-variable'; variable: string; comparison: NumericComparison; value: number | boolean }
   | { kind: 'all'; conditions: Condition[] }
   | { kind: 'any'; conditions: Condition[] }
   | { kind: 'not'; condition: Condition };
@@ -103,50 +68,37 @@ export type ActionResult =
 export type GameAction = {
   id: string;
   locationId: string;
-  inventoryItemId?: string;
   role?: 'optional' | 'progression' | 'utility';
-  titleKey?: string;
-  descriptionKey?: string;
   durationSeconds: number;
   rewards: Reward[];
-  requirements?: Requirement[] | Condition;
+  requirements?: Condition; // TODO: check what the UI looks like for a visible action that fails the requirements.
   visibleWhen?: Condition;
   results?: ActionResult[];
   maxCompletions?: number;
   enemyId?: string;
   interactionTypeId?: string;
-  sourceSkillId?: string;
-  targetSkillId?: string;
-  health?: number;
-  rate?: number;
 };
 
 export type SkillDefinition = {
   id: string;
-  titleKey?: string;
-  descriptionKey?: string;
   maxLevel: number;
-  rate?: number;
 };
 
 export type ItemDefinition = {
   id: string;
-  titleKey?: string;
-  descriptionKey?: string;
-  initialQuantity?: number;
   maxQuantity?: number;
 };
 
 export type StateFlagDefinition = {
   id: string;
-  initialValue?: boolean;
+  initialValue?: boolean | number;
 };
 
 export type InteractionTypeDefinition = {
   id: string;
   sourceSkillId: string;
   targetSkillId: string;
-  targetPlayerHealth: boolean;
+  targetPlayerHealth: boolean; // TODO:
 };
 
 export type ResourceBoundaryBehavior =
@@ -166,15 +118,23 @@ export type ResourceBoundaryBehavior =
       messageKey: string;
     }
   | {
-      kind: 'death-reset';
+      kind: 'reset-state';
+      locationId?: string;
+      incrementFlagId?: string;
+      preserve?: {
+        inventoryIds?: string[];
+        resourceIds?: string[];
+        flagIds?: string[];
+        skillXp?: boolean;
+        discoveredLocations?: boolean;
+        actionCompletionIds?: string[];
+      };
     };
 
 export type ResourceDefinition = {
   id: string;
-  minValue: number;
-  baseMaxValue: number;
-  initialValue?: number;
-  maxSkillId?: string;
+  sourceStat: string;
+  initialValue?: 'empty' | 'full';
   onEmpty?: ResourceBoundaryBehavior[];
   onFull?: ResourceBoundaryBehavior[];
 };
@@ -183,8 +143,7 @@ export type EffectDefinition = {
   id: string;
   resourceId: string;
   ratePerMinute: number;
-  rateSkillId?: string;
-  source: 'player' | 'location';
+  useStat?: string;
   locationId?: string;
 };
 
@@ -350,9 +309,8 @@ export type UniversePlayState = {
   activeTravel: ActiveTravel | null;
   resources: Record<string, number>;
   inventory: Record<string, number>;
-  flags: Record<string, boolean>;
+  flags: Record<string, boolean | number>;
   actionCompletions: Record<string, number>;
-  deathCount: number;
   resourcePools: Record<string, ResourcePool>;
   skillXp: Record<string, number>;
   equipmentSkillBonuses: Record<string, SkillEquipmentBonuses>;
@@ -386,7 +344,6 @@ export type ContributionDraft = {
   flags: StateFlagDefinition[];
   resourceDefinitions: ResourceDefinition[];
   effects: EffectDefinition[];
-  deathReset?: DeathResetPolicy;
   interactionTypes: InteractionTypeDefinition[];
   enemies: EnemyDefinition[];
   locales: Record<string, LocaleDictionary>;

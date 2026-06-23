@@ -109,9 +109,8 @@ try {
 
     console.log(`[${viewport.name}] resource capabilities`);
     await page.getByRole('button', { name: 'Resources', exact: true }).last().click();
-    const deathResetEditor = page.getByText('Death reset policy', { exact: true }).first();
     const onEmptyEditor = page.getByText(/When empty/, { exact: false }).first();
-    await deathResetEditor.scrollIntoViewIfNeeded();
+    await onEmptyEditor.scrollIntoViewIfNeeded();
     await page.screenshot({ fullPage: true, path: path.join(os.tmpdir(), `universalis-capabilities-${viewport.name}.png`) });
 
     const runTranscript = page.getByText('Run transcript', { exact: true });
@@ -126,7 +125,7 @@ try {
       actionDuration: actionDurationValue,
       maxCompletions: maxCompletionsValue,
       results: resultsValue,
-      deathResetEditor: await deathResetEditor.isVisible(),
+      resetStateEditor: await page.locator('option[value="reset-state"]:checked').count() > 0,
       onEmptyEditor: await onEmptyEditor.isVisible(),
       runTranscript: await runTranscript.isVisible(),
       editorGeometry: { attackBox, removeBox, referenceHealthBox },
@@ -148,7 +147,7 @@ const failed = results.some((result) =>
   result.actionDuration !== '6.5' ||
   result.maxCompletions !== '5' ||
   !result.results.includes('relocate') ||
-  !result.deathResetEditor ||
+  !result.resetStateEditor ||
   !result.onEmptyEditor ||
   !result.runTranscript ||
   result.errors.length > 0

@@ -11,7 +11,7 @@ import { SkillBars } from './components/SkillBars';
 import { TravelStatus } from './components/TravelStatus';
 import { WorldMap } from './components/WorldMap';
 import { StructuredDataDisplay, type StructuredValue } from './components/structuredData/StructuredData';
-import { actionTitleKey, itemTitleKey, locationDescriptionKey, locationTitleKey, resourceTitleKey, skillTitleKey } from './game/contentIds';
+import { actionTitleKey, itemTitleKey, locationDescriptionKey, locationTitleKey, resourceTitleKey, skillTitleKey, universeDescriptionKey, universeTitleKey } from './game/contentIds';
 import type { ContributionDraft, IdleReport, UniversePlayState } from './game/types';
 import { getNextResourceBoundaryAt } from './game/resources';
 import { load, save } from './lib/storage';
@@ -404,11 +404,11 @@ export default function App() {
               {activeTab === 'settings'
                 ? t('app.title')
                 : activeTab === 'home'
-                  ? t(currentLocation.titleKey ?? locationTitleKey(currentLocation.id), currentLocation.id)
+                  ? t(locationTitleKey(currentLocation.id), currentLocation.id)
                   : t(`app.tab.${activeTab}`)}
             </h1>
-            {activeTab === 'settings' && <p className="text-sm text-slate-400">{t(bundle.manifest.titleKey)} - {t(bundle.manifest.descriptionKey ?? '')}</p>}
-            {activeTab === 'home' && <p className="text-sm text-slate-400">{t(currentLocation.descriptionKey ?? locationDescriptionKey(currentLocation.id), '')}</p>}
+            {activeTab === 'settings' && <p className="text-sm text-slate-400">{t(universeTitleKey(bundle.manifest.id))} - {t(universeDescriptionKey(bundle.manifest.id), '')}</p>}
+            {activeTab === 'home' && <p className="text-sm text-slate-400">{t(locationDescriptionKey(currentLocation.id), '')}</p>}
           </div>
         </div>
       </header>
@@ -532,7 +532,7 @@ export default function App() {
             )}
 
             {characterTab === 'inventory' && (
-              <InventoryPanel bundle={bundle} onStartAction={beginAction} playState={playState} t={t} />
+              <InventoryPanel playState={playState} t={t} />
             )}
 
             {characterTab === 'stats' && (
@@ -560,7 +560,7 @@ export default function App() {
                   >
                     {manifests.map((manifest) => (
                       <option key={manifest.id} value={manifest.id}>
-                        {t(manifest.titleKey, manifest.id)}
+                        {t(universeTitleKey(manifest.id), manifest.id)}
                       </option>
                     ))}
                   </select>
@@ -870,7 +870,7 @@ export default function App() {
         <div className="fixed inset-0 z-20 grid place-items-center bg-slate-950/80 p-4">
           <section className="w-full max-w-md rounded border border-rose-800 bg-slate-900 p-5 shadow-xl">
             <h2 className="text-lg font-semibold text-rose-100">{t('dialog.resetTitle')}</h2>
-            <p className="mt-2 text-sm text-slate-300">{t('dialog.resetDescription', { universe: t(bundle.manifest.titleKey, bundle.manifest.id) })}</p>
+            <p className="mt-2 text-sm text-slate-300">{t('dialog.resetDescription', { universe: t(universeTitleKey(bundle.manifest.id), bundle.manifest.id) })}</p>
             <div className="mt-4 flex justify-end gap-2">
               <button className="rounded border border-slate-600 px-3 py-2 text-sm font-semibold text-slate-100" onClick={() => setConfirmReset(false)} type="button">
                 {t('dialog.cancel')}

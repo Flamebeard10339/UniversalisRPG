@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import type { ContentBundle, UniverseManifest, ValidationIssue } from '../game/types';
 import { normalizeEnemyDefinition } from '../game/enemies';
+import { normalizeGameAction } from '../game/actions';
 import {
   listBundledUniverses,
   loadLocalUniverseLibrary,
@@ -77,6 +78,7 @@ const applyDraft = (bundle: ContentBundle | null) => {
 
 const normalizeContentBundle = (bundle: ContentBundle): ContentBundle => ({
   ...bundle,
+  actions: bundle.actions.map(normalizeGameAction),
   items: bundle.items ?? [],
   flags: bundle.flags ?? [],
   resourceDefinitions: bundle.resourceDefinitions ?? [],

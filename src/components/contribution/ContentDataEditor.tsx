@@ -6,7 +6,7 @@ import { ContributionMapEditor } from './ContributionMapEditor';
 import { EnemyDiagnostics } from './EnemyDiagnostics';
 import { EdgeFields, LocationFields } from './MapContentFields';
 import { StructuredDataDisplay, StructuredDataEditor, type StructuredValue } from '../structuredData/StructuredData';
-import { actionSchema, boundarySchema, deathResetSchema, rewardSchema } from '../structuredData/contentSchemas';
+import { actionSchema, effectDefinitionSchema, flagDefinitionSchema, resourceDefinitionSchema, rewardSchema } from '../structuredData/contentSchemas';
 
 type ContentDataEditorProps = {
   baseBundle: ContentBundle;
@@ -190,10 +190,6 @@ export const ContentDataEditor = ({ baseBundle, bundle, draft, onPatch, t }: Con
     promote('items', { ...row.item, ...patch }, row.item.id);
   };
 
-  const updateFlag = (row: LayeredRow<StateFlagDefinition>, patch: Partial<StateFlagDefinition>) => {
-    promote('flags', { ...row.item, ...patch }, row.item.id);
-  };
-
   const updateResource = (row: LayeredRow<ResourceDefinition>, patch: Partial<ResourceDefinition>) => {
     const item = { ...row.item, ...patch };
     onPatch({
@@ -314,7 +310,7 @@ export const ContentDataEditor = ({ baseBundle, bundle, draft, onPatch, t }: Con
 
   const addItem = () => {
     const id = uniqueId('new-item', items.map((row) => row.item.id));
-    onPatch({ items: [{ id, initialQuantity: 0 }, ...draft.items] });
+    onPatch({ items: [{ id }, ...draft.items] });
   };
 
   const addFlag = () => {
@@ -324,7 +320,7 @@ export const ContentDataEditor = ({ baseBundle, bundle, draft, onPatch, t }: Con
 
   const addResource = () => {
     const id = uniqueId('new-resource', resources.map((row) => row.item.id));
-    onPatch({ resourceDefinitions: [{ id, minValue: 0, baseMaxValue: 100, initialValue: 100 }, ...draft.resourceDefinitions] });
+    onPatch({ resourceDefinitions: [{ id, sourceStat: skills[0]?.item.id ?? '', initialValue: 'full' }, ...draft.resourceDefinitions] });
   };
 
   const addEffect = () => {
@@ -334,7 +330,6 @@ export const ContentDataEditor = ({ baseBundle, bundle, draft, onPatch, t }: Con
         id,
         resourceId: resources[0]?.item.id ?? '',
         ratePerMinute: 0,
-        source: 'player',
       }, ...draft.effects],
     });
   };
@@ -381,7 +376,6 @@ export const ContentDataEditor = ({ baseBundle, bundle, draft, onPatch, t }: Con
     { path: 'flags.json', json: flags.map((row) => row.item) },
     { path: 'resources.json', json: resources.map((row) => row.item) },
     { path: 'effects.json', json: effects.map((row) => row.item) },
-    { path: 'universe.json', json: { deathReset: draft.deathReset ?? baseBundle.manifest.deathReset } },
     { path: 'interaction-types.json', json: interactionTypes.map((row) => row.item) },
     { path: 'enemies.json', json: enemies.map((row) => row.item) },
     { path: 'removed.json', json: draft.removed },
@@ -710,9 +704,8 @@ export const ContentDataEditor = ({ baseBundle, bundle, draft, onPatch, t }: Con
               {t('contribution.data.addItem')}
             </button>
           </div>
-          <div className="hidden grid-cols-[1fr_8rem_8rem_6rem] gap-2 px-2 text-xs font-semibold uppercase tracking-wide text-slate-500 lg:grid">
+          <div className="hidden grid-cols-[1fr_8rem_6rem] gap-2 px-2 text-xs font-semibold uppercase tracking-wide text-slate-500 lg:grid">
             <span>{t('contribution.column.id')}</span>
-            <span>{t('contribution.column.initialQuantity')}</span>
             <span>{t('contribution.column.maxQuantity')}</span>
             <span>{t('contribution.column.remove')}</span>
           </div>
@@ -721,9 +714,8 @@ export const ContentDataEditor = ({ baseBundle, bundle, draft, onPatch, t }: Con
           ) : (
             <div className="grid gap-1">
               {items.map((row) => (
-                <div className="grid gap-2 rounded bg-slate-950 p-2 lg:grid-cols-[1fr_8rem_8rem_6rem]" key={`${row.source}-${row.index}`}>
+                <div className="grid gap-2 rounded bg-slate-950 p-2 lg:grid-cols-[1fr_8rem_6rem]" key={`${row.source}-${row.index}`}>
                   <input aria-label="Item id" className="min-w-0 rounded bg-slate-900 px-2 py-1.5 text-sm" onChange={(event) => updateItem(row, { id: toKebabInput(event.target.value) })} value={row.item.id} />
-                  <input aria-label={t('contribution.column.initialQuantity')} className="min-w-0 rounded bg-slate-900 px-2 py-1.5 text-sm" min="0" onChange={(event) => updateItem(row, { initialQuantity: Number(event.target.value) })} type="number" value={row.item.initialQuantity ?? 0} />
                   <input aria-label={t('contribution.column.maxQuantity')} className="min-w-0 rounded bg-slate-900 px-2 py-1.5 text-sm" min="1" onChange={(event) => updateItem(row, { maxQuantity: event.target.value ? Number(event.target.value) : undefined })} type="number" value={row.item.maxQuantity ?? ''} />
                   <button className={removeButtonClass} onClick={() => removeRow('items', row)} type="button">
                     {t('contribution.column.remove')}
@@ -744,12 +736,8 @@ export const ContentDataEditor = ({ baseBundle, bundle, draft, onPatch, t }: Con
           ) : (
             <div className="grid gap-1">
               {flags.map((row) => (
-                <div className="grid gap-2 rounded bg-slate-950 p-2 lg:grid-cols-[1fr_8rem_6rem]" key={`${row.source}-${row.index}`}>
-                  <input aria-label={t('contribution.column.id')} className="min-w-0 rounded bg-slate-900 px-2 py-1.5 text-sm" onChange={(event) => updateFlag(row, { id: toKebabInput(event.target.value) })} value={row.item.id} />
-                  <label className="flex items-center gap-2 text-sm text-slate-300">
-                    <input checked={row.item.initialValue ?? false} onChange={(event) => updateFlag(row, { initialValue: event.target.checked })} type="checkbox" />
-                    {t('contribution.column.initialValue')}
-                  </label>
+                <div className="grid gap-2 rounded bg-slate-950 p-2" key={`${row.source}-${row.index}`}>
+                  <StructuredDataEditor onChange={(value) => { if (value) promote('flags', value as unknown as StateFlagDefinition, row.item.id); }} schema={flagDefinitionSchema()} t={t} value={row.item as unknown as StructuredValue} />
                   <button className={removeButtonClass} onClick={() => removeRow('flags', row)} type="button">{t('contribution.column.remove')}</button>
                 </div>
               ))}
@@ -767,21 +755,8 @@ export const ContentDataEditor = ({ baseBundle, bundle, draft, onPatch, t }: Con
             </div>
             {resources.map((row) => (
               <div className="grid gap-2 rounded bg-slate-950 p-2" key={stableEditorKey(resourceEditorKeys, 'resource', row.item.id)}>
-                <div className="grid gap-2 lg:grid-cols-[1fr_7rem_7rem_7rem_6rem]">
-                  <label className="grid gap-1 text-xs text-slate-400"><span>{t('contribution.column.id')}</span><input className="rounded bg-slate-900 px-2 py-1.5 text-sm text-slate-100" onChange={(event) => {
-                    const id = toKebabInput(event.target.value);
-                    renameStableEditorKey(resourceEditorKeys, 'resource', row.item.id, id);
-                    updateResource(row, { id });
-                  }} value={row.item.id} /></label>
-                  <label className="grid gap-1 text-xs text-slate-400"><span>{t('contribution.column.minimum')}</span><NumericEditor min={-1000000} onChange={(minValue) => updateResource(row, { minValue })} value={row.item.minValue} /></label>
-                  <label className="grid gap-1 text-xs text-slate-400"><span>{t('contribution.column.maximum')}</span><NumericEditor onChange={(baseMaxValue) => updateResource(row, { baseMaxValue })} value={row.item.baseMaxValue} /></label>
-                  <label className="grid gap-1 text-xs text-slate-400"><span>{t('contribution.column.initialValue')}</span><NumericEditor min={-1000000} onChange={(initialValue) => updateResource(row, { initialValue })} value={row.item.initialValue ?? row.item.baseMaxValue} /></label>
-                  <button className={`${removeButtonClass} self-end`} onClick={() => removeResource(row)} type="button">{t('contribution.column.remove')}</button>
-                </div>
-                <div className="grid gap-2 lg:grid-cols-2">
-                  <StructuredDataEditor label="contribution.column.onEmpty" onChange={(value) => updateResource(row, { onEmpty: value as unknown as ResourceDefinition['onEmpty'] })} optional schema={{ kind: 'array', item: boundarySchema(bundle), createItem: () => ({ kind: 'stop-action' }) }} t={t} value={row.item.onEmpty as unknown as StructuredValue} />
-                  <StructuredDataEditor label="contribution.column.onFull" onChange={(value) => updateResource(row, { onFull: value as unknown as ResourceDefinition['onFull'] })} optional schema={{ kind: 'array', item: boundarySchema(bundle), createItem: () => ({ kind: 'stop-action' }) }} t={t} value={row.item.onFull as unknown as StructuredValue} />
-                </div>
+                <StructuredDataEditor onChange={(value) => { if (value) updateResource(row, value as unknown as ResourceDefinition); }} schema={resourceDefinitionSchema(bundle)} t={t} value={row.item as unknown as StructuredValue} />
+                <button className={`${removeButtonClass} justify-self-start`} onClick={() => removeResource(row)} type="button">{t('contribution.column.remove')}</button>
               </div>
             ))}
           </section>
@@ -792,27 +767,13 @@ export const ContentDataEditor = ({ baseBundle, bundle, draft, onPatch, t }: Con
               <button className="rounded bg-cyan-400 px-3 py-2 text-sm font-semibold text-slate-950" onClick={addEffect} type="button">{t('contribution.data.addEffect')}</button>
             </div>
             {effects.map((row) => (
-              <div className="grid gap-2 rounded bg-slate-950 p-2 lg:grid-cols-[1fr_1fr_8rem_8rem_1fr_6rem]" key={stableEditorKey(effectEditorKeys, 'effect', row.item.id)}>
-                <label className="grid gap-1 text-xs text-slate-400"><span>{t('contribution.column.id')}</span><input className="rounded bg-slate-900 px-2 py-1.5 text-sm text-slate-100" onChange={(event) => {
-                  const id = toKebabInput(event.target.value);
-                  renameStableEditorKey(effectEditorKeys, 'effect', row.item.id, id);
-                  updateEffect(row, { id });
-                }} value={row.item.id} /></label>
-                <label className="grid gap-1 text-xs text-slate-400"><span>{t('contribution.column.resource')}</span><input className="rounded bg-slate-900 px-2 py-1.5 text-sm text-slate-100" list="content-resource-ids" onChange={(event) => updateEffect(row, { resourceId: toKebabInput(event.target.value) })} value={row.item.resourceId} /></label>
-                <label className="grid gap-1 text-xs text-slate-400"><span>{t('contribution.column.ratePerMinute')}</span><NumericEditor min={-1000000} onChange={(ratePerMinute) => updateEffect(row, { ratePerMinute })} step={0.1} value={row.item.ratePerMinute} /></label>
-                <label className="grid gap-1 text-xs text-slate-400"><span>{t('contribution.column.source')}</span><select className="rounded bg-slate-900 px-2 py-1.5 text-sm text-slate-100" onChange={(event) => updateEffect(row, { source: event.target.value as EffectDefinition['source'] })} value={row.item.source}>
-                  <option value="player">{t('contribution.effectSource.player')}</option>
-                  <option value="location">{t('contribution.effectSource.location')}</option>
-                </select></label>
-                <label className="grid gap-1 text-xs text-slate-400"><span>{t('contribution.column.location')}</span><input className="rounded bg-slate-900 px-2 py-1.5 text-sm text-slate-100" disabled={row.item.source !== 'location'} list="content-location-ids" onChange={(event) => updateEffect(row, { locationId: toKebabInput(event.target.value) || undefined })} value={row.item.locationId ?? ''} /></label>
-                <button className={`${removeButtonClass} self-end`} onClick={() => removeRow('effects', row)} type="button">{t('contribution.column.remove')}</button>
+              <div className="grid gap-2 rounded bg-slate-950 p-2" key={stableEditorKey(effectEditorKeys, 'effect', row.item.id)}>
+                <StructuredDataEditor onChange={(value) => { if (value) updateEffect(row, value as unknown as EffectDefinition); }} schema={effectDefinitionSchema(bundle)} t={t} value={row.item as unknown as StructuredValue} />
+                <button className={`${removeButtonClass} justify-self-start`} onClick={() => removeRow('effects', row)} type="button">{t('contribution.column.remove')}</button>
               </div>
             ))}
           </section>
 
-          <section className="border-t border-slate-700 pt-4">
-            <StructuredDataEditor label="contribution.column.deathReset" onChange={(value) => onPatch({ deathReset: value as unknown as ContributionDraft['deathReset'] })} optional schema={deathResetSchema(bundle)} t={t} value={(draft.deathReset ?? baseBundle.manifest.deathReset) as unknown as StructuredValue} />
-          </section>
         </section>
       )}
 

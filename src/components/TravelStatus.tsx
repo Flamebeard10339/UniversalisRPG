@@ -42,8 +42,8 @@ export const TravelStatus = ({
 
     return (
       <section className="rounded border border-slate-800 bg-slate-900 p-4">
-        <h2 className="text-lg font-semibold">{t(currentLocation.titleKey ?? locationTitleKey(currentLocation.id))}</h2>
-        <p className="mt-1 text-sm text-slate-400">{t(currentLocation.descriptionKey ?? locationDescriptionKey(currentLocation.id))}</p>
+        <h2 className="text-lg font-semibold">{t(locationTitleKey(currentLocation.id))}</h2>
+        <p className="mt-1 text-sm text-slate-400">{t(locationDescriptionKey(currentLocation.id))}</p>
       </section>
     );
   }
@@ -61,8 +61,8 @@ export const TravelStatus = ({
           <h2 className="text-base font-semibold text-cyan-100">{t('travelStatus.title')}</h2>
           <p className="text-sm text-slate-300">
             {t('travelStatus.to', {
-              from: fromLocation ? t(fromLocation.titleKey ?? locationTitleKey(fromLocation.id)) : activeTravel.fromLocationId,
-              to: toLocation ? t(toLocation.titleKey ?? locationTitleKey(toLocation.id)) : activeTravel.toLocationId,
+              from: fromLocation ? t(locationTitleKey(fromLocation.id)) : activeTravel.fromLocationId,
+              to: toLocation ? t(locationTitleKey(toLocation.id)) : activeTravel.toLocationId,
             })}
           </p>
           <p className="mt-1 text-xs text-cyan-200">{t('travelStatus.arrival', { seconds: remainingTime })}</p>

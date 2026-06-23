@@ -1,8 +1,6 @@
 {
   "schemaVersion": 1,
   "id": "base",
-  "titleKey": "universe.base.title",
-  "descriptionKey": "universe.base.description",
   "version": "0.1.0",
   "author": "UniversalisRPG",
   "locales": ["en"],
@@ -21,13 +19,5 @@
   ],
   "compatibility": {
     "minAppVersion": "0.1.0"
-  },
-  "deathReset": {
-    "locationId": "starting-location",
-    "preserve": {
-      "inventoryIds": ["emberleaf"],
-      "skillXp": true,
-      "discoveredLocations": true
-    }
   }
 }

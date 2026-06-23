@@ -30,8 +30,7 @@ export const ActionPanel = ({ bundle, debugEnabled, onSetLooping, playState, onS
     enemies: bundle.enemies,
   };
   const actions = bundle.actions.filter((action) =>
-    !action.inventoryItemId
-    && action.locationId === playState.currentLocationId
+    action.locationId === playState.currentLocationId
     && isActionVisible(playState, action, actionContext));
   const activeAction = actions.find((action) => action.id === playState.activeAction?.actionId);
   const getActionProgress = (action: GameAction) => {
@@ -48,7 +47,7 @@ export const ActionPanel = ({ bundle, debugEnabled, onSetLooping, playState, onS
           {isTravelling
             ? t('actionPanel.travelling')
             : activeAction
-              ? t('actionPanel.working', { action: t(activeAction.titleKey ?? actionTitleKey(activeAction.id)) })
+              ? t('actionPanel.working', { action: t(actionTitleKey(activeAction.id)) })
               : t('actionPanel.choose')}
         </p>
       </div>
@@ -88,8 +87,8 @@ export const ActionPanel = ({ bundle, debugEnabled, onSetLooping, playState, onS
                   style={{ width: `${actionProgress}%` }}
                 />
               )}
-              <span className="relative block text-sm font-semibold text-slate-100">{t(action.titleKey ?? actionTitleKey(action.id))}</span>
-              <span className="relative mt-1 block text-xs text-slate-400">{t(action.descriptionKey ?? actionDescriptionKey(action.id))}</span>
+              <span className="relative block text-sm font-semibold text-slate-100">{t(actionTitleKey(action.id))}</span>
+              <span className="relative mt-1 block text-xs text-slate-400">{t(actionDescriptionKey(action.id))}</span>
               <span className="relative mt-2 block text-xs text-cyan-200">{action.durationSeconds}s</span>
               {remaining !== null && (action.maxCompletions ?? 0) > 1 && (
                 <span className="relative mt-1 block text-xs text-slate-300">

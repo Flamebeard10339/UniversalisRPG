@@ -35,8 +35,7 @@ export type GmOperation =
   | { op: 'upsert'; contentType: GmContentType; value: Record<string, unknown> }
   | { op: 'remove'; contentType: GmContentType; id: string }
   | { op: 'localize'; locale: string; values: Record<string, string> }
-  | { op: 'set-manifest'; value: Record<string, unknown> }
-  | { op: 'set-death-reset'; value: Record<string, unknown> };
+  | { op: 'set-manifest'; value: Record<string, unknown> };
 
 export type AgentSessionMessage = PlayerChoiceMessage | GmUpdateMessage;
 

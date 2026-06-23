@@ -4,14 +4,13 @@
   "type": "array",
   "items": {
     "type": "object",
-    "required": ["id", "resourceId", "ratePerMinute", "source"],
+    "required": ["id", "resourceId", "ratePerMinute"],
     "additionalProperties": false,
     "properties": {
       "id": { "type": "string", "minLength": 1 },
       "resourceId": { "type": "string", "minLength": 1 },
       "ratePerMinute": { "type": "number" },
-      "rateSkillId": { "type": "string", "minLength": 1 },
-      "source": { "enum": ["player", "location"] },
+      "useStat": { "type": "string", "minLength": 1 },
       "locationId": { "type": "string", "minLength": 1 }
     }
   }
