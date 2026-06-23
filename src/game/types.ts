@@ -84,6 +84,14 @@ export type SkillDefinition = {
   maxLevel: number;
 };
 
+export type StatDefinition = {
+  id: string;
+  base?: number;
+  added?: number;
+  increased?: number;
+  skillId?: string;
+};
+
 export type ItemDefinition = {
   id: string;
   maxQuantity?: number;
@@ -96,8 +104,8 @@ export type StateFlagDefinition = {
 
 export type InteractionTypeDefinition = {
   id: string;
-  sourceSkillId: string;
-  targetSkillId: string;
+  sourceStatId: string;
+  targetStatId: string;
   targetPlayerHealth: boolean; // TODO:
 };
 
@@ -142,8 +150,7 @@ export type ResourceDefinition = {
 export type EffectDefinition = {
   id: string;
   resourceId: string;
-  ratePerMinute: number;
-  useStat?: string;
+  sourceStat: string;
   locationId?: string;
 };
 
@@ -169,6 +176,7 @@ export type ContentBundle = {
   edges: TravelEdgeDefinition[];
   actions: GameAction[];
   skills: SkillDefinition[];
+  stats: StatDefinition[];
   items: ItemDefinition[];
   flags: StateFlagDefinition[];
   resourceDefinitions: ResourceDefinition[];
@@ -283,6 +291,7 @@ export type SkillTotals = {
 export type ActionResolutionContext = {
   actions: GameAction[];
   skills: SkillDefinition[];
+  stats?: StatDefinition[];
   locations?: LocationNode[];
   manifest?: UniverseManifest;
   items?: ItemDefinition[];
@@ -313,6 +322,7 @@ export type UniversePlayState = {
   actionCompletions: Record<string, number>;
   resourcePools: Record<string, ResourcePool>;
   skillXp: Record<string, number>;
+  statOverrides: Record<string, number>;
   equipmentSkillBonuses: Record<string, SkillEquipmentBonuses>;
   actionLoopingEnabled: boolean;
   playerHealth: number;
@@ -340,6 +350,7 @@ export type ContributionDraft = {
   edges: TravelEdgeDefinition[];
   actions: GameAction[];
   skills: SkillDefinition[];
+  stats: StatDefinition[];
   items: ItemDefinition[];
   flags: StateFlagDefinition[];
   resourceDefinitions: ResourceDefinition[];
@@ -355,6 +366,7 @@ export type ContributionRemovedIds = {
   edges: string[];
   actions: string[];
   skills: string[];
+  stats: string[];
   items: string[];
   flags: string[];
   resources: string[];

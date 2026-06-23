@@ -11,6 +11,7 @@ import type {
   LocationNode,
   ResourceDefinition,
   SkillDefinition,
+  StatDefinition,
   StateFlagDefinition,
   TravelEdgeDefinition,
   UniverseManifest,
@@ -37,6 +38,8 @@ import {
   resourceTitleKey,
   skillDescriptionKey,
   skillTitleKey,
+  statDescriptionKey,
+  statTitleKey,
   toKebabCase,
   universeDescriptionKey,
   universeTitleKey,
@@ -174,6 +177,14 @@ const validateSkillsShape = (skills: unknown): skills is SkillDefinition[] =>
       hasNumber(skill, 'maxLevel'),
   );
 
+const validateStatsShape = (stats: unknown): stats is StatDefinition[] =>
+  Array.isArray(stats) && stats.every((stat) => isRecord(stat)
+    && hasString(stat, 'id')
+    && (stat.base === undefined || hasNumber(stat, 'base'))
+    && (stat.added === undefined || hasNumber(stat, 'added'))
+    && (stat.increased === undefined || hasNumber(stat, 'increased'))
+    && (stat.skillId === undefined || hasString(stat, 'skillId')));
+
 const validateItemsShape = (items: unknown): items is ItemDefinition[] =>
   items === undefined ||
   (Array.isArray(items) &&
@@ -217,8 +228,7 @@ const validateEffectsShape = (effects: unknown): effects is EffectDefinition[] =
         isRecord(effect) &&
         hasString(effect, 'id') &&
         hasString(effect, 'resourceId') &&
-        hasNumber(effect, 'ratePerMinute') &&
-        (effect.useStat === undefined || typeof effect.useStat === 'string') &&
+        hasString(effect, 'sourceStat') &&
         (effect.locationId === undefined || typeof effect.locationId === 'string'),
     ));
 
@@ -229,8 +239,8 @@ const validateInteractionTypesShape = (interactionTypes: unknown): interactionTy
       (interactionType) =>
         isRecord(interactionType) &&
         hasString(interactionType, 'id') &&
-        hasString(interactionType, 'sourceSkillId') &&
-        hasString(interactionType, 'targetSkillId') &&
+        hasString(interactionType, 'sourceStatId') &&
+        hasString(interactionType, 'targetStatId') &&
         typeof interactionType.targetPlayerHealth === 'boolean',
     ));
 
@@ -275,6 +285,10 @@ export const validateContentShape = (bundle: Partial<ContentBundle>) => {
 
   if (!validateSkillsShape(bundle.skills)) {
     issues.push(error('skills.json', 'validation.skillsShape'));
+  }
+
+  if (!validateStatsShape(bundle.stats)) {
+    issues.push(error('stats.json', 'validation.statsShape'));
   }
 
   if (!validateItemsShape(bundle.items)) {
@@ -324,6 +338,7 @@ export const validateContentReferences = (bundle: ContentBundle) => {
     ...findDuplicateIds(bundle.edges, 'edges'),
     ...findDuplicateIds(bundle.actions, 'actions'),
     ...findDuplicateIds(bundle.skills, 'skills'),
+    ...findDuplicateIds(bundle.stats, 'stats'),
     ...findDuplicateIds(bundle.items ?? [], 'items'),
     ...findDuplicateIds(bundle.flags ?? [], 'flags'),
     ...findDuplicateIds(bundle.resourceDefinitions ?? [], 'resources'),
@@ -334,6 +349,7 @@ export const validateContentReferences = (bundle: ContentBundle) => {
 
   const locationIds = new Set(bundle.locations.map((location) => location.id));
   const skillIds = new Set(bundle.skills.map((skill) => skill.id));
+  const statIds = new Set(bundle.stats.map((stat) => stat.id));
   const itemIds = new Set((bundle.items ?? []).map((item) => item.id));
   const flagIds = new Set((bundle.flags ?? []).map((flag) => flag.id));
   const resourceIds = new Set((bundle.resourceDefinitions ?? []).map((resource) => resource.id));
@@ -352,6 +368,7 @@ export const validateContentReferences = (bundle: ContentBundle) => {
         ...Array.from(itemIds, (id) => `item:${id}`),
         ...Array.from(resourceIds, (id) => `resource:${id}`),
         ...Array.from(skillIds, (id) => `skill-level:${id}`),
+        ...Array.from(statIds, (id) => `stat:${id}`),
         ...bundle.actions.map((action) => `action-completions:${action.id}`),
       ]);
       if (!knownVariables.has(condition.variable)) issues.push(error(path, 'validation.unknownStateVariable', { id: condition.variable }));
@@ -449,12 +466,17 @@ export const validateContentReferences = (bundle: ContentBundle) => {
     }
   }
 
+  for (const stat of bundle.stats) {
+    if (!isKebabCaseId(stat.id)) issues.push(error(`stats.${stat.id}.id`, 'validation.statIdKebab'));
+    if (stat.skillId && !skillIds.has(stat.skillId)) issues.push(error(`stats.${stat.id}.skillId`, 'validation.unknownSkill', { id: stat.skillId }));
+  }
+
   for (const resource of bundle.resourceDefinitions ?? []) {
     if (!isKebabCaseId(resource.id)) {
       issues.push(error(`resources.${resource.id}.id`, 'validation.resourceIdKebab'));
     }
-    if (!skillIds.has(resource.sourceStat)) {
-      issues.push(error(`resources.${resource.id}.sourceStat`, 'validation.unknownSkill', { id: resource.sourceStat }));
+    if (!statIds.has(resource.sourceStat)) {
+      issues.push(error(`resources.${resource.id}.sourceStat`, 'validation.unknownStat', { id: resource.sourceStat }));
     }
     for (const behavior of [...(resource.onEmpty ?? []), ...(resource.onFull ?? [])]) {
       if (behavior.kind === 'relocate' && behavior.locationId !== 'starting-location' && !locationIds.has(behavior.locationId)) {
@@ -478,8 +500,8 @@ export const validateContentReferences = (bundle: ContentBundle) => {
     if (!resourceIds.has(effect.resourceId)) {
       issues.push(error(`effects.${effect.id}.resourceId`, 'validation.unknownResource', { id: effect.resourceId }));
     }
-    if (effect.useStat && !skillIds.has(effect.useStat)) {
-      issues.push(error(`effects.${effect.id}.useStat`, 'validation.unknownSkill', { id: effect.useStat }));
+    if (!statIds.has(effect.sourceStat)) {
+      issues.push(error(`effects.${effect.id}.sourceStat`, 'validation.unknownStat', { id: effect.sourceStat }));
     }
     if (effect.locationId && !locationIds.has(effect.locationId)) {
       issues.push(error(`effects.${effect.id}.locationId`, 'validation.unknownLocation', { id: effect.locationId }));
@@ -490,11 +512,11 @@ export const validateContentReferences = (bundle: ContentBundle) => {
     if (!isKebabCaseId(interactionType.id)) {
       issues.push(error(`interactionTypes.${interactionType.id}.id`, 'validation.interactionTypeIdKebab'));
     }
-    if (!skillIds.has(interactionType.sourceSkillId)) {
-      issues.push(error(`interactionTypes.${interactionType.id}.sourceSkillId`, 'validation.unknownSkill', { id: interactionType.sourceSkillId }));
+    if (!statIds.has(interactionType.sourceStatId)) {
+      issues.push(error(`interactionTypes.${interactionType.id}.sourceStatId`, 'validation.unknownStat', { id: interactionType.sourceStatId }));
     }
-    if (!skillIds.has(interactionType.targetSkillId)) {
-      issues.push(error(`interactionTypes.${interactionType.id}.targetSkillId`, 'validation.unknownSkill', { id: interactionType.targetSkillId }));
+    if (!statIds.has(interactionType.targetStatId)) {
+      issues.push(error(`interactionTypes.${interactionType.id}.targetStatId`, 'validation.unknownStat', { id: interactionType.targetStatId }));
     }
   }
 
@@ -592,6 +614,7 @@ export const collectLocalizationKeys = (bundle: ContentBundle) => [
     skillTitleKey(skill.id),
     skillDescriptionKey(skill.id),
   ]),
+  ...bundle.stats.flatMap((stat) => [statTitleKey(stat.id), statDescriptionKey(stat.id)]),
   ...(bundle.items ?? []).flatMap((item) => [
     itemTitleKey(item.id),
     itemDescriptionKey(item.id),
@@ -631,6 +654,7 @@ export const mergeDraftIntoBundle = (bundle: ContentBundle, draft: ContributionD
     edges: mergeById(removeById(bundle.edges, draft.removed?.edges ?? []), draft.edges),
     actions: mergeById(removeById(bundle.actions, draft.removed?.actions ?? []), draft.actions),
     skills: mergeById(removeById(bundle.skills, draft.removed?.skills ?? []), draft.skills),
+    stats: mergeById(removeById(bundle.stats, draft.removed?.stats ?? []), draft.stats),
     items: mergeById(removeById(bundle.items ?? [], draft.removed?.items ?? []), draft.items),
     flags: mergeById(removeById(bundle.flags ?? [], draft.removed?.flags ?? []), draft.flags ?? []),
     resourceDefinitions: mergeById(removeById(bundle.resourceDefinitions ?? [], draft.removed?.resources ?? []), draft.resourceDefinitions ?? []),

@@ -34,8 +34,8 @@ const SOURCE_URL = 'https://github.com/Flamebeard10339/UniversalisRPG';
 const appearanceKey = 'universalis:settings:appearance';
 const emptyIdleReport: IdleReport = { kind: 'none' };
 const emptyContributionDraft = (universeId: string): ContributionDraft => ({
-  universeId, updatedAt: Date.now(), notes: '', locations: [], edges: [], actions: [], skills: [], items: [], flags: [], resourceDefinitions: [], effects: [], interactionTypes: [], enemies: [], locales: {},
-  removed: { locations: [], edges: [], actions: [], skills: [], items: [], flags: [], resources: [], effects: [], interactionTypes: [], enemies: [] },
+  universeId, updatedAt: Date.now(), notes: '', locations: [], edges: [], actions: [], skills: [], stats: [], items: [], flags: [], resourceDefinitions: [], effects: [], interactionTypes: [], enemies: [], locales: {},
+  removed: { locations: [], edges: [], actions: [], skills: [], stats: [], items: [], flags: [], resources: [], effects: [], interactionTypes: [], enemies: [] },
 });
 
 const encodeSave = (playState: UniversePlayState) =>
@@ -290,6 +290,7 @@ export default function App() {
           manifest: currentBundle.manifest,
           actions: currentBundle.actions,
           skills: currentBundle.skills,
+          stats: currentBundle.stats,
           locations: currentBundle.locations,
           items: currentBundle.items,
           flags: currentBundle.flags,

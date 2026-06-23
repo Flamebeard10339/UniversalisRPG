@@ -21,6 +21,7 @@ export const ActionPanel = ({ bundle, debugEnabled, onSetLooping, playState, onS
     manifest: bundle.manifest,
     actions: bundle.actions,
     skills: bundle.skills,
+    stats: bundle.stats,
     locations: bundle.locations,
     items: bundle.items,
     flags: bundle.flags,

@@ -102,8 +102,9 @@ describe('resolveIdleTimers', () => {
     const context: ActionResolutionContext = {
       actions: [],
       skills: [{ id: 'regeneration', maxLevel: 100 }],
-      resourceDefinitions: [{ id: 'health', sourceStat: 'regeneration', initialValue: 'full' }],
-      effects: [{ id: 'health-regeneration', resourceId: 'health', ratePerMinute: 60 }],
+      stats: [{ id: 'health', base: 100 }, { id: 'regeneration', base: 60 }],
+      resourceDefinitions: [{ id: 'health', sourceStat: 'health', initialValue: 'full' }],
+      effects: [{ id: 'health-regeneration', resourceId: 'health', sourceStat: 'regeneration' }],
       interactionTypes: [],
       enemies: [],
     };
@@ -135,8 +136,9 @@ describe('resolveIdleTimers', () => {
     const context: ActionResolutionContext = {
       actions: [action],
       skills: [{ id: 'regeneration', maxLevel: 100 }],
-      resourceDefinitions: [{ id: 'health', sourceStat: 'regeneration', initialValue: 'full' }],
-      effects: [{ id: 'health-regeneration', resourceId: 'health', ratePerMinute: 60 }],
+      stats: [{ id: 'health', base: 100 }, { id: 'regeneration', base: 60 }],
+      resourceDefinitions: [{ id: 'health', sourceStat: 'health', initialValue: 'full' }],
+      effects: [{ id: 'health-regeneration', resourceId: 'health', sourceStat: 'regeneration' }],
       interactionTypes: [],
       enemies: [],
     };
@@ -167,6 +169,7 @@ describe('resolveIdleTimers', () => {
     const context: ActionResolutionContext = {
       actions: [action],
       skills: [{ id: 'health-capacity', maxLevel: 100 }],
+      stats: [{ id: 'health-capacity', base: 100 }, { id: 'poison', base: -60 }],
       locations: [{ id: 'test-location', position: { x: 0, y: 0 }, starting: true }],
       resourceDefinitions: [{
         id: 'health',
@@ -179,7 +182,7 @@ describe('resolveIdleTimers', () => {
           { kind: 'chat', messageKey: 'resource.health.empty' },
         ],
       }],
-      effects: [{ id: 'poison', resourceId: 'health', ratePerMinute: -60 }],
+      effects: [{ id: 'poison', resourceId: 'health', sourceStat: 'poison' }],
       interactionTypes: [],
       enemies: [],
     };

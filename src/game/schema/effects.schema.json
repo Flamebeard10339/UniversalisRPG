@@ -4,13 +4,12 @@
   "type": "array",
   "items": {
     "type": "object",
-    "required": ["id", "resourceId", "ratePerMinute"],
+    "required": ["id", "resourceId", "sourceStat"],
     "additionalProperties": false,
     "properties": {
       "id": { "type": "string", "minLength": 1 },
       "resourceId": { "type": "string", "minLength": 1 },
-      "ratePerMinute": { "type": "number" },
-      "useStat": { "type": "string", "minLength": 1 },
+      "sourceStat": { "type": "string", "minLength": 1 },
       "locationId": { "type": "string", "minLength": 1 }
     }
   }

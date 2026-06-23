@@ -4,12 +4,12 @@
   "type": "array",
   "items": {
     "type": "object",
-    "required": ["id", "sourceSkillId", "targetSkillId", "targetPlayerHealth"],
+    "required": ["id", "sourceStatId", "targetStatId", "targetPlayerHealth"],
     "additionalProperties": false,
     "properties": {
       "id": { "type": "string", "minLength": 1 },
-      "sourceSkillId": { "type": "string", "minLength": 1 },
-      "targetSkillId": { "type": "string", "minLength": 1 },
+      "sourceStatId": { "type": "string", "minLength": 1 },
+      "targetStatId": { "type": "string", "minLength": 1 },
       "targetPlayerHealth": { "type": "boolean" }
     }
   }

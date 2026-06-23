@@ -1,0 +1,4 @@
+[
+  { "id": "air-capacity", "base": 100 },
+  { "id": "air-leak", "base": -105 }
+]

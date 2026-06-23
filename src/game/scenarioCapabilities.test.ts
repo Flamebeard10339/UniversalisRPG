@@ -25,9 +25,11 @@ const context: ActionResolutionContext = {
     files: [],
   },
   actions: [pickupWater],
-  skills: [
-    { id: 'air-capacity', maxLevel: 100 },
-    { id: 'memory-capacity', maxLevel: 100 },
+  skills: [],
+  stats: [
+    { id: 'air-capacity', base: 100 },
+    { id: 'memory-capacity', base: 100 },
+    { id: 'air-loss', base: -30 },
   ],
   items: [
     { id: 'water-bottle', maxQuantity: 5 },
@@ -92,6 +94,7 @@ describe('Derelict Extant scenario capabilities', () => {
       edges: [],
       actions: [conditionalAction],
       skills: context.skills,
+      stats: context.stats!,
       items: context.items!,
       flags: context.flags!,
       resourceDefinitions: context.resourceDefinitions!,
@@ -173,7 +176,7 @@ describe('Derelict Extant scenario capabilities', () => {
     const deathContext: ActionResolutionContext = {
       ...context,
       actions: [wait],
-      effects: [{ id: 'air-loss', resourceId: 'air', ratePerMinute: -30 }],
+      effects: [{ id: 'air-loss', resourceId: 'air', sourceStat: 'air-loss' }],
     };
     let state: UniversePlayState = {
       ...createInitialPlayState('test', 'storage'),
@@ -226,7 +229,7 @@ describe('Derelict Extant scenario capabilities', () => {
     expect(resolved.flags['temporary-access']).toBe(false);
     expect(resolved.skillXp.survival).toBe(40);
     expect(resolved.resourcePools['memory-debt'].current).toBe(12);
-    expect(resolved.resourcePools.air.current).toBe(7);
+    expect(resolved.resourcePools.air.current).toBe(100);
     expect(resolved.actionCompletions['pick-up-water']).toBe(3);
     expect(resolved.actionCompletions['temporary-action']).toBeUndefined();
     expect(resolved.discoveredLocationIds).toEqual(['cryopod', 'storage']);

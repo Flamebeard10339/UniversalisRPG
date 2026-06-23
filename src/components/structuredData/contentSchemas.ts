@@ -89,7 +89,7 @@ export const resetStateSchema = (bundle: ContentBundle): StructuredSchema => ({ 
 
 export const resourceDefinitionSchema = (bundle: ContentBundle): StructuredSchema => ({ kind: 'object', fields: {
   id: { label: 'contribution.column.id', schema: string() },
-  sourceStat: { label: 'contribution.column.sourceStat', schema: string(bundle.skills.map((item) => item.id)) },
+  sourceStat: { label: 'contribution.column.sourceStat', schema: string(bundle.stats.map((item) => item.id)) },
   initialValue: { label: 'contribution.column.initialValue', schema: { kind: 'enum', options: ['full', 'empty'] }, optional: true, defaultValue: 'full' },
   onEmpty: { label: 'contribution.column.onEmpty', schema: { kind: 'array', item: boundarySchema(bundle), createItem: () => ({ kind: 'stop-action' }) }, optional: true, defaultValue: [] },
   onFull: { label: 'contribution.column.onFull', schema: { kind: 'array', item: boundarySchema(bundle), createItem: () => ({ kind: 'stop-action' }) }, optional: true, defaultValue: [] },
@@ -98,7 +98,14 @@ export const resourceDefinitionSchema = (bundle: ContentBundle): StructuredSchem
 export const effectDefinitionSchema = (bundle: ContentBundle): StructuredSchema => ({ kind: 'object', fields: {
   id: { label: 'contribution.column.id', schema: string() },
   resourceId: { label: 'contribution.column.resource', schema: string(bundle.resourceDefinitions.map((item) => item.id)) },
-  ratePerMinute: { label: 'contribution.column.ratePerMinute', schema: number() },
-  useStat: { label: 'contribution.column.useStat', schema: string(bundle.skills.map((item) => item.id)), optional: true },
+  sourceStat: { label: 'contribution.column.sourceStat', schema: string(bundle.stats.map((item) => item.id)) },
   locationId: { label: 'contribution.column.location', schema: string(bundle.locations.map((item) => item.id)), optional: true },
+} });
+
+export const statDefinitionSchema = (bundle: ContentBundle): StructuredSchema => ({ kind: 'object', fields: {
+  id: { label: 'contribution.column.id', schema: string() },
+  base: { label: 'contribution.column.base', schema: number(), optional: true, defaultValue: 0 },
+  added: { label: 'contribution.column.added', schema: number(), optional: true, defaultValue: 0 },
+  increased: { label: 'contribution.column.increased', schema: number(), optional: true, defaultValue: 0 },
+  skillId: { label: 'contribution.column.skill', schema: string(bundle.skills.map((item) => item.id)), optional: true },
 } });

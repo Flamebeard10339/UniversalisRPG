@@ -1,7 +1,7 @@
 [
   {
     "id": "suit-air-loss",
-    "resourceId": "air",
-    "ratePerMinute": -105
+    "resourceId": "air-capacity",
+    "sourceStat": "air-leak"
   }
 ]

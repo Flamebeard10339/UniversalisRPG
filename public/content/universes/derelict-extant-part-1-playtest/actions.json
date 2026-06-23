@@ -95,7 +95,7 @@
     "rewards": [],
     "results": [
       { "kind": "flag", "flagId": "wearing-space-suit", "value": true },
-      { "kind": "resource", "resourceId": "air", "amount": 100 }
+      { "kind": "resource", "resourceId": "air-capacity", "amount": 100 }
     ]
   },
   {
@@ -111,7 +111,7 @@
         { "kind": "state-variable", "variable": "flag:airlock-open", "comparison": "equal", "value": false }
       ]
     },
-    "requirements": { "kind": "state-variable", "variable": "resource:air", "comparison": "greater-than", "value": 0 },
+    "requirements": { "kind": "state-variable", "variable": "resource:air-capacity", "comparison": "greater-than", "value": 0 },
     "rewards": [],
     "results": [{ "kind": "flag", "flagId": "airlock-open", "value": true }]
   },
@@ -126,13 +126,13 @@
       "kind": "all",
       "conditions": [
         { "kind": "not", "condition": { "kind": "state-variable", "variable": "item:air-canister", "comparison": "less-than", "value": 1 } },
-        { "kind": "not", "condition": { "kind": "state-variable", "variable": "resource:air", "comparison": "greater-than", "value": 50 } }
+        { "kind": "not", "condition": { "kind": "state-variable", "variable": "resource:air-capacity", "comparison": "greater-than", "value": 50 } }
       ]
     },
     "rewards": [],
     "results": [
       { "kind": "item", "itemId": "air-canister", "amount": -1 },
-      { "kind": "resource", "resourceId": "air", "amount": 50 }
+      { "kind": "resource", "resourceId": "air-capacity", "amount": 50 }
     ]
   },
   {
@@ -141,8 +141,8 @@
     "durationSeconds": 10,
     "maxCompletions": 1,
     "role": "progression",
-    "visibleWhen": { "kind": "flag", "flagId": "airlock-open", "value": true },
-    "requirements": { "kind": "resource", "resourceId": "air", "comparison": "greater-than", "value": 0 },
+    "visibleWhen": { "kind": "state-variable", "variable": "flag:airlock-open", "comparison": "equal", "value": true },
+    "requirements": { "kind": "state-variable", "variable": "resource:air-capacity", "comparison": "greater-than", "value": 0 },
     "rewards": [],
     "results": [{ "kind": "relocate", "locationId": "main-intersection" }]
   },
@@ -152,7 +152,7 @@
     "durationSeconds": 5,
     "maxCompletions": 1,
     "role": "optional",
-    "requirements": { "kind": "resource", "resourceId": "air", "comparison": "greater-than", "value": 0 },
+    "requirements": { "kind": "state-variable", "variable": "resource:air-capacity", "comparison": "greater-than", "value": 0 },
     "rewards": [],
     "results": [{ "kind": "flag", "flagId": "junction-map-read", "value": true }]
   },
@@ -162,7 +162,7 @@
     "durationSeconds": 6,
     "maxCompletions": 1,
     "role": "optional",
-    "requirements": { "kind": "resource", "resourceId": "air", "comparison": "greater-than", "value": 0 },
+    "requirements": { "kind": "state-variable", "variable": "resource:air-capacity", "comparison": "greater-than", "value": 0 },
     "rewards": []
   },
   {
@@ -171,7 +171,7 @@
     "durationSeconds": 7,
     "maxCompletions": 1,
     "role": "progression",
-    "requirements": { "kind": "resource", "resourceId": "air", "comparison": "greater-than", "value": 0 },
+    "requirements": { "kind": "state-variable", "variable": "resource:air-capacity", "comparison": "greater-than", "value": 0 },
     "rewards": [],
     "results": [{ "kind": "flag", "flagId": "captain-route-found", "value": true }]
   },
@@ -181,8 +181,8 @@
     "durationSeconds": 12,
     "maxCompletions": 1,
     "role": "progression",
-    "visibleWhen": { "kind": "flag", "flagId": "captain-route-found", "value": true },
-    "requirements": { "kind": "resource", "resourceId": "air", "comparison": "greater-than", "value": 0 },
+    "visibleWhen": { "kind": "state-variable", "variable": "flag:captain-route-found", "comparison": "equal", "value": true },
+    "requirements": { "kind": "state-variable", "variable": "resource:air-capacity", "comparison": "greater-than", "value": 0 },
     "rewards": [],
     "results": [{ "kind": "relocate", "locationId": "captain-quarters" }]
   },
@@ -192,7 +192,7 @@
     "durationSeconds": 8,
     "maxCompletions": 1,
     "role": "optional",
-    "requirements": { "kind": "resource", "resourceId": "air", "comparison": "greater-than", "value": 0 },
+    "requirements": { "kind": "state-variable", "variable": "resource:air-capacity", "comparison": "greater-than", "value": 0 },
     "rewards": []
   },
   {
@@ -201,7 +201,7 @@
     "durationSeconds": 7,
     "maxCompletions": 1,
     "role": "progression",
-    "requirements": { "kind": "resource", "resourceId": "air", "comparison": "greater-than", "value": 0 },
+    "requirements": { "kind": "state-variable", "variable": "resource:air-capacity", "comparison": "greater-than", "value": 0 },
     "rewards": [],
     "results": [{ "kind": "flag", "flagId": "communications-ready", "value": true }]
   },
@@ -211,8 +211,8 @@
     "durationSeconds": 15,
     "maxCompletions": 1,
     "role": "progression",
-    "visibleWhen": { "kind": "flag", "flagId": "communications-ready", "value": true },
-    "requirements": { "kind": "resource", "resourceId": "air", "comparison": "greater-than", "value": 0 },
+    "visibleWhen": { "kind": "state-variable", "variable": "flag:communications-ready", "comparison": "equal", "value": true },
+    "requirements": { "kind": "state-variable", "variable": "resource:air-capacity", "comparison": "greater-than", "value": 0 },
     "rewards": []
   }
 ]

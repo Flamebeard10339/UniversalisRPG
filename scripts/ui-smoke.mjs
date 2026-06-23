@@ -48,7 +48,9 @@ try {
     console.log(`[${viewport.name}] load`);
     await page.goto(baseUrl, { waitUntil: 'networkidle' });
     console.log(`[${viewport.name}] settings`);
-    await page.getByRole('button', { name: 'Settings', exact: true }).click();
+    const settingsButton = page.getByRole('button', { name: 'Settings', exact: true });
+    if (await settingsButton.count() === 0) console.error({ body: await page.locator('body').innerText(), errors });
+    await settingsButton.click();
     console.log(`[${viewport.name}] contribution`);
     await page.getByText('Contribution mode', { exact: true }).locator('xpath=ancestor::label').getByRole('checkbox').check();
     console.log(`[${viewport.name}] enemies`);

@@ -21,6 +21,7 @@ const HEALTH_RESOURCE_ID = 'health';
 const EMPTY_CONTEXT: ActionResolutionContext = {
   actions: [],
   skills: [],
+  stats: [],
   locations: [],
   items: [],
   flags: [],
@@ -102,6 +103,7 @@ export const createInitialPlayState = (universeId: string, startingLocationId: s
   actionCompletions: {},
   resourcePools: {},
   skillXp: {},
+  statOverrides: {},
   equipmentSkillBonuses: {},
   actionLoopingEnabled: false,
   playerHealth: 100,
@@ -149,6 +151,7 @@ export const normalizePlayState = (
     inventory: { ...(state.resources ?? {}), ...(state.inventory ?? {}) },
     flags: state.flags ?? {},
     actionCompletions: state.actionCompletions ?? {},
+    statOverrides: state.statOverrides ?? {},
     equipmentSkillBonuses: state.equipmentSkillBonuses ?? {},
     actionLoopingEnabled: state.actionLoopingEnabled ?? false,
     playerHealth: state.playerHealth ?? 100,
@@ -217,7 +220,7 @@ const getResourceMax = (
   const definition = getResourceDefinition(context, resourceId);
 
   return definition
-    ? resolveResourceMax(state, context.skills, definition)
+    ? resolveResourceMax(state, context.stats ?? [], definition)
     : state.resourcePools[resourceId]?.max ?? 0;
 };
 
@@ -481,7 +484,7 @@ const applyActiveEffects = (
     }
 
     const resource = nextState.resourcePools[effect.resourceId];
-    const delta = getEffectRatePerMinute(context.skills, nextState, effect) * elapsedMinutes;
+    const delta = getEffectRatePerMinute(context.stats ?? [], nextState, effect) * elapsedMinutes;
     const crossedMin = resource && delta < 0 && resource.current > resource.min && resource.current + delta <= resource.min;
     const crossedMax = resource && delta > 0 && resource.current < resource.max && resource.current + delta >= resource.max;
     const boundaryAt = crossedMin

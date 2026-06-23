@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createInitialPlayState } from './timers';
 import { getNextResourceBoundaryAt, projectResourcePool } from './resources';
+import { getCharacterStatValue } from './characterStats';
 import type { ContentBundle } from './types';
 
 const bundle: ContentBundle = {
@@ -15,11 +16,12 @@ const bundle: ContentBundle = {
   locations: [{ id: 'room', position: { x: 0, y: 0 }, starting: true }],
   edges: [],
   actions: [{ id: 'walk', locationId: 'room', durationSeconds: 120, rewards: [] }],
-  skills: [{ id: 'air-capacity', maxLevel: 100 }],
+  skills: [],
+  stats: [{ id: 'air-capacity', base: 100 }, { id: 'air-loss', base: -60 }],
   items: [],
   flags: [],
   resourceDefinitions: [{ id: 'air', sourceStat: 'air-capacity', initialValue: 'full' }],
-  effects: [{ id: 'air-loss', resourceId: 'air', ratePerMinute: -60 }],
+  effects: [{ id: 'air-loss', resourceId: 'air', sourceStat: 'air-loss' }],
   interactionTypes: [],
   enemies: [],
   locales: { en: {} },
@@ -44,6 +46,14 @@ const runningState = () => {
 };
 
 describe('resource projection', () => {
+  it('calculates explicit stats from base, added, increased, and an associated skill level', () => {
+    const state = { ...createInitialPlayState('test', 'room'), skillXp: { endurance: 90 } };
+    const stats = [{ id: 'air-capacity', base: 100, added: 10, increased: 0.5, skillId: 'endurance' }];
+
+    expect(getCharacterStatValue(state, stats, 'air-capacity')).toBe(171);
+    expect(getCharacterStatValue({ ...state, statOverrides: { 'air-capacity': 42 } }, stats, 'air-capacity')).toBe(42);
+  });
+
   it('projects a constant foreground effect without mutating persisted state', () => {
     const state = runningState();
     const projected = projectResourcePool(bundle, state, bundle.resourceDefinitions[0], 31_000);

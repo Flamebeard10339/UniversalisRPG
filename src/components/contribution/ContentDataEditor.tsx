@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState, type MutableRefObject } from 'react';
 import { edgeId, toKebabInput } from '../../game/contentIds';
 import type { Translator } from '../../game/i18n';
-import type { ContentBundle, ContributionDraft, ContributionRemovedIds, EffectDefinition, EnemyDefinition, GameAction, InteractionTypeDefinition, ItemDefinition, LocationNode, ResourceDefinition, SkillDefinition, StateFlagDefinition, TravelEdgeDefinition } from '../../game/types';
+import type { ContentBundle, ContributionDraft, ContributionRemovedIds, EffectDefinition, EnemyDefinition, GameAction, InteractionTypeDefinition, ItemDefinition, LocationNode, ResourceDefinition, SkillDefinition, StatDefinition, StateFlagDefinition, TravelEdgeDefinition } from '../../game/types';
 import { ContributionMapEditor } from './ContributionMapEditor';
 import { EnemyDiagnostics } from './EnemyDiagnostics';
 import { EdgeFields, LocationFields } from './MapContentFields';
 import { StructuredDataDisplay, StructuredDataEditor, type StructuredValue } from '../structuredData/StructuredData';
-import { actionSchema, effectDefinitionSchema, flagDefinitionSchema, resourceDefinitionSchema, rewardSchema } from '../structuredData/contentSchemas';
+import { actionSchema, effectDefinitionSchema, flagDefinitionSchema, resourceDefinitionSchema, rewardSchema, statDefinitionSchema } from '../structuredData/contentSchemas';
 
 type ContentDataEditorProps = {
   baseBundle: ContentBundle;
@@ -16,7 +16,7 @@ type ContentDataEditorProps = {
   t: Translator;
 };
 
-type ContentDataTab = 'map' | 'actions' | 'skills' | 'interactions' | 'enemies' | 'items' | 'resources' | 'json';
+type ContentDataTab = 'map' | 'actions' | 'skills' | 'stats' | 'interactions' | 'enemies' | 'items' | 'resources' | 'json';
 type DraftListKey = Exclude<keyof ContributionRemovedIds, 'resources'>;
 type LayeredRow<T> = {
   index: number;
@@ -24,7 +24,7 @@ type LayeredRow<T> = {
   source: 'draft' | 'base';
 };
 
-const contentTabs: ContentDataTab[] = ['map', 'actions', 'skills', 'interactions', 'enemies', 'items', 'resources', 'json'];
+const contentTabs: ContentDataTab[] = ['map', 'actions', 'skills', 'stats', 'interactions', 'enemies', 'items', 'resources', 'json'];
 
 const uniqueId = (baseId: string, existingIds: string[]) => {
   let index = 1;
@@ -51,6 +51,7 @@ const emptyRemoved = (): ContributionRemovedIds => ({
   edges: [],
   actions: [],
   skills: [],
+  stats: [],
   items: [],
   flags: [],
   resources: [],
@@ -79,6 +80,7 @@ const layeredRows = <T extends { id: string }>(
 const uniqueById = <T extends { id: string }>(items: T[]) => [...new Map(items.map((item) => [item.id, item])).values()];
 const allLocations = (bundle: ContentBundle, draft: ContributionDraft) => uniqueById([...bundle.locations, ...draft.locations]);
 const allSkills = (bundle: ContentBundle, draft: ContributionDraft) => uniqueById([...bundle.skills, ...draft.skills]);
+const allStats = (bundle: ContentBundle, draft: ContributionDraft) => uniqueById([...bundle.stats, ...draft.stats]);
 const allItems = (bundle: ContentBundle, draft: ContributionDraft) => uniqueById([...(bundle.items ?? []), ...draft.items]);
 const allFlags = (bundle: ContentBundle, draft: ContributionDraft) => uniqueById([...(bundle.flags ?? []), ...draft.flags]);
 const allInteractionTypes = (bundle: ContentBundle, draft: ContributionDraft) => uniqueById([...(bundle.interactionTypes ?? []), ...draft.interactionTypes]);
@@ -139,6 +141,7 @@ export const ContentDataEditor = ({ baseBundle, bundle, draft, onPatch, t }: Con
   const edges = layeredRows(draft.edges, baseBundle.edges, removed.edges, filter);
   const actions = layeredRows(draft.actions, baseBundle.actions, removed.actions, filter);
   const skills = layeredRows(draft.skills, baseBundle.skills, removed.skills, filter);
+  const stats = layeredRows(draft.stats, baseBundle.stats, removed.stats, filter);
   const items = layeredRows(draft.items, baseBundle.items ?? [], removed.items, filter);
   const flags = layeredRows(draft.flags, baseBundle.flags ?? [], removed.flags, filter);
   const resources = layeredRows(draft.resourceDefinitions, baseBundle.resourceDefinitions ?? [], removed.resources, filter);
@@ -184,6 +187,10 @@ export const ContentDataEditor = ({ baseBundle, bundle, draft, onPatch, t }: Con
 
   const updateSkill = (row: LayeredRow<SkillDefinition>, patch: Partial<SkillDefinition>) => {
     promote('skills', { ...row.item, ...patch }, row.item.id);
+  };
+
+  const updateStat = (row: LayeredRow<StatDefinition>, patch: Partial<StatDefinition>) => {
+    promote('stats', { ...row.item, ...patch }, row.item.id);
   };
 
   const updateItem = (row: LayeredRow<ItemDefinition>, patch: Partial<ItemDefinition>) => {
@@ -308,6 +315,11 @@ export const ContentDataEditor = ({ baseBundle, bundle, draft, onPatch, t }: Con
     onPatch({ skills: [{ id, maxLevel: 100 }, ...draft.skills] });
   };
 
+  const addStat = () => {
+    const id = uniqueId('new-stat', stats.map((row) => row.item.id));
+    onPatch({ stats: [{ id, base: 0 }, ...draft.stats] });
+  };
+
   const addItem = () => {
     const id = uniqueId('new-item', items.map((row) => row.item.id));
     onPatch({ items: [{ id }, ...draft.items] });
@@ -320,7 +332,7 @@ export const ContentDataEditor = ({ baseBundle, bundle, draft, onPatch, t }: Con
 
   const addResource = () => {
     const id = uniqueId('new-resource', resources.map((row) => row.item.id));
-    onPatch({ resourceDefinitions: [{ id, sourceStat: skills[0]?.item.id ?? '', initialValue: 'full' }, ...draft.resourceDefinitions] });
+    onPatch({ resourceDefinitions: [{ id, sourceStat: stats[0]?.item.id ?? '', initialValue: 'full' }, ...draft.resourceDefinitions] });
   };
 
   const addEffect = () => {
@@ -329,16 +341,16 @@ export const ContentDataEditor = ({ baseBundle, bundle, draft, onPatch, t }: Con
       effects: [{
         id,
         resourceId: resources[0]?.item.id ?? '',
-        ratePerMinute: 0,
+        sourceStat: stats[0]?.item.id ?? '',
       }, ...draft.effects],
     });
   };
 
   const addInteractionType = () => {
     const id = uniqueId('new-interaction', interactionTypes.map((row) => row.item.id));
-    const sourceSkillId = skills[0]?.item.id ?? '';
-    const targetSkillId = skills[1]?.item.id ?? sourceSkillId;
-    onPatch({ interactionTypes: [{ id, sourceSkillId, targetSkillId, targetPlayerHealth: false }, ...draft.interactionTypes] });
+    const sourceStatId = stats[0]?.item.id ?? '';
+    const targetStatId = stats[1]?.item.id ?? sourceStatId;
+    onPatch({ interactionTypes: [{ id, sourceStatId, targetStatId, targetPlayerHealth: false }, ...draft.interactionTypes] });
   };
 
   const addEnemy = () => {
@@ -372,6 +384,7 @@ export const ContentDataEditor = ({ baseBundle, bundle, draft, onPatch, t }: Con
     { path: 'edges.json', json: edges.map((row) => row.item) },
     { path: 'actions.json', json: actions.map((row) => row.item) },
     { path: 'skills.json', json: skills.map((row) => row.item) },
+    { path: 'stats.json', json: stats.map((row) => row.item) },
     { path: 'items.json', json: items.map((row) => row.item) },
     { path: 'flags.json', json: flags.map((row) => row.item) },
     { path: 'resources.json', json: resources.map((row) => row.item) },
@@ -549,6 +562,31 @@ export const ContentDataEditor = ({ baseBundle, bundle, draft, onPatch, t }: Con
         </section>
       )}
 
+      {activeTab === 'stats' && (
+        <section className="grid gap-2 rounded border border-slate-700 p-2">
+          <div className="flex items-center justify-between gap-3">
+            <h3 className="text-sm font-semibold text-slate-100">{t('contribution.data.stats')}</h3>
+            <button className="rounded bg-cyan-400 px-3 py-2 text-sm font-semibold text-slate-950" onClick={addStat} type="button">
+              {t('contribution.data.addStat')}
+            </button>
+          </div>
+          {stats.length === 0 ? (
+            <p className="px-2 py-1 text-sm text-slate-500">{t('contribution.data.noStatChanges')}</p>
+          ) : (
+            <div className="grid gap-2">
+              {stats.map((row) => (
+                <div className="flex flex-wrap items-start gap-2 rounded bg-slate-950 p-2" key={`${row.source}-${row.index}`}>
+                  <div className="min-w-0 flex-1">
+                    <StructuredDataEditor label="contribution.data.statFields" onChange={(value) => { if (value) updateStat(row, value as unknown as StatDefinition); }} schema={statDefinitionSchema(bundle)} t={t} value={row.item as unknown as StructuredValue} />
+                  </div>
+                  <button className={removeButtonClass} onClick={() => removeRow('stats', row)} type="button">{t('contribution.column.remove')}</button>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
+
       {activeTab === 'interactions' && (
         <section className="grid gap-1 rounded border border-slate-700 p-2">
           <div className="flex items-center justify-between gap-3">
@@ -559,8 +597,8 @@ export const ContentDataEditor = ({ baseBundle, bundle, draft, onPatch, t }: Con
           </div>
           <div className="hidden grid-cols-[1fr_1fr_1fr_8rem_6rem] gap-2 px-2 text-xs font-semibold uppercase tracking-wide text-slate-500 lg:grid">
             <span>{t('contribution.column.id')}</span>
-            <span>{t('contribution.column.sourceSkill')}</span>
-            <span>{t('contribution.column.targetSkill')}</span>
+            <span>{t('contribution.column.sourceStat')}</span>
+            <span>{t('contribution.column.targetStat')}</span>
             <span>{t('contribution.column.targetPlayerHealth')}</span>
             <span>{t('contribution.column.remove')}</span>
           </div>
@@ -571,8 +609,8 @@ export const ContentDataEditor = ({ baseBundle, bundle, draft, onPatch, t }: Con
               {interactionTypes.map((row) => (
                 <div className="grid gap-2 rounded bg-slate-950 p-2 lg:grid-cols-[1fr_1fr_1fr_8rem_6rem]" key={`${row.source}-${row.index}`}>
                   <input aria-label="Interaction id" className="min-w-0 rounded bg-slate-900 px-2 py-1.5 text-sm" onChange={(event) => updateInteractionType(row, { id: toKebabInput(event.target.value) })} value={row.item.id} />
-                  <input aria-label="Interaction source skill" className="min-w-0 rounded bg-slate-900 px-2 py-1.5 text-sm" list="content-skill-ids" onChange={(event) => updateInteractionType(row, { sourceSkillId: toKebabInput(event.target.value) })} value={row.item.sourceSkillId} />
-                  <input aria-label="Interaction target skill" className="min-w-0 rounded bg-slate-900 px-2 py-1.5 text-sm" list="content-skill-ids" onChange={(event) => updateInteractionType(row, { targetSkillId: toKebabInput(event.target.value) })} value={row.item.targetSkillId} />
+                  <input aria-label="Interaction source stat" className="min-w-0 rounded bg-slate-900 px-2 py-1.5 text-sm" list="content-stat-ids" onChange={(event) => updateInteractionType(row, { sourceStatId: toKebabInput(event.target.value) })} value={row.item.sourceStatId} />
+                  <input aria-label="Interaction target stat" className="min-w-0 rounded bg-slate-900 px-2 py-1.5 text-sm" list="content-stat-ids" onChange={(event) => updateInteractionType(row, { targetStatId: toKebabInput(event.target.value) })} value={row.item.targetStatId} />
                   <label className="flex items-center gap-2 text-sm text-slate-300">
                     <input checked={row.item.targetPlayerHealth} onChange={(event) => updateInteractionType(row, { targetPlayerHealth: event.target.checked })} type="checkbox" />
                     <span className="lg:hidden">{t('contribution.column.targetPlayerHealth')}</span>
@@ -797,6 +835,11 @@ export const ContentDataEditor = ({ baseBundle, bundle, draft, onPatch, t }: Con
       <datalist id="content-skill-ids">
         {allSkills(bundle, draft).map((skill) => (
           <option key={skill.id} value={skill.id} />
+        ))}
+      </datalist>
+      <datalist id="content-stat-ids">
+        {allStats(bundle, draft).map((stat) => (
+          <option key={stat.id} value={stat.id} />
         ))}
       </datalist>
       <datalist id="content-item-ids">

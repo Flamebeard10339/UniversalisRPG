@@ -1,4 +1,4 @@
-import { effectTitleKey, resourceTitleKey, skillTitleKey } from '../game/contentIds';
+import { effectTitleKey, resourceTitleKey } from '../game/contentIds';
 import type { ContentBundle, UniversePlayState } from '../game/types';
 import type { Translator } from '../game/i18n';
 import { getEffectRatePerMinute, isEffectApplicable, projectResourcePool } from '../game/resources';
@@ -53,7 +53,7 @@ export const ResourceStatus = ({ bundle, playState, showEffects = false, t }: Re
                       <p className="text-slate-500">{t('resources.effects.empty')}</p>
                     ) : (
                       effects.map((effect) => {
-                        const rate = getEffectRatePerMinute(bundle.skills, playState, effect);
+                        const rate = getEffectRatePerMinute(bundle.stats, playState, effect);
                         const active = Boolean(playState.activeAction) && isEffectApplicable(playState, effect);
 
                         return (
@@ -63,7 +63,7 @@ export const ResourceStatus = ({ bundle, playState, showEffects = false, t }: Re
                               {t(active ? 'resources.effects.activeRate' : 'resources.effects.inactiveRate', {
                                 rate: formatNumber(rate),
                               })}
-                              {effect.useStat && ` ${t('resources.effects.fromSkill', { skill: t(skillTitleKey(effect.useStat), effect.useStat) })}`}
+                              {` ${t('resources.effects.fromStat', { stat: effect.sourceStat })}`}
                             </span>
                           </div>
                         );

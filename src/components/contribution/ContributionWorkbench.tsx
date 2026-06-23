@@ -53,7 +53,7 @@ const actionMatchesStateFilter = (action: GameAction, key: StateKey | '', value:
       : compare(Number(value), condition.comparison, condition.value)));
 };
 
-const referencedStateKeys = (actions: GameAction[]) => {
+const referencedStateKeys = (actions: GameAction[], bundle: ContentBundle) => {
   const keys = new Set<StateKey>();
   for (const action of actions) {
     visitCondition(action.requirements, (condition) => {
@@ -74,6 +74,12 @@ const referencedStateKeys = (actions: GameAction[]) => {
       if (result.kind === 'skill-xp') keys.add(`skill-level:${result.skillId}`);
     }
     keys.add(`action-completions:${action.id}`);
+  }
+  for (const resource of bundle.resourceDefinitions) {
+    if (keys.has(`resource:${resource.id}`)) keys.add(`stat:${resource.sourceStat}`);
+  }
+  for (const effect of bundle.effects) {
+    if (!effect.locationId || actions.some((action) => action.locationId === effect.locationId)) keys.add(`stat:${effect.sourceStat}`);
   }
   return keys;
 };
@@ -104,7 +110,7 @@ export const ContributionWorkbench = ({ baseBundle, bundle, draft, onPatchDraft,
   useEffect(() => { void hydrateProfiles(bundle.manifest.id); }, [bundle.manifest.id, hydrateProfiles]);
 
   const currentActions = bundle.actions.filter((action) => action.locationId === playState.currentLocationId);
-  const relevantKeys = useMemo(() => Array.from(new Set([...referencedStateKeys(currentActions), ...extraKeys])), [currentActions, extraKeys]);
+  const relevantKeys = useMemo(() => Array.from(new Set([...referencedStateKeys(currentActions, bundle), ...extraKeys])), [bundle, currentActions, extraKeys]);
   const allKeys = useMemo<StateKey[]>(() => stateVariableKeys(bundle), [bundle]);
   const filteredActions = currentActions.filter((action) => actionMatchesStateFilter(action, filterKey, filterValue));
   const selectedAction = bundle.actions.find((action) => action.id === selectedActionId) ?? null;
@@ -156,7 +162,7 @@ export const ContributionWorkbench = ({ baseBundle, bundle, draft, onPatchDraft,
 
       <section className="grid gap-3 rounded border border-slate-700 p-3">
         <div className="flex flex-wrap items-end gap-2"><div className="mr-auto"><h3 className="font-semibold text-slate-100">{t('workbench.relevantState')}</h3><p className="text-xs text-slate-400">{t('workbench.relevantStateDescription')}</p></div><select className="rounded bg-slate-950 px-2 py-1.5 text-sm" onChange={(event) => setNewKey(event.target.value as StateKey)} value={newKey}><option value="">{t('workbench.addStateKey')}</option>{allKeys.filter((key) => !relevantKeys.includes(key)).map((key) => <option key={key} value={key}>{keyLabel(key)}</option>)}</select><button className="rounded border border-slate-600 px-2 py-1.5 text-sm" disabled={!newKey} onClick={() => { if (newKey) setExtraKeys((keys) => [...keys, newKey]); setNewKey(''); }} type="button">{t('workbench.add')}</button></div>
-        <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">{relevantKeys.map((key) => { const value = readStateVariable(playState, key, bundle); return <label className="grid grid-cols-[1fr_7rem] items-center gap-2 rounded bg-slate-950 p-2 text-xs" key={key}><span className="truncate text-slate-300">{keyLabel(key)}</span>{typeof value === 'boolean' ? <input checked={value} onChange={(event) => onReplaceState(writeStateVariable(playState, key, event.target.checked))} type="checkbox" /> : <input className="min-w-0 rounded bg-slate-900 px-2 py-1" min="0" onChange={(event) => onReplaceState(writeStateVariable(playState, key, Number(event.target.value)))} type="number" value={value} />}</label>; })}</div>
+        <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">{relevantKeys.map((key) => { const value = readStateVariable(playState, key, bundle); return <label className="grid grid-cols-[1fr_7rem] items-center gap-2 rounded bg-slate-950 p-2 text-xs" key={key}><span className="truncate text-slate-300">{keyLabel(key)}</span>{typeof value === 'boolean' ? <input checked={value} onChange={(event) => onReplaceState(writeStateVariable(playState, key, event.target.checked))} type="checkbox" /> : <input className="min-w-0 rounded bg-slate-900 px-2 py-1" min={key.startsWith('stat:') ? undefined : 0} onChange={(event) => onReplaceState(writeStateVariable(playState, key, Number(event.target.value)))} type="number" value={value} />}</label>; })}</div>
       </section>
 
       <section className="grid gap-3 rounded border border-slate-700 p-3">

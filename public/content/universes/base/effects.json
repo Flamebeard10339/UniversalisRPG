@@ -2,7 +2,6 @@
   {
     "id": "health-regeneration",
     "resourceId": "health",
-    "ratePerMinute": 0,
-    "useStat": "regeneration"
+    "sourceStat": "regeneration"
   }
 ]

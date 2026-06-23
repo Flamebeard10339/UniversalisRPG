@@ -175,15 +175,13 @@ Rules:
   - `{"op":"remove","contentType":"...","id":"..."}`
   - `{"op":"localize","locale":"en","values":{...}}`
   - `{"op":"set-manifest","value":{...}}`
-  - `{"op":"set-death-reset","value":{...}}`
-- Supported `contentType` values are `locations`, `edges`, `actions`, `skills`,
+- Supported `contentType` values are `locations`, `edges`, `actions`, `skills`, `stats`,
   `items`, `flags`, `resources`, `effects`, `interaction-types`, and `enemies`.
 - The controller translates operations into the existing split JSON files.
 - The controller derives the manifest `files` list automatically. The GM does
   not maintain it by hand.
 - `set-manifest` supplies manifest identity, version, author, locales, file
-  list, and compatibility. Death persistence remains a separate atomic
-  operation so it can be revised without replacing manifest metadata.
+list, and compatibility. State-reset behavior belongs to the resource boundary that triggers it.
 - Omission never means deletion. Removal always requires a `remove` operation.
 - The GM may remove an obsolete action only if doing so does not strand the
   player or invalidate the active action.
@@ -194,9 +192,7 @@ Rules:
 Actions always include `id`, `locationId`, `durationSeconds`, and `rewards`.
 Use `maxCompletions` for finite interactions. A completion increments the
 action's authoritative counter; exhausted actions are no longer available.
-`role` is `optional`, `progression`, or `utility`. An
-`inventoryItemId` action is launched from that item's Inventory entry and is
-not restricted to its authoring location.
+`role` is `optional`, `progression`, or `utility`.
 
 Ordered action `results` use only these forms:
 
@@ -224,27 +220,23 @@ Conditions may be assigned to `visibleWhen` or `requirements`:
 {
   "kind": "all",
   "conditions": [
-    { "kind": "item", "itemId": "space-suit", "comparison": "at-least", "value": 1 },
-    { "kind": "not", "condition": { "kind": "flag", "flagId": "airlock-open", "value": true } }
+    { "kind": "not", "condition": { "kind": "state-variable", "variable": "item:space-suit", "comparison": "less-than", "value": 1 } },
+    { "kind": "not", "condition": { "kind": "state-variable", "variable": "flag:airlock-open", "comparison": "equal", "value": true } }
   ]
 }
 ```
 
-Atomic condition kinds are `item`, `resource`, `skill-level`,
-`action-completions`, and `flag`. Combinators are `all`, `any`, and `not`.
-Numeric comparisons are `equal`, `at-least`, `at-most`, `greater-than`, and
-`less-than`.
+Atomic conditions use `state-variable` with `flag:`, `item:`, `resource:`,
+`skill-level:`, `stat:`, or `action-completions:` keys. Combinators are `all`,
+`any`, and `not`. Numeric comparisons are `equal`, `greater-than`, and `less-than`.
 
 Movement chosen through the action-only interface uses a `relocate` result.
 The action duration is its travel time. Resource effects remain active across
 that simulated duration. Do not ask the player to click the map.
 
-Death is triggered by a resource definition whose `onEmpty` array contains
-`{"kind":"death-reset"}`.
-The `deathReset.preserve` lists in `universe.json` explicitly name inventory,
-resources, flags, and action counters that survive; skill XP and discovered
-locations use booleans. `torn-suit` must be a declared flag before it can be
-preserved.
+Any resource boundary may reset state with `{"kind":"reset-state"}`. Its
+optional `preserve` object explicitly names inventory, resources, flags, and
+action counters that survive; skill XP and discovered locations use booleans.
 
 ## Capability Requests
 

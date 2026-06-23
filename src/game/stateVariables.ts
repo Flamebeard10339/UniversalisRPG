@@ -1,20 +1,22 @@
 import { skillLevelFromXp } from './skills';
+import { getCharacterStatValue } from './characterStats';
 import type { ActionResolutionContext, ContentBundle, UniversePlayState } from './types';
 
 export type StateVariableValue = boolean | number;
 
-export const stateVariableKeys = (bundle: Pick<ContentBundle, 'flags' | 'items' | 'resourceDefinitions' | 'skills' | 'actions'>) => [
+export const stateVariableKeys = (bundle: Pick<ContentBundle, 'flags' | 'items' | 'resourceDefinitions' | 'skills' | 'stats' | 'actions'>) => [
   ...bundle.flags.map((item) => `flag:${item.id}`),
   ...bundle.items.map((item) => `item:${item.id}`),
   ...bundle.resourceDefinitions.map((item) => `resource:${item.id}`),
   ...bundle.skills.map((item) => `skill-level:${item.id}`),
+  ...bundle.stats.map((item) => `stat:${item.id}`),
   ...bundle.actions.map((item) => `action-completions:${item.id}`),
 ];
 
 export const readStateVariable = (
   state: UniversePlayState,
   variable: string,
-  context?: Pick<ActionResolutionContext, 'skills'>,
+  context?: Pick<ActionResolutionContext, 'skills' | 'stats'>,
 ): StateVariableValue => {
   const separator = variable.indexOf(':');
   const category = separator >= 0 ? variable.slice(0, separator) : 'flag';
@@ -26,6 +28,7 @@ export const readStateVariable = (
     const skill = context?.skills.find((candidate) => candidate.id === id);
     return skill ? Math.min(skill.maxLevel, skillLevelFromXp(state.skillXp[id] ?? 0)) : skillLevelFromXp(state.skillXp[id] ?? 0);
   }
+  if (category === 'stat') return getCharacterStatValue(state, context?.stats ?? [], id);
   if (category === 'action-completions') return state.actionCompletions[id] ?? 0;
   return state.flags[variable] ?? false;
 };
@@ -44,6 +47,7 @@ export const writeStateVariable = (state: UniversePlayState, variable: string, v
     const level = Math.max(1, Number(value));
     return { ...state, skillXp: { ...state.skillXp, [id]: (level - 1) ** 2 * 10 } };
   }
+  if (category === 'stat') return { ...state, statOverrides: { ...state.statOverrides, [id]: Number(value) } };
   if (category === 'action-completions') return { ...state, actionCompletions: { ...state.actionCompletions, [id]: Number(value) } };
   return { ...state, flags: { ...state.flags, [variable]: value } };
 };

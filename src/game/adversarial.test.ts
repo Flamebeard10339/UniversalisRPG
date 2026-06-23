@@ -27,10 +27,11 @@ const context: ActionResolutionContext = {
     { id: 'attack', maxLevel: 100 },
     { id: 'defense', maxLevel: 100 },
   ],
+  stats: [{ id: 'attack', base: 6, skillId: 'attack' }, { id: 'defense', base: 6, skillId: 'defense' }, { id: 'health', base: 100 }],
   locations: [{ id: 'arena', position: { x: 0, y: 0 }, starting: true }],
   resourceDefinitions: [{
     id: 'health',
-    sourceStat: 'defense',
+    sourceStat: 'health',
     initialValue: 'full',
     onEmpty: [
       { kind: 'stop-action' },
@@ -42,8 +43,8 @@ const context: ActionResolutionContext = {
   effects: [],
   interactionTypes: [{
     id: 'melee-combat',
-    sourceSkillId: 'attack',
-    targetSkillId: 'defense',
+    sourceStatId: 'attack',
+    targetStatId: 'defense',
     targetPlayerHealth: true,
   }],
   enemies: [enemy()],
@@ -69,7 +70,7 @@ describe('adversarial actions', () => {
       showReport: true,
     }, startedAt + 10_000);
 
-    expect(resolved.state.activeAction?.targetHealth).toBeCloseTo(200 - 7 * DAMAGE_SCALE, 5);
+    expect(resolved.state.activeAction?.targetHealth).toBeCloseTo(200 - DAMAGE_SCALE, 5);
     expect(resolved.state.resources.fang).toBe(1);
     expect(resolved.state.chatMessages[0].key).toBe('interaction.melee-combat.player.hit');
   });
@@ -88,7 +89,7 @@ describe('adversarial actions', () => {
 
   it('grants player and enemy rewards once on kill', () => {
     const startedAt = 1_000;
-    const killContext = { ...context, enemies: [enemy({ health: 50 })], actions: [action] };
+    const killContext = { ...context, enemies: [enemy({ health: 10 })], actions: [action] };
     const state = {
       ...startAction(createInitialPlayState('test', 'arena'), action, killContext, startedAt),
       skillXp: { attack: 10 },
@@ -147,7 +148,7 @@ describe('adversarial actions', () => {
     const resolved = resolveIdleTimers(state, lethalContext, { random: () => 1 }, startedAt + 1_000);
 
     expect(resolved.state.activeAction).toBeNull();
-    expect(resolved.state.playerHealth).toBe(7);
+    expect(resolved.state.playerHealth).toBe(100);
     expect(resolved.state.chatMessages.map((message) => message.key)).toEqual([
       'interaction.melee-combat.entity.kill',
       'resource.health.empty',

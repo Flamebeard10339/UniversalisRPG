@@ -5,24 +5,22 @@ export const isEffectApplicable = (state: UniversePlayState, effect: EffectDefin
   !effect.locationId || effect.locationId === state.currentLocationId;
 
 export const getEffectRatePerMinute = (
-  stats: ContentBundle['skills'],
+  stats: ContentBundle['stats'],
   state: UniversePlayState,
   effect: EffectDefinition,
 ) => {
-  return effect.useStat
-    ? getCharacterStatValue(state, stats, effect.useStat)
-    : effect.ratePerMinute;
+  return getCharacterStatValue(state, stats, effect.sourceStat);
 };
 
 export const getResourceMax = (
   state: UniversePlayState,
-  stats: ContentBundle['skills'],
+  stats: ContentBundle['stats'],
   resource: ResourceDefinition,
 ) => Math.max(0, getCharacterStatValue(state, stats, resource.sourceStat));
 
 const basePool = (bundle: ContentBundle, state: UniversePlayState, resource: ResourceDefinition): ResourcePool => {
   const existing = state.resourcePools[resource.id];
-  const max = getResourceMax(state, bundle.skills, resource);
+  const max = getResourceMax(state, bundle.stats, resource);
   if (existing) return { current: Math.min(max, Math.max(0, existing.current)), min: 0, max };
   return {
     current: resource.initialValue === 'empty' ? 0 : max,
@@ -39,7 +37,7 @@ export const getActiveResourceRate = (
   if (!state.activeAction) return 0;
   return bundle.effects
     .filter((effect) => effect.resourceId === resourceId && isEffectApplicable(state, effect))
-    .reduce((total, effect) => total + getEffectRatePerMinute(bundle.skills, state, effect), 0);
+    .reduce((total, effect) => total + getEffectRatePerMinute(bundle.stats, state, effect), 0);
 };
 
 export const projectResourcePool = (

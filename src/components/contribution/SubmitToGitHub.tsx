@@ -23,6 +23,7 @@ export const SubmitToGitHub = ({ appVersion, draft, validationIssues, t }: Submi
         { path: 'edges.json', json: draft.edges },
         { path: 'actions.json', json: draft.actions },
         { path: 'skills.json', json: draft.skills },
+        { path: 'stats.json', json: draft.stats },
         { path: 'items.json', json: draft.items },
         { path: 'flags.json', json: draft.flags },
         { path: 'resources.json', json: draft.resourceDefinitions },

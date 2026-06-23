@@ -23,6 +23,7 @@ export const ActionDetails = ({ bundle, onStopAction, playState, t }: ActionDeta
     manifest: bundle.manifest,
     actions: bundle.actions,
     skills: bundle.skills,
+    stats: bundle.stats,
     locations: bundle.locations,
     items: bundle.items,
     flags: bundle.flags,

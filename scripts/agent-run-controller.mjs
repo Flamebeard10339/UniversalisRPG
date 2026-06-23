@@ -55,6 +55,7 @@ const canonicalFiles = (locales = ['en']) => [
   'edges.json',
   'actions.json',
   'skills.json',
+  'stats.json',
   'items.json',
   'flags.json',
   'resources.json',
@@ -106,6 +107,7 @@ const contextFromBundle = (bundle) => ({
   manifest: bundle.manifest,
   actions: bundle.actions,
   skills: bundle.skills,
+  stats: bundle.stats,
   locations: bundle.locations,
   items: bundle.items,
   flags: bundle.flags,
@@ -137,7 +139,7 @@ const buildPlayerSnapshot = (session) => {
     resources: session.bundle.resourceDefinitions.map((resource) => {
       const pool = session.state.resourcePools[resource.id];
       const applicableEffects = session.bundle.effects.filter((effect) => effect.resourceId === resource.id && resources.isEffectApplicable(session.state, effect));
-      const max = resources.getResourceMax(session.state, session.bundle.skills, resource);
+      const max = resources.getResourceMax(session.state, session.bundle.stats, resource);
       return {
         id: resource.id,
         label: localeText(session.bundle, contentIds.resourceTitleKey(resource.id), resource.id),
@@ -145,7 +147,7 @@ const buildPlayerSnapshot = (session) => {
         min: pool?.min ?? 0,
         max: pool?.max ?? max,
         ratePerMinute: session.state.activeAction
-          ? applicableEffects.reduce((total, effect) => total + resources.getEffectRatePerMinute(session.bundle.skills, session.state, effect), 0)
+          ? applicableEffects.reduce((total, effect) => total + resources.getEffectRatePerMinute(session.bundle.stats, session.state, effect), 0)
           : 0,
       };
     }),
@@ -185,6 +187,7 @@ const buildContentIndex = (session) => session.bundle ? {
   locations: session.bundle.locations.map(({ id, position, starting }) => ({ id, position, starting })),
   actions: session.bundle.actions.map(({ id, locationId }) => ({ id, locationId })),
   skills: session.bundle.skills.map(({ id }) => id),
+  stats: session.bundle.stats,
   items: session.bundle.items.map(({ id }) => id),
   flags: session.bundle.flags,
   resources: session.bundle.resourceDefinitions,
@@ -240,6 +243,7 @@ const contentProperty = {
   edges: 'edges',
   actions: 'actions',
   skills: 'skills',
+  stats: 'stats',
   items: 'items',
   flags: 'flags',
   resources: 'resourceDefinitions',
@@ -251,7 +255,7 @@ const contentProperty = {
 const applyOperations = (originalBundle, operations) => {
   let bundle = originalBundle ? structuredClone(originalBundle) : {
     manifest: null,
-    locations: [], edges: [], actions: [], skills: [], items: [], flags: [],
+    locations: [], edges: [], actions: [], skills: [], stats: [], items: [], flags: [],
     resourceDefinitions: [], effects: [], interactionTypes: [], enemies: [], locales: {},
   };
   for (const operation of operations) {
@@ -280,7 +284,10 @@ const designWarnings = (bundle) => {
   const warnings = [];
   const resetResources = bundle.resourceDefinitions.filter((resource) => resource.onEmpty?.some((behavior) => behavior.kind === 'reset-state'));
   for (const resource of resetResources) {
-      const hasNegativeEffect = bundle.effects.some((effect) => effect.resourceId === resource.id && effect.ratePerMinute < 0);
+      const hasNegativeEffect = bundle.effects.some((effect) => {
+        const stat = bundle.stats.find((candidate) => candidate.id === effect.sourceStat);
+        return effect.resourceId === resource.id && ((stat?.base ?? 0) + (stat?.added ?? 0)) < 0;
+      });
       const hasNegativeResult = bundle.actions.some((action) => action.results?.some((result) => result.kind === 'resource' && result.resourceId === resource.id && result.amount < 0));
       if (!hasNegativeEffect && !hasNegativeResult) {
         warnings.push({ severity: 'warning', path: `resources.${resource.id}`, message: 'agent.validation.deathResourceHasNoDrain' });
@@ -306,6 +313,7 @@ const exportBundle = async (bundle, universeId) => {
     'edges.json': normalized.edges,
     'actions.json': normalized.actions,
     'skills.json': normalized.skills,
+    'stats.json': normalized.stats,
     'items.json': normalized.items,
     'flags.json': normalized.flags,
     'resources.json': normalized.resourceDefinitions,
@@ -349,6 +357,7 @@ const loadExportedUniverse = async (universeId) => {
     edges: await optional('edges.json'),
     actions: await optional('actions.json'),
     skills: await optional('skills.json'),
+    stats: await optional('stats.json'),
     items: await optional('items.json'),
     flags: await optional('flags.json'),
     resourceDefinitions: await optional('resources.json'),

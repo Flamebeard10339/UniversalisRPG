@@ -82,6 +82,7 @@ const normalizeContentBundle = (bundle: ContentBundle): ContentBundle => ({
   items: bundle.items ?? [],
   flags: bundle.flags ?? [],
   resourceDefinitions: bundle.resourceDefinitions ?? [],
+  stats: bundle.stats ?? [],
   effects: bundle.effects ?? [],
   interactionTypes: bundle.interactionTypes ?? [],
   enemies: (bundle.enemies ?? []).map((enemy) => normalizeEnemyDefinition(enemy)),

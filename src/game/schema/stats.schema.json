@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://universalis-rpg.local/schema/stats.schema.json",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "required": ["id"],
+    "additionalProperties": false,
+    "properties": {
+      "id": { "type": "string", "minLength": 1 },
+      "base": { "type": "number", "default": 0 },
+      "added": { "type": "number", "default": 0 },
+      "increased": { "type": "number", "default": 0 },
+      "skillId": { "type": "string", "minLength": 1 }
+    }
+  }
+}

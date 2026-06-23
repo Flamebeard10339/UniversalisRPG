@@ -22,9 +22,5 @@
   {
     "id": "regeneration",
     "maxLevel": 100
-  },
-  {
-    "id": "health",
-    "maxLevel": 100
   }
 ]
