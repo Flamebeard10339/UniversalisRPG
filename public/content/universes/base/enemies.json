@@ -2,15 +2,10 @@
   {
     "id": "goblin",
     "interactionTypeId": "melee-combat",
-    "attack": 1,
-    "defense": 1,
-    "health": 10,
-    "rate": 30,
-    "regeneration": 0,
-    "armorPenetration": 0,
-    "torpidity": 0,
-    "critChance": 0,
-    "critMultiplier": 2,
+    "stats": {
+      "health": 10,
+      "rate": 30
+    },
     "showHealthBar": true,
     "rewards": [
       { "kind": "skillXp", "skillId": "attack", "amount": 2 },
@@ -20,15 +15,9 @@
   {
     "id": "oak-tree",
     "interactionTypeId": "woodcutting",
-    "attack": 0,
-    "defense": 1,
-    "health": 10,
-    "rate": 0,
-    "regeneration": 0,
-    "armorPenetration": 0,
-    "torpidity": 0,
-    "critChance": 0,
-    "critMultiplier": 1,
+    "stats": {
+      "health": 10
+    },
     "showHealthBar": true,
     "rewards": [
       { "kind": "skillXp", "skillId": "woodcutting", "amount": 4 }
@@ -37,15 +26,12 @@
   {
     "id": "ent",
     "interactionTypeId": "woodcutting-combat",
-    "attack": 6,
-    "defense": 4,
-    "health": 30,
-    "rate": 20,
-    "regeneration": 0,
-    "armorPenetration": 0,
-    "torpidity": 0,
-    "critChance": 0,
-    "critMultiplier": 2,
+    "stats": {
+      "attack": 6,
+      "defense": 4,
+      "health": 30,
+      "rate": 20
+    },
     "showHealthBar": true,
     "rewards": [
       { "kind": "skillXp", "skillId": "woodcutting", "amount": 8 },
@@ -55,15 +41,12 @@
   {
     "id": "ork",
     "interactionTypeId": "melee-combat",
-    "attack": 21,
-    "defense": 21,
-    "health": 40,
-    "rate": 24,
-    "regeneration": 0,
-    "armorPenetration": 0,
-    "torpidity": 0,
-    "critChance": 0,
-    "critMultiplier": 2,
+    "stats": {
+      "attack": 21,
+      "defense": 21,
+      "health": 40,
+      "rate": 24
+    },
     "showHealthBar": true,
     "rewards": [
       { "kind": "skillXp", "skillId": "attack", "amount": 4 },
@@ -73,15 +56,12 @@
   {
     "id": "troll",
     "interactionTypeId": "melee-combat",
-    "attack": 31,
-    "defense": 31,
-    "health": 80,
-    "rate": 18,
-    "regeneration": 0,
-    "armorPenetration": 0,
-    "torpidity": 0,
-    "critChance": 0,
-    "critMultiplier": 2,
+    "stats": {
+      "attack": 31,
+      "defense": 31,
+      "health": 80,
+      "rate": 18
+    },
     "showHealthBar": true,
     "rewards": [
       { "kind": "skillXp", "skillId": "attack", "amount": 8 },

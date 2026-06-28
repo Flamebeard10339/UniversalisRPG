@@ -64,8 +64,13 @@ try {
     console.log(`[${viewport.name}] edit`);
     await page.getByRole('button', { name: 'Edit', exact: true }).first().click();
 
-    const attack = page.getByLabel('Attack', { exact: true });
-    const defense = page.getByLabel('Defense', { exact: true });
+    const selectedEditor = page.locator('section').filter({ has: page.getByRole('heading', { name: 'goblin', exact: true }) }).last();
+    const enemyStats = selectedEditor.locator('section').filter({ hasText: 'Enemy stats' }).first();
+    await enemyStats.getByRole('button', { name: 'Add enemy stat', exact: true }).click();
+    await enemyStats.getByRole('button', { name: 'Add enemy stat', exact: true }).click();
+    const enemyStatValues = enemyStats.locator('input[type="number"]');
+    const attack = enemyStatValues.nth(await enemyStatValues.count() - 2);
+    const defense = enemyStatValues.nth(await enemyStatValues.count() - 1);
     await attack.fill('12.5');
     await attack.press('Tab');
     await defense.fill('11.5');
@@ -78,7 +83,6 @@ try {
     await page.screenshot({ fullPage: true, path: path.join(os.tmpdir(), `universalis-enemy-editor-${viewport.name}.png`) });
 
     const attackBox = await attack.boundingBox();
-    const selectedEditor = page.locator('section').filter({ has: page.getByRole('heading', { name: 'goblin', exact: true }) }).last();
     const removeBox = await selectedEditor.getByRole('button', { name: 'Remove', exact: true }).first().boundingBox();
     const overlaps = (first, second) => first && second
       ? first.x + first.width > second.x && second.x + second.width > first.x

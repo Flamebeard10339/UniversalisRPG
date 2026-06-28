@@ -31,7 +31,10 @@ const bundle = (manifestPatch: Partial<UniverseManifest> = {}): ContentBundle =>
 describe('universe manifest validation', () => {
   it('accepts omitted or explicit combat balance', () => {
     expect(validateManifest(manifest())).toBe(true);
-    expect(validateManifest(manifest({ combatBalance: { expectedHitsToKill: 1 / 7, combatSpread: 1 } }))).toBe(true);
+    expect(validateManifest(manifest({
+      basePlayer: { stats: { health: 100, regeneration: 10 }, inventory: {} },
+      combatBalance: { expectedHitsToKill: 1 / 7, combatSpread: 1 },
+    }))).toBe(true);
   });
 
   it('reports invalid combat balance tuning values', () => {
@@ -43,5 +46,13 @@ describe('universe manifest validation', () => {
       'validation.expectedHitsPositive',
       'validation.combatSpreadNonNegative',
     ]);
+  });
+
+  it('reports invalid base inventory amounts', () => {
+    const issues = validateContentBundle(bundle({
+      basePlayer: { inventory: { ration: -1 } },
+    })).filter((issue) => issue.severity === 'error');
+
+    expect(issues.map((issue) => issue.message)).toContain('validation.inventoryAmountNonNegative');
   });
 });

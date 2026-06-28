@@ -1,7 +1,7 @@
 [
-  { "id": "attack", "base": 6, "skillId": "attack" },
-  { "id": "defense", "base": 6, "skillId": "defense" },
-  { "id": "action-rate", "base": 25 },
-  { "id": "health", "base": 100 },
-  { "id": "regeneration", "skillId": "regeneration" }
+  { "id": "attack", "skillId": "attack" },
+  { "id": "defense", "skillId": "defense" },
+  { "id": "action-rate" },
+  { "id": "health" },
+  { "id": "regeneration" }
 ]

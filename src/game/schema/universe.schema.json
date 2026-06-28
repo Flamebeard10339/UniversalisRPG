@@ -21,6 +21,20 @@
       "minItems": 1,
       "uniqueItems": true
     },
+    "basePlayer": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "stats": {
+          "type": "object",
+          "additionalProperties": { "type": "number" }
+        },
+        "inventory": {
+          "type": "object",
+          "additionalProperties": { "type": "number", "minimum": 0 }
+        }
+      }
+    },
     "combatBalance": {
       "type": "object",
       "additionalProperties": false,

@@ -10,6 +10,7 @@ import {
   resolveManifestCombatBalance,
   sampleCombatDamage,
 } from './combatBalance';
+import { getEnemyStat } from './enemies';
 import { getCharacterStatValue, getSkillTotals } from './characterStats';
 export { getSkillTotals } from './characterStats';
 
@@ -68,7 +69,7 @@ export const getActionDurationMs = (
   context: ActionResolutionContext,
 ) => {
   if (getEnemy(action, context)) {
-    const actionsPerMinute = getCharacterStatValue(state, context.stats ?? [], ACTION_RATE_STAT_ID) || DEFAULT_ACTIONS_PER_MINUTE;
+    const actionsPerMinute = getCharacterStatValue(state, context.stats ?? [], ACTION_RATE_STAT_ID, context.manifest?.basePlayer) || DEFAULT_ACTIONS_PER_MINUTE;
     return 60_000 / Math.max(EPSILON, actionsPerMinute);
   }
 
@@ -90,14 +91,14 @@ export const getActionDps = (
     return null;
   }
 
-  const source = getCharacterStatValue(state, context.stats ?? [], sourceStat.id);
-  return expectedCombatDamage(source, enemy.defense, resolveManifestCombatBalance(context.manifest)).damage /
+  const source = getCharacterStatValue(state, context.stats ?? [], sourceStat.id, context.manifest?.basePlayer);
+  return expectedCombatDamage(source, getEnemyStat(enemy, 'defense'), resolveManifestCombatBalance(context.manifest)).damage /
     (getActionDurationMs(state, action, context) / 1000);
 };
 
 export const getEnemyAttackDurationMs = (
   enemy: EnemyDefinition | null,
-) => enemy && enemy.rate > 0 ? 60_000 / enemy.rate : null;
+) => enemy && getEnemyStat(enemy, 'rate') > 0 ? 60_000 / getEnemyStat(enemy, 'rate') : null;
 
 export const getEnemyAttackDps = (
   state: UniversePlayState,
@@ -113,12 +114,12 @@ export const getEnemyAttackDps = (
     return null;
   }
 
-  const target = getCharacterStatValue(state, context.stats ?? [], targetStat.id);
-  return expectedCombatDamage(enemy.attack, target, resolveManifestCombatBalance(context.manifest), {
-    armorPenetration: enemy.armorPenetration,
-    torpidity: enemy.torpidity,
-    critChance: enemy.critChance,
-    critMultiplier: enemy.critMultiplier,
+  const target = getCharacterStatValue(state, context.stats ?? [], targetStat.id, context.manifest?.basePlayer);
+  return expectedCombatDamage(getEnemyStat(enemy, 'attack'), target, resolveManifestCombatBalance(context.manifest), {
+    armorPenetration: getEnemyStat(enemy, 'armorPenetration'),
+    torpidity: getEnemyStat(enemy, 'torpidity'),
+    critChance: getEnemyStat(enemy, 'critChance'),
+    critMultiplier: getEnemyStat(enemy, 'critMultiplier'),
   }).damage / (attackDurationMs / 1000);
 };
 
@@ -135,15 +136,16 @@ export const sampleAdversarialDamage = (
     return null;
   }
 
-  const source = getCharacterStatValue(state, context.stats ?? [], sourceStat.id);
-  const sample = sampleCombatDamage(source, enemy.defense, resolveManifestCombatBalance(context.manifest), {}, random);
+  const source = getCharacterStatValue(state, context.stats ?? [], sourceStat.id, context.manifest?.basePlayer);
+  const target = getEnemyStat(enemy, 'defense');
+  const sample = sampleCombatDamage(source, target, resolveManifestCombatBalance(context.manifest), {}, random);
 
   return {
     sample: sample.roll,
     rawDamage: sample.damage,
     damage: sample.damage,
     source,
-    target: enemy.defense,
+    target,
   };
 };
 
@@ -157,18 +159,18 @@ export const sampleEnemyAttackDamage = (
   const interactionType = getInteractionType(action, context);
   const targetStat = context.stats?.find((stat) => stat.id === interactionType?.targetStatId);
 
-  if (!enemy || !interactionType?.targetPlayerHealth || enemy.rate <= 0 || !targetStat) {
+  if (!enemy || !interactionType?.targetPlayerHealth || getEnemyStat(enemy, 'rate') <= 0 || !targetStat) {
     return null;
   }
 
-  const target = getCharacterStatValue(state, context.stats ?? [], targetStat.id);
-  const sample = sampleCombatDamage(enemy.attack, target, resolveManifestCombatBalance(context.manifest), {
-    armorPenetration: enemy.armorPenetration,
-    torpidity: enemy.torpidity,
+  const target = getCharacterStatValue(state, context.stats ?? [], targetStat.id, context.manifest?.basePlayer);
+  const sample = sampleCombatDamage(getEnemyStat(enemy, 'attack'), target, resolveManifestCombatBalance(context.manifest), {
+    armorPenetration: getEnemyStat(enemy, 'armorPenetration'),
+    torpidity: getEnemyStat(enemy, 'torpidity'),
   }, random);
-  const critChance = Math.min(1, Math.max(0, enemy.critChance / 100));
+  const critChance = Math.min(1, Math.max(0, getEnemyStat(enemy, 'critChance') / 100));
   const critical = sample.damage > 0 && random() < critChance;
-  const critMultiplier = critical ? Math.max(1, enemy.critMultiplier) : 1;
+  const critMultiplier = critical ? Math.max(1, getEnemyStat(enemy, 'critMultiplier')) : 1;
 
   return {
     sample: sample.roll,

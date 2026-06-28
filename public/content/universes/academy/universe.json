@@ -8,6 +8,16 @@
     "expectedHitsToKill": 0.14285714285714285,
     "combatSpread": 1
   },
+  "basePlayer": {
+    "stats": {
+      "attack": 6,
+      "defense": 6,
+      "action-rate": 25,
+      "health": 100,
+      "regeneration": 10
+    },
+    "inventory": {}
+  },
   "files": [
     "locations.json",
     "edges.json",

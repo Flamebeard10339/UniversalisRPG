@@ -53,7 +53,7 @@ export const ResourceStatus = ({ bundle, playState, showEffects = false, t }: Re
                       <p className="text-slate-500">{t('resources.effects.empty')}</p>
                     ) : (
                       effects.map((effect) => {
-                        const rate = getEffectRatePerMinute(bundle.stats, playState, effect);
+                        const rate = getEffectRatePerMinute(bundle.stats, playState, effect, bundle.manifest.basePlayer);
                         const active = Boolean(playState.activeAction) && isEffectApplicable(playState, effect);
 
                         return (

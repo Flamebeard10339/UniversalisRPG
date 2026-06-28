@@ -17,6 +17,7 @@ import type {
   UniverseManifest,
   ValidationIssue,
 } from './types';
+import { ENEMY_STAT_KEYS, getEnemyStat } from './enemies';
 import {
   actionDescriptionKey,
   actionFailureKey,
@@ -98,6 +99,10 @@ export const validateManifest = (value: unknown): value is UniverseManifest =>
   value.locales.every((locale) => typeof locale === 'string') &&
   Array.isArray(value.files) &&
   value.files.every((file) => typeof file === 'string') &&
+  (value.basePlayer === undefined ||
+    (isRecord(value.basePlayer) &&
+      (value.basePlayer.stats === undefined || (isRecord(value.basePlayer.stats) && Object.values(value.basePlayer.stats).every((stat) => typeof stat === 'number' && Number.isFinite(stat)))) &&
+      (value.basePlayer.inventory === undefined || (isRecord(value.basePlayer.inventory) && Object.values(value.basePlayer.inventory).every((amount) => typeof amount === 'number' && Number.isFinite(amount)))))) &&
   (value.combatBalance === undefined ||
     (isRecord(value.combatBalance) &&
       hasNumber(value.combatBalance, 'expectedHitsToKill') &&
@@ -257,15 +262,7 @@ const validateEnemiesShape = (enemies: unknown): enemies is EnemyDefinition[] =>
         isRecord(enemy) &&
         hasString(enemy, 'id') &&
         hasString(enemy, 'interactionTypeId') &&
-        hasNumber(enemy, 'attack') &&
-        hasNumber(enemy, 'defense') &&
-        hasNumber(enemy, 'health') &&
-        hasNumber(enemy, 'rate') &&
-        hasNumber(enemy, 'regeneration') &&
-        hasNumber(enemy, 'armorPenetration') &&
-        hasNumber(enemy, 'torpidity') &&
-        hasNumber(enemy, 'critChance') &&
-        hasNumber(enemy, 'critMultiplier') &&
+        (enemy.stats === undefined || (isRecord(enemy.stats) && Object.values(enemy.stats).every((value) => typeof value === 'number' && Number.isFinite(value)))) &&
         Array.isArray(enemy.rewards),
     ));
 
@@ -274,12 +271,17 @@ export const validateContentShape = (bundle: Partial<ContentBundle>) => {
 
   if (!bundle.manifest || !validateManifest(bundle.manifest)) {
     issues.push(error('universe.json', 'validation.universeManifestMissing'));
-  } else if (bundle.manifest.combatBalance) {
-    if (bundle.manifest.combatBalance.expectedHitsToKill <= 0) {
+  } else {
+    if (bundle.manifest.combatBalance?.expectedHitsToKill !== undefined && bundle.manifest.combatBalance.expectedHitsToKill <= 0) {
       issues.push(error('universe.json.combatBalance.expectedHitsToKill', 'validation.expectedHitsPositive'));
     }
-    if (bundle.manifest.combatBalance.combatSpread < 0) {
+    if (bundle.manifest.combatBalance?.combatSpread !== undefined && bundle.manifest.combatBalance.combatSpread < 0) {
       issues.push(error('universe.json.combatBalance.combatSpread', 'validation.combatSpreadNonNegative'));
+    }
+    for (const [itemId, amount] of Object.entries(bundle.manifest.basePlayer?.inventory ?? {})) {
+      if (amount < 0) {
+        issues.push(error(`universe.json.basePlayer.inventory.${itemId}`, 'validation.inventoryAmountNonNegative'));
+      }
     }
   }
 
@@ -539,26 +541,31 @@ export const validateContentReferences = (bundle: ContentBundle) => {
     if (!interactionTypeIds.has(enemy.interactionTypeId)) {
       issues.push(error(`enemies.${enemy.id}.interactionTypeId`, 'validation.unknownInteractionType', { id: enemy.interactionTypeId }));
     }
-    if (enemy.health <= 0) {
+    if (getEnemyStat(enemy, 'health') <= 0) {
       issues.push(error(`enemies.${enemy.id}.health`, 'validation.healthPositive'));
     }
-    if (enemy.attack <= 0) {
+    if (getEnemyStat(enemy, 'attack') <= 0) {
       issues.push(error(`enemies.${enemy.id}.attack`, 'validation.attackPositive'));
     }
-    if (enemy.defense < 0) {
+    if (getEnemyStat(enemy, 'defense') < 0) {
       issues.push(error(`enemies.${enemy.id}.defense`, 'validation.defenseNonNegative'));
     }
-    if (enemy.rate < 0) {
+    if (getEnemyStat(enemy, 'rate') < 0) {
       issues.push(error(`enemies.${enemy.id}.rate`, 'validation.rateNonNegative'));
     }
-    if (enemy.regeneration < 0 || enemy.armorPenetration < 0 || enemy.torpidity < 0) {
+    if (getEnemyStat(enemy, 'regeneration') < 0 || getEnemyStat(enemy, 'armorPenetration') < 0 || getEnemyStat(enemy, 'torpidity') < 0) {
       issues.push(error(`enemies.${enemy.id}`, 'validation.enemyModifiersNonNegative'));
     }
-    if (enemy.critChance < 0 || enemy.critChance > 100) {
+    if (getEnemyStat(enemy, 'critChance') < 0 || getEnemyStat(enemy, 'critChance') > 100) {
       issues.push(error(`enemies.${enemy.id}.critChance`, 'validation.critChanceRange'));
     }
-    if (enemy.critMultiplier < 1) {
+    if (getEnemyStat(enemy, 'critMultiplier') < 1) {
       issues.push(error(`enemies.${enemy.id}.critMultiplier`, 'validation.critMultiplierMinimum'));
+    }
+    for (const key of Object.keys(enemy.stats ?? {})) {
+      if (!(ENEMY_STAT_KEYS as string[]).includes(key)) {
+        issues.push(error(`enemies.${enemy.id}.stats.${key}`, 'validation.unknownEnemyStat', { id: key }));
+      }
     }
     for (const reward of enemy.rewards) {
       if (reward.kind === 'skillXp' && !skillIds.has(reward.skillId)) {
@@ -663,8 +670,12 @@ export const mergeDraftIntoBundle = (bundle: ContentBundle, draft: ContributionD
 
   return {
     ...bundle,
-    manifest: draft.combatBalance
-      ? { ...bundle.manifest, combatBalance: draft.combatBalance }
+    manifest: draft.basePlayer || draft.combatBalance
+      ? {
+          ...bundle.manifest,
+          ...(draft.basePlayer ? { basePlayer: draft.basePlayer } : {}),
+          ...(draft.combatBalance ? { combatBalance: draft.combatBalance } : {}),
+        }
       : bundle.manifest,
     locations: mergeById(removeById(bundle.locations, draft.removed?.locations ?? []), draft.locations),
     edges: mergeById(removeById(bundle.edges, draft.removed?.edges ?? []), draft.edges),

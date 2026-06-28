@@ -46,15 +46,11 @@ const bundle: ContentBundle = {
 const enemy: EnemyDefinition = {
   id: 'test-enemy',
   interactionTypeId: 'melee-combat',
-  attack: 10,
-  defense: 10,
-  health: 100,
-  rate: 30,
-  regeneration: 0,
-  armorPenetration: 0,
-  torpidity: 0,
-  critChance: 0,
-  critMultiplier: 1,
+  stats: {
+    attack: 10,
+    defense: 10,
+    rate: 30,
+  },
   rewards: [],
 };
 

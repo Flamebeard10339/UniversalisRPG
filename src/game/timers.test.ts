@@ -248,15 +248,12 @@ describe('resolveIdleTimers', () => {
       enemies: [{
         id: 'test-enemy',
         interactionTypeId: 'test-combat',
-        attack: 200,
-        defense: 1,
-        health: 10,
-        rate: 60,
-        regeneration: 0,
-        armorPenetration: 0,
-        torpidity: 0,
-        critChance: 0,
-        critMultiplier: 1,
+        stats: {
+          attack: 200,
+          health: 10,
+          rate: 60,
+          critMultiplier: 1,
+        },
         rewards: [],
       }],
     };

@@ -35,12 +35,12 @@ export const CharacterStats = ({ bundle, playState, t }: CharacterStatsProps) =>
           <tbody>
             {bundle.stats.map((stat) => {
               const skillLevel = stat.skillId ? skillLevelFromXp(playState.skillXp[stat.skillId] ?? 0) : 0;
-              const effective = getCharacterStatValue(playState, bundle.stats, stat.id);
+              const effective = getCharacterStatValue(playState, bundle.stats, stat.id, bundle.manifest.basePlayer);
 
               return (
                 <tr className="border-b border-slate-800/80 text-slate-200" key={stat.id}>
                   <td className="py-2 pr-3 font-semibold text-slate-100">{t(statTitleKey(stat.id), stat.id)}</td>
-                  <td className="py-2 pr-3">{formatNumber(stat.base ?? 0)}</td>
+                  <td className="py-2 pr-3">{formatNumber(bundle.manifest.basePlayer?.stats?.[stat.id] ?? stat.base ?? 0)}</td>
                   <td className="py-2 pr-3">{formatNumber(stat.added ?? 0)}</td>
                   <td className="py-2 pr-3">{formatNumber(stat.increased ?? 0)}</td>
                   <td className="py-2 pr-3 text-cyan-100">{formatNumber(effective)}</td>

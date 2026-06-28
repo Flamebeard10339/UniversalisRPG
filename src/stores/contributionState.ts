@@ -18,6 +18,7 @@ const createEmptyDraft = (universeId: string): ContributionDraft => ({
   universeId,
   updatedAt: Date.now(),
   notes: '',
+  basePlayer: undefined,
   combatBalance: undefined,
   locations: [],
   edges: [],
@@ -49,6 +50,7 @@ const createEmptyDraft = (universeId: string): ContributionDraft => ({
 const normalizeDraft = (draft: ContributionDraft): ContributionDraft => ({
   ...createEmptyDraft(draft.universeId),
   ...draft,
+  basePlayer: draft.basePlayer,
   combatBalance: draft.combatBalance,
   actions: (draft.actions ?? []).map(normalizeGameAction),
   items: draft.items ?? [],

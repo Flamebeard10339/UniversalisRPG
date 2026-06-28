@@ -1,5 +1,6 @@
 import { actionTitleKey } from '../game/contentIds';
 import { getEnemy, getInteractionType } from '../game/adversarial';
+import { getEnemyStat } from '../game/enemies';
 import type { ContentBundle, UniversePlayState } from '../game/types';
 import type { Translator } from '../game/i18n';
 import { ResourceStatus } from './ResourceStatus';
@@ -34,7 +35,8 @@ export const ActionDetails = ({ bundle, onStopAction, playState, t }: ActionDeta
   };
   const enemy = activeAction ? getEnemy(activeAction, actionContext) : null;
   const interactionType = activeAction ? getInteractionType(activeAction, actionContext) : null;
-  const targetHealth = playState.activeAction?.targetHealth ?? enemy?.health ?? null;
+  const enemyMaxHealth = enemy ? getEnemyStat(enemy, 'health') : null;
+  const targetHealth = playState.activeAction?.targetHealth ?? enemyMaxHealth;
   const showEnemyHealth = Boolean(activeAction && enemy && (enemy.showHealthBar ?? true) && targetHealth !== null);
   const showPlayerHealth = Boolean(activeAction && interactionType?.targetPlayerHealth);
 
@@ -61,9 +63,9 @@ export const ActionDetails = ({ bundle, onStopAction, playState, t }: ActionDeta
               <div className="grid gap-1">
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-slate-300">{enemy.id}</span>
-                  <span className="text-rose-100">{Math.ceil(targetHealth ?? enemy.health)}/{enemy.health}</span>
+                  <span className="text-rose-100">{Math.ceil(targetHealth ?? enemyMaxHealth ?? 0)}/{enemyMaxHealth}</span>
                 </div>
-                <HealthBar color="bg-rose-500" current={targetHealth ?? enemy.health} max={enemy.health} />
+                <HealthBar color="bg-rose-500" current={targetHealth ?? enemyMaxHealth ?? 0} max={enemyMaxHealth ?? 0} />
               </div>
             )}
 

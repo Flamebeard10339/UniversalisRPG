@@ -2,25 +2,24 @@ import { describe, expect, it } from 'vitest';
 import { getActionDps, getEnemyAttackDps } from './adversarial';
 import { calculateMaxCombatDamage, resolveManifestCombatBalance } from './combatBalance';
 import { getCharacterStatValue } from './characterStats';
+import { getEnemyStat, normalizeEnemyDefinition } from './enemies';
 import type { ActionResolutionContext, EnemyDefinition, GameAction } from './types';
 import { createInitialPlayState, resolveIdleTimers, startAction } from './timers';
 
-const enemy = (patch: Partial<EnemyDefinition> = {}): EnemyDefinition => ({
-  id: 'training-dummy',
-  interactionTypeId: 'melee-combat',
-  attack: 8,
-  defense: 7,
-  health: 200,
-  rate: 0,
-  regeneration: 0,
-  armorPenetration: 0,
-  torpidity: 0,
-  critChance: 0,
-  critMultiplier: 2,
-  showHealthBar: true,
-  rewards: [{ kind: 'resource', resourceId: 'trophy', amount: 1 }],
-  ...patch,
-});
+const enemy = (patch: Partial<EnemyDefinition> & { stats?: Record<string, number> } = {}): EnemyDefinition =>
+  normalizeEnemyDefinition({
+    id: 'training-dummy',
+    interactionTypeId: 'melee-combat',
+    stats: {
+      attack: 8,
+      defense: 7,
+      health: 200,
+      ...(patch.stats ?? {}),
+    },
+    showHealthBar: true,
+    rewards: [{ kind: 'resource', resourceId: 'trophy', amount: 1 }],
+    ...patch,
+  });
 
 const context: ActionResolutionContext = {
   manifest: {
@@ -76,7 +75,7 @@ describe('adversarial actions', () => {
       skillXp: { attack: 10 },
     };
     const source = getCharacterStatValue(state, context.stats ?? [], 'attack');
-    const expectedDamage = calculateMaxCombatDamage(source, enemy().defense, resolveManifestCombatBalance(context.manifest));
+    const expectedDamage = calculateMaxCombatDamage(source, getEnemyStat(enemy(), 'defense'), resolveManifestCombatBalance(context.manifest));
     const resolved = resolveIdleTimers(state, { ...context, actions: [action] }, {
       random: () => 1,
       showReport: true,
@@ -101,7 +100,7 @@ describe('adversarial actions', () => {
 
   it('grants player and enemy rewards once on kill', () => {
     const startedAt = 1_000;
-    const killContext = { ...context, enemies: [enemy({ health: 2 })], actions: [action] };
+    const killContext = { ...context, enemies: [enemy({ stats: { health: 2 } })], actions: [action] };
     const state = {
       ...startAction(createInitialPlayState('test', 'arena'), action, killContext, startedAt),
       skillXp: { attack: 10 },
@@ -117,7 +116,7 @@ describe('adversarial actions', () => {
 
   it('reports player and entity DPS from the same analytical model', () => {
     const state = createInitialPlayState('test', 'arena');
-    const hostileContext = { ...context, enemies: [enemy({ rate: 60 })] };
+    const hostileContext = { ...context, enemies: [enemy({ stats: { rate: 60 } })] };
 
     expect(getActionDps(state, action, context)).toBeGreaterThan(0);
     expect(getEnemyAttackDps(state, action, hostileContext)).toBeGreaterThan(0);
@@ -127,9 +126,9 @@ describe('adversarial actions', () => {
     const state = createInitialPlayState('test', 'arena');
     const modifiedContext = {
       ...context,
-      enemies: [enemy({ rate: 60, armorPenetration: 2, torpidity: 1, critChance: 50, critMultiplier: 2 })],
+      enemies: [enemy({ stats: { rate: 60, armorPenetration: 2, torpidity: 1, critChance: 50 } })],
     };
-    const plain = getEnemyAttackDps(state, action, { ...context, enemies: [enemy({ rate: 60 })] }) ?? 0;
+    const plain = getEnemyAttackDps(state, action, { ...context, enemies: [enemy({ stats: { rate: 60 } })] }) ?? 0;
     const modified = getEnemyAttackDps(state, action, modifiedContext) ?? 0;
 
     expect(modified).not.toBeCloseTo(plain, 5);
@@ -137,7 +136,7 @@ describe('adversarial actions', () => {
 
   it('regenerates enemy health only while its action is active', () => {
     const startedAt = 1_000;
-    const regenContext = { ...context, enemies: [enemy({ regeneration: 60 })], actions: [action] };
+    const regenContext = { ...context, enemies: [enemy({ stats: { regeneration: 60 } })], actions: [action] };
     const started = startAction(createInitialPlayState('test', 'arena'), action, regenContext, startedAt);
     const injured = {
       ...started,
@@ -152,7 +151,7 @@ describe('adversarial actions', () => {
 
   it('stops and resets the action when a lethal entity attack empties health', () => {
     const startedAt = 1_000;
-    const lethalContext = { ...context, enemies: [enemy({ attack: 20, rate: 60 })], actions: [action] };
+    const lethalContext = { ...context, enemies: [enemy({ stats: { attack: 20, rate: 60 } })], actions: [action] };
     const state = {
       ...startAction(createInitialPlayState('test', 'arena'), action, lethalContext, startedAt),
       playerHealth: 10,

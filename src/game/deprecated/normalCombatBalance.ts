@@ -1,4 +1,5 @@
 import type { EnemyDefinition } from '../types';
+import { getEnemyStat } from '../enemies';
 
 /** @deprecated Retained for audit/reference only. Active combat uses src/game/combatBalance.ts. */
 export const COMBAT_CV = 0.3;
@@ -117,16 +118,17 @@ export const calculateEnemyDiagnostics = (
   enemy: EnemyDefinition,
   reference: EnemyDiagnosticReference,
 ): EnemyDiagnostics => {
-  const enemyRegenerationPerSecond = Math.max(0, enemy.regeneration) / 60;
+  const enemyRegenerationPerSecond = Math.max(0, getEnemyStat(enemy, 'regeneration')) / 60;
   const playerRegenerationPerSecond = Math.max(0, reference.playerRegenerationPerMinute) / 60;
   const playerActionSeconds = Math.max(EPSILON, reference.playerActionSeconds);
-  const enemyActionSeconds = enemy.rate > 0 ? 60 / enemy.rate : Number.POSITIVE_INFINITY;
-  const parityDamage = expectedCombatDamage(enemy.defense, enemy.defense).damage;
+  const enemyActionSeconds = getEnemyStat(enemy, 'rate') > 0 ? 60 / getEnemyStat(enemy, 'rate') : Number.POSITIVE_INFINITY;
+  const enemyDefense = getEnemyStat(enemy, 'defense');
+  const parityDamage = expectedCombatDamage(enemyDefense, enemyDefense).damage;
 
   const actionsToKill = DIAGNOSTIC_RATIOS.map((ratio) => {
-    const damage = expectedCombatDamage(enemy.defense * ratio, enemy.defense).damage;
+    const damage = expectedCombatDamage(enemyDefense * ratio, enemyDefense).damage;
     const netDps = damage / playerActionSeconds - enemyRegenerationPerSecond;
-    const timeToKill = durationOrInfinity(enemy.health, netDps);
+    const timeToKill = durationOrInfinity(getEnemyStat(enemy, 'health'), netDps);
 
     return {
       ratio,
@@ -136,18 +138,19 @@ export const calculateEnemyDiagnostics = (
 
   const fightsPerDeath = DIAGNOSTIC_RATIOS.flatMap((attackRatio) =>
     DIAGNOSTIC_RATIOS.map((defenseRatio) => {
-      const outgoingDamage = expectedCombatDamage(enemy.defense * attackRatio, enemy.defense).damage;
-      const incomingDamage = expectedCombatDamage(enemy.attack, enemy.attack * defenseRatio, {
-        armorPenetration: enemy.armorPenetration,
-        torpidity: enemy.torpidity,
-        critChance: enemy.critChance,
-        critMultiplier: enemy.critMultiplier,
+      const outgoingDamage = expectedCombatDamage(enemyDefense * attackRatio, enemyDefense).damage;
+      const enemyAttack = getEnemyStat(enemy, 'attack');
+      const incomingDamage = expectedCombatDamage(enemyAttack, enemyAttack * defenseRatio, {
+        armorPenetration: getEnemyStat(enemy, 'armorPenetration'),
+        torpidity: getEnemyStat(enemy, 'torpidity'),
+        critChance: getEnemyStat(enemy, 'critChance'),
+        critMultiplier: getEnemyStat(enemy, 'critMultiplier'),
       }).damage;
       const netDpsDealt = outgoingDamage / playerActionSeconds - enemyRegenerationPerSecond;
       const netDpsReceived = Number.isFinite(enemyActionSeconds)
         ? incomingDamage / enemyActionSeconds - playerRegenerationPerSecond
         : -playerRegenerationPerSecond;
-      const timeToKill = durationOrInfinity(enemy.health, netDpsDealt);
+      const timeToKill = durationOrInfinity(getEnemyStat(enemy, 'health'), netDpsDealt);
       const timeToDie = durationOrInfinity(reference.playerHealth, netDpsReceived);
       const value = !Number.isFinite(timeToKill)
         ? 0
@@ -160,8 +163,8 @@ export const calculateEnemyDiagnostics = (
   );
 
   return {
-    canonicalHealth: canonicalHealth(enemy.defense),
-    parityActionsToKill: parityDamage <= EPSILON ? Number.POSITIVE_INFINITY : enemy.health / parityDamage,
+    canonicalHealth: canonicalHealth(enemyDefense),
+    parityActionsToKill: parityDamage <= EPSILON ? Number.POSITIVE_INFINITY : getEnemyStat(enemy, 'health') / parityDamage,
     actionsToKill,
     fightsPerDeath,
   };

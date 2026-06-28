@@ -10,6 +10,14 @@
     "expectedHitsToKill": 0.14285714285714285,
     "combatSpread": 1
   },
+  "basePlayer": {
+    "stats": {
+      "action-rate": 25,
+      "air-capacity": 100,
+      "air-leak": -105
+    },
+    "inventory": {}
+  },
   "files": [
     "locations.json",
     "edges.json",

@@ -1,5 +1,6 @@
 import type { ActionResolutionContext, ActionResult, ChatMessage, GameAction, IdleReport, IdleResolution, ResourceBoundaryBehavior, Reward, RunLogEntry, TravelEdgeDefinition, UniversePlayState } from './types';
 import { getActionDurationMs, getEnemy, getEnemyAttackDurationMs, getInteractionType, sampleAdversarialDamage, sampleEnemyAttackDamage } from './adversarial';
+import { getEnemyStat } from './enemies';
 import { getEffectRatePerMinute, getResourceMax as resolveResourceMax, isEffectApplicable } from './resources';
 import {
   actionFailureKey,
@@ -106,8 +107,8 @@ export const createInitialPlayState = (universeId: string, startingLocationId: s
   statOverrides: {},
   equipmentSkillBonuses: {},
   actionLoopingEnabled: false,
-  playerHealth: 100,
-  playerMaxHealth: 100,
+  playerHealth: 0,
+  playerMaxHealth: 0,
   chatMessages: [],
   runLog: [],
   nextRunLogSequence: 1,
@@ -154,8 +155,8 @@ export const normalizePlayState = (
     statOverrides: state.statOverrides ?? {},
     equipmentSkillBonuses: state.equipmentSkillBonuses ?? {},
     actionLoopingEnabled: state.actionLoopingEnabled ?? false,
-    playerHealth: state.playerHealth ?? 100,
-    playerMaxHealth: state.playerMaxHealth ?? 100,
+    playerHealth: state.playerHealth ?? 0,
+    playerMaxHealth: state.playerMaxHealth ?? 0,
     chatMessages: state.chatMessages ?? [],
     runLog: (state.runLog ?? []).map((entry) => ({ ...entry, runId: entry.runId ?? runId })),
     nextRunLogSequence: state.nextRunLogSequence ?? ((state.runLog?.length ?? 0) + 1),
@@ -220,7 +221,7 @@ const getResourceMax = (
   const definition = getResourceDefinition(context, resourceId);
 
   return definition
-    ? resolveResourceMax(state, context.stats ?? [], definition)
+    ? resolveResourceMax(state, context.stats ?? [], definition, context.manifest?.basePlayer)
     : state.resourcePools[resourceId]?.max ?? 0;
 };
 
@@ -268,7 +269,10 @@ const ensureWorldState = (
   state: UniversePlayState,
   context: ActionResolutionContext,
 ) => {
-  const inventory = { ...state.inventory };
+  const inventory = {
+    ...(context.manifest?.basePlayer?.inventory ?? {}),
+    ...state.inventory,
+  };
   const flags = { ...state.flags };
 
   for (const item of context.items ?? []) {
@@ -515,13 +519,13 @@ const applyEnemyRegeneration = (
   const action = context.actions.find((candidate) => candidate.id === state.activeAction?.actionId);
   const enemy = action ? getEnemy(action, context) : null;
 
-  if (!enemy || enemy.regeneration <= 0) {
+  if (!enemy || getEnemyStat(enemy, 'regeneration') <= 0) {
     return state;
   }
 
   const effectUntil = Math.min(now, state.activeAction.completesAt);
   const elapsedMinutes = Math.max(0, effectUntil - (state.lastTickAt ?? effectUntil)) / 60_000;
-  const targetHealth = Math.min(enemy.health, state.activeAction.targetHealth + enemy.regeneration * elapsedMinutes);
+  const targetHealth = Math.min(getEnemyStat(enemy, 'health'), state.activeAction.targetHealth + getEnemyStat(enemy, 'regeneration') * elapsedMinutes);
 
   return {
     ...state,
@@ -587,7 +591,7 @@ export const startAction = (
       actionId: action.id,
       startedAt: now,
       completesAt: now + remainingMs,
-      targetHealth: progress.targetHealth ?? enemy?.health ?? null,
+      targetHealth: progress.targetHealth ?? (enemy ? getEnemyStat(enemy, 'health') : null),
       enemyAttackStartedAt,
       enemyAttackCompletesAt,
     },
@@ -596,7 +600,7 @@ export const startAction = (
       [action.id]: {
         ...progress,
         runningSince: now,
-        targetHealth: progress.targetHealth ?? enemy?.health ?? null,
+        targetHealth: progress.targetHealth ?? (enemy ? getEnemyStat(enemy, 'health') : null),
         enemyAttackStartedAt,
         enemyAttackCompletesAt,
       },
@@ -805,7 +809,7 @@ const completeActionWithResult = (
   if (enemy) {
     const result = sampleAdversarialDamage(state, action, context, options.random);
     damage = result?.damage ?? 0;
-    const currentHealth = state.activeAction?.targetHealth ?? enemy.health;
+    const currentHealth = state.activeAction?.targetHealth ?? getEnemyStat(enemy, 'health');
     const targetHealth = Math.max(0, currentHealth - damage);
     remainingHealth = targetHealth;
 
@@ -855,7 +859,7 @@ const completeActionWithResult = (
   const shouldLoop = completedState.actionLoopingEnabled
     && completedState.currentLocationId === action.locationId
     && canStartAction(completedState, action, context);
-  const restartTargetHealth = enemy ? enemy.health : null;
+  const restartTargetHealth = enemy ? getEnemyStat(enemy, 'health') : null;
 
   return {
     state: shouldLoop ? restartAction(completedState, action, context, now, restartTargetHealth) : completedState,

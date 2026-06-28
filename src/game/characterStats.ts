@@ -1,5 +1,5 @@
 import { skillLevelFromXp } from './skills';
-import type { SkillEquipmentBonuses, SkillDefinition, SkillTotals, StatDefinition, UniversePlayState } from './types';
+import type { BasePlayerDefinition, SkillEquipmentBonuses, SkillDefinition, SkillTotals, StatDefinition, UniversePlayState } from './types';
 
 const DEFAULT_RATE = 1;
 
@@ -23,6 +23,7 @@ export const getCharacterStatValue = (
   state: UniversePlayState,
   stats: StatDefinition[],
   statId: string,
+  basePlayer?: BasePlayerDefinition,
 ) => {
   if (state.statOverrides?.[statId] !== undefined) return state.statOverrides[statId];
   const stat = stats.find((candidate) => candidate.id === statId);
@@ -31,7 +32,7 @@ export const getCharacterStatValue = (
   const skillLevel = stat.skillId
     ? Math.max(1, skillLevelFromXp(state.skillXp[stat.skillId] ?? 0) + (skillBonus.base ?? 0))
     : 0;
-  const rawTotal = (stat.base ?? 0) + (stat.added ?? 0) + skillLevel + (skillBonus.added ?? 0);
+  const rawTotal = (basePlayer?.stats?.[statId] ?? 0) + (stat.base ?? 0) + (stat.added ?? 0) + skillLevel + (skillBonus.added ?? 0);
   const increased = (stat.increased ?? 0) + (skillBonus.increased ?? 0);
   return increased < 0 ? rawTotal / (1 - increased) : rawTotal * (1 + increased);
 };

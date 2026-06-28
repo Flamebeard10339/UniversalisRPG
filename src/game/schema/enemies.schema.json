@@ -4,11 +4,26 @@
   "type": "array",
   "items": {
     "type": "object",
-    "required": ["id", "interactionTypeId", "attack", "defense", "health", "rate", "regeneration", "armorPenetration", "torpidity", "critChance", "critMultiplier", "rewards"],
+    "required": ["id", "interactionTypeId", "rewards"],
     "additionalProperties": false,
     "properties": {
       "id": { "type": "string", "minLength": 1 },
       "interactionTypeId": { "type": "string", "minLength": 1 },
+      "stats": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "attack": { "type": "number", "exclusiveMinimum": 0 },
+          "defense": { "type": "number", "minimum": 0 },
+          "health": { "type": "number", "exclusiveMinimum": 0 },
+          "rate": { "type": "number", "minimum": 0 },
+          "regeneration": { "type": "number", "minimum": 0 },
+          "armorPenetration": { "type": "number", "minimum": 0 },
+          "torpidity": { "type": "number", "minimum": 0 },
+          "critChance": { "type": "number", "minimum": 0, "maximum": 100 },
+          "critMultiplier": { "type": "number", "minimum": 1 }
+        }
+      },
       "attack": { "type": "number", "exclusiveMinimum": 0 },
       "defense": { "type": "number", "minimum": 0 },
       "health": { "type": "number", "exclusiveMinimum": 0 },

@@ -12,12 +12,29 @@ export type UniverseManifest = {
   author: string;
   locales: string[];
   files: string[];
+  basePlayer?: BasePlayerDefinition;
   combatBalance?: CombatBalanceDefinition;
   compatibility?: {
     minAppVersion?: string;
     maxAppVersion?: string;
   };
 };
+
+export type BasePlayerDefinition = {
+  stats?: Record<string, number>;
+  inventory?: Record<string, number>;
+};
+
+export type EnemyStatKey =
+  | 'attack'
+  | 'defense'
+  | 'health'
+  | 'rate'
+  | 'regeneration'
+  | 'armorPenetration'
+  | 'torpidity'
+  | 'critChance'
+  | 'critMultiplier';
 
 export type CombatBalanceDefinition = {
   expectedHitsToKill: number;
@@ -163,15 +180,7 @@ export type EffectDefinition = {
 export type EnemyDefinition = {
   id: string;
   interactionTypeId: string;
-  attack: number;
-  defense: number;
-  health: number;
-  rate: number;
-  regeneration: number;
-  armorPenetration: number;
-  torpidity: number;
-  critChance: number;
-  critMultiplier: number;
+  stats?: Partial<Record<EnemyStatKey, number>>;
   showHealthBar?: boolean;
   rewards: Reward[];
 };
@@ -352,6 +361,7 @@ export type ContributionDraft = {
   universeId: string;
   updatedAt: number;
   notes: string;
+  basePlayer?: BasePlayerDefinition;
   combatBalance?: CombatBalanceDefinition;
   locations: LocationNode[];
   edges: TravelEdgeDefinition[];
