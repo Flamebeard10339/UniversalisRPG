@@ -65,13 +65,13 @@ export const appendChatMessage = (
   message: Omit<ChatMessage, 'id' | 'count' | 'createdAt'>,
   now = Date.now(),
 ): UniversePlayState => {
+  const messages = state.chatMessages ?? [];
   const nextMessage: ChatMessage = {
     ...message,
-    id: now,
+    id: Math.max(now, (messages[messages.length - 1]?.id ?? 0) + 1),
     count: 1,
     createdAt: now,
   };
-  const messages = state.chatMessages ?? [];
   const lastMessage = messages[messages.length - 1];
   const nextMessages = lastMessage && sameMessage(lastMessage, nextMessage)
     ? [

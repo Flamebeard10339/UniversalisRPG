@@ -20,6 +20,8 @@ type DisplayMessage = {
 const renderMessageText = (message: ChatMessage, t: Translator) =>
   message.key ? t(message.key, message.params) : message.text ?? '';
 
+const normalizeRenderedText = (text: string) => text.replace(/\s+/g, ' ').trim();
+
 const displayKey = (message: Pick<DisplayMessage, 'author' | 'text'>) =>
   `${message.author}\u0000${message.text}`;
 
@@ -33,7 +35,7 @@ export const buildDisplayMessages = (
     count: message.count,
     id: message.id,
     latestCreatedAt: message.createdAt,
-    text: renderMessageText(message, t),
+    text: normalizeRenderedText(renderMessageText(message, t)),
   }));
 
   if (!compressionEnabled) {
@@ -95,7 +97,7 @@ export const ChatPanel = ({ compressionEnabled, messages, t }: ChatPanelProps) =
                   ? 'bg-amber-950 text-amber-100'
                   : 'bg-slate-800 text-slate-200'
             }`}
-            key={message.id}
+            key={`${message.author}:${message.id}:${message.text}`}
           >
             {message.count > 1 ? `${message.text} (${message.count})` : message.text}
           </div>

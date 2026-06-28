@@ -16,7 +16,6 @@ type ActionPanelProps = {
 
 export const ActionPanel = ({ bundle, debugEnabled, onSetLooping, playState, onStartAction, t }: ActionPanelProps) => {
   const isTravelling = Boolean(playState.activeTravel);
-  const now = useNow(Boolean(playState.activeAction), 16);
   const actionContext = {
     manifest: bundle.manifest,
     actions: bundle.actions,
@@ -34,6 +33,8 @@ export const ActionPanel = ({ bundle, debugEnabled, onSetLooping, playState, onS
     action.locationId === playState.currentLocationId
     && isActionVisible(playState, action, actionContext));
   const activeAction = actions.find((action) => action.id === playState.activeAction?.actionId);
+  const activeActionIsContinuous = Boolean(activeAction && isContinuousAction(activeAction, actionContext));
+  const now = useNow(Boolean(playState.activeAction) && !activeActionIsContinuous, 16);
   const getActionProgress = (action: GameAction) => {
     const progress = playState.actionProgress[action.id];
     const elapsedMs = (progress?.elapsedMs ?? 0) + (progress?.runningSince ? Math.max(0, now - progress.runningSince) : 0);

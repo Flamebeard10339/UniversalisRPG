@@ -106,7 +106,10 @@ export const validateManifest = (value: unknown): value is UniverseManifest =>
   (value.combatBalance === undefined ||
     (isRecord(value.combatBalance) &&
       hasNumber(value.combatBalance, 'expectedHitsToKill') &&
-      hasNumber(value.combatBalance, 'combatSpread')));
+      hasNumber(value.combatBalance, 'combatSpread'))) &&
+  (value.ui === undefined ||
+    (isRecord(value.ui) &&
+      (value.ui.floatingTextDurationSeconds === undefined || hasNumber(value.ui, 'floatingTextDurationSeconds'))));
 
 const validateLocationsShape = (locations: unknown): locations is LocationNode[] =>
   Array.isArray(locations) &&
@@ -277,6 +280,9 @@ export const validateContentShape = (bundle: Partial<ContentBundle>) => {
     }
     if (bundle.manifest.combatBalance?.combatSpread !== undefined && bundle.manifest.combatBalance.combatSpread < 0) {
       issues.push(error('universe.json.combatBalance.combatSpread', 'validation.combatSpreadNonNegative'));
+    }
+    if (bundle.manifest.ui?.floatingTextDurationSeconds !== undefined && bundle.manifest.ui.floatingTextDurationSeconds <= 0) {
+      issues.push(error('universe.json.ui.floatingTextDurationSeconds', 'validation.floatingTextDurationPositive'));
     }
     for (const [itemId, amount] of Object.entries(bundle.manifest.basePlayer?.inventory ?? {})) {
       if (amount < 0) {
@@ -670,11 +676,12 @@ export const mergeDraftIntoBundle = (bundle: ContentBundle, draft: ContributionD
 
   return {
     ...bundle,
-    manifest: draft.basePlayer || draft.combatBalance
+    manifest: draft.basePlayer || draft.combatBalance || draft.ui
       ? {
           ...bundle.manifest,
           ...(draft.basePlayer ? { basePlayer: draft.basePlayer } : {}),
           ...(draft.combatBalance ? { combatBalance: draft.combatBalance } : {}),
+          ...(draft.ui ? { ui: draft.ui } : {}),
         }
       : bundle.manifest,
     locations: mergeById(removeById(bundle.locations, draft.removed?.locations ?? []), draft.locations),

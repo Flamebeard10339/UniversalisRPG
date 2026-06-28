@@ -44,6 +44,13 @@
         "combatSpread": { "type": "number", "minimum": 0 }
       }
     },
+    "ui": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "floatingTextDurationSeconds": { "type": "number", "exclusiveMinimum": 0 }
+      }
+    },
     "compatibility": {
       "type": "object",
       "additionalProperties": false,

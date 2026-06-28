@@ -1,6 +1,17 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { ActionResolutionContext, GameAction } from './types';
-import { createInitialPlayState, resolveIdleTimers, startAction } from './timers';
+import { appendChatMessage, createInitialPlayState, resolveIdleTimers, startAction } from './timers';
+
+describe('appendChatMessage', () => {
+  it('uses monotonic ids for messages emitted at the same timestamp', () => {
+    const state = createInitialPlayState('test-universe', 'test-location');
+    const first = appendChatMessage(state, { author: 'system', key: 'first' }, 1_000);
+    const second = appendChatMessage(first, { author: 'system', key: 'second' }, 1_000);
+
+    expect(second.chatMessages.map((message) => message.id)).toEqual([1_000, 1_001]);
+    expect(second.chatMessages.map((message) => message.createdAt)).toEqual([1_000, 1_000]);
+  });
+});
 
 describe('resolveIdleTimers', () => {
   afterEach(() => {

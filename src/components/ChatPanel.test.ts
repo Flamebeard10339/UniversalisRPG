@@ -55,6 +55,19 @@ describe('buildDisplayMessages', () => {
     });
   });
 
+  it('normalizes whitespace before compressing rendered messages', () => {
+    const display = buildDisplayMessages([
+      { ...message(1, 'text', {}), key: undefined, text: 'The goblin killed you.' },
+      { ...message(2, 'text', {}), key: undefined, text: ' The   goblin killed you. ' },
+    ], t, true);
+
+    expect(display).toHaveLength(1);
+    expect(display[0]).toMatchObject({
+      text: 'The goblin killed you.',
+      count: 2,
+    });
+  });
+
   it('does not compress messages with different rendered text', () => {
     const display = buildDisplayMessages([
       message(1, 'hit', { target: 'goblin', damage: 1 }),

@@ -15,6 +15,7 @@ import { actionTitleKey, interactionTitleKey, itemTitleKey, locationDescriptionK
 import { getInteractionType, isContinuousAction } from './game/adversarial';
 import type { ContributionDraft, IdleReport, UniversePlayState } from './game/types';
 import { getNextResourceBoundaryAt } from './game/resources';
+import { aggregateIdleRewards } from './game/rewards';
 import { load, save } from './lib/storage';
 import { useDebugState } from './stores/debugState';
 import { useContributionState } from './stores/contributionState';
@@ -40,7 +41,7 @@ const SOURCE_URL = 'https://github.com/Flamebeard10339/UniversalisRPG';
 const appearanceKey = 'universalis:settings:appearance';
 const emptyIdleReport: IdleReport = { kind: 'none' };
 const emptyContributionDraft = (universeId: string): ContributionDraft => ({
-  universeId, updatedAt: Date.now(), notes: '', basePlayer: undefined, combatBalance: undefined, locations: [], edges: [], actions: [], skills: [], stats: [], items: [], flags: [], resourceDefinitions: [], effects: [], interactionTypes: [], enemies: [], locales: {},
+  universeId, updatedAt: Date.now(), notes: '', basePlayer: undefined, combatBalance: undefined, ui: undefined, locations: [], edges: [], actions: [], skills: [], stats: [], items: [], flags: [], resourceDefinitions: [], effects: [], interactionTypes: [], enemies: [], locales: {},
   removed: { locations: [], edges: [], actions: [], skills: [], stats: [], items: [], flags: [], resources: [], effects: [], interactionTypes: [], enemies: [] },
 });
 
@@ -86,6 +87,7 @@ export default function App() {
   const [saveImport, setSaveImport] = useState('');
   const [saveMessage, setSaveMessage] = useState('');
   const [idleReport, setIdleReport] = useState<IdleReport>(emptyIdleReport);
+  const idleRewards = idleReport.kind === 'actionCompleted' ? aggregateIdleRewards(idleReport.rewards) : [];
   const [appActive, setAppActive] = useState(() => typeof document === 'undefined' || !document.hidden);
   const {
     activeUniverseId,
@@ -854,10 +856,10 @@ export default function App() {
               {idleReport.kind === 'actionCompleted' && (
                 <section className="grid gap-2">
                   <p>{t('welcomeBack.actionCompleted', { action: t(actionTitleKey(idleReport.actionId), idleReport.actionId) })}</p>
-                  {idleReport.rewards.length > 0 && (
+                  {idleRewards.length > 0 && (
                     <ul className="grid gap-1 rounded bg-slate-950 p-3 text-xs text-slate-300">
-                      {idleReport.rewards.map((reward, index) => (
-                        <li key={`${reward.kind}-${reward.labelId}-${index}`}>
+                      {idleRewards.map((reward) => (
+                        <li key={`${reward.kind}-${reward.labelId}`}>
                           {reward.kind === 'skillXp'
                             ? t('welcomeBack.reward.skillXp', { amount: reward.amount, skill: t(skillTitleKey(reward.labelId), reward.labelId) })
                             : reward.kind === 'item'

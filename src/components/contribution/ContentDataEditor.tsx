@@ -7,6 +7,7 @@ import { EnemyDiagnostics } from './EnemyDiagnostics';
 import { DEBUG_PLAYER_PROFILES, getProfileStatSummary, profileDescription, profileTitle } from '../../game/playerProfiles';
 import { resolveCombatBalance } from '../../game/combatBalance';
 import { ENEMY_STAT_DEFAULTS, ENEMY_STAT_KEYS, getEnemyStat, normalizeEnemyStats } from '../../game/enemies';
+import { resolveUniverseUiSettings } from '../../game/universeSettings';
 import { EdgeFields, LocationFields } from './MapContentFields';
 import { StructuredDataDisplay, StructuredDataEditor, type StructuredValue } from '../structuredData/StructuredData';
 import { actionSchema, effectDefinitionSchema, flagDefinitionSchema, resourceDefinitionSchema, rewardSchema, statDefinitionSchema } from '../structuredData/contentSchemas';
@@ -275,6 +276,7 @@ export const ContentDataEditor = ({ baseBundle, bundle, draft, onPatch, t }: Con
   const enemies = layeredRows(draft.enemies, baseBundle.enemies ?? [], removed.enemies, filter);
   const basePlayer = draft.basePlayer ?? bundle.manifest.basePlayer ?? { stats: {}, inventory: {} };
   const combatBalance = resolveCombatBalance(draft.combatBalance ?? bundle.manifest.combatBalance);
+  const uiSettings = resolveUniverseUiSettings(draft.ui ?? bundle.manifest.ui);
   const contributionBundle = {
     ...bundle,
     locations: locations.map((row) => row.item),
@@ -364,6 +366,10 @@ export const ContentDataEditor = ({ baseBundle, bundle, draft, onPatch, t }: Con
 
   const updateCombatBalance = (patch: Partial<typeof combatBalance>) => {
     onPatch({ combatBalance: resolveCombatBalance({ ...combatBalance, ...patch }) });
+  };
+
+  const updateUiSettings = (patch: Partial<typeof uiSettings>) => {
+    onPatch({ ui: resolveUniverseUiSettings({ ...uiSettings, ...patch }) });
   };
 
   const updateBasePlayerStats = (stats: Record<string, number>) => {
@@ -521,7 +527,7 @@ export const ContentDataEditor = ({ baseBundle, bundle, draft, onPatch, t }: Con
   };
 
   const jsonFiles = [
-    { path: 'universe.json', json: { ...bundle.manifest, basePlayer, combatBalance } },
+    { path: 'universe.json', json: { ...bundle.manifest, basePlayer, combatBalance, ui: uiSettings } },
     { path: 'locations.json', json: locations.map((row) => row.item) },
     { path: 'edges.json', json: edges.map((row) => row.item) },
     { path: 'actions.json', json: actions.map((row) => row.item) },
@@ -584,6 +590,15 @@ export const ContentDataEditor = ({ baseBundle, bundle, draft, onPatch, t }: Con
                 onChange={(value) => updateCombatBalance({ combatSpread: value })}
                 step={0.01}
                 value={combatBalance.combatSpread}
+              />
+            </label>
+            <label className="grid gap-1 text-xs text-slate-400">
+              <span>{t('contribution.universe.floatingTextDuration')}</span>
+              <NumericEditor
+                min={0.001}
+                onChange={(value) => updateUiSettings({ floatingTextDurationSeconds: value })}
+                step={0.1}
+                value={uiSettings.floatingTextDurationSeconds}
               />
             </label>
           </div>

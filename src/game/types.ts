@@ -14,6 +14,7 @@ export type UniverseManifest = {
   files: string[];
   basePlayer?: BasePlayerDefinition;
   combatBalance?: CombatBalanceDefinition;
+  ui?: UniverseUiSettings;
   compatibility?: {
     minAppVersion?: string;
     maxAppVersion?: string;
@@ -39,6 +40,10 @@ export type EnemyStatKey =
 export type CombatBalanceDefinition = {
   expectedHitsToKill: number;
   combatSpread: number;
+};
+
+export type UniverseUiSettings = {
+  floatingTextDurationSeconds?: number;
 };
 
 export type LocationNode = {
@@ -363,6 +368,7 @@ export type ContributionDraft = {
   notes: string;
   basePlayer?: BasePlayerDefinition;
   combatBalance?: CombatBalanceDefinition;
+  ui?: UniverseUiSettings;
   locations: LocationNode[];
   edges: TravelEdgeDefinition[];
   actions: GameAction[];

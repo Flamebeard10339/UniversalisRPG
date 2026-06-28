@@ -22,6 +22,7 @@ const emptyDraft = (universeId: string): ContributionDraft => ({
   notes: '',
   basePlayer: undefined,
   combatBalance: undefined,
+  ui: undefined,
   locations: [],
   edges: [],
   actions: [],
