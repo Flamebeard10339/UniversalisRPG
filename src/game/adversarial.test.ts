@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { getActionDps, getEnemyAttackDps } from './adversarial';
-import { DAMAGE_SCALE } from './combatBalance';
+import { calculateMaxCombatDamage, resolveManifestCombatBalance } from './combatBalance';
+import { getCharacterStatValue } from './characterStats';
 import type { ActionResolutionContext, EnemyDefinition, GameAction } from './types';
 import { createInitialPlayState, resolveIdleTimers, startAction } from './timers';
 
@@ -22,6 +23,15 @@ const enemy = (patch: Partial<EnemyDefinition> = {}): EnemyDefinition => ({
 });
 
 const context: ActionResolutionContext = {
+  manifest: {
+    schemaVersion: 1,
+    id: 'test',
+    version: '1',
+    author: 'test',
+    locales: ['en'],
+    files: [],
+    combatBalance: { expectedHitsToKill: 1 / 7, combatSpread: 1 },
+  },
   actions: [],
   skills: [
     { id: 'attack', maxLevel: 100 },
@@ -65,21 +75,23 @@ describe('adversarial actions', () => {
       ...startAction(createInitialPlayState('test', 'arena'), action, context, startedAt),
       skillXp: { attack: 10 },
     };
+    const source = getCharacterStatValue(state, context.stats ?? [], 'attack');
+    const expectedDamage = calculateMaxCombatDamage(source, enemy().defense, resolveManifestCombatBalance(context.manifest));
     const resolved = resolveIdleTimers(state, { ...context, actions: [action] }, {
       random: () => 1,
       showReport: true,
     }, startedAt + 10_000);
 
-    expect(resolved.state.activeAction?.targetHealth).toBeCloseTo(200 - DAMAGE_SCALE, 5);
+    expect(resolved.state.activeAction?.targetHealth).toBeCloseTo(200 - expectedDamage, 5);
     expect(resolved.state.resources.fang).toBe(1);
     expect(resolved.state.chatMessages[0].key).toBe('interaction.melee-combat.player.hit');
   });
 
-  it('logs a miss without rewards', () => {
+  it('logs a zero-damage hit without rewards', () => {
     const startedAt = 1_000;
     const state = startAction(createInitialPlayState('test', 'arena'), action, context, startedAt);
     const resolved = resolveIdleTimers(state, { ...context, actions: [action] }, {
-      random: () => 0.5,
+      random: () => 0,
     }, startedAt + 10_000);
 
     expect(resolved.state.activeAction?.targetHealth).toBe(200);
@@ -89,7 +101,7 @@ describe('adversarial actions', () => {
 
   it('grants player and enemy rewards once on kill', () => {
     const startedAt = 1_000;
-    const killContext = { ...context, enemies: [enemy({ health: 10 })], actions: [action] };
+    const killContext = { ...context, enemies: [enemy({ health: 2 })], actions: [action] };
     const state = {
       ...startAction(createInitialPlayState('test', 'arena'), action, killContext, startedAt),
       skillXp: { attack: 10 },
@@ -144,6 +156,7 @@ describe('adversarial actions', () => {
     const state = {
       ...startAction(createInitialPlayState('test', 'arena'), action, lethalContext, startedAt),
       playerHealth: 10,
+      resourcePools: { health: { current: 10, min: 0, max: 100 } },
     };
     const resolved = resolveIdleTimers(state, lethalContext, { random: () => 1 }, startedAt + 1_000);
 

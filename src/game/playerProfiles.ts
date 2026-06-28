@@ -1,5 +1,5 @@
 import { getCharacterStatValue } from './characterStats';
-import { DAMAGE_SCALE } from './combatBalance';
+import { diagnosticCombatDamage, type DiagnosticHitCase, resolveManifestCombatBalance } from './combatBalance';
 import { skillTitleKey, statTitleKey } from './contentIds';
 import type { ContentBundle, EnemyDefinition, SkillEquipmentBonuses, UniversePlayState } from './types';
 import { createInitialPlayState } from './timers';
@@ -19,7 +19,6 @@ export type PlayerProfileEnemyDiagnostic = {
   statSummary: string;
 };
 
-const HALF_NORMAL_MEAN_OFFSET = Math.sqrt(2 / Math.PI);
 const EPSILON = 1e-9;
 
 export const DEBUG_PLAYER_PROFILES: PlayerProfileDefinition[] = [
@@ -95,39 +94,6 @@ export const getProfileStatSummary = (
     .join(', ');
 };
 
-const deterministicRoll = (power: number, cv: number, balanceCase: BalanceCase, perspective: 'player' | 'enemy') => {
-  const sigma = Math.max(0, cv) * Math.max(0, power);
-  const sign = balanceCase === 'average'
-    ? 0
-    : balanceCase === 'best'
-      ? (perspective === 'player' ? 1 : -1)
-      : (perspective === 'player' ? -1 : 1);
-
-  return Math.max(EPSILON, power + sign * sigma * HALF_NORMAL_MEAN_OFFSET);
-};
-
-const deterministicDamage = (
-  attackerPower: number,
-  defenderPower: number,
-  cv: number,
-  balanceCase: BalanceCase,
-  perspective: 'player' | 'enemy',
-  modifiers: { armorPenetration?: number; torpidity?: number; critChance?: number; critMultiplier?: number } = {},
-) => {
-  const attack = deterministicRoll(
-    Math.max(EPSILON, attackerPower - Math.max(0, modifiers.torpidity ?? 0)),
-    cv,
-    balanceCase,
-    perspective,
-  );
-  const defense = Math.max(0, defenderPower - Math.max(0, modifiers.armorPenetration ?? 0));
-  const critChance = Math.min(1, Math.max(0, (modifiers.critChance ?? 0) / 100));
-  const critMultiplier = Math.max(1, modifiers.critMultiplier ?? 1);
-  const critFactor = 1 + critChance * (critMultiplier - 1);
-
-  return Math.max(0, attack - defense) * DAMAGE_SCALE * critFactor;
-};
-
 const durationOrInfinity = (health: number, netDps: number) =>
   netDps <= EPSILON ? Number.POSITIVE_INFINITY : health / netDps;
 
@@ -135,7 +101,6 @@ export const calculateProfileEnemyDiagnostic = (
   bundle: ContentBundle,
   enemy: EnemyDefinition,
   profile: PlayerProfileDefinition,
-  cv: number,
 ): PlayerProfileEnemyDiagnostic => {
   const interactionType = bundle.interactionTypes.find((candidate) => candidate.id === enemy.interactionTypeId);
   const sourceStatId = interactionType?.sourceStatId ?? 'attack';
@@ -147,10 +112,11 @@ export const calculateProfileEnemyDiagnostic = (
   const playerActionSeconds = 1;
   const enemyActionSeconds = enemy.rate > 0 ? 60 / enemy.rate : Number.POSITIVE_INFINITY;
   const enemyRegeneration = Math.max(0, enemy.regeneration) / 60;
+  const balance = resolveManifestCombatBalance(bundle.manifest);
 
   const cases: BalanceCase[] = ['worst', 'average', 'best'];
   const actionsToKill = Object.fromEntries(cases.map((balanceCase) => {
-    const outgoingDamage = deterministicDamage(playerAttack, enemy.defense, cv, balanceCase, 'player');
+    const outgoingDamage = diagnosticCombatDamage(playerAttack, enemy.defense, balance, balanceCase as DiagnosticHitCase);
     const timeToKill = durationOrInfinity(enemy.health, outgoingDamage / playerActionSeconds - enemyRegeneration);
     return [
       balanceCase,
@@ -159,9 +125,9 @@ export const calculateProfileEnemyDiagnostic = (
   })) as Record<BalanceCase, number>;
 
   const fightsPerDeath = Object.fromEntries(cases.map((balanceCase) => {
-    const outgoingDamage = deterministicDamage(playerAttack, enemy.defense, cv, balanceCase, 'player');
+    const outgoingDamage = diagnosticCombatDamage(playerAttack, enemy.defense, balance, balanceCase as DiagnosticHitCase);
     const incomingDamage = interactionType?.targetPlayerHealth && Number.isFinite(enemyActionSeconds)
-      ? deterministicDamage(enemy.attack, playerDefense, cv, balanceCase, 'enemy', {
+      ? diagnosticCombatDamage(enemy.attack, playerDefense, balance, balanceCase as DiagnosticHitCase, {
           armorPenetration: enemy.armorPenetration,
           torpidity: enemy.torpidity,
           critChance: enemy.critChance,

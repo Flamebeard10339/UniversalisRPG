@@ -97,7 +97,11 @@ export const validateManifest = (value: unknown): value is UniverseManifest =>
   Array.isArray(value.locales) &&
   value.locales.every((locale) => typeof locale === 'string') &&
   Array.isArray(value.files) &&
-  value.files.every((file) => typeof file === 'string');
+  value.files.every((file) => typeof file === 'string') &&
+  (value.combatBalance === undefined ||
+    (isRecord(value.combatBalance) &&
+      hasNumber(value.combatBalance, 'expectedHitsToKill') &&
+      hasNumber(value.combatBalance, 'combatSpread')));
 
 const validateLocationsShape = (locations: unknown): locations is LocationNode[] =>
   Array.isArray(locations) &&
@@ -270,6 +274,13 @@ export const validateContentShape = (bundle: Partial<ContentBundle>) => {
 
   if (!bundle.manifest || !validateManifest(bundle.manifest)) {
     issues.push(error('universe.json', 'validation.universeManifestMissing'));
+  } else if (bundle.manifest.combatBalance) {
+    if (bundle.manifest.combatBalance.expectedHitsToKill <= 0) {
+      issues.push(error('universe.json.combatBalance.expectedHitsToKill', 'validation.expectedHitsPositive'));
+    }
+    if (bundle.manifest.combatBalance.combatSpread < 0) {
+      issues.push(error('universe.json.combatBalance.combatSpread', 'validation.combatSpreadNonNegative'));
+    }
   }
 
   if (!validateLocationsShape(bundle.locations)) {
@@ -652,6 +663,9 @@ export const mergeDraftIntoBundle = (bundle: ContentBundle, draft: ContributionD
 
   return {
     ...bundle,
+    manifest: draft.combatBalance
+      ? { ...bundle.manifest, combatBalance: draft.combatBalance }
+      : bundle.manifest,
     locations: mergeById(removeById(bundle.locations, draft.removed?.locations ?? []), draft.locations),
     edges: mergeById(removeById(bundle.edges, draft.removed?.edges ?? []), draft.edges),
     actions: mergeById(removeById(bundle.actions, draft.removed?.actions ?? []), draft.actions),

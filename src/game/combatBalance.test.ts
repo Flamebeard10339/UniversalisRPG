@@ -1,78 +1,57 @@
 import { describe, expect, it } from 'vitest';
 import {
-  BASELINE_HEALTH,
-  BASELINE_POWER,
-  calculateEnemyDiagnostics,
-  canonicalHealth,
+  calculateAverageCombatDamage,
+  calculateMaxCombatDamage,
+  DEFAULT_COMBAT_BALANCE,
+  diagnosticCombatDamage,
   expectedCombatDamage,
-  HITS_AT_PARITY,
+  resolveCombatBalance,
+  sampleCombatDamage,
 } from './combatBalance';
-import type { EnemyDefinition } from './types';
-
-const enemy: EnemyDefinition = {
-  id: 'test-enemy',
-  interactionTypeId: 'melee-combat',
-  attack: BASELINE_POWER,
-  defense: BASELINE_POWER,
-  health: BASELINE_HEALTH,
-  rate: 60,
-  regeneration: 0,
-  armorPenetration: 0,
-  torpidity: 0,
-  critChance: 0,
-  critMultiplier: 2,
-  rewards: [],
-};
 
 describe('combat balance model', () => {
-  it('is scale invariant for equivalent power ratios', () => {
-    const low = expectedCombatDamage(100, 102).damage / 100;
-    const high = expectedCombatDamage(10_000, 10_200).damage / 10_000;
+  it('kills in seven average hits when health, attack, and defense match defaults', () => {
+    const health = 14;
+    const damage = calculateAverageCombatDamage(health, health, DEFAULT_COMBAT_BALANCE);
 
-    expect(high).toBeCloseTo(low, 8);
+    expect(health / damage).toBeCloseTo(7, 8);
   });
 
-  it('anchors canonical parity fights at seven actions', () => {
-    const damage = expectedCombatDamage(BASELINE_POWER, BASELINE_POWER).damage;
+  it('scales attack deltas by combat spread', () => {
+    const balance = { expectedHitsToKill: 1 / 7, combatSpread: 1 };
+    const parity = calculateAverageCombatDamage(10, 10, balance);
+    const doubled = calculateAverageCombatDamage(20, 10, balance);
+    const halved = calculateAverageCombatDamage(5, 10, balance);
 
-    expect(canonicalHealth(BASELINE_POWER)).toBeCloseTo(BASELINE_HEALTH, 8);
-    expect(canonicalHealth(BASELINE_POWER) / damage).toBeCloseTo(HITS_AT_PARITY, 8);
+    expect(doubled).toBeCloseTo(parity * 4, 8);
+    expect(halved).toBeCloseTo(parity * 0.25, 8);
   });
 
-  it('reports actual parity actions for designer-selected round health', () => {
-    const diagnostics = calculateEnemyDiagnostics({ ...enemy, health: 120 }, {
-      playerHealth: 100,
-      playerRegenerationPerMinute: 0,
-      playerActionSeconds: 1,
-    });
+  it('makes max hit exactly twice average damage', () => {
+    const average = calculateAverageCombatDamage(12, 8, DEFAULT_COMBAT_BALANCE);
 
-    expect(diagnostics.parityActionsToKill).toBeCloseTo(8.4, 5);
+    expect(calculateMaxCombatDamage(12, 8, DEFAULT_COMBAT_BALANCE)).toBeCloseTo(average * 2, 8);
+    expect(expectedCombatDamage(12, 8, DEFAULT_COMBAT_BALANCE).maxDamage).toBeCloseTo(average * 2, 8);
   });
 
-  it('reports immortality and unwinnable fights without clamping', () => {
-    const immortal = calculateEnemyDiagnostics(enemy, {
-      playerHealth: 100,
-      playerRegenerationPerMinute: 10_000,
-      playerActionSeconds: 1,
-    });
-    const unwinnable = calculateEnemyDiagnostics({ ...enemy, regeneration: 10_000 }, {
-      playerHealth: 100,
-      playerRegenerationPerMinute: 0,
-      playerActionSeconds: 1,
-    });
+  it('samples uniformly from zero to max hit', () => {
+    const average = calculateAverageCombatDamage(10, 10, DEFAULT_COMBAT_BALANCE);
 
-    expect(immortal.fightsPerDeath.some((cell) => cell.value === Number.POSITIVE_INFINITY)).toBe(true);
-    expect(unwinnable.fightsPerDeath.every((cell) => cell.value === 0)).toBe(true);
+    expect(sampleCombatDamage(10, 10, DEFAULT_COMBAT_BALANCE, {}, () => 0).damage).toBe(0);
+    expect(sampleCombatDamage(10, 10, DEFAULT_COMBAT_BALANCE, {}, () => 0.5).damage).toBeCloseTo(average, 8);
+    expect(sampleCombatDamage(10, 10, DEFAULT_COMBAT_BALANCE, {}, () => 1).damage).toBeCloseTo(average * 2, 8);
   });
 
-  it('applies analytical special-effect modifiers', () => {
-    const base = expectedCombatDamage(10, 10).damage;
-    const penetrated = expectedCombatDamage(10, 10, { armorPenetration: 3 }).damage;
-    const torpid = expectedCombatDamage(10, 10, { torpidity: 3 }).damage;
-    const critical = expectedCombatDamage(10, 10, { critChance: 50, critMultiplier: 2 }).damage;
+  it('uses quarter, half, and three-quarter max hit for diagnostics', () => {
+    const maxHit = calculateMaxCombatDamage(10, 10, DEFAULT_COMBAT_BALANCE);
 
-    expect(penetrated).toBeGreaterThan(base);
-    expect(torpid).toBeLessThan(base);
-    expect(critical).toBeCloseTo(base * 1.5, 8);
+    expect(diagnosticCombatDamage(10, 10, DEFAULT_COMBAT_BALANCE, 'worst')).toBeCloseTo(maxHit * 0.25, 8);
+    expect(diagnosticCombatDamage(10, 10, DEFAULT_COMBAT_BALANCE, 'average')).toBeCloseTo(maxHit * 0.5, 8);
+    expect(diagnosticCombatDamage(10, 10, DEFAULT_COMBAT_BALANCE, 'best')).toBeCloseTo(maxHit * 0.75, 8);
+  });
+
+  it('defaults invalid or missing universe balance values', () => {
+    expect(resolveCombatBalance()).toEqual(DEFAULT_COMBAT_BALANCE);
+    expect(resolveCombatBalance({ expectedHitsToKill: -1, combatSpread: -1 })).toEqual(DEFAULT_COMBAT_BALANCE);
   });
 });

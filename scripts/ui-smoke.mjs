@@ -53,6 +53,12 @@ try {
     await settingsButton.click();
     console.log(`[${viewport.name}] contribution`);
     await page.getByText('Contribution mode', { exact: true }).locator('xpath=ancestor::label').getByRole('checkbox').check();
+    console.log(`[${viewport.name}] universe settings`);
+    await page.getByRole('button', { name: 'Universe', exact: true }).last().click();
+    const expectedHits = page.getByLabel('Expected hits to kill factor', { exact: true });
+    const combatSpread = page.getByLabel('Combat spread', { exact: true });
+    const expectedHitsValue = await expectedHits.inputValue();
+    const combatSpreadValue = await combatSpread.inputValue();
     console.log(`[${viewport.name}] enemies`);
     await page.getByRole('button', { name: 'Enemies', exact: true }).click();
     console.log(`[${viewport.name}] edit`);
@@ -67,7 +73,6 @@ try {
 
     const worstActions = page.getByText('Worst actions', { exact: true });
     const averageFights = page.getByText('Average fights/death', { exact: true });
-    const combatSpread = page.getByLabel('Combat spread (CV)', { exact: true });
     await worstActions.scrollIntoViewIfNeeded();
     await averageFights.scrollIntoViewIfNeeded();
     await page.screenshot({ fullPage: true, path: path.join(os.tmpdir(), `universalis-enemy-editor-${viewport.name}.png`) });
@@ -75,17 +80,15 @@ try {
     const attackBox = await attack.boundingBox();
     const selectedEditor = page.locator('section').filter({ has: page.getByRole('heading', { name: 'goblin', exact: true }) }).last();
     const removeBox = await selectedEditor.getByRole('button', { name: 'Remove', exact: true }).first().boundingBox();
-    const combatSpreadBox = await combatSpread.boundingBox();
     const overlaps = (first, second) => first && second
       ? first.x + first.width > second.x && second.x + second.width > first.x
         && first.y + first.height > second.y && second.y + second.height > first.y
       : true;
-    const editorColumnsOverlap = overlaps(attackBox, combatSpreadBox) || overlaps(removeBox, combatSpreadBox);
+    const editorColumnsOverlap = overlaps(attackBox, removeBox);
     const attackValue = await attack.inputValue();
     const defenseValue = await defense.inputValue();
     const worstActionsVisible = await worstActions.isVisible();
     const averageFightsVisible = await averageFights.isVisible();
-    const combatSpreadValue = await combatSpread.inputValue();
 
     console.log(`[${viewport.name}] profiles`);
     await page.getByRole('button', { name: 'Profiles', exact: true }).last().click();
@@ -133,6 +136,7 @@ try {
       defense: defenseValue,
       worstActions: worstActionsVisible,
       averageFights: averageFightsVisible,
+      expectedHits: expectedHitsValue,
       combatSpread: combatSpreadValue,
       profilesTab: profilesTabVisible,
       trainedSword: trainedSwordVisible,
@@ -143,7 +147,7 @@ try {
       resetStateEditor: await page.locator('option[value="reset-state"]:checked').count() > 0,
       onEmptyEditor: await onEmptyEditor.isVisible(),
       runTranscript: await runTranscript.isVisible(),
-      editorGeometry: { attackBox, removeBox, combatSpreadBox },
+      editorGeometry: { attackBox, removeBox },
       errors,
     });
     await page.close();
@@ -158,7 +162,8 @@ const failed = results.some((result) =>
   result.defense !== '11.5' ||
   !result.worstActions ||
   !result.averageFights ||
-  result.combatSpread !== '0.3' ||
+  result.expectedHits !== '0.14285714285714285' ||
+  result.combatSpread !== '1' ||
   !result.profilesTab ||
   !result.trainedSword ||
   result.editorColumnsOverlap ||

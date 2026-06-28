@@ -21,6 +21,15 @@
       "minItems": 1,
       "uniqueItems": true
     },
+    "combatBalance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["expectedHitsToKill", "combatSpread"],
+      "properties": {
+        "expectedHitsToKill": { "type": "number", "exclusiveMinimum": 0 },
+        "combatSpread": { "type": "number", "minimum": 0 }
+      }
+    },
     "compatibility": {
       "type": "object",
       "additionalProperties": false,

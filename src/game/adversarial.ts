@@ -6,10 +6,9 @@ import type {
   UniversePlayState,
 } from './types';
 import {
-  COMBAT_CV,
-  DAMAGE_SCALE,
-  effectiveCombatStats,
   expectedCombatDamage,
+  resolveManifestCombatBalance,
+  sampleCombatDamage,
 } from './combatBalance';
 import { getCharacterStatValue, getSkillTotals } from './characterStats';
 export { getSkillTotals } from './characterStats';
@@ -85,7 +84,7 @@ export const getActionDps = (
   }
 
   const source = getCharacterStatValue(state, context.stats ?? [], sourceStat.id);
-  return expectedCombatDamage(source, enemy.defense).damage /
+  return expectedCombatDamage(source, enemy.defense, resolveManifestCombatBalance(context.manifest)).damage /
     (getActionDurationMs(state, action, context) / 1000);
 };
 
@@ -108,20 +107,12 @@ export const getEnemyAttackDps = (
   }
 
   const target = getCharacterStatValue(state, context.stats ?? [], targetStat.id);
-  return expectedCombatDamage(enemy.attack, target, {
+  return expectedCombatDamage(enemy.attack, target, resolveManifestCombatBalance(context.manifest), {
     armorPenetration: enemy.armorPenetration,
     torpidity: enemy.torpidity,
     critChance: enemy.critChance,
     critMultiplier: enemy.critMultiplier,
   }).damage / (attackDurationMs / 1000);
-};
-
-export const sampleNormal = (mean: number, standardDeviation: number, random = Math.random) => {
-  const u1 = Math.max(Number.EPSILON, random());
-  const u2 = random();
-  const z0 = Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
-
-  return mean + z0 * standardDeviation;
 };
 
 export const sampleAdversarialDamage = (
@@ -138,14 +129,12 @@ export const sampleAdversarialDamage = (
   }
 
   const source = getCharacterStatValue(state, context.stats ?? [], sourceStat.id);
-  const sigma = COMBAT_CV * source;
-  const sample = sampleNormal(source, sigma, random);
-  const rawDamage = Math.max(0, sample - enemy.defense);
+  const sample = sampleCombatDamage(source, enemy.defense, resolveManifestCombatBalance(context.manifest), {}, random);
 
   return {
-    sample,
-    rawDamage,
-    damage: rawDamage * DAMAGE_SCALE,
+    sample: sample.roll,
+    rawDamage: sample.damage,
+    damage: sample.damage,
     source,
     target: enemy.defense,
   };
@@ -166,23 +155,20 @@ export const sampleEnemyAttackDamage = (
   }
 
   const target = getCharacterStatValue(state, context.stats ?? [], targetStat.id);
-  const effective = effectiveCombatStats(enemy.attack, target, {
+  const sample = sampleCombatDamage(enemy.attack, target, resolveManifestCombatBalance(context.manifest), {
     armorPenetration: enemy.armorPenetration,
     torpidity: enemy.torpidity,
-  });
-  const sigma = COMBAT_CV * effective.attack;
-  const sample = sampleNormal(effective.attack, sigma, random);
-  const rawDamage = Math.max(0, sample - effective.defense);
+  }, random);
   const critChance = Math.min(1, Math.max(0, enemy.critChance / 100));
-  const critical = rawDamage > 0 && random() < critChance;
+  const critical = sample.damage > 0 && random() < critChance;
   const critMultiplier = critical ? Math.max(1, enemy.critMultiplier) : 1;
 
   return {
-    sample,
-    rawDamage,
-    damage: rawDamage * DAMAGE_SCALE * critMultiplier,
+    sample: sample.roll,
+    rawDamage: sample.damage,
+    damage: sample.damage * critMultiplier,
     critical,
-    source: effective.attack,
+    source: sample.attack,
     target,
   };
 };

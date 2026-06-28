@@ -4,6 +4,10 @@
   "version": "0.1.0",
   "author": "UniversalisRPG",
   "locales": ["en"],
+  "combatBalance": {
+    "expectedHitsToKill": 0.14285714285714285,
+    "combatSpread": 1
+  },
   "files": [
     "locations.json",
     "edges.json",

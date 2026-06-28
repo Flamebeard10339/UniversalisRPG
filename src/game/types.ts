@@ -12,10 +12,16 @@ export type UniverseManifest = {
   author: string;
   locales: string[];
   files: string[];
+  combatBalance?: CombatBalanceDefinition;
   compatibility?: {
     minAppVersion?: string;
     maxAppVersion?: string;
   };
+};
+
+export type CombatBalanceDefinition = {
+  expectedHitsToKill: number;
+  combatSpread: number;
 };
 
 export type LocationNode = {
@@ -346,6 +352,7 @@ export type ContributionDraft = {
   universeId: string;
   updatedAt: number;
   notes: string;
+  combatBalance?: CombatBalanceDefinition;
   locations: LocationNode[];
   edges: TravelEdgeDefinition[];
   actions: GameAction[];

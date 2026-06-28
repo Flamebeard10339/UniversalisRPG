@@ -8,7 +8,15 @@ import {
 import type { ContentBundle, EnemyDefinition } from './types';
 
 const bundle: ContentBundle = {
-  manifest: { schemaVersion: 1, id: 'test', version: '1', author: 'test', locales: ['en'], files: [] },
+  manifest: {
+    schemaVersion: 1,
+    id: 'test',
+    version: '1',
+    author: 'test',
+    locales: ['en'],
+    files: [],
+    combatBalance: { expectedHitsToKill: 1 / 7, combatSpread: 1 },
+  },
   locations: [{ id: 'start', position: { x: 0, y: 0 }, starting: true }],
   edges: [],
   actions: [],
@@ -66,11 +74,11 @@ describe('debug player profiles', () => {
     expect(getProfileStatSummary(bundle, sword)).toMatch(/^Health 100, Attack 24.1, Defense 16/);
   });
 
-  it('computes balance rows from profile stats and editable cv', () => {
+  it('computes balance rows from profile stats and universe combat balance', () => {
     const justSpawned = DEBUG_PLAYER_PROFILES.find((profile) => profile.id === 'just-spawned')!;
     const trainedSword = DEBUG_PLAYER_PROFILES.find((profile) => profile.id === 'trained-10-sword')!;
-    const weak = calculateProfileEnemyDiagnostic(bundle, enemy, justSpawned, 0.3);
-    const strong = calculateProfileEnemyDiagnostic(bundle, enemy, trainedSword, 0.3);
+    const weak = calculateProfileEnemyDiagnostic(bundle, enemy, justSpawned);
+    const strong = calculateProfileEnemyDiagnostic(bundle, enemy, trainedSword);
 
     expect(strong.actionsToKill.average).toBeLessThan(weak.actionsToKill.average);
     expect(strong.fightsPerDeath.average).toBeGreaterThan(weak.fightsPerDeath.average);

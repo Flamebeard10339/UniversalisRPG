@@ -33,26 +33,13 @@ const metricClass = (value: number) => {
 
 export const EnemyDiagnostics = ({ bundle, enemy, t }: EnemyDiagnosticsProps) => {
   const [selectedProfileId, setSelectedProfileId] = useState(DEBUG_PLAYER_PROFILES[0]?.id ?? '');
-  const [cv, setCv] = useState(0.3);
   const diagnostics = useMemo(() =>
-    DEBUG_PLAYER_PROFILES.map((profile) => calculateProfileEnemyDiagnostic(bundle, enemy, profile, cv)),
-  [bundle, cv, enemy]);
+    DEBUG_PLAYER_PROFILES.map((profile) => calculateProfileEnemyDiagnostic(bundle, enemy, profile)),
+  [bundle, enemy]);
   const selectedProfile = DEBUG_PLAYER_PROFILES.find((profile) => profile.id === selectedProfileId) ?? DEBUG_PLAYER_PROFILES[0];
 
   return (
     <section className="grid min-w-0 gap-3">
-      <label className="grid max-w-xs gap-1 text-xs text-slate-400">
-        <span>{t('contribution.enemyDiagnostics.cv')}</span>
-        <input
-          className="rounded bg-slate-950 px-2 py-1.5 text-sm text-slate-100"
-          min="0"
-          onChange={(event) => setCv(Math.max(0, Number(event.target.value)))}
-          step="0.01"
-          type="number"
-          value={cv}
-        />
-      </label>
-
       <div className="overflow-x-auto overscroll-x-contain">
         <table className="w-full min-w-[48rem] text-xs">
           <thead className="text-slate-500">

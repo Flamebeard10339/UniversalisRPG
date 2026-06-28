@@ -5,6 +5,7 @@ import type { ContentBundle, ContributionDraft, ContributionRemovedIds, EffectDe
 import { ContributionMapEditor } from './ContributionMapEditor';
 import { EnemyDiagnostics } from './EnemyDiagnostics';
 import { DEBUG_PLAYER_PROFILES, getProfileStatSummary, profileDescription, profileTitle } from '../../game/playerProfiles';
+import { resolveCombatBalance } from '../../game/combatBalance';
 import { EdgeFields, LocationFields } from './MapContentFields';
 import { StructuredDataDisplay, StructuredDataEditor, type StructuredValue } from '../structuredData/StructuredData';
 import { actionSchema, effectDefinitionSchema, flagDefinitionSchema, resourceDefinitionSchema, rewardSchema, statDefinitionSchema } from '../structuredData/contentSchemas';
@@ -17,7 +18,7 @@ type ContentDataEditorProps = {
   t: Translator;
 };
 
-type ContentDataTab = 'map' | 'actions' | 'skills' | 'stats' | 'profiles' | 'interactions' | 'enemies' | 'items' | 'resources' | 'json';
+type ContentDataTab = 'universe' | 'map' | 'actions' | 'skills' | 'stats' | 'profiles' | 'interactions' | 'enemies' | 'items' | 'resources' | 'json';
 type DraftListKey = Exclude<keyof ContributionRemovedIds, 'resources'>;
 type LayeredRow<T> = {
   index: number;
@@ -25,7 +26,7 @@ type LayeredRow<T> = {
   source: 'draft' | 'base';
 };
 
-const contentTabs: ContentDataTab[] = ['map', 'actions', 'skills', 'stats', 'profiles', 'interactions', 'enemies', 'items', 'resources', 'json'];
+const contentTabs: ContentDataTab[] = ['universe', 'map', 'actions', 'skills', 'stats', 'profiles', 'interactions', 'enemies', 'items', 'resources', 'json'];
 
 const uniqueId = (baseId: string, existingIds: string[]) => {
   let index = 1;
@@ -149,6 +150,7 @@ export const ContentDataEditor = ({ baseBundle, bundle, draft, onPatch, t }: Con
   const effects = layeredRows(draft.effects, baseBundle.effects ?? [], removed.effects, filter);
   const interactionTypes = layeredRows(draft.interactionTypes, baseBundle.interactionTypes ?? [], removed.interactionTypes, filter);
   const enemies = layeredRows(draft.enemies, baseBundle.enemies ?? [], removed.enemies, filter);
+  const combatBalance = resolveCombatBalance(draft.combatBalance ?? bundle.manifest.combatBalance);
   const contributionBundle = {
     ...bundle,
     locations: locations.map((row) => row.item),
@@ -230,6 +232,10 @@ export const ContentDataEditor = ({ baseBundle, bundle, draft, onPatch, t }: Con
 
   const updateEnemyInteraction = (row: LayeredRow<EnemyDefinition>, interactionTypeId: string) => {
     updateEnemy(row, { interactionTypeId });
+  };
+
+  const updateCombatBalance = (patch: Partial<typeof combatBalance>) => {
+    onPatch({ combatBalance: resolveCombatBalance({ ...combatBalance, ...patch }) });
   };
 
   const enemyEditorKey = (enemyId: string) => {
@@ -381,6 +387,7 @@ export const ContentDataEditor = ({ baseBundle, bundle, draft, onPatch, t }: Con
   };
 
   const jsonFiles = [
+    { path: 'universe.json', json: { ...bundle.manifest, combatBalance } },
     { path: 'locations.json', json: locations.map((row) => row.item) },
     { path: 'edges.json', json: edges.map((row) => row.item) },
     { path: 'actions.json', json: actions.map((row) => row.item) },
@@ -419,6 +426,35 @@ export const ContentDataEditor = ({ baseBundle, bundle, draft, onPatch, t }: Con
         placeholder={t('contribution.data.filter')}
         value={filter}
       />
+
+      {activeTab === 'universe' && (
+        <section className="grid gap-3 rounded border border-slate-700 p-3">
+          <div>
+            <h3 className="text-sm font-semibold text-slate-100">{t('contribution.data.universe')}</h3>
+            <p className="text-xs text-slate-500">{t('contribution.data.universeDescription')}</p>
+          </div>
+          <div className="grid gap-2 md:grid-cols-2">
+            <label className="grid gap-1 text-xs text-slate-400">
+              <span>{t('contribution.universe.expectedHitsToKill')}</span>
+              <NumericEditor
+                min={0.000001}
+                onChange={(value) => updateCombatBalance({ expectedHitsToKill: value })}
+                step={0.000001}
+                value={combatBalance.expectedHitsToKill}
+              />
+            </label>
+            <label className="grid gap-1 text-xs text-slate-400">
+              <span>{t('contribution.universe.combatSpread')}</span>
+              <NumericEditor
+                min={0}
+                onChange={(value) => updateCombatBalance({ combatSpread: value })}
+                step={0.01}
+                value={combatBalance.combatSpread}
+              />
+            </label>
+          </div>
+        </section>
+      )}
 
       {activeTab === 'map' && (
         <section className="grid gap-2">
