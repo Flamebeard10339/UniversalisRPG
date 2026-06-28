@@ -30,6 +30,11 @@ type HomeTab = 'actions' | 'details' | 'workbench';
 type CharacterTab = 'skills' | 'inventory' | 'stats';
 type ThemePreference = 'system' | 'dark' | 'light';
 type FontSizePreference = 'tiny' | 'small' | 'normal' | 'large' | 'huge';
+type AppearanceSettings = {
+  chatCompressionEnabled?: boolean;
+  fontSize: FontSizePreference;
+  theme: ThemePreference;
+};
 const APP_VERSION = '0.1.0';
 const SOURCE_URL = 'https://github.com/Flamebeard10339/UniversalisRPG';
 const appearanceKey = 'universalis:settings:appearance';
@@ -72,6 +77,8 @@ export default function App() {
   const [characterTab, setCharacterTab] = useState<CharacterTab>('skills');
   const [themePreference, setThemePreference] = useState<ThemePreference>('dark');
   const [fontSizePreference, setFontSizePreference] = useState<FontSizePreference>('normal');
+  const [chatCompressionEnabled, setChatCompressionEnabled] = useState(true);
+  const [appearanceLoaded, setAppearanceLoaded] = useState(false);
   const [showChangelog, setShowChangelog] = useState(false);
   const [changelogText, setChangelogText] = useState('');
   const [confirmReset, setConfirmReset] = useState(false);
@@ -124,20 +131,24 @@ export default function App() {
   }, [hydrateDebug, initialize]);
 
   useEffect(() => {
-    void load<{ theme: ThemePreference; fontSize: FontSizePreference }>(appearanceKey).then((settings) => {
+    void load<AppearanceSettings>(appearanceKey).then((settings) => {
       if (!settings) {
+        setAppearanceLoaded(true);
         return;
       }
       setThemePreference(settings.theme ?? 'dark');
       setFontSizePreference(settings.fontSize ?? 'normal');
+      setChatCompressionEnabled(settings.chatCompressionEnabled ?? true);
+      setAppearanceLoaded(true);
     });
   }, []);
 
   useEffect(() => {
     document.documentElement.dataset.theme = themePreference;
     document.documentElement.dataset.fontSize = fontSizePreference;
-    void save(appearanceKey, { theme: themePreference, fontSize: fontSizePreference });
-  }, [fontSizePreference, themePreference]);
+    if (!appearanceLoaded) return;
+    void save(appearanceKey, { chatCompressionEnabled, theme: themePreference, fontSize: fontSizePreference });
+  }, [appearanceLoaded, chatCompressionEnabled, fontSizePreference, themePreference]);
 
   useEffect(() => {
     if (!showChangelog || changelogText) {
@@ -621,6 +632,15 @@ export default function App() {
                     ))}
                   </select>
                 </label>
+                <label className="flex items-center justify-between gap-4">
+                  <span className="text-sm text-slate-300">{t('settings.appearance.compressChat')}</span>
+                  <input
+                    checked={chatCompressionEnabled}
+                    className="h-5 w-5"
+                    onChange={(event) => setChatCompressionEnabled(event.target.checked)}
+                    type="checkbox"
+                  />
+                </label>
               </section>
 
               <section className="grid gap-3 rounded border border-slate-800 bg-slate-950 p-3">
@@ -788,7 +808,7 @@ export default function App() {
       {activeTab === 'home' && homeTab !== 'workbench' && (
         <div className="fixed inset-x-0 bottom-[73px] z-10 h-[33vh] px-4">
           <div className="mx-auto h-full max-w-7xl">
-            <ChatPanel messages={playState.chatMessages} t={t} />
+            <ChatPanel compressionEnabled={chatCompressionEnabled} messages={playState.chatMessages} t={t} />
           </div>
         </div>
       )}

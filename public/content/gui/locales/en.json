@@ -21,6 +21,7 @@
   "settings.appearance.theme": "Theme",
   "settings.appearance.fontSize": "Font size",
   "settings.appearance.language": "Language",
+  "settings.appearance.compressChat": "Compress chat messages",
   "settings.theme.system": "System",
   "settings.theme.dark": "Dark",
   "settings.theme.light": "Light",
