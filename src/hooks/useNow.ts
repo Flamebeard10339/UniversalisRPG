@@ -30,5 +30,5 @@ export const useNow = (active: boolean, intervalMs = 50) => {
     return () => window.clearInterval(interval);
   }, [active, intervalMs, visible]);
 
-  return now;
+  return active && visible ? now : Date.now();
 };
