@@ -40,6 +40,11 @@ export const getInteractionType = (
     ? context.interactionTypes.find((interactionType) => interactionType.id === (getEnemy(action, context)?.interactionTypeId ?? action.interactionTypeId)) ?? null
     : null;
 
+export const isContinuousAction = (
+  action: GameAction,
+  context: ActionResolutionContext,
+) => Boolean(getEnemy(action, context));
+
 export const getActionStats = (
   action: GameAction,
   context: ActionResolutionContext,

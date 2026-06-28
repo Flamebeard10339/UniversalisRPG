@@ -11,7 +11,8 @@ import { SkillBars } from './components/SkillBars';
 import { TravelStatus } from './components/TravelStatus';
 import { WorldMap } from './components/WorldMap';
 import { StructuredDataDisplay, type StructuredValue } from './components/structuredData/StructuredData';
-import { actionTitleKey, itemTitleKey, locationDescriptionKey, locationTitleKey, resourceTitleKey, skillTitleKey, universeDescriptionKey, universeTitleKey } from './game/contentIds';
+import { actionTitleKey, interactionTitleKey, itemTitleKey, locationDescriptionKey, locationTitleKey, resourceTitleKey, skillTitleKey, universeDescriptionKey, universeTitleKey } from './game/contentIds';
+import { getInteractionType, isContinuousAction } from './game/adversarial';
 import type { ContributionDraft, IdleReport, UniversePlayState } from './game/types';
 import { getNextResourceBoundaryAt } from './game/resources';
 import { load, save } from './lib/storage';
@@ -156,6 +157,7 @@ export default function App() {
     manifest: bundle?.manifest,
     actions: bundle?.actions ?? [],
     skills: bundle?.skills ?? [],
+    stats: bundle?.stats ?? [],
     locations: bundle?.locations ?? [],
     items: bundle?.items ?? [],
     flags: bundle?.flags ?? [],
@@ -166,6 +168,8 @@ export default function App() {
   }), [bundle]);
   const playState = bundle ? gameStates[runtimeUniverseId] ?? getUniverseState(runtimeUniverseId, startingLocationId) : null;
   const currentLocation = bundle?.locations.find((location) => location.id === playState?.currentLocationId);
+  const activeAction = bundle?.actions.find((action) => action.id === playState?.activeAction?.actionId) ?? null;
+  const activeInteractionType = activeAction ? getInteractionType(activeAction, actionContext) : null;
   const logPlayerAction = (event: string, data?: Record<string, unknown>) => {
     logAction(event, data);
     if (bundle) recordRunEvent(runtimeUniverseId, 'player', event, data);
@@ -178,6 +182,10 @@ export default function App() {
       universeId: bundle.manifest.id,
     });
     startAction(runtimeUniverseId, action, actionContext);
+    if (isContinuousAction(action, actionContext) && playState?.activeAction?.actionId !== action.id) {
+      setActiveTab('home');
+      setHomeTab('details');
+    }
   };
   const nextTimerAt = bundle && playState
     ? [
@@ -455,7 +463,9 @@ export default function App() {
                     onClick={() => setHomeTab(tab)}
                     type="button"
                   >
-                    {t(`home.tab.${tab}`)}
+                    {tab === 'details' && activeInteractionType
+                      ? t(interactionTitleKey(activeInteractionType.id), t('home.tab.details'))
+                      : t(`home.tab.${tab}`)}
                   </button>
                 ))}
               </div>

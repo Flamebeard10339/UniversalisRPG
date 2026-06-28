@@ -12,6 +12,10 @@
     "maxLevel": 100
   },
   {
+    "id": "woodcutting",
+    "maxLevel": 100
+  },
+  {
     "id": "attack",
     "maxLevel": 100
   },

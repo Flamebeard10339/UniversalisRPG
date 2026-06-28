@@ -63,3 +63,19 @@ textarea {
 .contribution-map .react-flow__handle {
   display: block;
 }
+
+.continuous-action-progress {
+  background: linear-gradient(110deg, rgba(8, 47, 73, 0.25), rgba(34, 211, 238, 0.35), rgba(20, 184, 166, 0.2), rgba(8, 47, 73, 0.25));
+  background-size: 220% 100%;
+  animation: continuous-action-progress 1.4s linear infinite;
+}
+
+@keyframes continuous-action-progress {
+  from {
+    background-position: 220% 0;
+  }
+
+  to {
+    background-position: 0 0;
+  }
+}

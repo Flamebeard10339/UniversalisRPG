@@ -88,6 +88,7 @@
   "actionPanel.debugDps": "Player DPS {playerDps} | Entity DPS {entityDps}",
   "actionPanel.enemyHealth": "Health {current}/{max}",
   "actionPanel.playerHealth": "You {current}/{max}",
+  "actionPanel.continuous": "Continuous",
   "actionDetails.empty": "No actions being taken.",
   "actionDetails.player": "Player",
   "actionDetails.stop": "Stop",

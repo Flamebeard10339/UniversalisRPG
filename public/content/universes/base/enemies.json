@@ -4,7 +4,7 @@
     "interactionTypeId": "melee-combat",
     "attack": 1,
     "defense": 1,
-    "health": 20,
+    "health": 10,
     "rate": 30,
     "regeneration": 0,
     "armorPenetration": 0,
@@ -15,6 +15,41 @@
     "rewards": [
       { "kind": "skillXp", "skillId": "attack", "amount": 2 },
       { "kind": "skillXp", "skillId": "defense", "amount": 1 }
+    ]
+  },
+  {
+    "id": "oak-tree",
+    "interactionTypeId": "woodcutting",
+    "attack": 0,
+    "defense": 1,
+    "health": 10,
+    "rate": 0,
+    "regeneration": 0,
+    "armorPenetration": 0,
+    "torpidity": 0,
+    "critChance": 0,
+    "critMultiplier": 1,
+    "showHealthBar": true,
+    "rewards": [
+      { "kind": "skillXp", "skillId": "woodcutting", "amount": 4 }
+    ]
+  },
+  {
+    "id": "ent",
+    "interactionTypeId": "woodcutting-combat",
+    "attack": 6,
+    "defense": 4,
+    "health": 30,
+    "rate": 20,
+    "regeneration": 0,
+    "armorPenetration": 0,
+    "torpidity": 0,
+    "critChance": 0,
+    "critMultiplier": 2,
+    "showHealthBar": true,
+    "rewards": [
+      { "kind": "skillXp", "skillId": "woodcutting", "amount": 8 },
+      { "kind": "skillXp", "skillId": "defense", "amount": 2 }
     ]
   },
   {

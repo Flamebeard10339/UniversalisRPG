@@ -208,6 +208,76 @@ describe('resolveIdleTimers', () => {
     expect(resolved.state.chatMessages[0].key).toBe('resource.health.empty');
   });
 
+  it('cancels an adversarial action when enemy damage empties player health and respawns', () => {
+    const startedAt = 1_000;
+    const action: GameAction = {
+      id: 'fight-test-enemy',
+      locationId: 'danger-room',
+      durationSeconds: 60,
+      enemyId: 'test-enemy',
+      rewards: [{ kind: 'skillXp', skillId: 'attack', amount: 1 }],
+    };
+    const context: ActionResolutionContext = {
+      actions: [action],
+      skills: [{ id: 'attack', maxLevel: 100 }],
+      stats: [
+        { id: 'attack', base: 10, skillId: 'attack' },
+        { id: 'defense', base: 0 },
+        { id: 'health', base: 100 },
+      ],
+      locations: [
+        { id: 'respawn', position: { x: 0, y: 0 }, starting: true },
+        { id: 'danger-room', position: { x: 1, y: 0 } },
+      ],
+      resourceDefinitions: [{
+        id: 'health',
+        sourceStat: 'health',
+        initialValue: 'full',
+        onEmpty: [
+          { kind: 'reset-state', locationId: 'starting-location', preserve: { skillXp: true } },
+          { kind: 'chat', messageKey: 'resource.health.empty' },
+        ],
+      }],
+      effects: [],
+      interactionTypes: [{
+        id: 'test-combat',
+        sourceStatId: 'attack',
+        targetStatId: 'defense',
+        targetPlayerHealth: true,
+      }],
+      enemies: [{
+        id: 'test-enemy',
+        interactionTypeId: 'test-combat',
+        attack: 200,
+        defense: 1,
+        health: 10,
+        rate: 60,
+        regeneration: 0,
+        armorPenetration: 0,
+        torpidity: 0,
+        critChance: 0,
+        critMultiplier: 1,
+        rewards: [],
+      }],
+    };
+    const state = {
+      ...startAction(createInitialPlayState('test-universe', 'danger-room'), action, context, startedAt),
+      resourcePools: {
+        health: { current: 5, min: 0, max: 100 },
+      },
+      playerHealth: 5,
+      playerMaxHealth: 100,
+    };
+
+    const resolved = resolveIdleTimers(state, context, { random: () => 0.5 }, startedAt + 1_000);
+
+    expect(resolved.state.activeAction).toBeNull();
+    expect(resolved.state.currentLocationId).toBe('respawn');
+    expect(resolved.state.resourcePools.health.current).toBe(100);
+    expect(resolved.state.playerHealth).toBe(100);
+    expect(resolved.state.chatMessages[resolved.state.chatMessages.length - 1]?.key).toBe('resource.health.empty');
+  });
+
   it('timestamps delayed narration and announces when the last optional action is exhausted', () => {
     const startedAt = 1_000;
     const action: GameAction = {

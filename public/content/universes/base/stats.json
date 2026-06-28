@@ -1,6 +1,7 @@
 [
   { "id": "attack", "base": 6, "skillId": "attack" },
   { "id": "defense", "base": 6, "skillId": "defense" },
+  { "id": "woodcutting", "base": 6, "skillId": "woodcutting" },
   { "id": "health", "base": 100 },
   { "id": "regeneration", "skillId": "regeneration" }
 ]

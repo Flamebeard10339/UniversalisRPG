@@ -4,5 +4,17 @@
     "sourceStatId": "attack",
     "targetStatId": "defense",
     "targetPlayerHealth": true
+  },
+  {
+    "id": "woodcutting",
+    "sourceStatId": "woodcutting",
+    "targetStatId": "defense",
+    "targetPlayerHealth": false
+  },
+  {
+    "id": "woodcutting-combat",
+    "sourceStatId": "woodcutting",
+    "targetStatId": "defense",
+    "targetPlayerHealth": true
   }
 ]

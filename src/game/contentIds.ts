@@ -30,6 +30,7 @@ export const interactionPlayerKillKey = (id: string) => `interaction.${toKebabCa
 export const interactionEntityHitKey = (id: string) => `interaction.${toKebabCase(id)}.entity.hit`;
 export const interactionEntityMissKey = (id: string) => `interaction.${toKebabCase(id)}.entity.miss`;
 export const interactionEntityKillKey = (id: string) => `interaction.${toKebabCase(id)}.entity.kill`;
+export const interactionTitleKey = (id: string) => `interaction.${toKebabCase(id)}.title`;
 export const skillTitleKey = (id: string) => `skill.${toKebabCase(id)}.title`;
 export const skillDescriptionKey = (id: string) => `skill.${toKebabCase(id)}.description`;
 export const statTitleKey = (id: string) => `stat.${toKebabCase(id)}.title`;

@@ -13,6 +13,20 @@
     "rewards": [{ "kind": "skillXp", "skillId": "attack", "amount": 1 }]
   },
   {
+    "id": "chop-oak-tree",
+    "locationId": "emberwood",
+    "durationSeconds": 1,
+    "enemyId": "oak-tree",
+    "rewards": [{ "kind": "skillXp", "skillId": "woodcutting", "amount": 1 }]
+  },
+  {
+    "id": "fight-ent",
+    "locationId": "emberwood",
+    "durationSeconds": 1,
+    "enemyId": "ent",
+    "rewards": [{ "kind": "skillXp", "skillId": "woodcutting", "amount": 1 }]
+  },
+  {
     "id": "fight-ork",
     "locationId": "crossroads",
     "durationSeconds": 1,

@@ -1,6 +1,6 @@
 import type { ContentBundle, GameAction, UniversePlayState } from '../game/types';
 import { actionDescriptionKey, actionTitleKey } from '../game/contentIds';
-import { getActionDps, getActionDurationMs, getEnemyAttackDps } from '../game/adversarial';
+import { getActionDps, getActionDurationMs, getEnemyAttackDps, isContinuousAction } from '../game/adversarial';
 import type { Translator } from '../game/i18n';
 import { useNow } from '../hooks/useNow';
 import { canStartAction, isActionVisible } from '../game/conditions';
@@ -73,6 +73,7 @@ export const ActionPanel = ({ bundle, debugEnabled, onSetLooping, playState, onS
           const requirementsMet = canStartAction(playState, action, actionContext);
           const completions = playState.actionCompletions[action.id] ?? 0;
           const remaining = action.maxCompletions === undefined ? null : Math.max(0, action.maxCompletions - completions);
+          const continuous = isContinuousAction(action, actionContext);
 
           return (
             <button
@@ -82,7 +83,10 @@ export const ActionPanel = ({ bundle, debugEnabled, onSetLooping, playState, onS
               onClick={() => onStartAction(action)}
               type="button"
             >
-              {(active || actionProgress > 0) && (
+              {active && continuous && (
+                <span className="continuous-action-progress absolute inset-y-0 left-0 w-full opacity-70" />
+              )}
+              {!continuous && (active || actionProgress > 0) && (
                 <span
                   className={`absolute inset-y-0 left-0 ${active ? 'bg-cyan-400/25' : 'bg-slate-700/60'}`}
                   style={{ width: `${actionProgress}%` }}
@@ -90,7 +94,9 @@ export const ActionPanel = ({ bundle, debugEnabled, onSetLooping, playState, onS
               )}
               <span className="relative block text-sm font-semibold text-slate-100">{t(actionTitleKey(action.id))}</span>
               <span className="relative mt-1 block text-xs text-slate-400">{t(actionDescriptionKey(action.id))}</span>
-              <span className="relative mt-2 block text-xs text-cyan-200">{action.durationSeconds}s</span>
+              <span className="relative mt-2 block text-xs text-cyan-200">
+                {continuous ? t('actionPanel.continuous') : `${action.durationSeconds}s`}
+              </span>
               {remaining !== null && (action.maxCompletions ?? 0) > 1 && (
                 <span className="relative mt-1 block text-xs text-slate-300">
                   {t('actionPanel.remaining', { remaining, total: action.maxCompletions ?? 0 })}

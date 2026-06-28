@@ -35,6 +35,7 @@ import {
   interactionPlayerHitKey,
   interactionPlayerKillKey,
   interactionPlayerMissKey,
+  interactionTitleKey,
   resourceTitleKey,
   skillDescriptionKey,
   skillTitleKey,
@@ -621,6 +622,7 @@ export const collectLocalizationKeys = (bundle: ContentBundle) => [
   ]),
   ...bundle.actions.flatMap((action) => (action.results ?? []).flatMap((result) => result.kind === 'chat' ? [result.messageKey] : [])),
   ...(bundle.interactionTypes ?? []).flatMap((interactionType) => [
+    interactionTitleKey(interactionType.id),
     interactionPlayerHitKey(interactionType.id),
     interactionPlayerMissKey(interactionType.id),
     interactionPlayerKillKey(interactionType.id),
