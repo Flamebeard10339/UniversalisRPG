@@ -1,9 +1,15 @@
 import { useMemo, useState } from 'react';
-import { calculateEnemyDiagnostics, DIAGNOSTIC_RATIOS } from '../../game/combatBalance';
+import {
+  calculateProfileEnemyDiagnostic,
+  DEBUG_PLAYER_PROFILES,
+  getProfileStatSummary,
+  profileTitle,
+} from '../../game/playerProfiles';
 import type { Translator } from '../../game/i18n';
-import type { EnemyDefinition } from '../../game/types';
+import type { ContentBundle, EnemyDefinition } from '../../game/types';
 
 type EnemyDiagnosticsProps = {
+  bundle: ContentBundle;
   enemy: EnemyDefinition;
   t: Translator;
 };
@@ -18,103 +24,76 @@ const formatValue = (value: number, t: Translator) => {
   return value >= 10 ? value.toFixed(1) : value.toFixed(2);
 };
 
-const dangerClass = (value: number) => {
-  if (!Number.isFinite(value) || value > 5) {
-    return 'bg-emerald-950/60 text-emerald-200';
-  }
-  if (value >= 2) {
-    return 'bg-cyan-950/60 text-cyan-200';
-  }
-  if (value >= 1) {
-    return 'bg-amber-950/60 text-amber-200';
-  }
-  return 'bg-rose-950/60 text-rose-200';
+const metricClass = (value: number) => {
+  if (!Number.isFinite(value) || value > 5) return 'text-emerald-200';
+  if (value >= 2) return 'text-cyan-200';
+  if (value >= 1) return 'text-amber-200';
+  return 'text-rose-200';
 };
 
-export const EnemyDiagnostics = ({ enemy, t }: EnemyDiagnosticsProps) => {
-  const [playerHealth, setPlayerHealth] = useState(100);
-  const [playerRegeneration, setPlayerRegeneration] = useState(0);
-  const [playerActionSeconds, setPlayerActionSeconds] = useState(1);
-  const diagnostics = useMemo(() => calculateEnemyDiagnostics(enemy, {
-    playerHealth,
-    playerRegenerationPerMinute: playerRegeneration,
-    playerActionSeconds,
-  }), [enemy, playerActionSeconds, playerHealth, playerRegeneration]);
+export const EnemyDiagnostics = ({ bundle, enemy, t }: EnemyDiagnosticsProps) => {
+  const [selectedProfileId, setSelectedProfileId] = useState(DEBUG_PLAYER_PROFILES[0]?.id ?? '');
+  const [cv, setCv] = useState(0.3);
+  const diagnostics = useMemo(() =>
+    DEBUG_PLAYER_PROFILES.map((profile) => calculateProfileEnemyDiagnostic(bundle, enemy, profile, cv)),
+  [bundle, cv, enemy]);
+  const selectedProfile = DEBUG_PLAYER_PROFILES.find((profile) => profile.id === selectedProfileId) ?? DEBUG_PLAYER_PROFILES[0];
 
   return (
     <section className="grid min-w-0 gap-3">
-      <div className="grid gap-2 sm:grid-cols-3">
-        <label className="grid gap-1 text-xs text-slate-400">
-          <span>{t('contribution.enemyDiagnostics.playerHealth')}</span>
-          <input className="rounded bg-slate-950 px-2 py-1.5 text-sm text-slate-100" min="1" onChange={(event) => setPlayerHealth(Number(event.target.value))} type="number" value={playerHealth} />
-        </label>
-        <label className="grid gap-1 text-xs text-slate-400">
-          <span>{t('contribution.enemyDiagnostics.playerRegen')}</span>
-          <input className="rounded bg-slate-950 px-2 py-1.5 text-sm text-slate-100" min="0" onChange={(event) => setPlayerRegeneration(Number(event.target.value))} step="0.1" type="number" value={playerRegeneration} />
-        </label>
-        <label className="grid gap-1 text-xs text-slate-400">
-          <span>{t('contribution.enemyDiagnostics.playerActionTime')}</span>
-          <input className="rounded bg-slate-950 px-2 py-1.5 text-sm text-slate-100" min="0.01" onChange={(event) => setPlayerActionSeconds(Number(event.target.value))} step="0.1" type="number" value={playerActionSeconds} />
-        </label>
+      <label className="grid max-w-xs gap-1 text-xs text-slate-400">
+        <span>{t('contribution.enemyDiagnostics.cv')}</span>
+        <input
+          className="rounded bg-slate-950 px-2 py-1.5 text-sm text-slate-100"
+          min="0"
+          onChange={(event) => setCv(Math.max(0, Number(event.target.value)))}
+          step="0.01"
+          type="number"
+          value={cv}
+        />
+      </label>
+
+      <div className="overflow-x-auto overscroll-x-contain">
+        <table className="w-full min-w-[48rem] text-xs">
+          <thead className="text-slate-500">
+            <tr>
+              <th className="px-2 py-1 text-left">{t('contribution.enemyDiagnostics.profile')}</th>
+              <th className="px-2 py-1 text-right">{t('contribution.enemyDiagnostics.actionsWorst')}</th>
+              <th className="px-2 py-1 text-right">{t('contribution.enemyDiagnostics.actionsAverage')}</th>
+              <th className="px-2 py-1 text-right">{t('contribution.enemyDiagnostics.actionsBest')}</th>
+              <th className="px-2 py-1 text-right">{t('contribution.enemyDiagnostics.fightsWorst')}</th>
+              <th className="px-2 py-1 text-right">{t('contribution.enemyDiagnostics.fightsAverage')}</th>
+              <th className="px-2 py-1 text-right">{t('contribution.enemyDiagnostics.fightsBest')}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {diagnostics.map((row) => {
+              const selected = row.profile.id === selectedProfile?.id;
+              return (
+                <tr className={`border-t border-slate-800 ${selected ? 'bg-slate-800/70' : ''}`} key={row.profile.id}>
+                  <td className="px-2 py-1 text-left">
+                    <button className="text-cyan-200 underline-offset-2 hover:underline" onClick={() => setSelectedProfileId(row.profile.id)} type="button">
+                      {profileTitle(row.profile, t)}
+                    </button>
+                  </td>
+                  <td className={`px-2 py-1 text-right ${metricClass(row.actionsToKill.worst)}`}>{formatValue(row.actionsToKill.worst, t)}</td>
+                  <td className={`px-2 py-1 text-right ${metricClass(row.actionsToKill.average)}`}>{formatValue(row.actionsToKill.average, t)}</td>
+                  <td className={`px-2 py-1 text-right ${metricClass(row.actionsToKill.best)}`}>{formatValue(row.actionsToKill.best, t)}</td>
+                  <td className={`px-2 py-1 text-right ${metricClass(row.fightsPerDeath.worst)}`}>{formatValue(row.fightsPerDeath.worst, t)}</td>
+                  <td className={`px-2 py-1 text-right ${metricClass(row.fightsPerDeath.average)}`}>{formatValue(row.fightsPerDeath.average, t)}</td>
+                  <td className={`px-2 py-1 text-right ${metricClass(row.fightsPerDeath.best)}`}>{formatValue(row.fightsPerDeath.best, t)}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
       </div>
 
-      <div className="grid grid-cols-2 gap-2 text-xs">
-        <div className="rounded border border-slate-800 bg-slate-950 p-2">
-          <span className="block text-slate-500">{t('contribution.enemyDiagnostics.canonicalHealth')}</span>
-          <strong className="text-slate-100">{diagnostics.canonicalHealth.toFixed(1)}</strong>
-        </div>
-        <div className="rounded border border-slate-800 bg-slate-950 p-2">
-          <span className="block text-slate-500">{t('contribution.enemyDiagnostics.parityActions')}</span>
-          <strong className="text-slate-100">{formatValue(diagnostics.parityActionsToKill, t)}</strong>
-        </div>
-      </div>
-
-      <section className="grid gap-2">
-        <h4 className="text-sm font-semibold text-slate-100">{t('contribution.enemyDiagnostics.actionsToKill')}</h4>
-        <div className="overflow-x-auto overscroll-x-contain">
-          <table className="w-full min-w-80 text-xs">
-            <thead className="text-slate-500">
-              <tr>
-                <th className="px-2 py-1 text-left">{t('contribution.enemyDiagnostics.attackRatio')}</th>
-                <th className="px-2 py-1 text-right">{t('contribution.enemyDiagnostics.actions')}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {diagnostics.actionsToKill.map((row) => (
-                <tr className="border-t border-slate-800" key={row.ratio}>
-                  <td className="px-2 py-1 text-slate-300">{row.ratio.toFixed(1)}x</td>
-                  <td className="px-2 py-1 text-right text-slate-100">{formatValue(row.actions, t)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      <section className="grid gap-2">
-        <h4 className="text-sm font-semibold text-slate-100">{t('contribution.enemyDiagnostics.fightsPerDeath')}</h4>
-        <div className="overflow-x-auto overscroll-x-contain">
-          <table className="w-full min-w-[32rem] border-separate border-spacing-1 text-center text-xs">
-            <thead>
-              <tr className="text-slate-500">
-                <th>{t('contribution.enemyDiagnostics.attackDefense')}</th>
-                {DIAGNOSTIC_RATIOS.map((ratio) => <th key={ratio}>{ratio.toFixed(1)}x</th>)}
-              </tr>
-            </thead>
-            <tbody>
-              {DIAGNOSTIC_RATIOS.map((attackRatio) => (
-                <tr key={attackRatio}>
-                  <th className="text-slate-500">{attackRatio.toFixed(1)}x</th>
-                  {DIAGNOSTIC_RATIOS.map((defenseRatio) => {
-                    const value = diagnostics.fightsPerDeath.find((cell) => cell.attackRatio === attackRatio && cell.defenseRatio === defenseRatio)?.value ?? 0;
-                    return <td className={`rounded px-2 py-2 ${dangerClass(value)}`} key={defenseRatio}>{formatValue(value, t)}</td>;
-                  })}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </section>
+      {selectedProfile && (
+        <p className="rounded bg-slate-950 p-3 text-sm text-slate-300">
+          {getProfileStatSummary(bundle, selectedProfile, t)}
+        </p>
+      )}
     </section>
   );
 };

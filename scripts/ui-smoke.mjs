@@ -65,25 +65,35 @@ try {
     await defense.fill('11.5');
     console.log(`[${viewport.name}] diagnostics`);
 
-    const actionsGrid = page.getByText('Actions to kill', { exact: true });
-    const fightsGrid = page.getByText('Fights per death', { exact: true });
-    await actionsGrid.scrollIntoViewIfNeeded();
-    await fightsGrid.scrollIntoViewIfNeeded();
+    const worstActions = page.getByText('Worst actions', { exact: true });
+    const averageFights = page.getByText('Average fights/death', { exact: true });
+    const combatSpread = page.getByLabel('Combat spread (CV)', { exact: true });
+    await worstActions.scrollIntoViewIfNeeded();
+    await averageFights.scrollIntoViewIfNeeded();
     await page.screenshot({ fullPage: true, path: path.join(os.tmpdir(), `universalis-enemy-editor-${viewport.name}.png`) });
 
     const attackBox = await attack.boundingBox();
     const selectedEditor = page.locator('section').filter({ has: page.getByRole('heading', { name: 'goblin', exact: true }) }).last();
     const removeBox = await selectedEditor.getByRole('button', { name: 'Remove', exact: true }).first().boundingBox();
-    const referenceHealthBox = await page.getByLabel('Reference player health', { exact: true }).boundingBox();
+    const combatSpreadBox = await combatSpread.boundingBox();
     const overlaps = (first, second) => first && second
       ? first.x + first.width > second.x && second.x + second.width > first.x
         && first.y + first.height > second.y && second.y + second.height > first.y
       : true;
-    const editorColumnsOverlap = overlaps(attackBox, referenceHealthBox) || overlaps(removeBox, referenceHealthBox);
+    const editorColumnsOverlap = overlaps(attackBox, combatSpreadBox) || overlaps(removeBox, combatSpreadBox);
     const attackValue = await attack.inputValue();
     const defenseValue = await defense.inputValue();
-    const actionsGridVisible = await actionsGrid.isVisible();
-    const fightsGridVisible = await fightsGrid.isVisible();
+    const worstActionsVisible = await worstActions.isVisible();
+    const averageFightsVisible = await averageFights.isVisible();
+    const combatSpreadValue = await combatSpread.inputValue();
+
+    console.log(`[${viewport.name}] profiles`);
+    await page.getByRole('button', { name: 'Profiles', exact: true }).last().click();
+    const profilesTab = page.getByText('Player profiles', { exact: true });
+    const trainedSword = page.getByText('Trained 10 sword', { exact: true });
+    await profilesTab.scrollIntoViewIfNeeded();
+    const profilesTabVisible = await profilesTab.isVisible();
+    const trainedSwordVisible = await trainedSword.isVisible();
 
     console.log(`[${viewport.name}] action capabilities`);
     await page.getByRole('button', { name: 'Actions', exact: true }).last().click();
@@ -121,8 +131,11 @@ try {
       viewport: viewport.name,
       attack: attackValue,
       defense: defenseValue,
-      actionsGrid: actionsGridVisible,
-      fightsGrid: fightsGridVisible,
+      worstActions: worstActionsVisible,
+      averageFights: averageFightsVisible,
+      combatSpread: combatSpreadValue,
+      profilesTab: profilesTabVisible,
+      trainedSword: trainedSwordVisible,
       editorColumnsOverlap,
       actionDuration: actionDurationValue,
       maxCompletions: maxCompletionsValue,
@@ -130,7 +143,7 @@ try {
       resetStateEditor: await page.locator('option[value="reset-state"]:checked').count() > 0,
       onEmptyEditor: await onEmptyEditor.isVisible(),
       runTranscript: await runTranscript.isVisible(),
-      editorGeometry: { attackBox, removeBox, referenceHealthBox },
+      editorGeometry: { attackBox, removeBox, combatSpreadBox },
       errors,
     });
     await page.close();
@@ -143,8 +156,11 @@ try {
 const failed = results.some((result) =>
   result.attack !== '12.5' ||
   result.defense !== '11.5' ||
-  !result.actionsGrid ||
-  !result.fightsGrid ||
+  !result.worstActions ||
+  !result.averageFights ||
+  result.combatSpread !== '0.3' ||
+  !result.profilesTab ||
+  !result.trainedSword ||
   result.editorColumnsOverlap ||
   result.actionDuration !== '6.5' ||
   result.maxCompletions !== '5' ||

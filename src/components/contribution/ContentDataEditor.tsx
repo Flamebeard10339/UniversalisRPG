@@ -4,6 +4,7 @@ import type { Translator } from '../../game/i18n';
 import type { ContentBundle, ContributionDraft, ContributionRemovedIds, EffectDefinition, EnemyDefinition, GameAction, InteractionTypeDefinition, ItemDefinition, LocationNode, ResourceDefinition, SkillDefinition, StatDefinition, StateFlagDefinition, TravelEdgeDefinition } from '../../game/types';
 import { ContributionMapEditor } from './ContributionMapEditor';
 import { EnemyDiagnostics } from './EnemyDiagnostics';
+import { DEBUG_PLAYER_PROFILES, getProfileStatSummary, profileDescription, profileTitle } from '../../game/playerProfiles';
 import { EdgeFields, LocationFields } from './MapContentFields';
 import { StructuredDataDisplay, StructuredDataEditor, type StructuredValue } from '../structuredData/StructuredData';
 import { actionSchema, effectDefinitionSchema, flagDefinitionSchema, resourceDefinitionSchema, rewardSchema, statDefinitionSchema } from '../structuredData/contentSchemas';
@@ -16,7 +17,7 @@ type ContentDataEditorProps = {
   t: Translator;
 };
 
-type ContentDataTab = 'map' | 'actions' | 'skills' | 'stats' | 'interactions' | 'enemies' | 'items' | 'resources' | 'json';
+type ContentDataTab = 'map' | 'actions' | 'skills' | 'stats' | 'profiles' | 'interactions' | 'enemies' | 'items' | 'resources' | 'json';
 type DraftListKey = Exclude<keyof ContributionRemovedIds, 'resources'>;
 type LayeredRow<T> = {
   index: number;
@@ -24,7 +25,7 @@ type LayeredRow<T> = {
   source: 'draft' | 'base';
 };
 
-const contentTabs: ContentDataTab[] = ['map', 'actions', 'skills', 'stats', 'interactions', 'enemies', 'items', 'resources', 'json'];
+const contentTabs: ContentDataTab[] = ['map', 'actions', 'skills', 'stats', 'profiles', 'interactions', 'enemies', 'items', 'resources', 'json'];
 
 const uniqueId = (baseId: string, existingIds: string[]) => {
   let index = 1;
@@ -587,6 +588,35 @@ export const ContentDataEditor = ({ baseBundle, bundle, draft, onPatch, t }: Con
         </section>
       )}
 
+      {activeTab === 'profiles' && (
+        <section className="grid gap-2 rounded border border-slate-700 p-2">
+          <div>
+            <h3 className="text-sm font-semibold text-slate-100">{t('contribution.data.playerProfiles')}</h3>
+            <p className="text-xs text-slate-500">{t('contribution.data.playerProfilesDescription')}</p>
+          </div>
+          <div className="overflow-x-auto overscroll-x-contain">
+            <table className="w-full min-w-[42rem] text-sm">
+              <thead className="text-xs uppercase text-slate-500">
+                <tr>
+                  <th className="px-2 py-1 text-left">{t('contribution.enemyDiagnostics.profile')}</th>
+                  <th className="px-2 py-1 text-left">{t('contribution.column.description')}</th>
+                  <th className="px-2 py-1 text-left">{t('contribution.enemyDiagnostics.profileStats')}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {DEBUG_PLAYER_PROFILES.map((profile) => (
+                  <tr className="border-t border-slate-800" key={profile.id}>
+                    <td className="px-2 py-2 font-semibold text-cyan-200">{profileTitle(profile, t)}</td>
+                    <td className="px-2 py-2 text-slate-300">{profileDescription(profile, t)}</td>
+                    <td className="px-2 py-2 text-slate-300">{getProfileStatSummary(bundle, profile, t)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
+
       {activeTab === 'interactions' && (
         <section className="grid gap-1 rounded border border-slate-700 p-2">
           <div className="flex items-center justify-between gap-3">
@@ -696,7 +726,7 @@ export const ContentDataEditor = ({ baseBundle, bundle, draft, onPatch, t }: Con
                     {t('contribution.column.remove')}
                   </button>
                 </div>
-                <EnemyDiagnostics enemy={enemy} t={t} />
+                <EnemyDiagnostics bundle={bundle} enemy={enemy} t={t} />
               </section>
             );
           })()}
