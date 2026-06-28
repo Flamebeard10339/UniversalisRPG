@@ -1,4 +1,6 @@
 {
+  "stat.action-rate.title": "Action Rate",
+  "stat.action-rate.description": "Player adversarial actions per minute.",
   "stat.air-capacity.title": "Air capacity",
   "stat.air-capacity.description": "Maximum suit air capacity.",
   "stat.air-leak.title": "Air leak",

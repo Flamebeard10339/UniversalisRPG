@@ -30,6 +30,7 @@ const bundle: ContentBundle = {
     { id: 'attack', base: 6, skillId: 'attack' },
     { id: 'defense', base: 6, skillId: 'defense' },
     { id: 'woodcutting', base: 0, skillId: 'woodcutting' },
+    { id: 'action-rate', base: 25 },
     { id: 'health', base: 100 },
     { id: 'regeneration', skillId: 'regeneration' },
   ],
@@ -71,7 +72,7 @@ describe('debug player profiles', () => {
   it('summarizes profile stats sorted by effective total', () => {
     const sword = DEBUG_PLAYER_PROFILES.find((profile) => profile.id === 'trained-10-sword')!;
 
-    expect(getProfileStatSummary(bundle, sword)).toMatch(/^Health 100, Attack 24.1, Defense 16/);
+    expect(getProfileStatSummary(bundle, sword)).toMatch(/^Health 100, Action Rate 25, Attack 24.1, Defense 16/);
   });
 
   it('computes balance rows from profile stats and universe combat balance', () => {
@@ -82,5 +83,9 @@ describe('debug player profiles', () => {
 
     expect(strong.actionsToKill.average).toBeLessThan(weak.actionsToKill.average);
     expect(strong.fightsPerDeath.average).toBeGreaterThan(weak.fightsPerDeath.average);
+    expect(strong.dps).toBeGreaterThan(weak.dps);
+    expect(strong.maxHit).toBeCloseTo((strong.dps / 25) * 60 * 2, 5);
+    expect(strong.dpsTaken).toBeGreaterThan(0);
+    expect(strong.levelPair).toContain('Attack/Defense');
   });
 });

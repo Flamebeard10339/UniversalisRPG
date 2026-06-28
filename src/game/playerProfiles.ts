@@ -1,8 +1,9 @@
 import { getCharacterStatValue } from './characterStats';
-import { diagnosticCombatDamage, type DiagnosticHitCase, resolveManifestCombatBalance } from './combatBalance';
+import { diagnosticCombatDamage, expectedCombatDamage, type DiagnosticHitCase, resolveManifestCombatBalance } from './combatBalance';
 import { skillTitleKey, statTitleKey } from './contentIds';
 import type { ContentBundle, EnemyDefinition, SkillEquipmentBonuses, UniversePlayState } from './types';
 import { createInitialPlayState } from './timers';
+import { ACTION_RATE_STAT_ID } from './adversarial';
 
 export type PlayerProfileDefinition = {
   id: string;
@@ -14,12 +15,17 @@ export type BalanceCase = 'worst' | 'average' | 'best';
 
 export type PlayerProfileEnemyDiagnostic = {
   actionsToKill: Record<BalanceCase, number>;
+  dps: number;
+  dpsTaken: number;
   fightsPerDeath: Record<BalanceCase, number>;
+  levelPair: string;
+  maxHit: number;
   profile: PlayerProfileDefinition;
   statSummary: string;
 };
 
 const EPSILON = 1e-9;
+const DEFAULT_ACTIONS_PER_MINUTE = 25;
 
 export const DEBUG_PLAYER_PROFILES: PlayerProfileDefinition[] = [
   {
@@ -109,10 +115,20 @@ export const calculateProfileEnemyDiagnostic = (
   const playerDefense = getProfileStatValue(bundle, profile, targetStatId);
   const playerHealth = Math.max(1, getProfileStatValue(bundle, profile, 'health') || 100);
   const playerRegeneration = Math.max(0, getProfileStatValue(bundle, profile, 'regeneration')) / 60;
-  const playerActionSeconds = 1;
+  const playerActionsPerMinute = getProfileStatValue(bundle, profile, ACTION_RATE_STAT_ID) || DEFAULT_ACTIONS_PER_MINUTE;
+  const playerActionSeconds = 60 / Math.max(EPSILON, playerActionsPerMinute);
   const enemyActionSeconds = enemy.rate > 0 ? 60 / enemy.rate : Number.POSITIVE_INFINITY;
   const enemyRegeneration = Math.max(0, enemy.regeneration) / 60;
   const balance = resolveManifestCombatBalance(bundle.manifest);
+  const outgoingExpectation = expectedCombatDamage(playerAttack, enemy.defense, balance);
+  const incomingExpectation = interactionType?.targetPlayerHealth && Number.isFinite(enemyActionSeconds)
+    ? expectedCombatDamage(enemy.attack, playerDefense, balance, {
+        armorPenetration: enemy.armorPenetration,
+        torpidity: enemy.torpidity,
+        critChance: enemy.critChance,
+        critMultiplier: enemy.critMultiplier,
+      })
+    : null;
 
   const cases: BalanceCase[] = ['worst', 'average', 'best'];
   const actionsToKill = Object.fromEntries(cases.map((balanceCase) => {
@@ -147,7 +163,11 @@ export const calculateProfileEnemyDiagnostic = (
 
   return {
     actionsToKill,
+    dps: outgoingExpectation.damage / playerActionSeconds,
+    dpsTaken: incomingExpectation ? incomingExpectation.damage / enemyActionSeconds : 0,
     fightsPerDeath,
+    levelPair: `${titleCaseId(sourceStatId)}/${titleCaseId(targetStatId)}: ${formatStatValue(playerAttack)}/${formatStatValue(enemy.defense)} (${formatStatValue(playerAttack - enemy.defense)})`,
+    maxHit: outgoingExpectation.maxDamage,
     profile,
     statSummary: getProfileStatSummary(bundle, profile),
   };

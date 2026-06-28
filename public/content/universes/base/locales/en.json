@@ -87,6 +87,8 @@
   "stat.defense.description": "Protection against incoming attacks.",
   "stat.woodcutting.title": "Woodcutting",
   "stat.woodcutting.description": "Power applied to woodcutting actions.",
+  "stat.action-rate.title": "Action Rate",
+  "stat.action-rate.description": "Player adversarial actions per minute.",
   "stat.regeneration.title": "Regeneration",
   "stat.regeneration.description": "Health recovered per minute.",
   "resource.health.title": "Health",

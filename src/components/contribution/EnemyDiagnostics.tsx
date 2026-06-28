@@ -41,10 +41,14 @@ export const EnemyDiagnostics = ({ bundle, enemy, t }: EnemyDiagnosticsProps) =>
   return (
     <section className="grid min-w-0 gap-3">
       <div className="overflow-x-auto overscroll-x-contain">
-        <table className="w-full min-w-[48rem] text-xs">
+        <table className="w-full min-w-[72rem] text-xs">
           <thead className="text-slate-500">
             <tr>
               <th className="px-2 py-1 text-left">{t('contribution.enemyDiagnostics.profile')}</th>
+              <th className="px-2 py-1 text-left">{t('contribution.enemyDiagnostics.levelPair')}</th>
+              <th className="px-2 py-1 text-right">{t('contribution.enemyDiagnostics.dps')}</th>
+              <th className="px-2 py-1 text-right">{t('contribution.enemyDiagnostics.dpsTaken')}</th>
+              <th className="px-2 py-1 text-right">{t('contribution.enemyDiagnostics.maxHit')}</th>
               <th className="px-2 py-1 text-right">{t('contribution.enemyDiagnostics.actionsWorst')}</th>
               <th className="px-2 py-1 text-right">{t('contribution.enemyDiagnostics.actionsAverage')}</th>
               <th className="px-2 py-1 text-right">{t('contribution.enemyDiagnostics.actionsBest')}</th>
@@ -63,6 +67,10 @@ export const EnemyDiagnostics = ({ bundle, enemy, t }: EnemyDiagnosticsProps) =>
                       {profileTitle(row.profile, t)}
                     </button>
                   </td>
+                  <td className="px-2 py-1 text-left text-slate-300">{row.levelPair}</td>
+                  <td className="px-2 py-1 text-right text-slate-300">{formatValue(row.dps, t)}</td>
+                  <td className="px-2 py-1 text-right text-slate-300">{formatValue(row.dpsTaken, t)}</td>
+                  <td className="px-2 py-1 text-right text-slate-300">{formatValue(row.maxHit, t)}</td>
                   <td className={`px-2 py-1 text-right ${metricClass(row.actionsToKill.worst)}`}>{formatValue(row.actionsToKill.worst, t)}</td>
                   <td className={`px-2 py-1 text-right ${metricClass(row.actionsToKill.average)}`}>{formatValue(row.actionsToKill.average, t)}</td>
                   <td className={`px-2 py-1 text-right ${metricClass(row.actionsToKill.best)}`}>{formatValue(row.actionsToKill.best, t)}</td>

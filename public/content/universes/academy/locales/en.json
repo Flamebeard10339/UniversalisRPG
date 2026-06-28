@@ -43,6 +43,8 @@
   "stat.attack.description": "Power applied to outgoing attacks.",
   "stat.defense.title": "Defense",
   "stat.defense.description": "Protection against incoming attacks.",
+  "stat.action-rate.title": "Action Rate",
+  "stat.action-rate.description": "Player adversarial actions per minute.",
   "stat.regeneration.title": "Regeneration",
   "stat.regeneration.description": "Health recovered per minute.",
   "resource.health.title": "Health",

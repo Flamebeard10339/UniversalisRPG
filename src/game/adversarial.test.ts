@@ -143,11 +143,11 @@ describe('adversarial actions', () => {
       ...started,
       activeAction: started.activeAction ? { ...started.activeAction, targetHealth: 50 } : null,
     };
-    const resolved = resolveIdleTimers(injured, regenContext, {}, startedAt + 5_000);
+    const resolved = resolveIdleTimers(injured, regenContext, {}, startedAt + 2_000);
 
-    expect(resolved.state.activeAction?.targetHealth).toBeCloseTo(55, 5);
+    expect(resolved.state.activeAction?.targetHealth).toBeCloseTo(52, 5);
     const idle = resolveIdleTimers({ ...resolved.state, activeAction: null }, regenContext, {}, startedAt + 10_000);
-    expect(idle.state.actionProgress[action.id]?.targetHealth).not.toBeGreaterThan(55);
+    expect(idle.state.actionProgress[action.id]?.targetHealth).not.toBeGreaterThan(52);
   });
 
   it('stops and resets the action when a lethal entity attack empties health', () => {

@@ -92,11 +92,11 @@ type NumericEditorProps = {
   max?: number;
   min?: number;
   onChange: (value: number) => void;
-  step?: number;
+  step?: number | 'any';
   value: number;
 };
 
-const NumericEditor = ({ max, min = 0, onChange, step = 1, value }: NumericEditorProps) => {
+const NumericEditor = ({ max, min = 0, onChange, step = 'any', value }: NumericEditorProps) => {
   const [draftValue, setDraftValue] = useState(String(value));
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -722,7 +722,7 @@ export const ContentDataEditor = ({ baseBundle, bundle, draft, onPatch, t }: Con
             );
 
             return (
-              <section className="grid gap-y-4 border-y border-slate-700 bg-slate-900 p-3 xl:grid-cols-[minmax(20rem,0.8fr)_minmax(28rem,1.2fr)] xl:gap-x-8">
+              <section className="grid gap-4 border-y border-slate-700 bg-slate-900 p-3">
                 <div className="grid min-w-0 content-start gap-3">
                   <h4 className="font-semibold text-slate-100">{enemy.id}</h4>
                   <label className="grid gap-1 text-xs text-slate-400">

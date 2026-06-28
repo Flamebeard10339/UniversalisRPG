@@ -14,6 +14,8 @@ import { getCharacterStatValue, getSkillTotals } from './characterStats';
 export { getSkillTotals } from './characterStats';
 
 const DEFAULT_RATE = 1;
+const DEFAULT_ACTIONS_PER_MINUTE = 25;
+export const ACTION_RATE_STAT_ID = 'action-rate';
 const EPSILON = 0.000001;
 
 export const expectedDamage = (attackerPower: number, defenderPower: number) =>
@@ -65,6 +67,11 @@ export const getActionDurationMs = (
   action: GameAction,
   context: ActionResolutionContext,
 ) => {
+  if (getEnemy(action, context)) {
+    const actionsPerMinute = getCharacterStatValue(state, context.stats ?? [], ACTION_RATE_STAT_ID) || DEFAULT_ACTIONS_PER_MINUTE;
+    return 60_000 / Math.max(EPSILON, actionsPerMinute);
+  }
+
   const { sourceSkill } = getActionStats(action, context);
   const rate = sourceSkill ? getSkillTotals(state, sourceSkill).rate : DEFAULT_RATE;
 
