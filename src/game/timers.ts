@@ -20,7 +20,7 @@ const MAX_CHAT_MESSAGES = 80;
 const MIN_REPORT_INACTIVE_MS = 1000;
 const HEALTH_RESOURCE_ID = 'health';
 const ENEMY_HEALTH_RESOURCE_ID = 'enemy-health';
-const CONTINUOUS_ACTION_COMPLETES_AT = Number.MAX_SAFE_INTEGER;
+const CONTINUOUS_ACTION_MAX_MS = 4 * 60 * 60 * 1000;
 const EMPTY_CONTEXT: ActionResolutionContext = {
   actions: [],
   skills: [],
@@ -625,8 +625,7 @@ const applyActiveEffects = (
       return nextState;
     }
 
-    const action = context.actions.find((candidate) => candidate.id === nextState.activeAction?.actionId);
-    const effectUntil = action && getEnemy(action, context) ? now : Math.min(now, nextState.activeAction.completesAt);
+    const effectUntil = Math.min(now, nextState.activeAction.completesAt);
     const effectStartedAt = nextState.lastTickAt ?? effectUntil;
     const elapsedMs = Math.max(0, effectUntil - effectStartedAt);
     const elapsedMinutes = elapsedMs / 60_000;
@@ -689,7 +688,7 @@ export const startAction = (
     : savedProgress;
   const remainingMs = Math.max(0, durationMs - progress.elapsedMs);
   const enemy = getEnemy(action, context);
-  const completesAt = enemy ? CONTINUOUS_ACTION_COMPLETES_AT : now + remainingMs;
+  const completesAt = enemy ? now + CONTINUOUS_ACTION_MAX_MS : now + remainingMs;
 
   return appendRunLog({
     ...pausedState,
@@ -719,7 +718,7 @@ const restartAction = (
   targetHealth: number | null,
 ) => {
   const completesAt = getEnemy(action, context)
-    ? CONTINUOUS_ACTION_COMPLETES_AT
+    ? now + CONTINUOUS_ACTION_MAX_MS
     : now + getActionDurationMs(state, action, context);
 
   return {
@@ -1212,6 +1211,23 @@ export const resolveIdleTimers = (
 
     return {
       state: options.debugEnabled && report.kind !== 'none' ? appendIdleDebugMessage(withDebug, report, now) : withDebug,
+      report,
+    };
+  }
+
+  if (getEnemy(action, context) && state.activeAction.completesAt <= now) {
+    const capped = stopRunningAction(state, state.activeAction.completesAt, context);
+    const report: IdleReport = reportEnabled
+      ? {
+          kind: 'actionFailed',
+          inactiveMs,
+          actionId: action.id,
+          completedAt: state.activeAction.completesAt,
+        }
+      : noIdleReport();
+
+    return {
+      state: options.debugEnabled && report.kind !== 'none' ? appendIdleDebugMessage(capped, report, now) : capped,
       report,
     };
   }

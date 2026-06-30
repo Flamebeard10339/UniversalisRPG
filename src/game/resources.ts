@@ -127,8 +127,7 @@ export const projectResourcePool = (
 ): ResourcePool => {
   const pool = basePool(bundle, state, resource);
   if (!state.activeAction) return pool;
-  const action = bundle.actions.find((candidate) => candidate.id === state.activeAction?.actionId);
-  const until = action?.enemyId ? now : Math.min(now, state.activeAction.completesAt);
+  const until = Math.min(now, state.activeAction.completesAt);
   const elapsedMinutes = Math.max(0, until - state.lastTickAt) / 60_000;
   const current = Math.min(pool.max, Math.max(pool.min, pool.current + getActiveResourceRate(bundle, state, resource.id) * elapsedMinutes));
   return { ...pool, current };

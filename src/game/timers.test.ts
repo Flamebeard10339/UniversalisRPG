@@ -169,6 +169,77 @@ describe('resolveIdleTimers', () => {
     expect(resolved.state.playerHealth).toBe(60);
   });
 
+  it('reports continuous action remaining time from a four hour cap', () => {
+    const startedAt = 1_000;
+    const action: GameAction = {
+      id: 'long-fight',
+      locationId: 'arena',
+      durationSeconds: 1,
+      enemyId: 'dummy',
+      rewards: [],
+    };
+    const context: ActionResolutionContext = {
+      actions: [action],
+      skills: [],
+      stats: [
+        { id: 'attack', base: 1 },
+        { id: 'defense', base: 1 },
+        { id: 'health', base: 100 },
+      ],
+      locations: [{ id: 'arena', position: { x: 0, y: 0 }, starting: true }],
+      resourceDefinitions: [],
+      effects: [],
+      interactionTypes: [{ id: 'combat', sourceStatId: 'attack', targetStatId: 'defense', targetPlayerHealth: false }],
+      enemies: [{ id: 'dummy', interactionTypeId: 'combat', stats: { attack: 1, defense: 1, health: 100 }, rewards: [] }],
+    };
+    const state = startAction(createInitialPlayState('test-universe', 'arena'), action, context, startedAt);
+
+    const resolved = resolveIdleTimers(state, context, { showReport: true }, startedAt + 60 * 60 * 1000);
+
+    expect(resolved.report).toMatchObject({
+      kind: 'inProgress',
+      timerKind: 'action',
+      actionId: 'long-fight',
+      remainingMs: 3 * 60 * 60 * 1000,
+    });
+  });
+
+  it('stops continuous actions at the four hour cap without resolving a free completion', () => {
+    const startedAt = 1_000;
+    const action: GameAction = {
+      id: 'capped-fight',
+      locationId: 'arena',
+      durationSeconds: 1,
+      enemyId: 'dummy',
+      rewards: [{ kind: 'resource', resourceId: 'fang', amount: 1 }],
+    };
+    const context: ActionResolutionContext = {
+      actions: [action],
+      skills: [],
+      stats: [
+        { id: 'attack', base: 1 },
+        { id: 'defense', base: 1 },
+        { id: 'health', base: 100 },
+      ],
+      locations: [{ id: 'arena', position: { x: 0, y: 0 }, starting: true }],
+      resourceDefinitions: [],
+      effects: [],
+      interactionTypes: [{ id: 'combat', sourceStatId: 'attack', targetStatId: 'defense', targetPlayerHealth: false }],
+      enemies: [{ id: 'dummy', interactionTypeId: 'combat', stats: { attack: 1, defense: 1, health: 100 }, rewards: [] }],
+    };
+    const state = startAction(createInitialPlayState('test-universe', 'arena'), action, context, startedAt);
+
+    const resolved = resolveIdleTimers(state, context, { showReport: true }, startedAt + 5 * 60 * 60 * 1000);
+
+    expect(resolved.state.activeAction).toBeNull();
+    expect(resolved.state.resources.fang).toBeUndefined();
+    expect(resolved.report).toMatchObject({
+      kind: 'actionFailed',
+      actionId: 'capped-fight',
+      completedAt: startedAt + 4 * 60 * 60 * 1000,
+    });
+  });
+
   it('applies active effects from base player stats when stat definitions only declare ids', () => {
     const startedAt = 1_000;
     const action: GameAction = {
