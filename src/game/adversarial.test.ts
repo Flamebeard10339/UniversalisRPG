@@ -165,6 +165,25 @@ describe('adversarial actions', () => {
     expect(repeated.state.resources).toMatchObject({ fang: 1, trophy: 1 });
   });
 
+  it('starts a looped replacement enemy with fresh enemy-owned resources after a kill', () => {
+    const startedAt = 1_000;
+    const killContext = { ...context, enemies: [enemy({ stats: { health: 2, rate: 60 } })], actions: [action] };
+    const state = {
+      ...startAction(createInitialPlayState('test', 'arena'), action, killContext, startedAt),
+      actionLoopingEnabled: true,
+      skillXp: { attack: 10 },
+      resourcePools: {
+        'enemy-action-rate': { current: 55, min: 0, max: 60 },
+      },
+    };
+    const resolved = resolveIdleTimers(state, killContext, { random: () => 1 }, startedAt + 10_000);
+
+    expect(resolved.state.activeAction?.actionId).toBe(action.id);
+    expect(resolved.state.activeAction?.targetHealth).toBe(2);
+    expect(resolved.state.resourcePools['enemy-action-rate']).toEqual({ current: 0, min: 0, max: 60 });
+    expect(resolved.state.resourcePools['enemy-health']).toEqual({ current: 2, min: 0, max: 2 });
+  });
+
   it('reports player and entity DPS from the same analytical model', () => {
     const state = createInitialPlayState('test', 'arena');
     const hostileContext = { ...context, enemies: [enemy({ stats: { rate: 60 } })] };

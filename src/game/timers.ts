@@ -307,6 +307,32 @@ const ensureWorldState = (
   return ensureResourcePools({ ...state, inventory, flags }, context);
 };
 
+const resetOwnedResourcePools = (
+  state: UniversePlayState,
+  context: ActionResolutionContext,
+  owner: 'player' | 'enemy',
+) => {
+  const resourcePools = { ...state.resourcePools };
+
+  for (const definition of getResourceDefinitions(context)) {
+    if (definition.owner !== owner) {
+      continue;
+    }
+
+    const max = getResourceMaxForContext(context, state, definition);
+    resourcePools[definition.id] = {
+      current: definition.initialValue === 'empty' ? 0 : max,
+      min: 0,
+      max,
+    };
+  }
+
+  return syncLegacyHealth({
+    ...state,
+    resourcePools,
+  });
+};
+
 const setResourceCurrent = (
   state: UniversePlayState,
   context: ActionResolutionContext | null,
@@ -590,18 +616,22 @@ const applyActiveEffects = (
     return state;
   }
 
-  const action = context.actions.find((candidate) => candidate.id === state.activeAction?.actionId);
-  const effectUntil = action && getEnemy(action, context) ? now : Math.min(now, state.activeAction.completesAt);
-  const effectStartedAt = state.lastTickAt ?? effectUntil;
-  const elapsedMs = Math.max(0, effectUntil - effectStartedAt);
-  const elapsedMinutes = elapsedMs / 60_000;
-
-  if (elapsedMinutes <= 0) {
-    return state;
-  }
-
   return (context.effects ?? []).reduce((nextState, effect) => {
+    if (!nextState.activeAction) {
+      return nextState;
+    }
+
     if (!isEffectApplicable(context, nextState, effect)) {
+      return nextState;
+    }
+
+    const action = context.actions.find((candidate) => candidate.id === nextState.activeAction?.actionId);
+    const effectUntil = action && getEnemy(action, context) ? now : Math.min(now, nextState.activeAction.completesAt);
+    const effectStartedAt = nextState.lastTickAt ?? effectUntil;
+    const elapsedMs = Math.max(0, effectUntil - effectStartedAt);
+    const elapsedMinutes = elapsedMs / 60_000;
+
+    if (elapsedMinutes <= 0) {
       return nextState;
     }
 
@@ -913,7 +943,7 @@ const completeActionWithResult = (
     state = applyRewards(applyActionCompletion(damagedState, action, context, now), enemy.rewards, context, now);
   }
 
-  const resolvedState = enemy ? state : applyActionCompletion(state, action, context, now);
+  const resolvedState = enemy ? resetOwnedResourcePools(state, context, 'enemy') : applyActionCompletion(state, action, context, now);
   const completedState = {
     ...resolvedState,
     activeAction: null,
