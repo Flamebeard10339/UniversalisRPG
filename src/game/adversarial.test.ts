@@ -36,9 +36,23 @@ const context: ActionResolutionContext = {
     { id: 'attack', maxLevel: 100 },
     { id: 'defense', maxLevel: 100 },
   ],
-  stats: [{ id: 'attack', base: 6, skillId: 'attack' }, { id: 'defense', base: 6, skillId: 'defense' }, { id: 'health', base: 100 }],
+  stats: [
+    { id: 'attack', base: 6, skillId: 'attack' },
+    { id: 'defense', base: 6, skillId: 'defense' },
+    { id: 'action-rate', base: 6 },
+    { id: 'health', base: 100 },
+  ],
   locations: [{ id: 'arena', position: { x: 0, y: 0 }, starting: true }],
   resourceDefinitions: [{
+    id: 'action-rate',
+    sourceStat: 'action-rate',
+    max: 60,
+    initialValue: 'empty',
+    onFull: [
+      { kind: 'complete-action' },
+      { kind: 'refill', value: 'min' },
+    ],
+  }, {
     id: 'health',
     sourceStat: 'health',
     initialValue: 'full',
@@ -49,7 +63,14 @@ const context: ActionResolutionContext = {
       { kind: 'chat', messageKey: 'resource.health.empty' },
     ],
   }],
-  effects: [],
+  effects: [{
+    id: 'action-rate-regeneration',
+    resourceId: 'action-rate',
+    sourceStat: 'action-rate',
+    rateUnit: 'per-second',
+    activeWhen: { kind: 'state-variable', variable: 'active-interaction', comparison: 'equal', value: true },
+    resetResourceWhenInactive: true,
+  }],
   interactionTypes: [{
     id: 'melee-combat',
     sourceStatId: 'attack',

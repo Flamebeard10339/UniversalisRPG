@@ -105,7 +105,7 @@ const ResourceRow = ({ bundle, floatingTexts, playState, pool, resource, showEff
           ) : (
             effects.map((effect) => {
               const rate = getEffectRatePerMinute(bundle.stats, playState, effect, bundle.manifest.basePlayer);
-              const active = Boolean(playState.activeAction) && isEffectApplicable(playState, effect);
+              const active = Boolean(playState.activeAction) && isEffectApplicable(bundle, playState, effect);
 
               return (
                 <div className="flex flex-wrap items-center justify-between gap-2 text-slate-300" key={effect.id}>
@@ -130,7 +130,7 @@ const messageSignature = (id: number, index: number, count: number, createdAt: n
   `${id}:${index}:${count}:${createdAt}`;
 
 export const ResourceStatus = ({ bundle, playState, showEffects = false, t }: ResourceStatusProps) => {
-  const resources = bundle.resourceDefinitions ?? [];
+  const resources = (bundle.resourceDefinitions ?? []).filter((resource) => !resource.hidden);
   const [floatingTexts, setFloatingTexts] = useState<ResourceFloatingText[]>([]);
   const now = useNow(Boolean(playState.activeAction) || floatingTexts.length > 0, 100);
   const seenMessageIds = useRef<Set<string> | null>(null);

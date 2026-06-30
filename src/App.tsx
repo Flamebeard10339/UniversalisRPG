@@ -203,7 +203,7 @@ export default function App() {
   const nextTimerAt = bundle && playState
     ? [
         playState.activeTravel?.completesAt,
-        playState.activeAction?.completesAt,
+        activeAction && !isContinuousAction(activeAction, actionContext) ? playState.activeAction?.completesAt : undefined,
         playState.activeAction?.enemyAttackCompletesAt,
         getNextResourceBoundaryAt(bundle, playState),
       ]

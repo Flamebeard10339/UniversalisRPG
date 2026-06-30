@@ -142,6 +142,9 @@ export type ResourceBoundaryBehavior =
       kind: 'stop-action';
     }
   | {
+      kind: 'complete-action';
+    }
+  | {
       kind: 'refill';
       value: 'min' | 'max' | number;
     }
@@ -170,7 +173,9 @@ export type ResourceBoundaryBehavior =
 export type ResourceDefinition = {
   id: string;
   sourceStat: string;
+  max?: number;
   initialValue?: 'empty' | 'full';
+  hidden?: boolean;
   onEmpty?: ResourceBoundaryBehavior[];
   onFull?: ResourceBoundaryBehavior[];
 };
@@ -180,6 +185,9 @@ export type EffectDefinition = {
   resourceId: string;
   sourceStat: string;
   locationId?: string;
+  rateUnit?: 'per-minute' | 'per-second';
+  activeWhen?: Condition;
+  resetResourceWhenInactive?: boolean;
 };
 
 export type EnemyDefinition = {

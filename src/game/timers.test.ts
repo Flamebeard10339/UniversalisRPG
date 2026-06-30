@@ -215,6 +215,74 @@ describe('resolveIdleTimers', () => {
     expect(resolved.state.playerHealth).toBe(60);
   });
 
+  it('carries overflow through repeated reset-on-full resource loops', () => {
+    const startedAt = 1_000;
+    const action: GameAction = {
+      id: 'charge-action',
+      locationId: 'test-location',
+      durationSeconds: 120,
+      rewards: [],
+    };
+    const context: ActionResolutionContext = {
+      actions: [action],
+      skills: [],
+      stats: [{ id: 'charge-capacity', base: 100 }, { id: 'charge-rate', base: 1000 }],
+      resourceDefinitions: [{
+        id: 'charge',
+        sourceStat: 'charge-capacity',
+        initialValue: 'empty',
+        onFull: [
+          { kind: 'refill', value: 'min' },
+          { kind: 'chat', messageKey: 'resource.charge.full' },
+        ],
+      }],
+      effects: [{ id: 'charge-rate', resourceId: 'charge', sourceStat: 'charge-rate' }],
+      interactionTypes: [],
+      enemies: [],
+    };
+    const state = startAction(createInitialPlayState('test-universe', 'test-location'), action, context, startedAt);
+
+    const resolved = resolveIdleTimers(state, context, {}, startedAt + 60_000);
+
+    expect(resolved.state.resourcePools.charge.current).toBe(0);
+    expect(resolved.state.chatMessages.find((message) => message.key === 'resource.charge.full')?.count).toBe(10);
+  });
+
+  it('resets resources for inactive reset effects after stopping an interaction', () => {
+    const context: ActionResolutionContext = {
+      actions: [{
+        id: 'spar',
+        locationId: 'arena',
+        durationSeconds: 60,
+        interactionTypeId: 'melee-combat',
+        rewards: [],
+      }],
+      skills: [],
+      stats: [{ id: 'action-rate', base: 25 }],
+      resourceDefinitions: [{ id: 'action-rate', sourceStat: 'action-rate', max: 60, initialValue: 'empty' }],
+      effects: [{
+        id: 'action-rate-regeneration',
+        resourceId: 'action-rate',
+        sourceStat: 'action-rate',
+        rateUnit: 'per-second',
+        activeWhen: { kind: 'state-variable', variable: 'active-interaction', comparison: 'equal', value: true },
+        resetResourceWhenInactive: true,
+      }],
+      interactionTypes: [{ id: 'melee-combat', sourceStatId: 'action-rate', targetStatId: 'action-rate', targetPlayerHealth: false }],
+      enemies: [],
+    };
+    const state = {
+      ...createInitialPlayState('test-universe', 'arena'),
+      resourcePools: {
+        'action-rate': { current: 25, min: 0, max: 60 },
+      },
+    };
+
+    const resolved = resolveIdleTimers(state, context, {}, 2_000);
+
+    expect(resolved.state.resourcePools['action-rate'].current).toBe(0);
+  });
+
   it('recovers stale zero-capacity health pools from base player stats', () => {
     const context: ActionResolutionContext = {
       manifest: {

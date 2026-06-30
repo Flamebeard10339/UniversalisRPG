@@ -91,6 +91,8 @@
   "stat.action-rate.description": "Player adversarial actions per minute.",
   "stat.regeneration.title": "Regeneration",
   "stat.regeneration.description": "Health recovered per minute.",
+  "resource.action-rate.title": "Action Rate",
+  "effect.action-rate-regeneration.title": "Action rate buildup",
   "resource.health.title": "Health",
   "effect.health-regeneration.title": "Health regeneration",
   "resource.health.empty": "You died.",

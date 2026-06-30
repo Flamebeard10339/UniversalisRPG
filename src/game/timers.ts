@@ -1,7 +1,7 @@
 import type { ActionResolutionContext, ActionResult, ChatMessage, GameAction, IdleReport, IdleResolution, ResourceBoundaryBehavior, Reward, RunLogEntry, TravelEdgeDefinition, UniversePlayState } from './types';
 import { getActionDurationMs, getEnemy, getEnemyAttackDurationMs, getInteractionType, sampleAdversarialDamage, sampleEnemyAttackDamage } from './adversarial';
 import { getEnemyStat } from './enemies';
-import { getEffectRatePerMinute, getResourceMax as resolveResourceMax, isEffectApplicable } from './resources';
+import { getEffectDeltaPerMinute, getEffectRatePerMinute, getResourceMax as resolveResourceMax, isEffectApplicable } from './resources';
 import {
   actionFailureKey,
   actionKillKey,
@@ -19,6 +19,7 @@ import { areActionRequirementsMet, canStartAction, isActionExhausted, isActionVi
 const MAX_CHAT_MESSAGES = 80;
 const MIN_REPORT_INACTIVE_MS = 1000;
 const HEALTH_RESOURCE_ID = 'health';
+const CONTINUOUS_ACTION_COMPLETES_AT = Number.MAX_SAFE_INTEGER;
 const EMPTY_CONTEXT: ActionResolutionContext = {
   actions: [],
   skills: [],
@@ -163,13 +164,13 @@ export const normalizePlayState = (
   };
 };
 
-const pauseRunningAction = (state: UniversePlayState, now: number) => {
+const pauseRunningAction = (state: UniversePlayState, now: number, context?: ActionResolutionContext) => {
   if (!state.activeAction) {
     return state;
   }
 
   const progress = state.actionProgress[state.activeAction.actionId] ?? { elapsedMs: 0, runningSince: state.activeAction.startedAt };
-  return {
+  const paused = {
     ...state,
     activeAction: null,
     actionProgress: {
@@ -184,14 +185,16 @@ const pauseRunningAction = (state: UniversePlayState, now: number) => {
     },
     lastTickAt: now,
   };
+
+  return context ? resetInactiveEffectResources(paused, context, now) : paused;
 };
 
-const stopRunningAction = (state: UniversePlayState, now: number) => {
+const stopRunningAction = (state: UniversePlayState, now: number, context?: ActionResolutionContext) => {
   if (!state.activeAction) {
     return state;
   }
 
-  return {
+  const stopped = {
     ...state,
     activeAction: null,
     actionProgress: {
@@ -206,6 +209,8 @@ const stopRunningAction = (state: UniversePlayState, now: number) => {
     },
     lastTickAt: now,
   };
+
+  return context ? resetInactiveEffectResources(stopped, context, now) : stopped;
 };
 
 const getResourceDefinitions = (context: ActionResolutionContext) => context.resourceDefinitions ?? [];
@@ -313,6 +318,33 @@ const setResourceCurrent = (
   });
 };
 
+export const resetInactiveEffectResources = (
+  state: UniversePlayState,
+  context: ActionResolutionContext,
+  now = Date.now(),
+) => {
+  let nextState = state;
+
+  for (const effect of context.effects ?? []) {
+    if (!effect.resetResourceWhenInactive || isEffectApplicable(context, nextState, effect)) {
+      continue;
+    }
+
+    const resource = nextState.resourcePools[effect.resourceId];
+    if (resource && resource.current !== resource.min) {
+      nextState = setResourceCurrent(nextState, effect.resourceId, resource.min);
+      nextState = appendRunLog(nextState, 'engine', 'resource.reset-inactive', {
+        resourceId: effect.resourceId,
+        effectId: effect.id,
+        previous: resource.current,
+        current: resource.min,
+      }, now);
+    }
+  }
+
+  return nextState;
+};
+
 const resolveLocationId = (
   state: UniversePlayState,
   context: ActionResolutionContext,
@@ -383,12 +415,17 @@ const applyResourceBehaviors = (
   resourceId: string,
   behaviors: ResourceBoundaryBehavior[],
   now: number,
+  options: { random?: () => number } = {},
 ) => {
   let nextState = state;
 
   for (const behavior of behaviors) {
     if (behavior.kind === 'stop-action') {
-      nextState = stopRunningAction(nextState, now);
+      nextState = stopRunningAction(nextState, now, context);
+    }
+
+    if (behavior.kind === 'complete-action') {
+      nextState = completeActiveActionWithMessage(nextState, context, options, now);
     }
 
     if (behavior.kind === 'refill') {
@@ -438,6 +475,7 @@ const applyResourceDelta = (
   resourceId: string,
   delta: number,
   now: number,
+  options: { random?: () => number } = {},
 ) => {
   const definition = getResourceDefinition(context, resourceId);
   const resource = state.resourcePools[resourceId];
@@ -446,20 +484,57 @@ const applyResourceDelta = (
     return state;
   }
 
-  const previous = resource.current;
-  const nextValue = Math.min(resource.max, Math.max(resource.min, previous + delta));
-  let nextState = setResourceCurrent(state, resourceId, nextValue);
-  nextState = appendRunLog(nextState, 'engine', 'resource.change', {
-    resourceId,
-    requestedDelta: delta,
-    previous,
-    current: nextValue,
-  }, now);
+  let nextState = state;
+  let remaining = delta;
+  const direction = delta > 0 ? 'full' : 'empty';
+  let processedBoundaries = 0;
 
-  if (previous > resource.min && nextValue <= resource.min) {
-    nextState = applyResourceBehaviors(nextState, context, resourceId, definition.onEmpty ?? [], now);
-  } else if (previous < resource.max && nextValue >= resource.max) {
-    nextState = applyResourceBehaviors(nextState, context, resourceId, definition.onFull ?? [], now);
+  while (Math.abs(remaining) > 0.000001 && processedBoundaries < 1000) {
+    const currentResource = nextState.resourcePools[resourceId];
+    if (!currentResource) return nextState;
+
+    const previous = currentResource.current;
+    const boundary = remaining > 0 ? currentResource.max : currentResource.min;
+    const distance = boundary - previous;
+    const reachesBoundary = remaining > 0
+      ? previous < currentResource.max && remaining >= distance
+      : previous > currentResource.min && remaining <= distance;
+    const applied = reachesBoundary ? distance : remaining;
+    const nextValue = Math.min(currentResource.max, Math.max(currentResource.min, previous + applied));
+
+    nextState = setResourceCurrent(nextState, resourceId, nextValue);
+    nextState = appendRunLog(nextState, 'engine', 'resource.change', {
+      resourceId,
+      requestedDelta: delta,
+      appliedDelta: applied,
+      previous,
+      current: nextValue,
+    }, now);
+
+    if (!reachesBoundary) {
+      return nextState;
+    }
+
+    remaining -= applied;
+    const beforeBehaviors = nextState.resourcePools[resourceId]?.current;
+    nextState = applyResourceBehaviors(
+      nextState,
+      context,
+      resourceId,
+      direction === 'full' ? definition.onFull ?? [] : definition.onEmpty ?? [],
+      now,
+      options,
+    );
+    processedBoundaries += 1;
+
+    if (!nextState.activeAction) {
+      return nextState;
+    }
+
+    const afterBehaviors = nextState.resourcePools[resourceId]?.current;
+    if (beforeBehaviors === afterBehaviors) {
+      return nextState;
+    }
   }
 
   return nextState;
@@ -469,12 +544,14 @@ const applyActiveEffects = (
   state: UniversePlayState,
   context: ActionResolutionContext,
   now: number,
+  options: { random?: () => number } = {},
 ) => {
   if (!state.activeAction) {
     return state;
   }
 
-  const effectUntil = Math.min(now, state.activeAction.completesAt);
+  const action = context.actions.find((candidate) => candidate.id === state.activeAction?.actionId);
+  const effectUntil = action && getEnemy(action, context) ? now : Math.min(now, state.activeAction.completesAt);
   const effectStartedAt = state.lastTickAt ?? effectUntil;
   const elapsedMs = Math.max(0, effectUntil - effectStartedAt);
   const elapsedMinutes = elapsedMs / 60_000;
@@ -484,12 +561,12 @@ const applyActiveEffects = (
   }
 
   return (context.effects ?? []).reduce((nextState, effect) => {
-    if (!isEffectApplicable(nextState, effect)) {
+    if (!isEffectApplicable(context, nextState, effect)) {
       return nextState;
     }
 
+    const delta = getEffectDeltaPerMinute(context.stats ?? [], nextState, effect, context.manifest?.basePlayer) * elapsedMinutes;
     const resource = nextState.resourcePools[effect.resourceId];
-    const delta = getEffectRatePerMinute(context.stats ?? [], nextState, effect, context.manifest?.basePlayer) * elapsedMinutes;
     const crossedMin = resource && delta < 0 && resource.current > resource.min && resource.current + delta <= resource.min;
     const crossedMax = resource && delta > 0 && resource.current < resource.max && resource.current + delta >= resource.max;
     const boundaryAt = crossedMin
@@ -504,6 +581,7 @@ const applyActiveEffects = (
       effect.resourceId,
       delta,
       boundaryAt,
+      options,
     );
   }, state);
 };
@@ -524,7 +602,7 @@ const applyEnemyRegeneration = (
     return state;
   }
 
-  const effectUntil = Math.min(now, state.activeAction.completesAt);
+  const effectUntil = now;
   const elapsedMinutes = Math.max(0, effectUntil - (state.lastTickAt ?? effectUntil)) / 60_000;
   const targetHealth = Math.min(getEnemyStat(enemy, 'health'), state.activeAction.targetHealth + getEnemyStat(enemy, 'regeneration') * elapsedMinutes);
 
@@ -558,7 +636,7 @@ export const startAction = (
   state = ensureWorldState(state, context);
 
   if (state.activeAction?.actionId === action.id) {
-    return appendRunLog(pauseRunningAction(state, now), 'player', 'action.pause', { actionId: action.id }, now);
+    return appendRunLog(pauseRunningAction(state, now, context), 'player', 'action.pause', { actionId: action.id }, now);
   }
 
   if (!canStartAction(state, action, context)) {
@@ -568,7 +646,7 @@ export const startAction = (
     }, now);
   }
 
-  const pausedState = pauseRunningAction(state, now);
+  const pausedState = pauseRunningAction(state, now, context);
   const durationMs = getActionDurationMs(pausedState, action, context);
   const savedProgress = pausedState.actionProgress[action.id] ?? { elapsedMs: 0, runningSince: null };
   const progress = savedProgress.elapsedMs >= durationMs
@@ -585,13 +663,14 @@ export const startAction = (
   const enemyAttackDurationMs = getEnemyAttackDurationMs(enemy);
   const enemyAttackStartedAt = progress.enemyAttackStartedAt ?? (enemyAttackDurationMs ? now : null);
   const enemyAttackCompletesAt = progress.enemyAttackCompletesAt ?? (enemyAttackDurationMs ? now + enemyAttackDurationMs : null);
+  const completesAt = enemy ? CONTINUOUS_ACTION_COMPLETES_AT : now + remainingMs;
 
   return appendRunLog({
     ...pausedState,
     activeAction: {
       actionId: action.id,
       startedAt: now,
-      completesAt: now + remainingMs,
+      completesAt,
       targetHealth: progress.targetHealth ?? (enemy ? getEnemyStat(enemy, 'health') : null),
       enemyAttackStartedAt,
       enemyAttackCompletesAt,
@@ -620,13 +699,16 @@ const restartAction = (
   const enemyAttackDurationMs = getEnemyAttackDurationMs(getEnemy(action, context));
   const enemyAttackStartedAt = state.activeAction?.enemyAttackStartedAt ?? (enemyAttackDurationMs ? now : null);
   const enemyAttackCompletesAt = state.activeAction?.enemyAttackCompletesAt ?? (enemyAttackDurationMs ? now + enemyAttackDurationMs : null);
+  const completesAt = getEnemy(action, context)
+    ? CONTINUOUS_ACTION_COMPLETES_AT
+    : now + getActionDurationMs(state, action, context);
 
   return {
     ...state,
     activeAction: {
       actionId: action.id,
       startedAt: now,
-      completesAt: now + getActionDurationMs(state, action, context),
+      completesAt,
       targetHealth,
       enemyAttackStartedAt,
       enemyAttackCompletesAt,
@@ -992,6 +1074,40 @@ const getActionMessage = (
     : actionFailureKey(action.id);
 };
 
+function completeActiveActionWithMessage(
+  state: UniversePlayState,
+  context: ActionResolutionContext = EMPTY_CONTEXT,
+  options: { random?: () => number } = {},
+  now = Date.now(),
+): UniversePlayState {
+  const action = context.actions.find((candidate) => candidate.id === state.activeAction?.actionId);
+
+  if (!state.activeAction || !action || !areActionRequirementsMet(state, action, context)) {
+    return state.activeAction && action
+      ? appendRunLog(stopRunningAction(state, now, context), 'engine', 'action.requirements-failed', { actionId: action.id }, now)
+      : state;
+  }
+
+  const completion = completeActionWithResult(state, action, context, options, now);
+  const enemy = getEnemy(action, context);
+  const messageKey = getActionMessage(action, context, completion.outcome);
+  const completed = messageKey
+    ? appendChatMessage(completion.state, {
+        author: 'system',
+        key: messageKey,
+        params: {
+          actionId: action.id,
+          target: enemy?.id ?? action.id,
+          damage: roundCombatNumber(completion.damage),
+        },
+      }, now)
+    : completion.state;
+
+  return completion.finished
+    ? appendExhaustedLocationMessage(completed, action, context, now)
+    : completed;
+}
+
 const noIdleReport = (): IdleReport => ({ kind: 'none' });
 
 const shouldReportIdle = (inactiveMs: number, showReport?: boolean) =>
@@ -1026,7 +1142,10 @@ export const resolveIdleTimers = (
   const reportEnabled = shouldReportIdle(inactiveMs, options.showReport);
 
   state = ensureWorldState(state, context);
-  state = applyActiveEffects(state, context, now);
+  if (!state.activeAction) {
+    state = resetInactiveEffectResources(state, context, now);
+  }
+  state = applyActiveEffects(state, context, now, { random: options.random });
   state = applyEnemyRegeneration(state, context, now);
 
   if (state.activeTravel && state.activeTravel.completesAt <= now) {

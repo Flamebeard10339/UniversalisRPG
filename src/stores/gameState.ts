@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import type { ActionResolutionContext, GameAction, IdleReport, RunLogEntry, TravelEdgeDefinition, UniversePlayState } from '../game/types';
-import { appendChatMessage, appendRunLog, createInitialPlayState, normalizePlayState, resolveIdleTimers, startAction, startTravel } from '../game/timers';
+import { appendChatMessage, appendRunLog, createInitialPlayState, normalizePlayState, resetInactiveEffectResources, resolveIdleTimers, startAction, startTravel } from '../game/timers';
 import { load, remove, save } from '../lib/storage';
 import { recordAgentSessionMessage, type AgentSessionMessage } from '../game/agentSession';
 
@@ -158,7 +158,7 @@ export const useGameState = create<GameStateStore>((set, get) => ({
       }
       const actionId = resolved.activeAction.actionId;
       const progress = resolved.actionProgress[actionId] ?? { elapsedMs: 0, runningSince: resolved.activeAction.startedAt };
-      const next = {
+      const next = resetInactiveEffectResources({
         ...resolved,
         activeAction: null,
         actionProgress: {
@@ -173,7 +173,7 @@ export const useGameState = create<GameStateStore>((set, get) => ({
           },
         },
         lastTickAt: now,
-      };
+      }, context, now);
       void save(storageKey(universeId), next);
 
       return {

@@ -1,5 +1,6 @@
 import { skillLevelFromXp } from './skills';
 import { getCharacterStatValue } from './characterStats';
+import { getEnemy } from './adversarial';
 import type { ActionResolutionContext, ContentBundle, UniversePlayState } from './types';
 
 export type StateVariableValue = boolean | number;
@@ -11,16 +12,30 @@ export const stateVariableKeys = (bundle: Pick<ContentBundle, 'flags' | 'items' 
   ...bundle.skills.map((item) => `skill-level:${item.id}`),
   ...bundle.stats.map((item) => `stat:${item.id}`),
   ...bundle.actions.map((item) => `action-completions:${item.id}`),
+  'active-action',
+  'active-interaction',
 ];
 
 export const readStateVariable = (
   state: UniversePlayState,
   variable: string,
-  context?: Pick<ActionResolutionContext, 'manifest' | 'skills' | 'stats'>,
+  context?: Pick<ActionResolutionContext, 'actions' | 'enemies' | 'interactionTypes' | 'manifest' | 'skills' | 'stats'>,
 ): StateVariableValue => {
   const separator = variable.indexOf(':');
   const category = separator >= 0 ? variable.slice(0, separator) : 'flag';
   const id = separator >= 0 ? variable.slice(separator + 1) : variable;
+  if (variable === 'active-action') return Boolean(state.activeAction);
+  if (variable === 'active-interaction') {
+    const action = context?.actions.find((candidate) => candidate.id === state.activeAction?.actionId);
+    return Boolean(action && (action.interactionTypeId || getEnemy(action, {
+      actions: context?.actions ?? [],
+      skills: context?.skills ?? [],
+      stats: context?.stats,
+      manifest: context?.manifest,
+      interactionTypes: context?.interactionTypes ?? [],
+      enemies: context?.enemies ?? [],
+    })));
+  }
   if (category === 'flag') return state.flags[id] ?? false;
   if (category === 'item') return state.inventory[id] ?? 0;
   if (category === 'resource') return state.resourcePools[id]?.current ?? 0;

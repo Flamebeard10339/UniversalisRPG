@@ -55,4 +55,40 @@ describe('universe manifest validation', () => {
 
     expect(issues.map((issue) => issue.message)).toContain('validation.inventoryAmountNonNegative');
   });
+
+  it('accepts action-rate resource and conditional per-second effects', () => {
+    const issues = validateContentBundle({
+      ...bundle(),
+      actions: [{
+        id: 'spar',
+        locationId: 'start',
+        durationSeconds: 1,
+        interactionTypeId: 'practice',
+        rewards: [],
+      }],
+      stats: [{ id: 'action-rate' }],
+      resourceDefinitions: [{
+        id: 'action-rate',
+        sourceStat: 'action-rate',
+        max: 60,
+        initialValue: 'empty',
+        hidden: false,
+        onFull: [
+          { kind: 'complete-action' },
+          { kind: 'refill', value: 'min' },
+        ],
+      }],
+      effects: [{
+        id: 'action-rate-regeneration',
+        resourceId: 'action-rate',
+        sourceStat: 'action-rate',
+        rateUnit: 'per-second',
+        activeWhen: { kind: 'state-variable', variable: 'active-interaction', comparison: 'equal', value: true },
+        resetResourceWhenInactive: true,
+      }],
+      interactionTypes: [{ id: 'practice', sourceStatId: 'action-rate', targetStatId: 'action-rate', targetPlayerHealth: false }],
+    }).filter((issue) => issue.severity === 'error');
+
+    expect(issues).toEqual([]);
+  });
 });

@@ -10,7 +10,48 @@
       "id": { "type": "string", "minLength": 1 },
       "resourceId": { "type": "string", "minLength": 1 },
       "sourceStat": { "type": "string", "minLength": 1 },
-      "locationId": { "type": "string", "minLength": 1 }
+      "locationId": { "type": "string", "minLength": 1 },
+      "rateUnit": { "enum": ["per-minute", "per-second"] },
+      "activeWhen": { "$ref": "#/$defs/condition" },
+      "resetResourceWhenInactive": { "type": "boolean" }
+    }
+  },
+  "$defs": {
+    "comparison": {
+      "enum": ["equal", "greater-than", "less-than"]
+    },
+    "condition": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["kind", "variable", "comparison", "value"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "const": "state-variable" },
+            "variable": { "type": "string", "minLength": 1 },
+            "comparison": { "$ref": "#/$defs/comparison" },
+            "value": { "type": ["number", "boolean"] }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["kind", "conditions"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "enum": ["all", "any"] },
+            "conditions": { "type": "array", "items": { "$ref": "#/$defs/condition" } }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["kind", "condition"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "const": "not" },
+            "condition": { "$ref": "#/$defs/condition" }
+          }
+        }
+      ]
     }
   }
 }

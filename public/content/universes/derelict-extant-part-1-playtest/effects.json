@@ -1,5 +1,13 @@
 [
   {
+    "id": "action-rate-regeneration",
+    "resourceId": "action-rate",
+    "sourceStat": "action-rate",
+    "rateUnit": "per-second",
+    "activeWhen": { "kind": "state-variable", "variable": "active-interaction", "comparison": "equal", "value": true },
+    "resetResourceWhenInactive": true
+  },
+  {
     "id": "suit-air-loss",
     "resourceId": "air-capacity",
     "sourceStat": "air-leak"

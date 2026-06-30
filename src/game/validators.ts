@@ -214,6 +214,7 @@ const validateFlagsShape = (flags: unknown): flags is StateFlagDefinition[] =>
 
 const validateResourceBehaviorShape = (value: unknown) => isRecord(value) && (
   value.kind === 'stop-action'
+  || value.kind === 'complete-action'
   || (value.kind === 'reset-state' && validateResetStateShape(value))
   || (value.kind === 'refill' && (value.value === 'min' || value.value === 'max' || typeof value.value === 'number'))
   || (value.kind === 'relocate' && hasString(value, 'locationId'))
@@ -228,6 +229,8 @@ const validateResourceDefinitionsShape = (resources: unknown): resources is Reso
         isRecord(resource) &&
         hasString(resource, 'id') &&
         hasString(resource, 'sourceStat') &&
+        (resource.max === undefined || (typeof resource.max === 'number' && Number.isFinite(resource.max) && resource.max >= 0)) &&
+        (resource.hidden === undefined || typeof resource.hidden === 'boolean') &&
         (resource.initialValue === undefined || resource.initialValue === 'empty' || resource.initialValue === 'full') &&
         (resource.onEmpty === undefined || (Array.isArray(resource.onEmpty) && resource.onEmpty.every(validateResourceBehaviorShape))) &&
         (resource.onFull === undefined || (Array.isArray(resource.onFull) && resource.onFull.every(validateResourceBehaviorShape))),
@@ -242,7 +245,10 @@ const validateEffectsShape = (effects: unknown): effects is EffectDefinition[] =
         hasString(effect, 'id') &&
         hasString(effect, 'resourceId') &&
         hasString(effect, 'sourceStat') &&
-        (effect.locationId === undefined || typeof effect.locationId === 'string'),
+        (effect.locationId === undefined || typeof effect.locationId === 'string') &&
+        (effect.rateUnit === undefined || effect.rateUnit === 'per-minute' || effect.rateUnit === 'per-second') &&
+        (effect.activeWhen === undefined || validateConditionShape(effect.activeWhen)) &&
+        (effect.resetResourceWhenInactive === undefined || typeof effect.resetResourceWhenInactive === 'boolean'),
     ));
 
 const validateInteractionTypesShape = (interactionTypes: unknown): interactionTypes is InteractionTypeDefinition[] =>
@@ -390,6 +396,8 @@ export const validateContentReferences = (bundle: ContentBundle) => {
         ...Array.from(skillIds, (id) => `skill-level:${id}`),
         ...Array.from(statIds, (id) => `stat:${id}`),
         ...bundle.actions.map((action) => `action-completions:${action.id}`),
+        'active-action',
+        'active-interaction',
       ]);
       if (!knownVariables.has(condition.variable)) issues.push(error(path, 'validation.unknownStateVariable', { id: condition.variable }));
     }
@@ -525,6 +533,9 @@ export const validateContentReferences = (bundle: ContentBundle) => {
     }
     if (effect.locationId && !locationIds.has(effect.locationId)) {
       issues.push(error(`effects.${effect.id}.locationId`, 'validation.unknownLocation', { id: effect.locationId }));
+    }
+    if (effect.activeWhen) {
+      validateConditionReferences(effect.activeWhen, `effects.${effect.id}.activeWhen`);
     }
   }
 

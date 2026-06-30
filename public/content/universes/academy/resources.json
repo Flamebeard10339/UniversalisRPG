@@ -1,5 +1,16 @@
 [
   {
+    "id": "action-rate",
+    "sourceStat": "action-rate",
+    "max": 60,
+    "initialValue": "empty",
+    "hidden": false,
+    "onFull": [
+      { "kind": "complete-action" },
+      { "kind": "refill", "value": "min" }
+    ]
+  },
+  {
     "id": "health",
     "sourceStat": "health",
     "initialValue": "full",

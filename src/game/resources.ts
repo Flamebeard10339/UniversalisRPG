@@ -1,8 +1,26 @@
 import { getCharacterStatValue } from './characterStats';
-import type { BasePlayerDefinition, ContentBundle, EffectDefinition, ResourceDefinition, ResourcePool, UniversePlayState } from './types';
+import { evaluateCondition } from './conditions';
+import type { ActionResolutionContext, BasePlayerDefinition, ContentBundle, EffectDefinition, ResourceDefinition, ResourcePool, UniversePlayState } from './types';
 
-export const isEffectApplicable = (state: UniversePlayState, effect: EffectDefinition) =>
-  !effect.locationId || effect.locationId === state.currentLocationId;
+export const isEffectApplicable = (
+  context: Pick<ActionResolutionContext, 'actions' | 'effects' | 'enemies' | 'flags' | 'interactionTypes' | 'items' | 'locations' | 'manifest' | 'resourceDefinitions' | 'skills' | 'stats'>,
+  state: UniversePlayState,
+  effect: EffectDefinition,
+) =>
+  (!effect.locationId || effect.locationId === state.currentLocationId)
+  && (!effect.activeWhen || evaluateCondition(effect.activeWhen, state, {
+    manifest: context.manifest,
+    actions: context.actions,
+    skills: context.skills,
+    stats: context.stats,
+    locations: context.locations,
+    items: context.items,
+    flags: context.flags,
+    resourceDefinitions: context.resourceDefinitions,
+    effects: context.effects,
+    interactionTypes: context.interactionTypes,
+    enemies: context.enemies,
+  }));
 
 export const getEffectRatePerMinute = (
   stats: ContentBundle['stats'],
@@ -13,12 +31,22 @@ export const getEffectRatePerMinute = (
   return getCharacterStatValue(state, stats, effect.sourceStat, basePlayer);
 };
 
+export const getEffectDeltaPerMinute = (
+  stats: ContentBundle['stats'],
+  state: UniversePlayState,
+  effect: EffectDefinition,
+  basePlayer?: BasePlayerDefinition,
+) => {
+  const rate = getEffectRatePerMinute(stats, state, effect, basePlayer);
+  return effect.rateUnit === 'per-second' ? rate * 60 : rate;
+};
+
 export const getResourceMax = (
   state: UniversePlayState,
   stats: ContentBundle['stats'],
   resource: ResourceDefinition,
   basePlayer?: BasePlayerDefinition,
-) => Math.max(0, getCharacterStatValue(state, stats, resource.sourceStat, basePlayer));
+) => Math.max(0, resource.max ?? getCharacterStatValue(state, stats, resource.sourceStat, basePlayer));
 
 const basePool = (bundle: ContentBundle, state: UniversePlayState, resource: ResourceDefinition): ResourcePool => {
   const existing = state.resourcePools[resource.id];
@@ -44,8 +72,8 @@ export const getActiveResourceRate = (
 ) => {
   if (!state.activeAction) return 0;
   return bundle.effects
-    .filter((effect) => effect.resourceId === resourceId && isEffectApplicable(state, effect))
-    .reduce((total, effect) => total + getEffectRatePerMinute(bundle.stats, state, effect, bundle.manifest.basePlayer), 0);
+    .filter((effect) => effect.resourceId === resourceId && isEffectApplicable(bundle, state, effect))
+    .reduce((total, effect) => total + getEffectDeltaPerMinute(bundle.stats, state, effect, bundle.manifest.basePlayer), 0);
 };
 
 export const projectResourcePool = (
@@ -56,7 +84,8 @@ export const projectResourcePool = (
 ): ResourcePool => {
   const pool = basePool(bundle, state, resource);
   if (!state.activeAction) return pool;
-  const until = Math.min(now, state.activeAction.completesAt);
+  const action = bundle.actions.find((candidate) => candidate.id === state.activeAction?.actionId);
+  const until = action?.enemyId ? now : Math.min(now, state.activeAction.completesAt);
   const elapsedMinutes = Math.max(0, until - state.lastTickAt) / 60_000;
   const current = Math.min(pool.max, Math.max(pool.min, pool.current + getActiveResourceRate(bundle, state, resource.id) * elapsedMinutes));
   return { ...pool, current };
@@ -77,6 +106,6 @@ export const getNextResourceBoundaryAt = (
       return [state.lastTickAt + ((pool.max - pool.current) / rate) * 60_000];
     }
     return [];
-  }).filter((boundary) => boundary <= state.activeAction!.completesAt);
+  });
   return boundaries.length > 0 ? Math.min(...boundaries) : null;
 };
