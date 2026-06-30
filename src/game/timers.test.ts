@@ -88,6 +88,42 @@ describe('resolveIdleTimers', () => {
     });
   });
 
+  it('applies state-variable completion results', () => {
+    const startedAt = 1_000;
+    const action: GameAction = {
+      id: 'move-and-mark',
+      locationId: 'test-location',
+      durationSeconds: 1,
+      rewards: [],
+      results: [
+        { kind: 'state-variable', variable: 'location', value: 'next-location' },
+        { kind: 'state-variable', variable: 'flag:death-count', value: 2 },
+      ],
+    };
+    const context: ActionResolutionContext = {
+      actions: [action],
+      skills: [],
+      stats: [],
+      locations: [
+        { id: 'test-location', position: { x: 0, y: 0 }, starting: true },
+        { id: 'next-location', position: { x: 1, y: 0 } },
+      ],
+      flags: [{ id: 'death-count', initialValue: 0 }],
+      interactionTypes: [],
+      enemies: [],
+    };
+    const state = {
+      ...startAction(createInitialPlayState('test-universe', 'test-location'), action, context, startedAt),
+      actionLoopingEnabled: false,
+    };
+
+    const resolved = resolveIdleTimers(state, context, {}, startedAt + 1_000);
+
+    expect(resolved.state.currentLocationId).toBe('next-location');
+    expect(resolved.state.discoveredLocationIds).toContain('next-location');
+    expect(resolved.state.flags['death-count']).toBe(2);
+  });
+
   it('completes once when the app is inactive across the action completion boundary', () => {
     const startedAt = 5_000;
     const hiddenAt = startedAt + 8_000;

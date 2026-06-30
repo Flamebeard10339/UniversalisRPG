@@ -10,7 +10,7 @@ import { ENEMY_STAT_DEFAULTS, ENEMY_STAT_KEYS, getEnemyStat, normalizeEnemyStats
 import { resolveUniverseUiSettings } from '../../game/universeSettings';
 import { EdgeFields, LocationFields } from './MapContentFields';
 import { StructuredDataDisplay, StructuredDataEditor, type StructuredValue } from '../structuredData/StructuredData';
-import { actionSchema, effectDefinitionSchema, flagDefinitionSchema, resourceDefinitionSchema, rewardSchema, statDefinitionSchema } from '../structuredData/contentSchemas';
+import { actionSchema, effectDefinitionSchema, flagDefinitionSchema, resourceDefinitionSchema, rewardSchema } from '../structuredData/contentSchemas';
 
 type ContentDataEditorProps = {
   baseBundle: ContentBundle;
@@ -784,15 +784,19 @@ export const ContentDataEditor = ({ baseBundle, bundle, draft, onPatch, t }: Con
               {t('contribution.data.addStat')}
             </button>
           </div>
+          <div className="hidden grid-cols-[1fr_8rem_6rem] gap-2 px-2 text-xs font-semibold uppercase tracking-wide text-slate-500 lg:grid">
+            <span>{t('contribution.column.id')}</span>
+            <span>{t('contribution.column.base')}</span>
+            <span>{t('contribution.column.remove')}</span>
+          </div>
           {stats.length === 0 ? (
             <p className="px-2 py-1 text-sm text-slate-500">{t('contribution.data.noStatChanges')}</p>
           ) : (
-            <div className="grid gap-2">
+            <div className="grid gap-1">
               {stats.map((row) => (
-                <div className="flex flex-wrap items-start gap-2 rounded bg-slate-950 p-2" key={`${row.source}-${row.index}`}>
-                  <div className="min-w-0 flex-1">
-                    <StructuredDataEditor label="contribution.data.statFields" onChange={(value) => { if (value) updateStat(row, value as unknown as StatDefinition); }} schema={statDefinitionSchema()} t={t} value={row.item as unknown as StructuredValue} />
-                  </div>
+                <div className="grid gap-2 rounded bg-slate-950 p-2 lg:grid-cols-[1fr_8rem_6rem]" key={`${row.source}-${row.index}`}>
+                  <input aria-label={t('contribution.column.id')} className="min-w-0 rounded bg-slate-900 px-2 py-1.5 text-sm" onChange={(event) => updateStat(row, { id: toKebabInput(event.target.value) })} value={row.item.id} />
+                  <input aria-label={t('contribution.column.base')} className="min-w-0 rounded bg-slate-900 px-2 py-1.5 text-sm" onChange={(event) => updateStat(row, { base: Number(event.target.value) })} type="number" value={row.item.base ?? 0} />
                   <button className={removeButtonClass} onClick={() => removeRow('stats', row)} type="button">{t('contribution.column.remove')}</button>
                 </div>
               ))}
@@ -920,7 +924,7 @@ export const ContentDataEditor = ({ baseBundle, bundle, draft, onPatch, t }: Con
                     <span>{t('contribution.column.showHealth')}</span>
                     <input checked={enemy.showHealthBar ?? true} onChange={(event) => updateEnemy(row, { showHealthBar: event.target.checked })} type="checkbox" />
                   </label>
-                  <StructuredDataEditor label="contribution.column.rewards" onChange={(value) => updateEnemy(row, { rewards: (value ?? []) as unknown as EnemyDefinition['rewards'] })} schema={{ kind: 'array', item: rewardSchema(bundle), createItem: () => ({ kind: 'resource', resourceId: bundle.resourceDefinitions[0]?.id ?? '', amount: 1 }) }} t={t} value={enemy.rewards as unknown as StructuredValue} />
+                  <StructuredDataEditor label="contribution.column.rewards" onChange={(value) => updateEnemy(row, { rewards: (value ?? []) as unknown as EnemyDefinition['rewards'] })} schema={{ kind: 'array', item: rewardSchema(bundle), createItem: () => ({ kind: 'resource', resourceId: bundle.resourceDefinitions[0]?.id ?? '', amount: 1 }), inlineRows: true }} t={t} value={enemy.rewards as unknown as StructuredValue} />
                   <button className={`${removeButtonClass} justify-self-end`} onClick={() => { setSelectedEnemyKey(null); removeRow('enemies', row); }} type="button">
                     {t('contribution.column.remove')}
                   </button>
@@ -1008,8 +1012,10 @@ export const ContentDataEditor = ({ baseBundle, bundle, draft, onPatch, t }: Con
           ) : (
             <div className="grid gap-1">
               {flags.map((row) => (
-                <div className="grid gap-2 rounded bg-slate-950 p-2" key={`${row.source}-${row.index}`}>
-                  <StructuredDataEditor onChange={(value) => { if (value) promote('flags', value as unknown as StateFlagDefinition, row.item.id); }} schema={flagDefinitionSchema()} t={t} value={row.item as unknown as StructuredValue} />
+                <div className="flex min-w-0 flex-wrap items-center gap-2 rounded bg-slate-950 p-2" key={`${row.source}-${row.index}`}>
+                  <div className="min-w-0 flex-1">
+                    <StructuredDataEditor onChange={(value) => { if (value) promote('flags', value as unknown as StateFlagDefinition, row.item.id); }} schema={flagDefinitionSchema()} t={t} value={row.item as unknown as StructuredValue} />
+                  </div>
                   <button className={removeButtonClass} onClick={() => removeRow('flags', row)} type="button">{t('contribution.column.remove')}</button>
                 </div>
               ))}

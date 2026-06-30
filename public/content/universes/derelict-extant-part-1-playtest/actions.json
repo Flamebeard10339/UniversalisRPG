@@ -19,7 +19,7 @@
     "role": "progression",
     "visibleWhen": { "kind": "not", "condition": { "kind": "state-variable", "variable": "action-completions:open-your-eyes", "comparison": "less-than", "value": 1 } },
     "rewards": [],
-    "results": [{ "kind": "relocate", "locationId": "cryobay" }]
+    "results": [{ "kind": "state-variable", "variable": "location", "value": "cryobay" }]
   },
   {
     "id": "work-manual-release",
@@ -29,7 +29,7 @@
     "role": "progression",
     "visibleWhen": { "kind": "not", "condition": { "kind": "state-variable", "variable": "action-completions:open-your-eyes", "comparison": "less-than", "value": 1 } },
     "rewards": [],
-    "results": [{ "kind": "relocate", "locationId": "cryobay" }]
+    "results": [{ "kind": "state-variable", "variable": "location", "value": "cryobay" }]
   },
   {
     "id": "open-emergency-locker",
@@ -76,7 +76,7 @@
     "maxCompletions": 1,
     "role": "optional",
     "rewards": [],
-    "results": [{ "kind": "flag", "flagId": "cryopods-inspected", "value": true }]
+    "results": [{ "kind": "state-variable", "variable": "flag:cryopods-inspected", "value": true }]
   },
   {
     "id": "put-on-space-suit",
@@ -94,7 +94,7 @@
     "requirements": { "kind": "not", "condition": { "kind": "state-variable", "variable": "item:space-suit", "comparison": "less-than", "value": 1 } },
     "rewards": [],
     "results": [
-      { "kind": "flag", "flagId": "wearing-space-suit", "value": true },
+      { "kind": "state-variable", "variable": "flag:wearing-space-suit", "value": true },
       { "kind": "resource", "resourceId": "air-capacity", "amount": 100 }
     ]
   },
@@ -113,7 +113,7 @@
     },
     "requirements": { "kind": "state-variable", "variable": "resource:air-capacity", "comparison": "greater-than", "value": 0 },
     "rewards": [],
-    "results": [{ "kind": "flag", "flagId": "airlock-open", "value": true }]
+    "results": [{ "kind": "state-variable", "variable": "flag:airlock-open", "value": true }]
   },
   {
     "id": "replace-air-canister",
@@ -144,7 +144,7 @@
     "visibleWhen": { "kind": "state-variable", "variable": "flag:airlock-open", "comparison": "equal", "value": true },
     "requirements": { "kind": "state-variable", "variable": "resource:air-capacity", "comparison": "greater-than", "value": 0 },
     "rewards": [],
-    "results": [{ "kind": "relocate", "locationId": "main-intersection" }]
+    "results": [{ "kind": "state-variable", "variable": "location", "value": "main-intersection" }]
   },
   {
     "id": "read-junction-map",
@@ -154,7 +154,7 @@
     "role": "optional",
     "requirements": { "kind": "state-variable", "variable": "resource:air-capacity", "comparison": "greater-than", "value": 0 },
     "rewards": [],
-    "results": [{ "kind": "flag", "flagId": "junction-map-read", "value": true }]
+    "results": [{ "kind": "state-variable", "variable": "flag:junction-map-read", "value": true }]
   },
   {
     "id": "inspect-intersection-damage",
@@ -173,7 +173,7 @@
     "role": "progression",
     "requirements": { "kind": "state-variable", "variable": "resource:air-capacity", "comparison": "greater-than", "value": 0 },
     "rewards": [],
-    "results": [{ "kind": "flag", "flagId": "captain-route-found", "value": true }]
+    "results": [{ "kind": "state-variable", "variable": "flag:captain-route-found", "value": true }]
   },
   {
     "id": "follow-captain-route",
@@ -184,7 +184,7 @@
     "visibleWhen": { "kind": "state-variable", "variable": "flag:captain-route-found", "comparison": "equal", "value": true },
     "requirements": { "kind": "state-variable", "variable": "resource:air-capacity", "comparison": "greater-than", "value": 0 },
     "rewards": [],
-    "results": [{ "kind": "relocate", "locationId": "captain-quarters" }]
+    "results": [{ "kind": "state-variable", "variable": "location", "value": "captain-quarters" }]
   },
   {
     "id": "review-captains-terminal",
@@ -203,7 +203,7 @@
     "role": "progression",
     "requirements": { "kind": "state-variable", "variable": "resource:air-capacity", "comparison": "greater-than", "value": 0 },
     "rewards": [],
-    "results": [{ "kind": "flag", "flagId": "communications-ready", "value": true }]
+    "results": [{ "kind": "state-variable", "variable": "flag:communications-ready", "value": true }]
   },
   {
     "id": "send-distress-beacon",

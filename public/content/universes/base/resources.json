@@ -38,7 +38,7 @@
       {
         "kind": "reset-state",
         "locationId": "starting-location",
-        "incrementFlagId": "death-count",
+        "incrementVariable": "flag:death-count",
         "preserve": {
           "inventoryIds": ["emberleaf"],
           "skillXp": true,

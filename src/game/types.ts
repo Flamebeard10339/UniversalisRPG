@@ -80,7 +80,7 @@ export type Reward =
 export type NumericComparison = 'equal' | 'greater-than' | 'less-than';
 
 export type Condition =
-  | { kind: 'state-variable'; variable: string; comparison: NumericComparison; value: number | boolean }
+  | { kind: 'state-variable'; variable: string; comparison: NumericComparison; value: number | boolean | string }
   | { kind: 'all'; conditions: Condition[] }
   | { kind: 'any'; conditions: Condition[] }
   | { kind: 'not'; condition: Condition };
@@ -89,6 +89,7 @@ export type ActionResult =
   | { kind: 'item'; itemId: string; amount: number }
   | { kind: 'resource'; resourceId: string; amount: number }
   | { kind: 'skill-xp'; skillId: string; amount: number }
+  | { kind: 'state-variable'; variable: string; value: boolean | number | string }
   | { kind: 'flag'; flagId: string; value: boolean }
   | { kind: 'relocate'; locationId: string }
   | { kind: 'chat'; messageKey: string; delaySeconds?: number };
@@ -127,7 +128,7 @@ export type ItemDefinition = {
 
 export type StateFlagDefinition = {
   id: string;
-  initialValue?: boolean | number;
+  initialValue?: boolean | number | string;
 };
 
 export type InteractionTypeDefinition = {
@@ -162,10 +163,12 @@ export type ResourceBoundaryBehavior =
   | {
       kind: 'reset-state';
       locationId?: string;
+      incrementVariable?: string;
       incrementFlagId?: string;
       preserve?: {
         inventoryIds?: string[];
         resourceIds?: string[];
+        variableIds?: string[];
         flagIds?: string[];
         skillXp?: boolean;
         discoveredLocations?: boolean;
@@ -356,7 +359,7 @@ export type UniversePlayState = {
   activeTravel: ActiveTravel | null;
   resources: Record<string, number>;
   inventory: Record<string, number>;
-  flags: Record<string, boolean | number>;
+  flags: Record<string, boolean | number | string>;
   actionCompletions: Record<string, number>;
   resourcePools: Record<string, ResourcePool>;
   skillXp: Record<string, number>;

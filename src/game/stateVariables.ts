@@ -3,7 +3,7 @@ import { getCharacterStatValue } from './characterStats';
 import { getEnemy } from './adversarial';
 import type { ActionResolutionContext, ContentBundle, UniversePlayState } from './types';
 
-export type StateVariableValue = boolean | number;
+export type StateVariableValue = boolean | number | string;
 
 export const stateVariableKeys = (bundle: Pick<ContentBundle, 'flags' | 'items' | 'resourceDefinitions' | 'skills' | 'stats' | 'actions'>) => [
   ...bundle.flags.map((item) => `flag:${item.id}`),
@@ -12,6 +12,7 @@ export const stateVariableKeys = (bundle: Pick<ContentBundle, 'flags' | 'items' 
   ...bundle.skills.map((item) => `skill-level:${item.id}`),
   ...bundle.stats.map((item) => `stat:${item.id}`),
   ...bundle.actions.map((item) => `action-completions:${item.id}`),
+  'location',
   'active-action',
   'active-interaction',
 ];
@@ -24,6 +25,7 @@ export const readStateVariable = (
   const separator = variable.indexOf(':');
   const category = separator >= 0 ? variable.slice(0, separator) : 'flag';
   const id = separator >= 0 ? variable.slice(separator + 1) : variable;
+  if (variable === 'location') return state.currentLocationId;
   if (variable === 'active-action') return Boolean(state.activeAction);
   if (variable === 'active-interaction') {
     const action = context?.actions.find((candidate) => candidate.id === state.activeAction?.actionId);
@@ -52,6 +54,15 @@ export const writeStateVariable = (state: UniversePlayState, variable: string, v
   const separator = variable.indexOf(':');
   const category = separator >= 0 ? variable.slice(0, separator) : 'flag';
   const id = separator >= 0 ? variable.slice(separator + 1) : variable;
+  if (variable === 'location') {
+    const locationId = String(value);
+    return {
+      ...state,
+      currentLocationId: locationId,
+      discoveredLocationIds: Array.from(new Set([...state.discoveredLocationIds, locationId])),
+      activeTravel: null,
+    };
+  }
   if (category === 'flag') return { ...state, flags: { ...state.flags, [id]: value } };
   if (category === 'item') return { ...state, inventory: { ...state.inventory, [id]: Number(value) } };
   if (category === 'resource') {

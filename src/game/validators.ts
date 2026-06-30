@@ -78,11 +78,13 @@ const validateStringArray = (value: unknown) => value === undefined
 const validateResetStateShape = (value: unknown) => {
   if (!isRecord(value)
     || (value.locationId !== undefined && !hasString(value, 'locationId'))
+    || (value.incrementVariable !== undefined && !hasString(value, 'incrementVariable'))
     || (value.incrementFlagId !== undefined && !hasString(value, 'incrementFlagId'))) return false;
   if (value.preserve === undefined) return true;
   if (!isRecord(value.preserve)) return false;
   return validateStringArray(value.preserve.inventoryIds)
     && validateStringArray(value.preserve.resourceIds)
+    && validateStringArray(value.preserve.variableIds)
     && validateStringArray(value.preserve.flagIds)
     && validateStringArray(value.preserve.actionCompletionIds)
     && (value.preserve.skillXp === undefined || typeof value.preserve.skillXp === 'boolean')
@@ -144,7 +146,7 @@ const validateConditionShape = (value: unknown): value is Condition => {
   if (value.kind === 'not') return validateConditionShape(value.condition);
   return value.kind === 'state-variable'
     && hasString(value, 'variable')
-    && (typeof value.value === 'number' || typeof value.value === 'boolean')
+    && (typeof value.value === 'number' || typeof value.value === 'boolean' || typeof value.value === 'string')
     && comparisons.has(String(value.comparison));
 };
 
@@ -159,6 +161,7 @@ const validateActionResultShape = (value: unknown) => {
   if (value.kind === 'item') return hasString(value, 'itemId') && hasNumber(value, 'amount');
   if (value.kind === 'resource') return hasString(value, 'resourceId') && hasNumber(value, 'amount');
   if (value.kind === 'skill-xp') return hasString(value, 'skillId') && hasNumber(value, 'amount');
+  if (value.kind === 'state-variable') return hasString(value, 'variable') && (typeof value.value === 'boolean' || typeof value.value === 'number' || typeof value.value === 'string');
   if (value.kind === 'flag') return hasString(value, 'flagId') && typeof value.value === 'boolean';
   if (value.kind === 'relocate') return hasString(value, 'locationId');
   return value.kind === 'chat'
@@ -214,7 +217,7 @@ const validateItemsShape = (items: unknown): items is ItemDefinition[] =>
 const validateFlagsShape = (flags: unknown): flags is StateFlagDefinition[] =>
   flags === undefined || (Array.isArray(flags) && flags.every((flag) => isRecord(flag)
     && hasString(flag, 'id')
-    && (flag.initialValue === undefined || typeof flag.initialValue === 'boolean' || typeof flag.initialValue === 'number')));
+    && (flag.initialValue === undefined || typeof flag.initialValue === 'boolean' || typeof flag.initialValue === 'number' || typeof flag.initialValue === 'string')));
 
 const validateResourceBehaviorShape = (value: unknown) => isRecord(value) && (
   value.kind === 'stop-action'
@@ -392,23 +395,25 @@ export const validateContentReferences = (bundle: ContentBundle) => {
   const enemyIds = new Set((bundle.enemies ?? []).map((enemy) => enemy.id));
   const locale = bundle.locales[bundle.manifest.locales[0]] ?? {};
 
+  const knownStateVariables = () => new Set([
+    ...Array.from(flagIds, (id) => `flag:${id}`),
+    ...Array.from(itemIds, (id) => `item:${id}`),
+    ...Array.from(resourceIds, (id) => `resource:${id}`),
+    ...Array.from(skillIds, (id) => `skill-level:${id}`),
+    ...Array.from(statIds, (id) => `stat:${id}`),
+    ...bundle.actions.map((action) => `action-completions:${action.id}`),
+    'location',
+    'active-action',
+    'active-interaction',
+  ]);
+
   const validateConditionReferences = (condition: Condition, path: string) => {
     if (condition.kind === 'all' || condition.kind === 'any') {
       condition.conditions.forEach((child, index) => validateConditionReferences(child, `${path}.conditions.${index}`));
     } else if (condition.kind === 'not') {
       validateConditionReferences(condition.condition, `${path}.condition`);
     } else if (condition.kind === 'state-variable') {
-      const knownVariables = new Set([
-        ...Array.from(flagIds, (id) => `flag:${id}`),
-        ...Array.from(itemIds, (id) => `item:${id}`),
-        ...Array.from(resourceIds, (id) => `resource:${id}`),
-        ...Array.from(skillIds, (id) => `skill-level:${id}`),
-        ...Array.from(statIds, (id) => `stat:${id}`),
-        ...bundle.actions.map((action) => `action-completions:${action.id}`),
-        'active-action',
-        'active-interaction',
-      ]);
-      if (!knownVariables.has(condition.variable)) issues.push(error(path, 'validation.unknownStateVariable', { id: condition.variable }));
+      if (!knownStateVariables().has(condition.variable)) issues.push(error(path, 'validation.unknownStateVariable', { id: condition.variable }));
     }
   };
 
@@ -485,6 +490,8 @@ export const validateContentReferences = (bundle: ContentBundle) => {
       if (result.kind === 'item' && !itemIds.has(result.itemId)) issues.push(error(path, 'validation.unknownItem', { id: result.itemId }));
       if (result.kind === 'resource' && !resourceIds.has(result.resourceId)) issues.push(error(path, 'validation.unknownResource', { id: result.resourceId }));
       if (result.kind === 'skill-xp' && !skillIds.has(result.skillId)) issues.push(error(path, 'validation.unknownSkill', { id: result.skillId }));
+      if (result.kind === 'state-variable' && !knownStateVariables().has(result.variable)) issues.push(error(path, 'validation.unknownStateVariable', { id: result.variable }));
+      if (result.kind === 'state-variable' && result.variable === 'location' && result.value !== 'starting-location' && !locationIds.has(String(result.value))) issues.push(error(path, 'validation.unknownLocation', { id: String(result.value) }));
       if (result.kind === 'flag' && !flagIds.has(result.flagId)) issues.push(error(path, 'validation.unknownFlag', { id: result.flagId }));
       if (result.kind === 'relocate' && result.locationId !== 'starting-location' && !locationIds.has(result.locationId)) issues.push(error(path, 'validation.unknownLocation', { id: result.locationId }));
       if ('amount' in result && result.amount === 0) issues.push(error(path, 'validation.resultAmountNonZero'));
@@ -521,9 +528,11 @@ export const validateContentReferences = (bundle: ContentBundle) => {
       }
       if (behavior.kind === 'reset-state') {
         if (behavior.locationId && behavior.locationId !== 'starting-location' && !locationIds.has(behavior.locationId)) issues.push(error(`resources.${resource.id}`, 'validation.unknownLocation', { id: behavior.locationId }));
+        if (behavior.incrementVariable && !knownStateVariables().has(behavior.incrementVariable)) issues.push(error(`resources.${resource.id}`, 'validation.unknownStateVariable', { id: behavior.incrementVariable }));
         if (behavior.incrementFlagId && !flagIds.has(behavior.incrementFlagId)) issues.push(error(`resources.${resource.id}`, 'validation.unknownFlag', { id: behavior.incrementFlagId }));
         for (const id of behavior.preserve?.inventoryIds ?? []) if (!itemIds.has(id)) issues.push(error(`resources.${resource.id}`, 'validation.unknownItem', { id }));
         for (const id of behavior.preserve?.resourceIds ?? []) if (!resourceIds.has(id)) issues.push(error(`resources.${resource.id}`, 'validation.unknownResource', { id }));
+        for (const id of behavior.preserve?.variableIds ?? []) if (!knownStateVariables().has(id)) issues.push(error(`resources.${resource.id}`, 'validation.unknownStateVariable', { id }));
         for (const id of behavior.preserve?.flagIds ?? []) if (!flagIds.has(id)) issues.push(error(`resources.${resource.id}`, 'validation.unknownFlag', { id }));
         for (const id of behavior.preserve?.actionCompletionIds ?? []) if (!bundle.actions.some((action) => action.id === id)) issues.push(error(`resources.${resource.id}`, 'validation.unknownAction', { id }));
       }

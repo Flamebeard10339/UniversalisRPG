@@ -15,6 +15,7 @@ import {
   locationExhaustedKey,
 } from './contentIds';
 import { areActionRequirementsMet, canStartAction, isActionExhausted, isActionVisible } from './conditions';
+import { readStateVariable, writeStateVariable } from './stateVariables';
 import { resolveManifestUiSettings } from './universeSettings';
 
 const MAX_CHAT_MESSAGES = 80;
@@ -437,6 +438,18 @@ const resolveLocationId = (
 const selectKeys = <T>(values: Record<string, T>, ids: string[] = []) =>
   Object.fromEntries(ids.filter((id) => values[id] !== undefined).map((id) => [id, values[id]]));
 
+const legacyFlagVariables = (ids: string[] = []) => ids.map((id) => `flag:${id}`);
+
+const restoreStateVariables = (
+  next: UniversePlayState,
+  previous: UniversePlayState,
+  context: ActionResolutionContext,
+  variables: string[] = [],
+) => variables.reduce(
+  (state, variable) => writeStateVariable(state, variable, readStateVariable(previous, variable, context)),
+  next,
+);
+
 export const applyStateReset = (
   state: UniversePlayState,
   context: ActionResolutionContext,
@@ -445,8 +458,9 @@ export const applyStateReset = (
 ) => {
   const startingLocationId = resolveLocationId(state, context, policy?.locationId ?? 'starting-location');
   const preserve = policy?.preserve ?? {};
+  const preservedVariableIds = Array.from(new Set([...(preserve.variableIds ?? []), ...legacyFlagVariables(preserve.flagIds)]));
   const initial = ensureWorldState(createInitialPlayState(state.universeId, startingLocationId), context);
-  const next = {
+  let next = {
     ...initial,
     inventory: {
       ...initial.inventory,
@@ -475,17 +489,20 @@ export const applyStateReset = (
     lastTickAt: now,
   };
 
-  if (policy?.incrementFlagId) {
-    next.flags[policy.incrementFlagId] = Number(state.flags[policy.incrementFlagId] ?? 0) + 1;
+  next = restoreStateVariables(next, state, context, preservedVariableIds);
+
+  const incrementVariable = policy?.incrementVariable ?? (policy?.incrementFlagId ? `flag:${policy.incrementFlagId}` : undefined);
+  if (incrementVariable) {
+    next = writeStateVariable(next, incrementVariable, Number(readStateVariable(state, incrementVariable, context) ?? 0) + 1);
   }
 
   return appendRunLog(syncLegacyHealth(next), 'engine', 'state.reset', {
-    incrementFlagId: policy?.incrementFlagId ?? '',
-    incrementedValue: policy?.incrementFlagId ? next.flags[policy.incrementFlagId] : 0,
+    incrementVariable: incrementVariable ?? '',
+    incrementedValue: incrementVariable ? readStateVariable(next, incrementVariable, context) : 0,
     locationId: startingLocationId,
     preservedInventoryIds: preserve.inventoryIds ?? [],
     preservedResourceIds: preserve.resourceIds ?? [],
-    preservedFlagIds: preserve.flagIds ?? [],
+    preservedVariableIds,
   }, now);
 };
 
@@ -830,6 +847,9 @@ const applyActionResult = (
         [result.skillId]: Math.max(0, (state.skillXp[result.skillId] ?? 0) + result.amount),
       },
     };
+  }
+  if (result.kind === 'state-variable') {
+    return writeStateVariable(state, result.variable, result.value);
   }
   if (result.kind === 'flag') {
     return { ...state, flags: { ...state.flags, [result.flagId]: result.value } };

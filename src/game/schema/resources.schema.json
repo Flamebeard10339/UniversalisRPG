@@ -26,6 +26,7 @@
       "properties": {
         "inventoryIds": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
         "resourceIds": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+        "variableIds": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
         "flagIds": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
         "skillXp": { "type": "boolean" },
         "discoveredLocations": { "type": "boolean" },
@@ -40,7 +41,7 @@
         { "type": "object", "required": ["kind", "value"], "additionalProperties": false, "properties": { "kind": { "const": "refill" }, "value": { "oneOf": [{ "const": "min" }, { "const": "max" }, { "type": "number" }] } } },
         { "type": "object", "required": ["kind", "locationId"], "additionalProperties": false, "properties": { "kind": { "const": "relocate" }, "locationId": { "type": "string", "minLength": 1 } } },
         { "type": "object", "required": ["kind", "messageKey"], "additionalProperties": false, "properties": { "kind": { "const": "chat" }, "messageKey": { "type": "string", "minLength": 1 } } },
-        { "type": "object", "required": ["kind"], "additionalProperties": false, "properties": { "kind": { "const": "reset-state" }, "locationId": { "type": "string", "minLength": 1 }, "incrementFlagId": { "type": "string", "minLength": 1 }, "preserve": { "$ref": "#/$defs/preserve" } } }
+        { "type": "object", "required": ["kind"], "additionalProperties": false, "properties": { "kind": { "const": "reset-state" }, "locationId": { "type": "string", "minLength": 1 }, "incrementVariable": { "type": "string", "minLength": 1 }, "incrementFlagId": { "type": "string", "minLength": 1 }, "preserve": { "$ref": "#/$defs/preserve" } } }
       ]
     }
   }

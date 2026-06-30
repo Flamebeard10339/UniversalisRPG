@@ -44,7 +44,7 @@ const normalizeCondition = (value: unknown): Condition | undefined => {
     return child ? { kind: 'not', condition: child } : undefined;
   }
   const comparison = String(condition.comparison ?? 'equal');
-  if (condition.kind === 'state-variable' && typeof condition.variable === 'string' && (typeof condition.value === 'boolean' || typeof condition.value === 'number')) return stateCondition(condition.variable, comparison, condition.value);
+  if (condition.kind === 'state-variable' && typeof condition.variable === 'string' && (typeof condition.value === 'boolean' || typeof condition.value === 'number' || typeof condition.value === 'string')) return stateCondition(condition.variable, comparison, condition.value);
   if (condition.kind === 'death-count' && typeof condition.value === 'number') return stateCondition('flag:death-count', comparison, condition.value);
   if (condition.kind === 'flag' && typeof condition.flagId === 'string' && typeof condition.value === 'boolean') return { kind: 'state-variable', variable: `flag:${condition.flagId}`, comparison: 'equal', value: condition.value };
   if (condition.kind === 'item' && typeof condition.itemId === 'string' && typeof condition.value === 'number') return stateCondition(`item:${condition.itemId}`, comparison, condition.value);
@@ -54,7 +54,7 @@ const normalizeCondition = (value: unknown): Condition | undefined => {
   return undefined;
 };
 
-const stateCondition = (variable: string, comparison: string, value: number | boolean): Condition => {
+const stateCondition = (variable: string, comparison: string, value: number | boolean | string): Condition => {
   const atom = (kind: NumericComparison): Condition => ({ kind: 'state-variable', variable, comparison: kind, value });
   if (comparison === 'at-least') return { kind: 'not', condition: atom('less-than') };
   if (comparison === 'at-most') return { kind: 'not', condition: atom('greater-than') };

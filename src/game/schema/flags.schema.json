@@ -8,7 +8,7 @@
     "additionalProperties": false,
     "properties": {
       "id": { "type": "string", "minLength": 1 },
-      "initialValue": { "type": ["boolean", "number"] }
+      "initialValue": { "type": ["boolean", "number", "string"] }
     }
   }
 }

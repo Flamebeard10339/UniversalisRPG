@@ -25,6 +25,9 @@ export const evaluateCondition = (
   if (typeof actual === 'boolean' || typeof condition.value === 'boolean') {
     return condition.comparison === 'equal' && actual === condition.value;
   }
+  if (typeof actual === 'string' || typeof condition.value === 'string') {
+    return condition.comparison === 'equal' && actual === condition.value;
+  }
   return compare(actual, condition.comparison, condition.value);
 };
 

@@ -40,7 +40,7 @@
             "kind": { "const": "state-variable" },
             "variable": { "type": "string", "minLength": 1 },
             "comparison": { "$ref": "#/$defs/comparison" },
-            "value": { "type": ["number", "boolean"] }
+            "value": { "type": ["number", "boolean", "string"] }
           }
         },
         {
@@ -116,6 +116,12 @@
           "required": ["kind", "skillId", "amount"],
           "additionalProperties": false,
           "properties": { "kind": { "const": "skill-xp" }, "skillId": { "type": "string", "minLength": 1 }, "amount": { "type": "number", "not": { "const": 0 } } }
+        },
+        {
+          "type": "object",
+          "required": ["kind", "variable", "value"],
+          "additionalProperties": false,
+          "properties": { "kind": { "const": "state-variable" }, "variable": { "type": "string", "minLength": 1 }, "value": { "type": ["boolean", "number", "string"] } }
         },
         {
           "type": "object",
