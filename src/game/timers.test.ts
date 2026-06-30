@@ -130,6 +130,45 @@ describe('resolveIdleTimers', () => {
     expect(repeated.report).toEqual({ kind: 'none' });
   });
 
+  it('uses the universe loop default over stale saved action looping state', () => {
+    const startedAt = 1_000;
+    const rejoinedAt = startedAt + 11_000;
+    const action: GameAction = {
+      id: 'loop-default-action',
+      locationId: 'test-location',
+      durationSeconds: 10,
+      rewards: [],
+    };
+    const activeState = {
+      ...startAction(createInitialPlayState('test-universe', 'test-location'), action, startedAt),
+      actionLoopingEnabled: false,
+    };
+    const context: ActionResolutionContext = {
+      manifest: {
+        schemaVersion: 1,
+        id: 'test-universe',
+        version: '0.1.0',
+        author: 'test',
+        locales: ['en'],
+        files: [],
+        ui: { loopActionsByDefault: true },
+      },
+      actions: [action],
+      skills: [],
+      stats: [],
+      resourceDefinitions: [],
+      effects: [],
+      interactionTypes: [],
+      enemies: [],
+    };
+
+    const resolved = resolveIdleTimers(activeState, context, { showReport: true }, rejoinedAt);
+
+    expect(resolved.state.actionLoopingEnabled).toBe(true);
+    expect(resolved.state.activeAction).toMatchObject({ actionId: 'loop-default-action' });
+    expect(resolved.report).toMatchObject({ kind: 'actionCompleted', actionId: 'loop-default-action' });
+  });
+
   it('does not apply resource effects when no action is active', () => {
     const context: ActionResolutionContext = {
       actions: [],
@@ -278,16 +317,10 @@ describe('resolveIdleTimers', () => {
         author: 'test',
         locales: ['en'],
         files: [],
-        basePlayer: {
-          stats: {
-            health: 100,
-            regeneration: 60,
-          },
-        },
       },
       actions: [action],
       skills: [],
-      stats: [{ id: 'health' }, { id: 'regeneration' }],
+      stats: [{ id: 'health', base: 100 }, { id: 'regeneration', base: 60 }],
       resourceDefinitions: [{ id: 'health', sourceStat: 'health', initialValue: 'full' }],
       effects: [{ id: 'health-regeneration', resourceId: 'health', sourceStat: 'regeneration' }],
       interactionTypes: [],
@@ -385,16 +418,10 @@ describe('resolveIdleTimers', () => {
         author: 'test',
         locales: ['en'],
         files: [],
-        basePlayer: {
-          stats: {
-            health: 100,
-            regeneration: 10,
-          },
-        },
       },
       actions: [],
       skills: [],
-      stats: [{ id: 'health' }, { id: 'regeneration' }],
+      stats: [{ id: 'health', base: 100 }, { id: 'regeneration', base: 10 }],
       resourceDefinitions: [{ id: 'health', sourceStat: 'health', initialValue: 'full' }],
       effects: [{ id: 'health-regeneration', resourceId: 'health', sourceStat: 'regeneration' }],
       interactionTypes: [],
@@ -477,9 +504,9 @@ describe('resolveIdleTimers', () => {
     };
     const context: ActionResolutionContext = {
       actions: [action],
-      skills: [{ id: 'attack', maxLevel: 100 }],
+      skills: [{ id: 'attack', maxLevel: 100, statId: 'attack' }],
       stats: [
-        { id: 'attack', base: 10, skillId: 'attack' },
+        { id: 'attack', base: 10 },
         { id: 'defense', base: 0 },
         { id: 'action-rate', base: 25 },
         { id: 'health', base: 100 },

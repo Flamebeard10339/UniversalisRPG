@@ -30,15 +30,16 @@ const context: ActionResolutionContext = {
     locales: ['en'],
     files: [],
     combatBalance: { expectedHitsToKill: 1 / 7, combatSpread: 1 },
+    ui: { loopActionsByDefault: false },
   },
   actions: [],
   skills: [
-    { id: 'attack', maxLevel: 100 },
-    { id: 'defense', maxLevel: 100 },
+    { id: 'attack', maxLevel: 100, statId: 'attack' },
+    { id: 'defense', maxLevel: 100, statId: 'defense' },
   ],
   stats: [
-    { id: 'attack', base: 6, skillId: 'attack' },
-    { id: 'defense', base: 6, skillId: 'defense' },
+    { id: 'attack', base: 6 },
+    { id: 'defense', base: 6 },
     { id: 'action-rate', base: 6 },
     { id: 'health', base: 100 },
   ],
@@ -125,7 +126,7 @@ describe('adversarial actions', () => {
       ...startAction(createInitialPlayState('test', 'arena'), action, context, startedAt),
       skillXp: { attack: 10 },
     };
-    const source = getCharacterStatValue(state, context.stats ?? [], 'attack');
+    const source = getCharacterStatValue(state, context.stats ?? [], 'attack', context.skills);
     const expectedDamage = calculateMaxCombatDamage(source, getEnemyStat(enemy(), 'defense'), resolveManifestCombatBalance(context.manifest));
     const resolved = resolveIdleTimers(state, { ...context, actions: [action] }, {
       random: () => 1,
@@ -168,7 +169,7 @@ describe('adversarial actions', () => {
 
   it('starts a looped replacement enemy with fresh enemy-owned resources after a kill', () => {
     const startedAt = 1_000;
-    const killContext = { ...context, enemies: [enemy({ stats: { health: 2, rate: 60 } })], actions: [action] };
+    const killContext = { ...context, manifest: { ...context.manifest!, ui: { loopActionsByDefault: true } }, enemies: [enemy({ stats: { health: 2, rate: 60 } })], actions: [action] };
     const state = {
       ...startAction(createInitialPlayState('test', 'arena'), action, killContext, startedAt),
       actionLoopingEnabled: true,

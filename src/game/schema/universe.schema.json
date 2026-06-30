@@ -25,10 +25,6 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "stats": {
-          "type": "object",
-          "additionalProperties": { "type": "number" }
-        },
         "inventory": {
           "type": "object",
           "additionalProperties": { "type": "number", "minimum": 0 }

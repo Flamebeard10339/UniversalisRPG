@@ -22,7 +22,6 @@ export type UniverseManifest = {
 };
 
 export type BasePlayerDefinition = {
-  stats?: Record<string, number>;
   inventory?: Record<string, number>;
 };
 
@@ -111,14 +110,14 @@ export type GameAction = {
 export type SkillDefinition = {
   id: string;
   maxLevel: number;
+  statId?: string;
+  addedPerLevel?: number;
+  increasedPerLevel?: number;
 };
 
 export type StatDefinition = {
   id: string;
   base?: number;
-  added?: number;
-  increased?: number;
-  skillId?: string;
 };
 
 export type ItemDefinition = {
@@ -318,6 +317,13 @@ export type SkillTotals = {
   increased: number;
   effectiveTotal: number;
   rate: number;
+};
+
+export type StatTotals = {
+  base: number;
+  added: number;
+  increased: number;
+  effectiveTotal: number;
 };
 
 export type ActionResolutionContext = {

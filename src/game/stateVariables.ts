@@ -43,7 +43,7 @@ export const readStateVariable = (
     const skill = context?.skills.find((candidate) => candidate.id === id);
     return skill ? Math.min(skill.maxLevel, skillLevelFromXp(state.skillXp[id] ?? 0)) : skillLevelFromXp(state.skillXp[id] ?? 0);
   }
-  if (category === 'stat') return getCharacterStatValue(state, context?.stats ?? [], id, context?.manifest?.basePlayer);
+  if (category === 'stat') return getCharacterStatValue(state, context?.stats ?? [], id, context?.skills ?? []);
   if (category === 'action-completions') return state.actionCompletions[id] ?? 0;
   return state.flags[variable] ?? false;
 };

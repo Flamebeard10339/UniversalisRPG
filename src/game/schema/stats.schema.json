@@ -8,10 +8,7 @@
     "additionalProperties": false,
     "properties": {
       "id": { "type": "string", "minLength": 1 },
-      "base": { "type": "number", "default": 0 },
-      "added": { "type": "number", "default": 0 },
-      "increased": { "type": "number", "default": 0 },
-      "skillId": { "type": "string", "minLength": 1 }
+      "base": { "type": "number", "default": 0 }
     }
   }
 }

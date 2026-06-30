@@ -11,11 +11,6 @@
     "combatSpread": 1
   },
   "basePlayer": {
-    "stats": {
-      "action-rate": 25,
-      "air-capacity": 100,
-      "air-leak": -105
-    },
     "inventory": {}
   },
   "files": [

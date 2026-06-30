@@ -11,6 +11,7 @@ type SubmitToGitHubProps = {
 };
 
 export const SubmitToGitHub = ({ appVersion, draft, validationIssues, t }: SubmitToGitHubProps) => {
+  const basePlayerPatch = draft.basePlayer?.inventory ? { basePlayer: { inventory: draft.basePlayer.inventory } } : {};
   const contributionPackage = useMemo(
     () => ({
       appVersion,
@@ -19,7 +20,7 @@ export const SubmitToGitHub = ({ appVersion, draft, validationIssues, t }: Submi
       validationIssues,
       t,
       changedFiles: [
-        { path: 'universe.json', json: { ...(draft.basePlayer ? { basePlayer: draft.basePlayer } : {}), ...(draft.combatBalance ? { combatBalance: draft.combatBalance } : {}), ...(draft.ui ? { ui: draft.ui } : {}) } },
+        { path: 'universe.json', json: { ...basePlayerPatch, ...(draft.combatBalance ? { combatBalance: draft.combatBalance } : {}), ...(draft.ui ? { ui: draft.ui } : {}) } },
         { path: 'locations.json', json: draft.locations },
         { path: 'edges.json', json: draft.edges },
         { path: 'actions.json', json: draft.actions },
@@ -43,7 +44,7 @@ export const SubmitToGitHub = ({ appVersion, draft, validationIssues, t }: Submi
         return Object.keys(file.json as Record<string, unknown>).length > 0;
       }),
     }),
-    [appVersion, draft, t, validationIssues],
+    [appVersion, basePlayerPatch, draft, t, validationIssues],
   );
   const issueBody = useMemo(() => formatContributionIssueBody(contributionPackage), [contributionPackage]);
   const issueUrl = useMemo(() => createPrefilledIssueUrl(contributionPackage), [contributionPackage]);

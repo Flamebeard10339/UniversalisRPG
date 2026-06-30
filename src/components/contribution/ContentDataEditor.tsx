@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type MutableRefObject } from 'react';
-import { edgeId, itemTitleKey, statTitleKey, toKebabInput } from '../../game/contentIds';
+import { edgeId, itemTitleKey, toKebabInput } from '../../game/contentIds';
 import type { Translator } from '../../game/i18n';
 import type { ContentBundle, ContributionDraft, ContributionRemovedIds, EffectDefinition, EnemyDefinition, EnemyStatKey, GameAction, InteractionTypeDefinition, ItemDefinition, LocationNode, ResourceDefinition, SkillDefinition, StatDefinition, StateFlagDefinition, TravelEdgeDefinition } from '../../game/types';
 import { ContributionMapEditor } from './ContributionMapEditor';
@@ -20,7 +20,7 @@ type ContentDataEditorProps = {
   t: Translator;
 };
 
-type ContentDataTab = 'universe' | 'map' | 'actions' | 'skills' | 'stats' | 'profiles' | 'interactions' | 'enemies' | 'items' | 'flags' | 'resources' | 'json';
+type ContentDataTab = 'universe' | 'map' | 'actions' | 'primitives' | 'enemies' | 'resources' | 'json';
 type DraftListKey = Exclude<keyof ContributionRemovedIds, 'resources'>;
 type LayeredRow<T> = {
   index: number;
@@ -28,7 +28,7 @@ type LayeredRow<T> = {
   source: 'draft' | 'base';
 };
 
-const contentTabs: ContentDataTab[] = ['universe', 'map', 'actions', 'skills', 'stats', 'profiles', 'interactions', 'enemies', 'items', 'flags', 'resources', 'json'];
+const contentTabs: ContentDataTab[] = ['universe', 'map', 'actions', 'primitives', 'enemies', 'resources', 'json'];
 
 const uniqueId = (baseId: string, existingIds: string[]) => {
   let index = 1;
@@ -274,7 +274,7 @@ export const ContentDataEditor = ({ baseBundle, bundle, draft, onPatch, t }: Con
   const effects = layeredRows(draft.effects, baseBundle.effects ?? [], removed.effects, filter);
   const interactionTypes = layeredRows(draft.interactionTypes, baseBundle.interactionTypes ?? [], removed.interactionTypes, filter);
   const enemies = layeredRows(draft.enemies, baseBundle.enemies ?? [], removed.enemies, filter);
-  const basePlayer = draft.basePlayer ?? bundle.manifest.basePlayer ?? { stats: {}, inventory: {} };
+  const basePlayer = draft.basePlayer ?? bundle.manifest.basePlayer ?? { inventory: {} };
   const combatBalance = resolveCombatBalance(draft.combatBalance ?? bundle.manifest.combatBalance);
   const uiSettings = resolveUniverseUiSettings(draft.ui ?? bundle.manifest.ui);
   const contributionBundle = {
@@ -372,14 +372,9 @@ export const ContentDataEditor = ({ baseBundle, bundle, draft, onPatch, t }: Con
     onPatch({ ui: resolveUniverseUiSettings({ ...uiSettings, ...patch }) });
   };
 
-  const updateBasePlayerStats = (stats: Record<string, number>) => {
-    const valid = new Set(allStats(bundle, draft).map((stat) => stat.id));
-    onPatch({ basePlayer: { ...basePlayer, stats: Object.fromEntries(Object.entries(stats).filter(([key]) => valid.has(key))) } });
-  };
-
   const updateBasePlayerInventory = (inventory: Record<string, number>) => {
     const valid = new Set(allItems(bundle, draft).map((item) => item.id));
-    onPatch({ basePlayer: { ...basePlayer, inventory: Object.fromEntries(Object.entries(inventory).filter(([key, amount]) => valid.has(key) && amount >= 0)) } });
+    onPatch({ basePlayer: { inventory: Object.fromEntries(Object.entries(inventory).filter(([key, amount]) => valid.has(key) && amount >= 0)) } });
   };
 
   const enemyEditorKey = (enemyId: string) => {
@@ -463,7 +458,7 @@ export const ContentDataEditor = ({ baseBundle, bundle, draft, onPatch, t }: Con
 
   const addSkill = () => {
     const id = uniqueId('new-skill', skills.map((row) => row.item.id));
-    onPatch({ skills: [{ id, maxLevel: 100 }, ...draft.skills] });
+    onPatch({ skills: [{ id, maxLevel: 100, statId: stats[0]?.item.id }, ...draft.skills] });
   };
 
   const addStat = () => {
@@ -526,8 +521,9 @@ export const ContentDataEditor = ({ baseBundle, bundle, draft, onPatch, t }: Con
     });
   };
 
+  const universeBasePlayer = { inventory: basePlayer.inventory ?? {} };
   const jsonFiles = [
-    { path: 'universe.json', json: { ...bundle.manifest, basePlayer, combatBalance, ui: uiSettings } },
+    { path: 'universe.json', json: { ...bundle.manifest, basePlayer: universeBasePlayer, combatBalance, ui: uiSettings } },
     { path: 'locations.json', json: locations.map((row) => row.item) },
     { path: 'edges.json', json: edges.map((row) => row.item) },
     { path: 'actions.json', json: actions.map((row) => row.item) },
@@ -611,19 +607,6 @@ export const ContentDataEditor = ({ baseBundle, bundle, draft, onPatch, t }: Con
               />
             </label>
           </div>
-          <section className="grid gap-2 border-t border-slate-700 pt-3">
-            <h4 className="text-sm font-semibold text-slate-100">{t('contribution.universe.baseStats')}</h4>
-            <KeyValueRows
-              addLabel={t('contribution.universe.addBaseStat')}
-              datalistId="base-player-stat-keys"
-              keyLabel={t('contribution.column.stat')}
-              labelForKey={(key) => t(statTitleKey(key), key)}
-              onChange={updateBasePlayerStats}
-              validKeys={stats.map((row) => row.item.id)}
-              value={basePlayer.stats ?? {}}
-              valueLabel={t('structured.value')}
-            />
-          </section>
           <section className="grid gap-2 border-t border-slate-700 pt-3">
             <h4 className="text-sm font-semibold text-slate-100">{t('contribution.universe.baseInventory')}</h4>
             {items.length === 0 ? (
@@ -756,7 +739,7 @@ export const ContentDataEditor = ({ baseBundle, bundle, draft, onPatch, t }: Con
         </section>
       )}
 
-      {activeTab === 'skills' && (
+      {activeTab === 'primitives' && (
         <section className="grid gap-1 rounded border border-slate-700 p-2">
           <div className="flex items-center justify-between gap-3">
             <h3 className="text-sm font-semibold text-slate-100">{t('contribution.data.skills')}</h3>
@@ -764,9 +747,12 @@ export const ContentDataEditor = ({ baseBundle, bundle, draft, onPatch, t }: Con
               {t('contribution.data.addSkill')}
             </button>
           </div>
-          <div className="hidden grid-cols-[1fr_8rem_6rem] gap-2 px-2 text-xs font-semibold uppercase tracking-wide text-slate-500 lg:grid">
+          <div className="hidden grid-cols-[1fr_8rem_1fr_8rem_8rem_6rem] gap-2 px-2 text-xs font-semibold uppercase tracking-wide text-slate-500 lg:grid">
             <span>{t('contribution.column.id')}</span>
             <span>{t('contribution.column.maxLevel')}</span>
+            <span>{t('contribution.column.stat')}</span>
+            <span>{t('contribution.column.addedPerLevel')}</span>
+            <span>{t('contribution.column.increasedPerLevel')}</span>
             <span>{t('contribution.column.remove')}</span>
           </div>
           {skills.length === 0 ? (
@@ -774,9 +760,12 @@ export const ContentDataEditor = ({ baseBundle, bundle, draft, onPatch, t }: Con
           ) : (
             <div className="grid gap-1">
               {skills.map((row) => (
-                <div className="grid gap-2 rounded bg-slate-950 p-2 lg:grid-cols-[1fr_8rem_6rem]" key={`${row.source}-${row.index}`}>
+                <div className="grid gap-2 rounded bg-slate-950 p-2 lg:grid-cols-[1fr_8rem_1fr_8rem_8rem_6rem]" key={`${row.source}-${row.index}`}>
                   <input aria-label="Skill id" className="min-w-0 rounded bg-slate-900 px-2 py-1.5 text-sm" onChange={(event) => updateSkill(row, { id: toKebabInput(event.target.value) })} value={row.item.id} />
                   <input aria-label="Skill max level" className="min-w-0 rounded bg-slate-900 px-2 py-1.5 text-sm" min="1" onChange={(event) => updateSkill(row, { maxLevel: Number(event.target.value) })} type="number" value={row.item.maxLevel} />
+                  <input aria-label={t('contribution.column.stat')} className="min-w-0 rounded bg-slate-900 px-2 py-1.5 text-sm" list="content-stat-ids" onChange={(event) => updateSkill(row, { statId: toKebabInput(event.target.value) || undefined })} value={row.item.statId ?? ''} />
+                  <input aria-label={t('contribution.column.addedPerLevel')} className="min-w-0 rounded bg-slate-900 px-2 py-1.5 text-sm" onChange={(event) => updateSkill(row, { addedPerLevel: event.target.value === '' ? undefined : Number(event.target.value) })} placeholder="1" type="number" value={row.item.addedPerLevel ?? ''} />
+                  <input aria-label={t('contribution.column.increasedPerLevel')} className="min-w-0 rounded bg-slate-900 px-2 py-1.5 text-sm" onChange={(event) => updateSkill(row, { increasedPerLevel: event.target.value === '' ? undefined : Number(event.target.value) })} placeholder="0.01" step="0.01" type="number" value={row.item.increasedPerLevel ?? ''} />
                   <button className={removeButtonClass} onClick={() => removeRow('skills', row)} type="button">
                     {t('contribution.column.remove')}
                   </button>
@@ -787,7 +776,7 @@ export const ContentDataEditor = ({ baseBundle, bundle, draft, onPatch, t }: Con
         </section>
       )}
 
-      {activeTab === 'stats' && (
+      {activeTab === 'primitives' && (
         <section className="grid gap-2 rounded border border-slate-700 p-2">
           <div className="flex items-center justify-between gap-3">
             <h3 className="text-sm font-semibold text-slate-100">{t('contribution.data.stats')}</h3>
@@ -802,7 +791,7 @@ export const ContentDataEditor = ({ baseBundle, bundle, draft, onPatch, t }: Con
               {stats.map((row) => (
                 <div className="flex flex-wrap items-start gap-2 rounded bg-slate-950 p-2" key={`${row.source}-${row.index}`}>
                   <div className="min-w-0 flex-1">
-                    <StructuredDataEditor label="contribution.data.statFields" onChange={(value) => { if (value) updateStat(row, value as unknown as StatDefinition); }} schema={statDefinitionSchema(bundle)} t={t} value={row.item as unknown as StructuredValue} />
+                    <StructuredDataEditor label="contribution.data.statFields" onChange={(value) => { if (value) updateStat(row, value as unknown as StatDefinition); }} schema={statDefinitionSchema()} t={t} value={row.item as unknown as StructuredValue} />
                   </div>
                   <button className={removeButtonClass} onClick={() => removeRow('stats', row)} type="button">{t('contribution.column.remove')}</button>
                 </div>
@@ -812,7 +801,7 @@ export const ContentDataEditor = ({ baseBundle, bundle, draft, onPatch, t }: Con
         </section>
       )}
 
-      {activeTab === 'profiles' && (
+      {activeTab === 'primitives' && (
         <section className="grid gap-2 rounded border border-slate-700 p-2">
           <div>
             <h3 className="text-sm font-semibold text-slate-100">{t('contribution.data.playerProfiles')}</h3>
@@ -841,7 +830,7 @@ export const ContentDataEditor = ({ baseBundle, bundle, draft, onPatch, t }: Con
         </section>
       )}
 
-      {activeTab === 'interactions' && (
+      {activeTab === 'primitives' && (
         <section className="grid gap-1 rounded border border-slate-700 p-2">
           <div className="flex items-center justify-between gap-3">
             <h3 className="text-sm font-semibold text-slate-100">{t('contribution.data.interactions')}</h3>
@@ -974,7 +963,7 @@ export const ContentDataEditor = ({ baseBundle, bundle, draft, onPatch, t }: Con
         </section>
       )}
 
-      {activeTab === 'items' && (
+      {activeTab === 'primitives' && (
         <section className="grid gap-1 rounded border border-slate-700 p-2">
           <div className="flex items-center justify-between gap-3">
             <h3 className="text-sm font-semibold text-slate-100">{t('contribution.data.items')}</h3>
@@ -1006,7 +995,7 @@ export const ContentDataEditor = ({ baseBundle, bundle, draft, onPatch, t }: Con
         </section>
       )}
 
-      {activeTab === 'flags' && (
+      {activeTab === 'primitives' && (
         <section className="grid gap-1 rounded border border-slate-700 p-2">
           <div className="flex items-center justify-between gap-3">
             <h3 className="text-sm font-semibold text-slate-100">{t('contribution.data.flags')}</h3>
@@ -1110,4 +1099,3 @@ export const ContentDataEditor = ({ baseBundle, bundle, draft, onPatch, t }: Con
     </section>
   );
 };
-

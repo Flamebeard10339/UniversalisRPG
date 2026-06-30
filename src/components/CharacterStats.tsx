@@ -1,6 +1,5 @@
-import { skillTitleKey, statTitleKey } from '../game/contentIds';
-import { getCharacterStatValue } from '../game/characterStats';
-import { skillLevelFromXp } from '../game/skills';
+import { statTitleKey } from '../game/contentIds';
+import { getCharacterStatTotals } from '../game/characterStats';
 import type { ContentBundle, UniversePlayState } from '../game/types';
 import type { Translator } from '../game/i18n';
 import { ResourceStatus } from './ResourceStatus';
@@ -29,22 +28,19 @@ export const CharacterStats = ({ bundle, playState, t }: CharacterStatsProps) =>
               <th className="py-2 pr-3 font-medium">{t('characterStats.column.added')}</th>
               <th className="py-2 pr-3 font-medium">{t('characterStats.column.increased')}</th>
               <th className="py-2 pr-3 font-medium">{t('characterStats.column.effective')}</th>
-              <th className="py-2 pr-3 font-medium">{t('characterStats.column.skill')}</th>
             </tr>
           </thead>
           <tbody>
             {bundle.stats.map((stat) => {
-              const skillLevel = stat.skillId ? skillLevelFromXp(playState.skillXp[stat.skillId] ?? 0) : 0;
-              const effective = getCharacterStatValue(playState, bundle.stats, stat.id, bundle.manifest.basePlayer);
+              const totals = getCharacterStatTotals(playState, bundle.stats, stat.id, bundle.skills);
 
               return (
                 <tr className="border-b border-slate-800/80 text-slate-200" key={stat.id}>
                   <td className="py-2 pr-3 font-semibold text-slate-100">{t(statTitleKey(stat.id), stat.id)}</td>
-                  <td className="py-2 pr-3">{formatNumber(bundle.manifest.basePlayer?.stats?.[stat.id] ?? stat.base ?? 0)}</td>
-                  <td className="py-2 pr-3">{formatNumber(stat.added ?? 0)}</td>
-                  <td className="py-2 pr-3">{formatNumber(stat.increased ?? 0)}</td>
-                  <td className="py-2 pr-3 text-cyan-100">{formatNumber(effective)}</td>
-                  <td className="py-2 pr-3">{stat.skillId ? `${t(skillTitleKey(stat.skillId), stat.skillId)} (+${formatNumber(skillLevel)})` : t('characterStats.noSkill')}</td>
+                  <td className="py-2 pr-3">{formatNumber(totals.base)}</td>
+                  <td className="py-2 pr-3">{formatNumber(totals.added)}</td>
+                  <td className="py-2 pr-3">{formatNumber(totals.increased)}</td>
+                  <td className="py-2 pr-3 text-cyan-100">{formatNumber(totals.effectiveTotal)}</td>
                 </tr>
               );
             })}

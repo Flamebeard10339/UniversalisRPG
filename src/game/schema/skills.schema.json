@@ -8,7 +8,10 @@
     "additionalProperties": false,
     "properties": {
       "id": { "type": "string", "minLength": 1 },
-      "maxLevel": { "type": "integer", "minimum": 1 }
+      "maxLevel": { "type": "integer", "minimum": 1 },
+      "statId": { "type": "string", "minLength": 1 },
+      "addedPerLevel": { "type": "number" },
+      "increasedPerLevel": { "type": "number" }
     }
   }
 }

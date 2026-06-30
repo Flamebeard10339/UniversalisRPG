@@ -21,18 +21,18 @@ const bundle: ContentBundle = {
   edges: [],
   actions: [],
   skills: [
-    { id: 'attack', maxLevel: 100 },
-    { id: 'defense', maxLevel: 100 },
-    { id: 'woodcutting', maxLevel: 100 },
-    { id: 'regeneration', maxLevel: 100 },
+    { id: 'attack', maxLevel: 100, statId: 'attack' },
+    { id: 'defense', maxLevel: 100, statId: 'defense' },
+    { id: 'woodcutting', maxLevel: 100, statId: 'woodcutting' },
+    { id: 'regeneration', maxLevel: 100, statId: 'regeneration' },
   ],
   stats: [
-    { id: 'attack', base: 6, skillId: 'attack' },
-    { id: 'defense', base: 6, skillId: 'defense' },
-    { id: 'woodcutting', base: 0, skillId: 'woodcutting' },
+    { id: 'attack', base: 6 },
+    { id: 'defense', base: 6 },
+    { id: 'woodcutting', base: 0 },
     { id: 'action-rate', base: 25 },
     { id: 'health', base: 100 },
-    { id: 'regeneration', skillId: 'regeneration' },
+    { id: 'regeneration' },
   ],
   items: [],
   flags: [],
@@ -59,16 +59,16 @@ describe('debug player profiles', () => {
     const sword = DEBUG_PLAYER_PROFILES.find((profile) => profile.id === 'trained-10-sword')!;
     const shield = DEBUG_PLAYER_PROFILES.find((profile) => profile.id === 'trained-10-shield')!;
 
-    expect(getProfileStatValue(bundle, sword, 'attack')).toBeCloseTo(24.15, 5);
-    expect(getProfileStatValue(bundle, sword, 'defense')).toBe(16);
-    expect(getProfileStatValue(bundle, shield, 'attack')).toBe(16);
-    expect(getProfileStatValue(bundle, shield, 'defense')).toBeCloseTo(24.15, 5);
+    expect(getProfileStatValue(bundle, sword, 'attack')).toBeCloseTo(26.25, 5);
+    expect(getProfileStatValue(bundle, sword, 'defense')).toBeCloseTo(17.6, 5);
+    expect(getProfileStatValue(bundle, shield, 'attack')).toBeCloseTo(17.6, 5);
+    expect(getProfileStatValue(bundle, shield, 'defense')).toBeCloseTo(26.25, 5);
   });
 
   it('summarizes profile stats sorted by effective total', () => {
     const sword = DEBUG_PLAYER_PROFILES.find((profile) => profile.id === 'trained-10-sword')!;
 
-    expect(getProfileStatSummary(bundle, sword)).toMatch(/^Health 100, Action Rate 25, Attack 24.1, Defense 16/);
+    expect(getProfileStatSummary(bundle, sword)).toMatch(/^Health 100, Attack 26.3, Action Rate 25, Defense 17.6/);
   });
 
   it('computes balance rows from profile stats and universe combat balance', () => {

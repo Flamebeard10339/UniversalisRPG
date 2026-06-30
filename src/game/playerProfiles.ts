@@ -76,7 +76,7 @@ export const getProfileStatValue = (
   bundle: Pick<ContentBundle, 'manifest' | 'locations' | 'skills' | 'stats'>,
   profile: PlayerProfileDefinition,
   statId: string,
-) => getCharacterStatValue(createProfileState(bundle, profile), bundle.stats, statId, bundle.manifest.basePlayer);
+) => getCharacterStatValue(createProfileState(bundle, profile), bundle.stats, statId, bundle.skills);
 
 const titleCaseId = (id: string) =>
   id.split('-').filter(Boolean).map((part) => `${part.slice(0, 1).toUpperCase()}${part.slice(1)}`).join(' ');
@@ -94,7 +94,7 @@ export const getProfileStatSummary = (
     .map((stat) => ({
       id: stat.id,
       label: t ? t(statTitleKey(stat.id), titleCaseId(stat.id)) : titleCaseId(stat.id),
-      value: getCharacterStatValue(state, bundle.stats, stat.id, bundle.manifest.basePlayer),
+      value: getCharacterStatValue(state, bundle.stats, stat.id, bundle.skills),
     }))
     .sort((left, right) => right.value - left.value || left.label.localeCompare(right.label))
     .map((stat) => `${stat.label} ${formatStatValue(stat.value)}`)

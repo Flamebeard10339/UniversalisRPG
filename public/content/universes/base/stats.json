@@ -1,8 +1,8 @@
 [
-  { "id": "attack", "skillId": "attack" },
-  { "id": "defense", "skillId": "defense" },
-  { "id": "woodcutting", "skillId": "woodcutting" },
-  { "id": "action-rate" },
-  { "id": "health" },
-  { "id": "regeneration" }
+  { "id": "attack", "base": 6 },
+  { "id": "defense", "base": 6 },
+  { "id": "woodcutting", "base": 6 },
+  { "id": "action-rate", "base": 25 },
+  { "id": "health", "base": 100 },
+  { "id": "regeneration", "base": 10 }
 ]

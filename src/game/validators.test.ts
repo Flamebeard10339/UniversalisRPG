@@ -32,7 +32,7 @@ describe('universe manifest validation', () => {
   it('accepts omitted or explicit combat balance', () => {
     expect(validateManifest(manifest())).toBe(true);
     expect(validateManifest(manifest({
-      basePlayer: { stats: { health: 100, regeneration: 10 }, inventory: {} },
+      basePlayer: { inventory: {} },
       combatBalance: { expectedHitsToKill: 1 / 7, combatSpread: 1 },
     }))).toBe(true);
   });

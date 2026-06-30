@@ -44,27 +44,20 @@ const runningState = () => {
 };
 
 describe('resource projection', () => {
-  it('calculates explicit stats from base, added, increased, and an associated skill level', () => {
+  it('calculates stat added and increased components from attached skill levels', () => {
     const state = { ...createInitialPlayState('test', 'room'), skillXp: { endurance: 90 } };
-    const stats = [{ id: 'air-capacity', base: 100, added: 10, increased: 0.5, skillId: 'endurance' }];
+    const stats = [{ id: 'air-capacity', base: 100 }];
+    const skills = [{ id: 'endurance', maxLevel: 100, statId: 'air-capacity' }];
 
-    expect(getCharacterStatValue(state, stats, 'air-capacity')).toBe(171);
-    expect(getCharacterStatValue({ ...state, statOverrides: { 'air-capacity': 42 } }, stats, 'air-capacity')).toBe(42);
+    expect(getCharacterStatValue(state, stats, 'air-capacity', skills)).toBeCloseTo(108.16);
+    expect(getCharacterStatValue({ ...state, statOverrides: { 'air-capacity': 42 } }, stats, 'air-capacity', skills)).toBe(42);
   });
 
-  it('projects resources from base player stats when stat definitions only declare ids', () => {
+  it('projects resources from stat definition bases', () => {
     const state = createInitialPlayState('test', 'room');
     const baseStatBundle = {
       ...bundle,
-      manifest: {
-        ...bundle.manifest,
-        basePlayer: {
-          stats: {
-            'air-capacity': 100,
-          },
-        },
-      },
-      stats: [{ id: 'air-capacity' }, { id: 'air-loss' }],
+      stats: [{ id: 'air-capacity', base: 100 }, { id: 'air-loss' }],
     };
 
     const projected = projectResourcePool(baseStatBundle, state, baseStatBundle.resourceDefinitions[0], 1_000);
@@ -75,15 +68,7 @@ describe('resource projection', () => {
   it('refills full resources when recovering a stale zero-capacity pool', () => {
     const baseStatBundle = {
       ...bundle,
-      manifest: {
-        ...bundle.manifest,
-        basePlayer: {
-          stats: {
-            'air-capacity': 100,
-          },
-        },
-      },
-      stats: [{ id: 'air-capacity' }, { id: 'air-loss' }],
+      stats: [{ id: 'air-capacity', base: 100 }, { id: 'air-loss' }],
     };
     const state = {
       ...createInitialPlayState('test', 'room'),

@@ -113,10 +113,7 @@ export const effectDefinitionSchema = (bundle: ContentBundle): StructuredSchema 
   locationId: { label: 'contribution.column.location', schema: string(bundle.locations.map((item) => item.id)), optional: true },
 } });
 
-export const statDefinitionSchema = (bundle: ContentBundle): StructuredSchema => ({ kind: 'object', fields: {
+export const statDefinitionSchema = (): StructuredSchema => ({ kind: 'object', fields: {
   id: { label: 'contribution.column.id', schema: string() },
   base: { label: 'contribution.column.base', schema: number(), optional: true, defaultValue: 0 },
-  added: { label: 'contribution.column.added', schema: number(), optional: true, defaultValue: 0 },
-  increased: { label: 'contribution.column.increased', schema: number(), optional: true, defaultValue: 0 },
-  skillId: { label: 'contribution.column.skill', schema: string(bundle.skills.map((item) => item.id)), optional: true },
 } });

@@ -133,7 +133,7 @@ export const normalizePlayState = (
   const runId = state.runId ?? `run-${Date.now().toString(36)}`;
 
   return {
-    ...createInitialPlayState(universeId, startingLocationId),
+    ...createInitialPlayState(universeId, startingLocationId, context),
     ...state,
     runId,
     activeAction: state.activeAction
@@ -159,7 +159,9 @@ export const normalizePlayState = (
     actionCompletions: state.actionCompletions ?? {},
     statOverrides: state.statOverrides ?? {},
     equipmentSkillBonuses: state.equipmentSkillBonuses ?? {},
-    actionLoopingEnabled: state.actionLoopingEnabled ?? resolveManifestUiSettings(context?.manifest).loopActionsByDefault,
+    actionLoopingEnabled: context?.manifest
+      ? resolveManifestUiSettings(context.manifest).loopActionsByDefault
+      : state.actionLoopingEnabled ?? resolveManifestUiSettings().loopActionsByDefault,
     playerHealth: state.playerHealth ?? 0,
     playerMaxHealth: state.playerMaxHealth ?? 0,
     chatMessages: state.chatMessages ?? [],
@@ -167,6 +169,16 @@ export const normalizePlayState = (
     nextRunLogSequence: state.nextRunLogSequence ?? ((state.runLog?.length ?? 0) + 1),
   };
 };
+
+const applyManifestRuntimeSettings = (
+  state: UniversePlayState,
+  context: Pick<ActionResolutionContext, 'manifest'>,
+): UniversePlayState => context.manifest
+  ? {
+      ...state,
+      actionLoopingEnabled: resolveManifestUiSettings(context.manifest).loopActionsByDefault,
+    }
+  : state;
 
 const pauseRunningAction = (state: UniversePlayState, now: number, context?: ActionResolutionContext) => {
   if (!state.activeAction) {
@@ -311,7 +323,7 @@ const ensureWorldState = (
     }
   }
 
-  return ensureResourcePools({ ...state, inventory, flags }, context);
+  return applyManifestRuntimeSettings(ensureResourcePools({ ...state, inventory, flags }, context), context);
 };
 
 const resetOwnedResourcePools = (
@@ -459,7 +471,6 @@ export const applyStateReset = (
     chatMessages: state.chatMessages,
     runLog: state.runLog,
     nextRunLogSequence: state.nextRunLogSequence,
-    actionLoopingEnabled: state.actionLoopingEnabled,
     runId: state.runId,
     lastTickAt: now,
   };
@@ -906,6 +917,7 @@ const completeActionWithResult = (
   options: { random?: () => number } = {},
   now = Date.now(),
 ): ActionCompletionResult => {
+  state = applyManifestRuntimeSettings(state, context);
   let damage = 0;
   let remainingHealth: number | null = null;
   const enemy = getEnemy(action, context);

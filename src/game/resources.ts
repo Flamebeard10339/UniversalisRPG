@@ -2,7 +2,7 @@ import { getCharacterStatValue } from './characterStats';
 import { evaluateCondition } from './conditions';
 import { getEnemy } from './adversarial';
 import { getEnemyStat } from './enemies';
-import type { ActionResolutionContext, BasePlayerDefinition, ContentBundle, EffectDefinition, ResourceDefinition, ResourcePool, UniversePlayState } from './types';
+import type { ActionResolutionContext, ContentBundle, EffectDefinition, ResourceDefinition, ResourcePool, UniversePlayState } from './types';
 
 export const isEffectApplicable = (
   context: Pick<ActionResolutionContext, 'actions' | 'effects' | 'enemies' | 'flags' | 'interactionTypes' | 'items' | 'locations' | 'manifest' | 'resourceDefinitions' | 'skills' | 'stats'>,
@@ -42,7 +42,7 @@ export const getEffectRatePerMinute = (
     return enemy ? getEnemyStat(enemy, effect.sourceEnemyStat) : 0;
   }
 
-  return getCharacterStatValue(state, context.stats ?? [], effect.sourceStat, context.manifest?.basePlayer);
+  return getCharacterStatValue(state, context.stats ?? [], effect.sourceStat, context.skills);
 };
 
 export const getEffectDeltaPerMinute = (
@@ -58,8 +58,8 @@ export const getResourceMax = (
   state: UniversePlayState,
   stats: ContentBundle['stats'],
   resource: ResourceDefinition,
-  basePlayer?: BasePlayerDefinition,
-) => Math.max(0, resource.max ?? getCharacterStatValue(state, stats, resource.sourceStat, basePlayer));
+  skills: ContentBundle['skills'] = [],
+) => Math.max(0, resource.max ?? getCharacterStatValue(state, stats, resource.sourceStat, skills));
 
 export const getResourceMaxForContext = (
   context: Pick<ActionResolutionContext, 'actions' | 'enemies' | 'manifest' | 'skills' | 'stats'>,
@@ -79,7 +79,7 @@ export const getResourceMaxForContext = (
     return Math.max(0, enemy ? getEnemyStat(enemy, resource.sourceEnemyStat) : 0);
   }
 
-  return getResourceMax(state, context.stats ?? [], resource, context.manifest?.basePlayer);
+  return getResourceMax(state, context.stats ?? [], resource, context.skills);
 };
 
 const basePool = (bundle: ContentBundle, state: UniversePlayState, resource: ResourceDefinition): ResourcePool => {

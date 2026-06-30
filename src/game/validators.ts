@@ -101,7 +101,7 @@ export const validateManifest = (value: unknown): value is UniverseManifest =>
   value.files.every((file) => typeof file === 'string') &&
   (value.basePlayer === undefined ||
     (isRecord(value.basePlayer) &&
-      (value.basePlayer.stats === undefined || (isRecord(value.basePlayer.stats) && Object.values(value.basePlayer.stats).every((stat) => typeof stat === 'number' && Number.isFinite(stat)))) &&
+      value.basePlayer.stats === undefined &&
       (value.basePlayer.inventory === undefined || (isRecord(value.basePlayer.inventory) && Object.values(value.basePlayer.inventory).every((amount) => typeof amount === 'number' && Number.isFinite(amount)))))) &&
   (value.combatBalance === undefined ||
     (isRecord(value.combatBalance) &&
@@ -188,16 +188,19 @@ const validateSkillsShape = (skills: unknown): skills is SkillDefinition[] =>
     (skill) =>
       isRecord(skill) &&
       hasString(skill, 'id') &&
-      hasNumber(skill, 'maxLevel'),
+      hasNumber(skill, 'maxLevel') &&
+      (skill.statId === undefined || hasString(skill, 'statId')) &&
+      (skill.addedPerLevel === undefined || hasNumber(skill, 'addedPerLevel')) &&
+      (skill.increasedPerLevel === undefined || hasNumber(skill, 'increasedPerLevel')),
   );
 
 const validateStatsShape = (stats: unknown): stats is StatDefinition[] =>
   Array.isArray(stats) && stats.every((stat) => isRecord(stat)
     && hasString(stat, 'id')
     && (stat.base === undefined || hasNumber(stat, 'base'))
-    && (stat.added === undefined || hasNumber(stat, 'added'))
-    && (stat.increased === undefined || hasNumber(stat, 'increased'))
-    && (stat.skillId === undefined || hasString(stat, 'skillId')));
+    && stat.added === undefined
+    && stat.increased === undefined
+    && stat.skillId === undefined);
 
 const validateItemsShape = (items: unknown): items is ItemDefinition[] =>
   items === undefined ||
@@ -498,11 +501,11 @@ export const validateContentReferences = (bundle: ContentBundle) => {
     if (!isKebabCaseId(skill.id)) {
       issues.push(error(`skills.${skill.id}.id`, 'validation.skillIdKebab'));
     }
+    if (skill.statId && !statIds.has(skill.statId)) issues.push(error(`skills.${skill.id}.statId`, 'validation.unknownStat', { id: skill.statId }));
   }
 
   for (const stat of bundle.stats) {
     if (!isKebabCaseId(stat.id)) issues.push(error(`stats.${stat.id}.id`, 'validation.statIdKebab'));
-    if (stat.skillId && !skillIds.has(stat.skillId)) issues.push(error(`stats.${stat.id}.skillId`, 'validation.unknownSkill', { id: stat.skillId }));
   }
 
   for (const resource of bundle.resourceDefinitions ?? []) {

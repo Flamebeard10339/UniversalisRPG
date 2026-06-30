@@ -13,18 +13,22 @@
   },
   {
     "id": "woodcutting",
-    "maxLevel": 100
+    "maxLevel": 100,
+    "statId": "woodcutting"
   },
   {
     "id": "attack",
-    "maxLevel": 100
+    "maxLevel": 100,
+    "statId": "attack"
   },
   {
     "id": "defense",
-    "maxLevel": 100
+    "maxLevel": 100,
+    "statId": "defense"
   },
   {
     "id": "regeneration",
-    "maxLevel": 100
+    "maxLevel": 100,
+    "statId": "regeneration"
   }
 ]
