@@ -13,6 +13,7 @@
       "sourceEnemyStat": { "enum": ["attack", "defense", "health", "rate", "regeneration", "armorPenetration", "torpidity", "critChance", "critMultiplier"] },
       "max": { "type": "number", "minimum": 0 },
       "initialValue": { "enum": ["empty", "full"] },
+      "display": { "enum": ["full", "minimal", "hidden"] },
       "hidden": { "type": "boolean" },
       "onEmpty": { "type": "array", "items": { "$ref": "#/$defs/behavior" } },
       "onFull": { "type": "array", "items": { "$ref": "#/$defs/behavior" } }

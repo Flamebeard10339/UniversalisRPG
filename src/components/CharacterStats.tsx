@@ -54,7 +54,7 @@ export const CharacterStats = ({ bundle, playState, t }: CharacterStatsProps) =>
     </section>
 
     <section className="rounded border border-slate-800 bg-slate-900 p-4">
-      <ResourceStatus bundle={bundle} playState={playState} showEffects t={t} />
+      <ResourceStatus bundle={bundle} includeMinimal={false} playState={playState} showEffects t={t} />
     </section>
   </section>
 );

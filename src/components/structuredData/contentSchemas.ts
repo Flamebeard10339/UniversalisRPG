@@ -95,6 +95,7 @@ export const resourceDefinitionSchema = (bundle: ContentBundle): StructuredSchem
   sourceStat: { label: 'contribution.column.sourceStat', schema: string(bundle.stats.map((item) => item.id)) },
   sourceEnemyStat: { schema: { kind: 'enum', options: ['attack', 'defense', 'health', 'rate', 'regeneration', 'armorPenetration', 'torpidity', 'critChance', 'critMultiplier'] }, optional: true },
   max: { schema: number(0), optional: true, defaultValue: 0 },
+  display: { label: 'contribution.column.display', schema: { kind: 'enum', options: ['full', 'minimal', 'hidden'] }, optional: true, defaultValue: 'full' },
   hidden: { schema: boolean, optional: true, defaultValue: false },
   initialValue: { label: 'contribution.column.initialValue', schema: { kind: 'enum', options: ['full', 'empty'] }, optional: true, defaultValue: 'full' },
   onEmpty: { label: 'contribution.column.onEmpty', schema: { kind: 'array', item: boundarySchema(bundle), createItem: () => ({ kind: 'stop-action' }) }, optional: true, defaultValue: [] },

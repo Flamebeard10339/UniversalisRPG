@@ -181,6 +181,7 @@ export type ResourceDefinition = {
   sourceEnemyStat?: EnemyStatKey;
   max?: number;
   initialValue?: 'empty' | 'full';
+  display?: 'full' | 'minimal' | 'hidden';
   hidden?: boolean;
   onEmpty?: ResourceBoundaryBehavior[];
   onFull?: ResourceBoundaryBehavior[];

@@ -234,6 +234,7 @@ const validateResourceDefinitionsShape = (resources: unknown): resources is Reso
         hasString(resource, 'sourceStat') &&
         (resource.sourceEnemyStat === undefined || ['attack', 'defense', 'health', 'rate', 'regeneration', 'armorPenetration', 'torpidity', 'critChance', 'critMultiplier'].includes(String(resource.sourceEnemyStat))) &&
         (resource.max === undefined || (typeof resource.max === 'number' && Number.isFinite(resource.max) && resource.max >= 0)) &&
+        (resource.display === undefined || resource.display === 'full' || resource.display === 'minimal' || resource.display === 'hidden') &&
         (resource.hidden === undefined || typeof resource.hidden === 'boolean') &&
         (resource.initialValue === undefined || resource.initialValue === 'empty' || resource.initialValue === 'full') &&
         (resource.onEmpty === undefined || (Array.isArray(resource.onEmpty) && resource.onEmpty.every(validateResourceBehaviorShape))) &&

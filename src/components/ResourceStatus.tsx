@@ -8,6 +8,7 @@ import { useNow } from '../hooks/useNow';
 
 type ResourceStatusProps = {
   bundle: ContentBundle;
+  includeMinimal?: boolean;
   owner?: 'player' | 'enemy';
   playState: UniversePlayState;
   showEffects?: boolean;
@@ -40,12 +41,15 @@ type ResourceRowProps = {
   now: number;
 };
 
+const resourceDisplay = (resource: ResourceDefinition) => resource.display ?? (resource.hidden ? 'hidden' : 'full');
+
 const ResourceRow = ({ bundle, floatingTexts, playState, pool, resource, showEffects, t, now }: ResourceRowProps) => {
   const percent = Math.min(100, Math.max(0, ((pool.current - pool.min) / Math.max(1, pool.max - pool.min)) * 100));
   const [afterPercent, setAfterPercent] = useState(percent);
   const previousPercent = useRef(percent);
   const catchupTimeout = useRef<number | null>(null);
   const effects = (bundle.effects ?? []).filter((effect) => effect.resourceId === resource.id);
+  const minimal = resourceDisplay(resource) === 'minimal';
 
   useEffect(() => {
     const previous = previousPercent.current;
@@ -69,8 +73,8 @@ const ResourceRow = ({ bundle, floatingTexts, playState, pool, resource, showEff
   }, [percent]);
 
   return (
-    <section className="relative grid gap-2 overflow-hidden rounded border border-slate-800 bg-slate-950 p-3">
-      {floatingTexts.map((text) => {
+    <section className={`relative grid overflow-hidden rounded border border-slate-800 bg-slate-950 ${minimal ? 'p-1' : 'gap-2 p-3'}`}>
+      {!minimal && floatingTexts.map((text) => {
         const progress = Math.min(1, Math.max(0, (now - text.createdAt) / text.durationMs));
         return (
           <div
@@ -85,22 +89,24 @@ const ResourceRow = ({ bundle, floatingTexts, playState, pool, resource, showEff
           </div>
         );
       })}
-      <div className="flex items-baseline justify-between gap-3">
-        <span className="text-sm font-semibold text-slate-100">{t(resourceTitleKey(resource.id), resource.id)}</span>
-        <span className="text-xs text-slate-300">
-          {t('resources.value', {
-            current: formatNumber(pool.current),
-            min: formatNumber(pool.min),
-            max: formatNumber(pool.max),
-          })}
-        </span>
-      </div>
+      {!minimal && (
+        <div className="flex items-baseline justify-between gap-3">
+          <span className="text-sm font-semibold text-slate-100">{t(resourceTitleKey(resource.id), resource.id)}</span>
+          <span className="text-xs text-slate-300">
+            {t('resources.value', {
+              current: formatNumber(pool.current),
+              min: formatNumber(pool.min),
+              max: formatNumber(pool.max),
+            })}
+          </span>
+        </div>
+      )}
       <div className="relative h-2 overflow-hidden rounded bg-slate-800">
         <div className="absolute inset-y-0 left-0 bg-slate-500/70 transition-[width] duration-300" style={{ width: `${afterPercent}%` }} />
         <div className="absolute inset-y-0 left-0 bg-rose-400" style={{ width: `${percent}%` }} />
       </div>
 
-      {showEffects && (
+      {showEffects && !minimal && (
         <div className="grid gap-1 border-t border-slate-800 pt-2 text-xs">
           {effects.length === 0 ? (
             <p className="text-slate-500">{t('resources.effects.empty')}</p>
@@ -131,8 +137,13 @@ const ResourceRow = ({ bundle, floatingTexts, playState, pool, resource, showEff
 const messageSignature = (id: number, index: number, count: number, createdAt: number) =>
   `${id}:${index}:${count}:${createdAt}`;
 
-export const ResourceStatus = ({ bundle, owner = 'player', playState, showEffects = false, showTitle = true, t }: ResourceStatusProps) => {
-  const resources = (bundle.resourceDefinitions ?? []).filter((resource) => !resource.hidden && (resource.owner ?? 'player') === owner);
+export const ResourceStatus = ({ bundle, includeMinimal = true, owner = 'player', playState, showEffects = false, showTitle = true, t }: ResourceStatusProps) => {
+  const resources = (bundle.resourceDefinitions ?? []).filter((resource) => {
+    const display = resourceDisplay(resource);
+    return display !== 'hidden'
+      && (display !== 'minimal' || (includeMinimal && Boolean(playState.activeAction)))
+      && (resource.owner ?? 'player') === owner;
+  });
   const [floatingTexts, setFloatingTexts] = useState<ResourceFloatingText[]>([]);
   const now = useNow(Boolean(playState.activeAction) || floatingTexts.length > 0, 100);
   const seenMessageIds = useRef<Set<string> | null>(null);

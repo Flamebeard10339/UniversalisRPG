@@ -72,7 +72,7 @@ describe('universe manifest validation', () => {
         sourceStat: 'action-rate',
         max: 60,
         initialValue: 'empty',
-        hidden: false,
+        display: 'minimal',
         onFull: [
           { kind: 'complete-action' },
           { kind: 'refill', value: 'min' },
@@ -83,7 +83,7 @@ describe('universe manifest validation', () => {
         sourceStat: 'action-rate',
         max: 60,
         initialValue: 'empty',
-        hidden: false,
+        display: 'minimal',
         onFull: [
           { kind: 'enemy-attack' },
           { kind: 'refill', value: 'min' },
