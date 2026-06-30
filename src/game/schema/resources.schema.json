@@ -8,7 +8,9 @@
     "additionalProperties": false,
     "properties": {
       "id": { "type": "string", "minLength": 1 },
+      "owner": { "enum": ["player", "enemy"] },
       "sourceStat": { "type": "string", "minLength": 1 },
+      "sourceEnemyStat": { "enum": ["attack", "defense", "health", "rate", "regeneration", "armorPenetration", "torpidity", "critChance", "critMultiplier"] },
       "max": { "type": "number", "minimum": 0 },
       "initialValue": { "enum": ["empty", "full"] },
       "hidden": { "type": "boolean" },
@@ -33,6 +35,7 @@
       "oneOf": [
         { "type": "object", "required": ["kind"], "additionalProperties": false, "properties": { "kind": { "const": "stop-action" } } },
         { "type": "object", "required": ["kind"], "additionalProperties": false, "properties": { "kind": { "const": "complete-action" } } },
+        { "type": "object", "required": ["kind"], "additionalProperties": false, "properties": { "kind": { "const": "enemy-attack" } } },
         { "type": "object", "required": ["kind", "value"], "additionalProperties": false, "properties": { "kind": { "const": "refill" }, "value": { "oneOf": [{ "const": "min" }, { "const": "max" }, { "type": "number" }] } } },
         { "type": "object", "required": ["kind", "locationId"], "additionalProperties": false, "properties": { "kind": { "const": "relocate" }, "locationId": { "type": "string", "minLength": 1 } } },
         { "type": "object", "required": ["kind", "messageKey"], "additionalProperties": false, "properties": { "kind": { "const": "chat" }, "messageKey": { "type": "string", "minLength": 1 } } },

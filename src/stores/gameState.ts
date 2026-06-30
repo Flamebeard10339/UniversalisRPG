@@ -168,8 +168,6 @@ export const useGameState = create<GameStateStore>((set, get) => ({
             elapsedMs: progress.elapsedMs + Math.max(0, now - (progress.runningSince ?? resolved.activeAction.startedAt)),
             runningSince: null,
             targetHealth: resolved.activeAction.targetHealth ?? progress.targetHealth ?? null,
-            enemyAttackStartedAt: resolved.activeAction.enemyAttackStartedAt ?? progress.enemyAttackStartedAt ?? null,
-            enemyAttackCompletesAt: resolved.activeAction.enemyAttackCompletesAt ?? progress.enemyAttackCompletesAt ?? null,
           },
         },
         lastTickAt: now,

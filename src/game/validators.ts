@@ -215,6 +215,7 @@ const validateFlagsShape = (flags: unknown): flags is StateFlagDefinition[] =>
 const validateResourceBehaviorShape = (value: unknown) => isRecord(value) && (
   value.kind === 'stop-action'
   || value.kind === 'complete-action'
+  || value.kind === 'enemy-attack'
   || (value.kind === 'reset-state' && validateResetStateShape(value))
   || (value.kind === 'refill' && (value.value === 'min' || value.value === 'max' || typeof value.value === 'number'))
   || (value.kind === 'relocate' && hasString(value, 'locationId'))
@@ -228,7 +229,9 @@ const validateResourceDefinitionsShape = (resources: unknown): resources is Reso
       (resource) =>
         isRecord(resource) &&
         hasString(resource, 'id') &&
+        (resource.owner === undefined || resource.owner === 'player' || resource.owner === 'enemy') &&
         hasString(resource, 'sourceStat') &&
+        (resource.sourceEnemyStat === undefined || ['attack', 'defense', 'health', 'rate', 'regeneration', 'armorPenetration', 'torpidity', 'critChance', 'critMultiplier'].includes(String(resource.sourceEnemyStat))) &&
         (resource.max === undefined || (typeof resource.max === 'number' && Number.isFinite(resource.max) && resource.max >= 0)) &&
         (resource.hidden === undefined || typeof resource.hidden === 'boolean') &&
         (resource.initialValue === undefined || resource.initialValue === 'empty' || resource.initialValue === 'full') &&
@@ -245,6 +248,7 @@ const validateEffectsShape = (effects: unknown): effects is EffectDefinition[] =
         hasString(effect, 'id') &&
         hasString(effect, 'resourceId') &&
         hasString(effect, 'sourceStat') &&
+        (effect.sourceEnemyStat === undefined || ['attack', 'defense', 'health', 'rate', 'regeneration', 'armorPenetration', 'torpidity', 'critChance', 'critMultiplier'].includes(String(effect.sourceEnemyStat))) &&
         (effect.locationId === undefined || typeof effect.locationId === 'string') &&
         (effect.rateUnit === undefined || effect.rateUnit === 'per-minute' || effect.rateUnit === 'per-second') &&
         (effect.activeWhen === undefined || validateConditionShape(effect.activeWhen)) &&

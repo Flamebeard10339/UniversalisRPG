@@ -39,8 +39,6 @@ const runningState = () => {
       startedAt: 1_000,
       completesAt: 121_000,
       targetHealth: null,
-      enemyAttackStartedAt: null,
-      enemyAttackCompletesAt: null,
     },
   };
 };

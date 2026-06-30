@@ -1,5 +1,7 @@
 import { getCharacterStatValue } from './characterStats';
 import { evaluateCondition } from './conditions';
+import { getEnemy } from './adversarial';
+import { getEnemyStat } from './enemies';
 import type { ActionResolutionContext, BasePlayerDefinition, ContentBundle, EffectDefinition, ResourceDefinition, ResourcePool, UniversePlayState } from './types';
 
 export const isEffectApplicable = (
@@ -23,21 +25,32 @@ export const isEffectApplicable = (
   }));
 
 export const getEffectRatePerMinute = (
-  stats: ContentBundle['stats'],
+  context: Pick<ActionResolutionContext, 'actions' | 'enemies' | 'manifest' | 'skills' | 'stats'>,
   state: UniversePlayState,
   effect: EffectDefinition,
-  basePlayer?: BasePlayerDefinition,
 ) => {
-  return getCharacterStatValue(state, stats, effect.sourceStat, basePlayer);
+  if (effect.sourceEnemyStat && state.activeAction) {
+    const action = context.actions.find((candidate) => candidate.id === state.activeAction?.actionId);
+    const enemy = action ? getEnemy(action, {
+      actions: context.actions,
+      skills: context.skills,
+      stats: context.stats,
+      manifest: context.manifest,
+      interactionTypes: [],
+      enemies: context.enemies,
+    }) : null;
+    return enemy ? getEnemyStat(enemy, effect.sourceEnemyStat) : 0;
+  }
+
+  return getCharacterStatValue(state, context.stats ?? [], effect.sourceStat, context.manifest?.basePlayer);
 };
 
 export const getEffectDeltaPerMinute = (
-  stats: ContentBundle['stats'],
+  context: Pick<ActionResolutionContext, 'actions' | 'enemies' | 'manifest' | 'skills' | 'stats'>,
   state: UniversePlayState,
   effect: EffectDefinition,
-  basePlayer?: BasePlayerDefinition,
 ) => {
-  const rate = getEffectRatePerMinute(stats, state, effect, basePlayer);
+  const rate = getEffectRatePerMinute(context, state, effect);
   return effect.rateUnit === 'per-second' ? rate * 60 : rate;
 };
 
@@ -48,9 +61,39 @@ export const getResourceMax = (
   basePlayer?: BasePlayerDefinition,
 ) => Math.max(0, resource.max ?? getCharacterStatValue(state, stats, resource.sourceStat, basePlayer));
 
+export const getResourceMaxForContext = (
+  context: Pick<ActionResolutionContext, 'actions' | 'enemies' | 'manifest' | 'skills' | 'stats'>,
+  state: UniversePlayState,
+  resource: ResourceDefinition,
+) => {
+  if (resource.sourceEnemyStat && state.activeAction) {
+    const action = context.actions.find((candidate) => candidate.id === state.activeAction?.actionId);
+    const enemy = action ? getEnemy(action, {
+      actions: context.actions,
+      skills: context.skills,
+      stats: context.stats,
+      manifest: context.manifest,
+      interactionTypes: [],
+      enemies: context.enemies,
+    }) : null;
+    return Math.max(0, enemy ? getEnemyStat(enemy, resource.sourceEnemyStat) : 0);
+  }
+
+  return getResourceMax(state, context.stats ?? [], resource, context.manifest?.basePlayer);
+};
+
 const basePool = (bundle: ContentBundle, state: UniversePlayState, resource: ResourceDefinition): ResourcePool => {
+  if (resource.owner === 'enemy' && resource.sourceEnemyStat === 'health') {
+    const max = getResourceMaxForContext(bundle, state, resource);
+    return {
+      current: Math.min(max, Math.max(0, state.activeAction?.targetHealth ?? max)),
+      min: 0,
+      max,
+    };
+  }
+
   const existing = state.resourcePools[resource.id];
-  const max = getResourceMax(state, bundle.stats, resource, bundle.manifest.basePlayer);
+  const max = getResourceMaxForContext(bundle, state, resource);
   if (existing) {
     const wasUninitialized = existing.max <= existing.min && max > 0;
     const current = wasUninitialized && resource.initialValue !== 'empty'
@@ -73,7 +116,7 @@ export const getActiveResourceRate = (
   if (!state.activeAction) return 0;
   return bundle.effects
     .filter((effect) => effect.resourceId === resourceId && isEffectApplicable(bundle, state, effect))
-    .reduce((total, effect) => total + getEffectDeltaPerMinute(bundle.stats, state, effect, bundle.manifest.basePlayer), 0);
+    .reduce((total, effect) => total + getEffectDeltaPerMinute(bundle, state, effect), 0);
 };
 
 export const projectResourcePool = (

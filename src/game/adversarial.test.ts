@@ -53,6 +53,22 @@ const context: ActionResolutionContext = {
       { kind: 'refill', value: 'min' },
     ],
   }, {
+    id: 'enemy-action-rate',
+    sourceStat: 'action-rate',
+    owner: 'enemy',
+    max: 60,
+    initialValue: 'empty',
+    onFull: [
+      { kind: 'enemy-attack' },
+      { kind: 'refill', value: 'min' },
+    ],
+  }, {
+    id: 'enemy-health',
+    owner: 'enemy',
+    sourceStat: 'action-rate',
+    sourceEnemyStat: 'health',
+    initialValue: 'full',
+  }, {
     id: 'health',
     sourceStat: 'health',
     initialValue: 'full',
@@ -70,6 +86,20 @@ const context: ActionResolutionContext = {
     rateUnit: 'per-second',
     activeWhen: { kind: 'state-variable', variable: 'active-interaction', comparison: 'equal', value: true },
     resetResourceWhenInactive: true,
+  }, {
+    id: 'enemy-action-rate-regeneration',
+    resourceId: 'enemy-action-rate',
+    sourceStat: 'action-rate',
+    sourceEnemyStat: 'rate',
+    rateUnit: 'per-second',
+    activeWhen: { kind: 'state-variable', variable: 'active-interaction', comparison: 'equal', value: true },
+    resetResourceWhenInactive: true,
+  }, {
+    id: 'enemy-health-regeneration',
+    resourceId: 'enemy-health',
+    sourceStat: 'action-rate',
+    sourceEnemyStat: 'regeneration',
+    activeWhen: { kind: 'state-variable', variable: 'active-interaction', comparison: 'equal', value: true },
   }],
   interactionTypes: [{
     id: 'melee-combat',

@@ -10,6 +10,7 @@
       "id": { "type": "string", "minLength": 1 },
       "resourceId": { "type": "string", "minLength": 1 },
       "sourceStat": { "type": "string", "minLength": 1 },
+      "sourceEnemyStat": { "enum": ["attack", "defense", "health", "rate", "regeneration", "armorPenetration", "torpidity", "critChance", "critMultiplier"] },
       "locationId": { "type": "string", "minLength": 1 },
       "rateUnit": { "enum": ["per-minute", "per-second"] },
       "activeWhen": { "$ref": "#/$defs/condition" },

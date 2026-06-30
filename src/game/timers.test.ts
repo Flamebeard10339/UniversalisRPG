@@ -388,6 +388,7 @@ describe('resolveIdleTimers', () => {
       stats: [
         { id: 'attack', base: 10, skillId: 'attack' },
         { id: 'defense', base: 0 },
+        { id: 'action-rate', base: 25 },
         { id: 'health', base: 100 },
       ],
       locations: [
@@ -395,6 +396,22 @@ describe('resolveIdleTimers', () => {
         { id: 'danger-room', position: { x: 1, y: 0 } },
       ],
       resourceDefinitions: [{
+        id: 'enemy-action-rate',
+        owner: 'enemy',
+        sourceStat: 'action-rate',
+        max: 60,
+        initialValue: 'empty',
+        onFull: [
+          { kind: 'enemy-attack' },
+          { kind: 'refill', value: 'min' },
+        ],
+      }, {
+        id: 'enemy-health',
+        owner: 'enemy',
+        sourceStat: 'action-rate',
+        sourceEnemyStat: 'health',
+        initialValue: 'full',
+      }, {
         id: 'health',
         sourceStat: 'health',
         initialValue: 'full',
@@ -403,7 +420,21 @@ describe('resolveIdleTimers', () => {
           { kind: 'chat', messageKey: 'resource.health.empty' },
         ],
       }],
-      effects: [],
+      effects: [{
+        id: 'enemy-action-rate-regeneration',
+        resourceId: 'enemy-action-rate',
+        sourceStat: 'action-rate',
+        sourceEnemyStat: 'rate',
+        rateUnit: 'per-second',
+        activeWhen: { kind: 'state-variable', variable: 'active-interaction', comparison: 'equal', value: true },
+        resetResourceWhenInactive: true,
+      }, {
+        id: 'enemy-health-regeneration',
+        resourceId: 'enemy-health',
+        sourceStat: 'action-rate',
+        sourceEnemyStat: 'regeneration',
+        activeWhen: { kind: 'state-variable', variable: 'active-interaction', comparison: 'equal', value: true },
+      }],
       interactionTypes: [{
         id: 'test-combat',
         sourceStatId: 'attack',

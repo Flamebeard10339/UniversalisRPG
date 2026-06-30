@@ -1,7 +1,7 @@
 import type { ActionResolutionContext, ActionResult, ChatMessage, GameAction, IdleReport, IdleResolution, ResourceBoundaryBehavior, Reward, RunLogEntry, TravelEdgeDefinition, UniversePlayState } from './types';
-import { getActionDurationMs, getEnemy, getEnemyAttackDurationMs, getInteractionType, sampleAdversarialDamage, sampleEnemyAttackDamage } from './adversarial';
+import { getActionDurationMs, getEnemy, getInteractionType, sampleAdversarialDamage, sampleEnemyAttackDamage } from './adversarial';
 import { getEnemyStat } from './enemies';
-import { getEffectDeltaPerMinute, getEffectRatePerMinute, getResourceMax as resolveResourceMax, isEffectApplicable } from './resources';
+import { getEffectDeltaPerMinute, getResourceMaxForContext, isEffectApplicable } from './resources';
 import {
   actionFailureKey,
   actionKillKey,
@@ -19,6 +19,7 @@ import { areActionRequirementsMet, canStartAction, isActionExhausted, isActionVi
 const MAX_CHAT_MESSAGES = 80;
 const MIN_REPORT_INACTIVE_MS = 1000;
 const HEALTH_RESOURCE_ID = 'health';
+const ENEMY_HEALTH_RESOURCE_ID = 'enemy-health';
 const CONTINUOUS_ACTION_COMPLETES_AT = Number.MAX_SAFE_INTEGER;
 const EMPTY_CONTEXT: ActionResolutionContext = {
   actions: [],
@@ -132,8 +133,6 @@ export const normalizePlayState = (
       ? {
           ...state.activeAction,
           targetHealth: state.activeAction.targetHealth ?? null,
-          enemyAttackStartedAt: state.activeAction.enemyAttackStartedAt ?? null,
-          enemyAttackCompletesAt: state.activeAction.enemyAttackCompletesAt ?? null,
         }
       : null,
     actionProgress: state.activeAction && !actionProgress[state.activeAction.actionId]
@@ -143,8 +142,6 @@ export const normalizePlayState = (
             elapsedMs: 0,
             runningSince: state.activeAction.startedAt,
             targetHealth: state.activeAction.targetHealth ?? null,
-            enemyAttackStartedAt: state.activeAction.enemyAttackStartedAt ?? null,
-            enemyAttackCompletesAt: state.activeAction.enemyAttackCompletesAt ?? null,
           },
         }
       : actionProgress,
@@ -179,8 +176,6 @@ const pauseRunningAction = (state: UniversePlayState, now: number, context?: Act
         elapsedMs: progress.elapsedMs + Math.max(0, now - (progress.runningSince ?? state.activeAction.startedAt)),
         runningSince: null,
         targetHealth: state.activeAction.targetHealth ?? progress.targetHealth ?? null,
-        enemyAttackStartedAt: state.activeAction.enemyAttackStartedAt ?? progress.enemyAttackStartedAt ?? null,
-        enemyAttackCompletesAt: state.activeAction.enemyAttackCompletesAt ?? progress.enemyAttackCompletesAt ?? null,
       },
     },
     lastTickAt: now,
@@ -203,8 +198,6 @@ const stopRunningAction = (state: UniversePlayState, now: number, context?: Acti
         elapsedMs: 0,
         runningSince: null,
         targetHealth: null,
-        enemyAttackStartedAt: null,
-        enemyAttackCompletesAt: null,
       },
     },
     lastTickAt: now,
@@ -226,7 +219,7 @@ const getResourceMax = (
   const definition = getResourceDefinition(context, resourceId);
 
   return definition
-    ? resolveResourceMax(state, context.stats ?? [], definition, context.manifest?.basePlayer)
+    ? getResourceMaxForContext(context, state, definition)
     : state.resourcePools[resourceId]?.max ?? 0;
 };
 
@@ -242,6 +235,25 @@ const syncLegacyHealth = (state: UniversePlayState) => {
     playerHealth: health.current,
     playerMaxHealth: health.max,
   };
+};
+
+const getRuntimeResourcePool = (
+  state: UniversePlayState,
+  context: ActionResolutionContext,
+  resourceId: string,
+) => {
+  const definition = getResourceDefinition(context, resourceId);
+
+  if (definition?.owner === 'enemy' && definition.sourceEnemyStat === 'health') {
+    const max = getResourceMaxForContext(context, state, definition);
+    return {
+      current: Math.min(max, Math.max(0, state.activeAction?.targetHealth ?? max)),
+      min: 0,
+      max,
+    };
+  }
+
+  return state.resourcePools[resourceId];
 };
 
 const ensureResourcePools = (
@@ -297,9 +309,33 @@ const ensureWorldState = (
 
 const setResourceCurrent = (
   state: UniversePlayState,
+  context: ActionResolutionContext | null,
   resourceId: string,
   current: number,
 ) => {
+  const definition = context ? getResourceDefinition(context, resourceId) : null;
+  if (context && definition?.owner === 'enemy' && definition.sourceEnemyStat === 'health' && state.activeAction) {
+    const max = getResourceMaxForContext(context, state, definition);
+    const targetHealth = Math.min(max, Math.max(0, current));
+    return {
+      ...state,
+      activeAction: {
+        ...state.activeAction,
+        targetHealth,
+      },
+      actionProgress: {
+        ...state.actionProgress,
+        [state.activeAction.actionId]: {
+          ...(state.actionProgress[state.activeAction.actionId] ?? {
+            elapsedMs: 0,
+            runningSince: state.activeAction.startedAt,
+          }),
+          targetHealth,
+        },
+      },
+    };
+  }
+
   const resource = state.resourcePools[resourceId];
 
   if (!resource) {
@@ -330,9 +366,9 @@ export const resetInactiveEffectResources = (
       continue;
     }
 
-    const resource = nextState.resourcePools[effect.resourceId];
+    const resource = getRuntimeResourcePool(nextState, context, effect.resourceId);
     if (resource && resource.current !== resource.min) {
-      nextState = setResourceCurrent(nextState, effect.resourceId, resource.min);
+      nextState = setResourceCurrent(nextState, context, effect.resourceId, resource.min);
       nextState = appendRunLog(nextState, 'engine', 'resource.reset-inactive', {
         resourceId: effect.resourceId,
         effectId: effect.id,
@@ -428,8 +464,12 @@ const applyResourceBehaviors = (
       nextState = completeActiveActionWithMessage(nextState, context, options, now);
     }
 
+    if (behavior.kind === 'enemy-attack') {
+      nextState = applyEnemyAttackWithMessage(nextState, context, options, now);
+    }
+
     if (behavior.kind === 'refill') {
-      const resource = nextState.resourcePools[resourceId];
+      const resource = getRuntimeResourcePool(nextState, context, resourceId);
 
       if (resource) {
         const value = behavior.value === 'min'
@@ -437,7 +477,7 @@ const applyResourceBehaviors = (
           : behavior.value === 'max'
             ? resource.max
             : behavior.value;
-        nextState = setResourceCurrent(nextState, resourceId, value);
+        nextState = setResourceCurrent(nextState, context, resourceId, value);
       }
     }
 
@@ -478,7 +518,7 @@ const applyResourceDelta = (
   options: { random?: () => number } = {},
 ) => {
   const definition = getResourceDefinition(context, resourceId);
-  const resource = state.resourcePools[resourceId];
+  const resource = getRuntimeResourcePool(state, context, resourceId);
 
   if (!definition || !resource || delta === 0) {
     return state;
@@ -490,7 +530,7 @@ const applyResourceDelta = (
   let processedBoundaries = 0;
 
   while (Math.abs(remaining) > 0.000001 && processedBoundaries < 1000) {
-    const currentResource = nextState.resourcePools[resourceId];
+    const currentResource = getRuntimeResourcePool(nextState, context, resourceId);
     if (!currentResource) return nextState;
 
     const previous = currentResource.current;
@@ -502,7 +542,7 @@ const applyResourceDelta = (
     const applied = reachesBoundary ? distance : remaining;
     const nextValue = Math.min(currentResource.max, Math.max(currentResource.min, previous + applied));
 
-    nextState = setResourceCurrent(nextState, resourceId, nextValue);
+    nextState = setResourceCurrent(nextState, context, resourceId, nextValue);
     nextState = appendRunLog(nextState, 'engine', 'resource.change', {
       resourceId,
       requestedDelta: delta,
@@ -516,7 +556,7 @@ const applyResourceDelta = (
     }
 
     remaining -= applied;
-    const beforeBehaviors = nextState.resourcePools[resourceId]?.current;
+    const beforeBehaviors = getRuntimeResourcePool(nextState, context, resourceId)?.current;
     nextState = applyResourceBehaviors(
       nextState,
       context,
@@ -531,7 +571,7 @@ const applyResourceDelta = (
       return nextState;
     }
 
-    const afterBehaviors = nextState.resourcePools[resourceId]?.current;
+    const afterBehaviors = getRuntimeResourcePool(nextState, context, resourceId)?.current;
     if (beforeBehaviors === afterBehaviors) {
       return nextState;
     }
@@ -565,8 +605,8 @@ const applyActiveEffects = (
       return nextState;
     }
 
-    const delta = getEffectDeltaPerMinute(context.stats ?? [], nextState, effect, context.manifest?.basePlayer) * elapsedMinutes;
-    const resource = nextState.resourcePools[effect.resourceId];
+    const delta = getEffectDeltaPerMinute(context, nextState, effect) * elapsedMinutes;
+    const resource = getRuntimeResourcePool(nextState, context, effect.resourceId);
     const crossedMin = resource && delta < 0 && resource.current > resource.min && resource.current + delta <= resource.min;
     const crossedMax = resource && delta > 0 && resource.current < resource.max && resource.current + delta >= resource.max;
     const boundaryAt = crossedMin
@@ -584,45 +624,6 @@ const applyActiveEffects = (
       options,
     );
   }, state);
-};
-
-const applyEnemyRegeneration = (
-  state: UniversePlayState,
-  context: ActionResolutionContext,
-  now: number,
-) => {
-  if (!state.activeAction || state.activeAction.targetHealth === null) {
-    return state;
-  }
-
-  const action = context.actions.find((candidate) => candidate.id === state.activeAction?.actionId);
-  const enemy = action ? getEnemy(action, context) : null;
-
-  if (!enemy || getEnemyStat(enemy, 'regeneration') <= 0) {
-    return state;
-  }
-
-  const effectUntil = now;
-  const elapsedMinutes = Math.max(0, effectUntil - (state.lastTickAt ?? effectUntil)) / 60_000;
-  const targetHealth = Math.min(getEnemyStat(enemy, 'health'), state.activeAction.targetHealth + getEnemyStat(enemy, 'regeneration') * elapsedMinutes);
-
-  return {
-    ...state,
-    activeAction: {
-      ...state.activeAction,
-      targetHealth,
-    },
-    actionProgress: {
-      ...state.actionProgress,
-      [state.activeAction.actionId]: {
-        ...(state.actionProgress[state.activeAction.actionId] ?? {
-          elapsedMs: 0,
-          runningSince: state.activeAction.startedAt,
-        }),
-        targetHealth,
-      },
-    },
-  };
 };
 
 export const startAction = (
@@ -654,15 +655,10 @@ export const startAction = (
         elapsedMs: 0,
         runningSince: null,
         targetHealth: null,
-        enemyAttackStartedAt: null,
-        enemyAttackCompletesAt: null,
       }
     : savedProgress;
   const remainingMs = Math.max(0, durationMs - progress.elapsedMs);
   const enemy = getEnemy(action, context);
-  const enemyAttackDurationMs = getEnemyAttackDurationMs(enemy);
-  const enemyAttackStartedAt = progress.enemyAttackStartedAt ?? (enemyAttackDurationMs ? now : null);
-  const enemyAttackCompletesAt = progress.enemyAttackCompletesAt ?? (enemyAttackDurationMs ? now + enemyAttackDurationMs : null);
   const completesAt = enemy ? CONTINUOUS_ACTION_COMPLETES_AT : now + remainingMs;
 
   return appendRunLog({
@@ -672,8 +668,6 @@ export const startAction = (
       startedAt: now,
       completesAt,
       targetHealth: progress.targetHealth ?? (enemy ? getEnemyStat(enemy, 'health') : null),
-      enemyAttackStartedAt,
-      enemyAttackCompletesAt,
     },
     actionProgress: {
       ...pausedState.actionProgress,
@@ -681,8 +675,6 @@ export const startAction = (
         ...progress,
         runningSince: now,
         targetHealth: progress.targetHealth ?? (enemy ? getEnemyStat(enemy, 'health') : null),
-        enemyAttackStartedAt,
-        enemyAttackCompletesAt,
       },
     },
     lastTickAt: now,
@@ -696,9 +688,6 @@ const restartAction = (
   now: number,
   targetHealth: number | null,
 ) => {
-  const enemyAttackDurationMs = getEnemyAttackDurationMs(getEnemy(action, context));
-  const enemyAttackStartedAt = state.activeAction?.enemyAttackStartedAt ?? (enemyAttackDurationMs ? now : null);
-  const enemyAttackCompletesAt = state.activeAction?.enemyAttackCompletesAt ?? (enemyAttackDurationMs ? now + enemyAttackDurationMs : null);
   const completesAt = getEnemy(action, context)
     ? CONTINUOUS_ACTION_COMPLETES_AT
     : now + getActionDurationMs(state, action, context);
@@ -710,8 +699,6 @@ const restartAction = (
       startedAt: now,
       completesAt,
       targetHealth,
-      enemyAttackStartedAt,
-      enemyAttackCompletesAt,
     },
     actionProgress: {
       ...state.actionProgress,
@@ -719,8 +706,6 @@ const restartAction = (
         elapsedMs: 0,
         runningSince: now,
         targetHealth,
-        enemyAttackStartedAt,
-        enemyAttackCompletesAt,
       },
     },
     lastTickAt: now,
@@ -892,7 +877,9 @@ const completeActionWithResult = (
   if (enemy) {
     const result = sampleAdversarialDamage(state, action, context, options.random);
     damage = result?.damage ?? 0;
-    const currentHealth = state.activeAction?.targetHealth ?? getEnemyStat(enemy, 'health');
+    const currentHealth = getRuntimeResourcePool(state, context, ENEMY_HEALTH_RESOURCE_ID)?.current
+      ?? state.activeAction?.targetHealth
+      ?? getEnemyStat(enemy, 'health');
     const targetHealth = Math.max(0, currentHealth - damage);
     remainingHealth = targetHealth;
 
@@ -907,9 +894,12 @@ const completeActionWithResult = (
       };
     }
 
-    const hitState = applyRewards(state, action.rewards, context, now);
+    const damagedState = getResourceDefinition(context, ENEMY_HEALTH_RESOURCE_ID)
+      ? applyResourceDelta(state, context, ENEMY_HEALTH_RESOURCE_ID, -damage, now, options)
+      : restartAction(state, action, context, now, targetHealth);
 
     if (targetHealth > 0) {
+      const hitState = applyRewards(damagedState, action.rewards, context, now);
       return {
         state: restartAction(hitState, action, context, now, targetHealth),
         finished: false,
@@ -920,7 +910,7 @@ const completeActionWithResult = (
       };
     }
 
-    state = applyRewards(applyActionCompletion(state, action, context, now), enemy.rewards, context, now);
+    state = applyRewards(applyActionCompletion(damagedState, action, context, now), enemy.rewards, context, now);
   }
 
   const resolvedState = enemy ? state : applyActionCompletion(state, action, context, now);
@@ -933,8 +923,6 @@ const completeActionWithResult = (
         elapsedMs: 0,
         runningSince: null,
         targetHealth: null,
-        enemyAttackStartedAt: null,
-        enemyAttackCompletesAt: null,
       },
     },
     lastTickAt: now,
@@ -962,79 +950,42 @@ export const completeAction = (
   now = Date.now(),
 ): UniversePlayState => completeActionWithResult(state, action, context, options, now).state;
 
-const resolveDueEnemyAttacks = (
+const applyEnemyAttackWithMessage = (
   state: UniversePlayState,
-  action: GameAction,
   context: ActionResolutionContext,
   options: { random?: () => number },
   now: number,
 ) => {
-  const enemyAttackDurationMs = getEnemyAttackDurationMs(getEnemy(action, context));
-
-  if (!state.activeAction?.enemyAttackCompletesAt || !enemyAttackDurationMs) {
+  const action = context.actions.find((candidate) => candidate.id === state.activeAction?.actionId);
+  if (!state.activeAction || !action) {
     return state;
   }
 
+  const enemy = getEnemy(action, context);
+  const interactionType = getInteractionType(action, context);
+  const attack = sampleEnemyAttackDamage(state, action, context, options.random);
+  const damage = attack?.damage ?? 0;
+  const health = state.resourcePools[HEALTH_RESOURCE_ID];
+  const isKill = Boolean(health && damage > 0 && health.current - damage <= health.min);
   let nextState = state;
-  let nextAttackAt = state.activeAction.enemyAttackCompletesAt;
-  const latestAttackAt = Math.min(now, state.activeAction.completesAt);
-  let processed = 0;
 
-  while (nextAttackAt <= latestAttackAt && processed < 100) {
-    const attackAt = nextAttackAt;
-    const enemy = getEnemy(action, context);
-    const interactionType = getInteractionType(action, context);
-    const attack = sampleEnemyAttackDamage(nextState, action, context, options.random);
-    const damage = attack?.damage ?? 0;
-    const health = nextState.resourcePools[HEALTH_RESOURCE_ID];
-    const isKill = Boolean(health && damage > 0 && health.current - damage <= health.min);
-
-    if (enemy && interactionType) {
-      nextState = appendChatMessage(nextState, {
-        author: 'system',
-        key: isKill
-          ? interactionEntityKillKey(interactionType.id)
-          : damage > 0
-            ? interactionEntityHitKey(interactionType.id)
-            : interactionEntityMissKey(interactionType.id),
-        params: {
-          source: enemy.id,
-          target: 'you',
-          damage: roundCombatNumber(damage),
-        },
-      }, attackAt);
-    }
-
-    nextState = applyResourceDelta(nextState, context, HEALTH_RESOURCE_ID, -damage, attackAt);
-
-    nextAttackAt += enemyAttackDurationMs;
-    processed += 1;
-
-    if (!nextState.activeAction) {
-      return nextState;
-    }
+  if (enemy && interactionType) {
+    nextState = appendChatMessage(nextState, {
+      author: 'system',
+      key: isKill
+        ? interactionEntityKillKey(interactionType.id)
+        : damage > 0
+          ? interactionEntityHitKey(interactionType.id)
+          : interactionEntityMissKey(interactionType.id),
+      params: {
+        source: enemy.id,
+        target: 'you',
+        damage: roundCombatNumber(damage),
+      },
+    }, now);
   }
 
-  return {
-    ...nextState,
-    activeAction: nextState.activeAction
-      ? {
-          ...nextState.activeAction,
-          enemyAttackStartedAt: nextAttackAt - enemyAttackDurationMs,
-          enemyAttackCompletesAt: nextAttackAt,
-        }
-      : null,
-    actionProgress: nextState.activeAction
-      ? {
-          ...nextState.actionProgress,
-          [nextState.activeAction.actionId]: {
-            ...(nextState.actionProgress[nextState.activeAction.actionId] ?? { elapsedMs: 0, runningSince: nextState.activeAction.startedAt }),
-            enemyAttackStartedAt: nextAttackAt - enemyAttackDurationMs,
-            enemyAttackCompletesAt: nextAttackAt,
-          },
-        }
-      : nextState.actionProgress,
-  };
+  return applyResourceDelta(nextState, context, HEALTH_RESOURCE_ID, -damage, now, options);
 };
 
 const rewardLabelId = (reward: Reward) => reward.kind === 'resource'
@@ -1146,7 +1097,6 @@ export const resolveIdleTimers = (
     state = resetInactiveEffectResources(state, context, now);
   }
   state = applyActiveEffects(state, context, now, { random: options.random });
-  state = applyEnemyRegeneration(state, context, now);
 
   if (state.activeTravel && state.activeTravel.completesAt <= now) {
     const activeTravel = state.activeTravel;
@@ -1235,8 +1185,6 @@ export const resolveIdleTimers = (
       report,
     };
   }
-
-  state = resolveDueEnemyAttacks(state, action, context, { random: options.random }, now);
 
   if (!state.activeAction || state.activeAction.completesAt > now) {
     const nextState = {

@@ -96,10 +96,6 @@ export const getActionDps = (
     (getActionDurationMs(state, action, context) / 1000);
 };
 
-export const getEnemyAttackDurationMs = (
-  enemy: EnemyDefinition | null,
-) => enemy && getEnemyStat(enemy, 'rate') > 0 ? 60_000 / getEnemyStat(enemy, 'rate') : null;
-
 export const getEnemyAttackDps = (
   state: UniversePlayState,
   action: GameAction,
@@ -107,10 +103,10 @@ export const getEnemyAttackDps = (
 ) => {
   const enemy = getEnemy(action, context);
   const interactionType = getInteractionType(action, context);
-  const attackDurationMs = getEnemyAttackDurationMs(enemy);
+  const attacksPerMinute = enemy ? getEnemyStat(enemy, 'rate') : 0;
   const targetStat = context.stats?.find((stat) => stat.id === interactionType?.targetStatId);
 
-  if (!enemy || !interactionType?.targetPlayerHealth || !attackDurationMs || !targetStat) {
+  if (!enemy || !interactionType?.targetPlayerHealth || attacksPerMinute <= 0 || !targetStat) {
     return null;
   }
 
@@ -120,7 +116,7 @@ export const getEnemyAttackDps = (
     torpidity: getEnemyStat(enemy, 'torpidity'),
     critChance: getEnemyStat(enemy, 'critChance'),
     critMultiplier: getEnemyStat(enemy, 'critMultiplier'),
-  }).damage / (attackDurationMs / 1000);
+  }).damage * (attacksPerMinute / 60);
 };
 
 export const sampleAdversarialDamage = (

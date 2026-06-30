@@ -204,7 +204,6 @@ export default function App() {
     ? [
         playState.activeTravel?.completesAt,
         activeAction && !isContinuousAction(activeAction, actionContext) ? playState.activeAction?.completesAt : undefined,
-        playState.activeAction?.enemyAttackCompletesAt,
         getNextResourceBoundaryAt(bundle, playState),
       ]
         .filter((time): time is number => typeof time === 'number')

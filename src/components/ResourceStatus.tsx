@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { effectTitleKey, interactionEntityHitKey, interactionEntityKillKey, resourceTitleKey } from '../game/contentIds';
+import { effectTitleKey, interactionEntityHitKey, interactionEntityKillKey, interactionPlayerHitKey, interactionPlayerKillKey, resourceTitleKey } from '../game/contentIds';
 import type { ContentBundle, ResourceDefinition, ResourcePool, UniversePlayState } from '../game/types';
 import type { Translator } from '../game/i18n';
 import { getEffectRatePerMinute, isEffectApplicable, projectResourcePool } from '../game/resources';
@@ -8,8 +8,10 @@ import { useNow } from '../hooks/useNow';
 
 type ResourceStatusProps = {
   bundle: ContentBundle;
+  owner?: 'player' | 'enemy';
   playState: UniversePlayState;
   showEffects?: boolean;
+  showTitle?: boolean;
   t: Translator;
 };
 
@@ -104,7 +106,7 @@ const ResourceRow = ({ bundle, floatingTexts, playState, pool, resource, showEff
             <p className="text-slate-500">{t('resources.effects.empty')}</p>
           ) : (
             effects.map((effect) => {
-              const rate = getEffectRatePerMinute(bundle.stats, playState, effect, bundle.manifest.basePlayer);
+              const rate = getEffectRatePerMinute(bundle, playState, effect);
               const active = Boolean(playState.activeAction) && isEffectApplicable(bundle, playState, effect);
 
               return (
@@ -129,8 +131,8 @@ const ResourceRow = ({ bundle, floatingTexts, playState, pool, resource, showEff
 const messageSignature = (id: number, index: number, count: number, createdAt: number) =>
   `${id}:${index}:${count}:${createdAt}`;
 
-export const ResourceStatus = ({ bundle, playState, showEffects = false, t }: ResourceStatusProps) => {
-  const resources = (bundle.resourceDefinitions ?? []).filter((resource) => !resource.hidden);
+export const ResourceStatus = ({ bundle, owner = 'player', playState, showEffects = false, showTitle = true, t }: ResourceStatusProps) => {
+  const resources = (bundle.resourceDefinitions ?? []).filter((resource) => !resource.hidden && (resource.owner ?? 'player') === owner);
   const [floatingTexts, setFloatingTexts] = useState<ResourceFloatingText[]>([]);
   const now = useNow(Boolean(playState.activeAction) || floatingTexts.length > 0, 100);
   const seenMessageIds = useRef<Set<string> | null>(null);
@@ -142,10 +144,15 @@ export const ResourceStatus = ({ bundle, playState, showEffects = false, t }: Re
       return;
     }
 
-    const entityDamageKeys = new Set(bundle.interactionTypes.flatMap((interactionType) => [
-      interactionEntityHitKey(interactionType.id),
-      interactionEntityKillKey(interactionType.id),
-    ]));
+    const damageKeys = new Set(bundle.interactionTypes.flatMap((interactionType) => owner === 'player'
+      ? [
+          interactionEntityHitKey(interactionType.id),
+          interactionEntityKillKey(interactionType.id),
+        ]
+      : [
+          interactionPlayerHitKey(interactionType.id),
+          interactionPlayerKillKey(interactionType.id),
+        ]));
     const nextFloatingTexts: ResourceFloatingText[] = [];
 
     playState.chatMessages.forEach((message, index) => {
@@ -156,12 +163,12 @@ export const ResourceStatus = ({ bundle, playState, showEffects = false, t }: Re
       seenMessageIds.current?.add(messageId);
 
       const damage = Number(message.params?.damage ?? 0);
-      if (entityDamageKeys.has(message.key ?? '') && Number.isFinite(damage) && damage > 0) {
+      if (damageKeys.has(message.key ?? '') && Number.isFinite(damage) && damage > 0) {
         nextFloatingTexts.push({
           createdAt: message.createdAt,
           durationMs: floatingDurationMs,
           id: `${messageId}:health-damage`,
-          resourceId: 'health',
+          resourceId: owner === 'player' ? 'health' : 'enemy-health',
           text: `-${formatFloatNumber(damage)}`,
         });
       }
@@ -170,7 +177,7 @@ export const ResourceStatus = ({ bundle, playState, showEffects = false, t }: Re
     if (nextFloatingTexts.length > 0) {
       setFloatingTexts((current) => [...current, ...nextFloatingTexts].filter((text) => now - text.createdAt <= text.durationMs));
     }
-  }, [bundle.interactionTypes, floatingDurationMs, now, playState.chatMessages]);
+  }, [bundle.interactionTypes, floatingDurationMs, now, owner, playState.chatMessages]);
 
   useEffect(() => {
     setFloatingTexts((current) => {
@@ -181,7 +188,7 @@ export const ResourceStatus = ({ bundle, playState, showEffects = false, t }: Re
 
   return (
     <section className="grid gap-3">
-      <h2 className="text-base font-semibold text-slate-100">{t('resources.title')}</h2>
+      {showTitle && <h2 className="text-base font-semibold text-slate-100">{t('resources.title')}</h2>}
 
       {resources.length === 0 ? (
         <p className="text-sm text-slate-500">{t('resources.empty')}</p>

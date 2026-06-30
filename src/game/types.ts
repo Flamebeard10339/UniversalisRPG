@@ -145,6 +145,9 @@ export type ResourceBoundaryBehavior =
       kind: 'complete-action';
     }
   | {
+      kind: 'enemy-attack';
+    }
+  | {
       kind: 'refill';
       value: 'min' | 'max' | number;
     }
@@ -172,7 +175,9 @@ export type ResourceBoundaryBehavior =
 
 export type ResourceDefinition = {
   id: string;
+  owner?: 'player' | 'enemy';
   sourceStat: string;
+  sourceEnemyStat?: EnemyStatKey;
   max?: number;
   initialValue?: 'empty' | 'full';
   hidden?: boolean;
@@ -184,6 +189,7 @@ export type EffectDefinition = {
   id: string;
   resourceId: string;
   sourceStat: string;
+  sourceEnemyStat?: EnemyStatKey;
   locationId?: string;
   rateUnit?: 'per-minute' | 'per-second';
   activeWhen?: Condition;
@@ -228,16 +234,12 @@ export type ActiveAction = {
   startedAt: number;
   completesAt: number;
   targetHealth: number | null;
-  enemyAttackStartedAt: number | null;
-  enemyAttackCompletesAt: number | null;
 };
 
 export type ActionProgress = {
   elapsedMs: number;
   runningSince: number | null;
   targetHealth?: number | null;
-  enemyAttackStartedAt?: number | null;
-  enemyAttackCompletesAt?: number | null;
 };
 
 export type ActiveTravel = {

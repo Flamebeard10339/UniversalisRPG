@@ -77,6 +77,24 @@ describe('universe manifest validation', () => {
           { kind: 'complete-action' },
           { kind: 'refill', value: 'min' },
         ],
+      }, {
+        id: 'enemy-action-rate',
+        owner: 'enemy',
+        sourceStat: 'action-rate',
+        max: 60,
+        initialValue: 'empty',
+        hidden: false,
+        onFull: [
+          { kind: 'enemy-attack' },
+          { kind: 'refill', value: 'min' },
+        ],
+      }, {
+        id: 'enemy-health',
+        owner: 'enemy',
+        sourceStat: 'action-rate',
+        sourceEnemyStat: 'health',
+        initialValue: 'full',
+        hidden: false,
       }],
       effects: [{
         id: 'action-rate-regeneration',
@@ -85,6 +103,20 @@ describe('universe manifest validation', () => {
         rateUnit: 'per-second',
         activeWhen: { kind: 'state-variable', variable: 'active-interaction', comparison: 'equal', value: true },
         resetResourceWhenInactive: true,
+      }, {
+        id: 'enemy-action-rate-regeneration',
+        resourceId: 'enemy-action-rate',
+        sourceStat: 'action-rate',
+        sourceEnemyStat: 'rate',
+        rateUnit: 'per-second',
+        activeWhen: { kind: 'state-variable', variable: 'active-interaction', comparison: 'equal', value: true },
+        resetResourceWhenInactive: true,
+      }, {
+        id: 'enemy-health-regeneration',
+        resourceId: 'enemy-health',
+        sourceStat: 'action-rate',
+        sourceEnemyStat: 'regeneration',
+        activeWhen: { kind: 'state-variable', variable: 'active-interaction', comparison: 'equal', value: true },
       }],
       interactionTypes: [{ id: 'practice', sourceStatId: 'action-rate', targetStatId: 'action-rate', targetPlayerHealth: false }],
     }).filter((issue) => issue.severity === 'error');

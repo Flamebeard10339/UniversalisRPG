@@ -6,7 +6,6 @@ import {
   skillTitleKey,
 } from '../game/contentIds';
 import { getEnemy, getInteractionType } from '../game/adversarial';
-import { getEnemyStat } from '../game/enemies';
 import type { ContentBundle, Reward, UniversePlayState } from '../game/types';
 import type { Translator } from '../game/i18n';
 import { resolveManifestUiSettings } from '../game/universeSettings';
@@ -21,17 +20,10 @@ type ActionDetailsProps = {
   t: Translator;
 };
 
-const HealthBar = ({ color, current, max }: { color: string; current: number; max: number }) => (
-  <div className="h-3 overflow-hidden rounded bg-slate-950">
-    <div className={`h-full ${color}`} style={{ width: `${Math.min(100, Math.max(0, (current / Math.max(1, max)) * 100))}%` }} />
-  </div>
-);
-
 type FloatingText = {
   createdAt: number;
   durationMs: number;
   id: string;
-  kind: 'damage-out' | 'xp';
   text: string;
 };
 
@@ -66,16 +58,6 @@ export const ActionDetails = ({ bundle, onStopAction, playState, t }: ActionDeta
   };
   const enemy = activeAction ? getEnemy(activeAction, actionContext) : null;
   const interactionType = activeAction ? getInteractionType(activeAction, actionContext) : null;
-  const enemyMaxHealth = enemy ? getEnemyStat(enemy, 'health') : null;
-  const targetHealth = playState.activeAction?.targetHealth ?? enemyMaxHealth;
-  const enemyRegenerationPerMinute = enemy ? getEnemyStat(enemy, 'regeneration') : 0;
-  const displayedTargetHealth = enemy && targetHealth !== null
-    ? Math.min(
-        enemyMaxHealth ?? targetHealth,
-        targetHealth + enemyRegenerationPerMinute * (Math.max(0, Math.min(now, playState.activeAction?.completesAt ?? now) - playState.lastTickAt) / 60_000),
-      )
-    : targetHealth;
-  const showEnemyHealth = Boolean(activeAction && enemy && (enemy.showHealthBar ?? true) && targetHealth !== null);
   const floatingDurationMs = resolveManifestUiSettings(bundle.manifest).floatingTextDurationSeconds * 1000;
 
   useEffect(() => {
@@ -99,19 +81,6 @@ export const ActionDetails = ({ bundle, onStopAction, playState, t }: ActionDeta
       }
       seenMessageIds.current?.add(messageId);
 
-      const damage = Number(message.params?.damage ?? 0);
-      if (Number.isFinite(damage) && damage > 0) {
-        if (message.key === playerHitKey || message.key === playerKillKey) {
-          nextFloatingTexts.push({
-            createdAt: message.createdAt,
-            durationMs: floatingDurationMs,
-            id: `${messageId}:damage-out`,
-            kind: 'damage-out',
-            text: `-${formatFloatNumber(damage)}`,
-          });
-        }
-      }
-
       if (activeAction && enemy && (message.key === playerHitKey || message.key === playerKillKey)) {
         const rewards = message.key === playerKillKey ? [...activeAction.rewards, ...enemy.rewards] : activeAction.rewards;
         const text = skillXpText(rewards, t);
@@ -120,7 +89,6 @@ export const ActionDetails = ({ bundle, onStopAction, playState, t }: ActionDeta
             createdAt: message.createdAt,
             durationMs: floatingDurationMs,
             id: `${messageId}:xp`,
-            kind: 'xp',
             text,
           });
         }
@@ -142,26 +110,6 @@ export const ActionDetails = ({ bundle, onStopAction, playState, t }: ActionDeta
   return (
     <section className="grid min-h-0 gap-4">
       <section className="relative grid gap-3 overflow-hidden rounded border border-slate-800 bg-slate-900 p-4">
-        {floatingTexts.map((text) => {
-          const progress = Math.min(1, Math.max(0, (now - text.createdAt) / text.durationMs));
-          if (text.kind === 'xp') {
-            return null;
-          }
-          return (
-            <div
-              className="pointer-events-none absolute z-10 whitespace-nowrap text-sm font-semibold text-amber-200 drop-shadow"
-              key={text.id}
-              style={{
-                left: '68%',
-                opacity: 1 - progress,
-                top: `${48 - progress * 18}%`,
-                transform: 'translate(-50%, -50%)',
-              }}
-            >
-              {text.text}
-            </div>
-          );
-        })}
         {!activeAction && (
           <p className="text-sm text-slate-400">{t('actionDetails.empty')}</p>
         )}
@@ -178,14 +126,8 @@ export const ActionDetails = ({ bundle, onStopAction, playState, t }: ActionDeta
               </button>
             </div>
 
-            {enemy && showEnemyHealth && (
-              <div className="grid gap-1">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-slate-300">{enemy.id}</span>
-                  <span className="text-rose-100">{Math.ceil(displayedTargetHealth ?? enemyMaxHealth ?? 0)}/{enemyMaxHealth}</span>
-                </div>
-                <HealthBar color="bg-rose-500" current={displayedTargetHealth ?? enemyMaxHealth ?? 0} max={enemyMaxHealth ?? 0} />
-              </div>
+            {enemy && (enemy.showHealthBar ?? true) && (
+              <ResourceStatus bundle={bundle} owner="enemy" playState={playState} showTitle={false} t={t} />
             )}
           </>
         )}
@@ -196,9 +138,6 @@ export const ActionDetails = ({ bundle, onStopAction, playState, t }: ActionDeta
       </section>
 
       {floatingTexts.map((text) => {
-        if (text.kind !== 'xp') {
-          return null;
-        }
         const progress = Math.min(1, Math.max(0, (now - text.createdAt) / text.durationMs));
         return (
           <div

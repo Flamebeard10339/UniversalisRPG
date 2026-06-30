@@ -68,6 +68,8 @@ export const actionSchema = (bundle: ContentBundle): StructuredSchema => ({ kind
 
 export const boundarySchema = (bundle: ContentBundle): StructuredSchema => ({ kind: 'union', discriminator: 'kind', variants: {
   'stop-action': { createValue: () => ({ kind: 'stop-action' }), schema: { kind: 'object', fields: { kind: { schema: { kind: 'enum', options: ['stop-action'] } } } } },
+  'complete-action': { createValue: () => ({ kind: 'complete-action' }), schema: { kind: 'object', fields: { kind: { schema: { kind: 'enum', options: ['complete-action'] } } } } },
+  'enemy-attack': { createValue: () => ({ kind: 'enemy-attack' }), schema: { kind: 'object', fields: { kind: { schema: { kind: 'enum', options: ['enemy-attack'] } } } } },
   refill: { createValue: () => ({ kind: 'refill', value: 'max' }), schema: { kind: 'object', fields: { kind: { schema: { kind: 'enum', options: ['refill'] } }, value: { schema: { kind: 'inferred' } } } } },
   relocate: { createValue: () => ({ kind: 'relocate', locationId: bundle.locations[0]?.id ?? '' }), schema: { kind: 'object', fields: { kind: { schema: { kind: 'enum', options: ['relocate'] } }, locationId: { schema: string(bundle.locations.map((item) => item.id)) } } } },
   chat: { createValue: () => ({ kind: 'chat', messageKey: '' }), schema: { kind: 'object', fields: { kind: { schema: { kind: 'enum', options: ['chat'] } }, messageKey: { schema: string() } } } },
@@ -89,7 +91,11 @@ export const resetStateSchema = (bundle: ContentBundle): StructuredSchema => ({ 
 
 export const resourceDefinitionSchema = (bundle: ContentBundle): StructuredSchema => ({ kind: 'object', fields: {
   id: { label: 'contribution.column.id', schema: string() },
+  owner: { schema: { kind: 'enum', options: ['player', 'enemy'] }, optional: true, defaultValue: 'player' },
   sourceStat: { label: 'contribution.column.sourceStat', schema: string(bundle.stats.map((item) => item.id)) },
+  sourceEnemyStat: { schema: { kind: 'enum', options: ['attack', 'defense', 'health', 'rate', 'regeneration', 'armorPenetration', 'torpidity', 'critChance', 'critMultiplier'] }, optional: true },
+  max: { schema: number(0), optional: true, defaultValue: 0 },
+  hidden: { schema: boolean, optional: true, defaultValue: false },
   initialValue: { label: 'contribution.column.initialValue', schema: { kind: 'enum', options: ['full', 'empty'] }, optional: true, defaultValue: 'full' },
   onEmpty: { label: 'contribution.column.onEmpty', schema: { kind: 'array', item: boundarySchema(bundle), createItem: () => ({ kind: 'stop-action' }) }, optional: true, defaultValue: [] },
   onFull: { label: 'contribution.column.onFull', schema: { kind: 'array', item: boundarySchema(bundle), createItem: () => ({ kind: 'stop-action' }) }, optional: true, defaultValue: [] },
@@ -99,6 +105,10 @@ export const effectDefinitionSchema = (bundle: ContentBundle): StructuredSchema 
   id: { label: 'contribution.column.id', schema: string() },
   resourceId: { label: 'contribution.column.resource', schema: string(bundle.resourceDefinitions.map((item) => item.id)) },
   sourceStat: { label: 'contribution.column.sourceStat', schema: string(bundle.stats.map((item) => item.id)) },
+  sourceEnemyStat: { schema: { kind: 'enum', options: ['attack', 'defense', 'health', 'rate', 'regeneration', 'armorPenetration', 'torpidity', 'critChance', 'critMultiplier'] }, optional: true },
+  rateUnit: { schema: { kind: 'enum', options: ['per-minute', 'per-second'] }, optional: true, defaultValue: 'per-minute' },
+  activeWhen: { schema: conditionSchema(bundle), optional: true, defaultValue: { kind: 'state-variable', variable: stateVariableKeys(bundle)[0] ?? '', comparison: 'equal', value: 0 } },
+  resetResourceWhenInactive: { schema: boolean, optional: true, defaultValue: false },
   locationId: { label: 'contribution.column.location', schema: string(bundle.locations.map((item) => item.id)), optional: true },
 } });
 

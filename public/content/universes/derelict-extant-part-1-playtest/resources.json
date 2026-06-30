@@ -11,6 +11,26 @@
     ]
   },
   {
+    "id": "enemy-action-rate",
+    "owner": "enemy",
+    "sourceStat": "action-rate",
+    "max": 60,
+    "initialValue": "empty",
+    "hidden": false,
+    "onFull": [
+      { "kind": "enemy-attack" },
+      { "kind": "refill", "value": "min" }
+    ]
+  },
+  {
+    "id": "enemy-health",
+    "owner": "enemy",
+    "sourceStat": "action-rate",
+    "sourceEnemyStat": "health",
+    "initialValue": "full",
+    "hidden": false
+  },
+  {
     "id": "air-capacity",
     "sourceStat": "air-capacity",
     "initialValue": "full",
