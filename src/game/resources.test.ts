@@ -54,6 +54,51 @@ describe('resource projection', () => {
     expect(getCharacterStatValue({ ...state, statOverrides: { 'air-capacity': 42 } }, stats, 'air-capacity')).toBe(42);
   });
 
+  it('projects resources from base player stats when stat definitions only declare ids', () => {
+    const state = createInitialPlayState('test', 'room');
+    const baseStatBundle = {
+      ...bundle,
+      manifest: {
+        ...bundle.manifest,
+        basePlayer: {
+          stats: {
+            'air-capacity': 100,
+          },
+        },
+      },
+      stats: [{ id: 'air-capacity' }, { id: 'air-loss' }],
+    };
+
+    const projected = projectResourcePool(baseStatBundle, state, baseStatBundle.resourceDefinitions[0], 1_000);
+
+    expect(projected).toEqual({ current: 100, min: 0, max: 100 });
+  });
+
+  it('refills full resources when recovering a stale zero-capacity pool', () => {
+    const baseStatBundle = {
+      ...bundle,
+      manifest: {
+        ...bundle.manifest,
+        basePlayer: {
+          stats: {
+            'air-capacity': 100,
+          },
+        },
+      },
+      stats: [{ id: 'air-capacity' }, { id: 'air-loss' }],
+    };
+    const state = {
+      ...createInitialPlayState('test', 'room'),
+      resourcePools: {
+        air: { current: 0, min: 0, max: 0 },
+      },
+    };
+
+    const projected = projectResourcePool(baseStatBundle, state, baseStatBundle.resourceDefinitions[0], 1_000);
+
+    expect(projected).toEqual({ current: 100, min: 0, max: 100 });
+  });
+
   it('projects a constant foreground effect without mutating persisted state', () => {
     const state = runningState();
     const projected = projectResourcePool(bundle, state, bundle.resourceDefinitions[0], 31_000);

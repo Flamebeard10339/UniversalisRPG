@@ -23,7 +23,13 @@ export const getResourceMax = (
 const basePool = (bundle: ContentBundle, state: UniversePlayState, resource: ResourceDefinition): ResourcePool => {
   const existing = state.resourcePools[resource.id];
   const max = getResourceMax(state, bundle.stats, resource, bundle.manifest.basePlayer);
-  if (existing) return { current: Math.min(max, Math.max(0, existing.current)), min: 0, max };
+  if (existing) {
+    const wasUninitialized = existing.max <= existing.min && max > 0;
+    const current = wasUninitialized && resource.initialValue !== 'empty'
+      ? max
+      : Math.min(max, Math.max(0, existing.current));
+    return { current, min: 0, max };
+  }
   return {
     current: resource.initialValue === 'empty' ? 0 : max,
     min: 0,

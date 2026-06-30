@@ -169,6 +169,92 @@ describe('resolveIdleTimers', () => {
     expect(resolved.state.playerHealth).toBe(60);
   });
 
+  it('applies active effects from base player stats when stat definitions only declare ids', () => {
+    const startedAt = 1_000;
+    const action: GameAction = {
+      id: 'base-stat-rest-action',
+      locationId: 'test-location',
+      durationSeconds: 10,
+      rewards: [],
+    };
+    const context: ActionResolutionContext = {
+      manifest: {
+        schemaVersion: 1,
+        id: 'test-universe',
+        version: '0.1.0',
+        author: 'test',
+        locales: ['en'],
+        files: [],
+        basePlayer: {
+          stats: {
+            health: 100,
+            regeneration: 60,
+          },
+        },
+      },
+      actions: [action],
+      skills: [],
+      stats: [{ id: 'health' }, { id: 'regeneration' }],
+      resourceDefinitions: [{ id: 'health', sourceStat: 'health', initialValue: 'full' }],
+      effects: [{ id: 'health-regeneration', resourceId: 'health', sourceStat: 'regeneration' }],
+      interactionTypes: [],
+      enemies: [],
+    };
+    const state = {
+      ...startAction(createInitialPlayState('test-universe', 'test-location'), action, context, startedAt),
+      resourcePools: {
+        health: { current: 50, min: 0, max: 100 },
+      },
+      playerHealth: 50,
+      playerMaxHealth: 100,
+    };
+
+    const resolved = resolveIdleTimers(state, context, { showReport: true }, startedAt + 10_000);
+
+    expect(resolved.state.resourcePools.health.current).toBe(60);
+    expect(resolved.state.playerHealth).toBe(60);
+  });
+
+  it('recovers stale zero-capacity health pools from base player stats', () => {
+    const context: ActionResolutionContext = {
+      manifest: {
+        schemaVersion: 1,
+        id: 'test-universe',
+        version: '0.1.0',
+        author: 'test',
+        locales: ['en'],
+        files: [],
+        basePlayer: {
+          stats: {
+            health: 100,
+            regeneration: 10,
+          },
+        },
+      },
+      actions: [],
+      skills: [],
+      stats: [{ id: 'health' }, { id: 'regeneration' }],
+      resourceDefinitions: [{ id: 'health', sourceStat: 'health', initialValue: 'full' }],
+      effects: [{ id: 'health-regeneration', resourceId: 'health', sourceStat: 'regeneration' }],
+      interactionTypes: [],
+      enemies: [],
+    };
+    const state = {
+      ...createInitialPlayState('test-universe', 'test-location'),
+      resourcePools: {
+        health: { current: 0, min: 0, max: 0 },
+      },
+      playerHealth: 0,
+      playerMaxHealth: 0,
+    };
+
+    const resolved = resolveIdleTimers(state, context, {}, 1_000);
+
+    expect(resolved.state.resourcePools.health).toEqual({ current: 100, min: 0, max: 100 });
+    expect(resolved.state.playerHealth).toBe(100);
+    expect(resolved.state.playerMaxHealth).toBe(100);
+  });
+
   it('fires resource empty behaviors when an effect drains health during an action', () => {
     const startedAt = 1_000;
     const action: GameAction = {

@@ -250,7 +250,8 @@ const ensureResourcePools = (
     const min = 0;
     const max = getResourceMax(state, context, definition.id);
     const initial = definition.initialValue === 'empty' ? 0 : max;
-    const current = Math.min(max, Math.max(min, existing?.current ?? initial));
+    const wasUninitialized = existing && existing.max <= existing.min && max > min;
+    const current = Math.min(max, Math.max(min, wasUninitialized ? initial : existing?.current ?? initial));
 
     resourcePools[definition.id] = {
       current,
@@ -488,7 +489,7 @@ const applyActiveEffects = (
     }
 
     const resource = nextState.resourcePools[effect.resourceId];
-    const delta = getEffectRatePerMinute(context.stats ?? [], nextState, effect) * elapsedMinutes;
+    const delta = getEffectRatePerMinute(context.stats ?? [], nextState, effect, context.manifest?.basePlayer) * elapsedMinutes;
     const crossedMin = resource && delta < 0 && resource.current > resource.min && resource.current + delta <= resource.min;
     const crossedMax = resource && delta > 0 && resource.current < resource.max && resource.current + delta >= resource.max;
     const boundaryAt = crossedMin
