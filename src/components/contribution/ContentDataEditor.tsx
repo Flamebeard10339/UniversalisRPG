@@ -20,7 +20,7 @@ type ContentDataEditorProps = {
   t: Translator;
 };
 
-type ContentDataTab = 'universe' | 'map' | 'actions' | 'skills' | 'stats' | 'profiles' | 'interactions' | 'enemies' | 'items' | 'resources' | 'json';
+type ContentDataTab = 'universe' | 'map' | 'actions' | 'skills' | 'stats' | 'profiles' | 'interactions' | 'enemies' | 'items' | 'flags' | 'resources' | 'json';
 type DraftListKey = Exclude<keyof ContributionRemovedIds, 'resources'>;
 type LayeredRow<T> = {
   index: number;
@@ -28,7 +28,7 @@ type LayeredRow<T> = {
   source: 'draft' | 'base';
 };
 
-const contentTabs: ContentDataTab[] = ['universe', 'map', 'actions', 'skills', 'stats', 'profiles', 'interactions', 'enemies', 'items', 'resources', 'json'];
+const contentTabs: ContentDataTab[] = ['universe', 'map', 'actions', 'skills', 'stats', 'profiles', 'interactions', 'enemies', 'items', 'flags', 'resources', 'json'];
 
 const uniqueId = (baseId: string, existingIds: string[]) => {
   let index = 1;
@@ -601,6 +601,15 @@ export const ContentDataEditor = ({ baseBundle, bundle, draft, onPatch, t }: Con
                 value={uiSettings.floatingTextDurationSeconds}
               />
             </label>
+            <label className="flex items-center justify-between gap-3 rounded bg-slate-950 px-3 py-2 text-sm text-slate-300">
+              <span>{t('contribution.universe.loopActionsByDefault')}</span>
+              <input
+                checked={uiSettings.loopActionsByDefault}
+                className="h-5 w-5"
+                onChange={(event) => updateUiSettings({ loopActionsByDefault: event.target.checked })}
+                type="checkbox"
+              />
+            </label>
           </div>
           <section className="grid gap-2 border-t border-slate-700 pt-3">
             <h4 className="text-sm font-semibold text-slate-100">{t('contribution.universe.baseStats')}</h4>
@@ -994,7 +1003,12 @@ export const ContentDataEditor = ({ baseBundle, bundle, draft, onPatch, t }: Con
             </div>
           )}
 
-          <div className="mt-4 flex items-center justify-between gap-3 border-t border-slate-700 pt-3">
+        </section>
+      )}
+
+      {activeTab === 'flags' && (
+        <section className="grid gap-1 rounded border border-slate-700 p-2">
+          <div className="flex items-center justify-between gap-3">
             <h3 className="text-sm font-semibold text-slate-100">{t('contribution.data.flags')}</h3>
             <button className="rounded bg-cyan-400 px-3 py-2 text-sm font-semibold text-slate-950" onClick={addFlag} type="button">
               {t('contribution.data.addFlag')}

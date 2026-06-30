@@ -8,13 +8,12 @@ import { canStartAction, isActionVisible } from '../game/conditions';
 type ActionPanelProps = {
   bundle: ContentBundle;
   debugEnabled: boolean;
-  onSetLooping: (enabled: boolean) => void;
   playState: UniversePlayState;
   onStartAction: (action: GameAction) => void;
   t: Translator;
 };
 
-export const ActionPanel = ({ bundle, debugEnabled, onSetLooping, playState, onStartAction, t }: ActionPanelProps) => {
+export const ActionPanel = ({ bundle, debugEnabled, playState, onStartAction, t }: ActionPanelProps) => {
   const isTravelling = Boolean(playState.activeTravel);
   const actionContext = {
     manifest: bundle.manifest,
@@ -53,17 +52,6 @@ export const ActionPanel = ({ bundle, debugEnabled, onSetLooping, playState, onS
               : t('actionPanel.choose')}
         </p>
       </div>
-
-      <label className="flex items-center justify-between gap-3 rounded border border-slate-800 bg-slate-950 px-3 py-2">
-        <span className="text-sm text-slate-300">{t('actionPanel.looping')}</span>
-        <input
-          checked={playState.actionLoopingEnabled}
-          className="h-5 w-5"
-          disabled={isTravelling}
-          onChange={(event) => onSetLooping(event.target.checked)}
-          type="checkbox"
-        />
-      </label>
 
       <div className="grid gap-2">
         {actions.map((action) => {

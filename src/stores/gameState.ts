@@ -6,8 +6,8 @@ import { recordAgentSessionMessage, type AgentSessionMessage } from '../game/age
 
 type GameStateStore = {
   states: Record<string, UniversePlayState>;
-  hydrate: (universeId: string, startingLocationId: string) => Promise<void>;
-  getUniverseState: (universeId: string, startingLocationId: string) => UniversePlayState;
+  hydrate: (universeId: string, startingLocationId: string, context?: Pick<ActionResolutionContext, 'manifest'>) => Promise<void>;
+  getUniverseState: (universeId: string, startingLocationId: string, context?: Pick<ActionResolutionContext, 'manifest'>) => UniversePlayState;
   setCurrentLocation: (universeId: string, locationId: string) => void;
   travelTo: (universeId: string, edge: TravelEdgeDefinition, destinationLocationId: string) => void;
   cancelTravel: (universeId: string) => void;
@@ -22,7 +22,7 @@ type GameStateStore = {
   clearRunLog: (universeId: string) => void;
   importUniverseState: (playState: UniversePlayState) => Promise<void>;
   replaceUniverseState: (universeId: string, playState: UniversePlayState) => Promise<void>;
-  resetUniverse: (universeId: string, startingLocationId: string) => Promise<void>;
+  resetUniverse: (universeId: string, startingLocationId: string, context?: Pick<ActionResolutionContext, 'manifest'>) => Promise<void>;
 };
 
 const storageKey = (universeId: string) => `universalis:play:${universeId}`;
@@ -31,11 +31,11 @@ const noIdleReport = (): IdleReport => ({ kind: 'none' });
 export const useGameState = create<GameStateStore>((set, get) => ({
   states: {},
 
-  hydrate: async (universeId, startingLocationId) => {
+  hydrate: async (universeId, startingLocationId, context) => {
     const saved = await load<UniversePlayState>(storageKey(universeId));
     const nextState = saved
-      ? normalizePlayState(saved, universeId, startingLocationId)
-      : createInitialPlayState(universeId, startingLocationId);
+      ? normalizePlayState(saved, universeId, startingLocationId, context)
+      : createInitialPlayState(universeId, startingLocationId, context);
 
     set((state) => ({
       states: {
@@ -45,8 +45,8 @@ export const useGameState = create<GameStateStore>((set, get) => ({
     }));
   },
 
-  getUniverseState: (universeId, startingLocationId) =>
-    get().states[universeId] ?? createInitialPlayState(universeId, startingLocationId),
+  getUniverseState: (universeId, startingLocationId, context) =>
+    get().states[universeId] ?? createInitialPlayState(universeId, startingLocationId, context),
 
   setCurrentLocation: (universeId, locationId) => {
     set((state) => {
@@ -332,9 +332,9 @@ export const useGameState = create<GameStateStore>((set, get) => ({
     }));
   },
 
-  resetUniverse: async (universeId, startingLocationId) => {
+  resetUniverse: async (universeId, startingLocationId, context) => {
     const current = get().states[universeId];
-    const initial = createInitialPlayState(universeId, startingLocationId);
+    const initial = createInitialPlayState(universeId, startingLocationId, context);
     const next = current
       ? appendRunLog({
           ...initial,

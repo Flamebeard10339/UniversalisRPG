@@ -48,7 +48,8 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "floatingTextDurationSeconds": { "type": "number", "exclusiveMinimum": 0 }
+        "floatingTextDurationSeconds": { "type": "number", "exclusiveMinimum": 0 },
+        "loopActionsByDefault": { "type": "boolean" }
       }
     },
     "compatibility": {

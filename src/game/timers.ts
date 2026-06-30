@@ -15,8 +15,10 @@ import {
   locationExhaustedKey,
 } from './contentIds';
 import { areActionRequirementsMet, canStartAction, isActionExhausted, isActionVisible } from './conditions';
+import { resolveManifestUiSettings } from './universeSettings';
 
 const MAX_CHAT_MESSAGES = 80;
+const MAX_RUN_LOG_ENTRIES = 500;
 const MIN_REPORT_INACTIVE_MS = 1000;
 const HEALTH_RESOURCE_ID = 'health';
 const ENEMY_HEALTH_RESOURCE_ID = 'enemy-health';
@@ -52,7 +54,7 @@ export const appendRunLog = (
       event,
       ...(data ? { data } : {}),
     },
-  ],
+  ].slice(-MAX_RUN_LOG_ENTRIES),
   nextRunLogSequence: (state.nextRunLogSequence ?? 1) + 1,
 });
 
@@ -92,7 +94,11 @@ export const appendChatMessage = (
   };
 };
 
-export const createInitialPlayState = (universeId: string, startingLocationId: string): UniversePlayState => ({
+export const createInitialPlayState = (
+  universeId: string,
+  startingLocationId: string,
+  context?: Pick<ActionResolutionContext, 'manifest'>,
+): UniversePlayState => ({
   universeId,
   runId: `run-${Date.now().toString(36)}`,
   currentLocationId: startingLocationId,
@@ -108,7 +114,7 @@ export const createInitialPlayState = (universeId: string, startingLocationId: s
   skillXp: {},
   statOverrides: {},
   equipmentSkillBonuses: {},
-  actionLoopingEnabled: false,
+  actionLoopingEnabled: resolveManifestUiSettings(context?.manifest).loopActionsByDefault,
   playerHealth: 0,
   playerMaxHealth: 0,
   chatMessages: [],
@@ -121,6 +127,7 @@ export const normalizePlayState = (
   state: UniversePlayState,
   universeId: string,
   startingLocationId: string,
+  context?: Pick<ActionResolutionContext, 'manifest'>,
 ): UniversePlayState => {
   const actionProgress = state.actionProgress ?? {};
   const runId = state.runId ?? `run-${Date.now().toString(36)}`;
@@ -152,11 +159,11 @@ export const normalizePlayState = (
     actionCompletions: state.actionCompletions ?? {},
     statOverrides: state.statOverrides ?? {},
     equipmentSkillBonuses: state.equipmentSkillBonuses ?? {},
-    actionLoopingEnabled: state.actionLoopingEnabled ?? false,
+    actionLoopingEnabled: state.actionLoopingEnabled ?? resolveManifestUiSettings(context?.manifest).loopActionsByDefault,
     playerHealth: state.playerHealth ?? 0,
     playerMaxHealth: state.playerMaxHealth ?? 0,
     chatMessages: state.chatMessages ?? [],
-    runLog: (state.runLog ?? []).map((entry) => ({ ...entry, runId: entry.runId ?? runId })),
+    runLog: (state.runLog ?? []).map((entry) => ({ ...entry, runId: entry.runId ?? runId })).slice(-MAX_RUN_LOG_ENTRIES),
     nextRunLogSequence: state.nextRunLogSequence ?? ((state.runLog?.length ?? 0) + 1),
   };
 };

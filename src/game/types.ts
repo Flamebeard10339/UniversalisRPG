@@ -44,6 +44,7 @@ export type CombatBalanceDefinition = {
 
 export type UniverseUiSettings = {
   floatingTextDurationSeconds?: number;
+  loopActionsByDefault?: boolean;
 };
 
 export type LocationNode = {

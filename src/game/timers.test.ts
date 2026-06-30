@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { ActionResolutionContext, GameAction } from './types';
-import { appendChatMessage, createInitialPlayState, resolveIdleTimers, startAction } from './timers';
+import { appendChatMessage, appendRunLog, createInitialPlayState, resolveIdleTimers, startAction } from './timers';
 
 describe('appendChatMessage', () => {
   it('uses monotonic ids for messages emitted at the same timestamp', () => {
@@ -10,6 +10,21 @@ describe('appendChatMessage', () => {
 
     expect(second.chatMessages.map((message) => message.id)).toEqual([1_000, 1_001]);
     expect(second.chatMessages.map((message) => message.createdAt)).toEqual([1_000, 1_000]);
+  });
+});
+
+describe('appendRunLog', () => {
+  it('retains only the newest 500 entries', () => {
+    let state = createInitialPlayState('test-universe', 'test-location');
+
+    for (let index = 0; index < 505; index += 1) {
+      state = appendRunLog(state, 'engine', 'test.event', { index }, index);
+    }
+
+    expect(state.runLog).toHaveLength(500);
+    expect(state.runLog[0].sequence).toBe(6);
+    expect(state.runLog[499].sequence).toBe(505);
+    expect(state.nextRunLogSequence).toBe(506);
   });
 });
 
@@ -35,7 +50,10 @@ describe('resolveIdleTimers', () => {
         },
       ],
     };
-    const activeState = startAction(createInitialPlayState('test-universe', 'test-location'), action, startedAt);
+    const activeState = {
+      ...startAction(createInitialPlayState('test-universe', 'test-location'), action, startedAt),
+      actionLoopingEnabled: false,
+    };
     const closedAppSave = JSON.stringify(activeState);
     const rehydratedState = JSON.parse(closedAppSave) as typeof activeState;
 
@@ -86,7 +104,10 @@ describe('resolveIdleTimers', () => {
         },
       ],
     };
-    const activeState = startAction(createInitialPlayState('test-universe', 'test-location'), action, startedAt);
+    const activeState = {
+      ...startAction(createInitialPlayState('test-universe', 'test-location'), action, startedAt),
+      actionLoopingEnabled: false,
+    };
     const hiddenState = {
       ...activeState,
       lastTickAt: hiddenAt,
@@ -155,6 +176,7 @@ describe('resolveIdleTimers', () => {
     };
     const state = {
       ...startAction(createInitialPlayState('test-universe', 'test-location'), action, context, startedAt),
+      actionLoopingEnabled: false,
       equipmentSkillBonuses: { regeneration: { added: 93 } },
       resourcePools: {
         health: { current: 50, min: 0, max: 100 },

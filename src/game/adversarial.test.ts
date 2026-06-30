@@ -154,6 +154,7 @@ describe('adversarial actions', () => {
     const killContext = { ...context, enemies: [enemy({ stats: { health: 2 } })], actions: [action] };
     const state = {
       ...startAction(createInitialPlayState('test', 'arena'), action, killContext, startedAt),
+      actionLoopingEnabled: false,
       skillXp: { attack: 10 },
     };
     const resolved = resolveIdleTimers(state, killContext, { random: () => 1 }, startedAt + 10_000);

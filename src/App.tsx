@@ -111,7 +111,6 @@ export default function App() {
   const stopAction = useGameState((state) => state.stopAction);
   const resolveIdle = useGameState((state) => state.resolveIdle);
   const markInactive = useGameState((state) => state.markInactive);
-  const setActionLooping = useGameState((state) => state.setActionLooping);
   const importUniverseState = useGameState((state) => state.importUniverseState);
   const replaceUniverseState = useGameState((state) => state.replaceUniverseState);
   const resetUniverse = useGameState((state) => state.resetUniverse);
@@ -179,7 +178,7 @@ export default function App() {
     interactionTypes: bundle?.interactionTypes ?? [],
     enemies: bundle?.enemies ?? [],
   }), [bundle]);
-  const playState = bundle ? gameStates[runtimeUniverseId] ?? getUniverseState(runtimeUniverseId, startingLocationId) : null;
+  const playState = bundle ? gameStates[runtimeUniverseId] ?? getUniverseState(runtimeUniverseId, startingLocationId, { manifest: bundle.manifest }) : null;
   const currentLocation = bundle?.locations.find((location) => location.id === playState?.currentLocationId);
   const activeAction = bundle?.actions.find((action) => action.id === playState?.activeAction?.actionId) ?? null;
   const activeInteractionType = activeAction ? getInteractionType(activeAction, actionContext) : null;
@@ -286,7 +285,7 @@ export default function App() {
       return;
     }
 
-    await resetUniverse(runtimeUniverseId, startingLocationId);
+    await resetUniverse(runtimeUniverseId, startingLocationId, { manifest: bundle.manifest });
     setConfirmReset(false);
     setSaveMessage(t('settings.save.resetComplete'));
   };
@@ -298,8 +297,9 @@ export default function App() {
   };
 
   useEffect(() => {
-    if (runtimeUniverseId && startingLocationId) {
-      void hydratePlayState(runtimeUniverseId, startingLocationId).then(() => {
+    if (bundle && runtimeUniverseId && startingLocationId) {
+      const manifest = bundle.manifest;
+      void hydratePlayState(runtimeUniverseId, startingLocationId, { manifest }).then(() => {
         const currentBundle = useUniverseState.getState().bundle;
 
         if (!currentBundle || currentBundle.manifest.id !== activeBundleId) {
@@ -325,7 +325,7 @@ export default function App() {
         showIdleReport(report);
       });
     }
-  }, [activeBundleId, hydratePlayState, runtimeUniverseId, startingLocationId]);
+  }, [activeBundleId, bundle, hydratePlayState, runtimeUniverseId, startingLocationId]);
 
   useEffect(() => {
     if (!bundle) {
@@ -489,7 +489,6 @@ export default function App() {
                   <ActionPanel
                     debugEnabled={debugEnabled}
                     bundle={bundle}
-                    onSetLooping={(enabled) => setActionLooping(runtimeUniverseId, enabled)}
                     onStartAction={beginAction}
                     playState={playState}
                     t={t}

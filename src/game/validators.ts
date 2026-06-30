@@ -109,7 +109,8 @@ export const validateManifest = (value: unknown): value is UniverseManifest =>
       hasNumber(value.combatBalance, 'combatSpread'))) &&
   (value.ui === undefined ||
     (isRecord(value.ui) &&
-      (value.ui.floatingTextDurationSeconds === undefined || hasNumber(value.ui, 'floatingTextDurationSeconds'))));
+      (value.ui.floatingTextDurationSeconds === undefined || hasNumber(value.ui, 'floatingTextDurationSeconds')) &&
+      (value.ui.loopActionsByDefault === undefined || typeof value.ui.loopActionsByDefault === 'boolean')));
 
 const validateLocationsShape = (locations: unknown): locations is LocationNode[] =>
   Array.isArray(locations) &&
