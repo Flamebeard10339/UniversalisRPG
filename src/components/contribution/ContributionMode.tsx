@@ -1,20 +1,23 @@
-import { useState } from 'react';
 import type { Translator } from '../../game/i18n';
 import type { ContentBundle, ContributionDraft, ValidationIssue } from '../../game/types';
 import { useContributionState } from '../../stores/contributionState';
 import { useUniverseState } from '../../stores/universeState';
-import { ContentDataEditor } from './ContentDataEditor';
+import { ContentDataEditor, type ContentDataTab } from './ContentDataEditor';
 import { LocalUniverseManager } from './LocalUniverseManager';
 import { LocalizationEditor } from './LocalizationEditor';
 import { SubmitToGitHub } from './SubmitToGitHub';
 
 type ContributionModeProps = {
+  activeTab: ContributionTab;
   bundle: ContentBundle;
+  contentDataTab: ContentDataTab;
+  onContentDataTabChange: (tab: ContentDataTab) => void;
+  onTabChange: (tab: ContributionTab) => void;
   validationIssues: ValidationIssue[];
   t: Translator;
 };
 
-type ContributionTab = 'content' | 'localization' | 'submit';
+export type ContributionTab = 'content' | 'localization' | 'submit';
 
 const emptyDraft = (universeId: string): ContributionDraft => ({
   universeId,
@@ -50,8 +53,7 @@ const emptyDraft = (universeId: string): ContributionDraft => ({
   },
 });
 
-export const ContributionMode = ({ bundle, validationIssues, t }: ContributionModeProps) => {
-  const [activeTab, setActiveTab] = useState<ContributionTab>('content');
+export const ContributionMode = ({ activeTab, bundle, contentDataTab, onContentDataTabChange, onTabChange, validationIssues, t }: ContributionModeProps) => {
   const draft = useContributionState((state) => state.drafts[bundle.manifest.id] ?? emptyDraft(bundle.manifest.id));
   const updateDraft = useContributionState((state) => state.updateDraft);
   const resetDraft = useContributionState((state) => state.resetDraft);
@@ -89,7 +91,7 @@ export const ContributionMode = ({ bundle, validationIssues, t }: ContributionMo
               activeTab === tab ? 'bg-cyan-300 text-slate-950' : 'bg-slate-950 text-slate-300'
             }`}
             key={tab}
-            onClick={() => setActiveTab(tab)}
+            onClick={() => onTabChange(tab)}
             type="button"
           >
             {t(`contribution.tab.${tab}`)}
@@ -98,7 +100,7 @@ export const ContributionMode = ({ bundle, validationIssues, t }: ContributionMo
       </div>
 
       {activeTab === 'content' && (
-        <ContentDataEditor baseBundle={baseBundle ?? bundle} bundle={bundle} draft={draft} onPatch={patchDraft} t={t} />
+        <ContentDataEditor activeTab={contentDataTab} baseBundle={baseBundle ?? bundle} bundle={bundle} draft={draft} onPatch={patchDraft} onTabChange={onContentDataTabChange} t={t} />
       )}
 
       {activeTab === 'localization' && (

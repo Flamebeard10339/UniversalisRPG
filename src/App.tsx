@@ -5,7 +5,7 @@ import { ActionPanel } from './components/ActionPanel';
 import { ChatPanel } from './components/ChatPanel';
 import { CharacterStats } from './components/CharacterStats';
 import { InventoryPanel } from './components/InventoryPanel';
-import { ContributionMode } from './components/contribution/ContributionMode';
+import { ContributionMode, type ContributionTab } from './components/contribution/ContributionMode';
 import { ContributionWorkbench } from './components/contribution/ContributionWorkbench';
 import { SkillBars } from './components/SkillBars';
 import { TravelStatus } from './components/TravelStatus';
@@ -22,6 +22,7 @@ import { useContributionState } from './stores/contributionState';
 import { contributionRuntimeId } from './stores/contributionPlayState';
 import { useGameState } from './stores/gameState';
 import { useUniverseState } from './stores/universeState';
+import type { ContentDataTab } from './components/contribution/ContentDataEditor';
 
 const getStartingLocationId = (bundle: NonNullable<ReturnType<typeof useUniverseState.getState>['bundle']>) =>
   bundle.locations.find((location) => location.starting)?.id ?? bundle.locations[0]?.id ?? '';
@@ -36,9 +37,19 @@ type AppearanceSettings = {
   fontSize: FontSizePreference;
   theme: ThemePreference;
 };
+type ContributionUiSettings = {
+  contentDataTab?: ContentDataTab;
+  contributionMode?: boolean;
+  contributionTab?: ContributionTab;
+  homeTab?: HomeTab;
+};
 const APP_VERSION = '0.1.0';
 const SOURCE_URL = 'https://github.com/Flamebeard10339/UniversalisRPG';
 const appearanceKey = 'universalis:settings:appearance';
+const contributionUiKey = 'universalis:settings:contribution-ui';
+const contentDataTabs: ContentDataTab[] = ['universe', 'map', 'actions', 'primitives', 'enemies', 'resources', 'json'];
+const contributionTabs: ContributionTab[] = ['content', 'localization', 'submit'];
+const homeTabs: HomeTab[] = ['actions', 'details', 'workbench'];
 const emptyIdleReport: IdleReport = { kind: 'none' };
 const emptyContributionDraft = (universeId: string): ContributionDraft => ({
   universeId, updatedAt: Date.now(), notes: '', basePlayer: undefined, combatBalance: undefined, ui: undefined, locations: [], edges: [], actions: [], skills: [], stats: [], items: [], flags: [], resourceDefinitions: [], effects: [], interactionTypes: [], enemies: [], locales: {},
@@ -75,11 +86,14 @@ export default function App() {
   const [contributionMode, setContributionMode] = useState(false);
   const [activeTab, setActiveTab] = useState<AppTab>('home');
   const [homeTab, setHomeTab] = useState<HomeTab>('actions');
+  const [contributionTab, setContributionTab] = useState<ContributionTab>('content');
+  const [contentDataTab, setContentDataTab] = useState<ContentDataTab>('map');
   const [characterTab, setCharacterTab] = useState<CharacterTab>('skills');
   const [themePreference, setThemePreference] = useState<ThemePreference>('dark');
   const [fontSizePreference, setFontSizePreference] = useState<FontSizePreference>('normal');
   const [chatCompressionEnabled, setChatCompressionEnabled] = useState(true);
   const [appearanceLoaded, setAppearanceLoaded] = useState(false);
+  const [contributionUiLoaded, setContributionUiLoaded] = useState(false);
   const [showChangelog, setShowChangelog] = useState(false);
   const [changelogText, setChangelogText] = useState('');
   const [confirmReset, setConfirmReset] = useState(false);
@@ -152,6 +166,25 @@ export default function App() {
   }, [appearanceLoaded, chatCompressionEnabled, fontSizePreference, themePreference]);
 
   useEffect(() => {
+    void load<ContributionUiSettings>(contributionUiKey).then((settings) => {
+      if (!settings) {
+        setContributionUiLoaded(true);
+        return;
+      }
+      setContributionMode(Boolean(settings.contributionMode));
+      if (settings.homeTab && homeTabs.includes(settings.homeTab)) setHomeTab(settings.homeTab);
+      if (settings.contributionTab && contributionTabs.includes(settings.contributionTab)) setContributionTab(settings.contributionTab);
+      if (settings.contentDataTab && contentDataTabs.includes(settings.contentDataTab)) setContentDataTab(settings.contentDataTab);
+      setContributionUiLoaded(true);
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!contributionUiLoaded) return;
+    void save(contributionUiKey, { contributionMode, homeTab, contributionTab, contentDataTab });
+  }, [contentDataTab, contributionMode, contributionTab, contributionUiLoaded, homeTab]);
+
+  useEffect(() => {
     if (!showChangelog || changelogText) {
       return;
     }
@@ -179,6 +212,7 @@ export default function App() {
     enemies: bundle?.enemies ?? [],
   }), [bundle]);
   const playState = bundle ? gameStates[runtimeUniverseId] ?? getUniverseState(runtimeUniverseId, startingLocationId, { manifest: bundle.manifest }) : null;
+  const visibleHomeTab = homeTab === 'workbench' && !contributionMode ? 'actions' : homeTab;
   const currentLocation = bundle?.locations.find((location) => location.id === playState?.currentLocationId);
   const activeAction = bundle?.actions.find((action) => action.id === playState?.activeAction?.actionId) ?? null;
   const activeInteractionType = activeAction ? getInteractionType(activeAction, actionContext) : null;
@@ -417,7 +451,7 @@ export default function App() {
   }
 
   return (
-    <main className={`min-h-screen bg-slate-950 text-slate-100 ${activeTab === 'home' && homeTab !== 'workbench' ? 'pb-[calc(33vh+6rem)]' : 'pb-24'}`}>
+    <main className={`min-h-screen bg-slate-950 text-slate-100 ${activeTab === 'home' && visibleHomeTab !== 'workbench' ? 'pb-[calc(33vh+6rem)]' : 'pb-24'}`}>
       <header className="border-b border-slate-800 bg-slate-900/70 px-4 py-3">
         <div className="mx-auto max-w-7xl">
           <div>
@@ -469,7 +503,7 @@ export default function App() {
                 {(['actions', 'details', ...(contributionMode ? ['workbench' as const] : [])] as HomeTab[]).map((tab) => (
                   <button
                     className={`min-w-0 rounded px-2 py-2 text-sm font-semibold capitalize ${
-                      homeTab === tab ? 'bg-cyan-300 text-slate-950' : 'bg-slate-950 text-slate-300'
+                      visibleHomeTab === tab ? 'bg-cyan-300 text-slate-950' : 'bg-slate-950 text-slate-300'
                     }`}
                     key={tab}
                     onClick={() => setHomeTab(tab)}
@@ -483,7 +517,7 @@ export default function App() {
               </div>
             </div>
 
-            {homeTab === 'actions' && (
+            {visibleHomeTab === 'actions' && (
               <section className="grid gap-4">
                 <section className="rounded border border-slate-800 bg-slate-900 p-4" data-testid="home-action-panel">
                   <ActionPanel
@@ -497,7 +531,7 @@ export default function App() {
               </section>
             )}
 
-            {homeTab === 'details' && (
+            {visibleHomeTab === 'details' && (
               <ActionDetails
                 bundle={bundle}
                 onStopAction={() => {
@@ -512,7 +546,7 @@ export default function App() {
               />
             )}
 
-            {homeTab === 'workbench' && contributionMode && (
+            {visibleHomeTab === 'workbench' && contributionMode && (
               <ContributionWorkbench
                 baseBundle={useUniverseState.getState().baseBundle ?? bundle}
                 bundle={bundle}
@@ -740,7 +774,6 @@ export default function App() {
                     onChange={(event) => {
                       logPlayerAction('settings.contributionMode', { enabled: event.target.checked });
                       setContributionMode(event.target.checked);
-                      if (!event.target.checked) setHomeTab('actions');
                     }}
                     type="checkbox"
                   />
@@ -789,7 +822,7 @@ export default function App() {
                 )}
               </section>
 
-              {contributionMode && <ContributionMode bundle={bundle} validationIssues={validationIssues} t={t} />}
+              {contributionMode && <ContributionMode activeTab={contributionTab} bundle={bundle} contentDataTab={contentDataTab} onContentDataTabChange={setContentDataTab} onTabChange={setContributionTab} validationIssues={validationIssues} t={t} />}
 
               <div className="flex items-center justify-between gap-4 rounded border border-rose-900 bg-rose-950/30 p-3">
                 <span>
@@ -805,7 +838,7 @@ export default function App() {
         )}
       </div>
 
-      {activeTab === 'home' && homeTab !== 'workbench' && (
+      {activeTab === 'home' && visibleHomeTab !== 'workbench' && (
         <div className="fixed inset-x-0 bottom-[73px] z-10 h-[33vh] px-4">
           <div className="mx-auto h-full max-w-7xl">
             <ChatPanel compressionEnabled={chatCompressionEnabled} messages={playState.chatMessages} t={t} />

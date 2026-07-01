@@ -13,14 +13,16 @@ import { StructuredDataEditor, type StructuredValue } from '../structuredData/St
 import { actionSchema, basePlayerSchema, combatBalanceSchema, edgeSchema, effectDefinitionSchema, enemyStatsSchema, flagDefinitionSchema, interactionTypeDefinitionSchema, itemDefinitionSchema, locationSchema, resourceDefinitionSchema, rewardSchema, skillDefinitionSchema, statDefinitionSchema, universeUiSchema } from '../structuredData/contentSchemas';
 
 type ContentDataEditorProps = {
+  activeTab: ContentDataTab;
   baseBundle: ContentBundle;
   bundle: ContentBundle;
   draft: ContributionDraft;
   onPatch: (patch: Partial<Omit<ContributionDraft, 'universeId'>>) => void;
+  onTabChange: (tab: ContentDataTab) => void;
   t: Translator;
 };
 
-type ContentDataTab = 'universe' | 'map' | 'actions' | 'primitives' | 'enemies' | 'resources' | 'json';
+export type ContentDataTab = 'universe' | 'map' | 'actions' | 'primitives' | 'enemies' | 'resources' | 'json';
 type DraftListKey = Exclude<keyof ContributionRemovedIds, 'resources'>;
 type LayeredRow<T> = {
   index: number;
@@ -91,8 +93,7 @@ const allInteractionTypes = (bundle: ContentBundle, draft: ContributionDraft) =>
 const allEnemies = (bundle: ContentBundle, draft: ContributionDraft) => uniqueById([...(bundle.enemies ?? []), ...draft.enemies]);
 
 
-export const ContentDataEditor = ({ baseBundle, bundle, draft, onPatch, t }: ContentDataEditorProps) => {
-  const [activeTab, setActiveTab] = useState<ContentDataTab>('map');
+export const ContentDataEditor = ({ activeTab, baseBundle, bundle, draft, onPatch, onTabChange, t }: ContentDataEditorProps) => {
   const [filter, setFilter] = useState('');
   const [selectedActionId, setSelectedActionId] = useState<string | null>(null);
   const actionEditorKeys = useRef<Record<string, string>>({});
@@ -393,7 +394,7 @@ export const ContentDataEditor = ({ baseBundle, bundle, draft, onPatch, t }: Con
               activeTab === tab ? 'bg-cyan-300 text-slate-950' : 'bg-slate-950 text-slate-300'
             }`}
             key={tab}
-            onClick={() => setActiveTab(tab)}
+            onClick={() => onTabChange(tab)}
             type="button"
           >
             {t(`contribution.tab.${tab}`)}
