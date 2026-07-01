@@ -1,4 +1,4 @@
-import type { ActionResolutionContext, ActionResult, ChatMessage, ExperienceEventKind, ExperienceTrigger, GameAction, IdleReport, IdleResolution, ResourceBoundaryBehavior, Reward, RunLogEntry, TravelEdgeDefinition, UniversePlayState } from './types';
+import type { ActionResolutionContext, ActionResult, ChatMessage, ConcreteReward, ExperienceEventKind, ExperienceTrigger, GameAction, IdleReport, IdleResolution, ResourceBoundaryBehavior, Reward, RunLogEntry, TravelEdgeDefinition, UniversePlayState } from './types';
 import { getActionDurationMs, getEnemy, getInteractionType, sampleAdversarialDamage, sampleEnemyAttackDamage } from './adversarial';
 import { getEnemyStat } from './enemies';
 import { getEffectDeltaPerMinute, getResourceMaxForContext, isEffectApplicable } from './resources';
@@ -19,6 +19,7 @@ import { areActionRequirementsMet, canStartAction, evaluateCondition, isActionEx
 import { readStateVariable, writeStateVariable } from './stateVariables';
 import { resolveManifestUiSettings } from './universeSettings';
 import { skillLevelFromXp } from './skills';
+import { rollRewards } from './rewards';
 
 const MAX_CHAT_MESSAGES = 80;
 const MAX_RUN_LOG_ENTRIES = 500;
@@ -984,7 +985,7 @@ type ActionCompletionResult = {
   outcome: 'basicSuccess' | 'hit' | 'miss' | 'kill';
   damage: number;
   remainingHealth: number | null;
-  rewards: Reward[];
+  rewards: ConcreteReward[];
 };
 
 const applyItemDelta = (
@@ -1143,7 +1144,8 @@ const applyRewards = (
   rewards: Reward[],
   context: ActionResolutionContext,
   now: number,
-) => rewards.reduce((nextState, reward) => {
+  random: () => number = Math.random,
+) => rollRewards(rewards, random).reduce((nextState, reward) => {
   if (reward.kind === 'skillXp') {
     return applyActionResult(nextState, { kind: 'skill-xp', skillId: reward.skillId, amount: reward.amount }, context, now);
   }
@@ -1156,14 +1158,36 @@ const applyRewards = (
     : { kind: 'item', itemId: reward.resourceId, amount: reward.amount }, context, now);
 }, state);
 
+const rollAndApplyRewards = (
+  state: UniversePlayState,
+  rewards: Reward[],
+  context: ActionResolutionContext,
+  now: number,
+  random: () => number = Math.random,
+) => {
+  const rolled = rollRewards(rewards, random);
+  return {
+    rewards: rolled,
+    state: rolled.reduce((nextState, reward) => {
+      if (reward.kind === 'skillXp') return applyActionResult(nextState, { kind: 'skill-xp', skillId: reward.skillId, amount: reward.amount }, context, now);
+      if (reward.kind === 'item') return applyActionResult(nextState, { kind: 'item', itemId: reward.itemId, amount: reward.amount }, context, now);
+      const resourceExists = context.resourceDefinitions?.some((resource) => resource.id === reward.resourceId);
+      return applyActionResult(nextState, resourceExists
+        ? { kind: 'resource', resourceId: reward.resourceId, amount: reward.amount }
+        : { kind: 'item', itemId: reward.resourceId, amount: reward.amount }, context, now);
+    }, state),
+  };
+};
+
 const applyActionCompletion = (
   state: UniversePlayState,
   action: GameAction,
   context: ActionResolutionContext,
   now: number,
-  options: { emitActionComplete?: boolean } = {},
+  options: { emitActionComplete?: boolean; random?: () => number } = {},
 ) => {
-  const rewarded = applyRewards(state, action.rewards, context, now);
+  const rewardResult = rollAndApplyRewards(state, action.rewards, context, now, options.random);
+  const rewarded = rewardResult.state;
   const changed = (action.results ?? []).reduce(
     (nextState, result) => applyActionResult(nextState, result, context, now),
     rewarded,
@@ -1178,18 +1202,21 @@ const applyActionCompletion = (
         interactionTypeId: getInteractionType(action, context)?.id ?? action.interactionTypeId,
       }, now);
 
-  return appendRunLog({
-    ...withExperience,
-    actionCompletions: {
-      ...withExperience.actionCompletions,
-      [action.id]: (withExperience.actionCompletions[action.id] ?? 0) + 1,
-    },
-  }, 'engine', 'action.complete', {
-    actionId: action.id,
-    completion: (withExperience.actionCompletions[action.id] ?? 0) + 1,
-    results: action.results ?? [],
-    rewards: action.rewards,
-  }, now);
+  return {
+    rewards: rewardResult.rewards,
+    state: appendRunLog({
+      ...withExperience,
+      actionCompletions: {
+        ...withExperience.actionCompletions,
+        [action.id]: (withExperience.actionCompletions[action.id] ?? 0) + 1,
+      },
+    }, 'engine', 'action.complete', {
+      actionId: action.id,
+      completion: (withExperience.actionCompletions[action.id] ?? 0) + 1,
+      results: action.results ?? [],
+      rewards: rewardResult.rewards,
+    }, now),
+  };
 };
 
 const completeActionWithResult = (
@@ -1250,21 +1277,54 @@ const completeActionWithResult = (
         enemyId: enemy.id,
         interactionTypeId: getInteractionType(action, context)?.id ?? action.interactionTypeId,
       }, now);
-      const hitState = applyRewards(completedHitState, action.rewards, context, now);
+      const hitRewards = rollAndApplyRewards(completedHitState, action.rewards, context, now, options.random);
       return {
-        state: restartAction(hitState, action, context, now, targetHealth),
+        state: restartAction(hitRewards.state, action, context, now, targetHealth),
         finished: false,
         outcome: 'hit',
         damage,
         remainingHealth,
-        rewards: action.rewards,
+        rewards: hitRewards.rewards,
       };
     }
 
-    state = applyRewards(applyActionCompletion(damagedState, action, context, now), enemy.rewards, context, now);
+    const actionCompletion = applyActionCompletion(damagedState, action, context, now, { random: options.random });
+    const enemyRewards = rollAndApplyRewards(actionCompletion.state, enemy.rewards, context, now, options.random);
+    state = enemyRewards.state;
+    const killRewards = [...actionCompletion.rewards, ...enemyRewards.rewards];
+    const resolvedState = resetOwnedResourcePools(state, context, 'enemy');
+    const completedState = {
+      ...resolvedState,
+      activeAction: null,
+      actionProgress: {
+        ...resolvedState.actionProgress,
+        [action.id]: {
+          elapsedMs: 0,
+          runningSince: null,
+          targetHealth: null,
+        },
+      },
+      lastTickAt: now,
+    };
+    const startsDialogue = (action.results ?? []).some((result) => result.kind === 'dialogue');
+    const shouldLoop = !startsDialogue
+      && completedState.actionLoopingEnabled
+      && completedState.currentLocationId === action.locationId
+      && canStartAction(completedState, action, context);
+    const restartTargetHealth = getEnemyStat(enemy, 'health');
+
+    return {
+      state: shouldLoop ? restartAction(completedState, action, context, now, restartTargetHealth) : completedState,
+      finished: true,
+      outcome: 'kill',
+      damage,
+      remainingHealth,
+      rewards: killRewards,
+    };
   }
 
-  const resolvedState = enemy ? resetOwnedResourcePools(state, context, 'enemy') : applyActionCompletion(state, action, context, now);
+  const actionCompletion = applyActionCompletion(state, action, context, now, { random: options.random });
+  const resolvedState = actionCompletion.state;
   const completedState = {
     ...resolvedState,
     activeAction: null,
@@ -1283,15 +1343,15 @@ const completeActionWithResult = (
     && completedState.actionLoopingEnabled
     && completedState.currentLocationId === action.locationId
     && canStartAction(completedState, action, context);
-  const restartTargetHealth = enemy ? getEnemyStat(enemy, 'health') : null;
+  const restartTargetHealth = null;
 
   return {
     state: shouldLoop ? restartAction(completedState, action, context, now, restartTargetHealth) : completedState,
     finished: true,
-    outcome: enemy ? 'kill' : 'basicSuccess',
+    outcome: 'basicSuccess',
     damage,
     remainingHealth,
-    rewards: enemy ? [...action.rewards, ...enemy.rewards] : action.rewards,
+    rewards: actionCompletion.rewards,
   };
 };
 
@@ -1352,7 +1412,7 @@ const applyEnemyAttackWithMessage = (
   return applyResourceDelta(nextState, context, HEALTH_RESOURCE_ID, -damage, now, options);
 };
 
-const rewardLabelId = (reward: Reward) => reward.kind === 'resource'
+const rewardLabelId = (reward: ConcreteReward) => reward.kind === 'resource'
   ? reward.resourceId
   : reward.kind === 'item'
     ? reward.itemId

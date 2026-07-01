@@ -6,7 +6,7 @@ import {
   skillTitleKey,
 } from '../game/contentIds';
 import { getEnemy, getInteractionType } from '../game/adversarial';
-import type { ContentBundle, Reward, UniversePlayState } from '../game/types';
+import type { ConcreteReward, ContentBundle, Reward, UniversePlayState } from '../game/types';
 import type { Translator } from '../game/i18n';
 import { resolveManifestUiSettings } from '../game/universeSettings';
 import { aggregateRewards } from '../game/rewards';
@@ -30,8 +30,10 @@ type FloatingText = {
 const formatFloatNumber = (value: number) =>
   Number.isInteger(value) ? String(value) : Math.abs(value) < 10 ? value.toFixed(2) : value.toFixed(1);
 
-const skillXpText = (rewards: Reward[], t: Translator) => aggregateRewards(rewards)
-  .filter((reward): reward is Extract<Reward, { kind: 'skillXp' }> => reward.kind === 'skillXp' && reward.amount > 0)
+const skillXpText = (rewards: Reward[], t: Translator) => aggregateRewards(rewards.filter((reward): reward is ConcreteReward =>
+  reward.kind !== 'dropTable' && typeof reward.amount === 'number',
+))
+  .filter((reward): reward is Extract<ConcreteReward, { kind: 'skillXp' }> => reward.kind === 'skillXp' && reward.amount > 0)
   .map((reward) => `${t(skillTitleKey(reward.skillId), reward.skillId)} ${formatFloatNumber(reward.amount)}`)
   .join(', ');
 

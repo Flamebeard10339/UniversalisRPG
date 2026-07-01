@@ -12,6 +12,8 @@ import type {
   LocaleDictionary,
   LocationNode,
   ResourceDefinition,
+  Reward,
+  RewardAmount,
   SkillDefinition,
   StatDefinition,
   StateFlagDefinition,
@@ -154,11 +156,27 @@ const validateConditionShape = (value: unknown): value is Condition => {
     && comparisons.has(String(value.comparison));
 };
 
-const validateRewardShape = (value: unknown) => isRecord(value)
-  && hasNumber(value, 'amount')
-  && ((value.kind === 'skillXp' && hasString(value, 'skillId'))
-    || (value.kind === 'resource' && hasString(value, 'resourceId'))
-    || (value.kind === 'item' && hasString(value, 'itemId')));
+const validateRewardAmountShape = (value: unknown): value is RewardAmount =>
+  (typeof value === 'number' && Number.isFinite(value)) ||
+  (isRecord(value) && hasNumber(value, 'min') && hasNumber(value, 'max'));
+
+const rewardAmountPositive = (amount: RewardAmount) =>
+  typeof amount === 'number'
+    ? amount > 0
+    : amount.min > 0 && amount.max > 0 && amount.max >= amount.min;
+
+const validateRewardShape = (value: unknown): value is Reward => {
+  if (!isRecord(value) || !hasString(value, 'kind')) return false;
+  if (value.kind === 'dropTable') {
+    return (value.mode === 'independent' || value.mode === 'dependent')
+      && Array.isArray(value.drops)
+      && value.drops.every((drop) => isRecord(drop) && hasNumber(drop, 'weight') && validateRewardShape(drop.reward));
+  }
+  return validateRewardAmountShape(value.amount)
+    && ((value.kind === 'skillXp' && hasString(value, 'skillId'))
+      || (value.kind === 'resource' && hasString(value, 'resourceId'))
+      || (value.kind === 'item' && hasString(value, 'itemId')));
+};
 
 const experienceEvents = new Set(['action-complete', 'damage-dealt', 'damage-taken', 'health-regenerated', 'incoming-attack-missed']);
 
@@ -475,6 +493,29 @@ export const validateContentReferences = (bundle: ContentBundle) => {
     }
   };
 
+  const validateRewardReferences = (reward: Reward, path: string) => {
+    if (reward.kind === 'dropTable') {
+      if (reward.drops.length === 0) issues.push(error(path, 'validation.dropTableEmpty'));
+      for (const [index, drop] of reward.drops.entries()) {
+        if (drop.weight <= 0) issues.push(error(`${path}.drops.${index}.weight`, 'validation.dropTableWeightPositive'));
+        validateRewardReferences(drop.reward, `${path}.drops.${index}.reward`);
+      }
+      return;
+    }
+    if (reward.kind === 'skillXp' && !skillIds.has(reward.skillId)) {
+      issues.push(error(path, 'validation.unknownSkill', { id: reward.skillId }));
+    }
+    if (reward.kind === 'resource' && !itemIds.has(reward.resourceId) && !resourceIds.has(reward.resourceId)) {
+      issues.push(error(path, 'validation.unknownResource', { id: reward.resourceId }));
+    }
+    if (reward.kind === 'item' && !itemIds.has(reward.itemId)) {
+      issues.push(error(path, 'validation.unknownItem', { id: reward.itemId }));
+    }
+    if (!rewardAmountPositive(reward.amount)) {
+      issues.push(error(path, 'validation.rewardAmountPositive'));
+    }
+  };
+
   if (!bundle.locations.some((location) => location.starting)) {
     issues.push(error('locations', 'validation.startingLocationMissing'));
   }
@@ -529,20 +570,7 @@ export const validateContentReferences = (bundle: ContentBundle) => {
     if (action.requirements && !Array.isArray(action.requirements)) {
       validateConditionReferences(action.requirements, `actions.${action.id}.requirements`);
     }
-    for (const reward of action.rewards) {
-      if (reward.kind === 'skillXp' && !skillIds.has(reward.skillId)) {
-        issues.push(error(`actions.${action.id}.rewards`, 'validation.unknownSkill', { id: reward.skillId }));
-      }
-      if (reward.kind === 'resource' && !itemIds.has(reward.resourceId) && !resourceIds.has(reward.resourceId)) {
-        issues.push(error(`actions.${action.id}.rewards`, 'validation.unknownResource', { id: reward.resourceId }));
-      }
-      if (reward.kind === 'item' && !itemIds.has(reward.itemId)) {
-        issues.push(error(`actions.${action.id}.rewards`, 'validation.unknownItem', { id: reward.itemId }));
-      }
-      if (reward.amount <= 0) {
-        issues.push(error(`actions.${action.id}.rewards`, 'validation.rewardAmountPositive'));
-      }
-    }
+    action.rewards.forEach((reward, index) => validateRewardReferences(reward, `actions.${action.id}.rewards.${index}`));
     for (const [index, trigger] of (action.experience ?? []).entries()) {
       const path = `actions.${action.id}.experience.${index}`;
       if (!skillIds.has(trigger.skillId)) issues.push(error(path, 'validation.unknownSkill', { id: trigger.skillId }));
@@ -705,20 +733,7 @@ export const validateContentReferences = (bundle: ContentBundle) => {
         issues.push(error(`enemies.${enemy.id}.stats.${key}`, 'validation.unknownEnemyStat', { id: key }));
       }
     }
-    for (const reward of enemy.rewards) {
-      if (reward.kind === 'skillXp' && !skillIds.has(reward.skillId)) {
-        issues.push(error(`enemies.${enemy.id}.rewards`, 'validation.unknownSkill', { id: reward.skillId }));
-      }
-      if (reward.kind === 'resource' && !itemIds.has(reward.resourceId) && !resourceIds.has(reward.resourceId)) {
-        issues.push(error(`enemies.${enemy.id}.rewards`, 'validation.unknownResource', { id: reward.resourceId }));
-      }
-      if (reward.kind === 'item' && !itemIds.has(reward.itemId)) {
-        issues.push(error(`enemies.${enemy.id}.rewards`, 'validation.unknownItem', { id: reward.itemId }));
-      }
-      if (reward.amount <= 0) {
-        issues.push(error(`enemies.${enemy.id}.rewards`, 'validation.rewardAmountPositive'));
-      }
-    }
+    enemy.rewards.forEach((reward, index) => validateRewardReferences(reward, `enemies.${enemy.id}.rewards.${index}`));
   }
 
   for (const item of bundle.items ?? []) {

@@ -60,22 +60,36 @@ export type TravelEdgeDefinition = {
   travelTimeSeconds: number;
 };
 
+export type RewardAmount = number | { min: number; max: number };
+
 export type Reward =
   | {
       kind: 'skillXp';
       skillId: string;
-      amount: number;
+      amount: RewardAmount;
     }
   | {
       kind: 'resource';
       resourceId: string;
-      amount: number;
+      amount: RewardAmount;
     }
   | {
       kind: 'item';
       itemId: string;
-      amount: number;
+      amount: RewardAmount;
+    }
+  | {
+      kind: 'dropTable';
+      mode: 'independent' | 'dependent';
+      drops: DropTableEntry[];
     };
+
+export type ConcreteReward = Exclude<Reward, { kind: 'dropTable' }> & { amount: number };
+
+export type DropTableEntry = {
+  weight: number;
+  reward: Reward;
+};
 
 export type ExperienceEventKind =
   | 'action-complete'
@@ -325,7 +339,7 @@ export type ChatMessage = {
   createdAt: number;
 };
 
-export type IdleRewardSummary = Reward & {
+export type IdleRewardSummary = ConcreteReward & {
   labelId: string;
 };
 

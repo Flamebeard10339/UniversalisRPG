@@ -30,11 +30,25 @@ export const flagDefinitionSchema = (): StructuredSchema => ({ kind: 'object', f
 
 export const rewardSchema = (bundle: ContentBundle): StructuredSchema => ({
   kind: 'union', discriminator: 'kind', variants: {
-    skillXp: { label: 'contribution.reward.skillXp', createValue: () => ({ kind: 'skillXp', skillId: bundle.skills[0]?.id ?? '', amount: 1 }), schema: { kind: 'object', fields: { kind: { schema: { kind: 'enum', options: ['skillXp'] } }, skillId: { schema: string(bundle.skills.map((item) => item.id)) }, amount: { schema: number(0) } } } },
-    item: { label: 'contribution.reward.item', createValue: () => ({ kind: 'item', itemId: bundle.items[0]?.id ?? '', amount: 1 }), schema: { kind: 'object', fields: { kind: { schema: { kind: 'enum', options: ['item'] } }, itemId: { schema: string(bundle.items.map((item) => item.id)) }, amount: { schema: number(0) } } } },
-    resource: { label: 'contribution.reward.resource', createValue: () => ({ kind: 'resource', resourceId: bundle.resourceDefinitions[0]?.id ?? '', amount: 1 }), schema: { kind: 'object', fields: { kind: { schema: { kind: 'enum', options: ['resource'] } }, resourceId: { schema: string(bundle.resourceDefinitions.map((item) => item.id)) }, amount: { schema: number(0) } } } },
+    skillXp: { label: 'contribution.reward.skillXp', createValue: () => ({ kind: 'skillXp', skillId: bundle.skills[0]?.id ?? '', amount: 1 }), schema: { kind: 'object', fields: { kind: { schema: { kind: 'enum', options: ['skillXp'] } }, skillId: { schema: string(bundle.skills.map((item) => item.id)) }, amount: { schema: rewardAmountSchema() } } } },
+    item: { label: 'contribution.reward.item', createValue: () => ({ kind: 'item', itemId: bundle.items[0]?.id ?? '', amount: 1 }), schema: { kind: 'object', fields: { kind: { schema: { kind: 'enum', options: ['item'] } }, itemId: { schema: string(bundle.items.map((item) => item.id)) }, amount: { schema: rewardAmountSchema() } } } },
+    resource: { label: 'contribution.reward.resource', createValue: () => ({ kind: 'resource', resourceId: bundle.resourceDefinitions[0]?.id ?? '', amount: 1 }), schema: { kind: 'object', fields: { kind: { schema: { kind: 'enum', options: ['resource'] } }, resourceId: { schema: string(bundle.resourceDefinitions.map((item) => item.id)) }, amount: { schema: rewardAmountSchema() } } } },
+    dropTable: { label: 'contribution.reward.dropTable', createValue: () => ({ kind: 'dropTable', mode: 'dependent', drops: [] }), schema: () => dropTableRewardSchema(bundle) },
   },
 });
+
+const rewardAmountSchema = (): StructuredSchema => ({ kind: 'inferred' });
+
+const dropTableRewardSchema = (bundle: ContentBundle): StructuredSchema => ({ kind: 'object', fields: {
+  kind: { schema: { kind: 'enum', options: ['dropTable'] } },
+  mode: { schema: { kind: 'enum', options: ['independent', 'dependent'] } },
+  drops: { schema: { kind: 'array', listMode: 'free', item: dropTableEntrySchema(bundle), createItem: () => ({ weight: 1, reward: { kind: 'item', itemId: bundle.items[0]?.id ?? '', amount: 1 } }) } },
+} });
+
+const dropTableEntrySchema = (bundle: ContentBundle): StructuredSchema => ({ kind: 'object', fields: {
+  weight: { schema: number(0) },
+  reward: { schema: rewardSchema(bundle) },
+} });
 
 export const conditionSchema = (bundle: ContentBundle): StructuredSchema => ({
   kind: 'union', discriminator: 'kind', variants: {

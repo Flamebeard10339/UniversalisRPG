@@ -36,31 +36,58 @@
       "showHealthBar": { "type": "boolean" },
       "rewards": {
         "type": "array",
-        "items": {
-          "oneOf": [
-            {
-              "type": "object",
-              "required": ["kind", "skillId", "amount"],
-              "additionalProperties": false,
-              "properties": {
-                "kind": { "const": "skillXp" },
-                "skillId": { "type": "string", "minLength": 1 },
-                "amount": { "type": "number", "exclusiveMinimum": 0 }
-              }
-            },
-            {
-              "type": "object",
-              "required": ["kind", "resourceId", "amount"],
-              "additionalProperties": false,
-              "properties": {
-                "kind": { "const": "resource" },
-                "resourceId": { "type": "string", "minLength": 1 },
-                "amount": { "type": "number", "exclusiveMinimum": 0 }
-              }
-            }
-          ]
-        }
+        "items": { "$ref": "#/$defs/reward" }
       }
+    }
+  },
+  "$defs": {
+    "reward": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["kind", "skillId", "amount"],
+          "additionalProperties": false,
+          "properties": { "kind": { "const": "skillXp" }, "skillId": { "type": "string", "minLength": 1 }, "amount": { "$ref": "#/$defs/rewardAmount" } }
+        },
+        {
+          "type": "object",
+          "required": ["kind", "resourceId", "amount"],
+          "additionalProperties": false,
+          "properties": { "kind": { "const": "resource" }, "resourceId": { "type": "string", "minLength": 1 }, "amount": { "$ref": "#/$defs/rewardAmount" } }
+        },
+        {
+          "type": "object",
+          "required": ["kind", "itemId", "amount"],
+          "additionalProperties": false,
+          "properties": { "kind": { "const": "item" }, "itemId": { "type": "string", "minLength": 1 }, "amount": { "$ref": "#/$defs/rewardAmount" } }
+        },
+        {
+          "type": "object",
+          "required": ["kind", "mode", "drops"],
+          "additionalProperties": false,
+          "properties": { "kind": { "const": "dropTable" }, "mode": { "enum": ["independent", "dependent"] }, "drops": { "type": "array", "items": { "$ref": "#/$defs/dropTableEntry" } } }
+        }
+      ]
+    },
+    "rewardAmount": {
+      "oneOf": [
+        { "type": "number", "exclusiveMinimum": 0 },
+        {
+          "type": "object",
+          "required": ["min", "max"],
+          "additionalProperties": false,
+          "properties": {
+            "min": { "type": "number", "exclusiveMinimum": 0 },
+            "max": { "type": "number", "exclusiveMinimum": 0 }
+          }
+        }
+      ]
+    },
+    "dropTableEntry": {
+      "type": "object",
+      "required": ["weight", "reward"],
+      "additionalProperties": false,
+      "properties": { "weight": { "type": "number", "exclusiveMinimum": 0 }, "reward": { "$ref": "#/$defs/reward" } }
     }
   }
 }

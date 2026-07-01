@@ -9,7 +9,58 @@
     "showHealthBar": true,
     "rewards": [
       { "kind": "skillXp", "skillId": "attack", "amount": 2 },
-      { "kind": "skillXp", "skillId": "defense", "amount": 1 }
+      { "kind": "skillXp", "skillId": "defense", "amount": 1 },
+      {
+        "kind": "dropTable",
+        "mode": "independent",
+        "drops": [
+          {
+            "weight": 1,
+            "reward": { "kind": "item", "itemId": "bones", "amount": 1 }
+          },
+          {
+            "weight": 3,
+            "reward": {
+              "kind": "dropTable",
+              "mode": "dependent",
+              "drops": [
+                {
+                  "weight": 3,
+                  "reward": {
+                    "kind": "dropTable",
+                    "mode": "dependent",
+                    "drops": [
+                      {
+                        "weight": 2,
+                        "reward": {
+                          "kind": "dropTable",
+                          "mode": "dependent",
+                          "drops": [
+                            { "weight": 5, "reward": { "kind": "item", "itemId": "bronze-spear", "amount": 1 } },
+                            { "weight": 10, "reward": { "kind": "item", "itemId": "bronze-dagger", "amount": 1 } }
+                          ]
+                        }
+                      },
+                      {
+                        "weight": 1,
+                        "reward": {
+                          "kind": "dropTable",
+                          "mode": "dependent",
+                          "drops": [
+                            { "weight": 3, "reward": { "kind": "item", "itemId": "bronze-arrow", "amount": { "min": 5, "max": 8 } } },
+                            { "weight": 6, "reward": { "kind": "item", "itemId": "bronze-throwing-knife", "amount": { "min": 3, "max": 5 } } }
+                          ]
+                        }
+                      }
+                    ]
+                  }
+                },
+                { "weight": 5, "reward": { "kind": "item", "itemId": "iron-ore", "amount": { "min": 1, "max": 2 } } }
+              ]
+            }
+          }
+        ]
+      }
     ]
   },
   {

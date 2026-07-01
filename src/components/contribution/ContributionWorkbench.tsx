@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { canStartAction } from '../../game/conditions';
 import { edgeId, toKebabInput } from '../../game/contentIds';
 import type { Translator } from '../../game/i18n';
-import type { Condition, ContentBundle, ContributionDraft, GameAction, LocationNode, NumericComparison, TravelEdgeDefinition, UniversePlayState } from '../../game/types';
+import type { Condition, ContentBundle, ContributionDraft, GameAction, LocationNode, NumericComparison, Reward, TravelEdgeDefinition, UniversePlayState } from '../../game/types';
 import { readStateVariable, stateVariableKeys, writeStateVariable, type StateVariableValue } from '../../game/stateVariables';
 import { useContributionPlayState } from '../../stores/contributionPlayState';
 import { StructuredDataEditor, type StructuredValue } from '../structuredData/StructuredData';
@@ -57,6 +57,13 @@ const actionMatchesStateFilter = (action: GameAction, key: StateKey | '', value:
 
 const referencedStateKeys = (actions: GameAction[], bundle: ContentBundle) => {
   const keys = new Set<StateKey>();
+  const visitReward = (reward: Reward) => {
+    if (reward.kind === 'dropTable') {
+      reward.drops.forEach((drop) => visitReward(drop.reward));
+      return;
+    }
+    keys.add(reward.kind === 'skillXp' ? `skill-level:${reward.skillId}` : `${reward.kind}:${reward.kind === 'item' ? reward.itemId : reward.resourceId}`);
+  };
   for (const action of actions) {
     visitCondition(action.requirements, (condition) => {
       const key = conditionKey(condition);
@@ -66,9 +73,7 @@ const referencedStateKeys = (actions: GameAction[], bundle: ContentBundle) => {
       const key = conditionKey(condition);
       if (key) keys.add(key);
     });
-    for (const reward of action.rewards) {
-      keys.add(reward.kind === 'skillXp' ? `skill-level:${reward.skillId}` : `${reward.kind}:${reward.kind === 'item' ? reward.itemId : reward.resourceId}`);
-    }
+    action.rewards.forEach(visitReward);
     for (const result of action.results ?? []) {
       if (result.kind === 'flag') keys.add(`flag:${result.flagId}`);
       if (result.kind === 'item') keys.add(`item:${result.itemId}`);
