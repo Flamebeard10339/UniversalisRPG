@@ -15,14 +15,13 @@ export type StructuredSchema =
   | { kind: 'boolean' }
   | { kind: 'enum'; options: string[] }
   | { kind: 'scalar'; types?: Array<'boolean' | 'number' | 'string'> }
-  | { kind: 'object'; fields: Record<string, StructuredField>; allowAdditional?: boolean; inline?: boolean }
-  | { kind: 'array'; item: StructuredSchemaRef; createItem: () => StructuredValue; inlineRows?: boolean }
-  | { kind: 'union'; discriminator: string; variants: Record<string, { label?: string; schema: StructuredSchemaRef; createValue: () => StructuredValue }>; inline?: boolean }
+  | { kind: 'object'; fields: Record<string, StructuredField>; allowAdditional?: boolean }
+  | { kind: 'array'; item: StructuredSchemaRef; createItem: () => StructuredValue; listMode?: 'free' | 'table' | 'tags'; columns?: string[] }
+  | { kind: 'union'; discriminator: string; variants: Record<string, { label?: string; schema: StructuredSchemaRef; createValue: () => StructuredValue }> }
   | { kind: 'inferred' };
 
 type EditorProps = {
   hiddenKeys?: string[];
-  inline?: boolean;
   label?: string;
   onChange: (value: StructuredValue | undefined) => void;
   optional?: boolean;
@@ -35,6 +34,7 @@ const resolveSchema = (schema: StructuredSchemaRef): StructuredSchema => typeof 
 const inputClass = 'min-w-0 rounded border border-slate-700 bg-slate-900 px-2 py-1.5 text-sm text-slate-100';
 const removeButtonClass = 'rounded border border-rose-500 px-2 py-1.5 text-sm font-semibold text-rose-200';
 const labelText = (label: string, t: Translator) => label.includes('.') ? t(label) : label;
+const buttonClass = 'rounded border border-slate-600 px-2 py-1 text-xs text-slate-200';
 
 const inferredSchema = (value: StructuredValue | undefined): StructuredSchema => {
   if (typeof value === 'boolean') return { kind: 'boolean' };
@@ -104,7 +104,7 @@ const PrimitiveEditor = ({
   );
 };
 
-const EditorNode = ({ hiddenKeys = [], inline = false, label, onChange, optional, schema: schemaRef = { kind: 'inferred' }, t, value }: EditorProps) => {
+const EditorNode = ({ hiddenKeys = [], label, onChange, optional, schema: schemaRef = { kind: 'inferred' }, t, value }: EditorProps) => {
   const schema = compatibleSchema(resolveSchema(schemaRef), value);
   const [newField, setNewField] = useState('');
 
@@ -116,17 +116,16 @@ const EditorNode = ({ hiddenKeys = [], inline = false, label, onChange, optional
     const record = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
     const selected = String(record[schema.discriminator] ?? Object.keys(schema.variants)[0] ?? '');
     const variant = schema.variants[selected] ?? Object.values(schema.variants)[0];
-    const inlineUnion = inline || schema.inline;
     return (
-      <section className={inlineUnion ? 'flex min-w-0 flex-wrap items-center gap-2' : 'grid gap-2 rounded border border-slate-800 bg-slate-950/60 p-2'}>
+      <section className="grid gap-2 rounded border border-slate-800 bg-slate-950/60 p-2">
         <div className="flex min-w-[10rem] items-center gap-2">
-          <span className="text-xs text-slate-400">{inlineUnion ? schema.discriminator : label ? labelText(label, t) : schema.discriminator}</span>
+          <span className="text-xs text-slate-400">{label ? labelText(label, t) : schema.discriminator}</span>
           <select className={inputClass} onChange={(event) => onChange(schema.variants[event.target.value].createValue())} value={selected}>
             {Object.entries(schema.variants).map(([key, item]) => <option key={key} value={key}>{item.label ? labelText(item.label, t) : key}</option>)}
           </select>
-          {optional && <button className={inlineUnion ? removeButtonClass : 'text-xs text-rose-300'} onClick={() => onChange(undefined)} type="button">{t('structured.remove')}</button>}
+          {optional && <button className="text-xs text-rose-300" onClick={() => onChange(undefined)} type="button">{t('structured.remove')}</button>}
         </div>
-        {variant && <EditorNode hiddenKeys={[schema.discriminator]} inline={inlineUnion} onChange={onChange} schema={variant.schema} t={t} value={value} />}
+        {variant && <EditorNode hiddenKeys={[schema.discriminator]} onChange={onChange} schema={variant.schema} t={t} value={value} />}
       </section>
     );
   }
@@ -136,7 +135,7 @@ const EditorNode = ({ hiddenKeys = [], inline = false, label, onChange, optional
     const allowedTypes = schema.types ?? ['boolean', 'number', 'string'];
     const primitiveSchema: StructuredSchema = scalarType === 'number' ? { kind: 'number' } : scalarType === 'string' ? { kind: 'string' } : { kind: 'boolean' };
     return (
-      <div className={inline ? 'flex min-w-0 items-center gap-2' : 'grid min-w-0 gap-1'}>
+      <div className="grid min-w-0 gap-1">
         <span className="text-xs text-slate-400">{label ? labelText(label, t) : t('structured.value')}</span>
         <div className="flex min-w-0 items-center gap-2">
           <select className={inputClass} onChange={(event) => onChange(event.target.value === 'number' ? 0 : event.target.value === 'string' ? '' : false)} value={scalarType}>
@@ -145,7 +144,7 @@ const EditorNode = ({ hiddenKeys = [], inline = false, label, onChange, optional
             {allowedTypes.includes('string') && <option value="string">{t('structured.string')}</option>}
           </select>
           <PrimitiveEditor accessibleLabel={label ? labelText(label, t) : undefined} onChange={onChange} schema={primitiveSchema as Extract<StructuredSchema, { kind: 'string' | 'number' | 'boolean' | 'enum' }>} value={value} />
-          {optional && <button className={inline ? removeButtonClass : 'text-xs text-rose-300'} onClick={() => onChange(undefined)} type="button">{t('structured.remove')}</button>}
+          {optional && <button className="text-xs text-rose-300" onClick={() => onChange(undefined)} type="button">{t('structured.remove')}</button>}
         </div>
       </div>
     );
@@ -153,19 +152,104 @@ const EditorNode = ({ hiddenKeys = [], inline = false, label, onChange, optional
 
   if (schema.kind === 'array') {
     const items = Array.isArray(value) ? value : [];
+    const listMode = schema.listMode ?? 'free';
+
+    if (listMode === 'tags') {
+      return (
+        <section className="grid gap-2 border-l border-slate-700 pl-3">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label ? labelText(label, t) : t('structured.items')}</span>
+            <div className="flex gap-2">
+              <button className={buttonClass} onClick={() => onChange([...items, schema.createItem()])} type="button">+ {t('structured.addRow')}</button>
+              {optional && <button className="rounded px-2 py-1 text-xs text-rose-300" onClick={() => onChange(undefined)} type="button">{t('structured.remove')}</button>}
+            </div>
+          </div>
+          <div className="flex min-w-0 flex-wrap gap-2">
+            {items.map((item, index) => (
+              <div className="flex min-w-[10rem] items-center gap-2 rounded bg-slate-950 p-2" key={index}>
+                <EditorNode onChange={(next) => onChange(items.map((candidate, candidateIndex) => candidateIndex === index ? next ?? null : candidate))} schema={schema.item} t={t} value={item} />
+                <button aria-label={t('structured.removeRow', { index: index + 1 })} className={removeButtonClass} onClick={() => onChange(items.filter((_, candidateIndex) => candidateIndex !== index))} type="button">{t('structured.remove')}</button>
+              </div>
+            ))}
+          </div>
+        </section>
+      );
+    }
+
+    if (listMode === 'table') {
+      const itemSchema = resolveSchema(schema.item);
+      const columns = schema.columns ?? (itemSchema.kind === 'object' ? Object.keys(itemSchema.fields) : []);
+      return (
+        <section className="grid gap-2 border-l border-slate-700 pl-3">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label ? labelText(label, t) : t('structured.items')}</span>
+            <div className="flex gap-2">
+              <button className={buttonClass} onClick={() => onChange([...items, schema.createItem()])} type="button">+ {t('structured.addRow')}</button>
+              {optional && <button className="rounded px-2 py-1 text-xs text-rose-300" onClick={() => onChange(undefined)} type="button">{t('structured.remove')}</button>}
+            </div>
+          </div>
+          {items.length === 0 ? null : (
+            <div className="overflow-x-auto overscroll-x-contain">
+              <table className="w-full min-w-[32rem] text-sm">
+                <thead className="text-xs uppercase text-slate-500">
+                  <tr>
+                    {columns.map((column) => {
+                      const field = itemSchema.kind === 'object' ? itemSchema.fields[column] : undefined;
+                      return <th className="px-2 py-1 text-left" key={column}>{labelText(field?.label ?? column, t)}</th>;
+                    })}
+                    <th className="w-24 px-2 py-1 text-left">{t('structured.remove')}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {items.map((item, index) => {
+                    const record = item && typeof item === 'object' && !Array.isArray(item) ? item : {};
+                    return (
+                      <tr className="border-t border-slate-800 align-top" key={index}>
+                        {columns.map((column) => {
+                          const field = itemSchema.kind === 'object' ? itemSchema.fields[column] : undefined;
+                          return (
+                            <td className="px-2 py-2" key={column}>
+                              <EditorNode
+                                onChange={(next) => onChange(items.map((candidate, candidateIndex) => {
+                                  if (candidateIndex !== index) return candidate;
+                                  const updated = { ...record };
+                                  if (next === undefined) delete updated[column];
+                                  else updated[column] = next;
+                                  return updated;
+                                }))}
+                                optional={field?.optional}
+                                schema={field?.schema ?? { kind: 'inferred' }}
+                                t={t}
+                                value={record[column]}
+                              />
+                            </td>
+                          );
+                        })}
+                        <td className="px-2 py-2"><button aria-label={t('structured.removeRow', { index: index + 1 })} className={removeButtonClass} onClick={() => onChange(items.filter((_, candidateIndex) => candidateIndex !== index))} type="button">{t('structured.remove')}</button></td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+      );
+    }
+
     return (
       <section className="grid gap-2 border-l border-slate-700 pl-3">
         <div className="flex items-center justify-between gap-2">
           <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label ? labelText(label, t) : t('structured.items')}</span>
           <div className="flex gap-2">
-            <button className="rounded border border-slate-600 px-2 py-1 text-xs text-slate-200" onClick={() => onChange([...items, schema.createItem()])} type="button">+ {t('structured.addRow')}</button>
+            <button className={buttonClass} onClick={() => onChange([...items, schema.createItem()])} type="button">+ {t('structured.addRow')}</button>
             {optional && <button className="rounded px-2 py-1 text-xs text-rose-300" onClick={() => onChange(undefined)} type="button">{t('structured.remove')}</button>}
           </div>
         </div>
         {items.map((item, index) => (
-          <div className={schema.inlineRows ? 'flex min-w-0 flex-wrap items-center gap-2 rounded bg-slate-950 p-2' : 'grid grid-cols-[1fr_auto] items-start gap-2 rounded border border-slate-800 bg-slate-900/50 p-2'} key={index}>
+          <div className="grid grid-cols-[1fr_auto] items-start gap-2 rounded border border-slate-800 bg-slate-900/50 p-2" key={index}>
             <div className="min-w-0 flex-1">
-              <EditorNode inline={schema.inlineRows} label={schema.inlineRows ? undefined : `${t('structured.row')} ${index + 1}`} onChange={(next) => onChange(items.map((candidate, candidateIndex) => candidateIndex === index ? next ?? null : candidate))} schema={schema.item} t={t} value={item} />
+              <EditorNode label={`${t('structured.row')} ${index + 1}`} onChange={(next) => onChange(items.map((candidate, candidateIndex) => candidateIndex === index ? next ?? null : candidate))} schema={schema.item} t={t} value={item} />
             </div>
             <button aria-label={t('structured.removeRow', { index: index + 1 })} className={removeButtonClass} onClick={() => onChange(items.filter((_, candidateIndex) => candidateIndex !== index))} type="button">{t('structured.remove')}</button>
           </div>
@@ -178,37 +262,51 @@ const EditorNode = ({ hiddenKeys = [], inline = false, label, onChange, optional
     const record = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
     const allowedRecord = schema.allowAdditional ? record : Object.fromEntries(Object.entries(record).filter(([key]) => key in schema.fields));
     const fieldNames = Array.from(new Set([...Object.keys(schema.fields), ...(schema.allowAdditional ? Object.keys(record) : [])])).filter((key) => !hiddenKeys.includes(key));
+    const updateKey = (key: string, next: StructuredValue | undefined) => {
+      const updated = { ...allowedRecord };
+      if (next === undefined) delete updated[key];
+      else updated[key] = next;
+      onChange(updated);
+    };
+    const renderField = (key: string) => {
+      const field = schema.fields[key] ?? { schema: { kind: 'inferred' } as StructuredSchema, optional: true };
+      const fieldLabel = field.label ?? key;
+      const fieldValue = record[key];
+
+      if (field.optional && fieldValue === undefined) {
+        return (
+          <div className="grid min-w-0 gap-1 rounded bg-slate-950/60 p-2" key={key}>
+            <button className="justify-self-start rounded border border-dashed border-slate-600 px-2 py-1 text-xs text-slate-300" onClick={() => updateKey(key, defaultFor(field))} type="button">+ {labelText(fieldLabel, t)}</button>
+          </div>
+        );
+      }
+
+      return (
+        <div className="grid min-w-0 gap-2 rounded bg-slate-950/60 p-2" key={key}>
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-xs font-semibold text-slate-400">{labelText(fieldLabel, t)}</span>
+            {field.optional && <button className="text-xs text-rose-300" onClick={() => updateKey(key, undefined)} type="button">{t('structured.remove')}</button>}
+          </div>
+          <EditorNode
+            onChange={(next) => updateKey(key, next)}
+            optional={false}
+            schema={field.schema}
+            t={t}
+            value={fieldValue}
+          />
+        </div>
+      );
+    };
     return (
-      <section className="flex flex-wrap items-start gap-3">
+      <section className="grid min-w-0 gap-2">
         {label && (
-          <div className="flex basis-full items-center justify-between">
+          <div className="flex items-center justify-between">
             <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">{labelText(label, t)}</span>
             {optional && <button className="text-xs text-rose-300" onClick={() => onChange(undefined)} type="button">{t('structured.remove')}</button>}
           </div>
         )}
-        {fieldNames.map((key) => {
-          const field = schema.fields[key] ?? { schema: { kind: 'inferred' } as StructuredSchema, optional: true };
-          const fieldSchema = compatibleSchema(resolveSchema(field.schema), record[key]);
-          const nested = fieldSchema.kind === 'array' || fieldSchema.kind === 'object' || fieldSchema.kind === 'union';
-          return (
-            <div className={nested && !schema.inline ? 'min-w-0 basis-full' : 'min-w-[10rem] flex-1'} key={key}>
-              <EditorNode
-                inline={schema.inline}
-                label={field.label ?? key}
-                onChange={(next) => {
-                  const updated = { ...allowedRecord };
-                  if (next === undefined) delete updated[key];
-                  else updated[key] = next;
-                  onChange(updated);
-                }}
-                optional={field.optional}
-                schema={field.schema}
-                t={t}
-                value={record[key]}
-              />
-            </div>
-          );
-        })}
+        {fieldNames.length === 0 && <span className="text-xs text-slate-500">{t('structured.empty')}</span>}
+        {fieldNames.map((key) => renderField(key))}
         {schema.allowAdditional && (
           <div className="flex min-w-[14rem] flex-1 gap-2">
             <input className={inputClass} onChange={(event) => setNewField(event.target.value)} placeholder={t('structured.fieldName')} value={newField} />
@@ -220,43 +318,14 @@ const EditorNode = ({ hiddenKeys = [], inline = false, label, onChange, optional
   }
 
   return (
-    <div className={inline ? 'flex min-w-0 flex-1 items-center gap-2' : 'grid min-w-0 flex-1 gap-1'}>
+    <div className="grid min-w-0 flex-1 gap-1">
       {label && <span className="text-xs text-slate-400">{labelText(label, t)}</span>}
       <div className="flex min-w-0 items-center gap-2">
         <PrimitiveEditor accessibleLabel={label ? labelText(label, t) : undefined} onChange={onChange} schema={schema as Extract<StructuredSchema, { kind: 'string' | 'number' | 'boolean' | 'enum' }>} value={value} />
-        {optional && <button className={inline ? removeButtonClass : 'text-xs text-rose-300'} onClick={() => onChange(undefined)} type="button">{t('structured.remove')}</button>}
+        {optional && <button className="text-xs text-rose-300" onClick={() => onChange(undefined)} type="button">{t('structured.remove')}</button>}
       </div>
     </div>
   );
 };
 
 export const StructuredDataEditor = (props: EditorProps) => <EditorNode {...props} />;
-
-export const StructuredDataDisplay = ({ label, t, value }: { label?: string; t: Translator; value: StructuredValue | undefined }) => {
-  if (Array.isArray(value)) {
-    return (
-      <section className="grid gap-2 border-l border-slate-700 pl-3">
-        {label && <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">{labelText(label, t)}</span>}
-        {value.map((item, index) => (
-          <div className="rounded border border-slate-800 bg-slate-950/50 p-2" key={index}>
-            <StructuredDataDisplay label={`${t('structured.row')} ${index + 1}`} t={t} value={item} />
-          </div>
-        ))}
-      </section>
-    );
-  }
-  if (value && typeof value === 'object') {
-    return (
-      <section className="grid gap-1">
-        {label && <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">{labelText(label, t)}</span>}
-        {Object.entries(value).map(([key, child]) => (
-          <div className="grid gap-1 md:grid-cols-[10rem_minmax(0,1fr)]" key={key}>
-            <span className="text-xs text-slate-500">{key}</span>
-            <StructuredDataDisplay t={t} value={child} />
-          </div>
-        ))}
-      </section>
-    );
-  }
-  return <span className="break-words text-xs text-slate-300">{value === null ? 'null' : String(value ?? '')}</span>;
-};

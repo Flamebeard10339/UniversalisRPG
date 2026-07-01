@@ -10,7 +10,7 @@ import { ContributionWorkbench } from './components/contribution/ContributionWor
 import { SkillBars } from './components/SkillBars';
 import { TravelStatus } from './components/TravelStatus';
 import { WorldMap } from './components/WorldMap';
-import { StructuredDataDisplay, type StructuredValue } from './components/structuredData/StructuredData';
+import { StructuredDataEditor, type StructuredValue } from './components/structuredData/StructuredData';
 import { actionTitleKey, interactionTitleKey, itemTitleKey, locationDescriptionKey, locationTitleKey, resourceTitleKey, skillTitleKey, universeDescriptionKey, universeTitleKey } from './game/contentIds';
 import { getInteractionType, isContinuousAction } from './game/adversarial';
 import type { ContributionDraft, IdleReport, UniversePlayState } from './game/types';
@@ -720,7 +720,7 @@ export default function App() {
                           <span className="font-semibold text-cyan-200">{entry.runId} / {entry.sequence}. {entry.actor}: {entry.event}</span>
                           <time>{new Date(entry.createdAt).toLocaleString()}</time>
                         </div>
-                        {entry.data && <div className="mt-2"><StructuredDataDisplay t={t} value={entry.data as unknown as StructuredValue} /></div>}
+                        {entry.data && <div className="mt-2"><StructuredDataEditor onChange={() => undefined} schema={{ kind: 'inferred' }} t={t} value={entry.data as unknown as StructuredValue} /></div>}
                       </li>
                     ))}
                   </ol>
@@ -780,7 +780,7 @@ export default function App() {
                               <span className="font-semibold text-cyan-200">{entry.action}</span>
                               <time>{new Date(entry.timestamp).toLocaleTimeString()}</time>
                             </div>
-                            {entry.details && <div className="mt-2"><StructuredDataDisplay t={t} value={entry.details as unknown as StructuredValue} /></div>}
+                            {entry.details && <div className="mt-2"><StructuredDataEditor onChange={() => undefined} schema={{ kind: 'inferred' }} t={t} value={entry.details as unknown as StructuredValue} /></div>}
                           </li>
                         ))}
                       </ol>

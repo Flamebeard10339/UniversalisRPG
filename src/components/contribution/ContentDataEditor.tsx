@@ -1,16 +1,16 @@
-import { useEffect, useRef, useState, type MutableRefObject } from 'react';
-import { edgeId, itemTitleKey, toKebabInput } from '../../game/contentIds';
+import { useRef, useState, type MutableRefObject } from 'react';
+import { edgeId, toKebabInput } from '../../game/contentIds';
 import type { Translator } from '../../game/i18n';
-import type { ContentBundle, ContributionDraft, ContributionRemovedIds, EffectDefinition, EnemyDefinition, EnemyStatKey, GameAction, InteractionTypeDefinition, ItemDefinition, LocationNode, ResourceDefinition, SkillDefinition, StatDefinition, StateFlagDefinition, TravelEdgeDefinition } from '../../game/types';
+import type { BasePlayerDefinition, CombatBalanceDefinition, ContentBundle, ContributionDraft, ContributionRemovedIds, EffectDefinition, EnemyDefinition, GameAction, InteractionTypeDefinition, ItemDefinition, LocationNode, ResourceDefinition, SkillDefinition, StatDefinition, StateFlagDefinition, TravelEdgeDefinition, UniverseUiSettings } from '../../game/types';
 import { ContributionMapEditor } from './ContributionMapEditor';
 import { EnemyDiagnostics } from './EnemyDiagnostics';
 import { DEBUG_PLAYER_PROFILES, getProfileStatSummary, profileDescription, profileTitle } from '../../game/playerProfiles';
 import { resolveCombatBalance } from '../../game/combatBalance';
-import { ENEMY_STAT_DEFAULTS, ENEMY_STAT_KEYS, getEnemyStat, normalizeEnemyStats } from '../../game/enemies';
+import { getEnemyStat, normalizeEnemyStats } from '../../game/enemies';
 import { resolveUniverseUiSettings } from '../../game/universeSettings';
 import { EdgeFields, LocationFields } from './MapContentFields';
-import { StructuredDataDisplay, StructuredDataEditor, type StructuredValue } from '../structuredData/StructuredData';
-import { actionSchema, effectDefinitionSchema, flagDefinitionSchema, resourceDefinitionSchema, rewardSchema } from '../structuredData/contentSchemas';
+import { StructuredDataEditor, type StructuredValue } from '../structuredData/StructuredData';
+import { actionSchema, basePlayerSchema, combatBalanceSchema, edgeSchema, effectDefinitionSchema, enemyStatsSchema, flagDefinitionSchema, interactionTypeDefinitionSchema, itemDefinitionSchema, locationSchema, resourceDefinitionSchema, rewardSchema, skillDefinitionSchema, statDefinitionSchema, universeUiSchema } from '../structuredData/contentSchemas';
 
 type ContentDataEditorProps = {
   baseBundle: ContentBundle;
@@ -90,167 +90,6 @@ const allFlags = (bundle: ContentBundle, draft: ContributionDraft) => uniqueById
 const allInteractionTypes = (bundle: ContentBundle, draft: ContributionDraft) => uniqueById([...(bundle.interactionTypes ?? []), ...draft.interactionTypes]);
 const allEnemies = (bundle: ContentBundle, draft: ContributionDraft) => uniqueById([...(bundle.enemies ?? []), ...draft.enemies]);
 
-type NumericEditorProps = {
-  max?: number;
-  min?: number;
-  onChange: (value: number) => void;
-  step?: number | 'any';
-  value: number;
-};
-
-const NumericEditor = ({ max, min = 0, onChange, step = 'any', value }: NumericEditorProps) => {
-  const [draftValue, setDraftValue] = useState(String(value));
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    if (document.activeElement !== inputRef.current) {
-      setDraftValue(String(value));
-    }
-  }, [value]);
-
-  return (
-    <input
-      className="rounded bg-slate-950 px-2 py-1.5 text-sm text-slate-100"
-      max={max}
-      min={min}
-      onBlur={() => setDraftValue(String(value))}
-      onChange={(event) => {
-        const nextDraft = event.target.value;
-        const nextValue = Number(nextDraft);
-        setDraftValue(nextDraft);
-        if (nextDraft !== '' && Number.isFinite(nextValue)) {
-          onChange(nextValue);
-        }
-      }}
-      ref={inputRef}
-      step={step}
-      type="number"
-      value={draftValue}
-    />
-  );
-};
-
-type KeyValueRowsProps = {
-  addLabel: string;
-  createValue?: (key: string) => number;
-  datalistId: string;
-  keyLabel: string;
-  labelForKey: (key: string) => string;
-  onChange: (value: Record<string, number>) => void;
-  validKeys: string[];
-  value: Record<string, number>;
-  valueLabel: string;
-};
-
-type KeyValueRow = {
-  id: string;
-  key: string;
-  value: number;
-};
-
-const rowsFromRecord = (value: Record<string, number>): KeyValueRow[] =>
-  Object.entries(value).map(([key, amount], index) => ({ id: `${key}-${index}`, key, value: amount }));
-
-const KeyValueRows = ({ addLabel, createValue = () => 0, datalistId, keyLabel, labelForKey, onChange, validKeys, value, valueLabel }: KeyValueRowsProps) => {
-  const valid = new Set(validKeys);
-  const [rows, setRows] = useState<KeyValueRow[]>(() => rowsFromRecord(value));
-  const internalChange = useRef(false);
-  const nextRowId = useRef(rows.length + 1);
-  const valueSignature = JSON.stringify(value);
-
-  useEffect(() => {
-    if (internalChange.current) {
-      internalChange.current = false;
-      return;
-    }
-    setRows(rowsFromRecord(value));
-    nextRowId.current = Object.keys(value).length + 1;
-  }, [valueSignature]);
-
-  const emit = (nextRows: KeyValueRow[]) => {
-    const seen = new Set<string>();
-    const next: Record<string, number> = {};
-
-    for (const row of nextRows) {
-      if (!valid.has(row.key) || seen.has(row.key)) {
-        continue;
-      }
-      seen.add(row.key);
-      next[row.key] = row.value;
-    }
-
-    internalChange.current = true;
-    onChange(next);
-  };
-
-  const updateRows = (nextRows: KeyValueRow[]) => {
-    setRows(nextRows);
-    emit(nextRows);
-  };
-
-  const updateKey = (rowId: string, nextKey: string) => {
-    updateRows(rows.map((row) => row.id === rowId ? { ...row, key: nextKey } : row));
-  };
-
-  const updateValue = (rowId: string, nextValue: number) => {
-    updateRows(rows.map((row) => row.id === rowId ? { ...row, value: nextValue } : row));
-  };
-
-  const removeRow = (rowId: string) => {
-    updateRows(rows.filter((row) => row.id !== rowId));
-  };
-
-  const keyCounts = rows.reduce<Record<string, number>>((counts, row) => ({
-    ...counts,
-    [row.key]: (counts[row.key] ?? 0) + 1,
-  }), {});
-  const used = new Set(rows.filter((row) => valid.has(row.key)).map((row) => row.key));
-  const available = validKeys.filter((key) => !used.has(key));
-
-  return (
-    <div className="grid gap-2">
-      <div className="hidden grid-cols-[minmax(9rem,1fr)_8rem_4rem] gap-2 px-2 text-xs font-semibold uppercase text-slate-500 sm:grid">
-        <span>{keyLabel}</span>
-        <span>{valueLabel}</span>
-        <span />
-      </div>
-      {rows.map((row) => {
-        const invalid = !valid.has(row.key) || keyCounts[row.key] > 1;
-        return (
-        <div className={`grid gap-2 rounded p-2 sm:grid-cols-[minmax(9rem,1fr)_8rem_4rem] ${invalid ? 'bg-rose-950/70 ring-1 ring-rose-600' : 'bg-slate-950'}`} key={row.id}>
-          <input
-            className={`min-w-0 rounded px-2 py-1.5 text-sm text-slate-100 ${invalid ? 'bg-rose-950' : 'bg-slate-900'}`}
-            list={datalistId}
-            onChange={(event) => updateKey(row.id, event.target.value)}
-            value={row.key}
-          />
-          <NumericEditor onChange={(nextValue) => updateValue(row.id, nextValue)} value={row.value} />
-          <button className="rounded border border-rose-500 px-2 py-1.5 text-sm font-semibold text-rose-200" onClick={() => removeRow(row.id)} type="button">
-            -
-          </button>
-        </div>
-        );
-      })}
-      {available.length > 0 && (
-        <button
-          className="justify-self-start rounded border border-slate-600 px-3 py-2 text-sm font-semibold text-slate-100"
-          onClick={() => {
-            const key = available[0];
-            updateRows([...rows, { id: `row-${nextRowId.current++}`, key, value: createValue(key) }]);
-          }}
-          type="button"
-        >
-          {addLabel}
-        </button>
-      )}
-      <datalist id={datalistId}>
-        {validKeys.map((key) => (
-          <option key={key} label={labelForKey(key)} value={key} />
-        ))}
-      </datalist>
-    </div>
-  );
-};
 
 export const ContentDataEditor = ({ baseBundle, bundle, draft, onPatch, t }: ContentDataEditorProps) => {
   const [activeTab, setActiveTab] = useState<ContentDataTab>('map');
@@ -364,17 +203,16 @@ export const ContentDataEditor = ({ baseBundle, bundle, draft, onPatch, t }: Con
     updateEnemy(row, { stats: normalizeEnemyStats(stats) });
   };
 
-  const updateCombatBalance = (patch: Partial<typeof combatBalance>) => {
-    onPatch({ combatBalance: resolveCombatBalance({ ...combatBalance, ...patch }) });
+  const updateCombatBalance = (value: StructuredValue | undefined) => {
+    if (value && typeof value === 'object' && !Array.isArray(value)) onPatch({ combatBalance: resolveCombatBalance(value as unknown as CombatBalanceDefinition) });
   };
 
-  const updateUiSettings = (patch: Partial<typeof uiSettings>) => {
-    onPatch({ ui: resolveUniverseUiSettings({ ...uiSettings, ...patch }) });
+  const updateUiSettings = (value: StructuredValue | undefined) => {
+    if (value && typeof value === 'object' && !Array.isArray(value)) onPatch({ ui: resolveUniverseUiSettings(value as unknown as UniverseUiSettings) });
   };
 
-  const updateBasePlayerInventory = (inventory: Record<string, number>) => {
-    const valid = new Set(allItems(bundle, draft).map((item) => item.id));
-    onPatch({ basePlayer: { inventory: Object.fromEntries(Object.entries(inventory).filter(([key, amount]) => valid.has(key) && amount >= 0)) } });
+  const updateBasePlayer = (value: StructuredValue | undefined) => {
+    if (value && typeof value === 'object' && !Array.isArray(value)) onPatch({ basePlayer: value as unknown as BasePlayerDefinition });
   };
 
   const enemyEditorKey = (enemyId: string) => {
@@ -523,20 +361,27 @@ export const ContentDataEditor = ({ baseBundle, bundle, draft, onPatch, t }: Con
 
   const universeBasePlayer = { inventory: basePlayer.inventory ?? {} };
   const jsonFiles = [
-    { path: 'universe.json', json: { ...bundle.manifest, basePlayer: universeBasePlayer, combatBalance, ui: uiSettings } },
-    { path: 'locations.json', json: locations.map((row) => row.item) },
-    { path: 'edges.json', json: edges.map((row) => row.item) },
-    { path: 'actions.json', json: actions.map((row) => row.item) },
-    { path: 'skills.json', json: skills.map((row) => row.item) },
-    { path: 'stats.json', json: stats.map((row) => row.item) },
-    { path: 'items.json', json: items.map((row) => row.item) },
-    { path: 'flags.json', json: flags.map((row) => row.item) },
-    { path: 'resources.json', json: resources.map((row) => row.item) },
-    { path: 'effects.json', json: effects.map((row) => row.item) },
-    { path: 'interaction-types.json', json: interactionTypes.map((row) => row.item) },
-    { path: 'enemies.json', json: enemies.map((row) => row.item) },
-    { path: 'removed.json', json: draft.removed },
-    { path: 'locales.json', json: draft.locales },
+    { path: 'universe.json', json: { ...bundle.manifest, basePlayer: universeBasePlayer, combatBalance, ui: uiSettings }, onChange: (value: StructuredValue | undefined) => {
+      const next = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+      onPatch({
+        basePlayer: next.basePlayer as BasePlayerDefinition | undefined,
+        combatBalance: next.combatBalance as CombatBalanceDefinition | undefined,
+        ui: next.ui as UniverseUiSettings | undefined,
+      });
+    } },
+    { path: 'locations.json', json: locations.map((row) => row.item), schema: { kind: 'array' as const, listMode: 'free' as const, item: locationSchema(), createItem: () => ({ id: 'new-location', position: { x: 0, y: 0 } }) }, onChange: (value: StructuredValue | undefined) => onPatch({ locations: (Array.isArray(value) ? value : []) as unknown as LocationNode[] }) },
+    { path: 'edges.json', json: edges.map((row) => row.item), schema: { kind: 'array' as const, listMode: 'table' as const, columns: ['id', 'source', 'target', 'travelTimeSeconds'], item: edgeSchema(bundle), createItem: () => ({ id: 'new-edge', source: locations[0]?.item.id ?? '', target: locations[1]?.item.id ?? '', travelTimeSeconds: 1 }) }, onChange: (value: StructuredValue | undefined) => onPatch({ edges: (Array.isArray(value) ? value : []) as unknown as TravelEdgeDefinition[] }) },
+    { path: 'actions.json', json: actions.map((row) => row.item), onChange: (value: StructuredValue | undefined) => onPatch({ actions: (Array.isArray(value) ? value : []) as unknown as GameAction[] }) },
+    { path: 'skills.json', json: skills.map((row) => row.item), schema: { kind: 'array' as const, listMode: 'table' as const, columns: ['id', 'maxLevel', 'statId', 'addedPerLevel', 'increasedPerLevel'], item: skillDefinitionSchema(bundle), createItem: () => ({ id: 'new-skill', maxLevel: 100 }) }, onChange: (value: StructuredValue | undefined) => onPatch({ skills: (Array.isArray(value) ? value : []) as unknown as SkillDefinition[] }) },
+    { path: 'stats.json', json: stats.map((row) => row.item), schema: { kind: 'array' as const, listMode: 'table' as const, columns: ['id', 'base'], item: statDefinitionSchema(), createItem: () => ({ id: 'new-stat', base: 0 }) }, onChange: (value: StructuredValue | undefined) => onPatch({ stats: (Array.isArray(value) ? value : []) as unknown as StatDefinition[] }) },
+    { path: 'items.json', json: items.map((row) => row.item), schema: { kind: 'array' as const, listMode: 'table' as const, columns: ['id', 'maxQuantity'], item: itemDefinitionSchema(), createItem: () => ({ id: 'new-item' }) }, onChange: (value: StructuredValue | undefined) => onPatch({ items: (Array.isArray(value) ? value : []) as unknown as ItemDefinition[] }) },
+    { path: 'flags.json', json: flags.map((row) => row.item), schema: { kind: 'array' as const, listMode: 'table' as const, columns: ['id', 'initialValue'], item: flagDefinitionSchema(), createItem: () => ({ id: 'new-flag', initialValue: false }) }, onChange: (value: StructuredValue | undefined) => onPatch({ flags: (Array.isArray(value) ? value : []) as unknown as StateFlagDefinition[] }) },
+    { path: 'resources.json', json: resources.map((row) => row.item), onChange: (value: StructuredValue | undefined) => onPatch({ resourceDefinitions: (Array.isArray(value) ? value : []) as unknown as ResourceDefinition[] }) },
+    { path: 'effects.json', json: effects.map((row) => row.item), onChange: (value: StructuredValue | undefined) => onPatch({ effects: (Array.isArray(value) ? value : []) as unknown as EffectDefinition[] }) },
+    { path: 'interaction-types.json', json: interactionTypes.map((row) => row.item), schema: { kind: 'array' as const, listMode: 'table' as const, columns: ['id', 'sourceStatId', 'targetStatId', 'targetPlayerHealth'], item: interactionTypeDefinitionSchema(bundle), createItem: () => ({ id: 'new-interaction', sourceStatId: stats[0]?.item.id ?? '', targetStatId: stats[0]?.item.id ?? '', targetPlayerHealth: false }) }, onChange: (value: StructuredValue | undefined) => onPatch({ interactionTypes: (Array.isArray(value) ? value : []) as unknown as InteractionTypeDefinition[] }) },
+    { path: 'enemies.json', json: enemies.map((row) => row.item), onChange: (value: StructuredValue | undefined) => onPatch({ enemies: (Array.isArray(value) ? value : []) as unknown as EnemyDefinition[] }) },
+    { path: 'removed.json', json: draft.removed, onChange: (value: StructuredValue | undefined) => onPatch({ removed: value as unknown as ContributionRemovedIds }) },
+    { path: 'locales.json', json: draft.locales, onChange: (value: StructuredValue | undefined) => onPatch({ locales: (value ?? {}) as ContributionDraft['locales'] }) },
   ];
 
   return (
@@ -569,60 +414,10 @@ export const ContentDataEditor = ({ baseBundle, bundle, draft, onPatch, t }: Con
             <h3 className="text-sm font-semibold text-slate-100">{t('contribution.data.universe')}</h3>
             <p className="text-xs text-slate-500">{t('contribution.data.universeDescription')}</p>
           </div>
-          <div className="grid gap-2 md:grid-cols-2">
-            <label className="grid gap-1 text-xs text-slate-400">
-              <span>{t('contribution.universe.expectedHitsToKill')}</span>
-              <NumericEditor
-                min={0.000001}
-                onChange={(value) => updateCombatBalance({ expectedHitsToKill: value })}
-                step={0.000001}
-                value={combatBalance.expectedHitsToKill}
-              />
-            </label>
-            <label className="grid gap-1 text-xs text-slate-400">
-              <span>{t('contribution.universe.combatSpread')}</span>
-              <NumericEditor
-                min={0}
-                onChange={(value) => updateCombatBalance({ combatSpread: value })}
-                step={0.01}
-                value={combatBalance.combatSpread}
-              />
-            </label>
-            <label className="grid gap-1 text-xs text-slate-400">
-              <span>{t('contribution.universe.floatingTextDuration')}</span>
-              <NumericEditor
-                min={0.001}
-                onChange={(value) => updateUiSettings({ floatingTextDurationSeconds: value })}
-                step={0.1}
-                value={uiSettings.floatingTextDurationSeconds}
-              />
-            </label>
-            <label className="flex items-center justify-between gap-3 rounded bg-slate-950 px-3 py-2 text-sm text-slate-300">
-              <span>{t('contribution.universe.loopActionsByDefault')}</span>
-              <input
-                checked={uiSettings.loopActionsByDefault}
-                className="h-5 w-5"
-                onChange={(event) => updateUiSettings({ loopActionsByDefault: event.target.checked })}
-                type="checkbox"
-              />
-            </label>
-          </div>
+          <StructuredDataEditor label="contribution.data.combatBalance" onChange={updateCombatBalance} schema={combatBalanceSchema()} t={t} value={combatBalance as unknown as StructuredValue} />
+          <StructuredDataEditor label="contribution.data.ui" onChange={updateUiSettings} schema={universeUiSchema()} t={t} value={uiSettings as unknown as StructuredValue} />
           <section className="grid gap-2 border-t border-slate-700 pt-3">
-            <h4 className="text-sm font-semibold text-slate-100">{t('contribution.universe.baseInventory')}</h4>
-            {items.length === 0 ? (
-              <p className="text-sm text-slate-500">{t('inventory.empty')}</p>
-            ) : (
-              <KeyValueRows
-                addLabel={t('contribution.universe.addBaseInventory')}
-                datalistId="base-player-inventory-keys"
-                keyLabel={t('contribution.column.inventoryItem')}
-                labelForKey={(key) => t(itemTitleKey(key), key)}
-                onChange={updateBasePlayerInventory}
-                validKeys={items.map((row) => row.item.id)}
-                value={basePlayer.inventory ?? {}}
-                valueLabel={t('structured.value')}
-              />
-            )}
+            <StructuredDataEditor label="contribution.universe.baseInventory" onChange={updateBasePlayer} schema={basePlayerSchema(bundle)} t={t} value={basePlayer as unknown as StructuredValue} />
           </section>
         </section>
       )}
@@ -747,25 +542,15 @@ export const ContentDataEditor = ({ baseBundle, bundle, draft, onPatch, t }: Con
               {t('contribution.data.addSkill')}
             </button>
           </div>
-          <div className="hidden grid-cols-[1fr_8rem_1fr_8rem_8rem_6rem] gap-2 px-2 text-xs font-semibold uppercase tracking-wide text-slate-500 lg:grid">
-            <span>{t('contribution.column.id')}</span>
-            <span>{t('contribution.column.maxLevel')}</span>
-            <span>{t('contribution.column.stat')}</span>
-            <span>{t('contribution.column.addedPerLevel')}</span>
-            <span>{t('contribution.column.increasedPerLevel')}</span>
-            <span>{t('contribution.column.remove')}</span>
-          </div>
           {skills.length === 0 ? (
             <p className="px-2 py-1 text-sm text-slate-500">{t('contribution.data.noSkillChanges')}</p>
           ) : (
             <div className="grid gap-1">
               {skills.map((row) => (
-                <div className="grid gap-2 rounded bg-slate-950 p-2 lg:grid-cols-[1fr_8rem_1fr_8rem_8rem_6rem]" key={`${row.source}-${row.index}`}>
-                  <input aria-label="Skill id" className="min-w-0 rounded bg-slate-900 px-2 py-1.5 text-sm" onChange={(event) => updateSkill(row, { id: toKebabInput(event.target.value) })} value={row.item.id} />
-                  <input aria-label="Skill max level" className="min-w-0 rounded bg-slate-900 px-2 py-1.5 text-sm" min="1" onChange={(event) => updateSkill(row, { maxLevel: Number(event.target.value) })} type="number" value={row.item.maxLevel} />
-                  <input aria-label={t('contribution.column.stat')} className="min-w-0 rounded bg-slate-900 px-2 py-1.5 text-sm" list="content-stat-ids" onChange={(event) => updateSkill(row, { statId: toKebabInput(event.target.value) || undefined })} value={row.item.statId ?? ''} />
-                  <input aria-label={t('contribution.column.addedPerLevel')} className="min-w-0 rounded bg-slate-900 px-2 py-1.5 text-sm" onChange={(event) => updateSkill(row, { addedPerLevel: event.target.value === '' ? undefined : Number(event.target.value) })} placeholder="1" type="number" value={row.item.addedPerLevel ?? ''} />
-                  <input aria-label={t('contribution.column.increasedPerLevel')} className="min-w-0 rounded bg-slate-900 px-2 py-1.5 text-sm" onChange={(event) => updateSkill(row, { increasedPerLevel: event.target.value === '' ? undefined : Number(event.target.value) })} placeholder="0.01" step="0.01" type="number" value={row.item.increasedPerLevel ?? ''} />
+                <div className="flex min-w-0 flex-wrap items-center gap-2 rounded bg-slate-950 p-2" key={`${row.source}-${row.index}`}>
+                  <div className="min-w-0 flex-1">
+                    <StructuredDataEditor onChange={(value) => { if (value) updateSkill(row, value as unknown as SkillDefinition); }} schema={skillDefinitionSchema(bundle)} t={t} value={row.item as unknown as StructuredValue} />
+                  </div>
                   <button className={removeButtonClass} onClick={() => removeRow('skills', row)} type="button">
                     {t('contribution.column.remove')}
                   </button>
@@ -784,19 +569,15 @@ export const ContentDataEditor = ({ baseBundle, bundle, draft, onPatch, t }: Con
               {t('contribution.data.addStat')}
             </button>
           </div>
-          <div className="hidden grid-cols-[1fr_8rem_6rem] gap-2 px-2 text-xs font-semibold uppercase tracking-wide text-slate-500 lg:grid">
-            <span>{t('contribution.column.id')}</span>
-            <span>{t('contribution.column.base')}</span>
-            <span>{t('contribution.column.remove')}</span>
-          </div>
           {stats.length === 0 ? (
             <p className="px-2 py-1 text-sm text-slate-500">{t('contribution.data.noStatChanges')}</p>
           ) : (
             <div className="grid gap-1">
               {stats.map((row) => (
-                <div className="grid gap-2 rounded bg-slate-950 p-2 lg:grid-cols-[1fr_8rem_6rem]" key={`${row.source}-${row.index}`}>
-                  <input aria-label={t('contribution.column.id')} className="min-w-0 rounded bg-slate-900 px-2 py-1.5 text-sm" onChange={(event) => updateStat(row, { id: toKebabInput(event.target.value) })} value={row.item.id} />
-                  <input aria-label={t('contribution.column.base')} className="min-w-0 rounded bg-slate-900 px-2 py-1.5 text-sm" onChange={(event) => updateStat(row, { base: Number(event.target.value) })} type="number" value={row.item.base ?? 0} />
+                <div className="flex min-w-0 flex-wrap items-center gap-2 rounded bg-slate-950 p-2" key={`${row.source}-${row.index}`}>
+                  <div className="min-w-0 flex-1">
+                    <StructuredDataEditor onChange={(value) => { if (value) updateStat(row, value as unknown as StatDefinition); }} schema={statDefinitionSchema()} t={t} value={row.item as unknown as StructuredValue} />
+                  </div>
                   <button className={removeButtonClass} onClick={() => removeRow('stats', row)} type="button">{t('contribution.column.remove')}</button>
                 </div>
               ))}
@@ -842,26 +623,15 @@ export const ContentDataEditor = ({ baseBundle, bundle, draft, onPatch, t }: Con
               {t('contribution.data.addInteraction')}
             </button>
           </div>
-          <div className="hidden grid-cols-[1fr_1fr_1fr_8rem_6rem] gap-2 px-2 text-xs font-semibold uppercase tracking-wide text-slate-500 lg:grid">
-            <span>{t('contribution.column.id')}</span>
-            <span>{t('contribution.column.sourceStat')}</span>
-            <span>{t('contribution.column.targetStat')}</span>
-            <span>{t('contribution.column.targetPlayerHealth')}</span>
-            <span>{t('contribution.column.remove')}</span>
-          </div>
           {interactionTypes.length === 0 ? (
             <p className="px-2 py-1 text-sm text-slate-500">{t('contribution.data.noInteractionChanges')}</p>
           ) : (
             <div className="grid gap-1">
               {interactionTypes.map((row) => (
-                <div className="grid gap-2 rounded bg-slate-950 p-2 lg:grid-cols-[1fr_1fr_1fr_8rem_6rem]" key={`${row.source}-${row.index}`}>
-                  <input aria-label="Interaction id" className="min-w-0 rounded bg-slate-900 px-2 py-1.5 text-sm" onChange={(event) => updateInteractionType(row, { id: toKebabInput(event.target.value) })} value={row.item.id} />
-                  <input aria-label="Interaction source stat" className="min-w-0 rounded bg-slate-900 px-2 py-1.5 text-sm" list="content-stat-ids" onChange={(event) => updateInteractionType(row, { sourceStatId: toKebabInput(event.target.value) })} value={row.item.sourceStatId} />
-                  <input aria-label="Interaction target stat" className="min-w-0 rounded bg-slate-900 px-2 py-1.5 text-sm" list="content-stat-ids" onChange={(event) => updateInteractionType(row, { targetStatId: toKebabInput(event.target.value) })} value={row.item.targetStatId} />
-                  <label className="flex items-center gap-2 text-sm text-slate-300">
-                    <input checked={row.item.targetPlayerHealth} onChange={(event) => updateInteractionType(row, { targetPlayerHealth: event.target.checked })} type="checkbox" />
-                    <span className="lg:hidden">{t('contribution.column.targetPlayerHealth')}</span>
-                  </label>
+                <div className="flex min-w-0 flex-wrap items-center gap-2 rounded bg-slate-950 p-2" key={`${row.source}-${row.index}`}>
+                  <div className="min-w-0 flex-1">
+                    <StructuredDataEditor onChange={(value) => { if (value) updateInteractionType(row, value as unknown as InteractionTypeDefinition); }} schema={interactionTypeDefinitionSchema(bundle)} t={t} value={row.item as unknown as StructuredValue} />
+                  </div>
                   <button className={removeButtonClass} onClick={() => removeRow('interactionTypes', row)} type="button">
                     {t('contribution.column.remove')}
                   </button>
@@ -908,23 +678,13 @@ export const ContentDataEditor = ({ baseBundle, bundle, draft, onPatch, t }: Con
                   </label>
                   <section className="grid gap-2">
                     <h5 className="text-xs font-semibold uppercase text-slate-500">{t('contribution.enemyStats.title')}</h5>
-                    <KeyValueRows
-                      addLabel={t('contribution.enemyStats.add')}
-                      createValue={(key) => (ENEMY_STAT_DEFAULTS[key as EnemyStatKey] ?? 0) + 1}
-                      datalistId="enemy-stat-keys"
-                      keyLabel={t('contribution.column.stat')}
-                      labelForKey={(key) => t(`contribution.enemyStats.${key}`, key)}
-                      onChange={(value) => updateEnemyStats(row, value)}
-                      validKeys={[...ENEMY_STAT_KEYS]}
-                      value={enemy.stats ?? {}}
-                      valueLabel={t('structured.value')}
-                    />
+                    <StructuredDataEditor onChange={(value) => updateEnemyStats(row, normalizeEnemyStats((value ?? {}) as Record<string, number>))} schema={enemyStatsSchema()} t={t} value={(enemy.stats ?? {}) as StructuredValue} />
                   </section>
                   <label className="flex items-center justify-between gap-3 text-sm text-slate-300">
                     <span>{t('contribution.column.showHealth')}</span>
                     <input checked={enemy.showHealthBar ?? true} onChange={(event) => updateEnemy(row, { showHealthBar: event.target.checked })} type="checkbox" />
                   </label>
-                  <StructuredDataEditor label="contribution.column.rewards" onChange={(value) => updateEnemy(row, { rewards: (value ?? []) as unknown as EnemyDefinition['rewards'] })} schema={{ kind: 'array', item: rewardSchema(bundle), createItem: () => ({ kind: 'resource', resourceId: bundle.resourceDefinitions[0]?.id ?? '', amount: 1 }), inlineRows: true }} t={t} value={enemy.rewards as unknown as StructuredValue} />
+                  <StructuredDataEditor label="contribution.column.rewards" onChange={(value) => updateEnemy(row, { rewards: (value ?? []) as unknown as EnemyDefinition['rewards'] })} schema={{ kind: 'array', listMode: 'free', item: rewardSchema(bundle), createItem: () => ({ kind: 'resource', resourceId: bundle.resourceDefinitions[0]?.id ?? '', amount: 1 }) }} t={t} value={enemy.rewards as unknown as StructuredValue} />
                   <button className={`${removeButtonClass} justify-self-end`} onClick={() => { setSelectedEnemyKey(null); removeRow('enemies', row); }} type="button">
                     {t('contribution.column.remove')}
                   </button>
@@ -975,19 +735,15 @@ export const ContentDataEditor = ({ baseBundle, bundle, draft, onPatch, t }: Con
               {t('contribution.data.addItem')}
             </button>
           </div>
-          <div className="hidden grid-cols-[1fr_8rem_6rem] gap-2 px-2 text-xs font-semibold uppercase tracking-wide text-slate-500 lg:grid">
-            <span>{t('contribution.column.id')}</span>
-            <span>{t('contribution.column.maxQuantity')}</span>
-            <span>{t('contribution.column.remove')}</span>
-          </div>
           {items.length === 0 ? (
             <p className="px-2 py-1 text-sm text-slate-500">{t('contribution.data.noItemChanges')}</p>
           ) : (
             <div className="grid gap-1">
               {items.map((row) => (
-                <div className="grid gap-2 rounded bg-slate-950 p-2 lg:grid-cols-[1fr_8rem_6rem]" key={`${row.source}-${row.index}`}>
-                  <input aria-label="Item id" className="min-w-0 rounded bg-slate-900 px-2 py-1.5 text-sm" onChange={(event) => updateItem(row, { id: toKebabInput(event.target.value) })} value={row.item.id} />
-                  <input aria-label={t('contribution.column.maxQuantity')} className="min-w-0 rounded bg-slate-900 px-2 py-1.5 text-sm" min="1" onChange={(event) => updateItem(row, { maxQuantity: event.target.value ? Number(event.target.value) : undefined })} type="number" value={row.item.maxQuantity ?? ''} />
+                <div className="flex min-w-0 flex-wrap items-center gap-2 rounded bg-slate-950 p-2" key={`${row.source}-${row.index}`}>
+                  <div className="min-w-0 flex-1">
+                    <StructuredDataEditor onChange={(value) => { if (value) updateItem(row, value as unknown as ItemDefinition); }} schema={itemDefinitionSchema()} t={t} value={row.item as unknown as StructuredValue} />
+                  </div>
                   <button className={removeButtonClass} onClick={() => removeRow('items', row)} type="button">
                     {t('contribution.column.remove')}
                   </button>
@@ -1061,7 +817,9 @@ export const ContentDataEditor = ({ baseBundle, bundle, draft, onPatch, t }: Con
           {jsonFiles.map((file) => (
             <details className="rounded bg-slate-950 p-2" key={file.path}>
               <summary className="cursor-pointer text-sm font-semibold text-slate-100">{file.path}</summary>
-              <div className="mt-2"><StructuredDataDisplay t={t} value={file.json as unknown as StructuredValue} /></div>
+              <div className="mt-2">
+                <StructuredDataEditor onChange={file.onChange} schema={file.schema ?? { kind: 'inferred' }} t={t} value={file.json as unknown as StructuredValue} />
+              </div>
             </details>
           ))}
         </section>
