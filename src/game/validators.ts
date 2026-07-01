@@ -147,6 +147,7 @@ const validateConditionShape = (value: unknown): value is Condition => {
     return Array.isArray(value.conditions) && value.conditions.every(validateConditionShape);
   }
   if (value.kind === 'not') return validateConditionShape(value.condition);
+  if (value.kind === 'item-tag' || value.kind === 'equipped-item-tag') return hasString(value, 'tag');
   return value.kind === 'state-variable'
     && hasString(value, 'variable')
     && (typeof value.value === 'number' || typeof value.value === 'boolean' || typeof value.value === 'string')
@@ -466,6 +467,9 @@ export const validateContentReferences = (bundle: ContentBundle) => {
       condition.conditions.forEach((child, index) => validateConditionReferences(child, `${path}.conditions.${index}`));
     } else if (condition.kind === 'not') {
       validateConditionReferences(condition.condition, `${path}.condition`);
+    } else if (condition.kind === 'item-tag' || condition.kind === 'equipped-item-tag') {
+      const hasTag = (bundle.items ?? []).some((item) => (item.tags ?? '').split(',').some((tag) => tag.trim().split(/\s|\(/)[0] === condition.tag));
+      if (!hasTag) issues.push(error(path, 'validation.unknownItemTag', { id: condition.tag }));
     } else if (condition.kind === 'state-variable') {
       if (!knownStateVariables().has(condition.variable)) issues.push(error(path, 'validation.unknownStateVariable', { id: condition.variable }));
     }
@@ -723,6 +727,9 @@ export const validateContentReferences = (bundle: ContentBundle) => {
     }
     if (item.maxQuantity !== undefined && item.maxQuantity < 1) {
       issues.push(error(`items.${item.id}.maxQuantity`, 'validation.itemMaxPositive'));
+    }
+    if (item.tags !== undefined && typeof item.tags !== 'string') {
+      issues.push(error(`items.${item.id}.tags`, 'validation.itemTagsString'));
     }
   }
 

@@ -7,6 +7,9 @@ const number = (min?: number): StructuredSchema => ({ kind: 'number', min });
 const boolean: StructuredSchema = { kind: 'boolean' };
 const comparison: StructuredSchema = { kind: 'enum', options: ['equal', 'greater-than', 'less-than'] };
 const stateVariables = (bundle: ContentBundle) => stateVariableKeys(bundle);
+const itemTagSuggestions = (bundle: ContentBundle) => Array.from(new Set(bundle.items.flatMap((item) =>
+  (item.tags ?? '').split(',').map((tag) => tag.trim().split(/\s|\(/)[0]).filter((tag) => tag && !tag.startsWith('+') && !tag.startsWith('-')),
+)));
 
 export const locationSchema = (): StructuredSchema => ({ kind: 'object', fields: {
   id: { schema: string() },
@@ -36,6 +39,8 @@ export const rewardSchema = (bundle: ContentBundle): StructuredSchema => ({
 export const conditionSchema = (bundle: ContentBundle): StructuredSchema => ({
   kind: 'union', discriminator: 'kind', variants: {
     'state-variable': { createValue: () => ({ kind: 'state-variable', variable: stateVariables(bundle)[0] ?? '', comparison: 'equal', value: 0 }), schema: { kind: 'object', fields: { kind: { schema: { kind: 'enum', options: ['state-variable'] } }, variable: { schema: string(stateVariables(bundle)) }, comparison: { schema: comparison }, value: { schema: { kind: 'scalar', types: ['boolean', 'number', 'string'] } } } } },
+    'item-tag': { label: 'contribution.condition.itemTag', createValue: () => ({ kind: 'item-tag', tag: itemTagSuggestions(bundle)[0] ?? '' }), schema: { kind: 'object', fields: { kind: { schema: { kind: 'enum', options: ['item-tag'] } }, tag: { schema: string(itemTagSuggestions(bundle)) } } } },
+    'equipped-item-tag': { label: 'contribution.condition.equippedItemTag', createValue: () => ({ kind: 'equipped-item-tag', tag: itemTagSuggestions(bundle)[0] ?? '' }), schema: { kind: 'object', fields: { kind: { schema: { kind: 'enum', options: ['equipped-item-tag'] } }, tag: { schema: string(itemTagSuggestions(bundle)) } } } },
     all: { createValue: () => ({ kind: 'all', conditions: [] }), schema: { kind: 'object', fields: { kind: { schema: { kind: 'enum', options: ['all'] } }, conditions: { schema: { kind: 'array', item: () => conditionSchema(bundle), createItem: () => ({ kind: 'state-variable', variable: stateVariables(bundle)[0] ?? '', comparison: 'equal', value: 0 }) } } } } },
     any: { createValue: () => ({ kind: 'any', conditions: [] }), schema: { kind: 'object', fields: { kind: { schema: { kind: 'enum', options: ['any'] } }, conditions: { schema: { kind: 'array', item: () => conditionSchema(bundle), createItem: () => ({ kind: 'state-variable', variable: stateVariables(bundle)[0] ?? '', comparison: 'equal', value: 0 }) } } } } },
     not: { createValue: () => ({ kind: 'not', condition: { kind: 'state-variable', variable: stateVariables(bundle)[0] ?? '', comparison: 'equal', value: 0 } }), schema: { kind: 'object', fields: { kind: { schema: { kind: 'enum', options: ['not'] } }, condition: { schema: () => conditionSchema(bundle) } } } },
@@ -174,6 +179,7 @@ export const skillDefinitionSchema = (bundle: ContentBundle): StructuredSchema =
 export const itemDefinitionSchema = (): StructuredSchema => ({ kind: 'object', fields: {
   id: { label: 'contribution.column.id', schema: string() },
   maxQuantity: { label: 'contribution.column.maxQuantity', schema: number(1), optional: true },
+  tags: { label: 'contribution.column.tags', schema: string(), optional: true },
 } });
 
 export const interactionTypeDefinitionSchema = (bundle: ContentBundle): StructuredSchema => ({ kind: 'object', fields: {

@@ -130,6 +130,7 @@ export const createInitialPlayState = (
   skillXp: {},
   statOverrides: {},
   equipmentSkillBonuses: {},
+  equipment: {},
   actionLoopingEnabled: resolveManifestUiSettings(context?.manifest).loopActionsByDefault,
   playerHealth: 0,
   playerMaxHealth: 0,
@@ -176,6 +177,7 @@ export const normalizePlayState = (
     actionCompletions: state.actionCompletions ?? {},
     statOverrides: state.statOverrides ?? {},
     equipmentSkillBonuses: state.equipmentSkillBonuses ?? {},
+    equipment: state.equipment ?? {},
     actionLoopingEnabled: context?.manifest
       ? resolveManifestUiSettings(context.manifest).loopActionsByDefault
       : state.actionLoopingEnabled ?? resolveManifestUiSettings().loopActionsByDefault,

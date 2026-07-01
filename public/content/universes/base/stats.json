@@ -2,6 +2,7 @@
   { "id": "attack", "base": 6 },
   { "id": "defense", "base": 6 },
   { "id": "woodcutting", "base": 6 },
+  { "id": "mining", "base": 6 },
   { "id": "action-rate", "base": 25 },
   { "id": "health", "base": 100 },
   { "id": "regeneration", "base": 10 },

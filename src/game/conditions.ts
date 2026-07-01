@@ -1,5 +1,6 @@
 import type { ActionResolutionContext, Condition, GameAction, NumericComparison, UniversePlayState } from './types';
 import { readStateVariable } from './stateVariables';
+import { hasEquippedItemWithTag, hasInventoryItemWithTag } from './equipment';
 
 const compare = (actual: number, comparison: NumericComparison, expected: number) => {
   if (comparison === 'equal') return actual === expected;
@@ -20,6 +21,12 @@ export const evaluateCondition = (
   }
   if (condition.kind === 'not') {
     return !evaluateCondition(condition.condition, state, context);
+  }
+  if (condition.kind === 'item-tag') {
+    return hasInventoryItemWithTag(state, context.items ?? [], condition.tag);
+  }
+  if (condition.kind === 'equipped-item-tag') {
+    return hasEquippedItemWithTag(state, context.items ?? [], condition.tag);
   }
   const actual = readStateVariable(state, condition.variable, context);
   if (typeof actual === 'boolean' || typeof condition.value === 'boolean') {

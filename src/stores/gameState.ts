@@ -1,6 +1,7 @@
 import { create } from 'zustand';
-import type { ActionResolutionContext, GameAction, IdleReport, RunLogEntry, TravelEdgeDefinition, UniversePlayState } from '../game/types';
+import type { ActionResolutionContext, EquipmentSlot, GameAction, IdleReport, RunLogEntry, TravelEdgeDefinition, UniversePlayState } from '../game/types';
 import { appendChatMessage, appendRunLog, cancelDialogue, chooseDialogueOption, createInitialPlayState, normalizePlayState, resetInactiveEffectResources, resolveIdleTimers, startAction, startTravel } from '../game/timers';
+import { equipItem, unequipSlot } from '../game/equipment';
 import { load, remove, save } from '../lib/storage';
 import { recordAgentSessionMessage, type AgentSessionMessage } from '../game/agentSession';
 
@@ -17,6 +18,8 @@ type GameStateStore = {
   cancelDialogue: (universeId: string) => void;
   resolveIdle: (universeId: string, context: ActionResolutionContext, options?: { debugEnabled?: boolean; showReport?: boolean }) => IdleReport;
   setActionLooping: (universeId: string, enabled: boolean) => void;
+  equipItem: (universeId: string, itemId: string, slot: EquipmentSlot, context: ActionResolutionContext) => void;
+  unequipSlot: (universeId: string, slot: EquipmentSlot) => void;
   markInactive: (universeId: string) => void;
   sendChatMessage: (universeId: string, text: string) => void;
   recordRunEvent: (universeId: string, actor: RunLogEntry['actor'], event: string, data?: Record<string, unknown>) => void;
@@ -252,6 +255,27 @@ export const useGameState = create<GameStateStore>((set, get) => ({
           [universeId]: next,
         },
       };
+    });
+  },
+
+  equipItem: (universeId, itemId, slot, context) => {
+    set((state) => {
+      const current = state.states[universeId];
+      const item = context.items?.find((candidate) => candidate.id === itemId);
+      if (!current || !item) return state;
+      const next = equipItem(current, item, slot, context.skills);
+      void save(storageKey(universeId), next);
+      return { states: { ...state.states, [universeId]: next } };
+    });
+  },
+
+  unequipSlot: (universeId, slot) => {
+    set((state) => {
+      const current = state.states[universeId];
+      if (!current?.equipment?.[slot]) return state;
+      const next = unequipSlot(current, slot);
+      void save(storageKey(universeId), next);
+      return { states: { ...state.states, [universeId]: next } };
     });
   },
 

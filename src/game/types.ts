@@ -100,6 +100,8 @@ export type NumericComparison = 'equal' | 'greater-than' | 'less-than';
 
 export type Condition =
   | { kind: 'state-variable'; variable: string; comparison: NumericComparison; value: number | boolean | string }
+  | { kind: 'item-tag'; tag: string }
+  | { kind: 'equipped-item-tag'; tag: string }
   | { kind: 'all'; conditions: Condition[] }
   | { kind: 'any'; conditions: Condition[] }
   | { kind: 'not'; condition: Condition };
@@ -146,6 +148,7 @@ export type StatDefinition = {
 export type ItemDefinition = {
   id: string;
   maxQuantity?: number;
+  tags?: string;
 };
 
 export type StateFlagDefinition = {
@@ -372,6 +375,17 @@ export type SkillEquipmentBonuses = {
   rate?: number;
 };
 
+export type EquipmentSlot =
+  | 'head'
+  | 'body'
+  | 'legs'
+  | 'boots'
+  | 'gloves'
+  | 'ring'
+  | 'necklace'
+  | 'mainhand'
+  | 'offhand';
+
 export type SkillTotals = {
   base: number;
   added: number;
@@ -425,6 +439,7 @@ export type UniversePlayState = {
   skillXp: Record<string, number>;
   statOverrides: Record<string, number>;
   equipmentSkillBonuses: Record<string, SkillEquipmentBonuses>;
+  equipment: Partial<Record<EquipmentSlot, string>>;
   actionLoopingEnabled: boolean;
   playerHealth: number;
   playerMaxHealth: number;

@@ -17,6 +17,11 @@
     "statId": "woodcutting"
   },
   {
+    "id": "mining",
+    "maxLevel": 100,
+    "statId": "mining"
+  },
+  {
     "id": "health",
     "maxLevel": 100,
     "statId": "health"

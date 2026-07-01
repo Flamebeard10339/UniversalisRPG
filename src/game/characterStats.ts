@@ -1,5 +1,6 @@
 import { skillLevelFromXp } from './skills';
-import type { SkillEquipmentBonuses, SkillDefinition, SkillTotals, StatDefinition, StatTotals, UniversePlayState } from './types';
+import { equippedStatBonuses } from './equipment';
+import type { ItemDefinition, SkillEquipmentBonuses, SkillDefinition, SkillTotals, StatDefinition, StatTotals, UniversePlayState } from './types';
 
 const DEFAULT_RATE = 1;
 
@@ -38,6 +39,7 @@ export const getCharacterStatTotals = (
   stats: StatDefinition[],
   statId: string,
   skills: SkillDefinition[] = [],
+  items: ItemDefinition[] = [],
 ): StatTotals => {
   if (state.statOverrides?.[statId] !== undefined) {
     const effectiveTotal = state.statOverrides[statId];
@@ -57,12 +59,20 @@ export const getCharacterStatTotals = (
       { added: 0, increased: 0 },
     );
   const base = stat.base ?? 0;
-  const rawTotal = base + skillTotals.added;
-  const effectiveTotal = skillTotals.increased < 0
-    ? rawTotal / (1 - skillTotals.increased)
-    : rawTotal * (1 + skillTotals.increased);
+  const equipmentBonuses = equippedStatBonuses(state, items)
+    .filter((bonus) => bonus.statId === statId)
+    .reduce((total, bonus) => ({
+      added: total.added + (bonus.kind === 'added' ? bonus.amount : 0),
+      increased: total.increased + (bonus.kind === 'increased' ? bonus.amount : 0),
+    }), { added: 0, increased: 0 });
+  const added = skillTotals.added + equipmentBonuses.added;
+  const increased = skillTotals.increased + equipmentBonuses.increased;
+  const rawTotal = base + added;
+  const effectiveTotal = increased < 0
+    ? rawTotal / (1 - increased)
+    : rawTotal * (1 + increased);
 
-  return { base, added: skillTotals.added, increased: skillTotals.increased, effectiveTotal };
+  return { base, added, increased, effectiveTotal };
 };
 
 export const getCharacterStatValue = (
@@ -70,4 +80,5 @@ export const getCharacterStatValue = (
   stats: StatDefinition[],
   statId: string,
   skills: SkillDefinition[] = [],
-) => getCharacterStatTotals(state, stats, statId, skills).effectiveTotal;
+  items: ItemDefinition[] = [],
+) => getCharacterStatTotals(state, stats, statId, skills, items).effectiveTotal;

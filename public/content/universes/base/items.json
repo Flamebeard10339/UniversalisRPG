@@ -1,6 +1,13 @@
 [
   { "id": "emberleaf" },
   { "id": "log" },
-  { "id": "tutorial-blade" },
-  { "id": "bronze-pickaxe" }
+  { "id": "iron-ore" },
+  { 
+    "id": "tutorial-blade",
+    "tags": "mainhand (1 attack), +8 attack, +2% attack" 
+  },
+  {
+    "id": "bronze-pickaxe",
+    "tags": "pickaxe, mainhand (1 attack 1 mining), +8 mining, +3 attack, +5% health"
+  }
 ]

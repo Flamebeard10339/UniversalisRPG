@@ -69,7 +69,7 @@ export const getActionDurationMs = (
   context: ActionResolutionContext,
 ) => {
   if (getEnemy(action, context)) {
-    const actionsPerMinute = getCharacterStatValue(state, context.stats ?? [], ACTION_RATE_STAT_ID, context.skills) || DEFAULT_ACTIONS_PER_MINUTE;
+    const actionsPerMinute = getCharacterStatValue(state, context.stats ?? [], ACTION_RATE_STAT_ID, context.skills, context.items ?? []) || DEFAULT_ACTIONS_PER_MINUTE;
     return 60_000 / Math.max(EPSILON, actionsPerMinute);
   }
 
@@ -91,7 +91,7 @@ export const getActionDps = (
     return null;
   }
 
-  const source = getCharacterStatValue(state, context.stats ?? [], sourceStat.id, context.skills);
+  const source = getCharacterStatValue(state, context.stats ?? [], sourceStat.id, context.skills, context.items ?? []);
   return expectedCombatDamage(source, getEnemyStat(enemy, 'defense'), resolveManifestCombatBalance(context.manifest)).damage /
     (getActionDurationMs(state, action, context) / 1000);
 };
@@ -110,7 +110,7 @@ export const getEnemyAttackDps = (
     return null;
   }
 
-  const target = getCharacterStatValue(state, context.stats ?? [], targetStat.id, context.skills);
+  const target = getCharacterStatValue(state, context.stats ?? [], targetStat.id, context.skills, context.items ?? []);
   return expectedCombatDamage(getEnemyStat(enemy, 'attack'), target, resolveManifestCombatBalance(context.manifest), {
     armorPenetration: getEnemyStat(enemy, 'armorPenetration'),
     torpidity: getEnemyStat(enemy, 'torpidity'),
@@ -132,7 +132,7 @@ export const sampleAdversarialDamage = (
     return null;
   }
 
-  const source = getCharacterStatValue(state, context.stats ?? [], sourceStat.id, context.skills);
+  const source = getCharacterStatValue(state, context.stats ?? [], sourceStat.id, context.skills, context.items ?? []);
   const target = getEnemyStat(enemy, 'defense');
   const sample = sampleCombatDamage(source, target, resolveManifestCombatBalance(context.manifest), {}, random);
 
@@ -159,7 +159,7 @@ export const sampleEnemyAttackDamage = (
     return null;
   }
 
-  const target = getCharacterStatValue(state, context.stats ?? [], targetStat.id, context.skills);
+  const target = getCharacterStatValue(state, context.stats ?? [], targetStat.id, context.skills, context.items ?? []);
   const sample = sampleCombatDamage(getEnemyStat(enemy, 'attack'), target, resolveManifestCombatBalance(context.manifest), {
     armorPenetration: getEnemyStat(enemy, 'armorPenetration'),
     torpidity: getEnemyStat(enemy, 'torpidity'),

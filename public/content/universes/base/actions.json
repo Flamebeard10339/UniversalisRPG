@@ -98,5 +98,15 @@
     "locationId": "old-quarry",
     "durationSeconds": 10,
     "rewards": [{ "kind": "skillXp", "skillId": "craft", "amount": 4 }]
+  },
+  {
+    "id": "mine-iron-ore-vein",
+    "locationId": "old-quarry",
+    "durationSeconds": 2,
+    "requirements": { "kind": "item-tag", "tag": "pickaxe" },
+    "rewards": [
+      { "kind": "item", "itemId": "iron-ore", "amount": 1 },
+      { "kind": "skillXp", "skillId": "mining", "amount": 1 }
+    ]
   }
 ]

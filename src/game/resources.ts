@@ -25,7 +25,7 @@ export const isEffectApplicable = (
   }));
 
 export const getEffectRatePerMinute = (
-  context: Pick<ActionResolutionContext, 'actions' | 'enemies' | 'manifest' | 'skills' | 'stats'>,
+  context: Pick<ActionResolutionContext, 'actions' | 'enemies' | 'items' | 'manifest' | 'skills' | 'stats'>,
   state: UniversePlayState,
   effect: EffectDefinition,
 ) => {
@@ -38,15 +38,16 @@ export const getEffectRatePerMinute = (
       manifest: context.manifest,
       interactionTypes: [],
       enemies: context.enemies,
+      items: context.items,
     }) : null;
     return enemy ? getEnemyStat(enemy, effect.sourceEnemyStat) : 0;
   }
 
-  return getCharacterStatValue(state, context.stats ?? [], effect.sourceStat, context.skills);
+  return getCharacterStatValue(state, context.stats ?? [], effect.sourceStat, context.skills, context.items ?? []);
 };
 
 export const getEffectDeltaPerMinute = (
-  context: Pick<ActionResolutionContext, 'actions' | 'enemies' | 'manifest' | 'skills' | 'stats'>,
+  context: Pick<ActionResolutionContext, 'actions' | 'enemies' | 'items' | 'manifest' | 'skills' | 'stats'>,
   state: UniversePlayState,
   effect: EffectDefinition,
 ) => {
@@ -59,10 +60,11 @@ export const getResourceMax = (
   stats: ContentBundle['stats'],
   resource: ResourceDefinition,
   skills: ContentBundle['skills'] = [],
-) => Math.max(0, resource.max ?? getCharacterStatValue(state, stats, resource.sourceStat, skills));
+  items: ContentBundle['items'] = [],
+) => Math.max(0, resource.max ?? getCharacterStatValue(state, stats, resource.sourceStat, skills, items));
 
 export const getResourceMaxForContext = (
-  context: Pick<ActionResolutionContext, 'actions' | 'enemies' | 'manifest' | 'skills' | 'stats'>,
+  context: Pick<ActionResolutionContext, 'actions' | 'enemies' | 'items' | 'manifest' | 'skills' | 'stats'>,
   state: UniversePlayState,
   resource: ResourceDefinition,
 ) => {
@@ -79,7 +81,7 @@ export const getResourceMaxForContext = (
     return Math.max(0, enemy ? getEnemyStat(enemy, resource.sourceEnemyStat) : 0);
   }
 
-  return getResourceMax(state, context.stats ?? [], resource, context.skills);
+  return getResourceMax(state, context.stats ?? [], resource, context.skills, context.items ?? []);
 };
 
 const basePool = (bundle: ContentBundle, state: UniversePlayState, resource: ResourceDefinition): ResourcePool => {

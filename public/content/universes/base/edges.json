@@ -3,12 +3,12 @@
     "id": "crossroads-emberwood",
     "source": "crossroads",
     "target": "emberwood",
-    "travelTimeSeconds": 12
+    "travelTimeSeconds": 2
   },
   {
     "id": "crossroads-old-quarry",
     "source": "crossroads",
     "target": "old-quarry",
-    "travelTimeSeconds": 18
+    "travelTimeSeconds": 2
   }
 ]

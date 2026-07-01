@@ -20,7 +20,7 @@ export const stateVariableKeys = (bundle: Pick<ContentBundle, 'flags' | 'items' 
 export const readStateVariable = (
   state: UniversePlayState,
   variable: string,
-  context?: Pick<ActionResolutionContext, 'actions' | 'enemies' | 'interactionTypes' | 'manifest' | 'skills' | 'stats'>,
+  context?: Pick<ActionResolutionContext, 'actions' | 'enemies' | 'interactionTypes' | 'items' | 'manifest' | 'skills' | 'stats'>,
 ): StateVariableValue => {
   const separator = variable.indexOf(':');
   const category = separator >= 0 ? variable.slice(0, separator) : 'flag';
@@ -45,7 +45,7 @@ export const readStateVariable = (
     const skill = context?.skills.find((candidate) => candidate.id === id);
     return skill ? Math.min(skill.maxLevel, skillLevelFromXp(state.skillXp[id] ?? 0)) : skillLevelFromXp(state.skillXp[id] ?? 0);
   }
-  if (category === 'stat') return getCharacterStatValue(state, context?.stats ?? [], id, context?.skills ?? []);
+  if (category === 'stat') return getCharacterStatValue(state, context?.stats ?? [], id, context?.skills ?? [], context?.items ?? []);
   if (category === 'action-completions') return state.actionCompletions[id] ?? 0;
   return state.flags[variable] ?? false;
 };

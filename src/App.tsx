@@ -126,6 +126,8 @@ export default function App() {
   const stopAction = useGameState((state) => state.stopAction);
   const chooseDialogueOption = useGameState((state) => state.chooseDialogueOption);
   const cancelDialogue = useGameState((state) => state.cancelDialogue);
+  const equipItem = useGameState((state) => state.equipItem);
+  const unequipSlot = useGameState((state) => state.unequipSlot);
   const resolveIdle = useGameState((state) => state.resolveIdle);
   const markInactive = useGameState((state) => state.markInactive);
   const importUniverseState = useGameState((state) => state.importUniverseState);
@@ -604,7 +606,13 @@ export default function App() {
             )}
 
             {characterTab === 'inventory' && (
-              <InventoryPanel playState={playState} t={t} />
+              <InventoryPanel
+                bundle={bundle}
+                onEquip={(itemId, slot) => equipItem(runtimeUniverseId, itemId, slot, actionContext)}
+                onUnequip={(slot) => unequipSlot(runtimeUniverseId, slot)}
+                playState={playState}
+                t={t}
+              />
             )}
 
             {characterTab === 'stats' && (

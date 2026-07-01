@@ -64,6 +64,15 @@
             "kind": { "const": "not" },
             "condition": { "$ref": "#/$defs/condition" }
           }
+        },
+        {
+          "type": "object",
+          "required": ["kind", "tag"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "enum": ["item-tag", "equipped-item-tag"] },
+            "tag": { "type": "string", "minLength": 1 }
+          }
         }
       ]
     },
