@@ -17,6 +17,11 @@
     "statId": "woodcutting"
   },
   {
+    "id": "health",
+    "maxLevel": 100,
+    "statId": "health"
+  },
+  {
     "id": "attack",
     "maxLevel": 100,
     "statId": "attack"
@@ -29,6 +34,15 @@
   {
     "id": "regeneration",
     "maxLevel": 100,
-    "statId": "regeneration"
+    "statId": "regeneration",
+    "addedPerLevel": 0,
+    "increasedPerLevel": 0
+  },
+  {
+    "id": "troll-blood",
+    "maxLevel": 100,
+    "statId": "troll-blood",
+    "addedPerLevel": 0,
+    "increasedPerLevel": 0
   }
 ]

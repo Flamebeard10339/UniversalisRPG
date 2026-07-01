@@ -156,6 +156,20 @@ const validateRewardShape = (value: unknown) => isRecord(value)
     || (value.kind === 'resource' && hasString(value, 'resourceId'))
     || (value.kind === 'item' && hasString(value, 'itemId')));
 
+const experienceEvents = new Set(['action-complete', 'damage-dealt', 'damage-taken', 'health-regenerated', 'incoming-attack-missed']);
+
+const validateExperienceTriggerShape = (value: unknown) => isRecord(value)
+  && typeof value.event === 'string'
+  && experienceEvents.has(value.event)
+  && hasString(value, 'skillId')
+  && (value.amount === undefined || hasNumber(value, 'amount'))
+  && (value.amountPerUnit === undefined || hasNumber(value, 'amountPerUnit'))
+  && (value.effectId === undefined || hasString(value, 'effectId'))
+  && (value.enemyId === undefined || hasString(value, 'enemyId'))
+  && (value.interactionTypeId === undefined || hasString(value, 'interactionTypeId'))
+  && (value.resourceId === undefined || hasString(value, 'resourceId'))
+  && (value.sourceStat === undefined || hasString(value, 'sourceStat'));
+
 const validateActionResultShape = (value: unknown) => {
   if (!isRecord(value) || !hasString(value, 'kind')) return false;
   if (value.kind === 'item') return hasString(value, 'itemId') && hasNumber(value, 'amount');
@@ -179,6 +193,7 @@ const validateActionsShape = (actions: unknown): actions is GameAction[] =>
       (action.role === undefined || action.role === 'optional' || action.role === 'progression' || action.role === 'utility') &&
       hasNumber(action, 'durationSeconds') &&
       Array.isArray(action.rewards) && action.rewards.every(validateRewardShape) &&
+      (action.experience === undefined || (Array.isArray(action.experience) && action.experience.every(validateExperienceTriggerShape))) &&
       (action.results === undefined || (Array.isArray(action.results) && action.results.every(validateActionResultShape))) &&
       (action.visibleWhen === undefined || validateConditionShape(action.visibleWhen)) &&
       (action.requirements === undefined || validateConditionShape(action.requirements)) &&
@@ -484,6 +499,17 @@ export const validateContentReferences = (bundle: ContentBundle) => {
       if (reward.amount <= 0) {
         issues.push(error(`actions.${action.id}.rewards`, 'validation.rewardAmountPositive'));
       }
+    }
+    for (const [index, trigger] of (action.experience ?? []).entries()) {
+      const path = `actions.${action.id}.experience.${index}`;
+      if (!skillIds.has(trigger.skillId)) issues.push(error(path, 'validation.unknownSkill', { id: trigger.skillId }));
+      if (trigger.resourceId && !resourceIds.has(trigger.resourceId)) issues.push(error(path, 'validation.unknownResource', { id: trigger.resourceId }));
+      if (trigger.effectId && !(bundle.effects ?? []).some((effect) => effect.id === trigger.effectId)) issues.push(error(path, 'validation.unknownEffect', { id: trigger.effectId }));
+      if (trigger.enemyId && !enemyIds.has(trigger.enemyId)) issues.push(error(path, 'validation.unknownEnemy', { id: trigger.enemyId }));
+      if (trigger.interactionTypeId && !interactionTypeIds.has(trigger.interactionTypeId)) issues.push(error(path, 'validation.unknownInteractionType', { id: trigger.interactionTypeId }));
+      if (trigger.sourceStat && !statIds.has(trigger.sourceStat)) issues.push(error(path, 'validation.unknownStat', { id: trigger.sourceStat }));
+      if (trigger.amount !== undefined && trigger.amount <= 0) issues.push(error(path, 'validation.experienceAmountPositive'));
+      if (trigger.amountPerUnit !== undefined && trigger.amountPerUnit <= 0) issues.push(error(path, 'validation.experienceAmountPositive'));
     }
     for (const [index, result] of (action.results ?? []).entries()) {
       const path = `actions.${action.id}.results.${index}`;

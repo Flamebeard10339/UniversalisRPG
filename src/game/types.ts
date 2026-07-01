@@ -77,6 +77,25 @@ export type Reward =
       amount: number;
     };
 
+export type ExperienceEventKind =
+  | 'action-complete'
+  | 'damage-dealt'
+  | 'damage-taken'
+  | 'health-regenerated'
+  | 'incoming-attack-missed';
+
+export type ExperienceTrigger = {
+  event: ExperienceEventKind;
+  skillId: string;
+  amount?: number;
+  amountPerUnit?: number;
+  effectId?: string;
+  enemyId?: string;
+  interactionTypeId?: string;
+  resourceId?: string;
+  sourceStat?: string;
+};
+
 export type NumericComparison = 'equal' | 'greater-than' | 'less-than';
 
 export type Condition =
@@ -100,6 +119,7 @@ export type GameAction = {
   role?: 'optional' | 'progression' | 'utility';
   durationSeconds: number;
   rewards: Reward[];
+  experience?: ExperienceTrigger[];
   requirements?: Condition; // TODO: check what the UI looks like for a visible action that fails the requirements.
   visibleWhen?: Condition;
   results?: ActionResult[];

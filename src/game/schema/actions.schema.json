@@ -18,6 +18,10 @@
         "type": "array",
         "items": { "$ref": "#/$defs/reward" }
       },
+      "experience": {
+        "type": "array",
+        "items": { "$ref": "#/$defs/experienceTrigger" }
+      },
       "results": {
         "type": "array",
         "items": { "$ref": "#/$defs/result" }
@@ -96,6 +100,22 @@
           }
         }
       ]
+    },
+    "experienceTrigger": {
+      "type": "object",
+      "required": ["event", "skillId"],
+      "additionalProperties": false,
+      "properties": {
+        "event": { "enum": ["action-complete", "damage-dealt", "damage-taken", "health-regenerated", "incoming-attack-missed"] },
+        "skillId": { "type": "string", "minLength": 1 },
+        "amount": { "type": "number", "exclusiveMinimum": 0 },
+        "amountPerUnit": { "type": "number", "exclusiveMinimum": 0 },
+        "effectId": { "type": "string", "minLength": 1 },
+        "enemyId": { "type": "string", "minLength": 1 },
+        "interactionTypeId": { "type": "string", "minLength": 1 },
+        "resourceId": { "type": "string", "minLength": 1 },
+        "sourceStat": { "type": "string", "minLength": 1 }
+      }
     },
     "result": {
       "oneOf": [

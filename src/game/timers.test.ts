@@ -377,6 +377,208 @@ describe('resolveIdleTimers', () => {
     expect(resolved.state.playerHealth).toBe(60);
   });
 
+  it('grants separate health regeneration experience by source stat', () => {
+    const startedAt = 1_000;
+    const action: GameAction = {
+      id: 'rest-and-heal',
+      locationId: 'test-location',
+      durationSeconds: 60,
+      rewards: [],
+      experience: [
+        { event: 'health-regenerated', skillId: 'regeneration', sourceStat: 'regeneration' },
+        { event: 'health-regenerated', skillId: 'troll-blood', sourceStat: 'troll-blood' },
+      ],
+    };
+    const context: ActionResolutionContext = {
+      actions: [action],
+      skills: [
+        { id: 'regeneration', maxLevel: 100, statId: 'regeneration', addedPerLevel: 0, increasedPerLevel: 0 },
+        { id: 'troll-blood', maxLevel: 100, statId: 'troll-blood', addedPerLevel: 0, increasedPerLevel: 0 },
+      ],
+      stats: [
+        { id: 'health', base: 1000 },
+        { id: 'regeneration', base: 10 },
+        { id: 'troll-blood', base: 100 },
+      ],
+      resourceDefinitions: [{ id: 'health', sourceStat: 'health', initialValue: 'full' }],
+      effects: [
+        { id: 'health-regeneration', resourceId: 'health', sourceStat: 'regeneration' },
+        { id: 'health-troll-blood', resourceId: 'health', sourceStat: 'troll-blood' },
+      ],
+      interactionTypes: [],
+      enemies: [],
+    };
+    const state = {
+      ...startAction(createInitialPlayState('test-universe', 'test-location'), action, context, startedAt),
+      actionLoopingEnabled: false,
+      resourcePools: {
+        health: { current: 100, min: 0, max: 1000 },
+      },
+      playerHealth: 100,
+      playerMaxHealth: 1000,
+    };
+
+    const resolved = resolveIdleTimers(state, context, {}, startedAt + 60_000);
+
+    expect(resolved.state.resourcePools.health.current).toBe(210);
+    expect(resolved.state.skillXp.regeneration).toBe(10);
+    expect(resolved.state.skillXp['troll-blood']).toBe(100);
+  });
+
+  it('grants damage experience to the action-associated skill', () => {
+    const startedAt = 1_000;
+    const fightGoblin: GameAction = {
+      id: 'fight-goblin',
+      locationId: 'arena',
+      durationSeconds: 1,
+      enemyId: 'goblin',
+      rewards: [],
+      experience: [
+        { event: 'damage-dealt', skillId: 'attack' },
+        { event: 'action-complete', skillId: 'attack', amount: 1 },
+      ],
+    };
+    const chopTree: GameAction = {
+      id: 'chop-tree',
+      locationId: 'arena',
+      durationSeconds: 1,
+      enemyId: 'tree',
+      rewards: [],
+      experience: [
+        { event: 'damage-dealt', skillId: 'woodcutting' },
+        { event: 'action-complete', skillId: 'woodcutting', amount: 1 },
+      ],
+    };
+    const context: ActionResolutionContext = {
+      actions: [fightGoblin, chopTree],
+      skills: [
+        { id: 'attack', maxLevel: 100, statId: 'attack' },
+        { id: 'woodcutting', maxLevel: 100, statId: 'woodcutting' },
+      ],
+      stats: [
+        { id: 'attack', base: 10 },
+        { id: 'woodcutting', base: 10 },
+        { id: 'defense', base: 10 },
+        { id: 'action-rate', base: 60 },
+      ],
+      resourceDefinitions: [{
+        id: 'action-rate',
+        sourceStat: 'action-rate',
+        max: 60,
+        initialValue: 'empty',
+        onFull: [
+          { kind: 'complete-action' },
+          { kind: 'refill', value: 'min' },
+        ],
+      }],
+      effects: [{
+        id: 'action-rate-regeneration',
+        resourceId: 'action-rate',
+        sourceStat: 'action-rate',
+        rateUnit: 'per-second',
+      }],
+      interactionTypes: [
+        { id: 'combat', sourceStatId: 'attack', targetStatId: 'defense', targetPlayerHealth: false },
+        { id: 'woodcutting', sourceStatId: 'woodcutting', targetStatId: 'defense', targetPlayerHealth: false },
+      ],
+      enemies: [
+        { id: 'goblin', interactionTypeId: 'combat', stats: { health: 100, defense: 10 }, rewards: [] },
+        { id: 'tree', interactionTypeId: 'woodcutting', stats: { health: 100, defense: 10 }, rewards: [] },
+      ],
+    };
+    const afterGoblin = resolveIdleTimers(
+      startAction(createInitialPlayState('test-universe', 'arena'), fightGoblin, context, startedAt),
+      context,
+      { random: () => 0.5 },
+      startedAt + 1_000,
+    ).state;
+    const afterTree = resolveIdleTimers(
+      startAction({ ...afterGoblin, activeAction: null }, chopTree, context, startedAt + 2_000),
+      context,
+      { random: () => 0.5 },
+      startedAt + 3_000,
+    ).state;
+
+    expect(afterGoblin.skillXp.attack).toBeGreaterThan(1);
+    expect(afterGoblin.skillXp.woodcutting).toBeUndefined();
+    expect(afterTree.skillXp.attack).toBe(afterGoblin.skillXp.attack);
+    expect(afterTree.skillXp.woodcutting).toBeGreaterThan(1);
+  });
+
+  it('grants health xp for damage taken and defense xp for incoming misses', () => {
+    const startedAt = 1_000;
+    const action: GameAction = {
+      id: 'defend',
+      locationId: 'arena',
+      durationSeconds: 1,
+      enemyId: 'sparring-enemy',
+      rewards: [],
+      experience: [
+        { event: 'damage-taken', skillId: 'health' },
+        { event: 'incoming-attack-missed', skillId: 'defense', amount: 10 },
+      ],
+    };
+    const context: ActionResolutionContext = {
+      actions: [action],
+      skills: [
+        { id: 'health', maxLevel: 100, statId: 'health' },
+        { id: 'defense', maxLevel: 100, statId: 'defense' },
+      ],
+      stats: [
+        { id: 'attack', base: 1 },
+        { id: 'defense', base: 10 },
+        { id: 'health', base: 100 },
+        { id: 'action-rate', base: 60 },
+      ],
+      resourceDefinitions: [{
+        id: 'enemy-action-rate',
+        owner: 'enemy',
+        sourceStat: 'action-rate',
+        max: 60,
+        initialValue: 'empty',
+        onFull: [
+          { kind: 'enemy-attack' },
+          { kind: 'refill', value: 'min' },
+        ],
+      }, {
+        id: 'health',
+        sourceStat: 'health',
+        initialValue: 'full',
+      }],
+      effects: [{
+        id: 'enemy-action-rate-regeneration',
+        resourceId: 'enemy-action-rate',
+        sourceStat: 'action-rate',
+        sourceEnemyStat: 'rate',
+        rateUnit: 'per-second',
+      }],
+      interactionTypes: [{ id: 'combat', sourceStatId: 'attack', targetStatId: 'defense', targetPlayerHealth: true }],
+      enemies: [{
+        id: 'sparring-enemy',
+        interactionTypeId: 'combat',
+        stats: { attack: 10, health: 100, rate: 60, critMultiplier: 1 },
+        rewards: [],
+      }],
+    };
+    const hitState = resolveIdleTimers(
+      startAction(createInitialPlayState('test-universe', 'arena'), action, context, startedAt),
+      context,
+      { random: () => 0.5 },
+      startedAt + 1_000,
+    ).state;
+    const missState = resolveIdleTimers(
+      startAction(createInitialPlayState('test-universe', 'arena'), action, context, startedAt),
+      context,
+      { random: () => 0 },
+      startedAt + 1_000,
+    ).state;
+
+    expect(hitState.skillXp.health).toBeGreaterThan(0);
+    expect(hitState.skillXp.defense).toBeUndefined();
+    expect(missState.skillXp.health).toBeUndefined();
+    expect(missState.skillXp.defense).toBe(10);
+  });
+
   it('carries overflow through repeated reset-on-full resource loops', () => {
     const startedAt = 1_000;
     const action: GameAction = {

@@ -1,4 +1,4 @@
-import type { ActionResolutionContext, ActionResult, ChatMessage, GameAction, IdleReport, IdleResolution, ResourceBoundaryBehavior, Reward, RunLogEntry, TravelEdgeDefinition, UniversePlayState } from './types';
+import type { ActionResolutionContext, ActionResult, ChatMessage, ExperienceEventKind, ExperienceTrigger, GameAction, IdleReport, IdleResolution, ResourceBoundaryBehavior, Reward, RunLogEntry, TravelEdgeDefinition, UniversePlayState } from './types';
 import { getActionDurationMs, getEnemy, getInteractionType, sampleAdversarialDamage, sampleEnemyAttackDamage } from './adversarial';
 import { getEnemyStat } from './enemies';
 import { getEffectDeltaPerMinute, getResourceMaxForContext, isEffectApplicable } from './resources';
@@ -35,6 +35,17 @@ const EMPTY_CONTEXT: ActionResolutionContext = {
   effects: [],
   interactionTypes: [],
   enemies: [],
+};
+
+type GameExperienceEvent = {
+  kind: ExperienceEventKind;
+  amount: number;
+  actionId?: string;
+  effectId?: string;
+  enemyId?: string;
+  interactionTypeId?: string;
+  resourceId?: string;
+  sourceStat?: string;
 };
 
 export const appendRunLog = (
@@ -241,6 +252,123 @@ const getResourceMax = (
   return definition
     ? getResourceMaxForContext(context, state, definition)
     : state.resourcePools[resourceId]?.max ?? 0;
+};
+
+const matchesExperienceTrigger = (trigger: ExperienceTrigger, event: GameExperienceEvent) =>
+  trigger.event === event.kind
+  && (trigger.effectId === undefined || trigger.effectId === event.effectId)
+  && (trigger.enemyId === undefined || trigger.enemyId === event.enemyId)
+  && (trigger.interactionTypeId === undefined || trigger.interactionTypeId === event.interactionTypeId)
+  && (trigger.resourceId === undefined || trigger.resourceId === event.resourceId)
+  && (trigger.sourceStat === undefined || trigger.sourceStat === event.sourceStat);
+
+const experienceAmount = (trigger: ExperienceTrigger, event: GameExperienceEvent) =>
+  trigger.amount ?? event.amount * (trigger.amountPerUnit ?? 1);
+
+const grantSkillXp = (
+  state: UniversePlayState,
+  skillId: string,
+  amount: number,
+) => amount > 0
+  ? {
+      ...state,
+      skillXp: {
+        ...state.skillXp,
+        [skillId]: Math.max(0, (state.skillXp[skillId] ?? 0) + amount),
+      },
+    }
+  : state;
+
+const emitExperienceEvent = (
+  state: UniversePlayState,
+  action: GameAction,
+  context: ActionResolutionContext,
+  event: GameExperienceEvent,
+  now: number,
+) => {
+  let nextState = state;
+
+  for (const trigger of action.experience ?? []) {
+    if (!matchesExperienceTrigger(trigger, event)) {
+      continue;
+    }
+
+    const amount = experienceAmount(trigger, event);
+    nextState = grantSkillXp(nextState, trigger.skillId, amount);
+    nextState = appendRunLog(nextState, 'engine', 'skill.xp-event', {
+      actionId: action.id,
+      amount,
+      event: event.kind,
+      skillId: trigger.skillId,
+      eventAmount: event.amount,
+      effectId: event.effectId ?? '',
+      resourceId: event.resourceId ?? '',
+      sourceStat: event.sourceStat ?? '',
+    }, now);
+  }
+
+  return nextState;
+};
+
+const emitActiveActionExperienceEvent = (
+  state: UniversePlayState,
+  context: ActionResolutionContext,
+  event: GameExperienceEvent,
+  now: number,
+) => {
+  const action = context.actions.find((candidate) => candidate.id === state.activeAction?.actionId);
+  return action ? emitExperienceEvent(state, action, context, { ...event, actionId: action.id }, now) : state;
+};
+
+const emitResourceExperienceEvents = (
+  state: UniversePlayState,
+  context: ActionResolutionContext,
+  resourceId: string,
+  appliedDelta: number,
+  now: number,
+  source: { effectId?: string; sourceStat?: string } = {},
+) => {
+  if (Math.abs(appliedDelta) <= 0.000001) {
+    return state;
+  }
+
+  const action = context.actions.find((candidate) => candidate.id === state.activeAction?.actionId);
+  const interactionType = action ? getInteractionType(action, context) : null;
+  const enemy = action ? getEnemy(action, context) : null;
+  const baseEvent = {
+    actionId: action?.id,
+    effectId: source.effectId,
+    enemyId: enemy?.id,
+    interactionTypeId: interactionType?.id ?? action?.interactionTypeId,
+    resourceId,
+    sourceStat: source.sourceStat,
+  };
+
+  if (resourceId === ENEMY_HEALTH_RESOURCE_ID && appliedDelta < 0) {
+    return emitActiveActionExperienceEvent(state, context, {
+      ...baseEvent,
+      kind: 'damage-dealt',
+      amount: -appliedDelta,
+    }, now);
+  }
+
+  if (resourceId === HEALTH_RESOURCE_ID && appliedDelta < 0) {
+    return emitActiveActionExperienceEvent(state, context, {
+      ...baseEvent,
+      kind: 'damage-taken',
+      amount: -appliedDelta,
+    }, now);
+  }
+
+  if (resourceId === HEALTH_RESOURCE_ID && appliedDelta > 0) {
+    return emitActiveActionExperienceEvent(state, context, {
+      ...baseEvent,
+      kind: 'health-regenerated',
+      amount: appliedDelta,
+    }, now);
+  }
+
+  return state;
 };
 
 const syncLegacyHealth = (state: UniversePlayState) => {
@@ -576,7 +704,7 @@ const applyResourceDelta = (
   resourceId: string,
   delta: number,
   now: number,
-  options: { random?: () => number } = {},
+  options: { random?: () => number; effectId?: string; sourceStat?: string } = {},
 ) => {
   const definition = getResourceDefinition(context, resourceId);
   const resource = getRuntimeResourcePool(state, context, resourceId);
@@ -604,6 +732,10 @@ const applyResourceDelta = (
     const nextValue = Math.min(currentResource.max, Math.max(currentResource.min, previous + applied));
 
     nextState = setResourceCurrent(nextState, context, resourceId, nextValue);
+    nextState = emitResourceExperienceEvents(nextState, context, resourceId, applied, now, {
+      effectId: options.effectId,
+      sourceStat: options.sourceStat,
+    });
     nextState = appendRunLog(nextState, 'engine', 'resource.change', {
       resourceId,
       requestedDelta: delta,
@@ -685,7 +817,7 @@ const applyActiveEffects = (
       effect.resourceId,
       delta,
       boundaryAt,
-      options,
+      { ...options, effectId: effect.id, sourceStat: effect.sourceStat },
     );
   }, state);
 };
@@ -910,21 +1042,32 @@ const applyActionCompletion = (
   action: GameAction,
   context: ActionResolutionContext,
   now: number,
+  options: { emitActionComplete?: boolean } = {},
 ) => {
   const rewarded = applyRewards(state, action.rewards, context, now);
   const changed = (action.results ?? []).reduce(
     (nextState, result) => applyActionResult(nextState, result, context, now),
     rewarded,
   );
+  const withExperience = options.emitActionComplete === false
+    ? changed
+    : emitExperienceEvent(changed, action, context, {
+        kind: 'action-complete',
+        amount: 1,
+        actionId: action.id,
+        enemyId: action.enemyId,
+        interactionTypeId: getInteractionType(action, context)?.id ?? action.interactionTypeId,
+      }, now);
+
   return appendRunLog({
-    ...changed,
+    ...withExperience,
     actionCompletions: {
-      ...changed.actionCompletions,
-      [action.id]: (changed.actionCompletions[action.id] ?? 0) + 1,
+      ...withExperience.actionCompletions,
+      [action.id]: (withExperience.actionCompletions[action.id] ?? 0) + 1,
     },
   }, 'engine', 'action.complete', {
     actionId: action.id,
-    completion: (changed.actionCompletions[action.id] ?? 0) + 1,
+    completion: (withExperience.actionCompletions[action.id] ?? 0) + 1,
     results: action.results ?? [],
     rewards: action.rewards,
   }, now);
@@ -952,8 +1095,15 @@ const completeActionWithResult = (
     remainingHealth = targetHealth;
 
     if (damage <= 0) {
+      const missedState = emitExperienceEvent(state, action, context, {
+        kind: 'action-complete',
+        amount: 1,
+        actionId: action.id,
+        enemyId: enemy.id,
+        interactionTypeId: getInteractionType(action, context)?.id ?? action.interactionTypeId,
+      }, now);
       return {
-        state: restartAction(state, action, context, now, currentHealth),
+        state: restartAction(missedState, action, context, now, currentHealth),
         finished: false,
         outcome: 'miss',
         damage,
@@ -964,10 +1114,24 @@ const completeActionWithResult = (
 
     const damagedState = getResourceDefinition(context, ENEMY_HEALTH_RESOURCE_ID)
       ? applyResourceDelta(state, context, ENEMY_HEALTH_RESOURCE_ID, -damage, now, options)
-      : restartAction(state, action, context, now, targetHealth);
+      : emitExperienceEvent(state, action, context, {
+          kind: 'damage-dealt',
+          amount: damage,
+          actionId: action.id,
+          enemyId: enemy.id,
+          interactionTypeId: getInteractionType(action, context)?.id ?? action.interactionTypeId,
+          resourceId: ENEMY_HEALTH_RESOURCE_ID,
+        }, now);
 
     if (targetHealth > 0) {
-      const hitState = applyRewards(damagedState, action.rewards, context, now);
+      const completedHitState = emitExperienceEvent(damagedState, action, context, {
+        kind: 'action-complete',
+        amount: 1,
+        actionId: action.id,
+        enemyId: enemy.id,
+        interactionTypeId: getInteractionType(action, context)?.id ?? action.interactionTypeId,
+      }, now);
+      const hitState = applyRewards(completedHitState, action.rewards, context, now);
       return {
         state: restartAction(hitState, action, context, now, targetHealth),
         finished: false,
@@ -1050,6 +1214,17 @@ const applyEnemyAttackWithMessage = (
         target: 'you',
         damage: roundCombatNumber(damage),
       },
+    }, now);
+  }
+
+  if (enemy && interactionType && attack && damage <= 0) {
+    nextState = emitExperienceEvent(nextState, action, context, {
+      kind: 'incoming-attack-missed',
+      amount: 1,
+      actionId: action.id,
+      enemyId: enemy.id,
+      interactionTypeId: interactionType.id,
+      resourceId: HEALTH_RESOURCE_ID,
     }, now);
   }
 

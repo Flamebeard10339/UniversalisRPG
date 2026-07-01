@@ -4,5 +4,6 @@
   { "id": "woodcutting", "base": 6 },
   { "id": "action-rate", "base": 25 },
   { "id": "health", "base": 100 },
-  { "id": "regeneration", "base": 10 }
+  { "id": "regeneration", "base": 10 },
+  { "id": "troll-blood", "base": 100 }
 ]

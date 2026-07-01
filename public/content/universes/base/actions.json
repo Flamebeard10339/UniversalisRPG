@@ -10,35 +10,71 @@
     "locationId": "crossroads",
     "durationSeconds": 1,
     "enemyId": "goblin",
-    "rewards": [{ "kind": "skillXp", "skillId": "attack", "amount": 1 }]
+    "rewards": [{ "kind": "skillXp", "skillId": "attack", "amount": 1 }],
+    "experience": [
+      { "event": "action-complete", "skillId": "attack", "amount": 1 },
+      { "event": "damage-dealt", "skillId": "attack" },
+      { "event": "damage-taken", "skillId": "health" },
+      { "event": "incoming-attack-missed", "skillId": "defense", "amount": 10 },
+      { "event": "health-regenerated", "skillId": "regeneration", "sourceStat": "regeneration" },
+      { "event": "health-regenerated", "skillId": "troll-blood", "sourceStat": "troll-blood" }
+    ]
   },
   {
     "id": "chop-oak-tree",
     "locationId": "emberwood",
     "durationSeconds": 1,
     "enemyId": "oak-tree",
-    "rewards": [{ "kind": "skillXp", "skillId": "woodcutting", "amount": 1 }]
+    "rewards": [{ "kind": "skillXp", "skillId": "woodcutting", "amount": 1 }],
+    "experience": [
+      { "event": "action-complete", "skillId": "woodcutting", "amount": 1 },
+      { "event": "damage-dealt", "skillId": "woodcutting" }
+    ]
   },
   {
     "id": "fight-ent",
     "locationId": "emberwood",
     "durationSeconds": 1,
     "enemyId": "ent",
-    "rewards": [{ "kind": "skillXp", "skillId": "woodcutting", "amount": 1 }]
+    "rewards": [{ "kind": "skillXp", "skillId": "woodcutting", "amount": 1 }],
+    "experience": [
+      { "event": "action-complete", "skillId": "woodcutting", "amount": 1 },
+      { "event": "damage-dealt", "skillId": "woodcutting" },
+      { "event": "damage-taken", "skillId": "health" },
+      { "event": "incoming-attack-missed", "skillId": "defense", "amount": 10 },
+      { "event": "health-regenerated", "skillId": "regeneration", "sourceStat": "regeneration" },
+      { "event": "health-regenerated", "skillId": "troll-blood", "sourceStat": "troll-blood" }
+    ]
   },
   {
     "id": "fight-ork",
     "locationId": "crossroads",
     "durationSeconds": 1,
     "enemyId": "ork",
-    "rewards": [{ "kind": "skillXp", "skillId": "attack", "amount": 1 }]
+    "rewards": [{ "kind": "skillXp", "skillId": "attack", "amount": 1 }],
+    "experience": [
+      { "event": "action-complete", "skillId": "attack", "amount": 1 },
+      { "event": "damage-dealt", "skillId": "attack" },
+      { "event": "damage-taken", "skillId": "health" },
+      { "event": "incoming-attack-missed", "skillId": "defense", "amount": 10 },
+      { "event": "health-regenerated", "skillId": "regeneration", "sourceStat": "regeneration" },
+      { "event": "health-regenerated", "skillId": "troll-blood", "sourceStat": "troll-blood" }
+    ]
   },
   {
     "id": "fight-troll",
     "locationId": "crossroads",
     "durationSeconds": 1,
     "enemyId": "troll",
-    "rewards": [{ "kind": "skillXp", "skillId": "attack", "amount": 1 }]
+    "rewards": [{ "kind": "skillXp", "skillId": "attack", "amount": 1 }],
+    "experience": [
+      { "event": "action-complete", "skillId": "attack", "amount": 1 },
+      { "event": "damage-dealt", "skillId": "attack" },
+      { "event": "damage-taken", "skillId": "health" },
+      { "event": "incoming-attack-missed", "skillId": "defense", "amount": 10 },
+      { "event": "health-regenerated", "skillId": "regeneration", "sourceStat": "regeneration" },
+      { "event": "health-regenerated", "skillId": "troll-blood", "sourceStat": "troll-blood" }
+    ]
   },
   {
     "id": "forage-embers",

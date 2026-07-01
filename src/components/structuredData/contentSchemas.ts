@@ -52,12 +52,25 @@ export const resultSchema = (bundle: ContentBundle): StructuredSchema => ({
   },
 });
 
+export const experienceTriggerSchema = (bundle: ContentBundle): StructuredSchema => ({ kind: 'object', fields: {
+  event: { label: 'contribution.column.event', schema: { kind: 'enum', options: ['action-complete', 'damage-dealt', 'damage-taken', 'health-regenerated', 'incoming-attack-missed'] } },
+  skillId: { label: 'contribution.column.skill', schema: string(bundle.skills.map((item) => item.id)) },
+  amount: { label: 'contribution.column.amount', schema: number(0), optional: true },
+  amountPerUnit: { label: 'contribution.column.amountPerUnit', schema: number(0), optional: true },
+  resourceId: { label: 'contribution.column.resource', schema: string(bundle.resourceDefinitions.map((item) => item.id)), optional: true },
+  sourceStat: { label: 'contribution.column.sourceStat', schema: string(bundle.stats.map((item) => item.id)), optional: true },
+  effectId: { label: 'contribution.column.effect', schema: string(bundle.effects.map((item) => item.id)), optional: true },
+  enemyId: { label: 'contribution.column.enemy', schema: string(bundle.enemies.map((item) => item.id)), optional: true },
+  interactionTypeId: { label: 'contribution.column.interaction', schema: string(bundle.interactionTypes.map((item) => item.id)), optional: true },
+} });
+
 export const actionSchema = (bundle: ContentBundle): StructuredSchema => ({ kind: 'object', fields: {
   id: { label: 'contribution.column.id', schema: string() },
   locationId: { label: 'contribution.column.location', schema: string(bundle.locations.map((item) => item.id)) },
   role: { label: 'contribution.column.actionRole', schema: { kind: 'enum', options: ['optional', 'progression', 'utility'] }, optional: true, defaultValue: 'optional' },
   durationSeconds: { label: 'contribution.column.actionDuration', schema: number(0) },
   rewards: { label: 'contribution.column.rewards', schema: { kind: 'array', listMode: 'free', item: rewardSchema(bundle), createItem: () => ({ kind: 'resource', resourceId: bundle.resourceDefinitions[0]?.id ?? '', amount: 1 }) } },
+  experience: { label: 'contribution.column.experience', schema: { kind: 'array', listMode: 'free', item: experienceTriggerSchema(bundle), createItem: () => ({ event: 'action-complete', skillId: bundle.skills[0]?.id ?? '', amount: 1 }) }, optional: true, defaultValue: [] },
   requirements: { label: 'contribution.column.requirements', schema: conditionSchema(bundle), optional: true, defaultValue: { kind: 'state-variable', variable: stateVariables(bundle)[0] ?? '', comparison: 'equal', value: 0 } },
   visibleWhen: { label: 'contribution.column.visibleWhen', schema: conditionSchema(bundle), optional: true, defaultValue: { kind: 'state-variable', variable: stateVariables(bundle)[0] ?? '', comparison: 'equal', value: 0 } },
   results: { label: 'contribution.column.results', schema: { kind: 'array', listMode: 'free', item: resultSchema(bundle), createItem: () => ({ kind: 'state-variable', variable: 'location', value: bundle.locations[0]?.id ?? '' }) }, optional: true, defaultValue: [] },
