@@ -15,7 +15,7 @@ import {
   locationExhaustedKey,
   skillTitleKey,
 } from './contentIds';
-import { areActionRequirementsMet, canStartAction, isActionExhausted, isActionVisible } from './conditions';
+import { areActionRequirementsMet, canStartAction, evaluateCondition, isActionExhausted, isActionVisible } from './conditions';
 import { readStateVariable, writeStateVariable } from './stateVariables';
 import { resolveManifestUiSettings } from './universeSettings';
 import { skillLevelFromXp } from './skills';
@@ -37,6 +37,7 @@ const EMPTY_CONTEXT: ActionResolutionContext = {
   effects: [],
   interactionTypes: [],
   enemies: [],
+  dialogues: [],
 };
 
 type GameExperienceEvent = {
@@ -120,6 +121,7 @@ export const createInitialPlayState = (
   activeAction: null,
   actionProgress: {},
   activeTravel: null,
+  activeDialogue: null,
   resources: {},
   inventory: {},
   flags: {},
@@ -167,6 +169,7 @@ export const normalizePlayState = (
         }
       : actionProgress,
     activeTravel: state.activeTravel ?? null,
+    activeDialogue: state.activeDialogue ?? null,
     resourcePools: state.resourcePools ?? {},
     inventory: { ...(state.resources ?? {}), ...(state.inventory ?? {}) },
     flags: state.flags ?? {},
@@ -998,6 +1001,80 @@ const applyItemDelta = (
   };
 };
 
+const findDialogue = (context: ActionResolutionContext, dialogueId: string) =>
+  context.dialogues?.find((dialogue) => dialogue.id === dialogueId) ?? null;
+
+const findDialogueNode = (context: ActionResolutionContext, dialogueId: string, nodeId: string) =>
+  findDialogue(context, dialogueId)?.nodes.find((node) => node.id === nodeId) ?? null;
+
+export const cancelDialogue = (state: UniversePlayState, now = Date.now()): UniversePlayState =>
+  state.activeDialogue ? { ...state, activeDialogue: null, lastTickAt: now } : state;
+
+const enterDialogueNode = (
+  state: UniversePlayState,
+  context: ActionResolutionContext,
+  dialogueId: string,
+  nodeId: string,
+  now: number,
+  visited = new Set<string>(),
+): UniversePlayState => {
+  const visitKey = `${dialogueId}:${nodeId}`;
+  if (visited.has(visitKey)) return { ...state, activeDialogue: { dialogueId, nodeId }, lastTickAt: now };
+  visited.add(visitKey);
+
+  const node = findDialogueNode(context, dialogueId, nodeId);
+  if (!node) return cancelDialogue(state, now);
+
+  const changed = (node.results ?? []).reduce(
+    (nextState, result) => applyActionResult(nextState, result, context, now),
+    state,
+  );
+  const branch = (node.branches ?? []).find((candidate) => evaluateCondition(candidate.conditions, changed, context));
+  if (branch) return enterDialogueNode(changed, context, dialogueId, branch.gotoNodeId, now, visited);
+  if (!node.textKey && !node.narratorKey && (!node.options || node.options.length === 0) && node.gotoNodeId) {
+    return enterDialogueNode(changed, context, dialogueId, node.gotoNodeId, now, visited);
+  }
+  return { ...changed, activeDialogue: { dialogueId, nodeId }, lastTickAt: now };
+};
+
+export const startDialogue = (
+  state: UniversePlayState,
+  context: ActionResolutionContext,
+  dialogueId: string,
+  now = Date.now(),
+): UniversePlayState => {
+  const dialogue = findDialogue(context, dialogueId);
+  return dialogue ? enterDialogueNode(state, context, dialogue.id, dialogue.startNodeId, now) : state;
+};
+
+export const chooseDialogueOption = (
+  state: UniversePlayState,
+  context: ActionResolutionContext,
+  optionId?: string,
+  now = Date.now(),
+): UniversePlayState => {
+  const active = state.activeDialogue;
+  if (!active) return state;
+  const node = findDialogueNode(context, active.dialogueId, active.nodeId);
+  if (!node) return cancelDialogue(state, now);
+
+  if (node.options && node.options.length > 0) {
+    const option = node.options.find((candidate) => candidate.id === optionId);
+    if (!option || (option.conditions && !evaluateCondition(option.conditions, state, context))) return state;
+    const changed = (option.results ?? []).reduce(
+      (nextState, result) => applyActionResult(nextState, result, context, now),
+      state,
+    );
+    return option.gotoNodeId
+      ? enterDialogueNode(changed, context, active.dialogueId, option.gotoNodeId, now)
+      : cancelDialogue(changed, now);
+  }
+
+  return node.gotoNodeId
+    ? enterDialogueNode(state, context, active.dialogueId, node.gotoNodeId, now)
+    : cancelDialogue(state, now);
+};
+
 const applyActionResult = (
   state: UniversePlayState,
   result: ActionResult,
@@ -1016,6 +1093,10 @@ const applyActionResult = (
   if (result.kind === 'state-variable') {
     return writeStateVariable(state, result.variable, result.value);
   }
+  if (result.kind === 'state-variable-delta') {
+    const current = readStateVariable(state, result.variable, context);
+    return writeStateVariable(state, result.variable, (typeof current === 'number' ? current : 0) + result.amount);
+  }
   if (result.kind === 'flag') {
     return { ...state, flags: { ...state.flags, [result.flagId]: result.value } };
   }
@@ -1027,6 +1108,9 @@ const applyActionResult = (
       discoveredLocationIds: Array.from(new Set([...state.discoveredLocationIds, locationId])),
       activeTravel: null,
     };
+  }
+  if (result.kind === 'dialogue') {
+    return startDialogue(state, context, result.dialogueId, now);
   }
   return appendChatMessage(
     state,
@@ -1192,7 +1276,9 @@ const completeActionWithResult = (
     },
     lastTickAt: now,
   };
-  const shouldLoop = completedState.actionLoopingEnabled
+  const startsDialogue = (action.results ?? []).some((result) => result.kind === 'dialogue');
+  const shouldLoop = !startsDialogue
+    && completedState.actionLoopingEnabled
     && completedState.currentLocationId === action.locationId
     && canStartAction(completedState, action, context);
   const restartTargetHealth = enemy ? getEnemyStat(enemy, 'health') : null;

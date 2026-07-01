@@ -109,8 +109,10 @@ export type ActionResult =
   | { kind: 'resource'; resourceId: string; amount: number }
   | { kind: 'skill-xp'; skillId: string; amount: number }
   | { kind: 'state-variable'; variable: string; value: boolean | number | string }
+  | { kind: 'state-variable-delta'; variable: string; amount: number }
   | { kind: 'flag'; flagId: string; value: boolean }
   | { kind: 'relocate'; locationId: string }
+  | { kind: 'dialogue'; dialogueId: string }
   | { kind: 'chat'; messageKey: string; delaySeconds?: number };
 
 export type GameAction = {
@@ -228,6 +230,36 @@ export type EnemyDefinition = {
   rewards: Reward[];
 };
 
+export type DialogueOption = {
+  id: string;
+  labelKey: string;
+  conditions?: Condition;
+  results?: ActionResult[];
+  gotoNodeId?: string;
+};
+
+export type DialogueBranch = {
+  conditions: Condition;
+  gotoNodeId: string;
+};
+
+export type DialogueNode = {
+  id: string;
+  speakerId?: string;
+  textKey?: string;
+  narratorKey?: string;
+  results?: ActionResult[];
+  branches?: DialogueBranch[];
+  gotoNodeId?: string;
+  options?: DialogueOption[];
+};
+
+export type DialogueDefinition = {
+  id: string;
+  startNodeId: string;
+  nodes: DialogueNode[];
+};
+
 export type ContentBundle = {
   manifest: UniverseManifest;
   locations: LocationNode[];
@@ -241,6 +273,7 @@ export type ContentBundle = {
   effects: EffectDefinition[];
   interactionTypes: InteractionTypeDefinition[];
   enemies: EnemyDefinition[];
+  dialogues?: DialogueDefinition[];
   locales: Record<string, LocaleDictionary>;
 };
 
@@ -272,6 +305,11 @@ export type ActiveTravel = {
   toLocationId: string;
   startedAt: number;
   completesAt: number;
+};
+
+export type ActiveDialogue = {
+  dialogueId: string;
+  nodeId: string;
 };
 
 export type ChatMessage = {
@@ -361,6 +399,7 @@ export type ActionResolutionContext = {
   effects?: EffectDefinition[];
   interactionTypes: InteractionTypeDefinition[];
   enemies: EnemyDefinition[];
+  dialogues?: DialogueDefinition[];
 };
 
 export type ResourcePool = {
@@ -377,6 +416,7 @@ export type UniversePlayState = {
   activeAction: ActiveAction | null;
   actionProgress: Record<string, ActionProgress>;
   activeTravel: ActiveTravel | null;
+  activeDialogue: ActiveDialogue | null;
   resources: Record<string, number>;
   inventory: Record<string, number>;
   flags: Record<string, boolean | number | string>;
@@ -421,6 +461,7 @@ export type ContributionDraft = {
   effects: EffectDefinition[];
   interactionTypes: InteractionTypeDefinition[];
   enemies: EnemyDefinition[];
+  dialogues: DialogueDefinition[];
   locales: Record<string, LocaleDictionary>;
   removed: ContributionRemovedIds;
 };
@@ -437,6 +478,7 @@ export type ContributionRemovedIds = {
   effects: string[];
   interactionTypes: string[];
   enemies: string[];
+  dialogues: string[];
 };
 
 export type ContributionPackage = {

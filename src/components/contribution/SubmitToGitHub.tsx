@@ -32,6 +32,7 @@ export const SubmitToGitHub = ({ appVersion, draft, validationIssues, t }: Submi
         { path: 'effects.json', json: draft.effects },
         { path: 'interaction-types.json', json: draft.interactionTypes },
         { path: 'enemies.json', json: draft.enemies },
+        { path: 'dialogues.json', json: draft.dialogues },
         { path: 'removed.json', json: draft.removed },
         { path: 'locales.json', json: draft.locales },
       ].filter((file) => {

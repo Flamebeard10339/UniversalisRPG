@@ -1,0 +1,117 @@
+[
+  {
+    "id": "tutorial-guide",
+    "startNodeId": "start",
+    "nodes": [
+      {
+        "id": "start",
+        "speakerId": "tutorial-guide",
+        "textKey": "dialogue.tutorial-guide.start",
+        "gotoNodeId": "helpful-questions"
+      },
+      {
+        "id": "helpful-questions",
+        "options": [
+          {
+            "id": "combat-experience",
+            "labelKey": "dialogue.tutorial-guide.option.combatExperience",
+            "conditions": {
+              "kind": "not",
+              "condition": { "kind": "state-variable", "variable": "flag:tutorial-guide.q1.count", "comparison": "greater-than", "value": 5 }
+            },
+            "gotoNodeId": "q1"
+          },
+          { "id": "woodcutting-secrets", "labelKey": "dialogue.tutorial-guide.option.woodcuttingSecrets", "gotoNodeId": "q2" },
+          { "id": "gully-rocks", "labelKey": "dialogue.tutorial-guide.option.gullyRocks", "gotoNodeId": "q3" },
+          {
+            "id": "take-logs",
+            "labelKey": "dialogue.tutorial-guide.option.takeLogs",
+            "conditions": { "kind": "state-variable", "variable": "item:log", "comparison": "greater-than", "value": 0 },
+            "gotoNodeId": "q4"
+          }
+        ]
+      },
+      {
+        "id": "q1",
+        "results": [{ "kind": "state-variable-delta", "variable": "flag:tutorial-guide.q1.count", "amount": 1 }],
+        "branches": [
+          { "conditions": { "kind": "state-variable", "variable": "flag:tutorial-guide.q1.count", "comparison": "equal", "value": 1 }, "gotoNodeId": "q1-first" },
+          { "conditions": { "kind": "state-variable", "variable": "flag:tutorial-guide.q1.count", "comparison": "equal", "value": 2 }, "gotoNodeId": "q1-second-a" },
+          {
+            "conditions": {
+              "kind": "all",
+              "conditions": [
+                { "kind": "state-variable", "variable": "flag:tutorial-guide.q1.count", "comparison": "greater-than", "value": 2 },
+                { "kind": "state-variable", "variable": "flag:tutorial-guide.q1.count", "comparison": "less-than", "value": 6 }
+              ]
+            },
+            "gotoNodeId": "q1-forgetful-a"
+          },
+          { "conditions": { "kind": "state-variable", "variable": "flag:tutorial-guide.q1.count", "comparison": "greater-than", "value": 5 }, "gotoNodeId": "q1-final-a" }
+        ]
+      },
+      { "id": "q1-first", "speakerId": "tutorial-guide", "textKey": "dialogue.tutorial-guide.q1.first", "gotoNodeId": "helpful-questions" },
+      { "id": "q1-second-a", "speakerId": "tutorial-guide", "textKey": "dialogue.tutorial-guide.q1.secondA", "gotoNodeId": "q1-second-b" },
+      { "id": "q1-second-b", "speakerId": "tutorial-guide", "textKey": "dialogue.tutorial-guide.q1.secondB", "gotoNodeId": "helpful-questions" },
+      { "id": "q1-forgetful-a", "speakerId": "tutorial-guide", "textKey": "dialogue.tutorial-guide.q1.forgetfulA", "gotoNodeId": "q1-forgetful-b" },
+      { "id": "q1-forgetful-b", "speakerId": "tutorial-guide", "textKey": "dialogue.tutorial-guide.q1.forgetfulB", "gotoNodeId": "helpful-questions" },
+      { "id": "q1-final-a", "speakerId": "tutorial-guide", "textKey": "dialogue.tutorial-guide.q1.finalA", "gotoNodeId": "q1-final-b" },
+      {
+        "id": "q1-final-b",
+        "narratorKey": "dialogue.tutorial-guide.q1.finalReward",
+        "results": [{ "kind": "item", "itemId": "tutorial-blade", "amount": 1 }],
+        "gotoNodeId": "helpful-questions"
+      },
+      {
+        "id": "q2",
+        "speakerId": "tutorial-guide",
+        "textKey": "dialogue.tutorial-guide.q2",
+        "options": [
+          { "id": "tell-me", "labelKey": "dialogue.tutorial-guide.q2.option.tellMe", "gotoNodeId": "q2-o1-a" },
+          { "id": "not-telling", "labelKey": "dialogue.tutorial-guide.q2.option.notTelling", "gotoNodeId": "q2-o2" }
+        ]
+      },
+      { "id": "q2-o1-a", "speakerId": "tutorial-guide", "textKey": "dialogue.tutorial-guide.q2.o1.a", "gotoNodeId": "q2-o1-b" },
+      { "id": "q2-o1-b", "speakerId": "tutorial-guide", "textKey": "dialogue.tutorial-guide.q2.o1.b", "gotoNodeId": "helpful-questions" },
+      { "id": "q2-o2", "speakerId": "tutorial-guide", "textKey": "dialogue.tutorial-guide.q2.o2", "gotoNodeId": "helpful-questions" },
+      { "id": "q3", "gotoNodeId": "q3-a" },
+      { "id": "q3-a", "speakerId": "tutorial-guide", "textKey": "dialogue.tutorial-guide.q3.a", "gotoNodeId": "q3-b" },
+      {
+        "id": "q3-b",
+        "speakerId": "tutorial-guide",
+        "textKey": "dialogue.tutorial-guide.q3.b",
+        "results": [{ "kind": "item", "itemId": "bronze-pickaxe", "amount": 1 }],
+        "gotoNodeId": "helpful-questions"
+      },
+      {
+        "id": "q4",
+        "speakerId": "tutorial-guide",
+        "textKey": "dialogue.tutorial-guide.q4",
+        "options": [
+          {
+            "id": "give-1",
+            "labelKey": "dialogue.tutorial-guide.q4.option.give1",
+            "conditions": { "kind": "state-variable", "variable": "item:log", "comparison": "greater-than", "value": 0 },
+            "gotoNodeId": "q4-c1"
+          },
+          {
+            "id": "give-10",
+            "labelKey": "dialogue.tutorial-guide.q4.option.give10",
+            "conditions": { "kind": "state-variable", "variable": "item:log", "comparison": "greater-than", "value": 9 },
+            "gotoNodeId": "q4-c10"
+          },
+          {
+            "id": "give-25",
+            "labelKey": "dialogue.tutorial-guide.q4.option.give25",
+            "conditions": { "kind": "state-variable", "variable": "item:log", "comparison": "greater-than", "value": 24 },
+            "gotoNodeId": "q4-c25"
+          },
+          { "id": "changed-mind", "labelKey": "dialogue.tutorial-guide.q4.option.changedMind", "gotoNodeId": "helpful-questions" }
+        ]
+      },
+      { "id": "q4-c1", "results": [{ "kind": "item", "itemId": "log", "amount": -1 }], "gotoNodeId": "helpful-questions" },
+      { "id": "q4-c10", "results": [{ "kind": "item", "itemId": "log", "amount": -10 }], "gotoNodeId": "helpful-questions" },
+      { "id": "q4-c25", "results": [{ "kind": "item", "itemId": "log", "amount": -25 }], "gotoNodeId": "helpful-questions" }
+    ]
+  }
+]

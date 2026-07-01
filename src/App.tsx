@@ -4,6 +4,7 @@ import { ActionDetails } from './components/ActionDetails';
 import { ActionPanel } from './components/ActionPanel';
 import { ChatPanel } from './components/ChatPanel';
 import { CharacterStats } from './components/CharacterStats';
+import { DialoguePanel } from './components/DialoguePanel';
 import { InventoryPanel } from './components/InventoryPanel';
 import { ContributionMode, type ContributionTab } from './components/contribution/ContributionMode';
 import { ContributionWorkbench } from './components/contribution/ContributionWorkbench';
@@ -52,8 +53,8 @@ const contributionTabs: ContributionTab[] = ['content', 'localization', 'submit'
 const homeTabs: HomeTab[] = ['actions', 'details', 'workbench'];
 const emptyIdleReport: IdleReport = { kind: 'none' };
 const emptyContributionDraft = (universeId: string): ContributionDraft => ({
-  universeId, updatedAt: Date.now(), notes: '', basePlayer: undefined, combatBalance: undefined, ui: undefined, locations: [], edges: [], actions: [], skills: [], stats: [], items: [], flags: [], resourceDefinitions: [], effects: [], interactionTypes: [], enemies: [], locales: {},
-  removed: { locations: [], edges: [], actions: [], skills: [], stats: [], items: [], flags: [], resources: [], effects: [], interactionTypes: [], enemies: [] },
+  universeId, updatedAt: Date.now(), notes: '', basePlayer: undefined, combatBalance: undefined, ui: undefined, locations: [], edges: [], actions: [], skills: [], stats: [], items: [], flags: [], resourceDefinitions: [], effects: [], interactionTypes: [], enemies: [], dialogues: [], locales: {},
+  removed: { locations: [], edges: [], actions: [], skills: [], stats: [], items: [], flags: [], resources: [], effects: [], interactionTypes: [], enemies: [], dialogues: [] },
 });
 
 const encodeSave = (playState: UniversePlayState) =>
@@ -123,6 +124,8 @@ export default function App() {
   const cancelTravel = useGameState((state) => state.cancelTravel);
   const startAction = useGameState((state) => state.startAction);
   const stopAction = useGameState((state) => state.stopAction);
+  const chooseDialogueOption = useGameState((state) => state.chooseDialogueOption);
+  const cancelDialogue = useGameState((state) => state.cancelDialogue);
   const resolveIdle = useGameState((state) => state.resolveIdle);
   const markInactive = useGameState((state) => state.markInactive);
   const importUniverseState = useGameState((state) => state.importUniverseState);
@@ -210,6 +213,7 @@ export default function App() {
     effects: bundle?.effects ?? [],
     interactionTypes: bundle?.interactionTypes ?? [],
     enemies: bundle?.enemies ?? [],
+    dialogues: bundle?.dialogues ?? [],
   }), [bundle]);
   const playState = bundle ? gameStates[runtimeUniverseId] ?? getUniverseState(runtimeUniverseId, startingLocationId, { manifest: bundle.manifest }) : null;
   const visibleHomeTab = homeTab === 'workbench' && !contributionMode ? 'actions' : homeTab;
@@ -219,6 +223,9 @@ export default function App() {
   const logPlayerAction = (event: string, data?: Record<string, unknown>) => {
     logAction(event, data);
     if (bundle) recordRunEvent(runtimeUniverseId, 'player', event, data);
+  };
+  const dismissDialogue = () => {
+    if (playState?.activeDialogue) cancelDialogue(runtimeUniverseId);
   };
   const beginAction = (action: (typeof actionContext.actions)[number]) => {
     if (!bundle) return;
@@ -276,11 +283,19 @@ export default function App() {
 
   const setTab = (tab: AppTab) => {
     logPlayerAction('navigation.tab', { tab });
+    dismissDialogue();
     setActiveTab(tab);
+  };
+
+  const setHomeTopTab = (tab: HomeTab) => {
+    logPlayerAction('navigation.homeTab', { tab });
+    dismissDialogue();
+    setHomeTab(tab);
   };
 
   const setCharacterTopTab = (tab: CharacterTab) => {
     logPlayerAction('navigation.characterTab', { tab });
+    dismissDialogue();
     setCharacterTab(tab);
   };
 
@@ -352,6 +367,7 @@ export default function App() {
           effects: currentBundle.effects,
           interactionTypes: currentBundle.interactionTypes,
           enemies: currentBundle.enemies,
+          dialogues: currentBundle.dialogues,
         }, {
           debugEnabled: useDebugState.getState().enabled,
           showReport: true,
@@ -506,7 +522,7 @@ export default function App() {
                       visibleHomeTab === tab ? 'bg-cyan-300 text-slate-950' : 'bg-slate-950 text-slate-300'
                     }`}
                     key={tab}
-                    onClick={() => setHomeTab(tab)}
+                    onClick={() => setHomeTopTab(tab)}
                     type="button"
                   >
                     {tab === 'details' && activeInteractionType
@@ -629,7 +645,7 @@ export default function App() {
                   <span className="text-sm text-slate-300">{t('settings.appearance.theme')}</span>
                   <select
                     className="w-56 rounded border border-slate-700 bg-slate-900 px-3 py-2 text-sm"
-                    onChange={(event) => setThemePreference(event.target.value as ThemePreference)}
+                  onChange={(event) => { dismissDialogue(); setThemePreference(event.target.value as ThemePreference); }}
                     value={themePreference}
                   >
                     <option value="system">{t('settings.theme.system')}</option>
@@ -641,7 +657,7 @@ export default function App() {
                   <span className="text-sm text-slate-300">{t('settings.appearance.fontSize')}</span>
                   <select
                     className="w-56 rounded border border-slate-700 bg-slate-900 px-3 py-2 text-sm"
-                    onChange={(event) => setFontSizePreference(event.target.value as FontSizePreference)}
+                    onChange={(event) => { dismissDialogue(); setFontSizePreference(event.target.value as FontSizePreference); }}
                     value={fontSizePreference}
                   >
                     <option value="tiny">{t('settings.fontSize.tiny')}</option>
@@ -655,7 +671,7 @@ export default function App() {
                   <span className="text-sm text-slate-300">{t('settings.appearance.language')}</span>
                   <select
                     className="w-56 rounded border border-slate-700 bg-slate-900 px-3 py-2 text-sm"
-                    onChange={(event) => void setLocalePreference(event.target.value)}
+                    onChange={(event) => { dismissDialogue(); void setLocalePreference(event.target.value); }}
                     value={localePreference}
                   >
                     <option value="system">{t('settings.language.system')}</option>
@@ -671,7 +687,7 @@ export default function App() {
                   <input
                     checked={chatCompressionEnabled}
                     className="h-5 w-5"
-                    onChange={(event) => setChatCompressionEnabled(event.target.checked)}
+                    onChange={(event) => { dismissDialogue(); setChatCompressionEnabled(event.target.checked); }}
                     type="checkbox"
                   />
                 </label>
@@ -773,6 +789,7 @@ export default function App() {
                     className="h-5 w-5"
                     onChange={(event) => {
                       logPlayerAction('settings.contributionMode', { enabled: event.target.checked });
+                      dismissDialogue();
                       setContributionMode(event.target.checked);
                     }}
                     type="checkbox"
@@ -786,7 +803,7 @@ export default function App() {
                   <input
                     checked={debugEnabled}
                     className="h-5 w-5"
-                    onChange={(event) => setDebugEnabled(event.target.checked)}
+                    onChange={(event) => { dismissDialogue(); setDebugEnabled(event.target.checked); }}
                     type="checkbox"
                   />
                 </label>
@@ -841,7 +858,11 @@ export default function App() {
       {activeTab === 'home' && visibleHomeTab !== 'workbench' && (
         <div className="fixed inset-x-0 bottom-[73px] z-10 h-[33vh] px-4">
           <div className="mx-auto h-full max-w-7xl">
-            <ChatPanel compressionEnabled={chatCompressionEnabled} messages={playState.chatMessages} t={t} />
+            {playState.activeDialogue ? (
+              <DialoguePanel context={actionContext} onChoose={(optionId) => chooseDialogueOption(runtimeUniverseId, actionContext, optionId)} playState={playState} t={t} />
+            ) : (
+              <ChatPanel compressionEnabled={chatCompressionEnabled} messages={playState.chatMessages} t={t} />
+            )}
           </div>
         </div>
       )}

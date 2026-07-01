@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import type { ActionResolutionContext, GameAction, IdleReport, RunLogEntry, TravelEdgeDefinition, UniversePlayState } from '../game/types';
-import { appendChatMessage, appendRunLog, createInitialPlayState, normalizePlayState, resetInactiveEffectResources, resolveIdleTimers, startAction, startTravel } from '../game/timers';
+import { appendChatMessage, appendRunLog, cancelDialogue, chooseDialogueOption, createInitialPlayState, normalizePlayState, resetInactiveEffectResources, resolveIdleTimers, startAction, startTravel } from '../game/timers';
 import { load, remove, save } from '../lib/storage';
 import { recordAgentSessionMessage, type AgentSessionMessage } from '../game/agentSession';
 
@@ -13,6 +13,8 @@ type GameStateStore = {
   cancelTravel: (universeId: string) => void;
   startAction: (universeId: string, action: GameAction, context: ActionResolutionContext) => void;
   stopAction: (universeId: string, context: ActionResolutionContext) => void;
+  chooseDialogueOption: (universeId: string, context: ActionResolutionContext, optionId?: string) => void;
+  cancelDialogue: (universeId: string) => void;
   resolveIdle: (universeId: string, context: ActionResolutionContext, options?: { debugEnabled?: boolean; showReport?: boolean }) => IdleReport;
   setActionLooping: (universeId: string, enabled: boolean) => void;
   markInactive: (universeId: string) => void;
@@ -59,11 +61,11 @@ export const useGameState = create<GameStateStore>((set, get) => ({
       const discoveredLocationIds = current.discoveredLocationIds.includes(locationId)
         ? current.discoveredLocationIds
         : [...current.discoveredLocationIds, locationId];
-      const next = {
+      const next = cancelDialogue({
         ...current,
         currentLocationId: locationId,
         discoveredLocationIds,
-      };
+      });
 
       void save(storageKey(universeId), next);
 
@@ -84,7 +86,7 @@ export const useGameState = create<GameStateStore>((set, get) => ({
         return state;
       }
 
-      const next = startTravel(current, edge, destinationLocationId);
+      const next = startTravel(cancelDialogue(current), edge, destinationLocationId);
       void save(storageKey(universeId), next);
 
       return {
@@ -129,7 +131,7 @@ export const useGameState = create<GameStateStore>((set, get) => ({
       }
 
       const now = Date.now();
-      const resolved = resolveIdleTimers(current, context, {}, now).state;
+      const resolved = cancelDialogue(resolveIdleTimers(current, context, {}, now).state, now);
       const next = startAction(resolved, action, context, now);
       void save(storageKey(universeId), next);
 
@@ -139,6 +141,26 @@ export const useGameState = create<GameStateStore>((set, get) => ({
           [universeId]: next,
         },
       };
+    });
+  },
+
+  chooseDialogueOption: (universeId, context, optionId) => {
+    set((state) => {
+      const current = state.states[universeId];
+      if (!current?.activeDialogue) return state;
+      const next = chooseDialogueOption(current, context, optionId);
+      void save(storageKey(universeId), next);
+      return { states: { ...state.states, [universeId]: next } };
+    });
+  },
+
+  cancelDialogue: (universeId) => {
+    set((state) => {
+      const current = state.states[universeId];
+      if (!current?.activeDialogue) return state;
+      const next = cancelDialogue(current);
+      void save(storageKey(universeId), next);
+      return { states: { ...state.states, [universeId]: next } };
     });
   },
 

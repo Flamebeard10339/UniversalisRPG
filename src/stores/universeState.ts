@@ -86,6 +86,7 @@ const normalizeContentBundle = (bundle: ContentBundle): ContentBundle => ({
   effects: bundle.effects ?? [],
   interactionTypes: bundle.interactionTypes ?? [],
   enemies: (bundle.enemies ?? []).map((enemy) => normalizeEnemyDefinition(enemy)),
+  dialogues: bundle.dialogues ?? [],
 });
 
 const loadBaseBundle = async (

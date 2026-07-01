@@ -1,5 +1,6 @@
 [
-  {
-    "id": "emberleaf"
-  }
+  { "id": "emberleaf" },
+  { "id": "log" },
+  { "id": "tutorial-blade" },
+  { "id": "bronze-pickaxe" }
 ]

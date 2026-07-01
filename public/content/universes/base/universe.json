@@ -23,6 +23,7 @@
     "effects.json",
     "interaction-types.json",
     "enemies.json",
+    "dialogues.json",
     "locales/en.json"
   ],
   "compatibility": {

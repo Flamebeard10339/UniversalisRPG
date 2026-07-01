@@ -2,6 +2,8 @@ import type {
   ContentBundle,
   ContributionDraft,
   Condition,
+  ActionResult,
+  DialogueDefinition,
   EnemyDefinition,
   EffectDefinition,
   GameAction,
@@ -57,6 +59,7 @@ const hasNumber = (value: Record<string, unknown>, key: string) =>
   typeof value[key] === 'number' && Number.isFinite(value[key]);
 
 const isKebabCaseId = (id: string) => id === toKebabCase(id);
+const isDottedKebabCaseId = (id: string) => id.split('.').every((part) => part.length > 0 && isKebabCaseId(part));
 
 const error = (path: string, message: string, params?: Record<string, string | number>): ValidationIssue => ({
   severity: 'error',
@@ -176,8 +179,10 @@ const validateActionResultShape = (value: unknown) => {
   if (value.kind === 'resource') return hasString(value, 'resourceId') && hasNumber(value, 'amount');
   if (value.kind === 'skill-xp') return hasString(value, 'skillId') && hasNumber(value, 'amount');
   if (value.kind === 'state-variable') return hasString(value, 'variable') && (typeof value.value === 'boolean' || typeof value.value === 'number' || typeof value.value === 'string');
+  if (value.kind === 'state-variable-delta') return hasString(value, 'variable') && hasNumber(value, 'amount');
   if (value.kind === 'flag') return hasString(value, 'flagId') && typeof value.value === 'boolean';
   if (value.kind === 'relocate') return hasString(value, 'locationId');
+  if (value.kind === 'dialogue') return hasString(value, 'dialogueId');
   return value.kind === 'chat'
     && hasString(value, 'messageKey')
     && (value.delaySeconds === undefined || (typeof value.delaySeconds === 'number' && value.delaySeconds >= 0 && value.delaySeconds <= 2));
@@ -302,6 +307,34 @@ const validateEnemiesShape = (enemies: unknown): enemies is EnemyDefinition[] =>
         Array.isArray(enemy.rewards),
     ));
 
+const validateDialogueOptionShape = (value: unknown) => isRecord(value)
+  && hasString(value, 'id')
+  && hasString(value, 'labelKey')
+  && (value.conditions === undefined || validateConditionShape(value.conditions))
+  && (value.results === undefined || (Array.isArray(value.results) && value.results.every(validateActionResultShape)))
+  && (value.gotoNodeId === undefined || hasString(value, 'gotoNodeId'));
+
+const validateDialoguesShape = (dialogues: unknown): dialogues is DialogueDefinition[] =>
+  dialogues === undefined ||
+  (Array.isArray(dialogues) &&
+    dialogues.every((dialogue) =>
+      isRecord(dialogue) &&
+      hasString(dialogue, 'id') &&
+      hasString(dialogue, 'startNodeId') &&
+      Array.isArray(dialogue.nodes) &&
+      dialogue.nodes.every((node) =>
+        isRecord(node) &&
+        hasString(node, 'id') &&
+        (node.speakerId === undefined || hasString(node, 'speakerId')) &&
+        (node.textKey === undefined || hasString(node, 'textKey')) &&
+        (node.narratorKey === undefined || hasString(node, 'narratorKey')) &&
+        (node.results === undefined || (Array.isArray(node.results) && node.results.every(validateActionResultShape))) &&
+        (node.branches === undefined || (Array.isArray(node.branches) && node.branches.every((branch) => isRecord(branch) && validateConditionShape(branch.conditions) && hasString(branch, 'gotoNodeId')))) &&
+        (node.gotoNodeId === undefined || hasString(node, 'gotoNodeId')) &&
+        (node.options === undefined || (Array.isArray(node.options) && node.options.every(validateDialogueOptionShape))),
+      ),
+    ));
+
 export const validateContentShape = (bundle: Partial<ContentBundle>) => {
   const issues: ValidationIssue[] = [];
 
@@ -368,6 +401,10 @@ export const validateContentShape = (bundle: Partial<ContentBundle>) => {
     issues.push(error('enemies.json', 'validation.enemiesShape'));
   }
 
+  if (!validateDialoguesShape(bundle.dialogues)) {
+    issues.push(error('dialogues.json', 'validation.dialoguesShape'));
+  }
+
   return issues;
 };
 
@@ -398,6 +435,7 @@ export const validateContentReferences = (bundle: ContentBundle) => {
     ...findDuplicateIds(bundle.effects ?? [], 'effects'),
     ...findDuplicateIds(bundle.interactionTypes ?? [], 'interactionTypes'),
     ...findDuplicateIds(bundle.enemies ?? [], 'enemies'),
+    ...findDuplicateIds(bundle.dialogues ?? [], 'dialogues'),
   ];
 
   const locationIds = new Set(bundle.locations.map((location) => location.id));
@@ -408,6 +446,7 @@ export const validateContentReferences = (bundle: ContentBundle) => {
   const resourceIds = new Set((bundle.resourceDefinitions ?? []).map((resource) => resource.id));
   const interactionTypeIds = new Set((bundle.interactionTypes ?? []).map((interactionType) => interactionType.id));
   const enemyIds = new Set((bundle.enemies ?? []).map((enemy) => enemy.id));
+  const dialogueIds = new Set((bundle.dialogues ?? []).map((dialogue) => dialogue.id));
   const locale = bundle.locales[bundle.manifest.locales[0]] ?? {};
 
   const knownStateVariables = () => new Set([
@@ -517,10 +556,44 @@ export const validateContentReferences = (bundle: ContentBundle) => {
       if (result.kind === 'resource' && !resourceIds.has(result.resourceId)) issues.push(error(path, 'validation.unknownResource', { id: result.resourceId }));
       if (result.kind === 'skill-xp' && !skillIds.has(result.skillId)) issues.push(error(path, 'validation.unknownSkill', { id: result.skillId }));
       if (result.kind === 'state-variable' && !knownStateVariables().has(result.variable)) issues.push(error(path, 'validation.unknownStateVariable', { id: result.variable }));
+      if (result.kind === 'state-variable-delta' && !knownStateVariables().has(result.variable)) issues.push(error(path, 'validation.unknownStateVariable', { id: result.variable }));
       if (result.kind === 'state-variable' && result.variable === 'location' && result.value !== 'starting-location' && !locationIds.has(String(result.value))) issues.push(error(path, 'validation.unknownLocation', { id: String(result.value) }));
       if (result.kind === 'flag' && !flagIds.has(result.flagId)) issues.push(error(path, 'validation.unknownFlag', { id: result.flagId }));
       if (result.kind === 'relocate' && result.locationId !== 'starting-location' && !locationIds.has(result.locationId)) issues.push(error(path, 'validation.unknownLocation', { id: result.locationId }));
+      if (result.kind === 'dialogue' && !dialogueIds.has(result.dialogueId)) issues.push(error(path, 'validation.unknownDialogue', { id: result.dialogueId }));
       if ('amount' in result && result.amount === 0) issues.push(error(path, 'validation.resultAmountNonZero'));
+    }
+  }
+
+  const validateResultReferences = (result: ActionResult, path: string) => {
+    if (result.kind === 'item' && !itemIds.has(result.itemId)) issues.push(error(path, 'validation.unknownItem', { id: result.itemId }));
+    if (result.kind === 'resource' && !resourceIds.has(result.resourceId)) issues.push(error(path, 'validation.unknownResource', { id: result.resourceId }));
+    if (result.kind === 'skill-xp' && !skillIds.has(result.skillId)) issues.push(error(path, 'validation.unknownSkill', { id: result.skillId }));
+    if ((result.kind === 'state-variable' || result.kind === 'state-variable-delta') && !knownStateVariables().has(result.variable)) issues.push(error(path, 'validation.unknownStateVariable', { id: result.variable }));
+    if (result.kind === 'state-variable' && result.variable === 'location' && result.value !== 'starting-location' && !locationIds.has(String(result.value))) issues.push(error(path, 'validation.unknownLocation', { id: String(result.value) }));
+    if (result.kind === 'flag' && !flagIds.has(result.flagId)) issues.push(error(path, 'validation.unknownFlag', { id: result.flagId }));
+    if (result.kind === 'relocate' && result.locationId !== 'starting-location' && !locationIds.has(result.locationId)) issues.push(error(path, 'validation.unknownLocation', { id: result.locationId }));
+    if (result.kind === 'dialogue' && !dialogueIds.has(result.dialogueId)) issues.push(error(path, 'validation.unknownDialogue', { id: result.dialogueId }));
+    if ('amount' in result && result.amount === 0) issues.push(error(path, 'validation.resultAmountNonZero'));
+  };
+
+  for (const dialogue of bundle.dialogues ?? []) {
+    const nodeIds = new Set(dialogue.nodes.map((node) => node.id));
+    if (!isKebabCaseId(dialogue.id)) issues.push(error(`dialogues.${dialogue.id}.id`, 'validation.dialogueIdKebab'));
+    if (!nodeIds.has(dialogue.startNodeId)) issues.push(error(`dialogues.${dialogue.id}.startNodeId`, 'validation.unknownDialogueNode', { id: dialogue.startNodeId }));
+    for (const node of dialogue.nodes) {
+      const nodePath = `dialogues.${dialogue.id}.nodes.${node.id}`;
+      if (node.gotoNodeId && !nodeIds.has(node.gotoNodeId)) issues.push(error(`${nodePath}.gotoNodeId`, 'validation.unknownDialogueNode', { id: node.gotoNodeId }));
+      for (const [index, branch] of (node.branches ?? []).entries()) {
+        validateConditionReferences(branch.conditions, `${nodePath}.branches.${index}.conditions`);
+        if (!nodeIds.has(branch.gotoNodeId)) issues.push(error(`${nodePath}.branches.${index}.gotoNodeId`, 'validation.unknownDialogueNode', { id: branch.gotoNodeId }));
+      }
+      for (const [index, result] of (node.results ?? []).entries()) validateResultReferences(result, `${nodePath}.results.${index}`);
+      for (const [index, option] of (node.options ?? []).entries()) {
+        if (option.conditions) validateConditionReferences(option.conditions, `${nodePath}.options.${index}.conditions`);
+        if (option.gotoNodeId && !nodeIds.has(option.gotoNodeId)) issues.push(error(`${nodePath}.options.${index}.gotoNodeId`, 'validation.unknownDialogueNode', { id: option.gotoNodeId }));
+        for (const [resultIndex, result] of (option.results ?? []).entries()) validateResultReferences(result, `${nodePath}.options.${index}.results.${resultIndex}`);
+      }
     }
   }
 
@@ -654,7 +727,7 @@ export const validateContentReferences = (bundle: ContentBundle) => {
   }
 
   for (const flag of bundle.flags ?? []) {
-    if (!isKebabCaseId(flag.id)) {
+    if (!isDottedKebabCaseId(flag.id)) {
       issues.push(error(`flags.${flag.id}.id`, 'validation.flagIdKebab'));
     }
   }
@@ -700,6 +773,11 @@ export const collectLocalizationKeys = (bundle: ContentBundle) => [
     itemDescriptionKey(item.id),
   ]),
   ...bundle.actions.flatMap((action) => (action.results ?? []).flatMap((result) => result.kind === 'chat' ? [result.messageKey] : [])),
+  ...(bundle.dialogues ?? []).flatMap((dialogue) => dialogue.nodes.flatMap((node) => [
+    node.textKey,
+    node.narratorKey,
+    ...(node.options ?? []).map((option) => option.labelKey),
+  ])),
   ...(bundle.interactionTypes ?? []).flatMap((interactionType) => [
     interactionTitleKey(interactionType.id),
     interactionPlayerHitKey(interactionType.id),
@@ -750,6 +828,7 @@ export const mergeDraftIntoBundle = (bundle: ContentBundle, draft: ContributionD
     effects: mergeById(removeById(bundle.effects ?? [], draft.removed?.effects ?? []), draft.effects ?? []),
     interactionTypes: mergeById(removeById(bundle.interactionTypes ?? [], draft.removed?.interactionTypes ?? []), draft.interactionTypes ?? []),
     enemies: mergeById(removeById(bundle.enemies ?? [], draft.removed?.enemies ?? []), draft.enemies ?? []),
+    dialogues: mergeById(removeById(bundle.dialogues ?? [], draft.removed?.dialogues ?? []), draft.dialogues ?? []),
     locales: mergeLocales(bundle.locales, draft.locales),
   };
 };

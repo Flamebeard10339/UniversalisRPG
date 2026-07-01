@@ -48,6 +48,8 @@ export const resultSchema = (bundle: ContentBundle): StructuredSchema => ({
     resource: { createValue: () => ({ kind: 'resource', resourceId: bundle.resourceDefinitions[0]?.id ?? '', amount: 1 }), schema: { kind: 'object', fields: { kind: { schema: { kind: 'enum', options: ['resource'] } }, resourceId: { schema: string(bundle.resourceDefinitions.map((item) => item.id)) }, amount: { schema: number() } } } },
     'skill-xp': { createValue: () => ({ kind: 'skill-xp', skillId: bundle.skills[0]?.id ?? '', amount: 1 }), schema: { kind: 'object', fields: { kind: { schema: { kind: 'enum', options: ['skill-xp'] } }, skillId: { schema: string(bundle.skills.map((item) => item.id)) }, amount: { schema: number() } } } },
     'state-variable': { label: 'contribution.result.stateVariable', createValue: () => ({ kind: 'state-variable', variable: stateVariables(bundle)[0] ?? 'location', value: false }), schema: { kind: 'object', fields: { kind: { schema: { kind: 'enum', options: ['state-variable'] } }, variable: { schema: string(stateVariables(bundle)) }, value: { schema: { kind: 'scalar', types: ['boolean', 'number', 'string'] } } } } },
+    'state-variable-delta': { label: 'contribution.result.stateVariableDelta', createValue: () => ({ kind: 'state-variable-delta', variable: stateVariables(bundle)[0] ?? 'flag:new-flag', amount: 1 }), schema: { kind: 'object', fields: { kind: { schema: { kind: 'enum', options: ['state-variable-delta'] } }, variable: { schema: string(stateVariables(bundle)) }, amount: { schema: number() } } } },
+    dialogue: { label: 'contribution.result.dialogue', createValue: () => ({ kind: 'dialogue', dialogueId: bundle.dialogues?.[0]?.id ?? '' }), schema: { kind: 'object', fields: { kind: { schema: { kind: 'enum', options: ['dialogue'] } }, dialogueId: { schema: string((bundle.dialogues ?? []).map((item) => item.id)) } } } },
     chat: { createValue: () => ({ kind: 'chat', messageKey: '' }), schema: { kind: 'object', fields: { kind: { schema: { kind: 'enum', options: ['chat'] } }, messageKey: { schema: string() }, delaySeconds: { schema: number(0), optional: true, defaultValue: 0 } } } },
   },
 });
@@ -77,6 +79,36 @@ export const actionSchema = (bundle: ContentBundle): StructuredSchema => ({ kind
   maxCompletions: { label: 'contribution.column.maxCompletions', schema: number(1), optional: true, defaultValue: 1 },
   enemyId: { label: 'contribution.column.enemy', schema: string(bundle.enemies.map((item) => item.id)), optional: true },
   interactionTypeId: { label: 'contribution.column.interaction', schema: string(bundle.interactionTypes.map((item) => item.id)), optional: true },
+} });
+
+export const dialogueOptionSchema = (bundle: ContentBundle): StructuredSchema => ({ kind: 'object', fields: {
+  id: { label: 'contribution.column.id', schema: string() },
+  labelKey: { label: 'contribution.column.labelKey', schema: string() },
+  conditions: { label: 'contribution.column.requirements', schema: conditionSchema(bundle), optional: true, defaultValue: { kind: 'state-variable', variable: stateVariables(bundle)[0] ?? '', comparison: 'equal', value: 0 } },
+  results: { label: 'contribution.column.results', schema: { kind: 'array', listMode: 'free', item: resultSchema(bundle), createItem: () => ({ kind: 'state-variable-delta', variable: stateVariables(bundle)[0] ?? '', amount: 1 }) }, optional: true, defaultValue: [] },
+  gotoNodeId: { label: 'contribution.column.gotoNode', schema: string((bundle.dialogues ?? []).flatMap((dialogue) => dialogue.nodes.map((node) => node.id))), optional: true },
+} });
+
+export const dialogueBranchSchema = (bundle: ContentBundle): StructuredSchema => ({ kind: 'object', fields: {
+  conditions: { label: 'contribution.column.requirements', schema: conditionSchema(bundle) },
+  gotoNodeId: { label: 'contribution.column.gotoNode', schema: string((bundle.dialogues ?? []).flatMap((dialogue) => dialogue.nodes.map((node) => node.id))) },
+} });
+
+export const dialogueNodeSchema = (bundle: ContentBundle): StructuredSchema => ({ kind: 'object', fields: {
+  id: { label: 'contribution.column.id', schema: string() },
+  speakerId: { label: 'contribution.column.speaker', schema: string(), optional: true },
+  textKey: { label: 'contribution.column.textKey', schema: string(), optional: true },
+  narratorKey: { label: 'contribution.column.narratorKey', schema: string(), optional: true },
+  results: { label: 'contribution.column.results', schema: { kind: 'array', listMode: 'free', item: resultSchema(bundle), createItem: () => ({ kind: 'state-variable-delta', variable: stateVariables(bundle)[0] ?? '', amount: 1 }) }, optional: true, defaultValue: [] },
+  branches: { label: 'contribution.column.branches', schema: { kind: 'array', listMode: 'free', item: dialogueBranchSchema(bundle), createItem: () => ({ conditions: { kind: 'state-variable', variable: stateVariables(bundle)[0] ?? '', comparison: 'equal', value: 0 }, gotoNodeId: '' }) }, optional: true, defaultValue: [] },
+  gotoNodeId: { label: 'contribution.column.gotoNode', schema: string((bundle.dialogues ?? []).flatMap((dialogue) => dialogue.nodes.map((node) => node.id))), optional: true },
+  options: { label: 'contribution.column.options', schema: { kind: 'array', listMode: 'free', item: dialogueOptionSchema(bundle), createItem: () => ({ id: 'new-option', labelKey: '', gotoNodeId: '' }) }, optional: true, defaultValue: [] },
+} });
+
+export const dialogueSchema = (bundle: ContentBundle): StructuredSchema => ({ kind: 'object', fields: {
+  id: { label: 'contribution.column.id', schema: string() },
+  startNodeId: { label: 'contribution.column.startNode', schema: string((bundle.dialogues ?? []).flatMap((dialogue) => dialogue.nodes.map((node) => node.id))) },
+  nodes: { label: 'contribution.column.nodes', schema: { kind: 'array', listMode: 'free', item: dialogueNodeSchema(bundle), createItem: () => ({ id: 'new-node', textKey: '' }) } },
 } });
 
 export const boundarySchema = (bundle: ContentBundle): StructuredSchema => ({ kind: 'union', discriminator: 'kind', variants: {

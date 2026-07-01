@@ -1,7 +1,7 @@
 import { useRef, useState, type MutableRefObject } from 'react';
 import { edgeId, toKebabInput } from '../../game/contentIds';
 import type { Translator } from '../../game/i18n';
-import type { BasePlayerDefinition, CombatBalanceDefinition, ContentBundle, ContributionDraft, ContributionRemovedIds, EffectDefinition, EnemyDefinition, GameAction, InteractionTypeDefinition, ItemDefinition, LocationNode, ResourceDefinition, SkillDefinition, StatDefinition, StateFlagDefinition, TravelEdgeDefinition, UniverseUiSettings } from '../../game/types';
+import type { BasePlayerDefinition, CombatBalanceDefinition, ContentBundle, ContributionDraft, ContributionRemovedIds, DialogueDefinition, EffectDefinition, EnemyDefinition, GameAction, InteractionTypeDefinition, ItemDefinition, LocationNode, ResourceDefinition, SkillDefinition, StatDefinition, StateFlagDefinition, TravelEdgeDefinition, UniverseUiSettings } from '../../game/types';
 import { ContributionMapEditor } from './ContributionMapEditor';
 import { EnemyDiagnostics } from './EnemyDiagnostics';
 import { DEBUG_PLAYER_PROFILES, getProfileStatSummary, profileDescription, profileTitle } from '../../game/playerProfiles';
@@ -10,7 +10,7 @@ import { getEnemyStat, normalizeEnemyStats } from '../../game/enemies';
 import { resolveUniverseUiSettings } from '../../game/universeSettings';
 import { EdgeFields, LocationFields } from './MapContentFields';
 import { StructuredDataEditor, type StructuredValue } from '../structuredData/StructuredData';
-import { actionSchema, basePlayerSchema, combatBalanceSchema, edgeSchema, effectDefinitionSchema, enemyStatsSchema, flagDefinitionSchema, interactionTypeDefinitionSchema, itemDefinitionSchema, locationSchema, resourceDefinitionSchema, rewardSchema, skillDefinitionSchema, statDefinitionSchema, universeUiSchema } from '../structuredData/contentSchemas';
+import { actionSchema, basePlayerSchema, combatBalanceSchema, dialogueSchema, edgeSchema, effectDefinitionSchema, enemyStatsSchema, flagDefinitionSchema, interactionTypeDefinitionSchema, itemDefinitionSchema, locationSchema, resourceDefinitionSchema, rewardSchema, skillDefinitionSchema, statDefinitionSchema, universeUiSchema } from '../structuredData/contentSchemas';
 
 type ContentDataEditorProps = {
   activeTab: ContentDataTab;
@@ -64,6 +64,7 @@ const emptyRemoved = (): ContributionRemovedIds => ({
   effects: [],
   interactionTypes: [],
   enemies: [],
+  dialogues: [],
 });
 const matchesFilter = (value: unknown, filter: string) =>
   filter.trim().length === 0 || JSON.stringify(value).toLowerCase().includes(filter.trim().toLowerCase());
@@ -114,6 +115,7 @@ export const ContentDataEditor = ({ activeTab, baseBundle, bundle, draft, onPatc
   const effects = layeredRows(draft.effects, baseBundle.effects ?? [], removed.effects, filter);
   const interactionTypes = layeredRows(draft.interactionTypes, baseBundle.interactionTypes ?? [], removed.interactionTypes, filter);
   const enemies = layeredRows(draft.enemies, baseBundle.enemies ?? [], removed.enemies, filter);
+  const dialogues = layeredRows(draft.dialogues, baseBundle.dialogues ?? [], removed.dialogues, filter);
   const basePlayer = draft.basePlayer ?? bundle.manifest.basePlayer ?? { inventory: {} };
   const combatBalance = resolveCombatBalance(draft.combatBalance ?? bundle.manifest.combatBalance);
   const uiSettings = resolveUniverseUiSettings(draft.ui ?? bundle.manifest.ui);
@@ -360,6 +362,20 @@ export const ContentDataEditor = ({ activeTab, baseBundle, bundle, draft, onPatc
     });
   };
 
+  const addDialogue = () => {
+    const id = uniqueId('new-dialogue', dialogues.map((row) => row.item.id));
+    onPatch({
+      dialogues: [
+        {
+          id,
+          startNodeId: 'start',
+          nodes: [{ id: 'start', textKey: `dialogue.${id}.start` }],
+        },
+        ...draft.dialogues,
+      ],
+    });
+  };
+
   const universeBasePlayer = { inventory: basePlayer.inventory ?? {} };
   const jsonFiles = [
     { path: 'universe.json', json: { ...bundle.manifest, basePlayer: universeBasePlayer, combatBalance, ui: uiSettings }, onChange: (value: StructuredValue | undefined) => {
@@ -373,6 +389,7 @@ export const ContentDataEditor = ({ activeTab, baseBundle, bundle, draft, onPatc
     { path: 'locations.json', json: locations.map((row) => row.item), schema: { kind: 'array' as const, listMode: 'free' as const, item: locationSchema(), createItem: () => ({ id: 'new-location', position: { x: 0, y: 0 } }) }, onChange: (value: StructuredValue | undefined) => onPatch({ locations: (Array.isArray(value) ? value : []) as unknown as LocationNode[] }) },
     { path: 'edges.json', json: edges.map((row) => row.item), schema: { kind: 'array' as const, listMode: 'table' as const, columns: ['id', 'source', 'target', 'travelTimeSeconds'], item: edgeSchema(bundle), createItem: () => ({ id: 'new-edge', source: locations[0]?.item.id ?? '', target: locations[1]?.item.id ?? '', travelTimeSeconds: 1 }) }, onChange: (value: StructuredValue | undefined) => onPatch({ edges: (Array.isArray(value) ? value : []) as unknown as TravelEdgeDefinition[] }) },
     { path: 'actions.json', json: actions.map((row) => row.item), onChange: (value: StructuredValue | undefined) => onPatch({ actions: (Array.isArray(value) ? value : []) as unknown as GameAction[] }) },
+    { path: 'dialogues.json', json: dialogues.map((row) => row.item), schema: { kind: 'array' as const, listMode: 'free' as const, item: dialogueSchema(bundle), createItem: () => ({ id: 'new-dialogue', startNodeId: 'start', nodes: [{ id: 'start', textKey: 'dialogue.new-dialogue.start' }] }) }, onChange: (value: StructuredValue | undefined) => onPatch({ dialogues: (Array.isArray(value) ? value : []) as unknown as DialogueDefinition[] }) },
     { path: 'skills.json', json: skills.map((row) => row.item), schema: { kind: 'array' as const, listMode: 'table' as const, columns: ['id', 'maxLevel', 'statId', 'addedPerLevel', 'increasedPerLevel'], item: skillDefinitionSchema(bundle), createItem: () => ({ id: 'new-skill', maxLevel: 100 }) }, onChange: (value: StructuredValue | undefined) => onPatch({ skills: (Array.isArray(value) ? value : []) as unknown as SkillDefinition[] }) },
     { path: 'stats.json', json: stats.map((row) => row.item), schema: { kind: 'array' as const, listMode: 'table' as const, columns: ['id', 'base'], item: statDefinitionSchema(), createItem: () => ({ id: 'new-stat', base: 0 }) }, onChange: (value: StructuredValue | undefined) => onPatch({ stats: (Array.isArray(value) ? value : []) as unknown as StatDefinition[] }) },
     { path: 'items.json', json: items.map((row) => row.item), schema: { kind: 'array' as const, listMode: 'table' as const, columns: ['id', 'maxQuantity'], item: itemDefinitionSchema(), createItem: () => ({ id: 'new-item' }) }, onChange: (value: StructuredValue | undefined) => onPatch({ items: (Array.isArray(value) ? value : []) as unknown as ItemDefinition[] }) },
@@ -530,6 +547,33 @@ export const ContentDataEditor = ({ activeTab, baseBundle, bundle, draft, onPatc
                   </div>
                 );
               })}
+            </div>
+          )}
+        </section>
+      )}
+
+      {activeTab === 'actions' && (
+        <section className="grid gap-1 rounded border border-slate-700 p-2">
+          <div className="flex items-center justify-between gap-3">
+            <h3 className="text-sm font-semibold text-slate-100">{t('contribution.data.dialogues')}</h3>
+            <button className="rounded bg-cyan-400 px-3 py-2 text-sm font-semibold text-slate-950" onClick={addDialogue} type="button">
+              {t('contribution.data.addDialogue')}
+            </button>
+          </div>
+          {dialogues.length === 0 ? (
+            <p className="px-2 py-1 text-sm text-slate-500">{t('contribution.data.noDialogues')}</p>
+          ) : (
+            <div className="grid gap-1">
+              {dialogues.map((row) => (
+                <div className="flex min-w-0 flex-wrap items-start gap-2 rounded bg-slate-950 p-2" key={`${row.source}-${row.index}`}>
+                  <div className="min-w-0 flex-1">
+                    <StructuredDataEditor onChange={(value) => { if (value) promote('dialogues', value as unknown as DialogueDefinition, row.item.id); }} schema={dialogueSchema(bundle)} t={t} value={row.item as unknown as StructuredValue} />
+                  </div>
+                  <button className={removeButtonClass} onClick={() => removeRow('dialogues', row)} type="button">
+                    {t('contribution.column.remove')}
+                  </button>
+                </div>
+              ))}
             </div>
           )}
         </section>

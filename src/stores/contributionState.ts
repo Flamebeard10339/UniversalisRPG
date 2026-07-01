@@ -32,6 +32,7 @@ const createEmptyDraft = (universeId: string): ContributionDraft => ({
   effects: [],
   interactionTypes: [],
   enemies: [],
+  dialogues: [],
   locales: {},
   removed: {
     locations: [],
@@ -45,6 +46,7 @@ const createEmptyDraft = (universeId: string): ContributionDraft => ({
     effects: [],
     interactionTypes: [],
     enemies: [],
+    dialogues: [],
   },
 });
 
@@ -62,6 +64,7 @@ const normalizeDraft = (draft: ContributionDraft): ContributionDraft => ({
   effects: draft.effects ?? [],
   interactionTypes: draft.interactionTypes ?? [],
   enemies: (draft.enemies ?? []).map((enemy) => normalizeEnemyDefinition(enemy)),
+  dialogues: draft.dialogues ?? [],
   removed: {
     ...createEmptyDraft(draft.universeId).removed,
     ...(draft.removed ?? {}),

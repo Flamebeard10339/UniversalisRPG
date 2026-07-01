@@ -145,6 +145,12 @@
         },
         {
           "type": "object",
+          "required": ["kind", "variable", "amount"],
+          "additionalProperties": false,
+          "properties": { "kind": { "const": "state-variable-delta" }, "variable": { "type": "string", "minLength": 1 }, "amount": { "type": "number", "not": { "const": 0 } } }
+        },
+        {
+          "type": "object",
           "required": ["kind", "flagId", "value"],
           "additionalProperties": false,
           "properties": { "kind": { "const": "flag" }, "flagId": { "type": "string", "minLength": 1 }, "value": { "type": "boolean" } }
@@ -154,6 +160,12 @@
           "required": ["kind", "locationId"],
           "additionalProperties": false,
           "properties": { "kind": { "const": "relocate" }, "locationId": { "type": "string", "minLength": 1 } }
+        },
+        {
+          "type": "object",
+          "required": ["kind", "dialogueId"],
+          "additionalProperties": false,
+          "properties": { "kind": { "const": "dialogue" }, "dialogueId": { "type": "string", "minLength": 1 } }
         },
         {
           "type": "object",

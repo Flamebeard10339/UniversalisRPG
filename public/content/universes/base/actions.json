@@ -6,6 +6,14 @@
     "rewards": [{ "kind": "skillXp", "skillId": "lore", "amount": 2 }]
   },
   {
+    "id": "speak-to-tutorial-guide",
+    "locationId": "crossroads",
+    "role": "utility",
+    "durationSeconds": 0.1,
+    "rewards": [],
+    "results": [{ "kind": "dialogue", "dialogueId": "tutorial-guide" }]
+  },
+  {
     "id": "fight-goblin",
     "locationId": "crossroads",
     "durationSeconds": 1,

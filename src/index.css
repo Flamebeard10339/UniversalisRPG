@@ -79,6 +79,10 @@ textarea {
   animation: continuous-action-progress 1.4s linear infinite;
 }
 
+.dialogue-panel {
+  animation: dialogue-slide-up 160ms ease-out;
+}
+
 @keyframes continuous-action-progress {
   from {
     transform: translateX(-55%);
@@ -86,5 +90,17 @@ textarea {
 
   to {
     transform: translateX(0);
+  }
+}
+
+@keyframes dialogue-slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(1.5rem);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }

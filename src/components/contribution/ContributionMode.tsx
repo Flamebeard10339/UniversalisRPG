@@ -37,6 +37,7 @@ const emptyDraft = (universeId: string): ContributionDraft => ({
   effects: [],
   interactionTypes: [],
   enemies: [],
+  dialogues: [],
   locales: {},
   removed: {
     locations: [],
@@ -50,6 +51,7 @@ const emptyDraft = (universeId: string): ContributionDraft => ({
     effects: [],
     interactionTypes: [],
     enemies: [],
+    dialogues: [],
   },
 });
 

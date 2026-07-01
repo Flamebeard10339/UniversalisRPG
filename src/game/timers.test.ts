@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { ActionResolutionContext, GameAction } from './types';
-import { appendChatMessage, appendRunLog, createInitialPlayState, resolveIdleTimers, startAction } from './timers';
+import { appendChatMessage, appendRunLog, chooseDialogueOption, createInitialPlayState, resolveIdleTimers, startAction } from './timers';
 
 describe('appendChatMessage', () => {
   it('uses monotonic ids for messages emitted at the same timestamp', () => {
@@ -25,6 +25,82 @@ describe('appendRunLog', () => {
     expect(state.runLog[0].sequence).toBe(6);
     expect(state.runLog[499].sequence).toBe(505);
     expect(state.nextRunLogSequence).toBe(506);
+  });
+});
+
+describe('dialogue timers', () => {
+  it('starts dialogue from an action and applies continue, option, branch, and item effects', () => {
+    const action: GameAction = {
+      id: 'speak',
+      locationId: 'room',
+      durationSeconds: 1,
+      rewards: [],
+      results: [{ kind: 'dialogue', dialogueId: 'guide' }],
+    };
+    const context: ActionResolutionContext = {
+      actions: [action],
+      skills: [],
+      stats: [],
+      locations: [{ id: 'room', position: { x: 0, y: 0 }, starting: true }],
+      items: [{ id: 'log' }, { id: 'gift' }],
+      flags: [{ id: 'question-count', initialValue: 0 }],
+      resourceDefinitions: [],
+      effects: [],
+      interactionTypes: [],
+      enemies: [],
+      dialogues: [{
+        id: 'guide',
+        startNodeId: 'start',
+        nodes: [
+          { id: 'start', textKey: 'start', gotoNodeId: 'menu' },
+          {
+            id: 'menu',
+            options: [
+              { id: 'ask', labelKey: 'ask', gotoNodeId: 'asked' },
+              {
+                id: 'give-log',
+                labelKey: 'give',
+                conditions: { kind: 'state-variable', variable: 'item:log', comparison: 'greater-than', value: 0 },
+                results: [{ kind: 'item', itemId: 'log', amount: -1 }],
+                gotoNodeId: 'gift',
+              },
+            ],
+          },
+          {
+            id: 'asked',
+            results: [{ kind: 'state-variable-delta', variable: 'flag:question-count', amount: 1 }],
+            branches: [
+              { conditions: { kind: 'state-variable', variable: 'flag:question-count', comparison: 'equal', value: 1 }, gotoNodeId: 'first-answer' },
+            ],
+          },
+          { id: 'first-answer', textKey: 'answer', gotoNodeId: 'menu' },
+          { id: 'gift', narratorKey: 'gift', results: [{ kind: 'item', itemId: 'gift', amount: 1 }] },
+        ],
+      }],
+    };
+    const startedAt = 1_000;
+    const state = startAction({
+      ...createInitialPlayState('test', 'room'),
+      inventory: { log: 1 },
+      resources: { log: 1 },
+    }, action, context, startedAt);
+
+    const opened = resolveIdleTimers(state, context, {}, startedAt + 1_000).state;
+
+    expect(opened.activeDialogue).toEqual({ dialogueId: 'guide', nodeId: 'start' });
+
+    const menu = chooseDialogueOption(opened, context, undefined, startedAt + 1_001);
+    const answer = chooseDialogueOption(menu, context, 'ask', startedAt + 1_002);
+
+    expect(answer.activeDialogue).toEqual({ dialogueId: 'guide', nodeId: 'first-answer' });
+    expect(answer.flags['question-count']).toBe(1);
+
+    const returnedMenu = chooseDialogueOption(answer, context, undefined, startedAt + 1_003);
+    const gifted = chooseDialogueOption(returnedMenu, context, 'give-log', startedAt + 1_004);
+
+    expect(gifted.activeDialogue).toEqual({ dialogueId: 'guide', nodeId: 'gift' });
+    expect(gifted.inventory.log).toBe(0);
+    expect(gifted.inventory.gift).toBe(1);
   });
 });
 
