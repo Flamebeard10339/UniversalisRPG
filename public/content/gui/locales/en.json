@@ -119,6 +119,7 @@
   "chat.systemGreeting": "You arrive at {location}. The local channel is quiet for now.",
   "chat.actionSuccess": "Action completed: {actionId}.",
   "chat.actionFailure": "Action failed: {actionId}.",
+  "chat.skillLevelUp": "Congratulations! Your {skill-name} level has increased to {new-level}",
   "chat.debug.actionCompleted": "DEBUG action completed actionId={actionId} outcome={outcome} rewardCount={rewardCount} damage={damage} remainingHealth={remainingHealth} playerHealth={playerHealth} now={now}.",
   "chat.debug.actionCompletionFailed": "DEBUG action completion failed actionId={actionId} now={now}.",
   "chat.debug.actionRequirementFailed": "DEBUG action requirements failed actionId={actionId} now={now}.",

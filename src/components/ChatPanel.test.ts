@@ -8,6 +8,8 @@ const t: Translator = (key, fallbackOrParams) => {
 
   if (key === 'kill') return `You killed the ${params.target}.`;
   if (key === 'hit') return `You hit the ${params.target} for ${params.damage} damage.`;
+  if (key === 'chat.skillLevelUp') return `Congratulations! Your ${params['skill-name']} level has increased to ${params['new-level']}`;
+  if (key === 'skill.attack.title') return 'Attack';
   return typeof fallbackOrParams === 'string' ? fallbackOrParams : key;
 };
 
@@ -90,5 +92,13 @@ describe('buildDisplayMessages', () => {
       ['You killed the goblin.', 1],
       ['You killed the goblin.', 3],
     ]);
+  });
+
+  it('renders skill level up messages with localized skill names', () => {
+    const display = buildDisplayMessages([
+      message(1, 'chat.skillLevelUp', { 'skill-name': 'skill.attack.title', 'new-level': 2 }),
+    ], t, true);
+
+    expect(display[0].text).toBe('Congratulations! Your Attack level has increased to 2');
   });
 });

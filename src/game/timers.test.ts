@@ -124,6 +124,35 @@ describe('resolveIdleTimers', () => {
     expect(resolved.state.flags['death-count']).toBe(2);
   });
 
+  it('announces skill level ups from reward experience', () => {
+    const startedAt = 1_000;
+    const action: GameAction = {
+      id: 'train-attack',
+      locationId: 'test-location',
+      durationSeconds: 1,
+      rewards: [{ kind: 'skillXp', skillId: 'attack', amount: 10 }],
+    };
+    const context: ActionResolutionContext = {
+      actions: [action],
+      skills: [{ id: 'attack', maxLevel: 100 }],
+      stats: [],
+      locations: [{ id: 'test-location', position: { x: 0, y: 0 }, starting: true }],
+      interactionTypes: [],
+      enemies: [],
+    };
+    const state = startAction(createInitialPlayState('test-universe', 'test-location'), action, context, startedAt);
+
+    const resolved = resolveIdleTimers(state, context, {}, startedAt + 1_000);
+
+    expect(resolved.state.skillXp.attack).toBe(10);
+    expect(resolved.state.chatMessages).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        key: 'chat.skillLevelUp',
+        params: { 'skill-name': 'skill.attack.title', 'new-level': 2 },
+      }),
+    ]));
+  });
+
   it('completes once when the app is inactive across the action completion boundary', () => {
     const startedAt = 5_000;
     const hiddenAt = startedAt + 8_000;

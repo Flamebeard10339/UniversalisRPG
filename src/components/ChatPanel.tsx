@@ -17,8 +17,17 @@ type DisplayMessage = {
   text: string;
 };
 
-const renderMessageText = (message: ChatMessage, t: Translator) =>
-  message.key ? t(message.key, message.params) : message.text ?? '';
+const renderMessageText = (message: ChatMessage, t: Translator) => {
+  if (!message.key) return message.text ?? '';
+  if (message.key === 'chat.skillLevelUp') {
+    const skillTitleKey = String(message.params?.['skill-name'] ?? '');
+    return t(message.key, {
+      ...(message.params ?? {}),
+      'skill-name': skillTitleKey ? t(skillTitleKey, skillTitleKey) : '',
+    });
+  }
+  return t(message.key, message.params);
+};
 
 const normalizeRenderedText = (text: string) => text.replace(/\s+/g, ' ').trim();
 

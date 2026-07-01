@@ -13,10 +13,12 @@ import {
   interactionPlayerKillKey,
   interactionPlayerMissKey,
   locationExhaustedKey,
+  skillTitleKey,
 } from './contentIds';
 import { areActionRequirementsMet, canStartAction, isActionExhausted, isActionVisible } from './conditions';
 import { readStateVariable, writeStateVariable } from './stateVariables';
 import { resolveManifestUiSettings } from './universeSettings';
+import { skillLevelFromXp } from './skills';
 
 const MAX_CHAT_MESSAGES = 80;
 const MAX_RUN_LOG_ENTRIES = 500;
@@ -265,19 +267,56 @@ const matchesExperienceTrigger = (trigger: ExperienceTrigger, event: GameExperie
 const experienceAmount = (trigger: ExperienceTrigger, event: GameExperienceEvent) =>
   trigger.amount ?? event.amount * (trigger.amountPerUnit ?? 1);
 
+const maxSkillLevel = (context: ActionResolutionContext, skillId: string) =>
+  context.skills.find((skill) => skill.id === skillId)?.maxLevel ?? Number.POSITIVE_INFINITY;
+
+const skillLevel = (context: ActionResolutionContext, skillId: string, xp: number) =>
+  Math.min(maxSkillLevel(context, skillId), skillLevelFromXp(xp));
+
 const grantSkillXp = (
   state: UniversePlayState,
+  context: ActionResolutionContext,
   skillId: string,
   amount: number,
-) => amount > 0
-  ? {
-      ...state,
-      skillXp: {
-        ...state.skillXp,
-        [skillId]: Math.max(0, (state.skillXp[skillId] ?? 0) + amount),
+  now: number,
+) => {
+  if (amount <= 0) {
+    return state;
+  }
+
+  const previousXp = state.skillXp[skillId] ?? 0;
+  const nextXp = Math.max(0, previousXp + amount);
+  const previousLevel = skillLevel(context, skillId, previousXp);
+  const nextLevel = skillLevel(context, skillId, nextXp);
+  let nextState = {
+    ...state,
+    skillXp: {
+      ...state.skillXp,
+      [skillId]: nextXp,
+    },
+  };
+
+  for (let level = previousLevel + 1; level <= nextLevel; level += 1) {
+    nextState = appendChatMessage(nextState, {
+      author: 'system',
+      key: 'chat.skillLevelUp',
+      params: {
+        'skill-name': skillTitleKey(skillId),
+        'new-level': level,
       },
-    }
-  : state;
+    }, now);
+  }
+
+  return nextState;
+};
+
+const applySkillXpResult = (
+  state: UniversePlayState,
+  context: ActionResolutionContext,
+  skillId: string,
+  amount: number,
+  now: number,
+) => grantSkillXp(state, context, skillId, amount, now);
 
 const emitExperienceEvent = (
   state: UniversePlayState,
@@ -294,7 +333,7 @@ const emitExperienceEvent = (
     }
 
     const amount = experienceAmount(trigger, event);
-    nextState = grantSkillXp(nextState, trigger.skillId, amount);
+    nextState = grantSkillXp(nextState, context, trigger.skillId, amount, now);
     nextState = appendRunLog(nextState, 'engine', 'skill.xp-event', {
       actionId: action.id,
       amount,
@@ -972,13 +1011,7 @@ const applyActionResult = (
     return applyResourceDelta(state, context, result.resourceId, result.amount, now);
   }
   if (result.kind === 'skill-xp') {
-    return {
-      ...state,
-      skillXp: {
-        ...state.skillXp,
-        [result.skillId]: Math.max(0, (state.skillXp[result.skillId] ?? 0) + result.amount),
-      },
-    };
+    return applySkillXpResult(state, context, result.skillId, result.amount, now);
   }
   if (result.kind === 'state-variable') {
     return writeStateVariable(state, result.variable, result.value);
