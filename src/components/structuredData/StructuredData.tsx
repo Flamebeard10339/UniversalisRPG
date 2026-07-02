@@ -16,7 +16,7 @@ export type StructuredSchema =
   | { kind: 'boolean' }
   | { kind: 'enum'; options: string[] }
   | { kind: 'scalar'; types?: Array<'boolean' | 'number' | 'string'> }
-  | { kind: 'object'; fields: Record<string, StructuredField>; allowAdditional?: boolean }
+  | { kind: 'object'; fields: Record<string, StructuredField>; allowAdditional?: boolean; additionalField?: StructuredField }
   | { kind: 'array'; item: StructuredSchemaRef; createItem: () => StructuredValue; listMode?: 'free' | 'table' | 'tags'; columns?: string[] }
   | { kind: 'union'; discriminator: string; variants: Record<string, { label?: string; schema: StructuredSchemaRef; createValue: () => StructuredValue }> }
   | { kind: 'inferred' };
@@ -273,7 +273,7 @@ const EditorNode = ({ hiddenKeys = [], label, onChange, optional, schema: schema
       onChange(updated);
     };
     const renderField = (key: string) => {
-      const field = schema.fields[key] ?? { schema: { kind: 'inferred' } as StructuredSchema, optional: true };
+      const field = schema.fields[key] ?? schema.additionalField ?? { schema: { kind: 'inferred' } as StructuredSchema, optional: true };
       const fieldLabel = field.label ?? key;
       const fieldValue = record[key];
 
@@ -314,7 +314,7 @@ const EditorNode = ({ hiddenKeys = [], label, onChange, optional, schema: schema
         {schema.allowAdditional && (
           <div className="flex min-w-[14rem] flex-1 gap-2">
             <input className={inputClass} onChange={(event) => setNewField(event.target.value)} placeholder={t('structured.fieldName')} value={newField} />
-            <button className="rounded border border-slate-600 px-2 py-1 text-xs" disabled={!newField.trim() || newField in record} onClick={() => { onChange({ ...record, [newField.trim()]: '' }); setNewField(''); }} type="button">{t('structured.addField')}</button>
+            <button className="rounded border border-slate-600 px-2 py-1 text-xs" disabled={!newField.trim() || newField in record} onClick={() => { onChange({ ...record, [newField.trim()]: defaultFor(schema.additionalField ?? { schema: { kind: 'inferred' } }) }); setNewField(''); }} type="button">{t('structured.addField')}</button>
           </div>
         )}
       </section>

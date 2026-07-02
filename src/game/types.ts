@@ -356,6 +356,7 @@ export type ModuleDataUpdates = ModuleDataSection & {
     interactionTypes?: string[];
     enemies?: string[];
     dialogues?: string[];
+    dialogueOptions?: Record<string, string[]>;
     displayProfiles?: string[];
     locales?: string[];
   };

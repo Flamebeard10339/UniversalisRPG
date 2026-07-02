@@ -53,6 +53,40 @@ describe('module cleanup', () => {
     expect(result.report.cancelledDialogueId).toBe('removed-dialogue');
   });
 
+  it('cancels an active dialogue when its saved node no longer exists', () => {
+    const state = {
+      ...createInitialPlayState('test', 'start'),
+      activeDialogue: { dialogueId: 'kept-dialogue', nodeId: 'removed-node' },
+    };
+    const nextBundle = {
+      ...bundle(),
+      dialogues: [{ id: 'kept-dialogue', startNodeId: 'start', nodes: [{ id: 'start', textKey: 'dialogue.start' }] }],
+    };
+
+    const result = sanitizePlayStateForBundle(state, nextBundle, 'start');
+
+    expect(result.state.activeDialogue).toBeNull();
+    expect(result.report.cancelledDialogueId).toBeUndefined();
+    expect(result.report.cancelledDialogueNodeId).toBe('kept-dialogue.removed-node');
+  });
+
+  it('removes saved skill state from skill xp and equipment bonuses', () => {
+    const state = {
+      ...createInitialPlayState('test', 'start'),
+      skillXp: { mining: 10, 'removed-skill': 20 },
+      equipmentSkillBonuses: {
+        mining: { added: 1 },
+        'removed-skill': { added: 5 },
+      },
+    };
+
+    const result = sanitizePlayStateForBundle(state, bundle(), 'start');
+
+    expect(result.state.skillXp).toEqual({ mining: 10 });
+    expect(result.state.equipmentSkillBonuses).toEqual({ mining: { added: 1 } });
+    expect(result.report.removedSkillIds).toEqual(['removed-skill']);
+  });
+
   it('relocates the player if the current location is removed', () => {
     const state = {
       ...createInitialPlayState('test', 'removed-location'),

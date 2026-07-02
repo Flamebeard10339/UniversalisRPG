@@ -36,7 +36,9 @@
         },
         {
           "type": "number",
-          "minimum": 0
+          "minimum": 0,
+          "maximum": 65535,
+          "multipleOf": 1
         }
       ]
     },
@@ -48,6 +50,10 @@
       "type": "array",
       "items": { "type": "string", "minLength": 1 },
       "uniqueItems": true
+    },
+    "dialogueOptionRemovals": {
+      "type": "object",
+      "additionalProperties": { "$ref": "#/$defs/idList" }
     },
     "dataSection": {
       "type": "object",
@@ -131,6 +137,7 @@
             "interactionTypes": { "$ref": "#/$defs/idList" },
             "enemies": { "$ref": "#/$defs/idList" },
             "dialogues": { "$ref": "#/$defs/idList" },
+            "dialogueOptions": { "$ref": "#/$defs/dialogueOptionRemovals" },
             "displayProfiles": { "$ref": "#/$defs/idList" },
             "locales": { "$ref": "#/$defs/idList" }
           }

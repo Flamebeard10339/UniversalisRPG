@@ -363,6 +363,7 @@ export default function App() {
         moduleCleanupReport.cancelledActionId ? t('settings.modules.cleanup.cancelledAction', { id: moduleCleanupReport.cancelledActionId }) : null,
         moduleCleanupReport.cancelledTravelEdgeId ? t('settings.modules.cleanup.cancelledTravel', { id: moduleCleanupReport.cancelledTravelEdgeId }) : null,
         moduleCleanupReport.cancelledDialogueId ? t('settings.modules.cleanup.cancelledDialogue', { id: moduleCleanupReport.cancelledDialogueId }) : null,
+        moduleCleanupReport.cancelledDialogueNodeId ? t('settings.modules.cleanup.cancelledDialogueNode', { id: moduleCleanupReport.cancelledDialogueNodeId }) : null,
         moduleCleanupReport.relocatedToLocationId ? t('settings.modules.cleanup.relocated', { id: moduleCleanupReport.relocatedToLocationId }) : null,
       ].filter((item): item is string => Boolean(item))
     : [];
@@ -603,7 +604,7 @@ export default function App() {
     return <main className="grid min-h-screen place-items-center bg-slate-950 text-slate-100">{t('app.loadingUniverse')}</main>;
   }
 
-  if (error || !bundle || !playState || !currentLocation) {
+  if (error || !bundle || !playState) {
     return (
       <main className="grid min-h-screen place-items-center bg-slate-950 p-6 text-slate-100">
         <section className="max-w-xl rounded border border-rose-800 bg-rose-950/30 p-5">
@@ -614,26 +615,28 @@ export default function App() {
     );
   }
 
+  const visibleActiveTab = currentLocation ? activeTab : 'settings';
+
   return (
-    <main className={`min-h-screen bg-slate-950 text-slate-100 ${activeTab === 'home' && visibleHomeTab !== 'workbench' ? 'pb-[calc(33vh+6rem)]' : 'pb-24'}`}>
+    <main className={`min-h-screen bg-slate-950 text-slate-100 ${visibleActiveTab === 'home' && visibleHomeTab !== 'workbench' ? 'pb-[calc(33vh+6rem)]' : 'pb-24'}`}>
       <header className="border-b border-slate-800 bg-slate-900/70 px-4 py-3">
         <div className="mx-auto max-w-7xl">
           <div>
             <h1 className="text-xl font-semibold">
-              {activeTab === 'settings'
+              {visibleActiveTab === 'settings'
                 ? t('app.title')
-                : activeTab === 'home'
+                : visibleActiveTab === 'home' && currentLocation
                   ? t(locationTitleKey(currentLocation.id), currentLocation.id)
-                  : t(`app.tab.${activeTab}`)}
+                  : t(`app.tab.${visibleActiveTab}`)}
             </h1>
-            {activeTab === 'settings' && <p className="text-sm text-slate-400">{t(universeTitleKey(bundle.manifest.id))} - {t(universeDescriptionKey(bundle.manifest.id), '')}</p>}
-            {activeTab === 'home' && <p className="text-sm text-slate-400">{t(locationDescriptionKey(currentLocation.id), '')}</p>}
+            {visibleActiveTab === 'settings' && <p className="text-sm text-slate-400">{t(universeTitleKey(bundle.manifest.id))} - {t(universeDescriptionKey(bundle.manifest.id), '')}</p>}
+            {visibleActiveTab === 'home' && currentLocation && <p className="text-sm text-slate-400">{t(locationDescriptionKey(currentLocation.id), '')}</p>}
           </div>
         </div>
       </header>
 
       <div className="mx-auto max-w-7xl px-4 py-4">
-        {activeTab === 'map' && (
+        {visibleActiveTab === 'map' && (
           <section className="grid h-[calc(100vh-150px)] min-h-[560px] grid-rows-[auto_1fr] gap-4">
             <TravelStatus
               activeTravel={playState.activeTravel}
@@ -657,7 +660,7 @@ export default function App() {
           </section>
         )}
 
-        {activeTab === 'home' && (
+        {visibleActiveTab === 'home' && currentLocation && (
           <section className="grid gap-4">
             <div className="grid gap-4">
               {playState.activeTravel && (
@@ -728,7 +731,7 @@ export default function App() {
           </section>
         )}
 
-        {activeTab === 'character' && (
+        {visibleActiveTab === 'character' && (
           <section className="grid gap-4">
             <div className="grid grid-cols-3 gap-2 rounded border border-slate-800 bg-slate-900 p-2">
               {(['skills', 'inventory', 'stats'] as CharacterTab[]).map((tab) => (
@@ -767,7 +770,7 @@ export default function App() {
           </section>
         )}
 
-        {activeTab === 'settings' && (
+        {visibleActiveTab === 'settings' && (
           <section className="grid gap-4">
             <section className="grid gap-4 rounded border border-slate-800 bg-slate-900 p-4">
               <h2 className="text-lg font-semibold text-slate-100">{t('settings.title')}</h2>
@@ -1101,7 +1104,7 @@ export default function App() {
         )}
       </div>
 
-      {activeTab === 'home' && visibleHomeTab !== 'workbench' && (
+      {visibleActiveTab === 'home' && visibleHomeTab !== 'workbench' && (
         <div className="fixed inset-x-0 bottom-[73px] z-10 h-[33vh] px-4">
           <div className="mx-auto h-full max-w-7xl">
             {playState.activeDialogue ? (
@@ -1240,7 +1243,7 @@ export default function App() {
           {(['map', 'home', 'character', 'settings'] as AppTab[]).map((tab) => (
             <button
               className={`rounded px-3 py-3 text-sm font-semibold capitalize ${
-                activeTab === tab ? 'bg-cyan-300 text-slate-950' : 'bg-slate-900 text-slate-300'
+                visibleActiveTab === tab ? 'bg-cyan-300 text-slate-950' : 'bg-slate-900 text-slate-300'
               }`}
               key={tab}
               onClick={() => setTab(tab)}

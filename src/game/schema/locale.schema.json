@@ -3,5 +3,5 @@
   "$id": "https://universalis-rpg.local/schema/locale.schema.json",
   "type": "object",
   "propertyNames": { "minLength": 1 },
-  "additionalProperties": { "type": "string" }
+  "additionalProperties": { "type": "string", "minLength": 1 }
 }

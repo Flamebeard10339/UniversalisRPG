@@ -130,6 +130,11 @@ export const validateModuleShape = (module: unknown, filename?: string): module 
     (value.dependencies === undefined || (Array.isArray(value.dependencies) && value.dependencies.every((dependency) => typeof dependency === 'string')));
 };
 
+const sectionResources = (section?: ModuleDataSection) => [
+  ...(section?.resourceDefinitions ?? []),
+  ...(section?.resources ?? []),
+];
+
 const emptySectionBundle = (bundle: ContentBundle, section?: ModuleDataSection): Partial<ContentBundle> => ({
   manifest: {
     ...bundle.manifest,
@@ -142,7 +147,7 @@ const emptySectionBundle = (bundle: ContentBundle, section?: ModuleDataSection):
   stats: section?.stats ?? [],
   items: section?.items ?? [],
   flags: section?.flags ?? [],
-  resourceDefinitions: section?.resourceDefinitions ?? section?.resources ?? [],
+  resourceDefinitions: sectionResources(section),
   effects: section?.effects ?? [],
   interactionTypes: section?.interactionTypes ?? [],
   enemies: section?.enemies ?? [],
@@ -159,6 +164,84 @@ const validateModuleDataSection = (bundle: ContentBundle, module: ContentModule,
   const data = section === 'data' ? module.data : module['data-updates'];
   if (!data) return [];
   return validateContentShape(emptySectionBundle(bundle, data)).map((validationIssue) => prefixIssuePath(module.id, section, validationIssue));
+};
+
+const removableModuleDataKeys = new Set([
+  'locations',
+  'edges',
+  'actions',
+  'skills',
+  'stats',
+  'items',
+  'flags',
+  'resources',
+  'effects',
+  'interactionTypes',
+  'enemies',
+  'dialogues',
+  'dialogueOptions',
+  'displayProfiles',
+  'locales',
+]);
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
+const validateModuleDataUpdatesShape = (module: ContentModule): ValidationIssue[] => {
+  const updates = module['data-updates'];
+  if (!updates) return [];
+  const issues: ValidationIssue[] = [];
+
+  if (updates.remove !== undefined) {
+    if (!isRecord(updates.remove)) {
+      issues.push(issue('error', `modules.${module.id}.data-updates.remove`, 'validation.moduleRemoveInvalid'));
+    } else {
+      for (const [key, value] of Object.entries(updates.remove)) {
+        const validValue = key === 'dialogueOptions'
+          ? isRecord(value) && Object.entries(value).every(([path, ids]) => path.trim().length > 0 && Array.isArray(ids) && ids.every((id) => typeof id === 'string' && id.trim().length > 0))
+          : Array.isArray(value) && value.every((id) => typeof id === 'string' && id.trim().length > 0);
+        if (!removableModuleDataKeys.has(key) || !validValue) {
+          issues.push(issue('error', `modules.${module.id}.data-updates.remove.${key}`, 'validation.moduleRemoveInvalid', { id: key }));
+        }
+      }
+    }
+  }
+
+  for (const [locale, dictionary] of Object.entries(updates.locale ?? {})) {
+    issues.push(...validateLocaleDictionary(dictionary).map((validationIssue) => ({
+      ...validationIssue,
+      path: `modules.${module.id}.data-updates.locale.${locale}.${validationIssue.path}`,
+    })));
+  }
+
+  return issues;
+};
+
+const moduleShapeIssueId = (module: unknown, index: number) =>
+  module && typeof module === 'object' && !Array.isArray(module) && typeof (module as Record<string, unknown>).id === 'string'
+    ? String((module as Record<string, unknown>).id)
+    : `module-${index + 1}`;
+
+const partitionValidModuleShapes = (modules: unknown[]) => {
+  const issues: ValidationIssue[] = [];
+  const valid: ContentModule[] = [];
+  const seenIds = new Set<string>();
+
+  modules.forEach((module, index) => {
+    const id = moduleShapeIssueId(module, index);
+    if (!validateModuleShape(module)) {
+      issues.push(issue('error', `modules.${id}`, 'validation.moduleShapeInvalid', { id }));
+      return;
+    }
+    if (seenIds.has(module.id)) {
+      issues.push(issue('error', `modules.${module.id}`, 'validation.moduleDuplicate', { id: module.id }));
+      return;
+    }
+    seenIds.add(module.id);
+    valid.push(module);
+  });
+
+  return { valid, issues };
 };
 
 const localizationKeysFromAction = (action: GameAction) => [
@@ -198,11 +281,11 @@ const localizationKeysFromSection = (section?: ModuleDataSection) => [
     interactionEntityMissKey(interactionType.id),
     interactionEntityKillKey(interactionType.id),
   ]),
-  ...(section?.resourceDefinitions ?? section?.resources ?? []).filter(hasId).flatMap((resource) => [
+  ...sectionResources(section).filter(hasId).flatMap((resource) => [
     resourceTitleKey(resource.id),
-    ...(resource.onEmpty ?? []),
-    ...(resource.onFull ?? []),
-  ].flatMap((behavior) => typeof behavior === 'object' && behavior !== null && behavior.kind === 'chat' ? [behavior.messageKey] : [])),
+    ...(resource.onEmpty ?? []).flatMap((behavior) => typeof behavior === 'object' && behavior !== null && behavior.kind === 'chat' ? [behavior.messageKey] : []),
+    ...(resource.onFull ?? []).flatMap((behavior) => typeof behavior === 'object' && behavior !== null && behavior.kind === 'chat' ? [behavior.messageKey] : []),
+  ]),
   ...(section?.effects ?? []).filter(hasId).map((effect) => effectTitleKey(effect.id)),
   ...localizationKeysFromDialogues(section?.dialogues),
   ...(section?.displayProfiles ?? []).map((profile) => profile.titleKey),
@@ -214,7 +297,12 @@ export const collectModuleLocalizationKeys = (module: ContentModule) =>
     ...localizationKeysFromSection(module['data-updates']),
   ]));
 
-const validateContentModule = (bundle: ContentBundle, module: ContentModule): ValidationIssue[] => [
+const moduleLocaleDictionary = (module: ContentModule, locale: string): LocaleDictionary => ({
+  ...(module.locale?.[locale] ?? {}),
+  ...(module['data-updates']?.locale?.[locale] ?? {}),
+});
+
+const validateContentModule = (bundle: ContentBundle, module: ContentModule, currentLocale = bundle.manifest.locales[0] ?? 'en'): ValidationIssue[] => [
   ...(!isModuleVersion(module.version)
     ? [issue('error', `modules.${module.id}.version`, 'validation.moduleVersionInvalid', { id: module.id })]
     : []),
@@ -223,10 +311,11 @@ const validateContentModule = (bundle: ContentBundle, module: ContentModule): Va
     : []),
   ...validateModuleDataSection(bundle, module, 'data'),
   ...validateModuleDataSection(bundle, module, 'data-updates'),
+  ...validateModuleDataUpdatesShape(module),
   ...collectModuleLocalizationKeys(module).flatMap((key) =>
-    module.locale?.[bundle.manifest.locales[0]]?.[key]
+    moduleLocaleDictionary(module, currentLocale)[key]
       ? []
-      : [issue('warning', `modules.${module.id}.locale.${bundle.manifest.locales[0]}.${key}`, 'validation.missingLocalization')],
+      : [issue('warning', `modules.${module.id}.locale.${currentLocale}.${key}`, 'validation.missingLocalization')],
   ),
   ...Object.entries(module.locale ?? {}).flatMap(([locale, dictionary]) =>
     validateLocaleDictionary(dictionary).map((validationIssue) => ({
@@ -239,16 +328,24 @@ const validateContentModule = (bundle: ContentBundle, module: ContentModule): Va
 const validateModulePacks = (packs: ContentModulePack[], moduleIds: Set<string>, seenPackIds = new Set<string>()): ValidationIssue[] =>
   packs.flatMap((pack) => {
     const issues: ValidationIssue[] = [];
+    if (!pack || typeof pack !== 'object' || Array.isArray(pack) || typeof pack.id !== 'string') {
+      return [issue('warning', 'modulePacks', 'validation.modulePacksInvalid')];
+    }
     if (seenPackIds.has(pack.id)) {
       issues.push(issue('warning', `modulePacks.${pack.id}`, 'validation.modulePackDuplicate', { id: pack.id }));
     }
     seenPackIds.add(pack.id);
-    for (const moduleId of pack.modules ?? []) {
+    const packModules = Array.isArray(pack.modules) ? pack.modules : [];
+    for (const moduleId of packModules) {
+      if (typeof moduleId !== 'string') {
+        issues.push(issue('warning', `modulePacks.${pack.id}.modules`, 'validation.modulePacksInvalid'));
+        continue;
+      }
       if (!moduleIds.has(moduleId)) {
         issues.push(issue('warning', `modulePacks.${pack.id}.modules.${moduleId}`, 'validation.modulePackUnknownModule', { id: moduleId, pack: pack.id }));
       }
     }
-    return [...issues, ...validateModulePacks(pack.packs ?? [], moduleIds, seenPackIds)];
+    return [...issues, ...validateModulePacks(Array.isArray(pack.packs) ? pack.packs : [], moduleIds, seenPackIds)];
   });
 
 const mergeById = <T extends { id: string }>(base: T[], additions: T[] = []) => {
@@ -260,6 +357,30 @@ const mergeById = <T extends { id: string }>(base: T[], additions: T[] = []) => 
 const removeById = <T extends { id: string }>(base: T[], removed: string[] = []) => {
   const removedIds = new Set(removed);
   return base.filter((item) => !removedIds.has(item.id));
+};
+
+const removeDialogueOptions = (dialogues: DialogueDefinition[] = [], removals: Record<string, string[]> = {}) => {
+  const removalsByDialogue = new Map<string, Map<string, Set<string>>>();
+  for (const [path, optionIds] of Object.entries(removals)) {
+    const [dialogueId, ...nodeParts] = path.split('.');
+    const nodeId = nodeParts.join('.');
+    if (!dialogueId || !nodeId) continue;
+    const nodeRemovals = removalsByDialogue.get(dialogueId) ?? new Map<string, Set<string>>();
+    nodeRemovals.set(nodeId, new Set(optionIds));
+    removalsByDialogue.set(dialogueId, nodeRemovals);
+  }
+
+  return dialogues.map((dialogue) => {
+    const nodeRemovals = removalsByDialogue.get(dialogue.id);
+    if (!nodeRemovals) return dialogue;
+    return {
+      ...dialogue,
+      nodes: dialogue.nodes.map((node) => {
+        const optionIds = nodeRemovals.get(node.id);
+        return optionIds ? { ...node, options: (node.options ?? []).filter((option) => !optionIds.has(option.id)) } : node;
+      }),
+    };
+  });
 };
 
 const mergeLocales = (
@@ -293,7 +414,7 @@ const applyDataSection = (bundle: ContentBundle, data?: ModuleDataSection): Cont
     stats: mergeById(bundle.stats, data.stats),
     items: mergeById(bundle.items ?? [], data.items),
     flags: mergeById(bundle.flags ?? [], data.flags),
-    resourceDefinitions: mergeById(bundle.resourceDefinitions ?? [], data.resourceDefinitions ?? data.resources),
+    resourceDefinitions: mergeById(bundle.resourceDefinitions ?? [], sectionResources(data)),
     effects: mergeById(bundle.effects ?? [], data.effects),
     interactionTypes: mergeById(bundle.interactionTypes ?? [], data.interactionTypes),
     enemies: mergeById(bundle.enemies ?? [], data.enemies),
@@ -320,7 +441,7 @@ const applyDataUpdates = (bundle: ContentBundle, updates?: ModuleDataUpdates): C
     effects: removeById(bundle.effects ?? [], removed.effects),
     interactionTypes: removeById(bundle.interactionTypes ?? [], removed.interactionTypes),
     enemies: removeById(bundle.enemies ?? [], removed.enemies),
-    dialogues: removeById(bundle.dialogues ?? [], removed.dialogues),
+    dialogues: removeDialogueOptions(removeById(bundle.dialogues ?? [], removed.dialogues), removed.dialogueOptions),
     locales: mergeLocales(bundle.locales, updates.locale, removed.locales),
   };
   return applyDataSection(withoutRemoved, updates);
@@ -393,14 +514,16 @@ const orderModules = (modules: ContentModule[], enabled: Set<string>) => {
           issues.push(issue('warning', `modules.${module.id}.dependencies`, 'validation.moduleIncompatible', { id: dependency.id }));
         }
       }
-      if (dependency.prefix === '' || dependency.prefix === '+') {
+      if (dependency.prefix === '' || dependency.prefix === '+' || dependency.prefix === '?') {
         const dependencyModule = byId.get(dependency.id);
         if (!dependencyModule || !enabled.has(dependency.id)) {
+          if (dependency.prefix === '?') continue;
           disabled.add(module.id);
           issues.push(issue('warning', `modules.${module.id}.dependencies`, 'validation.moduleMissingDependency', { id: dependency.id }));
           continue;
         }
         if (!dependencyVersionMatches(dependencyModule, dependency)) {
+          if (dependency.prefix === '?') continue;
           disabled.add(module.id);
           issues.push(issue('warning', `modules.${module.id}.dependencies`, 'validation.moduleDependencyVersionMismatch', {
             id: dependency.id,
@@ -435,7 +558,11 @@ const applyOrderedModules = (bundle: ContentBundle, relevantModules: ContentModu
 };
 
 const removedIdsByModule = (module: ContentModule) =>
-  new Set(Object.values(module['data-updates']?.remove ?? {}).flatMap((ids) => ids ?? []));
+  new Set(Object.entries(module['data-updates']?.remove ?? {}).flatMap(([key, value]) =>
+    key === 'dialogueOptions' && isRecord(value)
+      ? Object.values(value).flatMap((ids) => Array.isArray(ids) ? ids : [])
+      : Array.isArray(value) ? value : [],
+  ));
 
 const referencesIdValue = (value: unknown, id: string, key = ''): boolean => {
   if (typeof value === 'string') return key !== 'id' && value === id;
@@ -522,9 +649,11 @@ export const applyModulesToBundle = (
   bundle: ContentBundle,
   modules: ContentModule[],
   enabledModuleIds?: string[],
+  currentLocale = bundle.manifest.locales[0] ?? 'en',
 ): ModuleResolution => {
-  const relevantModules = modules.filter((module) => module.universe === bundle.manifest.id);
-  const moduleValidationIssues = relevantModules.flatMap((module) => validateContentModule(bundle, module));
+  const moduleShapePartition = partitionValidModuleShapes(modules);
+  const relevantModules = moduleShapePartition.valid.filter((module) => module.universe === bundle.manifest.id);
+  const moduleValidationIssues = [...moduleShapePartition.issues, ...relevantModules.flatMap((module) => validateContentModule(bundle, module, currentLocale))];
   const modulePackIssues = validateModulePacks(bundle.modulePacks ?? [], new Set(relevantModules.map((module) => module.id)));
   const invalidModuleIds = new Set(
     moduleValidationIssues
@@ -552,4 +681,7 @@ export const applyModulesToBundle = (
 };
 
 export const flattenModulePackIds = (packs: ContentModulePack[] = []): string[] =>
-  packs.flatMap((pack) => [pack.id, ...(pack.modules ?? []), ...flattenModulePackIds(pack.packs)]);
+  packs.flatMap((pack) => {
+    if (!pack || typeof pack !== 'object' || Array.isArray(pack) || typeof pack.id !== 'string') return [];
+    return [pack.id, ...(Array.isArray(pack.modules) ? pack.modules.filter((id): id is string => typeof id === 'string') : []), ...flattenModulePackIds(Array.isArray(pack.packs) ? pack.packs : [])];
+  });

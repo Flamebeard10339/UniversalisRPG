@@ -64,6 +64,40 @@ const moduleBaseLocales = (bundle: ContentBundle, module: ContentModule, lang1: 
     ]),
   ) as Record<string, LocaleDictionary>;
 
+const mergeById = <T extends { id: string }>(base: T[], ...groups: Array<T[] | undefined>): T[] =>
+  [...new Map([...base, ...groups.flatMap((group) => group ?? [])].map((item) => [item.id, item])).values()];
+
+const bundleForModuleEditing = (bundle: ContentBundle, module: ContentModule, modules: ContentModule[]): ContentBundle => {
+  const data = module.data ?? {};
+  const updates = module['data-updates'] ?? {};
+  const resourceDefinitions = [
+    ...(data.resources ?? []),
+    ...(data.resourceDefinitions ?? []),
+    ...(updates.resources ?? []),
+    ...(updates.resourceDefinitions ?? []),
+  ];
+  return {
+    ...bundle,
+    manifest: {
+      ...bundle.manifest,
+      displayProfiles: mergeById(bundle.manifest.displayProfiles ?? [], data.displayProfiles, updates.displayProfiles),
+    },
+    locations: mergeById(bundle.locations, data.locations, updates.locations),
+    edges: mergeById(bundle.edges, data.edges, updates.edges),
+    actions: mergeById(bundle.actions, data.actions, updates.actions),
+    skills: mergeById(bundle.skills, data.skills, updates.skills),
+    stats: mergeById(bundle.stats, data.stats, updates.stats),
+    items: mergeById(bundle.items, data.items, updates.items),
+    flags: mergeById(bundle.flags, data.flags, updates.flags),
+    resourceDefinitions: mergeById(bundle.resourceDefinitions, resourceDefinitions),
+    effects: mergeById(bundle.effects, data.effects, updates.effects),
+    interactionTypes: mergeById(bundle.interactionTypes, data.interactionTypes, updates.interactionTypes),
+    enemies: mergeById(bundle.enemies, data.enemies, updates.enemies),
+    dialogues: mergeById(bundle.dialogues ?? [], data.dialogues, updates.dialogues),
+    modules: uniqueById([module, ...modules]),
+  };
+};
+
 const ModuleLocalizationEditor = ({
   bundle,
   module,
@@ -232,14 +266,20 @@ export const ModuleEditor = ({ bundle, draft, issues, onPatch, t }: ModuleEditor
       .map(packIdFromIssue)
       .filter((id): id is string => Boolean(id)),
   );
-  const modules = useMemo(() => {
+  const allModules = useMemo(() => {
     const baseModules = (bundle.modules ?? []).filter((module) => !removedModules.has(module.id));
-    const merged = uniqueById([...(draft.modules ?? []), ...baseModules]);
-    return merged
-      .filter((module) => !filter.trim() || JSON.stringify(module).toLowerCase().includes(filter.trim().toLowerCase()))
+    return uniqueById([...(draft.modules ?? []), ...baseModules])
       .sort((a, b) => String(a[sortMode]).localeCompare(String(b[sortMode])) || a.id.localeCompare(b.id));
-  }, [bundle.modules, draft.modules, filter, removedModules, sortMode]);
-  const selectedModule = modules.find((module) => module.id === selectedModuleId) ?? modules[0] ?? null;
+  }, [bundle.modules, draft.modules, removedModules, sortMode]);
+  const modules = useMemo(
+    () => allModules.filter((module) => !filter.trim() || JSON.stringify(module).toLowerCase().includes(filter.trim().toLowerCase())),
+    [allModules, filter],
+  );
+  const selectedModule = allModules.find((module) => module.id === selectedModuleId) ?? modules[0] ?? null;
+  const editorBundle = useMemo(
+    () => selectedModule ? bundleForModuleEditing(bundle, selectedModule, allModules) : { ...bundle, modules: allModules },
+    [allModules, bundle, selectedModule],
+  );
   const selectedModuleIssues = selectedModule
     ? issues.filter((issue) => moduleIdFromIssue(issue) === selectedModule.id)
     : [];
@@ -282,9 +322,9 @@ export const ModuleEditor = ({ bundle, draft, issues, onPatch, t }: ModuleEditor
     });
   };
 
-  const addModule = () => saveModule(createModule(bundle, modules.map((module) => module.id)));
+  const addModule = () => saveModule(createModule(bundle, allModules.map((module) => module.id)));
   const modulePacks = uniquePacksById([...(draft.modulePacks ?? []), ...(bundle.modulePacks ?? [])]);
-  const moduleIds = new Set(modules.map((module) => module.id));
+  const moduleIds = new Set(allModules.map((module) => module.id));
   const packIssues = issues.filter((issue) => packIdFromIssue(issue));
   const packedModuleIds = new Set(modulePacks.flatMap(packModuleIds));
   const unpackedModules = modules.filter((module) => !packedModuleIds.has(module.id));
@@ -320,7 +360,7 @@ export const ModuleEditor = ({ bundle, draft, issues, onPatch, t }: ModuleEditor
           )}
           <StructuredDataEditor
             onChange={(value) => onPatch({ modulePacks: (Array.isArray(value) ? value : []) as unknown as ContentModulePack[] })}
-            schema={{ kind: 'array', listMode: 'free', item: modulePackSchema({ ...bundle, modules }), createItem: () => ({ id: 'new-pack', modules: modules[0] ? [modules[0].id] : [] }) }}
+            schema={{ kind: 'array', listMode: 'free', item: modulePackSchema({ ...bundle, modules: allModules }), createItem: () => ({ id: 'new-pack', modules: allModules[0] ? [allModules[0].id] : [] }) }}
             t={t}
             value={modulePacks as unknown as StructuredValue}
           />
@@ -407,7 +447,7 @@ export const ModuleEditor = ({ bundle, draft, issues, onPatch, t }: ModuleEditor
                 onChange={(value) => {
                   if (value && typeof value === 'object' && !Array.isArray(value)) saveModule(value as unknown as ContentModule, selectedModule.id);
                 }}
-                schema={contentModuleSchema(bundle)}
+                schema={contentModuleSchema(editorBundle)}
                 t={t}
                 value={selectedModule as unknown as StructuredValue}
               />
@@ -429,7 +469,7 @@ export const ModuleEditor = ({ bundle, draft, issues, onPatch, t }: ModuleEditor
                   onChange={(value) => {
                     if (value && typeof value === 'object' && !Array.isArray(value)) saveModule(value as unknown as ContentModule, selectedModule.id);
                   }}
-                  schema={contentModuleSchema(bundle)}
+                  schema={contentModuleSchema(editorBundle)}
                   t={t}
                   value={selectedModule as unknown as StructuredValue}
                 />

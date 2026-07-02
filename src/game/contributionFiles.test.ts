@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { changedModuleJsonFiles, editableModuleJsonFiles, moduleIndexJson } from './contributionFiles';
+import { changedContributionJsonFiles, changedModuleJsonFiles, editableModuleJsonFiles, moduleIndexJson } from './contributionFiles';
 import type { ContentBundle, ContributionDraft } from './types';
 
 const bundle = (): ContentBundle => ({
@@ -58,6 +58,21 @@ describe('contribution module files', () => {
       'modules/index.json',
       'modules/base-module.json',
       'modules/draft-module.json',
+    ]);
+  });
+
+  it('packages contribution submissions as module files and module packs only', () => {
+    const contributionDraft = {
+      ...draft(),
+      modulePacks: [{ id: 'starter', modules: ['draft-module'] }],
+      actions: [{ id: 'legacy-action', locationId: 'start', durationSeconds: 1, rewards: [] }],
+      locales: { en: { 'legacy.key': 'Legacy' } },
+    };
+
+    expect(changedContributionJsonFiles(bundle(), contributionDraft).map((file) => file.path)).toEqual([
+      'modules/index.json',
+      'modules/draft-module.json',
+      'module-packs.json',
     ]);
   });
 });

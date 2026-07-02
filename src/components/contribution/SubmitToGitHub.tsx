@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import type { Translator } from '../../game/i18n';
 import type { ContentBundle, ContributionDraft, ValidationIssue } from '../../game/types';
-import { changedModuleJsonFiles } from '../../game/contributionFiles';
+import { changedContributionJsonFiles } from '../../game/contributionFiles';
 import { createPrefilledIssueUrl, formatContributionIssueBody } from '../../lib/githubIssues';
 
 type SubmitToGitHubProps = {
@@ -13,7 +13,6 @@ type SubmitToGitHubProps = {
 };
 
 export const SubmitToGitHub = ({ appVersion, bundle, draft, validationIssues, t }: SubmitToGitHubProps) => {
-  const basePlayerPatch = draft.basePlayer?.inventory ? { basePlayer: { inventory: draft.basePlayer.inventory } } : {};
   const contributionPackage = useMemo(
     () => ({
       appVersion,
@@ -21,35 +20,9 @@ export const SubmitToGitHub = ({ appVersion, bundle, draft, validationIssues, t 
       notes: draft.notes,
       validationIssues,
       t,
-      changedFiles: [
-        { path: 'universe.json', json: { ...basePlayerPatch, ...(draft.combatBalance ? { combatBalance: draft.combatBalance } : {}), ...(draft.displayProfiles ? { displayProfiles: draft.displayProfiles } : {}), ...(draft.ui ? { ui: draft.ui } : {}) } },
-        { path: 'locations.json', json: draft.locations },
-        { path: 'edges.json', json: draft.edges },
-        { path: 'actions.json', json: draft.actions },
-        { path: 'skills.json', json: draft.skills },
-        { path: 'stats.json', json: draft.stats },
-        { path: 'items.json', json: draft.items },
-        { path: 'flags.json', json: draft.flags },
-        { path: 'resources.json', json: draft.resourceDefinitions },
-        { path: 'effects.json', json: draft.effects },
-        { path: 'interaction-types.json', json: draft.interactionTypes },
-        { path: 'enemies.json', json: draft.enemies },
-        { path: 'dialogues.json', json: draft.dialogues },
-        ...changedModuleJsonFiles(bundle, draft),
-        { path: 'module-packs.json', json: draft.modulePacks },
-        { path: 'removed.json', json: draft.removed },
-        { path: 'locales.json', json: draft.locales },
-      ].filter((file) => {
-        if (Array.isArray(file.json)) {
-          return file.json.length > 0;
-        }
-        if (file.path === 'removed.json') {
-          return Object.values(file.json as Record<string, unknown[] | undefined>).some((items) => (items?.length ?? 0) > 0);
-        }
-        return Object.keys(file.json as Record<string, unknown>).length > 0;
-      }),
+      changedFiles: changedContributionJsonFiles(bundle, draft),
     }),
-    [appVersion, basePlayerPatch, bundle, draft, t, validationIssues],
+    [appVersion, bundle, draft, t, validationIssues],
   );
   const issueBody = useMemo(() => formatContributionIssueBody(contributionPackage), [contributionPackage]);
   const issueUrl = useMemo(() => createPrefilledIssueUrl(contributionPackage), [contributionPackage]);

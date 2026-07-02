@@ -31,6 +31,11 @@ export const changedModuleJsonFiles = (bundle: ContentBundle, draft: Contributio
   ];
 };
 
+export const changedContributionJsonFiles = (bundle: ContentBundle, draft: ContributionDraft): ContributionJsonFile[] => [
+  ...changedModuleJsonFiles(bundle, draft),
+  ...((draft.modulePacks ?? []).length > 0 ? [{ path: 'module-packs.json', json: draft.modulePacks }] : []),
+];
+
 export const editableModuleJsonFiles = (bundle: ContentBundle, draft: ContributionDraft): ContributionJsonFile[] => [
   { path: 'modules/index.json', json: moduleIndexJson(bundle, draft) },
   ...mergedContributionModules(bundle, draft).map((module) => ({ path: moduleFilePath(module), json: module })),

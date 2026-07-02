@@ -834,12 +834,17 @@ export const collectLocalizationKeys = (bundle: ContentBundle) => [
   ].flatMap((behavior) => behavior.kind === 'chat' ? [behavior.messageKey] : [])),
 ].filter((key): key is string => Boolean(key));
 
-export const validateLocaleDictionary = (locale: LocaleDictionary) =>
-  Object.entries(locale).flatMap(([key, value]) =>
-    key.trim().length === 0 || value.trim().length === 0
-      ? [error(`locales.${key}`, 'validation.localeEmpty')]
+export const validateLocaleDictionary = (locale: unknown) => {
+  if (!isRecord(locale)) {
+    return [error('locales', 'validation.localeShape')];
+  }
+
+  return Object.entries(locale).flatMap(([key, value]) =>
+    typeof value !== 'string' || key.trim().length === 0 || value.trim().length === 0
+      ? [error(`locales.${key}`, typeof value === 'string' ? 'validation.localeEmpty' : 'validation.localeShape')]
       : [],
   );
+};
 
 export const mergeDraftIntoBundle = (bundle: ContentBundle, draft: ContributionDraft | null): ContentBundle => {
   if (!draft || draft.universeId !== bundle.manifest.id) {

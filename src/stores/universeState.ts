@@ -67,7 +67,7 @@ const resolveLocale = (bundle: ContentBundle, preference: LocalePreference) => {
   return bundle.manifest.locales.includes(systemLocale) ? systemLocale : bundle.manifest.locales[0] ?? 'en';
 };
 
-const applyModulesAndDraft = (bundle: ContentBundle | null, enabledModules: Record<string, string[]>) => {
+const applyModulesAndDraft = (bundle: ContentBundle | null, enabledModules: Record<string, string[]>, localePreference: LocalePreference) => {
   if (!bundle) {
     return {
       bundle: null,
@@ -78,7 +78,12 @@ const applyModulesAndDraft = (bundle: ContentBundle | null, enabledModules: Reco
 
   const draft = useContributionState.getState().getDraft(bundle.manifest.id);
   const bundleWithDraftModules = mergeDraftModulesIntoBundle(bundle, draft);
-  const moduleResolution = applyModulesToBundle(bundleWithDraftModules, bundleWithDraftModules.modules ?? [], enabledModules[bundleWithDraftModules.manifest.id]);
+  const moduleResolution = applyModulesToBundle(
+    bundleWithDraftModules,
+    bundleWithDraftModules.modules ?? [],
+    enabledModules[bundleWithDraftModules.manifest.id],
+    resolveLocale(bundleWithDraftModules, localePreference),
+  );
   const merged = mergeDraftIntoBundle(moduleResolution.bundle, draft);
 
   return {
@@ -155,7 +160,8 @@ export const useUniverseState = create<UniverseStateStore>((set, get) => ({
       await useContributionState.getState().hydrate(activeUniverseId);
       const baseBundle = await loadBaseBundle(activeUniverseId, bundledManifests, localLibrary);
       const enabledModules = savedEnabledModules ?? {};
-      const preview = applyModulesAndDraft(baseBundle, enabledModules);
+      const localePreference = savedLocalePreference ?? 'system';
+      const preview = applyModulesAndDraft(baseBundle, enabledModules, localePreference);
       const { enabledModuleIds, ...previewState } = preview;
       const resolvedEnabledModules = {
         ...enabledModules,
@@ -169,7 +175,7 @@ export const useUniverseState = create<UniverseStateStore>((set, get) => ({
         activeUniverseId,
         baseBundle,
         enabledModules: resolvedEnabledModules,
-        localePreference: savedLocalePreference ?? 'system',
+        localePreference,
         ...previewState,
         loading: false,
       });
@@ -191,7 +197,7 @@ export const useUniverseState = create<UniverseStateStore>((set, get) => ({
         loadLocalUniverseLibrary(),
       ]);
       const baseBundle = await loadBaseBundle(universeId, bundledManifests, localLibrary);
-      const preview = applyModulesAndDraft(baseBundle, get().enabledModules);
+      const preview = applyModulesAndDraft(baseBundle, get().enabledModules, get().localePreference);
       const { enabledModuleIds, ...previewState } = preview;
       const enabledModules = {
         ...get().enabledModules,
@@ -215,7 +221,9 @@ export const useUniverseState = create<UniverseStateStore>((set, get) => ({
 
   setLocalePreference: async (locale) => {
     await save(localePreferenceKey, locale);
-    set({ localePreference: locale });
+    const preview = applyModulesAndDraft(get().baseBundle, get().enabledModules, locale);
+    const { enabledModuleIds: _enabledModuleIds, ...previewState } = preview;
+    set({ localePreference: locale, ...previewState });
   },
 
   setEnabledModules: async (universeId, moduleIds) => {
@@ -224,7 +232,7 @@ export const useUniverseState = create<UniverseStateStore>((set, get) => ({
       [universeId]: moduleIds,
     };
     const preview = get().baseBundle?.manifest.id === universeId
-      ? applyModulesAndDraft(get().baseBundle, requestedEnabledModules)
+      ? applyModulesAndDraft(get().baseBundle, requestedEnabledModules, get().localePreference)
       : null;
     const enabledModules = preview
       ? {
@@ -284,7 +292,7 @@ export const useUniverseState = create<UniverseStateStore>((set, get) => ({
   },
 
   refreshContributionPreview: () => {
-    const preview = applyModulesAndDraft(get().baseBundle, get().enabledModules);
+    const preview = applyModulesAndDraft(get().baseBundle, get().enabledModules, get().localePreference);
     const { enabledModuleIds, ...previewState } = preview;
     const universeId = get().baseBundle?.manifest.id;
     const enabledModules = universeId

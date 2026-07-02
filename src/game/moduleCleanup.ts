@@ -12,6 +12,7 @@ export type ModuleCleanupReport = {
   cancelledActionId?: string;
   cancelledTravelEdgeId?: string;
   cancelledDialogueId?: string;
+  cancelledDialogueNodeId?: string;
   relocatedToLocationId?: string;
 };
 
@@ -35,7 +36,7 @@ export const hasModuleCleanupChanges = (report: ModuleCleanupReport) =>
   report.removedFlagIds.length > 0 ||
   report.removedActionIds.length > 0 ||
   report.removedLocationIds.length > 0 ||
-  Boolean(report.cancelledActionId || report.cancelledTravelEdgeId || report.cancelledDialogueId || report.relocatedToLocationId);
+  Boolean(report.cancelledActionId || report.cancelledTravelEdgeId || report.cancelledDialogueId || report.cancelledDialogueNodeId || report.relocatedToLocationId);
 
 const filterRecord = <T>(
   record: Record<string, T>,
@@ -66,7 +67,10 @@ export const sanitizePlayStateForBundle = (
 
   report.removedInventoryIds = removedKeys(state.inventory ?? {}, itemIds);
   report.removedEquipmentItemIds = Object.values(state.equipment ?? {}).filter((itemId): itemId is string => Boolean(itemId && !itemIds.has(itemId)));
-  report.removedSkillIds = removedKeys(state.skillXp ?? {}, skillIds);
+  report.removedSkillIds = Array.from(new Set([
+    ...removedKeys(state.skillXp ?? {}, skillIds),
+    ...removedKeys(state.equipmentSkillBonuses ?? {}, skillIds),
+  ]));
   report.removedStatIds = removedKeys(state.statOverrides ?? {}, statIds);
   report.removedResourceIds = Array.from(new Set([
     ...removedKeys(state.resources ?? {}, resourceIds),
@@ -90,8 +94,21 @@ export const sanitizePlayStateForBundle = (
     : null;
   if (state.activeTravel && !activeTravel) report.cancelledTravelEdgeId = state.activeTravel.edgeId;
 
-  const activeDialogue = state.activeDialogue && dialogueIds.has(state.activeDialogue.dialogueId) ? state.activeDialogue : null;
-  if (state.activeDialogue && !activeDialogue) report.cancelledDialogueId = state.activeDialogue.dialogueId;
+  const activeDialogueDefinition = state.activeDialogue
+    ? (bundle.dialogues ?? []).find((dialogue) => dialogue.id === state.activeDialogue?.dialogueId)
+    : null;
+  const activeDialogue = state.activeDialogue &&
+    activeDialogueDefinition &&
+    activeDialogueDefinition.nodes.some((node) => node.id === state.activeDialogue?.nodeId)
+    ? state.activeDialogue
+    : null;
+  if (state.activeDialogue && !activeDialogue) {
+    if (!activeDialogueDefinition) {
+      report.cancelledDialogueId = state.activeDialogue.dialogueId;
+    } else {
+      report.cancelledDialogueNodeId = `${state.activeDialogue.dialogueId}.${state.activeDialogue.nodeId}`;
+    }
+  }
 
   const currentLocationId = locationIds.has(state.currentLocationId) ? state.currentLocationId : validFallbackLocationId;
   if (currentLocationId !== state.currentLocationId) report.relocatedToLocationId = currentLocationId;
@@ -112,6 +129,7 @@ export const sanitizePlayStateForBundle = (
       inventory: filterRecord(state.inventory ?? {}, itemIds),
       equipment: Object.fromEntries(Object.entries(state.equipment ?? {}).filter(([, itemId]) => itemId && itemIds.has(itemId))),
       skillXp: filterRecord(state.skillXp ?? {}, skillIds),
+      equipmentSkillBonuses: filterRecord(state.equipmentSkillBonuses ?? {}, skillIds),
       statOverrides: filterRecord(state.statOverrides ?? {}, statIds),
       resources: filterRecord(state.resources ?? {}, resourceIds),
       resourcePools: filterRecord(state.resourcePools ?? {}, resourceIds),

@@ -43,6 +43,36 @@ describe('content modules', () => {
     expect(validateModuleShape(module({ id: 'foo' }), 'bar.json')).toBe(false);
   });
 
+  it('rejects malformed in-memory modules without throwing', () => {
+    const result = applyModulesToBundle(baseBundle(), [
+      { id: 'bad-shape', universe: 'test', data: { items: [{ id: 'bad-item' }] } },
+      module({ id: 'good', data: { items: [{ id: 'good-item' }] } }),
+    ] as never);
+
+    expect(result.enabledModuleIds).toEqual(['good']);
+    expect(result.bundle.items.map((item) => item.id)).toEqual(['good-item']);
+    expect(result.issues).toContainEqual(expect.objectContaining({
+      message: 'validation.moduleShapeInvalid',
+      path: 'modules.bad-shape',
+      params: { id: 'bad-shape' },
+    }));
+  });
+
+  it('rejects duplicate in-memory module ids before resolution', () => {
+    const result = applyModulesToBundle(baseBundle(), [
+      module({ id: 'dupe', data: { items: [{ id: 'first-item' }] } }),
+      module({ id: 'dupe', data: { items: [{ id: 'second-item' }] } }),
+    ]);
+
+    expect(result.enabledModuleIds).toEqual([]);
+    expect(result.bundle.items).toEqual([]);
+    expect(result.issues).toContainEqual(expect.objectContaining({
+      message: 'validation.moduleDuplicate',
+      path: 'modules.dupe',
+      params: { id: 'dupe' },
+    }));
+  });
+
   it('loads hard dependencies before dependents', () => {
     const result = applyModulesToBundle(baseBundle(), [
       module({ id: 'quest', dependencies: ['core'], data: { actions: [{ id: 'talk', locationId: 'start', durationSeconds: 1, rewards: [] }] } }),
@@ -88,6 +118,33 @@ describe('content modules', () => {
     expect(result.enabledModuleIds).toEqual([]);
     expect(result.bundle.items).toEqual([]);
     expect(result.issues.some((issue) => issue.message === 'validation.moduleMissingDependency' && issue.params?.id === 'helper')).toBe(true);
+  });
+
+  it('loads enabled optional dependencies before dependents without requiring them', () => {
+    const withOptional = applyModulesToBundle(baseBundle(), [
+      module({ id: 'feature', dependencies: ['?helper'], data: { items: [{ id: 'feature-item' }] } }),
+      module({ id: 'helper', data: { items: [{ id: 'helper-item' }] } }),
+    ]);
+    const withoutOptional = applyModulesToBundle(baseBundle(), [
+      module({ id: 'feature', dependencies: ['?helper'], data: { items: [{ id: 'feature-item' }] } }),
+    ]);
+
+    expect(withOptional.enabledModuleIds).toEqual(['helper', 'feature']);
+    expect(withOptional.bundle.items.map((item) => item.id)).toEqual(['helper-item', 'feature-item']);
+    expect(withoutOptional.enabledModuleIds).toEqual(['feature']);
+    expect(withoutOptional.bundle.items.map((item) => item.id)).toEqual(['feature-item']);
+    expect(withoutOptional.issues.some((issue) => issue.message === 'validation.moduleMissingDependency')).toBe(false);
+  });
+
+  it('does not apply optional dependency load order when the optional version does not match', () => {
+    const result = applyModulesToBundle(baseBundle(), [
+      module({ id: 'feature', dependencies: ['?helper >= 2.0.0'], data: { items: [{ id: 'feature-item' }] } }),
+      module({ id: 'helper', version: '1.0.0', data: { items: [{ id: 'helper-item' }] } }),
+    ]);
+
+    expect(result.enabledModuleIds).toEqual(['feature', 'helper']);
+    expect(result.bundle.items.map((item) => item.id)).toEqual(['feature-item', 'helper-item']);
+    expect(result.issues.some((issue) => issue.message === 'validation.moduleDependencyVersionMismatch')).toBe(false);
   });
 
   it('applies incompatibilities only when dependency version constraints match', () => {
@@ -139,6 +196,16 @@ describe('content modules', () => {
     expect(result.issues.some((issue) => issue.message === 'validation.moduleCircularDependency')).toBe(false);
   });
 
+  it('does not load no-load-order dependencies before dependents', () => {
+    const result = applyModulesToBundle(baseBundle(), [
+      module({ id: 'feature', dependencies: ['~helper'], data: { items: [{ id: 'feature-item' }] } }),
+      module({ id: 'helper', data: { items: [{ id: 'helper-item' }] } }),
+    ]);
+
+    expect(result.enabledModuleIds).toEqual(['feature', 'helper']);
+    expect(result.bundle.items.map((item) => item.id)).toEqual(['feature-item', 'helper-item']);
+  });
+
   it('applies data-updates after all data sections', () => {
     const result = applyModulesToBundle(baseBundle(), [
       module({ id: 'core', data: { dialogues: [{ id: 'guide', startNodeId: 'start', nodes: [{ id: 'start', options: [{ id: 'yes', labelKey: 'dialogue.yes' }] }] }] } }),
@@ -146,6 +213,66 @@ describe('content modules', () => {
     ]);
 
     expect(result.bundle.dialogues).toEqual([]);
+  });
+
+  it('removes individual dialogue options during data-updates', () => {
+    const result = applyModulesToBundle(baseBundle(), [
+      module({
+        id: 'core',
+        data: {
+          dialogues: [{
+            id: 'guide',
+            startNodeId: 'start',
+            nodes: [{
+              id: 'start',
+              textKey: 'dialogue.guide.start',
+              options: [
+                { id: 'accept', labelKey: 'dialogue.guide.accept' },
+                { id: 'decline', labelKey: 'dialogue.guide.decline' },
+              ],
+            }],
+          }],
+        },
+      }),
+      module({ id: 'patch', dependencies: ['core'], 'data-updates': { remove: { dialogueOptions: { 'guide.start': ['decline'] } } } }),
+    ]);
+
+    expect(result.bundle.dialogues?.[0]?.nodes[0]?.options?.map((option) => option.id)).toEqual(['accept']);
+    expect(result.issues.some((issue) => issue.severity === 'error')).toBe(false);
+  });
+
+  it('merges resources from both supported module data aliases', () => {
+    const result = applyModulesToBundle(baseBundle(), [
+      module({
+        id: 'resource-pack',
+        data: {
+          stats: [{ id: 'power' }],
+          resourceDefinitions: [{ id: 'stamina', sourceStat: 'power' }],
+          resources: [{ id: 'focus', sourceStat: 'power' }],
+        },
+      }),
+    ]);
+
+    expect(result.enabledModuleIds).toEqual(['resource-pack']);
+    expect(result.bundle.resourceDefinitions.map((resource) => resource.id)).toEqual(['stamina', 'focus']);
+    expect(result.issues.some((issue) => issue.severity === 'error')).toBe(false);
+  });
+
+  it('merges resources from both supported module data-updates aliases', () => {
+    const result = applyModulesToBundle(baseBundle(), [
+      module({
+        id: 'resource-patch',
+        'data-updates': {
+          stats: [{ id: 'power' }],
+          resourceDefinitions: [{ id: 'stamina', sourceStat: 'power' }],
+          resources: [{ id: 'focus', sourceStat: 'power' }],
+        },
+      }),
+    ]);
+
+    expect(result.enabledModuleIds).toEqual(['resource-patch']);
+    expect(result.bundle.resourceDefinitions.map((resource) => resource.id)).toEqual(['stamina', 'focus']);
+    expect(result.issues.some((issue) => issue.severity === 'error')).toBe(false);
   });
 
   it('retries with conflicting modules disabled when an update removes referenced content', () => {
@@ -201,6 +328,46 @@ describe('content modules', () => {
     )).toBe(true);
   });
 
+  it('rejects modules with invalid data-updates removal lists', () => {
+    const result = applyModulesToBundle(baseBundle(), [
+      module({ id: 'bad-remove', 'data-updates': { remove: { items: ['kept', 1] } as never } }),
+    ]);
+
+    expect(result.enabledModuleIds).toEqual([]);
+    expect(result.issues.some((issue) =>
+      issue.severity === 'error' &&
+      issue.path === 'modules.bad-remove.data-updates.remove.items' &&
+      issue.message === 'validation.moduleRemoveInvalid',
+    )).toBe(true);
+    expect(result.issues.some((issue) => issue.message === 'validation.moduleDisabled' && issue.params?.id === 'bad-remove')).toBe(true);
+  });
+
+  it('rejects malformed data-updates dialogue option removals', () => {
+    const result = applyModulesToBundle(baseBundle(), [
+      module({ id: 'bad-remove', 'data-updates': { remove: { dialogueOptions: { 'guide.start': ['accept', 1] } } as never } }),
+    ]);
+
+    expect(result.enabledModuleIds).toEqual([]);
+    expect(result.issues.some((issue) =>
+      issue.severity === 'error' &&
+      issue.path === 'modules.bad-remove.data-updates.remove.dialogueOptions' &&
+      issue.message === 'validation.moduleRemoveInvalid',
+    )).toBe(true);
+  });
+
+  it('rejects modules with invalid data-updates locale dictionaries', () => {
+    const result = applyModulesToBundle(baseBundle(), [
+      module({ id: 'bad-locale', 'data-updates': { locale: { en: { 'item.foo.title': 1 } as never } } }),
+    ]);
+
+    expect(result.enabledModuleIds).toEqual([]);
+    expect(result.issues.some((issue) =>
+      issue.severity === 'error' &&
+      issue.path === 'modules.bad-locale.data-updates.locale.en.locales.item.foo.title' &&
+      issue.message === 'validation.localeShape',
+    )).toBe(true);
+  });
+
   it('rejects modules with invalid version metadata', () => {
     const result = applyModulesToBundle(baseBundle(), [
       module({ id: 'bad-version', version: '1.0.65536', game_version: '1', data: { items: [{ id: 'bad-version-item' }] } }),
@@ -236,6 +403,83 @@ describe('content modules', () => {
       issue.severity === 'warning' &&
       issue.path === 'modules.quest.locale.en.item.quest-token.description' &&
       issue.message === 'validation.missingLocalization',
+    )).toBe(true);
+  });
+
+  it('collects localization keys from both resource aliases', () => {
+    const resourceModule = module({
+      id: 'resource-pack',
+      data: {
+        resourceDefinitions: [{ id: 'stamina', sourceStat: 'power' }],
+        resources: [{ id: 'focus', sourceStat: 'power' }],
+      },
+    });
+
+    expect(collectModuleLocalizationKeys(resourceModule)).toEqual(expect.arrayContaining([
+      'resource.stamina.title',
+      'resource.focus.title',
+    ]));
+  });
+
+  it('warns for missing module localization in the selected locale', () => {
+    const bundle = {
+      ...baseBundle(),
+      manifest: { ...baseBundle().manifest, locales: ['en', 'es'] },
+      locales: { ...baseBundle().locales, es: {} },
+    };
+    const quest = module({
+      id: 'quest',
+      data: { items: [{ id: 'quest-token' }] },
+      locale: { en: { 'item.quest-token.title': 'Quest token', 'item.quest-token.description': 'A token.' } },
+    });
+
+    const result = applyModulesToBundle(bundle, [quest], undefined, 'es');
+
+    expect(result.issues.some((issue) =>
+      issue.severity === 'warning' &&
+      issue.path === 'modules.quest.locale.es.item.quest-token.title' &&
+      issue.message === 'validation.missingLocalization',
+    )).toBe(true);
+    expect(result.issues.some((issue) => issue.path === 'modules.quest.locale.en.item.quest-token.title')).toBe(false);
+  });
+
+  it('counts data-updates locale entries toward selected-locale module coverage', () => {
+    const bundle = {
+      ...baseBundle(),
+      manifest: { ...baseBundle().manifest, locales: ['en', 'es'] },
+      locales: { ...baseBundle().locales, es: {} },
+    };
+    const quest = module({
+      id: 'quest',
+      data: { items: [{ id: 'quest-token' }] },
+      'data-updates': {
+        locale: {
+          es: {
+            'item.quest-token.title': 'Ficha',
+            'item.quest-token.description': 'Una ficha.',
+          },
+        },
+      },
+    });
+
+    const result = applyModulesToBundle(bundle, [quest], undefined, 'es');
+
+    expect(result.issues.some((issue) =>
+      issue.path.startsWith('modules.quest.locale.es.item.quest-token') &&
+      issue.message === 'validation.missingLocalization',
+    )).toBe(false);
+  });
+
+  it('rejects modules with invalid module locale dictionaries', () => {
+    const result = applyModulesToBundle(baseBundle(), [
+      module({ id: 'bad-module-locale', locale: { en: { 'item.foo.title': 1 } as never } }),
+    ]);
+
+    expect(result.enabledModuleIds).toEqual([]);
+    expect(result.issues.some((issue) =>
+      issue.severity === 'error' &&
+      issue.path === 'modules.bad-module-locale.locale.en.locales.item.foo.title' &&
+      issue.message === 'validation.localeShape',
     )).toBe(true);
   });
 
@@ -313,6 +557,20 @@ describe('content modules', () => {
       issue.path === 'modulePacks.starter' &&
       issue.params?.id === 'starter',
     )).toBe(true);
+  });
+
+  it('warns instead of throwing when module packs have malformed draft data', () => {
+    const bundle = {
+      ...baseBundle(),
+      modulePacks: [
+        { id: 'starter', modules: ['known', 1] },
+        { modules: ['known'] },
+      ] as never,
+    };
+    const result = applyModulesToBundle(bundle, [module({ id: 'known', data: { items: [{ id: 'known-item' }] } })]);
+
+    expect(result.enabledModuleIds).toEqual(['known']);
+    expect(result.issues.filter((issue) => issue.message === 'validation.modulePacksInvalid')).toHaveLength(2);
   });
 
   it('preserves module load issues from the content bundle', () => {

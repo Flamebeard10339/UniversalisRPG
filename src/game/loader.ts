@@ -27,6 +27,7 @@ const BASE_CONTENT_PATH = '/content/universes';
 const LOCAL_UNIVERSES_KEY = 'universalis:local-universes';
 
 const moduleIdFromFile = (moduleFile: string) => moduleFile.replace(/\.json$/i, '');
+const moduleFilePattern = /^[a-z0-9][a-z0-9.-]*\.json$/;
 
 const moduleLoadIssue = (moduleFile: string, message: string, params?: Record<string, string | number>): ValidationIssue => ({
   severity: 'error',
@@ -34,6 +35,31 @@ const moduleLoadIssue = (moduleFile: string, message: string, params?: Record<st
   message,
   params,
 });
+
+const moduleFileIssue = (path: string, message: string, params?: Record<string, string | number>): ValidationIssue => ({
+  severity: 'error',
+  path,
+  message,
+  params,
+});
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
+const validateModuleIndexShape = (value: unknown): value is string[] =>
+  Array.isArray(value) &&
+  value.every((moduleFile) => typeof moduleFile === 'string' && moduleFilePattern.test(moduleFile));
+
+const validateModulePackShape = (value: unknown): value is ContentModulePack =>
+  isRecord(value) &&
+  typeof value.id === 'string' &&
+  /^[a-z0-9][a-z0-9.-]*$/.test(value.id) &&
+  (value.titleKey === undefined || typeof value.titleKey === 'string') &&
+  (value.modules === undefined || (Array.isArray(value.modules) && value.modules.every((moduleId) => typeof moduleId === 'string'))) &&
+  (value.packs === undefined || (Array.isArray(value.packs) && value.packs.every(validateModulePackShape)));
+
+const validateModulePacksShape = (value: unknown): value is ContentModulePack[] =>
+  Array.isArray(value) && value.every(validateModulePackShape);
 
 const loadJson = async <T>(path: string): Promise<T> => {
   const response = await fetch(path);
@@ -106,7 +132,21 @@ export const loadUniverse = async (universeId: string): Promise<ContentBundle> =
     },
     Promise.resolve({}),
   );
-  const moduleIds = await tryLoadJson<string[]>(`${basePath}/modules/index.json`) ?? [];
+  const moduleIssueSeeds: ValidationIssue[] = [];
+  let moduleIds: string[] = [];
+  try {
+    const moduleIndexJson = await tryLoadJson<unknown>(`${basePath}/modules/index.json`);
+    if (moduleIndexJson !== null) {
+      if (validateModuleIndexShape(moduleIndexJson)) {
+        moduleIds = moduleIndexJson;
+      } else {
+        moduleIssueSeeds.push(moduleFileIssue('modules.index', 'validation.moduleIndexInvalid'));
+      }
+    }
+  } catch {
+    moduleIssueSeeds.push(moduleFileIssue('modules.index', 'validation.moduleIndexInvalid'));
+  }
+
   const { modules, moduleIssues } = await moduleIds.reduce<Promise<{ modules: ContentModule[]; moduleIssues: ValidationIssue[] }>>(async (promise, moduleFile) => {
     const loaded = await promise;
     const modulePath = `${basePath}/modules/${moduleFile}`;
@@ -131,8 +171,21 @@ export const loadUniverse = async (universeId: string): Promise<ContentBundle> =
         ],
       };
     }
-  }, Promise.resolve({ modules: [], moduleIssues: [] }));
-  const modulePacks = await tryLoadJson<ContentModulePack[]>(`${basePath}/module-packs.json`) ?? [];
+  }, Promise.resolve({ modules: [], moduleIssues: moduleIssueSeeds }));
+
+  let modulePacks: ContentModulePack[] = [];
+  try {
+    const modulePacksJson = await tryLoadJson<unknown>(`${basePath}/module-packs.json`);
+    if (modulePacksJson !== null) {
+      if (validateModulePacksShape(modulePacksJson)) {
+        modulePacks = modulePacksJson;
+      } else {
+        moduleIssues.push(moduleFileIssue('modulePacks', 'validation.modulePacksInvalid'));
+      }
+    }
+  } catch {
+    moduleIssues.push(moduleFileIssue('modulePacks', 'validation.modulePacksInvalid'));
+  }
 
   const bundle = {
     manifest,
