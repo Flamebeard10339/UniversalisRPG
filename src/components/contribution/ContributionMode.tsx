@@ -2,22 +2,20 @@ import type { Translator } from '../../game/i18n';
 import type { ContentBundle, ContributionDraft, ValidationIssue } from '../../game/types';
 import { useContributionState } from '../../stores/contributionState';
 import { useUniverseState } from '../../stores/universeState';
-import { ContentDataEditor, type ContentDataTab } from './ContentDataEditor';
 import { LocalUniverseManager } from './LocalUniverseManager';
-import { LocalizationEditor } from './LocalizationEditor';
+import { ModuleEditor } from './ModuleEditor';
 import { SubmitToGitHub } from './SubmitToGitHub';
 
 type ContributionModeProps = {
   activeTab: ContributionTab;
   bundle: ContentBundle;
-  contentDataTab: ContentDataTab;
-  onContentDataTabChange: (tab: ContentDataTab) => void;
   onTabChange: (tab: ContributionTab) => void;
   validationIssues: ValidationIssue[];
   t: Translator;
 };
 
-export type ContributionTab = 'content' | 'localization' | 'submit';
+export type ContributionTab = 'content' | 'submit';
+const contributionTabs: ContributionTab[] = ['content', 'submit'];
 
 const emptyDraft = (universeId: string): ContributionDraft => ({
   universeId,
@@ -27,6 +25,8 @@ const emptyDraft = (universeId: string): ContributionDraft => ({
   combatBalance: undefined,
   displayProfiles: undefined,
   ui: undefined,
+  modules: [],
+  modulePacks: [],
   locations: [],
   edges: [],
   actions: [],
@@ -53,10 +53,11 @@ const emptyDraft = (universeId: string): ContributionDraft => ({
     interactionTypes: [],
     enemies: [],
     dialogues: [],
+    modules: [],
   },
 });
 
-export const ContributionMode = ({ activeTab, bundle, contentDataTab, onContentDataTabChange, onTabChange, validationIssues, t }: ContributionModeProps) => {
+export const ContributionMode = ({ activeTab, bundle, onTabChange, validationIssues, t }: ContributionModeProps) => {
   const draft = useContributionState((state) => state.drafts[bundle.manifest.id] ?? emptyDraft(bundle.manifest.id));
   const updateDraft = useContributionState((state) => state.updateDraft);
   const resetDraft = useContributionState((state) => state.resetDraft);
@@ -87,8 +88,8 @@ export const ContributionMode = ({ activeTab, bundle, contentDataTab, onContentD
         </button>
       </div>
 
-      <div className="grid grid-cols-3 gap-2 rounded border border-slate-800 bg-slate-900 p-2">
-        {(['content', 'localization', 'submit'] as ContributionTab[]).map((tab) => (
+      <div className="grid grid-cols-2 gap-2 rounded border border-slate-800 bg-slate-900 p-2">
+        {contributionTabs.map((tab) => (
           <button
             className={`rounded px-3 py-2 text-sm font-semibold capitalize ${
               activeTab === tab ? 'bg-cyan-300 text-slate-950' : 'bg-slate-950 text-slate-300'
@@ -103,11 +104,9 @@ export const ContributionMode = ({ activeTab, bundle, contentDataTab, onContentD
       </div>
 
       {activeTab === 'content' && (
-        <ContentDataEditor activeTab={contentDataTab} baseBundle={baseBundle ?? bundle} bundle={bundle} draft={draft} onPatch={patchDraft} onTabChange={onContentDataTabChange} t={t} />
-      )}
-
-      {activeTab === 'localization' && (
-        <LocalizationEditor bundle={bundle} draft={draft} onChange={(locales) => patchDraft({ locales })} t={t} />
+        <section className="grid gap-4">
+          <ModuleEditor bundle={baseBundle ?? bundle} draft={draft} issues={validationIssues} onPatch={patchDraft} t={t} />
+        </section>
       )}
 
       {activeTab === 'submit' && (
@@ -133,7 +132,7 @@ export const ContributionMode = ({ activeTab, bundle, contentDataTab, onContentD
             value={draft.notes}
           />
           <LocalUniverseManager bundle={bundle} t={t} />
-          <SubmitToGitHub appVersion="0.1.0" draft={draft} validationIssues={validationIssues} t={t} />
+          <SubmitToGitHub appVersion="0.1.0" bundle={baseBundle ?? bundle} draft={draft} validationIssues={validationIssues} t={t} />
         </>
       )}
     </section>

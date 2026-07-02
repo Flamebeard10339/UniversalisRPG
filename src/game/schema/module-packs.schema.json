@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://universalis-rpg.local/schema/module-packs.schema.json",
+  "type": "array",
+  "items": { "$ref": "#/$defs/pack" },
+  "$defs": {
+    "pack": {
+      "type": "object",
+      "required": ["id"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9.-]*$" },
+        "titleKey": { "type": "string", "minLength": 1 },
+        "modules": {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^[a-z0-9][a-z0-9.-]*$" },
+          "uniqueItems": true
+        },
+        "packs": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/pack" }
+        }
+      }
+    }
+  }
+}

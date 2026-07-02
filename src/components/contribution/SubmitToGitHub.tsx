@@ -1,16 +1,18 @@
 import { useMemo } from 'react';
 import type { Translator } from '../../game/i18n';
-import type { ContributionDraft, ValidationIssue } from '../../game/types';
+import type { ContentBundle, ContributionDraft, ValidationIssue } from '../../game/types';
+import { changedModuleJsonFiles } from '../../game/contributionFiles';
 import { createPrefilledIssueUrl, formatContributionIssueBody } from '../../lib/githubIssues';
 
 type SubmitToGitHubProps = {
   appVersion: string;
+  bundle: ContentBundle;
   draft: ContributionDraft;
   validationIssues: ValidationIssue[];
   t: Translator;
 };
 
-export const SubmitToGitHub = ({ appVersion, draft, validationIssues, t }: SubmitToGitHubProps) => {
+export const SubmitToGitHub = ({ appVersion, bundle, draft, validationIssues, t }: SubmitToGitHubProps) => {
   const basePlayerPatch = draft.basePlayer?.inventory ? { basePlayer: { inventory: draft.basePlayer.inventory } } : {};
   const contributionPackage = useMemo(
     () => ({
@@ -33,6 +35,8 @@ export const SubmitToGitHub = ({ appVersion, draft, validationIssues, t }: Submi
         { path: 'interaction-types.json', json: draft.interactionTypes },
         { path: 'enemies.json', json: draft.enemies },
         { path: 'dialogues.json', json: draft.dialogues },
+        ...changedModuleJsonFiles(bundle, draft),
+        { path: 'module-packs.json', json: draft.modulePacks },
         { path: 'removed.json', json: draft.removed },
         { path: 'locales.json', json: draft.locales },
       ].filter((file) => {
@@ -45,7 +49,7 @@ export const SubmitToGitHub = ({ appVersion, draft, validationIssues, t }: Submi
         return Object.keys(file.json as Record<string, unknown>).length > 0;
       }),
     }),
-    [appVersion, basePlayerPatch, draft, t, validationIssues],
+    [appVersion, basePlayerPatch, bundle, draft, t, validationIssues],
   );
   const issueBody = useMemo(() => formatContributionIssueBody(contributionPackage), [contributionPackage]);
   const issueUrl = useMemo(() => createPrefilledIssueUrl(contributionPackage), [contributionPackage]);

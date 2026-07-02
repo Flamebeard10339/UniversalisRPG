@@ -236,6 +236,57 @@ export const displayProfileSchema = (): StructuredSchema => ({ kind: 'object', f
   colors: { label: 'contribution.data.displayProfileColors', schema: displayPaletteSchema(), optional: true, defaultValue: {} },
 } });
 
+export const moduleDataSectionSchema = (bundle: ContentBundle): StructuredSchema => ({ kind: 'object', fields: {
+  locations: { label: 'contribution.data.locations', schema: { kind: 'array', listMode: 'free', item: locationSchema(), createItem: () => ({ id: 'new-location', position: { x: 0, y: 0 } }) }, optional: true, defaultValue: [] },
+  edges: { label: 'contribution.data.edges', schema: { kind: 'array', listMode: 'table', columns: ['id', 'source', 'target', 'travelTimeSeconds'], item: edgeSchema(bundle), createItem: () => ({ id: 'new-edge', source: bundle.locations[0]?.id ?? '', target: bundle.locations[1]?.id ?? '', travelTimeSeconds: 1 }) }, optional: true, defaultValue: [] },
+  actions: { label: 'contribution.data.actions', schema: { kind: 'array', listMode: 'free', item: actionSchema(bundle), createItem: () => ({ id: 'new-action', locationId: bundle.locations[0]?.id ?? '', durationSeconds: 1, rewards: [] }) }, optional: true, defaultValue: [] },
+  skills: { label: 'contribution.data.skills', schema: { kind: 'array', listMode: 'table', columns: ['id', 'maxLevel', 'statId'], item: skillDefinitionSchema(bundle), createItem: () => ({ id: 'new-skill', maxLevel: 100 }) }, optional: true, defaultValue: [] },
+  stats: { label: 'contribution.data.stats', schema: { kind: 'array', listMode: 'table', columns: ['id', 'base'], item: statDefinitionSchema(), createItem: () => ({ id: 'new-stat', base: 0 }) }, optional: true, defaultValue: [] },
+  items: { label: 'contribution.data.items', schema: { kind: 'array', listMode: 'table', columns: ['id', 'maxQuantity', 'tags'], item: itemDefinitionSchema(), createItem: () => ({ id: 'new-item' }) }, optional: true, defaultValue: [] },
+  flags: { label: 'contribution.data.flags', schema: { kind: 'array', listMode: 'table', columns: ['id', 'initialValue'], item: flagDefinitionSchema(), createItem: () => ({ id: 'new-flag', initialValue: false }) }, optional: true, defaultValue: [] },
+  resourceDefinitions: { label: 'contribution.data.resources', schema: { kind: 'array', listMode: 'free', item: resourceDefinitionSchema(bundle), createItem: () => ({ id: 'new-resource', sourceStat: bundle.stats[0]?.id ?? '' }) }, optional: true, defaultValue: [] },
+  effects: { label: 'contribution.data.effects', schema: { kind: 'array', listMode: 'free', item: effectDefinitionSchema(bundle), createItem: () => ({ id: 'new-effect', resourceId: bundle.resourceDefinitions[0]?.id ?? '', sourceStat: bundle.stats[0]?.id ?? '' }) }, optional: true, defaultValue: [] },
+  interactionTypes: { label: 'contribution.data.interactions', schema: { kind: 'array', listMode: 'table', columns: ['id', 'sourceStatId', 'targetStatId', 'targetPlayerHealth'], item: interactionTypeDefinitionSchema(bundle), createItem: () => ({ id: 'new-interaction', sourceStatId: bundle.stats[0]?.id ?? '', targetStatId: bundle.stats[0]?.id ?? '', targetPlayerHealth: false }) }, optional: true, defaultValue: [] },
+  enemies: { label: 'contribution.data.enemies', schema: { kind: 'array', listMode: 'free', item: { kind: 'inferred' }, createItem: () => ({ id: 'new-enemy', interactionTypeId: bundle.interactionTypes[0]?.id ?? '', rewards: [] }) }, optional: true, defaultValue: [] },
+  dialogues: { label: 'contribution.data.dialogues', schema: { kind: 'array', listMode: 'free', item: dialogueSchema(bundle), createItem: () => ({ id: 'new-dialogue', startNodeId: 'start', nodes: [{ id: 'start', textKey: 'dialogue.new-dialogue.start' }] }) }, optional: true, defaultValue: [] },
+  displayProfiles: { label: 'contribution.data.displayProfiles', schema: { kind: 'array', listMode: 'free', item: displayProfileSchema(), createItem: () => ({ id: 'new-profile', colors: {} }) }, optional: true, defaultValue: [] },
+} });
+
+export const moduleDataUpdatesSchema = (bundle: ContentBundle): StructuredSchema => ({ kind: 'object', fields: {
+  ...((moduleDataSectionSchema(bundle) as Extract<StructuredSchema, { kind: 'object' }>).fields),
+  remove: { label: 'contribution.module.remove', schema: { kind: 'inferred' }, optional: true, defaultValue: {} },
+  locale: { label: 'contribution.module.locale', schema: { kind: 'inferred' }, optional: true, defaultValue: {} },
+} });
+
+export const contentModuleSchema = (bundle: ContentBundle): StructuredSchema => ({ kind: 'object', fields: {
+  id: { label: 'contribution.column.id', schema: string() },
+  version: { label: 'contribution.module.version', schema: string() },
+  universe: { label: 'contribution.module.universe', schema: string([bundle.manifest.id]) },
+  author: { label: 'contribution.module.author', schema: string() },
+  game_version: { label: 'contribution.module.gameVersion', schema: string() },
+  dependencies: { label: 'contribution.module.dependencies', schema: { kind: 'array', listMode: 'tags', item: string((bundle.modules ?? []).map((module) => module.id)), createItem: () => '' }, optional: true, defaultValue: [] },
+  data: { label: 'contribution.module.data', schema: moduleDataSectionSchema(bundle), optional: true, defaultValue: {} },
+  'data-updates': { label: 'contribution.module.dataUpdates', schema: moduleDataUpdatesSchema(bundle), optional: true, defaultValue: {} },
+  locale: { label: 'contribution.module.locale', schema: { kind: 'inferred' }, optional: true, defaultValue: {} },
+} });
+
+export const modulePackSchema = (bundle: ContentBundle): StructuredSchema => ({ kind: 'object', fields: {
+  id: { label: 'contribution.column.id', schema: string() },
+  titleKey: { label: 'contribution.column.titleKey', schema: string(), optional: true },
+  modules: {
+    label: 'contribution.modules.title',
+    schema: { kind: 'array', listMode: 'tags', item: string((bundle.modules ?? []).map((module) => module.id)), createItem: () => bundle.modules?.[0]?.id ?? '' },
+    optional: true,
+    defaultValue: [],
+  },
+  packs: {
+    label: 'contribution.modules.packs',
+    schema: { kind: 'array', listMode: 'free', item: () => modulePackSchema(bundle), createItem: () => ({ id: 'new-pack', modules: [] }) },
+    optional: true,
+    defaultValue: [],
+  },
+} });
+
 export const universeUiSchema = (): StructuredSchema => ({ kind: 'object', fields: {
   floatingTextDurationSeconds: { label: 'contribution.universe.floatingTextDuration', schema: number(0.001), optional: true },
   loopActionsByDefault: { label: 'contribution.universe.loopActionsByDefault', schema: boolean, optional: true },

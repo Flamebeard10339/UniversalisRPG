@@ -24,7 +24,7 @@ import {
   resolveDisplayPalette,
 } from './game/displayProfiles';
 import { getInteractionType, isContinuousAction } from './game/adversarial';
-import type { ContributionDraft, DisplayColorPalette, DisplayProfileDefinition, IdleReport, UniversePlayState } from './game/types';
+import type { ContentModule, ContentModulePack, ContributionDraft, DisplayColorPalette, DisplayProfileDefinition, IdleReport, UniversePlayState } from './game/types';
 import { getNextResourceBoundaryAt } from './game/resources';
 import { aggregateIdleRewards } from './game/rewards';
 import { load, save } from './lib/storage';
@@ -33,7 +33,6 @@ import { useContributionState } from './stores/contributionState';
 import { contributionRuntimeId } from './stores/contributionPlayState';
 import { useGameState } from './stores/gameState';
 import { useUniverseState } from './stores/universeState';
-import type { ContentDataTab } from './components/contribution/ContentDataEditor';
 
 const getStartingLocationId = (bundle: NonNullable<ReturnType<typeof useUniverseState.getState>['bundle']>) =>
   bundle.locations.find((location) => location.starting)?.id ?? bundle.locations[0]?.id ?? '';
@@ -50,7 +49,6 @@ type AppearanceSettings = {
   theme?: 'system' | 'dark' | 'light';
 };
 type ContributionUiSettings = {
-  contentDataTab?: ContentDataTab;
   contributionMode?: boolean;
   contributionTab?: ContributionTab;
   homeTab?: HomeTab;
@@ -59,15 +57,19 @@ const APP_VERSION = '0.1.0';
 const SOURCE_URL = 'https://github.com/Flamebeard10339/UniversalisRPG';
 const appearanceKey = 'universalis:settings:appearance';
 const contributionUiKey = 'universalis:settings:contribution-ui';
-const contentDataTabs: ContentDataTab[] = ['universe', 'map', 'actions', 'primitives', 'enemies', 'resources', 'json'];
-const contributionTabs: ContributionTab[] = ['content', 'localization', 'submit'];
+const contributionTabs: ContributionTab[] = ['content', 'submit'];
 const homeTabs: HomeTab[] = ['actions', 'details', 'workbench'];
 const emptyIdleReport: IdleReport = { kind: 'none' };
 const emptyContributionDraft = (universeId: string): ContributionDraft => ({
-  universeId, updatedAt: Date.now(), notes: '', basePlayer: undefined, combatBalance: undefined, displayProfiles: undefined, ui: undefined, locations: [], edges: [], actions: [], skills: [], stats: [], items: [], flags: [], resourceDefinitions: [], effects: [], interactionTypes: [], enemies: [], dialogues: [], locales: {},
-  removed: { locations: [], edges: [], actions: [], skills: [], stats: [], items: [], flags: [], resources: [], effects: [], interactionTypes: [], enemies: [], dialogues: [] },
+  universeId, updatedAt: Date.now(), notes: '', basePlayer: undefined, combatBalance: undefined, displayProfiles: undefined, ui: undefined, modules: [], modulePacks: [], locations: [], edges: [], actions: [], skills: [], stats: [], items: [], flags: [], resourceDefinitions: [], effects: [], interactionTypes: [], enemies: [], dialogues: [], locales: {},
+  removed: { locations: [], edges: [], actions: [], skills: [], stats: [], items: [], flags: [], resources: [], effects: [], interactionTypes: [], enemies: [], dialogues: [], modules: [] },
 });
 const colorInputClass = 'h-9 w-12 rounded border border-slate-700 bg-slate-900 p-1';
+
+const packModuleIds = (pack: ContentModulePack): string[] => [
+  ...(pack.modules ?? []),
+  ...(pack.packs ?? []).flatMap(packModuleIds),
+];
 
 const encodeSave = (playState: UniversePlayState) =>
   btoa(unescape(encodeURIComponent(JSON.stringify(playState))));
@@ -100,7 +102,6 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<AppTab>('home');
   const [homeTab, setHomeTab] = useState<HomeTab>('actions');
   const [contributionTab, setContributionTab] = useState<ContributionTab>('content');
-  const [contentDataTab, setContentDataTab] = useState<ContentDataTab>('map');
   const [characterTab, setCharacterTab] = useState<CharacterTab>('skills');
   const [fontSizePreference, setFontSizePreference] = useState<FontSizePreference>('normal');
   const [chatCompressionEnabled, setChatCompressionEnabled] = useState(true);
@@ -126,8 +127,12 @@ export default function App() {
     loading,
     error,
     localePreference,
+    enabledModules,
+    moduleCleanupReport,
+    clearModuleCleanupReport,
     initialize,
     setActiveUniverse,
+    setEnabledModules,
     setLocalePreference,
     t,
   } = useUniverseState();
@@ -214,16 +219,15 @@ export default function App() {
       }
       setContributionMode(Boolean(settings.contributionMode));
       if (settings.homeTab && homeTabs.includes(settings.homeTab)) setHomeTab(settings.homeTab);
-      if (settings.contributionTab && contributionTabs.includes(settings.contributionTab)) setContributionTab(settings.contributionTab);
-      if (settings.contentDataTab && contentDataTabs.includes(settings.contentDataTab)) setContentDataTab(settings.contentDataTab);
+      setContributionTab(settings.contributionTab && contributionTabs.includes(settings.contributionTab) ? settings.contributionTab : 'content');
       setContributionUiLoaded(true);
     });
   }, []);
 
   useEffect(() => {
     if (!contributionUiLoaded) return;
-    void save(contributionUiKey, { contributionMode, homeTab, contributionTab, contentDataTab });
-  }, [contentDataTab, contributionMode, contributionTab, contributionUiLoaded, homeTab]);
+    void save(contributionUiKey, { contributionMode, homeTab, contributionTab });
+  }, [contributionMode, contributionTab, contributionUiLoaded, homeTab]);
 
   useEffect(() => {
     if (!showChangelog || changelogText) {
@@ -301,6 +305,67 @@ export default function App() {
   };
   const visibleHomeTab = homeTab === 'workbench' && !contributionMode ? 'actions' : homeTab;
   const currentLocation = bundle?.locations.find((location) => location.id === playState?.currentLocationId);
+  const activeModuleIds = bundle ? new Set(enabledModules[bundle.manifest.id] ?? bundle.modules?.map((module) => module.id) ?? []) : new Set<string>();
+  const moduleById = new Map((bundle?.modules ?? []).map((module) => [module.id, module]));
+  const packedModuleIds = new Set((bundle?.modulePacks ?? []).flatMap(packModuleIds));
+  const unpackedSettingModules = (bundle?.modules ?? []).filter((module) => !packedModuleIds.has(module.id));
+  const toggleModule = (moduleId: string, enabled: boolean) => {
+    if (!bundle) return;
+    const next = new Set(activeModuleIds);
+    if (enabled) next.add(moduleId);
+    else next.delete(moduleId);
+    void setEnabledModules(bundle.manifest.id, [...next]);
+  };
+  const renderModuleToggle = (module: ContentModule, key = module.id) => (
+    <label className="flex items-center justify-between gap-4 rounded bg-slate-900 p-2" key={key}>
+      <span>
+        <span className="block text-sm font-semibold text-slate-100">{module.id}</span>
+        <span className="block text-xs text-slate-400">{module.version} / {module.author}</span>
+      </span>
+      <input
+        checked={activeModuleIds.has(module.id)}
+        className="h-5 w-5"
+        onChange={(event) => toggleModule(module.id, event.target.checked)}
+        type="checkbox"
+      />
+    </label>
+  );
+  const renderModulePack = (pack: ContentModulePack, path = pack.id): JSX.Element | null => {
+    const packModules = (pack.modules ?? [])
+      .map((moduleId) => moduleById.get(moduleId))
+      .filter((module): module is ContentModule => Boolean(module));
+    const childPacks = (pack.packs ?? [])
+      .map((childPack) => renderModulePack(childPack, `${path}/${childPack.id}`))
+      .filter((packElement): packElement is JSX.Element => Boolean(packElement));
+
+    if (packModules.length === 0 && childPacks.length === 0) {
+      return null;
+    }
+
+    return (
+      <section className="grid gap-2 rounded border border-slate-800 bg-slate-900/60 p-2" key={path}>
+        <h4 className="text-xs font-semibold uppercase text-slate-500">{pack.titleKey ? t(pack.titleKey, pack.id) : pack.id}</h4>
+        {packModules.map((module) => renderModuleToggle(module, `${path}/${module.id}`))}
+        {childPacks.length > 0 && <div className="grid gap-2 border-l border-slate-700 pl-2">{childPacks}</div>}
+      </section>
+    );
+  };
+  const moduleCleanupItems = moduleCleanupReport
+    ? [
+        ...moduleCleanupReport.removedInventoryIds.map((id) => t('settings.modules.cleanup.inventory', { id })),
+        ...moduleCleanupReport.removedEquipmentItemIds.map((id) => t('settings.modules.cleanup.equipment', { id })),
+        ...moduleCleanupReport.removedSkillIds.map((id) => t('settings.modules.cleanup.skill', { id })),
+        ...moduleCleanupReport.removedStatIds.map((id) => t('settings.modules.cleanup.stat', { id })),
+        ...moduleCleanupReport.removedResourceIds.map((id) => t('settings.modules.cleanup.resource', { id })),
+        ...moduleCleanupReport.removedFlagIds.map((id) => t('settings.modules.cleanup.flag', { id })),
+        ...moduleCleanupReport.removedActionIds.map((id) => t('settings.modules.cleanup.action', { id })),
+        ...moduleCleanupReport.removedLocationIds.map((id) => t('settings.modules.cleanup.location', { id })),
+        moduleCleanupReport.cancelledActionId ? t('settings.modules.cleanup.cancelledAction', { id: moduleCleanupReport.cancelledActionId }) : null,
+        moduleCleanupReport.cancelledTravelEdgeId ? t('settings.modules.cleanup.cancelledTravel', { id: moduleCleanupReport.cancelledTravelEdgeId }) : null,
+        moduleCleanupReport.cancelledDialogueId ? t('settings.modules.cleanup.cancelledDialogue', { id: moduleCleanupReport.cancelledDialogueId }) : null,
+        moduleCleanupReport.relocatedToLocationId ? t('settings.modules.cleanup.relocated', { id: moduleCleanupReport.relocatedToLocationId }) : null,
+      ].filter((item): item is string => Boolean(item))
+    : [];
   const activeAction = bundle?.actions.find((action) => action.id === playState?.activeAction?.actionId) ?? null;
   const activeInteractionType = activeAction ? getInteractionType(activeAction, actionContext) : null;
   const logPlayerAction = (event: string, data?: Record<string, unknown>) => {
@@ -728,6 +793,44 @@ export default function App() {
                 </label>
               </section>
 
+              {(contributionMode || (bundle.modules && bundle.modules.length > 0)) && (
+                <section className="grid gap-3 rounded border border-slate-800 bg-slate-950 p-3">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <h3 className="text-sm font-semibold text-slate-100">{t('settings.modules.title')}</h3>
+                      <p className="text-xs text-slate-400">{t('settings.modules.description')}</p>
+                    </div>
+                    <button
+                      className="rounded border border-slate-600 px-3 py-2 text-sm font-semibold text-slate-100"
+                      onClick={() => {
+                        dismissDialogue();
+                        setContributionMode(true);
+                        setContributionTab('content');
+                      }}
+                      type="button"
+                    >
+                      {t('settings.modules.edit')}
+                    </button>
+                  </div>
+                  {(bundle.modules ?? []).length === 0 ? (
+                    <p className="rounded bg-slate-900 p-3 text-sm text-slate-400">{t('settings.modules.empty')}</p>
+                  ) : (
+                    <div className="grid gap-2">
+                      {(bundle.modulePacks ?? []).map((pack) => renderModulePack(pack))}
+                      {unpackedSettingModules.length > 0 && (bundle.modulePacks ?? []).length > 0 && (
+                        <section className="grid gap-2 rounded border border-slate-800 bg-slate-900/60 p-2">
+                          <h4 className="text-xs font-semibold uppercase text-slate-500">{t('settings.modules.unpacked')}</h4>
+                          {unpackedSettingModules.map((module) => renderModuleToggle(module))}
+                        </section>
+                      )}
+                      {((bundle.modulePacks ?? []).length === 0 ? (bundle.modules ?? []) : unpackedSettingModules).map((module) => (
+                        (bundle.modulePacks ?? []).length === 0 ? renderModuleToggle(module) : null
+                      ))}
+                    </div>
+                  )}
+                </section>
+              )}
+
               <section className="grid gap-3 rounded border border-slate-800 bg-slate-950 p-3">
                 <h3 className="text-sm font-semibold text-slate-100">{t('settings.appearance.title')}</h3>
                 <label className="flex items-center justify-between gap-4">
@@ -982,7 +1085,7 @@ export default function App() {
                 )}
               </section>
 
-              {contributionMode && <ContributionMode activeTab={contributionTab} bundle={bundle} contentDataTab={contentDataTab} onContentDataTabChange={setContentDataTab} onTabChange={setContributionTab} validationIssues={validationIssues} t={t} />}
+              {contributionMode && <ContributionMode activeTab={contributionTab} bundle={bundle} onTabChange={setContributionTab} validationIssues={validationIssues} t={t} />}
 
               <div className="flex items-center justify-between gap-4 rounded border border-rose-900 bg-rose-950/30 p-3">
                 <span>
@@ -1107,6 +1210,27 @@ export default function App() {
                 {t('dialog.resetConfirm')}
               </button>
             </div>
+          </section>
+        </div>
+      )}
+
+      {moduleCleanupReport && (
+        <div className="fixed inset-0 z-30 grid place-items-center bg-slate-950/80 p-4">
+          <section className="w-full max-w-lg rounded border border-amber-500 bg-slate-900 p-5 shadow-xl">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h2 className="text-lg font-semibold text-amber-300">{t('settings.modules.cleanup.title')}</h2>
+                <p className="mt-1 text-sm text-slate-300">{t('settings.modules.cleanup.description')}</p>
+              </div>
+              <button className="rounded border border-slate-600 px-3 py-1 text-sm text-slate-100" onClick={clearModuleCleanupReport} type="button">
+                {t('dialog.close')}
+              </button>
+            </div>
+            <ul className="mt-4 grid max-h-80 gap-1 overflow-auto rounded bg-slate-950 p-3 text-sm text-slate-300">
+              {moduleCleanupItems.map((item, index) => (
+                <li key={`${item}-${index}`}>{item}</li>
+              ))}
+            </ul>
           </section>
         </div>
       )}

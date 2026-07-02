@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import type { ContentBundle, UniverseManifest, ValidationIssue } from '../game/types';
+import { applyModulesToBundle } from '../game/contentModules';
 import { normalizeEnemyDefinition } from '../game/enemies';
 import { normalizeGameAction } from '../game/actions';
 import {
@@ -9,9 +10,11 @@ import {
   removeLocalUniverseBundle,
   saveLocalUniverseBundle,
 } from '../game/loader';
-import { mergeDraftIntoBundle, validateContentBundle } from '../game/validators';
+import { mergeDraftIntoBundle, mergeDraftModulesIntoBundle, validateContentBundle } from '../game/validators';
 import { load, save } from '../lib/storage';
 import { useContributionState } from './contributionState';
+import { useGameState } from './gameState';
+import type { ModuleCleanupReport } from '../game/moduleCleanup';
 
 export type LocalePreference = 'system' | string;
 
@@ -22,12 +25,16 @@ type UniverseStateStore = {
   baseBundle: ContentBundle | null;
   bundle: ContentBundle | null;
   validationIssues: ValidationIssue[];
+  enabledModules: Record<string, string[]>;
+  moduleCleanupReport: ModuleCleanupReport | null;
   localePreference: LocalePreference;
   loading: boolean;
   error: string | null;
   initialize: () => Promise<void>;
   setActiveUniverse: (universeId: string) => Promise<void>;
   setLocalePreference: (locale: LocalePreference) => Promise<void>;
+  setEnabledModules: (universeId: string, moduleIds: string[]) => Promise<void>;
+  clearModuleCleanupReport: () => void;
   importLocalUniverse: (bundle: ContentBundle) => Promise<void>;
   removeLocalUniverse: (universeId: string) => Promise<void>;
   refreshContributionPreview: () => void;
@@ -35,6 +42,7 @@ type UniverseStateStore = {
 };
 
 const localePreferenceKey = 'universalis:settings:locale';
+const moduleSettingsKey = 'universalis:settings:modules';
 const GUI_LOCALE_PATH = '/content/gui/locales';
 
 const loadGuiLocale = async (locale: string) => {
@@ -59,20 +67,24 @@ const resolveLocale = (bundle: ContentBundle, preference: LocalePreference) => {
   return bundle.manifest.locales.includes(systemLocale) ? systemLocale : bundle.manifest.locales[0] ?? 'en';
 };
 
-const applyDraft = (bundle: ContentBundle | null) => {
+const applyModulesAndDraft = (bundle: ContentBundle | null, enabledModules: Record<string, string[]>) => {
   if (!bundle) {
     return {
       bundle: null,
+      enabledModuleIds: [],
       validationIssues: [],
     };
   }
 
   const draft = useContributionState.getState().getDraft(bundle.manifest.id);
-  const merged = mergeDraftIntoBundle(bundle, draft);
+  const bundleWithDraftModules = mergeDraftModulesIntoBundle(bundle, draft);
+  const moduleResolution = applyModulesToBundle(bundleWithDraftModules, bundleWithDraftModules.modules ?? [], enabledModules[bundleWithDraftModules.manifest.id]);
+  const merged = mergeDraftIntoBundle(moduleResolution.bundle, draft);
 
   return {
     bundle: merged,
-    validationIssues: validateContentBundle(merged),
+    enabledModuleIds: moduleResolution.enabledModuleIds,
+    validationIssues: [...moduleResolution.issues, ...validateContentBundle(merged)],
   };
 };
 
@@ -121,6 +133,8 @@ export const useUniverseState = create<UniverseStateStore>((set, get) => ({
   baseBundle: null,
   bundle: null,
   validationIssues: [],
+  enabledModules: {},
+  moduleCleanupReport: null,
   localePreference: 'system',
   loading: false,
   error: null,
@@ -129,24 +143,34 @@ export const useUniverseState = create<UniverseStateStore>((set, get) => ({
     set({ loading: true, error: null });
 
     try {
-      const [bundledManifests, localLibrary, savedLocalePreference, guiEn] = await Promise.all([
+      const [bundledManifests, localLibrary, savedLocalePreference, savedEnabledModules, guiEn] = await Promise.all([
         listBundledUniverses(),
         loadLocalUniverseLibrary(),
         load<LocalePreference>(localePreferenceKey),
+        load<Record<string, string[]>>(moduleSettingsKey),
         loadGuiLocale('en'),
       ]);
       const manifests = mergeManifests(bundledManifests, localLibrary);
       const activeUniverseId = get().activeUniverseId;
       await useContributionState.getState().hydrate(activeUniverseId);
       const baseBundle = await loadBaseBundle(activeUniverseId, bundledManifests, localLibrary);
-      const preview = applyDraft(baseBundle);
+      const enabledModules = savedEnabledModules ?? {};
+      const preview = applyModulesAndDraft(baseBundle, enabledModules);
+      const { enabledModuleIds, ...previewState } = preview;
+      const resolvedEnabledModules = {
+        ...enabledModules,
+        ...(enabledModules[activeUniverseId] !== undefined || enabledModuleIds.length > 0
+          ? { [activeUniverseId]: enabledModuleIds }
+          : {}),
+      };
       set({
         manifests,
         guiLocales: { en: guiEn },
         activeUniverseId,
         baseBundle,
+        enabledModules: resolvedEnabledModules,
         localePreference: savedLocalePreference ?? 'system',
-        ...preview,
+        ...previewState,
         loading: false,
       });
     } catch (error) {
@@ -167,10 +191,18 @@ export const useUniverseState = create<UniverseStateStore>((set, get) => ({
         loadLocalUniverseLibrary(),
       ]);
       const baseBundle = await loadBaseBundle(universeId, bundledManifests, localLibrary);
-      const preview = applyDraft(baseBundle);
+      const preview = applyModulesAndDraft(baseBundle, get().enabledModules);
+      const { enabledModuleIds, ...previewState } = preview;
+      const enabledModules = {
+        ...get().enabledModules,
+        ...(get().enabledModules[universeId] !== undefined || enabledModuleIds.length > 0
+          ? { [universeId]: enabledModuleIds }
+          : {}),
+      };
       set({
         baseBundle,
-        ...preview,
+        enabledModules,
+        ...previewState,
         loading: false,
       });
     } catch (error) {
@@ -185,6 +217,35 @@ export const useUniverseState = create<UniverseStateStore>((set, get) => ({
     await save(localePreferenceKey, locale);
     set({ localePreference: locale });
   },
+
+  setEnabledModules: async (universeId, moduleIds) => {
+    const requestedEnabledModules = {
+      ...get().enabledModules,
+      [universeId]: moduleIds,
+    };
+    const preview = get().baseBundle?.manifest.id === universeId
+      ? applyModulesAndDraft(get().baseBundle, requestedEnabledModules)
+      : null;
+    const enabledModules = preview
+      ? {
+          ...requestedEnabledModules,
+          [universeId]: preview.enabledModuleIds,
+        }
+      : requestedEnabledModules;
+    await save(moduleSettingsKey, enabledModules);
+    const previewState = preview
+      ? (({ enabledModuleIds: _enabledModuleIds, ...state }) => state)(preview)
+      : null;
+    const nextBundle = preview?.bundle ?? null;
+    const startingLocationId = nextBundle?.locations.find((location) => location.starting)?.id ?? nextBundle?.locations[0]?.id ?? '';
+    const moduleCleanupReport = nextBundle && startingLocationId
+      ? useGameState.getState().sanitizeForBundle(universeId, nextBundle, startingLocationId)
+      : null;
+    set({ enabledModules, ...(previewState ?? {}) });
+    if (moduleCleanupReport) set({ moduleCleanupReport });
+  },
+
+  clearModuleCleanupReport: () => set({ moduleCleanupReport: null }),
 
   importLocalUniverse: async (bundle) => {
     const normalizedBundle = normalizeContentBundle(bundle);
@@ -223,8 +284,18 @@ export const useUniverseState = create<UniverseStateStore>((set, get) => ({
   },
 
   refreshContributionPreview: () => {
-    const preview = applyDraft(get().baseBundle);
-    set(preview);
+    const preview = applyModulesAndDraft(get().baseBundle, get().enabledModules);
+    const { enabledModuleIds, ...previewState } = preview;
+    const universeId = get().baseBundle?.manifest.id;
+    const enabledModules = universeId
+      ? {
+          ...get().enabledModules,
+          ...(get().enabledModules[universeId] !== undefined || enabledModuleIds.length > 0
+            ? { [universeId]: enabledModuleIds }
+            : {}),
+        }
+      : get().enabledModules;
+    set({ enabledModules, ...previewState });
   },
 
   t: (key, fallbackOrParams, params) => {

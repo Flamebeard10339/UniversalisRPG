@@ -1,7 +1,8 @@
 import { useRef, useState, type MutableRefObject } from 'react';
 import { edgeId, toKebabInput } from '../../game/contentIds';
 import type { Translator } from '../../game/i18n';
-import type { BasePlayerDefinition, CombatBalanceDefinition, ContentBundle, ContributionDraft, ContributionRemovedIds, DialogueDefinition, DisplayProfileDefinition, EffectDefinition, EnemyDefinition, GameAction, InteractionTypeDefinition, ItemDefinition, LocationNode, ResourceDefinition, SkillDefinition, StatDefinition, StateFlagDefinition, TravelEdgeDefinition, UniverseUiSettings } from '../../game/types';
+import type { BasePlayerDefinition, CombatBalanceDefinition, ContentBundle, ContentModule, ContentModulePack, ContributionDraft, ContributionRemovedIds, DialogueDefinition, DisplayProfileDefinition, EffectDefinition, EnemyDefinition, GameAction, InteractionTypeDefinition, ItemDefinition, LocationNode, ResourceDefinition, SkillDefinition, StatDefinition, StateFlagDefinition, TravelEdgeDefinition, UniverseUiSettings } from '../../game/types';
+import { editableModuleJsonFiles } from '../../game/contributionFiles';
 import { ContributionMapEditor } from './ContributionMapEditor';
 import { EnemyDiagnostics } from './EnemyDiagnostics';
 import { DEBUG_PLAYER_PROFILES, getProfileStatSummary, profileDescription, profileTitle } from '../../game/playerProfiles';
@@ -9,8 +10,8 @@ import { resolveCombatBalance } from '../../game/combatBalance';
 import { getEnemyStat, normalizeEnemyStats } from '../../game/enemies';
 import { resolveUniverseUiSettings } from '../../game/universeSettings';
 import { EdgeFields, LocationFields } from './MapContentFields';
-import { StructuredDataEditor, type StructuredValue } from '../structuredData/StructuredData';
-import { actionSchema, basePlayerSchema, combatBalanceSchema, dialogueSchema, displayProfileSchema, edgeSchema, effectDefinitionSchema, enemyStatsSchema, flagDefinitionSchema, interactionTypeDefinitionSchema, itemDefinitionSchema, locationSchema, resourceDefinitionSchema, rewardSchema, skillDefinitionSchema, statDefinitionSchema, universeUiSchema } from '../structuredData/contentSchemas';
+import { StructuredDataEditor, type StructuredSchema, type StructuredValue } from '../structuredData/StructuredData';
+import { actionSchema, basePlayerSchema, combatBalanceSchema, contentModuleSchema, dialogueSchema, displayProfileSchema, edgeSchema, effectDefinitionSchema, enemyStatsSchema, flagDefinitionSchema, interactionTypeDefinitionSchema, itemDefinitionSchema, locationSchema, modulePackSchema, resourceDefinitionSchema, rewardSchema, skillDefinitionSchema, statDefinitionSchema, universeUiSchema } from '../structuredData/contentSchemas';
 
 type ContentDataEditorProps = {
   activeTab: ContentDataTab;
@@ -23,6 +24,12 @@ type ContentDataEditorProps = {
 };
 
 export type ContentDataTab = 'universe' | 'map' | 'actions' | 'primitives' | 'enemies' | 'resources' | 'json';
+type JsonEditorFile = {
+  path: string;
+  json: unknown;
+  onChange: (value: StructuredValue | undefined) => void;
+  schema?: StructuredSchema;
+};
 type DraftListKey = Exclude<keyof ContributionRemovedIds, 'resources'>;
 type LayeredRow<T> = {
   index: number;
@@ -65,6 +72,7 @@ const emptyRemoved = (): ContributionRemovedIds => ({
   interactionTypes: [],
   enemies: [],
   dialogues: [],
+  modules: [],
 });
 const matchesFilter = (value: unknown, filter: string) =>
   filter.trim().length === 0 || JSON.stringify(value).toLowerCase().includes(filter.trim().toLowerCase());
@@ -382,7 +390,45 @@ export const ContentDataEditor = ({ activeTab, baseBundle, bundle, draft, onPatc
   };
 
   const universeBasePlayer = { inventory: basePlayer.inventory ?? {} };
-  const jsonFiles = [
+  const moduleJsonFiles: JsonEditorFile[] = editableModuleJsonFiles(baseBundle, draft).map((file) => {
+    if (file.path === 'modules/index.json') {
+      return {
+        ...file,
+        onChange: (value: StructuredValue | undefined) => {
+          const filenames = new Set((Array.isArray(value) ? value : []).filter((item): item is string => typeof item === 'string'));
+          const ids = new Set([...filenames].map((filename) => filename.replace(/\.json$/i, '')));
+          onPatch({
+            modules: draft.modules.filter((module) => ids.has(module.id)),
+            removed: {
+              ...removed,
+              modules: uniqueStrings([
+                ...removed.modules,
+                ...(baseBundle.modules ?? []).filter((module) => !ids.has(module.id)).map((module) => module.id),
+              ]),
+            },
+          });
+        },
+      };
+    }
+
+    const originalId = file.path.match(/^modules\/(.+)\.json$/)?.[1] ?? '';
+    return {
+      ...file,
+      schema: contentModuleSchema(bundle),
+      onChange: (value: StructuredValue | undefined) => {
+        if (!value || typeof value !== 'object' || Array.isArray(value)) return;
+        const nextModule = value as unknown as ContentModule;
+        onPatch({
+          modules: upsertById(withoutId(draft.modules, originalId), nextModule),
+          removed: {
+            ...removed,
+            modules: removed.modules.filter((id) => id !== nextModule.id),
+          },
+        });
+      },
+    };
+  });
+  const jsonFiles: JsonEditorFile[] = [
     { path: 'universe.json', json: { ...bundle.manifest, basePlayer: universeBasePlayer, combatBalance, displayProfiles, ui: uiSettings }, onChange: (value: StructuredValue | undefined) => {
       const next = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
       onPatch({
@@ -396,6 +442,8 @@ export const ContentDataEditor = ({ activeTab, baseBundle, bundle, draft, onPatc
     { path: 'edges.json', json: edges.map((row) => row.item), schema: { kind: 'array' as const, listMode: 'table' as const, columns: ['id', 'source', 'target', 'travelTimeSeconds'], item: edgeSchema(bundle), createItem: () => ({ id: 'new-edge', source: locations[0]?.item.id ?? '', target: locations[1]?.item.id ?? '', travelTimeSeconds: 1 }) }, onChange: (value: StructuredValue | undefined) => onPatch({ edges: (Array.isArray(value) ? value : []) as unknown as TravelEdgeDefinition[] }) },
     { path: 'actions.json', json: actions.map((row) => row.item), onChange: (value: StructuredValue | undefined) => onPatch({ actions: (Array.isArray(value) ? value : []) as unknown as GameAction[] }) },
     { path: 'dialogues.json', json: dialogues.map((row) => row.item), schema: { kind: 'array' as const, listMode: 'free' as const, item: dialogueSchema(bundle), createItem: () => ({ id: 'new-dialogue', startNodeId: 'start', nodes: [{ id: 'start', textKey: 'dialogue.new-dialogue.start' }] }) }, onChange: (value: StructuredValue | undefined) => onPatch({ dialogues: (Array.isArray(value) ? value : []) as unknown as DialogueDefinition[] }) },
+    ...moduleJsonFiles,
+    { path: 'module-packs.json', json: draft.modulePacks, schema: { kind: 'array' as const, listMode: 'free' as const, item: modulePackSchema(bundle), createItem: () => ({ id: 'new-pack', modules: [] }) }, onChange: (value: StructuredValue | undefined) => onPatch({ modulePacks: (Array.isArray(value) ? value : []) as unknown as ContentModulePack[] }) },
     { path: 'skills.json', json: skills.map((row) => row.item), schema: { kind: 'array' as const, listMode: 'table' as const, columns: ['id', 'maxLevel', 'statId', 'addedPerLevel', 'increasedPerLevel'], item: skillDefinitionSchema(bundle), createItem: () => ({ id: 'new-skill', maxLevel: 100 }) }, onChange: (value: StructuredValue | undefined) => onPatch({ skills: (Array.isArray(value) ? value : []) as unknown as SkillDefinition[] }) },
     { path: 'stats.json', json: stats.map((row) => row.item), schema: { kind: 'array' as const, listMode: 'table' as const, columns: ['id', 'base'], item: statDefinitionSchema(), createItem: () => ({ id: 'new-stat', base: 0 }) }, onChange: (value: StructuredValue | undefined) => onPatch({ stats: (Array.isArray(value) ? value : []) as unknown as StatDefinition[] }) },
     { path: 'items.json', json: items.map((row) => row.item), schema: { kind: 'array' as const, listMode: 'table' as const, columns: ['id', 'maxQuantity', 'tags'], item: itemDefinitionSchema(), createItem: () => ({ id: 'new-item' }) }, onChange: (value: StructuredValue | undefined) => onPatch({ items: (Array.isArray(value) ? value : []) as unknown as ItemDefinition[] }) },

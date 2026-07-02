@@ -1,9 +1,10 @@
 import { create } from 'zustand';
-import type { ActionResolutionContext, EquipmentSlot, GameAction, IdleReport, RunLogEntry, TravelEdgeDefinition, UniversePlayState } from '../game/types';
+import type { ActionResolutionContext, ContentBundle, EquipmentSlot, GameAction, IdleReport, RunLogEntry, TravelEdgeDefinition, UniversePlayState } from '../game/types';
 import { appendChatMessage, appendRunLog, cancelDialogue, chooseDialogueOption, createInitialPlayState, normalizePlayState, resetInactiveEffectResources, resolveIdleTimers, startAction, startTravel } from '../game/timers';
 import { equipItem, unequipSlot } from '../game/equipment';
 import { load, remove, save } from '../lib/storage';
 import { recordAgentSessionMessage, type AgentSessionMessage } from '../game/agentSession';
+import { hasModuleCleanupChanges, sanitizePlayStateForBundle, type ModuleCleanupReport } from '../game/moduleCleanup';
 
 type GameStateStore = {
   states: Record<string, UniversePlayState>;
@@ -25,6 +26,7 @@ type GameStateStore = {
   recordRunEvent: (universeId: string, actor: RunLogEntry['actor'], event: string, data?: Record<string, unknown>) => void;
   recordAgentMessage: (universeId: string, message: AgentSessionMessage) => void;
   clearRunLog: (universeId: string) => void;
+  sanitizeForBundle: (universeId: string, bundle: ContentBundle, startingLocationId: string) => ModuleCleanupReport | null;
   importUniverseState: (playState: UniversePlayState) => Promise<void>;
   replaceUniverseState: (universeId: string, playState: UniversePlayState) => Promise<void>;
   resetUniverse: (universeId: string, startingLocationId: string, context?: Pick<ActionResolutionContext, 'manifest'>) => Promise<void>;
@@ -354,6 +356,20 @@ export const useGameState = create<GameStateStore>((set, get) => ({
       void save(storageKey(universeId), next);
       return { states: { ...state.states, [universeId]: next } };
     });
+  },
+
+  sanitizeForBundle: (universeId, bundle, startingLocationId) => {
+    let report: ModuleCleanupReport | null = null;
+    set((state) => {
+      const current = state.states[universeId];
+      if (!current) return state;
+      const sanitized = sanitizePlayStateForBundle(current, bundle, startingLocationId);
+      if (!hasModuleCleanupChanges(sanitized.report)) return state;
+      report = sanitized.report;
+      void save(storageKey(universeId), sanitized.state);
+      return { states: { ...state.states, [universeId]: sanitized.state } };
+    });
+    return report;
   },
 
   importUniverseState: async (playState) => {

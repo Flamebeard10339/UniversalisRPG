@@ -1,0 +1,23 @@
+{
+  "$schema": "https://universalis-rpg.local/schema/module.schema.json",
+  "id": "wayside-supplies",
+  "version": "1.0.0",
+  "universe": "base",
+  "author": "UniversalisRPG",
+  "game_version": "1.0",
+  "dependencies": [],
+  "data": {
+    "items": [
+      {
+        "id": "wayside-token",
+        "maxQuantity": 99
+      }
+    ]
+  },
+  "locale": {
+    "en": {
+      "item.wayside-token.title": "Wayside Token",
+      "item.wayside-token.description": "A small token from a modular roadside supply cache."
+    }
+  }
+}

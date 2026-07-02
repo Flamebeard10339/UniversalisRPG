@@ -873,6 +873,18 @@ export const mergeDraftIntoBundle = (bundle: ContentBundle, draft: ContributionD
   };
 };
 
+export const mergeDraftModulesIntoBundle = (bundle: ContentBundle, draft: ContributionDraft | null): ContentBundle => {
+  if (!draft || draft.universeId !== bundle.manifest.id) {
+    return bundle;
+  }
+
+  return {
+    ...bundle,
+    modules: mergeById(removeById(bundle.modules ?? [], draft.removed?.modules ?? []), draft.modules ?? []),
+    modulePacks: mergeById(bundle.modulePacks ?? [], draft.modulePacks ?? []),
+  };
+};
+
 const removeById = <T extends { id: string }>(items: T[], removedIds: string[]) => {
   const removed = new Set(removedIds);
   return items.filter((item) => !removed.has(item.id));

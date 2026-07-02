@@ -1,5 +1,7 @@
 import type {
   ContentBundle,
+  ContentModule,
+  ContentModulePack,
   DialogueDefinition,
   EnemyDefinition,
   EffectDefinition,
@@ -15,12 +17,23 @@ import type {
   StateFlagDefinition,
   TravelEdgeDefinition,
   UniverseManifest,
+  ValidationIssue,
 } from './types';
+import { validateModuleShape } from './contentModules';
 import { validateContentShape, validateManifest } from './validators';
 import { load, save } from '../lib/storage';
 
 const BASE_CONTENT_PATH = '/content/universes';
 const LOCAL_UNIVERSES_KEY = 'universalis:local-universes';
+
+const moduleIdFromFile = (moduleFile: string) => moduleFile.replace(/\.json$/i, '');
+
+const moduleLoadIssue = (moduleFile: string, message: string, params?: Record<string, string | number>): ValidationIssue => ({
+  severity: 'error',
+  path: `modules.${moduleIdFromFile(moduleFile)}`,
+  message,
+  params,
+});
 
 const loadJson = async <T>(path: string): Promise<T> => {
   const response = await fetch(path);
@@ -29,6 +42,15 @@ const loadJson = async <T>(path: string): Promise<T> => {
     throw new Error(`Unable to load ${path}: ${response.status} ${response.statusText}`);
   }
 
+  return (await response.json()) as T;
+};
+
+const tryLoadJson = async <T>(path: string): Promise<T | null> => {
+  const response = await fetch(path);
+  if (response.status === 404) return null;
+  if (!response.ok) {
+    throw new Error(`Unable to load ${path}: ${response.status} ${response.statusText}`);
+  }
   return (await response.json()) as T;
 };
 
@@ -84,6 +106,33 @@ export const loadUniverse = async (universeId: string): Promise<ContentBundle> =
     },
     Promise.resolve({}),
   );
+  const moduleIds = await tryLoadJson<string[]>(`${basePath}/modules/index.json`) ?? [];
+  const { modules, moduleIssues } = await moduleIds.reduce<Promise<{ modules: ContentModule[]; moduleIssues: ValidationIssue[] }>>(async (promise, moduleFile) => {
+    const loaded = await promise;
+    const modulePath = `${basePath}/modules/${moduleFile}`;
+    try {
+      const module = await loadJson<unknown>(modulePath);
+      if (!validateModuleShape(module, moduleFile)) {
+        return {
+          ...loaded,
+          moduleIssues: [
+            ...loaded.moduleIssues,
+            moduleLoadIssue(moduleFile, 'validation.moduleShapeInvalid', { id: moduleIdFromFile(moduleFile) }),
+          ],
+        };
+      }
+      return { ...loaded, modules: [...loaded.modules, module] };
+    } catch {
+      return {
+        ...loaded,
+        moduleIssues: [
+          ...loaded.moduleIssues,
+          moduleLoadIssue(moduleFile, 'validation.moduleLoadFailed', { id: moduleIdFromFile(moduleFile) }),
+        ],
+      };
+    }
+  }, Promise.resolve({ modules: [], moduleIssues: [] }));
+  const modulePacks = await tryLoadJson<ContentModulePack[]>(`${basePath}/module-packs.json`) ?? [];
 
   const bundle = {
     manifest,
@@ -100,6 +149,9 @@ export const loadUniverse = async (universeId: string): Promise<ContentBundle> =
     enemies,
     dialogues,
     locales,
+    modules,
+    modulePacks,
+    moduleIssues,
   };
   const issues = validateContentShape(bundle);
 

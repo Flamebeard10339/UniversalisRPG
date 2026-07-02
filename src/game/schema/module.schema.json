@@ -1,0 +1,145 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://universalis-rpg.local/schema/module.schema.json",
+  "type": "object",
+  "required": ["id", "version", "universe", "author", "game_version"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9.-]*$" },
+    "version": { "$ref": "#/$defs/moduleVersion" },
+    "universe": { "type": "string", "minLength": 1 },
+    "author": { "type": "string", "minLength": 1 },
+    "game_version": { "$ref": "#/$defs/gameVersion" },
+    "dependencies": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/dependency" },
+      "uniqueItems": true
+    },
+    "data": { "$ref": "#/$defs/dataSection" },
+    "data-updates": { "$ref": "#/$defs/dataUpdates" },
+    "locale": {
+      "type": "object",
+      "additionalProperties": { "$ref": "https://universalis-rpg.local/schema/locale.schema.json" }
+    }
+  },
+  "$defs": {
+    "moduleVersion": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]{0,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5])\\.(0|[1-9][0-9]{0,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5])\\.(0|[1-9][0-9]{0,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5])$"
+    },
+    "gameVersion": {
+      "oneOf": [
+        {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]{0,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5])\\.(0|[1-9][0-9]{0,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5])$"
+        },
+        {
+          "type": "number",
+          "minimum": 0
+        }
+      ]
+    },
+    "dependency": {
+      "type": "string",
+      "pattern": "^([!+?~])?\\s*[a-z0-9][a-z0-9.-]*(\\s*(<=|>=|=|<|>)\\s*[0-9]+(\\.[0-9]+){0,2})?\\s*$"
+    },
+    "idList": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "uniqueItems": true
+    },
+    "dataSection": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "locations": { "$ref": "https://universalis-rpg.local/schema/locations.schema.json" },
+        "edges": { "$ref": "https://universalis-rpg.local/schema/edges.schema.json" },
+        "actions": { "$ref": "https://universalis-rpg.local/schema/actions.schema.json" },
+        "skills": { "$ref": "https://universalis-rpg.local/schema/skills.schema.json" },
+        "stats": { "$ref": "https://universalis-rpg.local/schema/stats.schema.json" },
+        "items": { "$ref": "https://universalis-rpg.local/schema/items.schema.json" },
+        "flags": { "$ref": "https://universalis-rpg.local/schema/flags.schema.json" },
+        "resources": { "$ref": "https://universalis-rpg.local/schema/resources.schema.json" },
+        "resourceDefinitions": { "$ref": "https://universalis-rpg.local/schema/resources.schema.json" },
+        "effects": { "$ref": "https://universalis-rpg.local/schema/effects.schema.json" },
+        "interactionTypes": { "$ref": "https://universalis-rpg.local/schema/interaction-types.schema.json" },
+        "enemies": { "$ref": "https://universalis-rpg.local/schema/enemies.schema.json" },
+        "dialogues": { "$ref": "https://universalis-rpg.local/schema/dialogues.schema.json" },
+        "displayProfiles": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id"],
+            "additionalProperties": false,
+            "properties": {
+              "id": { "type": "string", "minLength": 1 },
+              "titleKey": { "type": "string", "minLength": 1 },
+              "colors": { "$ref": "https://universalis-rpg.local/schema/universe.schema.json#/$defs/displayPalette" },
+              "light": { "$ref": "https://universalis-rpg.local/schema/universe.schema.json#/$defs/displayPalette" },
+              "dark": { "$ref": "https://universalis-rpg.local/schema/universe.schema.json#/$defs/displayPalette" }
+            }
+          }
+        }
+      }
+    },
+    "dataUpdates": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "locations": { "$ref": "https://universalis-rpg.local/schema/locations.schema.json" },
+        "edges": { "$ref": "https://universalis-rpg.local/schema/edges.schema.json" },
+        "actions": { "$ref": "https://universalis-rpg.local/schema/actions.schema.json" },
+        "skills": { "$ref": "https://universalis-rpg.local/schema/skills.schema.json" },
+        "stats": { "$ref": "https://universalis-rpg.local/schema/stats.schema.json" },
+        "items": { "$ref": "https://universalis-rpg.local/schema/items.schema.json" },
+        "flags": { "$ref": "https://universalis-rpg.local/schema/flags.schema.json" },
+        "resources": { "$ref": "https://universalis-rpg.local/schema/resources.schema.json" },
+        "resourceDefinitions": { "$ref": "https://universalis-rpg.local/schema/resources.schema.json" },
+        "effects": { "$ref": "https://universalis-rpg.local/schema/effects.schema.json" },
+        "interactionTypes": { "$ref": "https://universalis-rpg.local/schema/interaction-types.schema.json" },
+        "enemies": { "$ref": "https://universalis-rpg.local/schema/enemies.schema.json" },
+        "dialogues": { "$ref": "https://universalis-rpg.local/schema/dialogues.schema.json" },
+        "displayProfiles": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id"],
+            "additionalProperties": false,
+            "properties": {
+              "id": { "type": "string", "minLength": 1 },
+              "titleKey": { "type": "string", "minLength": 1 },
+              "colors": { "$ref": "https://universalis-rpg.local/schema/universe.schema.json#/$defs/displayPalette" },
+              "light": { "$ref": "https://universalis-rpg.local/schema/universe.schema.json#/$defs/displayPalette" },
+              "dark": { "$ref": "https://universalis-rpg.local/schema/universe.schema.json#/$defs/displayPalette" }
+            }
+          }
+        },
+        "remove": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "locations": { "$ref": "#/$defs/idList" },
+            "edges": { "$ref": "#/$defs/idList" },
+            "actions": { "$ref": "#/$defs/idList" },
+            "skills": { "$ref": "#/$defs/idList" },
+            "stats": { "$ref": "#/$defs/idList" },
+            "items": { "$ref": "#/$defs/idList" },
+            "flags": { "$ref": "#/$defs/idList" },
+            "resources": { "$ref": "#/$defs/idList" },
+            "effects": { "$ref": "#/$defs/idList" },
+            "interactionTypes": { "$ref": "#/$defs/idList" },
+            "enemies": { "$ref": "#/$defs/idList" },
+            "dialogues": { "$ref": "#/$defs/idList" },
+            "displayProfiles": { "$ref": "#/$defs/idList" },
+            "locales": { "$ref": "#/$defs/idList" }
+          }
+        },
+        "locale": {
+          "type": "object",
+          "additionalProperties": { "$ref": "https://universalis-rpg.local/schema/locale.schema.json" }
+        }
+      }
+    }
+  }
+}

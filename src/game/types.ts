@@ -320,6 +320,65 @@ export type ContentBundle = {
   enemies: EnemyDefinition[];
   dialogues?: DialogueDefinition[];
   locales: Record<string, LocaleDictionary>;
+  modules?: ContentModule[];
+  modulePacks?: ContentModulePack[];
+  moduleIssues?: ValidationIssue[];
+};
+
+export type ModuleDataSection = {
+  locations?: LocationNode[];
+  edges?: TravelEdgeDefinition[];
+  actions?: GameAction[];
+  skills?: SkillDefinition[];
+  stats?: StatDefinition[];
+  items?: ItemDefinition[];
+  flags?: StateFlagDefinition[];
+  resources?: ResourceDefinition[];
+  resourceDefinitions?: ResourceDefinition[];
+  effects?: EffectDefinition[];
+  interactionTypes?: InteractionTypeDefinition[];
+  enemies?: EnemyDefinition[];
+  dialogues?: DialogueDefinition[];
+  displayProfiles?: DisplayProfileDefinition[];
+};
+
+export type ModuleDataUpdates = ModuleDataSection & {
+  remove?: {
+    locations?: string[];
+    edges?: string[];
+    actions?: string[];
+    skills?: string[];
+    stats?: string[];
+    items?: string[];
+    flags?: string[];
+    resources?: string[];
+    effects?: string[];
+    interactionTypes?: string[];
+    enemies?: string[];
+    dialogues?: string[];
+    displayProfiles?: string[];
+    locales?: string[];
+  };
+  locale?: Record<string, LocaleDictionary>;
+};
+
+export type ContentModule = {
+  id: string;
+  version: string;
+  universe: string;
+  author: string;
+  game_version: string | number;
+  dependencies?: string[];
+  data?: ModuleDataSection;
+  'data-updates'?: ModuleDataUpdates;
+  locale?: Record<string, LocaleDictionary>;
+};
+
+export type ContentModulePack = {
+  id: string;
+  titleKey?: string;
+  modules?: string[];
+  packs?: ContentModulePack[];
 };
 
 export type ValidationSeverity = 'error' | 'warning';
@@ -508,6 +567,8 @@ export type ContributionDraft = {
   combatBalance?: CombatBalanceDefinition;
   displayProfiles?: DisplayProfileDefinition[];
   ui?: UniverseUiSettings;
+  modules: ContentModule[];
+  modulePacks: ContentModulePack[];
   locations: LocationNode[];
   edges: TravelEdgeDefinition[];
   actions: GameAction[];
@@ -537,6 +598,7 @@ export type ContributionRemovedIds = {
   interactionTypes: string[];
   enemies: string[];
   dialogues: string[];
+  modules: string[];
 };
 
 export type ContributionPackage = {
