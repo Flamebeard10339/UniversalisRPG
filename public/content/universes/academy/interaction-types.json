@@ -1,8 +1,0 @@
-[
-  {
-    "id": "melee-combat",
-    "sourceStatId": "attack",
-    "targetStatId": "defense",
-    "targetPlayerHealth": true
-  }
-]
