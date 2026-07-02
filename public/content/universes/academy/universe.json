@@ -11,6 +11,48 @@
   "basePlayer": {
     "inventory": {}
   },
+  "displayProfiles": [
+    {
+      "id": "quiet-academy",
+      "titleKey": "displayProfile.quiet-academy.title",
+      "light": {
+        "background": "#f6f3ff",
+        "surface": "#fffefe",
+        "surfaceRaised": "#efeafb",
+        "panel": "#e2daf3",
+        "border": "#c8bfe0",
+        "text": "#1d1b28",
+        "textMuted": "#504a63",
+        "textSubtle": "#756f86",
+        "accent": "#4477aa",
+        "accentStrong": "#315f8f",
+        "accentText": "#f7fbff",
+        "danger": "#be3455",
+        "dangerSurface": "#fff0f4",
+        "dangerText": "#8f2440",
+        "success": "#24846b",
+        "warning": "#ad7416"
+      },
+      "dark": {
+        "background": "#11111b",
+        "surface": "#1b1b28",
+        "surfaceRaised": "#232335",
+        "panel": "#2b2a3f",
+        "border": "#53506b",
+        "text": "#f0eef8",
+        "textMuted": "#d5d0e4",
+        "textSubtle": "#a8a1bb",
+        "accent": "#8bd5ff",
+        "accentStrong": "#b8e7ff",
+        "accentText": "#0d2638",
+        "danger": "#f38ba8",
+        "dangerSurface": "#4a1f2d",
+        "dangerText": "#ffe4ee",
+        "success": "#94e2d5",
+        "warning": "#f9e2af"
+      }
+    }
+  ],
   "files": [
     "locations.json",
     "edges.json",

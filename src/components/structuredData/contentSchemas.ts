@@ -1,4 +1,5 @@
 import type { ContentBundle } from '../../game/types';
+import { displayColorKeys } from '../../game/displayProfiles';
 import { stateVariableKeys } from '../../game/stateVariables';
 import type { StructuredSchema } from './StructuredData';
 
@@ -222,6 +223,17 @@ export const basePlayerSchema = (bundle: ContentBundle): StructuredSchema => ({ 
 export const combatBalanceSchema = (): StructuredSchema => ({ kind: 'object', fields: {
   expectedHitsToKill: { label: 'contribution.universe.expectedHitsToKill', schema: number(0.000001) },
   combatSpread: { label: 'contribution.universe.combatSpread', schema: number(0) },
+} });
+
+const displayPaletteSchema = (): StructuredSchema => ({ kind: 'object', fields: Object.fromEntries(
+  displayColorKeys.map((key) => [key, { label: `settings.color.${key}`, schema: string(), optional: true }]),
+) });
+
+export const displayProfileSchema = (): StructuredSchema => ({ kind: 'object', fields: {
+  id: { label: 'contribution.column.id', schema: string() },
+  titleKey: { label: 'contribution.column.titleKey', schema: string(), optional: true },
+  light: { label: 'settings.theme.light', schema: displayPaletteSchema(), optional: true, defaultValue: {} },
+  dark: { label: 'settings.theme.dark', schema: displayPaletteSchema(), optional: true, defaultValue: {} },
 } });
 
 export const universeUiSchema = (): StructuredSchema => ({ kind: 'object', fields: {

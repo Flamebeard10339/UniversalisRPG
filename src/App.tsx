@@ -13,8 +13,17 @@ import { TravelStatus } from './components/TravelStatus';
 import { WorldMap } from './components/WorldMap';
 import { StructuredDataEditor, type StructuredValue } from './components/structuredData/StructuredData';
 import { actionTitleKey, interactionTitleKey, itemTitleKey, locationDescriptionKey, locationTitleKey, resourceTitleKey, skillTitleKey, universeDescriptionKey, universeTitleKey } from './game/contentIds';
+import {
+  applyDisplayPalette,
+  createCustomDisplayProfile,
+  defaultDisplayProfile,
+  displayColorKeys,
+  profileTitleKey,
+  resolveDisplayPalette,
+  resolveDisplayScheme,
+} from './game/displayProfiles';
 import { getInteractionType, isContinuousAction } from './game/adversarial';
-import type { ContributionDraft, IdleReport, UniversePlayState } from './game/types';
+import type { ContributionDraft, DisplayColorPalette, DisplayProfileDefinition, IdleReport, UniversePlayState } from './game/types';
 import { getNextResourceBoundaryAt } from './game/resources';
 import { aggregateIdleRewards } from './game/rewards';
 import { load, save } from './lib/storage';
@@ -35,6 +44,8 @@ type ThemePreference = 'system' | 'dark' | 'light';
 type FontSizePreference = 'tiny' | 'small' | 'normal' | 'large' | 'huge';
 type AppearanceSettings = {
   chatCompressionEnabled?: boolean;
+  customDisplayProfile?: DisplayProfileDefinition;
+  displayProfileSelections?: Record<string, string>;
   fontSize: FontSizePreference;
   theme: ThemePreference;
 };
@@ -53,9 +64,10 @@ const contributionTabs: ContributionTab[] = ['content', 'localization', 'submit'
 const homeTabs: HomeTab[] = ['actions', 'details', 'workbench'];
 const emptyIdleReport: IdleReport = { kind: 'none' };
 const emptyContributionDraft = (universeId: string): ContributionDraft => ({
-  universeId, updatedAt: Date.now(), notes: '', basePlayer: undefined, combatBalance: undefined, ui: undefined, locations: [], edges: [], actions: [], skills: [], stats: [], items: [], flags: [], resourceDefinitions: [], effects: [], interactionTypes: [], enemies: [], dialogues: [], locales: {},
+  universeId, updatedAt: Date.now(), notes: '', basePlayer: undefined, combatBalance: undefined, displayProfiles: undefined, ui: undefined, locations: [], edges: [], actions: [], skills: [], stats: [], items: [], flags: [], resourceDefinitions: [], effects: [], interactionTypes: [], enemies: [], dialogues: [], locales: {},
   removed: { locations: [], edges: [], actions: [], skills: [], stats: [], items: [], flags: [], resources: [], effects: [], interactionTypes: [], enemies: [], dialogues: [] },
 });
+const colorInputClass = 'h-9 w-12 rounded border border-slate-700 bg-slate-900 p-1';
 
 const encodeSave = (playState: UniversePlayState) =>
   btoa(unescape(encodeURIComponent(JSON.stringify(playState))));
@@ -93,6 +105,8 @@ export default function App() {
   const [themePreference, setThemePreference] = useState<ThemePreference>('dark');
   const [fontSizePreference, setFontSizePreference] = useState<FontSizePreference>('normal');
   const [chatCompressionEnabled, setChatCompressionEnabled] = useState(true);
+  const [customDisplayProfile, setCustomDisplayProfile] = useState<DisplayProfileDefinition>(() => createCustomDisplayProfile());
+  const [displayProfileSelections, setDisplayProfileSelections] = useState<Record<string, string>>({});
   const [appearanceLoaded, setAppearanceLoaded] = useState(false);
   const [contributionUiLoaded, setContributionUiLoaded] = useState(false);
   const [showChangelog, setShowChangelog] = useState(false);
@@ -159,16 +173,40 @@ export default function App() {
       setThemePreference(settings.theme ?? 'dark');
       setFontSizePreference(settings.fontSize ?? 'normal');
       setChatCompressionEnabled(settings.chatCompressionEnabled ?? true);
+      setCustomDisplayProfile(settings.customDisplayProfile ?? createCustomDisplayProfile());
+      setDisplayProfileSelections(settings.displayProfileSelections ?? {});
       setAppearanceLoaded(true);
     });
   }, []);
 
   useEffect(() => {
-    document.documentElement.dataset.theme = themePreference;
     document.documentElement.dataset.fontSize = fontSizePreference;
+    const scheme = resolveDisplayScheme(themePreference);
+    document.documentElement.dataset.theme = scheme;
+    if (bundle) {
+      const selectedProfileId = displayProfileSelections[bundle.manifest.id] ?? bundle.manifest.displayProfiles?.[0]?.id ?? defaultDisplayProfile.id;
+      applyDisplayPalette(resolveDisplayPalette(bundle.manifest, selectedProfileId, customDisplayProfile, scheme));
+    }
     if (!appearanceLoaded) return;
-    void save(appearanceKey, { chatCompressionEnabled, theme: themePreference, fontSize: fontSizePreference });
-  }, [appearanceLoaded, chatCompressionEnabled, fontSizePreference, themePreference]);
+    void save(appearanceKey, {
+      chatCompressionEnabled,
+      customDisplayProfile,
+      displayProfileSelections,
+      theme: themePreference,
+      fontSize: fontSizePreference,
+    });
+  }, [appearanceLoaded, bundle, chatCompressionEnabled, customDisplayProfile, displayProfileSelections, fontSizePreference, themePreference]);
+
+  useEffect(() => {
+    if (!appearanceLoaded || !bundle || displayProfileSelections[bundle.manifest.id]) {
+      return;
+    }
+
+    setDisplayProfileSelections((selections) => ({
+      ...selections,
+      [bundle.manifest.id]: bundle.manifest.displayProfiles?.[0]?.id ?? defaultDisplayProfile.id,
+    }));
+  }, [appearanceLoaded, bundle, displayProfileSelections]);
 
   useEffect(() => {
     void load<ContributionUiSettings>(contributionUiKey).then((settings) => {
@@ -202,6 +240,16 @@ export default function App() {
 
   const startingLocationId = useMemo(() => (bundle ? getStartingLocationId(bundle) : ''), [bundle]);
   const activeBundleId = bundle?.manifest.id;
+  const selectedDisplayProfileId = bundle
+    ? displayProfileSelections[bundle.manifest.id] ?? bundle.manifest.displayProfiles?.[0]?.id ?? defaultDisplayProfile.id
+    : defaultDisplayProfile.id;
+  const displayProfileOptions = bundle
+    ? [
+        defaultDisplayProfile,
+        ...(bundle.manifest.displayProfiles ?? []),
+        { id: 'custom', titleKey: 'settings.displayProfile.custom' },
+      ]
+    : [];
   const runtimeUniverseId = bundle ? (contributionMode ? contributionRuntimeId(bundle.manifest.id) : bundle.manifest.id) : '';
   const actionContext = useMemo(() => ({
     manifest: bundle?.manifest,
@@ -218,6 +266,15 @@ export default function App() {
     dialogues: bundle?.dialogues ?? [],
   }), [bundle]);
   const playState = bundle ? gameStates[runtimeUniverseId] ?? getUniverseState(runtimeUniverseId, startingLocationId, { manifest: bundle.manifest }) : null;
+  const updateCustomColor = (scheme: 'light' | 'dark', key: keyof DisplayColorPalette, value: string) => {
+    setCustomDisplayProfile((profile) => ({
+      ...profile,
+      [scheme]: {
+        ...(profile[scheme] ?? {}),
+        [key]: value,
+      },
+    }));
+  };
   const visibleHomeTab = homeTab === 'workbench' && !contributionMode ? 'actions' : homeTab;
   const currentLocation = bundle?.locations.find((location) => location.id === playState?.currentLocationId);
   const activeAction = bundle?.actions.find((action) => action.id === playState?.activeAction?.actionId) ?? null;
@@ -662,6 +719,26 @@ export default function App() {
                   </select>
                 </label>
                 <label className="flex items-center justify-between gap-4">
+                  <span className="text-sm text-slate-300">{t('settings.appearance.displayProfile')}</span>
+                  <select
+                    className="w-56 rounded border border-slate-700 bg-slate-900 px-3 py-2 text-sm"
+                    onChange={(event) => {
+                      dismissDialogue();
+                      setDisplayProfileSelections((selections) => ({
+                        ...selections,
+                        [bundle.manifest.id]: event.target.value,
+                      }));
+                    }}
+                    value={selectedDisplayProfileId}
+                  >
+                    {displayProfileOptions.map((profile) => (
+                      <option key={profile.id} value={profile.id}>
+                        {t(profile.titleKey ?? profileTitleKey(profile.id), profile.id)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="flex items-center justify-between gap-4">
                   <span className="text-sm text-slate-300">{t('settings.appearance.fontSize')}</span>
                   <select
                     className="w-56 rounded border border-slate-700 bg-slate-900 px-3 py-2 text-sm"
@@ -699,6 +776,29 @@ export default function App() {
                     type="checkbox"
                   />
                 </label>
+                {selectedDisplayProfileId === 'custom' && (
+                  <section className="grid gap-3 rounded border border-slate-800 bg-slate-900/60 p-3">
+                    <h4 className="text-sm font-semibold text-slate-100">{t('settings.displayProfile.customEditor')}</h4>
+                    {(['light', 'dark'] as const).map((scheme) => (
+                      <section className="grid gap-2" key={scheme}>
+                        <h5 className="text-xs font-semibold uppercase text-slate-500">{t(`settings.theme.${scheme}`)}</h5>
+                        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                          {displayColorKeys.map((key) => (
+                            <label className="grid grid-cols-[1fr_auto] items-center gap-2 rounded bg-slate-950 p-2 text-xs text-slate-300" key={`${scheme}-${key}`}>
+                              <span>{t(`settings.color.${key}`)}</span>
+                              <input
+                                className={colorInputClass}
+                                onChange={(event) => updateCustomColor(scheme, key, event.target.value)}
+                                type="color"
+                                value={customDisplayProfile[scheme]?.[key] ?? defaultDisplayProfile[scheme][key]}
+                              />
+                            </label>
+                          ))}
+                        </div>
+                      </section>
+                    ))}
+                  </section>
+                )}
               </section>
 
               <section className="grid gap-3 rounded border border-slate-800 bg-slate-950 p-3">

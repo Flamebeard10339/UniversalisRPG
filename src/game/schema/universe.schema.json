@@ -40,6 +40,21 @@
         "combatSpread": { "type": "number", "minimum": 0 }
       }
     },
+    "displayProfiles": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "titleKey": { "type": "string", "minLength": 1 },
+          "light": { "$ref": "#/$defs/displayPalette" },
+          "dark": { "$ref": "#/$defs/displayPalette" }
+        }
+      },
+      "uniqueItems": true
+    },
     "ui": {
       "type": "object",
       "additionalProperties": false,
@@ -55,6 +70,34 @@
         "minAppVersion": { "type": "string" },
         "maxAppVersion": { "type": "string" }
       }
+    }
+  },
+  "$defs": {
+    "displayPalette": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "background": { "$ref": "#/$defs/color" },
+        "surface": { "$ref": "#/$defs/color" },
+        "surfaceRaised": { "$ref": "#/$defs/color" },
+        "panel": { "$ref": "#/$defs/color" },
+        "border": { "$ref": "#/$defs/color" },
+        "text": { "$ref": "#/$defs/color" },
+        "textMuted": { "$ref": "#/$defs/color" },
+        "textSubtle": { "$ref": "#/$defs/color" },
+        "accent": { "$ref": "#/$defs/color" },
+        "accentStrong": { "$ref": "#/$defs/color" },
+        "accentText": { "$ref": "#/$defs/color" },
+        "danger": { "$ref": "#/$defs/color" },
+        "dangerSurface": { "$ref": "#/$defs/color" },
+        "dangerText": { "$ref": "#/$defs/color" },
+        "success": { "$ref": "#/$defs/color" },
+        "warning": { "$ref": "#/$defs/color" }
+      }
+    },
+    "color": {
+      "type": "string",
+      "pattern": "^#[0-9a-fA-F]{6}$"
     }
   }
 }

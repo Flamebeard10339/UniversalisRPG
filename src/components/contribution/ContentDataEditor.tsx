@@ -1,7 +1,7 @@
 import { useRef, useState, type MutableRefObject } from 'react';
 import { edgeId, toKebabInput } from '../../game/contentIds';
 import type { Translator } from '../../game/i18n';
-import type { BasePlayerDefinition, CombatBalanceDefinition, ContentBundle, ContributionDraft, ContributionRemovedIds, DialogueDefinition, EffectDefinition, EnemyDefinition, GameAction, InteractionTypeDefinition, ItemDefinition, LocationNode, ResourceDefinition, SkillDefinition, StatDefinition, StateFlagDefinition, TravelEdgeDefinition, UniverseUiSettings } from '../../game/types';
+import type { BasePlayerDefinition, CombatBalanceDefinition, ContentBundle, ContributionDraft, ContributionRemovedIds, DialogueDefinition, DisplayProfileDefinition, EffectDefinition, EnemyDefinition, GameAction, InteractionTypeDefinition, ItemDefinition, LocationNode, ResourceDefinition, SkillDefinition, StatDefinition, StateFlagDefinition, TravelEdgeDefinition, UniverseUiSettings } from '../../game/types';
 import { ContributionMapEditor } from './ContributionMapEditor';
 import { EnemyDiagnostics } from './EnemyDiagnostics';
 import { DEBUG_PLAYER_PROFILES, getProfileStatSummary, profileDescription, profileTitle } from '../../game/playerProfiles';
@@ -10,7 +10,7 @@ import { getEnemyStat, normalizeEnemyStats } from '../../game/enemies';
 import { resolveUniverseUiSettings } from '../../game/universeSettings';
 import { EdgeFields, LocationFields } from './MapContentFields';
 import { StructuredDataEditor, type StructuredValue } from '../structuredData/StructuredData';
-import { actionSchema, basePlayerSchema, combatBalanceSchema, dialogueSchema, edgeSchema, effectDefinitionSchema, enemyStatsSchema, flagDefinitionSchema, interactionTypeDefinitionSchema, itemDefinitionSchema, locationSchema, resourceDefinitionSchema, rewardSchema, skillDefinitionSchema, statDefinitionSchema, universeUiSchema } from '../structuredData/contentSchemas';
+import { actionSchema, basePlayerSchema, combatBalanceSchema, dialogueSchema, displayProfileSchema, edgeSchema, effectDefinitionSchema, enemyStatsSchema, flagDefinitionSchema, interactionTypeDefinitionSchema, itemDefinitionSchema, locationSchema, resourceDefinitionSchema, rewardSchema, skillDefinitionSchema, statDefinitionSchema, universeUiSchema } from '../structuredData/contentSchemas';
 
 type ContentDataEditorProps = {
   activeTab: ContentDataTab;
@@ -118,6 +118,7 @@ export const ContentDataEditor = ({ activeTab, baseBundle, bundle, draft, onPatc
   const dialogues = layeredRows(draft.dialogues, baseBundle.dialogues ?? [], removed.dialogues, filter);
   const basePlayer = draft.basePlayer ?? bundle.manifest.basePlayer ?? { inventory: {} };
   const combatBalance = resolveCombatBalance(draft.combatBalance ?? bundle.manifest.combatBalance);
+  const displayProfiles = draft.displayProfiles ?? bundle.manifest.displayProfiles ?? [];
   const uiSettings = resolveUniverseUiSettings(draft.ui ?? bundle.manifest.ui);
   const contributionBundle = {
     ...bundle,
@@ -212,6 +213,10 @@ export const ContentDataEditor = ({ activeTab, baseBundle, bundle, draft, onPatc
 
   const updateUiSettings = (value: StructuredValue | undefined) => {
     if (value && typeof value === 'object' && !Array.isArray(value)) onPatch({ ui: resolveUniverseUiSettings(value as unknown as UniverseUiSettings) });
+  };
+
+  const updateDisplayProfiles = (value: StructuredValue | undefined) => {
+    onPatch({ displayProfiles: (Array.isArray(value) ? value : []) as unknown as DisplayProfileDefinition[] });
   };
 
   const updateBasePlayer = (value: StructuredValue | undefined) => {
@@ -378,11 +383,12 @@ export const ContentDataEditor = ({ activeTab, baseBundle, bundle, draft, onPatc
 
   const universeBasePlayer = { inventory: basePlayer.inventory ?? {} };
   const jsonFiles = [
-    { path: 'universe.json', json: { ...bundle.manifest, basePlayer: universeBasePlayer, combatBalance, ui: uiSettings }, onChange: (value: StructuredValue | undefined) => {
+    { path: 'universe.json', json: { ...bundle.manifest, basePlayer: universeBasePlayer, combatBalance, displayProfiles, ui: uiSettings }, onChange: (value: StructuredValue | undefined) => {
       const next = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
       onPatch({
         basePlayer: next.basePlayer as BasePlayerDefinition | undefined,
         combatBalance: next.combatBalance as CombatBalanceDefinition | undefined,
+        displayProfiles: next.displayProfiles as DisplayProfileDefinition[] | undefined,
         ui: next.ui as UniverseUiSettings | undefined,
       });
     } },
@@ -434,6 +440,7 @@ export const ContentDataEditor = ({ activeTab, baseBundle, bundle, draft, onPatc
           </div>
           <StructuredDataEditor label="contribution.data.combatBalance" onChange={updateCombatBalance} schema={combatBalanceSchema()} t={t} value={combatBalance as unknown as StructuredValue} />
           <StructuredDataEditor label="contribution.data.ui" onChange={updateUiSettings} schema={universeUiSchema()} t={t} value={uiSettings as unknown as StructuredValue} />
+          <StructuredDataEditor label="contribution.data.displayProfiles" onChange={updateDisplayProfiles} schema={{ kind: 'array', listMode: 'free', item: displayProfileSchema(), createItem: () => ({ id: uniqueId('new-profile', displayProfiles.map((profile) => profile.id)), light: {}, dark: {} }) }} t={t} value={displayProfiles as unknown as StructuredValue} />
           <section className="grid gap-2 border-t border-slate-700 pt-3">
             <StructuredDataEditor label="contribution.universe.baseInventory" onChange={updateBasePlayer} schema={basePlayerSchema(bundle)} t={t} value={basePlayer as unknown as StructuredValue} />
           </section>

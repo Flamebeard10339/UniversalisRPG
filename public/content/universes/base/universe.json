@@ -11,6 +11,48 @@
   "basePlayer": {
     "inventory": {}
   },
+  "displayProfiles": [
+    {
+      "id": "first-road",
+      "titleKey": "displayProfile.first-road.title",
+      "light": {
+        "background": "#f4f7f1",
+        "surface": "#fffdf7",
+        "surfaceRaised": "#edf4e9",
+        "panel": "#dce8d4",
+        "border": "#b9c8ad",
+        "text": "#182217",
+        "textMuted": "#44513f",
+        "textSubtle": "#66715f",
+        "accent": "#2f8f8a",
+        "accentStrong": "#246f6b",
+        "accentText": "#f8fffd",
+        "danger": "#b42318",
+        "dangerSurface": "#fff0ed",
+        "dangerText": "#8a1f14",
+        "success": "#2f855a",
+        "warning": "#b7791f"
+      },
+      "dark": {
+        "background": "#10160f",
+        "surface": "#182116",
+        "surfaceRaised": "#202b1d",
+        "panel": "#283725",
+        "border": "#4b5f43",
+        "text": "#edf7e8",
+        "textMuted": "#c9d8c0",
+        "textSubtle": "#99aa8f",
+        "accent": "#67d8c7",
+        "accentStrong": "#a7f3d0",
+        "accentText": "#0d2a24",
+        "danger": "#fb7185",
+        "dangerSurface": "#4c1d17",
+        "dangerText": "#ffe4e6",
+        "success": "#7dd3a8",
+        "warning": "#f6c177"
+      }
+    }
+  ],
   "files": [
     "locations.json",
     "edges.json",

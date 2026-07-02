@@ -1,6 +1,7 @@
 {
   "universe.base.title": "The First Road",
   "universe.base.description": "A small starter universe for testing JSON content, travel, actions, and contribution flow.",
+  "displayProfile.first-road.title": "First Road",
   "location.crossroads.title": "Wayside Crossroads",
   "location.crossroads.description": "A lantern-lit meeting place where rumors arrive before travelers do.",
   "location.emberwood.title": "Emberwood",

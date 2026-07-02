@@ -14,11 +14,38 @@ export type UniverseManifest = {
   files: string[];
   basePlayer?: BasePlayerDefinition;
   combatBalance?: CombatBalanceDefinition;
+  displayProfiles?: DisplayProfileDefinition[];
   ui?: UniverseUiSettings;
   compatibility?: {
     minAppVersion?: string;
     maxAppVersion?: string;
   };
+};
+
+export type DisplayColorPalette = {
+  background?: string;
+  surface?: string;
+  surfaceRaised?: string;
+  panel?: string;
+  border?: string;
+  text?: string;
+  textMuted?: string;
+  textSubtle?: string;
+  accent?: string;
+  accentStrong?: string;
+  accentText?: string;
+  danger?: string;
+  dangerSurface?: string;
+  dangerText?: string;
+  success?: string;
+  warning?: string;
+};
+
+export type DisplayProfileDefinition = {
+  id: string;
+  titleKey?: string;
+  light?: DisplayColorPalette;
+  dark?: DisplayColorPalette;
 };
 
 export type BasePlayerDefinition = {
@@ -478,6 +505,7 @@ export type ContributionDraft = {
   notes: string;
   basePlayer?: BasePlayerDefinition;
   combatBalance?: CombatBalanceDefinition;
+  displayProfiles?: DisplayProfileDefinition[];
   ui?: UniverseUiSettings;
   locations: LocationNode[];
   edges: TravelEdgeDefinition[];

@@ -80,6 +80,21 @@ const warning = (path: string, message: string, params?: Record<string, string |
 const validateStringArray = (value: unknown) => value === undefined
   || (Array.isArray(value) && value.every((entry) => typeof entry === 'string' && entry.length > 0));
 
+const validateDisplayPaletteShape = (value: unknown) =>
+  value === undefined ||
+  (isRecord(value) && Object.values(value).every((color) => typeof color === 'string' && /^#[0-9a-fA-F]{6}$/.test(color)));
+
+const validateDisplayProfilesShape = (value: unknown) =>
+  value === undefined ||
+  (Array.isArray(value) &&
+    value.every((profile) =>
+      isRecord(profile) &&
+      hasString(profile, 'id') &&
+      (profile.titleKey === undefined || hasString(profile, 'titleKey')) &&
+      validateDisplayPaletteShape(profile.light) &&
+      validateDisplayPaletteShape(profile.dark),
+    ));
+
 const validateResetStateShape = (value: unknown) => {
   if (!isRecord(value)
     || (value.locationId !== undefined && !hasString(value, 'locationId'))
@@ -114,6 +129,7 @@ export const validateManifest = (value: unknown): value is UniverseManifest =>
     (isRecord(value.combatBalance) &&
       hasNumber(value.combatBalance, 'expectedHitsToKill') &&
       hasNumber(value.combatBalance, 'combatSpread'))) &&
+  validateDisplayProfilesShape(value.displayProfiles) &&
   (value.ui === undefined ||
     (isRecord(value.ui) &&
       (value.ui.floatingTextDurationSeconds === undefined || hasNumber(value.ui, 'floatingTextDurationSeconds')) &&
@@ -831,11 +847,12 @@ export const mergeDraftIntoBundle = (bundle: ContentBundle, draft: ContributionD
 
   return {
     ...bundle,
-    manifest: draft.basePlayer || draft.combatBalance || draft.ui
+    manifest: draft.basePlayer || draft.combatBalance || draft.displayProfiles || draft.ui
       ? {
           ...bundle.manifest,
           ...(draft.basePlayer ? { basePlayer: draft.basePlayer } : {}),
           ...(draft.combatBalance ? { combatBalance: draft.combatBalance } : {}),
+          ...(draft.displayProfiles ? { displayProfiles: draft.displayProfiles } : {}),
           ...(draft.ui ? { ui: draft.ui } : {}),
         }
       : bundle.manifest,

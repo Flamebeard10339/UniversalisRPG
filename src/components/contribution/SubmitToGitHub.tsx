@@ -20,7 +20,7 @@ export const SubmitToGitHub = ({ appVersion, draft, validationIssues, t }: Submi
       validationIssues,
       t,
       changedFiles: [
-        { path: 'universe.json', json: { ...basePlayerPatch, ...(draft.combatBalance ? { combatBalance: draft.combatBalance } : {}), ...(draft.ui ? { ui: draft.ui } : {}) } },
+        { path: 'universe.json', json: { ...basePlayerPatch, ...(draft.combatBalance ? { combatBalance: draft.combatBalance } : {}), ...(draft.displayProfiles ? { displayProfiles: draft.displayProfiles } : {}), ...(draft.ui ? { ui: draft.ui } : {}) } },
         { path: 'locations.json', json: draft.locations },
         { path: 'edges.json', json: draft.edges },
         { path: 'actions.json', json: draft.actions },
