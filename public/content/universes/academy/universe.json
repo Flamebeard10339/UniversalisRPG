@@ -15,25 +15,7 @@
     {
       "id": "quiet-academy",
       "titleKey": "displayProfile.quiet-academy.title",
-      "light": {
-        "background": "#f6f3ff",
-        "surface": "#fffefe",
-        "surfaceRaised": "#efeafb",
-        "panel": "#e2daf3",
-        "border": "#c8bfe0",
-        "text": "#1d1b28",
-        "textMuted": "#504a63",
-        "textSubtle": "#756f86",
-        "accent": "#4477aa",
-        "accentStrong": "#315f8f",
-        "accentText": "#f7fbff",
-        "danger": "#be3455",
-        "dangerSurface": "#fff0f4",
-        "dangerText": "#8f2440",
-        "success": "#24846b",
-        "warning": "#ad7416"
-      },
-      "dark": {
+      "colors": {
         "background": "#11111b",
         "surface": "#1b1b28",
         "surfaceRaised": "#232335",

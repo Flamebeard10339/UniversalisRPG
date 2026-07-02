@@ -11,6 +11,7 @@ export type StructuredField = {
 };
 export type StructuredSchema =
   | { kind: 'string'; suggestions?: string[] }
+  | { kind: 'color' }
   | { kind: 'number'; min?: number; max?: number; step?: number }
   | { kind: 'boolean' }
   | { kind: 'enum'; options: string[] }
@@ -95,6 +96,9 @@ const PrimitiveEditor = ({
   }
   if (schema.kind === 'number') {
     return <input aria-label={accessibleLabel} className={inputClass} max={schema.max} min={schema.min} onChange={(event) => { const next = Number(event.target.value); if (Number.isFinite(next)) onChange(next); }} step={schema.step} type="number" value={typeof value === 'number' ? value : 0} />;
+  }
+  if (schema.kind === 'color') {
+    return <input aria-label={accessibleLabel} className="h-9 w-12 rounded border border-slate-700 bg-slate-900 p-1" onChange={(event) => onChange(event.target.value)} type="color" value={typeof value === 'string' && /^#[0-9a-fA-F]{6}$/.test(value) ? value : '#000000'} />;
   }
   return (
     <>
@@ -321,7 +325,7 @@ const EditorNode = ({ hiddenKeys = [], label, onChange, optional, schema: schema
     <div className="grid min-w-0 flex-1 gap-1">
       {label && <span className="text-xs text-slate-400">{labelText(label, t)}</span>}
       <div className="flex min-w-0 items-center gap-2">
-        <PrimitiveEditor accessibleLabel={label ? labelText(label, t) : undefined} onChange={onChange} schema={schema as Extract<StructuredSchema, { kind: 'string' | 'number' | 'boolean' | 'enum' }>} value={value} />
+        <PrimitiveEditor accessibleLabel={label ? labelText(label, t) : undefined} onChange={onChange} schema={schema as Extract<StructuredSchema, { kind: 'string' | 'color' | 'number' | 'boolean' | 'enum' }>} value={value} />
         {optional && <button className="text-xs text-rose-300" onClick={() => onChange(undefined)} type="button">{t('structured.remove')}</button>}
       </div>
     </div>

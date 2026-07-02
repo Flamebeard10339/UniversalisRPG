@@ -91,6 +91,7 @@ const validateDisplayProfilesShape = (value: unknown) =>
       isRecord(profile) &&
       hasString(profile, 'id') &&
       (profile.titleKey === undefined || hasString(profile, 'titleKey')) &&
+      validateDisplayPaletteShape(profile.colors) &&
       validateDisplayPaletteShape(profile.light) &&
       validateDisplayPaletteShape(profile.dark),
     ));

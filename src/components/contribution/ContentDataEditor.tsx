@@ -870,6 +870,13 @@ export const ContentDataEditor = ({ activeTab, baseBundle, bundle, draft, onPatc
             <details className="rounded bg-slate-950 p-2" key={file.path}>
               <summary className="cursor-pointer text-sm font-semibold text-slate-100">{file.path}</summary>
               <div className="mt-2">
+                <button
+                  className="mb-2 rounded border border-slate-600 px-3 py-1.5 text-xs font-semibold text-slate-100"
+                  onClick={() => void navigator.clipboard.writeText(JSON.stringify(file.json, null, 2))}
+                  type="button"
+                >
+                  {t('contribution.data.copyJson')}
+                </button>
                 <StructuredDataEditor onChange={file.onChange} schema={file.schema ?? { kind: 'inferred' }} t={t} value={file.json as unknown as StructuredValue} />
               </div>
             </details>

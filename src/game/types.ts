@@ -44,6 +44,7 @@ export type DisplayColorPalette = {
 export type DisplayProfileDefinition = {
   id: string;
   titleKey?: string;
+  colors?: DisplayColorPalette;
   light?: DisplayColorPalette;
   dark?: DisplayColorPalette;
 };

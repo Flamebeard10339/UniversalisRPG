@@ -15,25 +15,7 @@
     {
       "id": "first-road",
       "titleKey": "displayProfile.first-road.title",
-      "light": {
-        "background": "#f4f7f1",
-        "surface": "#fffdf7",
-        "surfaceRaised": "#edf4e9",
-        "panel": "#dce8d4",
-        "border": "#b9c8ad",
-        "text": "#182217",
-        "textMuted": "#44513f",
-        "textSubtle": "#66715f",
-        "accent": "#2f8f8a",
-        "accentStrong": "#246f6b",
-        "accentText": "#f8fffd",
-        "danger": "#b42318",
-        "dangerSurface": "#fff0ed",
-        "dangerText": "#8a1f14",
-        "success": "#2f855a",
-        "warning": "#b7791f"
-      },
-      "dark": {
+      "colors": {
         "background": "#10160f",
         "surface": "#182116",
         "surfaceRaised": "#202b1d",

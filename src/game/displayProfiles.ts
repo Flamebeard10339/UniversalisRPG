@@ -22,10 +22,10 @@ export const displayColorKeys = [
   'warning',
 ] as const satisfies readonly (keyof DisplayColorPalette)[];
 
-export const defaultDisplayProfile: { id: string; titleKey?: string; light: FullDisplayColorPalette; dark: FullDisplayColorPalette } = {
-  id: 'default',
-  titleKey: 'displayProfile.default.title',
-  light: {
+export const lightDisplayProfile: DisplayProfileDefinition & { colors: FullDisplayColorPalette } = {
+  id: 'light',
+  titleKey: 'displayProfile.light.title',
+  colors: {
     background: '#f5f7fb',
     surface: '#ffffff',
     surfaceRaised: '#eef3f8',
@@ -43,7 +43,12 @@ export const defaultDisplayProfile: { id: string; titleKey?: string; light: Full
     success: '#059669',
     warning: '#d97706',
   },
-  dark: {
+};
+
+export const darkDisplayProfile: DisplayProfileDefinition & { colors: FullDisplayColorPalette } = {
+  id: 'dark',
+  titleKey: 'displayProfile.dark.title',
+  colors: {
     background: '#0b1020',
     surface: '#111827',
     surfaceRaised: '#0f172a',
@@ -63,10 +68,11 @@ export const defaultDisplayProfile: { id: string; titleKey?: string; light: Full
   },
 };
 
+export const defaultDisplayProfile = darkDisplayProfile;
+
 export const createCustomDisplayProfile = (): DisplayProfileDefinition => ({
   id: 'custom',
-  light: { ...defaultDisplayProfile.light },
-  dark: { ...defaultDisplayProfile.dark },
+  colors: { ...darkDisplayProfile.colors },
 });
 
 export const resolveDisplayScheme = (preference: 'system' | DisplayScheme): DisplayScheme => {
@@ -80,24 +86,34 @@ export const findDisplayProfile = (
   manifest: UniverseManifest,
   profileId: string,
   customProfile: DisplayProfileDefinition,
-) => {
+): DisplayProfileDefinition => {
   if (profileId === 'custom') return customProfile;
-  if (profileId === defaultDisplayProfile.id) return defaultDisplayProfile;
-  return manifest.displayProfiles?.find((profile) => profile.id === profileId) ?? defaultDisplayProfile;
+  if (profileId === lightDisplayProfile.id) return lightDisplayProfile;
+  if (profileId === darkDisplayProfile.id || profileId === 'default') return darkDisplayProfile;
+  return manifest.displayProfiles?.find((profile) => profile.id === profileId) ?? darkDisplayProfile;
 };
 
 export const resolveDisplayPalette = (
   manifest: UniverseManifest,
   profileId: string,
   customProfile: DisplayProfileDefinition,
-  scheme: DisplayScheme,
+  scheme: DisplayScheme = 'dark',
 ): FullDisplayColorPalette => {
   const profile = findDisplayProfile(manifest, profileId, customProfile);
-  const profilePalette = profile[scheme] ?? {};
+  const fallback = profileId === 'light' ? lightDisplayProfile.colors : darkDisplayProfile.colors;
+  const profilePalette = profile.colors ?? profile[scheme] ?? profile.dark ?? profile.light ?? {};
   return {
-    ...defaultDisplayProfile[scheme],
+    ...fallback,
     ...profilePalette,
   };
+};
+
+export const isLightPalette = (palette: FullDisplayColorPalette) => {
+  const hex = palette.background.replace('#', '');
+  const red = Number.parseInt(hex.slice(0, 2), 16);
+  const green = Number.parseInt(hex.slice(2, 4), 16);
+  const blue = Number.parseInt(hex.slice(4, 6), 16);
+  return (red * 299 + green * 587 + blue * 114) / 1000 > 150;
 };
 
 export const applyDisplayPalette = (palette: FullDisplayColorPalette) => {

@@ -16,11 +16,12 @@ import { actionTitleKey, interactionTitleKey, itemTitleKey, locationDescriptionK
 import {
   applyDisplayPalette,
   createCustomDisplayProfile,
-  defaultDisplayProfile,
+  darkDisplayProfile,
   displayColorKeys,
+  isLightPalette,
+  lightDisplayProfile,
   profileTitleKey,
   resolveDisplayPalette,
-  resolveDisplayScheme,
 } from './game/displayProfiles';
 import { getInteractionType, isContinuousAction } from './game/adversarial';
 import type { ContributionDraft, DisplayColorPalette, DisplayProfileDefinition, IdleReport, UniversePlayState } from './game/types';
@@ -40,14 +41,13 @@ const getStartingLocationId = (bundle: NonNullable<ReturnType<typeof useUniverse
 type AppTab = 'map' | 'home' | 'character' | 'settings';
 type HomeTab = 'actions' | 'details' | 'workbench';
 type CharacterTab = 'skills' | 'inventory' | 'stats';
-type ThemePreference = 'system' | 'dark' | 'light';
 type FontSizePreference = 'tiny' | 'small' | 'normal' | 'large' | 'huge';
 type AppearanceSettings = {
   chatCompressionEnabled?: boolean;
   customDisplayProfile?: DisplayProfileDefinition;
   displayProfileSelections?: Record<string, string>;
   fontSize: FontSizePreference;
-  theme: ThemePreference;
+  theme?: 'system' | 'dark' | 'light';
 };
 type ContributionUiSettings = {
   contentDataTab?: ContentDataTab;
@@ -102,11 +102,11 @@ export default function App() {
   const [contributionTab, setContributionTab] = useState<ContributionTab>('content');
   const [contentDataTab, setContentDataTab] = useState<ContentDataTab>('map');
   const [characterTab, setCharacterTab] = useState<CharacterTab>('skills');
-  const [themePreference, setThemePreference] = useState<ThemePreference>('dark');
   const [fontSizePreference, setFontSizePreference] = useState<FontSizePreference>('normal');
   const [chatCompressionEnabled, setChatCompressionEnabled] = useState(true);
   const [customDisplayProfile, setCustomDisplayProfile] = useState<DisplayProfileDefinition>(() => createCustomDisplayProfile());
   const [displayProfileSelections, setDisplayProfileSelections] = useState<Record<string, string>>({});
+  const [themeEditorOpen, setThemeEditorOpen] = useState(false);
   const [appearanceLoaded, setAppearanceLoaded] = useState(false);
   const [contributionUiLoaded, setContributionUiLoaded] = useState(false);
   const [showChangelog, setShowChangelog] = useState(false);
@@ -170,7 +170,6 @@ export default function App() {
         setAppearanceLoaded(true);
         return;
       }
-      setThemePreference(settings.theme ?? 'dark');
       setFontSizePreference(settings.fontSize ?? 'normal');
       setChatCompressionEnabled(settings.chatCompressionEnabled ?? true);
       setCustomDisplayProfile(settings.customDisplayProfile ?? createCustomDisplayProfile());
@@ -181,21 +180,20 @@ export default function App() {
 
   useEffect(() => {
     document.documentElement.dataset.fontSize = fontSizePreference;
-    const scheme = resolveDisplayScheme(themePreference);
-    document.documentElement.dataset.theme = scheme;
     if (bundle) {
-      const selectedProfileId = displayProfileSelections[bundle.manifest.id] ?? bundle.manifest.displayProfiles?.[0]?.id ?? defaultDisplayProfile.id;
-      applyDisplayPalette(resolveDisplayPalette(bundle.manifest, selectedProfileId, customDisplayProfile, scheme));
+      const selectedProfileId = displayProfileSelections[bundle.manifest.id] ?? bundle.manifest.displayProfiles?.[0]?.id ?? darkDisplayProfile.id;
+      const palette = resolveDisplayPalette(bundle.manifest, selectedProfileId, customDisplayProfile);
+      document.documentElement.dataset.theme = isLightPalette(palette) ? 'light' : 'dark';
+      applyDisplayPalette(palette);
     }
     if (!appearanceLoaded) return;
     void save(appearanceKey, {
       chatCompressionEnabled,
       customDisplayProfile,
       displayProfileSelections,
-      theme: themePreference,
       fontSize: fontSizePreference,
     });
-  }, [appearanceLoaded, bundle, chatCompressionEnabled, customDisplayProfile, displayProfileSelections, fontSizePreference, themePreference]);
+  }, [appearanceLoaded, bundle, chatCompressionEnabled, customDisplayProfile, displayProfileSelections, fontSizePreference]);
 
   useEffect(() => {
     if (!appearanceLoaded || !bundle || displayProfileSelections[bundle.manifest.id]) {
@@ -204,7 +202,7 @@ export default function App() {
 
     setDisplayProfileSelections((selections) => ({
       ...selections,
-      [bundle.manifest.id]: bundle.manifest.displayProfiles?.[0]?.id ?? defaultDisplayProfile.id,
+      [bundle.manifest.id]: bundle.manifest.displayProfiles?.[0]?.id ?? darkDisplayProfile.id,
     }));
   }, [appearanceLoaded, bundle, displayProfileSelections]);
 
@@ -241,11 +239,14 @@ export default function App() {
   const startingLocationId = useMemo(() => (bundle ? getStartingLocationId(bundle) : ''), [bundle]);
   const activeBundleId = bundle?.manifest.id;
   const selectedDisplayProfileId = bundle
-    ? displayProfileSelections[bundle.manifest.id] ?? bundle.manifest.displayProfiles?.[0]?.id ?? defaultDisplayProfile.id
-    : defaultDisplayProfile.id;
+    ? displayProfileSelections[bundle.manifest.id] ?? bundle.manifest.displayProfiles?.[0]?.id ?? darkDisplayProfile.id
+    : darkDisplayProfile.id;
+  const currentPalette = bundle ? resolveDisplayPalette(bundle.manifest, selectedDisplayProfileId, customDisplayProfile) : darkDisplayProfile.colors;
+  const customPalette = bundle ? resolveDisplayPalette(bundle.manifest, 'custom', customDisplayProfile) : darkDisplayProfile.colors;
   const displayProfileOptions = bundle
     ? [
-        defaultDisplayProfile,
+        lightDisplayProfile,
+        darkDisplayProfile,
         ...(bundle.manifest.displayProfiles ?? []),
         { id: 'custom', titleKey: 'settings.displayProfile.custom' },
       ]
@@ -266,14 +267,37 @@ export default function App() {
     dialogues: bundle?.dialogues ?? [],
   }), [bundle]);
   const playState = bundle ? gameStates[runtimeUniverseId] ?? getUniverseState(runtimeUniverseId, startingLocationId, { manifest: bundle.manifest }) : null;
-  const updateCustomColor = (scheme: 'light' | 'dark', key: keyof DisplayColorPalette, value: string) => {
+  const copySelectedProfileToCustom = () => {
+    if (!bundle) return;
+    setCustomDisplayProfile({
+      id: 'custom',
+      colors: currentPalette,
+    });
+    setDisplayProfileSelections((selections) => ({
+      ...selections,
+      [bundle.manifest.id]: 'custom',
+    }));
+  };
+  const updateCustomColor = (key: keyof DisplayColorPalette, value: string) => {
+    if (bundle && selectedDisplayProfileId !== 'custom') {
+      setDisplayProfileSelections((selections) => ({
+        ...selections,
+        [bundle.manifest.id]: 'custom',
+      }));
+    }
     setCustomDisplayProfile((profile) => ({
       ...profile,
-      [scheme]: {
-        ...(profile[scheme] ?? {}),
+      colors: {
+        ...(profile.colors ?? {}),
         [key]: value,
       },
     }));
+  };
+  const openThemeEditor = (open: boolean) => {
+    setThemeEditorOpen(open);
+    if (open && selectedDisplayProfileId !== 'custom') {
+      copySelectedProfileToCustom();
+    }
   };
   const visibleHomeTab = homeTab === 'workbench' && !contributionMode ? 'actions' : homeTab;
   const currentLocation = bundle?.locations.find((location) => location.id === playState?.currentLocationId);
@@ -707,18 +731,6 @@ export default function App() {
               <section className="grid gap-3 rounded border border-slate-800 bg-slate-950 p-3">
                 <h3 className="text-sm font-semibold text-slate-100">{t('settings.appearance.title')}</h3>
                 <label className="flex items-center justify-between gap-4">
-                  <span className="text-sm text-slate-300">{t('settings.appearance.theme')}</span>
-                  <select
-                    className="w-56 rounded border border-slate-700 bg-slate-900 px-3 py-2 text-sm"
-                  onChange={(event) => { dismissDialogue(); setThemePreference(event.target.value as ThemePreference); }}
-                    value={themePreference}
-                  >
-                    <option value="system">{t('settings.theme.system')}</option>
-                    <option value="dark">{t('settings.theme.dark')}</option>
-                    <option value="light">{t('settings.theme.light')}</option>
-                  </select>
-                </label>
-                <label className="flex items-center justify-between gap-4">
                   <span className="text-sm text-slate-300">{t('settings.appearance.displayProfile')}</span>
                   <select
                     className="w-56 rounded border border-slate-700 bg-slate-900 px-3 py-2 text-sm"
@@ -738,6 +750,52 @@ export default function App() {
                     ))}
                   </select>
                 </label>
+                <details className="rounded border border-slate-800 bg-slate-900/60 p-3" onToggle={(event) => openThemeEditor(event.currentTarget.open)} open={themeEditorOpen}>
+                  <summary className="cursor-pointer text-sm font-semibold text-slate-100">{t('settings.displayProfile.editCurrent')}</summary>
+                  <section className="mt-3 grid gap-3">
+                    <div className="grid gap-2 rounded border p-3" style={{ background: customPalette.background, borderColor: customPalette.border, color: customPalette.text }}>
+                      <div className="grid gap-2 rounded border p-3" style={{ background: customPalette.surface, borderColor: customPalette.border }}>
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div>
+                            <p className="text-sm font-semibold" style={{ color: customPalette.text }}>{t('settings.displayProfile.previewTitle')}</p>
+                            <p className="text-xs" style={{ color: customPalette.textMuted }}>{t('settings.displayProfile.previewMuted')}</p>
+                          </div>
+                          <button className="rounded px-3 py-2 text-sm font-semibold" style={{ background: customPalette.accent, color: customPalette.accentText }} type="button">
+                            {t('settings.displayProfile.previewButton')}
+                          </button>
+                        </div>
+                        <div className="grid gap-2 sm:grid-cols-3">
+                          <div className="rounded border p-2" style={{ background: customPalette.surfaceRaised, borderColor: customPalette.border }}>
+                            <span className="block text-xs" style={{ color: customPalette.textSubtle }}>{t('settings.color.surfaceRaised')}</span>
+                            <span className="block text-sm font-semibold" style={{ color: customPalette.text }}>{t('settings.displayProfile.previewPanel')}</span>
+                          </div>
+                          <div className="rounded border p-2" style={{ background: customPalette.dangerSurface, borderColor: customPalette.danger }}>
+                            <span className="block text-xs" style={{ color: customPalette.dangerText }}>{t('settings.color.danger')}</span>
+                            <span className="block text-sm font-semibold" style={{ color: customPalette.dangerText }}>{t('settings.displayProfile.previewAlert')}</span>
+                          </div>
+                          <div className="rounded border p-2" style={{ background: customPalette.panel, borderColor: customPalette.border }}>
+                            <span className="block text-xs" style={{ color: customPalette.success }}>{t('settings.color.success')}</span>
+                            <span className="block text-xs" style={{ color: customPalette.warning }}>{t('settings.color.warning')}</span>
+                            <span className="block text-sm font-semibold" style={{ color: customPalette.accentStrong }}>{t('settings.color.accentStrong')}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                      {displayColorKeys.map((key) => (
+                        <label className="grid grid-cols-[1fr_auto] items-center gap-2 rounded bg-slate-950 p-2 text-xs text-slate-300" key={key}>
+                          <span>{t(`settings.color.${key}`)}</span>
+                          <input
+                            className={colorInputClass}
+                            onChange={(event) => updateCustomColor(key, event.target.value)}
+                            type="color"
+                            value={customDisplayProfile.colors?.[key] ?? customPalette[key]}
+                          />
+                        </label>
+                      ))}
+                    </div>
+                  </section>
+                </details>
                 <label className="flex items-center justify-between gap-4">
                   <span className="text-sm text-slate-300">{t('settings.appearance.fontSize')}</span>
                   <select
@@ -776,29 +834,6 @@ export default function App() {
                     type="checkbox"
                   />
                 </label>
-                {selectedDisplayProfileId === 'custom' && (
-                  <section className="grid gap-3 rounded border border-slate-800 bg-slate-900/60 p-3">
-                    <h4 className="text-sm font-semibold text-slate-100">{t('settings.displayProfile.customEditor')}</h4>
-                    {(['light', 'dark'] as const).map((scheme) => (
-                      <section className="grid gap-2" key={scheme}>
-                        <h5 className="text-xs font-semibold uppercase text-slate-500">{t(`settings.theme.${scheme}`)}</h5>
-                        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-                          {displayColorKeys.map((key) => (
-                            <label className="grid grid-cols-[1fr_auto] items-center gap-2 rounded bg-slate-950 p-2 text-xs text-slate-300" key={`${scheme}-${key}`}>
-                              <span>{t(`settings.color.${key}`)}</span>
-                              <input
-                                className={colorInputClass}
-                                onChange={(event) => updateCustomColor(scheme, key, event.target.value)}
-                                type="color"
-                                value={customDisplayProfile[scheme]?.[key] ?? defaultDisplayProfile[scheme][key]}
-                              />
-                            </label>
-                          ))}
-                        </div>
-                      </section>
-                    ))}
-                  </section>
-                )}
               </section>
 
               <section className="grid gap-3 rounded border border-slate-800 bg-slate-950 p-3">

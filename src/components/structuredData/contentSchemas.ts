@@ -4,6 +4,7 @@ import { stateVariableKeys } from '../../game/stateVariables';
 import type { StructuredSchema } from './StructuredData';
 
 const string = (suggestions?: string[]): StructuredSchema => ({ kind: 'string', suggestions });
+const color: StructuredSchema = { kind: 'color' };
 const number = (min?: number): StructuredSchema => ({ kind: 'number', min });
 const boolean: StructuredSchema = { kind: 'boolean' };
 const comparison: StructuredSchema = { kind: 'enum', options: ['equal', 'greater-than', 'less-than'] };
@@ -226,14 +227,13 @@ export const combatBalanceSchema = (): StructuredSchema => ({ kind: 'object', fi
 } });
 
 const displayPaletteSchema = (): StructuredSchema => ({ kind: 'object', fields: Object.fromEntries(
-  displayColorKeys.map((key) => [key, { label: `settings.color.${key}`, schema: string(), optional: true }]),
+  displayColorKeys.map((key) => [key, { label: `settings.color.${key}`, schema: color, optional: true }]),
 ) });
 
 export const displayProfileSchema = (): StructuredSchema => ({ kind: 'object', fields: {
   id: { label: 'contribution.column.id', schema: string() },
   titleKey: { label: 'contribution.column.titleKey', schema: string(), optional: true },
-  light: { label: 'settings.theme.light', schema: displayPaletteSchema(), optional: true, defaultValue: {} },
-  dark: { label: 'settings.theme.dark', schema: displayPaletteSchema(), optional: true, defaultValue: {} },
+  colors: { label: 'contribution.data.displayProfileColors', schema: displayPaletteSchema(), optional: true, defaultValue: {} },
 } });
 
 export const universeUiSchema = (): StructuredSchema => ({ kind: 'object', fields: {

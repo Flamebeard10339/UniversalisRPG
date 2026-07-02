@@ -49,6 +49,7 @@
         "properties": {
           "id": { "type": "string", "minLength": 1 },
           "titleKey": { "type": "string", "minLength": 1 },
+          "colors": { "$ref": "#/$defs/displayPalette" },
           "light": { "$ref": "#/$defs/displayPalette" },
           "dark": { "$ref": "#/$defs/displayPalette" }
         }
