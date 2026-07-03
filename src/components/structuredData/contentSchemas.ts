@@ -18,6 +18,12 @@ export const locationSchema = (): StructuredSchema => ({ kind: 'object', fields:
   position: { schema: { kind: 'object', fields: { x: { schema: number() }, y: { schema: number() } } } },
   starting: { schema: boolean, optional: true, defaultValue: false },
   tags: { schema: { kind: 'array', listMode: 'tags', item: string(), createItem: () => '' }, optional: true, defaultValue: [] },
+  entities: { schema: { kind: 'array', listMode: 'tags', item: string(), createItem: () => '' }, optional: true, defaultValue: [] },
+} });
+
+export const entityDefinitionSchema = (bundle: ContentBundle): StructuredSchema => ({ kind: 'object', fields: {
+  id: { label: 'contribution.column.id', schema: string() },
+  actionIds: { label: 'contribution.data.actions', schema: { kind: 'array', listMode: 'tags', item: string(bundle.actions.map((action) => action.id)), createItem: () => bundle.actions[0]?.id ?? '' } },
 } });
 
 export const edgeSchema = (bundle: ContentBundle): StructuredSchema => ({ kind: 'object', fields: {
@@ -252,6 +258,7 @@ export const displayProfileSchema = (): StructuredSchema => ({ kind: 'object', f
 export const moduleDataSectionSchema = (bundle: ContentBundle): StructuredSchema => ({ kind: 'object', fields: {
   locations: { label: 'contribution.data.locations', schema: { kind: 'array', listMode: 'free', item: locationSchema(), createItem: () => ({ id: 'new-location', position: { x: 0, y: 0 } }) }, optional: true, defaultValue: [] },
   edges: { label: 'contribution.data.edges', schema: { kind: 'array', listMode: 'table', columns: ['id', 'source', 'target', 'travelTimeSeconds'], item: edgeSchema(bundle), createItem: () => ({ id: 'new-edge', source: bundle.locations[0]?.id ?? '', target: bundle.locations[1]?.id ?? '', travelTimeSeconds: 1 }) }, optional: true, defaultValue: [] },
+  entities: { label: 'contribution.data.entities', schema: { kind: 'array', listMode: 'free', item: entityDefinitionSchema(bundle), createItem: () => ({ id: 'new-entity', actionIds: [] }) }, optional: true, defaultValue: [] },
   actions: { label: 'contribution.data.actions', schema: { kind: 'array', listMode: 'free', item: actionSchema(bundle), createItem: () => ({ id: 'new-action', locationId: bundle.locations[0]?.id ?? '', durationSeconds: 1, rewards: [] }) }, optional: true, defaultValue: [] },
   skills: { label: 'contribution.data.skills', schema: { kind: 'array', listMode: 'table', columns: ['id', 'maxLevel', 'statId'], item: skillDefinitionSchema(bundle), createItem: () => ({ id: 'new-skill', maxLevel: 100 }) }, optional: true, defaultValue: [] },
   stats: { label: 'contribution.data.stats', schema: { kind: 'array', listMode: 'table', columns: ['id', 'base'], item: statDefinitionSchema(), createItem: () => ({ id: 'new-stat', base: 0 }) }, optional: true, defaultValue: [] },
@@ -297,6 +304,7 @@ const dialogueOptionRemovalSchema = (bundle: ContentBundle): StructuredSchema =>
 export const moduleRemoveSchema = (bundle: ContentBundle): StructuredSchema => ({ kind: 'object', fields: {
   locations: { label: 'contribution.data.locations', schema: idListSchema(bundle.locations.map((item) => item.id)), optional: true, defaultValue: [] },
   edges: { label: 'contribution.data.edges', schema: idListSchema(bundle.edges.map((item) => item.id)), optional: true, defaultValue: [] },
+  entities: { label: 'contribution.data.entities', schema: idListSchema((bundle.entities ?? []).map((item) => item.id)), optional: true, defaultValue: [] },
   actions: { label: 'contribution.data.actions', schema: idListSchema(bundle.actions.map((item) => item.id)), optional: true, defaultValue: [] },
   skills: { label: 'contribution.data.skills', schema: idListSchema(bundle.skills.map((item) => item.id)), optional: true, defaultValue: [] },
   stats: { label: 'contribution.data.stats', schema: idListSchema(bundle.stats.map((item) => item.id)), optional: true, defaultValue: [] },

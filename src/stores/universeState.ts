@@ -97,6 +97,7 @@ const applyModulesAndDraft = (bundle: ContentBundle | null, enabledModules: Reco
 const normalizeContentBundle = (bundle: ContentBundle): ContentBundle => ({
   ...bundle,
   actions: bundle.actions.map(normalizeGameAction),
+  entities: bundle.entities ?? [],
   items: bundle.items ?? [],
   flags: bundle.flags ?? [],
   resourceDefinitions: bundle.resourceDefinitions ?? [],

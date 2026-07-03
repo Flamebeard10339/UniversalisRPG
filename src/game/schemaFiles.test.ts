@@ -60,6 +60,11 @@ describe('json schema files', () => {
             rewards: { items: { $ref: string } };
           };
         };
+        entityEntry: {
+          additionalProperties: boolean;
+          required: string[];
+          properties: { type: { enum: string[] }; actionIds: unknown };
+        };
         itemEntry: {
           additionalProperties: boolean;
           required: string[];
@@ -78,6 +83,7 @@ describe('json schema files', () => {
     expect(moduleSchema.$defs.typedDataSection.items).toEqual({ $ref: '#/$defs/dataEntry' });
     expect(moduleSchema.$defs.dataEntry.oneOf).toEqual(expect.arrayContaining([
       { $ref: '#/$defs/actionEntry' },
+      { $ref: '#/$defs/entityEntry' },
       { $ref: '#/$defs/itemEntry' },
       { $ref: '#/$defs/resourceEntry' },
     ]));
@@ -86,15 +92,21 @@ describe('json schema files', () => {
       { $ref: '#/$defs/removeEntry' },
     ]);
     expect(moduleSchema.$defs.removeEntry.properties.type.const).toBe('remove');
-    expect(moduleSchema.$defs.removeEntry.properties.target.enum).toEqual(expect.arrayContaining(['items', 'dialogueOptions', 'locales']));
+    expect(moduleSchema.$defs.removeEntry.properties.target.enum).toEqual(expect.arrayContaining(['entities', 'items', 'dialogueOptions', 'locales']));
     expect(moduleSchema.$defs.removeEntry.allOf).toHaveLength(1);
     expect(moduleSchema.$defs.actionEntry).toMatchObject({
       additionalProperties: false,
-      required: expect.arrayContaining(['id', 'type', 'locationId', 'durationSeconds', 'rewards']),
+      required: expect.arrayContaining(['id', 'type', 'durationSeconds', 'rewards']),
       properties: {
         type: { enum: ['action', 'actions'] },
         rewards: { items: { $ref: 'https://universalis-rpg.local/schema/actions.schema.json#/$defs/reward' } },
       },
+    });
+    expect(moduleSchema.$defs.actionEntry.required).not.toContain('locationId');
+    expect(moduleSchema.$defs.entityEntry).toMatchObject({
+      additionalProperties: false,
+      required: expect.arrayContaining(['id', 'type', 'actionIds']),
+      properties: { type: { enum: ['entity', 'entities'] } },
     });
     expect(moduleSchema.$defs.actionEntry.properties.durationSeconds).toEqual(actionsSchema.items.properties.durationSeconds);
     expect(moduleSchema.$defs.itemEntry).toMatchObject({

@@ -80,6 +80,7 @@ export type LocationNode = {
   position: Position;
   starting?: boolean;
   tags?: string[];
+  entities?: string[];
 };
 
 export type TravelEdgeDefinition = {
@@ -167,7 +168,7 @@ export type ActionResult =
 
 export type GameAction = {
   id: string;
-  locationId: string;
+  locationId?: string;
   role?: 'optional' | 'progression' | 'utility';
   durationSeconds: number;
   rewards: Reward[];
@@ -178,6 +179,11 @@ export type GameAction = {
   maxCompletions?: number;
   enemyId?: string;
   interactionTypeId?: string;
+};
+
+export type EntityDefinition = {
+  id: string;
+  actionIds: string[];
 };
 
 export type SkillDefinition = {
@@ -315,6 +321,7 @@ export type ContentBundle = {
   manifest: UniverseManifest;
   locations: LocationNode[];
   edges: TravelEdgeDefinition[];
+  entities?: EntityDefinition[];
   actions: GameAction[];
   skills: SkillDefinition[];
   stats: StatDefinition[];
@@ -335,6 +342,7 @@ export type ContentBundle = {
 export type ModuleDataSectionObject = {
   locations?: LocationNode[];
   edges?: TravelEdgeDefinition[];
+  entities?: EntityDefinition[];
   actions?: GameAction[];
   skills?: SkillDefinition[];
   stats?: StatDefinition[];
@@ -365,6 +373,7 @@ export type ModuleDataUpdatesObject = ModuleDataSectionObject & {
   remove?: {
     locations?: string[];
     edges?: string[];
+    entities?: string[];
     actions?: string[];
     skills?: string[];
     stats?: string[];
@@ -530,6 +539,7 @@ export type ActionResolutionContext = {
   skills: SkillDefinition[];
   stats?: StatDefinition[];
   locations?: LocationNode[];
+  entities?: EntityDefinition[];
   manifest?: UniverseManifest;
   items?: ItemDefinition[];
   flags?: StateFlagDefinition[];
@@ -595,6 +605,7 @@ export type ContributionDraft = {
   modulePacks: ContentModulePack[];
   locations: LocationNode[];
   edges: TravelEdgeDefinition[];
+  entities?: EntityDefinition[];
   actions: GameAction[];
   skills: SkillDefinition[];
   stats: StatDefinition[];
@@ -613,6 +624,7 @@ export type ContributionDraft = {
 export type ContributionRemovedIds = {
   locations: string[];
   edges: string[];
+  entities?: string[];
   actions: string[];
   skills: string[];
   stats: string[];

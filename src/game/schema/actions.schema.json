@@ -4,7 +4,7 @@
   "type": "array",
   "items": {
     "type": "object",
-    "required": ["id", "locationId", "durationSeconds", "rewards"],
+    "required": ["id", "durationSeconds", "rewards"],
     "additionalProperties": false,
     "properties": {
       "id": { "type": "string", "minLength": 1 },

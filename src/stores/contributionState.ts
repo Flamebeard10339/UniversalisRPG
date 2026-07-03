@@ -26,6 +26,7 @@ const createEmptyDraft = (universeId: string): ContributionDraft => ({
   modulePacks: [],
   locations: [],
   edges: [],
+  entities: [],
   actions: [],
   skills: [],
   stats: [],
@@ -41,6 +42,7 @@ const createEmptyDraft = (universeId: string): ContributionDraft => ({
   removed: {
     locations: [],
     edges: [],
+    entities: [],
     actions: [],
     skills: [],
     stats: [],
@@ -65,6 +67,7 @@ const normalizeDraft = (draft: ContributionDraft): ContributionDraft => ({
   ui: draft.ui,
   modules: draft.modules ?? [],
   modulePacks: draft.modulePacks ?? [],
+  entities: draft.entities ?? [],
   actions: (draft.actions ?? []).map(normalizeGameAction),
   items: draft.items ?? [],
   flags: draft.flags ?? [],
@@ -78,6 +81,7 @@ const normalizeDraft = (draft: ContributionDraft): ContributionDraft => ({
   removed: {
     ...createEmptyDraft(draft.universeId).removed,
     ...(draft.removed ?? {}),
+    entities: draft.removed?.entities ?? [],
     modules: draft.removed?.modules ?? [],
   },
 });

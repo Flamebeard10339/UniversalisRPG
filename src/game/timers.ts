@@ -1129,7 +1129,7 @@ const appendExhaustedLocationMessage = (
   context: ActionResolutionContext,
   now: number,
 ) => {
-  if (action.role !== 'optional') return state;
+  if (action.role !== 'optional' || !action.locationId) return state;
   const hasRemainingOptionalAction = context.actions.some((candidate) =>
     candidate.locationId === action.locationId
     && candidate.role === 'optional'
@@ -1308,9 +1308,9 @@ const completeActionWithResult = (
       lastTickAt: now,
     };
     const startsDialogue = (action.results ?? []).some((result) => result.kind === 'dialogue');
-    const shouldLoop = !startsDialogue
-      && completedState.actionLoopingEnabled
-      && completedState.currentLocationId === action.locationId
+  const shouldLoop = !startsDialogue
+    && completedState.actionLoopingEnabled
+      && (action.locationId === undefined || completedState.currentLocationId === action.locationId)
       && canStartAction(completedState, action, context);
     const restartTargetHealth = getEnemyStat(enemy, 'health');
 
@@ -1342,7 +1342,7 @@ const completeActionWithResult = (
   const startsDialogue = (action.results ?? []).some((result) => result.kind === 'dialogue');
   const shouldLoop = !startsDialogue
     && completedState.actionLoopingEnabled
-    && completedState.currentLocationId === action.locationId
+    && (action.locationId === undefined || completedState.currentLocationId === action.locationId)
     && canStartAction(completedState, action, context);
   const restartTargetHealth = null;
 

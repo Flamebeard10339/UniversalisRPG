@@ -62,6 +62,7 @@ const uniqueStrings = (items: string[]) => Array.from(new Set(items));
 const emptyRemoved = (): ContributionRemovedIds => ({
   locations: [],
   edges: [],
+  entities: [],
   actions: [],
   skills: [],
   stats: [],
@@ -139,13 +140,13 @@ export const ContentDataEditor = ({ activeTab, baseBundle, bundle, draft, onPatc
 
   const unremoveId = (key: DraftListKey, id: string) => ({
     ...removed,
-    [key]: removed[key].filter((removedId) => removedId !== id),
+    [key]: (removed[key] ?? []).filter((removedId) => removedId !== id),
   });
 
   const promote = <T extends { id: string }>(key: DraftListKey, item: T, originalId = item.id) => {
     onPatch({
       [key]: upsertById(withoutId(draft[key] as T[], originalId), item),
-      removed: originalId === item.id ? unremoveId(key, item.id) : { ...unremoveId(key, item.id), [key]: uniqueStrings([...removed[key], originalId]) },
+      removed: originalId === item.id ? unremoveId(key, item.id) : { ...unremoveId(key, item.id), [key]: uniqueStrings([...(removed[key] ?? []), originalId]) },
     });
   };
 
@@ -155,7 +156,7 @@ export const ContentDataEditor = ({ activeTab, baseBundle, bundle, draft, onPatc
       return;
     }
 
-    onPatch({ removed: { ...removed, [key]: uniqueStrings([...removed[key], row.item.id]) } });
+    onPatch({ removed: { ...removed, [key]: uniqueStrings([...(removed[key] ?? []), row.item.id]) } });
   };
 
   const updateLocation = (row: LayeredRow<LocationNode>, patch: Partial<LocationNode>) => {

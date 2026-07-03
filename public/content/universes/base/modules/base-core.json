@@ -40,6 +40,9 @@
       "starting": true,
       "tags": [
         "settlement"
+      ],
+      "entities": [
+        "goblin"
       ]
     },
     {
@@ -907,6 +910,13 @@
       ]
     },
     {
+      "type": "entity",
+      "id": "goblin",
+      "actionIds": [
+        "fight-goblin"
+      ]
+    },
+    {
       "type": "action",
       "id": "gather-rumors",
       "locationId": "crossroads",
@@ -936,7 +946,6 @@
     {
       "type": "action",
       "id": "fight-goblin",
-      "locationId": "crossroads",
       "durationSeconds": 1,
       "enemyId": "goblin",
       "rewards": [
@@ -1205,7 +1214,9 @@
       "action.speak-to-tutorial-guide.description": "Ask the guide for a little practical advice.",
       "action.speak-to-tutorial-guide.success": "The Tutorial Guide is ready to talk.",
       "action.speak-to-tutorial-guide.failure": "The Tutorial Guide is distracted.",
-      "action.fight-goblin.title": "Fight Goblin",
+      "entity.goblin.title": "Goblin",
+      "entity.goblin.description": "A small roadside raider looking for an easy mark.",
+      "action.fight-goblin.title": "Fight",
       "action.fight-goblin.description": "Trade quick blows with a small roadside raider.",
       "action.fight-goblin.success": "You hit the goblin.",
       "action.fight-goblin.failure": "The goblin slips away from your strike.",

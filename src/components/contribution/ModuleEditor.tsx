@@ -24,6 +24,7 @@ type RemoveTarget = Exclude<keyof NonNullable<Extract<ContentModule['data-update
 const dataKeys: DataKey[] = [
   'locations',
   'edges',
+  'entities',
   'actions',
   'skills',
   'stats',
@@ -41,6 +42,7 @@ const dataKeys: DataKey[] = [
 const dataKeyTypes: Record<DataKey, string> = {
   locations: 'location',
   edges: 'edge',
+  entities: 'entity',
   actions: 'action',
   skills: 'skill',
   stats: 'stat',
@@ -64,6 +66,7 @@ const dataTypeKeys = new Map<string, DataKey>([
 const removeTargets: RemoveTarget[] = [
   'locations',
   'edges',
+  'entities',
   'actions',
   'skills',
   'stats',

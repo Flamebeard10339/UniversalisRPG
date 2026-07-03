@@ -131,6 +131,9 @@
           "$ref": "#/$defs/edgeEntry"
         },
         {
+          "$ref": "#/$defs/entityEntry"
+        },
+        {
           "$ref": "#/$defs/actionEntry"
         },
         {
@@ -184,6 +187,7 @@
           "enum": [
             "locations",
             "edges",
+            "entities",
             "actions",
             "skills",
             "stats",
@@ -239,6 +243,9 @@
         },
         "edges": {
           "$ref": "https://universalis-rpg.local/schema/edges.schema.json"
+        },
+        "entities": {
+          "$ref": "https://universalis-rpg.local/schema/entities.schema.json"
         },
         "actions": {
           "$ref": "https://universalis-rpg.local/schema/actions.schema.json"
@@ -317,6 +324,9 @@
         "edges": {
           "$ref": "https://universalis-rpg.local/schema/edges.schema.json"
         },
+        "entities": {
+          "$ref": "https://universalis-rpg.local/schema/entities.schema.json"
+        },
         "actions": {
           "$ref": "https://universalis-rpg.local/schema/actions.schema.json"
         },
@@ -390,6 +400,9 @@
               "$ref": "#/$defs/idList"
             },
             "edges": {
+              "$ref": "#/$defs/idList"
+            },
+            "entities": {
               "$ref": "#/$defs/idList"
             },
             "actions": {
@@ -489,6 +502,14 @@
             "minLength": 1
           },
           "uniqueItems": true
+        },
+        "entities": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
         }
       }
     },
@@ -527,11 +548,39 @@
         }
       }
     },
+    "entityEntry": {
+      "type": "object",
+      "required": [
+        "id",
+        "actionIds",
+        "type"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "enum": [
+            "entity",
+            "entities"
+          ]
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "actionIds": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        }
+      }
+    },
     "actionEntry": {
       "type": "object",
       "required": [
         "id",
-        "locationId",
         "durationSeconds",
         "rewards",
         "type"

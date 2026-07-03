@@ -6,6 +6,7 @@ import type {
   DialogueDefinition,
   DropTableDefinition,
   EnemyDefinition,
+  EntityDefinition,
   EffectDefinition,
   GameAction,
   InteractionTypeDefinition,
@@ -29,6 +30,8 @@ import {
   actionKillKey,
   actionSuccessKey,
   actionTitleKey,
+  entityDescriptionKey,
+  entityTitleKey,
   itemDescriptionKey,
   itemTitleKey,
   locationDescriptionKey,
@@ -146,8 +149,19 @@ const validateLocationsShape = (locations: unknown): locations is LocationNode[]
       hasString(location, 'id') &&
       isRecord(location.position) &&
       typeof location.position.x === 'number' &&
-      typeof location.position.y === 'number',
+      typeof location.position.y === 'number' &&
+      (location.entities === undefined || validateStringArray(location.entities)),
   );
+
+const validateEntitiesShape = (entities: unknown): entities is EntityDefinition[] =>
+  entities === undefined ||
+  (Array.isArray(entities) &&
+    entities.every((entity) =>
+      isRecord(entity) &&
+      hasString(entity, 'id') &&
+      Array.isArray(entity.actionIds) &&
+      entity.actionIds.every((actionId) => typeof actionId === 'string' && actionId.trim().length > 0),
+    ));
 
 const validateEdgesShape = (edges: unknown): edges is TravelEdgeDefinition[] =>
   Array.isArray(edges) &&
@@ -228,7 +242,7 @@ const validateActionsShape = (actions: unknown): actions is GameAction[] =>
     (action) =>
       isRecord(action) &&
       hasString(action, 'id') &&
-      hasString(action, 'locationId') &&
+      (action.locationId === undefined || hasString(action, 'locationId')) &&
       (action.role === undefined || action.role === 'optional' || action.role === 'progression' || action.role === 'utility') &&
       hasNumber(action, 'durationSeconds') &&
       Array.isArray(action.rewards) && action.rewards.every(validateRewardShape) &&
@@ -410,6 +424,10 @@ export const validateContentShape = (bundle: Partial<ContentBundle>) => {
     issues.push(error('edges.json', 'validation.edgesShape'));
   }
 
+  if (!validateEntitiesShape(bundle.entities)) {
+    issues.push(error('entities.json', 'validation.entitiesShape'));
+  }
+
   if (!validateActionsShape(bundle.actions)) {
     issues.push(error('actions.json', 'validation.actionsShape'));
   }
@@ -475,6 +493,7 @@ export const validateContentReferences = (bundle: ContentBundle) => {
   const issues: ValidationIssue[] = [
     ...findDuplicateIds(bundle.locations, 'locations'),
     ...findDuplicateIds(bundle.edges, 'edges'),
+    ...findDuplicateIds(bundle.entities ?? [], 'entities'),
     ...findDuplicateIds(bundle.actions, 'actions'),
     ...findDuplicateIds(bundle.skills, 'skills'),
     ...findDuplicateIds(bundle.stats, 'stats'),
@@ -489,6 +508,9 @@ export const validateContentReferences = (bundle: ContentBundle) => {
   ];
 
   const locationIds = new Set(bundle.locations.map((location) => location.id));
+  const entityIds = new Set((bundle.entities ?? []).map((entity) => entity.id));
+  const entityActionIds = new Set((bundle.entities ?? []).flatMap((entity) => entity.actionIds));
+  const actionIds = new Set(bundle.actions.map((action) => action.id));
   const skillIds = new Set(bundle.skills.map((skill) => skill.id));
   const statIds = new Set(bundle.stats.map((stat) => stat.id));
   const itemIds = new Set((bundle.items ?? []).map((item) => item.id));
@@ -587,11 +609,25 @@ export const validateContentReferences = (bundle: ContentBundle) => {
     }
   }
 
+  for (const entity of bundle.entities ?? []) {
+    if (!isKebabCaseId(entity.id)) {
+      issues.push(error(`entities.${entity.id}.id`, 'validation.entityIdKebab'));
+    }
+    for (const actionId of entity.actionIds) {
+      if (!actionIds.has(actionId)) {
+        issues.push(error(`entities.${entity.id}.actionIds`, 'validation.unknownAction', { id: actionId }));
+      }
+    }
+  }
+
   for (const action of bundle.actions) {
     if (!isKebabCaseId(action.id)) {
       issues.push(error(`actions.${action.id}.id`, 'validation.actionIdKebab'));
     }
-    if (!locationIds.has(action.locationId)) {
+    if (action.locationId === undefined && !entityActionIds.has(action.id)) {
+      issues.push(error(`actions.${action.id}.locationId`, 'validation.actionLocationOrEntityRequired'));
+    }
+    if (action.locationId !== undefined && !locationIds.has(action.locationId)) {
       issues.push(error(`actions.${action.id}.locationId`, 'validation.unknownLocation', { id: action.locationId }));
     }
     if ((action.results ?? []).filter((result) => result.kind === 'chat').length > 2) {
@@ -682,6 +718,11 @@ export const validateContentReferences = (bundle: ContentBundle) => {
   for (const location of bundle.locations) {
     if (!isKebabCaseId(location.id)) {
       issues.push(error(`locations.${location.id}.id`, 'validation.locationIdKebab'));
+    }
+    for (const entityId of location.entities ?? []) {
+      if (!entityIds.has(entityId)) {
+        issues.push(error(`locations.${location.id}.entities`, 'validation.unknownEntity', { id: entityId }));
+      }
     }
   }
 
@@ -828,6 +869,10 @@ export const collectLocalizationKeys = (bundle: ContentBundle) => [
       ? locationExhaustedKey(location.id)
       : null,
   ]),
+  ...(bundle.entities ?? []).flatMap((entity) => [
+    entityTitleKey(entity.id),
+    entityDescriptionKey(entity.id),
+  ]),
   ...bundle.actions.flatMap((action) => [
     actionTitleKey(action.id),
     actionDescriptionKey(action.id),
@@ -897,6 +942,7 @@ export const mergeDraftIntoBundle = (bundle: ContentBundle, draft: ContributionD
       : bundle.manifest,
     locations: mergeById(removeById(bundle.locations, draft.removed?.locations ?? []), draft.locations),
     edges: mergeById(removeById(bundle.edges, draft.removed?.edges ?? []), draft.edges),
+    entities: mergeById(removeById(bundle.entities ?? [], draft.removed?.entities ?? []), draft.entities ?? []),
     actions: mergeById(removeById(bundle.actions, draft.removed?.actions ?? []), draft.actions),
     skills: mergeById(removeById(bundle.skills, draft.removed?.skills ?? []), draft.skills),
     stats: mergeById(removeById(bundle.stats, draft.removed?.stats ?? []), draft.stats),

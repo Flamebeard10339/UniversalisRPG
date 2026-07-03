@@ -19,6 +19,8 @@ export const universeTitleKey = (id: string) => `universe.${toKebabCase(id)}.tit
 export const universeDescriptionKey = (id: string) => `universe.${toKebabCase(id)}.description`;
 export const locationDescriptionKey = (id: string) => `location.${toKebabCase(id)}.description`;
 export const locationExhaustedKey = (id: string) => `location.${toKebabCase(id)}.exhausted`;
+export const entityTitleKey = (id: string) => `entity.${toKebabCase(id)}.title`;
+export const entityDescriptionKey = (id: string) => `entity.${toKebabCase(id)}.description`;
 export const actionTitleKey = (id: string) => `action.${toKebabCase(id)}.title`;
 export const actionDescriptionKey = (id: string) => `action.${toKebabCase(id)}.description`;
 export const actionSuccessKey = (id: string) => `action.${toKebabCase(id)}.success`;
