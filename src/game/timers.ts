@@ -15,7 +15,7 @@ import {
   locationExhaustedKey,
   skillTitleKey,
 } from './contentIds';
-import { areActionRequirementsMet, canStartAction, evaluateCondition, isActionExhausted, isActionVisible } from './conditions';
+import { areActionRequirementsMet, canStartAction, evaluateCondition, isActionAvailableAtCurrentLocation, isActionExhausted, isActionVisible } from './conditions';
 import { readStateVariable, writeStateVariable } from './stateVariables';
 import { resolveManifestUiSettings } from './universeSettings';
 import { skillLevelFromXp } from './skills';
@@ -641,6 +641,7 @@ export const applyStateReset = (
     ...initial,
     inventory: {
       ...initial.inventory,
+      ...(preserve.inventory ? state.inventory : {}),
       ...selectKeys(state.inventory, preserve.inventoryIds),
     },
     resourcePools: {
@@ -652,6 +653,7 @@ export const applyStateReset = (
       ...selectKeys(state.flags, preserve.flagIds),
     },
     skillXp: preserve.skillXp ? state.skillXp : initial.skillXp,
+    collectionLog: preserve.collectionLog ? state.collectionLog : initial.collectionLog,
     discoveredLocationIds: preserve.discoveredLocations
       ? Array.from(new Set([...state.discoveredLocationIds, startingLocationId]))
       : initial.discoveredLocationIds,
@@ -677,7 +679,9 @@ export const applyStateReset = (
     incrementVariable: incrementVariable ?? '',
     incrementedValue: incrementVariable ? readStateVariable(next, incrementVariable, context) : 0,
     locationId: startingLocationId,
+    preservedInventory: preserve.inventory === true,
     preservedInventoryIds: preserve.inventoryIds ?? [],
+    preservedCollectionLog: preserve.collectionLog === true,
     preservedResourceIds: preserve.resourceIds ?? [],
     preservedVariableIds,
   }, now);
@@ -1461,7 +1465,7 @@ function completeActiveActionWithMessage(
 ): UniversePlayState {
   const action = context.actions.find((candidate) => candidate.id === state.activeAction?.actionId);
 
-  if (!state.activeAction || !action || !areActionRequirementsMet(state, action, context)) {
+  if (!state.activeAction || !action || !isActionAvailableAtCurrentLocation(state, action, context) || !areActionRequirementsMet(state, action, context)) {
     return state.activeAction && action
       ? appendRunLog(stopRunningAction(state, now, context), 'engine', 'action.requirements-failed', { actionId: action.id }, now)
       : state;
@@ -1652,8 +1656,8 @@ export const resolveIdleTimers = (
     };
   }
 
-  if (!areActionRequirementsMet(state, action, context)) {
-    const failed = appendRunLog(stopRunningAction(state, now), 'engine', 'action.requirements-failed', { actionId: action.id }, now);
+  if (!isActionAvailableAtCurrentLocation(state, action, context) || !areActionRequirementsMet(state, action, context)) {
+    const failed = appendRunLog(stopRunningAction(state, now, context), 'engine', 'action.requirements-failed', { actionId: action.id }, now);
     const failedWithDebug = options.debugEnabled
       ? appendChatMessage(failed, {
           author: 'debug',

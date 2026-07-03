@@ -254,11 +254,13 @@ export type ResourceBoundaryBehavior =
       incrementVariable?: string;
       incrementFlagId?: string;
       preserve?: {
+        inventory?: boolean;
         inventoryIds?: string[];
         resourceIds?: string[];
         variableIds?: string[];
         flagIds?: string[];
         skillXp?: boolean;
+        collectionLog?: boolean;
         discoveredLocations?: boolean;
         actionCompletionIds?: string[];
       };

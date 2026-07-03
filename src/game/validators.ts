@@ -108,12 +108,14 @@ const validateResetStateShape = (value: unknown) => {
     || (value.incrementFlagId !== undefined && !hasString(value, 'incrementFlagId'))) return false;
   if (value.preserve === undefined) return true;
   if (!isRecord(value.preserve)) return false;
-  return validateStringArray(value.preserve.inventoryIds)
+  return (value.preserve.inventory === undefined || typeof value.preserve.inventory === 'boolean')
+    && validateStringArray(value.preserve.inventoryIds)
     && validateStringArray(value.preserve.resourceIds)
     && validateStringArray(value.preserve.variableIds)
     && validateStringArray(value.preserve.flagIds)
     && validateStringArray(value.preserve.actionCompletionIds)
     && (value.preserve.skillXp === undefined || typeof value.preserve.skillXp === 'boolean')
+    && (value.preserve.collectionLog === undefined || typeof value.preserve.collectionLog === 'boolean')
     && (value.preserve.discoveredLocations === undefined || typeof value.preserve.discoveredLocations === 'boolean');
 };
 

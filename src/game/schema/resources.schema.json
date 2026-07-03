@@ -24,11 +24,13 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
+        "inventory": { "type": "boolean" },
         "inventoryIds": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
         "resourceIds": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
         "variableIds": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
         "flagIds": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
         "skillXp": { "type": "boolean" },
+        "collectionLog": { "type": "boolean" },
         "discoveredLocations": { "type": "boolean" },
         "actionCompletionIds": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true }
       }

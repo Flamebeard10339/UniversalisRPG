@@ -58,9 +58,24 @@ export const isActionVisible = (
 ) => !isActionExhausted(state, action)
   && (!action.visibleWhen || evaluateCondition(action.visibleWhen, state, context));
 
+export const isActionAvailableAtCurrentLocation = (
+  state: UniversePlayState,
+  action: GameAction,
+  context: ActionResolutionContext,
+) => {
+  if (action.locationId !== undefined) {
+    return action.locationId === state.currentLocationId;
+  }
+  const location = context.locations?.find((candidate) => candidate.id === state.currentLocationId);
+  return (location?.entities ?? []).some((entityId) =>
+    (context.entities ?? []).some((entity) => entity.id === entityId && entity.actionIds.includes(action.id)),
+  );
+};
+
 export const canStartAction = (
   state: UniversePlayState,
   action: GameAction,
   context: ActionResolutionContext,
 ) => isActionVisible(state, action, context)
+  && isActionAvailableAtCurrentLocation(state, action, context)
   && areActionRequirementsMet(state, action, context);

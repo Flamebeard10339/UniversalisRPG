@@ -291,10 +291,12 @@
           "locationId": "starting-location",
           "incrementVariable": "flag:death-count",
           "preserve": {
+            "inventory": true,
             "inventoryIds": [
               "emberleaf"
             ],
             "skillXp": true,
+            "collectionLog": true,
             "discoveredLocations": true
           }
         },

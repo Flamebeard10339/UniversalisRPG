@@ -51,12 +51,14 @@ export const ActionDetails = ({ bundle, onStopAction, playState, t }: ActionDeta
     skills: bundle.skills,
     stats: bundle.stats,
     locations: bundle.locations,
+    entities: bundle.entities,
     items: bundle.items,
     flags: bundle.flags,
     resourceDefinitions: bundle.resourceDefinitions,
     effects: bundle.effects,
     interactionTypes: bundle.interactionTypes,
     enemies: bundle.enemies,
+    dropTables: bundle.dropTables,
   };
   const enemy = activeAction ? getEnemy(activeAction, actionContext) : null;
   const interactionType = activeAction ? getInteractionType(activeAction, actionContext) : null;

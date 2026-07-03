@@ -270,6 +270,7 @@ export default function App() {
     effects: bundle?.effects ?? [],
     interactionTypes: bundle?.interactionTypes ?? [],
     enemies: bundle?.enemies ?? [],
+    dropTables: bundle?.dropTables ?? [],
     dialogues: bundle?.dialogues ?? [],
   }), [bundle]);
   const playState = bundle ? gameStates[runtimeUniverseId] ?? getUniverseState(runtimeUniverseId, startingLocationId, { manifest: bundle.manifest }) : null;
@@ -512,12 +513,14 @@ export default function App() {
           skills: currentBundle.skills,
           stats: currentBundle.stats,
           locations: currentBundle.locations,
+          entities: currentBundle.entities,
           items: currentBundle.items,
           flags: currentBundle.flags,
           resourceDefinitions: currentBundle.resourceDefinitions,
           effects: currentBundle.effects,
           interactionTypes: currentBundle.interactionTypes,
           enemies: currentBundle.enemies,
+          dropTables: currentBundle.dropTables,
           dialogues: currentBundle.dialogues,
         }, {
           debugEnabled: useDebugState.getState().enabled,

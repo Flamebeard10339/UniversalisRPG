@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { ActionResolutionContext, GameAction } from './types';
-import { appendChatMessage, appendRunLog, chooseDialogueOption, createInitialPlayState, resolveIdleTimers, startAction } from './timers';
+import { appendChatMessage, appendRunLog, applyStateReset, chooseDialogueOption, createInitialPlayState, resolveIdleTimers, startAction } from './timers';
 
 describe('appendChatMessage', () => {
   it('uses monotonic ids for messages emitted at the same timestamp', () => {
@@ -25,6 +25,144 @@ describe('appendRunLog', () => {
     expect(state.runLog[0].sequence).toBe(6);
     expect(state.runLog[499].sequence).toBe(505);
     expect(state.nextRunLogSequence).toBe(506);
+  });
+});
+
+describe('entity collection actions', () => {
+  it('grants xp, rolls drops, and updates collection counters for location entity actions', () => {
+    const action: GameAction = {
+      id: 'fight-goblin',
+      durationSeconds: 1,
+      rewards: [
+        { kind: 'skillXp', skillId: 'attack', amount: 3 },
+        { kind: 'dropTable', dropTableId: 'goblin-drops' },
+      ],
+      experience: [{ event: 'action-complete', skillId: 'attack', amount: 2 }],
+    };
+    const context: ActionResolutionContext = {
+      actions: [action],
+      skills: [{ id: 'attack', maxLevel: 100 }],
+      stats: [],
+      locations: [
+        { id: 'road', position: { x: 0, y: 0 }, starting: true, entities: ['goblin'] },
+        { id: 'town', position: { x: 1, y: 0 } },
+      ],
+      entities: [{
+        id: 'goblin',
+        actionIds: ['fight-goblin'],
+        collectionLog: [{
+          categoryId: 'enemies',
+          actionId: 'fight-goblin',
+          dropTableIds: ['goblin-drops'],
+        }],
+      }],
+      items: [{ id: 'bones' }],
+      flags: [],
+      resourceDefinitions: [],
+      effects: [],
+      interactionTypes: [],
+      enemies: [],
+      dropTables: [{
+        id: 'goblin-drops',
+        mode: 'dependent',
+        drops: [{ weight: 1, reward: { kind: 'item', itemId: 'bones', amount: 1 } }],
+      }],
+    };
+
+    const started = startAction(createInitialPlayState('test-universe', 'road'), action, context, 1_000);
+    const resolved = resolveIdleTimers(started, context, { random: () => 0 }, 2_000).state;
+    const rejected = startAction({ ...resolved, currentLocationId: 'town' }, action, context, 3_000);
+
+    expect(resolved.skillXp.attack).toBe(5);
+    expect(resolved.inventory.bones).toBe(1);
+    expect(resolved.actionCompletions['fight-goblin']).toBe(1);
+    expect(resolved.collectionLog['entity:goblin:kills']).toBe(1);
+    expect(resolved.collectionLog['entity:goblin:drops:bones']).toBe(1);
+    expect(rejected.activeAction).toBeNull();
+    expect(rejected.inventory.bones).toBe(1);
+  });
+
+  it('does not reset existing tracked drops when a later completion rolls no drop', () => {
+    const action: GameAction = {
+      id: 'fight-goblin',
+      durationSeconds: 1,
+      rewards: [{ kind: 'dropTable', dropTableId: 'goblin-drops' }],
+    };
+    const context: ActionResolutionContext = {
+      actions: [action],
+      skills: [],
+      stats: [],
+      locations: [{ id: 'road', position: { x: 0, y: 0 }, starting: true, entities: ['goblin'] }],
+      entities: [{
+        id: 'goblin',
+        actionIds: ['fight-goblin'],
+        collectionLog: [{ categoryId: 'enemies', actionId: 'fight-goblin', dropTableIds: ['goblin-drops'] }],
+      }],
+      items: [{ id: 'iron-ore' }],
+      flags: [],
+      resourceDefinitions: [],
+      effects: [],
+      interactionTypes: [],
+      enemies: [],
+      dropTables: [{
+        id: 'goblin-drops',
+        mode: 'independent',
+        drops: [{ weight: 3, reward: { kind: 'item', itemId: 'iron-ore', amount: 1 } }],
+      }],
+    };
+    const started = startAction({
+      ...createInitialPlayState('test-universe', 'road'),
+      inventory: { 'iron-ore': 2 },
+      collectionLog: {
+        'entity:goblin:kills': 2,
+        'entity:goblin:drops:iron-ore': 2,
+      },
+    }, action, context, 1_000);
+
+    const resolved = resolveIdleTimers(started, context, { random: () => 0.9 }, 2_000).state;
+
+    expect(resolved.inventory['iron-ore']).toBe(2);
+    expect(resolved.collectionLog['entity:goblin:kills']).toBe(3);
+    expect(resolved.collectionLog['entity:goblin:drops:iron-ore']).toBe(2);
+  });
+
+  it('can preserve collection log and whole inventory through state resets', () => {
+    const context: ActionResolutionContext = {
+      actions: [],
+      skills: [{ id: 'attack', maxLevel: 100 }],
+      stats: [],
+      locations: [{ id: 'road', position: { x: 0, y: 0 }, starting: true }],
+      items: [{ id: 'iron-ore' }],
+      flags: [],
+      resourceDefinitions: [],
+      effects: [],
+      interactionTypes: [],
+      enemies: [],
+      dropTables: [],
+    };
+    const state = {
+      ...createInitialPlayState('test-universe', 'road'),
+      inventory: { 'iron-ore': 2 },
+      skillXp: { attack: 12 },
+      collectionLog: {
+        'entity:goblin:kills': 3,
+        'entity:goblin:drops:iron-ore': 2,
+      },
+    };
+
+    const reset = applyStateReset(state, context, {
+      kind: 'reset-state',
+      preserve: {
+        inventory: true,
+        skillXp: true,
+        collectionLog: true,
+      },
+    }, 3_000);
+
+    expect(reset.inventory['iron-ore']).toBe(2);
+    expect(reset.skillXp.attack).toBe(12);
+    expect(reset.collectionLog['entity:goblin:kills']).toBe(3);
+    expect(reset.collectionLog['entity:goblin:drops:iron-ore']).toBe(2);
   });
 });
 

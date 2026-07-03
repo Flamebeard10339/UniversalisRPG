@@ -30,6 +30,7 @@ export const ActionPanel = ({ bundle, debugEnabled, playState, onStartAction, t 
     effects: bundle.effects,
     interactionTypes: bundle.interactionTypes,
     enemies: bundle.enemies,
+    dropTables: bundle.dropTables,
   };
   const currentLocation = bundle.locations.find((location) => location.id === playState.currentLocationId);
   const entities = (currentLocation?.entities ?? [])

@@ -165,10 +165,11 @@ export const resetStateSchema = (bundle: ContentBundle): StructuredSchema => ({ 
   locationId: { schema: string(['starting-location', ...bundle.locations.map((item) => item.id)]), optional: true, defaultValue: 'starting-location' },
   incrementVariable: { label: 'contribution.column.incrementVariable', schema: string(stateVariables(bundle)), optional: true },
   preserve: { optional: true, defaultValue: {}, schema: { kind: 'object', fields: {
+    inventory: { optional: true, defaultValue: false, schema: boolean },
     inventoryIds: { optional: true, defaultValue: [], schema: { kind: 'array', item: string(bundle.items.map((item) => item.id)), createItem: () => bundle.items[0]?.id ?? '' } },
     resourceIds: { optional: true, defaultValue: [], schema: { kind: 'array', item: string(bundle.resourceDefinitions.map((item) => item.id)), createItem: () => bundle.resourceDefinitions[0]?.id ?? '' } },
     variableIds: { label: 'contribution.column.variables', optional: true, defaultValue: [], schema: { kind: 'array', listMode: 'tags', item: string(stateVariables(bundle)), createItem: () => stateVariables(bundle)[0] ?? '' } },
-    skillXp: { optional: true, defaultValue: true, schema: boolean }, discoveredLocations: { optional: true, defaultValue: true, schema: boolean },
+    skillXp: { optional: true, defaultValue: true, schema: boolean }, collectionLog: { optional: true, defaultValue: true, schema: boolean }, discoveredLocations: { optional: true, defaultValue: true, schema: boolean },
     actionCompletionIds: { optional: true, defaultValue: [], schema: { kind: 'array', listMode: 'tags', item: string(bundle.actions.map((item) => item.id)), createItem: () => bundle.actions[0]?.id ?? '' } },
   } } },
 } });
