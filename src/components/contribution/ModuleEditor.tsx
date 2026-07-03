@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import type { ContentBundle, ContentModule, ContentModulePack, ContributionDraft, LocaleDictionary, ModuleDataSectionObject, ValidationIssue } from '../../game/types';
+import type { ContentBundle, ContentModule, ContentModulePack, ContributionDraft, LocaleDictionary, ModuleDataRemoveEntry, ModuleDataSectionObject, ValidationIssue } from '../../game/types';
 import type { Translator } from '../../game/i18n';
 import { StructuredDataEditor, type StructuredSchema, type StructuredValue } from '../structuredData/StructuredData';
 import { moduleDataSectionSchema, modulePackSchema } from '../structuredData/contentSchemas';
@@ -17,6 +17,7 @@ type ModuleEditorProps = {
 
 type EditorTab = 'details' | 'data' | 'data-updates' | 'locale' | 'raw' | 'submit';
 type DataKey = keyof ModuleDataSectionObject;
+type RemoveTarget = Exclude<keyof NonNullable<Extract<ContentModule['data-updates'], Record<string, unknown>>['remove']>, symbol | number>;
 
 const dataKeys: DataKey[] = [
   'locations',
@@ -32,6 +33,46 @@ const dataKeys: DataKey[] = [
   'enemies',
   'dialogues',
   'displayProfiles',
+];
+
+const dataKeyTypes: Record<DataKey, string> = {
+  locations: 'location',
+  edges: 'edge',
+  actions: 'action',
+  skills: 'skill',
+  stats: 'stat',
+  items: 'item',
+  flags: 'flag',
+  resources: 'resource',
+  resourceDefinitions: 'resourceDefinition',
+  effects: 'effect',
+  interactionTypes: 'interactionType',
+  enemies: 'enemy',
+  dialogues: 'dialogue',
+  displayProfiles: 'displayProfile',
+};
+
+const dataTypeKeys = new Map<string, DataKey>([
+  ...Object.entries(dataKeyTypes).map(([key, type]) => [type, key as DataKey] as const),
+  ...dataKeys.map((key) => [key, key] as const),
+]);
+
+const removeTargets: RemoveTarget[] = [
+  'locations',
+  'edges',
+  'actions',
+  'skills',
+  'stats',
+  'items',
+  'flags',
+  'resources',
+  'effects',
+  'interactionTypes',
+  'enemies',
+  'dialogues',
+  'dialogueOptions',
+  'displayProfiles',
+  'locales',
 ];
 
 const uniqueById = <T extends { id: string }>(items: T[]) => [...new Map(items.map((item) => [item.id, item])).values()];
@@ -97,7 +138,42 @@ const mergeById = <T extends { id: string }>(base: T[], ...groups: Array<T[] | u
   [...new Map([...base, ...groups.flatMap((group) => group ?? [])].map((item) => [item.id, item])).values()];
 
 const moduleDataObject = (section: ContentModule['data'] | ContentModule['data-updates']): ModuleDataSectionObject =>
-  section && !Array.isArray(section) ? section : {};
+  section && !Array.isArray(section)
+    ? section
+    : Object.fromEntries(dataKeys.map((key) => [
+        key,
+        (Array.isArray(section) ? section : [])
+          .filter((entry) => dataTypeKeys.get(entry.type) === key)
+          .map(({ type: _type, ...entry }) => entry),
+      ]).filter(([, value]) => Array.isArray(value) && value.length > 0)) as ModuleDataSectionObject;
+
+const sectionToTypedRows = (section: ModuleDataSectionObject) =>
+  dataKeys.flatMap((key) =>
+    ((section[key] as StructuredValue[] | undefined) ?? [])
+      .filter((value): value is Exclude<StructuredValue, null | boolean | number | string | StructuredValue[]> => Boolean(value) && typeof value === 'object' && !Array.isArray(value))
+      .map((value) => ({ type: dataKeyTypes[key], ...value })),
+  );
+
+const isRemoveEntry = (entry: unknown): entry is ModuleDataRemoveEntry =>
+  Boolean(entry) &&
+  typeof entry === 'object' &&
+  !Array.isArray(entry) &&
+  (entry as { type?: unknown }).type === 'remove' &&
+  typeof (entry as { target?: unknown }).target === 'string' &&
+  typeof (entry as { id?: unknown }).id === 'string';
+
+const removalRowsFromUpdates = (updates: ContentModule['data-updates']): ModuleDataRemoveEntry[] => {
+  if (!updates) return [];
+  if (Array.isArray(updates)) return updates.filter(isRemoveEntry);
+  return Object.entries(updates.remove ?? {}).flatMap(([target, value]) => {
+    if (target === 'dialogueOptions' && value && typeof value === 'object' && !Array.isArray(value)) {
+      return Object.entries(value as Record<string, string[]>).flatMap(([path, ids]) =>
+        (Array.isArray(ids) ? ids : []).filter((id): id is string => typeof id === 'string').map((id) => ({ type: 'remove', target, path, id })),
+      );
+    }
+    return (Array.isArray(value) ? value : []).filter((id): id is string => typeof id === 'string').map((id) => ({ type: 'remove', target, id }));
+  });
+};
 
 const bundleForModuleEditing = (bundle: ContentBundle, module: ContentModule, modules: ContentModule[]): ContentBundle => {
   const data = moduleDataObject(module.data);
@@ -286,14 +362,22 @@ const DataRows = ({
 }) => {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [pendingRows, setPendingRows] = useState(0);
-  const section = moduleDataObject(sectionName === 'data' ? module.data : module['data-updates']);
+  const [pendingRemovals, setPendingRemovals] = useState(0);
+  const rawSection = sectionName === 'data' ? module.data : module['data-updates'];
+  const section = moduleDataObject(rawSection);
+  const removalRows = sectionName === 'data-updates' ? removalRowsFromUpdates(module['data-updates']) : [];
   const editorBundle = bundleForModuleEditing(bundle, module, bundle.modules ?? []);
   const rows = dataKeys.flatMap((key) => {
     const values = section[key];
     return Array.isArray(values) ? values.map((value, index) => ({ key, index, value: value as StructuredValue })) : [];
   });
 
-  const saveSection = (nextSection: ModuleDataSectionObject) => onSave({ ...module, [sectionName]: nextSection });
+  const saveSection = (nextSection: ModuleDataSectionObject, nextRemovals = removalRows) => onSave({
+    ...module,
+    [sectionName]: sectionName === 'data-updates'
+      ? [...sectionToTypedRows(nextSection), ...nextRemovals]
+      : sectionToTypedRows(nextSection),
+  });
   const saveRow = (key: DataKey, index: number, value: StructuredValue | undefined) => {
     const values = [...((section[key] as StructuredValue[] | undefined) ?? [])];
     if (value === undefined) values.splice(index, 1);
@@ -307,11 +391,31 @@ const DataRows = ({
     const toValues = [...((section[toKey] as StructuredValue[] | undefined) ?? []), value ?? createDataItem(editorBundle, toKey)];
     saveSection({ ...section, [fromKey]: fromValues, [toKey]: toValues });
   };
+  const saveRemoval = (index: number, patch: Partial<ModuleDataRemoveEntry> | undefined) => {
+    const nextRemovals = [...removalRows];
+    if (patch === undefined) nextRemovals.splice(index, 1);
+    else nextRemovals[index] = { ...nextRemovals[index], ...patch };
+    saveSection(section, nextRemovals);
+  };
+  const addRemoval = (target: RemoveTarget) => {
+    saveSection(section, [...removalRows, { type: 'remove', target, id: '', ...(target === 'dialogueOptions' ? { path: '' } : {}) }]);
+    setPendingRemovals((count) => Math.max(0, count - 1));
+  };
+  const targetLabel = (target: string) => target === 'dialogueOptions'
+    ? t('contribution.module.removeDialogueOptions')
+    : target === 'locales'
+      ? t('contribution.module.removeLocales')
+      : t(`contribution.data.${target}`, target);
 
   return (
     <section className="grid gap-2 rounded border border-slate-700 p-3">
-      {!readOnly && <button className="justify-self-start rounded bg-cyan-400 px-3 py-2 text-sm font-semibold text-slate-950" onClick={() => setPendingRows((count) => count + 1)} type="button">{t('contribution.modules.addRow')}</button>}
-      {rows.length === 0 && pendingRows === 0 ? <p className="rounded bg-slate-950 p-3 text-sm text-slate-500">{t('contribution.modules.noRows')}</p> : null}
+      {!readOnly && (
+        <div className="flex flex-wrap gap-2">
+          <button className="rounded bg-cyan-400 px-3 py-2 text-sm font-semibold text-slate-950" onClick={() => setPendingRows((count) => count + 1)} type="button">{t('contribution.modules.addRow')}</button>
+          {sectionName === 'data-updates' && <button className="rounded border border-slate-600 px-3 py-2 text-sm font-semibold text-slate-100" onClick={() => setPendingRemovals((count) => count + 1)} type="button">{t('contribution.modules.addRemoval')}</button>}
+        </div>
+      )}
+      {rows.length === 0 && removalRows.length === 0 && pendingRows === 0 && pendingRemovals === 0 ? <p className="rounded bg-slate-950 p-3 text-sm text-slate-500">{t('contribution.modules.noRows')}</p> : null}
       {Array.from({ length: pendingRows }).map((_, index) => (
         <div className="grid gap-2 rounded border border-slate-800 bg-slate-950 p-2 md:grid-cols-[1fr_12rem_auto]" key={`pending-${index}`}>
           <span className="text-sm text-slate-500">{t('structured.empty')}</span>
@@ -320,6 +424,28 @@ const DataRows = ({
             {dataKeys.map((key) => <option key={key} value={key}>{t(`contribution.data.${key}`)}</option>)}
           </select>
           <button className="rounded border border-rose-500 px-2 py-1.5 text-sm font-semibold text-rose-200" onClick={() => setPendingRows((count) => Math.max(0, count - 1))} type="button">{t('structured.remove')}</button>
+        </div>
+      ))}
+      {Array.from({ length: pendingRemovals }).map((_, index) => (
+        <div className="grid gap-2 rounded border border-slate-800 bg-slate-950 p-2 md:grid-cols-[1fr_12rem_auto]" key={`pending-removal-${index}`}>
+          <span className="text-sm text-slate-500">{t('contribution.modules.removeRow')}</span>
+          <select className="rounded bg-slate-900 px-2 py-1.5 text-sm" onChange={(event) => addRemoval(event.target.value as RemoveTarget)} value="">
+            <option value="">{t('contribution.modules.selectType')}</option>
+            {removeTargets.map((target) => <option key={target} value={target}>{targetLabel(target)}</option>)}
+          </select>
+          <button className="rounded border border-rose-500 px-2 py-1.5 text-sm font-semibold text-rose-200" onClick={() => setPendingRemovals((count) => Math.max(0, count - 1))} type="button">{t('structured.remove')}</button>
+        </div>
+      ))}
+      {removalRows.map((row, index) => (
+        <div className="grid gap-2 rounded border border-slate-800 bg-slate-950 p-2 md:grid-cols-[10rem_1fr_1fr_auto]" key={`remove-${index}-${row.target}-${row.path ?? ''}-${row.id}`}>
+          <select className="rounded bg-slate-900 px-2 py-1.5 text-sm text-slate-100" disabled={readOnly} onChange={(event) => saveRemoval(index, { target: event.target.value, path: event.target.value === 'dialogueOptions' ? row.path ?? '' : undefined })} value={row.target}>
+            {removeTargets.map((target) => <option key={target} value={target}>{targetLabel(target)}</option>)}
+          </select>
+          {row.target === 'dialogueOptions'
+            ? <input className="rounded bg-slate-900 px-2 py-1.5 text-sm text-slate-100" onChange={(event) => saveRemoval(index, { path: event.target.value })} placeholder={t('contribution.modules.removePath')} readOnly={readOnly} value={row.path ?? ''} />
+            : <span className="self-center text-sm text-slate-500">{t('contribution.modules.removeContent')}</span>}
+          <input className="rounded bg-slate-900 px-2 py-1.5 text-sm text-slate-100" onChange={(event) => saveRemoval(index, { id: event.target.value })} placeholder={t('contribution.modules.removeId')} readOnly={readOnly} value={row.id} />
+          {!readOnly && <button className="rounded border border-rose-500 px-2 py-1.5 text-sm font-semibold text-rose-200" onClick={() => saveRemoval(index, undefined)} type="button">{t('structured.remove')}</button>}
         </div>
       ))}
       {rows.map((row) => {
@@ -376,9 +502,8 @@ export const ModuleEditor = ({ bundle, draft, issues, onPatch, t }: ModuleEditor
   const modules = useMemo(() => allModules.filter((module) => !filter.trim() || JSON.stringify(module).toLowerCase().includes(filter.trim().toLowerCase())), [allModules, filter]);
   const selectedModule = allModules.find((module) => module.id === selectedModuleId) ?? modules[0] ?? null;
   const modulePacks = uniquePacksById([...(draft.modulePacks ?? []), ...(bundle.modulePacks ?? [])]);
-  const packedModuleIds = new Set(modulePacks.flatMap(packModuleIds));
   const localModules = modules.filter((module) => localIds.has(module.id));
-  const coreModules = modules.filter((module) => !localIds.has(module.id) && !packedModuleIds.has(module.id));
+  const coreModules = modules.filter((module) => !localIds.has(module.id));
   const moduleIds = new Set(allModules.map((module) => module.id));
   const isLocal = selectedModule ? localIds.has(selectedModule.id) : false;
   const selectedModuleIssues = selectedModule ? issues.filter((issue) => moduleIdFromIssue(issue) === selectedModule.id) : [];
@@ -442,17 +567,17 @@ export const ModuleEditor = ({ bundle, draft, issues, onPatch, t }: ModuleEditor
         </aside>
 
         {showModpacks ? (
-          <section className="grid min-w-0 gap-3">
+          <section className="grid min-w-0 content-start gap-3 self-start">
             <h4 className="text-sm font-semibold text-slate-100">{t('contribution.modules.modpacks')}</h4>
             <StructuredDataEditor onChange={(value) => onPatch({ modulePacks: (Array.isArray(value) ? value : []) as unknown as ContentModulePack[] })} schema={{ kind: 'array', listMode: 'free', item: modulePackSchema({ ...bundle, modules: allModules }), createItem: () => ({ id: 'new-pack', modules: allModules[0] ? [allModules[0].id] : [] }) }} t={t} value={modulePacks as unknown as StructuredValue} />
           </section>
         ) : selectedModule ? (
-          <section className="grid min-w-0 gap-3">
+          <section className="grid min-w-0 content-start gap-3 self-start">
             <div className="flex items-start justify-between gap-2">
               <div><h4 className="text-sm font-semibold text-slate-100">{selectedModule.id}</h4>{!isLocal && <p className="text-xs text-slate-400">{t('contribution.modules.coreReadonly')}</p>}</div>
               {!isLocal && <button className="rounded border border-rose-500 px-3 py-1.5 text-sm font-semibold text-rose-200" onClick={() => removeModule(selectedModule)} type="button">{t('contribution.modules.remove')}</button>}
             </div>
-            <div className="flex flex-wrap gap-2 border-b border-slate-700">
+            <div className="sticky top-0 z-10 flex flex-wrap content-start items-start gap-2 border-b border-slate-700 bg-slate-900/95 backdrop-blur">
               {(['details', 'data', 'data-updates', 'locale', 'raw', 'submit'] as const).map((tab) => <button className={`px-3 py-2 text-sm font-semibold ${editorTab === tab ? 'border-b-2 border-cyan-300 text-cyan-100' : 'text-slate-400'}`} key={tab} onClick={() => setEditorTab(tab)} type="button">{t(tab === 'details' ? 'contribution.modules.detailsTab' : tab === 'data' ? 'contribution.modules.dataTab' : tab === 'data-updates' ? 'contribution.modules.dataUpdatesTab' : tab === 'locale' ? 'contribution.modules.localeTab' : tab === 'raw' ? 'contribution.modules.rawTab' : 'contribution.modules.submitTab')}</button>)}
             </div>
             {editorTab === 'details' && (

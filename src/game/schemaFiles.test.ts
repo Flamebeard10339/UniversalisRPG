@@ -47,12 +47,69 @@ describe('json schema files', () => {
   it('supports typed module data rows in module schema', () => {
     const moduleSchema = readSchema('module.schema.json') as {
       $defs: {
-        dataEntry: { properties: { type: { enum: string[] } } };
+        dataEntry: { oneOf: Array<{ $ref: string }> };
         typedDataSection: { items: unknown };
+        typedDataUpdatesSection: { items: { oneOf: unknown[] } };
+        removeEntry: { properties: { type: { const: string }; target: { enum: string[] } }; allOf: unknown[] };
+        actionEntry: {
+          additionalProperties: boolean;
+          required: string[];
+          properties: {
+            type: { enum: string[] };
+            durationSeconds: unknown;
+            rewards: { items: { $ref: string } };
+          };
+        };
+        itemEntry: {
+          additionalProperties: boolean;
+          required: string[];
+          properties: { type: { enum: string[] }; maxQuantity: unknown };
+        };
+        resourceEntry: {
+          additionalProperties: boolean;
+          required: string[];
+          properties: { type: { enum: string[] }; onEmpty: { items: { $ref: string } } };
+        };
       };
     };
+    const actionsSchema = readSchema('actions.schema.json') as { items: { properties: Record<string, unknown> } };
+    const itemsSchema = readSchema('items.schema.json') as { items: { properties: Record<string, unknown> } };
 
     expect(moduleSchema.$defs.typedDataSection.items).toEqual({ $ref: '#/$defs/dataEntry' });
-    expect(moduleSchema.$defs.dataEntry.properties.type.enum).toEqual(expect.arrayContaining(['action', 'item', 'resource']));
+    expect(moduleSchema.$defs.dataEntry.oneOf).toEqual(expect.arrayContaining([
+      { $ref: '#/$defs/actionEntry' },
+      { $ref: '#/$defs/itemEntry' },
+      { $ref: '#/$defs/resourceEntry' },
+    ]));
+    expect(moduleSchema.$defs.typedDataUpdatesSection.items.oneOf).toEqual([
+      { $ref: '#/$defs/dataEntry' },
+      { $ref: '#/$defs/removeEntry' },
+    ]);
+    expect(moduleSchema.$defs.removeEntry.properties.type.const).toBe('remove');
+    expect(moduleSchema.$defs.removeEntry.properties.target.enum).toEqual(expect.arrayContaining(['items', 'dialogueOptions', 'locales']));
+    expect(moduleSchema.$defs.removeEntry.allOf).toHaveLength(1);
+    expect(moduleSchema.$defs.actionEntry).toMatchObject({
+      additionalProperties: false,
+      required: expect.arrayContaining(['id', 'type', 'locationId', 'durationSeconds', 'rewards']),
+      properties: {
+        type: { enum: ['action', 'actions'] },
+        rewards: { items: { $ref: 'https://universalis-rpg.local/schema/actions.schema.json#/$defs/reward' } },
+      },
+    });
+    expect(moduleSchema.$defs.actionEntry.properties.durationSeconds).toEqual(actionsSchema.items.properties.durationSeconds);
+    expect(moduleSchema.$defs.itemEntry).toMatchObject({
+      additionalProperties: false,
+      required: expect.arrayContaining(['id', 'type']),
+      properties: { type: { enum: ['item', 'items'] } },
+    });
+    expect(moduleSchema.$defs.itemEntry.properties.maxQuantity).toEqual(itemsSchema.items.properties.maxQuantity);
+    expect(moduleSchema.$defs.resourceEntry).toMatchObject({
+      additionalProperties: false,
+      required: expect.arrayContaining(['id', 'type', 'sourceStat']),
+      properties: {
+        type: { enum: ['resource', 'resources', 'resourceDefinition', 'resourceDefinitions'] },
+        onEmpty: { items: { $ref: 'https://universalis-rpg.local/schema/resources.schema.json#/$defs/behavior' } },
+      },
+    });
   });
 });

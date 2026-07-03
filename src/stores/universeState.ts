@@ -15,6 +15,7 @@ import { load, save } from '../lib/storage';
 import { useContributionState } from './contributionState';
 import { useGameState } from './gameState';
 import type { ModuleCleanupReport } from '../game/moduleCleanup';
+import { migrateMonolithicBundleToCoreModule } from '../game/moduleMigration';
 
 export type LocalePreference = 'system' | string;
 
@@ -256,8 +257,9 @@ export const useUniverseState = create<UniverseStateStore>((set, get) => ({
   clearModuleCleanupReport: () => set({ moduleCleanupReport: null }),
 
   importLocalUniverse: async (bundle) => {
-    const normalizedBundle = normalizeContentBundle(bundle);
-    const validationIssues = validateContentBundle(normalizedBundle);
+    const normalizedBundle = normalizeContentBundle(migrateMonolithicBundleToCoreModule(bundle));
+    const moduleResolution = applyModulesToBundle(normalizedBundle, normalizedBundle.modules ?? []);
+    const validationIssues = [...moduleResolution.issues, ...validateContentBundle(moduleResolution.bundle)];
     const hasErrors = validationIssues.some((issue) => issue.severity === 'error');
 
     if (hasErrors) {

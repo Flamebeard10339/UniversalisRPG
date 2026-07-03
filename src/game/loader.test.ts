@@ -102,7 +102,7 @@ describe('loader', () => {
     }));
   });
 
-  it('falls back to legacy module indexes when manifest modules are not defined', async () => {
+  it('does not load legacy module indexes when manifest modules are not defined', async () => {
     installFetch({
       ...baseResponses(),
       '/content/universes/test/modules/index.json': ['good.json'],
@@ -117,7 +117,8 @@ describe('loader', () => {
 
     const bundle = await loadUniverse('test');
 
-    expect(bundle.modules?.map((module) => module.id)).toEqual(['good']);
+    expect(bundle.modules).toEqual([]);
+    expect(fetch).not.toHaveBeenCalledWith('/content/universes/test/modules/index.json');
   });
 
   it('loads universes whose gameplay content is supplied entirely by modules', async () => {

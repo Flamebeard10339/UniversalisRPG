@@ -343,7 +343,14 @@ export type ModuleDataSectionObject = {
   displayProfiles?: DisplayProfileDefinition[];
 };
 
-export type ModuleDataEntry = { id?: string; type: string } & Record<string, unknown>;
+export type ModuleDataRemoveEntry = {
+  type: 'remove';
+  target: string;
+  id: string;
+  path?: string;
+};
+
+export type ModuleDataEntry = ({ id?: string; type: string } & Record<string, unknown>) | ModuleDataRemoveEntry;
 
 export type ModuleDataSection = ModuleDataSectionObject | ModuleDataEntry[];
 

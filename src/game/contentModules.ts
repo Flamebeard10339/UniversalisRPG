@@ -6,6 +6,7 @@ import type {
   GameAction,
   LocaleDictionary,
   ModuleDataEntry,
+  ModuleDataRemoveEntry,
   ModuleDataSection,
   ModuleDataSectionObject,
   ModuleDataUpdates,
@@ -185,6 +186,76 @@ const normalizeModuleDataSection = (section?: ModuleDataSection): ModuleDataSect
 const moduleDataUpdatesObject = (updates?: ModuleDataUpdates): ModuleDataUpdatesObject | undefined =>
   updates && !Array.isArray(updates) ? updates : undefined;
 
+type ModuleRemovalMap = NonNullable<ModuleDataUpdatesObject['remove']>;
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
+const removableModuleDataKeys = new Set([
+  'locations',
+  'edges',
+  'actions',
+  'skills',
+  'stats',
+  'items',
+  'flags',
+  'resources',
+  'effects',
+  'interactionTypes',
+  'enemies',
+  'dialogues',
+  'dialogueOptions',
+  'displayProfiles',
+  'locales',
+]);
+
+const isModuleRemoveEntry = (entry: unknown): entry is ModuleDataRemoveEntry =>
+  isRecord(entry) &&
+  entry.type === 'remove' &&
+  typeof entry.target === 'string' &&
+  typeof entry.id === 'string' &&
+  (entry.path === undefined || typeof entry.path === 'string');
+
+const mergeUniqueStrings = (left: string[] = [], right: string[] = []) =>
+  Array.from(new Set([...left, ...right]));
+
+const mergeModuleRemovals = (...removals: Array<ModuleRemovalMap | undefined>): ModuleRemovalMap => {
+  const next: ModuleRemovalMap = {};
+  for (const removal of removals) {
+    for (const [key, value] of Object.entries(removal ?? {})) {
+      if (key === 'dialogueOptions' && isRecord(value)) {
+        const current = next.dialogueOptions ?? {};
+        next.dialogueOptions = {
+          ...current,
+          ...Object.fromEntries(Object.entries(value).map(([path, ids]) => [
+            path,
+            mergeUniqueStrings(current[path], Array.isArray(ids) ? ids.filter((id): id is string => typeof id === 'string') : []),
+          ])),
+        };
+      } else if (Array.isArray(value)) {
+        (next as Record<string, string[] | undefined>)[key] = mergeUniqueStrings(
+          (next as Record<string, string[] | undefined>)[key],
+          value.filter((id): id is string => typeof id === 'string'),
+        );
+      }
+    }
+  }
+  return next;
+};
+
+const typedRemovalsToObject = (updates?: ModuleDataUpdates): ModuleRemovalMap => {
+  if (!Array.isArray(updates)) return {};
+  return mergeModuleRemovals(...updates.filter(isModuleRemoveEntry).map((entry) => {
+    if (entry.target === 'dialogueOptions') {
+      return entry.path ? { dialogueOptions: { [entry.path]: [entry.id] } } : {};
+    }
+    return { [entry.target]: [entry.id] };
+  }));
+};
+
+const moduleRemovals = (updates?: ModuleDataUpdates) =>
+  mergeModuleRemovals(moduleDataUpdatesObject(updates)?.remove, typedRemovalsToObject(updates));
+
 const sectionResources = (section?: ModuleDataSection) => {
   const normalized = normalizeModuleDataSection(section);
   return [
@@ -222,12 +293,14 @@ const validateModuleDataSection = (bundle: ContentBundle, module: ContentModule,
   const data = section === 'data' ? module.data : module['data-updates'];
   if (!data) return [];
   const typeIssues = Array.isArray(data)
-    ? data.flatMap((entry, index) =>
-        isRecord(entry) && typeof entry.type === 'string' && moduleDataTypeToKey[entry.type]
+    ? data.flatMap((entry, index) => {
+      if (section === 'data-updates' && isModuleRemoveEntry(entry)) return [];
+      return isRecord(entry) && typeof entry.type === 'string' && moduleDataTypeToKey[entry.type]
           ? []
           : [issue('error', `modules.${module.id}.${section}.${index}.type`, 'validation.moduleDataTypeInvalid', {
               id: isRecord(entry) && typeof entry.type === 'string' ? entry.type : String(index),
-            })])
+            })];
+    })
     : [];
   return [
     ...typeIssues,
@@ -235,33 +308,11 @@ const validateModuleDataSection = (bundle: ContentBundle, module: ContentModule,
   ];
 };
 
-const removableModuleDataKeys = new Set([
-  'locations',
-  'edges',
-  'actions',
-  'skills',
-  'stats',
-  'items',
-  'flags',
-  'resources',
-  'effects',
-  'interactionTypes',
-  'enemies',
-  'dialogues',
-  'dialogueOptions',
-  'displayProfiles',
-  'locales',
-]);
-
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null && !Array.isArray(value);
-
 const validateModuleDataUpdatesShape = (module: ContentModule): ValidationIssue[] => {
   const updates = moduleDataUpdatesObject(module['data-updates']);
-  if (!updates) return [];
   const issues: ValidationIssue[] = [];
 
-  if (updates.remove !== undefined) {
+  if (updates?.remove !== undefined) {
     if (!isRecord(updates.remove)) {
       issues.push(issue('error', `modules.${module.id}.data-updates.remove`, 'validation.moduleRemoveInvalid'));
     } else {
@@ -276,7 +327,23 @@ const validateModuleDataUpdatesShape = (module: ContentModule): ValidationIssue[
     }
   }
 
-  for (const [locale, dictionary] of Object.entries(updates.locale ?? {})) {
+  if (Array.isArray(module['data-updates'])) {
+    module['data-updates'].forEach((entry, index) => {
+      if (!isRecord(entry) || entry.type !== 'remove') return;
+      const validTarget = typeof entry.target === 'string' && removableModuleDataKeys.has(entry.target);
+      const validId = typeof entry.id === 'string' && entry.id.trim().length > 0;
+      const validPath = entry.target === 'dialogueOptions'
+        ? typeof entry.path === 'string' && entry.path.trim().length > 0
+        : entry.path === undefined || typeof entry.path === 'string';
+      if (!validTarget || !validId || !validPath) {
+        issues.push(issue('error', `modules.${module.id}.data-updates.${index}.remove`, 'validation.moduleRemoveInvalid', {
+          id: typeof entry.target === 'string' ? entry.target : String(index),
+        }));
+      }
+    });
+  }
+
+  for (const [locale, dictionary] of Object.entries(updates?.locale ?? {})) {
     issues.push(...validateLocaleDictionary(dictionary).map((validationIssue) => ({
       ...validationIssue,
       path: `modules.${module.id}.data-updates.locale.${locale}.${validationIssue.path}`,
@@ -495,7 +562,7 @@ const applyDataSection = (bundle: ContentBundle, data?: ModuleDataSection): Cont
 const applyDataUpdates = (bundle: ContentBundle, updates?: ModuleDataUpdates): ContentBundle => {
   if (!updates) return bundle;
   const updateObject = moduleDataUpdatesObject(updates);
-  const removed = updateObject?.remove ?? {};
+  const removed = moduleRemovals(updates);
   const withoutRemoved = {
     ...bundle,
     manifest: removed.displayProfiles
@@ -629,7 +696,7 @@ const applyOrderedModules = (bundle: ContentBundle, relevantModules: ContentModu
 };
 
 const removedIdsByModule = (module: ContentModule) =>
-  new Set(Object.entries(moduleDataUpdatesObject(module['data-updates'])?.remove ?? {}).flatMap(([key, value]) =>
+  new Set(Object.entries(moduleRemovals(module['data-updates'])).flatMap(([key, value]) =>
     key === 'dialogueOptions' && isRecord(value)
       ? Object.values(value).flatMap((ids) => Array.isArray(ids) ? ids : [])
       : Array.isArray(value) ? value : [],
@@ -643,7 +710,10 @@ const referencesIdValue = (value: unknown, id: string, key = ''): boolean => {
 };
 
 const moduleReferencesId = (module: ContentModule, id: string) =>
-  referencesIdValue(module.data, id) || referencesIdValue({ ...moduleDataUpdatesObject(module['data-updates']), remove: undefined }, id);
+  referencesIdValue(module.data, id) ||
+  (Array.isArray(module['data-updates'])
+    ? referencesIdValue(module['data-updates'].filter((entry) => !isModuleRemoveEntry(entry)), id)
+    : referencesIdValue({ ...moduleDataUpdatesObject(module['data-updates']), remove: undefined }, id));
 
 const findConflictModuleIds = (ordered: ContentModule[], validationIssues: ValidationIssue[]) => {
   const conflictIds = new Set<string>();

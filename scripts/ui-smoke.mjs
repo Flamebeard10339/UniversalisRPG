@@ -66,6 +66,7 @@ try {
     console.log(`[${viewport.name}] mod editor`);
     const detailsVisible = await page.getByRole('button', { name: 'Details', exact: true }).isVisible();
     await page.getByRole('button', { name: 'Data', exact: true }).click();
+    const coreLocationVisible = await page.getByText('crossroads', { exact: true }).first().isVisible();
     await page.getByRole('button', { name: 'Raw', exact: true }).click();
     const rawJson = await page.locator('textarea').last().inputValue();
     const rawContainsCore = rawJson.includes('"id": "base-core"') && rawJson.includes('"id": "crossroads"');
@@ -79,6 +80,7 @@ try {
       waysideVisible,
       contributionVisible,
       detailsVisible,
+      coreLocationVisible,
       rawContainsCore,
       errors,
     });
@@ -95,6 +97,7 @@ const failed = results.some((result) =>
   !result.waysideVisible ||
   !result.contributionVisible ||
   !result.detailsVisible ||
+  !result.coreLocationVisible ||
   !result.rawContainsCore ||
   result.errors.length > 0
 );

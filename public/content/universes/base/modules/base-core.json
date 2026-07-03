@@ -1,1339 +1,1335 @@
-﻿{
-    "$schema":  "https://universalis-rpg.local/schema/module.schema.json",
-    "id":  "base-core",
-    "version":  "1.0.0",
-    "universe":  "base",
-    "author":  "UniversalisRPG",
-    "game_version":  "1.0",
-    "dependencies":  [
-
-                     ],
-    "data":  [
-                 {
-                     "type":  "displayProfile",
-                     "id":  "first-road",
-                     "titleKey":  "displayProfile.first-road.title",
-                     "colors":  {
-                                    "background":  "#10160f",
-                                    "surface":  "#182116",
-                                    "surfaceRaised":  "#202b1d",
-                                    "panel":  "#283725",
-                                    "border":  "#4b5f43",
-                                    "text":  "#edf7e8",
-                                    "textMuted":  "#c9d8c0",
-                                    "textSubtle":  "#99aa8f",
-                                    "accent":  "#67d8c7",
-                                    "accentStrong":  "#a7f3d0",
-                                    "accentText":  "#0d2a24",
-                                    "danger":  "#fb7185",
-                                    "dangerSurface":  "#4c1d17",
-                                    "dangerText":  "#ffe4e6",
-                                    "success":  "#7dd3a8",
-                                    "warning":  "#f6c177"
+{
+  "$schema": "https://universalis-rpg.local/schema/module.schema.json",
+  "id": "base-core",
+  "version": "1.0.0",
+  "universe": "base",
+  "author": "UniversalisRPG",
+  "game_version": "1.0",
+  "dependencies": [],
+  "data": [
+    {
+      "type": "displayProfile",
+      "id": "first-road",
+      "titleKey": "displayProfile.first-road.title",
+      "colors": {
+        "background": "#10160f",
+        "surface": "#182116",
+        "surfaceRaised": "#202b1d",
+        "panel": "#283725",
+        "border": "#4b5f43",
+        "text": "#edf7e8",
+        "textMuted": "#c9d8c0",
+        "textSubtle": "#99aa8f",
+        "accent": "#67d8c7",
+        "accentStrong": "#a7f3d0",
+        "accentText": "#0d2a24",
+        "danger": "#fb7185",
+        "dangerSurface": "#4c1d17",
+        "dangerText": "#ffe4e6",
+        "success": "#7dd3a8",
+        "warning": "#f6c177"
+      }
+    },
+    {
+      "type": "location",
+      "id": "crossroads",
+      "position": {
+        "x": 0,
+        "y": 80
+      },
+      "starting": true,
+      "tags": [
+        "settlement"
+      ]
+    },
+    {
+      "type": "location",
+      "id": "emberwood",
+      "position": {
+        "x": 260,
+        "y": 0
+      },
+      "tags": [
+        "forest"
+      ]
+    },
+    {
+      "type": "location",
+      "id": "old-quarry",
+      "position": {
+        "x": 300,
+        "y": 190
+      },
+      "tags": [
+        "ruin"
+      ]
+    },
+    {
+      "type": "edge",
+      "id": "crossroads-emberwood",
+      "source": "crossroads",
+      "target": "emberwood",
+      "travelTimeSeconds": 2
+    },
+    {
+      "type": "edge",
+      "id": "crossroads-old-quarry",
+      "source": "crossroads",
+      "target": "old-quarry",
+      "travelTimeSeconds": 2
+    },
+    {
+      "type": "stat",
+      "id": "attack",
+      "base": 6
+    },
+    {
+      "type": "stat",
+      "id": "defense",
+      "base": 6
+    },
+    {
+      "type": "stat",
+      "id": "woodcutting",
+      "base": 6
+    },
+    {
+      "type": "stat",
+      "id": "mining",
+      "base": 6
+    },
+    {
+      "type": "stat",
+      "id": "action-rate",
+      "base": 25
+    },
+    {
+      "type": "stat",
+      "id": "health",
+      "base": 100
+    },
+    {
+      "type": "stat",
+      "id": "regeneration",
+      "base": 10
+    },
+    {
+      "type": "stat",
+      "id": "troll-blood",
+      "base": 100
+    },
+    {
+      "type": "skill",
+      "id": "lore",
+      "maxLevel": 100
+    },
+    {
+      "type": "skill",
+      "id": "survival",
+      "maxLevel": 100
+    },
+    {
+      "type": "skill",
+      "id": "craft",
+      "maxLevel": 100
+    },
+    {
+      "type": "skill",
+      "id": "woodcutting",
+      "maxLevel": 100,
+      "statId": "woodcutting"
+    },
+    {
+      "type": "skill",
+      "id": "mining",
+      "maxLevel": 100,
+      "statId": "mining"
+    },
+    {
+      "type": "skill",
+      "id": "health",
+      "maxLevel": 100,
+      "statId": "health"
+    },
+    {
+      "type": "skill",
+      "id": "attack",
+      "maxLevel": 100,
+      "statId": "attack"
+    },
+    {
+      "type": "skill",
+      "id": "defense",
+      "maxLevel": 100,
+      "statId": "defense"
+    },
+    {
+      "type": "skill",
+      "id": "regeneration",
+      "maxLevel": 100,
+      "statId": "regeneration",
+      "addedPerLevel": 0,
+      "increasedPerLevel": 0
+    },
+    {
+      "type": "skill",
+      "id": "troll-blood",
+      "maxLevel": 100,
+      "statId": "troll-blood",
+      "addedPerLevel": 0,
+      "increasedPerLevel": 0
+    },
+    {
+      "type": "item",
+      "id": "emberleaf"
+    },
+    {
+      "type": "item",
+      "id": "log"
+    },
+    {
+      "type": "item",
+      "id": "iron-ore"
+    },
+    {
+      "type": "item",
+      "id": "bones"
+    },
+    {
+      "type": "item",
+      "id": "bronze-spear",
+      "tags": "mainhand (1 attack), +2 attack"
+    },
+    {
+      "type": "item",
+      "id": "bronze-dagger",
+      "tags": "mainhand (1 attack), +1 attack"
+    },
+    {
+      "type": "item",
+      "id": "bronze-arrow"
+    },
+    {
+      "type": "item",
+      "id": "bronze-throwing-knife"
+    },
+    {
+      "type": "item",
+      "id": "tutorial-blade",
+      "tags": "mainhand (1 attack), +8 attack, +2% attack"
+    },
+    {
+      "type": "item",
+      "id": "bronze-pickaxe",
+      "tags": "pickaxe, mainhand (1 attack 1 mining), +8 mining, +3 attack, +5% health"
+    },
+    {
+      "type": "flag",
+      "id": "death-count",
+      "initialValue": 0
+    },
+    {
+      "type": "flag",
+      "id": "tutorial-guide.q1.count",
+      "initialValue": 0
+    },
+    {
+      "type": "resource",
+      "id": "action-rate",
+      "sourceStat": "action-rate",
+      "max": 60,
+      "initialValue": "empty",
+      "display": "minimal",
+      "onFull": [
+        {
+          "kind": "complete-action"
+        },
+        {
+          "kind": "refill",
+          "value": "min"
+        }
+      ]
+    },
+    {
+      "type": "resource",
+      "id": "enemy-action-rate",
+      "owner": "enemy",
+      "sourceStat": "action-rate",
+      "max": 60,
+      "initialValue": "empty",
+      "display": "minimal",
+      "onFull": [
+        {
+          "kind": "enemy-attack"
+        },
+        {
+          "kind": "refill",
+          "value": "min"
+        }
+      ]
+    },
+    {
+      "type": "resource",
+      "id": "enemy-health",
+      "owner": "enemy",
+      "sourceStat": "health",
+      "sourceEnemyStat": "health",
+      "initialValue": "full",
+      "hidden": false
+    },
+    {
+      "type": "resource",
+      "id": "health",
+      "sourceStat": "health",
+      "initialValue": "full",
+      "onEmpty": [
+        {
+          "kind": "reset-state",
+          "locationId": "starting-location",
+          "incrementVariable": "flag:death-count",
+          "preserve": {
+            "inventoryIds": [
+              "emberleaf"
+            ],
+            "skillXp": true,
+            "discoveredLocations": true
+          }
+        },
+        {
+          "kind": "chat",
+          "messageKey": "resource.health.empty"
+        }
+      ]
+    },
+    {
+      "type": "effect",
+      "id": "action-rate-regeneration",
+      "resourceId": "action-rate",
+      "sourceStat": "action-rate",
+      "rateUnit": "per-second",
+      "activeWhen": {
+        "kind": "state-variable",
+        "variable": "active-interaction",
+        "comparison": "equal",
+        "value": true
+      },
+      "resetResourceWhenInactive": true
+    },
+    {
+      "type": "effect",
+      "id": "enemy-action-rate-regeneration",
+      "resourceId": "enemy-action-rate",
+      "sourceStat": "action-rate",
+      "sourceEnemyStat": "rate",
+      "rateUnit": "per-second",
+      "activeWhen": {
+        "kind": "state-variable",
+        "variable": "active-interaction",
+        "comparison": "equal",
+        "value": true
+      },
+      "resetResourceWhenInactive": true
+    },
+    {
+      "type": "effect",
+      "id": "enemy-health-regeneration",
+      "resourceId": "enemy-health",
+      "sourceStat": "action-rate",
+      "sourceEnemyStat": "regeneration",
+      "activeWhen": {
+        "kind": "state-variable",
+        "variable": "active-interaction",
+        "comparison": "equal",
+        "value": true
+      }
+    },
+    {
+      "type": "effect",
+      "id": "health-regeneration",
+      "resourceId": "health",
+      "sourceStat": "regeneration"
+    },
+    {
+      "type": "effect",
+      "id": "health-troll-blood",
+      "resourceId": "health",
+      "sourceStat": "troll-blood"
+    },
+    {
+      "type": "interactionType",
+      "id": "melee-combat",
+      "sourceStatId": "attack",
+      "targetStatId": "defense",
+      "targetPlayerHealth": true
+    },
+    {
+      "type": "interactionType",
+      "id": "woodcutting",
+      "sourceStatId": "woodcutting",
+      "targetStatId": "defense",
+      "targetPlayerHealth": false
+    },
+    {
+      "type": "interactionType",
+      "id": "woodcutting-combat",
+      "sourceStatId": "woodcutting",
+      "targetStatId": "defense",
+      "targetPlayerHealth": true
+    },
+    {
+      "type": "enemy",
+      "id": "goblin",
+      "interactionTypeId": "melee-combat",
+      "stats": {
+        "health": 10,
+        "rate": 30
+      },
+      "showHealthBar": true,
+      "rewards": [
+        {
+          "kind": "skillXp",
+          "skillId": "attack",
+          "amount": 2
+        },
+        {
+          "kind": "skillXp",
+          "skillId": "defense",
+          "amount": 1
+        },
+        {
+          "kind": "dropTable",
+          "mode": "independent",
+          "drops": [
+            {
+              "weight": 1,
+              "reward": {
+                "kind": "item",
+                "itemId": "bones",
+                "amount": 1
+              }
+            },
+            {
+              "weight": 3,
+              "reward": {
+                "kind": "dropTable",
+                "mode": "dependent",
+                "drops": [
+                  {
+                    "weight": 3,
+                    "reward": {
+                      "kind": "dropTable",
+                      "mode": "dependent",
+                      "drops": [
+                        {
+                          "weight": 2,
+                          "reward": {
+                            "kind": "dropTable",
+                            "mode": "dependent",
+                            "drops": [
+                              {
+                                "weight": 5,
+                                "reward": {
+                                  "kind": "item",
+                                  "itemId": "bronze-spear",
+                                  "amount": 1
                                 }
-                 },
-                 {
-                     "type":  "location",
-                     "id":  "crossroads",
-                     "position":  {
-                                      "x":  0,
-                                      "y":  80
-                                  },
-                     "starting":  true,
-                     "tags":  [
-                                  "settlement"
-                              ]
-                 },
-                 {
-                     "type":  "location",
-                     "id":  "emberwood",
-                     "position":  {
-                                      "x":  260,
-                                      "y":  0
-                                  },
-                     "tags":  [
-                                  "forest"
-                              ]
-                 },
-                 {
-                     "type":  "location",
-                     "id":  "old-quarry",
-                     "position":  {
-                                      "x":  300,
-                                      "y":  190
-                                  },
-                     "tags":  [
-                                  "ruin"
-                              ]
-                 },
-                 {
-                     "type":  "edge",
-                     "id":  "crossroads-emberwood",
-                     "source":  "crossroads",
-                     "target":  "emberwood",
-                     "travelTimeSeconds":  2
-                 },
-                 {
-                     "type":  "edge",
-                     "id":  "crossroads-old-quarry",
-                     "source":  "crossroads",
-                     "target":  "old-quarry",
-                     "travelTimeSeconds":  2
-                 },
-                 {
-                     "type":  "stat",
-                     "id":  "attack",
-                     "base":  6
-                 },
-                 {
-                     "type":  "stat",
-                     "id":  "defense",
-                     "base":  6
-                 },
-                 {
-                     "type":  "stat",
-                     "id":  "woodcutting",
-                     "base":  6
-                 },
-                 {
-                     "type":  "stat",
-                     "id":  "mining",
-                     "base":  6
-                 },
-                 {
-                     "type":  "stat",
-                     "id":  "action-rate",
-                     "base":  25
-                 },
-                 {
-                     "type":  "stat",
-                     "id":  "health",
-                     "base":  100
-                 },
-                 {
-                     "type":  "stat",
-                     "id":  "regeneration",
-                     "base":  10
-                 },
-                 {
-                     "type":  "stat",
-                     "id":  "troll-blood",
-                     "base":  100
-                 },
-                 {
-                     "type":  "skill",
-                     "id":  "lore",
-                     "maxLevel":  100
-                 },
-                 {
-                     "type":  "skill",
-                     "id":  "survival",
-                     "maxLevel":  100
-                 },
-                 {
-                     "type":  "skill",
-                     "id":  "craft",
-                     "maxLevel":  100
-                 },
-                 {
-                     "type":  "skill",
-                     "id":  "woodcutting",
-                     "maxLevel":  100,
-                     "statId":  "woodcutting"
-                 },
-                 {
-                     "type":  "skill",
-                     "id":  "mining",
-                     "maxLevel":  100,
-                     "statId":  "mining"
-                 },
-                 {
-                     "type":  "skill",
-                     "id":  "health",
-                     "maxLevel":  100,
-                     "statId":  "health"
-                 },
-                 {
-                     "type":  "skill",
-                     "id":  "attack",
-                     "maxLevel":  100,
-                     "statId":  "attack"
-                 },
-                 {
-                     "type":  "skill",
-                     "id":  "defense",
-                     "maxLevel":  100,
-                     "statId":  "defense"
-                 },
-                 {
-                     "type":  "skill",
-                     "id":  "regeneration",
-                     "maxLevel":  100,
-                     "statId":  "regeneration",
-                     "addedPerLevel":  0,
-                     "increasedPerLevel":  0
-                 },
-                 {
-                     "type":  "skill",
-                     "id":  "troll-blood",
-                     "maxLevel":  100,
-                     "statId":  "troll-blood",
-                     "addedPerLevel":  0,
-                     "increasedPerLevel":  0
-                 },
-                 {
-                     "type":  "item",
-                     "id":  "emberleaf"
-                 },
-                 {
-                     "type":  "item",
-                     "id":  "log"
-                 },
-                 {
-                     "type":  "item",
-                     "id":  "iron-ore"
-                 },
-                 {
-                     "type":  "item",
-                     "id":  "bones"
-                 },
-                 {
-                     "type":  "item",
-                     "id":  "bronze-spear",
-                     "tags":  "mainhand (1 attack), +2 attack"
-                 },
-                 {
-                     "type":  "item",
-                     "id":  "bronze-dagger",
-                     "tags":  "mainhand (1 attack), +1 attack"
-                 },
-                 {
-                     "type":  "item",
-                     "id":  "bronze-arrow"
-                 },
-                 {
-                     "type":  "item",
-                     "id":  "bronze-throwing-knife"
-                 },
-                 {
-                     "type":  "item",
-                     "id":  "tutorial-blade",
-                     "tags":  "mainhand (1 attack), +8 attack, +2% attack"
-                 },
-                 {
-                     "type":  "item",
-                     "id":  "bronze-pickaxe",
-                     "tags":  "pickaxe, mainhand (1 attack 1 mining), +8 mining, +3 attack, +5% health"
-                 },
-                 {
-                     "type":  "flag",
-                     "id":  "death-count",
-                     "initialValue":  0
-                 },
-                 {
-                     "type":  "flag",
-                     "id":  "tutorial-guide.q1.count",
-                     "initialValue":  0
-                 },
-                 {
-                     "type":  "resource",
-                     "id":  "action-rate",
-                     "sourceStat":  "action-rate",
-                     "max":  60,
-                     "initialValue":  "empty",
-                     "display":  "minimal",
-                     "onFull":  [
-                                    {
-                                        "kind":  "complete-action"
-                                    },
-                                    {
-                                        "kind":  "refill",
-                                        "value":  "min"
-                                    }
-                                ]
-                 },
-                 {
-                     "type":  "resource",
-                     "id":  "enemy-action-rate",
-                     "owner":  "enemy",
-                     "sourceStat":  "action-rate",
-                     "max":  60,
-                     "initialValue":  "empty",
-                     "display":  "minimal",
-                     "onFull":  [
-                                    {
-                                        "kind":  "enemy-attack"
-                                    },
-                                    {
-                                        "kind":  "refill",
-                                        "value":  "min"
-                                    }
-                                ]
-                 },
-                 {
-                     "type":  "resource",
-                     "id":  "enemy-health",
-                     "owner":  "enemy",
-                     "sourceStat":  "health",
-                     "sourceEnemyStat":  "health",
-                     "initialValue":  "full",
-                     "hidden":  false
-                 },
-                 {
-                     "type":  "resource",
-                     "id":  "health",
-                     "sourceStat":  "health",
-                     "initialValue":  "full",
-                     "onEmpty":  [
-                                     {
-                                         "kind":  "reset-state",
-                                         "locationId":  "starting-location",
-                                         "incrementVariable":  "flag:death-count",
-                                         "preserve":  {
-                                                          "inventoryIds":  [
-                                                                               "emberleaf"
-                                                                           ],
-                                                          "skillXp":  true,
-                                                          "discoveredLocations":  true
-                                                      }
-                                     },
-                                     {
-                                         "kind":  "chat",
-                                         "messageKey":  "resource.health.empty"
-                                     }
-                                 ]
-                 },
-                 {
-                     "type":  "effect",
-                     "id":  "action-rate-regeneration",
-                     "resourceId":  "action-rate",
-                     "sourceStat":  "action-rate",
-                     "rateUnit":  "per-second",
-                     "activeWhen":  {
-                                        "kind":  "state-variable",
-                                        "variable":  "active-interaction",
-                                        "comparison":  "equal",
-                                        "value":  true
-                                    },
-                     "resetResourceWhenInactive":  true
-                 },
-                 {
-                     "type":  "effect",
-                     "id":  "enemy-action-rate-regeneration",
-                     "resourceId":  "enemy-action-rate",
-                     "sourceStat":  "action-rate",
-                     "sourceEnemyStat":  "rate",
-                     "rateUnit":  "per-second",
-                     "activeWhen":  {
-                                        "kind":  "state-variable",
-                                        "variable":  "active-interaction",
-                                        "comparison":  "equal",
-                                        "value":  true
-                                    },
-                     "resetResourceWhenInactive":  true
-                 },
-                 {
-                     "type":  "effect",
-                     "id":  "enemy-health-regeneration",
-                     "resourceId":  "enemy-health",
-                     "sourceStat":  "action-rate",
-                     "sourceEnemyStat":  "regeneration",
-                     "activeWhen":  {
-                                        "kind":  "state-variable",
-                                        "variable":  "active-interaction",
-                                        "comparison":  "equal",
-                                        "value":  true
-                                    }
-                 },
-                 {
-                     "type":  "effect",
-                     "id":  "health-regeneration",
-                     "resourceId":  "health",
-                     "sourceStat":  "regeneration"
-                 },
-                 {
-                     "type":  "effect",
-                     "id":  "health-troll-blood",
-                     "resourceId":  "health",
-                     "sourceStat":  "troll-blood"
-                 },
-                 {
-                     "type":  "interactionType",
-                     "id":  "melee-combat",
-                     "sourceStatId":  "attack",
-                     "targetStatId":  "defense",
-                     "targetPlayerHealth":  true
-                 },
-                 {
-                     "type":  "interactionType",
-                     "id":  "woodcutting",
-                     "sourceStatId":  "woodcutting",
-                     "targetStatId":  "defense",
-                     "targetPlayerHealth":  false
-                 },
-                 {
-                     "type":  "interactionType",
-                     "id":  "woodcutting-combat",
-                     "sourceStatId":  "woodcutting",
-                     "targetStatId":  "defense",
-                     "targetPlayerHealth":  true
-                 },
-                 {
-                     "type":  "enemy",
-                     "id":  "goblin",
-                     "interactionTypeId":  "melee-combat",
-                     "stats":  {
-                                   "health":  10,
-                                   "rate":  30
-                               },
-                     "showHealthBar":  true,
-                     "rewards":  [
-                                     {
-                                         "kind":  "skillXp",
-                                         "skillId":  "attack",
-                                         "amount":  2
-                                     },
-                                     {
-                                         "kind":  "skillXp",
-                                         "skillId":  "defense",
-                                         "amount":  1
-                                     },
-                                     {
-                                         "kind":  "dropTable",
-                                         "mode":  "independent",
-                                         "drops":  [
-                                                       {
-                                                           "weight":  1,
-                                                           "reward":  {
-                                                                          "kind":  "item",
-                                                                          "itemId":  "bones",
-                                                                          "amount":  1
-                                                                      }
-                                                       },
-                                                       {
-                                                           "weight":  3,
-                                                           "reward":  {
-                                                                          "kind":  "dropTable",
-                                                                          "mode":  "dependent",
-                                                                          "drops":  [
-                                                                                        {
-                                                                                            "weight":  3,
-                                                                                            "reward":  {
-                                                                                                           "kind":  "dropTable",
-                                                                                                           "mode":  "dependent",
-                                                                                                           "drops":  [
-                                                                                                                         {
-                                                                                                                             "weight":  2,
-                                                                                                                             "reward":  {
-                                                                                                                                            "kind":  "dropTable",
-                                                                                                                                            "mode":  "dependent",
-                                                                                                                                            "drops":  [
-                                                                                                                                                          {
-                                                                                                                                                              "weight":  5,
-                                                                                                                                                              "reward":  {
-                                                                                                                                                                             "kind":  "item",
-                                                                                                                                                                             "itemId":  "bronze-spear",
-                                                                                                                                                                             "amount":  1
-                                                                                                                                                                         }
-                                                                                                                                                          },
-                                                                                                                                                          {
-                                                                                                                                                              "weight":  10,
-                                                                                                                                                              "reward":  {
-                                                                                                                                                                             "kind":  "item",
-                                                                                                                                                                             "itemId":  "bronze-dagger",
-                                                                                                                                                                             "amount":  1
-                                                                                                                                                                         }
-                                                                                                                                                          }
-                                                                                                                                                      ]
-                                                                                                                                        }
-                                                                                                                         },
-                                                                                                                         {
-                                                                                                                             "weight":  1,
-                                                                                                                             "reward":  {
-                                                                                                                                            "kind":  "dropTable",
-                                                                                                                                            "mode":  "dependent",
-                                                                                                                                            "drops":  [
-                                                                                                                                                          {
-                                                                                                                                                              "weight":  3,
-                                                                                                                                                              "reward":  {
-                                                                                                                                                                             "kind":  "item",
-                                                                                                                                                                             "itemId":  "bronze-arrow",
-                                                                                                                                                                             "amount":  {
-                                                                                                                                                                                            "min":  5,
-                                                                                                                                                                                            "max":  8
-                                                                                                                                                                                        }
-                                                                                                                                                                         }
-                                                                                                                                                          },
-                                                                                                                                                          {
-                                                                                                                                                              "weight":  6,
-                                                                                                                                                              "reward":  {
-                                                                                                                                                                             "kind":  "item",
-                                                                                                                                                                             "itemId":  "bronze-throwing-knife",
-                                                                                                                                                                             "amount":  {
-                                                                                                                                                                                            "min":  3,
-                                                                                                                                                                                            "max":  5
-                                                                                                                                                                                        }
-                                                                                                                                                                         }
-                                                                                                                                                          }
-                                                                                                                                                      ]
-                                                                                                                                        }
-                                                                                                                         }
-                                                                                                                     ]
-                                                                                                       }
-                                                                                        },
-                                                                                        {
-                                                                                            "weight":  5,
-                                                                                            "reward":  {
-                                                                                                           "kind":  "item",
-                                                                                                           "itemId":  "iron-ore",
-                                                                                                           "amount":  {
-                                                                                                                          "min":  1,
-                                                                                                                          "max":  2
-                                                                                                                      }
-                                                                                                       }
-                                                                                        }
-                                                                                    ]
-                                                                      }
-                                                       }
-                                                   ]
-                                     }
-                                 ]
-                 },
-                 {
-                     "type":  "enemy",
-                     "id":  "oak-tree",
-                     "interactionTypeId":  "woodcutting",
-                     "stats":  {
-                                   "health":  10
-                               },
-                     "showHealthBar":  true,
-                     "rewards":  [
-                                     {
-                                         "kind":  "skillXp",
-                                         "skillId":  "woodcutting",
-                                         "amount":  4
-                                     }
-                                 ]
-                 },
-                 {
-                     "type":  "enemy",
-                     "id":  "ent",
-                     "interactionTypeId":  "woodcutting-combat",
-                     "stats":  {
-                                   "attack":  6,
-                                   "defense":  4,
-                                   "health":  30,
-                                   "rate":  20
-                               },
-                     "showHealthBar":  true,
-                     "rewards":  [
-                                     {
-                                         "kind":  "skillXp",
-                                         "skillId":  "woodcutting",
-                                         "amount":  8
-                                     },
-                                     {
-                                         "kind":  "skillXp",
-                                         "skillId":  "defense",
-                                         "amount":  2
-                                     }
-                                 ]
-                 },
-                 {
-                     "type":  "enemy",
-                     "id":  "ork",
-                     "interactionTypeId":  "melee-combat",
-                     "stats":  {
-                                   "attack":  21,
-                                   "defense":  21,
-                                   "health":  40,
-                                   "rate":  24
-                               },
-                     "showHealthBar":  true,
-                     "rewards":  [
-                                     {
-                                         "kind":  "skillXp",
-                                         "skillId":  "attack",
-                                         "amount":  4
-                                     },
-                                     {
-                                         "kind":  "skillXp",
-                                         "skillId":  "defense",
-                                         "amount":  2
-                                     }
-                                 ]
-                 },
-                 {
-                     "type":  "enemy",
-                     "id":  "troll",
-                     "interactionTypeId":  "melee-combat",
-                     "stats":  {
-                                   "attack":  31,
-                                   "defense":  31,
-                                   "health":  80,
-                                   "rate":  18
-                               },
-                     "showHealthBar":  true,
-                     "rewards":  [
-                                     {
-                                         "kind":  "skillXp",
-                                         "skillId":  "attack",
-                                         "amount":  8
-                                     },
-                                     {
-                                         "kind":  "skillXp",
-                                         "skillId":  "defense",
-                                         "amount":  4
-                                     }
-                                 ]
-                 },
-                 {
-                     "type":  "dialogue",
-                     "id":  "tutorial-guide",
-                     "startNodeId":  "start",
-                     "nodes":  [
-                                   {
-                                       "id":  "start",
-                                       "speakerId":  "tutorial-guide",
-                                       "textKey":  "dialogue.tutorial-guide.start",
-                                       "gotoNodeId":  "helpful-questions"
-                                   },
-                                   {
-                                       "id":  "helpful-questions",
-                                       "options":  [
-                                                       {
-                                                           "id":  "combat-experience",
-                                                           "labelKey":  "dialogue.tutorial-guide.option.combatExperience",
-                                                           "conditions":  {
-                                                                              "kind":  "not",
-                                                                              "condition":  {
-                                                                                                "kind":  "state-variable",
-                                                                                                "variable":  "flag:tutorial-guide.q1.count",
-                                                                                                "comparison":  "greater-than",
-                                                                                                "value":  5
-                                                                                            }
-                                                                          },
-                                                           "gotoNodeId":  "q1"
-                                                       },
-                                                       {
-                                                           "id":  "woodcutting-secrets",
-                                                           "labelKey":  "dialogue.tutorial-guide.option.woodcuttingSecrets",
-                                                           "gotoNodeId":  "q2"
-                                                       },
-                                                       {
-                                                           "id":  "gully-rocks",
-                                                           "labelKey":  "dialogue.tutorial-guide.option.gullyRocks",
-                                                           "gotoNodeId":  "q3"
-                                                       },
-                                                       {
-                                                           "id":  "take-logs",
-                                                           "labelKey":  "dialogue.tutorial-guide.option.takeLogs",
-                                                           "conditions":  {
-                                                                              "kind":  "state-variable",
-                                                                              "variable":  "item:log",
-                                                                              "comparison":  "greater-than",
-                                                                              "value":  0
-                                                                          },
-                                                           "gotoNodeId":  "q4"
-                                                       }
-                                                   ]
-                                   },
-                                   {
-                                       "id":  "q1",
-                                       "results":  [
-                                                       {
-                                                           "kind":  "state-variable-delta",
-                                                           "variable":  "flag:tutorial-guide.q1.count",
-                                                           "amount":  1
-                                                       }
-                                                   ],
-                                       "branches":  [
-                                                        {
-                                                            "conditions":  {
-                                                                               "kind":  "state-variable",
-                                                                               "variable":  "flag:tutorial-guide.q1.count",
-                                                                               "comparison":  "equal",
-                                                                               "value":  1
-                                                                           },
-                                                            "gotoNodeId":  "q1-first"
-                                                        },
-                                                        {
-                                                            "conditions":  {
-                                                                               "kind":  "state-variable",
-                                                                               "variable":  "flag:tutorial-guide.q1.count",
-                                                                               "comparison":  "equal",
-                                                                               "value":  2
-                                                                           },
-                                                            "gotoNodeId":  "q1-second-a"
-                                                        },
-                                                        {
-                                                            "conditions":  {
-                                                                               "kind":  "all",
-                                                                               "conditions":  [
-                                                                                                  {
-                                                                                                      "kind":  "state-variable",
-                                                                                                      "variable":  "flag:tutorial-guide.q1.count",
-                                                                                                      "comparison":  "greater-than",
-                                                                                                      "value":  2
-                                                                                                  },
-                                                                                                  {
-                                                                                                      "kind":  "state-variable",
-                                                                                                      "variable":  "flag:tutorial-guide.q1.count",
-                                                                                                      "comparison":  "less-than",
-                                                                                                      "value":  6
-                                                                                                  }
-                                                                                              ]
-                                                                           },
-                                                            "gotoNodeId":  "q1-forgetful-a"
-                                                        },
-                                                        {
-                                                            "conditions":  {
-                                                                               "kind":  "state-variable",
-                                                                               "variable":  "flag:tutorial-guide.q1.count",
-                                                                               "comparison":  "greater-than",
-                                                                               "value":  5
-                                                                           },
-                                                            "gotoNodeId":  "q1-final-a"
-                                                        }
-                                                    ]
-                                   },
-                                   {
-                                       "id":  "q1-first",
-                                       "speakerId":  "tutorial-guide",
-                                       "textKey":  "dialogue.tutorial-guide.q1.first",
-                                       "gotoNodeId":  "helpful-questions"
-                                   },
-                                   {
-                                       "id":  "q1-second-a",
-                                       "speakerId":  "tutorial-guide",
-                                       "textKey":  "dialogue.tutorial-guide.q1.secondA",
-                                       "gotoNodeId":  "q1-second-b"
-                                   },
-                                   {
-                                       "id":  "q1-second-b",
-                                       "speakerId":  "tutorial-guide",
-                                       "textKey":  "dialogue.tutorial-guide.q1.secondB",
-                                       "gotoNodeId":  "helpful-questions"
-                                   },
-                                   {
-                                       "id":  "q1-forgetful-a",
-                                       "speakerId":  "tutorial-guide",
-                                       "textKey":  "dialogue.tutorial-guide.q1.forgetfulA",
-                                       "gotoNodeId":  "q1-forgetful-b"
-                                   },
-                                   {
-                                       "id":  "q1-forgetful-b",
-                                       "speakerId":  "tutorial-guide",
-                                       "textKey":  "dialogue.tutorial-guide.q1.forgetfulB",
-                                       "gotoNodeId":  "helpful-questions"
-                                   },
-                                   {
-                                       "id":  "q1-final-a",
-                                       "speakerId":  "tutorial-guide",
-                                       "textKey":  "dialogue.tutorial-guide.q1.finalA",
-                                       "gotoNodeId":  "q1-final-b"
-                                   },
-                                   {
-                                       "id":  "q1-final-b",
-                                       "narratorKey":  "dialogue.tutorial-guide.q1.finalReward",
-                                       "results":  [
-                                                       {
-                                                           "kind":  "item",
-                                                           "itemId":  "tutorial-blade",
-                                                           "amount":  1
-                                                       }
-                                                   ],
-                                       "gotoNodeId":  "helpful-questions"
-                                   },
-                                   {
-                                       "id":  "q2",
-                                       "speakerId":  "tutorial-guide",
-                                       "textKey":  "dialogue.tutorial-guide.q2",
-                                       "options":  [
-                                                       {
-                                                           "id":  "tell-me",
-                                                           "labelKey":  "dialogue.tutorial-guide.q2.option.tellMe",
-                                                           "gotoNodeId":  "q2-o1-a"
-                                                       },
-                                                       {
-                                                           "id":  "not-telling",
-                                                           "labelKey":  "dialogue.tutorial-guide.q2.option.notTelling",
-                                                           "gotoNodeId":  "q2-o2"
-                                                       }
-                                                   ]
-                                   },
-                                   {
-                                       "id":  "q2-o1-a",
-                                       "speakerId":  "tutorial-guide",
-                                       "textKey":  "dialogue.tutorial-guide.q2.o1.a",
-                                       "gotoNodeId":  "q2-o1-b"
-                                   },
-                                   {
-                                       "id":  "q2-o1-b",
-                                       "speakerId":  "tutorial-guide",
-                                       "textKey":  "dialogue.tutorial-guide.q2.o1.b",
-                                       "gotoNodeId":  "helpful-questions"
-                                   },
-                                   {
-                                       "id":  "q2-o2",
-                                       "speakerId":  "tutorial-guide",
-                                       "textKey":  "dialogue.tutorial-guide.q2.o2",
-                                       "gotoNodeId":  "helpful-questions"
-                                   },
-                                   {
-                                       "id":  "q3",
-                                       "gotoNodeId":  "q3-a"
-                                   },
-                                   {
-                                       "id":  "q3-a",
-                                       "speakerId":  "tutorial-guide",
-                                       "textKey":  "dialogue.tutorial-guide.q3.a",
-                                       "gotoNodeId":  "q3-b"
-                                   },
-                                   {
-                                       "id":  "q3-b",
-                                       "speakerId":  "tutorial-guide",
-                                       "textKey":  "dialogue.tutorial-guide.q3.b",
-                                       "results":  [
-                                                       {
-                                                           "kind":  "item",
-                                                           "itemId":  "bronze-pickaxe",
-                                                           "amount":  1
-                                                       }
-                                                   ],
-                                       "gotoNodeId":  "helpful-questions"
-                                   },
-                                   {
-                                       "id":  "q4",
-                                       "speakerId":  "tutorial-guide",
-                                       "textKey":  "dialogue.tutorial-guide.q4",
-                                       "options":  [
-                                                       {
-                                                           "id":  "give-1",
-                                                           "labelKey":  "dialogue.tutorial-guide.q4.option.give1",
-                                                           "conditions":  {
-                                                                              "kind":  "state-variable",
-                                                                              "variable":  "item:log",
-                                                                              "comparison":  "greater-than",
-                                                                              "value":  0
-                                                                          },
-                                                           "gotoNodeId":  "q4-c1"
-                                                       },
-                                                       {
-                                                           "id":  "give-10",
-                                                           "labelKey":  "dialogue.tutorial-guide.q4.option.give10",
-                                                           "conditions":  {
-                                                                              "kind":  "state-variable",
-                                                                              "variable":  "item:log",
-                                                                              "comparison":  "greater-than",
-                                                                              "value":  9
-                                                                          },
-                                                           "gotoNodeId":  "q4-c10"
-                                                       },
-                                                       {
-                                                           "id":  "give-25",
-                                                           "labelKey":  "dialogue.tutorial-guide.q4.option.give25",
-                                                           "conditions":  {
-                                                                              "kind":  "state-variable",
-                                                                              "variable":  "item:log",
-                                                                              "comparison":  "greater-than",
-                                                                              "value":  24
-                                                                          },
-                                                           "gotoNodeId":  "q4-c25"
-                                                       },
-                                                       {
-                                                           "id":  "changed-mind",
-                                                           "labelKey":  "dialogue.tutorial-guide.q4.option.changedMind",
-                                                           "gotoNodeId":  "helpful-questions"
-                                                       }
-                                                   ]
-                                   },
-                                   {
-                                       "id":  "q4-c1",
-                                       "results":  [
-                                                       {
-                                                           "kind":  "item",
-                                                           "itemId":  "log",
-                                                           "amount":  -1
-                                                       }
-                                                   ],
-                                       "gotoNodeId":  "helpful-questions"
-                                   },
-                                   {
-                                       "id":  "q4-c10",
-                                       "results":  [
-                                                       {
-                                                           "kind":  "item",
-                                                           "itemId":  "log",
-                                                           "amount":  -10
-                                                       }
-                                                   ],
-                                       "gotoNodeId":  "helpful-questions"
-                                   },
-                                   {
-                                       "id":  "q4-c25",
-                                       "results":  [
-                                                       {
-                                                           "kind":  "item",
-                                                           "itemId":  "log",
-                                                           "amount":  -25
-                                                       }
-                                                   ],
-                                       "gotoNodeId":  "helpful-questions"
-                                   }
-                               ]
-                 },
-                 {
-                     "type":  "action",
-                     "id":  "gather-rumors",
-                     "locationId":  "crossroads",
-                     "durationSeconds":  5,
-                     "rewards":  [
-                                     {
-                                         "kind":  "skillXp",
-                                         "skillId":  "lore",
-                                         "amount":  2
-                                     }
-                                 ]
-                 },
-                 {
-                     "type":  "action",
-                     "id":  "speak-to-tutorial-guide",
-                     "locationId":  "crossroads",
-                     "role":  "utility",
-                     "durationSeconds":  0.1,
-                     "rewards":  [
-
-                                 ],
-                     "results":  [
-                                     {
-                                         "kind":  "dialogue",
-                                         "dialogueId":  "tutorial-guide"
-                                     }
-                                 ]
-                 },
-                 {
-                     "type":  "action",
-                     "id":  "fight-goblin",
-                     "locationId":  "crossroads",
-                     "durationSeconds":  1,
-                     "enemyId":  "goblin",
-                     "rewards":  [
-                                     {
-                                         "kind":  "skillXp",
-                                         "skillId":  "attack",
-                                         "amount":  1
-                                     }
-                                 ],
-                     "experience":  [
-                                        {
-                                            "event":  "action-complete",
-                                            "skillId":  "attack",
-                                            "amount":  1
-                                        },
-                                        {
-                                            "event":  "damage-dealt",
-                                            "skillId":  "attack"
-                                        },
-                                        {
-                                            "event":  "damage-taken",
-                                            "skillId":  "health"
-                                        },
-                                        {
-                                            "event":  "incoming-attack-missed",
-                                            "skillId":  "defense",
-                                            "amount":  10
-                                        },
-                                        {
-                                            "event":  "health-regenerated",
-                                            "skillId":  "regeneration",
-                                            "sourceStat":  "regeneration"
-                                        },
-                                        {
-                                            "event":  "health-regenerated",
-                                            "skillId":  "troll-blood",
-                                            "sourceStat":  "troll-blood"
-                                        }
-                                    ]
-                 },
-                 {
-                     "type":  "action",
-                     "id":  "chop-oak-tree",
-                     "locationId":  "emberwood",
-                     "durationSeconds":  1,
-                     "enemyId":  "oak-tree",
-                     "rewards":  [
-                                     {
-                                         "kind":  "skillXp",
-                                         "skillId":  "woodcutting",
-                                         "amount":  1
-                                     }
-                                 ],
-                     "experience":  [
-                                        {
-                                            "event":  "action-complete",
-                                            "skillId":  "woodcutting",
-                                            "amount":  1
-                                        },
-                                        {
-                                            "event":  "damage-dealt",
-                                            "skillId":  "woodcutting"
-                                        }
-                                    ]
-                 },
-                 {
-                     "type":  "action",
-                     "id":  "fight-ent",
-                     "locationId":  "emberwood",
-                     "durationSeconds":  1,
-                     "enemyId":  "ent",
-                     "rewards":  [
-                                     {
-                                         "kind":  "skillXp",
-                                         "skillId":  "woodcutting",
-                                         "amount":  1
-                                     }
-                                 ],
-                     "experience":  [
-                                        {
-                                            "event":  "action-complete",
-                                            "skillId":  "woodcutting",
-                                            "amount":  1
-                                        },
-                                        {
-                                            "event":  "damage-dealt",
-                                            "skillId":  "woodcutting"
-                                        },
-                                        {
-                                            "event":  "damage-taken",
-                                            "skillId":  "health"
-                                        },
-                                        {
-                                            "event":  "incoming-attack-missed",
-                                            "skillId":  "defense",
-                                            "amount":  10
-                                        },
-                                        {
-                                            "event":  "health-regenerated",
-                                            "skillId":  "regeneration",
-                                            "sourceStat":  "regeneration"
-                                        },
-                                        {
-                                            "event":  "health-regenerated",
-                                            "skillId":  "troll-blood",
-                                            "sourceStat":  "troll-blood"
-                                        }
-                                    ]
-                 },
-                 {
-                     "type":  "action",
-                     "id":  "fight-ork",
-                     "locationId":  "crossroads",
-                     "durationSeconds":  1,
-                     "enemyId":  "ork",
-                     "rewards":  [
-                                     {
-                                         "kind":  "skillXp",
-                                         "skillId":  "attack",
-                                         "amount":  1
-                                     }
-                                 ],
-                     "experience":  [
-                                        {
-                                            "event":  "action-complete",
-                                            "skillId":  "attack",
-                                            "amount":  1
-                                        },
-                                        {
-                                            "event":  "damage-dealt",
-                                            "skillId":  "attack"
-                                        },
-                                        {
-                                            "event":  "damage-taken",
-                                            "skillId":  "health"
-                                        },
-                                        {
-                                            "event":  "incoming-attack-missed",
-                                            "skillId":  "defense",
-                                            "amount":  10
-                                        },
-                                        {
-                                            "event":  "health-regenerated",
-                                            "skillId":  "regeneration",
-                                            "sourceStat":  "regeneration"
-                                        },
-                                        {
-                                            "event":  "health-regenerated",
-                                            "skillId":  "troll-blood",
-                                            "sourceStat":  "troll-blood"
-                                        }
-                                    ]
-                 },
-                 {
-                     "type":  "action",
-                     "id":  "fight-troll",
-                     "locationId":  "crossroads",
-                     "durationSeconds":  1,
-                     "enemyId":  "troll",
-                     "rewards":  [
-                                     {
-                                         "kind":  "skillXp",
-                                         "skillId":  "attack",
-                                         "amount":  1
-                                     }
-                                 ],
-                     "experience":  [
-                                        {
-                                            "event":  "action-complete",
-                                            "skillId":  "attack",
-                                            "amount":  1
-                                        },
-                                        {
-                                            "event":  "damage-dealt",
-                                            "skillId":  "attack"
-                                        },
-                                        {
-                                            "event":  "damage-taken",
-                                            "skillId":  "health"
-                                        },
-                                        {
-                                            "event":  "incoming-attack-missed",
-                                            "skillId":  "defense",
-                                            "amount":  10
-                                        },
-                                        {
-                                            "event":  "health-regenerated",
-                                            "skillId":  "regeneration",
-                                            "sourceStat":  "regeneration"
-                                        },
-                                        {
-                                            "event":  "health-regenerated",
-                                            "skillId":  "troll-blood",
-                                            "sourceStat":  "troll-blood"
-                                        }
-                                    ]
-                 },
-                 {
-                     "type":  "action",
-                     "id":  "forage-embers",
-                     "locationId":  "emberwood",
-                     "durationSeconds":  8,
-                     "rewards":  [
-                                     {
-                                         "kind":  "item",
-                                         "itemId":  "emberleaf",
-                                         "amount":  1
-                                     },
-                                     {
-                                         "kind":  "skillXp",
-                                         "skillId":  "survival",
-                                         "amount":  3
-                                     }
-                                 ]
-                 },
-                 {
-                     "type":  "action",
-                     "id":  "survey-stonework",
-                     "locationId":  "old-quarry",
-                     "durationSeconds":  10,
-                     "rewards":  [
-                                     {
-                                         "kind":  "skillXp",
-                                         "skillId":  "craft",
-                                         "amount":  4
-                                     }
-                                 ]
-                 },
-                 {
-                     "type":  "action",
-                     "id":  "mine-iron-ore-vein",
-                     "locationId":  "old-quarry",
-                     "durationSeconds":  2,
-                     "requirements":  {
-                                          "kind":  "item-tag",
-                                          "tag":  "pickaxe"
-                                      },
-                     "rewards":  [
-                                     {
-                                         "kind":  "item",
-                                         "itemId":  "iron-ore",
-                                         "amount":  1
-                                     },
-                                     {
-                                         "kind":  "skillXp",
-                                         "skillId":  "mining",
-                                         "amount":  1
-                                     }
-                                 ]
-                 }
-             ],
-    "locale":  {
-                   "en":  {
-                              "displayProfile.first-road.title":  "First Road",
-                              "location.crossroads.title":  "Wayside Crossroads",
-                              "location.crossroads.description":  "A lantern-lit meeting place where rumors arrive before travelers do.",
-                              "location.emberwood.title":  "Emberwood",
-                              "location.emberwood.description":  "A warm forest of red-barked trees and low-burning leaves.",
-                              "location.old-quarry.title":  "Old Quarry",
-                              "location.old-quarry.description":  "Weather-cut stone terraces hum faintly after sunset.",
-                              "action.gather-rumors.title":  "Gather Rumors",
-                              "action.gather-rumors.description":  "Listen for useful fragments of old stories and current trouble.",
-                              "action.gather-rumors.success":  "A useful rumor settles into memory.",
-                              "action.gather-rumors.failure":  "The rumor trail goes cold before anything useful turns up.",
-                              "action.speak-to-tutorial-guide.title":  "Speak to Tutorial Guide",
-                              "action.speak-to-tutorial-guide.description":  "Ask the guide for a little practical advice.",
-                              "action.speak-to-tutorial-guide.success":  "The Tutorial Guide is ready to talk.",
-                              "action.speak-to-tutorial-guide.failure":  "The Tutorial Guide is distracted.",
-                              "action.fight-goblin.title":  "Fight Goblin",
-                              "action.fight-goblin.description":  "Trade quick blows with a small roadside raider.",
-                              "action.fight-goblin.success":  "You hit the goblin.",
-                              "action.fight-goblin.failure":  "The goblin slips away from your strike.",
-                              "action.fight-goblin.kill":  "The goblin drops.",
-                              "action.chop-oak-tree.title":  "Chop Oak Tree",
-                              "action.chop-oak-tree.description":  "Work through the oak\u0027s stubborn trunk.",
-                              "action.chop-oak-tree.success":  "Your axe bites into the oak.",
-                              "action.chop-oak-tree.failure":  "The axe glances off the oak grain.",
-                              "action.chop-oak-tree.kill":  "The oak gives way.",
-                              "action.fight-ent.title":  "Fight Ent",
-                              "action.fight-ent.description":  "Use woodcutting skill against a walking tree that hits back.",
-                              "action.fight-ent.success":  "You cut into the ent\u0027s bark.",
-                              "action.fight-ent.failure":  "The ent twists away from the chop.",
-                              "action.fight-ent.kill":  "The ent falls still.",
-                              "action.fight-ork.title":  "Fight Ork",
-                              "action.fight-ork.description":  "Test yourself against a tougher brawler.",
-                              "action.fight-ork.success":  "You land a solid hit on the ork.",
-                              "action.fight-ork.failure":  "The ork shrugs past your attack.",
-                              "action.fight-ork.kill":  "The ork falls.",
-                              "action.fight-troll.title":  "Fight Troll",
-                              "action.fight-troll.description":  "Challenge a brute with heavy hands and thicker hide.",
-                              "action.fight-troll.success":  "You carve through part of the troll\u0027s guard.",
-                              "action.fight-troll.failure":  "The troll absorbs the attempt without giving ground.",
-                              "action.fight-troll.kill":  "The troll crashes down.",
-                              "interaction.melee-combat.title":  "Melee Combat",
-                              "interaction.melee-combat.player.hit":  "You hit the {target}.",
-                              "interaction.melee-combat.player.miss":  "You missed the {target}.",
-                              "interaction.melee-combat.player.kill":  "You killed the {target}.",
-                              "interaction.melee-combat.entity.hit":  "The {source} hit you.",
-                              "interaction.melee-combat.entity.miss":  "The {source} missed you.",
-                              "interaction.melee-combat.entity.kill":  "The {source} killed you.",
-                              "interaction.woodcutting.title":  "Woodcutting",
-                              "interaction.woodcutting.player.hit":  "You chop the {target}.",
-                              "interaction.woodcutting.player.miss":  "You fail to bite into the {target}.",
-                              "interaction.woodcutting.player.kill":  "You felled the {target}.",
-                              "interaction.woodcutting.entity.hit":  "The {source} hit you.",
-                              "interaction.woodcutting.entity.miss":  "The {source} missed you.",
-                              "interaction.woodcutting.entity.kill":  "The {source} killed you.",
-                              "interaction.woodcutting-combat.title":  "Woodcutting Combat",
-                              "interaction.woodcutting-combat.player.hit":  "You chop the {target}.",
-                              "interaction.woodcutting-combat.player.miss":  "The {target}\u0027s bark turns your chop aside.",
-                              "interaction.woodcutting-combat.player.kill":  "You felled the {target}.",
-                              "interaction.woodcutting-combat.entity.hit":  "The {source} hit you.",
-                              "interaction.woodcutting-combat.entity.miss":  "The {source} missed you.",
-                              "interaction.woodcutting-combat.entity.kill":  "The {source} killed you.",
-                              "action.forage-embers.title":  "Forage Emberleaf",
-                              "action.forage-embers.description":  "Gather emberleaf without waking the ash mites.",
-                              "action.forage-embers.success":  "You gather emberleaf and keep the ash mites sleeping.",
-                              "action.forage-embers.failure":  "The emberleaf crumbles to ash before you can collect it.",
-                              "action.survey-stonework.title":  "Survey Stonework",
-                              "action.survey-stonework.description":  "Study old tool marks and salvageable masonry.",
-                              "action.survey-stonework.success":  "The old stonework gives up a few practical secrets.",
-                              "action.survey-stonework.failure":  "Dust and shadows hide the stonework\u0027s useful details.",
-                              "action.mine-iron-ore-vein.title":  "Mine Iron Ore Vein",
-                              "action.mine-iron-ore-vein.description":  "Work an exposed ore vein with any pickaxe you own.",
-                              "action.mine-iron-ore-vein.success":  "You chip iron ore free from the vein.",
-                              "action.mine-iron-ore-vein.failure":  "The ore vein resists your attempt.",
-                              "skill.lore.title":  "Lore",
-                              "skill.lore.description":  "Memory, myth, and the patience to connect old clues.",
-                              "skill.survival.title":  "Survival",
-                              "skill.survival.description":  "Practical knowledge for harsh country and stranger weather.",
-                              "skill.craft.title":  "Craft",
-                              "skill.craft.description":  "Making, repairing, and improving useful things.",
-                              "skill.woodcutting.title":  "Woodcutting",
-                              "skill.woodcutting.description":  "Reading grain, landing chops, and bringing down stubborn timber.",
-                              "skill.mining.title":  "Mining",
-                              "skill.mining.description":  "Reading stone, striking ore, and extracting useful minerals.",
-                              "skill.health.title":  "Health",
-                              "skill.health.description":  "Maximum health and hard-earned toughness.",
-                              "skill.attack.title":  "Attack",
-                              "skill.attack.description":  "Accuracy, timing, and pressure in direct conflict.",
-                              "skill.defense.title":  "Defense",
-                              "skill.defense.description":  "Guard, positioning, and staying intact under pressure.",
-                              "skill.regeneration.title":  "Regeneration",
-                              "skill.regeneration.description":  "Recovered health per minute while time passes.",
-                              "skill.troll-blood.title":  "Troll\u0027s Blood",
-                              "skill.troll-blood.description":  "A second healing-over-time source for validating separate experience gain.",
-                              "stat.health.title":  "Health",
-                              "stat.health.description":  "Maximum player health.",
-                              "stat.attack.title":  "Attack",
-                              "stat.attack.description":  "Power applied to outgoing attacks.",
-                              "stat.defense.title":  "Defense",
-                              "stat.defense.description":  "Protection against incoming attacks.",
-                              "stat.woodcutting.title":  "Woodcutting",
-                              "stat.woodcutting.description":  "Power applied to woodcutting actions.",
-                              "stat.mining.title":  "Mining",
-                              "stat.mining.description":  "Power applied to mining actions.",
-                              "stat.action-rate.title":  "Action Rate",
-                              "stat.action-rate.description":  "Player adversarial actions per minute.",
-                              "stat.regeneration.title":  "Regeneration",
-                              "stat.regeneration.description":  "Health recovered per minute.",
-                              "stat.troll-blood.title":  "Troll\u0027s Blood",
-                              "stat.troll-blood.description":  "A stronger health recovery stat.",
-                              "resource.action-rate.title":  "Action Rate",
-                              "effect.action-rate-regeneration.title":  "Action rate buildup",
-                              "resource.enemy-action-rate.title":  "Enemy Action Rate",
-                              "effect.enemy-action-rate-regeneration.title":  "Enemy action rate buildup",
-                              "resource.enemy-health.title":  "Enemy Health",
-                              "effect.enemy-health-regeneration.title":  "Enemy health regeneration",
-                              "resource.health.title":  "Health",
-                              "effect.health-regeneration.title":  "Health regeneration",
-                              "effect.health-troll-blood.title":  "Troll\u0027s Blood healing",
-                              "resource.health.empty":  "You died.",
-                              "item.emberleaf.title":  "Emberleaf",
-                              "item.emberleaf.description":  "A warm leaf that keeps a coal-like glow after it falls.",
-                              "item.log.title":  "Log",
-                              "item.log.description":  "A plain length of timber.",
-                              "item.tutorial-blade.title":  "Heirloom Arming Sword",
-                              "item.tutorial-blade.description":  "A worn but cared-for sword from the Tutorial Guide.",
-                              "item.bronze-pickaxe.title":  "Bronze Pickaxe",
-                              "item.bronze-pickaxe.description":  "A simple pickaxe suitable for ore veins.",
-                              "item.iron-ore.title":  "Iron Ore",
-                              "item.iron-ore.description":  "A rough chunk of iron-bearing stone.",
-                              "item.bones.title":  "Bones",
-                              "item.bones.description":  "Dry bones from a defeated creature.",
-                              "item.bronze-spear.title":  "Bronze Spear",
-                              "item.bronze-spear.description":  "A simple bronze-tipped spear.",
-                              "item.bronze-dagger.title":  "Bronze Dagger",
-                              "item.bronze-dagger.description":  "A short bronze blade suited to quick strikes.",
-                              "item.bronze-arrow.title":  "Bronze Arrow",
-                              "item.bronze-arrow.description":  "An arrow with a small bronze head.",
-                              "item.bronze-throwing-knife.title":  "Bronze Throwing Knife",
-                              "item.bronze-throwing-knife.description":  "A balanced bronze knife meant to be thrown.",
-                              "dialogue.tutorial-guide.speaker.tutorial-guide":  "Tutorial Guide",
-                              "dialogue.tutorial-guide.start":  "Greetings adventurer, I see you are new in town. I am at your disposal!",
-                              "dialogue.tutorial-guide.option.combatExperience":  "What is the best way for me to get combat experience?",
-                              "dialogue.tutorial-guide.option.woodcuttingSecrets":  "Do you know any secrets about woodcutting?",
-                              "dialogue.tutorial-guide.option.gullyRocks":  "What can I do with those rocks in the gully?",
-                              "dialogue.tutorial-guide.option.takeLogs":  "Can you take some of these logs off of me?",
-                              "dialogue.tutorial-guide.q1.first":  "You\u0027re a fighter then! It\u0027s simple. You want to get better at fighting? Then... fight! Those goblins down the road are a good enough place to start.",
-                              "dialogue.tutorial-guide.q1.secondA":  "Again? Well, just fight things. The better you are at it the faster you improve.",
-                              "dialogue.tutorial-guide.q1.secondB":  "It\u0027s only common sense, how can you expect to be good at regeneration if you\u0027ve never healed a health point in your life! Ha ha ha!",
-                              "dialogue.tutorial-guide.q1.forgetfulA":  "Did you already forget? My! I heard fighters were meatheads, but this is pushing it!",
-                              "dialogue.tutorial-guide.q1.forgetfulB":  "Just fight some monsters and you\u0027ll be fine.",
-                              "dialogue.tutorial-guide.q1.finalA":  "Just... just, take this. And leave me alone!!",
-                              "dialogue.tutorial-guide.q1.finalReward":  "You receive an heirloom arming sword from the Tutorial Guide.",
-                              "dialogue.tutorial-guide.q2":  "Sure! I know all the secrets.",
-                              "dialogue.tutorial-guide.q2.option.tellMe":  "...can you tell me?",
-                              "dialogue.tutorial-guide.q2.option.notTelling":  "You\u0027re not going to tell me are you.",
-                              "dialogue.tutorial-guide.q2.o1.a":  "Ha! Youngsters these days. Look kid. Just chop that tree over there, and don\u0027t do it with a sword. Get yourself a proper woodcutting axe.",
-                              "dialogue.tutorial-guide.q2.o1.b":  "And be careful. Some trees can and will be rather upset at you for the attempt.",
-                              "dialogue.tutorial-guide.q2.o2":  "Nope!",
-                              "dialogue.tutorial-guide.q3.a":  "Those over there are called ore veins. You can mine them. Any sort of pickaxe will do and they give you some nice rich goodies for the trouble.",
-                              "dialogue.tutorial-guide.q3.b":  "Here, take this pickaxe and give it a try. Off you go!",
-                              "dialogue.tutorial-guide.q4":  "Little old me\u0027s not gonna say no to free stuff.",
-                              "dialogue.tutorial-guide.q4.option.give1":  "Give 1",
-                              "dialogue.tutorial-guide.q4.option.give10":  "Give 10",
-                              "dialogue.tutorial-guide.q4.option.give25":  "Give 25",
-                              "dialogue.tutorial-guide.q4.option.changedMind":  "I changed my mind"
+                              },
+                              {
+                                "weight": 10,
+                                "reward": {
+                                  "kind": "item",
+                                  "itemId": "bronze-dagger",
+                                  "amount": 1
+                                }
+                              }
+                            ]
                           }
-               }
+                        },
+                        {
+                          "weight": 1,
+                          "reward": {
+                            "kind": "dropTable",
+                            "mode": "dependent",
+                            "drops": [
+                              {
+                                "weight": 3,
+                                "reward": {
+                                  "kind": "item",
+                                  "itemId": "bronze-arrow",
+                                  "amount": {
+                                    "min": 5,
+                                    "max": 8
+                                  }
+                                }
+                              },
+                              {
+                                "weight": 6,
+                                "reward": {
+                                  "kind": "item",
+                                  "itemId": "bronze-throwing-knife",
+                                  "amount": {
+                                    "min": 3,
+                                    "max": 5
+                                  }
+                                }
+                              }
+                            ]
+                          }
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "weight": 5,
+                    "reward": {
+                      "kind": "item",
+                      "itemId": "iron-ore",
+                      "amount": {
+                        "min": 1,
+                        "max": 2
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "enemy",
+      "id": "oak-tree",
+      "interactionTypeId": "woodcutting",
+      "stats": {
+        "health": 10
+      },
+      "showHealthBar": true,
+      "rewards": [
+        {
+          "kind": "skillXp",
+          "skillId": "woodcutting",
+          "amount": 4
+        }
+      ]
+    },
+    {
+      "type": "enemy",
+      "id": "ent",
+      "interactionTypeId": "woodcutting-combat",
+      "stats": {
+        "attack": 6,
+        "defense": 4,
+        "health": 30,
+        "rate": 20
+      },
+      "showHealthBar": true,
+      "rewards": [
+        {
+          "kind": "skillXp",
+          "skillId": "woodcutting",
+          "amount": 8
+        },
+        {
+          "kind": "skillXp",
+          "skillId": "defense",
+          "amount": 2
+        }
+      ]
+    },
+    {
+      "type": "enemy",
+      "id": "ork",
+      "interactionTypeId": "melee-combat",
+      "stats": {
+        "attack": 21,
+        "defense": 21,
+        "health": 40,
+        "rate": 24
+      },
+      "showHealthBar": true,
+      "rewards": [
+        {
+          "kind": "skillXp",
+          "skillId": "attack",
+          "amount": 4
+        },
+        {
+          "kind": "skillXp",
+          "skillId": "defense",
+          "amount": 2
+        }
+      ]
+    },
+    {
+      "type": "enemy",
+      "id": "troll",
+      "interactionTypeId": "melee-combat",
+      "stats": {
+        "attack": 31,
+        "defense": 31,
+        "health": 80,
+        "rate": 18
+      },
+      "showHealthBar": true,
+      "rewards": [
+        {
+          "kind": "skillXp",
+          "skillId": "attack",
+          "amount": 8
+        },
+        {
+          "kind": "skillXp",
+          "skillId": "defense",
+          "amount": 4
+        }
+      ]
+    },
+    {
+      "type": "dialogue",
+      "id": "tutorial-guide",
+      "startNodeId": "start",
+      "nodes": [
+        {
+          "id": "start",
+          "speakerId": "tutorial-guide",
+          "textKey": "dialogue.tutorial-guide.start",
+          "gotoNodeId": "helpful-questions"
+        },
+        {
+          "id": "helpful-questions",
+          "options": [
+            {
+              "id": "combat-experience",
+              "labelKey": "dialogue.tutorial-guide.option.combatExperience",
+              "conditions": {
+                "kind": "not",
+                "condition": {
+                  "kind": "state-variable",
+                  "variable": "flag:tutorial-guide.q1.count",
+                  "comparison": "greater-than",
+                  "value": 5
+                }
+              },
+              "gotoNodeId": "q1"
+            },
+            {
+              "id": "woodcutting-secrets",
+              "labelKey": "dialogue.tutorial-guide.option.woodcuttingSecrets",
+              "gotoNodeId": "q2"
+            },
+            {
+              "id": "gully-rocks",
+              "labelKey": "dialogue.tutorial-guide.option.gullyRocks",
+              "gotoNodeId": "q3"
+            },
+            {
+              "id": "take-logs",
+              "labelKey": "dialogue.tutorial-guide.option.takeLogs",
+              "conditions": {
+                "kind": "state-variable",
+                "variable": "item:log",
+                "comparison": "greater-than",
+                "value": 0
+              },
+              "gotoNodeId": "q4"
+            }
+          ]
+        },
+        {
+          "id": "q1",
+          "results": [
+            {
+              "kind": "state-variable-delta",
+              "variable": "flag:tutorial-guide.q1.count",
+              "amount": 1
+            }
+          ],
+          "branches": [
+            {
+              "conditions": {
+                "kind": "state-variable",
+                "variable": "flag:tutorial-guide.q1.count",
+                "comparison": "equal",
+                "value": 1
+              },
+              "gotoNodeId": "q1-first"
+            },
+            {
+              "conditions": {
+                "kind": "state-variable",
+                "variable": "flag:tutorial-guide.q1.count",
+                "comparison": "equal",
+                "value": 2
+              },
+              "gotoNodeId": "q1-second-a"
+            },
+            {
+              "conditions": {
+                "kind": "all",
+                "conditions": [
+                  {
+                    "kind": "state-variable",
+                    "variable": "flag:tutorial-guide.q1.count",
+                    "comparison": "greater-than",
+                    "value": 2
+                  },
+                  {
+                    "kind": "state-variable",
+                    "variable": "flag:tutorial-guide.q1.count",
+                    "comparison": "less-than",
+                    "value": 6
+                  }
+                ]
+              },
+              "gotoNodeId": "q1-forgetful-a"
+            },
+            {
+              "conditions": {
+                "kind": "state-variable",
+                "variable": "flag:tutorial-guide.q1.count",
+                "comparison": "greater-than",
+                "value": 5
+              },
+              "gotoNodeId": "q1-final-a"
+            }
+          ]
+        },
+        {
+          "id": "q1-first",
+          "speakerId": "tutorial-guide",
+          "textKey": "dialogue.tutorial-guide.q1.first",
+          "gotoNodeId": "helpful-questions"
+        },
+        {
+          "id": "q1-second-a",
+          "speakerId": "tutorial-guide",
+          "textKey": "dialogue.tutorial-guide.q1.secondA",
+          "gotoNodeId": "q1-second-b"
+        },
+        {
+          "id": "q1-second-b",
+          "speakerId": "tutorial-guide",
+          "textKey": "dialogue.tutorial-guide.q1.secondB",
+          "gotoNodeId": "helpful-questions"
+        },
+        {
+          "id": "q1-forgetful-a",
+          "speakerId": "tutorial-guide",
+          "textKey": "dialogue.tutorial-guide.q1.forgetfulA",
+          "gotoNodeId": "q1-forgetful-b"
+        },
+        {
+          "id": "q1-forgetful-b",
+          "speakerId": "tutorial-guide",
+          "textKey": "dialogue.tutorial-guide.q1.forgetfulB",
+          "gotoNodeId": "helpful-questions"
+        },
+        {
+          "id": "q1-final-a",
+          "speakerId": "tutorial-guide",
+          "textKey": "dialogue.tutorial-guide.q1.finalA",
+          "gotoNodeId": "q1-final-b"
+        },
+        {
+          "id": "q1-final-b",
+          "narratorKey": "dialogue.tutorial-guide.q1.finalReward",
+          "results": [
+            {
+              "kind": "item",
+              "itemId": "tutorial-blade",
+              "amount": 1
+            }
+          ],
+          "gotoNodeId": "helpful-questions"
+        },
+        {
+          "id": "q2",
+          "speakerId": "tutorial-guide",
+          "textKey": "dialogue.tutorial-guide.q2",
+          "options": [
+            {
+              "id": "tell-me",
+              "labelKey": "dialogue.tutorial-guide.q2.option.tellMe",
+              "gotoNodeId": "q2-o1-a"
+            },
+            {
+              "id": "not-telling",
+              "labelKey": "dialogue.tutorial-guide.q2.option.notTelling",
+              "gotoNodeId": "q2-o2"
+            }
+          ]
+        },
+        {
+          "id": "q2-o1-a",
+          "speakerId": "tutorial-guide",
+          "textKey": "dialogue.tutorial-guide.q2.o1.a",
+          "gotoNodeId": "q2-o1-b"
+        },
+        {
+          "id": "q2-o1-b",
+          "speakerId": "tutorial-guide",
+          "textKey": "dialogue.tutorial-guide.q2.o1.b",
+          "gotoNodeId": "helpful-questions"
+        },
+        {
+          "id": "q2-o2",
+          "speakerId": "tutorial-guide",
+          "textKey": "dialogue.tutorial-guide.q2.o2",
+          "gotoNodeId": "helpful-questions"
+        },
+        {
+          "id": "q3",
+          "gotoNodeId": "q3-a"
+        },
+        {
+          "id": "q3-a",
+          "speakerId": "tutorial-guide",
+          "textKey": "dialogue.tutorial-guide.q3.a",
+          "gotoNodeId": "q3-b"
+        },
+        {
+          "id": "q3-b",
+          "speakerId": "tutorial-guide",
+          "textKey": "dialogue.tutorial-guide.q3.b",
+          "results": [
+            {
+              "kind": "item",
+              "itemId": "bronze-pickaxe",
+              "amount": 1
+            }
+          ],
+          "gotoNodeId": "helpful-questions"
+        },
+        {
+          "id": "q4",
+          "speakerId": "tutorial-guide",
+          "textKey": "dialogue.tutorial-guide.q4",
+          "options": [
+            {
+              "id": "give-1",
+              "labelKey": "dialogue.tutorial-guide.q4.option.give1",
+              "conditions": {
+                "kind": "state-variable",
+                "variable": "item:log",
+                "comparison": "greater-than",
+                "value": 0
+              },
+              "gotoNodeId": "q4-c1"
+            },
+            {
+              "id": "give-10",
+              "labelKey": "dialogue.tutorial-guide.q4.option.give10",
+              "conditions": {
+                "kind": "state-variable",
+                "variable": "item:log",
+                "comparison": "greater-than",
+                "value": 9
+              },
+              "gotoNodeId": "q4-c10"
+            },
+            {
+              "id": "give-25",
+              "labelKey": "dialogue.tutorial-guide.q4.option.give25",
+              "conditions": {
+                "kind": "state-variable",
+                "variable": "item:log",
+                "comparison": "greater-than",
+                "value": 24
+              },
+              "gotoNodeId": "q4-c25"
+            },
+            {
+              "id": "changed-mind",
+              "labelKey": "dialogue.tutorial-guide.q4.option.changedMind",
+              "gotoNodeId": "helpful-questions"
+            }
+          ]
+        },
+        {
+          "id": "q4-c1",
+          "results": [
+            {
+              "kind": "item",
+              "itemId": "log",
+              "amount": -1
+            }
+          ],
+          "gotoNodeId": "helpful-questions"
+        },
+        {
+          "id": "q4-c10",
+          "results": [
+            {
+              "kind": "item",
+              "itemId": "log",
+              "amount": -10
+            }
+          ],
+          "gotoNodeId": "helpful-questions"
+        },
+        {
+          "id": "q4-c25",
+          "results": [
+            {
+              "kind": "item",
+              "itemId": "log",
+              "amount": -25
+            }
+          ],
+          "gotoNodeId": "helpful-questions"
+        }
+      ]
+    },
+    {
+      "type": "action",
+      "id": "gather-rumors",
+      "locationId": "crossroads",
+      "durationSeconds": 5,
+      "rewards": [
+        {
+          "kind": "skillXp",
+          "skillId": "lore",
+          "amount": 2
+        }
+      ]
+    },
+    {
+      "type": "action",
+      "id": "speak-to-tutorial-guide",
+      "locationId": "crossroads",
+      "role": "utility",
+      "durationSeconds": 0.1,
+      "rewards": [],
+      "results": [
+        {
+          "kind": "dialogue",
+          "dialogueId": "tutorial-guide"
+        }
+      ]
+    },
+    {
+      "type": "action",
+      "id": "fight-goblin",
+      "locationId": "crossroads",
+      "durationSeconds": 1,
+      "enemyId": "goblin",
+      "rewards": [
+        {
+          "kind": "skillXp",
+          "skillId": "attack",
+          "amount": 1
+        }
+      ],
+      "experience": [
+        {
+          "event": "action-complete",
+          "skillId": "attack",
+          "amount": 1
+        },
+        {
+          "event": "damage-dealt",
+          "skillId": "attack"
+        },
+        {
+          "event": "damage-taken",
+          "skillId": "health"
+        },
+        {
+          "event": "incoming-attack-missed",
+          "skillId": "defense",
+          "amount": 10
+        },
+        {
+          "event": "health-regenerated",
+          "skillId": "regeneration",
+          "sourceStat": "regeneration"
+        },
+        {
+          "event": "health-regenerated",
+          "skillId": "troll-blood",
+          "sourceStat": "troll-blood"
+        }
+      ]
+    },
+    {
+      "type": "action",
+      "id": "chop-oak-tree",
+      "locationId": "emberwood",
+      "durationSeconds": 1,
+      "enemyId": "oak-tree",
+      "rewards": [
+        {
+          "kind": "skillXp",
+          "skillId": "woodcutting",
+          "amount": 1
+        }
+      ],
+      "experience": [
+        {
+          "event": "action-complete",
+          "skillId": "woodcutting",
+          "amount": 1
+        },
+        {
+          "event": "damage-dealt",
+          "skillId": "woodcutting"
+        }
+      ]
+    },
+    {
+      "type": "action",
+      "id": "fight-ent",
+      "locationId": "emberwood",
+      "durationSeconds": 1,
+      "enemyId": "ent",
+      "rewards": [
+        {
+          "kind": "skillXp",
+          "skillId": "woodcutting",
+          "amount": 1
+        }
+      ],
+      "experience": [
+        {
+          "event": "action-complete",
+          "skillId": "woodcutting",
+          "amount": 1
+        },
+        {
+          "event": "damage-dealt",
+          "skillId": "woodcutting"
+        },
+        {
+          "event": "damage-taken",
+          "skillId": "health"
+        },
+        {
+          "event": "incoming-attack-missed",
+          "skillId": "defense",
+          "amount": 10
+        },
+        {
+          "event": "health-regenerated",
+          "skillId": "regeneration",
+          "sourceStat": "regeneration"
+        },
+        {
+          "event": "health-regenerated",
+          "skillId": "troll-blood",
+          "sourceStat": "troll-blood"
+        }
+      ]
+    },
+    {
+      "type": "action",
+      "id": "fight-ork",
+      "locationId": "crossroads",
+      "durationSeconds": 1,
+      "enemyId": "ork",
+      "rewards": [
+        {
+          "kind": "skillXp",
+          "skillId": "attack",
+          "amount": 1
+        }
+      ],
+      "experience": [
+        {
+          "event": "action-complete",
+          "skillId": "attack",
+          "amount": 1
+        },
+        {
+          "event": "damage-dealt",
+          "skillId": "attack"
+        },
+        {
+          "event": "damage-taken",
+          "skillId": "health"
+        },
+        {
+          "event": "incoming-attack-missed",
+          "skillId": "defense",
+          "amount": 10
+        },
+        {
+          "event": "health-regenerated",
+          "skillId": "regeneration",
+          "sourceStat": "regeneration"
+        },
+        {
+          "event": "health-regenerated",
+          "skillId": "troll-blood",
+          "sourceStat": "troll-blood"
+        }
+      ]
+    },
+    {
+      "type": "action",
+      "id": "fight-troll",
+      "locationId": "crossroads",
+      "durationSeconds": 1,
+      "enemyId": "troll",
+      "rewards": [
+        {
+          "kind": "skillXp",
+          "skillId": "attack",
+          "amount": 1
+        }
+      ],
+      "experience": [
+        {
+          "event": "action-complete",
+          "skillId": "attack",
+          "amount": 1
+        },
+        {
+          "event": "damage-dealt",
+          "skillId": "attack"
+        },
+        {
+          "event": "damage-taken",
+          "skillId": "health"
+        },
+        {
+          "event": "incoming-attack-missed",
+          "skillId": "defense",
+          "amount": 10
+        },
+        {
+          "event": "health-regenerated",
+          "skillId": "regeneration",
+          "sourceStat": "regeneration"
+        },
+        {
+          "event": "health-regenerated",
+          "skillId": "troll-blood",
+          "sourceStat": "troll-blood"
+        }
+      ]
+    },
+    {
+      "type": "action",
+      "id": "forage-embers",
+      "locationId": "emberwood",
+      "durationSeconds": 8,
+      "rewards": [
+        {
+          "kind": "item",
+          "itemId": "emberleaf",
+          "amount": 1
+        },
+        {
+          "kind": "skillXp",
+          "skillId": "survival",
+          "amount": 3
+        }
+      ]
+    },
+    {
+      "type": "action",
+      "id": "survey-stonework",
+      "locationId": "old-quarry",
+      "durationSeconds": 10,
+      "rewards": [
+        {
+          "kind": "skillXp",
+          "skillId": "craft",
+          "amount": 4
+        }
+      ]
+    },
+    {
+      "type": "action",
+      "id": "mine-iron-ore-vein",
+      "locationId": "old-quarry",
+      "durationSeconds": 2,
+      "requirements": {
+        "kind": "item-tag",
+        "tag": "pickaxe"
+      },
+      "rewards": [
+        {
+          "kind": "item",
+          "itemId": "iron-ore",
+          "amount": 1
+        },
+        {
+          "kind": "skillXp",
+          "skillId": "mining",
+          "amount": 1
+        }
+      ]
+    }
+  ],
+  "locale": {
+    "en": {
+      "displayProfile.first-road.title": "First Road",
+      "location.crossroads.title": "Wayside Crossroads",
+      "location.crossroads.description": "A lantern-lit meeting place where rumors arrive before travelers do.",
+      "location.emberwood.title": "Emberwood",
+      "location.emberwood.description": "A warm forest of red-barked trees and low-burning leaves.",
+      "location.old-quarry.title": "Old Quarry",
+      "location.old-quarry.description": "Weather-cut stone terraces hum faintly after sunset.",
+      "action.gather-rumors.title": "Gather Rumors",
+      "action.gather-rumors.description": "Listen for useful fragments of old stories and current trouble.",
+      "action.gather-rumors.success": "A useful rumor settles into memory.",
+      "action.gather-rumors.failure": "The rumor trail goes cold before anything useful turns up.",
+      "action.speak-to-tutorial-guide.title": "Speak to Tutorial Guide",
+      "action.speak-to-tutorial-guide.description": "Ask the guide for a little practical advice.",
+      "action.speak-to-tutorial-guide.success": "The Tutorial Guide is ready to talk.",
+      "action.speak-to-tutorial-guide.failure": "The Tutorial Guide is distracted.",
+      "action.fight-goblin.title": "Fight Goblin",
+      "action.fight-goblin.description": "Trade quick blows with a small roadside raider.",
+      "action.fight-goblin.success": "You hit the goblin.",
+      "action.fight-goblin.failure": "The goblin slips away from your strike.",
+      "action.fight-goblin.kill": "The goblin drops.",
+      "action.chop-oak-tree.title": "Chop Oak Tree",
+      "action.chop-oak-tree.description": "Work through the oak's stubborn trunk.",
+      "action.chop-oak-tree.success": "Your axe bites into the oak.",
+      "action.chop-oak-tree.failure": "The axe glances off the oak grain.",
+      "action.chop-oak-tree.kill": "The oak gives way.",
+      "action.fight-ent.title": "Fight Ent",
+      "action.fight-ent.description": "Use woodcutting skill against a walking tree that hits back.",
+      "action.fight-ent.success": "You cut into the ent's bark.",
+      "action.fight-ent.failure": "The ent twists away from the chop.",
+      "action.fight-ent.kill": "The ent falls still.",
+      "action.fight-ork.title": "Fight Ork",
+      "action.fight-ork.description": "Test yourself against a tougher brawler.",
+      "action.fight-ork.success": "You land a solid hit on the ork.",
+      "action.fight-ork.failure": "The ork shrugs past your attack.",
+      "action.fight-ork.kill": "The ork falls.",
+      "action.fight-troll.title": "Fight Troll",
+      "action.fight-troll.description": "Challenge a brute with heavy hands and thicker hide.",
+      "action.fight-troll.success": "You carve through part of the troll's guard.",
+      "action.fight-troll.failure": "The troll absorbs the attempt without giving ground.",
+      "action.fight-troll.kill": "The troll crashes down.",
+      "interaction.melee-combat.title": "Melee Combat",
+      "interaction.melee-combat.player.hit": "You hit the {target}.",
+      "interaction.melee-combat.player.miss": "You missed the {target}.",
+      "interaction.melee-combat.player.kill": "You killed the {target}.",
+      "interaction.melee-combat.entity.hit": "The {source} hit you.",
+      "interaction.melee-combat.entity.miss": "The {source} missed you.",
+      "interaction.melee-combat.entity.kill": "The {source} killed you.",
+      "interaction.woodcutting.title": "Woodcutting",
+      "interaction.woodcutting.player.hit": "You chop the {target}.",
+      "interaction.woodcutting.player.miss": "You fail to bite into the {target}.",
+      "interaction.woodcutting.player.kill": "You felled the {target}.",
+      "interaction.woodcutting.entity.hit": "The {source} hit you.",
+      "interaction.woodcutting.entity.miss": "The {source} missed you.",
+      "interaction.woodcutting.entity.kill": "The {source} killed you.",
+      "interaction.woodcutting-combat.title": "Woodcutting Combat",
+      "interaction.woodcutting-combat.player.hit": "You chop the {target}.",
+      "interaction.woodcutting-combat.player.miss": "The {target}'s bark turns your chop aside.",
+      "interaction.woodcutting-combat.player.kill": "You felled the {target}.",
+      "interaction.woodcutting-combat.entity.hit": "The {source} hit you.",
+      "interaction.woodcutting-combat.entity.miss": "The {source} missed you.",
+      "interaction.woodcutting-combat.entity.kill": "The {source} killed you.",
+      "action.forage-embers.title": "Forage Emberleaf",
+      "action.forage-embers.description": "Gather emberleaf without waking the ash mites.",
+      "action.forage-embers.success": "You gather emberleaf and keep the ash mites sleeping.",
+      "action.forage-embers.failure": "The emberleaf crumbles to ash before you can collect it.",
+      "action.survey-stonework.title": "Survey Stonework",
+      "action.survey-stonework.description": "Study old tool marks and salvageable masonry.",
+      "action.survey-stonework.success": "The old stonework gives up a few practical secrets.",
+      "action.survey-stonework.failure": "Dust and shadows hide the stonework's useful details.",
+      "action.mine-iron-ore-vein.title": "Mine Iron Ore Vein",
+      "action.mine-iron-ore-vein.description": "Work an exposed ore vein with any pickaxe you own.",
+      "action.mine-iron-ore-vein.success": "You chip iron ore free from the vein.",
+      "action.mine-iron-ore-vein.failure": "The ore vein resists your attempt.",
+      "skill.lore.title": "Lore",
+      "skill.lore.description": "Memory, myth, and the patience to connect old clues.",
+      "skill.survival.title": "Survival",
+      "skill.survival.description": "Practical knowledge for harsh country and stranger weather.",
+      "skill.craft.title": "Craft",
+      "skill.craft.description": "Making, repairing, and improving useful things.",
+      "skill.woodcutting.title": "Woodcutting",
+      "skill.woodcutting.description": "Reading grain, landing chops, and bringing down stubborn timber.",
+      "skill.mining.title": "Mining",
+      "skill.mining.description": "Reading stone, striking ore, and extracting useful minerals.",
+      "skill.health.title": "Health",
+      "skill.health.description": "Maximum health and hard-earned toughness.",
+      "skill.attack.title": "Attack",
+      "skill.attack.description": "Accuracy, timing, and pressure in direct conflict.",
+      "skill.defense.title": "Defense",
+      "skill.defense.description": "Guard, positioning, and staying intact under pressure.",
+      "skill.regeneration.title": "Regeneration",
+      "skill.regeneration.description": "Recovered health per minute while time passes.",
+      "skill.troll-blood.title": "Troll's Blood",
+      "skill.troll-blood.description": "A second healing-over-time source for validating separate experience gain.",
+      "stat.health.title": "Health",
+      "stat.health.description": "Maximum player health.",
+      "stat.attack.title": "Attack",
+      "stat.attack.description": "Power applied to outgoing attacks.",
+      "stat.defense.title": "Defense",
+      "stat.defense.description": "Protection against incoming attacks.",
+      "stat.woodcutting.title": "Woodcutting",
+      "stat.woodcutting.description": "Power applied to woodcutting actions.",
+      "stat.mining.title": "Mining",
+      "stat.mining.description": "Power applied to mining actions.",
+      "stat.action-rate.title": "Action Rate",
+      "stat.action-rate.description": "Player adversarial actions per minute.",
+      "stat.regeneration.title": "Regeneration",
+      "stat.regeneration.description": "Health recovered per minute.",
+      "stat.troll-blood.title": "Troll's Blood",
+      "stat.troll-blood.description": "A stronger health recovery stat.",
+      "resource.action-rate.title": "Action Rate",
+      "effect.action-rate-regeneration.title": "Action rate buildup",
+      "resource.enemy-action-rate.title": "Enemy Action Rate",
+      "effect.enemy-action-rate-regeneration.title": "Enemy action rate buildup",
+      "resource.enemy-health.title": "Enemy Health",
+      "effect.enemy-health-regeneration.title": "Enemy health regeneration",
+      "resource.health.title": "Health",
+      "effect.health-regeneration.title": "Health regeneration",
+      "effect.health-troll-blood.title": "Troll's Blood healing",
+      "resource.health.empty": "You died.",
+      "item.emberleaf.title": "Emberleaf",
+      "item.emberleaf.description": "A warm leaf that keeps a coal-like glow after it falls.",
+      "item.log.title": "Log",
+      "item.log.description": "A plain length of timber.",
+      "item.tutorial-blade.title": "Heirloom Arming Sword",
+      "item.tutorial-blade.description": "A worn but cared-for sword from the Tutorial Guide.",
+      "item.bronze-pickaxe.title": "Bronze Pickaxe",
+      "item.bronze-pickaxe.description": "A simple pickaxe suitable for ore veins.",
+      "item.iron-ore.title": "Iron Ore",
+      "item.iron-ore.description": "A rough chunk of iron-bearing stone.",
+      "item.bones.title": "Bones",
+      "item.bones.description": "Dry bones from a defeated creature.",
+      "item.bronze-spear.title": "Bronze Spear",
+      "item.bronze-spear.description": "A simple bronze-tipped spear.",
+      "item.bronze-dagger.title": "Bronze Dagger",
+      "item.bronze-dagger.description": "A short bronze blade suited to quick strikes.",
+      "item.bronze-arrow.title": "Bronze Arrow",
+      "item.bronze-arrow.description": "An arrow with a small bronze head.",
+      "item.bronze-throwing-knife.title": "Bronze Throwing Knife",
+      "item.bronze-throwing-knife.description": "A balanced bronze knife meant to be thrown.",
+      "dialogue.tutorial-guide.speaker.tutorial-guide": "Tutorial Guide",
+      "dialogue.tutorial-guide.start": "Greetings adventurer, I see you are new in town. I am at your disposal!",
+      "dialogue.tutorial-guide.option.combatExperience": "What is the best way for me to get combat experience?",
+      "dialogue.tutorial-guide.option.woodcuttingSecrets": "Do you know any secrets about woodcutting?",
+      "dialogue.tutorial-guide.option.gullyRocks": "What can I do with those rocks in the gully?",
+      "dialogue.tutorial-guide.option.takeLogs": "Can you take some of these logs off of me?",
+      "dialogue.tutorial-guide.q1.first": "You're a fighter then! It's simple. You want to get better at fighting? Then... fight! Those goblins down the road are a good enough place to start.",
+      "dialogue.tutorial-guide.q1.secondA": "Again? Well, just fight things. The better you are at it the faster you improve.",
+      "dialogue.tutorial-guide.q1.secondB": "It's only common sense, how can you expect to be good at regeneration if you've never healed a health point in your life! Ha ha ha!",
+      "dialogue.tutorial-guide.q1.forgetfulA": "Did you already forget? My! I heard fighters were meatheads, but this is pushing it!",
+      "dialogue.tutorial-guide.q1.forgetfulB": "Just fight some monsters and you'll be fine.",
+      "dialogue.tutorial-guide.q1.finalA": "Just... just, take this. And leave me alone!!",
+      "dialogue.tutorial-guide.q1.finalReward": "You receive an heirloom arming sword from the Tutorial Guide.",
+      "dialogue.tutorial-guide.q2": "Sure! I know all the secrets.",
+      "dialogue.tutorial-guide.q2.option.tellMe": "...can you tell me?",
+      "dialogue.tutorial-guide.q2.option.notTelling": "You're not going to tell me are you.",
+      "dialogue.tutorial-guide.q2.o1.a": "Ha! Youngsters these days. Look kid. Just chop that tree over there, and don't do it with a sword. Get yourself a proper woodcutting axe.",
+      "dialogue.tutorial-guide.q2.o1.b": "And be careful. Some trees can and will be rather upset at you for the attempt.",
+      "dialogue.tutorial-guide.q2.o2": "Nope!",
+      "dialogue.tutorial-guide.q3.a": "Those over there are called ore veins. You can mine them. Any sort of pickaxe will do and they give you some nice rich goodies for the trouble.",
+      "dialogue.tutorial-guide.q3.b": "Here, take this pickaxe and give it a try. Off you go!",
+      "dialogue.tutorial-guide.q4": "Little old me's not gonna say no to free stuff.",
+      "dialogue.tutorial-guide.q4.option.give1": "Give 1",
+      "dialogue.tutorial-guide.q4.option.give10": "Give 10",
+      "dialogue.tutorial-guide.q4.option.give25": "Give 25",
+      "dialogue.tutorial-guide.q4.option.changedMind": "I changed my mind"
+    }
+  }
 }

@@ -1,6 +1,8 @@
 import { useMemo, useState } from 'react';
 import type { Translator } from '../../game/i18n';
 import type { ContentBundle } from '../../game/types';
+import { applyModulesToBundle } from '../../game/contentModules';
+import { migrateMonolithicBundleToCoreModule } from '../../game/moduleMigration';
 import { validateContentBundle } from '../../game/validators';
 import { useUniverseState } from '../../stores/universeState';
 
@@ -20,7 +22,9 @@ export const LocalUniverseManager = ({ bundle, t }: LocalUniverseManagerProps) =
   const importBundle = async () => {
     try {
       const parsed = JSON.parse(importText) as ContentBundle;
-      const issues = validateContentBundle(parsed);
+      const migrated = migrateMonolithicBundleToCoreModule(parsed);
+      const moduleResolution = applyModulesToBundle(migrated, migrated.modules ?? []);
+      const issues = [...moduleResolution.issues, ...validateContentBundle(moduleResolution.bundle)];
       const errors = issues.filter((issue) => issue.severity === 'error');
 
       if (errors.length > 0) {
@@ -28,7 +32,7 @@ export const LocalUniverseManager = ({ bundle, t }: LocalUniverseManagerProps) =
         return;
       }
 
-      await importLocalUniverse(parsed);
+      await importLocalUniverse(migrated);
       setImportText('');
       setMessage(t('contribution.localUniverses.imported'));
     } catch (error) {

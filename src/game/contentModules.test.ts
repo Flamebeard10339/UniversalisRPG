@@ -241,6 +241,68 @@ describe('content modules', () => {
     expect(result.issues.some((issue) => issue.severity === 'error')).toBe(false);
   });
 
+  it('applies typed data-update removal rows', () => {
+    const result = applyModulesToBundle(baseBundle(), [
+      module({
+        id: 'core',
+        data: [
+          { type: 'item', id: 'token' },
+          { type: 'item', id: 'kept' },
+        ],
+        locale: {
+          en: {
+            'item.token.title': 'Token',
+            'item.token.description': 'A token.',
+            'item.kept.title': 'Kept',
+            'item.kept.description': 'Kept.',
+          },
+        },
+      }),
+      module({
+        id: 'patch',
+        dependencies: ['core'],
+        'data-updates': [
+          { type: 'remove', target: 'items', id: 'token' },
+        ],
+      }),
+    ]);
+
+    expect(result.enabledModuleIds).toEqual(['core', 'patch']);
+    expect(result.bundle.items.map((item) => item.id)).toEqual(['kept']);
+    expect(result.issues.some((issue) => issue.severity === 'error')).toBe(false);
+  });
+
+  it('applies typed dialogue option removal rows', () => {
+    const result = applyModulesToBundle(baseBundle(), [
+      module({
+        id: 'core',
+        data: [{
+          type: 'dialogue',
+          id: 'guide',
+          startNodeId: 'start',
+          nodes: [{
+            id: 'start',
+            textKey: 'dialogue.guide.start',
+            options: [
+              { id: 'accept', labelKey: 'dialogue.guide.accept' },
+              { id: 'decline', labelKey: 'dialogue.guide.decline' },
+            ],
+          }],
+        }],
+      }),
+      module({
+        id: 'patch',
+        dependencies: ['core'],
+        'data-updates': [
+          { type: 'remove', target: 'dialogueOptions', path: 'guide.start', id: 'decline' },
+        ],
+      }),
+    ]);
+
+    expect(result.bundle.dialogues?.[0]?.nodes[0]?.options?.map((option) => option.id)).toEqual(['accept']);
+    expect(result.issues.some((issue) => issue.severity === 'error')).toBe(false);
+  });
+
   it('merges resources from both supported module data aliases', () => {
     const result = applyModulesToBundle(baseBundle(), [
       module({
@@ -417,6 +479,34 @@ describe('content modules', () => {
       issue.severity === 'error' &&
       issue.path === 'modules.bad-remove.data-updates.remove.dialogueOptions' &&
       issue.message === 'validation.moduleRemoveInvalid',
+    )).toBe(true);
+  });
+
+  it('rejects malformed typed data-update removal rows', () => {
+    const result = applyModulesToBundle(baseBundle(), [
+      module({ id: 'bad-remove', 'data-updates': [{ type: 'remove', target: 'dialogueOptions', id: 'accept' }] as never }),
+    ]);
+
+    expect(result.enabledModuleIds).toEqual([]);
+    expect(result.issues.some((issue) =>
+      issue.severity === 'error' &&
+      issue.path === 'modules.bad-remove.data-updates.0.remove' &&
+      issue.message === 'validation.moduleRemoveInvalid' &&
+      issue.params?.id === 'dialogueOptions',
+    )).toBe(true);
+  });
+
+  it('rejects typed removal rows in module data', () => {
+    const result = applyModulesToBundle(baseBundle(), [
+      module({ id: 'bad-remove', data: [{ type: 'remove', target: 'items', id: 'token' }] as never }),
+    ]);
+
+    expect(result.enabledModuleIds).toEqual([]);
+    expect(result.issues.some((issue) =>
+      issue.severity === 'error' &&
+      issue.path === 'modules.bad-remove.data.0.type' &&
+      issue.message === 'validation.moduleDataTypeInvalid' &&
+      issue.params?.id === 'remove',
     )).toBe(true);
   });
 
