@@ -1,10 +1,11 @@
 import { useMemo, useState } from 'react';
-import type { ContentBundle, ContentModule, ContentModulePack, ContributionDraft, LocaleDictionary, ValidationIssue } from '../../game/types';
+import type { ContentBundle, ContentModule, ContentModulePack, ContributionDraft, LocaleDictionary, ModuleDataSection, ValidationIssue } from '../../game/types';
 import type { Translator } from '../../game/i18n';
-import { StructuredDataEditor, type StructuredValue } from '../structuredData/StructuredData';
-import { contentModuleSchema, modulePackSchema } from '../structuredData/contentSchemas';
+import { StructuredDataEditor, type StructuredSchema, type StructuredValue } from '../structuredData/StructuredData';
+import { moduleDataSectionSchema, modulePackSchema } from '../structuredData/contentSchemas';
 import { collectModuleLocalizationKeys } from '../../game/contentModules';
-import { moduleFilePath, moduleIndexJson } from '../../game/contributionFiles';
+import { moduleFilePath } from '../../game/contributionFiles';
+import { createPrefilledIssueUrl, formatContributionIssueBody } from '../../lib/githubIssues';
 
 type ModuleEditorProps = {
   bundle: ContentBundle;
@@ -14,9 +15,37 @@ type ModuleEditorProps = {
   t: Translator;
 };
 
-const uniqueById = (modules: ContentModule[]) => [...new Map(modules.map((module) => [module.id, module])).values()];
-const uniquePacksById = (packs: ContentModulePack[]) => [...new Map(packs.map((pack) => [pack.id, pack])).values()];
+type EditorTab = 'details' | 'data' | 'data-updates' | 'locale' | 'raw' | 'submit';
+type DataKey = keyof ModuleDataSection;
+
+const dataKeys: DataKey[] = [
+  'locations',
+  'edges',
+  'actions',
+  'skills',
+  'stats',
+  'items',
+  'flags',
+  'resources',
+  'effects',
+  'interactionTypes',
+  'enemies',
+  'dialogues',
+  'displayProfiles',
+];
+
+const uniqueById = <T extends { id: string }>(items: T[]) => [...new Map(items.map((item) => [item.id, item])).values()];
+const uniquePacksById = (packs: ContentModulePack[]) => uniqueById(packs);
 const toModuleId = (value: string) => value.trim().toLowerCase().replace(/[^a-z0-9.-]+/g, '-').replace(/^-+|-+$/g, '') || 'new-module';
+const dependencyString = (module: ContentModule) => (module.dependencies ?? []).join(', ');
+const dependenciesFromString = (value: string) => value.split(/[\n,]/).map((item) => item.trim()).filter(Boolean);
+const serializeModule = (module: ContentModule) => btoa(unescape(encodeURIComponent(JSON.stringify(module))));
+const deserializeModule = (value: string) => {
+  const trimmed = value.trim();
+  const parsed = JSON.parse(trimmed.startsWith('{') ? trimmed : decodeURIComponent(escape(atob(trimmed))));
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('invalid module');
+  return parsed as ContentModule;
+};
 
 const upsertModule = (modules: ContentModule[], module: ContentModule, originalId = module.id) => [
   module,
@@ -98,15 +127,41 @@ const bundleForModuleEditing = (bundle: ContentBundle, module: ContentModule, mo
   };
 };
 
+const sectionFields = (bundle: ContentBundle) =>
+  (moduleDataSectionSchema(bundle) as Extract<StructuredSchema, { kind: 'object' }>).fields;
+
+const fieldSchema = (bundle: ContentBundle, key: DataKey): Extract<StructuredSchema, { kind: 'array' }> => {
+  const schema = sectionFields(bundle)[key]?.schema;
+  const resolved = typeof schema === 'function' ? schema() : schema;
+  return resolved?.kind === 'array' ? resolved : { kind: 'array', item: { kind: 'inferred' }, createItem: () => ({ id: '' }) };
+};
+
+const createDataItem = (bundle: ContentBundle, key: DataKey) => fieldSchema(bundle, key).createItem();
+
+const itemSchema = (bundle: ContentBundle, key: DataKey) => fieldSchema(bundle, key).item;
+
+const updateArray = (section: ModuleDataSection | undefined, key: DataKey, values: StructuredValue[]): ModuleDataSection => ({
+  ...(section ?? {}),
+  [key]: values,
+});
+
+const moduleDetailProblems = (module: ContentModule) => [
+  ...(!/^(?:[0-9]|[1-9][0-9]{1,4})\.(?:[0-9]|[1-9][0-9]{1,4})\.(?:[0-9]|[1-9][0-9]{1,4})$/.test(module.version) ? ['version'] : []),
+  ...(!/^(?:[0-9]|[1-9][0-9]{1,4})\.(?:[0-9]|[1-9][0-9]{1,4})$/.test(String(module.game_version)) ? ['game_version'] : []),
+  ...(!module.id || toModuleId(module.id) !== module.id ? ['id'] : []),
+];
+
 const ModuleLocalizationEditor = ({
   bundle,
   module,
   onSave,
+  readOnly,
   t,
 }: {
   bundle: ContentBundle;
   module: ContentModule;
   onSave: (module: ContentModule) => void;
+  readOnly: boolean;
   t: Translator;
 }) => {
   const locales = uniqueLocales(bundle, module);
@@ -122,30 +177,30 @@ const ModuleLocalizationEditor = ({
     return matchesSearch && (!missingOnly || missing);
   });
 
-  const updateLocales = (localesPatch: Record<string, LocaleDictionary>) => {
+  const updateValue = (locale: string, key: string, value: string) => {
+    if (readOnly) return;
     onSave({
       ...module,
       locale: {
         ...(module.locale ?? {}),
-        ...localesPatch,
-      },
-    });
-  };
-
-  const updateValue = (locale: string, key: string, value: string) => {
-    updateLocales({
-      [locale]: {
-        ...(module.locale?.[locale] ?? {}),
-        [key]: value,
+        [locale]: {
+          ...(module.locale?.[locale] ?? {}),
+          [key]: value,
+        },
       },
     });
   };
 
   const populateMissing = () => {
-    updateLocales({
-      [lang1]: {
-        ...(module.locale?.[lang1] ?? {}),
-        ...Object.fromEntries(keys.filter((key) => !mergedLocales[lang1]?.[key]).map((key) => [key, key])),
+    if (readOnly) return;
+    onSave({
+      ...module,
+      locale: {
+        ...(module.locale ?? {}),
+        [lang1]: {
+          ...(module.locale?.[lang1] ?? {}),
+          ...Object.fromEntries(keys.filter((key) => !mergedLocales[lang1]?.[key]).map((key) => [key, key])),
+        },
       },
     });
   };
@@ -153,52 +208,25 @@ const ModuleLocalizationEditor = ({
   return (
     <section className="grid gap-3 rounded border border-slate-700 p-3">
       <div className="flex flex-wrap items-end gap-2">
-        <div className="mr-auto">
-          <h5 className="text-sm font-semibold text-slate-100">{t('contribution.localization.title')}</h5>
-          <p className="text-xs text-slate-400">{t('contribution.modules.localizationDescription')}</p>
-        </div>
-        <button className="rounded border border-slate-600 px-3 py-2 text-xs font-semibold text-slate-100" onClick={populateMissing} type="button">
-          {t('contribution.modules.populateLocale')}
-        </button>
+        <h5 className="mr-auto text-sm font-semibold text-slate-100">{t('contribution.localization.title')}</h5>
+        {!readOnly && <button className="rounded border border-slate-600 px-3 py-2 text-xs font-semibold text-slate-100" onClick={populateMissing} type="button">{t('contribution.modules.populateLocale')}</button>}
       </div>
-
       <div className="grid gap-2 md:grid-cols-[1fr_auto_auto_auto]">
         <input className="rounded bg-slate-950 px-3 py-2 text-sm" onChange={(event) => setSearch(event.target.value)} placeholder={t('contribution.localization.search')} value={search} />
-        <select className="rounded bg-slate-950 px-3 py-2 text-sm" onChange={(event) => setLang1(event.target.value)} value={lang1}>
-          {Array.from(new Set(['en', ...locales, lang1])).map((locale) => <option key={locale} value={locale}>{locale}</option>)}
-        </select>
+        <select className="rounded bg-slate-950 px-3 py-2 text-sm" onChange={(event) => setLang1(event.target.value)} value={lang1}>{Array.from(new Set(['en', ...locales, lang1])).map((locale) => <option key={locale} value={locale}>{locale}</option>)}</select>
         <input className="rounded bg-slate-950 px-3 py-2 text-sm" list={`module-locales-${module.id}`} onChange={(event) => setLang2(event.target.value)} placeholder={t('contribution.localization.lang2')} value={lang2} />
-        <label className="flex items-center gap-2 rounded bg-slate-950 px-3 py-2 text-sm">
-          <input checked={missingOnly} onChange={(event) => setMissingOnly(event.target.checked)} type="checkbox" />
-          {t('contribution.localization.missingOnly')}
-        </label>
+        <label className="flex items-center gap-2 rounded bg-slate-950 px-3 py-2 text-sm"><input checked={missingOnly} onChange={(event) => setMissingOnly(event.target.checked)} type="checkbox" />{t('contribution.localization.missingOnly')}</label>
       </div>
-
-      <datalist id={`module-locales-${module.id}`}>
-        {locales.map((locale) => <option key={locale} value={locale} />)}
-      </datalist>
-
+      <datalist id={`module-locales-${module.id}`}>{locales.map((locale) => <option key={locale} value={locale} />)}</datalist>
       <div className="overflow-auto rounded border border-slate-800">
         <table className="min-w-full border-collapse text-sm">
-          <thead className="bg-slate-950 text-left text-xs uppercase text-slate-400">
-            <tr>
-              <th className="w-64 border-b border-slate-800 px-3 py-2">{t('contribution.localization.id')}</th>
-              <th className="border-b border-slate-800 px-3 py-2">{lang1}</th>
-              {lang2 && <th className="border-b border-slate-800 px-3 py-2">{lang2}</th>}
-            </tr>
-          </thead>
+          <thead className="bg-slate-950 text-left text-xs uppercase text-slate-400"><tr><th className="w-64 border-b border-slate-800 px-3 py-2">{t('contribution.localization.id')}</th><th className="border-b border-slate-800 px-3 py-2">{lang1}</th>{lang2 && <th className="border-b border-slate-800 px-3 py-2">{lang2}</th>}</tr></thead>
           <tbody>
             {visibleKeys.map((key) => (
               <tr className="border-b border-slate-800 last:border-0" key={key}>
                 <td className="align-top px-3 py-2 font-mono text-xs text-slate-400">{key}</td>
-                <td className="px-3 py-2">
-                  <textarea className="min-h-16 w-full rounded bg-slate-950 p-2 text-sm text-slate-100" onChange={(event) => updateValue(lang1, key, event.target.value)} value={mergedLocales[lang1]?.[key] ?? ''} />
-                </td>
-                {lang2 && (
-                  <td className="px-3 py-2">
-                    <textarea className="min-h-16 w-full rounded bg-slate-950 p-2 text-sm text-slate-100" onChange={(event) => updateValue(lang2, key, event.target.value)} value={mergedLocales[lang2]?.[key] ?? ''} />
-                  </td>
-                )}
+                <td className="px-3 py-2"><textarea className="min-h-16 w-full rounded bg-slate-950 p-2 text-sm text-slate-100" onChange={(event) => updateValue(lang1, key, event.target.value)} readOnly={readOnly} value={mergedLocales[lang1]?.[key] ?? ''} /></td>
+                {lang2 && <td className="px-3 py-2"><textarea className="min-h-16 w-full rounded bg-slate-950 p-2 text-sm text-slate-100" onChange={(event) => updateValue(lang2, key, event.target.value)} readOnly={readOnly} value={mergedLocales[lang2]?.[key] ?? ''} /></td>}
               </tr>
             ))}
           </tbody>
@@ -230,251 +258,216 @@ const ModulePackTree = ({
       <li className="rounded bg-slate-950 p-2" key={pack.id}>
         <span className={`block text-xs font-semibold uppercase ${issuePackIds.has(pack.id) ? 'text-rose-300' : 'text-slate-500'}`}>{pack.titleKey ? t(pack.titleKey, pack.id) : pack.id}</span>
         {(pack.modules ?? []).map((moduleId) => (
-          <button
-            className={`mt-1 block w-full rounded px-2 py-1 text-left text-sm ${selectedModuleId === moduleId ? 'bg-cyan-300 text-slate-950' : issueModuleIds.has(moduleId) || !moduleIds.has(moduleId) ? 'bg-rose-950/30 text-rose-100' : 'text-slate-300'}`}
-            key={moduleId}
-            onClick={() => onSelect(moduleId)}
-            type="button"
-          >
-            {moduleId}
-          </button>
+          <button className={`mt-1 block w-full rounded px-2 py-1 text-left text-sm ${selectedModuleId === moduleId ? 'bg-cyan-300 text-slate-950' : issueModuleIds.has(moduleId) || !moduleIds.has(moduleId) ? 'bg-rose-950/30 text-rose-100' : 'text-slate-300'}`} key={moduleId} onClick={() => onSelect(moduleId)} type="button">{moduleId}</button>
         ))}
-        {pack.packs && pack.packs.length > 0 && (
-          <div className="mt-2 border-l border-slate-700 pl-2">
-            <ModulePackTree packs={pack.packs} selectedModuleId={selectedModuleId} issueModuleIds={issueModuleIds} issuePackIds={issuePackIds} moduleIds={moduleIds} onSelect={onSelect} t={t} />
-          </div>
-        )}
+        {pack.packs && pack.packs.length > 0 && <div className="mt-2 border-l border-slate-700 pl-2"><ModulePackTree packs={pack.packs} selectedModuleId={selectedModuleId} issueModuleIds={issueModuleIds} issuePackIds={issuePackIds} moduleIds={moduleIds} onSelect={onSelect} t={t} /></div>}
       </li>
     ))}
   </ul>
 );
 
+const DataRows = ({
+  bundle,
+  module,
+  readOnly,
+  sectionName,
+  onSave,
+  t,
+}: {
+  bundle: ContentBundle;
+  module: ContentModule;
+  readOnly: boolean;
+  sectionName: 'data' | 'data-updates';
+  onSave: (module: ContentModule) => void;
+  t: Translator;
+}) => {
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [pendingRows, setPendingRows] = useState(0);
+  const section = (sectionName === 'data' ? module.data : module['data-updates']) ?? {};
+  const editorBundle = bundleForModuleEditing(bundle, module, bundle.modules ?? []);
+  const rows = dataKeys.flatMap((key) => {
+    const values = section[key];
+    return Array.isArray(values) ? values.map((value, index) => ({ key, index, value: value as StructuredValue })) : [];
+  });
+
+  const saveSection = (nextSection: ModuleDataSection) => onSave({ ...module, [sectionName]: nextSection });
+  const saveRow = (key: DataKey, index: number, value: StructuredValue | undefined) => {
+    const values = [...((section[key] as StructuredValue[] | undefined) ?? [])];
+    if (value === undefined) values.splice(index, 1);
+    else values[index] = value;
+    saveSection(updateArray(section, key, values));
+  };
+  const moveRow = (fromKey: DataKey, index: number, toKey: DataKey) => {
+    if (fromKey === toKey) return;
+    const fromValues = [...((section[fromKey] as StructuredValue[] | undefined) ?? [])];
+    const [value] = fromValues.splice(index, 1);
+    const toValues = [...((section[toKey] as StructuredValue[] | undefined) ?? []), value ?? createDataItem(editorBundle, toKey)];
+    saveSection({ ...section, [fromKey]: fromValues, [toKey]: toValues });
+  };
+
+  return (
+    <section className="grid gap-2 rounded border border-slate-700 p-3">
+      {!readOnly && <button className="justify-self-start rounded bg-cyan-400 px-3 py-2 text-sm font-semibold text-slate-950" onClick={() => setPendingRows((count) => count + 1)} type="button">{t('contribution.modules.addRow')}</button>}
+      {rows.length === 0 && pendingRows === 0 ? <p className="rounded bg-slate-950 p-3 text-sm text-slate-500">{t('contribution.modules.noRows')}</p> : null}
+      {Array.from({ length: pendingRows }).map((_, index) => (
+        <div className="grid gap-2 rounded border border-slate-800 bg-slate-950 p-2 md:grid-cols-[1fr_12rem_auto]" key={`pending-${index}`}>
+          <span className="text-sm text-slate-500">{t('structured.empty')}</span>
+          <select className="rounded bg-slate-900 px-2 py-1.5 text-sm" onChange={(event) => { const key = event.target.value as DataKey; if (!key) return; saveSection(updateArray(section, key, [...((section[key] as StructuredValue[] | undefined) ?? []), createDataItem(editorBundle, key)])); setPendingRows((count) => Math.max(0, count - 1)); }} value="">
+            <option value="">{t('contribution.modules.selectType')}</option>
+            {dataKeys.map((key) => <option key={key} value={key}>{t(`contribution.data.${key}`)}</option>)}
+          </select>
+          <button className="rounded border border-rose-500 px-2 py-1.5 text-sm font-semibold text-rose-200" onClick={() => setPendingRows((count) => Math.max(0, count - 1))} type="button">{t('structured.remove')}</button>
+        </div>
+      ))}
+      {rows.map((row) => {
+        const rowKey = `${row.key}-${row.index}`;
+        const record = row.value && typeof row.value === 'object' && !Array.isArray(row.value) ? row.value : {};
+        const isExpanded = expanded.has(rowKey);
+        return (
+          <div className="grid gap-2 rounded border border-slate-800 bg-slate-950 p-2" key={rowKey}>
+            <button className="grid items-center gap-2 text-left md:grid-cols-[1fr_12rem_auto]" onClick={() => setExpanded((current) => { const next = new Set(current); if (next.has(rowKey)) next.delete(rowKey); else next.add(rowKey); return next; })} type="button">
+              <span className="min-w-0 truncate text-sm font-semibold text-slate-100">{String(record.id ?? '') || t('structured.empty')}</span>
+              <span className="text-sm text-slate-400">{t(`contribution.data.${row.key}`)}</span>
+              {!readOnly && <span className="rounded border border-rose-500 px-2 py-1.5 text-center text-sm font-semibold text-rose-200" onClick={(event) => { event.stopPropagation(); saveRow(row.key, row.index, undefined); }}>{t('structured.remove')}</span>}
+            </button>
+            {isExpanded && (
+              <div className="grid gap-3 border-t border-slate-800 pt-2">
+                {!readOnly && (
+                  <label className="grid max-w-xs gap-1 text-xs text-slate-400">
+                    <span>{t('contribution.modules.selectType')}</span>
+                    <select className="rounded bg-slate-900 px-2 py-1.5 text-sm text-slate-100" onChange={(event) => moveRow(row.key, row.index, event.target.value as DataKey)} value={row.key}>
+                      {dataKeys.map((key) => <option key={key} value={key}>{t(`contribution.data.${key}`)}</option>)}
+                    </select>
+                  </label>
+                )}
+                {readOnly ? (
+                  <textarea className="min-h-56 rounded bg-slate-900 p-3 font-mono text-xs text-slate-300" readOnly value={JSON.stringify(row.value, null, 2)} />
+                ) : (
+                  <StructuredDataEditor onChange={(value) => saveRow(row.key, row.index, value)} schema={itemSchema(editorBundle, row.key)} t={t} value={row.value} />
+                )}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </section>
+  );
+};
+
 export const ModuleEditor = ({ bundle, draft, issues, onPatch, t }: ModuleEditorProps) => {
   const [filter, setFilter] = useState('');
   const [sortMode, setSortMode] = useState<'id' | 'author'>('id');
   const [selectedModuleId, setSelectedModuleId] = useState<string | null>(null);
-  const [editorTab, setEditorTab] = useState<'data' | 'locale' | 'json'>('data');
-  const [packEditorOpen, setPackEditorOpen] = useState(false);
+  const [editorTab, setEditorTab] = useState<EditorTab>('details');
+  const [showModpacks, setShowModpacks] = useState(false);
+  const [importText, setImportText] = useState('');
+  const [importError, setImportError] = useState(false);
   const removedModules = new Set(draft.removed?.modules ?? []);
-  const issueModuleIds = new Set(
-    issues
-      .map(moduleIdFromIssue)
-      .filter((id): id is string => Boolean(id)),
-  );
-  const issuePackIds = new Set(
-    issues
-      .map(packIdFromIssue)
-      .filter((id): id is string => Boolean(id)),
-  );
+  const localIds = new Set((draft.modules ?? []).map((module) => module.id));
+  const issueModuleIds = new Set(issues.map(moduleIdFromIssue).filter((id): id is string => Boolean(id)));
+  const issuePackIds = new Set(issues.map(packIdFromIssue).filter((id): id is string => Boolean(id)));
   const allModules = useMemo(() => {
     const baseModules = (bundle.modules ?? []).filter((module) => !removedModules.has(module.id));
-    return uniqueById([...(draft.modules ?? []), ...baseModules])
-      .sort((a, b) => String(a[sortMode]).localeCompare(String(b[sortMode])) || a.id.localeCompare(b.id));
+    return uniqueById([...(draft.modules ?? []), ...baseModules]).sort((a, b) => String(a[sortMode]).localeCompare(String(b[sortMode])) || a.id.localeCompare(b.id));
   }, [bundle.modules, draft.modules, removedModules, sortMode]);
-  const modules = useMemo(
-    () => allModules.filter((module) => !filter.trim() || JSON.stringify(module).toLowerCase().includes(filter.trim().toLowerCase())),
-    [allModules, filter],
-  );
+  const modules = useMemo(() => allModules.filter((module) => !filter.trim() || JSON.stringify(module).toLowerCase().includes(filter.trim().toLowerCase())), [allModules, filter]);
   const selectedModule = allModules.find((module) => module.id === selectedModuleId) ?? modules[0] ?? null;
-  const editorBundle = useMemo(
-    () => selectedModule ? bundleForModuleEditing(bundle, selectedModule, allModules) : { ...bundle, modules: allModules },
-    [allModules, bundle, selectedModule],
-  );
-  const selectedModuleIssues = selectedModule
-    ? issues.filter((issue) => moduleIdFromIssue(issue) === selectedModule.id)
-    : [];
+  const modulePacks = uniquePacksById([...(draft.modulePacks ?? []), ...(bundle.modulePacks ?? [])]);
+  const packedModuleIds = new Set(modulePacks.flatMap(packModuleIds));
+  const localModules = modules.filter((module) => localIds.has(module.id));
+  const coreModules = modules.filter((module) => !localIds.has(module.id) && !packedModuleIds.has(module.id));
+  const moduleIds = new Set(allModules.map((module) => module.id));
+  const isLocal = selectedModule ? localIds.has(selectedModule.id) : false;
+  const selectedModuleIssues = selectedModule ? issues.filter((issue) => moduleIdFromIssue(issue) === selectedModule.id) : [];
+  const rawJson = selectedModule ? JSON.stringify(selectedModule, null, 2) : '';
+  const serialization = selectedModule ? serializeModule(selectedModule) : '';
 
   const saveModule = (module: ContentModule, originalId = module.id) => {
     const normalized = { ...module, id: toModuleId(module.id), universe: bundle.manifest.id };
     onPatch({
       modules: upsertModule(draft.modules ?? [], normalized, originalId),
-      removed: {
-        ...draft.removed,
-        modules: (draft.removed?.modules ?? []).filter((id) => id !== normalized.id),
-      },
+      removed: { ...draft.removed, modules: (draft.removed?.modules ?? []).filter((id) => id !== normalized.id) },
     });
     setSelectedModuleId(normalized.id);
   };
-
   const removeModule = (module: ContentModule) => {
     onPatch({
       modules: (draft.modules ?? []).filter((candidate) => candidate.id !== module.id),
-      removed: {
-        ...draft.removed,
-        modules: Array.from(new Set([...(draft.removed?.modules ?? []), module.id])),
-      },
+      removed: { ...draft.removed, modules: localIds.has(module.id) ? draft.removed.modules : Array.from(new Set([...(draft.removed?.modules ?? []), module.id])) },
     });
     setSelectedModuleId(null);
   };
-
-  const updateModuleIndex = (value: StructuredValue | undefined) => {
-    const filenames = new Set((Array.isArray(value) ? value : []).filter((item): item is string => typeof item === 'string'));
-    const ids = new Set([...filenames].map((filename) => filename.replace(/\.json$/i, '')));
-    onPatch({
-      modules: (draft.modules ?? []).filter((module) => ids.has(module.id)),
-      removed: {
-        ...draft.removed,
-        modules: Array.from(new Set([
-          ...(draft.removed?.modules ?? []),
-          ...(bundle.modules ?? []).filter((module) => !ids.has(module.id)).map((module) => module.id),
-        ])),
-      },
-    });
+  const addModule = () => {
+    const module = createModule(bundle, allModules.map((item) => item.id));
+    saveModule(module);
+    setEditorTab('details');
   };
-
-  const addModule = () => saveModule(createModule(bundle, allModules.map((module) => module.id)));
-  const modulePacks = uniquePacksById([...(draft.modulePacks ?? []), ...(bundle.modulePacks ?? [])]);
-  const moduleIds = new Set(allModules.map((module) => module.id));
-  const packIssues = issues.filter((issue) => packIdFromIssue(issue));
-  const packedModuleIds = new Set(modulePacks.flatMap(packModuleIds));
-  const unpackedModules = modules.filter((module) => !packedModuleIds.has(module.id));
-  const indexJson = moduleIndexJson(bundle, draft);
+  const updateSelected = (patch: Partial<ContentModule>) => {
+    if (!selectedModule || !isLocal) return;
+    saveModule({ ...selectedModule, ...patch }, selectedModule.id);
+  };
+  const submitPackage = selectedModule ? {
+    appVersion: '0.1.0',
+    targetUniverseId: draft.universeId,
+    targetModuleId: selectedModule.id,
+    notes: draft.notes,
+    validationIssues: selectedModuleIssues,
+    t,
+    changedFiles: [{ path: moduleFilePath(selectedModule), json: selectedModule }],
+  } : null;
 
   return (
     <section className="grid gap-3 rounded border border-slate-700 p-3">
-      <div className="flex flex-wrap items-end gap-2">
-        <div className="mr-auto">
-          <h3 className="text-sm font-semibold text-slate-100">{t('contribution.modules.title')}</h3>
-          {/* <p className="text-xs text-slate-500">{t('contribution.modules.description')}</p> */}
-        </div>
-        <input className="rounded bg-slate-950 px-3 py-2 text-sm text-slate-100" onChange={(event) => setFilter(event.target.value)} placeholder={t('contribution.modules.filter')} value={filter} />
-        <select className="rounded bg-slate-950 px-3 py-2 text-sm text-slate-100" onChange={(event) => setSortMode(event.target.value as typeof sortMode)} value={sortMode}>
-          <option value="id">{t('contribution.modules.sortId')}</option>
-          <option value="author">{t('contribution.modules.sortAuthor')}</option>
-        </select>
-        <button className="rounded bg-cyan-400 px-3 py-2 text-sm font-semibold text-slate-950" onClick={addModule} type="button">{t('contribution.modules.add')}</button>
-      </div>
-
-      <details className="rounded border border-slate-800 bg-slate-950 p-3" onToggle={(event) => setPackEditorOpen(event.currentTarget.open)} open={packEditorOpen}>
-        <summary className="cursor-pointer text-sm font-semibold text-slate-100">{t('contribution.modules.packsEditor')}</summary>
-        <div className="mt-3 grid gap-3">
-          <p className="text-xs text-slate-400">{t('contribution.modules.packsDescription')}</p>
-          {packIssues.length > 0 && (
-            <ul className="grid gap-1 rounded border border-rose-900 bg-rose-950/20 p-3 text-sm">
-              {packIssues.map((issue) => (
-                <li className={issue.severity === 'error' ? 'text-rose-200' : 'text-amber-200'} key={`${issue.path}-${issue.message}`}>
-                  <span className="font-semibold">{issue.severity}</span>: {issue.path} - {t(issue.message, issue.params)}
-                </li>
-              ))}
-            </ul>
-          )}
-          <StructuredDataEditor
-            onChange={(value) => onPatch({ modulePacks: (Array.isArray(value) ? value : []) as unknown as ContentModulePack[] })}
-            schema={{ kind: 'array', listMode: 'free', item: modulePackSchema({ ...bundle, modules: allModules }), createItem: () => ({ id: 'new-pack', modules: allModules[0] ? [allModules[0].id] : [] }) }}
-            t={t}
-            value={modulePacks as unknown as StructuredValue}
-          />
-          <div className="flex flex-wrap gap-2">
-            <button
-              className="rounded border border-slate-600 px-3 py-1.5 text-xs font-semibold text-slate-100"
-              onClick={() => void navigator.clipboard.writeText(JSON.stringify(modulePacks, null, 2))}
-              type="button"
-            >
-              {t('contribution.data.copyJson')}
-            </button>
-          </div>
-        </div>
-      </details>
-
-      <details className="rounded border border-slate-800 bg-slate-950 p-3">
-        <summary className="cursor-pointer text-sm font-semibold text-slate-100">{t('contribution.modules.indexJson')}</summary>
-        <div className="mt-3 grid gap-2">
-          <button
-            className="justify-self-start rounded border border-slate-600 px-3 py-1.5 text-xs font-semibold text-slate-100"
-            onClick={() => void navigator.clipboard.writeText(JSON.stringify(indexJson, null, 2))}
-            type="button"
-          >
-            {t('contribution.data.copyJson')}
-          </button>
-          <StructuredDataEditor
-            onChange={updateModuleIndex}
-            schema={{ kind: 'array', listMode: 'tags', item: { kind: 'string' }, createItem: () => modules[0] ? `${modules[0].id}.json` : 'new-module.json' }}
-            t={t}
-            value={indexJson as unknown as StructuredValue}
-          />
-        </div>
-      </details>
-
       <div className="grid gap-3 lg:grid-cols-[18rem_1fr]">
-        <aside className="grid content-start gap-2">
-          {modulePacks.length > 0 && (
-            <ModulePackTree packs={modulePacks} selectedModuleId={selectedModule?.id ?? null} issueModuleIds={issueModuleIds} issuePackIds={issuePackIds} moduleIds={moduleIds} onSelect={setSelectedModuleId} t={t} />
-          )}
-          {unpackedModules.map((module) => (
-            <button
-              className={`rounded px-3 py-2 text-left text-sm ${selectedModule?.id === module.id ? 'bg-cyan-300 text-slate-950' : issueModuleIds.has(module.id) ? 'bg-rose-950/30 text-rose-100' : 'bg-slate-950 text-slate-300'}`}
-              key={module.id}
-              onClick={() => setSelectedModuleId(module.id)}
-              type="button"
-            >
-              <span className="block font-semibold">{module.id}</span>
-              <span className="block text-xs opacity-80">{module.version} / {module.author}</span>
-            </button>
-          ))}
+        <aside className="grid content-start gap-3 rounded border border-slate-800 bg-slate-900 p-3">
+          <div className="flex items-center gap-2">
+            <h3 className="mr-auto text-sm font-semibold text-slate-100">{bundle.manifest.id}</h3>
+            <button className="rounded bg-cyan-400 px-3 py-2 text-sm font-semibold text-slate-950" onClick={addModule} type="button">{t('contribution.modules.add')}</button>
+          </div>
+          <button className={`rounded px-3 py-2 text-left text-sm font-semibold ${showModpacks ? 'bg-cyan-300 text-slate-950' : issuePackIds.size ? 'bg-rose-950/30 text-rose-100' : 'bg-slate-950 text-slate-300'}`} onClick={() => setShowModpacks(true)} type="button">{t('contribution.modules.modpacks')}</button>
+          <input className="rounded bg-slate-950 px-3 py-2 text-sm text-slate-100" onChange={(event) => setFilter(event.target.value)} placeholder={t('contribution.modules.filter')} value={filter} />
+          <select className="rounded bg-slate-950 px-3 py-2 text-sm text-slate-100" onChange={(event) => setSortMode(event.target.value as typeof sortMode)} value={sortMode}><option value="id">{t('contribution.modules.sortId')}</option><option value="author">{t('contribution.modules.sortAuthor')}</option></select>
+          {modulePacks.length > 0 && <ModulePackTree packs={modulePacks} selectedModuleId={selectedModule?.id ?? null} issueModuleIds={issueModuleIds} issuePackIds={issuePackIds} moduleIds={moduleIds} onSelect={(id) => { setSelectedModuleId(id); setShowModpacks(false); }} t={t} />}
+          <div className="border-t border-slate-700 pt-2">
+            <h4 className="mb-2 text-xs font-semibold uppercase text-slate-500">{t('contribution.modules.localMods')}</h4>
+            <div className="grid gap-1">{localModules.map((module) => <button className={`grid grid-cols-[1fr_auto] items-center gap-2 rounded px-3 py-2 text-left text-sm ${selectedModule?.id === module.id && !showModpacks ? 'bg-cyan-300 text-slate-950' : issueModuleIds.has(module.id) ? 'bg-rose-950/30 text-rose-100' : 'bg-slate-950 text-slate-300'}`} key={module.id} onClick={() => { setSelectedModuleId(module.id); setShowModpacks(false); }} type="button"><span><span className="block font-semibold">{module.id}</span><span className="block text-xs opacity-80">{module.version} / {module.author}</span></span><span className="rounded bg-rose-500 px-2 py-1 text-xs font-semibold text-white" onClick={(event) => { event.stopPropagation(); removeModule(module); }}>{t('structured.remove')}</span></button>)}</div>
+          </div>
+          <div className="border-t border-slate-700 pt-2">
+            <h4 className="mb-2 text-xs font-semibold uppercase text-slate-500">{t('contribution.modules.coreMods')}</h4>
+            <div className="grid gap-1">{coreModules.map((module) => <button className={`rounded px-3 py-2 text-left text-sm ${selectedModule?.id === module.id && !showModpacks ? 'bg-cyan-300 text-slate-950' : issueModuleIds.has(module.id) ? 'bg-rose-950/30 text-rose-100' : 'bg-slate-950 text-slate-300'}`} key={module.id} onClick={() => { setSelectedModuleId(module.id); setShowModpacks(false); }} type="button"><span className="block font-semibold">{module.id}</span><span className="block text-xs opacity-80">{module.version} / {module.author}</span></button>)}</div>
+          </div>
         </aside>
 
-        {selectedModule ? (
+        {showModpacks ? (
           <section className="grid min-w-0 gap-3">
-            <div className="flex items-center justify-between gap-2">
-              <h4 className="text-sm font-semibold text-slate-100">{selectedModule.id}</h4>
-              <button className="rounded border border-rose-500 px-3 py-1.5 text-sm font-semibold text-rose-200" onClick={() => removeModule(selectedModule)} type="button">
-                {t('contribution.modules.remove')}
-              </button>
+            <h4 className="text-sm font-semibold text-slate-100">{t('contribution.modules.modpacks')}</h4>
+            <StructuredDataEditor onChange={(value) => onPatch({ modulePacks: (Array.isArray(value) ? value : []) as unknown as ContentModulePack[] })} schema={{ kind: 'array', listMode: 'free', item: modulePackSchema({ ...bundle, modules: allModules }), createItem: () => ({ id: 'new-pack', modules: allModules[0] ? [allModules[0].id] : [] }) }} t={t} value={modulePacks as unknown as StructuredValue} />
+          </section>
+        ) : selectedModule ? (
+          <section className="grid min-w-0 gap-3">
+            <div className="flex items-start justify-between gap-2">
+              <div><h4 className="text-sm font-semibold text-slate-100">{selectedModule.id}</h4>{!isLocal && <p className="text-xs text-slate-400">{t('contribution.modules.coreReadonly')}</p>}</div>
+              {!isLocal && <button className="rounded border border-rose-500 px-3 py-1.5 text-sm font-semibold text-rose-200" onClick={() => removeModule(selectedModule)} type="button">{t('contribution.modules.remove')}</button>}
             </div>
-            {selectedModuleIssues.length > 0 && (
-              <ul className="grid gap-1 rounded border border-rose-900 bg-rose-950/20 p-3 text-sm">
-                {selectedModuleIssues.map((issue) => (
-                  <li className={issue.severity === 'error' ? 'text-rose-200' : 'text-amber-200'} key={`${issue.path}-${issue.message}`}>
-                    <span className="font-semibold">{issue.severity}</span>: {issue.path} - {t(issue.message, issue.params)}
-                  </li>
-                ))}
-              </ul>
-            )}
             <div className="flex flex-wrap gap-2 border-b border-slate-700">
-              {(['data', 'locale', 'json'] as const).map((tab) => (
-                <button
-                  className={`px-3 py-2 text-sm font-semibold ${editorTab === tab ? 'border-b-2 border-cyan-300 text-cyan-100' : 'text-slate-400'}`}
-                  key={tab}
-                  onClick={() => setEditorTab(tab)}
-                  type="button"
-                >
-                  {t(tab === 'data' ? 'contribution.modules.dataTab' : tab === 'locale' ? 'contribution.modules.localeTab' : 'contribution.tab.json')}
-                </button>
-              ))}
+              {(['details', 'data', 'data-updates', 'locale', 'raw', 'submit'] as const).map((tab) => <button className={`px-3 py-2 text-sm font-semibold ${editorTab === tab ? 'border-b-2 border-cyan-300 text-cyan-100' : 'text-slate-400'}`} key={tab} onClick={() => setEditorTab(tab)} type="button">{t(tab === 'details' ? 'contribution.modules.detailsTab' : tab === 'data' ? 'contribution.modules.dataTab' : tab === 'data-updates' ? 'contribution.modules.dataUpdatesTab' : tab === 'locale' ? 'contribution.modules.localeTab' : tab === 'raw' ? 'contribution.modules.rawTab' : 'contribution.modules.submitTab')}</button>)}
             </div>
-            {editorTab === 'data' ? (
-              <StructuredDataEditor
-                onChange={(value) => {
-                  if (value && typeof value === 'object' && !Array.isArray(value)) saveModule(value as unknown as ContentModule, selectedModule.id);
-                }}
-                schema={contentModuleSchema(editorBundle)}
-                t={t}
-                value={selectedModule as unknown as StructuredValue}
-              />
-            ) : editorTab === 'locale' ? (
-              <ModuleLocalizationEditor bundle={bundle} module={selectedModule} onSave={(module) => saveModule(module, selectedModule.id)} t={t} />
-            ) : (
-              <section className="grid gap-2 rounded border border-slate-700 p-3">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <h5 className="text-sm font-semibold text-slate-100">{moduleFilePath(selectedModule)}</h5>
-                  <button
-                    className="rounded border border-slate-600 px-3 py-1.5 text-xs font-semibold text-slate-100"
-                    onClick={() => void navigator.clipboard.writeText(JSON.stringify(selectedModule, null, 2))}
-                    type="button"
-                  >
-                    {t('contribution.data.copyJson')}
-                  </button>
+            {editorTab === 'details' && (
+              <section className={`grid gap-3 rounded border p-3 ${moduleDetailProblems(selectedModule).length || selectedModuleIssues.length ? 'border-rose-800 bg-rose-950/10' : 'border-slate-700'}`}>
+                {selectedModuleIssues.length > 0 && <ul className="grid gap-1 text-sm">{selectedModuleIssues.map((issue) => <li className={issue.severity === 'error' ? 'text-rose-200' : 'text-amber-200'} key={`${issue.path}-${issue.message}`}><span className="font-semibold">{issue.severity}</span>: {issue.path} - {t(issue.message, issue.params)}</li>)}</ul>}
+                <div className="grid gap-2 md:grid-cols-[9rem_1fr]">
+                  {(['id', 'version', 'universe', 'author', 'game_version'] as const).map((key) => <label className="contents" key={key}><span className="self-center text-sm text-slate-400">{t(key === 'id' ? 'contribution.column.id' : key === 'game_version' ? 'contribution.module.gameVersion' : `contribution.module.${key}`)}</span><input className="rounded bg-slate-950 px-3 py-2 text-sm text-slate-100" onChange={(event) => updateSelected({ [key]: event.target.value })} readOnly={!isLocal || key === 'universe'} value={String(selectedModule[key])} /></label>)}
+                  <label className="contents"><span className="self-center text-sm text-slate-400">{t('contribution.module.dependencies')}</span><input className="rounded bg-slate-950 px-3 py-2 text-sm text-slate-100" list="module-dependency-ids" onChange={(event) => updateSelected({ dependencies: dependenciesFromString(event.target.value) })} readOnly={!isLocal} value={dependencyString(selectedModule)} /></label>
                 </div>
-                <StructuredDataEditor
-                  onChange={(value) => {
-                    if (value && typeof value === 'object' && !Array.isArray(value)) saveModule(value as unknown as ContentModule, selectedModule.id);
-                  }}
-                  schema={contentModuleSchema(editorBundle)}
-                  t={t}
-                  value={selectedModule as unknown as StructuredValue}
-                />
+                <datalist id="module-dependency-ids">{allModules.filter((module) => module.id !== selectedModule.id).map((module) => <option key={module.id} value={module.id} />)}</datalist>
+                {isLocal && <div className="grid gap-2 border-t border-slate-800 pt-3"><p className="text-xs text-amber-200">{t('contribution.modules.importWarning')}</p><textarea className="min-h-24 rounded bg-slate-950 p-3 text-xs text-slate-200" onChange={(event) => { setImportText(event.target.value); setImportError(false); }} placeholder={t('contribution.modules.importPlaceholder')} value={importText} />{importError && <p className="text-xs text-rose-300">{t('contribution.modules.importFailed')}</p>}<button className="justify-self-start rounded border border-slate-600 px-3 py-2 text-sm font-semibold text-slate-100" disabled={!importText.trim()} onClick={() => { try { saveModule({ ...deserializeModule(importText), id: selectedModule.id, universe: bundle.manifest.id }, selectedModule.id); setImportText(''); } catch { setImportError(true); } }} type="button">{t('contribution.modules.import')}</button></div>}
               </section>
             )}
+            {editorTab === 'data' && <DataRows bundle={bundle} module={selectedModule} onSave={(module) => saveModule(module, selectedModule.id)} readOnly={!isLocal} sectionName="data" t={t} />}
+            {editorTab === 'data-updates' && <DataRows bundle={bundle} module={selectedModule} onSave={(module) => saveModule(module, selectedModule.id)} readOnly={!isLocal} sectionName="data-updates" t={t} />}
+            {editorTab === 'locale' && <ModuleLocalizationEditor bundle={bundle} module={selectedModule} onSave={(module) => saveModule(module, selectedModule.id)} readOnly={!isLocal} t={t} />}
+            {editorTab === 'raw' && <section className="grid gap-3 rounded border border-slate-700 p-3"><button className="justify-self-start rounded border border-slate-600 px-3 py-1.5 text-xs font-semibold text-slate-100" onClick={() => void navigator.clipboard.writeText(serialization)} type="button">{t('contribution.modules.copySerialization')}</button><textarea className="min-h-24 rounded bg-slate-950 p-3 font-mono text-xs text-slate-300" readOnly value={serialization} /><button className="justify-self-start rounded border border-slate-600 px-3 py-1.5 text-xs font-semibold text-slate-100" onClick={() => void navigator.clipboard.writeText(rawJson)} type="button">{t('contribution.modules.copyJson')}</button><textarea className="min-h-72 rounded bg-slate-950 p-3 font-mono text-xs text-slate-300" readOnly value={rawJson} /></section>}
+            {editorTab === 'submit' && submitPackage && <section className="grid gap-3 rounded border border-slate-700 p-3"><h5 className="text-sm font-semibold text-slate-100">{t('contribution.github.title')}</h5>{selectedModuleIssues.length === 0 ? <p className="text-sm text-emerald-300">{t('contribution.validation.empty')}</p> : <ul className="grid gap-1 text-sm">{selectedModuleIssues.map((issue) => <li className={issue.severity === 'error' ? 'text-rose-300' : 'text-amber-300'} key={`${issue.path}-${issue.message}`}>{issue.severity}: {issue.path} - {t(issue.message, issue.params)}</li>)}</ul>}<textarea className="min-h-24 rounded bg-slate-950 p-3 text-sm text-slate-200" onChange={(event) => onPatch({ notes: event.target.value })} placeholder={t('contribution.notesPlaceholder')} value={draft.notes} /><div className="flex flex-wrap gap-2"><a className="rounded bg-emerald-400 px-3 py-2 text-sm font-semibold text-slate-950" href={createPrefilledIssueUrl(submitPackage)} rel="noreferrer" target="_blank">{t('contribution.github.open')}</a><button className="rounded border border-slate-600 px-3 py-2 text-sm font-semibold text-slate-100" onClick={() => void navigator.clipboard.writeText(formatContributionIssueBody(submitPackage))} type="button">{t('contribution.github.copy')}</button></div><textarea className="min-h-56 rounded bg-slate-950 p-3 text-xs text-slate-300" readOnly value={formatContributionIssueBody(submitPackage)} /></section>}
           </section>
         ) : (
           <p className="rounded bg-slate-950 p-3 text-sm text-slate-500">{t('contribution.modules.empty')}</p>

@@ -36,7 +36,9 @@ export const createPrefilledIssueUrl = (pack: ContributionPackage) => {
   const t = pack.t ?? ((key: string, fallbackOrParams?: string | Record<string, string | number>) =>
     typeof fallbackOrParams === 'string' ? fallbackOrParams : key);
   const params = new URLSearchParams({
-    title: t('github.issueTitle', { universe: pack.targetUniverseId }),
+    title: pack.targetModuleId
+      ? t('github.issueTitleModule', { universe: pack.targetUniverseId, module: pack.targetModuleId })
+      : t('github.issueTitle', { universe: pack.targetUniverseId }),
     labels: 'content,community',
     body: formatContributionIssueBody(pack),
   });

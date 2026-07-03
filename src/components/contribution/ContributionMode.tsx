@@ -2,9 +2,7 @@ import type { Translator } from '../../game/i18n';
 import type { ContentBundle, ContributionDraft, ValidationIssue } from '../../game/types';
 import { useContributionState } from '../../stores/contributionState';
 import { useUniverseState } from '../../stores/universeState';
-import { LocalUniverseManager } from './LocalUniverseManager';
 import { ModuleEditor } from './ModuleEditor';
-import { SubmitToGitHub } from './SubmitToGitHub';
 
 type ContributionModeProps = {
   activeTab: ContributionTab;
@@ -15,7 +13,6 @@ type ContributionModeProps = {
 };
 
 export type ContributionTab = 'content' | 'submit';
-const contributionTabs: ContributionTab[] = ['content', 'submit'];
 
 const emptyDraft = (universeId: string): ContributionDraft => ({
   universeId,
@@ -57,7 +54,7 @@ const emptyDraft = (universeId: string): ContributionDraft => ({
   },
 });
 
-export const ContributionMode = ({ activeTab, bundle, onTabChange, validationIssues, t }: ContributionModeProps) => {
+export const ContributionMode = ({ bundle, validationIssues, t }: ContributionModeProps) => {
   const draft = useContributionState((state) => state.drafts[bundle.manifest.id] ?? emptyDraft(bundle.manifest.id));
   const updateDraft = useContributionState((state) => state.updateDraft);
   const resetDraft = useContributionState((state) => state.resetDraft);
@@ -88,53 +85,9 @@ export const ContributionMode = ({ activeTab, bundle, onTabChange, validationIss
         </button>
       </div>
 
-      <div className="grid grid-cols-2 gap-2 rounded border border-slate-800 bg-slate-900 p-2">
-        {contributionTabs.map((tab) => (
-          <button
-            className={`rounded px-3 py-2 text-sm font-semibold capitalize ${
-              activeTab === tab ? 'bg-cyan-300 text-slate-950' : 'bg-slate-950 text-slate-300'
-            }`}
-            key={tab}
-            onClick={() => onTabChange(tab)}
-            type="button"
-          >
-            {t(`contribution.tab.${tab}`)}
-          </button>
-        ))}
-      </div>
-
-      {activeTab === 'content' && (
-        <section className="grid gap-4">
-          <ModuleEditor bundle={baseBundle ?? bundle} draft={draft} issues={validationIssues} onPatch={patchDraft} t={t} />
-        </section>
-      )}
-
-      {activeTab === 'submit' && (
-        <>
-          <section className="grid gap-2 rounded border border-slate-700 p-3">
-            <h3 className="text-sm font-semibold text-slate-100">{t('contribution.validation.title')}</h3>
-            {validationIssues.length === 0 ? (
-              <p className="text-sm text-emerald-300">{t('contribution.validation.empty')}</p>
-            ) : (
-              <ul className="grid gap-1 text-sm">
-                {validationIssues.map((issue) => (
-                  <li className={issue.severity === 'error' ? 'text-rose-300' : 'text-amber-300'} key={`${issue.path}-${issue.message}`}>
-                    {issue.severity}: {issue.path} - {t(issue.message, issue.params)}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
-          <textarea
-            className="min-h-24 rounded bg-slate-950 p-3 text-sm text-slate-200"
-            onChange={(event) => patchDraft({ notes: event.target.value })}
-            placeholder={t('contribution.notesPlaceholder')}
-            value={draft.notes}
-          />
-          <LocalUniverseManager bundle={bundle} t={t} />
-          <SubmitToGitHub appVersion="0.1.0" bundle={baseBundle ?? bundle} draft={draft} validationIssues={validationIssues} t={t} />
-        </>
-      )}
+      <section className="grid gap-4">
+        <ModuleEditor bundle={baseBundle ?? bundle} draft={draft} issues={validationIssues} onPatch={patchDraft} t={t} />
+      </section>
     </section>
   );
 };

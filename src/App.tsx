@@ -57,7 +57,7 @@ const APP_VERSION = '0.1.0';
 const SOURCE_URL = 'https://github.com/Flamebeard10339/UniversalisRPG';
 const appearanceKey = 'universalis:settings:appearance';
 const contributionUiKey = 'universalis:settings:contribution-ui';
-const contributionTabs: ContributionTab[] = ['content', 'submit'];
+const contributionTabs: ContributionTab[] = ['content'];
 const homeTabs: HomeTab[] = ['actions', 'details', 'workbench'];
 const emptyIdleReport: IdleReport = { kind: 'none' };
 const emptyContributionDraft = (universeId: string): ContributionDraft => ({

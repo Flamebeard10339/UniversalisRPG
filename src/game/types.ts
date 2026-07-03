@@ -604,6 +604,7 @@ export type ContributionRemovedIds = {
 
 export type ContributionPackage = {
   appVersion: string;
+  targetModuleId?: string;
   targetUniverseId: string;
   validationIssues: ValidationIssue[];
   notes: string;
