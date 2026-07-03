@@ -42,10 +42,9 @@
     "combatBalance": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["expectedHitsToKill", "combatSpread"],
+      "required": ["damage-scaler"],
       "properties": {
-        "expectedHitsToKill": { "type": "number", "exclusiveMinimum": 0 },
-        "combatSpread": { "type": "number", "minimum": 0 }
+        "damage-scaler": { "type": "number", "exclusiveMinimum": 0 }
       }
     },
     "displayProfiles": {

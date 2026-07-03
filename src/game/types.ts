@@ -66,8 +66,7 @@ export type EnemyStatKey =
   | 'critMultiplier';
 
 export type CombatBalanceDefinition = {
-  expectedHitsToKill: number;
-  combatSpread: number;
+  'damage-scaler': number;
 };
 
 export type UniverseUiSettings = {

@@ -249,8 +249,7 @@ export const basePlayerSchema = (bundle: ContentBundle): StructuredSchema => ({ 
 } });
 
 export const combatBalanceSchema = (): StructuredSchema => ({ kind: 'object', fields: {
-  expectedHitsToKill: { label: 'contribution.universe.expectedHitsToKill', schema: number(0.000001) },
-  combatSpread: { label: 'contribution.universe.combatSpread', schema: number(0) },
+  'damage-scaler': { label: 'contribution.universe.damageScaler', schema: number(0.000001) },
 } });
 
 const displayPaletteSchema = (): StructuredSchema => ({ kind: 'object', fields: Object.fromEntries(

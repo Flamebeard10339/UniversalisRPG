@@ -15,7 +15,7 @@ const bundle: ContentBundle = {
     author: 'test',
     locales: ['en'],
     files: [],
-    combatBalance: { expectedHitsToKill: 1 / 7, combatSpread: 1 },
+    combatBalance: { 'damage-scaler': 0.1 },
   },
   locations: [{ id: 'start', position: { x: 0, y: 0 }, starting: true }],
   edges: [],
@@ -80,7 +80,7 @@ describe('debug player profiles', () => {
     expect(strong.actionsToKill.average).toBeLessThan(weak.actionsToKill.average);
     expect(strong.fightsPerDeath.average).toBeGreaterThan(weak.fightsPerDeath.average);
     expect(strong.dps).toBeGreaterThan(weak.dps);
-    expect(strong.maxHit).toBeCloseTo((strong.dps / 25) * 60 * 2, 5);
+    expect(strong.maxHit).toBe(2);
     expect(strong.dpsTaken).toBeGreaterThan(0);
     expect(strong.levelPair).toContain('Attack/Defense');
   });

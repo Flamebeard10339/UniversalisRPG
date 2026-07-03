@@ -806,13 +806,13 @@ describe('resolveIdleTimers', () => {
     const hitState = resolveIdleTimers(
       startAction(createInitialPlayState('test-universe', 'arena'), action, context, startedAt),
       context,
-      { random: () => 0.5 },
+      { random: () => 0.49 },
       startedAt + 1_000,
     ).state;
     const missState = resolveIdleTimers(
       startAction(createInitialPlayState('test-universe', 'arena'), action, context, startedAt),
       context,
-      { random: () => 0 },
+      { random: () => 1 },
       startedAt + 1_000,
     ).state;
 

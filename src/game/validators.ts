@@ -136,8 +136,7 @@ export const validateManifest = (value: unknown): value is UniverseManifest =>
       (value.basePlayer.inventory === undefined || (isRecord(value.basePlayer.inventory) && Object.values(value.basePlayer.inventory).every((amount) => typeof amount === 'number' && Number.isFinite(amount)))))) &&
   (value.combatBalance === undefined ||
     (isRecord(value.combatBalance) &&
-      hasNumber(value.combatBalance, 'expectedHitsToKill') &&
-      hasNumber(value.combatBalance, 'combatSpread'))) &&
+      hasNumber(value.combatBalance, 'damage-scaler'))) &&
   validateDisplayProfilesShape(value.displayProfiles) &&
   (value.ui === undefined ||
     (isRecord(value.ui) &&
@@ -411,11 +410,8 @@ export const validateContentShape = (bundle: Partial<ContentBundle>) => {
   if (!bundle.manifest || !validateManifest(bundle.manifest)) {
     issues.push(error('universe.json', 'validation.universeManifestMissing'));
   } else {
-    if (bundle.manifest.combatBalance?.expectedHitsToKill !== undefined && bundle.manifest.combatBalance.expectedHitsToKill <= 0) {
-      issues.push(error('universe.json.combatBalance.expectedHitsToKill', 'validation.expectedHitsPositive'));
-    }
-    if (bundle.manifest.combatBalance?.combatSpread !== undefined && bundle.manifest.combatBalance.combatSpread < 0) {
-      issues.push(error('universe.json.combatBalance.combatSpread', 'validation.combatSpreadNonNegative'));
+    if (bundle.manifest.combatBalance?.['damage-scaler'] !== undefined && bundle.manifest.combatBalance['damage-scaler'] <= 0) {
+      issues.push(error('universe.json.combatBalance.damage-scaler', 'validation.damageScalerPositive'));
     }
     if (bundle.manifest.ui?.floatingTextDurationSeconds !== undefined && bundle.manifest.ui.floatingTextDurationSeconds <= 0) {
       issues.push(error('universe.json.ui.floatingTextDurationSeconds', 'validation.floatingTextDurationPositive'));

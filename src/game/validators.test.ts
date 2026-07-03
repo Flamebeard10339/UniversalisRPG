@@ -33,18 +33,17 @@ describe('universe manifest validation', () => {
     expect(validateManifest(manifest())).toBe(true);
     expect(validateManifest(manifest({
       basePlayer: { inventory: {} },
-      combatBalance: { expectedHitsToKill: 1 / 7, combatSpread: 1 },
+      combatBalance: { 'damage-scaler': 0.1 },
     }))).toBe(true);
   });
 
   it('reports invalid combat balance tuning values', () => {
     const issues = validateContentBundle(bundle({
-      combatBalance: { expectedHitsToKill: 0, combatSpread: -1 },
+      combatBalance: { 'damage-scaler': 0 },
     })).filter((issue) => issue.severity === 'error');
 
     expect(issues.map((issue) => issue.message)).toEqual([
-      'validation.expectedHitsPositive',
-      'validation.combatSpreadNonNegative',
+      'validation.damageScalerPositive',
     ]);
   });
 

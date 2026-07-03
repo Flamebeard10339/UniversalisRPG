@@ -5,8 +5,7 @@
   "author": "UniversalisRPG",
   "locales": ["en"],
   "combatBalance": {
-    "expectedHitsToKill": 0.14285714285714285,
-    "combatSpread": 1
+    "damage-scaler": 0.1
   },
   "basePlayer": {
     "inventory": {}

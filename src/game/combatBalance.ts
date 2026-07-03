@@ -1,8 +1,7 @@
 import type { CombatBalanceDefinition, UniverseManifest } from './types';
 
 export const DEFAULT_COMBAT_BALANCE: CombatBalanceDefinition = {
-  expectedHitsToKill: 1 / 7,
-  combatSpread: 1,
+  'damage-scaler': 0.1,
 };
 
 export type CombatModifiers = {
@@ -16,11 +15,14 @@ export type CombatExpectation = {
   attack: number;
   defense: number;
   averageDamage: number;
+  hitChance: number;
   maxDamage: number;
   damage: number;
 };
 
 export type CombatSample = CombatExpectation & {
+  damageRoll: number;
+  hit: boolean;
   roll: number;
 };
 
@@ -31,12 +33,9 @@ const DEFENSE_FLOOR = 1;
 export const resolveCombatBalance = (
   balance?: Partial<CombatBalanceDefinition>,
 ): CombatBalanceDefinition => ({
-  expectedHitsToKill: Number.isFinite(balance?.expectedHitsToKill) && Number(balance?.expectedHitsToKill) > 0
-    ? Number(balance?.expectedHitsToKill)
-    : DEFAULT_COMBAT_BALANCE.expectedHitsToKill,
-  combatSpread: Number.isFinite(balance?.combatSpread) && Number(balance?.combatSpread) >= 0
-    ? Number(balance?.combatSpread)
-    : DEFAULT_COMBAT_BALANCE.combatSpread,
+  'damage-scaler': Number.isFinite(balance?.['damage-scaler']) && Number(balance?.['damage-scaler']) > 0
+    ? Number(balance?.['damage-scaler'])
+    : DEFAULT_COMBAT_BALANCE['damage-scaler'],
 });
 
 export const resolveManifestCombatBalance = (
@@ -58,6 +57,17 @@ export const critExpectationFactor = (modifiers: CombatModifiers = {}) => {
   return 1 + critChance * (critMultiplier - 1);
 };
 
+export const calculateHitChance = (
+  attackerPower: number,
+  defenderPower: number,
+  modifiers: CombatModifiers = {},
+) => {
+  const { attack, defense } = effectiveCombatStats(attackerPower, defenderPower, modifiers);
+  return 1 / (1 + Math.pow(10, (defense - attack) / 100));
+};
+
+const calculateAverageUniformHitDamage = (maxDamage: number) => (1 + maxDamage) / 2;
+
 export const calculateAverageCombatDamage = (
   attackerPower: number,
   defenderPower: number,
@@ -66,16 +76,10 @@ export const calculateAverageCombatDamage = (
 ) => {
   const balance = resolveCombatBalance(balanceInput);
   const { attack, defense } = effectiveCombatStats(attackerPower, defenderPower, modifiers);
+  const maxDamage = calculateMaxCombatDamage(attackerPower, defenderPower, balance, modifiers);
+  const hitChance = calculateHitChance(attack, defense);
 
-  if (attack <= 0) {
-    return 0;
-  }
-
-  const ratio = attack / defense;
-  return balance.expectedHitsToKill
-    * Math.pow(ratio, balance.combatSpread)
-    * attack
-    * critExpectationFactor(modifiers);
+  return hitChance * calculateAverageUniformHitDamage(maxDamage) * critExpectationFactor(modifiers);
 };
 
 export const calculateMaxCombatDamage = (
@@ -83,7 +87,11 @@ export const calculateMaxCombatDamage = (
   defenderPower: number,
   balanceInput?: Partial<CombatBalanceDefinition>,
   modifiers: CombatModifiers = {},
-) => calculateAverageCombatDamage(attackerPower, defenderPower, balanceInput, modifiers) * 2;
+) => {
+  const balance = resolveCombatBalance(balanceInput);
+  const { attack } = effectiveCombatStats(attackerPower, defenderPower, modifiers);
+  return Math.max(1, Math.floor(attack * balance['damage-scaler']));
+};
 
 export const expectedCombatDamage = (
   attackerPower: number,
@@ -92,13 +100,16 @@ export const expectedCombatDamage = (
   modifiers: CombatModifiers = {},
 ): CombatExpectation => {
   const { attack, defense } = effectiveCombatStats(attackerPower, defenderPower, modifiers);
+  const hitChance = calculateHitChance(attackerPower, defenderPower, modifiers);
+  const maxDamage = calculateMaxCombatDamage(attackerPower, defenderPower, balanceInput, modifiers);
   const averageDamage = calculateAverageCombatDamage(attackerPower, defenderPower, balanceInput, modifiers);
 
   return {
     attack,
     defense,
+    hitChance,
     averageDamage,
-    maxDamage: averageDamage * 2,
+    maxDamage,
     damage: averageDamage,
   };
 };
@@ -112,11 +123,18 @@ export const sampleCombatDamage = (
 ): CombatSample => {
   const expectation = expectedCombatDamage(attackerPower, defenderPower, balanceInput, modifiers);
   const roll = Math.min(1, Math.max(0, random()));
+  const hit = roll < expectation.hitChance;
+  const damageRoll = hit ? Math.min(1, Math.max(0, random())) : 0;
+  const damage = hit
+    ? Math.max(1, Math.ceil(damageRoll * expectation.maxDamage))
+    : 0;
 
   return {
     ...expectation,
+    damageRoll,
+    hit,
     roll,
-    damage: expectation.maxDamage * roll,
+    damage,
   };
 };
 
@@ -134,5 +152,7 @@ export const diagnosticCombatDamage = (
   modifiers: CombatModifiers = {},
 ) => {
   const expectation = expectedCombatDamage(attackerPower, defenderPower, balanceInput, modifiers);
-  return expectation.maxDamage * diagnosticHitRoll(hitCase);
+  return expectation.hitChance
+    * Math.max(1, Math.ceil(expectation.maxDamage * diagnosticHitRoll(hitCase)))
+    * critExpectationFactor(modifiers);
 };

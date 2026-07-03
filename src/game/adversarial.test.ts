@@ -29,7 +29,7 @@ const context: ActionResolutionContext = {
     author: 'test',
     locales: ['en'],
     files: [],
-    combatBalance: { expectedHitsToKill: 1 / 7, combatSpread: 1 },
+    combatBalance: { 'damage-scaler': 0.1 },
     ui: { loopActionsByDefault: false },
   },
   actions: [],
@@ -128,8 +128,9 @@ describe('adversarial actions', () => {
     };
     const source = getCharacterStatValue(state, context.stats ?? [], 'attack', context.skills);
     const expectedDamage = calculateMaxCombatDamage(source, getEnemyStat(enemy(), 'defense'), resolveManifestCombatBalance(context.manifest));
+    const rolls = [0, 0.99];
     const resolved = resolveIdleTimers(state, { ...context, actions: [action] }, {
-      random: () => 1,
+      random: () => rolls.shift() ?? 0,
       showReport: true,
     }, startedAt + 10_000);
 
@@ -141,9 +142,7 @@ describe('adversarial actions', () => {
   it('logs a zero-damage hit without rewards', () => {
     const startedAt = 1_000;
     const state = startAction(createInitialPlayState('test', 'arena'), action, context, startedAt);
-    const resolved = resolveIdleTimers(state, { ...context, actions: [action] }, {
-      random: () => 0,
-    }, startedAt + 10_000);
+    const resolved = resolveIdleTimers(state, { ...context, actions: [action] }, { random: () => 1 }, startedAt + 10_000);
 
     expect(resolved.state.activeAction?.targetHealth).toBe(200);
     expect(resolved.state.resources.fang).toBeUndefined();
@@ -152,14 +151,14 @@ describe('adversarial actions', () => {
 
   it('grants player and enemy rewards once on kill', () => {
     const startedAt = 1_000;
-    const killContext = { ...context, enemies: [enemy({ stats: { health: 2 } })], actions: [action] };
+    const killContext = { ...context, enemies: [enemy({ stats: { health: 1 } })], actions: [action] };
     const state = {
       ...startAction(createInitialPlayState('test', 'arena'), action, killContext, startedAt),
       actionLoopingEnabled: false,
       skillXp: { attack: 10 },
     };
-    const resolved = resolveIdleTimers(state, killContext, { random: () => 1 }, startedAt + 10_000);
-    const repeated = resolveIdleTimers(resolved.state, killContext, { random: () => 1 }, startedAt + 10_001);
+    const resolved = resolveIdleTimers(state, killContext, { random: () => 0 }, startedAt + 10_000);
+    const repeated = resolveIdleTimers(resolved.state, killContext, { random: () => 0 }, startedAt + 10_001);
 
     expect(resolved.state.activeAction).toBeNull();
     expect(resolved.state.resources).toMatchObject({ fang: 1, trophy: 1 });
@@ -169,7 +168,7 @@ describe('adversarial actions', () => {
 
   it('starts a looped replacement enemy with fresh enemy-owned resources after a kill', () => {
     const startedAt = 1_000;
-    const killContext = { ...context, manifest: { ...context.manifest!, ui: { loopActionsByDefault: true } }, enemies: [enemy({ stats: { health: 2, rate: 60 } })], actions: [action] };
+    const killContext = { ...context, manifest: { ...context.manifest!, ui: { loopActionsByDefault: true } }, enemies: [enemy({ stats: { health: 1, rate: 60 } })], actions: [action] };
     const state = {
       ...startAction(createInitialPlayState('test', 'arena'), action, killContext, startedAt),
       actionLoopingEnabled: true,
@@ -178,12 +177,12 @@ describe('adversarial actions', () => {
         'enemy-action-rate': { current: 55, min: 0, max: 60 },
       },
     };
-    const resolved = resolveIdleTimers(state, killContext, { random: () => 1 }, startedAt + 10_000);
+    const resolved = resolveIdleTimers(state, killContext, { random: () => 0 }, startedAt + 10_000);
 
     expect(resolved.state.activeAction?.actionId).toBe(action.id);
-    expect(resolved.state.activeAction?.targetHealth).toBe(2);
+    expect(resolved.state.activeAction?.targetHealth).toBe(1);
     expect(resolved.state.resourcePools['enemy-action-rate']).toEqual({ current: 0, min: 0, max: 60 });
-    expect(resolved.state.resourcePools['enemy-health']).toEqual({ current: 2, min: 0, max: 2 });
+    expect(resolved.state.resourcePools['enemy-health']).toEqual({ current: 1, min: 0, max: 1 });
   });
 
   it('reports player and entity DPS from the same analytical model', () => {
@@ -226,10 +225,10 @@ describe('adversarial actions', () => {
     const lethalContext = { ...context, enemies: [enemy({ stats: { attack: 20, rate: 60 } })], actions: [action] };
     const state = {
       ...startAction(createInitialPlayState('test', 'arena'), action, lethalContext, startedAt),
-      playerHealth: 10,
-      resourcePools: { health: { current: 10, min: 0, max: 100 } },
+      playerHealth: 1,
+      resourcePools: { health: { current: 1, min: 0, max: 100 } },
     };
-    const resolved = resolveIdleTimers(state, lethalContext, { random: () => 1 }, startedAt + 1_000);
+    const resolved = resolveIdleTimers(state, lethalContext, { random: () => 0 }, startedAt + 1_000);
 
     expect(resolved.state.activeAction).toBeNull();
     expect(resolved.state.playerHealth).toBe(100);
