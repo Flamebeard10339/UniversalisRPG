@@ -275,6 +275,71 @@ describe('content modules', () => {
     expect(result.issues.some((issue) => issue.severity === 'error')).toBe(false);
   });
 
+  it('applies typed data rows through the same module lifecycle', () => {
+    const result = applyModulesToBundle(baseBundle(), [
+      module({
+        id: 'typed-pack',
+        data: [
+          { type: 'stat', id: 'power' },
+          { type: 'resource', id: 'focus', sourceStat: 'power' },
+          { type: 'item', id: 'typed-token' },
+        ],
+        locale: {
+          en: {
+            'stat.power.title': 'Power',
+            'stat.power.description': 'Power.',
+            'resource.focus.title': 'Focus',
+            'item.typed-token.title': 'Typed token',
+            'item.typed-token.description': 'Typed.',
+          },
+        },
+      }),
+    ]);
+
+    expect(result.enabledModuleIds).toEqual(['typed-pack']);
+    expect(result.bundle.stats.map((stat) => stat.id)).toEqual(['power']);
+    expect(result.bundle.resourceDefinitions.map((resource) => resource.id)).toEqual(['focus']);
+    expect(result.bundle.items.map((item) => item.id)).toEqual(['typed-token']);
+    expect(result.issues.some((issue) => issue.severity === 'error')).toBe(false);
+  });
+
+  it('rejects invalid typed data row prototypes', () => {
+    const result = applyModulesToBundle(baseBundle(), [
+      module({
+        id: 'bad-typed-pack',
+        data: [
+          { type: 'action', id: 'bad-action', locationId: 'start', durationSeconds: 'fast', rewards: [] },
+        ] as never,
+      }),
+    ]);
+
+    expect(result.enabledModuleIds).toEqual([]);
+    expect(result.issues.some((issue) =>
+      issue.severity === 'error' &&
+      issue.path === 'modules.bad-typed-pack.data.actions.json' &&
+      issue.message === 'validation.actionsShape',
+    )).toBe(true);
+  });
+
+  it('rejects unknown typed data row types', () => {
+    const result = applyModulesToBundle(baseBundle(), [
+      module({
+        id: 'bad-row-type',
+        data: [
+          { type: 'spell', id: 'spark' },
+        ] as never,
+      }),
+    ]);
+
+    expect(result.enabledModuleIds).toEqual([]);
+    expect(result.issues.some((issue) =>
+      issue.severity === 'error' &&
+      issue.path === 'modules.bad-row-type.data.0.type' &&
+      issue.message === 'validation.moduleDataTypeInvalid' &&
+      issue.params?.id === 'spell',
+    )).toBe(true);
+  });
+
   it('retries with conflicting modules disabled when an update removes referenced content', () => {
     const result = applyModulesToBundle(baseBundle(), [
       module({

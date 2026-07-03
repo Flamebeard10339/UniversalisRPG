@@ -391,12 +391,13 @@ export const ContentDataEditor = ({ activeTab, baseBundle, bundle, draft, onPatc
 
   const universeBasePlayer = { inventory: basePlayer.inventory ?? {} };
   const moduleJsonFiles: JsonEditorFile[] = editableModuleJsonFiles(baseBundle, draft).map((file) => {
-    if (file.path === 'modules/index.json') {
+    if (file.path === 'universe.json') {
       return {
         ...file,
         onChange: (value: StructuredValue | undefined) => {
-          const filenames = new Set((Array.isArray(value) ? value : []).filter((item): item is string => typeof item === 'string'));
-          const ids = new Set([...filenames].map((filename) => filename.replace(/\.json$/i, '')));
+          if (!value || typeof value !== 'object' || Array.isArray(value)) return;
+          const manifest = value as { modules?: unknown };
+          const ids = new Set((Array.isArray(manifest.modules) ? manifest.modules : []).filter((item): item is string => typeof item === 'string'));
           onPatch({
             modules: draft.modules.filter((module) => ids.has(module.id)),
             removed: {

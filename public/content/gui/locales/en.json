@@ -530,6 +530,7 @@
   "validation.moduleDependencyInvalid": "Invalid module dependency \"{id}\".",
   "validation.moduleDependencyVersionMismatch": "Module dependency \"{id}\" does not satisfy version \"{version}\".",
   "validation.moduleDisabled": "Module \"{id}\" was disabled.",
+  "validation.moduleDataTypeInvalid": "Invalid module data type \"{id}\".",
   "validation.moduleDuplicate": "Duplicate module id \"{id}\".",
   "validation.moduleGameVersionInvalid": "Module \"{id}\" has an invalid game version. Use number.number.",
   "validation.moduleIncompatible": "Module is incompatible with \"{id}\".",

@@ -46,7 +46,10 @@ describe('loader', () => {
   it('skips malformed module files instead of failing the universe load', async () => {
     installFetch({
       ...baseResponses(),
-      '/content/universes/test/modules/index.json': ['good.json', 'bad.json'],
+      '/content/universes/test/universe.json': {
+        ...baseResponses()['/content/universes/test/universe.json'],
+        modules: ['good', 'bad'],
+      },
       '/content/universes/test/modules/good.json': {
         id: 'good',
         version: '1.0.0',
@@ -74,10 +77,13 @@ describe('loader', () => {
     }));
   });
 
-  it('skips malformed module indexes instead of failing the universe load', async () => {
+  it('skips malformed manifest module lists instead of failing the universe load', async () => {
     installFetch({
       ...baseResponses(),
-      '/content/universes/test/modules/index.json': ['good.json', '../bad.json'],
+      '/content/universes/test/universe.json': {
+        ...baseResponses()['/content/universes/test/universe.json'],
+        modules: ['good', '../bad'],
+      },
       '/content/universes/test/modules/good.json': {
         id: 'good',
         version: '1.0.0',
@@ -92,14 +98,35 @@ describe('loader', () => {
     expect(bundle.modules).toEqual([]);
     expect(bundle.moduleIssues).toContainEqual(expect.objectContaining({
       message: 'validation.moduleIndexInvalid',
-      path: 'modules.index',
+      path: 'universe.json.modules',
     }));
+  });
+
+  it('falls back to legacy module indexes when manifest modules are not defined', async () => {
+    installFetch({
+      ...baseResponses(),
+      '/content/universes/test/modules/index.json': ['good.json'],
+      '/content/universes/test/modules/good.json': {
+        id: 'good',
+        version: '1.0.0',
+        universe: 'test',
+        author: 'test',
+        game_version: '1.0',
+      },
+    });
+
+    const bundle = await loadUniverse('test');
+
+    expect(bundle.modules?.map((module) => module.id)).toEqual(['good']);
   });
 
   it('skips malformed module packs instead of failing the universe load', async () => {
     installFetch({
       ...baseResponses(),
-      '/content/universes/test/modules/index.json': ['good.json'],
+      '/content/universes/test/universe.json': {
+        ...baseResponses()['/content/universes/test/universe.json'],
+        modules: ['good'],
+      },
       '/content/universes/test/modules/good.json': {
         id: 'good',
         version: '1.0.0',

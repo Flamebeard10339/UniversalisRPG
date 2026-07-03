@@ -28,6 +28,8 @@ const LOCAL_UNIVERSES_KEY = 'universalis:local-universes';
 
 const moduleIdFromFile = (moduleFile: string) => moduleFile.replace(/\.json$/i, '');
 const moduleFilePattern = /^[a-z0-9][a-z0-9.-]*\.json$/;
+const moduleIdPattern = /^[a-z0-9][a-z0-9.-]*$/;
+const moduleFileFromId = (moduleId: string) => `${moduleId}.json`;
 
 const moduleLoadIssue = (moduleFile: string, message: string, params?: Record<string, string | number>): ValidationIssue => ({
   severity: 'error',
@@ -49,6 +51,10 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 const validateModuleIndexShape = (value: unknown): value is string[] =>
   Array.isArray(value) &&
   value.every((moduleFile) => typeof moduleFile === 'string' && moduleFilePattern.test(moduleFile));
+
+const validateManifestModulesShape = (value: unknown): value is string[] =>
+  value === undefined ||
+  (Array.isArray(value) && value.every((moduleId) => typeof moduleId === 'string' && moduleIdPattern.test(moduleId)));
 
 const validateModulePackShape = (value: unknown): value is ContentModulePack =>
   isRecord(value) &&
@@ -133,21 +139,28 @@ export const loadUniverse = async (universeId: string): Promise<ContentBundle> =
     Promise.resolve({}),
   );
   const moduleIssueSeeds: ValidationIssue[] = [];
-  let moduleIds: string[] = [];
-  try {
-    const moduleIndexJson = await tryLoadJson<unknown>(`${basePath}/modules/index.json`);
-    if (moduleIndexJson !== null) {
-      if (validateModuleIndexShape(moduleIndexJson)) {
-        moduleIds = moduleIndexJson;
-      } else {
-        moduleIssueSeeds.push(moduleFileIssue('modules.index', 'validation.moduleIndexInvalid'));
+  let moduleFiles: string[] = [];
+  if (validateManifestModulesShape(manifest.modules)) {
+    moduleFiles = (manifest.modules ?? []).map(moduleFileFromId);
+  } else {
+    moduleIssueSeeds.push(moduleFileIssue('universe.json.modules', 'validation.moduleIndexInvalid'));
+  }
+  if (moduleFiles.length === 0) {
+    try {
+      const moduleIndexJson = await tryLoadJson<unknown>(`${basePath}/modules/index.json`);
+      if (moduleIndexJson !== null) {
+        if (validateModuleIndexShape(moduleIndexJson)) {
+          moduleFiles = moduleIndexJson;
+        } else {
+          moduleIssueSeeds.push(moduleFileIssue('modules.index', 'validation.moduleIndexInvalid'));
+        }
       }
+    } catch {
+      moduleIssueSeeds.push(moduleFileIssue('modules.index', 'validation.moduleIndexInvalid'));
     }
-  } catch {
-    moduleIssueSeeds.push(moduleFileIssue('modules.index', 'validation.moduleIndexInvalid'));
   }
 
-  const { modules, moduleIssues } = await moduleIds.reduce<Promise<{ modules: ContentModule[]; moduleIssues: ValidationIssue[] }>>(async (promise, moduleFile) => {
+  const { modules, moduleIssues } = await moduleFiles.reduce<Promise<{ modules: ContentModule[]; moduleIssues: ValidationIssue[] }>>(async (promise, moduleFile) => {
     const loaded = await promise;
     const modulePath = `${basePath}/modules/${moduleFile}`;
     try {

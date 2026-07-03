@@ -11,14 +11,14 @@ export const moduleFileName = (module: Pick<ContentModule, 'id'>) => `${module.i
 
 export const moduleFilePath = (module: Pick<ContentModule, 'id'>) => `modules/${moduleFileName(module)}`;
 
+export const moduleManifestIds = (bundle: ContentBundle, draft: ContributionDraft) =>
+  mergedContributionModules(bundle, draft).map((module) => module.id);
+
 export const mergedContributionModules = (bundle: ContentBundle, draft: ContributionDraft) => {
   const removedModules = new Set(draft.removed?.modules ?? []);
   const baseModules = (bundle.modules ?? []).filter((module) => !removedModules.has(module.id));
   return uniqueById([...(draft.modules ?? []), ...baseModules]).sort((left, right) => left.id.localeCompare(right.id));
 };
-
-export const moduleIndexJson = (bundle: ContentBundle, draft: ContributionDraft) =>
-  mergedContributionModules(bundle, draft).map((module) => moduleFileName(module));
 
 export const changedModuleJsonFiles = (bundle: ContentBundle, draft: ContributionDraft): ContributionJsonFile[] => {
   if ((draft.modules ?? []).length === 0 && (draft.removed?.modules ?? []).length === 0) {
@@ -26,7 +26,7 @@ export const changedModuleJsonFiles = (bundle: ContentBundle, draft: Contributio
   }
 
   return [
-    { path: 'modules/index.json', json: moduleIndexJson(bundle, draft) },
+    { path: 'universe.json', json: { ...bundle.manifest, modules: moduleManifestIds(bundle, draft) } },
     ...draft.modules.map((module) => ({ path: moduleFilePath(module), json: module })),
   ];
 };
@@ -37,6 +37,6 @@ export const changedContributionJsonFiles = (bundle: ContentBundle, draft: Contr
 ];
 
 export const editableModuleJsonFiles = (bundle: ContentBundle, draft: ContributionDraft): ContributionJsonFile[] => [
-  { path: 'modules/index.json', json: moduleIndexJson(bundle, draft) },
+  { path: 'universe.json', json: { ...bundle.manifest, modules: moduleManifestIds(bundle, draft) } },
   ...mergedContributionModules(bundle, draft).map((module) => ({ path: moduleFilePath(module), json: module })),
 ];

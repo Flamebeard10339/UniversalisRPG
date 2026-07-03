@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { changedContributionJsonFiles, changedModuleJsonFiles, editableModuleJsonFiles, moduleIndexJson } from './contributionFiles';
+import { changedContributionJsonFiles, changedModuleJsonFiles, editableModuleJsonFiles, moduleManifestIds } from './contributionFiles';
 import type { ContentBundle, ContributionDraft } from './types';
 
 const bundle = (): ContentBundle => ({
@@ -48,14 +48,18 @@ const draft = (): ContributionDraft => ({
 });
 
 describe('contribution module files', () => {
-  it('builds module index and module files from base plus draft changes', () => {
-    expect(moduleIndexJson(bundle(), draft())).toEqual(['base-module.json', 'draft-module.json']);
+  it('builds manifest module ids and module files from base plus draft changes', () => {
+    expect(moduleManifestIds(bundle(), draft())).toEqual(['base-module', 'draft-module']);
     expect(changedModuleJsonFiles(bundle(), draft()).map((file) => file.path)).toEqual([
-      'modules/index.json',
+      'universe.json',
       'modules/draft-module.json',
     ]);
+    expect(changedModuleJsonFiles(bundle(), draft())[0]?.json).toMatchObject({
+      id: 'test',
+      modules: ['base-module', 'draft-module'],
+    });
     expect(editableModuleJsonFiles(bundle(), draft()).map((file) => file.path)).toEqual([
-      'modules/index.json',
+      'universe.json',
       'modules/base-module.json',
       'modules/draft-module.json',
     ]);
@@ -70,7 +74,7 @@ describe('contribution module files', () => {
     };
 
     expect(changedContributionJsonFiles(bundle(), contributionDraft).map((file) => file.path)).toEqual([
-      'modules/index.json',
+      'universe.json',
       'modules/draft-module.json',
       'module-packs.json',
     ]);

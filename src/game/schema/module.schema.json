@@ -16,8 +16,18 @@
       "items": { "$ref": "#/$defs/dependency" },
       "uniqueItems": true
     },
-    "data": { "$ref": "#/$defs/dataSection" },
-    "data-updates": { "$ref": "#/$defs/dataUpdates" },
+    "data": {
+      "oneOf": [
+        { "$ref": "#/$defs/dataSection" },
+        { "$ref": "#/$defs/typedDataSection" }
+      ]
+    },
+    "data-updates": {
+      "oneOf": [
+        { "$ref": "#/$defs/dataUpdates" },
+        { "$ref": "#/$defs/typedDataSection" }
+      ]
+    },
     "locale": {
       "type": "object",
       "additionalProperties": { "$ref": "https://universalis-rpg.local/schema/locale.schema.json" }
@@ -54,6 +64,51 @@
     "dialogueOptionRemovals": {
       "type": "object",
       "additionalProperties": { "$ref": "#/$defs/idList" }
+    },
+    "typedDataSection": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/dataEntry" }
+    },
+    "dataEntry": {
+      "type": "object",
+      "required": ["id", "type"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "type": {
+          "type": "string",
+          "enum": [
+            "action",
+            "actions",
+            "dialogue",
+            "dialogues",
+            "displayProfile",
+            "displayProfiles",
+            "edge",
+            "edges",
+            "effect",
+            "effects",
+            "enemy",
+            "enemies",
+            "flag",
+            "flags",
+            "interactionType",
+            "interactionTypes",
+            "item",
+            "items",
+            "location",
+            "locations",
+            "resource",
+            "resources",
+            "resourceDefinition",
+            "resourceDefinitions",
+            "skill",
+            "skills",
+            "stat",
+            "stats"
+          ]
+        }
+      },
+      "additionalProperties": true
     },
     "dataSection": {
       "type": "object",

@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import type { ContentBundle, ContentModule, ContentModulePack, ContributionDraft, LocaleDictionary, ModuleDataSection, ValidationIssue } from '../../game/types';
+import type { ContentBundle, ContentModule, ContentModulePack, ContributionDraft, LocaleDictionary, ModuleDataSectionObject, ValidationIssue } from '../../game/types';
 import type { Translator } from '../../game/i18n';
 import { StructuredDataEditor, type StructuredSchema, type StructuredValue } from '../structuredData/StructuredData';
 import { moduleDataSectionSchema, modulePackSchema } from '../structuredData/contentSchemas';
@@ -16,7 +16,7 @@ type ModuleEditorProps = {
 };
 
 type EditorTab = 'details' | 'data' | 'data-updates' | 'locale' | 'raw' | 'submit';
-type DataKey = keyof ModuleDataSection;
+type DataKey = keyof ModuleDataSectionObject;
 
 const dataKeys: DataKey[] = [
   'locations',
@@ -96,9 +96,12 @@ const moduleBaseLocales = (bundle: ContentBundle, module: ContentModule, lang1: 
 const mergeById = <T extends { id: string }>(base: T[], ...groups: Array<T[] | undefined>): T[] =>
   [...new Map([...base, ...groups.flatMap((group) => group ?? [])].map((item) => [item.id, item])).values()];
 
+const moduleDataObject = (section: ContentModule['data'] | ContentModule['data-updates']): ModuleDataSectionObject =>
+  section && !Array.isArray(section) ? section : {};
+
 const bundleForModuleEditing = (bundle: ContentBundle, module: ContentModule, modules: ContentModule[]): ContentBundle => {
-  const data = module.data ?? {};
-  const updates = module['data-updates'] ?? {};
+  const data = moduleDataObject(module.data);
+  const updates = moduleDataObject(module['data-updates']);
   const resourceDefinitions = [
     ...(data.resources ?? []),
     ...(data.resourceDefinitions ?? []),
@@ -140,7 +143,7 @@ const createDataItem = (bundle: ContentBundle, key: DataKey) => fieldSchema(bund
 
 const itemSchema = (bundle: ContentBundle, key: DataKey) => fieldSchema(bundle, key).item;
 
-const updateArray = (section: ModuleDataSection | undefined, key: DataKey, values: StructuredValue[]): ModuleDataSection => ({
+const updateArray = (section: ModuleDataSectionObject | undefined, key: DataKey, values: StructuredValue[]): ModuleDataSectionObject => ({
   ...(section ?? {}),
   [key]: values,
 });
@@ -283,14 +286,14 @@ const DataRows = ({
 }) => {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [pendingRows, setPendingRows] = useState(0);
-  const section = (sectionName === 'data' ? module.data : module['data-updates']) ?? {};
+  const section = moduleDataObject(sectionName === 'data' ? module.data : module['data-updates']);
   const editorBundle = bundleForModuleEditing(bundle, module, bundle.modules ?? []);
   const rows = dataKeys.flatMap((key) => {
     const values = section[key];
     return Array.isArray(values) ? values.map((value, index) => ({ key, index, value: value as StructuredValue })) : [];
   });
 
-  const saveSection = (nextSection: ModuleDataSection) => onSave({ ...module, [sectionName]: nextSection });
+  const saveSection = (nextSection: ModuleDataSectionObject) => onSave({ ...module, [sectionName]: nextSection });
   const saveRow = (key: DataKey, index: number, value: StructuredValue | undefined) => {
     const values = [...((section[key] as StructuredValue[] | undefined) ?? [])];
     if (value === undefined) values.splice(index, 1);

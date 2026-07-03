@@ -50,6 +50,9 @@
     "dialogues.json",
     "locales/en.json"
   ],
+  "modules": [
+    "wayside-supplies"
+  ],
   "compatibility": {
     "minAppVersion": "0.1.0"
   }

@@ -122,6 +122,7 @@ export const validateManifest = (value: unknown): value is UniverseManifest =>
   value.locales.every((locale) => typeof locale === 'string') &&
   Array.isArray(value.files) &&
   value.files.every((file) => typeof file === 'string') &&
+  (value.modules === undefined || (Array.isArray(value.modules) && value.modules.every((moduleId) => typeof moduleId === 'string' && moduleId.trim().length > 0))) &&
   (value.basePlayer === undefined ||
     (isRecord(value.basePlayer) &&
       value.basePlayer.stats === undefined &&

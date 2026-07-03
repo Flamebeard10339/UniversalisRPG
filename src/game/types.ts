@@ -12,6 +12,7 @@ export type UniverseManifest = {
   author: string;
   locales: string[];
   files: string[];
+  modules?: string[];
   basePlayer?: BasePlayerDefinition;
   combatBalance?: CombatBalanceDefinition;
   displayProfiles?: DisplayProfileDefinition[];
@@ -325,7 +326,7 @@ export type ContentBundle = {
   moduleIssues?: ValidationIssue[];
 };
 
-export type ModuleDataSection = {
+export type ModuleDataSectionObject = {
   locations?: LocationNode[];
   edges?: TravelEdgeDefinition[];
   actions?: GameAction[];
@@ -342,7 +343,11 @@ export type ModuleDataSection = {
   displayProfiles?: DisplayProfileDefinition[];
 };
 
-export type ModuleDataUpdates = ModuleDataSection & {
+export type ModuleDataEntry = { id?: string; type: string } & Record<string, unknown>;
+
+export type ModuleDataSection = ModuleDataSectionObject | ModuleDataEntry[];
+
+export type ModuleDataUpdatesObject = ModuleDataSectionObject & {
   remove?: {
     locations?: string[];
     edges?: string[];
@@ -362,6 +367,8 @@ export type ModuleDataUpdates = ModuleDataSection & {
   };
   locale?: Record<string, LocaleDictionary>;
 };
+
+export type ModuleDataUpdates = ModuleDataUpdatesObject | ModuleDataEntry[];
 
 export type ContentModule = {
   id: string;

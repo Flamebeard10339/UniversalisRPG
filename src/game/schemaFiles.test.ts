@@ -43,4 +43,16 @@ describe('json schema files', () => {
       additionalProperties: { $ref: '#/$defs/idList' },
     });
   });
+
+  it('supports typed module data rows in module schema', () => {
+    const moduleSchema = readSchema('module.schema.json') as {
+      $defs: {
+        dataEntry: { properties: { type: { enum: string[] } } };
+        typedDataSection: { items: unknown };
+      };
+    };
+
+    expect(moduleSchema.$defs.typedDataSection.items).toEqual({ $ref: '#/$defs/dataEntry' });
+    expect(moduleSchema.$defs.dataEntry.properties.type.enum).toEqual(expect.arrayContaining(['action', 'item', 'resource']));
+  });
 });

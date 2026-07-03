@@ -5,8 +5,11 @@ import type {
   DialogueDefinition,
   GameAction,
   LocaleDictionary,
+  ModuleDataEntry,
   ModuleDataSection,
+  ModuleDataSectionObject,
   ModuleDataUpdates,
+  ModuleDataUpdatesObject,
   ValidationIssue,
 } from './types';
 import {
@@ -130,28 +133,83 @@ export const validateModuleShape = (module: unknown, filename?: string): module 
     (value.dependencies === undefined || (Array.isArray(value.dependencies) && value.dependencies.every((dependency) => typeof dependency === 'string')));
 };
 
-const sectionResources = (section?: ModuleDataSection) => [
-  ...(section?.resourceDefinitions ?? []),
-  ...(section?.resources ?? []),
-];
+const moduleDataTypeToKey: Record<string, keyof ModuleDataSectionObject> = {
+  action: 'actions',
+  actions: 'actions',
+  dialogue: 'dialogues',
+  dialogues: 'dialogues',
+  displayProfile: 'displayProfiles',
+  displayProfiles: 'displayProfiles',
+  edge: 'edges',
+  edges: 'edges',
+  effect: 'effects',
+  effects: 'effects',
+  enemy: 'enemies',
+  enemies: 'enemies',
+  flag: 'flags',
+  flags: 'flags',
+  interactionType: 'interactionTypes',
+  interactionTypes: 'interactionTypes',
+  item: 'items',
+  items: 'items',
+  location: 'locations',
+  locations: 'locations',
+  resource: 'resources',
+  resources: 'resources',
+  resourceDefinition: 'resourceDefinitions',
+  resourceDefinitions: 'resourceDefinitions',
+  skill: 'skills',
+  skills: 'skills',
+  stat: 'stats',
+  stats: 'stats',
+};
+
+const normalizeModuleDataEntry = (entry: ModuleDataEntry) => {
+  const { type: _type, ...value } = entry;
+  return value;
+};
+
+const normalizeModuleDataSection = (section?: ModuleDataSection): ModuleDataSectionObject => {
+  if (!section) return {};
+  if (!Array.isArray(section)) return section;
+  const normalized: ModuleDataSectionObject = {};
+  for (const entry of section) {
+    const key = moduleDataTypeToKey[entry.type];
+    if (!key) continue;
+    const values = ((normalized[key] ?? []) as Record<string, unknown>[]).concat(normalizeModuleDataEntry(entry));
+    (normalized as Record<keyof ModuleDataSectionObject, Record<string, unknown>[] | undefined>)[key] = values;
+  }
+  return normalized;
+};
+
+const moduleDataUpdatesObject = (updates?: ModuleDataUpdates): ModuleDataUpdatesObject | undefined =>
+  updates && !Array.isArray(updates) ? updates : undefined;
+
+const sectionResources = (section?: ModuleDataSection) => {
+  const normalized = normalizeModuleDataSection(section);
+  return [
+    ...(normalized.resourceDefinitions ?? []),
+    ...(normalized.resources ?? []),
+  ];
+};
 
 const emptySectionBundle = (bundle: ContentBundle, section?: ModuleDataSection): Partial<ContentBundle> => ({
   manifest: {
     ...bundle.manifest,
-    displayProfiles: section?.displayProfiles,
+    displayProfiles: normalizeModuleDataSection(section).displayProfiles,
   },
-  locations: section?.locations ?? [],
-  edges: section?.edges ?? [],
-  actions: section?.actions ?? [],
-  skills: section?.skills ?? [],
-  stats: section?.stats ?? [],
-  items: section?.items ?? [],
-  flags: section?.flags ?? [],
+  locations: normalizeModuleDataSection(section).locations ?? [],
+  edges: normalizeModuleDataSection(section).edges ?? [],
+  actions: normalizeModuleDataSection(section).actions ?? [],
+  skills: normalizeModuleDataSection(section).skills ?? [],
+  stats: normalizeModuleDataSection(section).stats ?? [],
+  items: normalizeModuleDataSection(section).items ?? [],
+  flags: normalizeModuleDataSection(section).flags ?? [],
   resourceDefinitions: sectionResources(section),
-  effects: section?.effects ?? [],
-  interactionTypes: section?.interactionTypes ?? [],
-  enemies: section?.enemies ?? [],
-  dialogues: section?.dialogues ?? [],
+  effects: normalizeModuleDataSection(section).effects ?? [],
+  interactionTypes: normalizeModuleDataSection(section).interactionTypes ?? [],
+  enemies: normalizeModuleDataSection(section).enemies ?? [],
+  dialogues: normalizeModuleDataSection(section).dialogues ?? [],
   locales: bundle.locales,
 });
 
@@ -163,7 +221,18 @@ const prefixIssuePath = (moduleId: string, section: string, validationIssue: Val
 const validateModuleDataSection = (bundle: ContentBundle, module: ContentModule, section: 'data' | 'data-updates') => {
   const data = section === 'data' ? module.data : module['data-updates'];
   if (!data) return [];
-  return validateContentShape(emptySectionBundle(bundle, data)).map((validationIssue) => prefixIssuePath(module.id, section, validationIssue));
+  const typeIssues = Array.isArray(data)
+    ? data.flatMap((entry, index) =>
+        isRecord(entry) && typeof entry.type === 'string' && moduleDataTypeToKey[entry.type]
+          ? []
+          : [issue('error', `modules.${module.id}.${section}.${index}.type`, 'validation.moduleDataTypeInvalid', {
+              id: isRecord(entry) && typeof entry.type === 'string' ? entry.type : String(index),
+            })])
+    : [];
+  return [
+    ...typeIssues,
+    ...validateContentShape(emptySectionBundle(bundle, data)).map((validationIssue) => prefixIssuePath(module.id, section, validationIssue)),
+  ];
 };
 
 const removableModuleDataKeys = new Set([
@@ -188,7 +257,7 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
 
 const validateModuleDataUpdatesShape = (module: ContentModule): ValidationIssue[] => {
-  const updates = module['data-updates'];
+  const updates = moduleDataUpdatesObject(module['data-updates']);
   if (!updates) return [];
   const issues: ValidationIssue[] = [];
 
@@ -263,16 +332,16 @@ const localizationKeysFromDialogues = (dialogues: DialogueDefinition[] = []) =>
 const hasId = (value: { id?: unknown }): value is { id: string } => typeof value.id === 'string' && value.id.trim().length > 0;
 
 const localizationKeysFromSection = (section?: ModuleDataSection) => [
-  ...(section?.locations ?? []).filter(hasId).flatMap((location) => [
+  ...(normalizeModuleDataSection(section).locations ?? []).filter(hasId).flatMap((location) => [
     locationTitleKey(location.id),
     locationDescriptionKey(location.id),
     locationExhaustedKey(location.id),
   ]),
-  ...(section?.actions ?? []).filter(hasId).flatMap(localizationKeysFromAction),
-  ...(section?.skills ?? []).filter(hasId).flatMap((skill) => [skillTitleKey(skill.id), skillDescriptionKey(skill.id)]),
-  ...(section?.stats ?? []).filter(hasId).flatMap((stat) => [statTitleKey(stat.id), statDescriptionKey(stat.id)]),
-  ...(section?.items ?? []).filter(hasId).flatMap((item) => [itemTitleKey(item.id), itemDescriptionKey(item.id)]),
-  ...(section?.interactionTypes ?? []).filter(hasId).flatMap((interactionType) => [
+  ...(normalizeModuleDataSection(section).actions ?? []).filter(hasId).flatMap(localizationKeysFromAction),
+  ...(normalizeModuleDataSection(section).skills ?? []).filter(hasId).flatMap((skill) => [skillTitleKey(skill.id), skillDescriptionKey(skill.id)]),
+  ...(normalizeModuleDataSection(section).stats ?? []).filter(hasId).flatMap((stat) => [statTitleKey(stat.id), statDescriptionKey(stat.id)]),
+  ...(normalizeModuleDataSection(section).items ?? []).filter(hasId).flatMap((item) => [itemTitleKey(item.id), itemDescriptionKey(item.id)]),
+  ...(normalizeModuleDataSection(section).interactionTypes ?? []).filter(hasId).flatMap((interactionType) => [
     interactionTitleKey(interactionType.id),
     interactionPlayerHitKey(interactionType.id),
     interactionPlayerMissKey(interactionType.id),
@@ -286,9 +355,9 @@ const localizationKeysFromSection = (section?: ModuleDataSection) => [
     ...(resource.onEmpty ?? []).flatMap((behavior) => typeof behavior === 'object' && behavior !== null && behavior.kind === 'chat' ? [behavior.messageKey] : []),
     ...(resource.onFull ?? []).flatMap((behavior) => typeof behavior === 'object' && behavior !== null && behavior.kind === 'chat' ? [behavior.messageKey] : []),
   ]),
-  ...(section?.effects ?? []).filter(hasId).map((effect) => effectTitleKey(effect.id)),
-  ...localizationKeysFromDialogues(section?.dialogues),
-  ...(section?.displayProfiles ?? []).map((profile) => profile.titleKey),
+  ...(normalizeModuleDataSection(section).effects ?? []).filter(hasId).map((effect) => effectTitleKey(effect.id)),
+  ...localizationKeysFromDialogues(normalizeModuleDataSection(section).dialogues),
+  ...(normalizeModuleDataSection(section).displayProfiles ?? []).map((profile) => profile.titleKey),
 ].filter((key): key is string => Boolean(key));
 
 export const collectModuleLocalizationKeys = (module: ContentModule) =>
@@ -299,7 +368,7 @@ export const collectModuleLocalizationKeys = (module: ContentModule) =>
 
 const moduleLocaleDictionary = (module: ContentModule, locale: string): LocaleDictionary => ({
   ...(module.locale?.[locale] ?? {}),
-  ...(module['data-updates']?.locale?.[locale] ?? {}),
+  ...(moduleDataUpdatesObject(module['data-updates'])?.locale?.[locale] ?? {}),
 });
 
 const validateContentModule = (bundle: ContentBundle, module: ContentModule, currentLocale = bundle.manifest.locales[0] ?? 'en'): ValidationIssue[] => [
@@ -402,29 +471,31 @@ const mergeLocales = (
 
 const applyDataSection = (bundle: ContentBundle, data?: ModuleDataSection): ContentBundle => {
   if (!data) return bundle;
+  const section = normalizeModuleDataSection(data);
   return {
     ...bundle,
-    manifest: data.displayProfiles
-      ? { ...bundle.manifest, displayProfiles: mergeById(bundle.manifest.displayProfiles ?? [], data.displayProfiles) }
+    manifest: section.displayProfiles
+      ? { ...bundle.manifest, displayProfiles: mergeById(bundle.manifest.displayProfiles ?? [], section.displayProfiles) }
       : bundle.manifest,
-    locations: mergeById(bundle.locations, data.locations),
-    edges: mergeById(bundle.edges, data.edges),
-    actions: mergeById(bundle.actions, data.actions),
-    skills: mergeById(bundle.skills, data.skills),
-    stats: mergeById(bundle.stats, data.stats),
-    items: mergeById(bundle.items ?? [], data.items),
-    flags: mergeById(bundle.flags ?? [], data.flags),
-    resourceDefinitions: mergeById(bundle.resourceDefinitions ?? [], sectionResources(data)),
-    effects: mergeById(bundle.effects ?? [], data.effects),
-    interactionTypes: mergeById(bundle.interactionTypes ?? [], data.interactionTypes),
-    enemies: mergeById(bundle.enemies ?? [], data.enemies),
-    dialogues: mergeById(bundle.dialogues ?? [], data.dialogues),
+    locations: mergeById(bundle.locations, section.locations),
+    edges: mergeById(bundle.edges, section.edges),
+    actions: mergeById(bundle.actions, section.actions),
+    skills: mergeById(bundle.skills, section.skills),
+    stats: mergeById(bundle.stats, section.stats),
+    items: mergeById(bundle.items ?? [], section.items),
+    flags: mergeById(bundle.flags ?? [], section.flags),
+    resourceDefinitions: mergeById(bundle.resourceDefinitions ?? [], sectionResources(section)),
+    effects: mergeById(bundle.effects ?? [], section.effects),
+    interactionTypes: mergeById(bundle.interactionTypes ?? [], section.interactionTypes),
+    enemies: mergeById(bundle.enemies ?? [], section.enemies),
+    dialogues: mergeById(bundle.dialogues ?? [], section.dialogues),
   };
 };
 
 const applyDataUpdates = (bundle: ContentBundle, updates?: ModuleDataUpdates): ContentBundle => {
   if (!updates) return bundle;
-  const removed = updates.remove ?? {};
+  const updateObject = moduleDataUpdatesObject(updates);
+  const removed = updateObject?.remove ?? {};
   const withoutRemoved = {
     ...bundle,
     manifest: removed.displayProfiles
@@ -442,7 +513,7 @@ const applyDataUpdates = (bundle: ContentBundle, updates?: ModuleDataUpdates): C
     interactionTypes: removeById(bundle.interactionTypes ?? [], removed.interactionTypes),
     enemies: removeById(bundle.enemies ?? [], removed.enemies),
     dialogues: removeDialogueOptions(removeById(bundle.dialogues ?? [], removed.dialogues), removed.dialogueOptions),
-    locales: mergeLocales(bundle.locales, updates.locale, removed.locales),
+    locales: mergeLocales(bundle.locales, updateObject?.locale, removed.locales),
   };
   return applyDataSection(withoutRemoved, updates);
 };
@@ -558,7 +629,7 @@ const applyOrderedModules = (bundle: ContentBundle, relevantModules: ContentModu
 };
 
 const removedIdsByModule = (module: ContentModule) =>
-  new Set(Object.entries(module['data-updates']?.remove ?? {}).flatMap(([key, value]) =>
+  new Set(Object.entries(moduleDataUpdatesObject(module['data-updates'])?.remove ?? {}).flatMap(([key, value]) =>
     key === 'dialogueOptions' && isRecord(value)
       ? Object.values(value).flatMap((ids) => Array.isArray(ids) ? ids : [])
       : Array.isArray(value) ? value : [],
@@ -572,7 +643,7 @@ const referencesIdValue = (value: unknown, id: string, key = ''): boolean => {
 };
 
 const moduleReferencesId = (module: ContentModule, id: string) =>
-  referencesIdValue(module.data, id) || referencesIdValue({ ...module['data-updates'], remove: undefined }, id);
+  referencesIdValue(module.data, id) || referencesIdValue({ ...moduleDataUpdatesObject(module['data-updates']), remove: undefined }, id);
 
 const findConflictModuleIds = (ordered: ContentModule[], validationIssues: ValidationIssue[]) => {
   const conflictIds = new Set<string>();
