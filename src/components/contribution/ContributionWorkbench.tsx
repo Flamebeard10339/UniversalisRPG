@@ -57,9 +57,10 @@ const actionMatchesStateFilter = (action: GameAction, key: StateKey | '', value:
 
 const referencedStateKeys = (actions: GameAction[], bundle: ContentBundle) => {
   const keys = new Set<StateKey>();
+  const dropTables = new Map((bundle.dropTables ?? []).map((dropTable) => [dropTable.id, dropTable]));
   const visitReward = (reward: Reward) => {
     if (reward.kind === 'dropTable') {
-      reward.drops.forEach((drop) => visitReward(drop.reward));
+      dropTables.get(reward.dropTableId)?.drops.forEach((drop) => visitReward(drop.reward));
       return;
     }
     keys.add(reward.kind === 'skillXp' ? `skill-level:${reward.skillId}` : `${reward.kind}:${reward.kind === 'item' ? reward.itemId : reward.resourceId}`);

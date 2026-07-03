@@ -3,6 +3,7 @@ import type {
   ContentModule,
   ContentModulePack,
   DialogueDefinition,
+  DropTableDefinition,
   EnemyDefinition,
   EffectDefinition,
   GameAction,
@@ -98,7 +99,7 @@ export const loadUniverse = async (universeId: string): Promise<ContentBundle> =
     manifest.files.includes(fileName)
       ? loadJson<T[]>(`${basePath}/${fileName}`)
       : Promise.resolve([]);
-  const [locations, edges, actions, skills, stats, items, flags, resourceDefinitions, effects, interactionTypes, enemies, dialogues] = await Promise.all([
+  const [locations, edges, actions, skills, stats, items, flags, resourceDefinitions, effects, interactionTypes, enemies, dropTables, dialogues] = await Promise.all([
     loadContentFile<LocationNode>('locations.json'),
     loadContentFile<TravelEdgeDefinition>('edges.json'),
     loadContentFile<GameAction>('actions.json'),
@@ -110,6 +111,7 @@ export const loadUniverse = async (universeId: string): Promise<ContentBundle> =
     loadContentFile<EffectDefinition>('effects.json'),
     loadContentFile<InteractionTypeDefinition>('interaction-types.json'),
     loadContentFile<EnemyDefinition>('enemies.json'),
+    loadContentFile<DropTableDefinition>('drop-tables.json'),
     loadContentFile<DialogueDefinition>('dialogues.json'),
   ]);
 
@@ -182,6 +184,7 @@ export const loadUniverse = async (universeId: string): Promise<ContentBundle> =
     effects,
     interactionTypes,
     enemies,
+    dropTables,
     dialogues,
     locales,
     modules,

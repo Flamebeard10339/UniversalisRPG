@@ -15,6 +15,7 @@ const bundle = (): ContentBundle => ({
   effects: [],
   interactionTypes: [],
   enemies: [],
+  dropTables: [],
   dialogues: [],
   locales: { en: {} },
   modules: [
@@ -42,9 +43,10 @@ const draft = (): ContributionDraft => ({
   effects: [],
   interactionTypes: [],
   enemies: [],
+  dropTables: [],
   dialogues: [],
   locales: {},
-  removed: { locations: [], edges: [], actions: [], skills: [], stats: [], items: [], flags: [], resources: [], effects: [], interactionTypes: [], enemies: [], dialogues: [], modules: ['removed-module'] },
+  removed: { locations: [], edges: [], actions: [], skills: [], stats: [], items: [], flags: [], resources: [], effects: [], interactionTypes: [], enemies: [], dropTables: [], dialogues: [], modules: ['removed-module'] },
 });
 
 describe('contribution module files', () => {

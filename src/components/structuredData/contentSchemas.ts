@@ -35,7 +35,7 @@ export const rewardSchema = (bundle: ContentBundle): StructuredSchema => ({
     skillXp: { label: 'contribution.reward.skillXp', createValue: () => ({ kind: 'skillXp', skillId: bundle.skills[0]?.id ?? '', amount: 1 }), schema: { kind: 'object', fields: { kind: { schema: { kind: 'enum', options: ['skillXp'] } }, skillId: { schema: string(bundle.skills.map((item) => item.id)) }, amount: { schema: rewardAmountSchema() } } } },
     item: { label: 'contribution.reward.item', createValue: () => ({ kind: 'item', itemId: bundle.items[0]?.id ?? '', amount: 1 }), schema: { kind: 'object', fields: { kind: { schema: { kind: 'enum', options: ['item'] } }, itemId: { schema: string(bundle.items.map((item) => item.id)) }, amount: { schema: rewardAmountSchema() } } } },
     resource: { label: 'contribution.reward.resource', createValue: () => ({ kind: 'resource', resourceId: bundle.resourceDefinitions[0]?.id ?? '', amount: 1 }), schema: { kind: 'object', fields: { kind: { schema: { kind: 'enum', options: ['resource'] } }, resourceId: { schema: string(bundle.resourceDefinitions.map((item) => item.id)) }, amount: { schema: rewardAmountSchema() } } } },
-    dropTable: { label: 'contribution.reward.dropTable', createValue: () => ({ kind: 'dropTable', mode: 'dependent', drops: [] }), schema: () => dropTableRewardSchema(bundle) },
+    dropTable: { label: 'contribution.reward.dropTable', createValue: () => ({ kind: 'dropTable', dropTableId: bundle.dropTables?.[0]?.id ?? '' }), schema: () => dropTableRewardSchema(bundle) },
   },
 });
 
@@ -43,13 +43,18 @@ const rewardAmountSchema = (): StructuredSchema => ({ kind: 'inferred' });
 
 const dropTableRewardSchema = (bundle: ContentBundle): StructuredSchema => ({ kind: 'object', fields: {
   kind: { schema: { kind: 'enum', options: ['dropTable'] } },
-  mode: { schema: { kind: 'enum', options: ['independent', 'dependent'] } },
-  drops: { schema: { kind: 'array', listMode: 'free', item: dropTableEntrySchema(bundle), createItem: () => ({ weight: 1, reward: { kind: 'item', itemId: bundle.items[0]?.id ?? '', amount: 1 } }) } },
+  dropTableId: { schema: string((bundle.dropTables ?? []).map((dropTable) => dropTable.id)) },
 } });
 
 const dropTableEntrySchema = (bundle: ContentBundle): StructuredSchema => ({ kind: 'object', fields: {
   weight: { schema: number(0) },
   reward: { schema: rewardSchema(bundle) },
+} });
+
+export const dropTableDefinitionSchema = (bundle: ContentBundle): StructuredSchema => ({ kind: 'object', fields: {
+  id: { label: 'contribution.column.id', schema: string() },
+  mode: { schema: { kind: 'enum', options: ['independent', 'dependent'] } },
+  drops: { schema: { kind: 'array', listMode: 'free', item: dropTableEntrySchema(bundle), createItem: () => ({ weight: 1, reward: { kind: 'item', itemId: bundle.items[0]?.id ?? '', amount: 1 } }) } },
 } });
 
 export const conditionSchema = (bundle: ContentBundle): StructuredSchema => ({
@@ -257,6 +262,7 @@ export const moduleDataSectionSchema = (bundle: ContentBundle): StructuredSchema
   effects: { label: 'contribution.data.effects', schema: { kind: 'array', listMode: 'free', item: effectDefinitionSchema(bundle), createItem: () => ({ id: 'new-effect', resourceId: bundle.resourceDefinitions[0]?.id ?? '', sourceStat: bundle.stats[0]?.id ?? '' }) }, optional: true, defaultValue: [] },
   interactionTypes: { label: 'contribution.data.interactions', schema: { kind: 'array', listMode: 'table', columns: ['id', 'sourceStatId', 'targetStatId', 'targetPlayerHealth'], item: interactionTypeDefinitionSchema(bundle), createItem: () => ({ id: 'new-interaction', sourceStatId: bundle.stats[0]?.id ?? '', targetStatId: bundle.stats[0]?.id ?? '', targetPlayerHealth: false }) }, optional: true, defaultValue: [] },
   enemies: { label: 'contribution.data.enemies', schema: { kind: 'array', listMode: 'free', item: enemyDefinitionSchema(bundle), createItem: () => ({ id: 'new-enemy', interactionTypeId: bundle.interactionTypes[0]?.id ?? '', rewards: [] }) }, optional: true, defaultValue: [] },
+  dropTables: { label: 'contribution.data.dropTables', schema: { kind: 'array', listMode: 'free', item: dropTableDefinitionSchema(bundle), createItem: () => ({ id: 'new-drop-table', mode: 'dependent', drops: [] }) }, optional: true, defaultValue: [] },
   dialogues: { label: 'contribution.data.dialogues', schema: { kind: 'array', listMode: 'free', item: dialogueSchema(bundle), createItem: () => ({ id: 'new-dialogue', startNodeId: 'start', nodes: [{ id: 'start', textKey: 'dialogue.new-dialogue.start' }] }) }, optional: true, defaultValue: [] },
   displayProfiles: { label: 'contribution.data.displayProfiles', schema: { kind: 'array', listMode: 'free', item: displayProfileSchema(), createItem: () => ({ id: 'new-profile', colors: {} }) }, optional: true, defaultValue: [] },
 } });
@@ -300,6 +306,7 @@ export const moduleRemoveSchema = (bundle: ContentBundle): StructuredSchema => (
   effects: { label: 'contribution.data.effects', schema: idListSchema(bundle.effects.map((item) => item.id)), optional: true, defaultValue: [] },
   interactionTypes: { label: 'contribution.data.interactions', schema: idListSchema(bundle.interactionTypes.map((item) => item.id)), optional: true, defaultValue: [] },
   enemies: { label: 'contribution.data.enemies', schema: idListSchema(bundle.enemies.map((item) => item.id)), optional: true, defaultValue: [] },
+  dropTables: { label: 'contribution.data.dropTables', schema: idListSchema((bundle.dropTables ?? []).map((item) => item.id)), optional: true, defaultValue: [] },
   dialogues: { label: 'contribution.data.dialogues', schema: idListSchema((bundle.dialogues ?? []).map((item) => item.id)), optional: true, defaultValue: [] },
   dialogueOptions: { label: 'contribution.module.removeDialogueOptions', schema: dialogueOptionRemovalSchema(bundle), optional: true, defaultValue: {} },
   displayProfiles: { label: 'contribution.data.displayProfiles', schema: idListSchema((bundle.manifest.displayProfiles ?? []).map((item) => item.id)), optional: true, defaultValue: [] },

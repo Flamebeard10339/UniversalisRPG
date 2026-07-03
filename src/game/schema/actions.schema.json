@@ -110,12 +110,11 @@
         },
         {
           "type": "object",
-          "required": ["kind", "mode", "drops"],
+          "required": ["kind", "dropTableId"],
           "additionalProperties": false,
           "properties": {
             "kind": { "const": "dropTable" },
-            "mode": { "enum": ["independent", "dependent"] },
-            "drops": { "type": "array", "items": { "$ref": "#/$defs/dropTableEntry" } }
+            "dropTableId": { "type": "string", "minLength": 1 }
           }
         }
       ]
@@ -133,15 +132,6 @@
           }
         }
       ]
-    },
-    "dropTableEntry": {
-      "type": "object",
-      "required": ["weight", "reward"],
-      "additionalProperties": false,
-      "properties": {
-        "weight": { "type": "number", "exclusiveMinimum": 0 },
-        "reward": { "$ref": "#/$defs/reward" }
-      }
     },
     "experienceTrigger": {
       "type": "object",

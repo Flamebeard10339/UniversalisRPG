@@ -35,6 +35,7 @@ const emptyDraft = (universeId: string): ContributionDraft => ({
   effects: [],
   interactionTypes: [],
   enemies: [],
+  dropTables: [],
   dialogues: [],
   locales: {},
   removed: {
@@ -49,6 +50,7 @@ const emptyDraft = (universeId: string): ContributionDraft => ({
     effects: [],
     interactionTypes: [],
     enemies: [],
+    dropTables: [],
     dialogues: [],
     modules: [],
   },
@@ -59,10 +61,25 @@ export const ContributionMode = ({ bundle, validationIssues, t }: ContributionMo
   const updateDraft = useContributionState((state) => state.updateDraft);
   const resetDraft = useContributionState((state) => state.resetDraft);
   const baseBundle = useUniverseState((state) => state.baseBundle);
+  const manifests = useUniverseState((state) => state.manifests);
   const refreshContributionPreview = useUniverseState((state) => state.refreshContributionPreview);
 
   const patchDraft = (patch: Partial<Omit<ContributionDraft, 'universeId'>>) => {
     updateDraft(bundle.manifest.id, patch);
+    queueMicrotask(refreshContributionPreview);
+  };
+
+  const moveModule = (module: ContributionDraft['modules'][number], originalId: string, targetUniverseId: string) => {
+    updateDraft(bundle.manifest.id, {
+      modules: (draft.modules ?? []).filter((candidate) => candidate.id !== originalId && candidate.id !== module.id),
+    });
+    const targetDraft = useContributionState.getState().getDraft(targetUniverseId) ?? emptyDraft(targetUniverseId);
+    updateDraft(targetUniverseId, {
+      modules: [
+        { ...module, universe: targetUniverseId },
+        ...(targetDraft.modules ?? []).filter((candidate) => candidate.id !== originalId && candidate.id !== module.id),
+      ],
+    });
     queueMicrotask(refreshContributionPreview);
   };
 
@@ -86,7 +103,15 @@ export const ContributionMode = ({ bundle, validationIssues, t }: ContributionMo
       </div>
 
       <section className="grid gap-4">
-        <ModuleEditor bundle={baseBundle ?? bundle} draft={draft} issues={validationIssues} onPatch={patchDraft} t={t} />
+        <ModuleEditor
+          bundle={baseBundle ?? bundle}
+          draft={draft}
+          issues={validationIssues}
+          onMoveModule={moveModule}
+          onPatch={patchDraft}
+          t={t}
+          universeIds={manifests.map((manifest) => manifest.id)}
+        />
       </section>
     </section>
   );

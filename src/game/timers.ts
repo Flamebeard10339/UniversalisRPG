@@ -38,6 +38,7 @@ const EMPTY_CONTEXT: ActionResolutionContext = {
   effects: [],
   interactionTypes: [],
   enemies: [],
+  dropTables: [],
   dialogues: [],
 };
 
@@ -1145,7 +1146,7 @@ const applyRewards = (
   context: ActionResolutionContext,
   now: number,
   random: () => number = Math.random,
-) => rollRewards(rewards, random).reduce((nextState, reward) => {
+) => rollRewards(rewards, random, context.dropTables ?? []).reduce((nextState, reward) => {
   if (reward.kind === 'skillXp') {
     return applyActionResult(nextState, { kind: 'skill-xp', skillId: reward.skillId, amount: reward.amount }, context, now);
   }
@@ -1165,7 +1166,7 @@ const rollAndApplyRewards = (
   now: number,
   random: () => number = Math.random,
 ) => {
-  const rolled = rollRewards(rewards, random);
+  const rolled = rollRewards(rewards, random, context.dropTables ?? []);
   return {
     rewards: rolled,
     state: rolled.reduce((nextState, reward) => {

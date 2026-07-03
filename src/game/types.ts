@@ -109,8 +109,7 @@ export type Reward =
     }
   | {
       kind: 'dropTable';
-      mode: 'independent' | 'dependent';
-      drops: DropTableEntry[];
+      dropTableId: string;
     };
 
 export type ConcreteReward = Exclude<Reward, { kind: 'dropTable' }> & { amount: number };
@@ -118,6 +117,12 @@ export type ConcreteReward = Exclude<Reward, { kind: 'dropTable' }> & { amount: 
 export type DropTableEntry = {
   weight: number;
   reward: Reward;
+};
+
+export type DropTableDefinition = {
+  id: string;
+  mode: 'independent' | 'dependent';
+  drops: DropTableEntry[];
 };
 
 export type ExperienceEventKind =
@@ -319,6 +324,7 @@ export type ContentBundle = {
   effects: EffectDefinition[];
   interactionTypes: InteractionTypeDefinition[];
   enemies: EnemyDefinition[];
+  dropTables?: DropTableDefinition[];
   dialogues?: DialogueDefinition[];
   locales: Record<string, LocaleDictionary>;
   modules?: ContentModule[];
@@ -339,6 +345,7 @@ export type ModuleDataSectionObject = {
   effects?: EffectDefinition[];
   interactionTypes?: InteractionTypeDefinition[];
   enemies?: EnemyDefinition[];
+  dropTables?: DropTableDefinition[];
   dialogues?: DialogueDefinition[];
   displayProfiles?: DisplayProfileDefinition[];
 };
@@ -367,6 +374,7 @@ export type ModuleDataUpdatesObject = ModuleDataSectionObject & {
     effects?: string[];
     interactionTypes?: string[];
     enemies?: string[];
+    dropTables?: string[];
     dialogues?: string[];
     dialogueOptions?: Record<string, string[]>;
     displayProfiles?: string[];
@@ -529,6 +537,7 @@ export type ActionResolutionContext = {
   effects?: EffectDefinition[];
   interactionTypes: InteractionTypeDefinition[];
   enemies: EnemyDefinition[];
+  dropTables?: DropTableDefinition[];
   dialogues?: DialogueDefinition[];
 };
 
@@ -595,6 +604,7 @@ export type ContributionDraft = {
   effects: EffectDefinition[];
   interactionTypes: InteractionTypeDefinition[];
   enemies: EnemyDefinition[];
+  dropTables: DropTableDefinition[];
   dialogues: DialogueDefinition[];
   locales: Record<string, LocaleDictionary>;
   removed: ContributionRemovedIds;
@@ -612,6 +622,7 @@ export type ContributionRemovedIds = {
   effects: string[];
   interactionTypes: string[];
   enemies: string[];
+  dropTables: string[];
   dialogues: string[];
   modules: string[];
 };

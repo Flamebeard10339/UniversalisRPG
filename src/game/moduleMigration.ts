@@ -12,6 +12,7 @@ const contentFileNames = new Set([
   'effects.json',
   'interaction-types.json',
   'enemies.json',
+  'drop-tables.json',
   'dialogues.json',
 ]);
 
@@ -41,6 +42,7 @@ export const migrateMonolithicBundleToCoreModule = (bundle: ContentBundle): Cont
     ...typedRows('effect', bundle.effects),
     ...typedRows('interactionType', bundle.interactionTypes),
     ...typedRows('enemy', bundle.enemies),
+    ...typedRows('dropTable', bundle.dropTables),
     ...typedRows('dialogue', bundle.dialogues),
   ];
 
@@ -77,6 +79,7 @@ export const migrateMonolithicBundleToCoreModule = (bundle: ContentBundle): Cont
     effects: [],
     interactionTypes: [],
     enemies: [],
+    dropTables: [],
     dialogues: [],
     locales: Object.fromEntries(bundle.manifest.locales.map((locale) => [locale, {}])),
     modules,

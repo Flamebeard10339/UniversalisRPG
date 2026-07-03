@@ -11,8 +11,10 @@ type ModuleEditorProps = {
   bundle: ContentBundle;
   draft: ContributionDraft;
   issues: ValidationIssue[];
+  onMoveModule: (module: ContentModule, originalId: string, targetUniverseId: string) => void;
   onPatch: (patch: Partial<Omit<ContributionDraft, 'universeId'>>) => void;
   t: Translator;
+  universeIds: string[];
 };
 
 type EditorTab = 'details' | 'data' | 'data-updates' | 'locale' | 'raw' | 'submit';
@@ -31,6 +33,7 @@ const dataKeys: DataKey[] = [
   'effects',
   'interactionTypes',
   'enemies',
+  'dropTables',
   'dialogues',
   'displayProfiles',
 ];
@@ -48,6 +51,7 @@ const dataKeyTypes: Record<DataKey, string> = {
   effects: 'effect',
   interactionTypes: 'interactionType',
   enemies: 'enemy',
+  dropTables: 'dropTable',
   dialogues: 'dialogue',
   displayProfiles: 'displayProfile',
 };
@@ -69,17 +73,20 @@ const removeTargets: RemoveTarget[] = [
   'effects',
   'interactionTypes',
   'enemies',
+  'dropTables',
   'dialogues',
   'dialogueOptions',
   'displayProfiles',
   'locales',
 ];
 
+const tableDataKeys = new Set<DataKey>(['edges', 'skills', 'stats', 'items', 'flags', 'interactionTypes']);
+
 const uniqueById = <T extends { id: string }>(items: T[]) => [...new Map(items.map((item) => [item.id, item])).values()];
 const uniquePacksById = (packs: ContentModulePack[]) => uniqueById(packs);
 const toModuleId = (value: string) => value.trim().toLowerCase().replace(/[^a-z0-9.-]+/g, '-').replace(/^-+|-+$/g, '') || 'new-module';
-const dependencyString = (module: ContentModule) => (module.dependencies ?? []).join(', ');
-const dependenciesFromString = (value: string) => value.split(/[\n,]/).map((item) => item.trim()).filter(Boolean);
+const dependencyListString = (module: ContentModule) => (module.dependencies ?? []).join('\n');
+const dependenciesFromListString = (value: string) => value.split(/\n/).map((item) => item.trim()).filter(Boolean);
 const serializeModule = (module: ContentModule) => btoa(unescape(encodeURIComponent(JSON.stringify(module))));
 const deserializeModule = (value: string) => {
   const trimmed = value.trim();
@@ -201,6 +208,7 @@ const bundleForModuleEditing = (bundle: ContentBundle, module: ContentModule, mo
     effects: mergeById(bundle.effects, data.effects, updates.effects),
     interactionTypes: mergeById(bundle.interactionTypes, data.interactionTypes, updates.interactionTypes),
     enemies: mergeById(bundle.enemies, data.enemies, updates.enemies),
+    dropTables: mergeById(bundle.dropTables ?? [], data.dropTables, updates.dropTables),
     dialogues: mergeById(bundle.dialogues ?? [], data.dialogues, updates.dialogues),
     modules: uniqueById([module, ...modules]),
   };
@@ -248,12 +256,13 @@ const ModuleLocalizationEditor = ({
   const [lang2, setLang2] = useState(locales.find((locale) => locale !== lang1) ?? '');
   const [missingOnly, setMissingOnly] = useState(true);
   const [search, setSearch] = useState('');
+  const [focusedLocaleKey, setFocusedLocaleKey] = useState<string | null>(null);
   const keys = useMemo(() => collectModuleLocalizationKeys(module), [module]);
   const mergedLocales = useMemo(() => moduleBaseLocales(bundle, module, lang1, lang2), [bundle, module, lang1, lang2]);
   const visibleKeys = keys.filter((key) => {
     const matchesSearch = search.trim().length === 0 || key.toLowerCase().includes(search.trim().toLowerCase());
     const missing = !mergedLocales[lang1]?.[key] || (lang2 ? !mergedLocales[lang2]?.[key] : false);
-    return matchesSearch && (!missingOnly || missing);
+    return matchesSearch && (!missingOnly || missing || focusedLocaleKey === key);
   });
 
   const updateValue = (locale: string, key: string, value: string) => {
@@ -304,8 +313,8 @@ const ModuleLocalizationEditor = ({
             {visibleKeys.map((key) => (
               <tr className="border-b border-slate-800 last:border-0" key={key}>
                 <td className="align-top px-3 py-2 font-mono text-xs text-slate-400">{key}</td>
-                <td className="px-3 py-2"><textarea className="min-h-16 w-full rounded bg-slate-950 p-2 text-sm text-slate-100" onChange={(event) => updateValue(lang1, key, event.target.value)} readOnly={readOnly} value={mergedLocales[lang1]?.[key] ?? ''} /></td>
-                {lang2 && <td className="px-3 py-2"><textarea className="min-h-16 w-full rounded bg-slate-950 p-2 text-sm text-slate-100" onChange={(event) => updateValue(lang2, key, event.target.value)} readOnly={readOnly} value={mergedLocales[lang2]?.[key] ?? ''} /></td>}
+                <td className="px-3 py-2"><textarea className="min-h-16 w-full rounded bg-slate-950 p-2 text-sm text-slate-100" onBlur={() => setFocusedLocaleKey(null)} onChange={(event) => updateValue(lang1, key, event.target.value)} onFocus={() => setFocusedLocaleKey(key)} readOnly={readOnly} value={mergedLocales[lang1]?.[key] ?? ''} /></td>
+                {lang2 && <td className="px-3 py-2"><textarea className="min-h-16 w-full rounded bg-slate-950 p-2 text-sm text-slate-100" onBlur={() => setFocusedLocaleKey(null)} onChange={(event) => updateValue(lang2, key, event.target.value)} onFocus={() => setFocusedLocaleKey(key)} readOnly={readOnly} value={mergedLocales[lang2]?.[key] ?? ''} /></td>}
               </tr>
             ))}
           </tbody>
@@ -361,6 +370,8 @@ const DataRows = ({
   t: Translator;
 }) => {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+  const [groupFilters, setGroupFilters] = useState<Record<string, string>>({});
   const [pendingRows, setPendingRows] = useState(0);
   const [pendingRemovals, setPendingRemovals] = useState(0);
   const rawSection = sectionName === 'data' ? module.data : module['data-updates'];
@@ -406,6 +417,27 @@ const DataRows = ({
     : target === 'locales'
       ? t('contribution.module.removeLocales')
       : t(`contribution.data.${target}`, target);
+  const toggleGroup = (key: string) => setCollapsedGroups((current) => {
+    const next = new Set(current);
+    if (next.has(key)) next.delete(key);
+    else next.add(key);
+    return next;
+  });
+  const addRowToGroup = (key: DataKey) => {
+    saveSection(updateArray(section, key, [...((section[key] as StructuredValue[] | undefined) ?? []), createDataItem(editorBundle, key)]));
+  };
+  const filteredRowsForKey = (key: DataKey) => {
+    const filter = (groupFilters[key] ?? '').trim().toLowerCase();
+    const values = section[key];
+    if (!Array.isArray(values)) return [];
+    return values
+      .map((value, index) => ({ key, index, value: value as StructuredValue }))
+      .filter((row) => {
+        if (!filter) return true;
+        const record = row.value && typeof row.value === 'object' && !Array.isArray(row.value) ? row.value : {};
+        return String(record.id ?? '').toLowerCase().includes(filter);
+      });
+  };
 
   return (
     <section className="grid gap-2 rounded border border-slate-700 p-3">
@@ -448,42 +480,77 @@ const DataRows = ({
           {!readOnly && <button className="rounded border border-rose-500 px-2 py-1.5 text-sm font-semibold text-rose-200" onClick={() => saveRemoval(index, undefined)} type="button">{t('structured.remove')}</button>}
         </div>
       ))}
-      {rows.map((row) => {
-        const rowKey = `${row.key}-${row.index}`;
-        const record = row.value && typeof row.value === 'object' && !Array.isArray(row.value) ? row.value : {};
-        const isExpanded = expanded.has(rowKey);
+      {dataKeys.filter((key) => ((section[key] as StructuredValue[] | undefined) ?? []).length > 0).map((key) => {
+        const groupRows = filteredRowsForKey(key);
+        const groupKey = `${sectionName}-${key}`;
+        const collapsed = collapsedGroups.has(groupKey);
+        const schema = fieldSchema(editorBundle, key);
+        const item = typeof schema.item === 'function' ? schema.item() : schema.item;
+        const columns = schema.columns ?? (item.kind === 'object' ? Object.keys(item.fields).filter((field) => field !== 'type') : ['id']);
         return (
-          <div className="grid gap-2 rounded border border-slate-800 bg-slate-950 p-2" key={rowKey}>
-            <button className="grid items-center gap-2 text-left md:grid-cols-[1fr_12rem_auto]" onClick={() => setExpanded((current) => { const next = new Set(current); if (next.has(rowKey)) next.delete(rowKey); else next.add(rowKey); return next; })} type="button">
-              <span className="min-w-0 truncate text-sm font-semibold text-slate-100">{String(record.id ?? '') || t('structured.empty')}</span>
-              <span className="text-sm text-slate-400">{t(`contribution.data.${row.key}`)}</span>
-              {!readOnly && <span className="rounded border border-rose-500 px-2 py-1.5 text-center text-sm font-semibold text-rose-200" onClick={(event) => { event.stopPropagation(); saveRow(row.key, row.index, undefined); }}>{t('structured.remove')}</span>}
-            </button>
-            {isExpanded && (
-              <div className="grid gap-3 border-t border-slate-800 pt-2">
-                {!readOnly && (
-                  <label className="grid max-w-xs gap-1 text-xs text-slate-400">
-                    <span>{t('contribution.modules.selectType')}</span>
-                    <select className="rounded bg-slate-900 px-2 py-1.5 text-sm text-slate-100" onChange={(event) => moveRow(row.key, row.index, event.target.value as DataKey)} value={row.key}>
-                      {dataKeys.map((key) => <option key={key} value={key}>{t(`contribution.data.${key}`)}</option>)}
-                    </select>
-                  </label>
-                )}
-                {readOnly ? (
-                  <textarea className="min-h-56 rounded bg-slate-900 p-3 font-mono text-xs text-slate-300" readOnly value={JSON.stringify(row.value, null, 2)} />
-                ) : (
-                  <StructuredDataEditor onChange={(value) => saveRow(row.key, row.index, value)} schema={itemSchema(editorBundle, row.key)} t={t} value={row.value} />
-                )}
+          <section className="grid gap-2 rounded border border-slate-800 bg-slate-950 p-2" key={key}>
+            <div className="flex flex-wrap items-center gap-2">
+              <button className="mr-auto text-left text-sm font-semibold text-slate-100" onClick={() => toggleGroup(groupKey)} type="button">
+                {t(`contribution.data.${key}`)} <span className="text-xs font-normal text-slate-500">({((section[key] as StructuredValue[] | undefined) ?? []).length})</span>
+              </button>
+              <input className="w-48 rounded bg-slate-900 px-2 py-1.5 text-sm text-slate-100" onChange={(event) => setGroupFilters((filters) => ({ ...filters, [key]: event.target.value }))} placeholder={t('contribution.modules.filterById')} value={groupFilters[key] ?? ''} />
+              {!readOnly && <button className="rounded bg-cyan-400 px-2 py-1.5 text-sm font-semibold text-slate-950" onClick={() => addRowToGroup(key)} type="button">{t('structured.addRow')}</button>}
+            </div>
+            {!collapsed && tableDataKeys.has(key) && item.kind === 'object' ? (
+              <div className="overflow-x-auto">
+                <table className="min-w-full border-collapse text-sm">
+                  <thead className="text-left text-xs uppercase text-slate-500"><tr>{columns.map((column) => <th className="px-2 py-1" key={column}>{t(item.fields[column]?.label ?? column)}</th>)}{!readOnly && <th className="px-2 py-1">{t('structured.remove')}</th>}</tr></thead>
+                  <tbody>{groupRows.map((row) => {
+                    const record = row.value && typeof row.value === 'object' && !Array.isArray(row.value) ? row.value : {};
+                    return (
+                      <tr className="border-t border-slate-800 align-top" key={`${key}-${row.index}`}>
+                        {columns.map((column) => <td className="px-2 py-2" key={column}><StructuredDataEditor onChange={(value) => saveRow(key, row.index, { ...record, [column]: value } as StructuredValue)} schema={item.fields[column]?.schema ?? { kind: 'inferred' }} t={t} value={record[column]} /></td>)}
+                        {!readOnly && <td className="px-2 py-2"><button className="rounded border border-rose-500 px-2 py-1.5 text-sm font-semibold text-rose-200" onClick={() => saveRow(key, row.index, undefined)} type="button">{t('structured.remove')}</button></td>}
+                      </tr>
+                    );
+                  })}</tbody>
+                </table>
               </div>
-            )}
-          </div>
+            ) : null}
+            {!collapsed && !tableDataKeys.has(key) ? groupRows.map((row) => {
+              const rowKey = `${row.key}-${row.index}`;
+              const record = row.value && typeof row.value === 'object' && !Array.isArray(row.value) ? row.value : {};
+              const isExpanded = expanded.has(rowKey);
+              return (
+                <div className="grid gap-2 rounded border border-slate-800 bg-slate-900/50 p-2" key={rowKey}>
+                  <button className="grid items-center gap-2 text-left md:grid-cols-[1fr_12rem_auto]" onClick={() => setExpanded((current) => { const next = new Set(current); if (next.has(rowKey)) next.delete(rowKey); else next.add(rowKey); return next; })} type="button">
+                    <span className="min-w-0 truncate text-sm font-semibold text-slate-100">{String(record.id ?? '') || t('structured.empty')}</span>
+                    <span className="text-sm text-slate-400">{t(`contribution.data.${row.key}`)}</span>
+                    {!readOnly && <span className="rounded border border-rose-500 px-2 py-1.5 text-center text-sm font-semibold text-rose-200" onClick={(event) => { event.stopPropagation(); saveRow(row.key, row.index, undefined); }}>{t('structured.remove')}</span>}
+                  </button>
+                  {isExpanded && (
+                    <div className="grid gap-3 border-t border-slate-800 pt-2">
+                      {!readOnly && (
+                        <label className="grid max-w-xs gap-1 text-xs text-slate-400">
+                          <span>{t('contribution.modules.selectType')}</span>
+                          <select className="rounded bg-slate-900 px-2 py-1.5 text-sm text-slate-100" onChange={(event) => moveRow(row.key, row.index, event.target.value as DataKey)} value={row.key}>
+                            {dataKeys.map((candidateKey) => <option key={candidateKey} value={candidateKey}>{t(`contribution.data.${candidateKey}`)}</option>)}
+                          </select>
+                        </label>
+                      )}
+                      {readOnly ? (
+                        <textarea className="min-h-56 rounded bg-slate-900 p-3 font-mono text-xs text-slate-300" readOnly value={JSON.stringify(row.value, null, 2)} />
+                      ) : (
+                        <StructuredDataEditor onChange={(value) => saveRow(row.key, row.index, value)} schema={itemSchema(editorBundle, row.key)} t={t} value={row.value} />
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            }) : null}
+          </section>
         );
       })}
     </section>
   );
 };
 
-export const ModuleEditor = ({ bundle, draft, issues, onPatch, t }: ModuleEditorProps) => {
+export const ModuleEditor = ({ bundle, draft, issues, onMoveModule, onPatch, t, universeIds }: ModuleEditorProps) => {
   const [filter, setFilter] = useState('');
   const [sortMode, setSortMode] = useState<'id' | 'author'>('id');
   const [selectedModuleId, setSelectedModuleId] = useState<string | null>(null);
@@ -507,11 +574,20 @@ export const ModuleEditor = ({ bundle, draft, issues, onPatch, t }: ModuleEditor
   const moduleIds = new Set(allModules.map((module) => module.id));
   const isLocal = selectedModule ? localIds.has(selectedModule.id) : false;
   const selectedModuleIssues = selectedModule ? issues.filter((issue) => moduleIdFromIssue(issue) === selectedModule.id) : [];
+  const submitIssues = [
+    ...selectedModuleIssues,
+    ...(!draft.notes.trim() ? [{ severity: 'error' as const, path: 'contribution.notes', message: 'validation.contributorNotesRequired' }] : []),
+  ];
   const rawJson = selectedModule ? JSON.stringify(selectedModule, null, 2) : '';
   const serialization = selectedModule ? serializeModule(selectedModule) : '';
 
   const saveModule = (module: ContentModule, originalId = module.id) => {
-    const normalized = { ...module, id: toModuleId(module.id), universe: bundle.manifest.id };
+    const normalized = { ...module, id: toModuleId(module.id), universe: module.universe || bundle.manifest.id };
+    if (isLocal && normalized.universe !== bundle.manifest.id) {
+      onMoveModule(normalized, originalId, normalized.universe);
+      setSelectedModuleId(null);
+      return;
+    }
     onPatch({
       modules: upsertModule(draft.modules ?? [], normalized, originalId),
       removed: { ...draft.removed, modules: (draft.removed?.modules ?? []).filter((id) => id !== normalized.id) },
@@ -539,7 +615,7 @@ export const ModuleEditor = ({ bundle, draft, issues, onPatch, t }: ModuleEditor
     targetUniverseId: draft.universeId,
     targetModuleId: selectedModule.id,
     notes: draft.notes,
-    validationIssues: selectedModuleIssues,
+    validationIssues: submitIssues,
     t,
     changedFiles: [{ path: moduleFilePath(selectedModule), json: selectedModule }],
   } : null;
@@ -584,8 +660,14 @@ export const ModuleEditor = ({ bundle, draft, issues, onPatch, t }: ModuleEditor
               <section className={`grid gap-3 rounded border p-3 ${moduleDetailProblems(selectedModule).length || selectedModuleIssues.length ? 'border-rose-800 bg-rose-950/10' : 'border-slate-700'}`}>
                 {selectedModuleIssues.length > 0 && <ul className="grid gap-1 text-sm">{selectedModuleIssues.map((issue) => <li className={issue.severity === 'error' ? 'text-rose-200' : 'text-amber-200'} key={`${issue.path}-${issue.message}`}><span className="font-semibold">{issue.severity}</span>: {issue.path} - {t(issue.message, issue.params)}</li>)}</ul>}
                 <div className="grid gap-2 md:grid-cols-[9rem_1fr]">
-                  {(['id', 'version', 'universe', 'author', 'game_version'] as const).map((key) => <label className="contents" key={key}><span className="self-center text-sm text-slate-400">{t(key === 'id' ? 'contribution.column.id' : key === 'game_version' ? 'contribution.module.gameVersion' : `contribution.module.${key}`)}</span><input className="rounded bg-slate-950 px-3 py-2 text-sm text-slate-100" onChange={(event) => updateSelected({ [key]: event.target.value })} readOnly={!isLocal || key === 'universe'} value={String(selectedModule[key])} /></label>)}
-                  <label className="contents"><span className="self-center text-sm text-slate-400">{t('contribution.module.dependencies')}</span><input className="rounded bg-slate-950 px-3 py-2 text-sm text-slate-100" list="module-dependency-ids" onChange={(event) => updateSelected({ dependencies: dependenciesFromString(event.target.value) })} readOnly={!isLocal} value={dependencyString(selectedModule)} /></label>
+                  <label className="contents"><span className="self-center text-sm text-slate-400">{t('contribution.column.id')}</span><input className="rounded bg-slate-950 px-3 py-2 text-sm text-slate-100" onChange={(event) => updateSelected({ id: toModuleId(event.target.value) })} readOnly={!isLocal} value={selectedModule.id} /></label>
+                  <label className="contents"><span className="self-center text-sm text-slate-400">{t('contribution.module.version')}</span><input className="rounded bg-slate-950 px-3 py-2 text-sm text-slate-100" onChange={(event) => updateSelected({ version: event.target.value })} readOnly={!isLocal} value={selectedModule.version} /></label>
+                  <label className="contents"><span className="self-center text-sm text-slate-400">{t('contribution.module.universe')}</span><select className="rounded bg-slate-950 px-3 py-2 text-sm text-slate-100" disabled={!isLocal} onChange={(event) => updateSelected({ universe: event.target.value })} value={selectedModule.universe}>
+                    {Array.from(new Set([selectedModule.universe, bundle.manifest.id, ...universeIds])).filter(Boolean).map((universeId) => <option key={universeId} value={universeId}>{universeId}</option>)}
+                  </select></label>
+                  <label className="contents"><span className="self-center text-sm text-slate-400">{t('contribution.module.author')}</span><input className="rounded bg-slate-950 px-3 py-2 text-sm text-slate-100" onChange={(event) => updateSelected({ author: event.target.value })} readOnly={!isLocal} value={selectedModule.author} /></label>
+                  <label className="contents"><span className="self-center text-sm text-slate-400">{t('contribution.module.gameVersion')}</span><input className="rounded bg-slate-950 px-3 py-2 text-sm text-slate-100" onChange={(event) => updateSelected({ game_version: event.target.value })} readOnly={!isLocal} value={String(selectedModule.game_version)} /></label>
+                  <label className="contents"><span className="self-start pt-2 text-sm text-slate-400">{t('contribution.module.dependencies')}</span><textarea className="min-h-24 rounded bg-slate-950 px-3 py-2 text-sm text-slate-100" onChange={(event) => updateSelected({ dependencies: dependenciesFromListString(event.target.value) })} placeholder={t('contribution.modules.dependenciesPlaceholder')} readOnly={!isLocal} value={dependencyListString(selectedModule)} /></label>
                 </div>
                 <datalist id="module-dependency-ids">{allModules.filter((module) => module.id !== selectedModule.id).map((module) => <option key={module.id} value={module.id} />)}</datalist>
                 {isLocal && <div className="grid gap-2 border-t border-slate-800 pt-3"><p className="text-xs text-amber-200">{t('contribution.modules.importWarning')}</p><textarea className="min-h-24 rounded bg-slate-950 p-3 text-xs text-slate-200" onChange={(event) => { setImportText(event.target.value); setImportError(false); }} placeholder={t('contribution.modules.importPlaceholder')} value={importText} />{importError && <p className="text-xs text-rose-300">{t('contribution.modules.importFailed')}</p>}<button className="justify-self-start rounded border border-slate-600 px-3 py-2 text-sm font-semibold text-slate-100" disabled={!importText.trim()} onClick={() => { try { saveModule({ ...deserializeModule(importText), id: selectedModule.id, universe: bundle.manifest.id }, selectedModule.id); setImportText(''); } catch { setImportError(true); } }} type="button">{t('contribution.modules.import')}</button></div>}
@@ -595,7 +677,7 @@ export const ModuleEditor = ({ bundle, draft, issues, onPatch, t }: ModuleEditor
             {editorTab === 'data-updates' && <DataRows bundle={bundle} module={selectedModule} onSave={(module) => saveModule(module, selectedModule.id)} readOnly={!isLocal} sectionName="data-updates" t={t} />}
             {editorTab === 'locale' && <ModuleLocalizationEditor bundle={bundle} module={selectedModule} onSave={(module) => saveModule(module, selectedModule.id)} readOnly={!isLocal} t={t} />}
             {editorTab === 'raw' && <section className="grid gap-3 rounded border border-slate-700 p-3"><button className="justify-self-start rounded border border-slate-600 px-3 py-1.5 text-xs font-semibold text-slate-100" onClick={() => void navigator.clipboard.writeText(serialization)} type="button">{t('contribution.modules.copySerialization')}</button><textarea className="min-h-24 rounded bg-slate-950 p-3 font-mono text-xs text-slate-300" readOnly value={serialization} /><button className="justify-self-start rounded border border-slate-600 px-3 py-1.5 text-xs font-semibold text-slate-100" onClick={() => void navigator.clipboard.writeText(rawJson)} type="button">{t('contribution.modules.copyJson')}</button><textarea className="min-h-72 rounded bg-slate-950 p-3 font-mono text-xs text-slate-300" readOnly value={rawJson} /></section>}
-            {editorTab === 'submit' && submitPackage && <section className="grid gap-3 rounded border border-slate-700 p-3"><h5 className="text-sm font-semibold text-slate-100">{t('contribution.github.title')}</h5>{selectedModuleIssues.length === 0 ? <p className="text-sm text-emerald-300">{t('contribution.validation.empty')}</p> : <ul className="grid gap-1 text-sm">{selectedModuleIssues.map((issue) => <li className={issue.severity === 'error' ? 'text-rose-300' : 'text-amber-300'} key={`${issue.path}-${issue.message}`}>{issue.severity}: {issue.path} - {t(issue.message, issue.params)}</li>)}</ul>}<textarea className="min-h-24 rounded bg-slate-950 p-3 text-sm text-slate-200" onChange={(event) => onPatch({ notes: event.target.value })} placeholder={t('contribution.notesPlaceholder')} value={draft.notes} /><div className="flex flex-wrap gap-2"><a className="rounded bg-emerald-400 px-3 py-2 text-sm font-semibold text-slate-950" href={createPrefilledIssueUrl(submitPackage)} rel="noreferrer" target="_blank">{t('contribution.github.open')}</a><button className="rounded border border-slate-600 px-3 py-2 text-sm font-semibold text-slate-100" onClick={() => void navigator.clipboard.writeText(formatContributionIssueBody(submitPackage))} type="button">{t('contribution.github.copy')}</button></div><textarea className="min-h-56 rounded bg-slate-950 p-3 text-xs text-slate-300" readOnly value={formatContributionIssueBody(submitPackage)} /></section>}
+            {editorTab === 'submit' && submitPackage && <section className="grid gap-3 rounded border border-slate-700 p-3"><h5 className="text-sm font-semibold text-slate-100">{t('contribution.github.title')}</h5>{submitIssues.length === 0 ? <p className="text-sm text-emerald-300">{t('contribution.validation.empty')}</p> : <ul className="grid gap-1 text-sm">{submitIssues.map((issue) => <li className={issue.severity === 'error' ? 'text-rose-300' : 'text-amber-300'} key={`${issue.path}-${issue.message}`}>{issue.severity}: {issue.path} - {t(issue.message, issue.params)}</li>)}</ul>}<textarea className="min-h-24 rounded bg-slate-950 p-3 text-sm text-slate-200" onChange={(event) => onPatch({ notes: event.target.value })} placeholder={t('contribution.notesPlaceholder')} value={draft.notes} /><div className="flex flex-wrap gap-2"><a className="rounded bg-emerald-400 px-3 py-2 text-sm font-semibold text-slate-950" href={createPrefilledIssueUrl(submitPackage)} rel="noreferrer" target="_blank">{t('contribution.github.open')}</a><button className="rounded border border-slate-600 px-3 py-2 text-sm font-semibold text-slate-100" onClick={() => void navigator.clipboard.writeText(formatContributionIssueBody(submitPackage))} type="button">{t('contribution.github.copy')}</button></div><textarea className="min-h-56 rounded bg-slate-950 p-3 text-xs text-slate-300" readOnly value={formatContributionIssueBody(submitPackage)} /></section>}
           </section>
         ) : (
           <p className="rounded bg-slate-950 p-3 text-sm text-slate-500">{t('contribution.modules.empty')}</p>

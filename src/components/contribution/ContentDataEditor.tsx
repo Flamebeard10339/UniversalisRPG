@@ -1,7 +1,7 @@
 import { useRef, useState, type MutableRefObject } from 'react';
 import { edgeId, toKebabInput } from '../../game/contentIds';
 import type { Translator } from '../../game/i18n';
-import type { BasePlayerDefinition, CombatBalanceDefinition, ContentBundle, ContentModule, ContentModulePack, ContributionDraft, ContributionRemovedIds, DialogueDefinition, DisplayProfileDefinition, EffectDefinition, EnemyDefinition, GameAction, InteractionTypeDefinition, ItemDefinition, LocationNode, ResourceDefinition, SkillDefinition, StatDefinition, StateFlagDefinition, TravelEdgeDefinition, UniverseUiSettings } from '../../game/types';
+import type { BasePlayerDefinition, CombatBalanceDefinition, ContentBundle, ContentModule, ContentModulePack, ContributionDraft, ContributionRemovedIds, DialogueDefinition, DisplayProfileDefinition, DropTableDefinition, EffectDefinition, EnemyDefinition, GameAction, InteractionTypeDefinition, ItemDefinition, LocationNode, ResourceDefinition, SkillDefinition, StatDefinition, StateFlagDefinition, TravelEdgeDefinition, UniverseUiSettings } from '../../game/types';
 import { editableModuleJsonFiles } from '../../game/contributionFiles';
 import { ContributionMapEditor } from './ContributionMapEditor';
 import { EnemyDiagnostics } from './EnemyDiagnostics';
@@ -11,7 +11,7 @@ import { getEnemyStat, normalizeEnemyStats } from '../../game/enemies';
 import { resolveUniverseUiSettings } from '../../game/universeSettings';
 import { EdgeFields, LocationFields } from './MapContentFields';
 import { StructuredDataEditor, type StructuredSchema, type StructuredValue } from '../structuredData/StructuredData';
-import { actionSchema, basePlayerSchema, combatBalanceSchema, contentModuleSchema, dialogueSchema, displayProfileSchema, edgeSchema, effectDefinitionSchema, enemyStatsSchema, flagDefinitionSchema, interactionTypeDefinitionSchema, itemDefinitionSchema, locationSchema, modulePackSchema, resourceDefinitionSchema, rewardSchema, skillDefinitionSchema, statDefinitionSchema, universeUiSchema } from '../structuredData/contentSchemas';
+import { actionSchema, basePlayerSchema, combatBalanceSchema, contentModuleSchema, dialogueSchema, displayProfileSchema, dropTableDefinitionSchema, edgeSchema, effectDefinitionSchema, enemyStatsSchema, flagDefinitionSchema, interactionTypeDefinitionSchema, itemDefinitionSchema, locationSchema, modulePackSchema, resourceDefinitionSchema, rewardSchema, skillDefinitionSchema, statDefinitionSchema, universeUiSchema } from '../structuredData/contentSchemas';
 
 type ContentDataEditorProps = {
   activeTab: ContentDataTab;
@@ -71,6 +71,7 @@ const emptyRemoved = (): ContributionRemovedIds => ({
   effects: [],
   interactionTypes: [],
   enemies: [],
+  dropTables: [],
   dialogues: [],
   modules: [],
 });
@@ -123,6 +124,7 @@ export const ContentDataEditor = ({ activeTab, baseBundle, bundle, draft, onPatc
   const effects = layeredRows(draft.effects, baseBundle.effects ?? [], removed.effects, filter);
   const interactionTypes = layeredRows(draft.interactionTypes, baseBundle.interactionTypes ?? [], removed.interactionTypes, filter);
   const enemies = layeredRows(draft.enemies, baseBundle.enemies ?? [], removed.enemies, filter);
+  const dropTables = layeredRows(draft.dropTables, baseBundle.dropTables ?? [], removed.dropTables, filter);
   const dialogues = layeredRows(draft.dialogues, baseBundle.dialogues ?? [], removed.dialogues, filter);
   const basePlayer = draft.basePlayer ?? bundle.manifest.basePlayer ?? { inventory: {} };
   const combatBalance = resolveCombatBalance(draft.combatBalance ?? bundle.manifest.combatBalance);
@@ -132,6 +134,7 @@ export const ContentDataEditor = ({ activeTab, baseBundle, bundle, draft, onPatc
     ...bundle,
     locations: locations.map((row) => row.item),
     edges: edges.map((row) => row.item),
+    dropTables: dropTables.map((row) => row.item),
   };
 
   const unremoveId = (key: DraftListKey, id: string) => ({
@@ -443,6 +446,7 @@ export const ContentDataEditor = ({ activeTab, baseBundle, bundle, draft, onPatc
     { path: 'edges.json', json: edges.map((row) => row.item), schema: { kind: 'array' as const, listMode: 'table' as const, columns: ['id', 'source', 'target', 'travelTimeSeconds'], item: edgeSchema(bundle), createItem: () => ({ id: 'new-edge', source: locations[0]?.item.id ?? '', target: locations[1]?.item.id ?? '', travelTimeSeconds: 1 }) }, onChange: (value: StructuredValue | undefined) => onPatch({ edges: (Array.isArray(value) ? value : []) as unknown as TravelEdgeDefinition[] }) },
     { path: 'actions.json', json: actions.map((row) => row.item), onChange: (value: StructuredValue | undefined) => onPatch({ actions: (Array.isArray(value) ? value : []) as unknown as GameAction[] }) },
     { path: 'dialogues.json', json: dialogues.map((row) => row.item), schema: { kind: 'array' as const, listMode: 'free' as const, item: dialogueSchema(bundle), createItem: () => ({ id: 'new-dialogue', startNodeId: 'start', nodes: [{ id: 'start', textKey: 'dialogue.new-dialogue.start' }] }) }, onChange: (value: StructuredValue | undefined) => onPatch({ dialogues: (Array.isArray(value) ? value : []) as unknown as DialogueDefinition[] }) },
+    { path: 'drop-tables.json', json: dropTables.map((row) => row.item), schema: { kind: 'array' as const, listMode: 'free' as const, item: dropTableDefinitionSchema(bundle), createItem: () => ({ id: 'new-drop-table', mode: 'dependent', drops: [] }) }, onChange: (value: StructuredValue | undefined) => onPatch({ dropTables: (Array.isArray(value) ? value : []) as unknown as DropTableDefinition[] }) },
     ...moduleJsonFiles,
     { path: 'module-packs.json', json: draft.modulePacks, schema: { kind: 'array' as const, listMode: 'free' as const, item: modulePackSchema(bundle), createItem: () => ({ id: 'new-pack', modules: [] }) }, onChange: (value: StructuredValue | undefined) => onPatch({ modulePacks: (Array.isArray(value) ? value : []) as unknown as ContentModulePack[] }) },
     { path: 'skills.json', json: skills.map((row) => row.item), schema: { kind: 'array' as const, listMode: 'table' as const, columns: ['id', 'maxLevel', 'statId', 'addedPerLevel', 'increasedPerLevel'], item: skillDefinitionSchema(bundle), createItem: () => ({ id: 'new-skill', maxLevel: 100 }) }, onChange: (value: StructuredValue | undefined) => onPatch({ skills: (Array.isArray(value) ? value : []) as unknown as SkillDefinition[] }) },

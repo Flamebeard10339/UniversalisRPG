@@ -4,6 +4,7 @@ import type {
   Condition,
   ActionResult,
   DialogueDefinition,
+  DropTableDefinition,
   EnemyDefinition,
   EffectDefinition,
   GameAction,
@@ -185,11 +186,7 @@ const rewardAmountPositive = (amount: RewardAmount) =>
 
 const validateRewardShape = (value: unknown): value is Reward => {
   if (!isRecord(value) || !hasString(value, 'kind')) return false;
-  if (value.kind === 'dropTable') {
-    return (value.mode === 'independent' || value.mode === 'dependent')
-      && Array.isArray(value.drops)
-      && value.drops.every((drop) => isRecord(drop) && hasNumber(drop, 'weight') && validateRewardShape(drop.reward));
-  }
+  if (value.kind === 'dropTable') return hasString(value, 'dropTableId');
   return validateRewardAmountShape(value.amount)
     && ((value.kind === 'skillXp' && hasString(value, 'skillId'))
       || (value.kind === 'resource' && hasString(value, 'resourceId'))
@@ -341,7 +338,18 @@ const validateEnemiesShape = (enemies: unknown): enemies is EnemyDefinition[] =>
         hasString(enemy, 'id') &&
         hasString(enemy, 'interactionTypeId') &&
         (enemy.stats === undefined || (isRecord(enemy.stats) && Object.values(enemy.stats).every((value) => typeof value === 'number' && Number.isFinite(value)))) &&
-        Array.isArray(enemy.rewards),
+        Array.isArray(enemy.rewards) && enemy.rewards.every(validateRewardShape),
+    ));
+
+const validateDropTablesShape = (dropTables: unknown): dropTables is DropTableDefinition[] =>
+  dropTables === undefined ||
+  (Array.isArray(dropTables) &&
+    dropTables.every((dropTable) =>
+      isRecord(dropTable) &&
+      hasString(dropTable, 'id') &&
+      (dropTable.mode === 'independent' || dropTable.mode === 'dependent') &&
+      Array.isArray(dropTable.drops) &&
+      dropTable.drops.every((drop) => isRecord(drop) && hasNumber(drop, 'weight') && validateRewardShape(drop.reward)),
     ));
 
 const validateDialogueOptionShape = (value: unknown) => isRecord(value)
@@ -438,6 +446,10 @@ export const validateContentShape = (bundle: Partial<ContentBundle>) => {
     issues.push(error('enemies.json', 'validation.enemiesShape'));
   }
 
+  if (!validateDropTablesShape(bundle.dropTables)) {
+    issues.push(error('drop-tables.json', 'validation.dropTablesShape'));
+  }
+
   if (!validateDialoguesShape(bundle.dialogues)) {
     issues.push(error('dialogues.json', 'validation.dialoguesShape'));
   }
@@ -472,6 +484,7 @@ export const validateContentReferences = (bundle: ContentBundle) => {
     ...findDuplicateIds(bundle.effects ?? [], 'effects'),
     ...findDuplicateIds(bundle.interactionTypes ?? [], 'interactionTypes'),
     ...findDuplicateIds(bundle.enemies ?? [], 'enemies'),
+    ...findDuplicateIds(bundle.dropTables ?? [], 'dropTables'),
     ...findDuplicateIds(bundle.dialogues ?? [], 'dialogues'),
   ];
 
@@ -483,6 +496,8 @@ export const validateContentReferences = (bundle: ContentBundle) => {
   const resourceIds = new Set((bundle.resourceDefinitions ?? []).map((resource) => resource.id));
   const interactionTypeIds = new Set((bundle.interactionTypes ?? []).map((interactionType) => interactionType.id));
   const enemyIds = new Set((bundle.enemies ?? []).map((enemy) => enemy.id));
+  const dropTableIds = new Set((bundle.dropTables ?? []).map((dropTable) => dropTable.id));
+  const dropTables = new Map((bundle.dropTables ?? []).map((dropTable) => [dropTable.id, dropTable]));
   const dialogueIds = new Set((bundle.dialogues ?? []).map((dialogue) => dialogue.id));
   const locale = bundle.locales[bundle.manifest.locales[0]] ?? {};
 
@@ -511,13 +526,25 @@ export const validateContentReferences = (bundle: ContentBundle) => {
     }
   };
 
-  const validateRewardReferences = (reward: Reward, path: string) => {
+  const validateDropTableEntries = (dropTable: DropTableDefinition, path: string, stack: string[]) => {
+    if (dropTable.drops.length === 0) issues.push(error(path, 'validation.dropTableEmpty'));
+    for (const [index, drop] of dropTable.drops.entries()) {
+      if (drop.weight <= 0) issues.push(error(`${path}.drops.${index}.weight`, 'validation.dropTableWeightPositive'));
+      validateRewardReferences(drop.reward, `${path}.drops.${index}.reward`, stack);
+    }
+  };
+
+  const validateRewardReferences = (reward: Reward, path: string, stack: string[] = []) => {
     if (reward.kind === 'dropTable') {
-      if (reward.drops.length === 0) issues.push(error(path, 'validation.dropTableEmpty'));
-      for (const [index, drop] of reward.drops.entries()) {
-        if (drop.weight <= 0) issues.push(error(`${path}.drops.${index}.weight`, 'validation.dropTableWeightPositive'));
-        validateRewardReferences(drop.reward, `${path}.drops.${index}.reward`);
+      if (!dropTableIds.has(reward.dropTableId)) {
+        issues.push(error(path, 'validation.unknownDropTable', { id: reward.dropTableId }));
+        return;
       }
+      if (stack.includes(reward.dropTableId)) {
+        issues.push(error(path, 'validation.dropTableCycle', { id: reward.dropTableId }));
+        return;
+      }
+      validateDropTableEntries(dropTables.get(reward.dropTableId)!, `dropTables.${reward.dropTableId}`, [...stack, reward.dropTableId]);
       return;
     }
     if (reward.kind === 'skillXp' && !skillIds.has(reward.skillId)) {
@@ -613,6 +640,11 @@ export const validateContentReferences = (bundle: ContentBundle) => {
       if (result.kind === 'dialogue' && !dialogueIds.has(result.dialogueId)) issues.push(error(path, 'validation.unknownDialogue', { id: result.dialogueId }));
       if ('amount' in result && result.amount === 0) issues.push(error(path, 'validation.resultAmountNonZero'));
     }
+  }
+
+  for (const dropTable of bundle.dropTables ?? []) {
+    if (!isKebabCaseId(dropTable.id)) issues.push(error(`dropTables.${dropTable.id}.id`, 'validation.dropTableIdKebab'));
+    validateDropTableEntries(dropTable, `dropTables.${dropTable.id}`, [dropTable.id]);
   }
 
   const validateResultReferences = (result: ActionResult, path: string) => {
@@ -874,6 +906,7 @@ export const mergeDraftIntoBundle = (bundle: ContentBundle, draft: ContributionD
     effects: mergeById(removeById(bundle.effects ?? [], draft.removed?.effects ?? []), draft.effects ?? []),
     interactionTypes: mergeById(removeById(bundle.interactionTypes ?? [], draft.removed?.interactionTypes ?? []), draft.interactionTypes ?? []),
     enemies: mergeById(removeById(bundle.enemies ?? [], draft.removed?.enemies ?? []), draft.enemies ?? []),
+    dropTables: mergeById(removeById(bundle.dropTables ?? [], draft.removed?.dropTables ?? []), draft.dropTables ?? []),
     dialogues: mergeById(removeById(bundle.dialogues ?? [], draft.removed?.dialogues ?? []), draft.dialogues ?? []),
     locales: mergeLocales(bundle.locales, draft.locales),
   };

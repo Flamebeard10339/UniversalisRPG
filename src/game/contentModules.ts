@@ -141,6 +141,8 @@ const moduleDataTypeToKey: Record<string, keyof ModuleDataSectionObject> = {
   dialogues: 'dialogues',
   displayProfile: 'displayProfiles',
   displayProfiles: 'displayProfiles',
+  dropTable: 'dropTables',
+  dropTables: 'dropTables',
   edge: 'edges',
   edges: 'edges',
   effect: 'effects',
@@ -203,6 +205,7 @@ const removableModuleDataKeys = new Set([
   'effects',
   'interactionTypes',
   'enemies',
+  'dropTables',
   'dialogues',
   'dialogueOptions',
   'displayProfiles',
@@ -280,6 +283,7 @@ const emptySectionBundle = (bundle: ContentBundle, section?: ModuleDataSection):
   effects: normalizeModuleDataSection(section).effects ?? [],
   interactionTypes: normalizeModuleDataSection(section).interactionTypes ?? [],
   enemies: normalizeModuleDataSection(section).enemies ?? [],
+  dropTables: normalizeModuleDataSection(section).dropTables ?? [],
   dialogues: normalizeModuleDataSection(section).dialogues ?? [],
   locales: bundle.locales,
 });
@@ -555,6 +559,7 @@ const applyDataSection = (bundle: ContentBundle, data?: ModuleDataSection): Cont
     effects: mergeById(bundle.effects ?? [], section.effects),
     interactionTypes: mergeById(bundle.interactionTypes ?? [], section.interactionTypes),
     enemies: mergeById(bundle.enemies ?? [], section.enemies),
+    dropTables: mergeById(bundle.dropTables ?? [], section.dropTables),
     dialogues: mergeById(bundle.dialogues ?? [], section.dialogues),
   };
 };
@@ -579,6 +584,7 @@ const applyDataUpdates = (bundle: ContentBundle, updates?: ModuleDataUpdates): C
     effects: removeById(bundle.effects ?? [], removed.effects),
     interactionTypes: removeById(bundle.interactionTypes ?? [], removed.interactionTypes),
     enemies: removeById(bundle.enemies ?? [], removed.enemies),
+    dropTables: removeById(bundle.dropTables ?? [], removed.dropTables),
     dialogues: removeDialogueOptions(removeById(bundle.dialogues ?? [], removed.dialogues), removed.dialogueOptions),
     locales: mergeLocales(bundle.locales, updateObject?.locale, removed.locales),
   };

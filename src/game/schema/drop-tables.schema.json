@@ -1,0 +1,86 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://universalis-rpg.local/schema/drop-tables.schema.json",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "required": ["id", "mode", "drops"],
+    "additionalProperties": false,
+    "properties": {
+      "id": { "type": "string", "minLength": 1 },
+      "mode": { "enum": ["independent", "dependent"] },
+      "drops": {
+        "type": "array",
+        "items": { "$ref": "#/$defs/dropTableEntry" }
+      }
+    }
+  },
+  "$defs": {
+    "reward": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["kind", "skillId", "amount"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "const": "skillXp" },
+            "skillId": { "type": "string", "minLength": 1 },
+            "amount": { "$ref": "#/$defs/rewardAmount" }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["kind", "resourceId", "amount"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "const": "resource" },
+            "resourceId": { "type": "string", "minLength": 1 },
+            "amount": { "$ref": "#/$defs/rewardAmount" }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["kind", "itemId", "amount"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "const": "item" },
+            "itemId": { "type": "string", "minLength": 1 },
+            "amount": { "$ref": "#/$defs/rewardAmount" }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["kind", "dropTableId"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "const": "dropTable" },
+            "dropTableId": { "type": "string", "minLength": 1 }
+          }
+        }
+      ]
+    },
+    "rewardAmount": {
+      "oneOf": [
+        { "type": "number", "exclusiveMinimum": 0 },
+        {
+          "type": "object",
+          "required": ["min", "max"],
+          "additionalProperties": false,
+          "properties": {
+            "min": { "type": "number", "exclusiveMinimum": 0 },
+            "max": { "type": "number", "exclusiveMinimum": 0 }
+          }
+        }
+      ]
+    },
+    "dropTableEntry": {
+      "type": "object",
+      "required": ["weight", "reward"],
+      "additionalProperties": false,
+      "properties": {
+        "weight": { "type": "number", "exclusiveMinimum": 0 },
+        "reward": { "$ref": "#/$defs/reward" }
+      }
+    }
+  }
+}

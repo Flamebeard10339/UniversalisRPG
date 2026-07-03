@@ -656,9 +656,10 @@ describe('content modules', () => {
       effects: [],
       interactionTypes: [],
       enemies: [],
+      dropTables: [],
       dialogues: [],
       locales: {},
-      removed: { locations: [], edges: [], actions: [], skills: [], stats: [], items: [], flags: [], resources: [], effects: [], interactionTypes: [], enemies: [], dialogues: [], modules: [] },
+      removed: { locations: [], edges: [], actions: [], skills: [], stats: [], items: [], flags: [], resources: [], effects: [], interactionTypes: [], enemies: [], dropTables: [], dialogues: [], modules: [] },
     });
 
     const result = applyModulesToBundle(bundleWithDraft, bundleWithDraft.modules ?? [], ['draft-module']);
@@ -683,9 +684,10 @@ describe('content modules', () => {
       effects: [],
       interactionTypes: [],
       enemies: [],
+      dropTables: [],
       dialogues: [],
       locales: {},
-      removed: { locations: [], edges: [], actions: [], skills: [], stats: [], items: [], flags: [], resources: [], effects: [], interactionTypes: [], enemies: [], dialogues: [], modules: [] },
+      removed: { locations: [], edges: [], actions: [], skills: [], stats: [], items: [], flags: [], resources: [], effects: [], interactionTypes: [], enemies: [], dropTables: [], dialogues: [], modules: [] },
     });
 
     expect(bundleWithDraft.modulePacks).toEqual([{ id: 'draft-pack', modules: ['draft-module'], packs: [{ id: 'nested-pack', modules: ['draft-module'] }] }]);

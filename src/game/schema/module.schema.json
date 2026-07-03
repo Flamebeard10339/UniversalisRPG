@@ -158,6 +158,9 @@
           "$ref": "#/$defs/enemyEntry"
         },
         {
+          "$ref": "#/$defs/dropTableEntry"
+        },
+        {
           "$ref": "#/$defs/dialogueEntry"
         },
         {
@@ -190,6 +193,7 @@
             "effects",
             "interactionTypes",
             "enemies",
+            "dropTables",
             "dialogues",
             "dialogueOptions",
             "displayProfiles",
@@ -266,6 +270,9 @@
         "enemies": {
           "$ref": "https://universalis-rpg.local/schema/enemies.schema.json"
         },
+        "dropTables": {
+          "$ref": "https://universalis-rpg.local/schema/drop-tables.schema.json"
+        },
         "dialogues": {
           "$ref": "https://universalis-rpg.local/schema/dialogues.schema.json"
         },
@@ -340,6 +347,9 @@
         "enemies": {
           "$ref": "https://universalis-rpg.local/schema/enemies.schema.json"
         },
+        "dropTables": {
+          "$ref": "https://universalis-rpg.local/schema/drop-tables.schema.json"
+        },
         "dialogues": {
           "$ref": "https://universalis-rpg.local/schema/dialogues.schema.json"
         },
@@ -407,6 +417,9 @@
               "$ref": "#/$defs/idList"
             },
             "enemies": {
+              "$ref": "#/$defs/idList"
+            },
+            "dropTables": {
               "$ref": "#/$defs/idList"
             },
             "dialogues": {
@@ -983,6 +996,40 @@
           "type": "array",
           "items": {
             "$ref": "https://universalis-rpg.local/schema/enemies.schema.json#/$defs/reward"
+          }
+        }
+      }
+    },
+    "dropTableEntry": {
+      "type": "object",
+      "required": [
+        "id",
+        "mode",
+        "drops",
+        "type"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "enum": [
+            "dropTable",
+            "dropTables"
+          ]
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "mode": {
+          "enum": [
+            "independent",
+            "dependent"
+          ]
+        },
+        "drops": {
+          "type": "array",
+          "items": {
+            "$ref": "https://universalis-rpg.local/schema/drop-tables.schema.json#/$defs/dropTableEntry"
           }
         }
       }

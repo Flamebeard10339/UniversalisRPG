@@ -1,4 +1,4 @@
-import type { ConcreteReward, IdleRewardSummary, Reward, RewardAmount } from './types';
+import type { ConcreteReward, DropTableDefinition, IdleRewardSummary, Reward, RewardAmount } from './types';
 
 const rewardId = (reward: ConcreteReward) =>
   reward.kind === 'skillXp'
@@ -26,15 +26,25 @@ const amountValue = (amount: RewardAmount, random: () => number) => {
   return min + Math.floor(random() * (max - min + 1));
 };
 
-const rollReward = (reward: Reward, random: () => number): ConcreteReward[] => {
+const rollReward = (
+  reward: Reward,
+  random: () => number,
+  dropTables: Map<string, DropTableDefinition>,
+  stack: string[] = [],
+): ConcreteReward[] => {
   if (reward.kind !== 'dropTable') {
     return [{ ...reward, amount: amountValue(reward.amount, random) }] as ConcreteReward[];
   }
 
-  const entries = reward.drops.filter((entry) => entry.weight > 0);
-  if (reward.mode === 'independent') {
+  if (stack.includes(reward.dropTableId)) return [];
+  const dropTable = dropTables.get(reward.dropTableId);
+  if (!dropTable) return [];
+
+  const entries = dropTable.drops.filter((entry) => entry.weight > 0);
+  const nextStack = [...stack, reward.dropTableId];
+  if (dropTable.mode === 'independent') {
     return entries.flatMap((entry) =>
-      random() < Math.min(1, 1 / entry.weight) ? rollReward(entry.reward, random) : [],
+      random() < Math.min(1, 1 / entry.weight) ? rollReward(entry.reward, random, dropTables, nextStack) : [],
     );
   }
 
@@ -42,13 +52,19 @@ const rollReward = (reward: Reward, random: () => number): ConcreteReward[] => {
   let roll = random() * totalWeight;
   for (const entry of entries) {
     roll -= entry.weight;
-    if (roll < 0) return rollReward(entry.reward, random);
+    if (roll < 0) return rollReward(entry.reward, random, dropTables, nextStack);
   }
   return [];
 };
 
-export const rollRewards = (rewards: Reward[], random: () => number = Math.random): ConcreteReward[] =>
-  rewards.flatMap((reward) => rollReward(reward, random));
+export const rollRewards = (
+  rewards: Reward[],
+  random: () => number = Math.random,
+  dropTables: DropTableDefinition[] = [],
+): ConcreteReward[] => {
+  const byId = new Map(dropTables.map((dropTable) => [dropTable.id, dropTable]));
+  return rewards.flatMap((reward) => rollReward(reward, random, byId));
+};
 
 export const aggregateIdleRewards = (rewards: IdleRewardSummary[]): IdleRewardSummary[] => {
   const groups = new Map<string, IdleRewardSummary>();

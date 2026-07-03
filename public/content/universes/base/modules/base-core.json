@@ -398,102 +398,7 @@
         },
         {
           "kind": "dropTable",
-          "mode": "independent",
-          "drops": [
-            {
-              "weight": 1,
-              "reward": {
-                "kind": "item",
-                "itemId": "bones",
-                "amount": 1
-              }
-            },
-            {
-              "weight": 3,
-              "reward": {
-                "kind": "dropTable",
-                "mode": "dependent",
-                "drops": [
-                  {
-                    "weight": 3,
-                    "reward": {
-                      "kind": "dropTable",
-                      "mode": "dependent",
-                      "drops": [
-                        {
-                          "weight": 2,
-                          "reward": {
-                            "kind": "dropTable",
-                            "mode": "dependent",
-                            "drops": [
-                              {
-                                "weight": 5,
-                                "reward": {
-                                  "kind": "item",
-                                  "itemId": "bronze-spear",
-                                  "amount": 1
-                                }
-                              },
-                              {
-                                "weight": 10,
-                                "reward": {
-                                  "kind": "item",
-                                  "itemId": "bronze-dagger",
-                                  "amount": 1
-                                }
-                              }
-                            ]
-                          }
-                        },
-                        {
-                          "weight": 1,
-                          "reward": {
-                            "kind": "dropTable",
-                            "mode": "dependent",
-                            "drops": [
-                              {
-                                "weight": 3,
-                                "reward": {
-                                  "kind": "item",
-                                  "itemId": "bronze-arrow",
-                                  "amount": {
-                                    "min": 5,
-                                    "max": 8
-                                  }
-                                }
-                              },
-                              {
-                                "weight": 6,
-                                "reward": {
-                                  "kind": "item",
-                                  "itemId": "bronze-throwing-knife",
-                                  "amount": {
-                                    "min": 3,
-                                    "max": 5
-                                  }
-                                }
-                              }
-                            ]
-                          }
-                        }
-                      ]
-                    }
-                  },
-                  {
-                    "weight": 5,
-                    "reward": {
-                      "kind": "item",
-                      "itemId": "iron-ore",
-                      "amount": {
-                        "min": 1,
-                        "max": 2
-                      }
-                    }
-                  }
-                ]
-              }
-            }
-          ]
+          "dropTableId": "goblin-drop-table-1"
         }
       ]
     },
@@ -582,6 +487,126 @@
           "kind": "skillXp",
           "skillId": "defense",
           "amount": 4
+        }
+      ]
+    },
+    {
+      "type": "dropTable",
+      "id": "goblin-drop-table-4",
+      "mode": "dependent",
+      "drops": [
+        {
+          "weight": 5,
+          "reward": {
+            "kind": "item",
+            "itemId": "bronze-spear",
+            "amount": 1
+          }
+        },
+        {
+          "weight": 10,
+          "reward": {
+            "kind": "item",
+            "itemId": "bronze-dagger",
+            "amount": 1
+          }
+        }
+      ]
+    },
+    {
+      "type": "dropTable",
+      "id": "goblin-drop-table-5",
+      "mode": "dependent",
+      "drops": [
+        {
+          "weight": 3,
+          "reward": {
+            "kind": "item",
+            "itemId": "bronze-arrow",
+            "amount": {
+              "min": 5,
+              "max": 8
+            }
+          }
+        },
+        {
+          "weight": 6,
+          "reward": {
+            "kind": "item",
+            "itemId": "bronze-throwing-knife",
+            "amount": {
+              "min": 3,
+              "max": 5
+            }
+          }
+        }
+      ]
+    },
+    {
+      "type": "dropTable",
+      "id": "goblin-drop-table-3",
+      "mode": "dependent",
+      "drops": [
+        {
+          "weight": 2,
+          "reward": {
+            "kind": "dropTable",
+            "dropTableId": "goblin-drop-table-4"
+          }
+        },
+        {
+          "weight": 1,
+          "reward": {
+            "kind": "dropTable",
+            "dropTableId": "goblin-drop-table-5"
+          }
+        }
+      ]
+    },
+    {
+      "type": "dropTable",
+      "id": "goblin-drop-table-2",
+      "mode": "dependent",
+      "drops": [
+        {
+          "weight": 3,
+          "reward": {
+            "kind": "dropTable",
+            "dropTableId": "goblin-drop-table-3"
+          }
+        },
+        {
+          "weight": 5,
+          "reward": {
+            "kind": "item",
+            "itemId": "iron-ore",
+            "amount": {
+              "min": 1,
+              "max": 2
+            }
+          }
+        }
+      ]
+    },
+    {
+      "type": "dropTable",
+      "id": "goblin-drop-table-1",
+      "mode": "independent",
+      "drops": [
+        {
+          "weight": 1,
+          "reward": {
+            "kind": "item",
+            "itemId": "bones",
+            "amount": 1
+          }
+        },
+        {
+          "weight": 3,
+          "reward": {
+            "kind": "dropTable",
+            "dropTableId": "goblin-drop-table-2"
+          }
         }
       ]
     },
