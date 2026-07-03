@@ -73,6 +73,8 @@ export type CombatBalanceDefinition = {
 export type UniverseUiSettings = {
   floatingTextDurationSeconds?: number;
   loopActionsByDefault?: boolean;
+  travelPathMaxSeconds?: number;
+  travelPathMaxNodes?: number;
 };
 
 export type LocationNode = {
@@ -81,13 +83,6 @@ export type LocationNode = {
   starting?: boolean;
   tags?: string[];
   entities?: string[];
-};
-
-export type TravelEdgeDefinition = {
-  id: string;
-  source: string;
-  target: string;
-  travelTimeSeconds: number;
 };
 
 export type RewardAmount = number | { min: number; max: number };
@@ -169,7 +164,7 @@ export type ActionResult =
 export type GameAction = {
   id: string;
   locationId?: string;
-  role?: 'optional' | 'progression' | 'utility';
+  role?: 'optional' | 'progression' | 'utility' | 'travel';
   durationSeconds: number;
   rewards: Reward[];
   experience?: ExperienceTrigger[];
@@ -332,7 +327,6 @@ export type DialogueDefinition = {
 export type ContentBundle = {
   manifest: UniverseManifest;
   locations: LocationNode[];
-  edges: TravelEdgeDefinition[];
   entities?: EntityDefinition[];
   actions: GameAction[];
   skills: SkillDefinition[];
@@ -353,7 +347,6 @@ export type ContentBundle = {
 
 export type ModuleDataSectionObject = {
   locations?: LocationNode[];
-  edges?: TravelEdgeDefinition[];
   entities?: EntityDefinition[];
   actions?: GameAction[];
   skills?: SkillDefinition[];
@@ -384,7 +377,6 @@ export type ModuleDataSection = ModuleDataSectionObject | ModuleDataEntry[];
 export type ModuleDataUpdatesObject = ModuleDataSectionObject & {
   remove?: {
     locations?: string[];
-    edges?: string[];
     entities?: string[];
     actions?: string[];
     skills?: string[];
@@ -448,11 +440,18 @@ export type ActionProgress = {
 };
 
 export type ActiveTravel = {
-  edgeId: string;
+  actionId: string;
   fromLocationId: string;
   toLocationId: string;
+  finalLocationId: string;
   startedAt: number;
   completesAt: number;
+  pathStartedAt: number;
+  pathCompletesAt: number;
+  pathLocationIds: string[];
+  pathActionIds: string[];
+  pathSegmentDurationsSeconds: number[];
+  pathIndex: number;
 };
 
 export type ActiveDialogue = {
@@ -618,7 +617,6 @@ export type ContributionDraft = {
   modules: ContentModule[];
   modulePacks: ContentModulePack[];
   locations: LocationNode[];
-  edges: TravelEdgeDefinition[];
   entities?: EntityDefinition[];
   actions: GameAction[];
   skills: SkillDefinition[];
@@ -637,7 +635,6 @@ export type ContributionDraft = {
 
 export type ContributionRemovedIds = {
   locations: string[];
-  edges: string[];
   entities?: string[];
   actions: string[];
   skills: string[];

@@ -1,7 +1,7 @@
 Version 0.1.0
 
 - Added JSON-first community contribution mode.
-- Added editable map, locations, edges, actions, skills, items, and localization data.
+- Added editable map, locations, travel actions, skills, items, and localization data.
 - Added multiple universes with separate save state.
 - Added smooth travel timers, action durations, rewards, inventory resources, and skill XP.
 - Added settings for universe switching, appearance, language, save import/export, changelog, debug tools, and universe reset.

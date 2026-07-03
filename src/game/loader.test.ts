@@ -24,10 +24,9 @@ const baseResponses = () => ({
     version: '0.1.0',
     author: 'test',
     locales: ['en'],
-    files: ['locations.json', 'edges.json', 'actions.json', 'skills.json'],
+    files: ['locations.json', 'actions.json', 'skills.json'],
   },
   '/content/universes/test/locations.json': [{ id: 'start', position: { x: 0, y: 0 }, starting: true }],
-  '/content/universes/test/edges.json': [],
   '/content/universes/test/actions.json': [],
   '/content/universes/test/skills.json': [],
   '/content/universes/test/locales/en.json': {

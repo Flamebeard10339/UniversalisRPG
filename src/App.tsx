@@ -28,6 +28,7 @@ import { getInteractionType, isContinuousAction } from './game/adversarial';
 import type { ContentModule, ContentModulePack, ContributionDraft, DisplayColorPalette, DisplayProfileDefinition, IdleReport, UniversePlayState } from './game/types';
 import { getNextResourceBoundaryAt } from './game/resources';
 import { aggregateIdleRewards } from './game/rewards';
+import { findTravelPath } from './game/travel';
 import { load, save } from './lib/storage';
 import { useDebugState } from './stores/debugState';
 import { useContributionState } from './stores/contributionState';
@@ -47,6 +48,7 @@ type AppearanceSettings = {
   customDisplayProfile?: DisplayProfileDefinition;
   displayProfileSelections?: Record<string, string>;
   fontSize: FontSizePreference;
+  showTravelActions?: boolean;
   theme?: 'system' | 'dark' | 'light';
 };
 type ContributionUiSettings = {
@@ -62,8 +64,8 @@ const contributionTabs: ContributionTab[] = ['content'];
 const homeTabs: HomeTab[] = ['actions', 'details', 'workbench'];
 const emptyIdleReport: IdleReport = { kind: 'none' };
 const emptyContributionDraft = (universeId: string): ContributionDraft => ({
-  universeId, updatedAt: Date.now(), notes: '', basePlayer: undefined, combatBalance: undefined, experience: undefined, displayProfiles: undefined, ui: undefined, modules: [], modulePacks: [], locations: [], edges: [], actions: [], skills: [], stats: [], items: [], flags: [], resourceDefinitions: [], effects: [], interactionTypes: [], enemies: [], dropTables: [], dialogues: [], locales: {},
-  removed: { locations: [], edges: [], actions: [], skills: [], stats: [], items: [], flags: [], resources: [], effects: [], interactionTypes: [], enemies: [], dropTables: [], dialogues: [], modules: [] },
+  universeId, updatedAt: Date.now(), notes: '', basePlayer: undefined, combatBalance: undefined, experience: undefined, displayProfiles: undefined, ui: undefined, modules: [], modulePacks: [], locations: [], actions: [], skills: [], stats: [], items: [], flags: [], resourceDefinitions: [], effects: [], interactionTypes: [], enemies: [], dropTables: [], dialogues: [], locales: {},
+  removed: { locations: [], actions: [], skills: [], stats: [], items: [], flags: [], resources: [], effects: [], interactionTypes: [], enemies: [], dropTables: [], dialogues: [], modules: [] },
 });
 const colorInputClass = 'h-9 w-12 rounded border border-slate-700 bg-slate-900 p-1';
 
@@ -106,6 +108,7 @@ export default function App() {
   const [characterTab, setCharacterTab] = useState<CharacterTab>('skills');
   const [fontSizePreference, setFontSizePreference] = useState<FontSizePreference>('normal');
   const [chatCompressionEnabled, setChatCompressionEnabled] = useState(true);
+  const [showTravelActions, setShowTravelActions] = useState(true);
   const [customDisplayProfile, setCustomDisplayProfile] = useState<DisplayProfileDefinition>(() => createCustomDisplayProfile());
   const [displayProfileSelections, setDisplayProfileSelections] = useState<Record<string, string>>({});
   const [themeEditorOpen, setThemeEditorOpen] = useState(false);
@@ -150,6 +153,7 @@ export default function App() {
   const unequipSlot = useGameState((state) => state.unequipSlot);
   const resolveIdle = useGameState((state) => state.resolveIdle);
   const markInactive = useGameState((state) => state.markInactive);
+  const appendSystemMessage = useGameState((state) => state.appendSystemMessage);
   const importUniverseState = useGameState((state) => state.importUniverseState);
   const replaceUniverseState = useGameState((state) => state.replaceUniverseState);
   const resetUniverse = useGameState((state) => state.resetUniverse);
@@ -178,6 +182,7 @@ export default function App() {
       }
       setFontSizePreference(settings.fontSize ?? 'normal');
       setChatCompressionEnabled(settings.chatCompressionEnabled ?? true);
+      setShowTravelActions(settings.showTravelActions ?? true);
       setCustomDisplayProfile(settings.customDisplayProfile ?? createCustomDisplayProfile());
       setDisplayProfileSelections(settings.displayProfileSelections ?? {});
       setAppearanceLoaded(true);
@@ -198,8 +203,9 @@ export default function App() {
       customDisplayProfile,
       displayProfileSelections,
       fontSize: fontSizePreference,
+      showTravelActions,
     });
-  }, [appearanceLoaded, bundle, chatCompressionEnabled, customDisplayProfile, displayProfileSelections, fontSizePreference]);
+  }, [appearanceLoaded, bundle, chatCompressionEnabled, customDisplayProfile, displayProfileSelections, fontSizePreference, showTravelActions]);
 
   useEffect(() => {
     if (!appearanceLoaded || !bundle || displayProfileSelections[bundle.manifest.id]) {
@@ -371,7 +377,7 @@ export default function App() {
         ...moduleCleanupReport.removedActionIds.map((id) => t('settings.modules.cleanup.action', { id })),
         ...moduleCleanupReport.removedLocationIds.map((id) => t('settings.modules.cleanup.location', { id })),
         moduleCleanupReport.cancelledActionId ? t('settings.modules.cleanup.cancelledAction', { id: moduleCleanupReport.cancelledActionId }) : null,
-        moduleCleanupReport.cancelledTravelEdgeId ? t('settings.modules.cleanup.cancelledTravel', { id: moduleCleanupReport.cancelledTravelEdgeId }) : null,
+        moduleCleanupReport.cancelledTravelActionId ? t('settings.modules.cleanup.cancelledTravel', { id: moduleCleanupReport.cancelledTravelActionId }) : null,
         moduleCleanupReport.cancelledDialogueId ? t('settings.modules.cleanup.cancelledDialogue', { id: moduleCleanupReport.cancelledDialogueId }) : null,
         moduleCleanupReport.cancelledDialogueNodeId ? t('settings.modules.cleanup.cancelledDialogueNode', { id: moduleCleanupReport.cancelledDialogueNodeId }) : null,
         moduleCleanupReport.relocatedToLocationId ? t('settings.modules.cleanup.relocated', { id: moduleCleanupReport.relocatedToLocationId }) : null,
@@ -419,19 +425,21 @@ export default function App() {
       return;
     }
 
-    const edge = bundle.edges.find(
-      (candidate) =>
-        (candidate.source === playState.currentLocationId && candidate.target === locationId) ||
-        (candidate.target === playState.currentLocationId && candidate.source === locationId),
-    );
+    const path = findTravelPath(playState, actionContext, locationId);
 
-    if (edge) {
+    if (path.status === 'found' && path.edges.length > 0) {
       logPlayerAction('travel.start', {
-        edgeId: edge.id,
+        actionIds: path.edges.map((edge) => edge.action.id),
         fromLocationId: playState.currentLocationId,
         toLocationId: locationId,
       });
-      travelTo(runtimeUniverseId, edge, locationId);
+      travelTo(runtimeUniverseId, path.edges);
+    } else if (path.status === 'too-far') {
+      logPlayerAction('travel.tooFar', {
+        fromLocationId: playState.currentLocationId,
+        toLocationId: locationId,
+      });
+      appendSystemMessage(runtimeUniverseId, 'chat.travelPathTooFar');
     } else {
       logPlayerAction('travel.noEdge', {
         fromLocationId: playState.currentLocationId,
@@ -704,6 +712,7 @@ export default function App() {
                     bundle={bundle}
                     onStartAction={beginAction}
                     playState={playState}
+                    showTravelActions={showTravelActions}
                     t={t}
                   />
                 </section>
@@ -960,6 +969,15 @@ export default function App() {
                     checked={chatCompressionEnabled}
                     className="h-5 w-5"
                     onChange={(event) => { dismissDialogue(); setChatCompressionEnabled(event.target.checked); }}
+                    type="checkbox"
+                  />
+                </label>
+                <label className="flex items-center justify-between gap-4">
+                  <span className="text-sm text-slate-300">{t('settings.appearance.showTravelActions')}</span>
+                  <input
+                    checked={showTravelActions}
+                    className="h-5 w-5"
+                    onChange={(event) => { dismissDialogue(); setShowTravelActions(event.target.checked); }}
                     type="checkbox"
                   />
                 </label>

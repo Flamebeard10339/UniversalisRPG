@@ -91,7 +91,6 @@ describe('Derelict Extant scenario capabilities', () => {
     const bundle: ContentBundle = {
       manifest: context.manifest!,
       locations: context.locations!,
-      edges: [],
       actions: [conditionalAction],
       skills: context.skills,
       stats: context.stats!,

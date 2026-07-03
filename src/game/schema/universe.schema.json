@@ -72,7 +72,9 @@
       "additionalProperties": false,
       "properties": {
         "floatingTextDurationSeconds": { "type": "number", "exclusiveMinimum": 0 },
-        "loopActionsByDefault": { "type": "boolean" }
+        "loopActionsByDefault": { "type": "boolean" },
+        "travelPathMaxSeconds": { "type": "number", "exclusiveMinimum": 0 },
+        "travelPathMaxNodes": { "type": "integer", "minimum": 1 }
       }
     },
     "compatibility": {

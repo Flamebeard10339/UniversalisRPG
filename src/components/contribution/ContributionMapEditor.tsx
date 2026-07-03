@@ -1,39 +1,20 @@
 import { useEffect, useMemo, useState } from 'react';
 import ReactFlow, {
   Background,
-  ConnectionLineType,
-  ConnectionMode,
   Controls,
-  Handle,
-  Position,
   applyNodeChanges,
-  type Connection,
-  type Edge,
   type Node,
   type NodeChange,
   type NodeProps,
 } from 'reactflow';
-import { edgeId } from '../../game/contentIds';
 import type { Translator } from '../../game/i18n';
-import type { ContentBundle, LocationNode, TravelEdgeDefinition } from '../../game/types';
+import type { ContentBundle, LocationNode } from '../../game/types';
 
 type ContributionMapEditorProps = {
   bundle: ContentBundle;
   onLocationsChange: (locations: LocationNode[]) => void;
-  onEdgesChange: (edges: TravelEdgeDefinition[]) => void;
   t: Translator;
 };
-
-type Selection =
-  | {
-      type: 'node';
-      id: string;
-    }
-  | {
-      type: 'edge';
-      id: string;
-    }
-  | null;
 
 type SimpleNodeData = {
   label: string;
@@ -42,9 +23,8 @@ type SimpleNodeData = {
 const snap = (value: number, size: number) => Math.round(value / size) * size;
 
 const SimpleNode = ({ data }: NodeProps<SimpleNodeData>) => (
-  <div className="relative rounded border border-slate-600 bg-slate-900 px-4 py-2 text-sm font-semibold text-slate-100 shadow">
+  <div className="rounded border border-slate-600 bg-slate-900 px-4 py-2 text-sm font-semibold text-slate-100 shadow">
     {data.label}
-    <Handle position={Position.Bottom} type="source" />
   </div>
 );
 
@@ -62,37 +42,24 @@ const toFlowNodes = (locations: LocationNode[]): Node<SimpleNodeData>[] =>
     },
   }));
 
-const toFlowEdges = (edges: TravelEdgeDefinition[]): Edge[] =>
-  edges.map((edge) => ({
-    id: edge.id,
-    source: edge.source,
-    target: edge.target,
-    type: 'straight',
-    label: `${edge.travelTimeSeconds}s`,
-  }));
-
 const upsertById = <T extends { id: string }>(items: T[], item: T) =>
   items.some((candidate) => candidate.id === item.id)
     ? items.map((candidate) => (candidate.id === item.id ? item : candidate))
     : [...items, item];
 
-export const ContributionMapEditor = ({ bundle, onLocationsChange, onEdgesChange, t }: ContributionMapEditorProps) => {
+export const ContributionMapEditor = ({ bundle, onLocationsChange, t }: ContributionMapEditorProps) => {
   const [nodes, setNodes] = useState<Node<SimpleNodeData>[]>(() => toFlowNodes(bundle.locations));
-  const [selection, setSelection] = useState<Selection>(null);
+  const [selectedLocationId, setSelectedLocationId] = useState<string | null>(null);
   const [snapSize, setSnapSize] = useState(8);
 
   useEffect(() => {
     setNodes(toFlowNodes(bundle.locations));
   }, [bundle.locations]);
 
-  const edges = useMemo(() => toFlowEdges(bundle.edges), [bundle.edges]);
   const normalizedSnapSize = Math.max(1, Math.round(snapSize) || 1);
   const snapGrid = useMemo<[number, number]>(() => [normalizedSnapSize, normalizedSnapSize], [normalizedSnapSize]);
-  const selectedLocation = selection?.type === 'node'
-    ? bundle.locations.find((location) => location.id === selection.id)
-    : undefined;
-  const selectedEdge = selection?.type === 'edge'
-    ? bundle.edges.find((edge) => edge.id === selection.id)
+  const selectedLocation = selectedLocationId
+    ? bundle.locations.find((location) => location.id === selectedLocationId)
     : undefined;
 
   const commitNodePosition = (node: Node) => {
@@ -113,34 +80,6 @@ export const ContributionMapEditor = ({ bundle, onLocationsChange, onEdgesChange
     );
   };
 
-  const connectLocations = (connection: Connection) => {
-    if (!connection.source || !connection.target || connection.source === connection.target) {
-      return;
-    }
-
-    const duplicate = bundle.edges.some(
-      (edge) =>
-        (edge.source === connection.source && edge.target === connection.target) ||
-        (edge.source === connection.target && edge.target === connection.source),
-    );
-
-    if (duplicate) {
-      return;
-    }
-
-    const id = edgeId(connection.source, connection.target);
-
-    onEdgesChange(
-      upsertById(bundle.edges, {
-        id,
-        source: connection.source,
-        target: connection.target,
-        travelTimeSeconds: 3,
-      }),
-    );
-    setSelection({ type: 'edge', id });
-  };
-
   const updateLocation = (patch: Partial<LocationNode>) => {
     if (!selectedLocation) {
       return;
@@ -155,25 +94,7 @@ export const ContributionMapEditor = ({ bundle, onLocationsChange, onEdgesChange
     }
 
     onLocationsChange(bundle.locations.filter((location) => location.id !== selectedLocation.id));
-    onEdgesChange(bundle.edges.filter((edge) => edge.source !== selectedLocation.id && edge.target !== selectedLocation.id));
-    setSelection(null);
-  };
-
-  const updateEdge = (patch: Partial<TravelEdgeDefinition>) => {
-    if (!selectedEdge) {
-      return;
-    }
-
-    onEdgesChange(upsertById(bundle.edges, { ...selectedEdge, ...patch }));
-  };
-
-  const removeEdge = () => {
-    if (!selectedEdge) {
-      return;
-    }
-
-    onEdgesChange(bundle.edges.filter((edge) => edge.id !== selectedEdge.id));
-    setSelection(null);
+    setSelectedLocationId(null);
   };
 
   return (
@@ -197,20 +118,15 @@ export const ContributionMapEditor = ({ bundle, onLocationsChange, onEdgesChange
       <div className="grid gap-3 lg:grid-cols-[1fr_320px]">
         <div className="contribution-map h-96 overflow-hidden rounded border border-slate-800 bg-slate-950">
           <ReactFlow
-            connectionLineType={ConnectionLineType.Straight}
-            connectionMode={ConnectionMode.Loose}
-            defaultEdgeOptions={{ type: 'straight' }}
-            edges={edges}
+            edges={[]}
             fitView
             nodeTypes={nodeTypes}
             nodes={nodes}
-            nodesConnectable
+            nodesConnectable={false}
             nodesDraggable
-            onConnect={connectLocations}
-            onEdgeClick={(_, edge) => setSelection({ type: 'edge', id: edge.id })}
-            onNodeClick={(_, node) => setSelection({ type: 'node', id: node.id })}
+            onNodeClick={(_, node) => setSelectedLocationId(node.id)}
             onNodeDrag={(_, node) => {
-              setSelection({ type: 'node', id: node.id });
+              setSelectedLocationId(node.id);
               setNodes((current) =>
                 current.map((candidate) =>
                   candidate.id === node.id
@@ -239,7 +155,7 @@ export const ContributionMapEditor = ({ bundle, onLocationsChange, onEdgesChange
         <aside className="grid min-w-0 content-start gap-3 rounded border border-slate-800 bg-slate-950 p-3">
           <h4 className="text-sm font-semibold text-slate-100">{t('contribution.selection.title')}</h4>
 
-          {!selectedLocation && !selectedEdge && <p className="text-sm text-slate-500">{t('contribution.selection.empty')}</p>}
+          {!selectedLocation && <p className="text-sm text-slate-500">{t('contribution.selection.empty')}</p>}
 
           {selectedLocation && (
             <div className="grid gap-3">
@@ -281,36 +197,6 @@ export const ContributionMapEditor = ({ bundle, onLocationsChange, onEdgesChange
               </label>
               <button className="rounded border border-rose-500 px-3 py-2 text-sm font-semibold text-rose-200" onClick={removeLocation} type="button">
                 {t('contribution.removeNode')}
-              </button>
-            </div>
-          )}
-
-          {selectedEdge && (
-            <div className="grid gap-3">
-              <label className="grid min-w-0 gap-1 text-xs text-slate-400">
-                {t('contribution.field.id')}
-                <input className="min-w-0 rounded bg-slate-900 px-3 py-2 text-sm text-slate-100" readOnly value={selectedEdge.id} />
-              </label>
-              <label className="grid min-w-0 gap-1 text-xs text-slate-400">
-                {t('contribution.field.source')}
-                <input className="min-w-0 rounded bg-slate-900 px-3 py-2 text-sm text-slate-100" readOnly value={selectedEdge.source} />
-              </label>
-              <label className="grid min-w-0 gap-1 text-xs text-slate-400">
-                {t('contribution.field.target')}
-                <input className="min-w-0 rounded bg-slate-900 px-3 py-2 text-sm text-slate-100" readOnly value={selectedEdge.target} />
-              </label>
-              <label className="grid min-w-0 gap-1 text-xs text-slate-400">
-                {t('contribution.field.durationSeconds')}
-                <input
-                  className="min-w-0 rounded bg-slate-900 px-3 py-2 text-sm text-slate-100"
-                  min="1"
-                  onChange={(event) => updateEdge({ travelTimeSeconds: Number(event.target.value) })}
-                  type="number"
-                  value={selectedEdge.travelTimeSeconds}
-                />
-              </label>
-              <button className="rounded border border-rose-500 px-3 py-2 text-sm font-semibold text-rose-200" onClick={removeEdge} type="button">
-                {t('contribution.removeEdge')}
               </button>
             </div>
           )}

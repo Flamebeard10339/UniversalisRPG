@@ -2,6 +2,9 @@ import { BaseEdge, type EdgeProps, getStraightPath } from 'reactflow';
 
 type TravelEdgeData = {
   active: boolean;
+  inPath: boolean;
+  isCompletePathSegment: boolean;
+  isFuturePathSegment: boolean;
   progress: number;
   sourcePoint: { x: number; y: number };
   targetPoint: { x: number; y: number };
@@ -17,6 +20,14 @@ export const TravelEdge = ({
   const progress = data?.progress ?? 0;
   const dotX = sourcePoint.x + (targetPoint.x - sourcePoint.x) * progress;
   const dotY = sourcePoint.y + (targetPoint.y - sourcePoint.y) * progress;
+  const stroke = data?.active
+    ? '#67e8f9'
+    : data?.isCompletePathSegment
+      ? '#2dd4bf'
+      : data?.isFuturePathSegment
+        ? '#e879f9'
+        : '#64748b';
+  const strokeWidth = data?.active || data?.inPath ? 3 : 2;
   const [edgePath] = getStraightPath({
     sourceX: sourcePoint.x,
     sourceY: sourcePoint.y,
@@ -30,7 +41,7 @@ export const TravelEdge = ({
         id={id}
         path={edgePath}
         markerEnd={markerEnd}
-        style={{ stroke: data?.active ? '#67e8f9' : '#64748b', strokeWidth: data?.active ? 3 : 2 }}
+        style={{ stroke, strokeWidth }}
       />
       {data?.active && (
         <circle cx={dotX} cy={dotY} r="5" className="fill-cyan-200 drop-shadow" />

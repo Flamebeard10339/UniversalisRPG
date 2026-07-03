@@ -9,7 +9,7 @@
     "properties": {
       "id": { "type": "string", "minLength": 1 },
       "locationId": { "type": "string", "minLength": 1 },
-      "role": { "enum": ["optional", "progression", "utility"] },
+      "role": { "enum": ["optional", "progression", "utility", "travel"] },
       "durationSeconds": { "type": "number", "exclusiveMinimum": 0 },
       "maxCompletions": { "type": "integer", "minimum": 1 },
       "enemyId": { "type": "string", "minLength": 1 },

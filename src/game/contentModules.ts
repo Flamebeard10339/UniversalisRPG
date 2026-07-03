@@ -146,8 +146,6 @@ const moduleDataTypeToKey: Record<string, keyof ModuleDataSectionObject> = {
   displayProfiles: 'displayProfiles',
   dropTable: 'dropTables',
   dropTables: 'dropTables',
-  edge: 'edges',
-  edges: 'edges',
   entity: 'entities',
   entities: 'entities',
   effect: 'effects',
@@ -200,7 +198,6 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 
 const removableModuleDataKeys = new Set([
   'locations',
-  'edges',
   'entities',
   'actions',
   'skills',
@@ -279,7 +276,6 @@ const emptySectionBundle = (bundle: ContentBundle, section?: ModuleDataSection):
     displayProfiles: normalizeModuleDataSection(section).displayProfiles,
   },
   locations: normalizeModuleDataSection(section).locations ?? [],
-  edges: normalizeModuleDataSection(section).edges ?? [],
   entities: normalizeModuleDataSection(section).entities ?? [],
   actions: normalizeModuleDataSection(section).actions ?? [],
   skills: normalizeModuleDataSection(section).skills ?? [],
@@ -562,7 +558,6 @@ const applyDataSection = (bundle: ContentBundle, data?: ModuleDataSection): Cont
       ? { ...bundle.manifest, displayProfiles: mergeById(bundle.manifest.displayProfiles ?? [], section.displayProfiles) }
       : bundle.manifest,
     locations: mergeById(bundle.locations, section.locations),
-    edges: mergeById(bundle.edges, section.edges),
     entities: mergeById(bundle.entities ?? [], section.entities),
     actions: mergeById(bundle.actions, section.actions),
     skills: mergeById(bundle.skills, section.skills),
@@ -588,7 +583,6 @@ const applyDataUpdates = (bundle: ContentBundle, updates?: ModuleDataUpdates): C
       ? { ...bundle.manifest, displayProfiles: removeById(bundle.manifest.displayProfiles ?? [], removed.displayProfiles) }
       : bundle.manifest,
     locations: removeById(bundle.locations, removed.locations),
-    edges: removeById(bundle.edges, removed.edges),
     entities: removeById(bundle.entities ?? [], removed.entities),
     actions: removeById(bundle.actions, removed.actions),
     skills: removeById(bundle.skills, removed.skills),

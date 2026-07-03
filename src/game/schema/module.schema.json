@@ -128,9 +128,6 @@
           "$ref": "#/$defs/locationEntry"
         },
         {
-          "$ref": "#/$defs/edgeEntry"
-        },
-        {
           "$ref": "#/$defs/entityEntry"
         },
         {
@@ -186,7 +183,6 @@
           "type": "string",
           "enum": [
             "locations",
-            "edges",
             "entities",
             "actions",
             "skills",
@@ -240,9 +236,6 @@
       "properties": {
         "locations": {
           "$ref": "https://universalis-rpg.local/schema/locations.schema.json"
-        },
-        "edges": {
-          "$ref": "https://universalis-rpg.local/schema/edges.schema.json"
         },
         "entities": {
           "$ref": "https://universalis-rpg.local/schema/entities.schema.json"
@@ -321,9 +314,6 @@
         "locations": {
           "$ref": "https://universalis-rpg.local/schema/locations.schema.json"
         },
-        "edges": {
-          "$ref": "https://universalis-rpg.local/schema/edges.schema.json"
-        },
         "entities": {
           "$ref": "https://universalis-rpg.local/schema/entities.schema.json"
         },
@@ -397,9 +387,6 @@
           "additionalProperties": false,
           "properties": {
             "locations": {
-              "$ref": "#/$defs/idList"
-            },
-            "edges": {
               "$ref": "#/$defs/idList"
             },
             "entities": {
@@ -513,41 +500,6 @@
         }
       }
     },
-    "edgeEntry": {
-      "type": "object",
-      "required": [
-        "id",
-        "source",
-        "target",
-        "travelTimeSeconds",
-        "type"
-      ],
-      "additionalProperties": false,
-      "properties": {
-        "type": {
-          "enum": [
-            "edge",
-            "edges"
-          ]
-        },
-        "id": {
-          "type": "string",
-          "minLength": 1
-        },
-        "source": {
-          "type": "string",
-          "minLength": 1
-        },
-        "target": {
-          "type": "string",
-          "minLength": 1
-        },
-        "travelTimeSeconds": {
-          "type": "number",
-          "exclusiveMinimum": 0
-        }
-      }
-    },
     "entityEntry": {
       "type": "object",
       "required": [
@@ -611,7 +563,8 @@
           "enum": [
             "optional",
             "progression",
-            "utility"
+            "utility",
+            "travel"
           ]
         },
         "durationSeconds": {

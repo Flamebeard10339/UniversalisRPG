@@ -28,7 +28,7 @@ export type GmUpdateMessage = {
   privateNotes: string;
 };
 
-export type GmContentType = 'locations' | 'edges' | 'actions' | 'skills' | 'stats' | 'items'
+export type GmContentType = 'locations' | 'actions' | 'skills' | 'stats' | 'items'
   | 'flags' | 'resources' | 'effects' | 'interaction-types' | 'enemies';
 
 export type GmOperation =

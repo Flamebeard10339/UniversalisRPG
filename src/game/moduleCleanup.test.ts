@@ -6,7 +6,6 @@ import type { ContentBundle } from './types';
 const bundle = (): ContentBundle => ({
   manifest: { schemaVersion: 1, id: 'test', version: '1.0.0', author: 'test', locales: ['en'], files: [] },
   locations: [{ id: 'start', position: { x: 0, y: 0 }, starting: true }],
-  edges: [],
   actions: [],
   skills: [{ id: 'mining', maxLevel: 100 }],
   stats: [{ id: 'strength' }],

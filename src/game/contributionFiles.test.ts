@@ -5,7 +5,6 @@ import type { ContentBundle, ContributionDraft } from './types';
 const bundle = (): ContentBundle => ({
   manifest: { schemaVersion: 1, id: 'test', version: '1.0.0', author: 'test', locales: ['en'], files: [] },
   locations: [],
-  edges: [],
   actions: [],
   skills: [],
   stats: [],
@@ -33,7 +32,6 @@ const draft = (): ContributionDraft => ({
   ],
   modulePacks: [],
   locations: [],
-  edges: [],
   actions: [],
   skills: [],
   stats: [],
@@ -46,7 +44,7 @@ const draft = (): ContributionDraft => ({
   dropTables: [],
   dialogues: [],
   locales: {},
-  removed: { locations: [], edges: [], actions: [], skills: [], stats: [], items: [], flags: [], resources: [], effects: [], interactionTypes: [], enemies: [], dropTables: [], dialogues: [], modules: ['removed-module'] },
+  removed: { locations: [], actions: [], skills: [], stats: [], items: [], flags: [], resources: [], effects: [], interactionTypes: [], enemies: [], dropTables: [], dialogues: [], modules: ['removed-module'] },
 });
 
 describe('contribution module files', () => {

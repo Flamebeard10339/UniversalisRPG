@@ -5,16 +5,18 @@ import { getActionDps, getActionDurationMs, getEnemyAttackDps, isContinuousActio
 import type { Translator } from '../game/i18n';
 import { useNow } from '../hooks/useNow';
 import { canStartAction, isActionVisible } from '../game/conditions';
+import { isPureTravelAction } from '../game/travel';
 
 type ActionPanelProps = {
   bundle: ContentBundle;
   debugEnabled: boolean;
   playState: UniversePlayState;
   onStartAction: (action: GameAction) => void;
+  showTravelActions: boolean;
   t: Translator;
 };
 
-export const ActionPanel = ({ bundle, debugEnabled, playState, onStartAction, t }: ActionPanelProps) => {
+export const ActionPanel = ({ bundle, debugEnabled, playState, onStartAction, showTravelActions, t }: ActionPanelProps) => {
   const [expandedEntities, setExpandedEntities] = useState<Record<string, boolean>>({});
   const isTravelling = Boolean(playState.activeTravel);
   const actionContext = {
@@ -40,6 +42,7 @@ export const ActionPanel = ({ bundle, debugEnabled, playState, onStartAction, t 
   const normalActions = bundle.actions.filter((action) =>
     action.locationId === playState.currentLocationId
     && !entityActionIds.has(action.id)
+    && (showTravelActions || !isPureTravelAction(action))
     && isActionVisible(playState, action, actionContext));
   const entityActions = (actionIds: string[]) => actionIds
     .map((actionId) => bundle.actions.find((action) => action.id === actionId))

@@ -23,7 +23,6 @@ type RemoveTarget = Exclude<keyof NonNullable<Extract<ContentModule['data-update
 
 const dataKeys: DataKey[] = [
   'locations',
-  'edges',
   'entities',
   'actions',
   'skills',
@@ -41,7 +40,6 @@ const dataKeys: DataKey[] = [
 
 const dataKeyTypes: Record<DataKey, string> = {
   locations: 'location',
-  edges: 'edge',
   entities: 'entity',
   actions: 'action',
   skills: 'skill',
@@ -65,7 +63,6 @@ const dataTypeKeys = new Map<string, DataKey>([
 
 const removeTargets: RemoveTarget[] = [
   'locations',
-  'edges',
   'entities',
   'actions',
   'skills',
@@ -83,7 +80,7 @@ const removeTargets: RemoveTarget[] = [
   'locales',
 ];
 
-const tableDataKeys = new Set<DataKey>(['edges', 'skills', 'stats', 'items', 'flags', 'interactionTypes']);
+const tableDataKeys = new Set<DataKey>(['skills', 'stats', 'items', 'flags', 'interactionTypes']);
 
 const uniqueById = <T extends { id: string }>(items: T[]) => [...new Map(items.map((item) => [item.id, item])).values()];
 const uniquePacksById = (packs: ContentModulePack[]) => uniqueById(packs);
@@ -201,7 +198,6 @@ const bundleForModuleEditing = (bundle: ContentBundle, module: ContentModule, mo
       displayProfiles: mergeById(bundle.manifest.displayProfiles ?? [], data.displayProfiles, updates.displayProfiles),
     },
     locations: mergeById(bundle.locations, data.locations, updates.locations),
-    edges: mergeById(bundle.edges, data.edges, updates.edges),
     actions: mergeById(bundle.actions, data.actions, updates.actions),
     skills: mergeById(bundle.skills, data.skills, updates.skills),
     stats: mergeById(bundle.stats, data.stats, updates.stats),

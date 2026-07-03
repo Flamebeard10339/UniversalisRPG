@@ -26,7 +26,6 @@ const createEmptyDraft = (universeId: string): ContributionDraft => ({
   modules: [],
   modulePacks: [],
   locations: [],
-  edges: [],
   entities: [],
   actions: [],
   skills: [],
@@ -42,7 +41,6 @@ const createEmptyDraft = (universeId: string): ContributionDraft => ({
   locales: {},
   removed: {
     locations: [],
-    edges: [],
     entities: [],
     actions: [],
     skills: [],

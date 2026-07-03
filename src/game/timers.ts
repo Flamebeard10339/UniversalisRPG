@@ -1,4 +1,5 @@
-import type { ActionResolutionContext, ActionResult, ChatMessage, ConcreteReward, ExperienceEventKind, ExperienceTrigger, GameAction, IdleReport, IdleResolution, ResourceBoundaryBehavior, Reward, RunLogEntry, TravelEdgeDefinition, UniversePlayState } from './types';
+import type { ActionResolutionContext, ActionResult, ChatMessage, ConcreteReward, ExperienceEventKind, ExperienceTrigger, GameAction, IdleReport, IdleResolution, ResourceBoundaryBehavior, Reward, RunLogEntry, UniversePlayState } from './types';
+import type { AvailableTravelEdge } from './travel';
 import { getActionDurationMs, getEnemy, getInteractionType, sampleAdversarialDamage, sampleEnemyAttackDamage } from './adversarial';
 import { getEnemyStat } from './enemies';
 import { getEffectDeltaPerMinute, getResourceMaxForContext, isEffectApplicable } from './resources';
@@ -129,7 +130,9 @@ export const createInitialPlayState = (
   inventory: {},
   flags: {},
   actionCompletions: {},
-  collectionLog: {},
+  collectionLog: {
+    [locationExploredKey(startingLocationId)]: 1,
+  },
   resourcePools: {},
   skillXp: {},
   statOverrides: {},
@@ -152,6 +155,14 @@ export const normalizePlayState = (
 ): UniversePlayState => {
   const actionProgress = state.actionProgress ?? {};
   const runId = state.runId ?? `run-${Date.now().toString(36)}`;
+  const discoveredLocationIds = Array.from(new Set(state.discoveredLocationIds?.length ? state.discoveredLocationIds : [startingLocationId]));
+  const collectionLog = {
+    ...(state.collectionLog ?? {}),
+    ...Object.fromEntries(discoveredLocationIds.map((locationId) => [locationExploredKey(locationId), 1])),
+  };
+  const activeTravel = state.activeTravel?.actionId && state.activeTravel.pathLocationIds?.length && state.activeTravel.pathActionIds?.length
+    ? state.activeTravel
+    : null;
 
   return {
     ...createInitialPlayState(universeId, startingLocationId, context),
@@ -173,13 +184,14 @@ export const normalizePlayState = (
           },
         }
       : actionProgress,
-    activeTravel: state.activeTravel ?? null,
+    activeTravel,
     activeDialogue: state.activeDialogue ?? null,
     resourcePools: state.resourcePools ?? {},
     inventory: { ...(state.resources ?? {}), ...(state.inventory ?? {}) },
     flags: state.flags ?? {},
     actionCompletions: state.actionCompletions ?? {},
-    collectionLog: state.collectionLog ?? {},
+    discoveredLocationIds,
+    collectionLog,
     statOverrides: state.statOverrides ?? {},
     equipmentSkillBonuses: state.equipmentSkillBonuses ?? {},
     equipment: state.equipment ?? {},
@@ -632,6 +644,21 @@ const resolveLocationId = (
   ? context.locations?.find((location) => location.starting)?.id ?? state.currentLocationId
   : locationId;
 
+const locationExploredKey = (locationId: string) => `location:${locationId}:explored`;
+
+const exploreLocation = (
+  state: UniversePlayState,
+  locationId: string,
+): UniversePlayState => ({
+  ...state,
+  currentLocationId: locationId,
+  discoveredLocationIds: Array.from(new Set([...state.discoveredLocationIds, locationId])),
+  collectionLog: {
+    ...state.collectionLog,
+    [locationExploredKey(locationId)]: 1,
+  },
+});
+
 const selectKeys = <T>(values: Record<string, T>, ids: string[] = []) =>
   Object.fromEntries(ids.filter((id) => values[id] !== undefined).map((id) => [id, values[id]]));
 
@@ -745,15 +772,7 @@ const applyResourceBehaviors = (
 
     if (behavior.kind === 'relocate') {
       const locationId = resolveLocationId(nextState, context, behavior.locationId);
-      const discoveredLocationIds = nextState.discoveredLocationIds.includes(locationId)
-        ? nextState.discoveredLocationIds
-        : [...nextState.discoveredLocationIds, locationId];
-
-      nextState = {
-        ...nextState,
-        currentLocationId: locationId,
-        discoveredLocationIds,
-      };
+      nextState = exploreLocation(nextState, locationId);
     }
 
     if (behavior.kind === 'chat') {
@@ -986,27 +1005,42 @@ const restartAction = (
 
 export const startTravel = (
   state: UniversePlayState,
-  edge: TravelEdgeDefinition,
-  destinationLocationId: string,
+  path: AvailableTravelEdge[],
   now = Date.now(),
 ): UniversePlayState => {
+  const firstEdge = path[0];
+  if (!firstEdge) {
+    return state;
+  }
   const pausedState = pauseRunningAction(state, now);
+  const pathLocationIds = [state.currentLocationId, ...path.map((edge) => edge.target)];
+  const totalMs = path.reduce((sum, edge) => sum + edge.travelTimeSeconds * 1000, 0);
 
   return appendRunLog({
     ...pausedState,
     activeTravel: {
-      edgeId: edge.id,
+      actionId: firstEdge.action.id,
       fromLocationId: state.currentLocationId,
-      toLocationId: destinationLocationId,
+      toLocationId: firstEdge.target,
+      finalLocationId: pathLocationIds[pathLocationIds.length - 1],
       startedAt: now,
-      completesAt: now + edge.travelTimeSeconds * 1000,
+      completesAt: now + firstEdge.travelTimeSeconds * 1000,
+      pathStartedAt: now,
+      pathCompletesAt: now + totalMs,
+      pathLocationIds,
+      pathActionIds: path.map((edge) => edge.action.id),
+      pathSegmentDurationsSeconds: path.map((edge) => edge.travelTimeSeconds),
+      pathIndex: 0,
     },
     activeAction: null,
     lastTickAt: now,
   }, 'player', 'travel.start', {
-    edgeId: edge.id,
+    actionId: firstEdge.action.id,
+    pathActionIds: path.map((edge) => edge.action.id),
+    pathLocationIds,
     fromLocationId: state.currentLocationId,
-    toLocationId: destinationLocationId,
+    toLocationId: firstEdge.target,
+    finalLocationId: pathLocationIds[pathLocationIds.length - 1],
   }, now);
 };
 
@@ -1137,9 +1171,7 @@ const applyActionResult = (
   if (result.kind === 'relocate') {
     const locationId = resolveLocationId(state, context, result.locationId);
     return {
-      ...state,
-      currentLocationId: locationId,
-      discoveredLocationIds: Array.from(new Set([...state.discoveredLocationIds, locationId])),
+      ...exploreLocation(state, locationId),
       activeTravel: null,
     };
   }
@@ -1535,6 +1567,74 @@ const appendIdleDebugMessage = (
       },
     }, now + 2);
 
+const completeDueTravelSegments = (
+  state: UniversePlayState,
+  now: number,
+) => {
+  let nextState = state;
+  let completedReport: Extract<IdleReport, { kind: 'travelCompleted' }> | null = null;
+
+  while (nextState.activeTravel && nextState.activeTravel.completesAt <= now) {
+    const activeTravel = nextState.activeTravel;
+    const destinationLocationId = activeTravel.toLocationId;
+    const completedAt = activeTravel.completesAt;
+    const nextPathIndex = activeTravel.pathIndex + 1;
+    const nextSegmentTarget = activeTravel.pathLocationIds[nextPathIndex + 1];
+    const segmentCompletedState = appendRunLog({
+      ...exploreLocation(nextState, destinationLocationId),
+      activeTravel: null,
+      lastTickAt: completedAt,
+    }, 'engine', 'travel.complete-segment', {
+      actionId: activeTravel.actionId,
+      fromLocationId: activeTravel.fromLocationId,
+      toLocationId: activeTravel.toLocationId,
+      finalLocationId: activeTravel.finalLocationId,
+      pathIndex: activeTravel.pathIndex,
+    }, completedAt);
+
+    if (nextSegmentTarget) {
+      const nextStartedAt = completedAt;
+      const nextDurationSeconds = activeTravel.pathSegmentDurationsSeconds[nextPathIndex] ?? 0;
+      nextState = appendRunLog({
+        ...segmentCompletedState,
+        activeTravel: {
+          ...activeTravel,
+          actionId: activeTravel.pathActionIds[nextPathIndex],
+          fromLocationId: destinationLocationId,
+          toLocationId: nextSegmentTarget,
+          startedAt: nextStartedAt,
+          completesAt: nextStartedAt + nextDurationSeconds * 1000,
+          pathIndex: nextPathIndex,
+        },
+        lastTickAt: completedAt,
+      }, 'engine', 'travel.start-segment', {
+        actionId: activeTravel.pathActionIds[nextPathIndex],
+        fromLocationId: destinationLocationId,
+        toLocationId: nextSegmentTarget,
+        finalLocationId: activeTravel.finalLocationId,
+        pathIndex: nextPathIndex,
+      }, completedAt);
+      continue;
+    }
+
+    nextState = appendRunLog(segmentCompletedState, 'engine', 'travel.complete', {
+      actionId: activeTravel.actionId,
+      fromLocationId: activeTravel.pathLocationIds[0],
+      toLocationId: activeTravel.finalLocationId,
+      pathLocationIds: activeTravel.pathLocationIds,
+    }, completedAt);
+    completedReport = {
+      kind: 'travelCompleted',
+      inactiveMs: 0,
+      fromLocationId: activeTravel.pathLocationIds[0],
+      toLocationId: activeTravel.finalLocationId,
+      completedAt,
+    };
+  }
+
+  return { state: nextState, completedReport };
+};
+
 export const resolveIdleTimers = (
   state: UniversePlayState,
   contextOrActions: ActionResolutionContext | GameAction[],
@@ -1553,35 +1653,18 @@ export const resolveIdleTimers = (
   }
   state = applyActiveEffects(state, context, now, { random: options.random });
 
-  if (state.activeTravel && state.activeTravel.completesAt <= now) {
-    const activeTravel = state.activeTravel;
-    const destinationLocationId = state.activeTravel.toLocationId;
-    const discoveredLocationIds = state.discoveredLocationIds.includes(destinationLocationId)
-      ? state.discoveredLocationIds
-      : [...state.discoveredLocationIds, destinationLocationId];
-    const nextState = appendRunLog({
-      ...state,
-      currentLocationId: destinationLocationId,
-      discoveredLocationIds,
-      activeTravel: null,
-      lastTickAt: now,
-    }, 'engine', 'travel.complete', {
-      edgeId: activeTravel.edgeId,
-      fromLocationId: activeTravel.fromLocationId,
-      toLocationId: activeTravel.toLocationId,
-    }, activeTravel.completesAt);
+  const travelCompletion = completeDueTravelSegments(state, now);
+  state = travelCompletion.state;
+  if (travelCompletion.completedReport) {
     const report: IdleReport = reportEnabled
       ? {
-          kind: 'travelCompleted',
+          ...travelCompletion.completedReport,
           inactiveMs,
-          fromLocationId: activeTravel.fromLocationId,
-          toLocationId: activeTravel.toLocationId,
-          completedAt: activeTravel.completesAt,
         }
       : noIdleReport();
 
     return {
-      state: options.debugEnabled && report.kind !== 'none' ? appendIdleDebugMessage(nextState, report, now) : nextState,
+      state: options.debugEnabled && report.kind !== 'none' ? appendIdleDebugMessage(state, report, now) : state,
       report,
     };
   }

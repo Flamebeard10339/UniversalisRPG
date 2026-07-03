@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { collectionCategoryTitleKey, collectionDropKey, collectionKillKey, collectionTrackedItemIds } from '../game/collectionLog';
-import { entityTitleKey, itemTitleKey } from '../game/contentIds';
+import { entityTitleKey, itemTitleKey, locationDescriptionKey, locationTitleKey } from '../game/contentIds';
 import type { ContentBundle, UniversePlayState } from '../game/types';
 import type { Translator } from '../game/i18n';
 
@@ -42,9 +42,34 @@ export const CollectionLogPanel = ({ bundle, playState, t }: CollectionLogPanelP
   const [expandedEntries, setExpandedEntries] = useState<Record<string, boolean>>({});
   const entries = entriesForBundle(bundle, playState);
   const categoryIds = Array.from(new Set(entries.map((entry) => entry.categoryId)));
+  const exploredLocationIds = new Set(playState.discoveredLocationIds);
+  const exploredLocations = bundle.locations.filter((location) =>
+    exploredLocationIds.has(location.id) || playState.collectionLog[`location:${location.id}:explored`] > 0,
+  );
 
   return (
     <section className="grid gap-4">
+      <section className="grid gap-3 rounded border border-slate-800 bg-slate-900 p-4">
+        <div>
+          <h2 className="text-base font-semibold text-slate-100">{t('collectionLog.locations.title')}</h2>
+          <p className="text-sm text-slate-400">
+            {t('collectionLog.locations.progress', { completed: exploredLocations.length, total: bundle.locations.length })}
+          </p>
+        </div>
+        {exploredLocations.length === 0 ? (
+          <p className="text-sm text-slate-500">{t('collectionLog.noDiscoveredEntries')}</p>
+        ) : (
+          <div className="grid gap-2">
+            {exploredLocations.map((location) => (
+              <section className="rounded border border-slate-800 bg-slate-950 p-3" key={location.id}>
+                <h3 className="text-sm font-semibold text-slate-100">{t(locationTitleKey(location.id), location.id)}</h3>
+                <p className="mt-1 text-sm text-slate-400">{t(locationDescriptionKey(location.id), '')}</p>
+              </section>
+            ))}
+          </div>
+        )}
+      </section>
+
       {categoryIds.length === 0 ? (
         <section className="rounded border border-slate-800 bg-slate-900 p-4">
           <p className="text-sm text-slate-500">{t('collectionLog.empty')}</p>
@@ -114,4 +139,3 @@ export const CollectionLogPanel = ({ bundle, playState, t }: CollectionLogPanelP
     </section>
   );
 };
-

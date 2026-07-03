@@ -14,7 +14,6 @@ const bundle: ContentBundle = {
     files: [],
   },
   locations: [{ id: 'room', position: { x: 0, y: 0 }, starting: true }],
-  edges: [],
   actions: [{ id: 'walk', locationId: 'room', durationSeconds: 120, rewards: [] }],
   skills: [],
   stats: [{ id: 'air-capacity', base: 100 }, { id: 'air-loss', base: -60 }],

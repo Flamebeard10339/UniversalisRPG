@@ -18,7 +18,6 @@ const bundle: ContentBundle = {
     combatBalance: { 'damage-scaler': 0.1 },
   },
   locations: [{ id: 'start', position: { x: 0, y: 0 }, starting: true }],
-  edges: [],
   actions: [],
   skills: [
     { id: 'attack', maxLevel: 100, statId: 'attack' },

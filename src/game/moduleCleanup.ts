@@ -11,7 +11,7 @@ export type ModuleCleanupReport = {
   removedActionIds: string[];
   removedLocationIds: string[];
   cancelledActionId?: string;
-  cancelledTravelEdgeId?: string;
+  cancelledTravelActionId?: string;
   cancelledDialogueId?: string;
   cancelledDialogueNodeId?: string;
   relocatedToLocationId?: string;
@@ -37,7 +37,7 @@ export const hasModuleCleanupChanges = (report: ModuleCleanupReport) =>
   report.removedFlagIds.length > 0 ||
   report.removedActionIds.length > 0 ||
   report.removedLocationIds.length > 0 ||
-  Boolean(report.cancelledActionId || report.cancelledTravelEdgeId || report.cancelledDialogueId || report.cancelledDialogueNodeId || report.relocatedToLocationId);
+  Boolean(report.cancelledActionId || report.cancelledTravelActionId || report.cancelledDialogueId || report.cancelledDialogueNodeId || report.relocatedToLocationId);
 
 const filterRecord = <T>(
   record: Record<string, T>,
@@ -54,7 +54,6 @@ export const sanitizePlayStateForBundle = (
 ) => {
   const report = emptyReport();
   const locationIds = new Set(bundle.locations.map((location) => location.id));
-  const edgeIds = new Set(bundle.edges.map((edge) => edge.id));
   const actionIds = new Set(bundle.actions.map((action) => action.id));
   const skillIds = new Set(bundle.skills.map((skill) => skill.id));
   const statIds = new Set(bundle.stats.map((stat) => stat.id));
@@ -62,12 +61,15 @@ export const sanitizePlayStateForBundle = (
   const flagIds = new Set((bundle.flags ?? []).map((flag) => flag.id));
   const resourceIds = new Set((bundle.resourceDefinitions ?? []).map((resource) => resource.id));
   const dialogueIds = new Set((bundle.dialogues ?? []).map((dialogue) => dialogue.id));
-  const collectionLogIds = new Set((bundle.entities ?? []).flatMap((entity) =>
-    (entity.collectionLog ?? []).flatMap((definition) => [
+  const collectionLogIds = new Set([
+    ...bundle.locations.map((location) => `location:${location.id}:explored`),
+    ...(bundle.entities ?? []).flatMap((entity) =>
+      (entity.collectionLog ?? []).flatMap((definition) => [
       collectionKillKey(entity.id),
       ...collectionTrackedItemIds(definition, bundle).map((itemId) => collectionDropKey(entity.id, itemId)),
-    ]),
-  ));
+      ]),
+    ),
+  ]);
   const validFallbackLocationId = locationIds.has(fallbackLocationId)
     ? fallbackLocationId
     : bundle.locations.find((location) => location.starting)?.id ?? bundle.locations[0]?.id ?? state.currentLocationId;
@@ -94,12 +96,14 @@ export const sanitizePlayStateForBundle = (
   if (state.activeAction && !activeAction) report.cancelledActionId = state.activeAction.actionId;
 
   const activeTravel = state.activeTravel &&
-    edgeIds.has(state.activeTravel.edgeId) &&
+    actionIds.has(state.activeTravel.actionId) &&
+    state.activeTravel.pathActionIds.every((actionId) => actionIds.has(actionId)) &&
+    state.activeTravel.pathLocationIds.every((locationId) => locationIds.has(locationId)) &&
     locationIds.has(state.activeTravel.fromLocationId) &&
     locationIds.has(state.activeTravel.toLocationId)
     ? state.activeTravel
     : null;
-  if (state.activeTravel && !activeTravel) report.cancelledTravelEdgeId = state.activeTravel.edgeId;
+  if (state.activeTravel && !activeTravel) report.cancelledTravelActionId = state.activeTravel.actionId;
 
   const activeDialogueDefinition = state.activeDialogue
     ? (bundle.dialogues ?? []).find((dialogue) => dialogue.id === state.activeDialogue?.dialogueId)

@@ -1,13 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import { canStartAction } from '../../game/conditions';
-import { edgeId, toKebabInput } from '../../game/contentIds';
+import { toKebabInput } from '../../game/contentIds';
 import type { Translator } from '../../game/i18n';
-import type { Condition, ContentBundle, ContributionDraft, GameAction, LocationNode, NumericComparison, Reward, TravelEdgeDefinition, UniversePlayState } from '../../game/types';
+import type { Condition, ContentBundle, ContributionDraft, GameAction, LocationNode, NumericComparison, Reward, UniversePlayState } from '../../game/types';
 import { readStateVariable, stateVariableKeys, writeStateVariable, type StateVariableValue } from '../../game/stateVariables';
 import { useContributionPlayState } from '../../stores/contributionPlayState';
 import { StructuredDataEditor, type StructuredValue } from '../structuredData/StructuredData';
 import { actionSchema } from '../structuredData/contentSchemas';
-import { EdgeFields, LocationFields } from './MapContentFields';
+import { LocationFields } from './MapContentFields';
 
 type StateKey = string;
 
@@ -123,7 +123,6 @@ export const ContributionWorkbench = ({ baseBundle, bundle, draft, onPatchDraft,
   const filteredActions = currentActions.filter((action) => actionMatchesStateFilter(action, filterKey, filterValue));
   const selectedAction = bundle.actions.find((action) => action.id === selectedActionId) ?? null;
   const currentLocation = bundle.locations.find((location) => location.id === playState.currentLocationId)!;
-  const connections = bundle.edges.filter((edge) => edge.source === currentLocation.id || edge.target === currentLocation.id);
 
   const removed = draft.removed;
   const upsertAction = (action: GameAction, originalId = action.id) => onPatchDraft({
@@ -140,15 +139,8 @@ export const ContributionWorkbench = ({ baseBundle, bundle, draft, onPatchDraft,
       ...(originalId !== location.id && baseBundle.locations.some((item) => item.id === originalId) ? [originalId] : []),
     ])) },
   });
-  const upsertEdge = (edge: TravelEdgeDefinition, originalId = edge.id) => onPatchDraft({
-    edges: [edge, ...draft.edges.filter((item) => item.id !== originalId && item.id !== edge.id)],
-    removed: { ...removed, edges: Array.from(new Set([
-      ...removed.edges.filter((id) => id !== edge.id),
-      ...(originalId !== edge.id && baseBundle.edges.some((item) => item.id === originalId) ? [originalId] : []),
-    ])) },
-  });
-  const removeContent = (kind: 'actions' | 'locations' | 'edges', id: string) => {
-    const baseItems = kind === 'actions' ? baseBundle.actions : kind === 'locations' ? baseBundle.locations : baseBundle.edges;
+  const removeContent = (kind: 'actions' | 'locations', id: string) => {
+    const baseItems = kind === 'actions' ? baseBundle.actions : baseBundle.locations;
     onPatchDraft({
       [kind]: draft[kind].filter((item) => item.id !== id),
       removed: { ...removed, [kind]: baseItems.some((item) => item.id === id) ? Array.from(new Set([...removed[kind], id])) : removed[kind].filter((item) => item !== id) },
@@ -180,8 +172,6 @@ export const ContributionWorkbench = ({ baseBundle, bundle, draft, onPatchDraft,
       </section>
 
       <section className="grid gap-3 rounded border border-slate-700 p-3"><div className="flex items-center justify-between gap-2"><h3 className="font-semibold text-slate-100">{t('workbench.locationEditor')}</h3><button className="rounded bg-cyan-400 px-3 py-2 text-sm font-semibold text-slate-950" onClick={() => { const id = toKebabInput(`location-${Date.now().toString(36)}`); const location = { id, position: { x: currentLocation.position.x + 160, y: currentLocation.position.y } }; upsertLocation(location); onReplaceState({ ...playState, currentLocationId: id, discoveredLocationIds: [...playState.discoveredLocationIds, id] }); }} type="button">{t('contribution.data.addLocation')}</button></div><LocationFields location={currentLocation} onChange={(next) => { upsertLocation(next, currentLocation.id); if (next.id !== currentLocation.id) onReplaceState({ ...playState, currentLocationId: next.id, discoveredLocationIds: playState.discoveredLocationIds.map((id) => id === currentLocation.id ? next.id : id) }); }} onRemove={() => { if (bundle.locations.length <= 1) return; const next = bundle.locations.find((location) => location.id !== currentLocation.id)!; onReplaceState({ ...playState, currentLocationId: next.id, activeAction: null, activeTravel: null }); removeContent('locations', currentLocation.id); }} t={t} /></section>
-
-      <section className="grid gap-3 rounded border border-slate-700 p-3"><div className="flex items-center justify-between gap-2"><div><h3 className="font-semibold text-slate-100">{t('workbench.connections')}</h3><p className="text-xs text-slate-400">{t('workbench.connectionsDescription')}</p></div>{bundle.locations.length > 1 && <button className="rounded bg-cyan-400 px-3 py-2 text-sm font-semibold text-slate-950" onClick={() => { const target = bundle.locations.find((location) => location.id !== currentLocation.id)!; const id = toKebabInput(`${currentLocation.id}-${target.id}-${Date.now().toString(36)}`); upsertEdge({ id, source: currentLocation.id, target: target.id, travelTimeSeconds: 1 }); }} type="button">{t('contribution.data.addEdge')}</button>}</div>{connections.map((edge) => <EdgeFields bundle={bundle} edge={edge} key={edge.id} onChange={(next) => { const normalized = { ...next, id: edgeId(next.source, next.target) }; upsertEdge(normalized, edge.id); }} onRemove={() => removeContent('edges', edge.id)} t={t} />)}<datalist id="content-location-ids">{bundle.locations.map((location) => <option key={location.id} value={location.id} />)}</datalist></section>
     </section>
   );
 };

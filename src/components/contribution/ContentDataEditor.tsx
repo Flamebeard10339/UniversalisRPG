@@ -1,7 +1,7 @@
 import { useRef, useState, type MutableRefObject } from 'react';
-import { edgeId, toKebabInput } from '../../game/contentIds';
+import { toKebabInput } from '../../game/contentIds';
 import type { Translator } from '../../game/i18n';
-import type { BasePlayerDefinition, CombatBalanceDefinition, ContentBundle, ContentModule, ContentModulePack, ContributionDraft, ContributionRemovedIds, DialogueDefinition, DisplayProfileDefinition, DropTableDefinition, EffectDefinition, EnemyDefinition, ExperienceTrigger, GameAction, InteractionTypeDefinition, ItemDefinition, LocationNode, ResourceDefinition, SkillDefinition, StatDefinition, StateFlagDefinition, TravelEdgeDefinition, UniverseUiSettings } from '../../game/types';
+import type { BasePlayerDefinition, CombatBalanceDefinition, ContentBundle, ContentModule, ContentModulePack, ContributionDraft, ContributionRemovedIds, DialogueDefinition, DisplayProfileDefinition, DropTableDefinition, EffectDefinition, EnemyDefinition, ExperienceTrigger, GameAction, InteractionTypeDefinition, ItemDefinition, LocationNode, ResourceDefinition, SkillDefinition, StatDefinition, StateFlagDefinition, UniverseUiSettings } from '../../game/types';
 import { editableModuleJsonFiles } from '../../game/contributionFiles';
 import { ContributionMapEditor } from './ContributionMapEditor';
 import { EnemyDiagnostics } from './EnemyDiagnostics';
@@ -9,9 +9,9 @@ import { DEBUG_PLAYER_PROFILES, getProfileStatSummary, profileDescription, profi
 import { resolveCombatBalance } from '../../game/combatBalance';
 import { getEnemyStat, normalizeEnemyStats } from '../../game/enemies';
 import { resolveUniverseUiSettings } from '../../game/universeSettings';
-import { EdgeFields, LocationFields } from './MapContentFields';
+import { LocationFields } from './MapContentFields';
 import { StructuredDataEditor, type StructuredSchema, type StructuredValue } from '../structuredData/StructuredData';
-import { actionSchema, basePlayerSchema, combatBalanceSchema, contentModuleSchema, dialogueSchema, displayProfileSchema, dropTableDefinitionSchema, edgeSchema, effectDefinitionSchema, enemyStatsSchema, flagDefinitionSchema, interactionTypeDefinitionSchema, itemDefinitionSchema, locationSchema, modulePackSchema, resourceDefinitionSchema, rewardSchema, skillDefinitionSchema, statDefinitionSchema, universeExperienceSchema, universeUiSchema } from '../structuredData/contentSchemas';
+import { actionSchema, basePlayerSchema, combatBalanceSchema, contentModuleSchema, dialogueSchema, displayProfileSchema, dropTableDefinitionSchema, effectDefinitionSchema, enemyStatsSchema, flagDefinitionSchema, interactionTypeDefinitionSchema, itemDefinitionSchema, locationSchema, modulePackSchema, resourceDefinitionSchema, rewardSchema, skillDefinitionSchema, statDefinitionSchema, universeExperienceSchema, universeUiSchema } from '../structuredData/contentSchemas';
 
 type ContentDataEditorProps = {
   activeTab: ContentDataTab;
@@ -61,7 +61,6 @@ const withoutId = <T extends { id: string }>(items: T[], id: string) => items.fi
 const uniqueStrings = (items: string[]) => Array.from(new Set(items));
 const emptyRemoved = (): ContributionRemovedIds => ({
   locations: [],
-  edges: [],
   entities: [],
   actions: [],
   skills: [],
@@ -115,7 +114,6 @@ export const ContentDataEditor = ({ activeTab, baseBundle, bundle, draft, onPatc
   const removed = { ...emptyRemoved(), ...(draft.removed ?? {}) };
   const removeButtonClass = 'rounded border border-rose-500 px-2 py-1.5 text-sm font-semibold text-rose-200';
   const locations = layeredRows(draft.locations, baseBundle.locations, removed.locations, filter);
-  const edges = layeredRows(draft.edges, baseBundle.edges, removed.edges, filter);
   const actions = layeredRows(draft.actions, baseBundle.actions, removed.actions, filter);
   const skills = layeredRows(draft.skills, baseBundle.skills, removed.skills, filter);
   const stats = layeredRows(draft.stats, baseBundle.stats, removed.stats, filter);
@@ -135,7 +133,6 @@ export const ContentDataEditor = ({ activeTab, baseBundle, bundle, draft, onPatc
   const contributionBundle = {
     ...bundle,
     locations: locations.map((row) => row.item),
-    edges: edges.map((row) => row.item),
     dropTables: dropTables.map((row) => row.item),
   };
 
@@ -162,12 +159,6 @@ export const ContentDataEditor = ({ activeTab, baseBundle, bundle, draft, onPatc
 
   const updateLocation = (row: LayeredRow<LocationNode>, patch: Partial<LocationNode>) => {
     promote('locations', { ...row.item, ...patch }, row.item.id);
-  };
-
-  const updateEdge = (row: LayeredRow<TravelEdgeDefinition>, patch: Partial<TravelEdgeDefinition>) => {
-    const edge = { ...row.item, ...patch };
-    const nextEdge = patch.source || patch.target ? { ...edge, id: edgeId(edge.source, edge.target) } : edge;
-    promote('edges', nextEdge, row.item.id);
   };
 
   const updateSkill = (row: LayeredRow<SkillDefinition>, patch: Partial<SkillDefinition>) => {
@@ -282,24 +273,6 @@ export const ContentDataEditor = ({ activeTab, baseBundle, bundle, draft, onPatc
         ...draft.locations,
       ],
     });
-  };
-
-  const addEdge = () => {
-    const locationItems = locations.map((row) => row.item);
-    const edgeItems = edges.map((row) => row.item);
-    const source = locationItems[0]?.id ?? '';
-    const target = locationItems.find((location) => location.id !== source)?.id ?? '';
-
-    if (!source || !target) {
-      return;
-    }
-
-    const id = edgeId(source, target);
-    if (edgeItems.some((edge) => edge.id === id)) {
-      return;
-    }
-
-    onPatch({ edges: [{ id, source, target, travelTimeSeconds: 15 }, ...draft.edges] });
   };
 
   const addAction = () => {
@@ -450,7 +423,6 @@ export const ContentDataEditor = ({ activeTab, baseBundle, bundle, draft, onPatc
       });
     } },
     { path: 'locations.json', json: locations.map((row) => row.item), schema: { kind: 'array' as const, listMode: 'free' as const, item: locationSchema(), createItem: () => ({ id: 'new-location', position: { x: 0, y: 0 } }) }, onChange: (value: StructuredValue | undefined) => onPatch({ locations: (Array.isArray(value) ? value : []) as unknown as LocationNode[] }) },
-    { path: 'edges.json', json: edges.map((row) => row.item), schema: { kind: 'array' as const, listMode: 'table' as const, columns: ['id', 'source', 'target', 'travelTimeSeconds'], item: edgeSchema(bundle), createItem: () => ({ id: 'new-edge', source: locations[0]?.item.id ?? '', target: locations[1]?.item.id ?? '', travelTimeSeconds: 1 }) }, onChange: (value: StructuredValue | undefined) => onPatch({ edges: (Array.isArray(value) ? value : []) as unknown as TravelEdgeDefinition[] }) },
     { path: 'actions.json', json: actions.map((row) => row.item), onChange: (value: StructuredValue | undefined) => onPatch({ actions: (Array.isArray(value) ? value : []) as unknown as GameAction[] }) },
     { path: 'dialogues.json', json: dialogues.map((row) => row.item), schema: { kind: 'array' as const, listMode: 'free' as const, item: dialogueSchema(bundle), createItem: () => ({ id: 'new-dialogue', startNodeId: 'start', nodes: [{ id: 'start', textKey: 'dialogue.new-dialogue.start' }] }) }, onChange: (value: StructuredValue | undefined) => onPatch({ dialogues: (Array.isArray(value) ? value : []) as unknown as DialogueDefinition[] }) },
     { path: 'drop-tables.json', json: dropTables.map((row) => row.item), schema: { kind: 'array' as const, listMode: 'free' as const, item: dropTableDefinitionSchema(bundle), createItem: () => ({ id: 'new-drop-table', mode: 'dependent', drops: [] }) }, onChange: (value: StructuredValue | undefined) => onPatch({ dropTables: (Array.isArray(value) ? value : []) as unknown as DropTableDefinition[] }) },
@@ -512,7 +484,6 @@ export const ContentDataEditor = ({ activeTab, baseBundle, bundle, draft, onPatc
         <section className="grid gap-2">
           <ContributionMapEditor
             bundle={contributionBundle}
-            onEdgesChange={(edges) => onPatch({ edges })}
             onLocationsChange={(locations) => onPatch({ locations })}
             t={t}
           />
@@ -543,30 +514,6 @@ export const ContentDataEditor = ({ activeTab, baseBundle, bundle, draft, onPatc
             )}
           </div>
 
-          <div className="grid gap-1 rounded border border-slate-700 p-2">
-            <div className="flex items-center justify-between gap-3">
-              <h3 className="text-sm font-semibold text-slate-100">{t('contribution.data.edges')}</h3>
-              <button className="rounded bg-cyan-400 px-3 py-2 text-sm font-semibold text-slate-950" onClick={addEdge} type="button">
-                {t('contribution.data.addEdge')}
-              </button>
-            </div>
-            <div className="hidden grid-cols-[1fr_1fr_1fr_8rem_6rem] gap-2 px-2 text-xs font-semibold uppercase tracking-wide text-slate-500 lg:grid">
-              <span>{t('contribution.column.id')}</span>
-              <span>{t('contribution.column.source')}</span>
-              <span>{t('contribution.column.target')}</span>
-              <span>{t('contribution.column.seconds')}</span>
-              <span>{t('contribution.column.remove')}</span>
-            </div>
-            {edges.length === 0 ? (
-              <p className="px-2 py-1 text-sm text-slate-500">{t('contribution.data.noEdgeChanges')}</p>
-            ) : (
-              <div className="grid gap-1">
-                {edges.map((row) => (
-                  <EdgeFields bundle={bundle} edge={row.item} key={`${row.source}-${row.index}`} onChange={(edge) => updateEdge(row, edge)} onRemove={() => removeRow('edges', row)} t={t} />
-                ))}
-              </div>
-            )}
-          </div>
         </section>
       )}
 

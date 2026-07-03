@@ -20,7 +20,6 @@ import type {
   SkillDefinition,
   StatDefinition,
   StateFlagDefinition,
-  TravelEdgeDefinition,
   UniverseManifest,
   ValidationIssue,
 } from './types';
@@ -143,7 +142,9 @@ export const validateManifest = (value: unknown): value is UniverseManifest =>
   (value.ui === undefined ||
     (isRecord(value.ui) &&
       (value.ui.floatingTextDurationSeconds === undefined || hasNumber(value.ui, 'floatingTextDurationSeconds')) &&
-      (value.ui.loopActionsByDefault === undefined || typeof value.ui.loopActionsByDefault === 'boolean')));
+      (value.ui.loopActionsByDefault === undefined || typeof value.ui.loopActionsByDefault === 'boolean') &&
+      (value.ui.travelPathMaxSeconds === undefined || hasNumber(value.ui, 'travelPathMaxSeconds')) &&
+      (value.ui.travelPathMaxNodes === undefined || hasNumber(value.ui, 'travelPathMaxNodes'))));
 
 const validateLocationsShape = (locations: unknown): locations is LocationNode[] =>
   Array.isArray(locations) &&
@@ -174,17 +175,6 @@ const validateEntitiesShape = (entities: unknown): entities is EntityDefinition[
         (definition.itemIds === undefined || validateStringArray(definition.itemIds)),
       ))),
     ));
-
-const validateEdgesShape = (edges: unknown): edges is TravelEdgeDefinition[] =>
-  Array.isArray(edges) &&
-  edges.every(
-    (edge) =>
-      isRecord(edge) &&
-      hasString(edge, 'id') &&
-      hasString(edge, 'source') &&
-      hasString(edge, 'target') &&
-      hasNumber(edge, 'travelTimeSeconds'),
-  );
 
 const comparisons = new Set(['equal', 'greater-than', 'less-than']);
 
@@ -255,7 +245,7 @@ const validateActionsShape = (actions: unknown): actions is GameAction[] =>
       isRecord(action) &&
       hasString(action, 'id') &&
       (action.locationId === undefined || hasString(action, 'locationId')) &&
-      (action.role === undefined || action.role === 'optional' || action.role === 'progression' || action.role === 'utility') &&
+      (action.role === undefined || action.role === 'optional' || action.role === 'progression' || action.role === 'utility' || action.role === 'travel') &&
       hasNumber(action, 'durationSeconds') &&
       Array.isArray(action.rewards) && action.rewards.every(validateRewardShape) &&
       (action.experience === undefined || (Array.isArray(action.experience) && action.experience.every(validateExperienceTriggerShape))) &&
@@ -430,10 +420,6 @@ export const validateContentShape = (bundle: Partial<ContentBundle>) => {
     issues.push(error('locations.json', 'validation.locationsShape'));
   }
 
-  if (!validateEdgesShape(bundle.edges)) {
-    issues.push(error('edges.json', 'validation.edgesShape'));
-  }
-
   if (!validateEntitiesShape(bundle.entities)) {
     issues.push(error('entities.json', 'validation.entitiesShape'));
   }
@@ -502,7 +488,6 @@ const findDuplicateIds = <T extends { id: string }>(items: T[], path: string) =>
 export const validateContentReferences = (bundle: ContentBundle) => {
   const issues: ValidationIssue[] = [
     ...findDuplicateIds(bundle.locations, 'locations'),
-    ...findDuplicateIds(bundle.edges, 'edges'),
     ...findDuplicateIds(bundle.entities ?? [], 'entities'),
     ...findDuplicateIds(bundle.actions, 'actions'),
     ...findDuplicateIds(bundle.skills, 'skills'),
@@ -610,28 +595,6 @@ export const validateContentReferences = (bundle: ContentBundle) => {
 
   if (!bundle.locations.some((location) => location.starting)) {
     issues.push(error('locations', 'validation.startingLocationMissing'));
-  }
-
-  for (const edge of bundle.edges) {
-    const duplicatePair = bundle.edges.find(
-      (candidate) =>
-        candidate.id !== edge.id &&
-        ((candidate.source === edge.source && candidate.target === edge.target) ||
-          (candidate.source === edge.target && candidate.target === edge.source)),
-    );
-
-    if (duplicatePair) {
-      issues.push(error(`edges.${edge.id}`, 'validation.duplicateEdge', { source: edge.source, target: edge.target }));
-    }
-    if (!locationIds.has(edge.source)) {
-      issues.push(error(`edges.${edge.id}.source`, 'validation.unknownSourceLocation', { id: edge.source }));
-    }
-    if (!locationIds.has(edge.target)) {
-      issues.push(error(`edges.${edge.id}.target`, 'validation.unknownTargetLocation', { id: edge.target }));
-    }
-    if (edge.travelTimeSeconds <= 0) {
-      issues.push(error(`edges.${edge.id}.travelTimeSeconds`, 'validation.travelTimePositive'));
-    }
   }
 
   for (const entity of bundle.entities ?? []) {
@@ -984,7 +947,6 @@ export const mergeDraftIntoBundle = (bundle: ContentBundle, draft: ContributionD
         }
       : bundle.manifest,
     locations: mergeById(removeById(bundle.locations, draft.removed?.locations ?? []), draft.locations),
-    edges: mergeById(removeById(bundle.edges, draft.removed?.edges ?? []), draft.edges),
     entities: mergeById(removeById(bundle.entities ?? [], draft.removed?.entities ?? []), draft.entities ?? []),
     actions: mergeById(removeById(bundle.actions, draft.removed?.actions ?? []), draft.actions),
     skills: mergeById(removeById(bundle.skills, draft.removed?.skills ?? []), draft.skills),

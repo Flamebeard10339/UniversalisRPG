@@ -33,11 +33,6 @@ export const entityDefinitionSchema = (bundle: ContentBundle): StructuredSchema 
   } }, createItem: () => ({ categoryId: 'enemies', actionId: bundle.actions[0]?.id ?? '', killTargetCount: 1, dropTableIds: [], itemIds: [] }) }, optional: true, defaultValue: [] },
 } });
 
-export const edgeSchema = (bundle: ContentBundle): StructuredSchema => ({ kind: 'object', fields: {
-  id: { schema: string() }, source: { schema: string(bundle.locations.map((item) => item.id)) }, target: { schema: string(bundle.locations.map((item) => item.id)) },
-  travelTimeSeconds: { schema: number(0) },
-} });
-
 export const flagDefinitionSchema = (): StructuredSchema => ({ kind: 'object', fields: {
   id: { label: 'contribution.column.id', schema: string() },
   initialValue: { label: 'contribution.column.initialValue', schema: { kind: 'scalar', types: ['boolean', 'number', 'string'] }, optional: true, defaultValue: false },
@@ -108,7 +103,7 @@ export const experienceTriggerSchema = (bundle: ContentBundle): StructuredSchema
 export const actionSchema = (bundle: ContentBundle): StructuredSchema => ({ kind: 'object', fields: {
   id: { label: 'contribution.column.id', schema: string() },
   locationId: { label: 'contribution.column.location', schema: string(bundle.locations.map((item) => item.id)) },
-  role: { label: 'contribution.column.actionRole', schema: { kind: 'enum', options: ['optional', 'progression', 'utility'] }, optional: true, defaultValue: 'optional' },
+  role: { label: 'contribution.column.actionRole', schema: { kind: 'enum', options: ['optional', 'progression', 'utility', 'travel'] }, optional: true, defaultValue: 'optional' },
   durationSeconds: { label: 'contribution.column.actionDuration', schema: number(0) },
   rewards: { label: 'contribution.column.rewards', schema: { kind: 'array', listMode: 'free', item: rewardSchema(bundle), createItem: () => ({ kind: 'resource', resourceId: bundle.resourceDefinitions[0]?.id ?? '', amount: 1 }) } },
   experience: { label: 'contribution.column.experience', schema: { kind: 'array', listMode: 'free', item: experienceTriggerSchema(bundle), createItem: () => ({ event: 'action-complete', skillId: bundle.skills[0]?.id ?? '', amount: 1 }) }, optional: true, defaultValue: [] },
@@ -265,7 +260,6 @@ export const displayProfileSchema = (): StructuredSchema => ({ kind: 'object', f
 
 export const moduleDataSectionSchema = (bundle: ContentBundle): StructuredSchema => ({ kind: 'object', fields: {
   locations: { label: 'contribution.data.locations', schema: { kind: 'array', listMode: 'free', item: locationSchema(), createItem: () => ({ id: 'new-location', position: { x: 0, y: 0 } }) }, optional: true, defaultValue: [] },
-  edges: { label: 'contribution.data.edges', schema: { kind: 'array', listMode: 'table', columns: ['id', 'source', 'target', 'travelTimeSeconds'], item: edgeSchema(bundle), createItem: () => ({ id: 'new-edge', source: bundle.locations[0]?.id ?? '', target: bundle.locations[1]?.id ?? '', travelTimeSeconds: 1 }) }, optional: true, defaultValue: [] },
   entities: { label: 'contribution.data.entities', schema: { kind: 'array', listMode: 'free', item: entityDefinitionSchema(bundle), createItem: () => ({ id: 'new-entity', actionIds: [] }) }, optional: true, defaultValue: [] },
   actions: { label: 'contribution.data.actions', schema: { kind: 'array', listMode: 'free', item: actionSchema(bundle), createItem: () => ({ id: 'new-action', locationId: bundle.locations[0]?.id ?? '', durationSeconds: 1, rewards: [] }) }, optional: true, defaultValue: [] },
   skills: { label: 'contribution.data.skills', schema: { kind: 'array', listMode: 'table', columns: ['id', 'maxLevel', 'statId'], item: skillDefinitionSchema(bundle), createItem: () => ({ id: 'new-skill', maxLevel: 100 }) }, optional: true, defaultValue: [] },
@@ -311,7 +305,6 @@ const dialogueOptionRemovalSchema = (bundle: ContentBundle): StructuredSchema =>
 
 export const moduleRemoveSchema = (bundle: ContentBundle): StructuredSchema => ({ kind: 'object', fields: {
   locations: { label: 'contribution.data.locations', schema: idListSchema(bundle.locations.map((item) => item.id)), optional: true, defaultValue: [] },
-  edges: { label: 'contribution.data.edges', schema: idListSchema(bundle.edges.map((item) => item.id)), optional: true, defaultValue: [] },
   entities: { label: 'contribution.data.entities', schema: idListSchema((bundle.entities ?? []).map((item) => item.id)), optional: true, defaultValue: [] },
   actions: { label: 'contribution.data.actions', schema: idListSchema(bundle.actions.map((item) => item.id)), optional: true, defaultValue: [] },
   skills: { label: 'contribution.data.skills', schema: idListSchema(bundle.skills.map((item) => item.id)), optional: true, defaultValue: [] },
@@ -367,6 +360,8 @@ export const modulePackSchema = (bundle: ContentBundle): StructuredSchema => ({ 
 export const universeUiSchema = (): StructuredSchema => ({ kind: 'object', fields: {
   floatingTextDurationSeconds: { label: 'contribution.universe.floatingTextDuration', schema: number(0.001), optional: true },
   loopActionsByDefault: { label: 'contribution.universe.loopActionsByDefault', schema: boolean, optional: true },
+  travelPathMaxSeconds: { label: 'contribution.universe.travelPathMaxSeconds', schema: number(0.001), optional: true },
+  travelPathMaxNodes: { label: 'contribution.universe.travelPathMaxNodes', schema: number(1), optional: true },
 } });
 
 export const universeExperienceSchema = (bundle: ContentBundle): StructuredSchema => ({

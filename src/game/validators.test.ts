@@ -15,7 +15,6 @@ const manifest = (patch: Partial<UniverseManifest> = {}): UniverseManifest => ({
 const bundle = (manifestPatch: Partial<UniverseManifest> = {}): ContentBundle => ({
   manifest: manifest(manifestPatch),
   locations: [{ id: 'start', position: { x: 0, y: 0 }, starting: true }],
-  edges: [],
   actions: [],
   skills: [],
   stats: [],

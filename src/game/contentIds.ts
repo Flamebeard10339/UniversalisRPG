@@ -41,4 +41,3 @@ export const resourceTitleKey = (id: string) => `resource.${toKebabCase(id)}.tit
 export const effectTitleKey = (id: string) => `effect.${toKebabCase(id)}.title`;
 export const itemTitleKey = (id: string) => `item.${toKebabCase(id)}.title`;
 export const itemDescriptionKey = (id: string) => `item.${toKebabCase(id)}.description`;
-export const edgeId = (source: string, target: string) => `${toKebabCase(source)}-${toKebabCase(target)}`;

@@ -4,9 +4,8 @@ import { mergeDraftModulesIntoBundle } from './validators';
 import type { ContentBundle, ContentModule } from './types';
 
 const baseBundle = (): ContentBundle => ({
-  manifest: { schemaVersion: 1, id: 'test', version: '0.1.0', author: 'test', locales: ['en'], files: ['locations.json', 'edges.json', 'actions.json', 'skills.json'] },
+  manifest: { schemaVersion: 1, id: 'test', version: '0.1.0', author: 'test', locales: ['en'], files: ['locations.json', 'actions.json', 'skills.json'] },
   locations: [{ id: 'start', position: { x: 0, y: 0 }, starting: true }],
-  edges: [],
   actions: [],
   skills: [],
   stats: [],
@@ -646,7 +645,6 @@ describe('content modules', () => {
       modules: [module({ id: 'draft-module', data: { items: [{ id: 'draft-item' }] } })],
       modulePacks: [],
       locations: [],
-      edges: [],
       actions: [],
       skills: [],
       stats: [],
@@ -659,7 +657,7 @@ describe('content modules', () => {
       dropTables: [],
       dialogues: [],
       locales: {},
-      removed: { locations: [], edges: [], actions: [], skills: [], stats: [], items: [], flags: [], resources: [], effects: [], interactionTypes: [], enemies: [], dropTables: [], dialogues: [], modules: [] },
+      removed: { locations: [], actions: [], skills: [], stats: [], items: [], flags: [], resources: [], effects: [], interactionTypes: [], enemies: [], dropTables: [], dialogues: [], modules: [] },
     });
 
     const result = applyModulesToBundle(bundleWithDraft, bundleWithDraft.modules ?? [], ['draft-module']);
@@ -674,7 +672,6 @@ describe('content modules', () => {
       modules: [module({ id: 'draft-module', data: { items: [{ id: 'draft-item' }] } })],
       modulePacks: [{ id: 'draft-pack', modules: ['draft-module'], packs: [{ id: 'nested-pack', modules: ['draft-module'] }] }],
       locations: [],
-      edges: [],
       actions: [],
       skills: [],
       stats: [],
@@ -687,7 +684,7 @@ describe('content modules', () => {
       dropTables: [],
       dialogues: [],
       locales: {},
-      removed: { locations: [], edges: [], actions: [], skills: [], stats: [], items: [], flags: [], resources: [], effects: [], interactionTypes: [], enemies: [], dropTables: [], dialogues: [], modules: [] },
+      removed: { locations: [], actions: [], skills: [], stats: [], items: [], flags: [], resources: [], effects: [], interactionTypes: [], enemies: [], dropTables: [], dialogues: [], modules: [] },
     });
 
     expect(bundleWithDraft.modulePacks).toEqual([{ id: 'draft-pack', modules: ['draft-module'], packs: [{ id: 'nested-pack', modules: ['draft-module'] }] }]);

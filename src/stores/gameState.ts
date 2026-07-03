@@ -1,5 +1,6 @@
 import { create } from 'zustand';
-import type { ActionResolutionContext, ContentBundle, EquipmentSlot, GameAction, IdleReport, RunLogEntry, TravelEdgeDefinition, UniversePlayState } from '../game/types';
+import type { ActionResolutionContext, ContentBundle, EquipmentSlot, GameAction, IdleReport, RunLogEntry, UniversePlayState } from '../game/types';
+import type { AvailableTravelEdge } from '../game/travel';
 import { appendChatMessage, appendRunLog, cancelDialogue, chooseDialogueOption, createInitialPlayState, normalizePlayState, resetInactiveEffectResources, resolveIdleTimers, startAction, startTravel } from '../game/timers';
 import { equipItem, unequipSlot } from '../game/equipment';
 import { load, remove, save } from '../lib/storage';
@@ -11,7 +12,7 @@ type GameStateStore = {
   hydrate: (universeId: string, startingLocationId: string, context?: Pick<ActionResolutionContext, 'manifest'>) => Promise<void>;
   getUniverseState: (universeId: string, startingLocationId: string, context?: Pick<ActionResolutionContext, 'manifest'>) => UniversePlayState;
   setCurrentLocation: (universeId: string, locationId: string) => void;
-  travelTo: (universeId: string, edge: TravelEdgeDefinition, destinationLocationId: string) => void;
+  travelTo: (universeId: string, path: AvailableTravelEdge[]) => void;
   cancelTravel: (universeId: string) => void;
   startAction: (universeId: string, action: GameAction, context: ActionResolutionContext) => void;
   stopAction: (universeId: string, context: ActionResolutionContext) => void;
@@ -23,6 +24,7 @@ type GameStateStore = {
   unequipSlot: (universeId: string, slot: EquipmentSlot) => void;
   markInactive: (universeId: string) => void;
   sendChatMessage: (universeId: string, text: string) => void;
+  appendSystemMessage: (universeId: string, key: string, params?: Record<string, string | number>) => void;
   recordRunEvent: (universeId: string, actor: RunLogEntry['actor'], event: string, data?: Record<string, unknown>) => void;
   recordAgentMessage: (universeId: string, message: AgentSessionMessage) => void;
   clearRunLog: (universeId: string) => void;
@@ -70,6 +72,10 @@ export const useGameState = create<GameStateStore>((set, get) => ({
         ...current,
         currentLocationId: locationId,
         discoveredLocationIds,
+        collectionLog: {
+          ...current.collectionLog,
+          [`location:${locationId}:explored`]: 1,
+        },
       });
 
       void save(storageKey(universeId), next);
@@ -83,15 +89,16 @@ export const useGameState = create<GameStateStore>((set, get) => ({
     });
   },
 
-  travelTo: (universeId, edge, destinationLocationId) => {
+  travelTo: (universeId, path) => {
     set((state) => {
       const current = state.states[universeId];
+      const destinationLocationId = path[path.length - 1]?.target;
 
-      if (!current || current.activeTravel || current.currentLocationId === destinationLocationId) {
+      if (!current || !destinationLocationId || current.activeTravel || current.currentLocationId === destinationLocationId) {
         return state;
       }
 
-      const next = startTravel(cancelDialogue(current), edge, destinationLocationId);
+      const next = startTravel(cancelDialogue(current), path);
       void save(storageKey(universeId), next);
 
       return {
@@ -325,6 +332,16 @@ export const useGameState = create<GameStateStore>((set, get) => ({
           [universeId]: next,
         },
       };
+    });
+  },
+
+  appendSystemMessage: (universeId, key, params) => {
+    set((state) => {
+      const current = state.states[universeId];
+      if (!current) return state;
+      const next = appendChatMessage(current, { author: 'system', key, params });
+      void save(storageKey(universeId), next);
+      return { states: { ...state.states, [universeId]: next } };
     });
   },
 

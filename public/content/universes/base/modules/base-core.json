@@ -68,18 +68,40 @@
       ]
     },
     {
-      "type": "edge",
-      "id": "crossroads-emberwood",
-      "source": "crossroads",
-      "target": "emberwood",
-      "travelTimeSeconds": 2
+      "type": "action",
+      "id": "travel-crossroads-to-emberwood",
+      "locationId": "crossroads",
+      "role": "travel",
+      "durationSeconds": 2,
+      "rewards": [],
+      "results": [{ "kind": "relocate", "locationId": "emberwood" }]
     },
     {
-      "type": "edge",
-      "id": "crossroads-old-quarry",
-      "source": "crossroads",
-      "target": "old-quarry",
-      "travelTimeSeconds": 2
+      "type": "action",
+      "id": "travel-emberwood-to-crossroads",
+      "locationId": "emberwood",
+      "role": "travel",
+      "durationSeconds": 2,
+      "rewards": [],
+      "results": [{ "kind": "relocate", "locationId": "crossroads" }]
+    },
+    {
+      "type": "action",
+      "id": "travel-crossroads-to-old-quarry",
+      "locationId": "crossroads",
+      "role": "travel",
+      "durationSeconds": 2,
+      "rewards": [],
+      "results": [{ "kind": "relocate", "locationId": "old-quarry" }]
+    },
+    {
+      "type": "action",
+      "id": "travel-old-quarry-to-crossroads",
+      "locationId": "old-quarry",
+      "role": "travel",
+      "durationSeconds": 2,
+      "rewards": [],
+      "results": [{ "kind": "relocate", "locationId": "crossroads" }]
     },
     {
       "type": "stat",
@@ -1114,6 +1136,14 @@
       "location.emberwood.description": "A warm forest of red-barked trees and low-burning leaves.",
       "location.old-quarry.title": "Old Quarry",
       "location.old-quarry.description": "Weather-cut stone terraces hum faintly after sunset.",
+      "action.travel-crossroads-to-emberwood.title": "Travel to Emberwood",
+      "action.travel-crossroads-to-emberwood.description": "Follow the emberleaf trail into the red-barked forest.",
+      "action.travel-emberwood-to-crossroads.title": "Travel to Wayside Crossroads",
+      "action.travel-emberwood-to-crossroads.description": "Return along the emberleaf trail to the crossroads.",
+      "action.travel-crossroads-to-old-quarry.title": "Travel to Old Quarry",
+      "action.travel-crossroads-to-old-quarry.description": "Take the worn stone road toward the quarry.",
+      "action.travel-old-quarry-to-crossroads.title": "Travel to Wayside Crossroads",
+      "action.travel-old-quarry-to-crossroads.description": "Follow the worn stone road back to the crossroads.",
       "action.gather-rumors.title": "Gather Rumors",
       "action.gather-rumors.description": "Listen for useful fragments of old stories and current trouble.",
       "action.gather-rumors.success": "A useful rumor settles into memory.",
