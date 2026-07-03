@@ -184,6 +184,15 @@ export type GameAction = {
 export type EntityDefinition = {
   id: string;
   actionIds: string[];
+  collectionLog?: EntityCollectionLogDefinition[];
+};
+
+export type EntityCollectionLogDefinition = {
+  categoryId: string;
+  actionId: string;
+  killTargetCount?: number;
+  dropTableIds?: string[];
+  itemIds?: string[];
 };
 
 export type SkillDefinition = {
@@ -570,6 +579,7 @@ export type UniversePlayState = {
   inventory: Record<string, number>;
   flags: Record<string, boolean | number | string>;
   actionCompletions: Record<string, number>;
+  collectionLog: Record<string, number>;
   resourcePools: Record<string, ResourcePool>;
   skillXp: Record<string, number>;
   statOverrides: Record<string, number>;

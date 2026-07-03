@@ -1,4 +1,5 @@
 import type { ContentBundle, UniversePlayState } from './types';
+import { collectionDropKey, collectionKillKey, collectionTrackedItemIds } from './collectionLog';
 
 export type ModuleCleanupReport = {
   removedInventoryIds: string[];
@@ -61,6 +62,12 @@ export const sanitizePlayStateForBundle = (
   const flagIds = new Set((bundle.flags ?? []).map((flag) => flag.id));
   const resourceIds = new Set((bundle.resourceDefinitions ?? []).map((resource) => resource.id));
   const dialogueIds = new Set((bundle.dialogues ?? []).map((dialogue) => dialogue.id));
+  const collectionLogIds = new Set((bundle.entities ?? []).flatMap((entity) =>
+    (entity.collectionLog ?? []).flatMap((definition) => [
+      collectionKillKey(entity.id),
+      ...collectionTrackedItemIds(definition, bundle).map((itemId) => collectionDropKey(entity.id, itemId)),
+    ]),
+  ));
   const validFallbackLocationId = locationIds.has(fallbackLocationId)
     ? fallbackLocationId
     : bundle.locations.find((location) => location.starting)?.id ?? bundle.locations[0]?.id ?? state.currentLocationId;
@@ -135,6 +142,7 @@ export const sanitizePlayStateForBundle = (
       resourcePools: filterRecord(state.resourcePools ?? {}, resourceIds),
       flags: filterRecord(state.flags ?? {}, flagIds),
       actionCompletions: filterRecord(state.actionCompletions ?? {}, actionIds),
+      collectionLog: filterRecord(state.collectionLog ?? {}, collectionLogIds),
       actionProgress: filterRecord(state.actionProgress ?? {}, actionIds),
       lastTickAt: Date.now(),
     },

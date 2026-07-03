@@ -24,6 +24,13 @@ export const locationSchema = (): StructuredSchema => ({ kind: 'object', fields:
 export const entityDefinitionSchema = (bundle: ContentBundle): StructuredSchema => ({ kind: 'object', fields: {
   id: { label: 'contribution.column.id', schema: string() },
   actionIds: { label: 'contribution.data.actions', schema: { kind: 'array', listMode: 'tags', item: string(bundle.actions.map((action) => action.id)), createItem: () => bundle.actions[0]?.id ?? '' } },
+  collectionLog: { label: 'contribution.data.collectionLog', schema: { kind: 'array', listMode: 'free', item: { kind: 'object', fields: {
+    categoryId: { label: 'contribution.collection.category', schema: string(['enemies']) },
+    actionId: { label: 'contribution.column.action', schema: string(bundle.actions.map((action) => action.id)) },
+    killTargetCount: { label: 'contribution.collection.killTargetCount', schema: number(1), optional: true, defaultValue: 1 },
+    dropTableIds: { label: 'contribution.data.dropTables', schema: { kind: 'array', listMode: 'tags', item: string((bundle.dropTables ?? []).map((dropTable) => dropTable.id)), createItem: () => bundle.dropTables?.[0]?.id ?? '' }, optional: true, defaultValue: [] },
+    itemIds: { label: 'contribution.data.items', schema: { kind: 'array', listMode: 'tags', item: string(bundle.items.map((item) => item.id)), createItem: () => bundle.items[0]?.id ?? '' }, optional: true, defaultValue: [] },
+  } }, createItem: () => ({ categoryId: 'enemies', actionId: bundle.actions[0]?.id ?? '', killTargetCount: 1, dropTableIds: [], itemIds: [] }) }, optional: true, defaultValue: [] },
 } });
 
 export const edgeSchema = (bundle: ContentBundle): StructuredSchema => ({ kind: 'object', fields: {

@@ -574,6 +574,12 @@
             "minLength": 1
           },
           "uniqueItems": true
+        },
+        "collectionLog": {
+          "type": "array",
+          "items": {
+            "$ref": "https://universalis-rpg.local/schema/entities.schema.json#/$defs/collectionLog"
+          }
         }
       }
     },

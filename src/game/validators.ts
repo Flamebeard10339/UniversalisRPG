@@ -24,6 +24,7 @@ import type {
   ValidationIssue,
 } from './types';
 import { ENEMY_STAT_KEYS, getEnemyStat } from './enemies';
+import { collectionCategoryTitleKey, collectionTrackedItemIds } from './collectionLog';
 import {
   actionDescriptionKey,
   actionFailureKey,
@@ -160,7 +161,15 @@ const validateEntitiesShape = (entities: unknown): entities is EntityDefinition[
       isRecord(entity) &&
       hasString(entity, 'id') &&
       Array.isArray(entity.actionIds) &&
-      entity.actionIds.every((actionId) => typeof actionId === 'string' && actionId.trim().length > 0),
+      entity.actionIds.every((actionId) => typeof actionId === 'string' && actionId.trim().length > 0) &&
+      (entity.collectionLog === undefined || (Array.isArray(entity.collectionLog) && entity.collectionLog.every((definition) =>
+        isRecord(definition) &&
+        hasString(definition, 'categoryId') &&
+        hasString(definition, 'actionId') &&
+        (definition.killTargetCount === undefined || (Number.isInteger(definition.killTargetCount) && Number(definition.killTargetCount) >= 1)) &&
+        (definition.dropTableIds === undefined || validateStringArray(definition.dropTableIds)) &&
+        (definition.itemIds === undefined || validateStringArray(definition.itemIds)),
+      ))),
     ));
 
 const validateEdgesShape = (edges: unknown): edges is TravelEdgeDefinition[] =>
@@ -618,6 +627,27 @@ export const validateContentReferences = (bundle: ContentBundle) => {
         issues.push(error(`entities.${entity.id}.actionIds`, 'validation.unknownAction', { id: actionId }));
       }
     }
+    for (const [index, definition] of (entity.collectionLog ?? []).entries()) {
+      const path = `entities.${entity.id}.collectionLog.${index}`;
+      if (!entity.actionIds.includes(definition.actionId)) {
+        issues.push(error(`${path}.actionId`, 'validation.unknownAction', { id: definition.actionId }));
+      }
+      if (!actionIds.has(definition.actionId)) {
+        issues.push(error(`${path}.actionId`, 'validation.unknownAction', { id: definition.actionId }));
+      }
+      if (definition.killTargetCount !== undefined && definition.killTargetCount < 1) {
+        issues.push(error(`${path}.killTargetCount`, 'validation.collectionTargetPositive'));
+      }
+      for (const dropTableId of definition.dropTableIds ?? []) {
+        if (!dropTableIds.has(dropTableId)) issues.push(error(`${path}.dropTableIds`, 'validation.unknownDropTable', { id: dropTableId }));
+      }
+      for (const itemId of definition.itemIds ?? []) {
+        if (!itemIds.has(itemId)) issues.push(error(`${path}.itemIds`, 'validation.unknownItem', { id: itemId }));
+      }
+      for (const itemId of collectionTrackedItemIds(definition, bundle)) {
+        if (!itemIds.has(itemId)) issues.push(error(`${path}.dropTableIds`, 'validation.unknownItem', { id: itemId }));
+      }
+    }
   }
 
   for (const action of bundle.actions) {
@@ -872,6 +902,7 @@ export const collectLocalizationKeys = (bundle: ContentBundle) => [
   ...(bundle.entities ?? []).flatMap((entity) => [
     entityTitleKey(entity.id),
     entityDescriptionKey(entity.id),
+    ...(entity.collectionLog ?? []).map((definition) => collectionCategoryTitleKey(definition.categoryId)),
   ]),
   ...bundle.actions.flatMap((action) => [
     actionTitleKey(action.id),

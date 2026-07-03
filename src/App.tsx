@@ -4,6 +4,7 @@ import { ActionDetails } from './components/ActionDetails';
 import { ActionPanel } from './components/ActionPanel';
 import { ChatPanel } from './components/ChatPanel';
 import { CharacterStats } from './components/CharacterStats';
+import { CollectionLogPanel } from './components/CollectionLogPanel';
 import { DialoguePanel } from './components/DialoguePanel';
 import { InventoryPanel } from './components/InventoryPanel';
 import { ContributionMode, type ContributionTab } from './components/contribution/ContributionMode';
@@ -39,7 +40,7 @@ const getStartingLocationId = (bundle: NonNullable<ReturnType<typeof useUniverse
 
 type AppTab = 'map' | 'home' | 'character' | 'settings';
 type HomeTab = 'actions' | 'details' | 'workbench';
-type CharacterTab = 'skills' | 'inventory' | 'stats';
+type CharacterTab = 'skills' | 'inventory' | 'stats' | 'collectionLog';
 type FontSizePreference = 'tiny' | 'small' | 'normal' | 'large' | 'huge';
 type AppearanceSettings = {
   chatCompressionEnabled?: boolean;
@@ -262,6 +263,7 @@ export default function App() {
     skills: bundle?.skills ?? [],
     stats: bundle?.stats ?? [],
     locations: bundle?.locations ?? [],
+    entities: bundle?.entities ?? [],
     items: bundle?.items ?? [],
     flags: bundle?.flags ?? [],
     resourceDefinitions: bundle?.resourceDefinitions ?? [],
@@ -734,7 +736,7 @@ export default function App() {
         {visibleActiveTab === 'character' && (
           <section className="grid gap-4">
             <div className="grid grid-cols-3 gap-2 rounded border border-slate-800 bg-slate-900 p-2">
-              {(['skills', 'inventory', 'stats'] as CharacterTab[]).map((tab) => (
+              {(['skills', 'inventory', 'stats', 'collectionLog'] as CharacterTab[]).map((tab) => (
                 <button
                   className={`rounded px-3 py-2 text-sm font-semibold capitalize ${
                     characterTab === tab ? 'bg-cyan-300 text-slate-950' : 'bg-slate-950 text-slate-300'
@@ -766,6 +768,10 @@ export default function App() {
 
             {characterTab === 'stats' && (
               <CharacterStats bundle={bundle} playState={playState} t={t} />
+            )}
+
+            {characterTab === 'collectionLog' && (
+              <CollectionLogPanel bundle={bundle} playState={playState} t={t} />
             )}
           </section>
         )}

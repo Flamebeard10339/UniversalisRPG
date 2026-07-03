@@ -12,6 +12,32 @@
         "type": "array",
         "items": { "type": "string", "minLength": 1 },
         "uniqueItems": true
+      },
+      "collectionLog": {
+        "type": "array",
+        "items": { "$ref": "#/$defs/collectionLog" }
+      }
+    }
+  },
+  "$defs": {
+    "collectionLog": {
+      "type": "object",
+      "required": ["categoryId", "actionId"],
+      "additionalProperties": false,
+      "properties": {
+        "categoryId": { "type": "string", "minLength": 1 },
+        "actionId": { "type": "string", "minLength": 1 },
+        "killTargetCount": { "type": "integer", "minimum": 1 },
+        "dropTableIds": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        },
+        "itemIds": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        }
       }
     }
   }

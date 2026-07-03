@@ -3,6 +3,7 @@ import type { ContentBundle, ContentModule, ModuleDataEntry } from './types';
 const contentFileNames = new Set([
   'locations.json',
   'edges.json',
+  'entities.json',
   'actions.json',
   'skills.json',
   'stats.json',
@@ -33,6 +34,7 @@ export const migrateMonolithicBundleToCoreModule = (bundle: ContentBundle): Cont
     ...typedRows('displayProfile', bundle.manifest.displayProfiles as Array<Record<string, unknown>> | undefined),
     ...typedRows('location', bundle.locations),
     ...typedRows('edge', bundle.edges),
+    ...typedRows('entity', bundle.entities),
     ...typedRows('action', bundle.actions),
     ...typedRows('skill', bundle.skills),
     ...typedRows('stat', bundle.stats),
@@ -70,6 +72,7 @@ export const migrateMonolithicBundleToCoreModule = (bundle: ContentBundle): Cont
     },
     locations: [],
     edges: [],
+    entities: [],
     actions: [],
     skills: [],
     stats: [],

@@ -914,6 +914,16 @@
       "id": "goblin",
       "actionIds": [
         "fight-goblin"
+      ],
+      "collectionLog": [
+        {
+          "categoryId": "enemies",
+          "actionId": "fight-goblin",
+          "killTargetCount": 1,
+          "dropTableIds": [
+            "goblin-drop-table-1"
+          ]
+        }
       ]
     },
     {
@@ -1216,6 +1226,7 @@
       "action.speak-to-tutorial-guide.failure": "The Tutorial Guide is distracted.",
       "entity.goblin.title": "Goblin",
       "entity.goblin.description": "A small roadside raider looking for an easy mark.",
+      "collection.category.enemies.title": "Enemies",
       "action.fight-goblin.title": "Fight",
       "action.fight-goblin.description": "Trade quick blows with a small roadside raider.",
       "action.fight-goblin.success": "You hit the goblin.",

@@ -20,6 +20,7 @@ import { readStateVariable, writeStateVariable } from './stateVariables';
 import { resolveManifestUiSettings } from './universeSettings';
 import { skillLevelFromXp } from './skills';
 import { rollRewards } from './rewards';
+import { applyCollectionLogRewards } from './collectionLog';
 
 const MAX_CHAT_MESSAGES = 80;
 const MAX_RUN_LOG_ENTRIES = 500;
@@ -128,6 +129,7 @@ export const createInitialPlayState = (
   inventory: {},
   flags: {},
   actionCompletions: {},
+  collectionLog: {},
   resourcePools: {},
   skillXp: {},
   statOverrides: {},
@@ -177,6 +179,7 @@ export const normalizePlayState = (
     inventory: { ...(state.resources ?? {}), ...(state.inventory ?? {}) },
     flags: state.flags ?? {},
     actionCompletions: state.actionCompletions ?? {},
+    collectionLog: state.collectionLog ?? {},
     statOverrides: state.statOverrides ?? {},
     equipmentSkillBonuses: state.equipmentSkillBonuses ?? {},
     equipment: state.equipment ?? {},
@@ -1291,8 +1294,8 @@ const completeActionWithResult = (
 
     const actionCompletion = applyActionCompletion(damagedState, action, context, now, { random: options.random });
     const enemyRewards = rollAndApplyRewards(actionCompletion.state, enemy.rewards, context, now, options.random);
-    state = enemyRewards.state;
     const killRewards = [...actionCompletion.rewards, ...enemyRewards.rewards];
+    state = applyCollectionLogRewards(enemyRewards.state, action, context, killRewards);
     const resolvedState = resetOwnedResourcePools(state, context, 'enemy');
     const completedState = {
       ...resolvedState,
@@ -1325,7 +1328,7 @@ const completeActionWithResult = (
   }
 
   const actionCompletion = applyActionCompletion(state, action, context, now, { random: options.random });
-  const resolvedState = actionCompletion.state;
+  const resolvedState = applyCollectionLogRewards(actionCompletion.state, action, context, actionCompletion.rewards);
   const completedState = {
     ...resolvedState,
     activeAction: null,

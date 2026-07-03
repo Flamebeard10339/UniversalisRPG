@@ -41,6 +41,7 @@ import {
   statTitleKey,
 } from './contentIds';
 import { validateContentBundle, validateContentShape, validateLocaleDictionary } from './validators';
+import { collectionCategoryTitleKey } from './collectionLog';
 
 type ModuleDependency = {
   id: string;
@@ -417,6 +418,8 @@ const localizationKeysFromSection = (section?: ModuleDataSection) => [
   ...(normalizeModuleDataSection(section).entities ?? []).filter(hasId).flatMap((entity) => [
     entityTitleKey(entity.id),
     entityDescriptionKey(entity.id),
+    ...((entity as { collectionLog?: Array<{ categoryId?: string }> }).collectionLog ?? [])
+      .map((definition) => definition.categoryId ? collectionCategoryTitleKey(definition.categoryId) : null),
   ]),
   ...(normalizeModuleDataSection(section).actions ?? []).filter(hasId).flatMap(localizationKeysFromAction),
   ...(normalizeModuleDataSection(section).skills ?? []).filter(hasId).flatMap((skill) => [skillTitleKey(skill.id), skillDescriptionKey(skill.id)]),
