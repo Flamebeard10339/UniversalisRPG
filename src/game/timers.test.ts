@@ -863,6 +863,56 @@ describe('resolveIdleTimers', () => {
     expect(resolved.state.chatMessages.find((message) => message.key === 'resource.charge.full')?.count).toBe(10);
   });
 
+  it('fires full-boundary action-rate behavior when the stored pool is already full', () => {
+    const startedAt = 1_000;
+    const action: GameAction = {
+      id: 'fight-dummy',
+      locationId: 'arena',
+      durationSeconds: 60,
+      enemyId: 'dummy',
+      rewards: [],
+    };
+    const context: ActionResolutionContext = {
+      actions: [action],
+      skills: [],
+      stats: [
+        { id: 'attack', base: 100 },
+        { id: 'defense', base: 10 },
+        { id: 'action-rate', base: 60 },
+      ],
+      resourceDefinitions: [{
+        id: 'action-rate',
+        sourceStat: 'action-rate',
+        max: 60,
+        initialValue: 'empty',
+        onFull: [
+          { kind: 'complete-action' },
+          { kind: 'refill', value: 'min' },
+        ],
+      }],
+      effects: [{
+        id: 'action-rate-regeneration',
+        resourceId: 'action-rate',
+        sourceStat: 'action-rate',
+        rateUnit: 'per-second',
+      }],
+      interactionTypes: [{ id: 'combat', sourceStatId: 'attack', targetStatId: 'defense', targetPlayerHealth: false }],
+      enemies: [{ id: 'dummy', interactionTypeId: 'combat', stats: { health: 100, defense: 10 }, rewards: [] }],
+    };
+    const state = {
+      ...startAction(createInitialPlayState('test-universe', 'arena'), action, context, startedAt),
+      resourcePools: {
+        'action-rate': { current: 60, min: 0, max: 60 },
+      },
+    };
+
+    const resolved = resolveIdleTimers(state, context, { random: () => 0 }, startedAt + 1_000);
+
+    expect(resolved.state.resourcePools['action-rate'].current).toBe(0);
+    expect(resolved.state.activeAction?.targetHealth).toBeLessThan(100);
+    expect(resolved.state.chatMessages[0].key).toBe('interaction.combat.player.hit');
+  });
+
   it('resets resources for inactive reset effects after stopping an interaction', () => {
     const context: ActionResolutionContext = {
       actions: [{

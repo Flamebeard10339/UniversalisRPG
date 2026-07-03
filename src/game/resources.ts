@@ -146,8 +146,14 @@ export const getNextResourceBoundaryAt = (
     if (rate < 0 && pool.current > pool.min) {
       return [state.lastTickAt + ((pool.current - pool.min) / -rate) * 60_000];
     }
+    if (rate < 0 && pool.current <= pool.min && (resource.onEmpty ?? []).length > 0) {
+      return [state.lastTickAt];
+    }
     if (rate > 0 && pool.current < pool.max) {
       return [state.lastTickAt + ((pool.max - pool.current) / rate) * 60_000];
+    }
+    if (rate > 0 && pool.current >= pool.max && (resource.onFull ?? []).length > 0) {
+      return [state.lastTickAt];
     }
     return [];
   });

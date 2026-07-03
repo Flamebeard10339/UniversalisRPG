@@ -798,10 +798,13 @@ const applyResourceDelta = (
     const previous = currentResource.current;
     const boundary = remaining > 0 ? currentResource.max : currentResource.min;
     const distance = boundary - previous;
-    const reachesBoundary = remaining > 0
+    const alreadyAtBoundary = remaining > 0
+      ? previous >= currentResource.max
+      : previous <= currentResource.min;
+    const reachesBoundary = alreadyAtBoundary || (remaining > 0
       ? previous < currentResource.max && remaining >= distance
-      : previous > currentResource.min && remaining <= distance;
-    const applied = reachesBoundary ? distance : remaining;
+      : previous > currentResource.min && remaining <= distance);
+    const applied = alreadyAtBoundary ? 0 : reachesBoundary ? distance : remaining;
     const nextValue = Math.min(currentResource.max, Math.max(currentResource.min, previous + applied));
 
     nextState = setResourceCurrent(nextState, context, resourceId, nextValue);

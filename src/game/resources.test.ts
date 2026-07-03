@@ -95,4 +95,24 @@ describe('resource projection', () => {
     state.resourcePools.air.current = 30;
     expect(getNextResourceBoundaryAt(bundle, state)).toBe(31_000);
   });
+
+  it('schedules an already-full resource with full-boundary behavior immediately', () => {
+    const fullBoundaryBundle: ContentBundle = {
+      ...bundle,
+      stats: [{ id: 'charge-capacity', base: 60 }, { id: 'charge-rate', base: 60 }],
+      resourceDefinitions: [{
+        id: 'charge',
+        sourceStat: 'charge-capacity',
+        initialValue: 'empty',
+        onFull: [{ kind: 'complete-action' }, { kind: 'refill', value: 'min' }],
+      }],
+      effects: [{ id: 'charge-rate', resourceId: 'charge', sourceStat: 'charge-rate', rateUnit: 'per-second' }],
+    };
+    const state = {
+      ...runningState(),
+      resourcePools: { charge: { current: 60, min: 0, max: 60 } },
+    };
+
+    expect(getNextResourceBoundaryAt(fullBoundaryBundle, state)).toBe(state.lastTickAt);
+  });
 });

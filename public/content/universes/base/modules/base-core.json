@@ -151,8 +151,8 @@
       "id": "regeneration",
       "maxLevel": 100,
       "statId": "regeneration",
-      "addedPerLevel": 0,
-      "increasedPerLevel": 0
+      "addedPerLevel": 1,
+      "increasedPerLevel": 1
     },
     {
       "type": "item",
