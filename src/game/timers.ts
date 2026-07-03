@@ -23,7 +23,7 @@ import { rollRewards } from './rewards';
 import { applyCollectionLogRewards } from './collectionLog';
 
 const MAX_CHAT_MESSAGES = 80;
-const MAX_RUN_LOG_ENTRIES = 500;
+const MAX_RUN_LOG_ENTRIES = 100;
 const MIN_REPORT_INACTIVE_MS = 1000;
 const HEALTH_RESOURCE_ID = 'health';
 const ENEMY_HEALTH_RESOURCE_ID = 'enemy-health';

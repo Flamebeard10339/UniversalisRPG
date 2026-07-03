@@ -12,10 +12,10 @@
       "id": "first-road",
       "titleKey": "displayProfile.first-road.title",
       "colors": {
-        "background": "#10160f",
-        "surface": "#182116",
-        "surfaceRaised": "#202b1d",
-        "panel": "#283725",
+        "background": "#151733",
+        "surface": "#282541",
+        "surfaceRaised": "#45455f",
+        "panel": "#18182b",
         "border": "#4b5f43",
         "text": "#edf7e8",
         "textMuted": "#c9d8c0",
@@ -109,32 +109,12 @@
     {
       "type": "stat",
       "id": "health",
-      "base": 100
+      "base": 10
     },
     {
       "type": "stat",
       "id": "regeneration",
       "base": 10
-    },
-    {
-      "type": "stat",
-      "id": "troll-blood",
-      "base": 100
-    },
-    {
-      "type": "skill",
-      "id": "lore",
-      "maxLevel": 100
-    },
-    {
-      "type": "skill",
-      "id": "survival",
-      "maxLevel": 100
-    },
-    {
-      "type": "skill",
-      "id": "craft",
-      "maxLevel": 100
     },
     {
       "type": "skill",
@@ -171,14 +151,6 @@
       "id": "regeneration",
       "maxLevel": 100,
       "statId": "regeneration",
-      "addedPerLevel": 0,
-      "increasedPerLevel": 0
-    },
-    {
-      "type": "skill",
-      "id": "troll-blood",
-      "maxLevel": 100,
-      "statId": "troll-blood",
       "addedPerLevel": 0,
       "increasedPerLevel": 0
     },
@@ -353,12 +325,6 @@
       "id": "health-regeneration",
       "resourceId": "health",
       "sourceStat": "regeneration"
-    },
-    {
-      "type": "effect",
-      "id": "health-troll-blood",
-      "resourceId": "health",
-      "sourceStat": "troll-blood"
     },
     {
       "type": "interactionType",
@@ -990,11 +956,6 @@
           "event": "health-regenerated",
           "skillId": "regeneration",
           "sourceStat": "regeneration"
-        },
-        {
-          "event": "health-regenerated",
-          "skillId": "troll-blood",
-          "sourceStat": "troll-blood"
         }
       ]
     },
@@ -1059,11 +1020,6 @@
           "event": "health-regenerated",
           "skillId": "regeneration",
           "sourceStat": "regeneration"
-        },
-        {
-          "event": "health-regenerated",
-          "skillId": "troll-blood",
-          "sourceStat": "troll-blood"
         }
       ]
     },
@@ -1103,55 +1059,6 @@
           "event": "health-regenerated",
           "skillId": "regeneration",
           "sourceStat": "regeneration"
-        },
-        {
-          "event": "health-regenerated",
-          "skillId": "troll-blood",
-          "sourceStat": "troll-blood"
-        }
-      ]
-    },
-    {
-      "type": "action",
-      "id": "fight-troll",
-      "locationId": "crossroads",
-      "durationSeconds": 1,
-      "enemyId": "troll",
-      "rewards": [
-        {
-          "kind": "skillXp",
-          "skillId": "attack",
-          "amount": 1
-        }
-      ],
-      "experience": [
-        {
-          "event": "action-complete",
-          "skillId": "attack",
-          "amount": 1
-        },
-        {
-          "event": "damage-dealt",
-          "skillId": "attack"
-        },
-        {
-          "event": "damage-taken",
-          "skillId": "health"
-        },
-        {
-          "event": "incoming-attack-missed",
-          "skillId": "defense",
-          "amount": 10
-        },
-        {
-          "event": "health-regenerated",
-          "skillId": "regeneration",
-          "sourceStat": "regeneration"
-        },
-        {
-          "event": "health-regenerated",
-          "skillId": "troll-blood",
-          "sourceStat": "troll-blood"
         }
       ]
     },
@@ -1305,8 +1212,6 @@
       "skill.defense.description": "Guard, positioning, and staying intact under pressure.",
       "skill.regeneration.title": "Regeneration",
       "skill.regeneration.description": "Recovered health per minute while time passes.",
-      "skill.troll-blood.title": "Troll's Blood",
-      "skill.troll-blood.description": "A second healing-over-time source for validating separate experience gain.",
       "stat.health.title": "Health",
       "stat.health.description": "Maximum player health.",
       "stat.attack.title": "Attack",
@@ -1321,8 +1226,6 @@
       "stat.action-rate.description": "Player adversarial actions per minute.",
       "stat.regeneration.title": "Regeneration",
       "stat.regeneration.description": "Health recovered per minute.",
-      "stat.troll-blood.title": "Troll's Blood",
-      "stat.troll-blood.description": "A stronger health recovery stat.",
       "resource.action-rate.title": "Action Rate",
       "effect.action-rate-regeneration.title": "Action rate buildup",
       "resource.enemy-action-rate.title": "Enemy Action Rate",
@@ -1331,7 +1234,6 @@
       "effect.enemy-health-regeneration.title": "Enemy health regeneration",
       "resource.health.title": "Health",
       "effect.health-regeneration.title": "Health regeneration",
-      "effect.health-troll-blood.title": "Troll's Blood healing",
       "resource.health.empty": "You died.",
       "item.emberleaf.title": "Emberleaf",
       "item.emberleaf.description": "A warm leaf that keeps a coal-like glow after it falls.",

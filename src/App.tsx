@@ -306,6 +306,13 @@ export default function App() {
       copySelectedProfileToCustom();
     }
   };
+  const copyCurrentThemeJson = () => {
+    const themeJson = {
+      id: 'custom',
+      colors: customPalette,
+    } satisfies DisplayProfileDefinition;
+    void navigator.clipboard.writeText(JSON.stringify(themeJson, null, 2));
+  };
   const visibleHomeTab = homeTab === 'workbench' && !contributionMode ? 'actions' : homeTab;
   const currentLocation = bundle?.locations.find((location) => location.id === playState?.currentLocationId);
   const activeModuleIds = bundle ? new Set(enabledModules[bundle.manifest.id] ?? bundle.modules?.map((module) => module.id) ?? []) : new Set<string>();
@@ -868,6 +875,13 @@ export default function App() {
                 <details className="rounded border border-slate-800 bg-slate-900/60 p-3" onToggle={(event) => openThemeEditor(event.currentTarget.open)} open={themeEditorOpen}>
                   <summary className="cursor-pointer text-sm font-semibold text-slate-100">{t('settings.displayProfile.editCurrent')}</summary>
                   <section className="mt-3 grid gap-3">
+                    <button
+                      className="justify-self-start rounded border border-slate-600 px-3 py-2 text-sm font-semibold text-slate-100"
+                      onClick={copyCurrentThemeJson}
+                      type="button"
+                    >
+                      {t('settings.displayProfile.copyJson')}
+                    </button>
                     <div className="grid gap-2 rounded border p-3" style={{ background: customPalette.background, borderColor: customPalette.border, color: customPalette.text }}>
                       <div className="grid gap-2 rounded border p-3" style={{ background: customPalette.surface, borderColor: customPalette.border }}>
                         <div className="flex flex-wrap items-center justify-between gap-2">
@@ -995,45 +1009,47 @@ export default function App() {
                 </div>
               </div>
 
-              <section className="grid gap-3 rounded border border-slate-800 bg-slate-950 p-3">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div>
-                    <h3 className="text-sm font-semibold text-slate-100">{t('settings.runLog.title')}</h3>
-                    <p className="text-xs text-slate-400">{t('settings.runLog.description', { count: playState.runLog.length })}</p>
+              {debugEnabled && (
+                <section className="grid gap-3 rounded border border-slate-800 bg-slate-950 p-3">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <h3 className="text-sm font-semibold text-slate-100">{t('settings.runLog.title')}</h3>
+                      <p className="text-xs text-slate-400">{t('settings.runLog.description', { count: playState.runLog.length })}</p>
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        className="rounded border border-slate-600 px-3 py-2 text-sm font-semibold text-slate-100"
+                        onClick={() => void navigator.clipboard.writeText(JSON.stringify(playState.runLog, null, 2))}
+                        type="button"
+                      >
+                        {t('settings.runLog.copy')}
+                      </button>
+                      <button
+                        className="rounded border border-rose-700 px-3 py-2 text-sm font-semibold text-rose-100"
+                        onClick={() => clearRunLog(runtimeUniverseId)}
+                        type="button"
+                      >
+                        {t('settings.runLog.clear')}
+                      </button>
+                    </div>
                   </div>
-                  <div className="flex gap-2">
-                    <button
-                      className="rounded border border-slate-600 px-3 py-2 text-sm font-semibold text-slate-100"
-                      onClick={() => void navigator.clipboard.writeText(JSON.stringify(playState.runLog, null, 2))}
-                      type="button"
-                    >
-                      {t('settings.runLog.copy')}
-                    </button>
-                    <button
-                      className="rounded border border-rose-700 px-3 py-2 text-sm font-semibold text-rose-100"
-                      onClick={() => clearRunLog(runtimeUniverseId)}
-                      type="button"
-                    >
-                      {t('settings.runLog.clear')}
-                    </button>
-                  </div>
-                </div>
-                {playState.runLog.length === 0 ? (
-                  <p className="text-sm text-slate-500">{t('settings.runLog.empty')}</p>
-                ) : (
-                  <ol className="grid max-h-80 gap-2 overflow-auto text-xs">
-                    {[...playState.runLog].reverse().map((entry) => (
-                      <li className="rounded bg-slate-900 p-3" key={entry.sequence}>
-                        <div className="flex flex-wrap justify-between gap-2 text-slate-300">
-                          <span className="font-semibold text-cyan-200">{entry.runId} / {entry.sequence}. {entry.actor}: {entry.event}</span>
-                          <time>{new Date(entry.createdAt).toLocaleString()}</time>
-                        </div>
-                        {entry.data && <div className="mt-2"><StructuredDataEditor onChange={() => undefined} schema={{ kind: 'inferred' }} t={t} value={entry.data as unknown as StructuredValue} /></div>}
-                      </li>
-                    ))}
-                  </ol>
-                )}
-              </section>
+                  {playState.runLog.length === 0 ? (
+                    <p className="text-sm text-slate-500">{t('settings.runLog.empty')}</p>
+                  ) : (
+                    <ol className="grid max-h-80 gap-2 overflow-auto text-xs">
+                      {[...playState.runLog].reverse().map((entry) => (
+                        <li className="rounded bg-slate-900 p-3" key={entry.sequence}>
+                          <div className="flex flex-wrap justify-between gap-2 text-slate-300">
+                            <span className="font-semibold text-cyan-200">{entry.runId} / {entry.sequence}. {entry.actor}: {entry.event}</span>
+                            <time>{new Date(entry.createdAt).toLocaleString()}</time>
+                          </div>
+                          {entry.data && <div className="mt-2"><StructuredDataEditor onChange={() => undefined} schema={{ kind: 'inferred' }} t={t} value={entry.data as unknown as StructuredValue} /></div>}
+                        </li>
+                      ))}
+                    </ol>
+                  )}
+                </section>
+              )}
 
               <section className="grid gap-3 rounded border border-slate-800 bg-slate-950 p-3">
                 <h3 className="text-sm font-semibold text-slate-100">{t('settings.debug.title')}</h3>

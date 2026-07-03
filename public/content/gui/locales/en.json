@@ -66,6 +66,7 @@
   "settings.displayProfile.custom": "Custom",
   "settings.displayProfile.customEditor": "Custom colors",
   "settings.displayProfile.editCurrent": "Edit current theme",
+  "settings.displayProfile.copyJson": "Copy JSON",
   "settings.displayProfile.previewTitle": "Theme preview",
   "settings.displayProfile.previewMuted": "Muted and subtle text, surfaces, borders, alerts, and accents.",
   "settings.displayProfile.previewButton": "Accent",

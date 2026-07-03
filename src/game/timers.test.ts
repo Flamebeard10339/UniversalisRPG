@@ -14,17 +14,17 @@ describe('appendChatMessage', () => {
 });
 
 describe('appendRunLog', () => {
-  it('retains only the newest 500 entries', () => {
+  it('retains only the newest 100 entries', () => {
     let state = createInitialPlayState('test-universe', 'test-location');
 
-    for (let index = 0; index < 505; index += 1) {
+    for (let index = 0; index < 105; index += 1) {
       state = appendRunLog(state, 'engine', 'test.event', { index }, index);
     }
 
-    expect(state.runLog).toHaveLength(500);
+    expect(state.runLog).toHaveLength(100);
     expect(state.runLog[0].sequence).toBe(6);
-    expect(state.runLog[499].sequence).toBe(505);
-    expect(state.nextRunLogSequence).toBe(506);
+    expect(state.runLog[99].sequence).toBe(105);
+    expect(state.nextRunLogSequence).toBe(106);
   });
 });
 
