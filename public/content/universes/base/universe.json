@@ -11,46 +11,11 @@
   "basePlayer": {
     "inventory": {}
   },
-  "displayProfiles": [
-    {
-      "id": "first-road",
-      "titleKey": "displayProfile.first-road.title",
-      "colors": {
-        "background": "#10160f",
-        "surface": "#182116",
-        "surfaceRaised": "#202b1d",
-        "panel": "#283725",
-        "border": "#4b5f43",
-        "text": "#edf7e8",
-        "textMuted": "#c9d8c0",
-        "textSubtle": "#99aa8f",
-        "accent": "#67d8c7",
-        "accentStrong": "#a7f3d0",
-        "accentText": "#0d2a24",
-        "danger": "#fb7185",
-        "dangerSurface": "#4c1d17",
-        "dangerText": "#ffe4e6",
-        "success": "#7dd3a8",
-        "warning": "#f6c177"
-      }
-    }
-  ],
   "files": [
-    "locations.json",
-    "edges.json",
-    "actions.json",
-    "skills.json",
-    "stats.json",
-    "items.json",
-    "flags.json",
-    "resources.json",
-    "effects.json",
-    "interaction-types.json",
-    "enemies.json",
-    "dialogues.json",
     "locales/en.json"
   ],
   "modules": [
+    "base-core",
     "wayside-supplies"
   ],
   "compatibility": {

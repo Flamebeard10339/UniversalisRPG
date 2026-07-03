@@ -99,35 +99,23 @@ export const loadUniverseManifest = async (universeId: string) => {
 export const loadUniverse = async (universeId: string): Promise<ContentBundle> => {
   const basePath = `${BASE_CONTENT_PATH}/${universeId}`;
   const manifest = await loadUniverseManifest(universeId);
+  const loadContentFile = <T>(fileName: string) =>
+    manifest.files.includes(fileName)
+      ? loadJson<T[]>(`${basePath}/${fileName}`)
+      : Promise.resolve([]);
   const [locations, edges, actions, skills, stats, items, flags, resourceDefinitions, effects, interactionTypes, enemies, dialogues] = await Promise.all([
-    loadJson<LocationNode[]>(`${basePath}/locations.json`),
-    loadJson<TravelEdgeDefinition[]>(`${basePath}/edges.json`),
-    loadJson<GameAction[]>(`${basePath}/actions.json`),
-    loadJson<SkillDefinition[]>(`${basePath}/skills.json`),
-    manifest.files.includes('stats.json')
-      ? loadJson<StatDefinition[]>(`${basePath}/stats.json`)
-      : Promise.resolve([]),
-    manifest.files.includes('items.json')
-      ? loadJson<ItemDefinition[]>(`${basePath}/items.json`)
-      : Promise.resolve([]),
-    manifest.files.includes('flags.json')
-      ? loadJson<StateFlagDefinition[]>(`${basePath}/flags.json`)
-      : Promise.resolve([]),
-    manifest.files.includes('resources.json')
-      ? loadJson<ResourceDefinition[]>(`${basePath}/resources.json`)
-      : Promise.resolve([]),
-    manifest.files.includes('effects.json')
-      ? loadJson<EffectDefinition[]>(`${basePath}/effects.json`)
-      : Promise.resolve([]),
-    manifest.files.includes('interaction-types.json')
-      ? loadJson<InteractionTypeDefinition[]>(`${basePath}/interaction-types.json`)
-      : Promise.resolve([]),
-    manifest.files.includes('enemies.json')
-      ? loadJson<EnemyDefinition[]>(`${basePath}/enemies.json`)
-      : Promise.resolve([]),
-    manifest.files.includes('dialogues.json')
-      ? loadJson<DialogueDefinition[]>(`${basePath}/dialogues.json`)
-      : Promise.resolve([]),
+    loadContentFile<LocationNode>('locations.json'),
+    loadContentFile<TravelEdgeDefinition>('edges.json'),
+    loadContentFile<GameAction>('actions.json'),
+    loadContentFile<SkillDefinition>('skills.json'),
+    loadContentFile<StatDefinition>('stats.json'),
+    loadContentFile<ItemDefinition>('items.json'),
+    loadContentFile<StateFlagDefinition>('flags.json'),
+    loadContentFile<ResourceDefinition>('resources.json'),
+    loadContentFile<EffectDefinition>('effects.json'),
+    loadContentFile<InteractionTypeDefinition>('interaction-types.json'),
+    loadContentFile<EnemyDefinition>('enemies.json'),
+    loadContentFile<DialogueDefinition>('dialogues.json'),
   ]);
 
   const locales = await manifest.locales.reduce<Promise<Record<string, LocaleDictionary>>>(

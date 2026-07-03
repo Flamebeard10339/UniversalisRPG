@@ -1,6 +1,6 @@
 [
   {
     "id": "starter",
-    "modules": ["wayside-supplies"]
+    "modules": ["base-core", "wayside-supplies"]
   }
 ]

@@ -120,6 +120,38 @@ describe('loader', () => {
     expect(bundle.modules?.map((module) => module.id)).toEqual(['good']);
   });
 
+  it('loads universes whose gameplay content is supplied entirely by modules', async () => {
+    installFetch({
+      ...baseResponses(),
+      '/content/universes/test/universe.json': {
+        schemaVersion: 1,
+        id: 'test',
+        version: '0.1.0',
+        author: 'test',
+        locales: ['en'],
+        files: ['locales/en.json'],
+        modules: ['core'],
+      },
+      '/content/universes/test/modules/core.json': {
+        id: 'core',
+        version: '1.0.0',
+        universe: 'test',
+        author: 'test',
+        game_version: '1.0',
+        data: [
+          { type: 'location', id: 'start', position: { x: 0, y: 0 }, starting: true },
+          { type: 'skill', id: 'lore', maxLevel: 100 },
+        ],
+      },
+    });
+
+    const bundle = await loadUniverse('test');
+
+    expect(bundle.locations).toEqual([]);
+    expect(bundle.skills).toEqual([]);
+    expect(bundle.modules?.map((module) => module.id)).toEqual(['core']);
+  });
+
   it('skips malformed module packs instead of failing the universe load', async () => {
     installFetch({
       ...baseResponses(),
