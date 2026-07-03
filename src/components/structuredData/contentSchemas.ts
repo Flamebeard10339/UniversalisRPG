@@ -222,6 +222,7 @@ export const interactionTypeDefinitionSchema = (bundle: ContentBundle): Structur
   sourceStatId: { label: 'contribution.column.sourceStat', schema: string(bundle.stats.map((item) => item.id)) },
   targetStatId: { label: 'contribution.column.targetStat', schema: string(bundle.stats.map((item) => item.id)) },
   targetPlayerHealth: { label: 'contribution.column.targetPlayerHealth', schema: boolean },
+  experience: { label: 'contribution.column.experience', schema: { kind: 'array', listMode: 'free', item: experienceTriggerSchema(bundle), createItem: () => ({ event: 'damage-dealt', skillId: bundle.skills[0]?.id ?? '' }) }, optional: true, defaultValue: [] },
 } });
 
 export const enemyStatsSchema = (): StructuredSchema => ({ kind: 'object', fields: {
@@ -367,3 +368,10 @@ export const universeUiSchema = (): StructuredSchema => ({ kind: 'object', field
   floatingTextDurationSeconds: { label: 'contribution.universe.floatingTextDuration', schema: number(0.001), optional: true },
   loopActionsByDefault: { label: 'contribution.universe.loopActionsByDefault', schema: boolean, optional: true },
 } });
+
+export const universeExperienceSchema = (bundle: ContentBundle): StructuredSchema => ({
+  kind: 'array',
+  listMode: 'free',
+  item: experienceTriggerSchema(bundle),
+  createItem: () => ({ event: 'health-regenerated', skillId: bundle.skills[0]?.id ?? '' }),
+});

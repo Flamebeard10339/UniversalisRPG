@@ -277,6 +277,25 @@ const matchesExperienceTrigger = (trigger: ExperienceTrigger, event: GameExperie
 const experienceAmount = (trigger: ExperienceTrigger, event: GameExperienceEvent) =>
   trigger.amount ?? event.amount * (trigger.amountPerUnit ?? 1);
 
+const interactionTypeForExperienceEvent = (
+  action: GameAction | null,
+  context: ActionResolutionContext,
+  event: GameExperienceEvent,
+) => {
+  const interactionTypeId = event.interactionTypeId ?? (action ? getInteractionType(action, context)?.id ?? action.interactionTypeId : undefined);
+  return context.interactionTypes.find((interactionType) => interactionType.id === interactionTypeId) ?? null;
+};
+
+const experienceTriggersForEvent = (
+  action: GameAction | null,
+  context: ActionResolutionContext,
+  event: GameExperienceEvent,
+) => [
+  ...(context.manifest?.experience ?? []),
+  ...(interactionTypeForExperienceEvent(action, context, event)?.experience ?? []),
+  ...(action?.experience ?? []),
+];
+
 const maxSkillLevel = (context: ActionResolutionContext, skillId: string) =>
   context.skills.find((skill) => skill.id === skillId)?.maxLevel ?? Number.POSITIVE_INFINITY;
 
@@ -330,14 +349,14 @@ const applySkillXpResult = (
 
 const emitExperienceEvent = (
   state: UniversePlayState,
-  action: GameAction,
+  action: GameAction | null,
   context: ActionResolutionContext,
   event: GameExperienceEvent,
   now: number,
 ) => {
   let nextState = state;
 
-  for (const trigger of action.experience ?? []) {
+  for (const trigger of experienceTriggersForEvent(action, context, event)) {
     if (!matchesExperienceTrigger(trigger, event)) {
       continue;
     }
@@ -345,12 +364,13 @@ const emitExperienceEvent = (
     const amount = experienceAmount(trigger, event);
     nextState = grantSkillXp(nextState, context, trigger.skillId, amount, now);
     nextState = appendRunLog(nextState, 'engine', 'skill.xp-event', {
-      actionId: action.id,
+      actionId: event.actionId ?? action?.id ?? '',
       amount,
       event: event.kind,
       skillId: trigger.skillId,
       eventAmount: event.amount,
       effectId: event.effectId ?? '',
+      interactionTypeId: event.interactionTypeId ?? '',
       resourceId: event.resourceId ?? '',
       sourceStat: event.sourceStat ?? '',
     }, now);
@@ -366,7 +386,7 @@ const emitActiveActionExperienceEvent = (
   now: number,
 ) => {
   const action = context.actions.find((candidate) => candidate.id === state.activeAction?.actionId);
-  return action ? emitExperienceEvent(state, action, context, { ...event, actionId: action.id }, now) : state;
+  return emitExperienceEvent(state, action ?? null, context, action ? { ...event, actionId: action.id } : event, now);
 };
 
 const emitResourceExperienceEvents = (

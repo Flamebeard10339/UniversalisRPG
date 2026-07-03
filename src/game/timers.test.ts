@@ -620,19 +620,27 @@ describe('resolveIdleTimers', () => {
     expect(resolved.state.playerHealth).toBe(60);
   });
 
-  it('grants separate health regeneration experience by source stat', () => {
+  it('grants universe health regeneration experience by source stat regardless of the active action', () => {
     const startedAt = 1_000;
     const action: GameAction = {
-      id: 'rest-and-heal',
+      id: 'wait',
       locationId: 'test-location',
       durationSeconds: 60,
       rewards: [],
-      experience: [
-        { event: 'health-regenerated', skillId: 'regeneration', sourceStat: 'regeneration' },
-        { event: 'health-regenerated', skillId: 'troll-blood', sourceStat: 'troll-blood' },
-      ],
     };
     const context: ActionResolutionContext = {
+      manifest: {
+        schemaVersion: 1,
+        id: 'test-universe',
+        version: '1',
+        author: 'test',
+        locales: ['en'],
+        files: [],
+        experience: [
+          { event: 'health-regenerated', skillId: 'regeneration', sourceStat: 'regeneration' },
+          { event: 'health-regenerated', skillId: 'troll-blood', sourceStat: 'troll-blood' },
+        ],
+      },
       actions: [action],
       skills: [
         { id: 'regeneration', maxLevel: 100, statId: 'regeneration', addedPerLevel: 0, increasedPerLevel: 0 },
@@ -668,7 +676,7 @@ describe('resolveIdleTimers', () => {
     expect(resolved.state.skillXp['troll-blood']).toBe(100);
   });
 
-  it('grants damage experience to the action-associated skill', () => {
+  it('grants interaction damage experience and preserves action experience', () => {
     const startedAt = 1_000;
     const fightGoblin: GameAction = {
       id: 'fight-goblin',
@@ -677,8 +685,7 @@ describe('resolveIdleTimers', () => {
       enemyId: 'goblin',
       rewards: [],
       experience: [
-        { event: 'damage-dealt', skillId: 'attack' },
-        { event: 'action-complete', skillId: 'attack', amount: 1 },
+        { event: 'damage-dealt', skillId: 'attack', amount: 3 },
       ],
     };
     const chopTree: GameAction = {
@@ -687,10 +694,6 @@ describe('resolveIdleTimers', () => {
       durationSeconds: 1,
       enemyId: 'tree',
       rewards: [],
-      experience: [
-        { event: 'damage-dealt', skillId: 'woodcutting' },
-        { event: 'action-complete', skillId: 'woodcutting', amount: 1 },
-      ],
     };
     const context: ActionResolutionContext = {
       actions: [fightGoblin, chopTree],
@@ -721,8 +724,8 @@ describe('resolveIdleTimers', () => {
         rateUnit: 'per-second',
       }],
       interactionTypes: [
-        { id: 'combat', sourceStatId: 'attack', targetStatId: 'defense', targetPlayerHealth: false },
-        { id: 'woodcutting', sourceStatId: 'woodcutting', targetStatId: 'defense', targetPlayerHealth: false },
+        { id: 'combat', sourceStatId: 'attack', targetStatId: 'defense', targetPlayerHealth: false, experience: [{ event: 'damage-dealt', skillId: 'attack' }] },
+        { id: 'woodcutting', sourceStatId: 'woodcutting', targetStatId: 'defense', targetPlayerHealth: false, experience: [{ event: 'damage-dealt', skillId: 'woodcutting' }] },
       ],
       enemies: [
         { id: 'goblin', interactionTypeId: 'combat', stats: { health: 100, defense: 10 }, rewards: [] },
@@ -732,20 +735,20 @@ describe('resolveIdleTimers', () => {
     const afterGoblin = resolveIdleTimers(
       startAction(createInitialPlayState('test-universe', 'arena'), fightGoblin, context, startedAt),
       context,
-      { random: () => 0.5 },
+      { random: () => 0 },
       startedAt + 1_000,
     ).state;
     const afterTree = resolveIdleTimers(
       startAction({ ...afterGoblin, activeAction: null }, chopTree, context, startedAt + 2_000),
       context,
-      { random: () => 0.5 },
+      { random: () => 0 },
       startedAt + 3_000,
     ).state;
 
-    expect(afterGoblin.skillXp.attack).toBeGreaterThan(1);
+    expect(afterGoblin.skillXp.attack).toBeGreaterThan(3);
     expect(afterGoblin.skillXp.woodcutting).toBeUndefined();
     expect(afterTree.skillXp.attack).toBe(afterGoblin.skillXp.attack);
-    expect(afterTree.skillXp.woodcutting).toBeGreaterThan(1);
+    expect(afterTree.skillXp.woodcutting).toBeGreaterThan(0);
   });
 
   it('grants health xp for damage taken and defense xp for incoming misses', () => {
@@ -756,10 +759,6 @@ describe('resolveIdleTimers', () => {
       durationSeconds: 1,
       enemyId: 'sparring-enemy',
       rewards: [],
-      experience: [
-        { event: 'damage-taken', skillId: 'health' },
-        { event: 'incoming-attack-missed', skillId: 'defense', amount: 10 },
-      ],
     };
     const context: ActionResolutionContext = {
       actions: [action],
@@ -795,7 +794,16 @@ describe('resolveIdleTimers', () => {
         sourceEnemyStat: 'rate',
         rateUnit: 'per-second',
       }],
-      interactionTypes: [{ id: 'combat', sourceStatId: 'attack', targetStatId: 'defense', targetPlayerHealth: true }],
+      interactionTypes: [{
+        id: 'combat',
+        sourceStatId: 'attack',
+        targetStatId: 'defense',
+        targetPlayerHealth: true,
+        experience: [
+          { event: 'damage-taken', skillId: 'health' },
+          { event: 'incoming-attack-missed', skillId: 'defense', amount: 10 },
+        ],
+      }],
       enemies: [{
         id: 'sparring-enemy',
         interactionTypeId: 'combat',

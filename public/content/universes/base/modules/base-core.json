@@ -902,7 +902,7 @@
       "rewards": [
         {
           "kind": "skillXp",
-          "skillId": "lore",
+          "skillId": "attack",
           "amount": 2
         }
       ]
@@ -976,11 +976,7 @@
         {
           "event": "action-complete",
           "skillId": "woodcutting",
-          "amount": 1
-        },
-        {
-          "event": "damage-dealt",
-          "skillId": "woodcutting"
+          "amount": 5
         }
       ]
     },
@@ -1072,11 +1068,6 @@
           "kind": "item",
           "itemId": "emberleaf",
           "amount": 1
-        },
-        {
-          "kind": "skillXp",
-          "skillId": "survival",
-          "amount": 3
         }
       ]
     },
@@ -1088,7 +1079,7 @@
       "rewards": [
         {
           "kind": "skillXp",
-          "skillId": "craft",
+          "skillId": "mining",
           "amount": 4
         }
       ]
@@ -1194,12 +1185,6 @@
       "action.mine-iron-ore-vein.description": "Work an exposed ore vein with any pickaxe you own.",
       "action.mine-iron-ore-vein.success": "You chip iron ore free from the vein.",
       "action.mine-iron-ore-vein.failure": "The ore vein resists your attempt.",
-      "skill.lore.title": "Lore",
-      "skill.lore.description": "Memory, myth, and the patience to connect old clues.",
-      "skill.survival.title": "Survival",
-      "skill.survival.description": "Practical knowledge for harsh country and stranger weather.",
-      "skill.craft.title": "Craft",
-      "skill.craft.description": "Making, repairing, and improving useful things.",
       "skill.woodcutting.title": "Woodcutting",
       "skill.woodcutting.description": "Reading grain, landing chops, and bringing down stubborn timber.",
       "skill.mining.title": "Mining",

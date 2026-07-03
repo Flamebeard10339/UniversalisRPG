@@ -15,6 +15,7 @@ export type UniverseManifest = {
   modules?: string[];
   basePlayer?: BasePlayerDefinition;
   combatBalance?: CombatBalanceDefinition;
+  experience?: ExperienceTrigger[];
   displayProfiles?: DisplayProfileDefinition[];
   ui?: UniverseUiSettings;
   compatibility?: {
@@ -223,6 +224,7 @@ export type InteractionTypeDefinition = {
   sourceStatId: string;
   targetStatId: string;
   targetPlayerHealth: boolean; // TODO:
+  experience?: ExperienceTrigger[];
 };
 
 export type ResourceBoundaryBehavior =
@@ -610,6 +612,7 @@ export type ContributionDraft = {
   notes: string;
   basePlayer?: BasePlayerDefinition;
   combatBalance?: CombatBalanceDefinition;
+  experience?: ExperienceTrigger[];
   displayProfiles?: DisplayProfileDefinition[];
   ui?: UniverseUiSettings;
   modules: ContentModule[];

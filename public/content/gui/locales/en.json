@@ -379,6 +379,7 @@
   "contribution.reward.add": "Add reward",
   "contribution.skillStat.empty": "No skill stats.",
   "contribution.universe.damageScaler": "Damage scaler",
+  "contribution.universe.experience": "Universe experience",
   "contribution.universe.floatingTextDuration": "Floating text duration (seconds)",
   "contribution.universe.loopActionsByDefault": "Loop actions by default",
   "contribution.universe.baseInventory": "Base inventory",

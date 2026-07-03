@@ -122,4 +122,51 @@ describe('universe manifest validation', () => {
 
     expect(issues).toEqual([]);
   });
+
+  it('accepts universe and interaction experience triggers', () => {
+    const issues = validateContentBundle({
+      ...bundle({
+        experience: [{ event: 'health-regenerated', skillId: 'regeneration', sourceStat: 'regeneration' }],
+      }),
+      skills: [
+        { id: 'attack', maxLevel: 100, statId: 'attack' },
+        { id: 'regeneration', maxLevel: 100, statId: 'regeneration' },
+      ],
+      stats: [
+        { id: 'attack' },
+        { id: 'defense' },
+        { id: 'regeneration' },
+      ],
+      interactionTypes: [{
+        id: 'practice',
+        sourceStatId: 'attack',
+        targetStatId: 'defense',
+        targetPlayerHealth: true,
+        experience: [{ event: 'damage-dealt', skillId: 'attack' }],
+      }],
+    }).filter((issue) => issue.severity === 'error');
+
+    expect(issues).toEqual([]);
+  });
+
+  it('reports invalid universe and interaction experience references', () => {
+    const issues = validateContentBundle({
+      ...bundle({
+        experience: [{ event: 'health-regenerated', skillId: 'missing-skill', sourceStat: 'missing-stat' }],
+      }),
+      stats: [{ id: 'attack' }, { id: 'defense' }],
+      interactionTypes: [{
+        id: 'practice',
+        sourceStatId: 'attack',
+        targetStatId: 'defense',
+        targetPlayerHealth: true,
+        experience: [{ event: 'damage-dealt', skillId: 'missing-skill' }],
+      }],
+    }).filter((issue) => issue.severity === 'error');
+
+    expect(issues.map((issue) => issue.message)).toEqual(expect.arrayContaining([
+      'validation.unknownSkill',
+      'validation.unknownStat',
+    ]));
+  });
 });

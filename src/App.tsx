@@ -62,7 +62,7 @@ const contributionTabs: ContributionTab[] = ['content'];
 const homeTabs: HomeTab[] = ['actions', 'details', 'workbench'];
 const emptyIdleReport: IdleReport = { kind: 'none' };
 const emptyContributionDraft = (universeId: string): ContributionDraft => ({
-  universeId, updatedAt: Date.now(), notes: '', basePlayer: undefined, combatBalance: undefined, displayProfiles: undefined, ui: undefined, modules: [], modulePacks: [], locations: [], edges: [], actions: [], skills: [], stats: [], items: [], flags: [], resourceDefinitions: [], effects: [], interactionTypes: [], enemies: [], dropTables: [], dialogues: [], locales: {},
+  universeId, updatedAt: Date.now(), notes: '', basePlayer: undefined, combatBalance: undefined, experience: undefined, displayProfiles: undefined, ui: undefined, modules: [], modulePacks: [], locations: [], edges: [], actions: [], skills: [], stats: [], items: [], flags: [], resourceDefinitions: [], effects: [], interactionTypes: [], enemies: [], dropTables: [], dialogues: [], locales: {},
   removed: { locations: [], edges: [], actions: [], skills: [], stats: [], items: [], flags: [], resources: [], effects: [], interactionTypes: [], enemies: [], dropTables: [], dialogues: [], modules: [] },
 });
 const colorInputClass = 'h-9 w-12 rounded border border-slate-700 bg-slate-900 p-1';

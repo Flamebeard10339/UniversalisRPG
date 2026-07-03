@@ -937,6 +937,12 @@
         },
         "targetPlayerHealth": {
           "type": "boolean"
+        },
+        "experience": {
+          "type": "array",
+          "items": {
+            "$ref": "https://universalis-rpg.local/schema/actions.schema.json#/$defs/experienceTrigger"
+          }
         }
       }
     },

@@ -8,6 +8,7 @@ import type {
   EnemyDefinition,
   EntityDefinition,
   EffectDefinition,
+  ExperienceTrigger,
   GameAction,
   InteractionTypeDefinition,
   ItemDefinition,
@@ -137,6 +138,7 @@ export const validateManifest = (value: unknown): value is UniverseManifest =>
   (value.combatBalance === undefined ||
     (isRecord(value.combatBalance) &&
       hasNumber(value.combatBalance, 'damage-scaler'))) &&
+  (value.experience === undefined || (Array.isArray(value.experience) && value.experience.every(validateExperienceTriggerShape))) &&
   validateDisplayProfilesShape(value.displayProfiles) &&
   (value.ui === undefined ||
     (isRecord(value.ui) &&
@@ -350,7 +352,8 @@ const validateInteractionTypesShape = (interactionTypes: unknown): interactionTy
         hasString(interactionType, 'id') &&
         hasString(interactionType, 'sourceStatId') &&
         hasString(interactionType, 'targetStatId') &&
-        typeof interactionType.targetPlayerHealth === 'boolean',
+        typeof interactionType.targetPlayerHealth === 'boolean' &&
+        (interactionType.experience === undefined || (Array.isArray(interactionType.experience) && interactionType.experience.every(validateExperienceTriggerShape))),
     ));
 
 const validateEnemiesShape = (enemies: unknown): enemies is EnemyDefinition[] =>
@@ -590,6 +593,21 @@ export const validateContentReferences = (bundle: ContentBundle) => {
     }
   };
 
+  const validateExperienceTriggerReferences = (trigger: ExperienceTrigger, path: string) => {
+    if (!skillIds.has(trigger.skillId)) issues.push(error(path, 'validation.unknownSkill', { id: trigger.skillId }));
+    if (trigger.resourceId && !resourceIds.has(trigger.resourceId)) issues.push(error(path, 'validation.unknownResource', { id: trigger.resourceId }));
+    if (trigger.effectId && !(bundle.effects ?? []).some((effect) => effect.id === trigger.effectId)) issues.push(error(path, 'validation.unknownEffect', { id: trigger.effectId }));
+    if (trigger.enemyId && !enemyIds.has(trigger.enemyId)) issues.push(error(path, 'validation.unknownEnemy', { id: trigger.enemyId }));
+    if (trigger.interactionTypeId && !interactionTypeIds.has(trigger.interactionTypeId)) issues.push(error(path, 'validation.unknownInteractionType', { id: trigger.interactionTypeId }));
+    if (trigger.sourceStat && !statIds.has(trigger.sourceStat)) issues.push(error(path, 'validation.unknownStat', { id: trigger.sourceStat }));
+    if (trigger.amount !== undefined && trigger.amount <= 0) issues.push(error(path, 'validation.experienceAmountPositive'));
+    if (trigger.amountPerUnit !== undefined && trigger.amountPerUnit <= 0) issues.push(error(path, 'validation.experienceAmountPositive'));
+  };
+
+  for (const [index, trigger] of (bundle.manifest.experience ?? []).entries()) {
+    validateExperienceTriggerReferences(trigger, `universe.json.experience.${index}`);
+  }
+
   if (!bundle.locations.some((location) => location.starting)) {
     issues.push(error('locations', 'validation.startingLocationMissing'));
   }
@@ -681,15 +699,7 @@ export const validateContentReferences = (bundle: ContentBundle) => {
     }
     action.rewards.forEach((reward, index) => validateRewardReferences(reward, `actions.${action.id}.rewards.${index}`));
     for (const [index, trigger] of (action.experience ?? []).entries()) {
-      const path = `actions.${action.id}.experience.${index}`;
-      if (!skillIds.has(trigger.skillId)) issues.push(error(path, 'validation.unknownSkill', { id: trigger.skillId }));
-      if (trigger.resourceId && !resourceIds.has(trigger.resourceId)) issues.push(error(path, 'validation.unknownResource', { id: trigger.resourceId }));
-      if (trigger.effectId && !(bundle.effects ?? []).some((effect) => effect.id === trigger.effectId)) issues.push(error(path, 'validation.unknownEffect', { id: trigger.effectId }));
-      if (trigger.enemyId && !enemyIds.has(trigger.enemyId)) issues.push(error(path, 'validation.unknownEnemy', { id: trigger.enemyId }));
-      if (trigger.interactionTypeId && !interactionTypeIds.has(trigger.interactionTypeId)) issues.push(error(path, 'validation.unknownInteractionType', { id: trigger.interactionTypeId }));
-      if (trigger.sourceStat && !statIds.has(trigger.sourceStat)) issues.push(error(path, 'validation.unknownStat', { id: trigger.sourceStat }));
-      if (trigger.amount !== undefined && trigger.amount <= 0) issues.push(error(path, 'validation.experienceAmountPositive'));
-      if (trigger.amountPerUnit !== undefined && trigger.amountPerUnit <= 0) issues.push(error(path, 'validation.experienceAmountPositive'));
+      validateExperienceTriggerReferences(trigger, `actions.${action.id}.experience.${index}`);
     }
     for (const [index, result] of (action.results ?? []).entries()) {
       const path = `actions.${action.id}.results.${index}`;
@@ -816,6 +826,9 @@ export const validateContentReferences = (bundle: ContentBundle) => {
     }
     if (!statIds.has(interactionType.targetStatId)) {
       issues.push(error(`interactionTypes.${interactionType.id}.targetStatId`, 'validation.unknownStat', { id: interactionType.targetStatId }));
+    }
+    for (const [index, trigger] of (interactionType.experience ?? []).entries()) {
+      validateExperienceTriggerReferences(trigger, `interactionTypes.${interactionType.id}.experience.${index}`);
     }
   }
 
@@ -960,11 +973,12 @@ export const mergeDraftIntoBundle = (bundle: ContentBundle, draft: ContributionD
 
   return {
     ...bundle,
-    manifest: draft.basePlayer || draft.combatBalance || draft.displayProfiles || draft.ui
+    manifest: draft.basePlayer || draft.combatBalance || draft.experience || draft.displayProfiles || draft.ui
       ? {
           ...bundle.manifest,
           ...(draft.basePlayer ? { basePlayer: draft.basePlayer } : {}),
           ...(draft.combatBalance ? { combatBalance: draft.combatBalance } : {}),
+          ...(draft.experience ? { experience: draft.experience } : {}),
           ...(draft.displayProfiles ? { displayProfiles: draft.displayProfiles } : {}),
           ...(draft.ui ? { ui: draft.ui } : {}),
         }

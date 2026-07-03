@@ -10,7 +10,11 @@
       "id": { "type": "string", "minLength": 1 },
       "sourceStatId": { "type": "string", "minLength": 1 },
       "targetStatId": { "type": "string", "minLength": 1 },
-      "targetPlayerHealth": { "type": "boolean" }
+      "targetPlayerHealth": { "type": "boolean" },
+      "experience": {
+        "type": "array",
+        "items": { "$ref": "https://universalis-rpg.local/schema/actions.schema.json#/$defs/experienceTrigger" }
+      }
     }
   }
 }

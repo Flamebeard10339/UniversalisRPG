@@ -47,6 +47,10 @@
         "damage-scaler": { "type": "number", "exclusiveMinimum": 0 }
       }
     },
+    "experience": {
+      "type": "array",
+      "items": { "$ref": "https://universalis-rpg.local/schema/actions.schema.json#/$defs/experienceTrigger" }
+    },
     "displayProfiles": {
       "type": "array",
       "items": {
