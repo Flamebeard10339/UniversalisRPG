@@ -416,7 +416,7 @@
   "contribution.modules.importPlaceholder": "Paste a module JSON object or serialized module",
   "contribution.modules.importWarning": "Importing a mod overrides the selected module data.",
   "contribution.modules.importFailed": "Unable to import module.",
-  "contribution.modules.dependenciesPlaceholder": "One dependency per line",
+  "contribution.modules.dependenciesPlaceholder": "Comma-separated dependencies",
   "contribution.modules.filterById": "Filter by id",
   "contribution.modules.copySerialization": "Copy serialization",
   "contribution.modules.copyJson": "Copy JSON",

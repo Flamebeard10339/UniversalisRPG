@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { ContentBundle, ContentModule, ContentModulePack, ContributionDraft, LocaleDictionary, ModuleDataRemoveEntry, ModuleDataSectionObject, ValidationIssue } from '../../game/types';
 import type { Translator } from '../../game/i18n';
 import { StructuredDataEditor, type StructuredSchema, type StructuredValue } from '../structuredData/StructuredData';
@@ -84,9 +84,9 @@ const tableDataKeys = new Set<DataKey>(['edges', 'skills', 'stats', 'items', 'fl
 
 const uniqueById = <T extends { id: string }>(items: T[]) => [...new Map(items.map((item) => [item.id, item])).values()];
 const uniquePacksById = (packs: ContentModulePack[]) => uniqueById(packs);
-const toModuleId = (value: string) => value.trim().toLowerCase().replace(/[^a-z0-9.-]+/g, '-').replace(/^-+|-+$/g, '') || 'new-module';
-const dependencyListString = (module: ContentModule) => (module.dependencies ?? []).join('\n');
-const dependenciesFromListString = (value: string) => value.split(/\n/).map((item) => item.trim()).filter(Boolean);
+const toModuleId = (value: string) => value.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9.-]+/g, '-').replace(/^-+/, '') || 'new-module';
+const dependencyListString = (module: ContentModule) => (module.dependencies ?? []).join(', ');
+const dependenciesFromListString = (value: string) => value.split(',').map((item) => item.trim()).filter(Boolean);
 const serializeModule = (module: ContentModule) => btoa(unescape(encodeURIComponent(JSON.stringify(module))));
 const deserializeModule = (value: string) => {
   const trimmed = value.trim();
@@ -558,6 +558,7 @@ export const ModuleEditor = ({ bundle, draft, issues, onMoveModule, onPatch, t, 
   const [showModpacks, setShowModpacks] = useState(false);
   const [importText, setImportText] = useState('');
   const [importError, setImportError] = useState(false);
+  const [dependencyText, setDependencyText] = useState('');
   const removedModules = new Set(draft.removed?.modules ?? []);
   const localIds = new Set((draft.modules ?? []).map((module) => module.id));
   const issueModuleIds = new Set(issues.map(moduleIdFromIssue).filter((id): id is string => Boolean(id)));
@@ -580,6 +581,10 @@ export const ModuleEditor = ({ bundle, draft, issues, onMoveModule, onPatch, t, 
   ];
   const rawJson = selectedModule ? JSON.stringify(selectedModule, null, 2) : '';
   const serialization = selectedModule ? serializeModule(selectedModule) : '';
+
+  useEffect(() => {
+    setDependencyText(selectedModule ? dependencyListString(selectedModule) : '');
+  }, [selectedModule?.id]);
 
   const saveModule = (module: ContentModule, originalId = module.id) => {
     const normalized = { ...module, id: toModuleId(module.id), universe: module.universe || bundle.manifest.id };
@@ -609,6 +614,10 @@ export const ModuleEditor = ({ bundle, draft, issues, onMoveModule, onPatch, t, 
   const updateSelected = (patch: Partial<ContentModule>) => {
     if (!selectedModule || !isLocal) return;
     saveModule({ ...selectedModule, ...patch }, selectedModule.id);
+  };
+  const saveDependencyText = () => {
+    if (!selectedModule || !isLocal) return;
+    updateSelected({ dependencies: dependenciesFromListString(dependencyText) });
   };
   const submitPackage = selectedModule ? {
     appVersion: '0.1.0',
@@ -667,7 +676,7 @@ export const ModuleEditor = ({ bundle, draft, issues, onMoveModule, onPatch, t, 
                   </select></label>
                   <label className="contents"><span className="self-center text-sm text-slate-400">{t('contribution.module.author')}</span><input className="rounded bg-slate-950 px-3 py-2 text-sm text-slate-100" onChange={(event) => updateSelected({ author: event.target.value })} readOnly={!isLocal} value={selectedModule.author} /></label>
                   <label className="contents"><span className="self-center text-sm text-slate-400">{t('contribution.module.gameVersion')}</span><input className="rounded bg-slate-950 px-3 py-2 text-sm text-slate-100" onChange={(event) => updateSelected({ game_version: event.target.value })} readOnly={!isLocal} value={String(selectedModule.game_version)} /></label>
-                  <label className="contents"><span className="self-start pt-2 text-sm text-slate-400">{t('contribution.module.dependencies')}</span><textarea className="min-h-24 rounded bg-slate-950 px-3 py-2 text-sm text-slate-100" onChange={(event) => updateSelected({ dependencies: dependenciesFromListString(event.target.value) })} placeholder={t('contribution.modules.dependenciesPlaceholder')} readOnly={!isLocal} value={dependencyListString(selectedModule)} /></label>
+                  <label className="contents"><span className="self-start pt-2 text-sm text-slate-400">{t('contribution.module.dependencies')}</span><textarea className="min-h-24 rounded bg-slate-950 px-3 py-2 text-sm text-slate-100" onBlur={saveDependencyText} onChange={(event) => setDependencyText(event.target.value)} placeholder={t('contribution.modules.dependenciesPlaceholder')} readOnly={!isLocal} value={dependencyText} /></label>
                 </div>
                 <datalist id="module-dependency-ids">{allModules.filter((module) => module.id !== selectedModule.id).map((module) => <option key={module.id} value={module.id} />)}</datalist>
                 {isLocal && <div className="grid gap-2 border-t border-slate-800 pt-3"><p className="text-xs text-amber-200">{t('contribution.modules.importWarning')}</p><textarea className="min-h-24 rounded bg-slate-950 p-3 text-xs text-slate-200" onChange={(event) => { setImportText(event.target.value); setImportError(false); }} placeholder={t('contribution.modules.importPlaceholder')} value={importText} />{importError && <p className="text-xs text-rose-300">{t('contribution.modules.importFailed')}</p>}<button className="justify-self-start rounded border border-slate-600 px-3 py-2 text-sm font-semibold text-slate-100" disabled={!importText.trim()} onClick={() => { try { saveModule({ ...deserializeModule(importText), id: selectedModule.id, universe: bundle.manifest.id }, selectedModule.id); setImportText(''); } catch { setImportError(true); } }} type="button">{t('contribution.modules.import')}</button></div>}
