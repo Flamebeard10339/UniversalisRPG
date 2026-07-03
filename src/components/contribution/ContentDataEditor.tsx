@@ -1,7 +1,7 @@
 import { useRef, useState, type MutableRefObject } from 'react';
 import { toKebabInput } from '../../game/contentIds';
 import type { Translator } from '../../game/i18n';
-import type { BasePlayerDefinition, CombatBalanceDefinition, ContentBundle, ContentModule, ContentModulePack, ContributionDraft, ContributionRemovedIds, DialogueDefinition, DisplayProfileDefinition, DropTableDefinition, EffectDefinition, EnemyDefinition, ExperienceTrigger, GameAction, InteractionTypeDefinition, ItemDefinition, LocationNode, ResourceDefinition, SkillDefinition, StatDefinition, StateFlagDefinition, UniverseUiSettings } from '../../game/types';
+import type { BasePlayerDefinition, CombatBalanceDefinition, ContentBundle, ContentModule, ContentModulePack, ContributionDraft, ContributionRemovedIds, DialogueDefinition, DisplayProfileDefinition, DropTableDefinition, EffectDefinition, EnemyDefinition, ExperienceCurveDefinition, ExperienceTrigger, GameAction, InteractionTypeDefinition, ItemDefinition, LocationNode, ResourceDefinition, SkillDefinition, StatDefinition, StateFlagDefinition, UniverseUiSettings } from '../../game/types';
 import { editableModuleJsonFiles } from '../../game/contributionFiles';
 import { ContributionMapEditor } from './ContributionMapEditor';
 import { EnemyDiagnostics } from './EnemyDiagnostics';
@@ -9,9 +9,10 @@ import { DEBUG_PLAYER_PROFILES, getProfileStatSummary, profileDescription, profi
 import { resolveCombatBalance } from '../../game/combatBalance';
 import { getEnemyStat, normalizeEnemyStats } from '../../game/enemies';
 import { resolveUniverseUiSettings } from '../../game/universeSettings';
+import { resolveExperienceCurve } from '../../game/skills';
 import { LocationFields } from './MapContentFields';
 import { StructuredDataEditor, type StructuredSchema, type StructuredValue } from '../structuredData/StructuredData';
-import { actionSchema, basePlayerSchema, combatBalanceSchema, contentModuleSchema, dialogueSchema, displayProfileSchema, dropTableDefinitionSchema, effectDefinitionSchema, enemyStatsSchema, flagDefinitionSchema, interactionTypeDefinitionSchema, itemDefinitionSchema, locationSchema, modulePackSchema, resourceDefinitionSchema, rewardSchema, skillDefinitionSchema, statDefinitionSchema, universeExperienceSchema, universeUiSchema } from '../structuredData/contentSchemas';
+import { actionSchema, basePlayerSchema, combatBalanceSchema, contentModuleSchema, dialogueSchema, displayProfileSchema, dropTableDefinitionSchema, effectDefinitionSchema, enemyStatsSchema, experienceCurveSchema, flagDefinitionSchema, interactionTypeDefinitionSchema, itemDefinitionSchema, locationSchema, modulePackSchema, resourceDefinitionSchema, rewardSchema, skillDefinitionSchema, statDefinitionSchema, universeExperienceSchema, universeUiSchema } from '../structuredData/contentSchemas';
 
 type ContentDataEditorProps = {
   activeTab: ContentDataTab;
@@ -127,6 +128,7 @@ export const ContentDataEditor = ({ activeTab, baseBundle, bundle, draft, onPatc
   const dialogues = layeredRows(draft.dialogues, baseBundle.dialogues ?? [], removed.dialogues, filter);
   const basePlayer = draft.basePlayer ?? bundle.manifest.basePlayer ?? { inventory: {} };
   const combatBalance = resolveCombatBalance(draft.combatBalance ?? bundle.manifest.combatBalance);
+  const experienceCurve = resolveExperienceCurve({ experienceCurve: draft.experienceCurve ?? bundle.manifest.experienceCurve });
   const universeExperience = draft.experience ?? bundle.manifest.experience ?? [];
   const displayProfiles = draft.displayProfiles ?? bundle.manifest.displayProfiles ?? [];
   const uiSettings = resolveUniverseUiSettings(draft.ui ?? bundle.manifest.ui);
@@ -213,6 +215,10 @@ export const ContentDataEditor = ({ activeTab, baseBundle, bundle, draft, onPatc
 
   const updateCombatBalance = (value: StructuredValue | undefined) => {
     if (value && typeof value === 'object' && !Array.isArray(value)) onPatch({ combatBalance: resolveCombatBalance(value as unknown as CombatBalanceDefinition) });
+  };
+
+  const updateExperienceCurve = (value: StructuredValue | undefined) => {
+    if (value && typeof value === 'object' && !Array.isArray(value)) onPatch({ experienceCurve: resolveExperienceCurve({ experienceCurve: value as unknown as ExperienceCurveDefinition }) });
   };
 
   const updateUiSettings = (value: StructuredValue | undefined) => {
@@ -412,11 +418,12 @@ export const ContentDataEditor = ({ activeTab, baseBundle, bundle, draft, onPatc
     };
   });
   const jsonFiles: JsonEditorFile[] = [
-    { path: 'universe.json', json: { ...bundle.manifest, basePlayer: universeBasePlayer, combatBalance, experience: universeExperience, displayProfiles, ui: uiSettings }, onChange: (value: StructuredValue | undefined) => {
+    { path: 'universe.json', json: { ...bundle.manifest, basePlayer: universeBasePlayer, combatBalance, experienceCurve, experience: universeExperience, displayProfiles, ui: uiSettings }, onChange: (value: StructuredValue | undefined) => {
       const next = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
       onPatch({
         basePlayer: next.basePlayer as BasePlayerDefinition | undefined,
         combatBalance: next.combatBalance as CombatBalanceDefinition | undefined,
+        experienceCurve: next.experienceCurve as ExperienceCurveDefinition | undefined,
         experience: next.experience as ExperienceTrigger[] | undefined,
         displayProfiles: next.displayProfiles as DisplayProfileDefinition[] | undefined,
         ui: next.ui as UniverseUiSettings | undefined,
@@ -471,6 +478,7 @@ export const ContentDataEditor = ({ activeTab, baseBundle, bundle, draft, onPatc
             <p className="text-xs text-slate-500">{t('contribution.data.universeDescription')}</p>
           </div>
           <StructuredDataEditor label="contribution.data.combatBalance" onChange={updateCombatBalance} schema={combatBalanceSchema()} t={t} value={combatBalance as unknown as StructuredValue} />
+          <StructuredDataEditor label="contribution.universe.experienceCurve" onChange={updateExperienceCurve} schema={experienceCurveSchema()} t={t} value={experienceCurve as unknown as StructuredValue} />
           <StructuredDataEditor label="contribution.universe.experience" onChange={updateUniverseExperience} schema={universeExperienceSchema(bundle)} t={t} value={universeExperience as unknown as StructuredValue} />
           <StructuredDataEditor label="contribution.data.ui" onChange={updateUiSettings} schema={universeUiSchema()} t={t} value={uiSettings as unknown as StructuredValue} />
           <StructuredDataEditor label="contribution.data.displayProfiles" onChange={updateDisplayProfiles} schema={{ kind: 'array', listMode: 'free', item: displayProfileSchema(), createItem: () => ({ id: uniqueId('new-profile', displayProfiles.map((profile) => profile.id)), light: {}, dark: {} }) }} t={t} value={displayProfiles as unknown as StructuredValue} />

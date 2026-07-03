@@ -101,6 +101,13 @@ const validateDisplayProfilesShape = (value: unknown) =>
       validateDisplayPaletteShape(profile.dark),
     ));
 
+const validateExperienceCurveShape = (value: unknown) =>
+  value === undefined ||
+  (isRecord(value) &&
+    (value['starting-experience'] === undefined || hasNumber(value, 'starting-experience')) &&
+    (value['level-factor'] === undefined || hasNumber(value, 'level-factor')) &&
+    (value.exponential === undefined || hasNumber(value, 'exponential')));
+
 const validateResetStateShape = (value: unknown) => {
   if (!isRecord(value)
     || (value.locationId !== undefined && !hasString(value, 'locationId'))
@@ -137,6 +144,7 @@ export const validateManifest = (value: unknown): value is UniverseManifest =>
   (value.combatBalance === undefined ||
     (isRecord(value.combatBalance) &&
       hasNumber(value.combatBalance, 'damage-scaler'))) &&
+  validateExperienceCurveShape(value.experienceCurve) &&
   (value.experience === undefined || (Array.isArray(value.experience) && value.experience.every(validateExperienceTriggerShape))) &&
   validateDisplayProfilesShape(value.displayProfiles) &&
   (value.ui === undefined ||
@@ -405,6 +413,11 @@ export const validateContentShape = (bundle: Partial<ContentBundle>) => {
   } else {
     if (bundle.manifest.combatBalance?.['damage-scaler'] !== undefined && bundle.manifest.combatBalance['damage-scaler'] <= 0) {
       issues.push(error('universe.json.combatBalance.damage-scaler', 'validation.damageScalerPositive'));
+    }
+    for (const key of ['starting-experience', 'level-factor', 'exponential'] as const) {
+      if (bundle.manifest.experienceCurve?.[key] !== undefined && bundle.manifest.experienceCurve[key] <= 0) {
+        issues.push(error(`universe.json.experienceCurve.${key}`, 'validation.experienceCurvePositive'));
+      }
     }
     if (bundle.manifest.ui?.floatingTextDurationSeconds !== undefined && bundle.manifest.ui.floatingTextDurationSeconds <= 0) {
       issues.push(error('universe.json.ui.floatingTextDurationSeconds', 'validation.floatingTextDurationPositive'));
@@ -936,11 +949,12 @@ export const mergeDraftIntoBundle = (bundle: ContentBundle, draft: ContributionD
 
   return {
     ...bundle,
-    manifest: draft.basePlayer || draft.combatBalance || draft.experience || draft.displayProfiles || draft.ui
+    manifest: draft.basePlayer || draft.combatBalance || draft.experienceCurve || draft.experience || draft.displayProfiles || draft.ui
       ? {
           ...bundle.manifest,
           ...(draft.basePlayer ? { basePlayer: draft.basePlayer } : {}),
           ...(draft.combatBalance ? { combatBalance: draft.combatBalance } : {}),
+          ...(draft.experienceCurve ? { experienceCurve: draft.experienceCurve } : {}),
           ...(draft.experience ? { experience: draft.experience } : {}),
           ...(draft.displayProfiles ? { displayProfiles: draft.displayProfiles } : {}),
           ...(draft.ui ? { ui: draft.ui } : {}),

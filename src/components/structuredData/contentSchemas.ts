@@ -248,6 +248,12 @@ export const combatBalanceSchema = (): StructuredSchema => ({ kind: 'object', fi
   'damage-scaler': { label: 'contribution.universe.damageScaler', schema: number(0.000001) },
 } });
 
+export const experienceCurveSchema = (): StructuredSchema => ({ kind: 'object', fields: {
+  'starting-experience': { label: 'contribution.universe.startingExperience', schema: number(0.000001), optional: true },
+  'level-factor': { label: 'contribution.universe.levelFactor', schema: number(0.000001), optional: true },
+  exponential: { label: 'contribution.universe.exponential', schema: number(0.000001), optional: true },
+} });
+
 const displayPaletteSchema = (): StructuredSchema => ({ kind: 'object', fields: Object.fromEntries(
   displayColorKeys.map((key) => [key, { label: `settings.color.${key}`, schema: color, optional: true }]),
 ) });

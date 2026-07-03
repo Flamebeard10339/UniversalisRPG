@@ -344,7 +344,7 @@ describe('resolveIdleTimers', () => {
       id: 'train-attack',
       locationId: 'test-location',
       durationSeconds: 1,
-      rewards: [{ kind: 'skillXp', skillId: 'attack', amount: 10 }],
+      rewards: [{ kind: 'skillXp', skillId: 'attack', amount: 1000 }],
     };
     const context: ActionResolutionContext = {
       actions: [action],
@@ -358,7 +358,7 @@ describe('resolveIdleTimers', () => {
 
     const resolved = resolveIdleTimers(state, context, {}, startedAt + 1_000);
 
-    expect(resolved.state.skillXp.attack).toBe(10);
+    expect(resolved.state.skillXp.attack).toBe(1000);
     expect(resolved.state.chatMessages).toEqual(expect.arrayContaining([
       expect.objectContaining({
         key: 'chat.skillLevelUp',

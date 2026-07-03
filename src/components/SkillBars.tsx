@@ -1,7 +1,7 @@
 import type { ContentBundle, UniversePlayState } from '../game/types';
 import { skillTitleKey } from '../game/contentIds';
 import type { Translator } from '../game/i18n';
-import { skillLevelFromXp } from '../game/skills';
+import { skillLevelProgressFromXp } from '../game/skills';
 
 type SkillBarsProps = {
   bundle: ContentBundle;
@@ -15,8 +15,8 @@ export const SkillBars = ({ bundle, playState, t }: SkillBarsProps) => (
     <div className="grid gap-3">
       {bundle.skills.map((skill) => {
         const xp = playState.skillXp[skill.id] ?? 0;
-        const level = Math.min(skill.maxLevel, skillLevelFromXp(xp));
-        const progress = Math.min(100, xp % 100);
+        const progress = skillLevelProgressFromXp(xp, bundle.manifest.experienceCurve);
+        const level = Math.min(skill.maxLevel, progress.level);
 
         return (
           <div className="grid gap-1" key={skill.id}>
@@ -25,7 +25,7 @@ export const SkillBars = ({ bundle, playState, t }: SkillBarsProps) => (
               <span className="text-xs text-slate-400">Lv {level}</span>
             </div>
             <div className="h-2 overflow-hidden rounded bg-slate-800">
-              <div className="h-full bg-emerald-300" style={{ width: `${progress}%` }} />
+              <div className="h-full bg-emerald-300" style={{ width: `${progress.percent}%` }} />
             </div>
             <p className="text-xs text-slate-500">{xp} xp</p>
           </div>

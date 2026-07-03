@@ -32,7 +32,7 @@ export const CharacterStats = ({ bundle, playState, t }: CharacterStatsProps) =>
           </thead>
           <tbody>
             {bundle.stats.map((stat) => {
-              const totals = getCharacterStatTotals(playState, bundle.stats, stat.id, bundle.skills, bundle.items);
+              const totals = getCharacterStatTotals(playState, bundle.stats, stat.id, bundle.skills, bundle.items, bundle.manifest.experienceCurve);
 
               return (
                 <tr className="border-b border-slate-800/80 text-slate-200" key={stat.id}>

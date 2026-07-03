@@ -69,12 +69,12 @@ export const getActionDurationMs = (
   context: ActionResolutionContext,
 ) => {
   if (getEnemy(action, context)) {
-    const actionsPerMinute = getCharacterStatValue(state, context.stats ?? [], ACTION_RATE_STAT_ID, context.skills, context.items ?? []) || DEFAULT_ACTIONS_PER_MINUTE;
+    const actionsPerMinute = getCharacterStatValue(state, context.stats ?? [], ACTION_RATE_STAT_ID, context.skills, context.items ?? [], context.manifest?.experienceCurve) || DEFAULT_ACTIONS_PER_MINUTE;
     return 60_000 / Math.max(EPSILON, actionsPerMinute);
   }
 
   const { sourceSkill } = getActionStats(action, context);
-  const rate = sourceSkill ? getSkillTotals(state, sourceSkill).rate : DEFAULT_RATE;
+  const rate = sourceSkill ? getSkillTotals(state, sourceSkill, undefined, context.manifest?.experienceCurve).rate : DEFAULT_RATE;
 
   return (action.durationSeconds * 1000) / Math.max(EPSILON, rate);
 };
@@ -91,7 +91,7 @@ export const getActionDps = (
     return null;
   }
 
-  const source = getCharacterStatValue(state, context.stats ?? [], sourceStat.id, context.skills, context.items ?? []);
+  const source = getCharacterStatValue(state, context.stats ?? [], sourceStat.id, context.skills, context.items ?? [], context.manifest?.experienceCurve);
   return expectedCombatDamage(source, getEnemyStat(enemy, 'defense'), resolveManifestCombatBalance(context.manifest)).damage /
     (getActionDurationMs(state, action, context) / 1000);
 };
@@ -110,7 +110,7 @@ export const getEnemyAttackDps = (
     return null;
   }
 
-  const target = getCharacterStatValue(state, context.stats ?? [], targetStat.id, context.skills, context.items ?? []);
+  const target = getCharacterStatValue(state, context.stats ?? [], targetStat.id, context.skills, context.items ?? [], context.manifest?.experienceCurve);
   return expectedCombatDamage(getEnemyStat(enemy, 'attack'), target, resolveManifestCombatBalance(context.manifest), {
     armorPenetration: getEnemyStat(enemy, 'armorPenetration'),
     torpidity: getEnemyStat(enemy, 'torpidity'),
@@ -132,7 +132,7 @@ export const sampleAdversarialDamage = (
     return null;
   }
 
-  const source = getCharacterStatValue(state, context.stats ?? [], sourceStat.id, context.skills, context.items ?? []);
+  const source = getCharacterStatValue(state, context.stats ?? [], sourceStat.id, context.skills, context.items ?? [], context.manifest?.experienceCurve);
   const target = getEnemyStat(enemy, 'defense');
   const sample = sampleCombatDamage(source, target, resolveManifestCombatBalance(context.manifest), {}, random);
 
@@ -159,7 +159,7 @@ export const sampleEnemyAttackDamage = (
     return null;
   }
 
-  const target = getCharacterStatValue(state, context.stats ?? [], targetStat.id, context.skills, context.items ?? []);
+  const target = getCharacterStatValue(state, context.stats ?? [], targetStat.id, context.skills, context.items ?? [], context.manifest?.experienceCurve);
   const sample = sampleCombatDamage(getEnemyStat(enemy, 'attack'), target, resolveManifestCombatBalance(context.manifest), {
     armorPenetration: getEnemyStat(enemy, 'armorPenetration'),
     torpidity: getEnemyStat(enemy, 'torpidity'),

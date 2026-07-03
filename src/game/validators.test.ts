@@ -33,6 +33,7 @@ describe('universe manifest validation', () => {
     expect(validateManifest(manifest({
       basePlayer: { inventory: {} },
       combatBalance: { 'damage-scaler': 0.1 },
+      experienceCurve: { 'starting-experience': 1000, 'level-factor': 10, exponential: 2 },
     }))).toBe(true);
   });
 
@@ -44,6 +45,14 @@ describe('universe manifest validation', () => {
     expect(issues.map((issue) => issue.message)).toEqual([
       'validation.damageScalerPositive',
     ]);
+  });
+
+  it('reports invalid experience curve tuning values', () => {
+    const issues = validateContentBundle(bundle({
+      experienceCurve: { 'starting-experience': 0, 'level-factor': 10, exponential: 2 },
+    })).filter((issue) => issue.severity === 'error');
+
+    expect(issues.map((issue) => issue.message)).toContain('validation.experienceCurvePositive');
   });
 
   it('reports invalid base inventory amounts', () => {

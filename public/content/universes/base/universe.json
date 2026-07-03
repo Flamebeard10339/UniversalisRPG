@@ -7,6 +7,11 @@
   "combatBalance": {
     "damage-scaler": 0.1
   },
+  "experienceCurve": {
+    "starting-experience": 1000,
+    "level-factor": 10,
+    "exponential": 2
+  },
   "basePlayer": {
     "inventory": {}
   },

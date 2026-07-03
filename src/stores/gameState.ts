@@ -272,7 +272,7 @@ export const useGameState = create<GameStateStore>((set, get) => ({
       const current = state.states[universeId];
       const item = context.items?.find((candidate) => candidate.id === itemId);
       if (!current || !item) return state;
-      const next = equipItem(current, item, slot, context.skills);
+      const next = equipItem(current, item, slot, context.skills, context.manifest?.experienceCurve);
       void save(storageKey(universeId), next);
       return { states: { ...state.states, [universeId]: next } };
     });

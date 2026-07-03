@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createInitialPlayState } from './timers';
 import { getNextResourceBoundaryAt, projectResourcePool } from './resources';
 import { getCharacterStatValue } from './characterStats';
+import { xpRequiredForLevel } from './skills';
 import type { ContentBundle } from './types';
 
 const bundle: ContentBundle = {
@@ -44,7 +45,7 @@ const runningState = () => {
 
 describe('resource projection', () => {
   it('calculates stat added and increased components from attached skill levels', () => {
-    const state = { ...createInitialPlayState('test', 'room'), skillXp: { endurance: 90 } };
+    const state = { ...createInitialPlayState('test', 'room'), skillXp: { endurance: xpRequiredForLevel(4) } };
     const stats = [{ id: 'air-capacity', base: 100 }];
     const skills = [{ id: 'endurance', maxLevel: 100, statId: 'air-capacity' }];
 

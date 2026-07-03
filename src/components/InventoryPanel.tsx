@@ -69,11 +69,11 @@ export const InventoryPanel = ({ bundle, onEquip, onUnequip, playState, t }: Inv
                 {item && slots.length > 0 && (
                   <div className="flex flex-wrap gap-2">
                     {slots.map((slotTag) => {
-                      const requirementsMet = meetsEquipmentRequirements(playState, slotTag, bundle.skills);
+                      const requirementsMet = meetsEquipmentRequirements(playState, slotTag, bundle.skills, bundle.manifest.experienceCurve);
                       return (
                         <button
                           className="rounded border border-cyan-700 px-3 py-1.5 text-xs font-semibold text-cyan-100 disabled:cursor-not-allowed disabled:border-slate-700 disabled:text-slate-500"
-                          disabled={!canEquipItemInSlot(playState, item, slotTag.slot, bundle.skills)}
+                          disabled={!canEquipItemInSlot(playState, item, slotTag.slot, bundle.skills, bundle.manifest.experienceCurve)}
                           key={`${item.id}-${slotTag.slot}`}
                           onClick={() => onEquip(item.id, slotTag.slot)}
                           title={requirementsMet ? undefined : t('equipment.requirementsNotMet')}

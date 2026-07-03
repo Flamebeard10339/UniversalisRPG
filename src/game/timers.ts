@@ -312,7 +312,7 @@ const maxSkillLevel = (context: ActionResolutionContext, skillId: string) =>
   context.skills.find((skill) => skill.id === skillId)?.maxLevel ?? Number.POSITIVE_INFINITY;
 
 const skillLevel = (context: ActionResolutionContext, skillId: string, xp: number) =>
-  Math.min(maxSkillLevel(context, skillId), skillLevelFromXp(xp));
+  Math.min(maxSkillLevel(context, skillId), skillLevelFromXp(xp, context.manifest?.experienceCurve));
 
 const grantSkillXp = (
   state: UniversePlayState,

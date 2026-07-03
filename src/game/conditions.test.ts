@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { evaluateCondition } from './conditions';
 import { createInitialPlayState } from './timers';
+import { xpRequiredForLevel } from './skills';
 
 const context = { actions: [], skills: [], items: [], interactionTypes: [], enemies: [] };
 
@@ -17,7 +18,7 @@ describe('state-variable conditions', () => {
       ...createInitialPlayState('test', 'start'),
       inventory: { key: 2 },
       resourcePools: { air: { current: 7, min: 0, max: 10 } },
-      skillXp: { focus: 90 },
+      skillXp: { focus: xpRequiredForLevel(4) },
     };
     const skillContext = { ...context, skills: [{ id: 'focus', maxLevel: 10 }] };
 

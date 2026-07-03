@@ -1,4 +1,4 @@
-import { skillLevelFromXp } from './skills';
+import { skillLevelFromXp, xpRequiredForLevel } from './skills';
 import { getCharacterStatValue } from './characterStats';
 import { getEnemy } from './adversarial';
 import type { ActionResolutionContext, ContentBundle, UniversePlayState } from './types';
@@ -43,9 +43,11 @@ export const readStateVariable = (
   if (category === 'resource') return state.resourcePools[id]?.current ?? 0;
   if (category === 'skill-level') {
     const skill = context?.skills.find((candidate) => candidate.id === id);
-    return skill ? Math.min(skill.maxLevel, skillLevelFromXp(state.skillXp[id] ?? 0)) : skillLevelFromXp(state.skillXp[id] ?? 0);
+    return skill
+      ? Math.min(skill.maxLevel, skillLevelFromXp(state.skillXp[id] ?? 0, context?.manifest?.experienceCurve))
+      : skillLevelFromXp(state.skillXp[id] ?? 0, context?.manifest?.experienceCurve);
   }
-  if (category === 'stat') return getCharacterStatValue(state, context?.stats ?? [], id, context?.skills ?? [], context?.items ?? []);
+  if (category === 'stat') return getCharacterStatValue(state, context?.stats ?? [], id, context?.skills ?? [], context?.items ?? [], context?.manifest?.experienceCurve);
   if (category === 'action-completions') return state.actionCompletions[id] ?? 0;
   return state.flags[variable] ?? false;
 };
@@ -71,7 +73,7 @@ export const writeStateVariable = (state: UniversePlayState, variable: string, v
   }
   if (category === 'skill-level') {
     const level = Math.max(1, Number(value));
-    return { ...state, skillXp: { ...state.skillXp, [id]: (level - 1) ** 2 * 10 } };
+    return { ...state, skillXp: { ...state.skillXp, [id]: xpRequiredForLevel(level) } };
   }
   if (category === 'stat') return { ...state, statOverrides: { ...state.statOverrides, [id]: Number(value) } };
   if (category === 'action-completions') return { ...state, actionCompletions: { ...state.actionCompletions, [id]: Number(value) } };

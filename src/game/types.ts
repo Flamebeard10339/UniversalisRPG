@@ -15,6 +15,7 @@ export type UniverseManifest = {
   modules?: string[];
   basePlayer?: BasePlayerDefinition;
   combatBalance?: CombatBalanceDefinition;
+  experienceCurve?: ExperienceCurveDefinition;
   experience?: ExperienceTrigger[];
   displayProfiles?: DisplayProfileDefinition[];
   ui?: UniverseUiSettings;
@@ -68,6 +69,12 @@ export type EnemyStatKey =
 
 export type CombatBalanceDefinition = {
   'damage-scaler': number;
+};
+
+export type ExperienceCurveDefinition = {
+  'starting-experience'?: number;
+  'level-factor'?: number;
+  exponential?: number;
 };
 
 export type UniverseUiSettings = {
@@ -611,6 +618,7 @@ export type ContributionDraft = {
   notes: string;
   basePlayer?: BasePlayerDefinition;
   combatBalance?: CombatBalanceDefinition;
+  experienceCurve?: ExperienceCurveDefinition;
   experience?: ExperienceTrigger[];
   displayProfiles?: DisplayProfileDefinition[];
   ui?: UniverseUiSettings;

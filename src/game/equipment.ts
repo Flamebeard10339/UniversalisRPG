@@ -1,6 +1,6 @@
 import { skillTitleKey, statTitleKey } from './contentIds';
 import { skillLevelFromXp } from './skills';
-import type { EquipmentSlot, ItemDefinition, SkillDefinition, StatDefinition, UniversePlayState } from './types';
+import type { EquipmentSlot, ExperienceCurveDefinition, ItemDefinition, SkillDefinition, StatDefinition, UniversePlayState } from './types';
 import type { Translator } from './i18n';
 
 export const equipmentSlots: EquipmentSlot[] = ['head', 'body', 'legs', 'boots', 'gloves', 'ring', 'necklace', 'mainhand', 'offhand'];
@@ -82,10 +82,11 @@ export const meetsEquipmentRequirements = (
   state: UniversePlayState,
   slotTag: Extract<ParsedItemTag, { kind: 'slot' }>,
   skills: SkillDefinition[] = [],
+  experienceCurve?: ExperienceCurveDefinition,
 ) =>
   slotTag.requirements.every((requirement) => {
     const skill = skills.find((candidate) => candidate.id === requirement.skillId);
-    const level = Math.min(skill?.maxLevel ?? Number.POSITIVE_INFINITY, skillLevelFromXp(state.skillXp[requirement.skillId] ?? 0));
+    const level = Math.min(skill?.maxLevel ?? Number.POSITIVE_INFINITY, skillLevelFromXp(state.skillXp[requirement.skillId] ?? 0, experienceCurve));
     return level >= requirement.level;
   });
 
@@ -94,6 +95,7 @@ export const canEquipItemInSlot = (
   item: ItemDefinition | undefined,
   slot: EquipmentSlot,
   skills: SkillDefinition[] = [],
+  experienceCurve?: ExperienceCurveDefinition,
 ) => {
   if (!item) return false;
   const equippedElsewhere = Object.entries(state.equipment ?? {})
@@ -101,7 +103,7 @@ export const canEquipItemInSlot = (
     .length;
   if ((state.inventory[item.id] ?? 0) <= equippedElsewhere) return false;
   const slotTag = itemSlots(item).find((candidate) => candidate.slot === slot);
-  return Boolean(slotTag && meetsEquipmentRequirements(state, slotTag, skills));
+  return Boolean(slotTag && meetsEquipmentRequirements(state, slotTag, skills, experienceCurve));
 };
 
 export const equipItem = (
@@ -109,8 +111,9 @@ export const equipItem = (
   item: ItemDefinition,
   slot: EquipmentSlot,
   skills: SkillDefinition[] = [],
+  experienceCurve?: ExperienceCurveDefinition,
 ) =>
-  canEquipItemInSlot(state, item, slot, skills)
+  canEquipItemInSlot(state, item, slot, skills, experienceCurve)
     ? { ...state, equipment: { ...(state.equipment ?? {}), [slot]: item.id }, lastTickAt: Date.now() }
     : state;
 

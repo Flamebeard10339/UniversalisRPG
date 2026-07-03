@@ -47,6 +47,9 @@
         "damage-scaler": { "type": "number", "exclusiveMinimum": 0 }
       }
     },
+    "experienceCurve": {
+      "$ref": "#/$defs/experienceCurve"
+    },
     "experience": {
       "type": "array",
       "items": { "$ref": "https://universalis-rpg.local/schema/actions.schema.json#/$defs/experienceTrigger" }
@@ -107,6 +110,15 @@
         "dangerText": { "$ref": "#/$defs/color" },
         "success": { "$ref": "#/$defs/color" },
         "warning": { "$ref": "#/$defs/color" }
+      }
+    },
+    "experienceCurve": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "starting-experience": { "type": "number", "exclusiveMinimum": 0 },
+        "level-factor": { "type": "number", "exclusiveMinimum": 0 },
+        "exponential": { "type": "number", "exclusiveMinimum": 0 }
       }
     },
     "color": {

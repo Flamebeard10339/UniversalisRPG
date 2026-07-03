@@ -5,6 +5,7 @@ import type { ContentBundle, EnemyDefinition, SkillEquipmentBonuses, UniversePla
 import { createInitialPlayState } from './timers';
 import { ACTION_RATE_STAT_ID } from './adversarial';
 import { getEnemyStat } from './enemies';
+import { xpRequiredForLevel } from './skills';
 
 export type PlayerProfileDefinition = {
   id: string;
@@ -53,8 +54,6 @@ export const DEBUG_PLAYER_PROFILES: PlayerProfileDefinition[] = [
   },
 ];
 
-const xpForLevel = (level: number) => Math.max(0, Math.pow(Math.max(1, level) - 1, 2) * 10);
-
 export const createProfileState = (
   bundle: Pick<ContentBundle, 'manifest' | 'locations' | 'skills'>,
   profile: PlayerProfileDefinition,
@@ -62,7 +61,7 @@ export const createProfileState = (
   const startingLocationId = bundle.locations.find((location) => location.starting)?.id ?? bundle.locations[0]?.id ?? '';
   const allSkillXp = Object.fromEntries(bundle.skills.map((skill) => [
     skill.id,
-    xpForLevel(profile.skillLevels[skill.id] ?? 1),
+    xpRequiredForLevel(profile.skillLevels[skill.id] ?? 1, bundle.manifest.experienceCurve),
   ]));
 
   return {
@@ -76,7 +75,7 @@ export const getProfileStatValue = (
   bundle: Pick<ContentBundle, 'manifest' | 'locations' | 'skills' | 'stats'>,
   profile: PlayerProfileDefinition,
   statId: string,
-) => getCharacterStatValue(createProfileState(bundle, profile), bundle.stats, statId, bundle.skills);
+) => getCharacterStatValue(createProfileState(bundle, profile), bundle.stats, statId, bundle.skills, [], bundle.manifest.experienceCurve);
 
 const titleCaseId = (id: string) =>
   id.split('-').filter(Boolean).map((part) => `${part.slice(0, 1).toUpperCase()}${part.slice(1)}`).join(' ');
@@ -94,7 +93,7 @@ export const getProfileStatSummary = (
     .map((stat) => ({
       id: stat.id,
       label: t ? t(statTitleKey(stat.id), titleCaseId(stat.id)) : titleCaseId(stat.id),
-      value: getCharacterStatValue(state, bundle.stats, stat.id, bundle.skills),
+      value: getCharacterStatValue(state, bundle.stats, stat.id, bundle.skills, [], bundle.manifest.experienceCurve),
     }))
     .sort((left, right) => right.value - left.value || left.label.localeCompare(right.label))
     .map((stat) => `${stat.label} ${formatStatValue(stat.value)}`)
