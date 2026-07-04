@@ -1,4 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { applyModulesToBundle } from './contentModules';
 import { loadUniverse } from './loader';
 
 const jsonResponse = (json: unknown, status = 200) =>
@@ -14,6 +17,18 @@ const installFetch = (responses: Record<string, unknown>) => {
       return jsonResponse({}, 404);
     }
     return jsonResponse(responses[path]);
+  }));
+};
+
+const installPublicContentFetch = () => {
+  vi.stubGlobal('fetch', vi.fn(async (path: string) => {
+    try {
+      const jsonText = readFileSync(join(process.cwd(), 'public', path.replace(/^\//, '')), 'utf8').replace(/^\uFEFF/, '');
+      const json = JSON.parse(jsonText) as unknown;
+      return jsonResponse(json);
+    } catch {
+      return jsonResponse({}, 404);
+    }
   }));
 };
 
@@ -177,5 +192,20 @@ describe('loader', () => {
       message: 'validation.modulePacksInvalid',
       path: 'modulePacks',
     }));
+  });
+
+  it('loads base-core as a valid enabled module without warnings', async () => {
+    installPublicContentFetch();
+
+    const bundle = await loadUniverse('base');
+    const baseCore = bundle.modules?.find((module) => module.id === 'base-core');
+
+    expect(baseCore).toBeDefined();
+
+    const result = applyModulesToBundle(bundle, [baseCore!], ['base-core']);
+    const baseCoreIssues = result.issues.filter((issue) => issue.path.startsWith('modules.base-core'));
+
+    expect(result.enabledModuleIds).toContain('base-core');
+    expect(baseCoreIssues).toEqual([]);
   });
 });

@@ -8,6 +8,7 @@ import { CollectionLogPanel } from './components/CollectionLogPanel';
 import { DialoguePanel } from './components/DialoguePanel';
 import { InventoryPanel } from './components/InventoryPanel';
 import { ContributionMode, type ContributionTab } from './components/contribution/ContributionMode';
+import { ContributionQuickWorkbench } from './components/contribution/ContributionQuickWorkbench';
 import { ContributionWorkbench } from './components/contribution/ContributionWorkbench';
 import { SkillBars } from './components/SkillBars';
 import { TravelStatus } from './components/TravelStatus';
@@ -42,6 +43,7 @@ const getStartingLocationId = (bundle: NonNullable<ReturnType<typeof useUniverse
 type AppTab = 'map' | 'home' | 'character' | 'settings';
 type HomeTab = 'actions' | 'details' | 'workbench';
 type CharacterTab = 'skills' | 'inventory' | 'stats' | 'collectionLog';
+type QuickWorkbenchSheet = 'add' | 'edit-location';
 type FontSizePreference = 'tiny' | 'small' | 'normal' | 'large' | 'huge';
 type AppearanceSettings = {
   chatCompressionEnabled?: boolean;
@@ -115,6 +117,8 @@ export default function App() {
   const [appearanceLoaded, setAppearanceLoaded] = useState(false);
   const [contributionUiLoaded, setContributionUiLoaded] = useState(false);
   const [showChangelog, setShowChangelog] = useState(false);
+  const [quickWorkbenchSheet, setQuickWorkbenchSheet] = useState<QuickWorkbenchSheet | null>(null);
+  const [quickWorkbenchModuleId, setQuickWorkbenchModuleId] = useState('');
   const [changelogText, setChangelogText] = useState('');
   const [confirmReset, setConfirmReset] = useState(false);
   const [saveExport, setSaveExport] = useState('');
@@ -385,6 +389,52 @@ export default function App() {
     : [];
   const activeAction = bundle?.actions.find((action) => action.id === playState?.activeAction?.actionId) ?? null;
   const activeInteractionType = activeAction ? getInteractionType(activeAction, actionContext) : null;
+  const currentContributionDraft = bundle ? contributionDrafts[bundle.manifest.id] ?? emptyContributionDraft(bundle.manifest.id) : null;
+  const createLocalContributionModule = (draft: ContributionDraft): ContentModule => {
+    const existingIds = new Set([...(bundle?.modules ?? []).map((module) => module.id), ...(draft.modules ?? []).map((module) => module.id)]);
+    let index = 1;
+    let id = 'local-contribution';
+    while (existingIds.has(id)) {
+      index += 1;
+      id = `local-contribution-${index}`;
+    }
+    return {
+      id,
+      version: '1.0.0',
+      universe: draft.universeId,
+      author: bundle?.manifest.author ?? 'contributor',
+      game_version: '1.0',
+      dependencies: [],
+      data: [],
+      locale: {},
+    };
+  };
+  const patchContributionDraft = (patch: Partial<Omit<ContributionDraft, 'universeId'>>) => {
+    if (!bundle) return;
+    updateContributionDraft(bundle.manifest.id, patch);
+    queueMicrotask(refreshContributionPreview);
+  };
+  const ensureQuickWorkbenchModule = () => {
+    if (!bundle || !currentContributionDraft) return '';
+    const selected = currentContributionDraft.modules.find((module) => module.id === quickWorkbenchModuleId) ?? currentContributionDraft.modules[0];
+    if (selected) {
+      if (!activeModuleIds.has(selected.id)) void setEnabledModules(bundle.manifest.id, [...activeModuleIds, selected.id]);
+      return selected.id;
+    }
+    const module = createLocalContributionModule(currentContributionDraft);
+    patchContributionDraft({
+      modules: [module, ...(currentContributionDraft.modules ?? [])],
+      removed: { ...currentContributionDraft.removed, modules: (currentContributionDraft.removed?.modules ?? []).filter((id) => id !== module.id) },
+    });
+    void setEnabledModules(bundle.manifest.id, [...activeModuleIds, module.id]);
+    return module.id;
+  };
+  const openQuickWorkbench = (sheet: QuickWorkbenchSheet) => {
+    const moduleId = ensureQuickWorkbenchModule();
+    if (!moduleId) return;
+    setQuickWorkbenchModuleId(moduleId);
+    setQuickWorkbenchSheet(sheet);
+  };
   const logPlayerAction = (event: string, data?: Record<string, unknown>) => {
     logAction(event, data);
     if (bundle) recordRunEvent(runtimeUniverseId, 'player', event, data);
@@ -706,6 +756,24 @@ export default function App() {
 
             {visibleHomeTab === 'actions' && (
               <section className="grid gap-4">
+                {contributionMode && (
+                  <section className="grid gap-2 rounded border border-cyan-800/60 bg-slate-900 p-3">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div>
+                        <h2 className="text-sm font-semibold text-cyan-100">{t('quickWorkbench.title')}</h2>
+                        <p className="text-xs text-slate-400">{t('quickWorkbench.description')}</p>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        <button className="rounded bg-cyan-300 px-3 py-2 text-sm font-semibold text-slate-950" onClick={() => openQuickWorkbench('add')} type="button">
+                          {t('quickWorkbench.add')}
+                        </button>
+                        <button className="rounded border border-cyan-500 px-3 py-2 text-sm font-semibold text-cyan-100" onClick={() => openQuickWorkbench('edit-location')} type="button">
+                          {t('quickWorkbench.editLocation')}
+                        </button>
+                      </div>
+                    </div>
+                  </section>
+                )}
                 <section className="rounded border border-slate-800 bg-slate-900 p-4" data-testid="home-action-panel">
                   <ActionPanel
                     debugEnabled={debugEnabled}
@@ -1279,6 +1347,33 @@ export default function App() {
             </ul>
           </section>
         </div>
+      )}
+
+      {quickWorkbenchSheet && contributionMode && currentContributionDraft && (
+        <ContributionQuickWorkbench
+          bundle={bundle}
+          draft={currentContributionDraft}
+          kind={quickWorkbenchSheet}
+          moduleId={quickWorkbenchModuleId}
+          onClose={() => setQuickWorkbenchSheet(null)}
+          onLocationIdChange={(previousId, nextId) => {
+            if (playState.currentLocationId !== previousId) return;
+            void replaceUniverseState(runtimeUniverseId, {
+              ...playState,
+              currentLocationId: nextId,
+              discoveredLocationIds: playState.discoveredLocationIds.map((id) => id === previousId ? nextId : id),
+              activeAction: null,
+              activeTravel: null,
+            });
+          }}
+          onModuleChange={(moduleId) => {
+            setQuickWorkbenchModuleId(moduleId);
+            if (!activeModuleIds.has(moduleId)) void setEnabledModules(bundle.manifest.id, [...activeModuleIds, moduleId]);
+          }}
+          onPatchDraft={patchContributionDraft}
+          playState={playState}
+          t={t}
+        />
       )}
 
       <nav className="fixed inset-x-0 bottom-0 border-t border-slate-800 bg-slate-950/95 px-4 py-3 backdrop-blur">

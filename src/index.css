@@ -207,6 +207,10 @@ textarea {
   animation: dialogue-slide-up 160ms ease-out;
 }
 
+.quick-workbench-sheet {
+  animation: quick-workbench-slide-up 180ms ease-out;
+}
+
 @keyframes continuous-action-progress {
   from {
     transform: translateX(-55%);
@@ -221,6 +225,18 @@ textarea {
   from {
     opacity: 0;
     transform: translateY(1.5rem);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes quick-workbench-slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(2.5rem);
   }
 
   to {
