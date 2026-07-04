@@ -16,8 +16,10 @@ const entityActionRuntimeId = (entityId: string, actionId: string) =>
   actionId.includes('.') ? actionId : `entity.${entityId}.${actionId}`;
 
 const actionIdsForEntity = (entity: EntityDefinition) => [
-  ...(entity.actionIds ?? []),
-  ...(entity.actions ?? []).map((action) => entityActionRuntimeId(entity.id, action.id)),
+  ...new Set([
+    ...(entity.actionIds ?? []),
+    ...(entity.actions ?? []).map((action) => entityActionRuntimeId(entity.id, action.id)),
+  ]),
 ];
 
 const locationActionIds = (locations: LocationNode[]) =>

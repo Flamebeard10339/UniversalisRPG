@@ -14,6 +14,13 @@ export const toKebabInput = (value: string) =>
     .replace(/^-+/, '')
     .replace(/-{2,}/g, '-');
 
+const toLocalizationId = (value: string) =>
+  value
+    .split('.')
+    .map(toKebabCase)
+    .filter(Boolean)
+    .join('.');
+
 export const locationTitleKey = (id: string) => `location.${toKebabCase(id)}.title`;
 export const universeTitleKey = (id: string) => `universe.${toKebabCase(id)}.title`;
 export const universeDescriptionKey = (id: string) => `universe.${toKebabCase(id)}.description`;
@@ -21,11 +28,11 @@ export const locationDescriptionKey = (id: string) => `location.${toKebabCase(id
 export const locationExhaustedKey = (id: string) => `location.${toKebabCase(id)}.exhausted`;
 export const entityTitleKey = (id: string) => `entity.${toKebabCase(id)}.title`;
 export const entityDescriptionKey = (id: string) => `entity.${toKebabCase(id)}.description`;
-export const actionTitleKey = (id: string) => `action.${toKebabCase(id)}.title`;
-export const actionDescriptionKey = (id: string) => `action.${toKebabCase(id)}.description`;
-export const actionSuccessKey = (id: string) => `action.${toKebabCase(id)}.success`;
-export const actionFailureKey = (id: string) => `action.${toKebabCase(id)}.failure`;
-export const actionKillKey = (id: string) => `action.${toKebabCase(id)}.kill`;
+export const actionTitleKey = (id: string) => `action.${toLocalizationId(id)}.title`;
+export const actionDescriptionKey = (id: string) => `action.${toLocalizationId(id)}.description`;
+export const actionSuccessKey = (id: string) => `action.${toLocalizationId(id)}.success`;
+export const actionFailureKey = (id: string) => `action.${toLocalizationId(id)}.failure`;
+export const actionKillKey = (id: string) => `action.${toLocalizationId(id)}.kill`;
 export const interactionPlayerHitKey = (id: string) => `interaction.${toKebabCase(id)}.player.hit`;
 export const interactionPlayerMissKey = (id: string) => `interaction.${toKebabCase(id)}.player.miss`;
 export const interactionPlayerKillKey = (id: string) => `interaction.${toKebabCase(id)}.player.kill`;
