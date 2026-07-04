@@ -305,6 +305,7 @@ const experienceTriggersForEvent = (
 ) => [
   ...(context.manifest?.experience ?? []),
   ...(interactionTypeForExperienceEvent(action, context, event)?.experience ?? []),
+  ...(event.effectId ? (context.effects ?? []).find((effect) => effect.id === event.effectId)?.experience ?? [] : []),
   ...(action?.experience ?? []),
 ];
 

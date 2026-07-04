@@ -42,7 +42,14 @@
         "settlement"
       ],
       "entities": [
-        "goblin"
+        "goblin",
+        "ork"
+      ],
+      "actions": [
+        "travel-crossroads-to-emberwood",
+        "travel-crossroads-to-old-quarry",
+        "gather-rumors",
+        "speak-to-tutorial-guide"
       ]
     },
     {
@@ -54,6 +61,14 @@
       },
       "tags": [
         "forest"
+      ],
+      "actions": [
+        "travel-emberwood-to-crossroads",
+        "forage-embers"
+      ],
+      "entities": [
+        "oak-tree",
+        "ent"
       ]
     },
     {
@@ -65,43 +80,12 @@
       },
       "tags": [
         "ruin"
+      ],
+      "actions": [
+        "travel-old-quarry-to-crossroads",
+        "survey-stonework",
+        "mine-iron-ore-vein"
       ]
-    },
-    {
-      "type": "action",
-      "id": "travel-crossroads-to-emberwood",
-      "locationId": "crossroads",
-      "role": "travel",
-      "durationSeconds": 2,
-      "rewards": [],
-      "results": [{ "kind": "relocate", "locationId": "emberwood" }]
-    },
-    {
-      "type": "action",
-      "id": "travel-emberwood-to-crossroads",
-      "locationId": "emberwood",
-      "role": "travel",
-      "durationSeconds": 2,
-      "rewards": [],
-      "results": [{ "kind": "relocate", "locationId": "crossroads" }]
-    },
-    {
-      "type": "action",
-      "id": "travel-crossroads-to-old-quarry",
-      "locationId": "crossroads",
-      "role": "travel",
-      "durationSeconds": 2,
-      "rewards": [],
-      "results": [{ "kind": "relocate", "locationId": "old-quarry" }]
-    },
-    {
-      "type": "action",
-      "id": "travel-old-quarry-to-crossroads",
-      "locationId": "old-quarry",
-      "role": "travel",
-      "durationSeconds": 2,
-      "rewards": [],
-      "results": [{ "kind": "relocate", "locationId": "crossroads" }]
     },
     {
       "type": "stat",
@@ -243,6 +227,20 @@
           "kind": "refill",
           "value": "min"
         }
+      ],
+      "effects": [
+        {
+          "id": "action-rate-regeneration",
+          "sourceStat": "action-rate",
+          "rateUnit": "per-second",
+          "activeWhen": {
+            "kind": "state-variable",
+            "variable": "active-interaction",
+            "comparison": "equal",
+            "value": true
+          },
+          "resetResourceWhenInactive": true
+        }
       ]
     },
     {
@@ -261,6 +259,21 @@
           "kind": "refill",
           "value": "min"
         }
+      ],
+      "effects": [
+        {
+          "id": "enemy-action-rate-regeneration",
+          "sourceStat": "action-rate",
+          "sourceEnemyStat": "rate",
+          "rateUnit": "per-second",
+          "activeWhen": {
+            "kind": "state-variable",
+            "variable": "active-interaction",
+            "comparison": "equal",
+            "value": true
+          },
+          "resetResourceWhenInactive": true
+        }
       ]
     },
     {
@@ -270,7 +283,20 @@
       "sourceStat": "health",
       "sourceEnemyStat": "health",
       "initialValue": "full",
-      "hidden": false
+      "hidden": false,
+      "effects": [
+        {
+          "id": "enemy-health-regeneration",
+          "sourceStat": "action-rate",
+          "sourceEnemyStat": "regeneration",
+          "activeWhen": {
+            "kind": "state-variable",
+            "variable": "active-interaction",
+            "comparison": "equal",
+            "value": true
+          }
+        }
+      ]
     },
     {
       "type": "resource",
@@ -296,62 +322,47 @@
           "kind": "chat",
           "messageKey": "resource.health.empty"
         }
+      ],
+      "effects": [
+        {
+          "id": "health-regeneration",
+          "sourceStat": "regeneration",
+          "experience": [
+            {
+              "event": "health-regenerated",
+              "skillId": "regeneration",
+              "sourceStat": "regeneration"
+            }
+          ]
+        }
       ]
-    },
-    {
-      "type": "effect",
-      "id": "action-rate-regeneration",
-      "resourceId": "action-rate",
-      "sourceStat": "action-rate",
-      "rateUnit": "per-second",
-      "activeWhen": {
-        "kind": "state-variable",
-        "variable": "active-interaction",
-        "comparison": "equal",
-        "value": true
-      },
-      "resetResourceWhenInactive": true
-    },
-    {
-      "type": "effect",
-      "id": "enemy-action-rate-regeneration",
-      "resourceId": "enemy-action-rate",
-      "sourceStat": "action-rate",
-      "sourceEnemyStat": "rate",
-      "rateUnit": "per-second",
-      "activeWhen": {
-        "kind": "state-variable",
-        "variable": "active-interaction",
-        "comparison": "equal",
-        "value": true
-      },
-      "resetResourceWhenInactive": true
-    },
-    {
-      "type": "effect",
-      "id": "enemy-health-regeneration",
-      "resourceId": "enemy-health",
-      "sourceStat": "action-rate",
-      "sourceEnemyStat": "regeneration",
-      "activeWhen": {
-        "kind": "state-variable",
-        "variable": "active-interaction",
-        "comparison": "equal",
-        "value": true
-      }
-    },
-    {
-      "type": "effect",
-      "id": "health-regeneration",
-      "resourceId": "health",
-      "sourceStat": "regeneration"
     },
     {
       "type": "interactionType",
       "id": "melee-combat",
       "sourceStatId": "attack",
       "targetStatId": "defense",
-      "targetPlayerHealth": true
+      "targetPlayerHealth": true,
+      "experience": [
+        {
+          "event": "action-complete",
+          "skillId": "attack",
+          "amount": 1
+        },
+        {
+          "event": "damage-dealt",
+          "skillId": "attack"
+        },
+        {
+          "event": "damage-taken",
+          "skillId": "health"
+        },
+        {
+          "event": "incoming-attack-missed",
+          "skillId": "defense",
+          "amount": 10
+        }
+      ]
     },
     {
       "type": "interactionType",
@@ -365,239 +376,25 @@
       "id": "woodcutting-combat",
       "sourceStatId": "woodcutting",
       "targetStatId": "defense",
-      "targetPlayerHealth": true
-    },
-    {
-      "type": "enemy",
-      "id": "goblin",
-      "interactionTypeId": "melee-combat",
-      "stats": {
-        "health": 10,
-        "rate": 30
-      },
-      "showHealthBar": true,
-      "rewards": [
+      "targetPlayerHealth": true,
+      "experience": [
         {
-          "kind": "skillXp",
-          "skillId": "attack",
-          "amount": 2
-        },
-        {
-          "kind": "skillXp",
-          "skillId": "defense",
+          "event": "action-complete",
+          "skillId": "woodcutting",
           "amount": 1
         },
         {
-          "kind": "dropTable",
-          "dropTableId": "goblin-drop-table-1"
-        }
-      ]
-    },
-    {
-      "type": "enemy",
-      "id": "oak-tree",
-      "interactionTypeId": "woodcutting",
-      "stats": {
-        "health": 10
-      },
-      "showHealthBar": true,
-      "rewards": [
-        {
-          "kind": "skillXp",
-          "skillId": "woodcutting",
-          "amount": 4
-        }
-      ]
-    },
-    {
-      "type": "enemy",
-      "id": "ent",
-      "interactionTypeId": "woodcutting-combat",
-      "stats": {
-        "attack": 6,
-        "defense": 4,
-        "health": 30,
-        "rate": 20
-      },
-      "showHealthBar": true,
-      "rewards": [
-        {
-          "kind": "skillXp",
-          "skillId": "woodcutting",
-          "amount": 8
+          "event": "damage-dealt",
+          "skillId": "woodcutting"
         },
         {
-          "kind": "skillXp",
+          "event": "damage-taken",
+          "skillId": "health"
+        },
+        {
+          "event": "incoming-attack-missed",
           "skillId": "defense",
-          "amount": 2
-        }
-      ]
-    },
-    {
-      "type": "enemy",
-      "id": "ork",
-      "interactionTypeId": "melee-combat",
-      "stats": {
-        "attack": 21,
-        "defense": 21,
-        "health": 40,
-        "rate": 24
-      },
-      "showHealthBar": true,
-      "rewards": [
-        {
-          "kind": "skillXp",
-          "skillId": "attack",
-          "amount": 4
-        },
-        {
-          "kind": "skillXp",
-          "skillId": "defense",
-          "amount": 2
-        }
-      ]
-    },
-    {
-      "type": "enemy",
-      "id": "troll",
-      "interactionTypeId": "melee-combat",
-      "stats": {
-        "attack": 31,
-        "defense": 31,
-        "health": 80,
-        "rate": 18
-      },
-      "showHealthBar": true,
-      "rewards": [
-        {
-          "kind": "skillXp",
-          "skillId": "attack",
-          "amount": 8
-        },
-        {
-          "kind": "skillXp",
-          "skillId": "defense",
-          "amount": 4
-        }
-      ]
-    },
-    {
-      "type": "dropTable",
-      "id": "goblin-drop-table-4",
-      "mode": "dependent",
-      "drops": [
-        {
-          "weight": 5,
-          "reward": {
-            "kind": "item",
-            "itemId": "bronze-spear",
-            "amount": 1
-          }
-        },
-        {
-          "weight": 10,
-          "reward": {
-            "kind": "item",
-            "itemId": "bronze-dagger",
-            "amount": 1
-          }
-        }
-      ]
-    },
-    {
-      "type": "dropTable",
-      "id": "goblin-drop-table-5",
-      "mode": "dependent",
-      "drops": [
-        {
-          "weight": 3,
-          "reward": {
-            "kind": "item",
-            "itemId": "bronze-arrow",
-            "amount": {
-              "min": 5,
-              "max": 8
-            }
-          }
-        },
-        {
-          "weight": 6,
-          "reward": {
-            "kind": "item",
-            "itemId": "bronze-throwing-knife",
-            "amount": {
-              "min": 3,
-              "max": 5
-            }
-          }
-        }
-      ]
-    },
-    {
-      "type": "dropTable",
-      "id": "goblin-drop-table-3",
-      "mode": "dependent",
-      "drops": [
-        {
-          "weight": 2,
-          "reward": {
-            "kind": "dropTable",
-            "dropTableId": "goblin-drop-table-4"
-          }
-        },
-        {
-          "weight": 1,
-          "reward": {
-            "kind": "dropTable",
-            "dropTableId": "goblin-drop-table-5"
-          }
-        }
-      ]
-    },
-    {
-      "type": "dropTable",
-      "id": "goblin-drop-table-2",
-      "mode": "dependent",
-      "drops": [
-        {
-          "weight": 3,
-          "reward": {
-            "kind": "dropTable",
-            "dropTableId": "goblin-drop-table-3"
-          }
-        },
-        {
-          "weight": 5,
-          "reward": {
-            "kind": "item",
-            "itemId": "iron-ore",
-            "amount": {
-              "min": 1,
-              "max": 2
-            }
-          }
-        }
-      ]
-    },
-    {
-      "type": "dropTable",
-      "id": "goblin-drop-table-1",
-      "mode": "independent",
-      "drops": [
-        {
-          "weight": 1,
-          "reward": {
-            "kind": "item",
-            "itemId": "bones",
-            "amount": 1
-          }
-        },
-        {
-          "weight": 3,
-          "reward": {
-            "kind": "dropTable",
-            "dropTableId": "goblin-drop-table-2"
-          }
+          "amount": 10
         }
       ]
     },
@@ -898,26 +695,60 @@
       ]
     },
     {
-      "type": "entity",
-      "id": "goblin",
-      "actionIds": [
-        "fight-goblin"
-      ],
-      "collectionLog": [
+      "type": "action",
+      "id": "travel-crossroads-to-emberwood",
+      "role": "travel",
+      "durationSeconds": 2,
+      "rewards": [],
+      "results": [
         {
-          "categoryId": "enemies",
-          "actionId": "fight-goblin",
-          "killTargetCount": 1,
-          "dropTableIds": [
-            "goblin-drop-table-1"
-          ]
+          "kind": "relocate",
+          "locationId": "emberwood"
+        }
+      ]
+    },
+    {
+      "type": "action",
+      "id": "travel-emberwood-to-crossroads",
+      "role": "travel",
+      "durationSeconds": 2,
+      "rewards": [],
+      "results": [
+        {
+          "kind": "relocate",
+          "locationId": "crossroads"
+        }
+      ]
+    },
+    {
+      "type": "action",
+      "id": "travel-crossroads-to-old-quarry",
+      "role": "travel",
+      "durationSeconds": 2,
+      "rewards": [],
+      "results": [
+        {
+          "kind": "relocate",
+          "locationId": "old-quarry"
+        }
+      ]
+    },
+    {
+      "type": "action",
+      "id": "travel-old-quarry-to-crossroads",
+      "role": "travel",
+      "durationSeconds": 2,
+      "rewards": [],
+      "results": [
+        {
+          "kind": "relocate",
+          "locationId": "crossroads"
         }
       ]
     },
     {
       "type": "action",
       "id": "gather-rumors",
-      "locationId": "crossroads",
       "durationSeconds": 5,
       "rewards": [
         {
@@ -930,7 +761,6 @@
     {
       "type": "action",
       "id": "speak-to-tutorial-guide",
-      "locationId": "crossroads",
       "role": "utility",
       "durationSeconds": 0.1,
       "rewards": [],
@@ -943,145 +773,7 @@
     },
     {
       "type": "action",
-      "id": "fight-goblin",
-      "durationSeconds": 1,
-      "enemyId": "goblin",
-      "rewards": [
-        {
-          "kind": "skillXp",
-          "skillId": "attack",
-          "amount": 1
-        }
-      ],
-      "experience": [
-        {
-          "event": "action-complete",
-          "skillId": "attack",
-          "amount": 1
-        },
-        {
-          "event": "damage-dealt",
-          "skillId": "attack"
-        },
-        {
-          "event": "damage-taken",
-          "skillId": "health"
-        },
-        {
-          "event": "incoming-attack-missed",
-          "skillId": "defense",
-          "amount": 10
-        },
-        {
-          "event": "health-regenerated",
-          "skillId": "regeneration",
-          "sourceStat": "regeneration"
-        }
-      ]
-    },
-    {
-      "type": "action",
-      "id": "chop-oak-tree",
-      "locationId": "emberwood",
-      "durationSeconds": 1,
-      "enemyId": "oak-tree",
-      "rewards": [
-        {
-          "kind": "skillXp",
-          "skillId": "woodcutting",
-          "amount": 1
-        }
-      ],
-      "experience": [
-        {
-          "event": "action-complete",
-          "skillId": "woodcutting",
-          "amount": 5
-        }
-      ]
-    },
-    {
-      "type": "action",
-      "id": "fight-ent",
-      "locationId": "emberwood",
-      "durationSeconds": 1,
-      "enemyId": "ent",
-      "rewards": [
-        {
-          "kind": "skillXp",
-          "skillId": "woodcutting",
-          "amount": 1
-        }
-      ],
-      "experience": [
-        {
-          "event": "action-complete",
-          "skillId": "woodcutting",
-          "amount": 1
-        },
-        {
-          "event": "damage-dealt",
-          "skillId": "woodcutting"
-        },
-        {
-          "event": "damage-taken",
-          "skillId": "health"
-        },
-        {
-          "event": "incoming-attack-missed",
-          "skillId": "defense",
-          "amount": 10
-        },
-        {
-          "event": "health-regenerated",
-          "skillId": "regeneration",
-          "sourceStat": "regeneration"
-        }
-      ]
-    },
-    {
-      "type": "action",
-      "id": "fight-ork",
-      "locationId": "crossroads",
-      "durationSeconds": 1,
-      "enemyId": "ork",
-      "rewards": [
-        {
-          "kind": "skillXp",
-          "skillId": "attack",
-          "amount": 1
-        }
-      ],
-      "experience": [
-        {
-          "event": "action-complete",
-          "skillId": "attack",
-          "amount": 1
-        },
-        {
-          "event": "damage-dealt",
-          "skillId": "attack"
-        },
-        {
-          "event": "damage-taken",
-          "skillId": "health"
-        },
-        {
-          "event": "incoming-attack-missed",
-          "skillId": "defense",
-          "amount": 10
-        },
-        {
-          "event": "health-regenerated",
-          "skillId": "regeneration",
-          "sourceStat": "regeneration"
-        }
-      ]
-    },
-    {
-      "type": "action",
       "id": "forage-embers",
-      "locationId": "emberwood",
       "durationSeconds": 8,
       "rewards": [
         {
@@ -1094,7 +786,6 @@
     {
       "type": "action",
       "id": "survey-stonework",
-      "locationId": "old-quarry",
       "durationSeconds": 10,
       "rewards": [
         {
@@ -1107,7 +798,6 @@
     {
       "type": "action",
       "id": "mine-iron-ore-vein",
-      "locationId": "old-quarry",
       "durationSeconds": 2,
       "requirements": {
         "kind": "item-tag",
@@ -1125,6 +815,299 @@
           "amount": 1
         }
       ]
+    },
+    {
+      "type": "entity",
+      "id": "goblin",
+      "actions": [
+        {
+          "type": "action",
+          "id": "fight",
+          "durationSeconds": 1,
+          "rewards": [
+            {
+              "kind": "skillXp",
+              "skillId": "attack",
+              "amount": 1
+            }
+          ],
+          "interactionTypeId": "melee-combat",
+          "enemy": {
+            "interactionTypeId": "melee-combat",
+            "stats": {
+              "health": 10,
+              "rate": 30
+            },
+            "showHealthBar": true,
+            "rewards": [
+              {
+                "kind": "skillXp",
+                "skillId": "attack",
+                "amount": 2
+              },
+              {
+                "kind": "skillXp",
+                "skillId": "defense",
+                "amount": 1
+              },
+              {
+                "kind": "dropTable",
+                "mode": "independent",
+                "drops": [
+                  {
+                    "weight": 1,
+                    "reward": {
+                      "kind": "item",
+                      "itemId": "bones",
+                      "amount": 1
+                    }
+                  },
+                  {
+                    "weight": 3,
+                    "reward": {
+                      "kind": "dropTable",
+                      "mode": "dependent",
+                      "drops": [
+                        {
+                          "weight": 3,
+                          "reward": {
+                            "kind": "dropTable",
+                            "mode": "dependent",
+                            "drops": [
+                              {
+                                "weight": 2,
+                                "reward": {
+                                  "kind": "dropTable",
+                                  "mode": "dependent",
+                                  "drops": [
+                                    {
+                                      "weight": 5,
+                                      "reward": {
+                                        "kind": "item",
+                                        "itemId": "bronze-spear",
+                                        "amount": 1
+                                      }
+                                    },
+                                    {
+                                      "weight": 10,
+                                      "reward": {
+                                        "kind": "item",
+                                        "itemId": "bronze-dagger",
+                                        "amount": 1
+                                      }
+                                    }
+                                  ]
+                                }
+                              },
+                              {
+                                "weight": 1,
+                                "reward": {
+                                  "kind": "dropTable",
+                                  "mode": "dependent",
+                                  "drops": [
+                                    {
+                                      "weight": 3,
+                                      "reward": {
+                                        "kind": "item",
+                                        "itemId": "bronze-arrow",
+                                        "amount": {
+                                          "min": 5,
+                                          "max": 8
+                                        }
+                                      }
+                                    },
+                                    {
+                                      "weight": 6,
+                                      "reward": {
+                                        "kind": "item",
+                                        "itemId": "bronze-throwing-knife",
+                                        "amount": {
+                                          "min": 3,
+                                          "max": 5
+                                        }
+                                      }
+                                    }
+                                  ]
+                                }
+                              }
+                            ]
+                          }
+                        },
+                        {
+                          "weight": 5,
+                          "reward": {
+                            "kind": "item",
+                            "itemId": "iron-ore",
+                            "amount": {
+                              "min": 1,
+                              "max": 2
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "type": "entity",
+      "id": "oak-tree",
+      "actions": [
+        {
+          "type": "action",
+          "id": "chop",
+          "durationSeconds": 1,
+          "rewards": [
+            {
+              "kind": "skillXp",
+              "skillId": "woodcutting",
+              "amount": 1
+            }
+          ],
+          "interactionTypeId": "woodcutting",
+          "enemy": {
+            "interactionTypeId": "woodcutting",
+            "stats": {
+              "health": 10
+            },
+            "showHealthBar": true,
+            "rewards": [
+              {
+                "kind": "skillXp",
+                "skillId": "woodcutting",
+                "amount": 4
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "type": "entity",
+      "id": "ent",
+      "actions": [
+        {
+          "type": "action",
+          "id": "fight",
+          "durationSeconds": 1,
+          "rewards": [
+            {
+              "kind": "skillXp",
+              "skillId": "woodcutting",
+              "amount": 1
+            }
+          ],
+          "interactionTypeId": "woodcutting-combat",
+          "enemy": {
+            "interactionTypeId": "woodcutting-combat",
+            "stats": {
+              "attack": 6,
+              "defense": 4,
+              "health": 30,
+              "rate": 20
+            },
+            "showHealthBar": true,
+            "rewards": [
+              {
+                "kind": "skillXp",
+                "skillId": "woodcutting",
+                "amount": 8
+              },
+              {
+                "kind": "skillXp",
+                "skillId": "defense",
+                "amount": 2
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "type": "entity",
+      "id": "ork",
+      "actions": [
+        {
+          "type": "action",
+          "id": "fight",
+          "durationSeconds": 1,
+          "rewards": [
+            {
+              "kind": "skillXp",
+              "skillId": "attack",
+              "amount": 1
+            }
+          ],
+          "interactionTypeId": "melee-combat",
+          "enemy": {
+            "interactionTypeId": "melee-combat",
+            "stats": {
+              "attack": 21,
+              "defense": 21,
+              "health": 40,
+              "rate": 24
+            },
+            "showHealthBar": true,
+            "rewards": [
+              {
+                "kind": "skillXp",
+                "skillId": "attack",
+                "amount": 4
+              },
+              {
+                "kind": "skillXp",
+                "skillId": "defense",
+                "amount": 2
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "type": "collectionLog",
+      "id": "goblin-kills",
+      "categoryId": "enemies",
+      "entityId": "goblin",
+      "actionId": "entity.goblin.fight",
+      "killTargetCount": 1,
+      "itemIds": [
+        "bones",
+        "iron-ore",
+        "bronze-spear",
+        "bronze-dagger",
+        "bronze-arrow",
+        "bronze-throwing-knife"
+      ]
+    },
+    {
+      "type": "collectionLog",
+      "id": "oak-tree-kills",
+      "categoryId": "enemies",
+      "entityId": "oak-tree",
+      "actionId": "entity.oak-tree.fight",
+      "killTargetCount": 1
+    },
+    {
+      "type": "collectionLog",
+      "id": "ent-kills",
+      "categoryId": "enemies",
+      "entityId": "ent",
+      "actionId": "entity.ent.fight",
+      "killTargetCount": 1
+    },
+    {
+      "type": "collectionLog",
+      "id": "ork-kills",
+      "categoryId": "enemies",
+      "entityId": "ork",
+      "actionId": "entity.ork.fight",
+      "killTargetCount": 1
     }
   ],
   "locale": {
@@ -1293,7 +1276,27 @@
       "dialogue.tutorial-guide.q4.option.give1": "Give 1",
       "dialogue.tutorial-guide.q4.option.give10": "Give 10",
       "dialogue.tutorial-guide.q4.option.give25": "Give 25",
-      "dialogue.tutorial-guide.q4.option.changedMind": "I changed my mind"
+      "dialogue.tutorial-guide.q4.option.changedMind": "I changed my mind",
+      "action.entity.goblin.fight.title": "Fight",
+      "action.entity.goblin.fight.description": "Trade quick blows with a small roadside raider.",
+      "action.entity.goblin.fight.success": "You hit the goblin.",
+      "action.entity.goblin.fight.failure": "The goblin slips away from your strike.",
+      "action.entity.goblin.fight.kill": "The goblin drops.",
+      "action.entity.ent.fight.title": "Fight Ent",
+      "action.entity.ent.fight.description": "Use woodcutting skill against a walking tree that hits back.",
+      "action.entity.ent.fight.success": "You cut into the ent's bark.",
+      "action.entity.ent.fight.failure": "The ent twists away from the chop.",
+      "action.entity.ent.fight.kill": "The ent falls still.",
+      "action.entity.ork.fight.title": "Fight Ork",
+      "action.entity.ork.fight.description": "Test yourself against a tougher brawler.",
+      "action.entity.ork.fight.success": "You land a solid hit on the ork.",
+      "action.entity.ork.fight.failure": "The ork shrugs past your attack.",
+      "action.entity.ork.fight.kill": "The ork falls.",
+      "action.entity.oak-tree.chop.title": "Chop Oak Tree",
+      "action.entity.oak-tree.chop.description": "Work through the oak's stubborn trunk.",
+      "action.entity.oak-tree.chop.success": "Your axe bites into the oak.",
+      "action.entity.oak-tree.chop.failure": "The axe glances off the oak grain.",
+      "action.entity.oak-tree.chop.kill": "The oak gives way."
     }
   }
 }

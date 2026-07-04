@@ -36,15 +36,26 @@ const rollReward = (
     return [{ ...reward, amount: amountValue(reward.amount, random) }] as ConcreteReward[];
   }
 
-  if (stack.includes(reward.dropTableId)) return [];
-  const dropTable = dropTables.get(reward.dropTableId);
+  const dropTable = reward.drops
+    ? { id: reward.dropTableId ?? `inline-${stack.length}`, mode: reward.mode ?? 'dependent', drops: reward.drops }
+    : reward.dropTableId
+      ? dropTables.get(reward.dropTableId)
+      : null;
   if (!dropTable) return [];
+  if (stack.includes(dropTable.id)) return [];
 
   const entries = dropTable.drops.filter((entry) => entry.weight > 0);
-  const nextStack = [...stack, reward.dropTableId];
+  const nextStack = [...stack, dropTable.id];
+  const rollEntry = (entry: DropTableDefinition['drops'][number]) => {
+    if (entry.reward) return rollReward(entry.reward, random, dropTables, nextStack);
+    if (entry.dropTableId) return rollReward({ kind: 'dropTable', dropTableId: entry.dropTableId }, random, dropTables, nextStack);
+    if (entry.drops) return rollReward({ kind: 'dropTable', mode: 'dependent', drops: entry.drops }, random, dropTables, nextStack);
+    return [];
+  };
+
   if (dropTable.mode === 'independent') {
     return entries.flatMap((entry) =>
-      random() < Math.min(1, 1 / entry.weight) ? rollReward(entry.reward, random, dropTables, nextStack) : [],
+      random() < Math.min(1, 1 / entry.weight) ? rollEntry(entry) : [],
     );
   }
 
@@ -52,7 +63,7 @@ const rollReward = (
   let roll = random() * totalWeight;
   for (const entry of entries) {
     roll -= entry.weight;
-    if (roll < 0) return rollReward(entry.reward, random, dropTables, nextStack);
+    if (roll < 0) return rollEntry(entry);
   }
   return [];
 };

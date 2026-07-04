@@ -89,6 +89,7 @@ export type LocationNode = {
   position: Position;
   starting?: boolean;
   tags?: string[];
+  actions?: string[];
   entities?: string[];
 };
 
@@ -112,19 +113,25 @@ export type Reward =
     }
   | {
       kind: 'dropTable';
-      dropTableId: string;
+      dropTableId?: string;
+      mode?: DropTableMode;
+      drops?: DropTableEntry[];
     };
 
 export type ConcreteReward = Exclude<Reward, { kind: 'dropTable' }> & { amount: number };
 
 export type DropTableEntry = {
   weight: number;
-  reward: Reward;
+  reward?: Reward;
+  drops?: DropTableEntry[];
+  dropTableId?: string;
 };
+
+export type DropTableMode = 'independent' | 'dependent';
 
 export type DropTableDefinition = {
   id: string;
-  mode: 'independent' | 'dependent';
+  mode: DropTableMode;
   drops: DropTableEntry[];
 };
 
@@ -171,6 +178,7 @@ export type ActionResult =
 export type GameAction = {
   id: string;
   locationId?: string;
+  entityId?: string;
   role?: 'optional' | 'progression' | 'utility' | 'travel';
   durationSeconds: number;
   rewards: Reward[];
@@ -185,8 +193,14 @@ export type GameAction = {
 
 export type EntityDefinition = {
   id: string;
-  actionIds: string[];
+  actionIds?: string[];
+  actions?: EntityActionDefinition[];
   collectionLog?: EntityCollectionLogDefinition[];
+};
+
+export type EntityActionDefinition = Omit<GameAction, 'id' | 'entityId'> & {
+  id: string;
+  enemy?: Omit<EnemyDefinition, 'id'>;
 };
 
 export type EntityCollectionLogDefinition = {
@@ -195,6 +209,11 @@ export type EntityCollectionLogDefinition = {
   killTargetCount?: number;
   dropTableIds?: string[];
   itemIds?: string[];
+};
+
+export type CollectionLogDefinition = EntityCollectionLogDefinition & {
+  id: string;
+  entityId: string;
 };
 
 export type SkillDefinition = {
@@ -280,6 +299,7 @@ export type ResourceDefinition = {
   hidden?: boolean;
   onEmpty?: ResourceBoundaryBehavior[];
   onFull?: ResourceBoundaryBehavior[];
+  effects?: Omit<EffectDefinition, 'resourceId'>[];
 };
 
 export type EffectDefinition = {
@@ -291,6 +311,7 @@ export type EffectDefinition = {
   rateUnit?: 'per-minute' | 'per-second';
   activeWhen?: Condition;
   resetResourceWhenInactive?: boolean;
+  experience?: ExperienceTrigger[];
 };
 
 export type EnemyDefinition = {
@@ -345,6 +366,7 @@ export type ContentBundle = {
   interactionTypes: InteractionTypeDefinition[];
   enemies: EnemyDefinition[];
   dropTables?: DropTableDefinition[];
+  collectionLogs?: CollectionLogDefinition[];
   dialogues?: DialogueDefinition[];
   locales: Record<string, LocaleDictionary>;
   modules?: ContentModule[];
@@ -366,6 +388,7 @@ export type ModuleDataSectionObject = {
   interactionTypes?: InteractionTypeDefinition[];
   enemies?: EnemyDefinition[];
   dropTables?: DropTableDefinition[];
+  collectionLogs?: CollectionLogDefinition[];
   dialogues?: DialogueDefinition[];
   displayProfiles?: DisplayProfileDefinition[];
 };
@@ -395,6 +418,7 @@ export type ModuleDataUpdatesObject = ModuleDataSectionObject & {
     interactionTypes?: string[];
     enemies?: string[];
     dropTables?: string[];
+    collectionLogs?: string[];
     dialogues?: string[];
     dialogueOptions?: Record<string, string[]>;
     displayProfiles?: string[];
@@ -566,6 +590,7 @@ export type ActionResolutionContext = {
   interactionTypes: InteractionTypeDefinition[];
   enemies: EnemyDefinition[];
   dropTables?: DropTableDefinition[];
+  collectionLogs?: CollectionLogDefinition[];
   dialogues?: DialogueDefinition[];
 };
 
@@ -636,6 +661,7 @@ export type ContributionDraft = {
   interactionTypes: InteractionTypeDefinition[];
   enemies: EnemyDefinition[];
   dropTables: DropTableDefinition[];
+  collectionLogs?: CollectionLogDefinition[];
   dialogues: DialogueDefinition[];
   locales: Record<string, LocaleDictionary>;
   removed: ContributionRemovedIds;
@@ -654,6 +680,7 @@ export type ContributionRemovedIds = {
   interactionTypes: string[];
   enemies: string[];
   dropTables: string[];
+  collectionLogs?: string[];
   dialogues: string[];
   modules: string[];
 };

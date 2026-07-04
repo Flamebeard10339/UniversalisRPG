@@ -23,6 +23,11 @@
         "items": { "type": "string", "minLength": 1 },
         "uniqueItems": true
       },
+      "actions": {
+        "type": "array",
+        "items": { "type": "string", "minLength": 1 },
+        "uniqueItems": true
+      },
       "entities": {
         "type": "array",
         "items": { "type": "string", "minLength": 1 },

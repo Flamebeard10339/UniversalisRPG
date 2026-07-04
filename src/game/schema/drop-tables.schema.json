@@ -50,11 +50,13 @@
         },
         {
           "type": "object",
-          "required": ["kind", "dropTableId"],
+          "required": ["kind"],
           "additionalProperties": false,
           "properties": {
             "kind": { "const": "dropTable" },
-            "dropTableId": { "type": "string", "minLength": 1 }
+            "dropTableId": { "type": "string", "minLength": 1 },
+            "mode": { "enum": ["independent", "dependent"] },
+            "drops": { "type": "array", "items": { "$ref": "#/$defs/dropTableEntry" } }
           }
         }
       ]
@@ -75,11 +77,13 @@
     },
     "dropTableEntry": {
       "type": "object",
-      "required": ["weight", "reward"],
+      "required": ["weight"],
       "additionalProperties": false,
       "properties": {
         "weight": { "type": "number", "exclusiveMinimum": 0 },
-        "reward": { "$ref": "#/$defs/reward" }
+        "reward": { "$ref": "#/$defs/reward" },
+        "dropTableId": { "type": "string", "minLength": 1 },
+        "drops": { "type": "array", "items": { "$ref": "#/$defs/dropTableEntry" } }
       }
     }
   }

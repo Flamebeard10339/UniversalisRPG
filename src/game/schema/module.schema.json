@@ -161,6 +161,9 @@
           "$ref": "#/$defs/dropTableEntry"
         },
         {
+          "$ref": "#/$defs/collectionLogEntry"
+        },
+        {
           "$ref": "#/$defs/dialogueEntry"
         },
         {
@@ -273,6 +276,12 @@
         "dropTables": {
           "$ref": "https://universalis-rpg.local/schema/drop-tables.schema.json"
         },
+        "collectionLogs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/collectionLogEntry"
+          }
+        },
         "dialogues": {
           "$ref": "https://universalis-rpg.local/schema/dialogues.schema.json"
         },
@@ -350,6 +359,12 @@
         "dropTables": {
           "$ref": "https://universalis-rpg.local/schema/drop-tables.schema.json"
         },
+        "collectionLogs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/collectionLogEntry"
+          }
+        },
         "dialogues": {
           "$ref": "https://universalis-rpg.local/schema/dialogues.schema.json"
         },
@@ -420,6 +435,9 @@
               "$ref": "#/$defs/idList"
             },
             "dropTables": {
+              "$ref": "#/$defs/idList"
+            },
+            "collectionLogs": {
               "$ref": "#/$defs/idList"
             },
             "dialogues": {
@@ -497,6 +515,14 @@
             "minLength": 1
           },
           "uniqueItems": true
+        },
+        "actions": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
         }
       }
     },
@@ -504,7 +530,6 @@
       "type": "object",
       "required": [
         "id",
-        "actionIds",
         "type"
       ],
       "additionalProperties": false,
@@ -526,6 +551,12 @@
             "minLength": 1
           },
           "uniqueItems": true
+        },
+        "actions": {
+          "type": "array",
+          "items": {
+            "$ref": "https://universalis-rpg.local/schema/entities.schema.json#/$defs/action"
+          }
         },
         "collectionLog": {
           "type": "array",
@@ -797,6 +828,12 @@
           "items": {
             "$ref": "https://universalis-rpg.local/schema/resources.schema.json#/$defs/behavior"
           }
+        },
+        "effects": {
+          "type": "array",
+          "items": {
+            "$ref": "https://universalis-rpg.local/schema/resources.schema.json#/$defs/effect"
+          }
         }
       }
     },
@@ -856,6 +893,12 @@
         },
         "resetResourceWhenInactive": {
           "type": "boolean"
+        },
+        "experience": {
+          "type": "array",
+          "items": {
+            "$ref": "https://universalis-rpg.local/schema/actions.schema.json#/$defs/experienceTrigger"
+          }
         }
       }
     },
@@ -1045,6 +1088,61 @@
           "items": {
             "$ref": "https://universalis-rpg.local/schema/drop-tables.schema.json#/$defs/dropTableEntry"
           }
+        }
+      }
+    },
+    "collectionLogEntry": {
+      "type": "object",
+      "required": [
+        "id",
+        "categoryId",
+        "entityId",
+        "actionId",
+        "type"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "enum": [
+            "collectionLog",
+            "collectionLogs"
+          ]
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "categoryId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "entityId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "actionId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "killTargetCount": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "dropTableIds": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "itemIds": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
         }
       }
     },

@@ -14,11 +14,35 @@ const collectDropItemIds = (
   const dropTable = dropTables.get(dropTableId);
   if (!dropTable) return [];
   return dropTable.drops.flatMap((drop) => {
-    if (drop.reward.kind === 'item') return [drop.reward.itemId];
-    if (drop.reward.kind === 'dropTable') return collectDropItemIds(drop.reward.dropTableId, dropTables, [...stack, dropTableId]);
+    if (drop.reward?.kind === 'item') return [drop.reward.itemId];
+    if (drop.reward?.kind === 'dropTable') return collectRewardDropItemIds(drop.reward, dropTables, [...stack, dropTableId]);
+    if (drop.dropTableId) return collectDropItemIds(drop.dropTableId, dropTables, [...stack, dropTableId]);
+    if (drop.drops) return collectInlineDropItemIds(drop.drops, dropTables, [...stack, dropTableId]);
     return [];
   });
 };
+
+const collectInlineDropItemIds = (
+  drops: DropTableDefinition['drops'],
+  dropTables: Map<string, DropTableDefinition>,
+  stack: string[] = [],
+): string[] =>
+  drops.flatMap((drop) => {
+    if (drop.reward?.kind === 'item') return [drop.reward.itemId];
+    if (drop.reward?.kind === 'dropTable') return collectRewardDropItemIds(drop.reward, dropTables, stack);
+    if (drop.dropTableId) return collectDropItemIds(drop.dropTableId, dropTables, stack);
+    if (drop.drops) return collectInlineDropItemIds(drop.drops, dropTables, stack);
+    return [];
+  });
+
+const collectRewardDropItemIds = (
+  reward: { dropTableId?: string; drops?: DropTableDefinition['drops'] },
+  dropTables: Map<string, DropTableDefinition>,
+  stack: string[] = [],
+) => [
+  ...(reward.dropTableId ? collectDropItemIds(reward.dropTableId, dropTables, stack) : []),
+  ...(reward.drops ? collectInlineDropItemIds(reward.drops, dropTables, stack) : []),
+];
 
 export const collectionTrackedItemIds = (
   definition: EntityCollectionLogDefinition,
@@ -68,4 +92,3 @@ export const applyCollectionLogRewards = (
 
   return { ...state, collectionLog: nextCollectionLog };
 };
-

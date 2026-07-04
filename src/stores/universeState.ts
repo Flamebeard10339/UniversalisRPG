@@ -1,8 +1,7 @@
 import { create } from 'zustand';
 import type { ContentBundle, UniverseManifest, ValidationIssue } from '../game/types';
 import { applyModulesToBundle } from '../game/contentModules';
-import { normalizeEnemyDefinition } from '../game/enemies';
-import { normalizeGameAction } from '../game/actions';
+import { normalizeContentBundleStructure } from '../game/contentNormalization';
 import {
   listBundledUniverses,
   loadLocalUniverseLibrary,
@@ -85,7 +84,7 @@ const applyModulesAndDraft = (bundle: ContentBundle | null, enabledModules: Reco
     enabledModules[bundleWithDraftModules.manifest.id],
     resolveLocale(bundleWithDraftModules, localePreference),
   );
-  const merged = mergeDraftIntoBundle(moduleResolution.bundle, draft);
+  const merged = normalizeContentBundleStructure(mergeDraftIntoBundle(moduleResolution.bundle, draft));
 
   return {
     bundle: merged,
@@ -94,19 +93,21 @@ const applyModulesAndDraft = (bundle: ContentBundle | null, enabledModules: Reco
   };
 };
 
-const normalizeContentBundle = (bundle: ContentBundle): ContentBundle => ({
-  ...bundle,
-  actions: bundle.actions.map(normalizeGameAction),
-  entities: bundle.entities ?? [],
-  items: bundle.items ?? [],
-  flags: bundle.flags ?? [],
-  resourceDefinitions: bundle.resourceDefinitions ?? [],
-  stats: bundle.stats ?? [],
-  effects: bundle.effects ?? [],
-  interactionTypes: bundle.interactionTypes ?? [],
-  enemies: (bundle.enemies ?? []).map((enemy) => normalizeEnemyDefinition(enemy)),
-  dialogues: bundle.dialogues ?? [],
-});
+const normalizeContentBundle = (bundle: ContentBundle): ContentBundle => {
+  const normalized = normalizeContentBundleStructure(bundle);
+  return {
+    ...normalized,
+    entities: normalized.entities ?? [],
+    items: normalized.items ?? [],
+    flags: normalized.flags ?? [],
+    resourceDefinitions: normalized.resourceDefinitions ?? [],
+    stats: normalized.stats ?? [],
+    effects: normalized.effects ?? [],
+    interactionTypes: normalized.interactionTypes ?? [],
+    enemies: normalized.enemies ?? [],
+    dialogues: normalized.dialogues ?? [],
+  };
+};
 
 const loadBaseBundle = async (
   universeId: string,

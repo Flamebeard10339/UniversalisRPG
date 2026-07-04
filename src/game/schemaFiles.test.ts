@@ -105,9 +105,10 @@ describe('json schema files', () => {
     expect(moduleSchema.$defs.actionEntry.required).not.toContain('locationId');
     expect(moduleSchema.$defs.entityEntry).toMatchObject({
       additionalProperties: false,
-      required: expect.arrayContaining(['id', 'type', 'actionIds']),
-      properties: { type: { enum: ['entity', 'entities'] } },
+      required: expect.arrayContaining(['id', 'type']),
+      properties: { type: { enum: ['entity', 'entities'] }, actions: { items: { $ref: 'https://universalis-rpg.local/schema/entities.schema.json#/$defs/action' } } },
     });
+    expect(moduleSchema.$defs.entityEntry.required).not.toContain('actionIds');
     expect(moduleSchema.$defs.actionEntry.properties.durationSeconds).toEqual(actionsSchema.items.properties.durationSeconds);
     expect(moduleSchema.$defs.itemEntry).toMatchObject({
       additionalProperties: false,

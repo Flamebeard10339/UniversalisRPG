@@ -163,6 +163,7 @@ const validateLocationsShape = (locations: unknown): locations is LocationNode[]
       isRecord(location.position) &&
       typeof location.position.x === 'number' &&
       typeof location.position.y === 'number' &&
+      (location.actions === undefined || validateStringArray(location.actions)) &&
       (location.entities === undefined || validateStringArray(location.entities)),
   );
 
@@ -172,8 +173,8 @@ const validateEntitiesShape = (entities: unknown): entities is EntityDefinition[
     entities.every((entity) =>
       isRecord(entity) &&
       hasString(entity, 'id') &&
-      Array.isArray(entity.actionIds) &&
-      entity.actionIds.every((actionId) => typeof actionId === 'string' && actionId.trim().length > 0) &&
+      (entity.actionIds === undefined || validateStringArray(entity.actionIds)) &&
+      (entity.actions === undefined || validateActionsShape(entity.actions)) &&
       (entity.collectionLog === undefined || (Array.isArray(entity.collectionLog) && entity.collectionLog.every((definition) =>
         isRecord(definition) &&
         hasString(definition, 'categoryId') &&
@@ -210,12 +211,23 @@ const rewardAmountPositive = (amount: RewardAmount) =>
 
 const validateRewardShape = (value: unknown): value is Reward => {
   if (!isRecord(value) || !hasString(value, 'kind')) return false;
-  if (value.kind === 'dropTable') return hasString(value, 'dropTableId');
+  if (value.kind === 'dropTable') return hasString(value, 'dropTableId') || validateDropEntriesShape(value.drops);
   return validateRewardAmountShape(value.amount)
     && ((value.kind === 'skillXp' && hasString(value, 'skillId'))
       || (value.kind === 'resource' && hasString(value, 'resourceId'))
       || (value.kind === 'item' && hasString(value, 'itemId')));
 };
+
+function validateDropEntriesShape(value: unknown): boolean {
+  return Array.isArray(value) &&
+    value.every((drop) =>
+      isRecord(drop) &&
+      hasNumber(drop, 'weight') &&
+      (drop.reward === undefined || validateRewardShape(drop.reward)) &&
+      (drop.dropTableId === undefined || hasString(drop, 'dropTableId')) &&
+      (drop.drops === undefined || validateDropEntriesShape(drop.drops)),
+    );
+}
 
 const experienceEvents = new Set(['action-complete', 'damage-dealt', 'damage-taken', 'health-regenerated', 'incoming-attack-missed']);
 
@@ -322,7 +334,17 @@ const validateResourceDefinitionsShape = (resources: unknown): resources is Reso
         (resource.hidden === undefined || typeof resource.hidden === 'boolean') &&
         (resource.initialValue === undefined || resource.initialValue === 'empty' || resource.initialValue === 'full') &&
         (resource.onEmpty === undefined || (Array.isArray(resource.onEmpty) && resource.onEmpty.every(validateResourceBehaviorShape))) &&
-        (resource.onFull === undefined || (Array.isArray(resource.onFull) && resource.onFull.every(validateResourceBehaviorShape))),
+        (resource.onFull === undefined || (Array.isArray(resource.onFull) && resource.onFull.every(validateResourceBehaviorShape))) &&
+        (resource.effects === undefined || (Array.isArray(resource.effects) && resource.effects.every((effect) =>
+          isRecord(effect) &&
+          hasString(effect, 'id') &&
+          hasString(effect, 'sourceStat') &&
+          (effect.sourceEnemyStat === undefined || ['attack', 'defense', 'health', 'rate', 'regeneration', 'armorPenetration', 'torpidity', 'critChance', 'critMultiplier'].includes(String(effect.sourceEnemyStat))) &&
+          (effect.locationId === undefined || typeof effect.locationId === 'string') &&
+          (effect.rateUnit === undefined || effect.rateUnit === 'per-minute' || effect.rateUnit === 'per-second') &&
+          (effect.activeWhen === undefined || validateConditionShape(effect.activeWhen)) &&
+          (effect.resetResourceWhenInactive === undefined || typeof effect.resetResourceWhenInactive === 'boolean') &&
+          (effect.experience === undefined || (Array.isArray(effect.experience) && effect.experience.every(validateExperienceTriggerShape)))))),
     ));
 
 const validateEffectsShape = (effects: unknown): effects is EffectDefinition[] =>
@@ -338,7 +360,8 @@ const validateEffectsShape = (effects: unknown): effects is EffectDefinition[] =
         (effect.locationId === undefined || typeof effect.locationId === 'string') &&
         (effect.rateUnit === undefined || effect.rateUnit === 'per-minute' || effect.rateUnit === 'per-second') &&
         (effect.activeWhen === undefined || validateConditionShape(effect.activeWhen)) &&
-        (effect.resetResourceWhenInactive === undefined || typeof effect.resetResourceWhenInactive === 'boolean'),
+        (effect.resetResourceWhenInactive === undefined || typeof effect.resetResourceWhenInactive === 'boolean') &&
+        (effect.experience === undefined || (Array.isArray(effect.experience) && effect.experience.every(validateExperienceTriggerShape)))
     ));
 
 const validateInteractionTypesShape = (interactionTypes: unknown): interactionTypes is InteractionTypeDefinition[] =>
@@ -373,8 +396,7 @@ const validateDropTablesShape = (dropTables: unknown): dropTables is DropTableDe
       isRecord(dropTable) &&
       hasString(dropTable, 'id') &&
       (dropTable.mode === 'independent' || dropTable.mode === 'dependent') &&
-      Array.isArray(dropTable.drops) &&
-      dropTable.drops.every((drop) => isRecord(drop) && hasNumber(drop, 'weight') && validateRewardShape(drop.reward)),
+      validateDropEntriesShape(dropTable.drops),
     ));
 
 const validateDialogueOptionShape = (value: unknown) => isRecord(value)
@@ -404,6 +426,18 @@ const validateDialoguesShape = (dialogues: unknown): dialogues is DialogueDefini
         (node.options === undefined || (Array.isArray(node.options) && node.options.every(validateDialogueOptionShape))),
       ),
     ));
+
+const validateCollectionLogsShape = (collectionLogs: unknown) =>
+  collectionLogs === undefined ||
+  (Array.isArray(collectionLogs) && collectionLogs.every((definition) =>
+    isRecord(definition) &&
+    hasString(definition, 'id') &&
+    hasString(definition, 'categoryId') &&
+    hasString(definition, 'entityId') &&
+    hasString(definition, 'actionId') &&
+    (definition.killTargetCount === undefined || (Number.isInteger(definition.killTargetCount) && Number(definition.killTargetCount) >= 1)) &&
+    (definition.dropTableIds === undefined || validateStringArray(definition.dropTableIds)) &&
+    (definition.itemIds === undefined || validateStringArray(definition.itemIds))));
 
 export const validateContentShape = (bundle: Partial<ContentBundle>) => {
   const issues: ValidationIssue[] = [];
@@ -477,6 +511,10 @@ export const validateContentShape = (bundle: Partial<ContentBundle>) => {
     issues.push(error('drop-tables.json', 'validation.dropTablesShape'));
   }
 
+  if (!validateCollectionLogsShape(bundle.collectionLogs)) {
+    issues.push(error('collection-log.json', 'validation.collectionLogShape'));
+  }
+
   if (!validateDialoguesShape(bundle.dialogues)) {
     issues.push(error('dialogues.json', 'validation.dialoguesShape'));
   }
@@ -512,12 +550,13 @@ export const validateContentReferences = (bundle: ContentBundle) => {
     ...findDuplicateIds(bundle.interactionTypes ?? [], 'interactionTypes'),
     ...findDuplicateIds(bundle.enemies ?? [], 'enemies'),
     ...findDuplicateIds(bundle.dropTables ?? [], 'dropTables'),
+    ...findDuplicateIds(bundle.collectionLogs ?? [], 'collectionLogs'),
     ...findDuplicateIds(bundle.dialogues ?? [], 'dialogues'),
   ];
 
   const locationIds = new Set(bundle.locations.map((location) => location.id));
   const entityIds = new Set((bundle.entities ?? []).map((entity) => entity.id));
-  const entityActionIds = new Set((bundle.entities ?? []).flatMap((entity) => entity.actionIds));
+  const entityActionIds = new Set((bundle.entities ?? []).flatMap((entity) => entity.actionIds ?? []));
   const actionIds = new Set(bundle.actions.map((action) => action.id));
   const skillIds = new Set(bundle.skills.map((skill) => skill.id));
   const statIds = new Set(bundle.stats.map((stat) => stat.id));
@@ -556,16 +595,28 @@ export const validateContentReferences = (bundle: ContentBundle) => {
     }
   };
 
+  const validateDropEntries = (drops: DropTableDefinition['drops'], path: string, stack: string[]) => {
+    if (drops.length === 0) issues.push(error(path, 'validation.dropTableEmpty'));
+    for (const [index, drop] of drops.entries()) {
+      const dropPath = `${path}.${index}`;
+      if (drop.weight <= 0) issues.push(error(`${dropPath}.weight`, 'validation.dropTableWeightPositive'));
+      if (drop.reward) validateRewardReferences(drop.reward, `${dropPath}.reward`, stack);
+      if (drop.dropTableId) validateRewardReferences({ kind: 'dropTable', dropTableId: drop.dropTableId }, `${dropPath}.dropTableId`, stack);
+      if (drop.drops) validateDropEntries(drop.drops, `${dropPath}.drops`, stack);
+    }
+  };
+
   const validateDropTableEntries = (dropTable: DropTableDefinition, path: string, stack: string[]) => {
     if (dropTable.drops.length === 0) issues.push(error(path, 'validation.dropTableEmpty'));
-    for (const [index, drop] of dropTable.drops.entries()) {
-      if (drop.weight <= 0) issues.push(error(`${path}.drops.${index}.weight`, 'validation.dropTableWeightPositive'));
-      validateRewardReferences(drop.reward, `${path}.drops.${index}.reward`, stack);
-    }
+    validateDropEntries(dropTable.drops, `${path}.drops`, stack);
   };
 
   const validateRewardReferences = (reward: Reward, path: string, stack: string[] = []) => {
     if (reward.kind === 'dropTable') {
+      if (reward.drops) {
+        validateDropEntries(reward.drops, `${path}.drops`, stack);
+      }
+      if (!reward.dropTableId) return;
       if (!dropTableIds.has(reward.dropTableId)) {
         issues.push(error(path, 'validation.unknownDropTable', { id: reward.dropTableId }));
         return;
@@ -614,14 +665,14 @@ export const validateContentReferences = (bundle: ContentBundle) => {
     if (!isKebabCaseId(entity.id)) {
       issues.push(error(`entities.${entity.id}.id`, 'validation.entityIdKebab'));
     }
-    for (const actionId of entity.actionIds) {
+    for (const actionId of entity.actionIds ?? []) {
       if (!actionIds.has(actionId)) {
         issues.push(error(`entities.${entity.id}.actionIds`, 'validation.unknownAction', { id: actionId }));
       }
     }
     for (const [index, definition] of (entity.collectionLog ?? []).entries()) {
       const path = `entities.${entity.id}.collectionLog.${index}`;
-      if (!entity.actionIds.includes(definition.actionId)) {
+      if (!(entity.actionIds ?? []).includes(definition.actionId)) {
         issues.push(error(`${path}.actionId`, 'validation.unknownAction', { id: definition.actionId }));
       }
       if (!actionIds.has(definition.actionId)) {
@@ -642,8 +693,27 @@ export const validateContentReferences = (bundle: ContentBundle) => {
     }
   }
 
+  for (const definition of bundle.collectionLogs ?? []) {
+    const path = `collectionLogs.${definition.id}`;
+    if (!isKebabCaseId(definition.id)) issues.push(error(`${path}.id`, 'validation.collectionLogIdKebab'));
+    if (!entityIds.has(definition.entityId)) issues.push(error(`${path}.entityId`, 'validation.unknownEntity', { id: definition.entityId }));
+    if (!actionIds.has(definition.actionId)) issues.push(error(`${path}.actionId`, 'validation.unknownAction', { id: definition.actionId }));
+    if (definition.killTargetCount !== undefined && definition.killTargetCount < 1) {
+      issues.push(error(`${path}.killTargetCount`, 'validation.collectionTargetPositive'));
+    }
+    for (const dropTableId of definition.dropTableIds ?? []) {
+      if (!dropTableIds.has(dropTableId)) issues.push(error(`${path}.dropTableIds`, 'validation.unknownDropTable', { id: dropTableId }));
+    }
+    for (const itemId of definition.itemIds ?? []) {
+      if (!itemIds.has(itemId)) issues.push(error(`${path}.itemIds`, 'validation.unknownItem', { id: itemId }));
+    }
+    for (const itemId of collectionTrackedItemIds(definition, bundle)) {
+      if (!itemIds.has(itemId)) issues.push(error(`${path}.dropTableIds`, 'validation.unknownItem', { id: itemId }));
+    }
+  }
+
   for (const action of bundle.actions) {
-    if (!isKebabCaseId(action.id)) {
+    if (!isDottedKebabCaseId(action.id)) {
       issues.push(error(`actions.${action.id}.id`, 'validation.actionIdKebab'));
     }
     if (action.locationId === undefined && !entityActionIds.has(action.id)) {
@@ -738,6 +808,11 @@ export const validateContentReferences = (bundle: ContentBundle) => {
         issues.push(error(`locations.${location.id}.entities`, 'validation.unknownEntity', { id: entityId }));
       }
     }
+    for (const actionId of location.actions ?? []) {
+      if (!actionIds.has(actionId)) {
+        issues.push(error(`locations.${location.id}.actions`, 'validation.unknownAction', { id: actionId }));
+      }
+    }
   }
 
   for (const skill of bundle.skills) {
@@ -790,6 +865,9 @@ export const validateContentReferences = (bundle: ContentBundle) => {
     }
     if (effect.activeWhen) {
       validateConditionReferences(effect.activeWhen, `effects.${effect.id}.activeWhen`);
+    }
+    for (const [index, trigger] of (effect.experience ?? []).entries()) {
+      validateExperienceTriggerReferences(trigger, `effects.${effect.id}.experience.${index}`);
     }
   }
 

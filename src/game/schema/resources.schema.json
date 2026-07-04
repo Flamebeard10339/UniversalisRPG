@@ -16,7 +16,8 @@
       "display": { "enum": ["full", "minimal", "hidden"] },
       "hidden": { "type": "boolean" },
       "onEmpty": { "type": "array", "items": { "$ref": "#/$defs/behavior" } },
-      "onFull": { "type": "array", "items": { "$ref": "#/$defs/behavior" } }
+      "onFull": { "type": "array", "items": { "$ref": "#/$defs/behavior" } },
+      "effects": { "type": "array", "items": { "$ref": "#/$defs/effect" } }
     }
   },
   "$defs": {
@@ -45,6 +46,21 @@
         { "type": "object", "required": ["kind", "messageKey"], "additionalProperties": false, "properties": { "kind": { "const": "chat" }, "messageKey": { "type": "string", "minLength": 1 } } },
         { "type": "object", "required": ["kind"], "additionalProperties": false, "properties": { "kind": { "const": "reset-state" }, "locationId": { "type": "string", "minLength": 1 }, "incrementVariable": { "type": "string", "minLength": 1 }, "incrementFlagId": { "type": "string", "minLength": 1 }, "preserve": { "$ref": "#/$defs/preserve" } } }
       ]
+    },
+    "effect": {
+      "type": "object",
+      "required": ["id", "sourceStat"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "sourceStat": { "type": "string", "minLength": 1 },
+        "sourceEnemyStat": { "enum": ["attack", "defense", "health", "rate", "regeneration", "armorPenetration", "torpidity", "critChance", "critMultiplier"] },
+        "locationId": { "type": "string", "minLength": 1 },
+        "rateUnit": { "enum": ["per-minute", "per-second"] },
+        "activeWhen": { "$ref": "https://universalis-rpg.local/schema/actions.schema.json#/$defs/condition" },
+        "resetResourceWhenInactive": { "type": "boolean" },
+        "experience": { "type": "array", "items": { "$ref": "https://universalis-rpg.local/schema/actions.schema.json#/$defs/experienceTrigger" } }
+      }
     }
   }
 }

@@ -42,6 +42,7 @@ import {
 } from './contentIds';
 import { validateContentBundle, validateContentShape, validateLocaleDictionary } from './validators';
 import { collectionCategoryTitleKey } from './collectionLog';
+import { normalizeContentBundleStructure } from './contentNormalization';
 
 type ModuleDependency = {
   id: string;
@@ -144,6 +145,8 @@ const moduleDataTypeToKey: Record<string, keyof ModuleDataSectionObject> = {
   dialogues: 'dialogues',
   displayProfile: 'displayProfiles',
   displayProfiles: 'displayProfiles',
+  collectionLog: 'collectionLogs',
+  collectionLogs: 'collectionLogs',
   dropTable: 'dropTables',
   dropTables: 'dropTables',
   entity: 'entities',
@@ -209,6 +212,7 @@ const removableModuleDataKeys = new Set([
   'interactionTypes',
   'enemies',
   'dropTables',
+  'collectionLogs',
   'dialogues',
   'dialogueOptions',
   'displayProfiles',
@@ -287,6 +291,7 @@ const emptySectionBundle = (bundle: ContentBundle, section?: ModuleDataSection):
   interactionTypes: normalizeModuleDataSection(section).interactionTypes ?? [],
   enemies: normalizeModuleDataSection(section).enemies ?? [],
   dropTables: normalizeModuleDataSection(section).dropTables ?? [],
+  collectionLogs: normalizeModuleDataSection(section).collectionLogs ?? [],
   dialogues: normalizeModuleDataSection(section).dialogues ?? [],
   locales: bundle.locales,
 });
@@ -417,6 +422,9 @@ const localizationKeysFromSection = (section?: ModuleDataSection) => [
     ...((entity as { collectionLog?: Array<{ categoryId?: string }> }).collectionLog ?? [])
       .map((definition) => definition.categoryId ? collectionCategoryTitleKey(definition.categoryId) : null),
   ]),
+  ...((normalizeModuleDataSection(section).collectionLogs ?? []) as Array<{ categoryId?: string }>).map((definition) =>
+    definition.categoryId ? collectionCategoryTitleKey(definition.categoryId) : null,
+  ),
   ...(normalizeModuleDataSection(section).actions ?? []).filter(hasId).flatMap(localizationKeysFromAction),
   ...(normalizeModuleDataSection(section).skills ?? []).filter(hasId).flatMap((skill) => [skillTitleKey(skill.id), skillDescriptionKey(skill.id)]),
   ...(normalizeModuleDataSection(section).stats ?? []).filter(hasId).flatMap((stat) => [statTitleKey(stat.id), statDescriptionKey(stat.id)]),
@@ -569,6 +577,7 @@ const applyDataSection = (bundle: ContentBundle, data?: ModuleDataSection): Cont
     interactionTypes: mergeById(bundle.interactionTypes ?? [], section.interactionTypes),
     enemies: mergeById(bundle.enemies ?? [], section.enemies),
     dropTables: mergeById(bundle.dropTables ?? [], section.dropTables),
+    collectionLogs: mergeById(bundle.collectionLogs ?? [], section.collectionLogs),
     dialogues: mergeById(bundle.dialogues ?? [], section.dialogues),
   };
 };
@@ -594,6 +603,7 @@ const applyDataUpdates = (bundle: ContentBundle, updates?: ModuleDataUpdates): C
     interactionTypes: removeById(bundle.interactionTypes ?? [], removed.interactionTypes),
     enemies: removeById(bundle.enemies ?? [], removed.enemies),
     dropTables: removeById(bundle.dropTables ?? [], removed.dropTables),
+    collectionLogs: removeById(bundle.collectionLogs ?? [], removed.collectionLogs),
     dialogues: removeDialogueOptions(removeById(bundle.dialogues ?? [], removed.dialogues), removed.dialogueOptions),
     locales: mergeLocales(bundle.locales, updateObject?.locale, removed.locales),
   };
@@ -707,7 +717,7 @@ const applyOrderedModules = (bundle: ContentBundle, relevantModules: ContentModu
       locales: mergeLocales(next.locales, module.locale),
     };
   }
-  return next;
+  return normalizeContentBundleStructure(next);
 };
 
 const removedIdsByModule = (module: ContentModule) =>

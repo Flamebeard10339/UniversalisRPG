@@ -4,7 +4,7 @@
   "type": "array",
   "items": {
     "type": "object",
-    "required": ["id", "actionIds"],
+    "required": ["id"],
     "additionalProperties": false,
     "properties": {
       "id": { "type": "string", "minLength": 1 },
@@ -12,6 +12,10 @@
         "type": "array",
         "items": { "type": "string", "minLength": 1 },
         "uniqueItems": true
+      },
+      "actions": {
+        "type": "array",
+        "items": { "$ref": "#/$defs/action" }
       },
       "collectionLog": {
         "type": "array",
@@ -38,6 +42,18 @@
           "items": { "type": "string", "minLength": 1 },
           "uniqueItems": true
         }
+      }
+    },
+    "action": {
+      "type": "object",
+      "required": ["id", "durationSeconds", "rewards"],
+      "additionalProperties": true,
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "durationSeconds": { "type": "number", "exclusiveMinimum": 0 },
+        "rewards": { "type": "array" },
+        "interactionTypeId": { "type": "string", "minLength": 1 },
+        "enemy": { "type": "object" }
       }
     }
   }

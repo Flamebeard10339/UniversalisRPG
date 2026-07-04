@@ -60,7 +60,16 @@ const referencedStateKeys = (actions: GameAction[], bundle: ContentBundle) => {
   const dropTables = new Map((bundle.dropTables ?? []).map((dropTable) => [dropTable.id, dropTable]));
   const visitReward = (reward: Reward) => {
     if (reward.kind === 'dropTable') {
-      dropTables.get(reward.dropTableId)?.drops.forEach((drop) => visitReward(drop.reward));
+      if (reward.dropTableId) dropTables.get(reward.dropTableId)?.drops.forEach((drop) => {
+        if (drop.reward) visitReward(drop.reward);
+        if (drop.dropTableId) visitReward({ kind: 'dropTable', dropTableId: drop.dropTableId });
+        if (drop.drops) visitReward({ kind: 'dropTable', drops: drop.drops });
+      });
+      reward.drops?.forEach((drop) => {
+        if (drop.reward) visitReward(drop.reward);
+        if (drop.dropTableId) visitReward({ kind: 'dropTable', dropTableId: drop.dropTableId });
+        if (drop.drops) visitReward({ kind: 'dropTable', drops: drop.drops });
+      });
       return;
     }
     keys.add(reward.kind === 'skillXp' ? `skill-level:${reward.skillId}` : `${reward.kind}:${reward.kind === 'item' ? reward.itemId : reward.resourceId}`);

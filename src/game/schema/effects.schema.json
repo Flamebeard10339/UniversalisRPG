@@ -14,7 +14,8 @@
       "locationId": { "type": "string", "minLength": 1 },
       "rateUnit": { "enum": ["per-minute", "per-second"] },
       "activeWhen": { "$ref": "#/$defs/condition" },
-      "resetResourceWhenInactive": { "type": "boolean" }
+      "resetResourceWhenInactive": { "type": "boolean" },
+      "experience": { "type": "array", "items": { "$ref": "https://universalis-rpg.local/schema/actions.schema.json#/$defs/experienceTrigger" } }
     }
   },
   "$defs": {

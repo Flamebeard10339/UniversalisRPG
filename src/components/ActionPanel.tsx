@@ -38,13 +38,13 @@ export const ActionPanel = ({ bundle, debugEnabled, playState, onStartAction, sh
   const entities = (currentLocation?.entities ?? [])
     .map((entityId) => (bundle.entities ?? []).find((entity) => entity.id === entityId))
     .filter((entity): entity is NonNullable<typeof entity> => Boolean(entity));
-  const entityActionIds = new Set(entities.flatMap((entity) => entity.actionIds));
+  const entityActionIds = new Set(entities.flatMap((entity) => entity.actionIds ?? []));
   const normalActions = bundle.actions.filter((action) =>
     action.locationId === playState.currentLocationId
     && !entityActionIds.has(action.id)
     && (showTravelActions || !isPureTravelAction(action))
     && isActionVisible(playState, action, actionContext));
-  const entityActions = (actionIds: string[]) => actionIds
+  const entityActions = (actionIds: string[] = []) => actionIds
     .map((actionId) => bundle.actions.find((action) => action.id === actionId))
     .filter((action): action is GameAction => Boolean(action))
     .filter((action) => isActionVisible(playState, action, actionContext));

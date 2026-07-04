@@ -34,6 +34,7 @@ const dataKeys: DataKey[] = [
   'interactionTypes',
   'enemies',
   'dropTables',
+  'collectionLogs',
   'dialogues',
   'displayProfiles',
 ];
@@ -52,6 +53,7 @@ const dataKeyTypes: Record<DataKey, string> = {
   interactionTypes: 'interactionType',
   enemies: 'enemy',
   dropTables: 'dropTable',
+  collectionLogs: 'collectionLog',
   dialogues: 'dialogue',
   displayProfiles: 'displayProfile',
 };

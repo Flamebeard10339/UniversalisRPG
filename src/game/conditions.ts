@@ -67,8 +67,11 @@ export const isActionAvailableAtCurrentLocation = (
     return action.locationId === state.currentLocationId;
   }
   const location = context.locations?.find((candidate) => candidate.id === state.currentLocationId);
+  if ((location?.actions ?? []).includes(action.id)) {
+    return true;
+  }
   return (location?.entities ?? []).some((entityId) =>
-    (context.entities ?? []).some((entity) => entity.id === entityId && entity.actionIds.includes(action.id)),
+    (context.entities ?? []).some((entity) => entity.id === entityId && (entity.actionIds ?? []).includes(action.id)),
   );
 };
 
