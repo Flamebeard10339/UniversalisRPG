@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { validateContentBundle, validateManifest } from './validators';
-import type { ContentBundle, UniverseManifest } from './types';
+import { mergeValidDraftIntoBundle, validateContentBundle, validateManifest } from './validators';
+import type { ContentBundle, ContributionDraft, UniverseManifest } from './types';
 
 const manifest = (patch: Partial<UniverseManifest> = {}): UniverseManifest => ({
   schemaVersion: 1,
@@ -25,6 +25,45 @@ const bundle = (manifestPatch: Partial<UniverseManifest> = {}): ContentBundle =>
   interactionTypes: [],
   enemies: [],
   locales: { en: { 'universe.test.title': 'Test', 'universe.test.description': 'Test' } },
+});
+
+const draft = (patch: Partial<ContributionDraft>): ContributionDraft => ({
+  universeId: 'test',
+  updatedAt: 1,
+  notes: '',
+  modules: [],
+  modulePacks: [],
+  locations: [],
+  entities: [],
+  actions: [],
+  skills: [],
+  stats: [],
+  items: [],
+  flags: [],
+  resourceDefinitions: [],
+  effects: [],
+  interactionTypes: [],
+  enemies: [],
+  dropTables: [],
+  dialogues: [],
+  locales: {},
+  removed: {
+    locations: [],
+    entities: [],
+    actions: [],
+    skills: [],
+    stats: [],
+    items: [],
+    flags: [],
+    resources: [],
+    effects: [],
+    interactionTypes: [],
+    enemies: [],
+    dropTables: [],
+    dialogues: [],
+    modules: [],
+  },
+  ...patch,
 });
 
 describe('universe manifest validation', () => {
@@ -176,5 +215,52 @@ describe('universe manifest validation', () => {
       'validation.unknownSkill',
       'validation.unknownStat',
     ]));
+  });
+
+  it('merges valid legacy contribution drafts', () => {
+    const result = mergeValidDraftIntoBundle(bundle(), draft({
+      locations: [{ id: 'camp', position: { x: 100, y: 0 } }],
+      locales: { en: { 'location.camp.title': 'Camp', 'location.camp.description': 'A camp.' } },
+    }));
+
+    expect(result.issues.filter((issue) => issue.severity === 'error')).toEqual([]);
+    expect(result.bundle.locations.map((location) => location.id)).toEqual(['start', 'camp']);
+  });
+
+  it('quarantines invalid legacy contribution drafts instead of returning invalid content', () => {
+    const result = mergeValidDraftIntoBundle(bundle(), draft({
+      locations: [{ id: 'camp', position: { x: 100, y: 0 }, entities: ['tutorial-guide'] }],
+      locales: { en: { 'location.camp.title': 'Camp', 'location.camp.description': 'A camp.' } },
+    }));
+
+    expect(result.bundle.locations.map((location) => location.id)).toEqual(['start']);
+    expect(result.issues).toContainEqual(expect.objectContaining({
+      severity: 'error',
+      path: 'draft.locations.camp.entities',
+      message: 'validation.unknownEntity',
+      params: { id: 'tutorial-guide' },
+    }));
+  });
+
+  it('reports duplicate location entity and action references', () => {
+    const issues = validateContentBundle({
+      ...bundle(),
+      locations: [{ id: 'start', position: { x: 0, y: 0 }, starting: true, entities: ['goblin', 'goblin'], actions: ['gather', 'gather'] }],
+      entities: [{ id: 'goblin' }],
+      actions: [{ id: 'gather', locationId: 'start', durationSeconds: 1, rewards: [] }],
+    });
+
+    expect(issues).toContainEqual(expect.objectContaining({
+      severity: 'error',
+      path: 'locations.start.entities',
+      message: 'validation.duplicateId',
+      params: { id: 'goblin' },
+    }));
+    expect(issues).toContainEqual(expect.objectContaining({
+      severity: 'error',
+      path: 'locations.start.actions',
+      message: 'validation.duplicateId',
+      params: { id: 'gather' },
+    }));
   });
 });

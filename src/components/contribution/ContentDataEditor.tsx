@@ -430,7 +430,7 @@ export const ContentDataEditor = ({ activeTab, baseBundle, bundle, draft, onPatc
         ui: next.ui as UniverseUiSettings | undefined,
       });
     } },
-    { path: 'locations.json', json: locations.map((row) => row.item), schema: { kind: 'array' as const, listMode: 'free' as const, item: locationSchema(), createItem: () => ({ id: 'new-location', position: { x: 0, y: 0 } }) }, onChange: (value: StructuredValue | undefined) => onPatch({ locations: (Array.isArray(value) ? value : []) as unknown as LocationNode[] }) },
+    { path: 'locations.json', json: locations.map((row) => row.item), schema: { kind: 'array' as const, listMode: 'free' as const, item: locationSchema(bundle), createItem: () => ({ id: 'new-location', position: { x: 0, y: 0 } }) }, onChange: (value: StructuredValue | undefined) => onPatch({ locations: (Array.isArray(value) ? value : []) as unknown as LocationNode[] }) },
     { path: 'actions.json', json: actions.map((row) => row.item), onChange: (value: StructuredValue | undefined) => onPatch({ actions: (Array.isArray(value) ? value : []) as unknown as GameAction[] }) },
     { path: 'dialogues.json', json: dialogues.map((row) => row.item), schema: { kind: 'array' as const, listMode: 'free' as const, item: dialogueSchema(bundle), createItem: () => ({ id: 'new-dialogue', startNodeId: 'start', nodes: [{ id: 'start', textKey: 'dialogue.new-dialogue.start' }] }) }, onChange: (value: StructuredValue | undefined) => onPatch({ dialogues: (Array.isArray(value) ? value : []) as unknown as DialogueDefinition[] }) },
     { path: 'drop-tables.json', json: dropTables.map((row) => row.item), schema: { kind: 'array' as const, listMode: 'free' as const, item: dropTableDefinitionSchema(bundle), createItem: () => ({ id: 'new-drop-table', mode: 'dependent', drops: [] }) }, onChange: (value: StructuredValue | undefined) => onPatch({ dropTables: (Array.isArray(value) ? value : []) as unknown as DropTableDefinition[] }) },
@@ -517,7 +517,7 @@ export const ContentDataEditor = ({ activeTab, baseBundle, bundle, draft, onPatc
             ) : (
               <div className="grid gap-1">
                 {locations.map((row) => (
-                  <LocationFields key={`${row.source}-${row.index}`} location={row.item} onChange={(location) => updateLocation(row, location)} onRemove={() => removeRow('locations', row)} t={t} />
+                  <LocationFields bundle={bundle} key={`${row.source}-${row.index}`} location={row.item} onChange={(location) => updateLocation(row, location)} onRemove={() => removeRow('locations', row)} t={t} />
                 ))}
               </div>
             )}

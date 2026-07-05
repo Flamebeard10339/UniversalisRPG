@@ -536,6 +536,20 @@ const findDuplicateIds = <T extends { id: string }>(items: T[], path: string) =>
   return issues;
 };
 
+const findDuplicateStrings = (items: string[] | undefined, path: string) => {
+  const issues: ValidationIssue[] = [];
+  const seen = new Set<string>();
+
+  for (const item of items ?? []) {
+    if (seen.has(item)) {
+      issues.push(error(path, 'validation.duplicateId', { id: item }));
+    }
+    seen.add(item);
+  }
+
+  return issues;
+};
+
 export const validateContentReferences = (bundle: ContentBundle) => {
   const issues: ValidationIssue[] = [
     ...findDuplicateIds(bundle.locations, 'locations'),
@@ -803,11 +817,13 @@ export const validateContentReferences = (bundle: ContentBundle) => {
     if (!isKebabCaseId(location.id)) {
       issues.push(error(`locations.${location.id}.id`, 'validation.locationIdKebab'));
     }
+    issues.push(...findDuplicateStrings(location.entities, `locations.${location.id}.entities`));
     for (const entityId of location.entities ?? []) {
       if (!entityIds.has(entityId)) {
         issues.push(error(`locations.${location.id}.entities`, 'validation.unknownEntity', { id: entityId }));
       }
     }
+    issues.push(...findDuplicateStrings(location.actions, `locations.${location.id}.actions`));
     for (const actionId of location.actions ?? []) {
       if (!actionIds.has(actionId)) {
         issues.push(error(`locations.${location.id}.actions`, 'validation.unknownAction', { id: actionId }));
@@ -1053,6 +1069,23 @@ export const mergeDraftIntoBundle = (bundle: ContentBundle, draft: ContributionD
     dialogues: mergeById(removeById(bundle.dialogues ?? [], draft.removed?.dialogues ?? []), draft.dialogues ?? []),
     locales: mergeLocales(bundle.locales, draft.locales),
   };
+};
+
+export const mergeValidDraftIntoBundle = (bundle: ContentBundle, draft: ContributionDraft | null) => {
+  const merged = mergeDraftIntoBundle(bundle, draft);
+  if (!draft || draft.universeId !== bundle.manifest.id || merged === bundle) {
+    return { bundle, issues: [] as ValidationIssue[] };
+  }
+
+  const issues = validateContentBundle(merged).map((validationIssue) => ({
+    ...validationIssue,
+    path: `draft.${validationIssue.path}`,
+  }));
+  if (issues.some((validationIssue) => validationIssue.severity === 'error')) {
+    return { bundle, issues };
+  }
+
+  return { bundle: merged, issues };
 };
 
 export const mergeDraftModulesIntoBundle = (bundle: ContentBundle, draft: ContributionDraft | null): ContentBundle => {

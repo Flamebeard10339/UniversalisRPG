@@ -316,7 +316,10 @@ const validateModuleDataSection = (bundle: ContentBundle, module: ContentModule,
     : [];
   return [
     ...typeIssues,
-    ...validateContentShape(emptySectionBundle(bundle, data)).map((validationIssue) => prefixIssuePath(module.id, section, validationIssue)),
+    ...(section === 'data'
+      ? validateContentShape(emptySectionBundle(bundle, data))
+      : validateContentShape(applyDataUpdates(bundle, data))
+    ).map((validationIssue) => prefixIssuePath(module.id, section, validationIssue)),
   ];
 };
 
@@ -410,13 +413,42 @@ const localizationKeysFromDialogues = (dialogues: DialogueDefinition[] = []) =>
 
 const hasId = (value: { id?: unknown }): value is { id: string } => typeof value.id === 'string' && value.id.trim().length > 0;
 
-const localizationKeysFromSection = (section?: ModuleDataSection) => [
-  ...(normalizeModuleDataSection(section).locations ?? []).filter(hasId).flatMap((location) => [
+type ExistingModuleDataIds = Partial<Record<keyof ModuleDataSectionObject | 'resources', Set<string>>>;
+
+const existingDataIdsFromBundle = (bundle: ContentBundle): ExistingModuleDataIds => ({
+  locations: new Set(bundle.locations.map((item) => item.id)),
+  entities: new Set((bundle.entities ?? []).map((item) => item.id)),
+  actions: new Set(bundle.actions.map((item) => item.id)),
+  skills: new Set(bundle.skills.map((item) => item.id)),
+  stats: new Set(bundle.stats.map((item) => item.id)),
+  items: new Set((bundle.items ?? []).map((item) => item.id)),
+  flags: new Set((bundle.flags ?? []).map((item) => item.id)),
+  resources: new Set((bundle.resourceDefinitions ?? []).map((item) => item.id)),
+  resourceDefinitions: new Set((bundle.resourceDefinitions ?? []).map((item) => item.id)),
+  effects: new Set((bundle.effects ?? []).map((item) => item.id)),
+  interactionTypes: new Set((bundle.interactionTypes ?? []).map((item) => item.id)),
+  enemies: new Set((bundle.enemies ?? []).map((item) => item.id)),
+  dropTables: new Set((bundle.dropTables ?? []).map((item) => item.id)),
+  collectionLogs: new Set((bundle.collectionLogs ?? []).map((item) => item.id)),
+  dialogues: new Set((bundle.dialogues ?? []).map((item) => item.id)),
+  displayProfiles: new Set((bundle.manifest.displayProfiles ?? []).map((item) => item.id)),
+});
+
+const newLocalizationRows = <T extends { id?: unknown }>(
+  rows: T[] | undefined,
+  key: keyof ExistingModuleDataIds,
+  existingIds?: ExistingModuleDataIds,
+) => (rows ?? [])
+  .filter((row): row is T & { id: string } => hasId(row))
+  .filter((row) => !existingIds?.[key]?.has(row.id));
+
+const localizationKeysFromSection = (section?: ModuleDataSection, existingIds?: ExistingModuleDataIds) => [
+  ...newLocalizationRows(normalizeModuleDataSection(section).locations, 'locations', existingIds).flatMap((location) => [
     locationTitleKey(location.id),
     locationDescriptionKey(location.id),
     locationExhaustedKey(location.id),
   ]),
-  ...(normalizeModuleDataSection(section).entities ?? []).filter(hasId).flatMap((entity) => [
+  ...newLocalizationRows(normalizeModuleDataSection(section).entities, 'entities', existingIds).flatMap((entity) => [
     entityTitleKey(entity.id),
     entityDescriptionKey(entity.id),
     ...((entity as { collectionLog?: Array<{ categoryId?: string }> }).collectionLog ?? [])
@@ -425,11 +457,11 @@ const localizationKeysFromSection = (section?: ModuleDataSection) => [
   ...((normalizeModuleDataSection(section).collectionLogs ?? []) as Array<{ categoryId?: string }>).map((definition) =>
     definition.categoryId ? collectionCategoryTitleKey(definition.categoryId) : null,
   ),
-  ...(normalizeModuleDataSection(section).actions ?? []).filter(hasId).flatMap(localizationKeysFromAction),
-  ...(normalizeModuleDataSection(section).skills ?? []).filter(hasId).flatMap((skill) => [skillTitleKey(skill.id), skillDescriptionKey(skill.id)]),
-  ...(normalizeModuleDataSection(section).stats ?? []).filter(hasId).flatMap((stat) => [statTitleKey(stat.id), statDescriptionKey(stat.id)]),
-  ...(normalizeModuleDataSection(section).items ?? []).filter(hasId).flatMap((item) => [itemTitleKey(item.id), itemDescriptionKey(item.id)]),
-  ...(normalizeModuleDataSection(section).interactionTypes ?? []).filter(hasId).flatMap((interactionType) => [
+  ...newLocalizationRows(normalizeModuleDataSection(section).actions, 'actions', existingIds).flatMap(localizationKeysFromAction),
+  ...newLocalizationRows(normalizeModuleDataSection(section).skills, 'skills', existingIds).flatMap((skill) => [skillTitleKey(skill.id), skillDescriptionKey(skill.id)]),
+  ...newLocalizationRows(normalizeModuleDataSection(section).stats, 'stats', existingIds).flatMap((stat) => [statTitleKey(stat.id), statDescriptionKey(stat.id)]),
+  ...newLocalizationRows(normalizeModuleDataSection(section).items, 'items', existingIds).flatMap((item) => [itemTitleKey(item.id), itemDescriptionKey(item.id)]),
+  ...newLocalizationRows(normalizeModuleDataSection(section).interactionTypes, 'interactionTypes', existingIds).flatMap((interactionType) => [
     interactionTitleKey(interactionType.id),
     interactionPlayerHitKey(interactionType.id),
     interactionPlayerMissKey(interactionType.id),
@@ -438,20 +470,20 @@ const localizationKeysFromSection = (section?: ModuleDataSection) => [
     interactionEntityMissKey(interactionType.id),
     interactionEntityKillKey(interactionType.id),
   ]),
-  ...sectionResources(section).filter(hasId).flatMap((resource) => [
+  ...newLocalizationRows(sectionResources(section), 'resources', existingIds).flatMap((resource) => [
     resourceTitleKey(resource.id),
     ...(resource.onEmpty ?? []).flatMap((behavior) => typeof behavior === 'object' && behavior !== null && behavior.kind === 'chat' ? [behavior.messageKey] : []),
     ...(resource.onFull ?? []).flatMap((behavior) => typeof behavior === 'object' && behavior !== null && behavior.kind === 'chat' ? [behavior.messageKey] : []),
   ]),
-  ...(normalizeModuleDataSection(section).effects ?? []).filter(hasId).map((effect) => effectTitleKey(effect.id)),
+  ...newLocalizationRows(normalizeModuleDataSection(section).effects, 'effects', existingIds).map((effect) => effectTitleKey(effect.id)),
   ...localizationKeysFromDialogues(normalizeModuleDataSection(section).dialogues),
   ...(normalizeModuleDataSection(section).displayProfiles ?? []).map((profile) => profile.titleKey),
 ].filter((key): key is string => Boolean(key));
 
-export const collectModuleLocalizationKeys = (module: ContentModule) =>
+export const collectModuleLocalizationKeys = (module: ContentModule, bundle?: ContentBundle) =>
   Array.from(new Set([
-    ...localizationKeysFromSection(module.data),
-    ...localizationKeysFromSection(module['data-updates']),
+    ...localizationKeysFromSection(module.data, bundle ? existingDataIdsFromBundle(bundle) : undefined),
+    ...localizationKeysFromSection(module['data-updates'], bundle ? existingDataIdsFromBundle(bundle) : undefined),
   ]));
 
 const moduleLocaleDictionary = (module: ContentModule, locale: string): LocaleDictionary => ({
@@ -459,7 +491,26 @@ const moduleLocaleDictionary = (module: ContentModule, locale: string): LocaleDi
   ...(moduleDataUpdatesObject(module['data-updates'])?.locale?.[locale] ?? {}),
 });
 
-const validateContentModule = (bundle: ContentBundle, module: ContentModule, currentLocale = bundle.manifest.locales[0] ?? 'en'): ValidationIssue[] => [
+export const bundleWithModuleData = (bundle: ContentBundle, modules: ContentModule[]) => {
+  let next = bundle;
+  for (const module of modules) {
+    if (validateModuleDataSection(bundle, module, 'data').some((validationIssue) => validationIssue.severity === 'error')) {
+      continue;
+    }
+    next = {
+      ...applyDataSection(next, module.data),
+      locales: mergeLocales(next.locales, module.locale),
+    };
+  }
+  return next;
+};
+
+const validateContentModule = (
+  bundle: ContentBundle,
+  module: ContentModule,
+  currentLocale = bundle.manifest.locales[0] ?? 'en',
+  localizationBundle = bundle,
+): ValidationIssue[] => [
   ...(!isModuleVersion(module.version)
     ? [issue('error', `modules.${module.id}.version`, 'validation.moduleVersionInvalid', { id: module.id })]
     : []),
@@ -469,7 +520,7 @@ const validateContentModule = (bundle: ContentBundle, module: ContentModule, cur
   ...validateModuleDataSection(bundle, module, 'data'),
   ...validateModuleDataSection(bundle, module, 'data-updates'),
   ...validateModuleDataUpdatesShape(module),
-  ...collectModuleLocalizationKeys(module).flatMap((key) =>
+  ...collectModuleLocalizationKeys(module, localizationBundle).flatMap((key) =>
     moduleLocaleDictionary(module, currentLocale)[key]
       ? []
       : [issue('warning', `modules.${module.id}.locale.${currentLocale}.${key}`, 'validation.missingLocalization')],
@@ -481,6 +532,132 @@ const validateContentModule = (bundle: ContentBundle, module: ContentModule, cur
     })),
   ),
 ];
+
+const moduleDataCollisionKeys: Array<keyof ModuleDataSectionObject> = [
+  'locations',
+  'entities',
+  'actions',
+  'skills',
+  'stats',
+  'items',
+  'flags',
+  'effects',
+  'interactionTypes',
+  'enemies',
+  'dropTables',
+  'collectionLogs',
+  'dialogues',
+  'displayProfiles',
+];
+
+const bundleIdsForDataKey = (bundle: ContentBundle, key: keyof ModuleDataSectionObject) => {
+  if (key === 'displayProfiles') return (bundle.manifest.displayProfiles ?? []).map((item) => item.id);
+  return (((bundle as unknown as Record<keyof ModuleDataSectionObject, Array<{ id: string }> | undefined>)[key]) ?? []).map((item) => item.id);
+};
+
+const validateModuleDataCollisions = (bundle: ContentBundle, modules: ContentModule[]): ValidationIssue[] => {
+  const seen = Object.fromEntries(moduleDataCollisionKeys.map((key) => [key, new Set(bundleIdsForDataKey(bundle, key))])) as Record<keyof ModuleDataSectionObject, Set<string>>;
+  seen.resources = new Set((bundle.resourceDefinitions ?? []).map((item) => item.id));
+  seen.resourceDefinitions = seen.resources;
+  const issues: ValidationIssue[] = [];
+
+  for (const module of modules) {
+    const data = normalizeModuleDataSection(module.data);
+    for (const key of moduleDataCollisionKeys) {
+      const rows = (data[key] as Array<{ id?: unknown }> | undefined) ?? [];
+      for (const row of rows) {
+        if (!hasId(row)) continue;
+        if (seen[key]?.has(row.id)) {
+          issues.push(issue('error', `modules.${module.id}.data.${key}.${row.id}`, 'validation.duplicateId', { id: row.id }));
+        }
+        seen[key]?.add(row.id);
+      }
+    }
+    for (const row of sectionResources(data) as Array<{ id?: unknown }>) {
+      if (!hasId(row)) continue;
+      if (seen.resources?.has(row.id)) {
+        issues.push(issue('error', `modules.${module.id}.data.resources.${row.id}`, 'validation.duplicateId', { id: row.id }));
+      }
+      seen.resources?.add(row.id);
+    }
+  }
+
+  return issues;
+};
+
+const validateModuleDataUpdateDuplicates = (module: ContentModule): ValidationIssue[] => {
+  const data = normalizeModuleDataSection(module['data-updates']);
+  const seen = Object.fromEntries(moduleDataCollisionKeys.map((key) => [key, new Set<string>()])) as Record<keyof ModuleDataSectionObject, Set<string>>;
+  seen.resources = new Set<string>();
+  seen.resourceDefinitions = seen.resources;
+  const issues: ValidationIssue[] = [];
+
+  for (const key of moduleDataCollisionKeys) {
+    const rows = (data[key] as Array<{ id?: unknown }> | undefined) ?? [];
+    for (const row of rows) {
+      if (!hasId(row)) continue;
+      if (seen[key]?.has(row.id)) {
+        issues.push(issue('error', `modules.${module.id}.data-updates.${key}.${row.id}`, 'validation.duplicateId', { id: row.id }));
+      }
+      seen[key]?.add(row.id);
+    }
+  }
+  for (const row of sectionResources(data) as Array<{ id?: unknown }>) {
+    if (!hasId(row)) continue;
+    if (seen.resources?.has(row.id)) {
+      issues.push(issue('error', `modules.${module.id}.data-updates.resources.${row.id}`, 'validation.duplicateId', { id: row.id }));
+    }
+    seen.resources?.add(row.id);
+  }
+
+  return issues;
+};
+
+const validateModuleDataUpdateTargets = (bundle: ContentBundle, module: ContentModule): ValidationIssue[] => {
+  const data = normalizeModuleDataSection(module['data-updates']);
+  const existingIds = existingDataIdsFromBundle(bundle);
+  const issues: ValidationIssue[] = [];
+
+  for (const key of moduleDataCollisionKeys) {
+    const rows = (data[key] as Array<{ id?: unknown }> | undefined) ?? [];
+    for (const row of rows) {
+      if (!hasId(row) || existingIds[key]?.has(row.id)) continue;
+      issues.push(issue('error', `modules.${module.id}.data-updates.${key}.${row.id}`, 'validation.moduleUpdateTargetMissing', { id: row.id }));
+    }
+  }
+  for (const row of sectionResources(data) as Array<{ id?: unknown }>) {
+    if (!hasId(row) || existingIds.resources?.has(row.id)) continue;
+    issues.push(issue('error', `modules.${module.id}.data-updates.resources.${row.id}`, 'validation.moduleUpdateTargetMissing', { id: row.id }));
+  }
+
+  return issues;
+};
+
+const validateModuleSemanticChanges = (bundle: ContentBundle, module: ContentModule): ValidationIssue[] => {
+  const shapeIssues = [
+    ...validateModuleDataSection(bundle, module, 'data'),
+    ...validateModuleDataSection(bundle, module, 'data-updates'),
+  ];
+  if (shapeIssues.some((validationIssue) => validationIssue.severity === 'error')) return [];
+
+  const withData = {
+    ...applyDataSection(bundle, module.data),
+    locales: mergeLocales(bundle.locales, module.locale),
+  };
+  const withUpdates = applyDataUpdates(withData, module['data-updates']);
+  const semanticIssues = validateContentBundle(normalizeContentBundleStructure(withUpdates))
+    .filter((validationIssue) =>
+      moduleChangesContentPath(module, validationIssue, typeof validationIssue.params?.id === 'string' ? validationIssue.params.id : '') ||
+      moduleOwnsContentPath(module, validationIssue) ||
+      (typeof validationIssue.params?.id === 'string' && removedIdsByModule(module).has(validationIssue.params.id)),
+    );
+  const conflictKeys = Array.from(new Set(semanticIssues
+    .filter((validationIssue) => validationIssue.severity === 'error')
+    .map((validationIssue) => typeof validationIssue.params?.id === 'string'
+      ? validationIssue.params.id
+      : contentPathKey(validationIssue) ?? module.id)));
+  return conflictKeys.map((key) => issue('error', `modules.${module.id}`, 'validation.moduleConflictDisabled', { id: module.id, key }));
+};
 
 const validateModulePacks = (packs: ContentModulePack[], moduleIds: Set<string>, seenPackIds = new Set<string>()): ValidationIssue[] =>
   packs.flatMap((pack) => {
@@ -508,6 +685,27 @@ const validateModulePacks = (packs: ContentModulePack[], moduleIds: Set<string>,
 const mergeById = <T extends { id: string }>(base: T[], additions: T[] = []) => {
   const merged = new Map(base.map((item) => [item.id, item]));
   for (const item of additions) merged.set(item.id, item);
+  return [...merged.values()];
+};
+
+const isPlainObject = (value: unknown): value is Record<string, unknown> =>
+  isRecord(value) && Object.getPrototypeOf(value) === Object.prototype;
+
+const mergePatchValue = (base: unknown, patch: unknown): unknown => {
+  if (!isPlainObject(base) || !isPlainObject(patch)) return patch;
+  const next: Record<string, unknown> = { ...base };
+  for (const [key, value] of Object.entries(patch)) {
+    next[key] = key in next ? mergePatchValue(next[key], value) : value;
+  }
+  return next;
+};
+
+const mergePatchById = <T extends { id: string }>(base: T[], patches: Array<Partial<T> & { id: string }> = []) => {
+  const merged = new Map(base.map((item) => [item.id, item]));
+  for (const patch of patches) {
+    const current = merged.get(patch.id);
+    if (current) merged.set(patch.id, mergePatchValue(current, patch) as T);
+  }
   return [...merged.values()];
 };
 
@@ -582,6 +780,31 @@ const applyDataSection = (bundle: ContentBundle, data?: ModuleDataSection): Cont
   };
 };
 
+const applyDataUpdateSection = (bundle: ContentBundle, data?: ModuleDataSection): ContentBundle => {
+  if (!data) return bundle;
+  const section = normalizeModuleDataSection(data);
+  return {
+    ...bundle,
+    manifest: section.displayProfiles
+      ? { ...bundle.manifest, displayProfiles: mergePatchById(bundle.manifest.displayProfiles ?? [], section.displayProfiles) }
+      : bundle.manifest,
+    locations: mergePatchById(bundle.locations, section.locations),
+    entities: mergePatchById(bundle.entities ?? [], section.entities),
+    actions: mergePatchById(bundle.actions, section.actions),
+    skills: mergePatchById(bundle.skills, section.skills),
+    stats: mergePatchById(bundle.stats, section.stats),
+    items: mergePatchById(bundle.items ?? [], section.items),
+    flags: mergePatchById(bundle.flags ?? [], section.flags),
+    resourceDefinitions: mergePatchById(bundle.resourceDefinitions ?? [], sectionResources(section)),
+    effects: mergePatchById(bundle.effects ?? [], section.effects),
+    interactionTypes: mergePatchById(bundle.interactionTypes ?? [], section.interactionTypes),
+    enemies: mergePatchById(bundle.enemies ?? [], section.enemies),
+    dropTables: mergePatchById(bundle.dropTables ?? [], section.dropTables),
+    collectionLogs: mergePatchById(bundle.collectionLogs ?? [], section.collectionLogs),
+    dialogues: mergePatchById(bundle.dialogues ?? [], section.dialogues),
+  };
+};
+
 const applyDataUpdates = (bundle: ContentBundle, updates?: ModuleDataUpdates): ContentBundle => {
   if (!updates) return bundle;
   const updateObject = moduleDataUpdatesObject(updates);
@@ -607,7 +830,7 @@ const applyDataUpdates = (bundle: ContentBundle, updates?: ModuleDataUpdates): C
     dialogues: removeDialogueOptions(removeById(bundle.dialogues ?? [], removed.dialogues), removed.dialogueOptions),
     locales: mergeLocales(bundle.locales, updateObject?.locale, removed.locales),
   };
-  return applyDataSection(withoutRemoved, updates);
+  return applyDataUpdateSection(withoutRemoved, updates);
 };
 
 const resolveEnabledSet = (modules: ContentModule[], requestedEnabledIds?: string[]) => {
@@ -740,23 +963,92 @@ const moduleReferencesId = (module: ContentModule, id: string) =>
     ? referencesIdValue(module['data-updates'].filter((entry) => !isModuleRemoveEntry(entry)), id)
     : referencesIdValue({ ...moduleDataUpdatesObject(module['data-updates']), remove: undefined }, id));
 
+const isProtectedCoreModule = (module: Pick<ContentModule, 'id'>) =>
+  module.id === 'base-core';
+
+const pathContentKeys: Record<string, keyof ModuleDataSectionObject> = {
+  locations: 'locations',
+  entities: 'entities',
+  actions: 'actions',
+  skills: 'skills',
+  stats: 'stats',
+  items: 'items',
+  flags: 'flags',
+  resources: 'resources',
+  effects: 'effects',
+  interactionTypes: 'interactionTypes',
+  enemies: 'enemies',
+  dropTables: 'dropTables',
+  collectionLogs: 'collectionLogs',
+  dialogues: 'dialogues',
+};
+
+const contentPathFromValidationIssue = (validationIssue: ValidationIssue) => {
+  const path = validationIssue.path.replace(/^modules:/, '');
+  const [collection, id] = path.split('.');
+  const key = pathContentKeys[collection];
+  return key && id ? { key, id } : null;
+};
+
+const collectionKeyFromValidationIssue = (validationIssue: ValidationIssue) => {
+  const [collection] = validationIssue.path.replace(/^modules:/, '').split('.');
+  return pathContentKeys[collection];
+};
+
+const contentPathKey = (validationIssue: ValidationIssue) => {
+  const contentPath = contentPathFromValidationIssue(validationIssue);
+  return contentPath?.id;
+};
+
+const rowsForModuleKey = (module: ContentModule, key: keyof ModuleDataSectionObject) => [
+  ...((normalizeModuleDataSection(module.data)[key] as Array<{ id?: unknown }> | undefined) ?? []),
+  ...((normalizeModuleDataSection(module['data-updates'])[key] as Array<{ id?: unknown }> | undefined) ?? []),
+];
+
+const moduleChangesContentPath = (module: ContentModule, validationIssue: ValidationIssue, missingId: string) => {
+  const contentPath = contentPathFromValidationIssue(validationIssue);
+  if (!contentPath) return false;
+  return rowsForModuleKey(module, contentPath.key)
+    .some((row) => row.id === contentPath.id && referencesIdValue(row, missingId));
+};
+
+const moduleOwnsContentPath = (module: ContentModule, validationIssue: ValidationIssue) => {
+  const contentPath = contentPathFromValidationIssue(validationIssue);
+  if (!contentPath) return false;
+  return rowsForModuleKey(module, contentPath.key).some((row) => row.id === contentPath.id);
+};
+
+const removedIdsForValidationCollection = (module: ContentModule, validationIssue: ValidationIssue) => {
+  const key = collectionKeyFromValidationIssue(validationIssue);
+  if (!key) return [];
+  const removed = moduleRemovals(module['data-updates']);
+  const removalKey = key === 'resourceDefinitions' ? 'resources' : key;
+  const values = (removed as Record<string, unknown>)[removalKey];
+  return Array.isArray(values) ? values.filter((id): id is string => typeof id === 'string') : [];
+};
+
 const findConflictModuleIds = (ordered: ContentModule[], validationIssues: ValidationIssue[]) => {
   const conflictIds = new Set<string>();
   const conflictKeys = new Map<string, string>();
-  const errors = validationIssues.filter((validationIssue) => validationIssue.severity === 'error' && typeof validationIssue.params?.id === 'string');
+  const errors = validationIssues.filter((validationIssue) => validationIssue.severity === 'error');
 
   for (const validationIssue of errors) {
-    const missingId = String(validationIssue.params?.id);
-    for (const module of ordered) {
-      if (removedIdsByModule(module).has(missingId) || moduleReferencesId(module, missingId)) {
-        conflictIds.add(module.id);
-        conflictKeys.set(module.id, missingId);
-      }
+    const missingId = typeof validationIssue.params?.id === 'string' ? String(validationIssue.params.id) : null;
+    const culprit = missingId
+      ? [...ordered].reverse().find((module) => removedIdsByModule(module).has(missingId)) ??
+        [...ordered].reverse().find((module) => moduleChangesContentPath(module, validationIssue, missingId)) ??
+        [...ordered].reverse().find((module) => moduleOwnsContentPath(module, validationIssue)) ??
+        [...ordered].reverse().find((module) => moduleReferencesId(module, missingId))
+      : [...ordered].reverse().find((module) => removedIdsForValidationCollection(module, validationIssue).length > 0) ??
+        [...ordered].reverse().find((module) => moduleOwnsContentPath(module, validationIssue));
+    if (culprit) {
+      conflictIds.add(culprit.id);
+      conflictKeys.set(culprit.id, missingId ?? contentPathKey(validationIssue) ?? removedIdsForValidationCollection(culprit, validationIssue)[0] ?? culprit.id);
     }
   }
 
   if (conflictIds.size === 0 && validationIssues.some((validationIssue) => validationIssue.severity === 'error')) {
-    const lastUpdater = [...ordered].reverse().find((module) => module['data-updates']);
+    const lastUpdater = [...ordered].reverse().find((module) => module['data-updates'] || module.data);
     if (lastUpdater) {
       conflictIds.add(lastUpdater.id);
       conflictKeys.set(lastUpdater.id, lastUpdater.id);
@@ -792,7 +1084,14 @@ const resolveAndApplyModules = (
     latest = { bundle: next, ordered, disabled, issues: [...conflictIssues, ...issues, ...validationIssues] };
 
     const { conflictIds, conflictKeys } = findConflictModuleIds(ordered, validationIssues);
-    const newConflictIds = [...conflictIds].filter((id) => !conflictDisabled.has(id));
+    const hasNonCoreConflict = [...conflictIds].some((id) => {
+      const module = ordered.find((candidate) => candidate.id === id);
+      return module && !isProtectedCoreModule(module);
+    });
+    const newConflictIds = [...conflictIds].filter((id) => {
+      const module = ordered.find((candidate) => candidate.id === id);
+      return !conflictDisabled.has(id) && (!hasNonCoreConflict || !module || !isProtectedCoreModule(module));
+    });
     if (validationIssues.every((validationIssue) => validationIssue.severity !== 'error') || newConflictIds.length === 0) {
       return latest;
     }
@@ -819,7 +1118,17 @@ export const applyModulesToBundle = (
 ): ModuleResolution => {
   const moduleShapePartition = partitionValidModuleShapes(modules);
   const relevantModules = moduleShapePartition.valid.filter((module) => module.universe === bundle.manifest.id);
-  const moduleValidationIssues = [...moduleShapePartition.issues, ...relevantModules.flatMap((module) => validateContentModule(bundle, module, currentLocale))];
+  const moduleDataBundle = bundleWithModuleData(bundle, relevantModules);
+  const moduleLocalizationBundle = (module: ContentModule) =>
+    bundleWithModuleData(bundle, relevantModules.filter((candidate) => candidate.id !== module.id));
+  const moduleValidationIssues = [
+    ...moduleShapePartition.issues,
+    ...validateModuleDataCollisions(bundle, relevantModules),
+    ...relevantModules.flatMap(validateModuleDataUpdateDuplicates),
+    ...relevantModules.flatMap((module) => validateModuleDataUpdateTargets(moduleDataBundle, module)),
+    ...relevantModules.flatMap((module) => validateModuleSemanticChanges(moduleLocalizationBundle(module), module)),
+    ...relevantModules.flatMap((module) => validateContentModule(moduleDataBundle, module, currentLocale, moduleLocalizationBundle(module))),
+  ];
   const modulePackIssues = validateModulePacks(bundle.modulePacks ?? [], new Set(relevantModules.map((module) => module.id)));
   const invalidModuleIds = new Set(
     moduleValidationIssues

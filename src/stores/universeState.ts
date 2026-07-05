@@ -9,7 +9,7 @@ import {
   removeLocalUniverseBundle,
   saveLocalUniverseBundle,
 } from '../game/loader';
-import { mergeDraftIntoBundle, mergeDraftModulesIntoBundle, validateContentBundle } from '../game/validators';
+import { mergeDraftModulesIntoBundle, mergeValidDraftIntoBundle, validateContentBundle } from '../game/validators';
 import { load, save } from '../lib/storage';
 import { useContributionState } from './contributionState';
 import { useGameState } from './gameState';
@@ -67,14 +67,14 @@ const resolveLocale = (bundle: ContentBundle, preference: LocalePreference) => {
   return bundle.manifest.locales.includes(systemLocale) ? systemLocale : bundle.manifest.locales[0] ?? 'en';
 };
 
-const isProtectedCoreModule = (moduleId: string) => moduleId === 'base-core' || moduleId.endsWith('-core');
+const isProtectedCoreModule = (moduleId: string) => moduleId === 'base-core';
 
 const protectedCoreModuleIds = (bundle: ContentBundle) =>
   (bundle.modules ?? []).filter((module) => isProtectedCoreModule(module.id)).map((module) => module.id);
 
-const enabledWithProtectedCore = (bundle: ContentBundle, enabledModules: Record<string, string[]>) => {
-  const protectedIds = protectedCoreModuleIds(bundle);
-  const requested = enabledModules[bundle.manifest.id];
+const enabledWithProtectedCore = (baseBundle: ContentBundle, enabledModules: Record<string, string[]>) => {
+  const protectedIds = protectedCoreModuleIds(baseBundle);
+  const requested = enabledModules[baseBundle.manifest.id];
   if (requested === undefined) return undefined;
   return Array.from(new Set([...protectedIds, ...requested]));
 };
@@ -93,15 +93,16 @@ const applyModulesAndDraft = (bundle: ContentBundle | null, enabledModules: Reco
   const moduleResolution = applyModulesToBundle(
     bundleWithDraftModules,
     bundleWithDraftModules.modules ?? [],
-    enabledWithProtectedCore(bundleWithDraftModules, enabledModules),
+    enabledWithProtectedCore(bundle, enabledModules),
     resolveLocale(bundleWithDraftModules, localePreference),
   );
-  const merged = normalizeContentBundleStructure(mergeDraftIntoBundle(moduleResolution.bundle, draft));
+  const draftMerge = mergeValidDraftIntoBundle(moduleResolution.bundle, draft);
+  const merged = normalizeContentBundleStructure(draftMerge.bundle);
 
   return {
     bundle: merged,
     enabledModuleIds: moduleResolution.enabledModuleIds,
-    validationIssues: [...moduleResolution.issues, ...validateContentBundle(merged)],
+    validationIssues: [...moduleResolution.issues, ...draftMerge.issues, ...validateContentBundle(merged)],
   };
 };
 

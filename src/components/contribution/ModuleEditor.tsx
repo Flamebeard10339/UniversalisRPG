@@ -3,7 +3,7 @@ import type { ContentBundle, ContentModule, ContentModulePack, ContributionDraft
 import type { Translator } from '../../game/i18n';
 import { StructuredDataEditor, type StructuredSchema, type StructuredValue } from '../structuredData/StructuredData';
 import { moduleDataSectionSchema, modulePackSchema } from '../structuredData/contentSchemas';
-import { collectModuleLocalizationKeys } from '../../game/contentModules';
+import { bundleWithModuleData, collectModuleLocalizationKeys } from '../../game/contentModules';
 import { moduleFilePath } from '../../game/contributionFiles';
 import { createPrefilledIssueUrl, formatContributionIssueBody } from '../../lib/githubIssues';
 
@@ -258,7 +258,7 @@ const ModuleLocalizationEditor = ({
   const [missingOnly, setMissingOnly] = useState(true);
   const [search, setSearch] = useState('');
   const [focusedLocaleKey, setFocusedLocaleKey] = useState<string | null>(null);
-  const keys = useMemo(() => collectModuleLocalizationKeys(module), [module]);
+  const keys = useMemo(() => collectModuleLocalizationKeys(module, bundle), [bundle, module]);
   const mergedLocales = useMemo(() => moduleBaseLocales(bundle, module, lang1, lang2), [bundle, module, lang1, lang2]);
   const visibleKeys = keys.filter((key) => {
     const matchesSearch = search.trim().length === 0 || key.toLowerCase().includes(search.trim().toLowerCase());
@@ -572,6 +572,10 @@ export const ModuleEditor = ({ bundle, draft, issues, onMoveModule, onPatch, t, 
   }, [bundle.modules, draftLocalModules, sortMode]);
   const modules = useMemo(() => allModules.filter((module) => !filter.trim() || JSON.stringify(module).toLowerCase().includes(filter.trim().toLowerCase())), [allModules, filter]);
   const selectedModule = allModules.find((module) => module.id === selectedModuleId) ?? modules[0] ?? null;
+  const moduleContextBundle = useMemo(
+    () => bundleWithModuleData(bundle, allModules.filter((module) => module.id !== selectedModule?.id)),
+    [allModules, bundle, selectedModule?.id],
+  );
   const modulePacks = uniquePacksById([...(draft.modulePacks ?? []), ...(bundle.modulePacks ?? [])]);
   const localModules = modules.filter((module) => localIds.has(module.id));
   const coreModules = modules.filter((module) => !localIds.has(module.id));
@@ -687,7 +691,7 @@ export const ModuleEditor = ({ bundle, draft, issues, onMoveModule, onPatch, t, 
             )}
             {editorTab === 'data' && <DataRows bundle={bundle} module={selectedModule} onSave={(module) => saveModule(module, selectedModule.id)} readOnly={!isLocal} sectionName="data" t={t} />}
             {editorTab === 'data-updates' && <DataRows bundle={bundle} module={selectedModule} onSave={(module) => saveModule(module, selectedModule.id)} readOnly={!isLocal} sectionName="data-updates" t={t} />}
-            {editorTab === 'locale' && <ModuleLocalizationEditor bundle={bundle} module={selectedModule} onSave={(module) => saveModule(module, selectedModule.id)} readOnly={!isLocal} t={t} />}
+            {editorTab === 'locale' && <ModuleLocalizationEditor bundle={moduleContextBundle} module={selectedModule} onSave={(module) => saveModule(module, selectedModule.id)} readOnly={!isLocal} t={t} />}
             {editorTab === 'raw' && <section className="grid gap-3 rounded border border-slate-700 p-3"><button className="justify-self-start rounded border border-slate-600 px-3 py-1.5 text-xs font-semibold text-slate-100" onClick={() => void navigator.clipboard.writeText(serialization)} type="button">{t('contribution.modules.copySerialization')}</button><textarea className="min-h-24 rounded bg-slate-950 p-3 font-mono text-xs text-slate-300" readOnly value={serialization} /><button className="justify-self-start rounded border border-slate-600 px-3 py-1.5 text-xs font-semibold text-slate-100" onClick={() => void navigator.clipboard.writeText(rawJson)} type="button">{t('contribution.modules.copyJson')}</button><textarea className="min-h-72 rounded bg-slate-950 p-3 font-mono text-xs text-slate-300" readOnly value={rawJson} /></section>}
             {editorTab === 'submit' && submitPackage && <section className="grid gap-3 rounded border border-slate-700 p-3"><h5 className="text-sm font-semibold text-slate-100">{t('contribution.github.title')}</h5>{submitIssues.length === 0 ? <p className="text-sm text-emerald-300">{t('contribution.validation.empty')}</p> : <ul className="grid gap-1 text-sm">{submitIssues.map((issue) => <li className={issue.severity === 'error' ? 'text-rose-300' : 'text-amber-300'} key={`${issue.path}-${issue.message}`}>{issue.severity}: {issue.path} - {t(issue.message, issue.params)}</li>)}</ul>}<textarea className="min-h-24 rounded bg-slate-950 p-3 text-sm text-slate-200" onChange={(event) => onPatch({ notes: event.target.value })} placeholder={t('contribution.notesPlaceholder')} value={draft.notes} /><div className="flex flex-wrap gap-2"><a className="rounded bg-emerald-400 px-3 py-2 text-sm font-semibold text-slate-950" href={createPrefilledIssueUrl(submitPackage)} rel="noreferrer" target="_blank">{t('contribution.github.open')}</a><button className="rounded border border-slate-600 px-3 py-2 text-sm font-semibold text-slate-100" onClick={() => void navigator.clipboard.writeText(formatContributionIssueBody(submitPackage))} type="button">{t('contribution.github.copy')}</button></div><textarea className="min-h-56 rounded bg-slate-950 p-3 text-xs text-slate-300" readOnly value={formatContributionIssueBody(submitPackage)} /></section>}
           </section>

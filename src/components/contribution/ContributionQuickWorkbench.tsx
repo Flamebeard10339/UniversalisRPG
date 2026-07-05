@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { ContentBundle, ContentModule, ContributionDraft, ModuleDataEntry, ModuleDataSection, ModuleDataSectionObject, UniversePlayState } from '../../game/types';
+import type { ContentBundle, ContentModule, ContributionDraft, ModuleDataEntry, ModuleDataSection, ModuleDataSectionObject, UniversePlayState, ValidationIssue } from '../../game/types';
 import type { Translator } from '../../game/i18n';
 import { StructuredDataEditor, type StructuredSchema, type StructuredValue } from '../structuredData/StructuredData';
 import { moduleDataSectionSchema } from '../structuredData/contentSchemas';
+import { applyModulesToBundle } from '../../game/contentModules';
 
 type DataKey = keyof ModuleDataSectionObject;
 type SheetKind = 'add' | 'edit-location';
@@ -99,6 +100,9 @@ const itemSchema = (bundle: ContentBundle, key: DataKey): StructuredSchema => {
 };
 
 const createItem = (bundle: ContentBundle, key: DataKey, currentLocationId: string): StructuredValue => {
+  const validLocationId = bundle.locations.some((location) => location.id === currentLocationId)
+    ? currentLocationId
+    : bundle.locations.find((location) => location.starting)?.id ?? bundle.locations[0]?.id ?? currentLocationId;
   const schema = moduleDataSectionSchema(bundle);
   const field = schema.kind === 'object' ? schema.fields[key] : undefined;
   const resolved = typeof field?.schema === 'function' ? field.schema() : field?.schema;
@@ -110,11 +114,11 @@ const createItem = (bundle: ContentBundle, key: DataKey, currentLocationId: stri
     ),
   ]);
   if (typeof record.id === 'string') record.id = uniqueId(record.id, existingIds);
-  if (key === 'locations' && isRecord(bundle.locations.find((location) => location.id === currentLocationId)?.position)) {
-    const current = bundle.locations.find((location) => location.id === currentLocationId);
+  if (key === 'locations' && isRecord(bundle.locations.find((location) => location.id === validLocationId)?.position)) {
+    const current = bundle.locations.find((location) => location.id === validLocationId);
     record.position = { x: (current?.position.x ?? 0) + 160, y: current?.position.y ?? 0 };
   }
-  if ((key === 'actions' || key === 'effects') && !record.locationId) record.locationId = currentLocationId;
+  if ((key === 'actions' || key === 'effects') && !record.locationId) record.locationId = validLocationId;
   return record as StructuredValue;
 };
 
@@ -149,6 +153,8 @@ const saveModule = (
   });
 };
 
+const moduleIssueId = (issue: Pick<ValidationIssue, 'path'>) => issue.path.match(/^modules\.([^.]+)/)?.[1] ?? null;
+
 export const ContributionQuickWorkbench = ({
   baseBundle,
   bundle,
@@ -169,7 +175,9 @@ export const ContributionQuickWorkbench = ({
   const [addKey, setAddKey] = useState<DataKey>(keys.includes('actions') ? 'actions' : keys[0]);
   const [newValue, setNewValue] = useState<StructuredValue>(() => createItem(bundle, keys.includes('actions') ? 'actions' : keys[0], playState.currentLocationId));
 
-  const currentLocation = bundle.locations.find((location) => location.id === playState.currentLocationId);
+  const currentLocation = bundle.locations.find((location) => location.id === playState.currentLocationId)
+    ?? bundle.locations.find((location) => location.starting)
+    ?? bundle.locations[0];
   const associatedItems = useMemo<AssociatedItem[]>(() => {
     if (!currentLocation) return [];
     const entityIds = new Set(currentLocation.entities ?? []);
@@ -213,10 +221,38 @@ export const ContributionQuickWorkbench = ({
     };
   };
 
+  const stagedModule = useMemo(() => {
+    if (!module) return null;
+    if (kind === 'add') return updateModuleRow(module, 'data', addKey, newValue);
+    if (!associated) return module;
+    const next = isRecord(associatedValue)
+      ? { ...associatedValue, id: associated.id }
+      : { id: associated.id };
+    return updateModuleRow(module, 'data-updates', associated.key, next as StructuredValue, associated.id);
+  }, [addKey, associated, associatedValue, kind, module, newValue]);
+  const stagedIssues = useMemo(() => {
+    if (!stagedModule) return [];
+    const stagedModules = [
+      ...(baseBundle.modules ?? []),
+      stagedModule,
+      ...(draft.modules ?? []).filter((candidate) => candidate.id !== stagedModule.id && !packagedModuleIds.has(candidate.id)),
+    ];
+    const result = applyModulesToBundle(baseBundle, stagedModules, stagedModules.map((candidate) => candidate.id));
+    return result.issues.filter((issue) =>
+      moduleIssueId(issue) === stagedModule.id ||
+      issue.path === `modules.${stagedModule.id}` ||
+      issue.path.startsWith(`modules.${stagedModule.id}.`),
+    );
+  }, [baseBundle, draft.modules, packagedModuleIds, stagedModule]);
+  const blockingIssues = stagedIssues.filter((issue) =>
+    issue.severity === 'error' ||
+    (issue.path === `modules.${stagedModule?.id}` && (issue.message === 'validation.moduleDisabled' || issue.message === 'validation.moduleConflictDisabled')),
+  );
+
   const commitAndClose = () => {
-    if (!module) return;
+    if (!module || !stagedModule || blockingIssues.length > 0) return;
     if (kind === 'add') {
-      saveModule(draft, updateModuleRow(module, 'data', addKey, newValue), onPatchDraft);
+      saveModule(draft, stagedModule, onPatchDraft);
       onClose();
       return;
     }
@@ -224,10 +260,7 @@ export const ContributionQuickWorkbench = ({
       onClose();
       return;
     }
-    const next = isRecord(associatedValue)
-      ? { ...associatedValue, id: associated.id }
-      : { id: associated.id };
-    saveModule(draft, updateModuleRow(module, 'data-updates', associated.key, next as StructuredValue, associated.id), onPatchDraft);
+    saveModule(draft, stagedModule, onPatchDraft);
     if (associated.key === 'locations' && playState.currentLocationId !== associated.id) {
       onLocationIdChange(playState.currentLocationId, associated.id);
     }
@@ -248,9 +281,22 @@ export const ContributionQuickWorkbench = ({
             <select className="rounded bg-slate-950 px-3 py-2 text-sm text-slate-100" onChange={(event) => onModuleChange(event.target.value)} value={module.id}>
               {localModules.map((candidate) => <option key={candidate.id} value={candidate.id}>{candidate.id}</option>)}
             </select>
-            <button className="rounded bg-cyan-300 px-3 py-2 text-sm font-semibold text-slate-950" onClick={commitAndClose} type="button">{t('quickWorkbench.confirm')}</button>
+            <button className="rounded bg-cyan-300 px-3 py-2 text-sm font-semibold text-slate-950 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-400" disabled={blockingIssues.length > 0} onClick={commitAndClose} type="button">{t('quickWorkbench.confirm')}</button>
           </div>
         </div>
+
+        {stagedIssues.length > 0 && (
+          <section className={`grid gap-1 rounded border p-3 text-sm ${blockingIssues.length > 0 ? 'border-rose-800 bg-rose-950/20' : 'border-amber-700 bg-amber-950/20'}`}>
+            <h3 className={`text-sm font-semibold ${blockingIssues.length > 0 ? 'text-rose-200' : 'text-amber-200'}`}>{t('quickWorkbench.validationTitle')}</h3>
+            <ul className="grid gap-1">
+              {stagedIssues.slice(0, 8).map((issue, index) => (
+                <li className={issue.severity === 'error' ? 'text-rose-200' : 'text-amber-200'} key={`${issue.path}-${issue.message}-${issue.params?.id ?? ''}-${issue.params?.key ?? ''}-${index}`}>
+                  <span className="font-semibold">{issue.severity}</span>: {issue.path} - {t(issue.message, issue.params)}
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
 
         {kind === 'add' ? (
           <section className="grid gap-3">

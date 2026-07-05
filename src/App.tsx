@@ -162,6 +162,7 @@ export default function App() {
   const importUniverseState = useGameState((state) => state.importUniverseState);
   const replaceUniverseState = useGameState((state) => state.replaceUniverseState);
   const resetUniverse = useGameState((state) => state.resetUniverse);
+  const sanitizeForBundle = useGameState((state) => state.sanitizeForBundle);
   const recordRunEvent = useGameState((state) => state.recordRunEvent);
   const clearRunLog = useGameState((state) => state.clearRunLog);
   const debugEnabled = useDebugState((state) => state.enabled);
@@ -420,18 +421,21 @@ export default function App() {
     queueMicrotask(refreshContributionPreview);
   };
   const ensureQuickWorkbenchModule = () => {
-    if (!bundle || !currentContributionDraft) return '';
-    const selected = localContributionModules.find((module) => module.id === quickWorkbenchModuleId) ?? localContributionModules[0];
+    if (!bundle) return '';
+    const latestDraft = useContributionState.getState().getDraft(bundle.manifest.id) ?? currentContributionDraft ?? emptyContributionDraft(bundle.manifest.id);
+    const latestLocalModules = latestDraft.modules.filter((module) => !packagedContributionModuleIds.has(module.id));
+    const latestActiveModuleIds = new Set(useUniverseState.getState().enabledModules[bundle.manifest.id] ?? bundle.modules?.map((module) => module.id) ?? []);
+    const selected = latestLocalModules.find((module) => module.id === quickWorkbenchModuleId) ?? latestLocalModules[0];
     if (selected) {
-      if (!activeModuleIds.has(selected.id)) void setEnabledModules(bundle.manifest.id, [...activeModuleIds, selected.id]);
+      if (!latestActiveModuleIds.has(selected.id)) void setEnabledModules(bundle.manifest.id, [...latestActiveModuleIds, selected.id]);
       return selected.id;
     }
-    const module = createLocalContributionModule(currentContributionDraft);
+    const module = createLocalContributionModule(latestDraft);
     patchContributionDraft({
-      modules: [module, ...(currentContributionDraft.modules ?? [])],
-      removed: { ...currentContributionDraft.removed, modules: (currentContributionDraft.removed?.modules ?? []).filter((id) => id !== module.id) },
+      modules: [module, ...(latestDraft.modules ?? [])],
+      removed: { ...latestDraft.removed, modules: (latestDraft.removed?.modules ?? []).filter((id) => id !== module.id) },
     });
-    void setEnabledModules(bundle.manifest.id, [...activeModuleIds, module.id]);
+    void setEnabledModules(bundle.manifest.id, [...latestActiveModuleIds, module.id]);
     return module.id;
   };
   const openQuickWorkbench = (sheet: QuickWorkbenchSheet) => {
@@ -600,6 +604,11 @@ export default function App() {
       });
     }
   }, [activeBundleId, bundle, hydratePlayState, runtimeUniverseId, startingLocationId]);
+
+  useEffect(() => {
+    if (!bundle || !runtimeUniverseId || !startingLocationId) return;
+    sanitizeForBundle(runtimeUniverseId, bundle, startingLocationId);
+  }, [bundle, runtimeUniverseId, sanitizeForBundle, startingLocationId]);
 
   useEffect(() => {
     if (!bundle) {

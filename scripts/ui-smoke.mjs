@@ -29,6 +29,62 @@ if (server) {
 const browser = await chromium.launch({ executablePath, headless: true });
 const results = [];
 
+const preferenceKey = (key) => `CapacitorStorage.${key}`;
+
+const badContributionDraft = {
+  universeId: 'base',
+  updatedAt: 1,
+  notes: '',
+  modules: [{
+    id: 'local-contribution',
+    version: '1.0.0',
+    universe: 'base',
+    author: 'UniversalisRPG',
+    game_version: '1.0',
+    data: [
+      { type: 'location', id: 'bad-camp', position: { x: 640, y: 80 }, entities: ['tutorial-guide'] },
+    ],
+    locale: {
+      en: {
+        'location.bad-camp.title': 'Bad camp',
+        'location.bad-camp.description': 'Invalid on purpose.',
+        'location.bad-camp.exhausted': 'Nothing more here.',
+      },
+    },
+  }],
+  modulePacks: [],
+  locations: [],
+  entities: [],
+  actions: [],
+  skills: [],
+  stats: [],
+  items: [],
+  flags: [],
+  resourceDefinitions: [],
+  effects: [],
+  interactionTypes: [],
+  enemies: [],
+  dropTables: [],
+  dialogues: [],
+  locales: {},
+  removed: {
+    locations: [],
+    entities: [],
+    actions: [],
+    skills: [],
+    stats: [],
+    items: [],
+    flags: [],
+    resources: [],
+    effects: [],
+    interactionTypes: [],
+    enemies: [],
+    dropTables: [],
+    dialogues: [],
+    modules: [],
+  },
+};
+
 try {
   for (const viewport of [
     { name: 'desktop', width: 1440, height: 1000 },
@@ -45,6 +101,15 @@ try {
       if (response.status() >= 400) errors.push(`${response.status()} ${response.url()}`);
     });
 
+    if (viewport.name === 'desktop') {
+      await page.addInitScript(({ badContributionDraft, preferencePrefix }) => {
+        window.localStorage.setItem(`${preferencePrefix}universalis:contribution:base`, JSON.stringify(badContributionDraft));
+        window.localStorage.setItem(`${preferencePrefix}universalis:settings:modules`, JSON.stringify({
+          base: ['local-contribution'],
+        }));
+      }, { badContributionDraft, preferencePrefix: preferenceKey('') });
+    }
+
     console.log(`[${viewport.name}] load`);
     await page.goto(baseUrl, { waitUntil: 'networkidle' });
 
@@ -57,10 +122,44 @@ try {
 
     const moduleSettingsVisible = await page.getByText('base-core', { exact: true }).first().isVisible();
     const waysideVisible = await page.getByText('wayside-supplies', { exact: true }).first().isVisible();
+    const badDraftRecoveryVisible = viewport.name === 'desktop'
+      ? await page.getByText('local-contribution', { exact: true }).first().isVisible()
+      : true;
 
     console.log(`[${viewport.name}] contribution`);
     await page.getByText('Contribution mode', { exact: true }).locator('xpath=ancestor::label').getByRole('checkbox').check();
     const contributionVisible = await page.getByText('Contribution Mode', { exact: true }).isVisible();
+    let quickWorkbenchOpens = true;
+    let duplicateLocationEntityTurnsRed = true;
+    let duplicateLocationEntityBlocksConfirm = true;
+    let invalidLocationEntityTurnsRed = true;
+    let invalidLocationEntityBlocksConfirm = true;
+    let invalidEditLocationEntityTurnsRed = true;
+    let invalidEditLocationEntityBlocksConfirm = true;
+    let noNumberedLocalContributionVisible = true;
+    if (viewport.name === 'desktop') {
+      await page.locator('nav').getByRole('button', { name: 'Home', exact: true }).evaluate((button) => button.click());
+      await page.getByRole('button', { name: 'Add', exact: true }).click();
+      quickWorkbenchOpens = await page.getByText('Add content', { exact: true }).isVisible();
+      await page.locator('.quick-workbench-sheet select').nth(1).selectOption('locations');
+      await page.getByRole('button', { name: '+ entities' }).click();
+      await page.getByRole('button', { name: '+ Add row' }).click();
+      await page.getByRole('button', { name: '+ Add row' }).click();
+      await page.locator('.quick-workbench-sheet input[list]').last().fill('goblin');
+      duplicateLocationEntityTurnsRed = await page.locator('.quick-workbench-sheet input[aria-invalid="true"]').count() > 0;
+      duplicateLocationEntityBlocksConfirm = await page.locator('.quick-workbench-sheet').getByRole('button', { name: 'Confirm', exact: true }).isDisabled();
+      await page.locator('.quick-workbench-sheet input').last().fill('tutorial-guide');
+      invalidLocationEntityTurnsRed = await page.locator('.quick-workbench-sheet input[aria-invalid="true"]').count() > 0;
+      invalidLocationEntityBlocksConfirm = await page.locator('.quick-workbench-sheet').getByRole('button', { name: 'Confirm', exact: true }).isDisabled();
+      await page.mouse.click(8, 8);
+      await page.getByRole('button', { name: 'Edit location', exact: true }).click();
+      await page.locator('.quick-workbench-sheet input').last().fill('tutorial-guide');
+      invalidEditLocationEntityTurnsRed = await page.locator('.quick-workbench-sheet input[aria-invalid="true"]').count() > 0;
+      invalidEditLocationEntityBlocksConfirm = await page.locator('.quick-workbench-sheet').getByRole('button', { name: 'Confirm', exact: true }).isDisabled();
+      await page.mouse.click(8, 8);
+      await page.locator('nav').getByRole('button', { name: 'Settings', exact: true }).evaluate((button) => button.click());
+      noNumberedLocalContributionVisible = await page.getByText(/^local-contribution-\d+$/).count() === 0;
+    }
     await page.getByRole('button', { name: 'base-core', exact: true }).first().click();
 
     console.log(`[${viewport.name}] mod editor`);
@@ -78,6 +177,15 @@ try {
       actionVisible,
       moduleSettingsVisible,
       waysideVisible,
+      badDraftRecoveryVisible,
+      quickWorkbenchOpens,
+      duplicateLocationEntityTurnsRed,
+      duplicateLocationEntityBlocksConfirm,
+      invalidLocationEntityTurnsRed,
+      invalidLocationEntityBlocksConfirm,
+      invalidEditLocationEntityTurnsRed,
+      invalidEditLocationEntityBlocksConfirm,
+      noNumberedLocalContributionVisible,
       contributionVisible,
       detailsVisible,
       coreLocationVisible,
@@ -95,6 +203,15 @@ const failed = results.some((result) =>
   !result.actionVisible ||
   !result.moduleSettingsVisible ||
   !result.waysideVisible ||
+  !result.badDraftRecoveryVisible ||
+  !result.quickWorkbenchOpens ||
+  !result.duplicateLocationEntityTurnsRed ||
+  !result.duplicateLocationEntityBlocksConfirm ||
+  !result.invalidLocationEntityTurnsRed ||
+  !result.invalidLocationEntityBlocksConfirm ||
+  !result.invalidEditLocationEntityTurnsRed ||
+  !result.invalidEditLocationEntityBlocksConfirm ||
+  !result.noNumberedLocalContributionVisible ||
   !result.contributionVisible ||
   !result.detailsVisible ||
   !result.coreLocationVisible ||

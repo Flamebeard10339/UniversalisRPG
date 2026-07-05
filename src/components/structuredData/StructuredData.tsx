@@ -23,6 +23,7 @@ export type StructuredSchema =
 
 type EditorProps = {
   hiddenKeys?: string[];
+  invalid?: boolean;
   label?: string;
   onChange: (value: StructuredValue | undefined) => void;
   optional?: boolean;
@@ -77,8 +78,10 @@ const PrimitiveEditor = ({
   schema,
   value,
   onChange,
+  invalid,
 }: {
   accessibleLabel?: string;
+  invalid?: boolean;
   schema: Exclude<StructuredSchema, { kind: 'object' | 'array' | 'union' | 'inferred' | 'scalar' }>;
   value: StructuredValue | undefined;
   onChange: (value: StructuredValue) => void;
@@ -100,15 +103,26 @@ const PrimitiveEditor = ({
   if (schema.kind === 'color') {
     return <input aria-label={accessibleLabel} className="h-9 w-12 rounded border border-slate-700 bg-slate-900 p-1" onChange={(event) => onChange(event.target.value)} type="color" value={typeof value === 'string' && /^#[0-9a-fA-F]{6}$/.test(value) ? value : '#000000'} />;
   }
+  const stringValue = typeof value === 'string' ? value : '';
+  const hasSuggestions = Boolean(schema.suggestions?.length);
+  const invalidSuggestion = hasSuggestions && stringValue.trim().length > 0 && !schema.suggestions?.includes(stringValue);
+  const invalidValue = Boolean(invalid || invalidSuggestion);
   return (
     <>
       {schema.suggestions?.length ? <datalist id={suggestionId}>{schema.suggestions.map((suggestion) => <option key={suggestion} value={suggestion} />)}</datalist> : null}
-      <input aria-label={accessibleLabel} className={inputClass} list={schema.suggestions?.length ? suggestionId : undefined} onChange={(event) => onChange(event.target.value)} value={typeof value === 'string' ? value : ''} />
+      <input
+        aria-invalid={invalidValue || undefined}
+        aria-label={accessibleLabel}
+        className={`${inputClass} ${invalidValue ? 'border-rose-500 bg-rose-950/40 text-rose-100' : ''}`}
+        list={hasSuggestions ? suggestionId : undefined}
+        onChange={(event) => onChange(event.target.value)}
+        value={stringValue}
+      />
     </>
   );
 };
 
-const EditorNode = ({ hiddenKeys = [], label, onChange, optional, schema: schemaRef = { kind: 'inferred' }, t, value }: EditorProps) => {
+const EditorNode = ({ hiddenKeys = [], invalid, label, onChange, optional, schema: schemaRef = { kind: 'inferred' }, t, value }: EditorProps) => {
   const schema = compatibleSchema(resolveSchema(schemaRef), value);
   const [newField, setNewField] = useState('');
 
@@ -147,7 +161,7 @@ const EditorNode = ({ hiddenKeys = [], label, onChange, optional, schema: schema
             {allowedTypes.includes('number') && <option value="number">{t('structured.number')}</option>}
             {allowedTypes.includes('string') && <option value="string">{t('structured.string')}</option>}
           </select>
-          <PrimitiveEditor accessibleLabel={label ? labelText(label, t) : undefined} onChange={onChange} schema={primitiveSchema as Extract<StructuredSchema, { kind: 'string' | 'number' | 'boolean' | 'enum' }>} value={value} />
+        <PrimitiveEditor accessibleLabel={label ? labelText(label, t) : undefined} invalid={invalid} onChange={onChange} schema={primitiveSchema as Extract<StructuredSchema, { kind: 'string' | 'number' | 'boolean' | 'enum' }>} value={value} />
           {optional && <button className="text-xs text-rose-300" onClick={() => onChange(undefined)} type="button">{t('structured.remove')}</button>}
         </div>
       </div>
@@ -159,6 +173,11 @@ const EditorNode = ({ hiddenKeys = [], label, onChange, optional, schema: schema
     const listMode = schema.listMode ?? 'free';
 
     if (listMode === 'tags') {
+      const duplicateTagValues = new Set(
+        items
+          .filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
+          .filter((item, index, values) => values.indexOf(item) !== index),
+      );
       return (
         <section className="grid gap-2 border-l border-slate-700 pl-3">
           <div className="flex items-center justify-between gap-2">
@@ -171,7 +190,7 @@ const EditorNode = ({ hiddenKeys = [], label, onChange, optional, schema: schema
           <div className="flex min-w-0 flex-wrap gap-2">
             {items.map((item, index) => (
               <div className="flex min-w-[10rem] items-center gap-2 rounded bg-slate-950 p-2" key={index}>
-                <EditorNode onChange={(next) => onChange(items.map((candidate, candidateIndex) => candidateIndex === index ? next ?? null : candidate))} schema={schema.item} t={t} value={item} />
+                <EditorNode invalid={typeof item === 'string' && (item.trim().length === 0 || duplicateTagValues.has(item))} onChange={(next) => onChange(items.map((candidate, candidateIndex) => candidateIndex === index ? next ?? null : candidate))} schema={schema.item} t={t} value={item} />
                 <button aria-label={t('structured.removeRow', { index: index + 1 })} className={removeButtonClass} onClick={() => onChange(items.filter((_, candidateIndex) => candidateIndex !== index))} type="button">{t('structured.remove')}</button>
               </div>
             ))}
@@ -325,7 +344,7 @@ const EditorNode = ({ hiddenKeys = [], label, onChange, optional, schema: schema
     <div className="grid min-w-0 flex-1 gap-1">
       {label && <span className="text-xs text-slate-400">{labelText(label, t)}</span>}
       <div className="flex min-w-0 items-center gap-2">
-        <PrimitiveEditor accessibleLabel={label ? labelText(label, t) : undefined} onChange={onChange} schema={schema as Extract<StructuredSchema, { kind: 'string' | 'color' | 'number' | 'boolean' | 'enum' }>} value={value} />
+        <PrimitiveEditor accessibleLabel={label ? labelText(label, t) : undefined} invalid={invalid} onChange={onChange} schema={schema as Extract<StructuredSchema, { kind: 'string' | 'color' | 'number' | 'boolean' | 'enum' }>} value={value} />
         {optional && <button className="text-xs text-rose-300" onClick={() => onChange(undefined)} type="button">{t('structured.remove')}</button>}
       </div>
     </div>

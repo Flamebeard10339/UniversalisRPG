@@ -126,12 +126,26 @@ export const ContributionWorkbench = ({ baseBundle, bundle, draft, onPatchDraft,
 
   useEffect(() => { void hydrateProfiles(bundle.manifest.id); }, [bundle.manifest.id, hydrateProfiles]);
 
-  const currentActions = bundle.actions.filter((action) => action.locationId === playState.currentLocationId);
+  const currentLocation = bundle.locations.find((location) => location.id === playState.currentLocationId)
+    ?? bundle.locations.find((location) => location.starting)
+    ?? bundle.locations[0];
+  const currentLocationId = currentLocation?.id ?? playState.currentLocationId;
+  const currentActions = bundle.actions.filter((action) => action.locationId === currentLocationId);
   const relevantKeys = useMemo(() => Array.from(new Set([...referencedStateKeys(currentActions, bundle), ...extraKeys])), [bundle, currentActions, extraKeys]);
   const allKeys = useMemo<StateKey[]>(() => stateVariableKeys(bundle), [bundle]);
   const filteredActions = currentActions.filter((action) => actionMatchesStateFilter(action, filterKey, filterValue));
   const selectedAction = bundle.actions.find((action) => action.id === selectedActionId) ?? null;
-  const currentLocation = bundle.locations.find((location) => location.id === playState.currentLocationId)!;
+
+  useEffect(() => {
+    if (!currentLocation || currentLocation.id === playState.currentLocationId) return;
+    onReplaceState({
+      ...playState,
+      currentLocationId: currentLocation.id,
+      discoveredLocationIds: Array.from(new Set([currentLocation.id, ...playState.discoveredLocationIds.filter((id) => bundle.locations.some((location) => location.id === id))])),
+      activeAction: null,
+      activeTravel: null,
+    });
+  }, [bundle.locations, currentLocation, onReplaceState, playState]);
 
   const removed = draft.removed;
   const upsertAction = (action: GameAction, originalId = action.id) => onPatchDraft({
@@ -155,6 +169,8 @@ export const ContributionWorkbench = ({ baseBundle, bundle, draft, onPatchDraft,
       removed: { ...removed, [kind]: baseItems.some((item) => item.id === id) ? Array.from(new Set([...removed[kind], id])) : removed[kind].filter((item) => item !== id) },
     });
   };
+
+  if (!currentLocation) return null;
 
   return (
     <section className="grid gap-4 rounded border border-cyan-800/70 bg-slate-900 p-4" data-testid="contribution-workbench">
@@ -180,7 +196,7 @@ export const ContributionWorkbench = ({ baseBundle, bundle, draft, onPatchDraft,
         {selectedAction && <div className="grid gap-3 rounded border border-slate-700 p-3"><StructuredDataEditor label="workbench.actionFields" onChange={(value) => { if (value) { const next = value as unknown as GameAction; upsertAction(next, selectedAction.id); if (next.id !== selectedAction.id) setSelectedActionId(next.id); } }} schema={actionSchema(bundle)} t={t} value={selectedAction as unknown as StructuredValue} /><div className="flex flex-wrap items-end gap-2"><label className="grid gap-1 text-xs text-slate-400"><span>{t('workbench.requireFromState')}</span><select className="rounded bg-slate-950 px-2 py-1.5 text-sm" id="workbench-requirement-key"><option value="">{t('workbench.selectStateKey')}</option>{relevantKeys.map((key) => <option key={key} value={key}>{keyLabel(key)} = {String(readStateVariable(playState, key, bundle))}</option>)}</select></label><button className="rounded border border-slate-600 px-3 py-1.5 text-sm" onClick={() => { const select = document.getElementById('workbench-requirement-key') as HTMLSelectElement | null; const key = select?.value as StateKey; if (!key) return; upsertAction(mergeRequirement(selectedAction, conditionFor(key, readStateVariable(playState, key, bundle)))); }} type="button">{t('workbench.addRequirement')}</button></div></div>}
       </section>
 
-      <section className="grid gap-3 rounded border border-slate-700 p-3"><div className="flex items-center justify-between gap-2"><h3 className="font-semibold text-slate-100">{t('workbench.locationEditor')}</h3><button className="rounded bg-cyan-400 px-3 py-2 text-sm font-semibold text-slate-950" onClick={() => { const id = toKebabInput(`location-${Date.now().toString(36)}`); const location = { id, position: { x: currentLocation.position.x + 160, y: currentLocation.position.y } }; upsertLocation(location); onReplaceState({ ...playState, currentLocationId: id, discoveredLocationIds: [...playState.discoveredLocationIds, id] }); }} type="button">{t('contribution.data.addLocation')}</button></div><LocationFields location={currentLocation} onChange={(next) => { upsertLocation(next, currentLocation.id); if (next.id !== currentLocation.id) onReplaceState({ ...playState, currentLocationId: next.id, discoveredLocationIds: playState.discoveredLocationIds.map((id) => id === currentLocation.id ? next.id : id) }); }} onRemove={() => { if (bundle.locations.length <= 1) return; const next = bundle.locations.find((location) => location.id !== currentLocation.id)!; onReplaceState({ ...playState, currentLocationId: next.id, activeAction: null, activeTravel: null }); removeContent('locations', currentLocation.id); }} t={t} /></section>
+      <section className="grid gap-3 rounded border border-slate-700 p-3"><div className="flex items-center justify-between gap-2"><h3 className="font-semibold text-slate-100">{t('workbench.locationEditor')}</h3><button className="rounded bg-cyan-400 px-3 py-2 text-sm font-semibold text-slate-950" onClick={() => { const id = toKebabInput(`location-${Date.now().toString(36)}`); const location = { id, position: { x: currentLocation.position.x + 160, y: currentLocation.position.y } }; upsertLocation(location); onReplaceState({ ...playState, currentLocationId: id, discoveredLocationIds: [...playState.discoveredLocationIds, id] }); }} type="button">{t('contribution.data.addLocation')}</button></div><LocationFields bundle={bundle} location={currentLocation} onChange={(next) => { upsertLocation(next, currentLocation.id); if (next.id !== currentLocation.id) onReplaceState({ ...playState, currentLocationId: next.id, discoveredLocationIds: playState.discoveredLocationIds.map((id) => id === currentLocation.id ? next.id : id) }); }} onRemove={() => { if (bundle.locations.length <= 1) return; const next = bundle.locations.find((location) => location.id !== currentLocation.id)!; onReplaceState({ ...playState, currentLocationId: next.id, activeAction: null, activeTravel: null }); removeContent('locations', currentLocation.id); }} t={t} /></section>
     </section>
   );
 };

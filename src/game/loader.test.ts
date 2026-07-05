@@ -208,4 +208,76 @@ describe('loader', () => {
     expect(result.enabledModuleIds).toContain('base-core');
     expect(baseCoreIssues).toEqual([]);
   });
+
+  it('keeps packaged base modules enabled when a local module adds a location with an unknown entity', async () => {
+    installPublicContentFetch();
+
+    const bundle = await loadUniverse('base');
+    const localContribution = {
+      id: 'local-contribution',
+      version: '1.0.0',
+      universe: 'base',
+      author: 'test',
+      game_version: '1.0',
+      data: [
+        { type: 'location', id: 'bad-camp', position: { x: 640, y: 80 }, entities: ['tutorial-guide'] },
+      ],
+      locale: {
+        en: {
+          'location.bad-camp.title': 'Bad camp',
+          'location.bad-camp.description': 'Invalid on purpose.',
+          'location.bad-camp.exhausted': 'Nothing more here.',
+        },
+      },
+    };
+    const modules = [...(bundle.modules ?? []), localContribution];
+
+    const result = applyModulesToBundle(bundle, modules, modules.map((module) => module.id));
+
+    expect(result.enabledModuleIds).toContain('base-core');
+    expect(result.enabledModuleIds).toContain('wayside-supplies');
+    expect(result.enabledModuleIds).not.toContain('local-contribution');
+    expect(result.bundle.locations.some((location) => location.id === 'crossroads')).toBe(true);
+    expect(result.bundle.locations.some((location) => location.id === 'bad-camp')).toBe(false);
+    expect(result.issues).toContainEqual(expect.objectContaining({
+      message: 'validation.moduleConflictDisabled',
+      path: 'modules.local-contribution',
+      params: { id: 'local-contribution', key: 'tutorial-guide' },
+    }));
+    expect(result.issues.some((issue) =>
+      issue.path === 'modules.base-core' &&
+      (issue.message === 'validation.moduleConflictDisabled' || issue.message === 'validation.moduleDisabled'),
+    )).toBe(false);
+  });
+
+  it('does not warn for inherited base-core location localization in a local overlay', async () => {
+    installPublicContentFetch();
+
+    const bundle = await loadUniverse('base');
+    const localContribution = {
+      id: 'local-contribution',
+      version: '1.0.0',
+      universe: 'base',
+      author: 'test',
+      game_version: '1.0',
+      'data-updates': [
+        {
+          type: 'location',
+          id: 'crossroads',
+          position: { x: 10 },
+          entities: ['goblin'],
+        },
+      ],
+    };
+    const modules = [...(bundle.modules ?? []), localContribution];
+
+    const result = applyModulesToBundle(bundle, modules, modules.map((module) => module.id));
+    const localContributionIssues = result.issues.filter((issue) => issue.path.startsWith('modules.local-contribution'));
+
+    expect(result.enabledModuleIds).toContain('local-contribution');
+    expect(result.bundle.locations.find((location) => location.id === 'crossroads')?.position).toEqual({ x: 10, y: 80 });
+    expect(localContributionIssues.some((issue) =>
+      issue.path.startsWith('modules.local-contribution.locale.en.location.crossroads'),
+    )).toBe(false);
+  });
 });
