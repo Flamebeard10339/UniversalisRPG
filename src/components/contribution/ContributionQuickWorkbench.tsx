@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { ContentBundle, ContentModule, ContributionDraft, ModuleDataEntry, ModuleDataSection, ModuleDataSectionObject, UniversePlayState } from '../../game/types';
 import type { Translator } from '../../game/i18n';
 import { StructuredDataEditor, type StructuredSchema, type StructuredValue } from '../structuredData/StructuredData';
@@ -8,6 +8,7 @@ type DataKey = keyof ModuleDataSectionObject;
 type SheetKind = 'add' | 'edit-location';
 
 type Props = {
+  baseBundle: ContentBundle;
   bundle: ContentBundle;
   draft: ContributionDraft;
   kind: SheetKind;
@@ -149,6 +150,7 @@ const saveModule = (
 };
 
 export const ContributionQuickWorkbench = ({
+  baseBundle,
   bundle,
   draft,
   kind,
@@ -160,7 +162,9 @@ export const ContributionQuickWorkbench = ({
   playState,
   t,
 }: Props) => {
-  const module = draft.modules.find((candidate) => candidate.id === moduleId) ?? draft.modules[0] ?? null;
+  const packagedModuleIds = useMemo(() => new Set((baseBundle.modules ?? []).map((candidate) => candidate.id)), [baseBundle.modules]);
+  const localModules = useMemo(() => draft.modules.filter((candidate) => !packagedModuleIds.has(candidate.id)), [draft.modules, packagedModuleIds]);
+  const module = localModules.find((candidate) => candidate.id === moduleId) ?? localModules[0] ?? null;
   const keys = useMemo(() => dataKeysForBundle(bundle), [bundle]);
   const [addKey, setAddKey] = useState<DataKey>(keys.includes('actions') ? 'actions' : keys[0]);
   const [newValue, setNewValue] = useState<StructuredValue>(() => createItem(bundle, keys.includes('actions') ? 'actions' : keys[0], playState.currentLocationId));
@@ -185,41 +189,49 @@ export const ContributionQuickWorkbench = ({
   }, [bundle, currentLocation, t]);
   const [associatedIndex, setAssociatedIndex] = useState(0);
   const associated = associatedItems[Math.min(associatedIndex, Math.max(0, associatedItems.length - 1))] ?? null;
+  const [associatedValue, setAssociatedValue] = useState<StructuredValue | undefined>(() => associated?.value);
+
+  useEffect(() => {
+    setAssociatedValue(associated?.value);
+  }, [associated?.id, associated?.key, associated?.value]);
 
   const changeAddKey = (key: DataKey) => {
     setAddKey(key);
     setNewValue(createItem(bundle, key, playState.currentLocationId));
   };
 
-  const upsertModuleRow = (sectionName: 'data' | 'data-updates', key: DataKey, value: StructuredValue, originalId?: string) => {
-    if (!module) return;
-    const section = moduleDataObject(module[sectionName]);
-    const removals = sectionName === 'data-updates' ? moduleRemoveRows(module[sectionName]) : [];
+  const updateModuleRow = (sourceModule: ContentModule, sectionName: 'data' | 'data-updates', key: DataKey, value: StructuredValue, originalId?: string) => {
+    const section = moduleDataObject(sourceModule[sectionName]);
+    const removals = sectionName === 'data-updates' ? moduleRemoveRows(sourceModule[sectionName]) : [];
     const nextSection = {
       ...section,
       [key]: upsertById(section[key] ?? [], value, originalId),
     };
-    saveModule(draft, {
-      ...module,
+    return {
+      ...sourceModule,
       [sectionName]: sectionToTypedRows(nextSection, removals),
-    }, onPatchDraft);
+    };
   };
 
-  const updateNewValue = (value: StructuredValue | undefined) => {
-    const next = value ?? {};
-    setNewValue(next);
-    upsertModuleRow('data', addKey, next);
-  };
-
-  const updateAssociated = (value: StructuredValue | undefined) => {
-    if (!associated) return;
-    const next = value ?? {};
-    const previousId = associated.id;
-    const nextId = isRecord(next) && typeof next.id === 'string' ? next.id : previousId;
-    upsertModuleRow('data-updates', associated.key, next, previousId);
-    if (associated.key === 'locations' && nextId !== previousId && previousId === playState.currentLocationId) {
-      onLocationIdChange(previousId, nextId);
+  const commitAndClose = () => {
+    if (!module) return;
+    if (kind === 'add') {
+      saveModule(draft, updateModuleRow(module, 'data', addKey, newValue), onPatchDraft);
+      onClose();
+      return;
     }
+    if (!associated) {
+      onClose();
+      return;
+    }
+    const next = isRecord(associatedValue)
+      ? { ...associatedValue, id: associated.id }
+      : { id: associated.id };
+    saveModule(draft, updateModuleRow(module, 'data-updates', associated.key, next as StructuredValue, associated.id), onPatchDraft);
+    if (associated.key === 'locations' && playState.currentLocationId !== associated.id) {
+      onLocationIdChange(playState.currentLocationId, associated.id);
+    }
+    onClose();
   };
 
   if (!module) return null;
@@ -234,9 +246,9 @@ export const ContributionQuickWorkbench = ({
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <select className="rounded bg-slate-950 px-3 py-2 text-sm text-slate-100" onChange={(event) => onModuleChange(event.target.value)} value={module.id}>
-              {draft.modules.map((candidate) => <option key={candidate.id} value={candidate.id}>{candidate.id}</option>)}
+              {localModules.map((candidate) => <option key={candidate.id} value={candidate.id}>{candidate.id}</option>)}
             </select>
-            <button className="rounded bg-cyan-300 px-3 py-2 text-sm font-semibold text-slate-950" onClick={onClose} type="button">{t('quickWorkbench.confirm')}</button>
+            <button className="rounded bg-cyan-300 px-3 py-2 text-sm font-semibold text-slate-950" onClick={commitAndClose} type="button">{t('quickWorkbench.confirm')}</button>
           </div>
         </div>
 
@@ -248,7 +260,7 @@ export const ContributionQuickWorkbench = ({
                 {keys.map((key) => <option key={key} value={key}>{t(`contribution.data.${key}`)}</option>)}
               </select>
             </label>
-            <StructuredDataEditor onChange={updateNewValue} schema={itemSchema(bundle, addKey)} t={t} value={newValue} />
+            <StructuredDataEditor onChange={(value) => setNewValue(value ?? {})} schema={itemSchema(bundle, addKey)} t={t} value={newValue} />
             <textarea className="min-h-40 rounded bg-slate-950 p-3 font-mono text-xs text-slate-300" readOnly value={JSON.stringify(newValue, null, 2)} />
           </section>
         ) : (
@@ -261,8 +273,8 @@ export const ContributionQuickWorkbench = ({
             </label>
             {associated && (
               <>
-                <StructuredDataEditor onChange={updateAssociated} schema={itemSchema(bundle, associated.key)} t={t} value={associated.value} />
-                <textarea className="min-h-40 rounded bg-slate-950 p-3 font-mono text-xs text-slate-300" readOnly value={JSON.stringify(associated.value, null, 2)} />
+                <StructuredDataEditor hiddenKeys={['id']} onChange={(value) => setAssociatedValue(value ?? {})} schema={itemSchema(bundle, associated.key)} t={t} value={associatedValue} />
+                <textarea className="min-h-40 rounded bg-slate-950 p-3 font-mono text-xs text-slate-300" readOnly value={JSON.stringify(isRecord(associatedValue) ? { ...associatedValue, id: associated.id } : associatedValue, null, 2)} />
               </>
             )}
           </section>

@@ -1060,9 +1060,15 @@ export const mergeDraftModulesIntoBundle = (bundle: ContentBundle, draft: Contri
     return bundle;
   }
 
+  const packagedModuleIds = new Set((bundle.modules ?? []).map((module) => module.id));
+  const draftRemovedModules = new Set(draft.removed?.modules ?? []);
+  const localDraftModules = (draft.modules ?? [])
+    .filter((module) => !packagedModuleIds.has(module.id))
+    .filter((module) => !draftRemovedModules.has(module.id));
+
   return {
     ...bundle,
-    modules: mergeById(removeById(bundle.modules ?? [], draft.removed?.modules ?? []), draft.modules ?? []),
+    modules: mergeById(bundle.modules ?? [], localDraftModules),
     modulePacks: mergeById(bundle.modulePacks ?? [], draft.modulePacks ?? []),
   };
 };

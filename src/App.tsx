@@ -132,6 +132,7 @@ export default function App() {
     bundle,
     manifests,
     validationIssues,
+    baseBundle,
     loading,
     error,
     localePreference,
@@ -390,6 +391,10 @@ export default function App() {
   const activeAction = bundle?.actions.find((action) => action.id === playState?.activeAction?.actionId) ?? null;
   const activeInteractionType = activeAction ? getInteractionType(activeAction, actionContext) : null;
   const currentContributionDraft = bundle ? contributionDrafts[bundle.manifest.id] ?? emptyContributionDraft(bundle.manifest.id) : null;
+  const packagedContributionModuleIds = new Set((baseBundle?.modules ?? []).map((module) => module.id));
+  const localContributionModules = currentContributionDraft
+    ? currentContributionDraft.modules.filter((module) => !packagedContributionModuleIds.has(module.id))
+    : [];
   const createLocalContributionModule = (draft: ContributionDraft): ContentModule => {
     const existingIds = new Set([...(bundle?.modules ?? []).map((module) => module.id), ...(draft.modules ?? []).map((module) => module.id)]);
     let index = 1;
@@ -416,7 +421,7 @@ export default function App() {
   };
   const ensureQuickWorkbenchModule = () => {
     if (!bundle || !currentContributionDraft) return '';
-    const selected = currentContributionDraft.modules.find((module) => module.id === quickWorkbenchModuleId) ?? currentContributionDraft.modules[0];
+    const selected = localContributionModules.find((module) => module.id === quickWorkbenchModuleId) ?? localContributionModules[0];
     if (selected) {
       if (!activeModuleIds.has(selected.id)) void setEnabledModules(bundle.manifest.id, [...activeModuleIds, selected.id]);
       return selected.id;
@@ -1351,6 +1356,7 @@ export default function App() {
 
       {quickWorkbenchSheet && contributionMode && currentContributionDraft && (
         <ContributionQuickWorkbench
+          baseBundle={baseBundle ?? bundle}
           bundle={bundle}
           draft={currentContributionDraft}
           kind={quickWorkbenchSheet}

@@ -67,6 +67,18 @@ const resolveLocale = (bundle: ContentBundle, preference: LocalePreference) => {
   return bundle.manifest.locales.includes(systemLocale) ? systemLocale : bundle.manifest.locales[0] ?? 'en';
 };
 
+const isProtectedCoreModule = (moduleId: string) => moduleId === 'base-core' || moduleId.endsWith('-core');
+
+const protectedCoreModuleIds = (bundle: ContentBundle) =>
+  (bundle.modules ?? []).filter((module) => isProtectedCoreModule(module.id)).map((module) => module.id);
+
+const enabledWithProtectedCore = (bundle: ContentBundle, enabledModules: Record<string, string[]>) => {
+  const protectedIds = protectedCoreModuleIds(bundle);
+  const requested = enabledModules[bundle.manifest.id];
+  if (requested === undefined) return undefined;
+  return Array.from(new Set([...protectedIds, ...requested]));
+};
+
 const applyModulesAndDraft = (bundle: ContentBundle | null, enabledModules: Record<string, string[]>, localePreference: LocalePreference) => {
   if (!bundle) {
     return {
@@ -81,7 +93,7 @@ const applyModulesAndDraft = (bundle: ContentBundle | null, enabledModules: Reco
   const moduleResolution = applyModulesToBundle(
     bundleWithDraftModules,
     bundleWithDraftModules.modules ?? [],
-    enabledModules[bundleWithDraftModules.manifest.id],
+    enabledWithProtectedCore(bundleWithDraftModules, enabledModules),
     resolveLocale(bundleWithDraftModules, localePreference),
   );
   const merged = normalizeContentBundleStructure(mergeDraftIntoBundle(moduleResolution.bundle, draft));

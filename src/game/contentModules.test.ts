@@ -664,6 +664,82 @@ describe('content modules', () => {
     expect(result.bundle.items.map((item) => item.id)).toEqual(['draft-item']);
   });
 
+  it('does not let drafted modules replace or remove packaged core modules', () => {
+    const core = module({
+      id: 'base-core',
+      data: { items: [{ id: 'core-item' }] },
+      locale: { en: { 'item.core-item.title': 'Core item', 'item.core-item.description': 'From core.' } },
+    });
+    const bundleWithDraft = mergeDraftModulesIntoBundle({
+      ...baseBundle(),
+      modules: [core],
+    }, {
+      universeId: 'test',
+      updatedAt: 1,
+      notes: '',
+      modules: [
+        module({
+          id: 'base-core',
+          data: { items: [{ id: 'draft-replacement' }] },
+          locale: { en: { 'item.draft-replacement.title': 'Draft', 'item.draft-replacement.description': 'Wrong.' } },
+        }),
+        module({
+          id: 'local-patch',
+          dependencies: ['base-core'],
+          data: { items: [{ id: 'local-item' }] },
+          locale: { en: { 'item.local-item.title': 'Local item', 'item.local-item.description': 'From local.' } },
+        }),
+      ],
+      modulePacks: [],
+      locations: [],
+      actions: [],
+      skills: [],
+      stats: [],
+      items: [],
+      flags: [],
+      resourceDefinitions: [],
+      effects: [],
+      interactionTypes: [],
+      enemies: [],
+      dropTables: [],
+      dialogues: [],
+      locales: {},
+      removed: { locations: [], actions: [], skills: [], stats: [], items: [], flags: [], resources: [], effects: [], interactionTypes: [], enemies: [], dropTables: [], dialogues: [], modules: ['base-core'] },
+    });
+
+    expect(bundleWithDraft.modules?.map((candidate) => candidate.id)).toEqual(['base-core', 'local-patch']);
+
+    const result = applyModulesToBundle(bundleWithDraft, bundleWithDraft.modules ?? [], ['base-core', 'local-patch']);
+    expect(result.enabledModuleIds).toEqual(['base-core', 'local-patch']);
+    expect(result.bundle.items.map((item) => item.id)).toEqual(['core-item', 'local-item']);
+  });
+
+  it('disables a broken overlay while preserving the core module', () => {
+    const core = module({
+      id: 'base-core',
+      data: { items: [{ id: 'core-item' }] },
+      locale: { en: { 'item.core-item.title': 'Core item', 'item.core-item.description': 'From core.' } },
+    });
+    const brokenOverlay = module({
+      id: 'broken-overlay',
+      dependencies: ['base-core'],
+      'data-updates': { remove: { locations: ['start'] } },
+    });
+
+    const result = applyModulesToBundle({
+      ...baseBundle(),
+      modules: [core, brokenOverlay],
+    }, [core, brokenOverlay], ['base-core', 'broken-overlay']);
+
+    expect(result.enabledModuleIds).toEqual(['base-core']);
+    expect(result.bundle.locations.map((location) => location.id)).toEqual(['start']);
+    expect(result.bundle.items.map((item) => item.id)).toEqual(['core-item']);
+    expect(result.issues).toContainEqual(expect.objectContaining({
+      message: 'validation.moduleConflictDisabled',
+      path: 'modules.broken-overlay',
+    }));
+  });
+
   it('can merge drafted module packs into the contribution preview', () => {
     const bundleWithDraft = mergeDraftModulesIntoBundle(baseBundle(), {
       universeId: 'test',

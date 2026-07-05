@@ -378,6 +378,8 @@ export const ContentDataEditor = ({ activeTab, baseBundle, bundle, draft, onPatc
   };
 
   const universeBasePlayer = { inventory: basePlayer.inventory ?? {} };
+  const packagedModuleIds = new Set((baseBundle.modules ?? []).map((module) => module.id));
+  const localDraftModules = (draft.modules ?? []).filter((module) => !packagedModuleIds.has(module.id));
   const moduleJsonFiles: JsonEditorFile[] = editableModuleJsonFiles(baseBundle, draft).map((file) => {
     if (file.path === 'universe.json') {
       return {
@@ -387,13 +389,10 @@ export const ContentDataEditor = ({ activeTab, baseBundle, bundle, draft, onPatc
           const manifest = value as { modules?: unknown };
           const ids = new Set((Array.isArray(manifest.modules) ? manifest.modules : []).filter((item): item is string => typeof item === 'string'));
           onPatch({
-            modules: draft.modules.filter((module) => ids.has(module.id)),
+            modules: localDraftModules.filter((module) => ids.has(module.id)),
             removed: {
               ...removed,
-              modules: uniqueStrings([
-                ...removed.modules,
-                ...(baseBundle.modules ?? []).filter((module) => !ids.has(module.id)).map((module) => module.id),
-              ]),
+              modules: removed.modules.filter((id) => !packagedModuleIds.has(id)),
             },
           });
         },
@@ -401,14 +400,16 @@ export const ContentDataEditor = ({ activeTab, baseBundle, bundle, draft, onPatc
     }
 
     const originalId = file.path.match(/^modules\/(.+)\.json$/)?.[1] ?? '';
+    const editingPackagedModule = packagedModuleIds.has(originalId);
     return {
       ...file,
       schema: contentModuleSchema(bundle),
       onChange: (value: StructuredValue | undefined) => {
         if (!value || typeof value !== 'object' || Array.isArray(value)) return;
         const nextModule = value as unknown as ContentModule;
+        if (editingPackagedModule || packagedModuleIds.has(nextModule.id)) return;
         onPatch({
-          modules: upsertById(withoutId(draft.modules, originalId), nextModule),
+          modules: upsertById(withoutId(localDraftModules, originalId), nextModule),
           removed: {
             ...removed,
             modules: removed.modules.filter((id) => id !== nextModule.id),

@@ -560,14 +560,16 @@ export const ModuleEditor = ({ bundle, draft, issues, onMoveModule, onPatch, t, 
   const [importText, setImportText] = useState('');
   const [importError, setImportError] = useState(false);
   const [dependencyText, setDependencyText] = useState('');
+  const packagedModuleIds = new Set((bundle.modules ?? []).map((module) => module.id));
   const removedModules = new Set(draft.removed?.modules ?? []);
-  const localIds = new Set((draft.modules ?? []).map((module) => module.id));
+  const draftLocalModules = (draft.modules ?? []).filter((module) => !packagedModuleIds.has(module.id) && !removedModules.has(module.id));
+  const localIds = new Set(draftLocalModules.map((module) => module.id));
   const issueModuleIds = new Set(issues.map(moduleIdFromIssue).filter((id): id is string => Boolean(id)));
   const issuePackIds = new Set(issues.map(packIdFromIssue).filter((id): id is string => Boolean(id)));
   const allModules = useMemo(() => {
-    const baseModules = (bundle.modules ?? []).filter((module) => !removedModules.has(module.id));
-    return uniqueById([...(draft.modules ?? []), ...baseModules]).sort((a, b) => String(a[sortMode]).localeCompare(String(b[sortMode])) || a.id.localeCompare(b.id));
-  }, [bundle.modules, draft.modules, removedModules, sortMode]);
+    const baseModules = bundle.modules ?? [];
+    return uniqueById([...draftLocalModules, ...baseModules]).sort((a, b) => String(a[sortMode]).localeCompare(String(b[sortMode])) || a.id.localeCompare(b.id));
+  }, [bundle.modules, draftLocalModules, sortMode]);
   const modules = useMemo(() => allModules.filter((module) => !filter.trim() || JSON.stringify(module).toLowerCase().includes(filter.trim().toLowerCase())), [allModules, filter]);
   const selectedModule = allModules.find((module) => module.id === selectedModuleId) ?? modules[0] ?? null;
   const modulePacks = uniquePacksById([...(draft.modulePacks ?? []), ...(bundle.modulePacks ?? [])]);
@@ -595,15 +597,16 @@ export const ModuleEditor = ({ bundle, draft, issues, onMoveModule, onPatch, t, 
       return;
     }
     onPatch({
-      modules: upsertModule(draft.modules ?? [], normalized, originalId),
+      modules: upsertModule(draftLocalModules, normalized, originalId),
       removed: { ...draft.removed, modules: (draft.removed?.modules ?? []).filter((id) => id !== normalized.id) },
     });
     setSelectedModuleId(normalized.id);
   };
   const removeModule = (module: ContentModule) => {
+    if (!localIds.has(module.id)) return;
     onPatch({
-      modules: (draft.modules ?? []).filter((candidate) => candidate.id !== module.id),
-      removed: { ...draft.removed, modules: localIds.has(module.id) ? draft.removed.modules : Array.from(new Set([...(draft.removed?.modules ?? []), module.id])) },
+      modules: draftLocalModules.filter((candidate) => candidate.id !== module.id),
+      removed: { ...draft.removed, modules: draft.removed.modules },
     });
     setSelectedModuleId(null);
   };
@@ -661,7 +664,6 @@ export const ModuleEditor = ({ bundle, draft, issues, onMoveModule, onPatch, t, 
           <section className="grid min-w-0 content-start gap-3 self-start">
             <div className="flex items-start justify-between gap-2">
               <div><h4 className="text-sm font-semibold text-slate-100">{selectedModule.id}</h4>{!isLocal && <p className="text-xs text-slate-400">{t('contribution.modules.coreReadonly')}</p>}</div>
-              {!isLocal && <button className="rounded border border-rose-500 px-3 py-1.5 text-sm font-semibold text-rose-200" onClick={() => removeModule(selectedModule)} type="button">{t('contribution.modules.remove')}</button>}
             </div>
             <div className="sticky top-0 z-10 flex flex-wrap content-start items-start gap-2 border-b border-slate-700 bg-slate-900/95 backdrop-blur">
               {(['details', 'data', 'data-updates', 'locale', 'raw', 'submit'] as const).map((tab) => <button className={`px-3 py-2 text-sm font-semibold ${editorTab === tab ? 'border-b-2 border-cyan-300 text-cyan-100' : 'text-slate-400'}`} key={tab} onClick={() => setEditorTab(tab)} type="button">{t(tab === 'details' ? 'contribution.modules.detailsTab' : tab === 'data' ? 'contribution.modules.dataTab' : tab === 'data-updates' ? 'contribution.modules.dataUpdatesTab' : tab === 'locale' ? 'contribution.modules.localeTab' : tab === 'raw' ? 'contribution.modules.rawTab' : 'contribution.modules.submitTab')}</button>)}

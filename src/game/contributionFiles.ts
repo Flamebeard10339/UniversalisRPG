@@ -14,20 +14,28 @@ export const moduleFilePath = (module: Pick<ContentModule, 'id'>) => `modules/${
 export const moduleManifestIds = (bundle: ContentBundle, draft: ContributionDraft) =>
   mergedContributionModules(bundle, draft).map((module) => module.id);
 
-export const mergedContributionModules = (bundle: ContentBundle, draft: ContributionDraft) => {
+const packagedModuleIds = (bundle: ContentBundle) => new Set((bundle.modules ?? []).map((module) => module.id));
+
+const localDraftModules = (bundle: ContentBundle, draft: ContributionDraft) => {
+  const packagedIds = packagedModuleIds(bundle);
   const removedModules = new Set(draft.removed?.modules ?? []);
-  const baseModules = (bundle.modules ?? []).filter((module) => !removedModules.has(module.id));
-  return uniqueById([...(draft.modules ?? []), ...baseModules]).sort((left, right) => left.id.localeCompare(right.id));
+  return (draft.modules ?? []).filter((module) => !packagedIds.has(module.id) && !removedModules.has(module.id));
+};
+
+export const mergedContributionModules = (bundle: ContentBundle, draft: ContributionDraft) => {
+  const baseModules = bundle.modules ?? [];
+  return uniqueById([...localDraftModules(bundle, draft), ...baseModules]).sort((left, right) => left.id.localeCompare(right.id));
 };
 
 export const changedModuleJsonFiles = (bundle: ContentBundle, draft: ContributionDraft): ContributionJsonFile[] => {
-  if ((draft.modules ?? []).length === 0 && (draft.removed?.modules ?? []).length === 0) {
+  const localModules = localDraftModules(bundle, draft);
+  if (localModules.length === 0) {
     return [];
   }
 
   return [
     { path: 'universe.json', json: { ...bundle.manifest, modules: moduleManifestIds(bundle, draft) } },
-    ...draft.modules.map((module) => ({ path: moduleFilePath(module), json: module })),
+    ...localModules.map((module) => ({ path: moduleFilePath(module), json: module })),
   ];
 };
 

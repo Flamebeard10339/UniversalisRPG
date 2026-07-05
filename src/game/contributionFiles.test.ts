@@ -49,19 +49,20 @@ const draft = (): ContributionDraft => ({
 
 describe('contribution module files', () => {
   it('builds manifest module ids and module files from base plus draft changes', () => {
-    expect(moduleManifestIds(bundle(), draft())).toEqual(['base-module', 'draft-module']);
+    expect(moduleManifestIds(bundle(), draft())).toEqual(['base-module', 'draft-module', 'removed-module']);
     expect(changedModuleJsonFiles(bundle(), draft()).map((file) => file.path)).toEqual([
       'universe.json',
       'modules/draft-module.json',
     ]);
     expect(changedModuleJsonFiles(bundle(), draft())[0]?.json).toMatchObject({
       id: 'test',
-      modules: ['base-module', 'draft-module'],
+      modules: ['base-module', 'draft-module', 'removed-module'],
     });
     expect(editableModuleJsonFiles(bundle(), draft()).map((file) => file.path)).toEqual([
       'universe.json',
       'modules/base-module.json',
       'modules/draft-module.json',
+      'modules/removed-module.json',
     ]);
   });
 
@@ -77,6 +78,23 @@ describe('contribution module files', () => {
       'universe.json',
       'modules/draft-module.json',
       'module-packs.json',
+    ]);
+  });
+
+  it('does not package draft modules that shadow packaged modules', () => {
+    const contributionDraft = {
+      ...draft(),
+      modules: [
+        ...draft().modules,
+        { id: 'base-module', version: '9.9.9', universe: 'test', author: 'draft', game_version: '1.0' },
+      ],
+      removed: { ...draft().removed, modules: ['base-module', 'removed-module'] },
+    };
+
+    expect(moduleManifestIds(bundle(), contributionDraft)).toEqual(['base-module', 'draft-module', 'removed-module']);
+    expect(changedModuleJsonFiles(bundle(), contributionDraft).map((file) => file.path)).toEqual([
+      'universe.json',
+      'modules/draft-module.json',
     ]);
   });
 });
