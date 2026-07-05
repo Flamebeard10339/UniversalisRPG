@@ -220,7 +220,7 @@ describe('loader', () => {
       author: 'test',
       game_version: '1.0',
       data: [
-        { type: 'location', id: 'bad-camp', position: { x: 640, y: 80 }, entities: ['tutorial-guide'] },
+        { type: 'location', id: 'bad-camp', position: { x: 640, y: 80 }, entities: ['missing-guide'] },
       ],
       locale: {
         en: {
@@ -242,7 +242,7 @@ describe('loader', () => {
     expect(result.issues).toContainEqual(expect.objectContaining({
       message: 'validation.moduleConflictDisabled',
       path: 'modules.local-contribution',
-      params: { id: 'local-contribution', key: 'tutorial-guide' },
+      params: { id: 'local-contribution', key: 'missing-guide' },
     }));
     expect(result.issues.some((issue) =>
       issue.path === 'modules.base-core' &&

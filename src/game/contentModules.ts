@@ -20,7 +20,6 @@ import {
   actionSuccessKey,
   actionTitleKey,
   effectTitleKey,
-  entityDescriptionKey,
   entityTitleKey,
   interactionEntityHitKey,
   interactionEntityKillKey,
@@ -454,7 +453,6 @@ const localizationKeysFromSection = (section?: ModuleDataSection, existingIds?: 
   ]),
   ...newLocalizationRows(normalizeModuleDataSection(section).entities, 'entities', existingIds).flatMap((entity) => [
     entityTitleKey(entity.id),
-    entityDescriptionKey(entity.id),
     ...((entity as { collectionLog?: Array<{ categoryId?: string }> }).collectionLog ?? [])
       .map((definition) => definition.categoryId ? collectionCategoryTitleKey(definition.categoryId) : null),
   ]),

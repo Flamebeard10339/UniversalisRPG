@@ -1535,6 +1535,7 @@ function completeActiveActionWithMessage(
         author: 'system',
         key: messageKey,
         params: {
+          entity: action.entityId ?? enemy?.id ?? action.id,
           actionId: action.id,
           target: enemy?.id ?? action.id,
           damage: roundCombatNumber(completion.damage),

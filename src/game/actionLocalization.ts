@@ -1,4 +1,4 @@
-import { actionDescriptionKey, actionFailureKey, actionSuccessKey, actionTitleKey, locationTitleKey } from './contentIds';
+import { actionDescriptionKey, actionFailureKey, actionSuccessKey, actionTitleKey, entityTitleKey, locationTitleKey } from './contentIds';
 import { getPureTravelDestination } from './travel';
 import type { ContentBundle, GameAction } from './types';
 import type { Translator } from './i18n';
@@ -20,12 +20,24 @@ const travelActionLocationLabel = (bundle: ContentBundle, locationId: string, t:
   return location ? t(locationTitleKey(location.id), location.id) : locationId;
 };
 
+const actionEntityLabel = (action: GameAction, bundle: ContentBundle, t: Translator) => {
+  if (!action.entityId) {
+    return null;
+  }
+
+  const entity = (bundle.entities ?? []).find((item) => item.id === action.entityId);
+  return t(entityTitleKey(action.entityId), entity?.id ?? action.entityId);
+};
+
 export const getActionTitleText = (action: GameAction, bundle: ContentBundle, t: Translator) => {
   const destinationId = getPureTravelDestination(action);
   if (destinationId) {
     return t(actionTitleKey(action.id), t('action.travel.title', { location: travelActionLocationLabel(bundle, destinationId, t) }));
   }
-  return t(actionTitleKey(action.id), action.id);
+  const entity = actionEntityLabel(action, bundle, t);
+  return entity
+    ? t(actionTitleKey(action.id), action.id, { entity })
+    : t(actionTitleKey(action.id), action.id);
 };
 
 export const getActionDescriptionText = (action: GameAction, bundle: ContentBundle, t: Translator) => {
@@ -33,5 +45,8 @@ export const getActionDescriptionText = (action: GameAction, bundle: ContentBund
   if (destinationId) {
     return t(actionDescriptionKey(action.id), t('action.travel.description', { location: travelActionLocationLabel(bundle, destinationId, t) }));
   }
-  return t(actionDescriptionKey(action.id), action.id);
+  const entity = actionEntityLabel(action, bundle, t);
+  return entity
+    ? t(actionDescriptionKey(action.id), action.id, { entity })
+    : t(actionDescriptionKey(action.id), action.id);
 };

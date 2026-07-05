@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { ContentBundle, GameAction, UniversePlayState } from '../game/types';
-import { entityDescriptionKey, entityTitleKey } from '../game/contentIds';
+import { entityTitleKey } from '../game/contentIds';
 import { getActionDps, getActionDurationMs, getEnemyAttackDps, isContinuousAction } from '../game/adversarial';
 import type { Translator } from '../game/i18n';
 import { useNow } from '../hooks/useNow';
@@ -136,7 +136,6 @@ export const ActionPanel = ({ bundle, debugEnabled, playState, onStartAction, sh
                 <span className="w-4 shrink-0 text-cyan-200">{expanded ? 'v' : '>'}</span>
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-sm font-semibold text-slate-100">{t(entityTitleKey(entity.id))}</span>
-                  <span className="mt-1 block text-xs text-slate-400">{t(entityDescriptionKey(entity.id))}</span>
                 </span>
               </button>
               {expanded && (

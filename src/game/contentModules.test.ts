@@ -441,9 +441,40 @@ describe('content modules', () => {
     const core = module({
       id: 'base-core',
       data: {
-        locations: [{ id: 'crossroads', position: { x: 0, y: 80 }, starting: true, entities: ['goblin'] }],
-        entities: [{ id: 'goblin' }],
-        actions: [{ id: 'speak-to-tutorial-guide', locationId: 'crossroads', durationSeconds: 1, rewards: [], results: [{ kind: 'chat', messageKey: 'chat.tutorial-guide' }] }],
+        locations: [{ id: 'crossroads', position: { x: 0, y: 80 }, starting: true, entities: ['goblin', 'tutorial-guide'] }],
+        entities: [
+          { id: 'goblin' },
+          {
+            id: 'tutorial-guide',
+            actions: [
+              {
+                id: 'talk',
+                durationSeconds: 1,
+                rewards: [],
+                results: [{ kind: 'dialogue', dialogueId: 'tutorial-guide' }],
+              },
+              {
+                id: 'examine',
+                durationSeconds: 0.1,
+                rewards: [],
+                results: [{ kind: 'chat', messageKey: 'chat.entity.tutorial-guide.examine' }],
+              },
+            ],
+          },
+        ],
+        dialogues: [
+          {
+            id: 'tutorial-guide',
+            startNodeId: 'start',
+            nodes: [
+              {
+                id: 'start',
+                speakerId: 'tutorial-guide',
+                textKey: 'dialogue.tutorial-guide.start',
+              },
+            ],
+          },
+        ],
       },
       locale: {
         en: {
@@ -451,30 +482,36 @@ describe('content modules', () => {
           'location.crossroads.description': 'A meeting of roads.',
           'location.crossroads.exhausted': 'Nothing more here.',
           'entity.goblin.title': 'Goblin',
-          'entity.goblin.description': 'Small trouble.',
-          'action.speak-to-tutorial-guide.title': 'Speak',
-          'action.speak-to-tutorial-guide.description': 'Speak.',
-          'action.speak-to-tutorial-guide.success': 'Done.',
-          'action.speak-to-tutorial-guide.failure': 'No.',
-          'chat.tutorial-guide': 'Hello.',
+          'entity.tutorial-guide.title': 'Tutorial Guide',
+          'action.entity.tutorial-guide.talk.title': 'Talk',
+          'action.entity.tutorial-guide.talk.description': 'Talk with the {entity}.',
+          'action.entity.tutorial-guide.talk.success': 'The {entity} is ready to talk.',
+          'action.entity.tutorial-guide.talk.failure': 'The {entity} is distracted.',
+          'action.entity.tutorial-guide.examine.title': 'Examine',
+          'action.entity.tutorial-guide.examine.description': 'Examine the {entity}.',
+          'action.entity.tutorial-guide.examine.success': 'You examine the {entity}.',
+          'action.entity.tutorial-guide.examine.failure': 'You learn nothing useful from the {entity}.',
+          'dialogue.tutorial-guide.start': 'Hello.',
+          'dialogue.tutorial-guide.speaker.tutorial-guide': 'Tutorial Guide',
+          'chat.entity.tutorial-guide.examine': 'Helpful.',
         },
       },
     });
     const contribution = module({
       id: 'local-contribution',
       'data-updates': [
-        { type: 'location', id: 'crossroads', entities: ['goblin', 'tutorial-guide'] },
+        { type: 'location', id: 'crossroads', entities: ['goblin', 'missing-guide'] },
       ] as never,
     });
 
     const result = applyModulesToBundle(rawBundle, [core, contribution], ['base-core', 'local-contribution']);
 
     expect(result.enabledModuleIds).toEqual(['base-core']);
-    expect(result.bundle.locations[0]?.entities).toEqual(['goblin']);
+    expect(result.bundle.locations[0]?.entities).toEqual(['goblin', 'tutorial-guide']);
     expect(result.issues).toContainEqual(expect.objectContaining({
       message: 'validation.moduleConflictDisabled',
       path: 'modules.local-contribution',
-      params: { id: 'local-contribution', key: 'tutorial-guide' },
+      params: { id: 'local-contribution', key: 'missing-guide' },
     }));
     expect(result.issues.some((issue) =>
       issue.path === 'modules.base-core' &&
@@ -502,7 +539,7 @@ describe('content modules', () => {
     const contribution = module({
       id: 'fake-core',
       'data-updates': [
-        { type: 'location', id: 'crossroads', entities: ['goblin', 'tutorial-guide'] },
+        { type: 'location', id: 'crossroads', entities: ['goblin', 'missing-guide'] },
       ] as never,
     });
 
@@ -517,7 +554,7 @@ describe('content modules', () => {
     expect(result.issues).toContainEqual(expect.objectContaining({
       message: 'validation.moduleConflictDisabled',
       path: 'modules.fake-core',
-      params: { id: 'fake-core', key: 'tutorial-guide' },
+      params: { id: 'fake-core', key: 'missing-guide' },
     }));
     expect(result.issues.some((issue) =>
       issue.path === 'modules.base-core' &&
@@ -545,7 +582,7 @@ describe('content modules', () => {
     const contribution = module({
       id: 'local-contribution',
       data: [
-        { type: 'location', id: 'bad-camp', position: { x: 100, y: 80 }, entities: ['tutorial-guide'] },
+        { type: 'location', id: 'bad-camp', position: { x: 100, y: 80 }, entities: ['missing-guide'] },
       ] as never,
       locale: {
         en: {
@@ -567,7 +604,7 @@ describe('content modules', () => {
     expect(result.issues).toContainEqual(expect.objectContaining({
       message: 'validation.moduleConflictDisabled',
       path: 'modules.local-contribution',
-      params: { id: 'local-contribution', key: 'tutorial-guide' },
+      params: { id: 'local-contribution', key: 'missing-guide' },
     }));
     expect(result.issues.some((issue) =>
       issue.path === 'modules.base-core' &&
@@ -595,7 +632,7 @@ describe('content modules', () => {
     const badContribution = module({
       id: 'bad-contribution',
       data: [
-        { type: 'location', id: 'bad-camp', position: { x: 100, y: 80 }, entities: ['tutorial-guide'] },
+        { type: 'location', id: 'bad-camp', position: { x: 100, y: 80 }, entities: ['missing-guide'] },
       ] as never,
       locale: {
         en: {
@@ -632,7 +669,7 @@ describe('content modules', () => {
     expect(result.issues).toContainEqual(expect.objectContaining({
       message: 'validation.moduleConflictDisabled',
       path: 'modules.bad-contribution',
-      params: { id: 'bad-contribution', key: 'tutorial-guide' },
+      params: { id: 'bad-contribution', key: 'missing-guide' },
     }));
     expect(result.issues.some((issue) =>
       (issue.path === 'modules.base-core' || issue.path === 'modules.good-contribution') &&
@@ -662,7 +699,7 @@ describe('content modules', () => {
     const badOverlay = module({
       id: 'bad-overlay',
       'data-updates': [
-        { type: 'location', id: 'crossroads', entities: ['goblin', 'tutorial-guide'] },
+        { type: 'location', id: 'crossroads', entities: ['goblin', 'missing-guide'] },
       ] as never,
     });
     const goodOverlay = module({
@@ -684,7 +721,7 @@ describe('content modules', () => {
     expect(result.issues).toContainEqual(expect.objectContaining({
       message: 'validation.moduleConflictDisabled',
       path: 'modules.bad-overlay',
-      params: { id: 'bad-overlay', key: 'tutorial-guide' },
+      params: { id: 'bad-overlay', key: 'missing-guide' },
     }));
     expect(result.issues.some((issue) =>
       (issue.path === 'modules.base-core' || issue.path === 'modules.good-overlay') &&

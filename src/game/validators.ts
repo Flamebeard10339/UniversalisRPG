@@ -31,7 +31,6 @@ import {
   actionKillKey,
   actionSuccessKey,
   actionTitleKey,
-  entityDescriptionKey,
   entityTitleKey,
   itemDescriptionKey,
   itemTitleKey,
@@ -982,7 +981,6 @@ export const collectLocalizationKeys = (bundle: ContentBundle) => [
   ]),
   ...(bundle.entities ?? []).flatMap((entity) => [
     entityTitleKey(entity.id),
-    entityDescriptionKey(entity.id),
     ...(entity.collectionLog ?? []).map((definition) => collectionCategoryTitleKey(definition.categoryId)),
   ]),
   ...bundle.actions.flatMap((action) => [

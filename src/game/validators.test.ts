@@ -229,7 +229,7 @@ describe('universe manifest validation', () => {
 
   it('quarantines invalid legacy contribution drafts instead of returning invalid content', () => {
     const result = mergeValidDraftIntoBundle(bundle(), draft({
-      locations: [{ id: 'camp', position: { x: 100, y: 0 }, entities: ['tutorial-guide'] }],
+      locations: [{ id: 'camp', position: { x: 100, y: 0 }, entities: ['missing-guide'] }],
       locales: { en: { 'location.camp.title': 'Camp', 'location.camp.description': 'A camp.' } },
     }));
 
@@ -238,7 +238,7 @@ describe('universe manifest validation', () => {
       severity: 'error',
       path: 'draft.locations.camp.entities',
       message: 'validation.unknownEntity',
-      params: { id: 'tutorial-guide' },
+      params: { id: 'missing-guide' },
     }));
   });
 
