@@ -1,7 +1,9 @@
+import { useState } from 'react';
 import type { Translator } from '../../game/i18n';
 import type { ContentBundle, ContributionDraft, ValidationIssue } from '../../game/types';
 import { useContributionState } from '../../stores/contributionState';
 import { useUniverseState } from '../../stores/universeState';
+import { ContentDataEditor, type ContentDataTab } from './ContentDataEditor';
 import { ModuleEditor } from './ModuleEditor';
 
 type ContributionModeProps = {
@@ -63,6 +65,7 @@ export const ContributionMode = ({ bundle, validationIssues, t }: ContributionMo
   const baseBundle = useUniverseState((state) => state.baseBundle);
   const manifests = useUniverseState((state) => state.manifests);
   const refreshContributionPreview = useUniverseState((state) => state.refreshContributionPreview);
+  const [contentTab, setContentTab] = useState<ContentDataTab>('map');
 
   const patchDraft = (patch: Partial<Omit<ContributionDraft, 'universeId'>>) => {
     updateDraft(bundle.manifest.id, patch);
@@ -103,6 +106,16 @@ export const ContributionMode = ({ bundle, validationIssues, t }: ContributionMo
       </div>
 
       <section className="grid gap-4">
+        <ContentDataEditor
+          activeTab={contentTab}
+          baseBundle={baseBundle ?? bundle}
+          bundle={bundle}
+          draft={draft}
+          onPatch={patchDraft}
+          onTabChange={setContentTab}
+          t={t}
+        />
+
         <ModuleEditor
           bundle={baseBundle ?? bundle}
           draft={draft}

@@ -1,18 +1,20 @@
-import { useRef, useState, type MutableRefObject } from 'react';
-import { toKebabInput } from '../../game/contentIds';
+import { useEffect, useRef, useState, type MutableRefObject } from 'react';
+import { locationDescriptionKey, locationTitleKey, toKebabInput } from '../../game/contentIds';
 import type { Translator } from '../../game/i18n';
 import type { BasePlayerDefinition, CombatBalanceDefinition, ContentBundle, ContentModule, ContentModulePack, ContributionDraft, ContributionRemovedIds, DialogueDefinition, DisplayProfileDefinition, DropTableDefinition, EffectDefinition, EnemyDefinition, ExperienceCurveDefinition, ExperienceTrigger, GameAction, InteractionTypeDefinition, ItemDefinition, LocationNode, ResourceDefinition, SkillDefinition, StatDefinition, StateFlagDefinition, UniverseUiSettings } from '../../game/types';
 import { editableModuleJsonFiles } from '../../game/contributionFiles';
 import { ContributionMapEditor } from './ContributionMapEditor';
+import { DialogueGraphEditor } from './DialogueGraphEditor';
+import { dialogueNarratorKey, dialogueOptionLabelKey, dialogueTextKey, mergeLocalePatch, workingLocale, defaultModuleLocalePatch } from './contributionLocalization';
 import { EnemyDiagnostics } from './EnemyDiagnostics';
 import { DEBUG_PLAYER_PROFILES, getProfileStatSummary, profileDescription, profileTitle } from '../../game/playerProfiles';
 import { resolveCombatBalance } from '../../game/combatBalance';
 import { getEnemyStat, normalizeEnemyStats } from '../../game/enemies';
 import { resolveUniverseUiSettings } from '../../game/universeSettings';
 import { resolveExperienceCurve } from '../../game/skills';
-import { LocationFields } from './MapContentFields';
 import { StructuredDataEditor, type StructuredSchema, type StructuredValue } from '../structuredData/StructuredData';
 import { actionSchema, basePlayerSchema, combatBalanceSchema, contentModuleSchema, dialogueSchema, displayProfileSchema, dropTableDefinitionSchema, effectDefinitionSchema, enemyStatsSchema, experienceCurveSchema, flagDefinitionSchema, interactionTypeDefinitionSchema, itemDefinitionSchema, locationSchema, modulePackSchema, resourceDefinitionSchema, rewardSchema, skillDefinitionSchema, statDefinitionSchema, universeExperienceSchema, universeUiSchema } from '../structuredData/contentSchemas';
+import { useUniverseState } from '../../stores/universeState';
 
 type ContentDataEditorProps = {
   activeTab: ContentDataTab;
@@ -38,7 +40,7 @@ type LayeredRow<T> = {
   source: 'draft' | 'base';
 };
 
-const contentTabs: ContentDataTab[] = ['universe', 'map', 'actions', 'primitives', 'enemies', 'resources', 'json'];
+const contentTabs: ContentDataTab[] = ['universe', 'map', 'actions', 'primitives', 'resources', 'json'];
 
 const uniqueId = (baseId: string, existingIds: string[]) => {
   let index = 1;
@@ -96,6 +98,7 @@ const layeredRows = <T extends { id: string }>(
 
 const uniqueById = <T extends { id: string }>(items: T[]) => [...new Map(items.map((item) => [item.id, item])).values()];
 const allLocations = (bundle: ContentBundle, draft: ContributionDraft) => uniqueById([...bundle.locations, ...draft.locations]);
+const allEntities = (bundle: ContentBundle, draft: ContributionDraft) => uniqueById([...(bundle.entities ?? []), ...(draft.entities ?? [])]);
 const allSkills = (bundle: ContentBundle, draft: ContributionDraft) => uniqueById([...bundle.skills, ...draft.skills]);
 const allStats = (bundle: ContentBundle, draft: ContributionDraft) => uniqueById([...bundle.stats, ...draft.stats]);
 const allItems = (bundle: ContentBundle, draft: ContributionDraft) => uniqueById([...(bundle.items ?? []), ...draft.items]);
@@ -107,12 +110,15 @@ const allEnemies = (bundle: ContentBundle, draft: ContributionDraft) => uniqueBy
 export const ContentDataEditor = ({ activeTab, baseBundle, bundle, draft, onPatch, onTabChange, t }: ContentDataEditorProps) => {
   const [filter, setFilter] = useState('');
   const [selectedActionId, setSelectedActionId] = useState<string | null>(null);
+  const [selectedDialogueId, setSelectedDialogueId] = useState<string | null>(null);
   const actionEditorKeys = useRef<Record<string, string>>({});
   const resourceEditorKeys = useRef<Record<string, string>>({});
   const effectEditorKeys = useRef<Record<string, string>>({});
   const [selectedEnemyKey, setSelectedEnemyKey] = useState<string | null>(null);
   const enemyEditorKeys = useRef<Record<string, string>>({});
+  const localePreference = useUniverseState((state) => state.localePreference);
   const removed = { ...emptyRemoved(), ...(draft.removed ?? {}) };
+  const workingLocaleId = workingLocale(bundle, localePreference);
   const removeButtonClass = 'rounded border border-rose-500 px-2 py-1.5 text-sm font-semibold text-rose-200';
   const locations = layeredRows(draft.locations, baseBundle.locations, removed.locations, filter);
   const actions = layeredRows(draft.actions, baseBundle.actions, removed.actions, filter);
@@ -126,6 +132,7 @@ export const ContentDataEditor = ({ activeTab, baseBundle, bundle, draft, onPatc
   const enemies = layeredRows(draft.enemies, baseBundle.enemies ?? [], removed.enemies, filter);
   const dropTables = layeredRows(draft.dropTables, baseBundle.dropTables ?? [], removed.dropTables, filter);
   const dialogues = layeredRows(draft.dialogues, baseBundle.dialogues ?? [], removed.dialogues, filter);
+  const selectedDialogueRow = dialogues.find((row) => row.item.id === selectedDialogueId) ?? null;
   const basePlayer = draft.basePlayer ?? bundle.manifest.basePlayer ?? { inventory: {} };
   const combatBalance = resolveCombatBalance(draft.combatBalance ?? bundle.manifest.combatBalance);
   const experienceCurve = resolveExperienceCurve({ experienceCurve: draft.experienceCurve ?? bundle.manifest.experienceCurve });
@@ -134,9 +141,20 @@ export const ContentDataEditor = ({ activeTab, baseBundle, bundle, draft, onPatc
   const uiSettings = resolveUniverseUiSettings(draft.ui ?? bundle.manifest.ui);
   const contributionBundle = {
     ...bundle,
+    entities: allEntities(baseBundle, draft),
     locations: locations.map((row) => row.item),
     dropTables: dropTables.map((row) => row.item),
   };
+
+  const patchWorkingLocale = (patch: Record<string, string>) => mergeLocalePatch(draft.locales, workingLocaleId, patch);
+
+  useEffect(() => {
+    if (selectedDialogueId && dialogues.some((row) => row.item.id === selectedDialogueId)) {
+      return;
+    }
+
+    setSelectedDialogueId(dialogues[0]?.item.id ?? null);
+  }, [dialogues, selectedDialogueId]);
 
   const unremoveId = (key: DraftListKey, id: string) => ({
     ...removed,
@@ -269,6 +287,8 @@ export const ContentDataEditor = ({ activeTab, baseBundle, bundle, draft, onPatc
   const addLocation = () => {
     const allLocationItems = locations.map((row) => row.item);
     const id = uniqueId('new-location', allLocationItems.map((location) => location.id));
+    const titleKey = locationTitleKey(id);
+    const descriptionKey = locationDescriptionKey(id);
     onPatch({
       locations: [
         {
@@ -278,6 +298,7 @@ export const ContentDataEditor = ({ activeTab, baseBundle, bundle, draft, onPatc
         },
         ...draft.locations,
       ],
+      locales: patchWorkingLocale(defaultModuleLocalePatch('locations', id)),
     });
   };
 
@@ -295,22 +316,32 @@ export const ContentDataEditor = ({ activeTab, baseBundle, bundle, draft, onPatc
         },
         ...draft.actions,
       ],
+      locales: patchWorkingLocale(defaultModuleLocalePatch('actions', id)),
     });
   };
 
   const addSkill = () => {
     const id = uniqueId('new-skill', skills.map((row) => row.item.id));
-    onPatch({ skills: [{ id, maxLevel: 100, statId: stats[0]?.item.id }, ...draft.skills] });
+    onPatch({
+      skills: [{ id, maxLevel: 100, statId: stats[0]?.item.id }, ...draft.skills],
+      locales: patchWorkingLocale(defaultModuleLocalePatch('skills', id)),
+    });
   };
 
   const addStat = () => {
     const id = uniqueId('new-stat', stats.map((row) => row.item.id));
-    onPatch({ stats: [{ id, base: 0 }, ...draft.stats] });
+    onPatch({
+      stats: [{ id, base: 0 }, ...draft.stats],
+      locales: patchWorkingLocale(defaultModuleLocalePatch('stats', id)),
+    });
   };
 
   const addItem = () => {
     const id = uniqueId('new-item', items.map((row) => row.item.id));
-    onPatch({ items: [{ id }, ...draft.items] });
+    onPatch({
+      items: [{ id }, ...draft.items],
+      locales: patchWorkingLocale(defaultModuleLocalePatch('items', id)),
+    });
   };
 
   const addFlag = () => {
@@ -320,7 +351,10 @@ export const ContentDataEditor = ({ activeTab, baseBundle, bundle, draft, onPatc
 
   const addResource = () => {
     const id = uniqueId('new-resource', resources.map((row) => row.item.id));
-    onPatch({ resourceDefinitions: [{ id, sourceStat: stats[0]?.item.id ?? '', initialValue: 'full' }, ...draft.resourceDefinitions] });
+    onPatch({
+      resourceDefinitions: [{ id, sourceStat: stats[0]?.item.id ?? '', initialValue: 'full' }, ...draft.resourceDefinitions],
+      locales: patchWorkingLocale(defaultModuleLocalePatch('resources', id)),
+    });
   };
 
   const addEffect = () => {
@@ -331,6 +365,7 @@ export const ContentDataEditor = ({ activeTab, baseBundle, bundle, draft, onPatc
         resourceId: resources[0]?.item.id ?? '',
         sourceStat: stats[0]?.item.id ?? '',
       }, ...draft.effects],
+      locales: patchWorkingLocale(defaultModuleLocalePatch('effects', id)),
     });
   };
 
@@ -338,7 +373,10 @@ export const ContentDataEditor = ({ activeTab, baseBundle, bundle, draft, onPatc
     const id = uniqueId('new-interaction', interactionTypes.map((row) => row.item.id));
     const sourceStatId = stats[0]?.item.id ?? '';
     const targetStatId = stats[1]?.item.id ?? sourceStatId;
-    onPatch({ interactionTypes: [{ id, sourceStatId, targetStatId, targetPlayerHealth: false, experience: [] }, ...draft.interactionTypes] });
+    onPatch({
+      interactionTypes: [{ id, sourceStatId, targetStatId, targetPlayerHealth: false, experience: [] }, ...draft.interactionTypes],
+      locales: patchWorkingLocale(defaultModuleLocalePatch('interactionTypes', id)),
+    });
   };
 
   const addEnemy = () => {
@@ -365,16 +403,22 @@ export const ContentDataEditor = ({ activeTab, baseBundle, bundle, draft, onPatc
 
   const addDialogue = () => {
     const id = uniqueId('new-dialogue', dialogues.map((row) => row.item.id));
+    const startNodeId = 'start';
+    const textKey = dialogueTextKey(id, startNodeId);
     onPatch({
       dialogues: [
         {
           id,
-          startNodeId: 'start',
-          nodes: [{ id: 'start', textKey: `dialogue.${id}.start` }],
+          startNodeId,
+          nodes: [{ id: startNodeId, textKey }],
         },
         ...draft.dialogues,
       ],
+      locales: mergeLocalePatch(draft.locales, workingLocaleId, {
+        [textKey]: t('contribution.dialogue.defaultNodeText'),
+      }),
     });
+    setSelectedDialogueId(id);
   };
 
   const universeBasePlayer = { inventory: basePlayer.inventory ?? {} };
@@ -482,7 +526,6 @@ export const ContentDataEditor = ({ activeTab, baseBundle, bundle, draft, onPatc
           <StructuredDataEditor label="contribution.universe.experienceCurve" onChange={updateExperienceCurve} schema={experienceCurveSchema()} t={t} value={experienceCurve as unknown as StructuredValue} />
           <StructuredDataEditor label="contribution.universe.experience" onChange={updateUniverseExperience} schema={universeExperienceSchema(bundle)} t={t} value={universeExperience as unknown as StructuredValue} />
           <StructuredDataEditor label="contribution.data.ui" onChange={updateUiSettings} schema={universeUiSchema()} t={t} value={uiSettings as unknown as StructuredValue} />
-          <StructuredDataEditor label="contribution.data.displayProfiles" onChange={updateDisplayProfiles} schema={{ kind: 'array', listMode: 'free', item: displayProfileSchema(), createItem: () => ({ id: uniqueId('new-profile', displayProfiles.map((profile) => profile.id)), light: {}, dark: {} }) }} t={t} value={displayProfiles as unknown as StructuredValue} />
           <section className="grid gap-2 border-t border-slate-700 pt-3">
             <StructuredDataEditor label="contribution.universe.baseInventory" onChange={updateBasePlayer} schema={basePlayerSchema(bundle)} t={t} value={basePlayer as unknown as StructuredValue} />
           </section>
@@ -493,36 +536,12 @@ export const ContentDataEditor = ({ activeTab, baseBundle, bundle, draft, onPatc
         <section className="grid gap-2">
           <ContributionMapEditor
             bundle={contributionBundle}
+            onEntitiesChange={(entities) => onPatch({ entities })}
+            onActionsChange={(actions) => onPatch({ actions })}
             onLocationsChange={(locations) => onPatch({ locations })}
+            onLocalesChange={(patch) => onPatch({ locales: patchWorkingLocale(patch) })}
             t={t}
           />
-
-          <div className="grid gap-1 rounded border border-slate-700 p-2">
-            <div className="flex items-center justify-between gap-3">
-              <h3 className="text-sm font-semibold text-slate-100">{t('contribution.data.locations')}</h3>
-              <button className="rounded bg-cyan-400 px-3 py-2 text-sm font-semibold text-slate-950" onClick={addLocation} type="button">
-                {t('contribution.data.addLocation')}
-              </button>
-            </div>
-            <div className="hidden grid-cols-[1.2fr_7rem_7rem_1fr_5rem_6rem] gap-2 px-2 text-xs font-semibold uppercase tracking-wide text-slate-500 lg:grid">
-              <span>{t('contribution.column.id')}</span>
-              <span>{t('contribution.column.x')}</span>
-              <span>{t('contribution.column.y')}</span>
-              <span>{t('contribution.column.tags')}</span>
-              <span>{t('contribution.column.start')}</span>
-              <span>{t('contribution.column.remove')}</span>
-            </div>
-            {locations.length === 0 ? (
-              <p className="px-2 py-1 text-sm text-slate-500">{t('contribution.data.noLocationChanges')}</p>
-            ) : (
-              <div className="grid gap-1">
-                {locations.map((row) => (
-                  <LocationFields bundle={bundle} key={`${row.source}-${row.index}`} location={row.item} onChange={(location) => updateLocation(row, location)} onRemove={() => removeRow('locations', row)} t={t} />
-                ))}
-              </div>
-            )}
-          </div>
-
         </section>
       )}
 
@@ -587,17 +606,57 @@ export const ContentDataEditor = ({ activeTab, baseBundle, bundle, draft, onPatc
           {dialogues.length === 0 ? (
             <p className="px-2 py-1 text-sm text-slate-500">{t('contribution.data.noDialogues')}</p>
           ) : (
-            <div className="grid gap-1">
-              {dialogues.map((row) => (
-                <div className="flex min-w-0 flex-wrap items-start gap-2 rounded bg-slate-950 p-2" key={`${row.source}-${row.index}`}>
-                  <div className="min-w-0 flex-1">
-                    <StructuredDataEditor onChange={(value) => { if (value) promote('dialogues', value as unknown as DialogueDefinition, row.item.id); }} schema={dialogueSchema(bundle)} t={t} value={row.item as unknown as StructuredValue} />
-                  </div>
-                  <button className={removeButtonClass} onClick={() => removeRow('dialogues', row)} type="button">
-                    {t('contribution.column.remove')}
-                  </button>
-                </div>
-              ))}
+            <div className="grid gap-2">
+              <div className="grid gap-2">
+                {dialogues.map((row) => {
+                  const dialogue = row.item;
+                  const isSelected = selectedDialogueId === dialogue.id;
+                  return (
+                    <div className={`grid gap-2 rounded border p-3 ${isSelected ? 'border-cyan-500 bg-cyan-950/10' : 'border-slate-800 bg-slate-950'}`} key={`${row.source}-${row.index}`}>
+                      <div className="flex min-w-0 flex-wrap items-center gap-2">
+                        <button className="min-w-0 flex-1 rounded bg-slate-900 px-3 py-2 text-left" onClick={() => setSelectedDialogueId(isSelected ? null : dialogue.id)} type="button">
+                          <span className="block truncate text-sm font-semibold text-slate-100">{dialogue.id}</span>
+                          <span className="block truncate text-xs text-slate-400">{dialogue.startNodeId} · {dialogue.nodes.length} nodes</span>
+                        </button>
+                        <button className="rounded border border-slate-600 px-3 py-2 text-sm text-slate-200" onClick={() => setSelectedDialogueId(isSelected ? null : dialogue.id)} type="button">
+                          {isSelected ? t('structured.collapse') : t('contribution.column.edit')}
+                        </button>
+                        <button
+                          className={removeButtonClass}
+                          onClick={() => {
+                            if (selectedDialogueId === dialogue.id) {
+                              setSelectedDialogueId(null);
+                            }
+                            removeRow('dialogues', row);
+                          }}
+                          type="button"
+                        >
+                          {t('contribution.column.remove')}
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              {selectedDialogueRow && (
+                <DialogueGraphEditor
+                  bundle={bundle}
+                  dialogue={selectedDialogueRow.item}
+                  locales={draft.locales}
+                  onChange={(nextDialogue, localePatch) => {
+                    promote('dialogues', nextDialogue, selectedDialogueRow.item.id);
+                    if (localePatch) {
+                      onPatch({ locales: mergeLocalePatch(draft.locales, workingLocaleId, localePatch) });
+                    }
+                  }}
+                  onRemove={() => {
+                    removeRow('dialogues', selectedDialogueRow);
+                    setSelectedDialogueId(null);
+                  }}
+                  t={t}
+                  workingLocale={workingLocaleId}
+                />
+              )}
             </div>
           )}
         </section>

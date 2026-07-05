@@ -1809,6 +1809,28 @@ describe('content modules', () => {
     )).toBe(true);
   });
 
+  it('does not require explicit localization for generated travel action text', () => {
+    const quest = module({
+      id: 'quest',
+      data: {
+        actions: [{ id: 'travel-to-emberwood', role: 'travel', locationId: 'start', durationSeconds: 1, rewards: [], results: [{ kind: 'relocate', locationId: 'start' }] }],
+      },
+    });
+    const result = applyModulesToBundle(baseBundle(), [quest]);
+
+    expect(collectModuleLocalizationKeys(quest)).toEqual(expect.arrayContaining([
+      'action.travel-to-emberwood.title',
+      'action.travel-to-emberwood.description',
+      'action.travel-to-emberwood.success',
+      'action.travel-to-emberwood.failure',
+    ]));
+    expect(result.issues.some((issue) =>
+      issue.severity === 'warning' &&
+      issue.path.startsWith('modules.quest.locale.en.action.travel-to-emberwood') &&
+      issue.message === 'validation.missingLocalization',
+    )).toBe(false);
+  });
+
   it('collects localization keys from both resource aliases', () => {
     const resourceModule = module({
       id: 'resource-pack',

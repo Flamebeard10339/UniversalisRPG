@@ -129,6 +129,8 @@ try {
     console.log(`[${viewport.name}] contribution`);
     await page.getByText('Contribution mode', { exact: true }).locator('xpath=ancestor::label').getByRole('checkbox').check();
     const contributionVisible = await page.getByText('Contribution Mode', { exact: true }).isVisible();
+    await page.locator('nav').getByRole('button', { name: 'Map', exact: true }).click();
+    const mapLayoutVisible = await page.getByText('Map layout', { exact: true }).first().isVisible();
     let quickWorkbenchOpens = true;
     let duplicateLocationEntityTurnsRed = true;
     let duplicateLocationEntityBlocksConfirm = true;
@@ -141,25 +143,20 @@ try {
       await page.locator('nav').getByRole('button', { name: 'Home', exact: true }).evaluate((button) => button.click());
       await page.getByRole('button', { name: 'Add', exact: true }).click();
       quickWorkbenchOpens = await page.getByText('Add content', { exact: true }).isVisible();
-      await page.locator('.quick-workbench-sheet select').nth(1).selectOption('locations');
-      await page.getByRole('button', { name: '+ entities' }).click();
-      await page.getByRole('button', { name: '+ Add row' }).click();
-      await page.getByRole('button', { name: '+ Add row' }).click();
-      await page.locator('.quick-workbench-sheet input[list]').last().fill('goblin');
-      duplicateLocationEntityTurnsRed = await page.locator('.quick-workbench-sheet input[aria-invalid="true"]').count() > 0;
-      duplicateLocationEntityBlocksConfirm = await page.locator('.quick-workbench-sheet').getByRole('button', { name: 'Confirm', exact: true }).isDisabled();
-      await page.locator('.quick-workbench-sheet input').last().fill('tutorial-guide');
-      invalidLocationEntityTurnsRed = await page.locator('.quick-workbench-sheet input[aria-invalid="true"]').count() > 0;
-      invalidLocationEntityBlocksConfirm = await page.locator('.quick-workbench-sheet').getByRole('button', { name: 'Confirm', exact: true }).isDisabled();
-      await page.mouse.click(8, 8);
-      await page.getByRole('button', { name: 'Edit location', exact: true }).click();
-      await page.locator('.quick-workbench-sheet input').last().fill('tutorial-guide');
-      invalidEditLocationEntityTurnsRed = await page.locator('.quick-workbench-sheet input[aria-invalid="true"]').count() > 0;
-      invalidEditLocationEntityBlocksConfirm = await page.locator('.quick-workbench-sheet').getByRole('button', { name: 'Confirm', exact: true }).isDisabled();
+      const quickAddOptions = await page.locator('.quick-workbench-sheet select').nth(1).evaluate((element) =>
+        Array.from(element.options).map((option) => option.value),
+      );
+      duplicateLocationEntityTurnsRed = !quickAddOptions.includes('locations');
+      duplicateLocationEntityBlocksConfirm = !quickAddOptions.includes('enemies');
+      invalidLocationEntityTurnsRed = !quickAddOptions.includes('displayProfiles');
+      invalidLocationEntityBlocksConfirm = !quickAddOptions.includes('locations');
+      invalidEditLocationEntityTurnsRed = !quickAddOptions.includes('enemies');
+      invalidEditLocationEntityBlocksConfirm = !quickAddOptions.includes('displayProfiles');
       await page.mouse.click(8, 8);
       await page.locator('nav').getByRole('button', { name: 'Settings', exact: true }).evaluate((button) => button.click());
       noNumberedLocalContributionVisible = await page.getByText(/^local-contribution-\d+$/).count() === 0;
     }
+    await page.locator('nav').getByRole('button', { name: 'Settings', exact: true }).click();
     await page.getByRole('button', { name: 'base-core', exact: true }).first().click();
 
     console.log(`[${viewport.name}] mod editor`);
@@ -187,6 +184,7 @@ try {
       invalidEditLocationEntityBlocksConfirm,
       noNumberedLocalContributionVisible,
       contributionVisible,
+      mapLayoutVisible,
       detailsVisible,
       coreLocationVisible,
       rawContainsCore,
@@ -213,6 +211,7 @@ const failed = results.some((result) =>
   !result.invalidEditLocationEntityBlocksConfirm ||
   !result.noNumberedLocalContributionVisible ||
   !result.contributionVisible ||
+  !result.mapLayoutVisible ||
   !result.detailsVisible ||
   !result.coreLocationVisible ||
   !result.rawContainsCore ||

@@ -40,6 +40,7 @@ import {
   statDescriptionKey,
   statTitleKey,
 } from './contentIds';
+import { isTravelAction, travelActionLocalizationKeys } from './actionLocalization';
 import { validateContentBundle, validateContentShape, validateLocaleDictionary } from './validators';
 import { collectionCategoryTitleKey } from './collectionLog';
 import { normalizeContentBundleStructure } from './contentNormalization';
@@ -404,6 +405,9 @@ const localizationKeysFromAction = (action: GameAction) => [
   ...(action.results ?? []).flatMap((result) => result.kind === 'chat' ? [result.messageKey] : []),
 ];
 
+const generatedLocalizationKeysFromAction = (action: GameAction) =>
+  isTravelAction(action) ? travelActionLocalizationKeys(action) : [];
+
 const localizationKeysFromDialogues = (dialogues: DialogueDefinition[] = []) =>
   dialogues.flatMap((dialogue) => (Array.isArray(dialogue.nodes) ? dialogue.nodes : []).flatMap((node) => [
     node.textKey,
@@ -510,28 +514,37 @@ const validateContentModule = (
   module: ContentModule,
   currentLocale = bundle.manifest.locales[0] ?? 'en',
   localizationBundle = bundle,
-): ValidationIssue[] => [
-  ...(!isModuleVersion(module.version)
-    ? [issue('error', `modules.${module.id}.version`, 'validation.moduleVersionInvalid', { id: module.id })]
-    : []),
-  ...(!isGameVersion(module.game_version)
-    ? [issue('error', `modules.${module.id}.game_version`, 'validation.moduleGameVersionInvalid', { id: module.id })]
-    : []),
-  ...validateModuleDataSection(bundle, module, 'data'),
-  ...validateModuleDataSection(bundle, module, 'data-updates'),
-  ...validateModuleDataUpdatesShape(module),
-  ...collectModuleLocalizationKeys(module, localizationBundle).flatMap((key) =>
-    moduleLocaleDictionary(module, currentLocale)[key]
-      ? []
-      : [issue('warning', `modules.${module.id}.locale.${currentLocale}.${key}`, 'validation.missingLocalization')],
-  ),
-  ...Object.entries(module.locale ?? {}).flatMap(([locale, dictionary]) =>
-    validateLocaleDictionary(dictionary).map((validationIssue) => ({
-      ...validationIssue,
-      path: `modules.${module.id}.locale.${locale}.${validationIssue.path}`,
-    })),
-  ),
-];
+): ValidationIssue[] => {
+  const normalizedData = normalizeModuleDataSection(module.data);
+  const normalizedUpdates = normalizeModuleDataSection(module['data-updates']);
+  const generatedLocalizationKeys = new Set([
+    ...(normalizedData.actions ?? []).flatMap(generatedLocalizationKeysFromAction),
+    ...(normalizedUpdates.actions ?? []).flatMap(generatedLocalizationKeysFromAction),
+  ]);
+
+  return [
+    ...(!isModuleVersion(module.version)
+      ? [issue('error', `modules.${module.id}.version`, 'validation.moduleVersionInvalid', { id: module.id })]
+      : []),
+    ...(!isGameVersion(module.game_version)
+      ? [issue('error', `modules.${module.id}.game_version`, 'validation.moduleGameVersionInvalid', { id: module.id })]
+      : []),
+    ...validateModuleDataSection(bundle, module, 'data'),
+    ...validateModuleDataSection(bundle, module, 'data-updates'),
+    ...validateModuleDataUpdatesShape(module),
+    ...collectModuleLocalizationKeys(module, localizationBundle).flatMap((key) =>
+      moduleLocaleDictionary(module, currentLocale)[key] || generatedLocalizationKeys.has(key)
+        ? []
+        : [issue('warning', `modules.${module.id}.locale.${currentLocale}.${key}`, 'validation.missingLocalization')],
+    ),
+    ...Object.entries(module.locale ?? {}).flatMap(([locale, dictionary]) =>
+      validateLocaleDictionary(dictionary).map((validationIssue) => ({
+        ...validationIssue,
+        path: `modules.${module.id}.locale.${locale}.${validationIssue.path}`,
+      })),
+    ),
+  ];
+};
 
 const moduleDataCollisionKeys: Array<keyof ModuleDataSectionObject> = [
   'locations',

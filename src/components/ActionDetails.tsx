@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
 import {
-  actionTitleKey,
   interactionPlayerHitKey,
   interactionPlayerKillKey,
   skillTitleKey,
@@ -12,6 +11,7 @@ import { resolveManifestUiSettings } from '../game/universeSettings';
 import { aggregateRewards } from '../game/rewards';
 import { useNow } from '../hooks/useNow';
 import { ResourceStatus } from './ResourceStatus';
+import { getActionTitleText } from '../game/actionLocalization';
 
 type ActionDetailsProps = {
   bundle: ContentBundle;
@@ -122,7 +122,7 @@ export const ActionDetails = ({ bundle, onStopAction, playState, t }: ActionDeta
           <>
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <h2 className="text-base font-semibold text-slate-100">{t(actionTitleKey(activeAction.id))}</h2>
+                <h2 className="text-base font-semibold text-slate-100">{getActionTitleText(activeAction, bundle, t)}</h2>
                 {enemy && <p className="text-sm text-slate-400">{enemy.id}</p>}
               </div>
               <button className="rounded border border-rose-500 px-3 py-2 text-sm font-semibold text-rose-100" onClick={onStopAction} type="button">

@@ -10,7 +10,7 @@ export type StructuredField = {
   schema: StructuredSchemaRef;
 };
 export type StructuredSchema =
-  | { kind: 'string'; suggestions?: string[] }
+  | { kind: 'string'; suggestions?: string[]; select?: boolean }
   | { kind: 'color' }
   | { kind: 'number'; min?: number; max?: number; step?: number }
   | { kind: 'boolean' }
@@ -107,6 +107,23 @@ const PrimitiveEditor = ({
   const hasSuggestions = Boolean(schema.suggestions?.length);
   const invalidSuggestion = hasSuggestions && stringValue.trim().length > 0 && !schema.suggestions?.includes(stringValue);
   const invalidValue = Boolean(invalid || invalidSuggestion);
+  if (schema.select && hasSuggestions) {
+    const optionValues = [...schema.suggestions ?? []];
+    if (stringValue && !optionValues.includes(stringValue)) {
+      optionValues.unshift(stringValue);
+    }
+    return (
+      <select
+        aria-invalid={invalidValue || undefined}
+        aria-label={accessibleLabel}
+        className={`${inputClass} ${invalidValue ? 'border-rose-500 bg-rose-950/40 text-rose-100' : ''}`}
+        onChange={(event) => onChange(event.target.value)}
+        value={stringValue || optionValues[0] || ''}
+      >
+        {optionValues.map((option) => <option key={option} value={option}>{option}</option>)}
+      </select>
+    );
+  }
   return (
     <>
       {schema.suggestions?.length ? <datalist id={suggestionId}>{schema.suggestions.map((suggestion) => <option key={suggestion} value={suggestion} />)}</datalist> : null}

@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import type { ContentBundle, GameAction, UniversePlayState } from '../game/types';
-import { actionDescriptionKey, actionTitleKey, entityDescriptionKey, entityTitleKey } from '../game/contentIds';
+import { entityDescriptionKey, entityTitleKey } from '../game/contentIds';
 import { getActionDps, getActionDurationMs, getEnemyAttackDps, isContinuousAction } from '../game/adversarial';
 import type { Translator } from '../game/i18n';
 import { useNow } from '../hooks/useNow';
 import { canStartAction, isActionVisible } from '../game/conditions';
 import { isPureTravelAction } from '../game/travel';
+import { getActionDescriptionText, getActionTitleText } from '../game/actionLocalization';
 
 type ActionPanelProps = {
   bundle: ContentBundle;
@@ -84,8 +85,8 @@ export const ActionPanel = ({ bundle, debugEnabled, playState, onStartAction, sh
             style={{ width: `${actionProgress}%` }}
           />
         )}
-        <span className="relative block text-sm font-semibold text-slate-100">{t(actionTitleKey(action.id))}</span>
-        <span className="relative mt-1 block text-xs text-slate-400">{t(actionDescriptionKey(action.id))}</span>
+        <span className="relative block text-sm font-semibold text-slate-100">{getActionTitleText(action, bundle, t)}</span>
+        <span className="relative mt-1 block text-xs text-slate-400">{getActionDescriptionText(action, bundle, t)}</span>
         <span className="relative mt-2 block text-xs text-cyan-200">
           {continuous ? t('actionPanel.continuous') : `${action.durationSeconds}s`}
         </span>
@@ -114,7 +115,7 @@ export const ActionPanel = ({ bundle, debugEnabled, playState, onStartAction, sh
           {isTravelling
             ? t('actionPanel.travelling')
             : activeAction
-              ? t('actionPanel.working', { action: t(actionTitleKey(activeAction.id)) })
+              ? t('actionPanel.working', { action: getActionTitleText(activeAction, bundle, t) })
               : t('actionPanel.choose')}
         </p>
       </div>

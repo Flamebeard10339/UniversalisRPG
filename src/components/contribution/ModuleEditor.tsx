@@ -6,6 +6,8 @@ import { moduleDataSectionSchema, modulePackSchema } from '../structuredData/con
 import { bundleWithModuleData, collectModuleLocalizationKeys } from '../../game/contentModules';
 import { moduleFilePath } from '../../game/contributionFiles';
 import { createPrefilledIssueUrl, formatContributionIssueBody } from '../../lib/githubIssues';
+import { toKebabInput } from '../../game/contentIds';
+import { defaultModuleLocalePatch, mergeLocalePatch, workingLocale } from './contributionLocalization';
 
 type ModuleEditorProps = {
   bundle: ContentBundle;
@@ -379,38 +381,43 @@ const DataRows = ({
   const section = moduleDataObject(rawSection);
   const removalRows = sectionName === 'data-updates' ? removalRowsFromUpdates(module['data-updates']) : [];
   const editorBundle = bundleForModuleEditing(bundle, module, bundle.modules ?? []);
+  const saveModuleSection = (nextSection: ModuleDataSectionObject, nextRemovals = removalRows, nextLocale?: LocaleDictionary) => onSave({
+    ...module,
+    ...(nextLocale ? { locale: mergeLocalePatch(module.locale ?? {}, workingLocale(bundle), nextLocale) } : {}),
+    [sectionName]: sectionName === 'data-updates'
+      ? [...sectionToTypedRows(nextSection), ...nextRemovals]
+      : sectionToTypedRows(nextSection),
+  });
   const rows = dataKeys.flatMap((key) => {
     const values = section[key];
     return Array.isArray(values) ? values.map((value, index) => ({ key, index, value: value as StructuredValue })) : [];
   });
 
-  const saveSection = (nextSection: ModuleDataSectionObject, nextRemovals = removalRows) => onSave({
-    ...module,
-    [sectionName]: sectionName === 'data-updates'
-      ? [...sectionToTypedRows(nextSection), ...nextRemovals]
-      : sectionToTypedRows(nextSection),
-  });
   const saveRow = (key: DataKey, index: number, value: StructuredValue | undefined) => {
     const values = [...((section[key] as StructuredValue[] | undefined) ?? [])];
     if (value === undefined) values.splice(index, 1);
     else values[index] = value;
-    saveSection(updateArray(section, key, values));
+    saveModuleSection(updateArray(section, key, values));
   };
   const moveRow = (fromKey: DataKey, index: number, toKey: DataKey) => {
     if (fromKey === toKey) return;
     const fromValues = [...((section[fromKey] as StructuredValue[] | undefined) ?? [])];
     const [value] = fromValues.splice(index, 1);
-    const toValues = [...((section[toKey] as StructuredValue[] | undefined) ?? []), value ?? createDataItem(editorBundle, toKey)];
-    saveSection({ ...section, [fromKey]: fromValues, [toKey]: toValues });
+    const nextValue = value ?? createDataItem(editorBundle, toKey);
+    const localePatch = value === undefined && nextValue && typeof nextValue === 'object' && !Array.isArray(nextValue) && typeof nextValue.id === 'string'
+      ? defaultModuleLocalePatch(toKey, nextValue.id)
+      : {};
+    const toValues = [...((section[toKey] as StructuredValue[] | undefined) ?? []), nextValue];
+    saveModuleSection({ ...section, [fromKey]: fromValues, [toKey]: toValues }, removalRows, localePatch);
   };
   const saveRemoval = (index: number, patch: Partial<ModuleDataRemoveEntry> | undefined) => {
     const nextRemovals = [...removalRows];
     if (patch === undefined) nextRemovals.splice(index, 1);
     else nextRemovals[index] = { ...nextRemovals[index], ...patch };
-    saveSection(section, nextRemovals);
+    saveModuleSection(section, nextRemovals);
   };
   const addRemoval = (target: RemoveTarget) => {
-    saveSection(section, [...removalRows, { type: 'remove', target, id: '', ...(target === 'dialogueOptions' ? { path: '' } : {}) }]);
+    saveModuleSection(section, [...removalRows, { type: 'remove', target, id: '', ...(target === 'dialogueOptions' ? { path: '' } : {}) }]);
     setPendingRemovals((count) => Math.max(0, count - 1));
   };
   const targetLabel = (target: string) => target === 'dialogueOptions'
@@ -424,8 +431,15 @@ const DataRows = ({
     else next.add(key);
     return next;
   });
+  const addDataRow = (key: DataKey) => {
+    const nextValue = createDataItem(editorBundle, key);
+    const localePatch = nextValue && typeof nextValue === 'object' && !Array.isArray(nextValue) && typeof nextValue.id === 'string'
+      ? defaultModuleLocalePatch(key, nextValue.id)
+      : {};
+    saveModuleSection(updateArray(section, key, [...((section[key] as StructuredValue[] | undefined) ?? []), nextValue]), removalRows, localePatch);
+  };
   const addRowToGroup = (key: DataKey) => {
-    saveSection(updateArray(section, key, [...((section[key] as StructuredValue[] | undefined) ?? []), createDataItem(editorBundle, key)]));
+    addDataRow(key);
   };
   const filteredRowsForKey = (key: DataKey) => {
     const filter = (groupFilters[key] ?? '').trim().toLowerCase();
@@ -452,7 +466,7 @@ const DataRows = ({
       {Array.from({ length: pendingRows }).map((_, index) => (
         <div className="grid gap-2 rounded border border-slate-800 bg-slate-950 p-2 md:grid-cols-[1fr_12rem_auto]" key={`pending-${index}`}>
           <span className="text-sm text-slate-500">{t('structured.empty')}</span>
-          <select className="rounded bg-slate-900 px-2 py-1.5 text-sm" onChange={(event) => { const key = event.target.value as DataKey; if (!key) return; saveSection(updateArray(section, key, [...((section[key] as StructuredValue[] | undefined) ?? []), createDataItem(editorBundle, key)])); setPendingRows((count) => Math.max(0, count - 1)); }} value="">
+          <select className="rounded bg-slate-900 px-2 py-1.5 text-sm" onChange={(event) => { const key = event.target.value as DataKey; if (!key) return; addDataRow(key); setPendingRows((count) => Math.max(0, count - 1)); }} value="">
             <option value="">{t('contribution.modules.selectType')}</option>
             {dataKeys.map((key) => <option key={key} value={key}>{t(`contribution.data.${key}`)}</option>)}
           </select>

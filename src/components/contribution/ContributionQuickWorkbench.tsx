@@ -53,6 +53,21 @@ const dataTypeKeys = new Map<string, DataKey>([
   ...Object.keys(dataKeyTypes).map((key) => [key, key as DataKey] as const),
 ]);
 
+const quickAddKeys: DataKey[] = [
+  'entities',
+  'actions',
+  'skills',
+  'stats',
+  'items',
+  'flags',
+  'resources',
+  'effects',
+  'interactionTypes',
+  'dropTables',
+  'collectionLogs',
+  'dialogues',
+];
+
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 
@@ -124,7 +139,9 @@ const createItem = (bundle: ContentBundle, key: DataKey, currentLocationId: stri
 
 const dataKeysForBundle = (bundle: ContentBundle) => {
   const schema = moduleDataSectionSchema(bundle);
-  return schema.kind === 'object' ? (Object.keys(schema.fields) as DataKey[]).filter((key) => key !== 'resourceDefinitions') : [];
+  return schema.kind === 'object'
+    ? (Object.keys(schema.fields) as DataKey[]).filter((key) => key !== 'resourceDefinitions' && quickAddKeys.includes(key))
+    : [];
 };
 
 const upsertById = (items: StructuredValue[], value: StructuredValue, originalId?: string) => {
@@ -172,8 +189,9 @@ export const ContributionQuickWorkbench = ({
   const localModules = useMemo(() => draft.modules.filter((candidate) => !packagedModuleIds.has(candidate.id)), [draft.modules, packagedModuleIds]);
   const module = localModules.find((candidate) => candidate.id === moduleId) ?? localModules[0] ?? null;
   const keys = useMemo(() => dataKeysForBundle(bundle), [bundle]);
-  const [addKey, setAddKey] = useState<DataKey>(keys.includes('actions') ? 'actions' : keys[0]);
-  const [newValue, setNewValue] = useState<StructuredValue>(() => createItem(bundle, keys.includes('actions') ? 'actions' : keys[0], playState.currentLocationId));
+  const defaultAddKey: DataKey = keys.includes('actions') ? 'actions' : keys[0] ?? 'actions';
+  const [addKey, setAddKey] = useState<DataKey>(() => defaultAddKey);
+  const [newValue, setNewValue] = useState<StructuredValue>(() => createItem(bundle, defaultAddKey, playState.currentLocationId));
 
   const currentLocation = bundle.locations.find((location) => location.id === playState.currentLocationId)
     ?? bundle.locations.find((location) => location.starting)
@@ -202,6 +220,14 @@ export const ContributionQuickWorkbench = ({
   useEffect(() => {
     setAssociatedValue(associated?.value);
   }, [associated?.id, associated?.key, associated?.value]);
+
+  useEffect(() => {
+    if (!keys.includes(addKey)) {
+      const nextKey: DataKey = keys.includes('actions') ? 'actions' : keys[0] ?? 'actions';
+      setAddKey(nextKey);
+      setNewValue(createItem(bundle, nextKey, playState.currentLocationId));
+    }
+  }, [addKey, bundle, keys, playState.currentLocationId]);
 
   const changeAddKey = (key: DataKey) => {
     setAddKey(key);

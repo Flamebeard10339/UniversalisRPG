@@ -8,13 +8,15 @@ import { CollectionLogPanel } from './components/CollectionLogPanel';
 import { DialoguePanel } from './components/DialoguePanel';
 import { InventoryPanel } from './components/InventoryPanel';
 import { ContributionMode, type ContributionTab } from './components/contribution/ContributionMode';
+import { ContributionMapEditor } from './components/contribution/ContributionMapEditor';
 import { ContributionQuickWorkbench } from './components/contribution/ContributionQuickWorkbench';
 import { ContributionWorkbench } from './components/contribution/ContributionWorkbench';
 import { SkillBars } from './components/SkillBars';
 import { TravelStatus } from './components/TravelStatus';
 import { WorldMap } from './components/WorldMap';
 import { StructuredDataEditor, type StructuredValue } from './components/structuredData/StructuredData';
-import { actionTitleKey, interactionTitleKey, itemTitleKey, locationDescriptionKey, locationTitleKey, resourceTitleKey, skillTitleKey, universeDescriptionKey, universeTitleKey } from './game/contentIds';
+import { interactionTitleKey, itemTitleKey, locationDescriptionKey, locationTitleKey, resourceTitleKey, skillTitleKey, universeDescriptionKey, universeTitleKey } from './game/contentIds';
+import { getActionTitleText } from './game/actionLocalization';
 import {
   applyDisplayPalette,
   createCustomDisplayProfile,
@@ -36,6 +38,7 @@ import { useContributionState } from './stores/contributionState';
 import { contributionRuntimeId } from './stores/contributionPlayState';
 import { useGameState } from './stores/gameState';
 import { useUniverseState } from './stores/universeState';
+import { mergeLocalePatch, workingLocale } from './components/contribution/contributionLocalization';
 
 const getStartingLocationId = (bundle: NonNullable<ReturnType<typeof useUniverseState.getState>['bundle']>) =>
   bundle.locations.find((location) => location.starting)?.id ?? bundle.locations[0]?.id ?? '';
@@ -174,6 +177,13 @@ export default function App() {
   const contributionDrafts = useContributionState((state) => state.drafts);
   const updateContributionDraft = useContributionState((state) => state.updateDraft);
   const refreshContributionPreview = useUniverseState((state) => state.refreshContributionPreview);
+  const actionTitleFor = (actionId?: string) => {
+    if (!bundle || !actionId) {
+      return actionId ?? '';
+    }
+    const action = bundle.actions.find((candidate) => candidate.id === actionId);
+    return action ? getActionTitleText(action, bundle, t) : actionId;
+  };
 
   useEffect(() => {
     void initialize();
@@ -721,26 +731,44 @@ export default function App() {
 
       <div className="mx-auto max-w-7xl px-4 py-4">
         {visibleActiveTab === 'map' && (
-          <section className="grid h-[calc(100vh-150px)] min-h-[560px] grid-rows-[auto_1fr] gap-4">
-            <TravelStatus
-              activeTravel={playState.activeTravel}
-              bundle={bundle}
-              currentLocationId={playState.currentLocationId}
-              onCancel={() => {
-                logPlayerAction('travel.cancel', { universeId: bundle.manifest.id });
-                cancelTravel(runtimeUniverseId);
-              }}
-              titleWhenIdle
-              t={t}
-            />
-            <section className="min-h-0 overflow-hidden rounded border border-slate-800 bg-slate-900">
-              <WorldMap
+          <section className="grid gap-4">
+            {contributionMode && bundle && currentContributionDraft && (
+              <ContributionMapEditor
                 bundle={bundle}
-                onTravel={beginTravel}
-                playState={playState}
+                onActionsChange={(actions) => patchContributionDraft({ actions })}
+                onEntitiesChange={(entities) => patchContributionDraft({ entities })}
+                onLocationsChange={(locations) => patchContributionDraft({ locations })}
+                onLocalesChange={(patch) => patchContributionDraft({
+                  locales: mergeLocalePatch(
+                    currentContributionDraft.locales,
+                    workingLocale(bundle, localePreference),
+                    patch,
+                  ),
+                })}
                 t={t}
               />
-            </section>
+            )}
+            <div className="grid h-[calc(100vh-150px)] min-h-[560px] grid-rows-[auto_1fr] gap-4">
+              <TravelStatus
+                activeTravel={playState.activeTravel}
+                bundle={bundle}
+                currentLocationId={playState.currentLocationId}
+                onCancel={() => {
+                  logPlayerAction('travel.cancel', { universeId: bundle.manifest.id });
+                  cancelTravel(runtimeUniverseId);
+                }}
+                titleWhenIdle
+                t={t}
+              />
+              <section className="min-h-0 overflow-hidden rounded border border-slate-800 bg-slate-900">
+                <WorldMap
+                  bundle={bundle}
+                  onTravel={beginTravel}
+                  playState={playState}
+                  t={t}
+                />
+              </section>
+            </div>
           </section>
         )}
 
@@ -1281,7 +1309,7 @@ export default function App() {
 
               {idleReport.kind === 'actionCompleted' && (
                 <section className="grid gap-2">
-                  <p>{t('welcomeBack.actionCompleted', { action: t(actionTitleKey(idleReport.actionId), idleReport.actionId) })}</p>
+                  <p>{t('welcomeBack.actionCompleted', { action: actionTitleFor(idleReport.actionId) })}</p>
                   {idleRewards.length > 0 && (
                     <ul className="grid gap-1 rounded bg-slate-950 p-3 text-xs text-slate-300">
                       {idleRewards.map((reward) => (
@@ -1299,13 +1327,13 @@ export default function App() {
               )}
 
               {idleReport.kind === 'actionFailed' && (
-                <p>{t('welcomeBack.actionFailed', { action: t(actionTitleKey(idleReport.actionId), idleReport.actionId) })}</p>
+                <p>{t('welcomeBack.actionFailed', { action: actionTitleFor(idleReport.actionId) })}</p>
               )}
 
               {idleReport.kind === 'inProgress' && idleReport.timerKind === 'action' && (
                 <p>
                   {t('welcomeBack.actionInProgress', {
-                    action: t(actionTitleKey(idleReport.actionId ?? ''), idleReport.actionId ?? ''),
+                    action: actionTitleFor(idleReport.actionId),
                     remaining: formatDuration(idleReport.remainingMs, t),
                   })}
                 </p>
