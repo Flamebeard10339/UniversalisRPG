@@ -406,6 +406,7 @@ export type ModuleDataEntry = ({ id?: string; type: string } & Record<string, un
 export type ModuleDataSection = ModuleDataSectionObject | ModuleDataEntry[];
 
 export type ModuleDataUpdatesObject = ModuleDataSectionObject & {
+  patches?: ModuleObjectPatch[];
   remove?: {
     locations?: string[];
     entities?: string[];
@@ -429,6 +430,17 @@ export type ModuleDataUpdatesObject = ModuleDataSectionObject & {
 };
 
 export type ModuleDataUpdates = ModuleDataUpdatesObject | ModuleDataEntry[];
+
+export type JsonPatchOperation =
+  | { op: 'add' | 'replace'; path: string; value: unknown }
+  | { op: 'remove'; path: string };
+
+export type ModuleObjectPatch = {
+  targetModId: string;
+  objectType: string;
+  objectId: string;
+  ops: JsonPatchOperation[];
+};
 
 export type ContentModule = {
   id: string;

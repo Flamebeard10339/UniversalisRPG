@@ -17,6 +17,8 @@ Android via Capacitor, and open source community content contributions.
 - Do not hard-code game content in TypeScript.
 - Never hard-code English UI strings in the codebase. Use localization ids in
   code and put display text in JSON localization files, including GUI text.
+- Never create another persistence path for saving data. Only use the already 
+  existing local-universe storage API.
 - Locations, edges, actions, skills, and localizations live under
   `public/content/universes/*`.
 - Shared app/UI localization lives under `public/content/gui/locales/`.

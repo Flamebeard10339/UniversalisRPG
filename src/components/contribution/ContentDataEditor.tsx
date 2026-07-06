@@ -15,6 +15,8 @@ import { resolveExperienceCurve } from '../../game/skills';
 import { StructuredDataEditor, type StructuredSchema, type StructuredValue } from '../structuredData/StructuredData';
 import { actionSchema, basePlayerSchema, combatBalanceSchema, contentModuleSchema, dialogueSchema, displayProfileSchema, dropTableDefinitionSchema, effectDefinitionSchema, enemyStatsSchema, experienceCurveSchema, flagDefinitionSchema, interactionTypeDefinitionSchema, itemDefinitionSchema, locationSchema, modulePackSchema, resourceDefinitionSchema, rewardSchema, skillDefinitionSchema, statDefinitionSchema, universeExperienceSchema, universeUiSchema } from '../structuredData/contentSchemas';
 import { useUniverseState } from '../../stores/universeState';
+import { createModEditService, localContributionsModId } from '../../game/modEditService';
+import { createDraftModStore } from '../../game/modStore';
 
 type ContentDataEditorProps = {
   activeTab: ContentDataTab;
@@ -54,14 +56,11 @@ const uniqueId = (baseId: string, existingIds: string[]) => {
   return nextId;
 };
 
-const replaceAt = <T,>(items: T[], index: number, item: T) => items.map((candidate, candidateIndex) => (candidateIndex === index ? item : candidate));
-const removeAt = <T,>(items: T[], index: number) => items.filter((_, candidateIndex) => candidateIndex !== index);
 const upsertById = <T extends { id: string }>(items: T[], item: T) =>
   items.some((candidate) => candidate.id === item.id)
     ? items.map((candidate) => (candidate.id === item.id ? item : candidate))
     : [item, ...items];
 const withoutId = <T extends { id: string }>(items: T[], id: string) => items.filter((item) => item.id !== id);
-const uniqueStrings = (items: string[]) => Array.from(new Set(items));
 const emptyRemoved = (): ContributionRemovedIds => ({
   locations: [],
   entities: [],
@@ -97,14 +96,15 @@ const layeredRows = <T extends { id: string }>(
 };
 
 const uniqueById = <T extends { id: string }>(items: T[]) => [...new Map(items.map((item) => [item.id, item])).values()];
-const allLocations = (bundle: ContentBundle, draft: ContributionDraft) => uniqueById([...bundle.locations, ...draft.locations]);
-const allEntities = (bundle: ContentBundle, draft: ContributionDraft) => uniqueById([...(bundle.entities ?? []), ...(draft.entities ?? [])]);
 const allSkills = (bundle: ContentBundle, draft: ContributionDraft) => uniqueById([...bundle.skills, ...draft.skills]);
 const allStats = (bundle: ContentBundle, draft: ContributionDraft) => uniqueById([...bundle.stats, ...draft.stats]);
 const allItems = (bundle: ContentBundle, draft: ContributionDraft) => uniqueById([...(bundle.items ?? []), ...draft.items]);
 const allFlags = (bundle: ContentBundle, draft: ContributionDraft) => uniqueById([...(bundle.flags ?? []), ...draft.flags]);
 const allInteractionTypes = (bundle: ContentBundle, draft: ContributionDraft) => uniqueById([...(bundle.interactionTypes ?? []), ...draft.interactionTypes]);
 const allEnemies = (bundle: ContentBundle, draft: ContributionDraft) => uniqueById([...(bundle.enemies ?? []), ...draft.enemies]);
+
+const defaultPatchTargetModId = (bundle: ContentBundle) =>
+  bundle.modules?.some((module) => module.id === 'base-core') ? 'base-core' : bundle.manifest.id;
 
 
 export const ContentDataEditor = ({ activeTab, baseBundle, bundle, draft, onPatch, onTabChange, t }: ContentDataEditorProps) => {
@@ -117,22 +117,23 @@ export const ContentDataEditor = ({ activeTab, baseBundle, bundle, draft, onPatc
   const [selectedEnemyKey, setSelectedEnemyKey] = useState<string | null>(null);
   const enemyEditorKeys = useRef<Record<string, string>>({});
   const localePreference = useUniverseState((state) => state.localePreference);
+  const setEnabledModules = useUniverseState((state) => state.setEnabledModules);
   const removed = { ...emptyRemoved(), ...(draft.removed ?? {}) };
   const workingLocaleId = workingLocale(bundle, localePreference);
   const removeButtonClass = 'rounded border border-rose-500 px-2 py-1.5 text-sm font-semibold text-rose-200';
-  const locations = layeredRows(draft.locations, baseBundle.locations, removed.locations, filter);
-  const actions = layeredRows(draft.actions, baseBundle.actions, removed.actions, filter);
-  const skills = layeredRows(draft.skills, baseBundle.skills, removed.skills, filter);
-  const stats = layeredRows(draft.stats, baseBundle.stats, removed.stats, filter);
-  const items = layeredRows(draft.items, baseBundle.items ?? [], removed.items, filter);
-  const flags = layeredRows(draft.flags, baseBundle.flags ?? [], removed.flags, filter);
-  const resources = layeredRows(draft.resourceDefinitions, baseBundle.resourceDefinitions ?? [], removed.resources, filter);
-  const effects = layeredRows(draft.effects, baseBundle.effects ?? [], removed.effects, filter);
-  const interactionTypes = layeredRows(draft.interactionTypes, baseBundle.interactionTypes ?? [], removed.interactionTypes, filter);
-  const enemies = layeredRows(draft.enemies, baseBundle.enemies ?? [], removed.enemies, filter);
-  const dropTables = layeredRows(draft.dropTables, baseBundle.dropTables ?? [], removed.dropTables, filter);
-  const dialogues = layeredRows(draft.dialogues, baseBundle.dialogues ?? [], removed.dialogues, filter);
-  const entities = layeredRows(draft.entities ?? [], baseBundle.entities ?? [], removed.entities ?? [], filter);
+  const locations = layeredRows(draft.locations, bundle.locations, removed.locations, filter);
+  const actions = layeredRows(draft.actions, bundle.actions, removed.actions, filter);
+  const skills = layeredRows(draft.skills, bundle.skills, removed.skills, filter);
+  const stats = layeredRows(draft.stats, bundle.stats, removed.stats, filter);
+  const items = layeredRows(draft.items, bundle.items ?? [], removed.items, filter);
+  const flags = layeredRows(draft.flags, bundle.flags ?? [], removed.flags, filter);
+  const resources = layeredRows(draft.resourceDefinitions, bundle.resourceDefinitions ?? [], removed.resources, filter);
+  const effects = layeredRows(draft.effects, bundle.effects ?? [], removed.effects, filter);
+  const interactionTypes = layeredRows(draft.interactionTypes, bundle.interactionTypes ?? [], removed.interactionTypes, filter);
+  const enemies = layeredRows(draft.enemies, bundle.enemies ?? [], removed.enemies, filter);
+  const dropTables = layeredRows(draft.dropTables, bundle.dropTables ?? [], removed.dropTables, filter);
+  const dialogues = layeredRows(draft.dialogues, bundle.dialogues ?? [], removed.dialogues, filter);
+  const entities = layeredRows(draft.entities ?? [], bundle.entities ?? [], removed.entities ?? [], filter);
   const selectedDialogueRow = dialogues.find((row) => row.item.id === selectedDialogueId) ?? null;
   const basePlayer = draft.basePlayer ?? bundle.manifest.basePlayer ?? { inventory: {} };
   const combatBalance = resolveCombatBalance(draft.combatBalance ?? bundle.manifest.combatBalance);
@@ -140,45 +141,69 @@ export const ContentDataEditor = ({ activeTab, baseBundle, bundle, draft, onPatc
   const universeExperience = draft.experience ?? bundle.manifest.experience ?? [];
   const displayProfiles = draft.displayProfiles ?? bundle.manifest.displayProfiles ?? [];
   const uiSettings = resolveUniverseUiSettings(draft.ui ?? bundle.manifest.ui);
-  const contributionBundle = {
-    ...bundle,
-    entities: allEntities(baseBundle, draft),
-    locations: locations.map((row) => row.item),
-    dropTables: dropTables.map((row) => row.item),
+  const patchWorkingLocale = (patch: Record<string, string>) => mergeLocalePatch(draft.locales, workingLocaleId, patch);
+  const modEditService = () => createModEditService({
+    resolvedBundle: bundle,
+    store: createDraftModStore(draft, onPatch),
+  });
+
+  const enableLocalContributions = () => {
+    const latestActiveModuleIds = new Set(useUniverseState.getState().enabledModules[bundle.manifest.id] ?? bundle.modules?.map((module) => module.id) ?? []);
+    if (!latestActiveModuleIds.has(localContributionsModId)) {
+      void setEnabledModules(bundle.manifest.id, [...latestActiveModuleIds, localContributionsModId]);
+    }
   };
 
-  const patchWorkingLocale = (patch: Record<string, string>) => mergeLocalePatch(draft.locales, workingLocaleId, patch);
-  const baseLocationIds = new Set(baseBundle.locations.map((location) => location.id));
-  const baseEntityIds = new Set((baseBundle.entities ?? []).map((entity) => entity.id));
-  const baseActionIds = new Set(baseBundle.actions.map((action) => action.id));
-  const nextRemovedIds = (baseIds: Set<string>, items: { id: string }[]) =>
-    Array.from(baseIds).filter((id) => !items.some((item) => item.id === id));
-  const patchLocations = (nextLocations: LocationNode[]) => {
-    onPatch({
-      locations: nextLocations,
-      removed: {
-        ...removed,
-        locations: nextRemovedIds(baseLocationIds, nextLocations),
-      },
-    });
+  const saveObjectListEdits = <T extends { id: string }>(objectType: string, previousItems: T[], nextItems: T[]) => {
+    const service = modEditService();
+    const targetModId = defaultPatchTargetModId(baseBundle);
+    const previousById = new Map(previousItems.map((item) => [item.id, item]));
+    const nextById = new Map(nextItems.map((item) => [item.id, item]));
+
+    for (const item of nextItems) {
+      const previous = previousById.get(item.id);
+      const ops = previous ? service.diffEdit(previous, item) : [{ op: 'add' as const, path: '', value: item }];
+      if (ops.length > 0) service.saveEdit(targetModId, objectType, item.id, ops);
+    }
+
+    for (const item of previousItems) {
+      if (!nextById.has(item.id)) service.saveEdit(targetModId, objectType, item.id, [{ op: 'remove', path: '' }]);
+    }
+
+    enableLocalContributions();
   };
-  const patchEntities = (nextEntities: EntityDefinition[]) => {
-    onPatch({
-      entities: nextEntities,
-      removed: {
-        ...removed,
-        entities: nextRemovedIds(baseEntityIds, nextEntities),
-      },
-    });
+
+  const objectTypeForDraftKey = (key: DraftListKey) => key;
+
+  const saveObjectEdit = <T extends { id: string }>(objectType: string, previous: T | null, next: T | null) => {
+    const service = modEditService();
+    const targetModId = defaultPatchTargetModId(baseBundle);
+    if (previous && next && previous.id !== next.id) {
+      service.saveEdit(targetModId, objectType, previous.id, [{ op: 'remove', path: '' }]);
+      service.saveEdit(targetModId, objectType, next.id, [{ op: 'add', path: '', value: next }]);
+    } else if (previous && next) {
+      const ops = service.diffEdit(previous, next);
+      if (ops.length > 0) service.saveEdit(targetModId, objectType, next.id, ops);
+    } else if (next) {
+      service.saveEdit(targetModId, objectType, next.id, [{ op: 'add', path: '', value: next }]);
+    } else if (previous) {
+      service.saveEdit(targetModId, objectType, previous.id, [{ op: 'remove', path: '' }]);
+    }
+    enableLocalContributions();
   };
-  const patchActions = (nextActions: GameAction[]) => {
-    onPatch({
-      actions: nextActions,
-      removed: {
-        ...removed,
-        actions: nextRemovedIds(baseActionIds, nextActions),
-      },
-    });
+
+  const patchLocalMapModule = (
+    nextLocations: LocationNode[] = bundle.locations,
+    nextActions: GameAction[] = bundle.actions,
+    nextEntities: EntityDefinition[] = bundle.entities ?? [],
+    localePatch: Record<string, string> = {},
+  ) => {
+    saveObjectListEdits('locations', bundle.locations, nextLocations);
+    saveObjectListEdits('actions', bundle.actions, nextActions);
+    saveObjectListEdits('entities', bundle.entities ?? [], nextEntities);
+    if (Object.keys(localePatch).length > 0) {
+      onPatch({ locales: patchWorkingLocale(localePatch) });
+    }
   };
 
   useEffect(() => {
@@ -189,25 +214,13 @@ export const ContentDataEditor = ({ activeTab, baseBundle, bundle, draft, onPatc
     setSelectedDialogueId(dialogues[0]?.item.id ?? null);
   }, [dialogues, selectedDialogueId]);
 
-  const unremoveId = (key: DraftListKey, id: string) => ({
-    ...removed,
-    [key]: (removed[key] ?? []).filter((removedId) => removedId !== id),
-  });
-
   const promote = <T extends { id: string }>(key: DraftListKey, item: T, originalId = item.id) => {
-    onPatch({
-      [key]: upsertById(withoutId(draft[key] as T[], originalId), item),
-      removed: originalId === item.id ? unremoveId(key, item.id) : { ...unremoveId(key, item.id), [key]: uniqueStrings([...(removed[key] ?? []), originalId]) },
-    });
+    const previous = [...(draft[key] as T[]), ...((bundle as unknown as Record<string, T[] | undefined>)[key] ?? [])].find((candidate) => candidate.id === originalId) ?? null;
+    saveObjectEdit(objectTypeForDraftKey(key), previous, item);
   };
 
   const removeRow = <T extends { id: string }>(key: DraftListKey, row: LayeredRow<T>) => {
-    if (row.source === 'draft') {
-      onPatch({ [key]: removeAt(draft[key] as T[], row.index) });
-      return;
-    }
-
-    onPatch({ removed: { ...removed, [key]: uniqueStrings([...(removed[key] ?? []), row.item.id]) } });
+    saveObjectEdit(objectTypeForDraftKey(key), row.item, null);
   };
 
   const updateLocation = (row: LayeredRow<LocationNode>, patch: Partial<LocationNode>) => {
@@ -228,20 +241,11 @@ export const ContentDataEditor = ({ activeTab, baseBundle, bundle, draft, onPatc
 
   const updateResource = (row: LayeredRow<ResourceDefinition>, patch: Partial<ResourceDefinition>) => {
     const item = { ...row.item, ...patch };
-    onPatch({
-      resourceDefinitions: upsertById(withoutId(draft.resourceDefinitions, row.item.id), item),
-      removed: row.item.id === item.id
-        ? { ...removed, resources: removed.resources.filter((id) => id !== item.id) }
-        : { ...removed, resources: uniqueStrings([...removed.resources.filter((id) => id !== item.id), row.item.id]) },
-    });
+    saveObjectEdit('resources', row.item, item);
   };
 
   const removeResource = (row: LayeredRow<ResourceDefinition>) => {
-    if (row.source === 'draft') {
-      onPatch({ resourceDefinitions: removeAt(draft.resourceDefinitions, row.index) });
-    } else {
-      onPatch({ removed: { ...removed, resources: uniqueStrings([...removed.resources, row.item.id]) } });
-    }
+    saveObjectEdit('resources', row.item, null);
   };
 
   const updateEffect = (row: LayeredRow<EffectDefinition>, patch: Partial<EffectDefinition>) => {
@@ -320,17 +324,12 @@ export const ContentDataEditor = ({ activeTab, baseBundle, bundle, draft, onPatc
   const addLocation = () => {
     const allLocationItems = locations.map((row) => row.item);
     const id = uniqueId('new-location', allLocationItems.map((location) => location.id));
-    const titleKey = locationTitleKey(id);
-    const descriptionKey = locationDescriptionKey(id);
+    saveObjectEdit('locations', null, {
+      id,
+      position: { x: 80 + allLocationItems.length * 80, y: 320 },
+      tags: ['community'],
+    });
     onPatch({
-      locations: [
-        {
-          id,
-          position: { x: 80 + allLocationItems.length * 80, y: 320 },
-          tags: ['community'],
-        },
-        ...draft.locations,
-      ],
       locales: patchWorkingLocale(defaultModuleLocalePatch('locations', id)),
     });
   };
@@ -339,66 +338,63 @@ export const ContentDataEditor = ({ activeTab, baseBundle, bundle, draft, onPatc
     const allActionItems = actions.map((row) => row.item);
     const id = uniqueId('new-action', allActionItems.map((action) => action.id));
     setSelectedActionId(id);
+    saveObjectEdit('actions', null, {
+      id,
+      locationId: locations[0]?.item.id ?? '',
+      instant: false,
+      durationSeconds: 10,
+      rewards: [],
+    });
     onPatch({
-      actions: [
-        {
-          id,
-          locationId: locations[0]?.item.id ?? '',
-          instant: false,
-          durationSeconds: 10,
-          rewards: [],
-        },
-        ...draft.actions,
-      ],
       locales: patchWorkingLocale(defaultModuleLocalePatch('actions', id)),
     });
   };
 
   const addSkill = () => {
     const id = uniqueId('new-skill', skills.map((row) => row.item.id));
+    saveObjectEdit('skills', null, { id, maxLevel: 100, statId: stats[0]?.item.id });
     onPatch({
-      skills: [{ id, maxLevel: 100, statId: stats[0]?.item.id }, ...draft.skills],
       locales: patchWorkingLocale(defaultModuleLocalePatch('skills', id)),
     });
   };
 
   const addStat = () => {
     const id = uniqueId('new-stat', stats.map((row) => row.item.id));
+    saveObjectEdit('stats', null, { id, base: 0 });
     onPatch({
-      stats: [{ id, base: 0 }, ...draft.stats],
       locales: patchWorkingLocale(defaultModuleLocalePatch('stats', id)),
     });
   };
 
   const addItem = () => {
     const id = uniqueId('new-item', items.map((row) => row.item.id));
+    saveObjectEdit('items', null, { id });
     onPatch({
-      items: [{ id }, ...draft.items],
       locales: patchWorkingLocale(defaultModuleLocalePatch('items', id)),
     });
   };
 
   const addFlag = () => {
     const id = uniqueId('new-flag', flags.map((row) => row.item.id));
-    onPatch({ flags: [{ id, initialValue: false }, ...draft.flags] });
+    saveObjectEdit('flags', null, { id, initialValue: false });
   };
 
   const addResource = () => {
     const id = uniqueId('new-resource', resources.map((row) => row.item.id));
+    saveObjectEdit('resources', null, { id, sourceStat: stats[0]?.item.id ?? '', initialValue: 'full' });
     onPatch({
-      resourceDefinitions: [{ id, sourceStat: stats[0]?.item.id ?? '', initialValue: 'full' }, ...draft.resourceDefinitions],
       locales: patchWorkingLocale(defaultModuleLocalePatch('resources', id)),
     });
   };
 
   const addEffect = () => {
     const id = uniqueId('new-effect', effects.map((row) => row.item.id));
+    saveObjectEdit('effects', null, {
+      id,
+      resourceId: resources[0]?.item.id ?? '',
+      sourceStat: stats[0]?.item.id ?? '',
+    });
     onPatch({
-      effects: [{
-        id,
-        resourceId: resources[0]?.item.id ?? '',
-        sourceStat: stats[0]?.item.id ?? '',
-      }, ...draft.effects],
       locales: patchWorkingLocale(defaultModuleLocalePatch('effects', id)),
     });
   };
@@ -407,8 +403,8 @@ export const ContentDataEditor = ({ activeTab, baseBundle, bundle, draft, onPatc
     const id = uniqueId('new-interaction', interactionTypes.map((row) => row.item.id));
     const sourceStatId = stats[0]?.item.id ?? '';
     const targetStatId = stats[1]?.item.id ?? sourceStatId;
+    saveObjectEdit('interactionTypes', null, { id, sourceStatId, targetStatId, targetPlayerHealth: false, experience: [] });
     onPatch({
-      interactionTypes: [{ id, sourceStatId, targetStatId, targetPlayerHealth: false, experience: [] }, ...draft.interactionTypes],
       locales: patchWorkingLocale(defaultModuleLocalePatch('interactionTypes', id)),
     });
   };
@@ -417,21 +413,16 @@ export const ContentDataEditor = ({ activeTab, baseBundle, bundle, draft, onPatc
     const id = uniqueId('new-enemy', enemies.map((row) => row.item.id));
     const interactionTypeId = interactionTypes[0]?.item.id ?? '';
     setSelectedEnemyKey(enemyEditorKey(id));
-    onPatch({
-      enemies: [
-        {
-          id,
-          interactionTypeId,
-          stats: {
-            attack: 10,
-            defense: 10,
-            rate: 25,
-          },
-          showHealthBar: true,
-          rewards: [],
-        },
-        ...draft.enemies,
-      ],
+    saveObjectEdit('enemies', null, {
+      id,
+      interactionTypeId,
+      stats: {
+        attack: 10,
+        defense: 10,
+        rate: 25,
+      },
+      showHealthBar: true,
+      rewards: [],
     });
   };
 
@@ -439,15 +430,12 @@ export const ContentDataEditor = ({ activeTab, baseBundle, bundle, draft, onPatc
     const id = uniqueId('new-dialogue', dialogues.map((row) => row.item.id));
     const startNodeId = 'start';
     const textKey = dialogueTextKey(id, startNodeId);
+    saveObjectEdit('dialogues', null, {
+      id,
+      startNodeId,
+      nodes: [{ id: startNodeId, textKey }],
+    });
     onPatch({
-      dialogues: [
-        {
-          id,
-          startNodeId,
-          nodes: [{ id: startNodeId, textKey }],
-        },
-        ...draft.dialogues,
-      ],
       locales: mergeLocalePatch(draft.locales, workingLocaleId, {
         [textKey]: t('contribution.dialogue.defaultNodeText'),
       }),
@@ -508,21 +496,21 @@ export const ContentDataEditor = ({ activeTab, baseBundle, bundle, draft, onPatc
         ui: next.ui as UniverseUiSettings | undefined,
       });
     } },
-    { path: 'locations.json', json: locations.map((row) => row.item), schema: { kind: 'array' as const, listMode: 'free' as const, item: locationSchema(bundle), createItem: () => ({ id: 'new-location', position: { x: 0, y: 0 } }) }, onChange: (value: StructuredValue | undefined) => patchLocations((Array.isArray(value) ? value : []) as unknown as LocationNode[]) },
-    { path: 'actions.json', json: actions.map((row) => row.item), onChange: (value: StructuredValue | undefined) => patchActions((Array.isArray(value) ? value : []) as unknown as GameAction[]) },
-    { path: 'entities.json', json: entities.map((row) => row.item), onChange: (value: StructuredValue | undefined) => patchEntities((Array.isArray(value) ? value : []) as unknown as { id: string }[]) },
-    { path: 'dialogues.json', json: dialogues.map((row) => row.item), schema: { kind: 'array' as const, listMode: 'free' as const, item: dialogueSchema(bundle), createItem: () => ({ id: 'new-dialogue', startNodeId: 'start', nodes: [{ id: 'start', textKey: 'dialogue.new-dialogue.start' }] }) }, onChange: (value: StructuredValue | undefined) => onPatch({ dialogues: (Array.isArray(value) ? value : []) as unknown as DialogueDefinition[] }) },
-    { path: 'drop-tables.json', json: dropTables.map((row) => row.item), schema: { kind: 'array' as const, listMode: 'free' as const, item: dropTableDefinitionSchema(bundle), createItem: () => ({ id: 'new-drop-table', mode: 'dependent', drops: [] }) }, onChange: (value: StructuredValue | undefined) => onPatch({ dropTables: (Array.isArray(value) ? value : []) as unknown as DropTableDefinition[] }) },
+    { path: 'locations.json', json: locations.map((row) => row.item), schema: { kind: 'array' as const, listMode: 'free' as const, item: locationSchema(bundle), createItem: () => ({ id: 'new-location', position: { x: 0, y: 0 } }) }, onChange: (value: StructuredValue | undefined) => patchLocalMapModule((Array.isArray(value) ? value : []) as unknown as LocationNode[], bundle.actions, bundle.entities ?? []) },
+    { path: 'actions.json', json: actions.map((row) => row.item), onChange: (value: StructuredValue | undefined) => patchLocalMapModule(bundle.locations, (Array.isArray(value) ? value : []) as unknown as GameAction[], bundle.entities ?? []) },
+    { path: 'entities.json', json: entities.map((row) => row.item), onChange: (value: StructuredValue | undefined) => patchLocalMapModule(bundle.locations, bundle.actions, (Array.isArray(value) ? value : []) as unknown as EntityDefinition[]) },
+    { path: 'dialogues.json', json: dialogues.map((row) => row.item), schema: { kind: 'array' as const, listMode: 'free' as const, item: dialogueSchema(bundle), createItem: () => ({ id: 'new-dialogue', startNodeId: 'start', nodes: [{ id: 'start', textKey: 'dialogue.new-dialogue.start' }] }) }, onChange: (value: StructuredValue | undefined) => saveObjectListEdits('dialogues', bundle.dialogues ?? [], (Array.isArray(value) ? value : []) as unknown as DialogueDefinition[]) },
+    { path: 'drop-tables.json', json: dropTables.map((row) => row.item), schema: { kind: 'array' as const, listMode: 'free' as const, item: dropTableDefinitionSchema(bundle), createItem: () => ({ id: 'new-drop-table', mode: 'dependent', drops: [] }) }, onChange: (value: StructuredValue | undefined) => saveObjectListEdits('dropTables', bundle.dropTables ?? [], (Array.isArray(value) ? value : []) as unknown as DropTableDefinition[]) },
     ...moduleJsonFiles,
     { path: 'module-packs.json', json: draft.modulePacks, schema: { kind: 'array' as const, listMode: 'free' as const, item: modulePackSchema(bundle), createItem: () => ({ id: 'new-pack', modules: [] }) }, onChange: (value: StructuredValue | undefined) => onPatch({ modulePacks: (Array.isArray(value) ? value : []) as unknown as ContentModulePack[] }) },
-    { path: 'skills.json', json: skills.map((row) => row.item), schema: { kind: 'array' as const, listMode: 'table' as const, columns: ['id', 'maxLevel', 'statId', 'addedPerLevel', 'increasedPerLevel'], item: skillDefinitionSchema(bundle), createItem: () => ({ id: 'new-skill', maxLevel: 100 }) }, onChange: (value: StructuredValue | undefined) => onPatch({ skills: (Array.isArray(value) ? value : []) as unknown as SkillDefinition[] }) },
-    { path: 'stats.json', json: stats.map((row) => row.item), schema: { kind: 'array' as const, listMode: 'table' as const, columns: ['id', 'base'], item: statDefinitionSchema(), createItem: () => ({ id: 'new-stat', base: 0 }) }, onChange: (value: StructuredValue | undefined) => onPatch({ stats: (Array.isArray(value) ? value : []) as unknown as StatDefinition[] }) },
-    { path: 'items.json', json: items.map((row) => row.item), schema: { kind: 'array' as const, listMode: 'table' as const, columns: ['id', 'maxQuantity', 'tags'], item: itemDefinitionSchema(), createItem: () => ({ id: 'new-item' }) }, onChange: (value: StructuredValue | undefined) => onPatch({ items: (Array.isArray(value) ? value : []) as unknown as ItemDefinition[] }) },
-    { path: 'flags.json', json: flags.map((row) => row.item), schema: { kind: 'array' as const, listMode: 'table' as const, columns: ['id', 'initialValue'], item: flagDefinitionSchema(), createItem: () => ({ id: 'new-flag', initialValue: false }) }, onChange: (value: StructuredValue | undefined) => onPatch({ flags: (Array.isArray(value) ? value : []) as unknown as StateFlagDefinition[] }) },
-    { path: 'resources.json', json: resources.map((row) => row.item), onChange: (value: StructuredValue | undefined) => onPatch({ resourceDefinitions: (Array.isArray(value) ? value : []) as unknown as ResourceDefinition[] }) },
-    { path: 'effects.json', json: effects.map((row) => row.item), onChange: (value: StructuredValue | undefined) => onPatch({ effects: (Array.isArray(value) ? value : []) as unknown as EffectDefinition[] }) },
-    { path: 'interaction-types.json', json: interactionTypes.map((row) => row.item), schema: { kind: 'array' as const, listMode: 'table' as const, columns: ['id', 'sourceStatId', 'targetStatId', 'targetPlayerHealth'], item: interactionTypeDefinitionSchema(bundle), createItem: () => ({ id: 'new-interaction', sourceStatId: stats[0]?.item.id ?? '', targetStatId: stats[0]?.item.id ?? '', targetPlayerHealth: false, experience: [] }) }, onChange: (value: StructuredValue | undefined) => onPatch({ interactionTypes: (Array.isArray(value) ? value : []) as unknown as InteractionTypeDefinition[] }) },
-    { path: 'enemies.json', json: enemies.map((row) => row.item), onChange: (value: StructuredValue | undefined) => onPatch({ enemies: (Array.isArray(value) ? value : []) as unknown as EnemyDefinition[] }) },
+    { path: 'skills.json', json: skills.map((row) => row.item), schema: { kind: 'array' as const, listMode: 'table' as const, columns: ['id', 'maxLevel', 'statId', 'addedPerLevel', 'increasedPerLevel'], item: skillDefinitionSchema(bundle), createItem: () => ({ id: 'new-skill', maxLevel: 100 }) }, onChange: (value: StructuredValue | undefined) => saveObjectListEdits('skills', bundle.skills, (Array.isArray(value) ? value : []) as unknown as SkillDefinition[]) },
+    { path: 'stats.json', json: stats.map((row) => row.item), schema: { kind: 'array' as const, listMode: 'table' as const, columns: ['id', 'base'], item: statDefinitionSchema(), createItem: () => ({ id: 'new-stat', base: 0 }) }, onChange: (value: StructuredValue | undefined) => saveObjectListEdits('stats', bundle.stats, (Array.isArray(value) ? value : []) as unknown as StatDefinition[]) },
+    { path: 'items.json', json: items.map((row) => row.item), schema: { kind: 'array' as const, listMode: 'table' as const, columns: ['id', 'maxQuantity', 'tags'], item: itemDefinitionSchema(), createItem: () => ({ id: 'new-item' }) }, onChange: (value: StructuredValue | undefined) => saveObjectListEdits('items', bundle.items ?? [], (Array.isArray(value) ? value : []) as unknown as ItemDefinition[]) },
+    { path: 'flags.json', json: flags.map((row) => row.item), schema: { kind: 'array' as const, listMode: 'table' as const, columns: ['id', 'initialValue'], item: flagDefinitionSchema(), createItem: () => ({ id: 'new-flag', initialValue: false }) }, onChange: (value: StructuredValue | undefined) => saveObjectListEdits('flags', bundle.flags ?? [], (Array.isArray(value) ? value : []) as unknown as StateFlagDefinition[]) },
+    { path: 'resources.json', json: resources.map((row) => row.item), onChange: (value: StructuredValue | undefined) => saveObjectListEdits('resources', bundle.resourceDefinitions ?? [], (Array.isArray(value) ? value : []) as unknown as ResourceDefinition[]) },
+    { path: 'effects.json', json: effects.map((row) => row.item), onChange: (value: StructuredValue | undefined) => saveObjectListEdits('effects', bundle.effects ?? [], (Array.isArray(value) ? value : []) as unknown as EffectDefinition[]) },
+    { path: 'interaction-types.json', json: interactionTypes.map((row) => row.item), schema: { kind: 'array' as const, listMode: 'table' as const, columns: ['id', 'sourceStatId', 'targetStatId', 'targetPlayerHealth'], item: interactionTypeDefinitionSchema(bundle), createItem: () => ({ id: 'new-interaction', sourceStatId: stats[0]?.item.id ?? '', targetStatId: stats[0]?.item.id ?? '', targetPlayerHealth: false, experience: [] }) }, onChange: (value: StructuredValue | undefined) => saveObjectListEdits('interactionTypes', bundle.interactionTypes ?? [], (Array.isArray(value) ? value : []) as unknown as InteractionTypeDefinition[]) },
+    { path: 'enemies.json', json: enemies.map((row) => row.item), onChange: (value: StructuredValue | undefined) => saveObjectListEdits('enemies', bundle.enemies ?? [], (Array.isArray(value) ? value : []) as unknown as EnemyDefinition[]) },
     { path: 'removed.json', json: draft.removed, onChange: (value: StructuredValue | undefined) => onPatch({ removed: value as unknown as ContributionRemovedIds }) },
     { path: 'locales.json', json: draft.locales, onChange: (value: StructuredValue | undefined) => onPatch({ locales: (value ?? {}) as ContributionDraft['locales'] }) },
   ];
@@ -570,11 +558,11 @@ export const ContentDataEditor = ({ activeTab, baseBundle, bundle, draft, onPatc
       {activeTab === 'map' && (
         <section className="grid gap-2">
           <ContributionMapEditor
-            bundle={contributionBundle}
-            onEntitiesChange={(entities) => onPatch({ entities })}
-            onActionsChange={patchActions}
-            onLocationsChange={patchLocations}
-            onLocalesChange={(patch) => onPatch({ locales: patchWorkingLocale(patch) })}
+            bundle={bundle}
+            onEntitiesChange={(entities) => patchLocalMapModule(bundle.locations, bundle.actions, entities)}
+            onActionsChange={(actions) => patchLocalMapModule(bundle.locations, actions, bundle.entities ?? [])}
+            onLocationsChange={(locations) => patchLocalMapModule(locations, bundle.actions, bundle.entities ?? [])}
+            onLocalesChange={(patch) => patchLocalMapModule(bundle.locations, bundle.actions, bundle.entities ?? [], patch)}
             t={t}
           />
         </section>
@@ -996,7 +984,7 @@ export const ContentDataEditor = ({ activeTab, baseBundle, bundle, draft, onPatc
       )}
 
       <datalist id="content-location-ids">
-        {allLocations(bundle, draft).map((location) => (
+        {bundle.locations.map((location) => (
           <option key={location.id} value={location.id} />
         ))}
       </datalist>

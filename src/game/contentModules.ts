@@ -11,6 +11,7 @@ import type {
   ModuleDataSectionObject,
   ModuleDataUpdates,
   ModuleDataUpdatesObject,
+  ModuleObjectPatch,
   ValidationIssue,
 } from './types';
 import {
@@ -43,7 +44,24 @@ import { isTravelAction, travelActionLocalizationKeys } from './actionLocalizati
 import { validateContentBundle, validateContentShape, validateLocaleDictionary } from './validators';
 import { collectionCategoryTitleKey } from './collectionLog';
 import { normalizeContentBundleStructure } from './contentNormalization';
+import { applyJsonPatch } from './jsonPatch';
+import { getModObjectType } from './modObjectRegistry';
 
+// Dependency
+// Each dependency is a string that consists of up to three parts: "<prefix> internal-mod-name <equality-operator> <version>".
+
+// Example: "? some-other-mod >= 4.2.0"
+
+// The equality operator (<, <=, =, >= or >) combined with the version allows to define dependencies that require certain mod versions, but it is not required. Incompatibility does not support versions; if incompatibility is used, version is ignored. If a version is used for an optional dependency, the mod is considered incompatible (and disabled) if the dependency is present but does not fulfill the version requirement.
+
+// The possible prefixes are:
+
+// ! for incompatibility
+// ? for an optional dependency
+// + for a recommended dependency
+// (?) for a hidden optional dependency
+// ~ for a dependency that does not affect load order
+// no prefix for a hard requirement for the other mod
 type ModuleDependency = {
   id: string;
   prefix: '' | '!' | '+' | '?' | '~';
@@ -326,6 +344,22 @@ const validateModuleDataSection = (bundle: ContentBundle, module: ContentModule,
 const validateModuleDataUpdatesShape = (module: ContentModule): ValidationIssue[] => {
   const updates = moduleDataUpdatesObject(module['data-updates']);
   const issues: ValidationIssue[] = [];
+
+  for (const [index, patch] of (updates?.patches ?? []).entries()) {
+    if (!isRecord(patch) ||
+      typeof patch.targetModId !== 'string' ||
+      typeof patch.objectType !== 'string' ||
+      typeof patch.objectId !== 'string' ||
+      !Array.isArray(patch.ops) ||
+      patch.ops.some((op) =>
+        !isRecord(op) ||
+        (op.op !== 'add' && op.op !== 'replace' && op.op !== 'remove') ||
+        typeof op.path !== 'string' ||
+        ((op.op === 'add' || op.op === 'replace') && !('value' in op)),
+      )) {
+      issues.push(issue('error', `modules.${module.id}.data-updates.patches.${index}`, 'validation.modulePatchInvalid', { id: String(index) }));
+    }
+  }
 
   if (updates?.remove !== undefined) {
     if (!isRecord(updates.remove)) {
@@ -626,6 +660,7 @@ const validateModuleDataUpdateDuplicates = (module: ContentModule): ValidationIs
 
 const validateModuleDataUpdateTargets = (bundle: ContentBundle, module: ContentModule): ValidationIssue[] => {
   const data = normalizeModuleDataSection(module['data-updates']);
+  const patches = moduleDataUpdatesObject(module['data-updates'])?.patches ?? [];
   const existingIds = existingDataIdsFromBundle(bundle);
   const issues: ValidationIssue[] = [];
 
@@ -639,6 +674,22 @@ const validateModuleDataUpdateTargets = (bundle: ContentBundle, module: ContentM
   for (const row of sectionResources(data) as Array<{ id?: unknown }>) {
     if (!hasId(row) || existingIds.resources?.has(row.id)) continue;
     issues.push(issue('error', `modules.${module.id}.data-updates.resources.${row.id}`, 'validation.moduleUpdateTargetMissing', { id: row.id }));
+  }
+
+  for (const [index, patch] of patches.entries()) {
+    const entry = getModObjectType(patch.objectType);
+    if (!entry) {
+      issues.push(issue('error', `modules.${module.id}.data-updates.patches.${index}.objectType`, 'validation.moduleDataTypeInvalid', { id: patch.objectType }));
+      continue;
+    }
+    const exists = entry.read(bundle).some((item) => item.id === patch.objectId);
+    const createsObject = patch.ops.some((op) => op.op === 'add' && op.path === '');
+    if (!exists && !createsObject) {
+      issues.push(issue('error', `modules.${module.id}.data-updates.patches.${index}`, 'validation.moduleUpdateTargetMissing', { id: patch.objectId }));
+    }
+    if (exists && createsObject) {
+      issues.push(issue('error', `modules.${module.id}.data-updates.patches.${index}`, 'validation.duplicateId', { id: patch.objectId }));
+    }
   }
 
   return issues;
@@ -816,6 +867,29 @@ const applyDataUpdateSection = (bundle: ContentBundle, data?: ModuleDataSection)
   };
 };
 
+const applyObjectPatches = (bundle: ContentBundle, patches: ModuleObjectPatch[] = []) => {
+  let next = bundle;
+  for (const patch of patches) {
+    const entry = getModObjectType(patch.objectType);
+    if (!entry) continue;
+    const rows = entry.read(next);
+    const current = rows.find((row) => row.id === patch.objectId);
+    const patched = applyJsonPatch(current, patch.ops) as { id?: string } | undefined;
+    if (!patched) {
+      next = entry.write(next, rows.filter((row) => row.id !== patch.objectId));
+      continue;
+    }
+    const row = { ...patched, id: patch.objectId } as { id: string };
+    next = entry.write(
+      next,
+      current
+        ? rows.map((candidate) => (candidate.id === patch.objectId ? row : candidate))
+        : [...rows, row],
+    );
+  }
+  return next;
+};
+
 const applyDataUpdates = (bundle: ContentBundle, updates?: ModuleDataUpdates): ContentBundle => {
   if (!updates) return bundle;
   const updateObject = moduleDataUpdatesObject(updates);
@@ -841,7 +915,7 @@ const applyDataUpdates = (bundle: ContentBundle, updates?: ModuleDataUpdates): C
     dialogues: removeDialogueOptions(removeById(bundle.dialogues ?? [], removed.dialogues), removed.dialogueOptions),
     locales: mergeLocales(bundle.locales, updateObject?.locale, removed.locales),
   };
-  return applyDataUpdateSection(withoutRemoved, updates);
+  return applyObjectPatches(applyDataUpdateSection(withoutRemoved, updates), updateObject?.patches);
 };
 
 const resolveEnabledSet = (modules: ContentModule[], requestedEnabledIds?: string[]) => {
@@ -1014,6 +1088,9 @@ const contentPathKey = (validationIssue: ValidationIssue) => {
 const rowsForModuleKey = (module: ContentModule, key: keyof ModuleDataSectionObject) => [
   ...((normalizeModuleDataSection(module.data)[key] as Array<{ id?: unknown }> | undefined) ?? []),
   ...((normalizeModuleDataSection(module['data-updates'])[key] as Array<{ id?: unknown }> | undefined) ?? []),
+  ...((moduleDataUpdatesObject(module['data-updates'])?.patches ?? [])
+    .filter((patch) => getModObjectType(patch.objectType)?.dataKey === key)
+    .map((patch) => ({ id: patch.objectId, ops: patch.ops }))),
 ];
 
 const moduleChangesContentPath = (module: ContentModule, validationIssue: ValidationIssue, missingId: string) => {

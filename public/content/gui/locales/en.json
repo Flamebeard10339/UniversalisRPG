@@ -643,6 +643,7 @@
   "validation.modulePacksInvalid": "Module packs must be an array of valid pack objects.",
   "validation.modulePackUnknownModule": "Module pack \"{pack}\" references unknown module \"{id}\".",
   "validation.moduleRemoveInvalid": "Module removal entries must be arrays of ids.",
+  "validation.modulePatchInvalid": "Module patch entries must include a target mod id, object type, object id, and valid patch operations.",
   "validation.moduleShapeInvalid": "Module \"{id}\" has invalid metadata or does not match its filename.",
   "validation.moduleUpdateTargetMissing": "Module update target \"{id}\" does not exist.",
   "validation.moduleVersionInvalid": "Module \"{id}\" has an invalid version. Use number.number.number with each number from 0 to 65535.",

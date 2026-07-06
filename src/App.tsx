@@ -28,7 +28,9 @@ import {
   resolveDisplayPalette,
 } from './game/displayProfiles';
 import { getInteractionType, isContinuousAction } from './game/adversarial';
-import type { ContentModule, ContentModulePack, ContributionDraft, DisplayColorPalette, DisplayProfileDefinition, IdleReport, UniversePlayState } from './game/types';
+import type { ContentBundle, ContentModule, ContentModulePack, ContributionDraft, DisplayColorPalette, DisplayProfileDefinition, EntityDefinition, GameAction, IdleReport, LocationNode, UniversePlayState } from './game/types';
+import { createModEditService, localContributionsModId } from './game/modEditService';
+import { createDraftModStore } from './game/modStore';
 import { getNextResourceBoundaryAt } from './game/resources';
 import { aggregateIdleRewards } from './game/rewards';
 import { findTravelPath } from './game/travel';
@@ -38,7 +40,7 @@ import { useContributionState } from './stores/contributionState';
 import { contributionRuntimeId } from './stores/contributionPlayState';
 import { useGameState } from './stores/gameState';
 import { useUniverseState } from './stores/universeState';
-import { mergeLocalePatch, workingLocale } from './components/contribution/contributionLocalization';
+import { workingLocale } from './components/contribution/contributionLocalization';
 
 const getStartingLocationId = (bundle: NonNullable<ReturnType<typeof useUniverseState.getState>['bundle']>) =>
   bundle.locations.find((location) => location.starting)?.id ?? bundle.locations[0]?.id ?? '';
@@ -430,6 +432,47 @@ export default function App() {
     updateContributionDraft(bundle.manifest.id, patch);
     queueMicrotask(refreshContributionPreview);
   };
+  const patchLocalMapModule = (patch: { locations?: LocationNode[]; actions?: GameAction[]; entities?: EntityDefinition[]; localePatch?: Record<string, string> }) => {
+    if (!bundle) return;
+    const latestDraft = useContributionState.getState().getDraft(bundle.manifest.id) ?? currentContributionDraft ?? emptyContributionDraft(bundle.manifest.id);
+    const service = createModEditService({
+      resolvedBundle: bundle,
+      store: createDraftModStore(latestDraft, patchContributionDraft),
+    });
+    const targetModId = (baseBundle ?? bundle).modules?.some((module) => module.id === 'base-core') ? 'base-core' : (baseBundle ?? bundle).manifest.id;
+    const saveList = <T extends { id: string }>(objectType: string, previousItems: T[], nextItems: T[]) => {
+      const previousById = new Map(previousItems.map((item) => [item.id, item]));
+      const nextById = new Map(nextItems.map((item) => [item.id, item]));
+      for (const item of nextItems) {
+        const previous = previousById.get(item.id);
+        const ops = previous ? service.diffEdit(previous, item) : [{ op: 'add' as const, path: '', value: item }];
+        if (ops.length > 0) service.saveEdit(targetModId, objectType, item.id, ops);
+      }
+      for (const item of previousItems) {
+        if (!nextById.has(item.id)) service.saveEdit(targetModId, objectType, item.id, [{ op: 'remove', path: '' }]);
+      }
+    };
+
+    saveList('locations', bundle.locations, patch.locations ?? bundle.locations);
+    saveList('actions', bundle.actions, patch.actions ?? bundle.actions);
+    saveList('entities', bundle.entities ?? [], patch.entities ?? (bundle.entities ?? []));
+    if (patch.localePatch && Object.keys(patch.localePatch).length > 0) {
+      patchContributionDraft({
+        locales: {
+          ...latestDraft.locales,
+          [workingLocale(bundle, localePreference)]: {
+            ...(latestDraft.locales[workingLocale(bundle, localePreference)] ?? {}),
+            ...patch.localePatch,
+          },
+        },
+      });
+    }
+
+    const latestActiveModuleIds = new Set(useUniverseState.getState().enabledModules[bundle.manifest.id] ?? bundle.modules?.map((module) => module.id) ?? []);
+    if (!latestActiveModuleIds.has(localContributionsModId)) {
+      void setEnabledModules(bundle.manifest.id, [...latestActiveModuleIds, localContributionsModId]);
+    }
+  };
   const ensureQuickWorkbenchModule = () => {
     if (!bundle) return '';
     const latestDraft = useContributionState.getState().getDraft(bundle.manifest.id) ?? currentContributionDraft ?? emptyContributionDraft(bundle.manifest.id);
@@ -735,16 +778,10 @@ export default function App() {
             {contributionMode && bundle && currentContributionDraft ? (
               <ContributionMapEditor
                 bundle={bundle}
-                onActionsChange={(actions) => patchContributionDraft({ actions })}
-                onEntitiesChange={(entities) => patchContributionDraft({ entities })}
-                onLocationsChange={(locations) => patchContributionDraft({ locations })}
-                onLocalesChange={(patch) => patchContributionDraft({
-                  locales: mergeLocalePatch(
-                    currentContributionDraft.locales,
-                    workingLocale(bundle, localePreference),
-                    patch,
-                  ),
-                })}
+                onActionsChange={(actions) => patchLocalMapModule({ actions })}
+                onEntitiesChange={(entities) => patchLocalMapModule({ entities })}
+                onLocationsChange={(locations) => patchLocalMapModule({ locations })}
+                onLocalesChange={(patch) => patchLocalMapModule({ localePatch: patch })}
                 t={t}
               />
             ) : (

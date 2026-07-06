@@ -237,6 +237,12 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
+        "patches": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/objectPatch"
+          }
+        },
         "locations": {
           "$ref": "https://universalis-rpg.local/schema/locations.schema.json"
         },
@@ -461,6 +467,77 @@
           }
         }
       }
+    },
+    "objectPatch": {
+      "type": "object",
+      "required": [
+        "targetModId",
+        "objectType",
+        "objectId",
+        "ops"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "targetModId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "objectType": {
+          "type": "string",
+          "minLength": 1
+        },
+        "objectId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "ops": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/jsonPatchOperation"
+          }
+        }
+      }
+    },
+    "jsonPatchOperation": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": [
+            "op",
+            "path",
+            "value"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "op": {
+              "enum": [
+                "add",
+                "replace"
+              ]
+            },
+            "path": {
+              "type": "string"
+            },
+            "value": true
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "op",
+            "path"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "op": {
+              "const": "remove"
+            },
+            "path": {
+              "type": "string"
+            }
+          }
+        }
+      ]
     },
     "locationEntry": {
       "type": "object",

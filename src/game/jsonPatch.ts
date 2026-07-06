@@ -1,0 +1,106 @@
+import type { JsonPatchOperation } from './types';
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
+const encodePathPart = (value: string) => value.replace(/~/g, '~0').replace(/\//g, '~1');
+const decodePathPart = (value: string) => value.replace(/~1/g, '/').replace(/~0/g, '~');
+
+const isEqual = (left: unknown, right: unknown) => JSON.stringify(left) === JSON.stringify(right);
+
+const childPath = (basePath: string, key: string) => `${basePath}/${encodePathPart(key)}`;
+
+const hasId = (value: unknown): value is { id: string } =>
+  isRecord(value) && typeof value.id === 'string';
+
+const diffArrayPatch = (previous: unknown[], next: unknown[], basePath: string): JsonPatchOperation[] | null => {
+  const primitiveIds = previous.every((item) => typeof item === 'string') && next.every((item) => typeof item === 'string');
+  const objectIds = previous.every(hasId) && next.every(hasId);
+  if (!primitiveIds && !objectIds) return null;
+
+  const keyFor = (item: unknown) => (typeof item === 'string' ? item : hasId(item) ? item.id : '');
+  const previousByKey = new Map(previous.map((item, index) => [keyFor(item), { item, index }]));
+  const nextByKey = new Map(next.map((item, index) => [keyFor(item), { item, index }]));
+  const ops: JsonPatchOperation[] = [];
+
+  for (const [key, { index }] of [...previousByKey.entries()].sort((left, right) => right[1].index - left[1].index)) {
+    if (!nextByKey.has(key)) ops.push({ op: 'remove', path: childPath(basePath, String(index)) });
+  }
+
+  for (const [key, { item, index }] of nextByKey.entries()) {
+    const previousEntry = previousByKey.get(key);
+    if (!previousEntry) {
+      ops.push({ op: 'add', path: childPath(basePath, '-'), value: item });
+    } else if (objectIds) {
+      ops.push(...diffJsonPatch(previousEntry.item, item, childPath(basePath, String(index))));
+    } else if (previousEntry.index !== index) {
+      return [{ op: 'replace', path: basePath, value: next }];
+    }
+  }
+
+  return ops;
+};
+
+export const diffJsonPatch = (previous: unknown, next: unknown, basePath = ''): JsonPatchOperation[] => {
+  if (isEqual(previous, next)) return [];
+  if (Array.isArray(previous) && Array.isArray(next)) {
+    return diffArrayPatch(previous, next, basePath) ?? [{ op: 'replace', path: basePath, value: next }];
+  }
+  if (!isRecord(previous) || !isRecord(next)) {
+    return [{ op: previous === undefined ? 'add' : 'replace', path: basePath, value: next }];
+  }
+
+  const ops: JsonPatchOperation[] = [];
+  const keys = new Set([...Object.keys(previous), ...Object.keys(next)]);
+  for (const key of keys) {
+    if (!(key in next)) {
+      ops.push({ op: 'remove', path: childPath(basePath, key) });
+    } else if (!(key in previous)) {
+      ops.push({ op: 'add', path: childPath(basePath, key), value: next[key] });
+    } else {
+      ops.push(...diffJsonPatch(previous[key], next[key], childPath(basePath, key)));
+    }
+  }
+  return ops;
+};
+
+export const applyJsonPatch = <T>(value: T, ops: JsonPatchOperation[]): T => {
+  let next = structuredClone(value) as unknown;
+
+  const targetFor = (path: string) => {
+    if (path === '') return { parent: null as Record<string, unknown> | unknown[] | null, key: '' };
+    const parts = path.split('/').slice(1).map(decodePathPart);
+    const key = parts.pop() ?? '';
+    let parent = next as Record<string, unknown> | unknown[];
+    for (const part of parts) {
+      if (Array.isArray(parent)) {
+        parent = parent[Number(part)] as Record<string, unknown> | unknown[];
+      } else {
+        parent = parent[part] as Record<string, unknown> | unknown[];
+      }
+    }
+    return { parent, key };
+  };
+
+  for (const op of ops) {
+    const { parent, key } = targetFor(op.path);
+    if (parent === null) {
+      if (op.op === 'remove') next = undefined;
+      else next = structuredClone(op.value);
+      continue;
+    }
+
+    if (Array.isArray(parent)) {
+      const index = key === '-' ? parent.length : Number(key);
+      if (op.op === 'remove') parent.splice(index, 1);
+      else if (op.op === 'add') parent.splice(index, 0, structuredClone(op.value));
+      else parent[index] = structuredClone(op.value);
+    } else if (op.op === 'remove') {
+      delete parent[key];
+    } else {
+      parent[key] = structuredClone(op.value);
+    }
+  }
+
+  return next as T;
+};
