@@ -166,6 +166,42 @@ describe('entity collection actions', () => {
   });
 });
 
+describe('instant actions', () => {
+  it('completes immediately without creating an active action or looping', () => {
+    const action: GameAction = {
+      id: 'talk',
+      locationId: 'road',
+      instant: true,
+      rewards: [],
+      results: [{ kind: 'dialogue', dialogueId: 'guide' }],
+    };
+    const context: ActionResolutionContext = {
+      actions: [action],
+      skills: [],
+      stats: [],
+      locations: [{ id: 'road', position: { x: 0, y: 0 }, starting: true }],
+      items: [],
+      flags: [],
+      resourceDefinitions: [],
+      effects: [],
+      interactionTypes: [],
+      enemies: [],
+      dialogues: [{
+        id: 'guide',
+        startNodeId: 'start',
+        nodes: [{ id: 'start', textKey: 'start' }],
+      }],
+    };
+
+    const started = startAction(createInitialPlayState('test-universe', 'road'), action, context, 1_000);
+
+    expect(started.activeAction).toBeNull();
+    expect(started.actionCompletions.talk).toBe(1);
+    expect(started.activeDialogue).toEqual({ dialogueId: 'guide', nodeId: 'start' });
+    expect(started.actionProgress.talk).toEqual({ elapsedMs: 0, runningSince: null, targetHealth: null });
+  });
+});
+
 describe('dialogue timers', () => {
   it('starts dialogue from an action and applies continue, option, branch, and item effects', () => {
     const action: GameAction = {

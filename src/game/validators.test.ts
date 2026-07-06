@@ -170,6 +170,20 @@ describe('universe manifest validation', () => {
     expect(issues).toEqual([]);
   });
 
+  it('accepts instant actions without a duration', () => {
+    const issues = validateContentBundle({
+      ...bundle(),
+      actions: [{
+        id: 'talk',
+        locationId: 'start',
+        instant: true,
+        rewards: [],
+      }],
+    }).filter((issue) => issue.severity === 'error');
+
+    expect(issues).toEqual([]);
+  });
+
   it('accepts universe and interaction experience triggers', () => {
     const issues = validateContentBundle({
       ...bundle({

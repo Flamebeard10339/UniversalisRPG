@@ -1,6 +1,6 @@
 import type { ActionResolutionContext, ActionResult, ChatMessage, ConcreteReward, ExperienceEventKind, ExperienceTrigger, GameAction, IdleReport, IdleResolution, ResourceBoundaryBehavior, Reward, RunLogEntry, UniversePlayState } from './types';
 import type { AvailableTravelEdge } from './travel';
-import { getActionDurationMs, getEnemy, getInteractionType, sampleAdversarialDamage, sampleEnemyAttackDamage } from './adversarial';
+import { getActionDurationMs, getEnemy, getInteractionType, isInstantAction, sampleAdversarialDamage, sampleEnemyAttackDamage } from './adversarial';
 import { getEnemyStat } from './enemies';
 import { getEffectDeltaPerMinute, getResourceMaxForContext, isEffectApplicable } from './resources';
 import {
@@ -940,6 +940,10 @@ export const startAction = (
   }
 
   const pausedState = pauseRunningAction(state, now, context);
+  if (isInstantAction(action)) {
+    const started = appendRunLog(pausedState, 'player', 'action.start', { actionId: action.id, locationId: action.locationId }, now);
+    return completeActionWithResult(started, action, context, { random: Math.random }, now).state;
+  }
   const durationMs = getActionDurationMs(pausedState, action, context);
   const savedProgress = pausedState.actionProgress[action.id] ?? { elapsedMs: 0, runningSince: null };
   const progress = savedProgress.elapsedMs >= durationMs
@@ -1371,7 +1375,8 @@ const completeActionWithResult = (
       lastTickAt: now,
     };
     const startsDialogue = (action.results ?? []).some((result) => result.kind === 'dialogue');
-  const shouldLoop = !startsDialogue
+    const shouldLoop = !startsDialogue
+    && !isInstantAction(action)
     && completedState.actionLoopingEnabled
       && (action.locationId === undefined || completedState.currentLocationId === action.locationId)
       && canStartAction(completedState, action, context);
@@ -1404,6 +1409,7 @@ const completeActionWithResult = (
   };
   const startsDialogue = (action.results ?? []).some((result) => result.kind === 'dialogue');
   const shouldLoop = !startsDialogue
+    && !isInstantAction(action)
     && completedState.actionLoopingEnabled
     && (action.locationId === undefined || completedState.currentLocationId === action.locationId)
     && canStartAction(completedState, action, context);
@@ -1722,6 +1728,58 @@ export const resolveIdleTimers = (
 
     return {
       state: options.debugEnabled && report.kind !== 'none' ? appendIdleDebugMessage(withDebug, report, now) : withDebug,
+      report,
+    };
+  }
+
+  if (isInstantAction(action)) {
+    const completion = completeActionWithResult(state, action, context, { random: options.random }, now);
+    const enemy = getEnemy(action, context);
+    const messageKey = getActionMessage(action, context, completion.outcome);
+    const completed = messageKey
+      ? appendChatMessage(completion.state, {
+          author: 'system',
+          key: messageKey,
+          params: {
+            actionId: action.id,
+            target: enemy?.id ?? action.id,
+            damage: roundCombatNumber(completion.damage),
+          },
+        }, now)
+      : completion.state;
+    const completedWithExhaustion = completion.finished
+      ? appendExhaustedLocationMessage(completed, action, context, now)
+      : completed;
+    const completedWithDebug = options.debugEnabled
+      ? appendChatMessage(completedWithExhaustion, {
+          author: 'debug',
+          key: 'chat.debug.actionCompleted',
+          params: {
+            actionId: action.id,
+            outcome: completion.outcome,
+            rewardCount: completion.rewards.length,
+            damage: roundCombatNumber(completion.damage),
+            remainingHealth: roundCombatNumber(completion.remainingHealth ?? 0),
+            playerHealth: roundCombatNumber(completed.playerHealth),
+            now,
+          },
+        }, now + 1)
+      : completedWithExhaustion;
+    const report: IdleReport = reportEnabled && completion.finished
+      ? {
+          kind: 'actionCompleted',
+          inactiveMs,
+          actionId: action.id,
+          completedAt: now,
+          rewards: completion.rewards.map((reward) => ({
+            ...reward,
+            labelId: rewardLabelId(reward),
+          })),
+        }
+      : noIdleReport();
+
+    return {
+      state: options.debugEnabled && report.kind !== 'none' ? appendIdleDebugMessage(completedWithDebug, report, now) : completedWithDebug,
       report,
     };
   }

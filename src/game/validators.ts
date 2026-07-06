@@ -265,7 +265,8 @@ const validateActionsShape = (actions: unknown): actions is GameAction[] =>
       hasString(action, 'id') &&
       (action.locationId === undefined || hasString(action, 'locationId')) &&
       (action.role === undefined || action.role === 'optional' || action.role === 'progression' || action.role === 'utility' || action.role === 'travel') &&
-      hasNumber(action, 'durationSeconds') &&
+      (action.instant === undefined || typeof action.instant === 'boolean') &&
+      (action.instant ? action.durationSeconds === undefined : hasNumber(action, 'durationSeconds')) &&
       Array.isArray(action.rewards) && action.rewards.every(validateRewardShape) &&
       (action.experience === undefined || (Array.isArray(action.experience) && action.experience.every(validateExperienceTriggerShape))) &&
       (action.results === undefined || (Array.isArray(action.results) && action.results.every(validateActionResultShape))) &&
@@ -738,7 +739,7 @@ export const validateContentReferences = (bundle: ContentBundle) => {
     if ((action.results ?? []).filter((result) => result.kind === 'chat').length > 2) {
       issues.push(error(`actions.${action.id}.results`, 'validation.tooManySequentialMessages'));
     }
-    if (action.durationSeconds <= 0) {
+    if (!action.instant && (action.durationSeconds ?? 0) <= 0) {
       issues.push(error(`actions.${action.id}.durationSeconds`, 'validation.actionDurationPositive'));
     }
     if (action.interactionTypeId && !interactionTypeIds.has(action.interactionTypeId)) {

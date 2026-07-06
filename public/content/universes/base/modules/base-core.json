@@ -944,7 +944,7 @@
           "type": "action",
           "id": "examine",
           "role": "utility",
-          "durationSeconds": 0.1,
+          "instant": true,
           "rewards": [],
           "results": [
             {
@@ -991,7 +991,7 @@
           "type": "action",
           "id": "examine",
           "role": "utility",
-          "durationSeconds": 0.1,
+          "instant": true,
           "rewards": [],
           "results": [
             {
@@ -1046,7 +1046,7 @@
           "type": "action",
           "id": "examine",
           "role": "utility",
-          "durationSeconds": 0.1,
+          "instant": true,
           "rewards": [],
           "results": [
             {
@@ -1101,7 +1101,7 @@
           "type": "action",
           "id": "examine",
           "role": "utility",
-          "durationSeconds": 0.1,
+          "instant": true,
           "rewards": [],
           "results": [
             {
@@ -1120,7 +1120,7 @@
           "type": "action",
           "id": "talk",
           "role": "utility",
-          "durationSeconds": 0.1,
+          "instant": true,
           "rewards": [],
           "results": [
             {
@@ -1134,7 +1134,7 @@
           "type": "action",
           "id": "examine",
           "role": "utility",
-          "durationSeconds": 0.1,
+          "instant": true,
           "rewards": [],
           "results": [
             {
@@ -1219,7 +1219,6 @@
       "action.gather-rumors.success": "A useful rumor settles into memory.",
       "action.gather-rumors.failure": "The rumor trail goes cold before anything useful turns up.",
       "action.entity.tutorial-guide.talk.title": "Talk",
-      "action.entity.tutorial-guide.talk.description": "Talk with the {entity}.",
       "action.entity.tutorial-guide.talk.success": "The {entity} is ready to talk.",
       "action.entity.tutorial-guide.talk.failure": "The {entity} is distracted.",
       "entity.goblin.title": "Goblin",
@@ -1239,7 +1238,6 @@
       "action.fight-goblin.failure": "You miss the {entity}.",
       "action.fight-goblin.kill": "The {entity} drops.",
       "action.entity.goblin.examine.title": "Examine",
-      "action.entity.goblin.examine.description": "Examine the {entity}.",
       "action.entity.goblin.examine.success": "You examine the {entity}.",
       "action.entity.goblin.examine.failure": "You learn nothing useful from the {entity}.",
       "action.chop-oak-tree.title": "Chop Oak Tree",
@@ -1253,7 +1251,6 @@
       "action.fight-ent.failure": "You miss the {entity}.",
       "action.fight-ent.kill": "The {entity} drops.",
       "action.entity.ent.examine.title": "Examine",
-      "action.entity.ent.examine.description": "Examine the {entity}.",
       "action.entity.ent.examine.success": "You examine the {entity}.",
       "action.entity.ent.examine.failure": "You learn nothing useful from the {entity}.",
       "action.fight-ork.title": "Fight",
@@ -1262,7 +1259,6 @@
       "action.fight-ork.failure": "You miss the {entity}.",
       "action.fight-ork.kill": "The {entity} drops.",
       "action.entity.ork.examine.title": "Examine",
-      "action.entity.ork.examine.description": "Examine the {entity}.",
       "action.entity.ork.examine.success": "You examine the {entity}.",
       "action.entity.ork.examine.failure": "You learn nothing useful from the {entity}.",
       "action.fight-troll.title": "Fight",
@@ -1271,11 +1267,9 @@
       "action.fight-troll.failure": "You miss the {entity}.",
       "action.fight-troll.kill": "The {entity} drops.",
       "action.entity.oak-tree.examine.title": "Examine",
-      "action.entity.oak-tree.examine.description": "Examine the {entity}.",
       "action.entity.oak-tree.examine.success": "You examine the {entity}.",
       "action.entity.oak-tree.examine.failure": "You learn nothing useful from the {entity}.",
       "action.entity.tutorial-guide.examine.title": "Examine",
-      "action.entity.tutorial-guide.examine.description": "Examine the {entity}.",
       "action.entity.tutorial-guide.examine.success": "You examine the {entity}.",
       "action.entity.tutorial-guide.examine.failure": "You learn nothing useful from the {entity}.",
       "interaction.melee-combat.title": "Melee Combat",
@@ -1393,22 +1387,18 @@
       "dialogue.tutorial-guide.q4.option.give25": "Give 25",
       "dialogue.tutorial-guide.q4.option.changedMind": "I changed my mind",
       "action.entity.goblin.fight.title": "Fight",
-      "action.entity.goblin.fight.description": "Fight the {entity}.",
       "action.entity.goblin.fight.success": "You hit the {entity}.",
       "action.entity.goblin.fight.failure": "You miss the {entity}.",
       "action.entity.goblin.fight.kill": "The {entity} drops.",
       "action.entity.ent.fight.title": "Fight",
-      "action.entity.ent.fight.description": "Fight the {entity}.",
       "action.entity.ent.fight.success": "You hit the {entity}.",
       "action.entity.ent.fight.failure": "You miss the {entity}.",
       "action.entity.ent.fight.kill": "The {entity} drops.",
       "action.entity.ork.fight.title": "Fight",
-      "action.entity.ork.fight.description": "Fight the {entity}.",
       "action.entity.ork.fight.success": "You hit the {entity}.",
       "action.entity.ork.fight.failure": "You miss the {entity}.",
       "action.entity.ork.fight.kill": "The {entity} drops.",
       "action.entity.oak-tree.chop.title": "Chop Oak Tree",
-      "action.entity.oak-tree.chop.description": "Work through the oak's stubborn trunk.",
       "action.entity.oak-tree.chop.success": "Your axe bites into the oak.",
       "action.entity.oak-tree.chop.failure": "The axe glances off the oak grain.",
       "action.entity.oak-tree.chop.kill": "The oak gives way."

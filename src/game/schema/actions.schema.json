@@ -4,12 +4,13 @@
   "type": "array",
   "items": {
     "type": "object",
-    "required": ["id", "durationSeconds", "rewards"],
+    "required": ["id", "rewards"],
     "additionalProperties": false,
     "properties": {
       "id": { "type": "string", "minLength": 1 },
       "locationId": { "type": "string", "minLength": 1 },
       "role": { "enum": ["optional", "progression", "utility", "travel"] },
+      "instant": { "type": "boolean" },
       "durationSeconds": { "type": "number", "exclusiveMinimum": 0 },
       "maxCompletions": { "type": "integer", "minimum": 1 },
       "enemyId": { "type": "string", "minLength": 1 },
@@ -28,7 +29,22 @@
       },
       "visibleWhen": { "$ref": "#/$defs/condition" },
       "requirements": { "$ref": "#/$defs/condition" }
-    }
+    },
+    "anyOf": [
+      {
+        "required": ["instant"],
+        "not": { "required": ["durationSeconds"] },
+        "properties": {
+          "instant": { "const": true }
+        }
+      },
+      {
+        "required": ["durationSeconds"],
+        "properties": {
+          "instant": { "const": false }
+        }
+      }
+    ]
   },
   "$defs": {
     "comparison": {

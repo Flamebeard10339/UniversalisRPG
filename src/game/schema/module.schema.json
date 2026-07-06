@@ -570,7 +570,6 @@
       "type": "object",
       "required": [
         "id",
-        "durationSeconds",
         "rewards",
         "type"
       ],
@@ -597,6 +596,9 @@
             "utility",
             "travel"
           ]
+        },
+        "instant": {
+          "type": "boolean"
         },
         "durationSeconds": {
           "type": "number",
@@ -638,7 +640,34 @@
         "requirements": {
           "$ref": "https://universalis-rpg.local/schema/actions.schema.json#/$defs/condition"
         }
-      }
+      },
+      "anyOf": [
+        {
+          "required": [
+            "instant"
+          ],
+          "not": {
+            "required": [
+              "durationSeconds"
+            ]
+          },
+          "properties": {
+            "instant": {
+              "const": true
+            }
+          }
+        },
+        {
+          "required": [
+            "durationSeconds"
+          ],
+          "properties": {
+            "instant": {
+              "const": false
+            }
+          }
+        }
+      ]
     },
     "skillEntry": {
       "type": "object",

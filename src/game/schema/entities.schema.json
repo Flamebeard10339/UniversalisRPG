@@ -46,15 +46,31 @@
     },
     "action": {
       "type": "object",
-      "required": ["id", "durationSeconds", "rewards"],
+      "required": ["id", "rewards"],
       "additionalProperties": true,
       "properties": {
         "id": { "type": "string", "minLength": 1 },
+        "instant": { "type": "boolean" },
         "durationSeconds": { "type": "number", "exclusiveMinimum": 0 },
         "rewards": { "type": "array" },
         "interactionTypeId": { "type": "string", "minLength": 1 },
         "enemy": { "type": "object" }
-      }
+      },
+      "anyOf": [
+        {
+          "required": ["instant"],
+          "not": { "required": ["durationSeconds"] },
+          "properties": {
+            "instant": { "const": true }
+          }
+        },
+        {
+          "required": ["durationSeconds"],
+          "properties": {
+            "instant": { "const": false }
+          }
+        }
+      ]
     }
   }
 }

@@ -311,6 +311,7 @@ export const ContentDataEditor = ({ activeTab, baseBundle, bundle, draft, onPatc
         {
           id,
           locationId: locations[0]?.item.id ?? '',
+          instant: false,
           durationSeconds: 10,
           rewards: [],
         },
@@ -566,7 +567,7 @@ export const ContentDataEditor = ({ activeTab, baseBundle, bundle, draft, onPatc
                     <div className="grid gap-2 sm:grid-cols-[1fr_auto_auto]">
                       <button className="min-w-0 rounded bg-slate-900 px-3 py-2 text-left" onClick={() => setSelectedActionId(selected ? null : action.id)} type="button">
                         <span className="block truncate text-sm font-semibold text-slate-100">{action.id}</span>
-                        <span className="block truncate text-xs text-slate-400">{action.locationId} · {action.durationSeconds}s</span>
+                        <span className="block truncate text-xs text-slate-400">{action.locationId} · {action.instant ? t('actionPanel.instant') : `${action.durationSeconds ?? 0}s`}</span>
                       </button>
                       <button className="rounded border border-slate-600 px-3 py-2 text-sm text-slate-200" onClick={() => setSelectedActionId(selected ? null : action.id)} type="button">{selected ? t('structured.collapse') : t('contribution.column.edit')}</button>
                       <button

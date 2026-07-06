@@ -62,7 +62,7 @@ export const getAvailableTravelEdgesForNode = (
       id: travelEdgeId(action),
       source: locationId,
       target: destination,
-      travelTimeSeconds: action.durationSeconds,
+      travelTimeSeconds: action.durationSeconds ?? 0,
     }];
   });
 };

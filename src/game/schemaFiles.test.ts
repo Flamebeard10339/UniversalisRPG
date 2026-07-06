@@ -56,6 +56,7 @@ describe('json schema files', () => {
           required: string[];
           properties: {
             type: { enum: string[] };
+            instant: unknown;
             durationSeconds: unknown;
             rewards: { items: { $ref: string } };
           };
@@ -96,9 +97,10 @@ describe('json schema files', () => {
     expect(moduleSchema.$defs.removeEntry.allOf).toHaveLength(1);
     expect(moduleSchema.$defs.actionEntry).toMatchObject({
       additionalProperties: false,
-      required: expect.arrayContaining(['id', 'type', 'durationSeconds', 'rewards']),
+      required: expect.arrayContaining(['id', 'type', 'rewards']),
       properties: {
         type: { enum: ['action', 'actions'] },
+        instant: { type: 'boolean' },
         rewards: { items: { $ref: 'https://universalis-rpg.local/schema/actions.schema.json#/$defs/reward' } },
       },
     });
@@ -109,6 +111,7 @@ describe('json schema files', () => {
       properties: { type: { enum: ['entity', 'entities'] }, actions: { items: { $ref: 'https://universalis-rpg.local/schema/entities.schema.json#/$defs/action' } } },
     });
     expect(moduleSchema.$defs.entityEntry.required).not.toContain('actionIds');
+    expect(moduleSchema.$defs.actionEntry.properties.instant).toEqual(actionsSchema.items.properties.instant);
     expect(moduleSchema.$defs.actionEntry.properties.durationSeconds).toEqual(actionsSchema.items.properties.durationSeconds);
     expect(moduleSchema.$defs.itemEntry).toMatchObject({
       additionalProperties: false,

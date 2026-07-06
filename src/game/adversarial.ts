@@ -47,6 +47,8 @@ export const isContinuousAction = (
   context: ActionResolutionContext,
 ) => Boolean(getEnemy(action, context));
 
+export const isInstantAction = (action: GameAction) => Boolean(action.instant);
+
 export const getActionStats = (
   action: GameAction,
   context: ActionResolutionContext,
@@ -68,15 +70,19 @@ export const getActionDurationMs = (
   action: GameAction,
   context: ActionResolutionContext,
 ) => {
+  if (isInstantAction(action)) {
+    return 0;
+  }
   if (getEnemy(action, context)) {
     const actionsPerMinute = getCharacterStatValue(state, context.stats ?? [], ACTION_RATE_STAT_ID, context.skills, context.items ?? [], context.manifest?.experienceCurve) || DEFAULT_ACTIONS_PER_MINUTE;
     return 60_000 / Math.max(EPSILON, actionsPerMinute);
   }
 
   const { sourceSkill } = getActionStats(action, context);
+  const durationSeconds = action.durationSeconds ?? 0;
   const rate = sourceSkill ? getSkillTotals(state, sourceSkill, undefined, context.manifest?.experienceCurve).rate : DEFAULT_RATE;
 
-  return (action.durationSeconds * 1000) / Math.max(EPSILON, rate);
+  return (durationSeconds * 1000) / Math.max(EPSILON, rate);
 };
 
 export const getActionDps = (

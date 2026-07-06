@@ -105,7 +105,8 @@ export const actionSchema = (bundle: ContentBundle): StructuredSchema => ({ kind
   id: { label: 'contribution.column.id', schema: string() },
   locationId: { label: 'contribution.column.location', schema: string(bundle.locations.map((item) => item.id), true) },
   role: { label: 'contribution.column.actionRole', schema: { kind: 'enum', options: ['optional', 'progression', 'utility', 'travel'] }, optional: true, defaultValue: 'optional' },
-  durationSeconds: { label: 'contribution.column.actionDuration', schema: number(0) },
+  instant: { label: 'contribution.column.instant', schema: boolean, optional: true, defaultValue: false },
+  durationSeconds: { label: 'contribution.column.actionDuration', schema: number(0), optional: true, defaultValue: 1 },
   rewards: { label: 'contribution.column.rewards', schema: { kind: 'array', listMode: 'free', item: rewardSchema(bundle), createItem: () => ({ kind: 'resource', resourceId: bundle.resourceDefinitions[0]?.id ?? '', amount: 1 }) } },
   experience: { label: 'contribution.column.experience', schema: { kind: 'array', listMode: 'free', item: experienceTriggerSchema(bundle), createItem: () => ({ event: 'action-complete', skillId: bundle.skills[0]?.id ?? '', amount: 1 }) }, optional: true, defaultValue: [] },
   requirements: { label: 'contribution.column.requirements', schema: conditionSchema(bundle), optional: true, defaultValue: { kind: 'state-variable', variable: stateVariables(bundle)[0] ?? '', comparison: 'equal', value: 0 } },
@@ -268,7 +269,7 @@ export const displayProfileSchema = (): StructuredSchema => ({ kind: 'object', f
 export const moduleDataSectionSchema = (bundle: ContentBundle): StructuredSchema => ({ kind: 'object', fields: {
   locations: { label: 'contribution.data.locations', schema: { kind: 'array', listMode: 'free', item: locationSchema(bundle), createItem: () => ({ id: 'new-location', position: { x: 0, y: 0 } }) }, optional: true, defaultValue: [] },
   entities: { label: 'contribution.data.entities', schema: { kind: 'array', listMode: 'free', item: entityDefinitionSchema(bundle), createItem: () => ({ id: 'new-entity', actionIds: [] }) }, optional: true, defaultValue: [] },
-  actions: { label: 'contribution.data.actions', schema: { kind: 'array', listMode: 'free', item: actionSchema(bundle), createItem: () => ({ id: 'new-action', locationId: bundle.locations[0]?.id ?? '', durationSeconds: 1, rewards: [] }) }, optional: true, defaultValue: [] },
+  actions: { label: 'contribution.data.actions', schema: { kind: 'array', listMode: 'free', item: actionSchema(bundle), createItem: () => ({ id: 'new-action', locationId: bundle.locations[0]?.id ?? '', instant: false, durationSeconds: 1, rewards: [] }) }, optional: true, defaultValue: [] },
   skills: { label: 'contribution.data.skills', schema: { kind: 'array', listMode: 'table', columns: ['id', 'maxLevel', 'statId'], item: skillDefinitionSchema(bundle), createItem: () => ({ id: 'new-skill', maxLevel: 100 }) }, optional: true, defaultValue: [] },
   stats: { label: 'contribution.data.stats', schema: { kind: 'array', listMode: 'table', columns: ['id', 'base'], item: statDefinitionSchema(), createItem: () => ({ id: 'new-stat', base: 0 }) }, optional: true, defaultValue: [] },
   items: { label: 'contribution.data.items', schema: { kind: 'array', listMode: 'table', columns: ['id', 'maxQuantity', 'tags'], item: itemDefinitionSchema(), createItem: () => ({ id: 'new-item' }) }, optional: true, defaultValue: [] },

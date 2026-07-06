@@ -180,7 +180,8 @@ export type GameAction = {
   locationId?: string;
   entityId?: string;
   role?: 'optional' | 'progression' | 'utility' | 'travel';
-  durationSeconds: number;
+  durationSeconds?: number;
+  instant?: boolean;
   rewards: Reward[];
   experience?: ExperienceTrigger[];
   requirements?: Condition; // TODO: check what the UI looks like for a visible action that fails the requirements.

@@ -203,6 +203,13 @@ textarea {
   animation: continuous-action-progress 1.4s linear infinite;
 }
 
+.instant-action-pulse {
+  background: radial-gradient(circle at center, rgba(34, 211, 238, 0.34) 0%, rgba(34, 211, 238, 0.18) 28%, rgba(45, 212, 191, 0.08) 48%, rgba(8, 47, 73, 0) 72%);
+  opacity: 0;
+  transform-origin: center;
+  animation: instant-action-pulse 650ms ease-out;
+}
+
 .dialogue-panel {
   animation: dialogue-slide-up 160ms ease-out;
 }
@@ -218,6 +225,23 @@ textarea {
 
   to {
     transform: translateX(0);
+  }
+}
+
+@keyframes instant-action-pulse {
+  0% {
+    opacity: 0.9;
+    transform: scale(0.9);
+  }
+
+  45% {
+    opacity: 0.7;
+    transform: scale(1.04);
+  }
+
+  100% {
+    opacity: 0;
+    transform: scale(1.18);
   }
 }
 

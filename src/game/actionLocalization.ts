@@ -45,6 +45,9 @@ export const getActionDescriptionText = (action: GameAction, bundle: ContentBund
   if (destinationId) {
     return t(actionDescriptionKey(action.id), t('action.travel.description', { location: travelActionLocationLabel(bundle, destinationId, t) }));
   }
+  if (action.entityId) {
+    return '';
+  }
   const entity = actionEntityLabel(action, bundle, t);
   return entity
     ? t(actionDescriptionKey(action.id), action.id, { entity })
