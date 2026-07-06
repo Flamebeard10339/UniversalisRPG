@@ -676,20 +676,34 @@ const validateModuleDataUpdateTargets = (bundle: ContentBundle, module: ContentM
     issues.push(issue('error', `modules.${module.id}.data-updates.resources.${row.id}`, 'validation.moduleUpdateTargetMissing', { id: row.id }));
   }
 
+  const patchIds = new Map<string, Set<string>>();
+  const patchTypeIds = (objectType: string) => {
+    const current = patchIds.get(objectType);
+    if (current) return current;
+    const entry = getModObjectType(objectType);
+    const ids = new Set(entry ? entry.read(bundle).map((item) => item.id) : []);
+    patchIds.set(objectType, ids);
+    return ids;
+  };
+
   for (const [index, patch] of patches.entries()) {
     const entry = getModObjectType(patch.objectType);
     if (!entry) {
       issues.push(issue('error', `modules.${module.id}.data-updates.patches.${index}.objectType`, 'validation.moduleDataTypeInvalid', { id: patch.objectType }));
       continue;
     }
-    const exists = entry.read(bundle).some((item) => item.id === patch.objectId);
+    const ids = patchTypeIds(patch.objectType);
+    const exists = ids.has(patch.objectId);
     const createsObject = patch.ops.some((op) => op.op === 'add' && op.path === '');
+    const removesObject = patch.ops.some((op) => op.op === 'remove' && op.path === '');
     if (!exists && !createsObject) {
       issues.push(issue('error', `modules.${module.id}.data-updates.patches.${index}`, 'validation.moduleUpdateTargetMissing', { id: patch.objectId }));
     }
     if (exists && createsObject) {
       issues.push(issue('error', `modules.${module.id}.data-updates.patches.${index}`, 'validation.duplicateId', { id: patch.objectId }));
     }
+    if (removesObject) ids.delete(patch.objectId);
+    else if (exists || createsObject) ids.add(patch.objectId);
   }
 
   return issues;
@@ -706,9 +720,13 @@ const validateModuleSemanticChanges = (bundle: ContentBundle, module: ContentMod
     ...applyDataSection(bundle, module.data),
     locales: mergeLocales(bundle.locales, module.locale),
   };
+  const beforeIssues = new Set(validateContentBundle(normalizeContentBundleStructure(withData))
+    .filter((validationIssue) => validationIssue.severity === 'error')
+    .map((validationIssue) => `${validationIssue.path}:${validationIssue.message}:${JSON.stringify(validationIssue.params ?? {})}`));
   const withUpdates = applyDataUpdates(withData, module['data-updates']);
   const semanticIssues = validateContentBundle(normalizeContentBundleStructure(withUpdates))
     .filter((validationIssue) =>
+      (validationIssue.severity === 'error' && !beforeIssues.has(`${validationIssue.path}:${validationIssue.message}:${JSON.stringify(validationIssue.params ?? {})}`)) ||
       moduleChangesContentPath(module, validationIssue, typeof validationIssue.params?.id === 'string' ? validationIssue.params.id : '') ||
       moduleOwnsContentPath(module, validationIssue) ||
       (typeof validationIssue.params?.id === 'string' && removedIdsByModule(module).has(validationIssue.params.id)),
@@ -717,7 +735,7 @@ const validateModuleSemanticChanges = (bundle: ContentBundle, module: ContentMod
     .filter((validationIssue) => validationIssue.severity === 'error')
     .map((validationIssue) => typeof validationIssue.params?.id === 'string'
       ? validationIssue.params.id
-      : contentPathKey(validationIssue) ?? module.id)));
+      : contentPathKey(validationIssue) ?? removedIdsForValidationCollection(module, validationIssue)[0] ?? module.id)));
   return conflictKeys.map((key) => issue('error', `modules.${module.id}`, 'validation.moduleConflictDisabled', { id: module.id, key }));
 };
 
@@ -1225,7 +1243,8 @@ export const applyModulesToBundle = (
       .filter((id): id is string => Boolean(id)),
   );
   const validModules = relevantModules.filter((module) => !invalidModuleIds.has(module.id));
-  const applied = resolveAndApplyModules(bundle, relevantModules, validModules, enabledModuleIds, invalidModuleIds);
+  const dependencyExpandedEnabledModuleIds = [...resolveEnabledSet(relevantModules, enabledModuleIds)];
+  const applied = resolveAndApplyModules(bundle, relevantModules, validModules, dependencyExpandedEnabledModuleIds, invalidModuleIds);
   const existingModuleIssues = bundle.moduleIssues ?? [];
   return {
     bundle: {

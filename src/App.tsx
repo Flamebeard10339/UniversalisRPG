@@ -1227,6 +1227,7 @@ export default function App() {
                   <input
                     checked={contributionMode}
                     className="h-5 w-5"
+                    data-testid="settings-contribution-mode"
                     onChange={(event) => {
                       logPlayerAction('settings.contributionMode', { enabled: event.target.checked });
                       dismissDialogue();

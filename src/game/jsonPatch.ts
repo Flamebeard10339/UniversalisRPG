@@ -13,10 +13,55 @@ const childPath = (basePath: string, key: string) => `${basePath}/${encodePathPa
 const hasId = (value: unknown): value is { id: string } =>
   isRecord(value) && typeof value.id === 'string';
 
+const diffStringArrayPatch = (previous: string[], next: string[], basePath: string): JsonPatchOperation[] => {
+  const lengths = Array.from({ length: previous.length + 1 }, () => Array(next.length + 1).fill(0) as number[]);
+  for (let previousIndex = previous.length - 1; previousIndex >= 0; previousIndex -= 1) {
+    for (let nextIndex = next.length - 1; nextIndex >= 0; nextIndex -= 1) {
+      lengths[previousIndex][nextIndex] = previous[previousIndex] === next[nextIndex]
+        ? lengths[previousIndex + 1][nextIndex + 1] + 1
+        : Math.max(lengths[previousIndex + 1][nextIndex], lengths[previousIndex][nextIndex + 1]);
+    }
+  }
+
+  const matchedPrevious = new Set<number>();
+  const matchedNext = new Set<number>();
+  let previousIndex = 0;
+  let nextIndex = 0;
+  while (previousIndex < previous.length && nextIndex < next.length) {
+    if (previous[previousIndex] === next[nextIndex]) {
+      matchedPrevious.add(previousIndex);
+      matchedNext.add(nextIndex);
+      previousIndex += 1;
+      nextIndex += 1;
+    } else if (lengths[previousIndex + 1][nextIndex] >= lengths[previousIndex][nextIndex + 1]) {
+      previousIndex += 1;
+    } else {
+      nextIndex += 1;
+    }
+  }
+
+  const removals = previous
+    .map((_, index) => index)
+    .filter((index) => !matchedPrevious.has(index))
+    .sort((left, right) => right - left);
+  const additions = next
+    .map((item, index) => ({ item, index }))
+    .filter((entry) => !matchedNext.has(entry.index));
+  const ops: JsonPatchOperation[] = removals.map((index) => ({ op: 'remove', path: childPath(basePath, String(index)) }));
+  let currentLength = previous.length - removals.length;
+  for (const { item, index } of additions) {
+    const path = index >= currentLength ? childPath(basePath, '-') : childPath(basePath, String(index));
+    ops.push({ op: 'add', path, value: item });
+    currentLength += 1;
+  }
+  return ops;
+};
+
 const diffArrayPatch = (previous: unknown[], next: unknown[], basePath: string): JsonPatchOperation[] | null => {
   const primitiveIds = previous.every((item) => typeof item === 'string') && next.every((item) => typeof item === 'string');
   const objectIds = previous.every(hasId) && next.every(hasId);
   if (!primitiveIds && !objectIds) return null;
+  if (primitiveIds) return diffStringArrayPatch(previous as string[], next as string[], basePath);
 
   const keyFor = (item: unknown) => (typeof item === 'string' ? item : hasId(item) ? item.id : '');
   const previousByKey = new Map(previous.map((item, index) => [keyFor(item), { item, index }]));

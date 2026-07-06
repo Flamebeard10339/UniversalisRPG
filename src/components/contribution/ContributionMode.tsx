@@ -87,7 +87,7 @@ export const ContributionMode = ({ bundle, validationIssues, t }: ContributionMo
   };
 
   return (
-    <section className="grid gap-4">
+    <section className="grid gap-4" data-testid="contribution-mode">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold text-slate-100">{t('contribution.title')}</h2>

@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { applyModulesToBundle } from './contentModules';
 import { createModEditService, localContributionsModId } from './modEditService';
 import { createDraftModStore } from './modStore';
@@ -74,6 +76,9 @@ const module = (patch: Partial<ContentModule> & Pick<ContentModule, 'id'>): Cont
   ...patch,
 });
 
+const readPublicJson = <T,>(...parts: string[]) =>
+  JSON.parse(readFileSync(join(process.cwd(), 'public', 'content', 'universes', ...parts), 'utf8').replace(/^\uFEFF/, '')) as T;
+
 describe('ModEditService', () => {
   it('writes addressed RFC 6902 edits only through local-contributions data-updates', () => {
     let nextDraft = draft();
@@ -105,6 +110,85 @@ describe('ModEditService', () => {
         ],
       }],
     });
+  });
+
+  it('preserves incremental edits to the same existing object as ordered patches', () => {
+    let nextDraft = draft();
+    const store = createDraftModStore(nextDraft, (patch) => {
+      nextDraft = { ...nextDraft, ...patch };
+    });
+    const service = createModEditService({ resolvedBundle: bundle(), store });
+
+    service.saveEdit('base-core', 'locations', 'start', [{ op: 'replace', path: '/position/x', value: 10 }]);
+    service.saveEdit('base-core', 'locations', 'start', [{ op: 'replace', path: '/position/y', value: 20 }]);
+
+    expect(nextDraft.modules[0]['data-updates']).toEqual({
+      patches: [
+        {
+          targetModId: 'base-core',
+          objectType: 'locations',
+          objectId: 'start',
+          ops: [{ op: 'replace', path: '/position/x', value: 10 }],
+        },
+        {
+          targetModId: 'base-core',
+          objectType: 'locations',
+          objectId: 'start',
+          ops: [{ op: 'replace', path: '/position/y', value: 20 }],
+        },
+      ],
+    });
+  });
+
+  it('diffs string id arrays as explicit element removals and additions', () => {
+    const service = createModEditService({
+      resolvedBundle: bundle(),
+      store: createDraftModStore(draft(), () => undefined),
+    });
+
+    expect(service.diffEdit(
+      { id: 'start', actions: ['a', 'b', 'c'] },
+      { id: 'start', actions: ['b', 'c', 'd'] },
+    )).toEqual([
+      { op: 'remove', path: '/actions/0' },
+      { op: 'add', path: '/actions/-', value: 'd' },
+    ]);
+  });
+
+  it('validates later edits to objects created by earlier local-contributions patches', () => {
+    const core = module({ id: 'base-core', data: {} });
+    const local = module({
+      id: localContributionsModId,
+      dependencies: ['+base-core'],
+      'data-updates': {
+        patches: [
+          {
+            targetModId: 'base-core',
+            objectType: 'stats',
+            objectId: 'new-stat',
+            ops: [{ op: 'add', path: '', value: { id: 'new-stat', base: 0 } }],
+          },
+          {
+            targetModId: 'base-core',
+            objectType: 'stats',
+            objectId: 'new-stat',
+            ops: [{ op: 'replace', path: '/base', value: 5 }],
+          },
+        ],
+      },
+    });
+
+    const rawBundle = bundle();
+    const result = applyModulesToBundle({
+      ...rawBundle,
+      locations: rawBundle.locations.map((location) => ({ ...location, starting: true })),
+      stats: [],
+      modules: [core, local],
+    }, [core, local], [localContributionsModId]);
+
+    expect(result.enabledModuleIds).toEqual(['base-core', localContributionsModId]);
+    expect(result.bundle.stats).toContainEqual({ id: 'new-stat', base: 5 });
+    expect(result.issues.some((issue) => issue.message === 'validation.moduleUpdateTargetMissing')).toBe(false);
   });
 
   it('applies local-contributions patches and disables only that mod when invalid', () => {
@@ -153,5 +237,136 @@ describe('ModEditService', () => {
       message: 'validation.moduleConflictDisabled',
       path: `modules.${localContributionsModId}`,
     }));
+  });
+
+  it('does not blame base-core when local-contributions replaces a location action with an invalid action', () => {
+    const rawBundle = {
+      ...bundle(),
+      manifest: { ...bundle().manifest, id: 'base' },
+      locations: [],
+      entities: [],
+      locales: { en: { 'universe.base.title': 'Base', 'universe.base.description': 'Base' } },
+    };
+    const core = module({
+      id: 'base-core',
+      universe: 'base',
+      data: {
+        locations: [{
+          id: 'crossroads',
+          position: { x: 0, y: 80 },
+          starting: true,
+          actions: ['travel-crossroads-to-emberwood'],
+        }],
+        actions: [{
+          id: 'travel-crossroads-to-emberwood',
+          role: 'travel',
+          durationSeconds: 2,
+          rewards: [],
+          results: [{ kind: 'relocate', locationId: 'crossroads' }],
+        }],
+      },
+      locale: {
+        en: {
+          'location.crossroads.title': 'Crossroads',
+          'location.crossroads.description': 'Crossroads.',
+          'location.crossroads.exhausted': 'Nothing more here.',
+          'action.travel-crossroads-to-emberwood.title': 'Travel',
+          'action.travel-crossroads-to-emberwood.description': 'Travel.',
+          'action.travel-crossroads-to-emberwood.success': 'Arrived.',
+          'action.travel-crossroads-to-emberwood.failure': 'Lost.',
+        },
+      },
+    });
+    const local = module({
+      id: localContributionsModId,
+      universe: 'base',
+      dependencies: ['+base-core'],
+      'data-updates': {
+        patches: [{
+          targetModId: 'base-core',
+          objectType: 'locations',
+          objectId: 'crossroads',
+          ops: [
+            { op: 'remove', path: '/actions/0' },
+            { op: 'add', path: '/actions/-', value: 'entity.ork.examine' },
+          ],
+        }],
+      },
+    });
+
+    const result = applyModulesToBundle(
+      { ...rawBundle, modules: [core, local] },
+      [core, local],
+      [localContributionsModId],
+    );
+
+    expect(result.enabledModuleIds).toEqual(['base-core']);
+    expect(result.bundle.locations[0].actions).toEqual(['travel-crossroads-to-emberwood']);
+    expect(result.issues).toContainEqual(expect.objectContaining({
+      message: 'validation.moduleConflictDisabled',
+      path: `modules.${localContributionsModId}`,
+      params: expect.objectContaining({ id: localContributionsModId }),
+    }));
+    expect(result.issues.some((issue) =>
+      issue.path === 'modules.base-core' &&
+      (issue.message === 'validation.moduleConflictDisabled' || issue.message === 'validation.moduleDisabled')
+    )).toBe(false);
+    expect(result.issues.some((issue) =>
+      issue.path === `modules.${localContributionsModId}.dependencies` &&
+      issue.message === 'validation.moduleMissingDependency'
+    )).toBe(false);
+  });
+
+  it('keeps real base-core enabled for the reported local-contributions action replacement patch', () => {
+    const manifest = readPublicJson<ContentBundle['manifest']>('base', 'universe.json');
+    const core = readPublicJson<ContentModule>('base', 'modules', 'base-core.json');
+    const locale = readPublicJson<Record<string, string>>('base', 'locales', 'en.json');
+    const local = module({
+      id: localContributionsModId,
+      universe: 'base',
+      author: 'UniversalisRPG',
+      dependencies: ['+base-core'],
+      'data-updates': {
+        patches: [{
+          targetModId: 'base-core',
+          objectType: 'locations',
+          objectId: 'crossroads',
+          ops: [
+            { op: 'remove', path: '/actions/0' },
+            { op: 'add', path: '/actions/-', value: 'entity.ork.examine' },
+          ],
+        }],
+      },
+    });
+    const rawBundle: ContentBundle = {
+      manifest,
+      locations: [],
+      entities: [],
+      actions: [],
+      skills: [],
+      stats: [],
+      items: [],
+      flags: [],
+      resourceDefinitions: [],
+      effects: [],
+      interactionTypes: [],
+      enemies: [],
+      dropTables: [],
+      collectionLogs: [],
+      dialogues: [],
+      locales: { en: locale },
+      modules: [core, local],
+    };
+
+    const result = applyModulesToBundle(rawBundle, [core, local], [localContributionsModId]);
+
+    expect(result.enabledModuleIds).toEqual(['base-core']);
+    expect(result.bundle.locations.find((location) => location.id === 'crossroads')?.actions).toContain('travel-crossroads-to-emberwood');
+    expect(result.issues).toContainEqual(expect.objectContaining({
+      message: 'validation.moduleConflictDisabled',
+      path: `modules.${localContributionsModId}`,
+    }));
+    expect(result.issues.some((issue) => issue.path === 'modules.base-core' && issue.message === 'validation.moduleDisabled')).toBe(false);
+    expect(result.issues.some((issue) => issue.path === `modules.${localContributionsModId}.dependencies` && issue.message === 'validation.moduleMissingDependency')).toBe(false);
   });
 });

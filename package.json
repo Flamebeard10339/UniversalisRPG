@@ -11,7 +11,8 @@
     "sync": "npm run build && cap sync",
     "test": "vitest run --configLoader runner",
     "test:ui": "node scripts/ui-smoke.mjs",
-    "merge:issue": "node scripts/merge-contribution-issue.mjs"
+    "merge:issue": "node scripts/merge-contribution-issue.mjs",
+    "mod-editor:cli": "node scripts/mod-editor-cli.mjs"
   },
   "dependencies": {
     "@capacitor/android": "^6.2.1",

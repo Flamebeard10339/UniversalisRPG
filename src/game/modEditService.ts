@@ -57,11 +57,7 @@ export const createModEditService = ({ resolvedBundle, store }: ModEditServiceOp
     const current = store.read(localContributionsModId) ?? localContributionModule(resolvedBundle);
     const updates = asUpdatesObject(current);
     const nextPatches = [
-      ...(updates.patches ?? []).filter((patch) =>
-        patch.targetModId !== targetModId ||
-        patch.objectType !== objectType ||
-        patch.objectId !== objectId,
-      ),
+      ...(updates.patches ?? []),
       { targetModId, objectType, objectId, ops: patchOps },
     ];
 

@@ -13,7 +13,7 @@ import { getEnemyStat, normalizeEnemyStats } from '../../game/enemies';
 import { resolveUniverseUiSettings } from '../../game/universeSettings';
 import { resolveExperienceCurve } from '../../game/skills';
 import { StructuredDataEditor, type StructuredSchema, type StructuredValue } from '../structuredData/StructuredData';
-import { actionSchema, basePlayerSchema, combatBalanceSchema, contentModuleSchema, dialogueSchema, displayProfileSchema, dropTableDefinitionSchema, effectDefinitionSchema, enemyStatsSchema, experienceCurveSchema, flagDefinitionSchema, interactionTypeDefinitionSchema, itemDefinitionSchema, locationSchema, modulePackSchema, resourceDefinitionSchema, rewardSchema, skillDefinitionSchema, statDefinitionSchema, universeExperienceSchema, universeUiSchema } from '../structuredData/contentSchemas';
+import { actionSchema, basePlayerSchema, combatBalanceSchema, contentModuleSchema, dialogueSchema, displayProfileSchema, dropTableDefinitionSchema, effectDefinitionSchema, enemyStatsSchema, entityDefinitionSchema, experienceCurveSchema, flagDefinitionSchema, interactionTypeDefinitionSchema, itemDefinitionSchema, locationSchema, modulePackSchema, resourceDefinitionSchema, rewardSchema, skillDefinitionSchema, statDefinitionSchema, universeExperienceSchema, universeUiSchema } from '../structuredData/contentSchemas';
 import { useUniverseState } from '../../stores/universeState';
 import { createModEditService, localContributionsModId } from '../../game/modEditService';
 import { createDraftModStore } from '../../game/modStore';
@@ -42,7 +42,7 @@ type LayeredRow<T> = {
   source: 'draft' | 'base';
 };
 
-const contentTabs: ContentDataTab[] = ['universe', 'map', 'actions', 'primitives', 'resources', 'json'];
+const contentTabs: ContentDataTab[] = ['universe', 'map', 'actions', 'primitives', 'enemies', 'resources', 'json'];
 
 const uniqueId = (baseId: string, existingIds: string[]) => {
   let index = 1;
@@ -498,10 +498,10 @@ export const ContentDataEditor = ({ activeTab, baseBundle, bundle, draft, onPatc
     } },
     { path: 'locations.json', json: locations.map((row) => row.item), schema: { kind: 'array' as const, listMode: 'free' as const, item: locationSchema(bundle), createItem: () => ({ id: 'new-location', position: { x: 0, y: 0 } }) }, onChange: (value: StructuredValue | undefined) => patchLocalMapModule((Array.isArray(value) ? value : []) as unknown as LocationNode[], bundle.actions, bundle.entities ?? []) },
     { path: 'actions.json', json: actions.map((row) => row.item), onChange: (value: StructuredValue | undefined) => patchLocalMapModule(bundle.locations, (Array.isArray(value) ? value : []) as unknown as GameAction[], bundle.entities ?? []) },
-    { path: 'entities.json', json: entities.map((row) => row.item), onChange: (value: StructuredValue | undefined) => patchLocalMapModule(bundle.locations, bundle.actions, (Array.isArray(value) ? value : []) as unknown as EntityDefinition[]) },
+    { path: 'entities.json', json: entities.map((row) => row.item), schema: { kind: 'array' as const, listMode: 'free' as const, item: entityDefinitionSchema(bundle), createItem: () => ({ id: 'new-entity', actionIds: [] }) }, onChange: (value: StructuredValue | undefined) => patchLocalMapModule(bundle.locations, bundle.actions, (Array.isArray(value) ? value : []) as unknown as EntityDefinition[]) },
     { path: 'dialogues.json', json: dialogues.map((row) => row.item), schema: { kind: 'array' as const, listMode: 'free' as const, item: dialogueSchema(bundle), createItem: () => ({ id: 'new-dialogue', startNodeId: 'start', nodes: [{ id: 'start', textKey: 'dialogue.new-dialogue.start' }] }) }, onChange: (value: StructuredValue | undefined) => saveObjectListEdits('dialogues', bundle.dialogues ?? [], (Array.isArray(value) ? value : []) as unknown as DialogueDefinition[]) },
     { path: 'drop-tables.json', json: dropTables.map((row) => row.item), schema: { kind: 'array' as const, listMode: 'free' as const, item: dropTableDefinitionSchema(bundle), createItem: () => ({ id: 'new-drop-table', mode: 'dependent', drops: [] }) }, onChange: (value: StructuredValue | undefined) => saveObjectListEdits('dropTables', bundle.dropTables ?? [], (Array.isArray(value) ? value : []) as unknown as DropTableDefinition[]) },
-    ...moduleJsonFiles,
+    ...moduleJsonFiles.filter((file) => file.path !== 'universe.json'),
     { path: 'module-packs.json', json: draft.modulePacks, schema: { kind: 'array' as const, listMode: 'free' as const, item: modulePackSchema(bundle), createItem: () => ({ id: 'new-pack', modules: [] }) }, onChange: (value: StructuredValue | undefined) => onPatch({ modulePacks: (Array.isArray(value) ? value : []) as unknown as ContentModulePack[] }) },
     { path: 'skills.json', json: skills.map((row) => row.item), schema: { kind: 'array' as const, listMode: 'table' as const, columns: ['id', 'maxLevel', 'statId', 'addedPerLevel', 'increasedPerLevel'], item: skillDefinitionSchema(bundle), createItem: () => ({ id: 'new-skill', maxLevel: 100 }) }, onChange: (value: StructuredValue | undefined) => saveObjectListEdits('skills', bundle.skills, (Array.isArray(value) ? value : []) as unknown as SkillDefinition[]) },
     { path: 'stats.json', json: stats.map((row) => row.item), schema: { kind: 'array' as const, listMode: 'table' as const, columns: ['id', 'base'], item: statDefinitionSchema(), createItem: () => ({ id: 'new-stat', base: 0 }) }, onChange: (value: StructuredValue | undefined) => saveObjectListEdits('stats', bundle.stats, (Array.isArray(value) ? value : []) as unknown as StatDefinition[]) },
@@ -516,13 +516,14 @@ export const ContentDataEditor = ({ activeTab, baseBundle, bundle, draft, onPatc
   ];
 
   return (
-    <section className="grid gap-3">
-      <div className="flex gap-2 overflow-x-auto rounded border border-slate-800 bg-slate-900 p-2">
+    <section className="grid gap-3" data-testid="content-data-editor">
+      <div className="flex gap-2 overflow-x-auto rounded border border-slate-800 bg-slate-900 p-2" data-testid="content-data-tabs">
         {contentTabs.map((tab) => (
           <button
             className={`min-w-28 flex-1 rounded px-3 py-2 text-sm font-semibold capitalize ${
               activeTab === tab ? 'bg-cyan-300 text-slate-950' : 'bg-slate-950 text-slate-300'
             }`}
+            data-testid={`content-tab-${tab}`}
             key={tab}
             onClick={() => onTabChange(tab)}
             type="button"
@@ -534,6 +535,7 @@ export const ContentDataEditor = ({ activeTab, baseBundle, bundle, draft, onPatc
 
       <input
         className="rounded bg-slate-950 px-3 py-2 text-sm text-slate-100"
+        data-testid="content-data-filter"
         onChange={(event) => setFilter(event.target.value)}
         placeholder={t('contribution.data.filter')}
         value={filter}
@@ -572,7 +574,7 @@ export const ContentDataEditor = ({ activeTab, baseBundle, bundle, draft, onPatc
         <section className="grid gap-1 rounded border border-slate-700 p-2">
           <div className="flex items-center justify-between gap-3">
             <h3 className="text-sm font-semibold text-slate-100">{t('contribution.data.actions')}</h3>
-            <button className="rounded bg-cyan-400 px-3 py-2 text-sm font-semibold text-slate-950" onClick={addAction} type="button">
+            <button className="rounded bg-cyan-400 px-3 py-2 text-sm font-semibold text-slate-950" data-testid="content-add-action" onClick={addAction} type="button">
               {t('contribution.data.addAction')}
             </button>
           </div>
@@ -585,7 +587,7 @@ export const ContentDataEditor = ({ activeTab, baseBundle, bundle, draft, onPatc
                 const selected = selectedActionId === action.id;
 
                 return (
-                  <div className="grid gap-2 rounded bg-slate-950 p-2" key={actionEditorKey(action.id)}>
+                  <div className="grid gap-2 rounded bg-slate-950 p-2" data-testid={`content-row-action-${action.id}`} key={actionEditorKey(action.id)}>
                     <div className="grid gap-2 sm:grid-cols-[1fr_auto_auto]">
                       <button className="min-w-0 rounded bg-slate-900 px-3 py-2 text-left" onClick={() => setSelectedActionId(selected ? null : action.id)} type="button">
                         <span className="block truncate text-sm font-semibold text-slate-100">{action.id}</span>
@@ -622,7 +624,7 @@ export const ContentDataEditor = ({ activeTab, baseBundle, bundle, draft, onPatc
         <section className="grid gap-1 rounded border border-slate-700 p-2">
           <div className="flex items-center justify-between gap-3">
             <h3 className="text-sm font-semibold text-slate-100">{t('contribution.data.dialogues')}</h3>
-            <button className="rounded bg-cyan-400 px-3 py-2 text-sm font-semibold text-slate-950" onClick={addDialogue} type="button">
+            <button className="rounded bg-cyan-400 px-3 py-2 text-sm font-semibold text-slate-950" data-testid="content-add-dialogue" onClick={addDialogue} type="button">
               {t('contribution.data.addDialogue')}
             </button>
           </div>
@@ -635,7 +637,7 @@ export const ContentDataEditor = ({ activeTab, baseBundle, bundle, draft, onPatc
                   const dialogue = row.item;
                   const isSelected = selectedDialogueId === dialogue.id;
                   return (
-                    <div className={`grid gap-2 rounded border p-3 ${isSelected ? 'border-cyan-500 bg-cyan-950/10' : 'border-slate-800 bg-slate-950'}`} key={`${row.source}-${row.index}`}>
+                    <div className={`grid gap-2 rounded border p-3 ${isSelected ? 'border-cyan-500 bg-cyan-950/10' : 'border-slate-800 bg-slate-950'}`} data-testid={`content-row-dialogue-${dialogue.id}`} key={`${row.source}-${row.index}`}>
                       <div className="flex min-w-0 flex-wrap items-center gap-2">
                         <button className="min-w-0 flex-1 rounded bg-slate-900 px-3 py-2 text-left" onClick={() => setSelectedDialogueId(isSelected ? null : dialogue.id)} type="button">
                           <span className="block truncate text-sm font-semibold text-slate-100">{dialogue.id}</span>
@@ -689,7 +691,7 @@ export const ContentDataEditor = ({ activeTab, baseBundle, bundle, draft, onPatc
         <section className="grid gap-1 rounded border border-slate-700 p-2">
           <div className="flex items-center justify-between gap-3">
             <h3 className="text-sm font-semibold text-slate-100">{t('contribution.data.skills')}</h3>
-            <button className="rounded bg-cyan-400 px-3 py-2 text-sm font-semibold text-slate-950" onClick={addSkill} type="button">
+            <button className="rounded bg-cyan-400 px-3 py-2 text-sm font-semibold text-slate-950" data-testid="content-add-skill" onClick={addSkill} type="button">
               {t('contribution.data.addSkill')}
             </button>
           </div>
@@ -698,7 +700,7 @@ export const ContentDataEditor = ({ activeTab, baseBundle, bundle, draft, onPatc
           ) : (
             <div className="grid gap-1">
               {skills.map((row) => (
-                <div className="flex min-w-0 flex-wrap items-center gap-2 rounded bg-slate-950 p-2" key={`${row.source}-${row.index}`}>
+                <div className="flex min-w-0 flex-wrap items-center gap-2 rounded bg-slate-950 p-2" data-testid={`content-row-skill-${row.item.id}`} key={`${row.source}-${row.index}`}>
                   <div className="min-w-0 flex-1">
                     <StructuredDataEditor onChange={(value) => { if (value) updateSkill(row, value as unknown as SkillDefinition); }} schema={skillDefinitionSchema(bundle)} t={t} value={row.item as unknown as StructuredValue} />
                   </div>
@@ -716,7 +718,7 @@ export const ContentDataEditor = ({ activeTab, baseBundle, bundle, draft, onPatc
         <section className="grid gap-2 rounded border border-slate-700 p-2">
           <div className="flex items-center justify-between gap-3">
             <h3 className="text-sm font-semibold text-slate-100">{t('contribution.data.stats')}</h3>
-            <button className="rounded bg-cyan-400 px-3 py-2 text-sm font-semibold text-slate-950" onClick={addStat} type="button">
+            <button className="rounded bg-cyan-400 px-3 py-2 text-sm font-semibold text-slate-950" data-testid="content-add-stat" onClick={addStat} type="button">
               {t('contribution.data.addStat')}
             </button>
           </div>
@@ -725,7 +727,7 @@ export const ContentDataEditor = ({ activeTab, baseBundle, bundle, draft, onPatc
           ) : (
             <div className="grid gap-1">
               {stats.map((row) => (
-                <div className="flex min-w-0 flex-wrap items-center gap-2 rounded bg-slate-950 p-2" key={`${row.source}-${row.index}`}>
+                <div className="flex min-w-0 flex-wrap items-center gap-2 rounded bg-slate-950 p-2" data-testid={`content-row-stat-${row.item.id}`} key={`${row.source}-${row.index}`}>
                   <div className="min-w-0 flex-1">
                     <StructuredDataEditor onChange={(value) => { if (value) updateStat(row, value as unknown as StatDefinition); }} schema={statDefinitionSchema()} t={t} value={row.item as unknown as StructuredValue} />
                   </div>
@@ -770,7 +772,7 @@ export const ContentDataEditor = ({ activeTab, baseBundle, bundle, draft, onPatc
         <section className="grid gap-1 rounded border border-slate-700 p-2">
           <div className="flex items-center justify-between gap-3">
             <h3 className="text-sm font-semibold text-slate-100">{t('contribution.data.interactions')}</h3>
-            <button className="rounded bg-cyan-400 px-3 py-2 text-sm font-semibold text-slate-950" onClick={addInteractionType} type="button">
+            <button className="rounded bg-cyan-400 px-3 py-2 text-sm font-semibold text-slate-950" data-testid="content-add-interaction" onClick={addInteractionType} type="button">
               {t('contribution.data.addInteraction')}
             </button>
           </div>
@@ -779,7 +781,7 @@ export const ContentDataEditor = ({ activeTab, baseBundle, bundle, draft, onPatc
           ) : (
             <div className="grid gap-1">
               {interactionTypes.map((row) => (
-                <div className="flex min-w-0 flex-wrap items-center gap-2 rounded bg-slate-950 p-2" key={`${row.source}-${row.index}`}>
+                <div className="flex min-w-0 flex-wrap items-center gap-2 rounded bg-slate-950 p-2" data-testid={`content-row-interaction-${row.item.id}`} key={`${row.source}-${row.index}`}>
                   <div className="min-w-0 flex-1">
                     <StructuredDataEditor onChange={(value) => { if (value) updateInteractionType(row, value as unknown as InteractionTypeDefinition); }} schema={interactionTypeDefinitionSchema(bundle)} t={t} value={row.item as unknown as StructuredValue} />
                   </div>
@@ -797,7 +799,7 @@ export const ContentDataEditor = ({ activeTab, baseBundle, bundle, draft, onPatc
         <section className="grid gap-3 rounded border border-slate-700 p-2">
           <div className="flex items-center justify-between gap-3">
             <h3 className="text-sm font-semibold text-slate-100">{t('contribution.data.enemies')}</h3>
-            <button className="rounded bg-cyan-400 px-3 py-2 text-sm font-semibold text-slate-950" onClick={addEnemy} type="button">
+            <button className="rounded bg-cyan-400 px-3 py-2 text-sm font-semibold text-slate-950" data-testid="content-add-enemy" onClick={addEnemy} type="button">
               {t('contribution.data.addEnemy')}
             </button>
           </div>
@@ -862,7 +864,7 @@ export const ContentDataEditor = ({ activeTab, baseBundle, bundle, draft, onPatc
                 const enemy = row.item;
                 const rowKey = enemyEditorKey(enemy.id);
                 return (
-                  <div className={`grid min-w-[40rem] grid-cols-[5rem_1fr_6rem_6rem_6rem_8rem_6rem] items-center gap-2 border-b border-slate-800 px-2 py-2 text-sm ${selectedEnemyKey === rowKey ? 'bg-slate-800/70' : 'bg-slate-950'}`} key={rowKey}>
+                  <div className={`grid min-w-[40rem] grid-cols-[5rem_1fr_6rem_6rem_6rem_8rem_6rem] items-center gap-2 border-b border-slate-800 px-2 py-2 text-sm ${selectedEnemyKey === rowKey ? 'bg-slate-800/70' : 'bg-slate-950'}`} data-testid={`content-row-enemy-${enemy.id}`} key={rowKey}>
                     <button className="rounded border border-slate-600 px-2 py-1 text-xs font-semibold text-slate-100" onClick={() => setSelectedEnemyKey(rowKey)} type="button">{t('contribution.column.edit')}</button>
                     <span className="truncate text-slate-100">{enemy.id}</span>
                     <span className="text-slate-300">{getEnemyStat(enemy, 'attack')}</span>
@@ -882,7 +884,7 @@ export const ContentDataEditor = ({ activeTab, baseBundle, bundle, draft, onPatc
         <section className="grid gap-1 rounded border border-slate-700 p-2">
           <div className="flex items-center justify-between gap-3">
             <h3 className="text-sm font-semibold text-slate-100">{t('contribution.data.items')}</h3>
-            <button className="rounded bg-cyan-400 px-3 py-2 text-sm font-semibold text-slate-950" onClick={addItem} type="button">
+            <button className="rounded bg-cyan-400 px-3 py-2 text-sm font-semibold text-slate-950" data-testid="content-add-item" onClick={addItem} type="button">
               {t('contribution.data.addItem')}
             </button>
           </div>
@@ -891,7 +893,7 @@ export const ContentDataEditor = ({ activeTab, baseBundle, bundle, draft, onPatc
           ) : (
             <div className="grid gap-1">
               {items.map((row) => (
-                <div className="flex min-w-0 flex-wrap items-center gap-2 rounded bg-slate-950 p-2" key={`${row.source}-${row.index}`}>
+                <div className="flex min-w-0 flex-wrap items-center gap-2 rounded bg-slate-950 p-2" data-testid={`content-row-item-${row.item.id}`} key={`${row.source}-${row.index}`}>
                   <div className="min-w-0 flex-1">
                     <StructuredDataEditor onChange={(value) => { if (value) updateItem(row, value as unknown as ItemDefinition); }} schema={itemDefinitionSchema()} t={t} value={row.item as unknown as StructuredValue} />
                   </div>
@@ -910,7 +912,7 @@ export const ContentDataEditor = ({ activeTab, baseBundle, bundle, draft, onPatc
         <section className="grid gap-1 rounded border border-slate-700 p-2">
           <div className="flex items-center justify-between gap-3">
             <h3 className="text-sm font-semibold text-slate-100">{t('contribution.data.flags')}</h3>
-            <button className="rounded bg-cyan-400 px-3 py-2 text-sm font-semibold text-slate-950" onClick={addFlag} type="button">
+            <button className="rounded bg-cyan-400 px-3 py-2 text-sm font-semibold text-slate-950" data-testid="content-add-flag" onClick={addFlag} type="button">
               {t('contribution.data.addFlag')}
             </button>
           </div>
@@ -919,7 +921,7 @@ export const ContentDataEditor = ({ activeTab, baseBundle, bundle, draft, onPatc
           ) : (
             <div className="grid gap-1">
               {flags.map((row) => (
-                <div className="flex min-w-0 flex-wrap items-center gap-2 rounded bg-slate-950 p-2" key={`${row.source}-${row.index}`}>
+                <div className="flex min-w-0 flex-wrap items-center gap-2 rounded bg-slate-950 p-2" data-testid={`content-row-flag-${row.item.id}`} key={`${row.source}-${row.index}`}>
                   <div className="min-w-0 flex-1">
                     <StructuredDataEditor onChange={(value) => { if (value) promote('flags', value as unknown as StateFlagDefinition, row.item.id); }} schema={flagDefinitionSchema()} t={t} value={row.item as unknown as StructuredValue} />
                   </div>
@@ -936,10 +938,10 @@ export const ContentDataEditor = ({ activeTab, baseBundle, bundle, draft, onPatc
           <section className="grid gap-2">
             <div className="flex items-center justify-between gap-3">
               <h3 className="text-sm font-semibold text-slate-100">{t('contribution.data.resources')}</h3>
-              <button className="rounded bg-cyan-400 px-3 py-2 text-sm font-semibold text-slate-950" onClick={addResource} type="button">{t('contribution.data.addResource')}</button>
+              <button className="rounded bg-cyan-400 px-3 py-2 text-sm font-semibold text-slate-950" data-testid="content-add-resource" onClick={addResource} type="button">{t('contribution.data.addResource')}</button>
             </div>
             {resources.map((row) => (
-              <div className="grid gap-2 rounded bg-slate-950 p-2" key={stableEditorKey(resourceEditorKeys, 'resource', row.item.id)}>
+              <div className="grid gap-2 rounded bg-slate-950 p-2" data-testid={`content-row-resource-${row.item.id}`} key={stableEditorKey(resourceEditorKeys, 'resource', row.item.id)}>
                 <StructuredDataEditor onChange={(value) => { if (value) updateResource(row, value as unknown as ResourceDefinition); }} schema={resourceDefinitionSchema(bundle)} t={t} value={row.item as unknown as StructuredValue} />
                 <button className={`${removeButtonClass} justify-self-start`} onClick={() => removeResource(row)} type="button">{t('contribution.column.remove')}</button>
               </div>
@@ -949,10 +951,10 @@ export const ContentDataEditor = ({ activeTab, baseBundle, bundle, draft, onPatc
           <section className="grid gap-2 border-t border-slate-700 pt-4">
             <div className="flex items-center justify-between gap-3">
               <h3 className="text-sm font-semibold text-slate-100">{t('contribution.data.effects')}</h3>
-              <button className="rounded bg-cyan-400 px-3 py-2 text-sm font-semibold text-slate-950" onClick={addEffect} type="button">{t('contribution.data.addEffect')}</button>
+              <button className="rounded bg-cyan-400 px-3 py-2 text-sm font-semibold text-slate-950" data-testid="content-add-effect" onClick={addEffect} type="button">{t('contribution.data.addEffect')}</button>
             </div>
             {effects.map((row) => (
-              <div className="grid gap-2 rounded bg-slate-950 p-2" key={stableEditorKey(effectEditorKeys, 'effect', row.item.id)}>
+              <div className="grid gap-2 rounded bg-slate-950 p-2" data-testid={`content-row-effect-${row.item.id}`} key={stableEditorKey(effectEditorKeys, 'effect', row.item.id)}>
                 <StructuredDataEditor onChange={(value) => { if (value) updateEffect(row, value as unknown as EffectDefinition); }} schema={effectDefinitionSchema(bundle)} t={t} value={row.item as unknown as StructuredValue} />
                 <button className={`${removeButtonClass} justify-self-start`} onClick={() => removeRow('effects', row)} type="button">{t('contribution.column.remove')}</button>
               </div>
@@ -966,7 +968,7 @@ export const ContentDataEditor = ({ activeTab, baseBundle, bundle, draft, onPatc
         <section className="grid gap-2 rounded border border-slate-700 p-2">
           <h3 className="text-sm font-semibold text-slate-100">{t('contribution.data.jsonFiles')}</h3>
           {jsonFiles.map((file) => (
-            <details className="rounded bg-slate-950 p-2" key={file.path}>
+            <details className="rounded bg-slate-950 p-2" data-testid={`content-json-file-${file.path}`} key={file.path}>
               <summary className="cursor-pointer text-sm font-semibold text-slate-100">{file.path}</summary>
               <div className="mt-2">
                 <button

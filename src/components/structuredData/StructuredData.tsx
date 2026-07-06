@@ -27,6 +27,7 @@ type EditorProps = {
   label?: string;
   onChange: (value: StructuredValue | undefined) => void;
   optional?: boolean;
+  path?: string;
   schema?: StructuredSchemaRef;
   t: Translator;
   value: StructuredValue | undefined;
@@ -72,6 +73,7 @@ const defaultFor = (field: StructuredField) => field.defaultValue ?? (() => {
   if (schema.kind === 'scalar') return false;
   return '';
 })();
+const uniqueStrings = (items: string[] = []) => Array.from(new Set(items));
 
 const PrimitiveEditor = ({
   accessibleLabel,
@@ -93,7 +95,7 @@ const PrimitiveEditor = ({
   if (schema.kind === 'enum') {
     return (
       <select aria-label={accessibleLabel} className={inputClass} onChange={(event) => onChange(event.target.value)} value={String(value ?? schema.options[0] ?? '')}>
-        {schema.options.map((option) => <option key={option} value={option}>{option}</option>)}
+        {uniqueStrings(schema.options).map((option) => <option key={option} value={option}>{option}</option>)}
       </select>
     );
   }
@@ -108,7 +110,7 @@ const PrimitiveEditor = ({
   const invalidSuggestion = hasSuggestions && stringValue.trim().length > 0 && !schema.suggestions?.includes(stringValue);
   const invalidValue = Boolean(invalid || invalidSuggestion);
   if (schema.select && hasSuggestions) {
-    const optionValues = [...schema.suggestions ?? []];
+    const optionValues = uniqueStrings(schema.suggestions ?? []);
     if (stringValue && !optionValues.includes(stringValue)) {
       optionValues.unshift(stringValue);
     }
@@ -126,7 +128,7 @@ const PrimitiveEditor = ({
   }
   return (
     <>
-      {schema.suggestions?.length ? <datalist id={suggestionId}>{schema.suggestions.map((suggestion) => <option key={suggestion} value={suggestion} />)}</datalist> : null}
+      {schema.suggestions?.length ? <datalist id={suggestionId}>{uniqueStrings(schema.suggestions).map((suggestion) => <option key={suggestion} value={suggestion} />)}</datalist> : null}
       <input
         aria-invalid={invalidValue || undefined}
         aria-label={accessibleLabel}
@@ -139,7 +141,9 @@ const PrimitiveEditor = ({
   );
 };
 
-const EditorNode = ({ hiddenKeys = [], invalid, label, onChange, optional, schema: schemaRef = { kind: 'inferred' }, t, value }: EditorProps) => {
+const childPath = (path: string | undefined, child: string | number) => `${path ?? ''}/${child}`;
+
+const EditorNode = ({ hiddenKeys = [], invalid, label, onChange, optional, path, schema: schemaRef = { kind: 'inferred' }, t, value }: EditorProps) => {
   const schema = compatibleSchema(resolveSchema(schemaRef), value);
   const [newField, setNewField] = useState('');
 
@@ -152,7 +156,7 @@ const EditorNode = ({ hiddenKeys = [], invalid, label, onChange, optional, schem
     const selected = String(record[schema.discriminator] ?? Object.keys(schema.variants)[0] ?? '');
     const variant = schema.variants[selected] ?? Object.values(schema.variants)[0];
     return (
-      <section className="grid gap-2 rounded border border-slate-800 bg-slate-950/60 p-2">
+        <section className="grid gap-2 rounded border border-slate-800 bg-slate-950/60 p-2" data-structured-path={path}>
         <div className="flex min-w-[10rem] items-center gap-2">
           <span className="text-xs text-slate-400">{label ? labelText(label, t) : schema.discriminator}</span>
           <select className={inputClass} onChange={(event) => onChange(schema.variants[event.target.value].createValue())} value={selected}>
@@ -160,7 +164,7 @@ const EditorNode = ({ hiddenKeys = [], invalid, label, onChange, optional, schem
           </select>
           {optional && <button className="text-xs text-rose-300" onClick={() => onChange(undefined)} type="button">{t('structured.remove')}</button>}
         </div>
-        {variant && <EditorNode hiddenKeys={[schema.discriminator]} onChange={onChange} schema={variant.schema} t={t} value={value} />}
+        {variant && <EditorNode hiddenKeys={[schema.discriminator]} onChange={onChange} path={path} schema={variant.schema} t={t} value={value} />}
       </section>
     );
   }
@@ -170,7 +174,7 @@ const EditorNode = ({ hiddenKeys = [], invalid, label, onChange, optional, schem
     const allowedTypes = schema.types ?? ['boolean', 'number', 'string'];
     const primitiveSchema: StructuredSchema = scalarType === 'number' ? { kind: 'number' } : scalarType === 'string' ? { kind: 'string' } : { kind: 'boolean' };
     return (
-      <div className="grid min-w-0 gap-1">
+      <div className="grid min-w-0 gap-1" data-structured-path={path}>
         <span className="text-xs text-slate-400">{label ? labelText(label, t) : t('structured.value')}</span>
         <div className="flex min-w-0 items-center gap-2">
           <select className={inputClass} onChange={(event) => onChange(event.target.value === 'number' ? 0 : event.target.value === 'string' ? '' : false)} value={scalarType}>
@@ -196,7 +200,7 @@ const EditorNode = ({ hiddenKeys = [], invalid, label, onChange, optional, schem
           .filter((item, index, values) => values.indexOf(item) !== index),
       );
       return (
-        <section className="grid gap-2 border-l border-slate-700 pl-3">
+        <section className="grid gap-2 border-l border-slate-700 pl-3" data-structured-path={path}>
           <div className="flex items-center justify-between gap-2">
             <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label ? labelText(label, t) : t('structured.items')}</span>
             <div className="flex gap-2">
@@ -206,8 +210,8 @@ const EditorNode = ({ hiddenKeys = [], invalid, label, onChange, optional, schem
           </div>
           <div className="flex min-w-0 flex-wrap gap-2">
             {items.map((item, index) => (
-              <div className="flex min-w-[10rem] items-center gap-2 rounded bg-slate-950 p-2" key={index}>
-                <EditorNode invalid={typeof item === 'string' && (item.trim().length === 0 || duplicateTagValues.has(item))} onChange={(next) => onChange(items.map((candidate, candidateIndex) => candidateIndex === index ? next ?? null : candidate))} schema={schema.item} t={t} value={item} />
+              <div className="flex min-w-[10rem] items-center gap-2 rounded bg-slate-950 p-2" data-structured-path={childPath(path, index)} key={index}>
+                <EditorNode invalid={typeof item === 'string' && (item.trim().length === 0 || duplicateTagValues.has(item))} onChange={(next) => onChange(items.map((candidate, candidateIndex) => candidateIndex === index ? next ?? null : candidate))} path={childPath(path, index)} schema={schema.item} t={t} value={item} />
                 <button aria-label={t('structured.removeRow', { index: index + 1 })} className={removeButtonClass} onClick={() => onChange(items.filter((_, candidateIndex) => candidateIndex !== index))} type="button">{t('structured.remove')}</button>
               </div>
             ))}
@@ -220,7 +224,7 @@ const EditorNode = ({ hiddenKeys = [], invalid, label, onChange, optional, schem
       const itemSchema = resolveSchema(schema.item);
       const columns = schema.columns ?? (itemSchema.kind === 'object' ? Object.keys(itemSchema.fields) : []);
       return (
-        <section className="grid gap-2 border-l border-slate-700 pl-3">
+        <section className="grid gap-2 border-l border-slate-700 pl-3" data-structured-path={path}>
           <div className="flex items-center justify-between gap-2">
             <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label ? labelText(label, t) : t('structured.items')}</span>
             <div className="flex gap-2">
@@ -244,7 +248,7 @@ const EditorNode = ({ hiddenKeys = [], invalid, label, onChange, optional, schem
                   {items.map((item, index) => {
                     const record = item && typeof item === 'object' && !Array.isArray(item) ? item : {};
                     return (
-                      <tr className="border-t border-slate-800 align-top" key={index}>
+                      <tr className="border-t border-slate-800 align-top" data-structured-path={childPath(path, index)} key={index}>
                         {columns.map((column) => {
                           const field = itemSchema.kind === 'object' ? itemSchema.fields[column] : undefined;
                           return (
@@ -258,6 +262,7 @@ const EditorNode = ({ hiddenKeys = [], invalid, label, onChange, optional, schem
                                   return updated;
                                 }))}
                                 optional={field?.optional}
+                                path={childPath(childPath(path, index), column)}
                                 schema={field?.schema ?? { kind: 'inferred' }}
                                 t={t}
                                 value={record[column]}
@@ -278,7 +283,7 @@ const EditorNode = ({ hiddenKeys = [], invalid, label, onChange, optional, schem
     }
 
     return (
-      <section className="grid gap-2 border-l border-slate-700 pl-3">
+      <section className="grid gap-2 border-l border-slate-700 pl-3" data-structured-path={path}>
         <div className="flex items-center justify-between gap-2">
           <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label ? labelText(label, t) : t('structured.items')}</span>
           <div className="flex gap-2">
@@ -287,9 +292,9 @@ const EditorNode = ({ hiddenKeys = [], invalid, label, onChange, optional, schem
           </div>
         </div>
         {items.map((item, index) => (
-          <div className="grid grid-cols-[1fr_auto] items-start gap-2 rounded border border-slate-800 bg-slate-900/50 p-2" key={index}>
+          <div className="grid grid-cols-[1fr_auto] items-start gap-2 rounded border border-slate-800 bg-slate-900/50 p-2" data-structured-path={childPath(path, index)} key={index}>
             <div className="min-w-0 flex-1">
-              <EditorNode label={`${t('structured.row')} ${index + 1}`} onChange={(next) => onChange(items.map((candidate, candidateIndex) => candidateIndex === index ? next ?? null : candidate))} schema={schema.item} t={t} value={item} />
+              <EditorNode label={`${t('structured.row')} ${index + 1}`} onChange={(next) => onChange(items.map((candidate, candidateIndex) => candidateIndex === index ? next ?? null : candidate))} path={childPath(path, index)} schema={schema.item} t={t} value={item} />
             </div>
             <button aria-label={t('structured.removeRow', { index: index + 1 })} className={removeButtonClass} onClick={() => onChange(items.filter((_, candidateIndex) => candidateIndex !== index))} type="button">{t('structured.remove')}</button>
           </div>
@@ -315,14 +320,14 @@ const EditorNode = ({ hiddenKeys = [], invalid, label, onChange, optional, schem
 
       if (field.optional && fieldValue === undefined) {
         return (
-          <div className="grid min-w-0 gap-1 rounded bg-slate-950/60 p-2" key={key}>
+          <div className="grid min-w-0 gap-1 rounded bg-slate-950/60 p-2" data-structured-path={childPath(path, key)} key={key}>
             <button className="justify-self-start rounded border border-dashed border-slate-600 px-2 py-1 text-xs text-slate-300" onClick={() => updateKey(key, defaultFor(field))} type="button">+ {labelText(fieldLabel, t)}</button>
           </div>
         );
       }
 
       return (
-        <div className="grid min-w-0 gap-2 rounded bg-slate-950/60 p-2" key={key}>
+        <div className="grid min-w-0 gap-2 rounded bg-slate-950/60 p-2" data-structured-path={childPath(path, key)} key={key}>
           <div className="flex items-center justify-between gap-2">
             <span className="text-xs font-semibold text-slate-400">{labelText(fieldLabel, t)}</span>
             {field.optional && <button className="text-xs text-rose-300" onClick={() => updateKey(key, undefined)} type="button">{t('structured.remove')}</button>}
@@ -330,6 +335,7 @@ const EditorNode = ({ hiddenKeys = [], invalid, label, onChange, optional, schem
           <EditorNode
             onChange={(next) => updateKey(key, next)}
             optional={false}
+            path={childPath(path, key)}
             schema={field.schema}
             t={t}
             value={fieldValue}
@@ -338,7 +344,7 @@ const EditorNode = ({ hiddenKeys = [], invalid, label, onChange, optional, schem
       );
     };
     return (
-      <section className="grid min-w-0 gap-2">
+      <section className="grid min-w-0 gap-2" data-structured-path={path}>
         {label && (
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">{labelText(label, t)}</span>
@@ -358,7 +364,7 @@ const EditorNode = ({ hiddenKeys = [], invalid, label, onChange, optional, schem
   }
 
   return (
-    <div className="grid min-w-0 flex-1 gap-1">
+    <div className="grid min-w-0 flex-1 gap-1" data-structured-path={path}>
       {label && <span className="text-xs text-slate-400">{labelText(label, t)}</span>}
       <div className="flex min-w-0 items-center gap-2">
         <PrimitiveEditor accessibleLabel={label ? labelText(label, t) : undefined} invalid={invalid} onChange={onChange} schema={schema as Extract<StructuredSchema, { kind: 'string' | 'color' | 'number' | 'boolean' | 'enum' }>} value={value} />
