@@ -10,7 +10,8 @@
     "preview": "vite preview --configLoader runner",
     "sync": "npm run build && cap sync",
     "test": "vitest run --configLoader runner",
-    "test:ui": "node scripts/ui-smoke.mjs"
+    "test:ui": "node scripts/ui-smoke.mjs",
+    "merge:issue": "node scripts/merge-contribution-issue.mjs"
   },
   "dependencies": {
     "@capacitor/android": "^6.2.1",
