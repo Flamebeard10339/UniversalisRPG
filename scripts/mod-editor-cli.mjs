@@ -155,7 +155,10 @@ const removeJsonRow = async (page, fileName, objectId, label) => {
     if (!host) throw new Error(`Missing JSON editor for ${name}`);
     const candidates = Array.from(host.querySelectorAll(`[data-structured-path="${pathValue}"]`));
     const button = candidates
-      .map((candidate) => candidate.querySelector('button[aria-label^="Remove row"]'))
+      .map((candidate) => Array.from(candidate.children).find((child) =>
+        child instanceof HTMLButtonElement &&
+        child.getAttribute('aria-label')?.startsWith('Remove row'),
+      ))
       .find(Boolean);
     if (!(button instanceof HTMLElement)) throw new Error(`Could not find remove button for ${name} ${pathValue}`);
     button.click();
@@ -222,6 +225,14 @@ const assertLocalContributionShape = async (page) => {
   return module;
 };
 
+const assertLocalContributionsEnabled = async (page) => {
+  await page.waitForFunction(({ key }) => {
+    const value = window.localStorage.getItem(key);
+    if (!value) return false;
+    return (JSON.parse(value).base ?? []).includes('local-contributions');
+  }, { key: modulesKey });
+};
+
 const assertBaseStillPlayable = async (page) => {
   await nav(page, 'Home');
   await page.getByText('Gather Rumors', { exact: true }).first().waitFor();
@@ -263,14 +274,40 @@ const runAdversarialScenario = async (page) => {
   return module;
 };
 
+const runRemoveTravelActionScenario = async (page) => {
+  await page.goto(baseUrl, { waitUntil: 'networkidle' });
+  await enableContributionMode(page);
+  await removeJsonRow(page, 'actions.json', 'travel-emberwood-to-crossroads', 'remove travel-emberwood-to-crossroads');
+  const module = await assertLocalContributionShape(page);
+  const patches = module['data-updates']?.patches ?? [];
+  const actionRemove = patches.some((patch) =>
+    patch.objectType === 'actions' &&
+    patch.objectId === 'travel-emberwood-to-crossroads' &&
+    patch.ops.some((op) => op.op === 'remove' && op.path === ''),
+  );
+  const emberwoodCleanup = patches.some((patch) =>
+    patch.objectType === 'locations' &&
+    patch.objectId === 'emberwood' &&
+    patch.ops.some((op) => op.op === 'remove' && op.path === '/actions/0'),
+  );
+  if (!actionRemove) throw new Error('Expected an action object remove patch for travel-emberwood-to-crossroads');
+  if (!emberwoodCleanup) throw new Error('Expected an emberwood.actions reference cleanup patch');
+  await page.reload({ waitUntil: 'networkidle' });
+  await assertLocalContributionsEnabled(page);
+  await assertBaseStillPlayable(page);
+  return module;
+};
+
 const executeCommand = async (page, command) => {
   if (command.op === 'goto') return nav(page, command.tab);
   if (command.op === 'enableContributionMode') return enableContributionMode(page);
   if (command.op === 'contentTab') return switchContentTab(page, command.tab);
   if (command.op === 'click') return page.getByTestId(command.testId).click();
   if (command.op === 'removeFirstLocationAction') return removeFirstLocationAction(page, command.locationId);
+  if (command.op === 'removeJsonRow') return removeJsonRow(page, command.fileName, command.objectId, command.label ?? `remove ${command.objectId}`);
   if (command.op === 'addInvalidLocationAction') return addInvalidLocationAction(page, command.locationId, command.actionId);
   if (command.op === 'assertLocalContributions') return assertLocalContributionShape(page);
+  if (command.op === 'assertLocalContributionsEnabled') return assertLocalContributionsEnabled(page);
   if (command.op === 'assertBaseStillPlayable') return assertBaseStillPlayable(page);
   if (command.op === 'dumpDraft') {
     console.log(JSON.stringify(await readDraft(page), null, 2));
@@ -311,6 +348,8 @@ try {
     module = await localModule(page);
   } else if (scenarioName === 'adversarial') {
     module = await runAdversarialScenario(page);
+  } else if (scenarioName === 'remove-travel-action') {
+    module = await runRemoveTravelActionScenario(page);
   } else {
     throw new Error(`Unknown scenario: ${scenarioName}`);
   }
@@ -327,6 +366,10 @@ try {
     scenario: commandsPath ? commandsPath : scenarioName,
     dependency: module?.dependencies ?? [],
     patchCount: patches.length,
+    actionPatches: patches.filter((patch) => patch.objectType === 'actions').map((patch) => ({
+      objectId: patch.objectId,
+      ops: patch.ops,
+    })),
     locationPatches: patches.filter((patch) => patch.objectType === 'locations').map((patch) => ({
       objectId: patch.objectId,
       ops: patch.ops,

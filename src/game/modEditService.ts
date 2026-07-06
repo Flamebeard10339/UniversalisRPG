@@ -1,6 +1,6 @@
-import type { ContentBundle, ContentModule, JsonPatchOperation, ModuleDataUpdatesObject } from './types';
+import type { ContentBundle, ContentModule, JsonPatchOperation, ModuleDataUpdatesObject, ModuleObjectPatch } from './types';
 import { diffJsonPatch } from './jsonPatch';
-import { getModObjectType } from './modObjectRegistry';
+import { getModObjectType, modObjectTypes } from './modObjectRegistry';
 import type { ModStore } from './modStore';
 
 export const localContributionsModId = 'local-contributions';
@@ -39,6 +39,62 @@ const withSoftDependency = (module: ContentModule, targetModId: string) => {
   return { ...module, dependencies: [...(module.dependencies ?? []), `+${targetModId}`] };
 };
 
+const removeStringArrayReferences = (value: unknown, removedId: string): { changed: boolean; value: unknown } => {
+  if (Array.isArray(value)) {
+    if (value.every((item) => typeof item === 'string')) {
+      const next = value.filter((item) => item !== removedId);
+      return { changed: next.length !== value.length, value: next };
+    }
+
+    let changed = false;
+    const next = value.map((item) => {
+      const result = removeStringArrayReferences(item, removedId);
+      changed ||= result.changed;
+      return result.value;
+    });
+    return { changed, value: next };
+  }
+
+  if (!value || typeof value !== 'object') {
+    return { changed: false, value };
+  }
+
+  let changed = false;
+  const next: Record<string, unknown> = {};
+  for (const [key, child] of Object.entries(value)) {
+    const result = removeStringArrayReferences(child, removedId);
+    changed ||= result.changed;
+    next[key] = result.value;
+  }
+  return { changed, value: next };
+};
+
+const referenceCleanupPatches = (
+  resolvedBundle: ContentBundle,
+  targetModId: string,
+  removedObjectType: string,
+  removedObjectId: string,
+): ModuleObjectPatch[] => {
+  const removedEntry = getModObjectType(removedObjectType);
+  return modObjectTypes().flatMap((entry) =>
+    entry.read(resolvedBundle).flatMap((row) => {
+      if (entry.dataKey === removedEntry?.dataKey && row.id === removedObjectId) {
+        return [];
+      }
+
+      const result = removeStringArrayReferences(row, removedObjectId);
+      if (!result.changed) {
+        return [];
+      }
+
+      const ops = diffJsonPatch(row, result.value);
+      return ops.length > 0
+        ? [{ targetModId, objectType: String(entry.dataKey), objectId: row.id, ops }]
+        : [];
+    }),
+  );
+};
+
 export const createModEditService = ({ resolvedBundle, store }: ModEditServiceOptions): ModEditService => ({
   diffEdit: diffJsonPatch,
 
@@ -56,9 +112,14 @@ export const createModEditService = ({ resolvedBundle, store }: ModEditServiceOp
 
     const current = store.read(localContributionsModId) ?? localContributionModule(resolvedBundle);
     const updates = asUpdatesObject(current);
+    const removesObject = patchOps.some((op) => op.op === 'remove' && op.path === '');
+    const cleanupPatches = removesObject
+      ? referenceCleanupPatches(resolvedBundle, targetModId, objectType, objectId)
+      : [];
     const nextPatches = [
       ...(updates.patches ?? []),
       { targetModId, objectType, objectId, ops: patchOps },
+      ...cleanupPatches,
     ];
 
     store.write(withSoftDependency({

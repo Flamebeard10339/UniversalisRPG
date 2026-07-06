@@ -155,6 +155,97 @@ describe('ModEditService', () => {
     ]);
   });
 
+  it('removes references from location action lists when deleting an action through local-contributions', () => {
+    const rawBundle = {
+      ...bundle(),
+      locations: [],
+      actions: [],
+      locales: { en: { 'universe.test.title': 'Test', 'universe.test.description': 'Test' } },
+    };
+    const core = module({
+      id: 'base-core',
+      data: {
+        locations: [{
+          id: 'emberwood',
+          position: { x: 200, y: 80 },
+          starting: true,
+          actions: ['travel-emberwood-to-crossroads', 'forage-embers'],
+        }],
+        actions: [
+          {
+            id: 'travel-emberwood-to-crossroads',
+            locationId: 'emberwood',
+            role: 'travel',
+            durationSeconds: 2,
+            rewards: [],
+            results: [{ kind: 'relocate', locationId: 'emberwood' }],
+          },
+          {
+            id: 'forage-embers',
+            locationId: 'emberwood',
+            durationSeconds: 5,
+            rewards: [],
+          },
+        ],
+      },
+      locale: {
+        en: {
+          'location.emberwood.title': 'Emberwood',
+          'location.emberwood.description': 'Emberwood.',
+          'location.emberwood.exhausted': 'Nothing more here.',
+          'action.travel-emberwood-to-crossroads.title': 'Travel',
+          'action.travel-emberwood-to-crossroads.description': 'Travel.',
+          'action.travel-emberwood-to-crossroads.success': 'Arrived.',
+          'action.travel-emberwood-to-crossroads.failure': 'Lost.',
+          'action.forage-embers.title': 'Forage',
+          'action.forage-embers.description': 'Forage.',
+          'action.forage-embers.success': 'Found.',
+          'action.forage-embers.failure': 'Nothing.',
+        },
+      },
+    });
+    const resolved = applyModulesToBundle({ ...rawBundle, modules: [core] }, [core], ['base-core']).bundle;
+    let nextDraft = draft();
+    const service = createModEditService({
+      resolvedBundle: resolved,
+      store: createDraftModStore(nextDraft, (patch) => {
+        nextDraft = { ...nextDraft, ...patch };
+      }),
+    });
+
+    service.saveEdit('base-core', 'actions', 'travel-emberwood-to-crossroads', [{ op: 'remove', path: '' }]);
+
+    const local = nextDraft.modules.find((candidate) => candidate.id === localContributionsModId);
+    expect(local?.['data-updates']).toEqual({
+      patches: [
+        {
+          targetModId: 'base-core',
+          objectType: 'actions',
+          objectId: 'travel-emberwood-to-crossroads',
+          ops: [{ op: 'remove', path: '' }],
+        },
+        {
+          targetModId: 'base-core',
+          objectType: 'locations',
+          objectId: 'emberwood',
+          ops: [{ op: 'remove', path: '/actions/0' }],
+        },
+      ],
+    });
+
+    const result = applyModulesToBundle(
+      { ...rawBundle, modules: [core, local!] },
+      [core, local!],
+      [localContributionsModId],
+    );
+
+    expect(result.enabledModuleIds).toEqual(['base-core', localContributionsModId]);
+    expect(result.bundle.actions.map((action) => action.id)).toEqual(['forage-embers']);
+    expect(result.bundle.locations.find((location) => location.id === 'emberwood')?.actions).toEqual(['forage-embers']);
+    expect(result.issues.some((issue) => issue.message === 'validation.moduleConflictDisabled')).toBe(false);
+    expect(result.issues.some((issue) => issue.message === 'validation.unknownAction')).toBe(false);
+  });
+
   it('validates later edits to objects created by earlier local-contributions patches', () => {
     const core = module({ id: 'base-core', data: {} });
     const local = module({
