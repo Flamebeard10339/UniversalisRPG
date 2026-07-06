@@ -404,7 +404,7 @@ export const ContributionMapEditor = ({ bundle, onEntitiesChange, onActionsChang
         </div>
       )}
 
-      <div className="grid gap-3 lg:grid-cols-[1fr_340px]">
+      <div className="relative lg:pr-[44%]">
         <div className="contribution-map h-[32rem] overflow-hidden rounded border border-slate-800 bg-slate-950">
           <ReactFlow
             edgeTypes={travelEdgeTypes}
@@ -481,7 +481,7 @@ export const ContributionMapEditor = ({ bundle, onEntitiesChange, onActionsChang
           </ReactFlow>
         </div>
 
-        <aside className="grid min-w-0 content-start gap-3 rounded border border-slate-800 bg-slate-950 p-3">
+        <aside className="grid min-w-0 content-start gap-3 rounded border border-slate-800 bg-slate-950 p-3 lg:absolute lg:inset-y-0 lg:right-0 lg:z-20 lg:h-full lg:w-[44%] lg:max-w-[36rem] lg:overflow-y-auto lg:border-l lg:border-slate-700/80 lg:bg-slate-950/95 lg:shadow-2xl lg:backdrop-blur">
           <h4 className="text-sm font-semibold text-slate-100">{t('contribution.selection.title')}</h4>
 
           {pendingLocation && (

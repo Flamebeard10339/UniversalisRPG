@@ -158,8 +158,6 @@
   "actionPanel.debugDps": "Player DPS {playerDps} | Entity DPS {entityDps}",
   "actionPanel.enemyHealth": "Health {current}/{max}",
   "actionPanel.playerHealth": "You {current}/{max}",
-  "actionPanel.continuous": "Continuous",
-  "actionPanel.instant": "Instant",
   "actionPanel.noEntityActions": "No available actions.",
   "action.travel.title": "Travel to {location}",
   "action.travel.description": "Go to {location}.",

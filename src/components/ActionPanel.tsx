@@ -120,12 +120,7 @@ export const ActionPanel = ({ bundle, debugEnabled, playState, onStartAction, sh
         )}
         <span className="relative block text-sm font-semibold text-slate-100">{getActionTitleText(action, bundle, t)}</span>
         {!options.entityAction && (
-          <>
-            <span className="relative mt-1 block text-xs text-slate-400">{getActionDescriptionText(action, bundle, t)}</span>
-            <span className="relative mt-2 block text-xs text-cyan-200">
-              {continuous ? t('actionPanel.continuous') : instant ? t('actionPanel.instant') : t('time.duration.seconds', { seconds: action.durationSeconds ?? 0 })}
-            </span>
-          </>
+          <span className="relative mt-1 block text-xs text-slate-400">{getActionDescriptionText(action, bundle, t)}</span>
         )}
         {remaining !== null && (action.maxCompletions ?? 0) > 1 && (
           <span className="relative mt-1 block text-xs text-slate-300">

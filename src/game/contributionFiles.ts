@@ -41,7 +41,11 @@ export const changedModuleJsonFiles = (bundle: ContentBundle, draft: Contributio
 
 export const changedContributionJsonFiles = (bundle: ContentBundle, draft: ContributionDraft): ContributionJsonFile[] => [
   ...changedModuleJsonFiles(bundle, draft),
+  ...(((draft.locations ?? []).length > 0 || (draft.removed?.locations ?? []).length > 0) ? [{ path: 'locations.json', json: draft.locations ?? [] }] : []),
+  ...(((draft.entities ?? []).length > 0 || (draft.removed?.entities ?? []).length > 0) ? [{ path: 'entities.json', json: draft.entities ?? [] }] : []),
+  ...(((draft.actions ?? []).length > 0 || (draft.removed?.actions ?? []).length > 0) ? [{ path: 'actions.json', json: draft.actions ?? [] }] : []),
   ...((draft.modulePacks ?? []).length > 0 ? [{ path: 'module-packs.json', json: draft.modulePacks }] : []),
+  ...((draft.locales && Object.keys(draft.locales).length > 0) ? [{ path: 'locales.json', json: draft.locales }] : []),
 ];
 
 export const editableModuleJsonFiles = (bundle: ContentBundle, draft: ContributionDraft): ContributionJsonFile[] => [

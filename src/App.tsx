@@ -732,7 +732,7 @@ export default function App() {
       <div className="mx-auto max-w-7xl px-4 py-4">
         {visibleActiveTab === 'map' && (
           <section className="grid gap-4">
-            {contributionMode && bundle && currentContributionDraft && (
+            {contributionMode && bundle && currentContributionDraft ? (
               <ContributionMapEditor
                 bundle={bundle}
                 onActionsChange={(actions) => patchContributionDraft({ actions })}
@@ -747,28 +747,29 @@ export default function App() {
                 })}
                 t={t}
               />
-            )}
-            <div className="grid h-[calc(100vh-150px)] min-h-[560px] grid-rows-[auto_1fr] gap-4">
-              <TravelStatus
-                activeTravel={playState.activeTravel}
-                bundle={bundle}
-                currentLocationId={playState.currentLocationId}
-                onCancel={() => {
-                  logPlayerAction('travel.cancel', { universeId: bundle.manifest.id });
-                  cancelTravel(runtimeUniverseId);
-                }}
-                titleWhenIdle
-                t={t}
-              />
-              <section className="min-h-0 overflow-hidden rounded border border-slate-800 bg-slate-900">
-                <WorldMap
+            ) : (
+              <div className="grid h-[calc(100vh-150px)] min-h-[560px] grid-rows-[auto_1fr] gap-4">
+                <TravelStatus
+                  activeTravel={playState.activeTravel}
                   bundle={bundle}
-                  onTravel={beginTravel}
-                  playState={playState}
+                  currentLocationId={playState.currentLocationId}
+                  onCancel={() => {
+                    logPlayerAction('travel.cancel', { universeId: bundle.manifest.id });
+                    cancelTravel(runtimeUniverseId);
+                  }}
+                  titleWhenIdle
                   t={t}
                 />
-              </section>
-            </div>
+                <section className="min-h-0 overflow-hidden rounded border border-slate-800 bg-slate-900">
+                  <WorldMap
+                    bundle={bundle}
+                    onTravel={beginTravel}
+                    playState={playState}
+                    t={t}
+                  />
+                </section>
+              </div>
+            )}
           </section>
         )}
 

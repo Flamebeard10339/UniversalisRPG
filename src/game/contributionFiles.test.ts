@@ -77,7 +77,36 @@ describe('contribution module files', () => {
     expect(changedContributionJsonFiles(bundle(), contributionDraft).map((file) => file.path)).toEqual([
       'universe.json',
       'modules/draft-module.json',
+      'actions.json',
       'module-packs.json',
+      'locales.json',
+    ]);
+  });
+
+  it('includes empty top-level content files when the draft only records removals', () => {
+    const contributionDraft = {
+      ...draft(),
+      removed: {
+        ...draft().removed,
+        locations: ['old-location'],
+        entities: ['old-entity'],
+        actions: ['old-action'],
+      },
+    };
+
+    expect(changedContributionJsonFiles(bundle(), contributionDraft).map((file) => file.path)).toEqual([
+      'universe.json',
+      'modules/draft-module.json',
+      'locations.json',
+      'entities.json',
+      'actions.json',
+    ]);
+    expect(changedContributionJsonFiles(bundle(), contributionDraft)).toEqual([
+      { path: 'universe.json', json: { ...bundle().manifest, modules: ['base-module', 'draft-module', 'removed-module'] } },
+      { path: 'modules/draft-module.json', json: { id: 'draft-module', version: '1.0.0', universe: 'test', author: 'test', game_version: '1.0' } },
+      { path: 'locations.json', json: [] },
+      { path: 'entities.json', json: [] },
+      { path: 'actions.json', json: [] },
     ]);
   });
 
