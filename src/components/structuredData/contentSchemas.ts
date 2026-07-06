@@ -86,6 +86,12 @@ export const resultSchema = (bundle: ContentBundle): StructuredSchema => ({
     'state-variable-delta': { label: 'contribution.result.stateVariableDelta', createValue: () => ({ kind: 'state-variable-delta', variable: stateVariables(bundle)[0] ?? 'flag:new-flag', amount: 1 }), schema: { kind: 'object', fields: { kind: { schema: { kind: 'enum', options: ['state-variable-delta'] } }, variable: { schema: string(stateVariables(bundle), true) }, amount: { schema: number() } } } },
     dialogue: { label: 'contribution.result.dialogue', createValue: () => ({ kind: 'dialogue', dialogueId: bundle.dialogues?.[0]?.id ?? '' }), schema: { kind: 'object', fields: { kind: { schema: { kind: 'enum', options: ['dialogue'] } }, dialogueId: { schema: string((bundle.dialogues ?? []).map((item) => item.id), true) } } } },
     chat: { createValue: () => ({ kind: 'chat', messageKey: '' }), schema: { kind: 'object', fields: { kind: { schema: { kind: 'enum', options: ['chat'] } }, messageKey: { schema: string() }, delaySeconds: { schema: number(0), optional: true, defaultValue: 0 } } } },
+    flag: { label: 'contribution.result.flag', createValue: () => ({ kind: 'flag', flagId: bundle.flags[0]?.id ?? '', value: true }), schema: { kind: 'object', fields: { kind: { schema: { kind: 'enum', options: ['flag'] } }, flagId: { schema: string(bundle.flags.map((item) => item.id), true) }, value: { schema: boolean }, expiresAfterSeconds: { schema: number(0), optional: true } } } },
+    relocate: { label: 'contribution.result.relocate', createValue: () => ({ kind: 'relocate', locationId: bundle.locations[0]?.id ?? '' }), schema: { kind: 'object', fields: { kind: { schema: { kind: 'enum', options: ['relocate'] } }, locationId: { schema: string(bundle.locations.map((item) => item.id), true) } } } },
+    'bank-deposit': { label: 'contribution.result.bankDeposit', createValue: () => ({ kind: 'bank-deposit', itemId: bundle.items[0]?.id ?? '', amount: 1 }), schema: { kind: 'object', fields: { kind: { schema: { kind: 'enum', options: ['bank-deposit'] } }, itemId: { schema: string(bundle.items.map((item) => item.id), true) }, amount: { schema: number(0) } } } },
+    'bank-withdraw': { label: 'contribution.result.bankWithdraw', createValue: () => ({ kind: 'bank-withdraw', itemId: bundle.items[0]?.id ?? '', amount: 1 }), schema: { kind: 'object', fields: { kind: { schema: { kind: 'enum', options: ['bank-withdraw'] } }, itemId: { schema: string(bundle.items.map((item) => item.id), true) }, amount: { schema: number(0) } } } },
+    'set-spawn': { label: 'contribution.result.setSpawn', createValue: () => ({ kind: 'set-spawn', locationId: bundle.locations[0]?.id ?? '' }), schema: { kind: 'object', fields: { kind: { schema: { kind: 'enum', options: ['set-spawn'] } }, locationId: { schema: string(bundle.locations.map((item) => item.id), true) } } } },
+    'set-appearance': { label: 'contribution.result.setAppearance', createValue: () => ({ kind: 'set-appearance', presetId: '' }), schema: { kind: 'object', fields: { kind: { schema: { kind: 'enum', options: ['set-appearance'] } }, presetId: { schema: string() } } } },
   },
 });
 
@@ -115,6 +121,26 @@ export const actionSchema = (bundle: ContentBundle): StructuredSchema => ({ kind
   maxCompletions: { label: 'contribution.column.maxCompletions', schema: number(1), optional: true, defaultValue: 1 },
   enemyId: { label: 'contribution.column.enemy', schema: string(bundle.enemies.map((item) => item.id), true), optional: true },
   interactionTypeId: { label: 'contribution.column.interaction', schema: string(bundle.interactionTypes.map((item) => item.id), true), optional: true },
+  chance: { label: 'contribution.column.chance', schema: number(0), optional: true },
+  failureResults: { label: 'contribution.column.failureResults', schema: { kind: 'array', listMode: 'free', item: resultSchema(bundle), createItem: () => ({ kind: 'state-variable', variable: 'location', value: bundle.locations[0]?.id ?? '' }) }, optional: true, defaultValue: [] },
+  stationId: { label: 'contribution.column.stationId', schema: string(), optional: true },
+} });
+
+export const recipeIngredientSchema = (bundle: ContentBundle): StructuredSchema => ({ kind: 'object', fields: {
+  itemId: { label: 'contribution.column.itemId', schema: string(bundle.items.map((item) => item.id), true) },
+  amount: { label: 'contribution.column.amount', schema: number(0.000001) },
+} });
+
+export const recipeSchema = (bundle: ContentBundle): StructuredSchema => ({ kind: 'object', fields: {
+  id: { label: 'contribution.column.id', schema: string() },
+  stationId: { label: 'contribution.column.stationId', schema: string() },
+  skillId: { label: 'contribution.column.skillId', schema: string(bundle.skills.map((item) => item.id), true), optional: true },
+  xpAmount: { label: 'contribution.column.xpAmount', schema: number(0), optional: true },
+  durationSeconds: { label: 'contribution.column.actionDuration', schema: number(0), optional: true, defaultValue: 2 },
+  resultMessageKey: { label: 'contribution.column.resultMessageKey', schema: string(), optional: true },
+  extraResults: { label: 'contribution.column.results', schema: { kind: 'array', listMode: 'free', item: resultSchema(bundle), createItem: () => ({ kind: 'state-variable-delta', variable: stateVariables(bundle)[0] ?? '', amount: 1 }) }, optional: true, defaultValue: [] },
+  inputs: { label: 'contribution.column.inputs', schema: { kind: 'array', listMode: 'free', item: recipeIngredientSchema(bundle), createItem: () => ({ itemId: bundle.items[0]?.id ?? '', amount: 1 }) } },
+  outputs: { label: 'contribution.column.outputs', schema: { kind: 'array', listMode: 'free', item: recipeIngredientSchema(bundle), createItem: () => ({ itemId: bundle.items[0]?.id ?? '', amount: 1 }) } },
 } });
 
 export const dialogueOptionSchema = (bundle: ContentBundle): StructuredSchema => ({ kind: 'object', fields: {
@@ -145,6 +171,19 @@ export const dialogueSchema = (bundle: ContentBundle): StructuredSchema => ({ ki
   id: { label: 'contribution.column.id', schema: string() },
   startNodeId: { label: 'contribution.column.startNode', schema: string((bundle.dialogues ?? []).flatMap((dialogue) => dialogue.nodes.map((node) => node.id)), true) },
   nodes: { label: 'contribution.column.nodes', schema: { kind: 'array', listMode: 'free', item: dialogueNodeSchema(bundle), createItem: () => ({ id: 'new-node', textKey: '' }) } },
+} });
+
+export const questStageSchema = (bundle: ContentBundle): StructuredSchema => ({ kind: 'object', fields: {
+  id: { label: 'contribution.column.id', schema: string() },
+  descriptionKey: { label: 'contribution.column.textKey', schema: string() },
+  hintKey: { label: 'contribution.column.hintKey', schema: string(), optional: true },
+  condition: { label: 'contribution.column.requirements', schema: conditionSchema(bundle), defaultValue: { kind: 'state-variable', variable: stateVariables(bundle)[0] ?? '', comparison: 'equal', value: 0 } },
+} });
+
+export const questSchema = (bundle: ContentBundle): StructuredSchema => ({ kind: 'object', fields: {
+  id: { label: 'contribution.column.id', schema: string() },
+  titleKey: { label: 'contribution.column.titleKey', schema: string() },
+  stages: { label: 'contribution.column.stages', schema: { kind: 'array', listMode: 'free', item: questStageSchema(bundle), createItem: () => ({ id: 'new-stage', descriptionKey: '', condition: { kind: 'state-variable', variable: stateVariables(bundle)[0] ?? '', comparison: 'equal', value: 0 } }) } },
 } });
 
 export const boundarySchema = (bundle: ContentBundle): StructuredSchema => ({ kind: 'union', discriminator: 'kind', variants: {
@@ -244,6 +283,7 @@ export const enemyDefinitionSchema = (bundle: ContentBundle): StructuredSchema =
 
 export const basePlayerSchema = (bundle: ContentBundle): StructuredSchema => ({ kind: 'object', fields: {
   inventory: { label: 'contribution.universe.baseInventory', defaultValue: {}, schema: { kind: 'object', fields: Object.fromEntries(bundle.items.map((item) => [item.id, { label: item.id, schema: number(0), optional: true }])) } },
+  bank: { label: 'contribution.universe.baseBank', optional: true, defaultValue: {}, schema: { kind: 'object', fields: Object.fromEntries(bundle.items.map((item) => [item.id, { label: item.id, schema: number(0), optional: true }])) } },
 } });
 
 export const combatBalanceSchema = (): StructuredSchema => ({ kind: 'object', fields: {
@@ -281,6 +321,8 @@ export const moduleDataSectionSchema = (bundle: ContentBundle): StructuredSchema
   enemies: { label: 'contribution.data.enemies', schema: { kind: 'array', listMode: 'free', item: enemyDefinitionSchema(bundle), createItem: () => ({ id: 'new-enemy', interactionTypeId: bundle.interactionTypes[0]?.id ?? '', rewards: [] }) }, optional: true, defaultValue: [] },
   dropTables: { label: 'contribution.data.dropTables', schema: { kind: 'array', listMode: 'free', item: dropTableDefinitionSchema(bundle), createItem: () => ({ id: 'new-drop-table', mode: 'dependent', drops: [] }) }, optional: true, defaultValue: [] },
   dialogues: { label: 'contribution.data.dialogues', schema: { kind: 'array', listMode: 'free', item: dialogueSchema(bundle), createItem: () => ({ id: 'new-dialogue', startNodeId: 'start', nodes: [{ id: 'start', textKey: 'dialogue.new-dialogue.start' }] }) }, optional: true, defaultValue: [] },
+  quests: { label: 'contribution.data.quests', schema: { kind: 'array', listMode: 'free', item: questSchema(bundle), createItem: () => ({ id: 'new-quest', titleKey: '', stages: [{ id: 'start', descriptionKey: '', condition: { kind: 'state-variable', variable: stateVariables(bundle)[0] ?? '', comparison: 'equal', value: 0 } }] }) }, optional: true, defaultValue: [] },
+  recipes: { label: 'contribution.data.recipes', schema: { kind: 'array', listMode: 'free', item: recipeSchema(bundle), createItem: () => ({ id: 'new-recipe', stationId: 'new-station', inputs: [{ itemId: bundle.items[0]?.id ?? '', amount: 1 }], outputs: [{ itemId: bundle.items[0]?.id ?? '', amount: 1 }] }) }, optional: true, defaultValue: [] },
   displayProfiles: { label: 'contribution.data.displayProfiles', schema: { kind: 'array', listMode: 'free', item: displayProfileSchema(), createItem: () => ({ id: 'new-profile', colors: {} }) }, optional: true, defaultValue: [] },
 } });
 
@@ -326,6 +368,8 @@ export const moduleRemoveSchema = (bundle: ContentBundle): StructuredSchema => (
   dropTables: { label: 'contribution.data.dropTables', schema: idListSchema((bundle.dropTables ?? []).map((item) => item.id)), optional: true, defaultValue: [] },
   dialogues: { label: 'contribution.data.dialogues', schema: idListSchema((bundle.dialogues ?? []).map((item) => item.id)), optional: true, defaultValue: [] },
   dialogueOptions: { label: 'contribution.module.removeDialogueOptions', schema: dialogueOptionRemovalSchema(bundle), optional: true, defaultValue: {} },
+  quests: { label: 'contribution.data.quests', schema: idListSchema((bundle.quests ?? []).map((item) => item.id)), optional: true, defaultValue: [] },
+  recipes: { label: 'contribution.data.recipes', schema: idListSchema((bundle.recipes ?? []).map((item) => item.id)), optional: true, defaultValue: [] },
   displayProfiles: { label: 'contribution.data.displayProfiles', schema: idListSchema((bundle.manifest.displayProfiles ?? []).map((item) => item.id)), optional: true, defaultValue: [] },
   locales: { label: 'contribution.module.locale', schema: idListSchema(Object.keys(bundle.locales).flatMap((locale) => Object.keys(bundle.locales[locale] ?? {}))), optional: true, defaultValue: [] },
 } });

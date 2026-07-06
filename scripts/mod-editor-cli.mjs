@@ -4,12 +4,6 @@ import { readFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 
-if (process.argv[2] === 'tutorial-island') {
-  const { runTutorialIslandCli } = await import('./tutorial-island-cli.mjs');
-  await runTutorialIslandCli(process.argv.slice(3));
-  process.exit(0);
-}
-
 const baseUrl = process.env.BASE_URL ?? 'http://127.0.0.1:5173/';
 const executablePath = process.env.EDGE_PATH ?? 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe';
 const preferencePrefix = 'CapacitorStorage.';
@@ -98,6 +92,75 @@ const enableContributionMode = async (page) => {
   const checkbox = page.getByTestId('settings-contribution-mode');
   await checkbox.check();
   await page.getByTestId('contribution-mode').waitFor();
+};
+
+const moduleById = async (page, moduleId) => {
+  const draft = await readDraft(page);
+  return draft?.modules?.find((module) => module.id === moduleId) ?? null;
+};
+
+const addModule = async (page) => {
+  await page.getByTestId('module-add').click();
+  await page.getByTestId('module-field-id').waitFor();
+};
+
+const selectModule = async (page, moduleId) => {
+  await page.getByTestId(`module-list-item-${moduleId}`).click();
+  await page.getByTestId('module-field-id').waitFor();
+};
+
+const moduleFieldSelectors = ['id', 'version', 'universe', 'author', 'gameVersion', 'dependencies'];
+
+const setModuleField = async (page, field, value) => {
+  if (!moduleFieldSelectors.includes(field)) throw new Error(`Unknown module field: ${field}`);
+  const locator = page.getByTestId(`module-field-${field}`);
+  const tagName = await locator.evaluate((element) => element.tagName);
+  if (tagName === 'SELECT') {
+    await locator.selectOption(value);
+    return;
+  }
+  await locator.fill(value);
+  await locator.blur();
+};
+
+const importModuleJson = async (page, moduleJson) => {
+  const textarea = page.getByTestId('module-import-textarea');
+  await textarea.fill(JSON.stringify(moduleJson));
+  await page.getByTestId('module-import-button').click();
+
+  const deadline = Date.now() + 10_000;
+  while (Date.now() < deadline) {
+    if ((await textarea.inputValue()) === '') return;
+    if (await page.getByTestId('module-import-error').count() > 0) {
+      throw new Error(`Import failed for module ${moduleJson.id ?? '(unknown id)'}: invalid module JSON`);
+    }
+    await page.waitForTimeout(100);
+  }
+  throw new Error(`Timed out importing module JSON for ${moduleJson.id ?? '(unknown id)'}`);
+};
+
+const authorModule = async (page, moduleDefinition) => {
+  const existing = await moduleById(page, moduleDefinition.id);
+  if (existing) {
+    await selectModule(page, moduleDefinition.id);
+  } else {
+    await addModule(page);
+    await setModuleField(page, 'id', moduleDefinition.id);
+  }
+  // Field inputs only need to carry the id: importModuleJson below replaces
+  // version/author/game_version/dependencies/data/locale in one validated commit.
+  await importModuleJson(page, {
+    id: moduleDefinition.id,
+    version: moduleDefinition.version,
+    universe: moduleDefinition.universe,
+    author: moduleDefinition.author,
+    game_version: moduleDefinition.game_version,
+    dependencies: moduleDefinition.dependencies ?? [],
+    data: moduleDefinition.data ?? {},
+    'data-updates': moduleDefinition['data-updates'],
+    locale: moduleDefinition.locale ?? {},
+  });
+  return moduleById(page, moduleDefinition.id);
 };
 
 const switchContentTab = async (page, tab) => {
@@ -315,8 +378,17 @@ const executeCommand = async (page, command) => {
   if (command.op === 'assertLocalContributions') return assertLocalContributionShape(page);
   if (command.op === 'assertLocalContributionsEnabled') return assertLocalContributionsEnabled(page);
   if (command.op === 'assertBaseStillPlayable') return assertBaseStillPlayable(page);
+  if (command.op === 'addModule') return addModule(page);
+  if (command.op === 'selectModule') return selectModule(page, command.moduleId);
+  if (command.op === 'setModuleField') return setModuleField(page, command.field, command.value);
+  if (command.op === 'importModuleJson') return importModuleJson(page, command.module);
+  if (command.op === 'authorModule') return authorModule(page, command.module);
   if (command.op === 'dumpDraft') {
     console.log(JSON.stringify(await readDraft(page), null, 2));
+    return undefined;
+  }
+  if (command.op === 'dumpModule') {
+    console.log(JSON.stringify(await moduleById(page, command.moduleId), null, 2));
     return undefined;
   }
   throw new Error(`Unknown command op: ${command.op}`);
@@ -329,9 +401,12 @@ const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
 page.setDefaultTimeout(12_000);
 const errors = [];
 page.on('console', (message) => {
-  if (message.type() === 'error') errors.push(message.text());
+  if (message.type() !== 'error') return;
+  const location = message.location();
+  const origin = location?.url ? ` (${location.url}:${location.lineNumber}:${location.columnNumber})` : '';
+  errors.push(`${message.text()}${origin}`);
 });
-page.on('pageerror', (error) => errors.push(error.message));
+page.on('pageerror', (error) => errors.push(`${error.message}\n${error.stack ?? ''}`));
 page.on('response', (response) => {
   if (response.status() >= 400) errors.push(`${response.status()} ${response.url()}`);
 });

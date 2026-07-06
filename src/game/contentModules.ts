@@ -161,6 +161,10 @@ const moduleDataTypeToKey: Record<string, keyof ModuleDataSectionObject> = {
   actions: 'actions',
   dialogue: 'dialogues',
   dialogues: 'dialogues',
+  quest: 'quests',
+  quests: 'quests',
+  recipe: 'recipes',
+  recipes: 'recipes',
   displayProfile: 'displayProfiles',
   displayProfiles: 'displayProfiles',
   collectionLog: 'collectionLogs',
@@ -233,6 +237,8 @@ const removableModuleDataKeys = new Set([
   'collectionLogs',
   'dialogues',
   'dialogueOptions',
+  'quests',
+  'recipes',
   'displayProfiles',
   'locales',
 ]);
@@ -311,6 +317,8 @@ const emptySectionBundle = (bundle: ContentBundle, section?: ModuleDataSection):
   dropTables: normalizeModuleDataSection(section).dropTables ?? [],
   collectionLogs: normalizeModuleDataSection(section).collectionLogs ?? [],
   dialogues: normalizeModuleDataSection(section).dialogues ?? [],
+  quests: normalizeModuleDataSection(section).quests ?? [],
+  recipes: normalizeModuleDataSection(section).recipes ?? [],
   locales: bundle.locales,
 });
 
@@ -468,6 +476,8 @@ const existingDataIdsFromBundle = (bundle: ContentBundle): ExistingModuleDataIds
   dropTables: new Set((bundle.dropTables ?? []).map((item) => item.id)),
   collectionLogs: new Set((bundle.collectionLogs ?? []).map((item) => item.id)),
   dialogues: new Set((bundle.dialogues ?? []).map((item) => item.id)),
+  quests: new Set((bundle.quests ?? []).map((item) => item.id)),
+  recipes: new Set((bundle.recipes ?? []).map((item) => item.id)),
   displayProfiles: new Set((bundle.manifest.displayProfiles ?? []).map((item) => item.id)),
 });
 
@@ -513,6 +523,10 @@ const localizationKeysFromSection = (section?: ModuleDataSection, existingIds?: 
   ]),
   ...newLocalizationRows(normalizeModuleDataSection(section).effects, 'effects', existingIds).map((effect) => effectTitleKey(effect.id)),
   ...localizationKeysFromDialogues(normalizeModuleDataSection(section).dialogues),
+  ...newLocalizationRows(normalizeModuleDataSection(section).quests, 'quests', existingIds).flatMap((quest) => [
+    quest.titleKey,
+    ...quest.stages.flatMap((stage) => [stage.descriptionKey, stage.hintKey]),
+  ]),
   ...(normalizeModuleDataSection(section).displayProfiles ?? []).map((profile) => profile.titleKey),
 ].filter((key): key is string => Boolean(key));
 
@@ -592,6 +606,8 @@ const moduleDataCollisionKeys: Array<keyof ModuleDataSectionObject> = [
   'dropTables',
   'collectionLogs',
   'dialogues',
+  'quests',
+  'recipes',
   'displayProfiles',
 ];
 
@@ -857,6 +873,8 @@ const applyDataSection = (bundle: ContentBundle, data?: ModuleDataSection): Cont
     dropTables: mergeById(bundle.dropTables ?? [], section.dropTables),
     collectionLogs: mergeById(bundle.collectionLogs ?? [], section.collectionLogs),
     dialogues: mergeById(bundle.dialogues ?? [], section.dialogues),
+    quests: mergeById(bundle.quests ?? [], section.quests),
+    recipes: mergeById(bundle.recipes ?? [], section.recipes),
   };
 };
 
@@ -882,6 +900,8 @@ const applyDataUpdateSection = (bundle: ContentBundle, data?: ModuleDataSection)
     dropTables: mergePatchById(bundle.dropTables ?? [], section.dropTables),
     collectionLogs: mergePatchById(bundle.collectionLogs ?? [], section.collectionLogs),
     dialogues: mergePatchById(bundle.dialogues ?? [], section.dialogues),
+    quests: mergePatchById(bundle.quests ?? [], section.quests),
+    recipes: mergePatchById(bundle.recipes ?? [], section.recipes),
   };
 };
 
@@ -931,6 +951,8 @@ const applyDataUpdates = (bundle: ContentBundle, updates?: ModuleDataUpdates): C
     dropTables: removeById(bundle.dropTables ?? [], removed.dropTables),
     collectionLogs: removeById(bundle.collectionLogs ?? [], removed.collectionLogs),
     dialogues: removeDialogueOptions(removeById(bundle.dialogues ?? [], removed.dialogues), removed.dialogueOptions),
+    quests: removeById(bundle.quests ?? [], removed.quests),
+    recipes: removeById(bundle.recipes ?? [], removed.recipes),
     locales: mergeLocales(bundle.locales, updateObject?.locale, removed.locales),
   };
   return applyObjectPatches(applyDataUpdateSection(withoutRemoved, updates), updateObject?.patches);

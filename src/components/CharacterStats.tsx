@@ -1,11 +1,13 @@
 import { statTitleKey } from '../game/contentIds';
 import { getCharacterStatTotals } from '../game/characterStats';
+import { appearancePresets } from '../game/appearance';
 import type { ContentBundle, UniversePlayState } from '../game/types';
 import type { Translator } from '../game/i18n';
 import { ResourceStatus } from './ResourceStatus';
 
 type CharacterStatsProps = {
   bundle: ContentBundle;
+  onSetAppearance: (presetId: string) => void;
   playState: UniversePlayState;
   t: Translator;
 };
@@ -13,8 +15,30 @@ type CharacterStatsProps = {
 const formatNumber = (value: number) =>
   Number.isInteger(value) ? String(value) : value.toFixed(2);
 
-export const CharacterStats = ({ bundle, playState, t }: CharacterStatsProps) => (
+export const CharacterStats = ({ bundle, onSetAppearance, playState, t }: CharacterStatsProps) => (
   <section className="grid gap-4">
+    <section className="grid gap-3 rounded border border-slate-800 bg-slate-900 p-4">
+      <div>
+        <h2 className="text-base font-semibold text-slate-100">{t('appearance.title')}</h2>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        {appearancePresets.map((preset) => (
+          <button
+            className={`rounded border px-3 py-1.5 text-xs font-semibold ${
+              playState.appearance.presetId === preset.id
+                ? 'border-cyan-400 bg-cyan-300 text-slate-950'
+                : 'border-slate-700 text-slate-200'
+            }`}
+            key={preset.id}
+            onClick={() => onSetAppearance(preset.id)}
+            type="button"
+          >
+            {t(preset.labelKey)}
+          </button>
+        ))}
+      </div>
+    </section>
+
     <section className="grid gap-3 rounded border border-slate-800 bg-slate-900 p-4">
       <div>
         <h2 className="text-base font-semibold text-slate-100">{t('characterStats.stats.title')}</h2>

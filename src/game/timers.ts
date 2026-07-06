@@ -22,6 +22,8 @@ import { resolveManifestUiSettings } from './universeSettings';
 import { skillLevelFromXp } from './skills';
 import { rollRewards } from './rewards';
 import { applyCollectionLogRewards } from './collectionLog';
+import { DEFAULT_APPEARANCE_PRESET_ID } from './appearance';
+import { resolveStationAction } from './recipes';
 
 const MAX_CHAT_MESSAGES = 80;
 const MAX_RUN_LOG_ENTRIES = 100;
@@ -128,7 +130,9 @@ export const createInitialPlayState = (
   activeDialogue: null,
   resources: {},
   inventory: {},
+  bank: {},
   flags: {},
+  flagExpirations: {},
   actionCompletions: {},
   collectionLog: {
     [locationExploredKey(startingLocationId)]: 1,
@@ -145,6 +149,8 @@ export const createInitialPlayState = (
   runLog: [],
   nextRunLogSequence: 1,
   lastTickAt: Date.now(),
+  spawnLocationId: null,
+  appearance: { presetId: DEFAULT_APPEARANCE_PRESET_ID },
 });
 
 export const normalizePlayState = (
@@ -188,7 +194,9 @@ export const normalizePlayState = (
     activeDialogue: state.activeDialogue ?? null,
     resourcePools: state.resourcePools ?? {},
     inventory: { ...(state.resources ?? {}), ...(state.inventory ?? {}) },
+    bank: state.bank ?? {},
     flags: state.flags ?? {},
+    flagExpirations: state.flagExpirations ?? {},
     actionCompletions: state.actionCompletions ?? {},
     discoveredLocationIds,
     collectionLog,
@@ -203,6 +211,8 @@ export const normalizePlayState = (
     chatMessages: state.chatMessages ?? [],
     runLog: (state.runLog ?? []).map((entry) => ({ ...entry, runId: entry.runId ?? runId })).slice(-MAX_RUN_LOG_ENTRIES),
     nextRunLogSequence: state.nextRunLogSequence ?? ((state.runLog?.length ?? 0) + 1),
+    spawnLocationId: state.spawnLocationId ?? null,
+    appearance: state.appearance ?? { presetId: DEFAULT_APPEARANCE_PRESET_ID },
   };
 };
 
@@ -231,6 +241,7 @@ const pauseRunningAction = (state: UniversePlayState, now: number, context?: Act
         elapsedMs: progress.elapsedMs + Math.max(0, now - (progress.runningSince ?? state.activeAction.startedAt)),
         runningSince: null,
         targetHealth: state.activeAction.targetHealth ?? progress.targetHealth ?? null,
+        recipeId: state.activeAction.recipeId,
       },
     },
     lastTickAt: now,
@@ -521,6 +532,10 @@ const ensureWorldState = (
     ...(context.manifest?.basePlayer?.inventory ?? {}),
     ...state.inventory,
   };
+  const bank = {
+    ...(context.manifest?.basePlayer?.bank ?? {}),
+    ...state.bank,
+  };
   const flags = { ...state.flags };
 
   for (const item of context.items ?? []) {
@@ -534,7 +549,7 @@ const ensureWorldState = (
     }
   }
 
-  return applyManifestRuntimeSettings(ensureResourcePools({ ...state, inventory, flags }, context), context);
+  return applyManifestRuntimeSettings(ensureResourcePools({ ...state, inventory, bank, flags }, context), context);
 };
 
 const resetOwnedResourcePools = (
@@ -642,7 +657,7 @@ const resolveLocationId = (
   context: ActionResolutionContext,
   locationId: string,
 ) => locationId === 'starting-location'
-  ? context.locations?.find((location) => location.starting)?.id ?? state.currentLocationId
+  ? state.spawnLocationId ?? context.locations?.find((location) => location.starting)?.id ?? state.currentLocationId
   : locationId;
 
 const locationExploredKey = (locationId: string) => `location:${locationId}:explored`;
@@ -923,16 +938,22 @@ export const startAction = (
   action: GameAction,
   contextOrNow: ActionResolutionContext | number = EMPTY_CONTEXT,
   maybeNow = Date.now(),
+  options: { random?: () => number; recipeId?: string } = {},
 ): UniversePlayState => {
   const context = typeof contextOrNow === 'number' ? EMPTY_CONTEXT : contextOrNow;
   const now = typeof contextOrNow === 'number' ? contextOrNow : maybeNow;
   state = ensureWorldState(state, context);
 
-  if (state.activeAction?.actionId === action.id) {
+  const sameActiveAction = state.activeAction?.actionId === action.id
+    && (action.stationId === undefined || state.activeAction?.recipeId === options.recipeId);
+
+  if (sameActiveAction) {
     return appendRunLog(pauseRunningAction(state, now, context), 'player', 'action.pause', { actionId: action.id }, now);
   }
 
-  if (!canStartAction(state, action, context)) {
+  const resolvedAction = action.stationId ? resolveStationAction(action, options.recipeId, context) : action;
+
+  if (!canStartAction(state, resolvedAction, context)) {
     return appendRunLog(state, 'player', 'action.rejected', {
       actionId: action.id,
       exhausted: isActionExhausted(state, action),
@@ -940,13 +961,14 @@ export const startAction = (
   }
 
   const pausedState = pauseRunningAction(state, now, context);
-  if (isInstantAction(action)) {
+  if (isInstantAction(resolvedAction)) {
     const started = appendRunLog(pausedState, 'player', 'action.start', { actionId: action.id, locationId: action.locationId }, now);
-    return completeActionWithResult(started, action, context, { random: Math.random }, now).state;
+    return completeActionWithResult(started, resolvedAction, context, { random: options.random ?? Math.random }, now).state;
   }
-  const durationMs = getActionDurationMs(pausedState, action, context);
+  const durationMs = getActionDurationMs(pausedState, resolvedAction, context);
   const savedProgress = pausedState.actionProgress[action.id] ?? { elapsedMs: 0, runningSince: null };
-  const progress = savedProgress.elapsedMs >= durationMs
+  const progressMatchesRecipe = action.stationId === undefined || savedProgress.recipeId === options.recipeId;
+  const progress = !progressMatchesRecipe || savedProgress.elapsedMs >= durationMs
     ? {
         elapsedMs: 0,
         runningSince: null,
@@ -954,7 +976,7 @@ export const startAction = (
       }
     : savedProgress;
   const remainingMs = Math.max(0, durationMs - progress.elapsedMs);
-  const enemy = getEnemy(action, context);
+  const enemy = getEnemy(resolvedAction, context);
   const completesAt = enemy ? now + CONTINUOUS_ACTION_MAX_MS : now + remainingMs;
 
   return appendRunLog({
@@ -964,6 +986,7 @@ export const startAction = (
       startedAt: now,
       completesAt,
       targetHealth: progress.targetHealth ?? (enemy ? getEnemyStat(enemy, 'health') : null),
+      recipeId: options.recipeId,
     },
     actionProgress: {
       ...pausedState.actionProgress,
@@ -971,6 +994,7 @@ export const startAction = (
         ...progress,
         runningSince: now,
         targetHealth: progress.targetHealth ?? (enemy ? getEnemyStat(enemy, 'health') : null),
+        recipeId: options.recipeId,
       },
     },
     lastTickAt: now,
@@ -1052,11 +1076,14 @@ export const startTravel = (
 type ActionCompletionResult = {
   state: UniversePlayState;
   finished: boolean;
-  outcome: 'basicSuccess' | 'hit' | 'miss' | 'kill';
+  outcome: 'basicSuccess' | 'hit' | 'miss' | 'kill' | 'chanceFailure';
   damage: number;
   remainingHealth: number | null;
   rewards: ConcreteReward[];
 };
+
+const occupiedInventorySlots = (inventory: Record<string, number>) =>
+  Object.values(inventory).filter((amount) => amount > 0).length;
 
 const applyItemDelta = (
   state: UniversePlayState,
@@ -1066,6 +1093,10 @@ const applyItemDelta = (
 ) => {
   const definition = context.items?.find((item) => item.id === itemId);
   const current = state.inventory[itemId] ?? 0;
+  const maxSlots = context.manifest?.maxInventorySlots;
+  if (amount > 0 && current <= 0 && maxSlots !== undefined && occupiedInventorySlots(state.inventory) >= maxSlots) {
+    return state;
+  }
   const next = Math.max(0, Math.min(definition?.maxQuantity ?? Number.POSITIVE_INFINITY, current + amount));
   return {
     ...state,
@@ -1073,6 +1104,44 @@ const applyItemDelta = (
     resources: { ...state.resources, [itemId]: next },
   };
 };
+
+const applyBankDelta = (
+  state: UniversePlayState,
+  itemId: string,
+  amount: number,
+): UniversePlayState => {
+  const current = state.bank[itemId] ?? 0;
+  const next = Math.max(0, current + amount);
+  return { ...state, bank: { ...state.bank, [itemId]: next } };
+};
+
+export const depositToBank = (
+  state: UniversePlayState,
+  context: ActionResolutionContext,
+  itemId: string,
+  amount: number,
+): UniversePlayState => {
+  const available = Math.min(amount, state.inventory[itemId] ?? 0);
+  if (available <= 0) return state;
+  return applyBankDelta(applyItemDelta(state, context, itemId, -available), itemId, available);
+};
+
+export const withdrawFromBank = (
+  state: UniversePlayState,
+  context: ActionResolutionContext,
+  itemId: string,
+  amount: number,
+): UniversePlayState => {
+  const available = Math.min(amount, state.bank[itemId] ?? 0);
+  if (available <= 0) return state;
+  return applyItemDelta(applyBankDelta(state, itemId, -available), context, itemId, available);
+};
+
+export const setAppearancePreset = (
+  state: UniversePlayState,
+  presetId: string,
+  now = Date.now(),
+): UniversePlayState => ({ ...state, appearance: { presetId }, lastTickAt: now });
 
 const findDialogue = (context: ActionResolutionContext, dialogueId: string) =>
   context.dialogues?.find((dialogue) => dialogue.id === dialogueId) ?? null;
@@ -1098,10 +1167,7 @@ const enterDialogueNode = (
   const node = findDialogueNode(context, dialogueId, nodeId);
   if (!node) return cancelDialogue(state, now);
 
-  const changed = (node.results ?? []).reduce(
-    (nextState, result) => applyActionResult(nextState, result, context, now),
-    state,
-  );
+  const changed = applyResults(state, node.results, context, now);
   const branch = (node.branches ?? []).find((candidate) => evaluateCondition(candidate.conditions, changed, context));
   if (branch) return enterDialogueNode(changed, context, dialogueId, branch.gotoNodeId, now, visited);
   if (!node.textKey && !node.narratorKey && (!node.options || node.options.length === 0) && node.gotoNodeId) {
@@ -1134,10 +1200,7 @@ export const chooseDialogueOption = (
   if (node.options && node.options.length > 0) {
     const option = node.options.find((candidate) => candidate.id === optionId);
     if (!option || (option.conditions && !evaluateCondition(option.conditions, state, context))) return state;
-    const changed = (option.results ?? []).reduce(
-      (nextState, result) => applyActionResult(nextState, result, context, now),
-      state,
-    );
+    const changed = applyResults(state, option.results, context, now);
     return option.gotoNodeId
       ? enterDialogueNode(changed, context, active.dialogueId, option.gotoNodeId, now)
       : cancelDialogue(changed, now);
@@ -1171,7 +1234,14 @@ const applyActionResult = (
     return writeStateVariable(state, result.variable, (typeof current === 'number' ? current : 0) + result.amount);
   }
   if (result.kind === 'flag') {
-    return { ...state, flags: { ...state.flags, [result.flagId]: result.value } };
+    const flags = { ...state.flags, [result.flagId]: result.value };
+    const flagExpirations = { ...state.flagExpirations };
+    if (result.expiresAfterSeconds !== undefined) {
+      flagExpirations[result.flagId] = now + result.expiresAfterSeconds * 1000;
+    } else {
+      delete flagExpirations[result.flagId];
+    }
+    return { ...state, flags, flagExpirations };
   }
   if (result.kind === 'relocate') {
     const locationId = resolveLocationId(state, context, result.locationId);
@@ -1183,12 +1253,34 @@ const applyActionResult = (
   if (result.kind === 'dialogue') {
     return startDialogue(state, context, result.dialogueId, now);
   }
+  if (result.kind === 'bank-deposit') {
+    return depositToBank(state, context, result.itemId, result.amount);
+  }
+  if (result.kind === 'bank-withdraw') {
+    return withdrawFromBank(state, context, result.itemId, result.amount);
+  }
+  if (result.kind === 'set-spawn') {
+    return { ...state, spawnLocationId: resolveLocationId(state, context, result.locationId) };
+  }
+  if (result.kind === 'set-appearance') {
+    return setAppearancePreset(state, result.presetId, now);
+  }
   return appendChatMessage(
     state,
     { author: 'system', key: result.messageKey },
     now + (result.delaySeconds ?? 0) * 1000,
   );
 };
+
+const applyResults = (
+  state: UniversePlayState,
+  results: ActionResult[] | undefined,
+  context: ActionResolutionContext,
+  now: number,
+) => (results ?? []).reduce(
+  (nextState, result) => applyActionResult(nextState, result, context, now),
+  state,
+);
 
 const appendExhaustedLocationMessage = (
   state: UniversePlayState,
@@ -1256,10 +1348,7 @@ const applyActionCompletion = (
 ) => {
   const rewardResult = rollAndApplyRewards(state, action.rewards, context, now, options.random);
   const rewarded = rewardResult.state;
-  const changed = (action.results ?? []).reduce(
-    (nextState, result) => applyActionResult(nextState, result, context, now),
-    rewarded,
-  );
+  const changed = applyResults(rewarded, action.results, context, now);
   const withExperience = options.emitActionComplete === false
     ? changed
     : emitExperienceEvent(changed, action, context, {
@@ -1390,6 +1479,45 @@ const completeActionWithResult = (
       remainingHealth,
       rewards: killRewards,
     };
+  }
+
+  if (action.chance !== undefined) {
+    const random = options.random ?? Math.random;
+    const roll = random() * 100;
+    if (roll >= action.chance) {
+      const failedState = applyResults(state, action.failureResults, context, now);
+      const nextCompletionCount = (failedState.actionCompletions[action.id] ?? 0) + 1;
+      const completedFailureState = {
+        ...failedState,
+        activeAction: null,
+        actionProgress: {
+          ...failedState.actionProgress,
+          [action.id]: {
+            elapsedMs: 0,
+            runningSince: null,
+            targetHealth: null,
+          },
+        },
+        actionCompletions: {
+          ...failedState.actionCompletions,
+          [action.id]: nextCompletionCount,
+        },
+        lastTickAt: now,
+      };
+
+      return {
+        state: appendRunLog(completedFailureState, 'engine', 'action.complete', {
+          actionId: action.id,
+          completion: nextCompletionCount,
+          outcome: 'chanceFailure',
+        }, now),
+        finished: true,
+        outcome: 'chanceFailure',
+        damage,
+        remainingHealth,
+        rewards: [],
+      };
+    }
   }
 
   const actionCompletion = applyActionCompletion(state, action, context, now, { random: options.random });
@@ -1525,7 +1653,8 @@ function completeActiveActionWithMessage(
   options: { random?: () => number } = {},
   now = Date.now(),
 ): UniversePlayState {
-  const action = context.actions.find((candidate) => candidate.id === state.activeAction?.actionId);
+  const foundAction = context.actions.find((candidate) => candidate.id === state.activeAction?.actionId);
+  const action = foundAction ? resolveStationAction(foundAction, state.activeAction?.recipeId, context) : foundAction;
 
   if (!state.activeAction || !action || !isActionAvailableAtCurrentLocation(state, action, context) || !areActionRequirementsMet(state, action, context)) {
     return state.activeAction && action
@@ -1643,6 +1772,21 @@ const completeDueTravelSegments = (
   return { state: nextState, completedReport };
 };
 
+const clearExpiredFlags = (state: UniversePlayState, now: number): UniversePlayState => {
+  const expirations = state.flagExpirations ?? {};
+  const expiredIds = Object.entries(expirations).filter(([, expiresAt]) => expiresAt <= now).map(([flagId]) => flagId);
+  if (expiredIds.length === 0) return state;
+
+  const flags = { ...state.flags };
+  const flagExpirations = { ...expirations };
+  for (const flagId of expiredIds) {
+    flags[flagId] = false;
+    delete flagExpirations[flagId];
+  }
+
+  return { ...state, flags, flagExpirations };
+};
+
 export const resolveIdleTimers = (
   state: UniversePlayState,
   contextOrActions: ActionResolutionContext | GameAction[],
@@ -1656,6 +1800,7 @@ export const resolveIdleTimers = (
   const reportEnabled = shouldReportIdle(inactiveMs, options.showReport);
 
   state = ensureWorldState(state, context);
+  state = clearExpiredFlags(state, now);
   if (!state.activeAction) {
     state = resetInactiveEffectResources(state, context, now);
   }
@@ -1701,7 +1846,7 @@ export const resolveIdleTimers = (
     };
   }
 
-  const action = context.actions.find((candidate) => candidate.id === state.activeAction?.actionId);
+  let action = context.actions.find((candidate) => candidate.id === state.activeAction?.actionId);
 
   if (!action) {
     const actionId = state.activeAction.actionId;
@@ -1730,6 +1875,10 @@ export const resolveIdleTimers = (
       state: options.debugEnabled && report.kind !== 'none' ? appendIdleDebugMessage(withDebug, report, now) : withDebug,
       report,
     };
+  }
+
+  if (action.stationId) {
+    action = resolveStationAction(action, state.activeAction.recipeId, context);
   }
 
   if (isInstantAction(action)) {

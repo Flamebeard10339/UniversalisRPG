@@ -54,7 +54,8 @@
         "durationSeconds": { "type": "number", "exclusiveMinimum": 0 },
         "rewards": { "type": "array" },
         "interactionTypeId": { "type": "string", "minLength": 1 },
-        "enemy": { "type": "object" }
+        "enemy": { "type": "object" },
+        "stationId": { "type": "string", "minLength": 1 }
       },
       "anyOf": [
         {
@@ -69,6 +70,9 @@
           "properties": {
             "instant": { "const": false }
           }
+        },
+        {
+          "required": ["stationId"]
         }
       ]
     }

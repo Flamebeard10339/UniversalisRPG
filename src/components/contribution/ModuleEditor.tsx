@@ -38,6 +38,8 @@ const dataKeys: DataKey[] = [
   'dropTables',
   'collectionLogs',
   'dialogues',
+  'quests',
+  'recipes',
   'displayProfiles',
 ];
 
@@ -57,6 +59,8 @@ const dataKeyTypes: Record<DataKey, string> = {
   dropTables: 'dropTable',
   collectionLogs: 'collectionLog',
   dialogues: 'dialogue',
+  quests: 'quest',
+  recipes: 'recipe',
   displayProfiles: 'displayProfile',
 };
 
@@ -80,6 +84,8 @@ const removeTargets: RemoveTarget[] = [
   'dropTables',
   'dialogues',
   'dialogueOptions',
+  'quests',
+  'recipes',
   'displayProfiles',
   'locales',
 ];
@@ -213,6 +219,7 @@ const bundleForModuleEditing = (bundle: ContentBundle, module: ContentModule, mo
     enemies: mergeById(bundle.enemies, data.enemies, updates.enemies),
     dropTables: mergeById(bundle.dropTables ?? [], data.dropTables, updates.dropTables),
     dialogues: mergeById(bundle.dialogues ?? [], data.dialogues, updates.dialogues),
+    quests: mergeById(bundle.quests ?? [], data.quests, updates.quests),
     modules: uniqueById([module, ...modules]),
   };
 };
@@ -657,7 +664,7 @@ export const ModuleEditor = ({ bundle, draft, issues, onMoveModule, onPatch, t, 
         <aside className="grid content-start gap-3 rounded border border-slate-800 bg-slate-900 p-3">
           <div className="flex items-center gap-2">
             <h3 className="mr-auto text-sm font-semibold text-slate-100">{bundle.manifest.id}</h3>
-            <button className="rounded bg-cyan-400 px-3 py-2 text-sm font-semibold text-slate-950" onClick={addModule} type="button">{t('contribution.modules.add')}</button>
+            <button className="rounded bg-cyan-400 px-3 py-2 text-sm font-semibold text-slate-950" data-testid="module-add" onClick={addModule} type="button">{t('contribution.modules.add')}</button>
           </div>
           <button className={`rounded px-3 py-2 text-left text-sm font-semibold ${showModpacks ? 'bg-cyan-300 text-slate-950' : issuePackIds.size ? 'bg-rose-950/30 text-rose-100' : 'bg-slate-950 text-slate-300'}`} onClick={() => setShowModpacks(true)} type="button">{t('contribution.modules.modpacks')}</button>
           <input className="rounded bg-slate-950 px-3 py-2 text-sm text-slate-100" onChange={(event) => setFilter(event.target.value)} placeholder={t('contribution.modules.filter')} value={filter} />
@@ -665,7 +672,7 @@ export const ModuleEditor = ({ bundle, draft, issues, onMoveModule, onPatch, t, 
           {modulePacks.length > 0 && <ModulePackTree packs={modulePacks} selectedModuleId={selectedModule?.id ?? null} issueModuleIds={issueModuleIds} issuePackIds={issuePackIds} moduleIds={moduleIds} onSelect={(id) => { setSelectedModuleId(id); setShowModpacks(false); }} t={t} />}
           <div className="border-t border-slate-700 pt-2">
             <h4 className="mb-2 text-xs font-semibold uppercase text-slate-500">{t('contribution.modules.localMods')}</h4>
-            <div className="grid gap-1">{localModules.map((module) => <button className={`grid grid-cols-[1fr_auto] items-center gap-2 rounded px-3 py-2 text-left text-sm ${selectedModule?.id === module.id && !showModpacks ? 'bg-cyan-300 text-slate-950' : issueModuleIds.has(module.id) ? 'bg-rose-950/30 text-rose-100' : 'bg-slate-950 text-slate-300'}`} key={module.id} onClick={() => { setSelectedModuleId(module.id); setShowModpacks(false); }} type="button"><span><span className="block font-semibold">{module.id}</span><span className="block text-xs opacity-80">{module.version} / {module.author}</span></span><span className="rounded bg-rose-500 px-2 py-1 text-xs font-semibold text-white" onClick={(event) => { event.stopPropagation(); removeModule(module); }}>{t('structured.remove')}</span></button>)}</div>
+            <div className="grid gap-1">{localModules.map((module) => <button className={`grid grid-cols-[1fr_auto] items-center gap-2 rounded px-3 py-2 text-left text-sm ${selectedModule?.id === module.id && !showModpacks ? 'bg-cyan-300 text-slate-950' : issueModuleIds.has(module.id) ? 'bg-rose-950/30 text-rose-100' : 'bg-slate-950 text-slate-300'}`} data-testid={`module-list-item-${module.id}`} key={module.id} onClick={() => { setSelectedModuleId(module.id); setShowModpacks(false); }} type="button"><span><span className="block font-semibold">{module.id}</span><span className="block text-xs opacity-80">{module.version} / {module.author}</span></span><span className="rounded bg-rose-500 px-2 py-1 text-xs font-semibold text-white" onClick={(event) => { event.stopPropagation(); removeModule(module); }}>{t('structured.remove')}</span></button>)}</div>
           </div>
           <div className="border-t border-slate-700 pt-2">
             <h4 className="mb-2 text-xs font-semibold uppercase text-slate-500">{t('contribution.modules.coreMods')}</h4>
@@ -690,17 +697,17 @@ export const ModuleEditor = ({ bundle, draft, issues, onMoveModule, onPatch, t, 
               <section className={`grid gap-3 rounded border p-3 ${moduleDetailProblems(selectedModule).length || selectedModuleIssues.length ? 'border-rose-800 bg-rose-950/10' : 'border-slate-700'}`}>
                 {selectedModuleIssues.length > 0 && <ul className="grid gap-1 text-sm">{selectedModuleIssues.map((issue) => <li className={issue.severity === 'error' ? 'text-rose-200' : 'text-amber-200'} key={`${issue.path}-${issue.message}`}><span className="font-semibold">{issue.severity}</span>: {issue.path} - {t(issue.message, issue.params)}</li>)}</ul>}
                 <div className="grid gap-2 md:grid-cols-[9rem_1fr]">
-                  <label className="contents"><span className="self-center text-sm text-slate-400">{t('contribution.column.id')}</span><input className="rounded bg-slate-950 px-3 py-2 text-sm text-slate-100" onChange={(event) => updateSelected({ id: toModuleId(event.target.value) })} readOnly={!isLocal} value={selectedModule.id} /></label>
-                  <label className="contents"><span className="self-center text-sm text-slate-400">{t('contribution.module.version')}</span><input className="rounded bg-slate-950 px-3 py-2 text-sm text-slate-100" onChange={(event) => updateSelected({ version: event.target.value })} readOnly={!isLocal} value={selectedModule.version} /></label>
-                  <label className="contents"><span className="self-center text-sm text-slate-400">{t('contribution.module.universe')}</span><select className="rounded bg-slate-950 px-3 py-2 text-sm text-slate-100" disabled={!isLocal} onChange={(event) => updateSelected({ universe: event.target.value })} value={selectedModule.universe}>
+                  <label className="contents"><span className="self-center text-sm text-slate-400">{t('contribution.column.id')}</span><input className="rounded bg-slate-950 px-3 py-2 text-sm text-slate-100" data-testid="module-field-id" onChange={(event) => updateSelected({ id: toModuleId(event.target.value) })} readOnly={!isLocal} value={selectedModule.id} /></label>
+                  <label className="contents"><span className="self-center text-sm text-slate-400">{t('contribution.module.version')}</span><input className="rounded bg-slate-950 px-3 py-2 text-sm text-slate-100" data-testid="module-field-version" onChange={(event) => updateSelected({ version: event.target.value })} readOnly={!isLocal} value={selectedModule.version} /></label>
+                  <label className="contents"><span className="self-center text-sm text-slate-400">{t('contribution.module.universe')}</span><select className="rounded bg-slate-950 px-3 py-2 text-sm text-slate-100" data-testid="module-field-universe" disabled={!isLocal} onChange={(event) => updateSelected({ universe: event.target.value })} value={selectedModule.universe}>
                     {Array.from(new Set([selectedModule.universe, bundle.manifest.id, ...universeIds])).filter(Boolean).map((universeId) => <option key={universeId} value={universeId}>{universeId}</option>)}
                   </select></label>
-                  <label className="contents"><span className="self-center text-sm text-slate-400">{t('contribution.module.author')}</span><input className="rounded bg-slate-950 px-3 py-2 text-sm text-slate-100" onChange={(event) => updateSelected({ author: event.target.value })} readOnly={!isLocal} value={selectedModule.author} /></label>
-                  <label className="contents"><span className="self-center text-sm text-slate-400">{t('contribution.module.gameVersion')}</span><input className="rounded bg-slate-950 px-3 py-2 text-sm text-slate-100" onChange={(event) => updateSelected({ game_version: event.target.value })} readOnly={!isLocal} value={String(selectedModule.game_version)} /></label>
-                  <label className="contents"><span className="self-start pt-2 text-sm text-slate-400">{t('contribution.module.dependencies')}</span><textarea className="min-h-24 rounded bg-slate-950 px-3 py-2 text-sm text-slate-100" onBlur={saveDependencyText} onChange={(event) => setDependencyText(event.target.value)} placeholder={t('contribution.modules.dependenciesPlaceholder')} readOnly={!isLocal} value={dependencyText} /></label>
+                  <label className="contents"><span className="self-center text-sm text-slate-400">{t('contribution.module.author')}</span><input className="rounded bg-slate-950 px-3 py-2 text-sm text-slate-100" data-testid="module-field-author" onChange={(event) => updateSelected({ author: event.target.value })} readOnly={!isLocal} value={selectedModule.author} /></label>
+                  <label className="contents"><span className="self-center text-sm text-slate-400">{t('contribution.module.gameVersion')}</span><input className="rounded bg-slate-950 px-3 py-2 text-sm text-slate-100" data-testid="module-field-gameVersion" onChange={(event) => updateSelected({ game_version: event.target.value })} readOnly={!isLocal} value={String(selectedModule.game_version)} /></label>
+                  <label className="contents"><span className="self-start pt-2 text-sm text-slate-400">{t('contribution.module.dependencies')}</span><textarea className="min-h-24 rounded bg-slate-950 px-3 py-2 text-sm text-slate-100" data-testid="module-field-dependencies" onBlur={saveDependencyText} onChange={(event) => setDependencyText(event.target.value)} placeholder={t('contribution.modules.dependenciesPlaceholder')} readOnly={!isLocal} value={dependencyText} /></label>
                 </div>
                 <datalist id="module-dependency-ids">{allModules.filter((module) => module.id !== selectedModule.id).map((module) => <option key={module.id} value={module.id} />)}</datalist>
-                {isLocal && <div className="grid gap-2 border-t border-slate-800 pt-3"><p className="text-xs text-amber-200">{t('contribution.modules.importWarning')}</p><textarea className="min-h-24 rounded bg-slate-950 p-3 text-xs text-slate-200" onChange={(event) => { setImportText(event.target.value); setImportError(false); }} placeholder={t('contribution.modules.importPlaceholder')} value={importText} />{importError && <p className="text-xs text-rose-300">{t('contribution.modules.importFailed')}</p>}<button className="justify-self-start rounded border border-slate-600 px-3 py-2 text-sm font-semibold text-slate-100" disabled={!importText.trim()} onClick={() => { try { saveModule({ ...deserializeModule(importText), id: selectedModule.id, universe: bundle.manifest.id }, selectedModule.id); setImportText(''); } catch { setImportError(true); } }} type="button">{t('contribution.modules.import')}</button></div>}
+                {isLocal && <div className="grid gap-2 border-t border-slate-800 pt-3"><p className="text-xs text-amber-200">{t('contribution.modules.importWarning')}</p><textarea className="min-h-24 rounded bg-slate-950 p-3 text-xs text-slate-200" data-testid="module-import-textarea" onChange={(event) => { setImportText(event.target.value); setImportError(false); }} placeholder={t('contribution.modules.importPlaceholder')} value={importText} />{importError && <p className="text-xs text-rose-300" data-testid="module-import-error">{t('contribution.modules.importFailed')}</p>}<button className="justify-self-start rounded border border-slate-600 px-3 py-2 text-sm font-semibold text-slate-100" data-testid="module-import-button" disabled={!importText.trim()} onClick={() => { try { saveModule({ ...deserializeModule(importText), id: selectedModule.id, universe: bundle.manifest.id }, selectedModule.id); setImportText(''); } catch { setImportError(true); } }} type="button">{t('contribution.modules.import')}</button></div>}
               </section>
             )}
             {editorTab === 'data' && <DataRows bundle={bundle} module={selectedModule} onSave={(module) => saveModule(module, selectedModule.id)} readOnly={!isLocal} sectionName="data" t={t} />}

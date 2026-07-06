@@ -278,3 +278,49 @@ describe('universe manifest validation', () => {
     }));
   });
 });
+
+describe('new action result kinds', () => {
+  const actionWith = (overrides: Record<string, unknown>) => validateContentBundle({
+    ...bundle(),
+    actions: [{ id: 'do-thing', locationId: 'start', instant: true, rewards: [], ...overrides }],
+  });
+
+  it('accepts a bank-deposit result', () => {
+    const issues = actionWith({ results: [{ kind: 'bank-deposit', itemId: 'gold', amount: 5 }] });
+    expect(issues.some((issue) => issue.message === 'validation.actionsShape')).toBe(false);
+  });
+
+  it('accepts a bank-withdraw result', () => {
+    const issues = actionWith({ results: [{ kind: 'bank-withdraw', itemId: 'gold', amount: 5 }] });
+    expect(issues.some((issue) => issue.message === 'validation.actionsShape')).toBe(false);
+  });
+
+  it('accepts a set-spawn result', () => {
+    const issues = actionWith({ results: [{ kind: 'set-spawn', locationId: 'start' }] });
+    expect(issues.some((issue) => issue.message === 'validation.actionsShape')).toBe(false);
+  });
+
+  it('accepts a set-appearance result', () => {
+    const issues = actionWith({ results: [{ kind: 'set-appearance', presetId: 'default' }] });
+    expect(issues.some((issue) => issue.message === 'validation.actionsShape')).toBe(false);
+  });
+
+  it('accepts a flag result with expiresAfterSeconds', () => {
+    const issues = actionWith({ results: [{ kind: 'flag', flagId: 'well-fed', value: true, expiresAfterSeconds: 60 }] });
+    expect(issues.some((issue) => issue.message === 'validation.actionsShape')).toBe(false);
+  });
+
+  it('accepts chance and failureResults on an action', () => {
+    const issues = actionWith({
+      chance: 50,
+      results: [{ kind: 'chat', messageKey: 'a' }],
+      failureResults: [{ kind: 'resource', resourceId: 'health', amount: -3 }],
+    });
+    expect(issues.some((issue) => issue.message === 'validation.actionsShape')).toBe(false);
+  });
+
+  it('rejects an out-of-range chance', () => {
+    const issues = actionWith({ chance: 150, results: [{ kind: 'chat', messageKey: 'a' }] });
+    expect(issues.some((issue) => issue.message === 'validation.actionsShape')).toBe(true);
+  });
+});

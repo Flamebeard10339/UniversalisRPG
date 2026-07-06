@@ -40,7 +40,14 @@ export const InventoryPanel = ({ bundle, onEquip, onUnequip, playState, t }: Inv
       </section>
 
       <section className="grid gap-2">
-        <h2 className="text-base font-semibold text-slate-100">{t('inventory.title')}</h2>
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-base font-semibold text-slate-100">{t('inventory.title')}</h2>
+          {bundle.manifest.maxInventorySlots !== undefined && (
+            <span className="text-xs font-semibold text-slate-400">
+              {t('inventory.slotsUsed', { used: entries.length, max: bundle.manifest.maxInventorySlots })}
+            </span>
+          )}
+        </div>
       {entries.length === 0 ? (
         <p className="text-sm text-slate-500">{t('inventory.empty')}</p>
       ) : (

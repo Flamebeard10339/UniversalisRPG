@@ -167,6 +167,12 @@
           "$ref": "#/$defs/dialogueEntry"
         },
         {
+          "$ref": "#/$defs/questEntry"
+        },
+        {
+          "$ref": "#/$defs/recipeEntry"
+        },
+        {
           "$ref": "#/$defs/displayProfileEntry"
         }
       ]
@@ -199,6 +205,8 @@
             "dropTables",
             "dialogues",
             "dialogueOptions",
+            "quests",
+            "recipes",
             "displayProfiles",
             "locales"
           ]
@@ -291,6 +299,12 @@
         "dialogues": {
           "$ref": "https://universalis-rpg.local/schema/dialogues.schema.json"
         },
+        "quests": {
+          "$ref": "https://universalis-rpg.local/schema/quests.schema.json"
+        },
+        "recipes": {
+          "$ref": "https://universalis-rpg.local/schema/recipes.schema.json"
+        },
         "displayProfiles": {
           "type": "array",
           "items": {
@@ -374,6 +388,12 @@
         "dialogues": {
           "$ref": "https://universalis-rpg.local/schema/dialogues.schema.json"
         },
+        "quests": {
+          "$ref": "https://universalis-rpg.local/schema/quests.schema.json"
+        },
+        "recipes": {
+          "$ref": "https://universalis-rpg.local/schema/recipes.schema.json"
+        },
         "displayProfiles": {
           "type": "array",
           "items": {
@@ -451,6 +471,12 @@
             },
             "dialogueOptions": {
               "$ref": "#/$defs/dialogueOptionRemovals"
+            },
+            "quests": {
+              "$ref": "#/$defs/idList"
+            },
+            "recipes": {
+              "$ref": "#/$defs/idList"
             },
             "displayProfiles": {
               "$ref": "#/$defs/idList"
@@ -692,6 +718,17 @@
         "interactionTypeId": {
           "type": "string",
           "minLength": 1
+        },
+        "chance": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "failureResults": {
+          "type": "array",
+          "items": {
+            "$ref": "https://universalis-rpg.local/schema/actions.schema.json#/$defs/result"
+          }
         },
         "rewards": {
           "type": "array",
@@ -1280,6 +1317,101 @@
           "type": "array",
           "items": {
             "$ref": "https://universalis-rpg.local/schema/dialogues.schema.json#/$defs/node"
+          }
+        }
+      }
+    },
+    "questEntry": {
+      "type": "object",
+      "required": [
+        "id",
+        "titleKey",
+        "stages",
+        "type"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "enum": [
+            "quest",
+            "quests"
+          ]
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "titleKey": {
+          "type": "string",
+          "minLength": 1
+        },
+        "stages": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "https://universalis-rpg.local/schema/quests.schema.json#/$defs/stage"
+          }
+        }
+      }
+    },
+    "recipeEntry": {
+      "type": "object",
+      "required": [
+        "id",
+        "stationId",
+        "inputs",
+        "outputs",
+        "type"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "enum": [
+            "recipe",
+            "recipes"
+          ]
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "stationId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "skillId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "xpAmount": {
+          "type": "number"
+        },
+        "durationSeconds": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "resultMessageKey": {
+          "type": "string",
+          "minLength": 1
+        },
+        "extraResults": {
+          "type": "array",
+          "items": {
+            "$ref": "https://universalis-rpg.local/schema/actions.schema.json#/$defs/result"
+          }
+        },
+        "inputs": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "https://universalis-rpg.local/schema/recipes.schema.json#/$defs/ingredient"
+          }
+        },
+        "outputs": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "https://universalis-rpg.local/schema/recipes.schema.json#/$defs/ingredient"
           }
         }
       }

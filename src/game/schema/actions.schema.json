@@ -15,6 +15,12 @@
       "maxCompletions": { "type": "integer", "minimum": 1 },
       "enemyId": { "type": "string", "minLength": 1 },
       "interactionTypeId": { "type": "string", "minLength": 1 },
+      "chance": { "type": "number", "minimum": 0, "maximum": 100 },
+      "failureResults": {
+        "type": "array",
+        "items": { "$ref": "#/$defs/result" }
+      },
+      "stationId": { "type": "string", "minLength": 1 },
       "rewards": {
         "type": "array",
         "items": { "$ref": "#/$defs/reward" }
@@ -43,6 +49,9 @@
         "properties": {
           "instant": { "const": false }
         }
+      },
+      {
+        "required": ["stationId"]
       }
     ]
   },
@@ -214,7 +223,12 @@
           "type": "object",
           "required": ["kind", "flagId", "value"],
           "additionalProperties": false,
-          "properties": { "kind": { "const": "flag" }, "flagId": { "type": "string", "minLength": 1 }, "value": { "type": "boolean" } }
+          "properties": {
+            "kind": { "const": "flag" },
+            "flagId": { "type": "string", "minLength": 1 },
+            "value": { "type": "boolean" },
+            "expiresAfterSeconds": { "type": "number", "exclusiveMinimum": 0 }
+          }
         },
         {
           "type": "object",
@@ -237,6 +251,30 @@
             "messageKey": { "type": "string", "minLength": 1 },
             "delaySeconds": { "type": "number", "minimum": 0, "maximum": 2 }
           }
+        },
+        {
+          "type": "object",
+          "required": ["kind", "itemId", "amount"],
+          "additionalProperties": false,
+          "properties": { "kind": { "const": "bank-deposit" }, "itemId": { "type": "string", "minLength": 1 }, "amount": { "type": "number", "exclusiveMinimum": 0 } }
+        },
+        {
+          "type": "object",
+          "required": ["kind", "itemId", "amount"],
+          "additionalProperties": false,
+          "properties": { "kind": { "const": "bank-withdraw" }, "itemId": { "type": "string", "minLength": 1 }, "amount": { "type": "number", "exclusiveMinimum": 0 } }
+        },
+        {
+          "type": "object",
+          "required": ["kind", "locationId"],
+          "additionalProperties": false,
+          "properties": { "kind": { "const": "set-spawn" }, "locationId": { "type": "string", "minLength": 1 } }
+        },
+        {
+          "type": "object",
+          "required": ["kind", "presetId"],
+          "additionalProperties": false,
+          "properties": { "kind": { "const": "set-appearance" }, "presetId": { "type": "string", "minLength": 1 } }
         }
       ]
     }

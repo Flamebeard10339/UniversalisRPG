@@ -1,0 +1,373 @@
+# Playtest: tutorial-island-mining-alt
+Modules: base-core, wayside-supplies, tutorial-island-reset, tutorial-island-foundation, tutorial-island-guide-house, tutorial-island-survival, tutorial-island-bank, tutorial-island-mining
+Mode: from-start
+
+## At Guide House (tutorial-guide-house)
+A small room with a locked front door and too many helpful objects.
+Entities present (5): Miki, Front Door, Mirror, Drawer, Bookshelf
+Visible choices:
+- `action:entity.miki.talk` (entity-action on miki): Talk
+- `action:entity.miki.examine` (entity-action on miki): Examine
+- `action:entity.front-door.pick` (entity-action on front-door): Pick Lock [requirements not met]
+- `action:entity.front-door.examine` (entity-action on front-door): Examine
+- `action:entity.mirror.look` (entity-action on mirror): Look
+- `action:entity.drawer.search` (entity-action on drawer): Search
+- `action:entity.bookshelf.read` (entity-action on bookshelf): Read
+
+> Chose: `action:entity.miki.talk` — Talk
+
+  - Miki: Welcome. Keep your map open, poke what looks useful, and check the Quests tab if you forget what you were doing. Colors there mean red for not started, yellow for in progress, green for done. Ready to see the island?
+
+## At Guide House (tutorial-guide-house)
+A small room with a locked front door and too many helpful objects.
+Entities present (5): Miki, Front Door, Mirror, Drawer, Bookshelf
+Visible choices:
+- `dialogue-option:ready` (dialogue-option): I can find my way.
+
+> Chose: `dialogue-option:ready` — I can find my way.
+
+  - Miki: Good. The door is open. Curiosity is allowed here.
+
+## At Guide House (tutorial-guide-house)
+A small room with a locked front door and too many helpful objects.
+Entities present (5): Miki, Front Door, Mirror, Drawer, Bookshelf
+Visible choices:
+- `action:travel-house-to-beach` (action): Travel to Shell Beach
+- `action:entity.miki.talk` (entity-action on miki): Talk
+- `action:entity.miki.examine` (entity-action on miki): Examine
+- `action:entity.front-door.examine` (entity-action on front-door): Examine
+- `action:entity.mirror.look` (entity-action on mirror): Look
+- `action:entity.drawer.search` (entity-action on drawer): Search
+- `action:entity.bookshelf.read` (entity-action on bookshelf): Read
+
+> Chose: `action:entity.drawer.search` — Search
+
+  - The drawer was not locked. Inside: a few coins, a lockpick, and a small guide book. That feels deliberate.
+
+## At Guide House (tutorial-guide-house)
+A small room with a locked front door and too many helpful objects.
+Entities present (5): Miki, Front Door, Mirror, Drawer, Bookshelf
+Visible choices:
+- `action:travel-house-to-beach` (action): Travel to Shell Beach
+- `action:entity.miki.talk` (entity-action on miki): Talk
+- `action:entity.miki.examine` (entity-action on miki): Examine
+- `action:entity.front-door.examine` (entity-action on front-door): Examine
+- `action:entity.mirror.look` (entity-action on mirror): Look
+- `action:entity.bookshelf.read` (entity-action on bookshelf): Read
+
+> Chose: `action:travel-house-to-beach` — Travel to Shell Beach
+
+  - You arrive.
+
+## At Shell Beach (tutorial-beach)
+Low shoals glitter beside a smoky campfire.
+Entities present (5): Brianna, Shrimp Shoals, Campfire, Supply Crate, Bridge Sign
+Visible choices:
+- `action:travel-beach-to-house` (action): Travel to Guide House
+- `action:travel-beach-to-hermit-grove` (action): Travel to Hermit Grove
+- `action:travel-beach-to-bridge` (action): Travel to Bridge Toll
+- `action:entity.brianna.talk` (entity-action on brianna): Talk
+- `action:entity.shoals.fish` (entity-action on shoals): Fish [requirements not met]
+- `action:entity.shoals.examine` (entity-action on shoals): Examine
+- `action:entity.campfire.eat` (entity-action on campfire): Eat [requirements not met]
+- `action:entity.supply-crate.search` (entity-action on supply-crate): Search
+- `action:entity.bridge-sign.read` (entity-action on bridge-sign): Read
+
+> Chose: `action:entity.supply-crate.search` — Search
+
+  - A net and bowl sit on top, practically accusing you of missing them.
+
+## At Shell Beach (tutorial-beach)
+Low shoals glitter beside a smoky campfire.
+Entities present (5): Brianna, Shrimp Shoals, Campfire, Supply Crate, Bridge Sign
+Visible choices:
+- `action:travel-beach-to-house` (action): Travel to Guide House
+- `action:travel-beach-to-hermit-grove` (action): Travel to Hermit Grove
+- `action:travel-beach-to-bridge` (action): Travel to Bridge Toll
+- `action:entity.brianna.talk` (entity-action on brianna): Talk
+- `action:entity.shoals.fish` (entity-action on shoals): Fish
+- `action:entity.shoals.examine` (entity-action on shoals): Examine
+- `action:entity.campfire.eat` (entity-action on campfire): Eat [requirements not met]
+- `action:entity.bridge-sign.read` (entity-action on bridge-sign): Read
+
+> Chose: `action:entity.shoals.fish` — Fish
+
+  - 
+
+## At Shell Beach (tutorial-beach)
+Low shoals glitter beside a smoky campfire.
+Entities present (5): Brianna, Shrimp Shoals, Campfire, Supply Crate, Bridge Sign
+Visible choices:
+- `action:travel-beach-to-house` (action): Travel to Guide House
+- `action:travel-beach-to-hermit-grove` (action): Travel to Hermit Grove
+- `action:travel-beach-to-bridge` (action): Travel to Bridge Toll
+- `action:entity.brianna.talk` (entity-action on brianna): Talk
+- `action:entity.shoals.fish` (entity-action on shoals): Fish
+- `action:entity.shoals.examine` (entity-action on shoals): Examine
+- `action:entity.campfire.cook@cook-shrimp` (entity-action on campfire): Raw Shrimp
+- `action:entity.campfire.eat` (entity-action on campfire): Eat [requirements not met]
+- `action:entity.bridge-sign.read` (entity-action on bridge-sign): Read
+
+> Chose: `action:entity.shoals.examine` — Examine
+
+  - Shrimp dart away from your shadow.
+
+## At Shell Beach (tutorial-beach)
+Low shoals glitter beside a smoky campfire.
+Entities present (5): Brianna, Shrimp Shoals, Campfire, Supply Crate, Bridge Sign
+Visible choices:
+- `action:travel-beach-to-house` (action): Travel to Guide House
+- `action:travel-beach-to-hermit-grove` (action): Travel to Hermit Grove
+- `action:travel-beach-to-bridge` (action): Travel to Bridge Toll
+- `action:entity.brianna.talk` (entity-action on brianna): Talk
+- `action:entity.shoals.fish` (entity-action on shoals): Fish
+- `action:entity.shoals.examine` (entity-action on shoals): Examine
+- `action:entity.campfire.cook@cook-shrimp` (entity-action on campfire): Raw Shrimp
+- `action:entity.campfire.eat` (entity-action on campfire): Eat [requirements not met]
+- `action:entity.bridge-sign.read` (entity-action on bridge-sign): Read
+
+> Chose: `action:entity.shoals.fish` — Fish
+
+  - 
+
+## At Shell Beach (tutorial-beach)
+Low shoals glitter beside a smoky campfire.
+Entities present (5): Brianna, Shrimp Shoals, Campfire, Supply Crate, Bridge Sign
+Visible choices:
+- `action:travel-beach-to-house` (action): Travel to Guide House
+- `action:travel-beach-to-hermit-grove` (action): Travel to Hermit Grove
+- `action:travel-beach-to-bridge` (action): Travel to Bridge Toll
+- `action:entity.brianna.talk` (entity-action on brianna): Talk
+- `action:entity.shoals.fish` (entity-action on shoals): Fish
+- `action:entity.shoals.examine` (entity-action on shoals): Examine
+- `action:entity.campfire.cook@cook-shrimp` (entity-action on campfire): Raw Shrimp
+- `action:entity.campfire.eat` (entity-action on campfire): Eat [requirements not met]
+- `action:entity.bridge-sign.read` (entity-action on bridge-sign): Read
+
+> Chose: `action:entity.shoals.examine` — Examine
+
+  - Shrimp dart away from your shadow.
+
+## At Shell Beach (tutorial-beach)
+Low shoals glitter beside a smoky campfire.
+Entities present (5): Brianna, Shrimp Shoals, Campfire, Supply Crate, Bridge Sign
+Visible choices:
+- `action:travel-beach-to-house` (action): Travel to Guide House
+- `action:travel-beach-to-hermit-grove` (action): Travel to Hermit Grove
+- `action:travel-beach-to-bridge` (action): Travel to Bridge Toll
+- `action:entity.brianna.talk` (entity-action on brianna): Talk
+- `action:entity.shoals.fish` (entity-action on shoals): Fish
+- `action:entity.shoals.examine` (entity-action on shoals): Examine
+- `action:entity.campfire.cook@cook-shrimp` (entity-action on campfire): Raw Shrimp
+- `action:entity.campfire.eat` (entity-action on campfire): Eat [requirements not met]
+- `action:entity.bridge-sign.read` (entity-action on bridge-sign): Read
+
+> Chose: `action:entity.shoals.fish` — Fish
+
+  - 
+
+## At Shell Beach (tutorial-beach)
+Low shoals glitter beside a smoky campfire.
+Entities present (5): Brianna, Shrimp Shoals, Campfire, Supply Crate, Bridge Sign
+Visible choices:
+- `action:travel-beach-to-house` (action): Travel to Guide House
+- `action:travel-beach-to-hermit-grove` (action): Travel to Hermit Grove
+- `action:travel-beach-to-bridge` (action): Travel to Bridge Toll
+- `action:entity.brianna.talk` (entity-action on brianna): Talk
+- `action:entity.shoals.fish` (entity-action on shoals): Fish
+- `action:entity.shoals.examine` (entity-action on shoals): Examine
+- `action:entity.campfire.cook@cook-shrimp` (entity-action on campfire): Raw Shrimp
+- `action:entity.campfire.eat` (entity-action on campfire): Eat [requirements not met]
+- `action:entity.bridge-sign.read` (entity-action on bridge-sign): Read
+
+> Chose: `action:entity.campfire.cook@cook-shrimp` — Raw Shrimp
+
+  - It is ready.
+
+## At Shell Beach (tutorial-beach)
+Low shoals glitter beside a smoky campfire.
+Entities present (5): Brianna, Shrimp Shoals, Campfire, Supply Crate, Bridge Sign
+Visible choices:
+- `action:travel-beach-to-house` (action): Travel to Guide House
+- `action:travel-beach-to-hermit-grove` (action): Travel to Hermit Grove
+- `action:travel-beach-to-bridge` (action): Travel to Bridge Toll
+- `action:entity.brianna.talk` (entity-action on brianna): Talk
+- `action:entity.shoals.fish` (entity-action on shoals): Fish
+- `action:entity.shoals.examine` (entity-action on shoals): Examine
+- `action:entity.campfire.cook@cook-shrimp` (entity-action on campfire): Raw Shrimp
+- `action:entity.campfire.eat` (entity-action on campfire): Eat
+- `action:entity.bridge-sign.read` (entity-action on bridge-sign): Read
+
+> Chose: `action:entity.shoals.examine` — Examine
+
+  - Shrimp dart away from your shadow.
+
+## At Shell Beach (tutorial-beach)
+Low shoals glitter beside a smoky campfire.
+Entities present (5): Brianna, Shrimp Shoals, Campfire, Supply Crate, Bridge Sign
+Visible choices:
+- `action:travel-beach-to-house` (action): Travel to Guide House
+- `action:travel-beach-to-hermit-grove` (action): Travel to Hermit Grove
+- `action:travel-beach-to-bridge` (action): Travel to Bridge Toll
+- `action:entity.brianna.talk` (entity-action on brianna): Talk
+- `action:entity.shoals.fish` (entity-action on shoals): Fish
+- `action:entity.shoals.examine` (entity-action on shoals): Examine
+- `action:entity.campfire.cook@cook-shrimp` (entity-action on campfire): Raw Shrimp
+- `action:entity.campfire.eat` (entity-action on campfire): Eat
+- `action:entity.bridge-sign.read` (entity-action on bridge-sign): Read
+
+> Chose: `action:entity.campfire.cook@cook-shrimp` — Raw Shrimp
+
+  - It is ready.
+
+## At Shell Beach (tutorial-beach)
+Low shoals glitter beside a smoky campfire.
+Entities present (5): Brianna, Shrimp Shoals, Campfire, Supply Crate, Bridge Sign
+Visible choices:
+- `action:travel-beach-to-house` (action): Travel to Guide House
+- `action:travel-beach-to-hermit-grove` (action): Travel to Hermit Grove
+- `action:travel-beach-to-bridge` (action): Travel to Bridge Toll
+- `action:entity.brianna.talk` (entity-action on brianna): Talk
+- `action:entity.shoals.fish` (entity-action on shoals): Fish
+- `action:entity.shoals.examine` (entity-action on shoals): Examine
+- `action:entity.campfire.cook@cook-shrimp` (entity-action on campfire): Raw Shrimp
+- `action:entity.campfire.eat` (entity-action on campfire): Eat
+- `action:entity.bridge-sign.read` (entity-action on bridge-sign): Read
+
+> Chose: `action:entity.shoals.examine` — Examine
+
+  - Shrimp dart away from your shadow.
+
+## At Shell Beach (tutorial-beach)
+Low shoals glitter beside a smoky campfire.
+Entities present (5): Brianna, Shrimp Shoals, Campfire, Supply Crate, Bridge Sign
+Visible choices:
+- `action:travel-beach-to-house` (action): Travel to Guide House
+- `action:travel-beach-to-hermit-grove` (action): Travel to Hermit Grove
+- `action:travel-beach-to-bridge` (action): Travel to Bridge Toll
+- `action:entity.brianna.talk` (entity-action on brianna): Talk
+- `action:entity.shoals.fish` (entity-action on shoals): Fish
+- `action:entity.shoals.examine` (entity-action on shoals): Examine
+- `action:entity.campfire.cook@cook-shrimp` (entity-action on campfire): Raw Shrimp
+- `action:entity.campfire.eat` (entity-action on campfire): Eat
+- `action:entity.bridge-sign.read` (entity-action on bridge-sign): Read
+
+> Chose: `action:entity.campfire.cook@cook-shrimp` — Raw Shrimp
+
+  - It is ready.
+
+## At Shell Beach (tutorial-beach)
+Low shoals glitter beside a smoky campfire.
+Entities present (5): Brianna, Shrimp Shoals, Campfire, Supply Crate, Bridge Sign
+Visible choices:
+- `action:travel-beach-to-house` (action): Travel to Guide House
+- `action:travel-beach-to-hermit-grove` (action): Travel to Hermit Grove
+- `action:travel-beach-to-bridge` (action): Travel to Bridge Toll
+- `action:entity.brianna.talk` (entity-action on brianna): Talk
+- `action:entity.shoals.fish` (entity-action on shoals): Fish
+- `action:entity.shoals.examine` (entity-action on shoals): Examine
+- `action:entity.campfire.eat` (entity-action on campfire): Eat
+- `action:entity.bridge-sign.read` (entity-action on bridge-sign): Read
+
+> Chose: `action:travel-beach-to-bridge` — Travel to Bridge Toll
+
+  - You arrive.
+
+## At Bridge Toll (tutorial-bridge)
+A narrow bridge crosses the river. Something large waits below.
+Entities present (3): Gommi, River, Loose Plank
+Visible choices:
+- `action:travel-bridge-to-beach` (action): Travel to Shell Beach
+- `action:travel-bridge-to-bank` (action): Travel to Island Bank
+- `action:entity.gommi.pay-toll` (entity-action on gommi): Pay Toll
+- `action:entity.gommi.examine` (entity-action on gommi): Examine
+- `action:entity.river.use-draught` (entity-action on river): Use Draught [requirements not met]
+- `action:entity.river.examine` (entity-action on river): Examine
+- `action:entity.loose-plank.examine` (entity-action on loose-plank): Examine
+
+> Chose: `action:entity.gommi.pay-toll` — Pay Toll
+
+  - Gommi eats first and negotiates never.
+
+## At Bridge Toll (tutorial-bridge)
+A narrow bridge crosses the river. Something large waits below.
+Entities present (3): Gommi, River, Loose Plank
+Visible choices:
+- `action:travel-bridge-to-beach` (action): Travel to Shell Beach
+- `action:travel-bridge-to-bank` (action): Travel to Island Bank
+- `action:entity.gommi.examine` (entity-action on gommi): Examine
+- `action:entity.river.use-draught` (entity-action on river): Use Draught [requirements not met]
+- `action:entity.river.examine` (entity-action on river): Examine
+- `action:entity.loose-plank.examine` (entity-action on loose-plank): Examine
+
+> Chose: `action:travel-bridge-to-bank` — Travel to Island Bank
+
+  - You arrive.
+
+## At Island Bank (tutorial-bank)
+A tidy counter and an open trapdoor share the room.
+Entities present (2): Bank Teller, Trapdoor
+Visible choices:
+- `action:descend-to-mine` (action): Descend
+- `action:entity.bank-teller.talk` (entity-action on bank-teller): Talk
+- `action:entity.trapdoor.examine` (entity-action on trapdoor): Examine
+
+> Chose: `action:descend-to-mine` — Descend
+
+  - You climb into the cave below.
+
+## At Training Mine (tutorial-mine)
+Copper and tin glint in a cramped cave.
+Entities present (5): Denzel, Copper Rock, Tin Rock, Locked Chest, Mine Tunnel
+Visible choices:
+- `action:entity.denzel.talk` (entity-action on denzel): Talk
+- `action:entity.denzel.examine` (entity-action on denzel): Examine
+- `action:entity.copper-rock.mine` (entity-action on copper-rock): Mine Copper
+- `action:entity.tin-rock.mine` (entity-action on tin-rock): Mine Tin
+- `action:entity.locked-chest.pick` (entity-action on locked-chest): Pick Lock
+- `action:entity.locked-chest.examine` (entity-action on locked-chest): Examine
+- `action:entity.mine-tunnel.enter-forge` (entity-action on mine-tunnel): Enter Forge
+
+> Chose: `action:entity.denzel.talk` — Talk
+
+  - Denzel: Copper plus tin makes bronze. Furnace first, anvil second. I'd be out of here already if I hadn't drawn this posting as part of my... sentence. Don't touch the chest.
+
+## At Training Mine (tutorial-mine)
+Copper and tin glint in a cramped cave.
+Entities present (5): Denzel, Copper Rock, Tin Rock, Locked Chest, Mine Tunnel
+Visible choices:
+- `action:entity.denzel.examine` (entity-action on denzel): Examine
+- `action:entity.copper-rock.mine` (entity-action on copper-rock): Mine Copper
+- `action:entity.tin-rock.mine` (entity-action on tin-rock): Mine Tin
+- `action:entity.locked-chest.pick` (entity-action on locked-chest): Pick Lock
+- `action:entity.locked-chest.examine` (entity-action on locked-chest): Examine
+- `action:entity.mine-tunnel.enter-forge` (entity-action on mine-tunnel): Enter Forge
+
+> Chose: `action:entity.locked-chest.examine` — Examine
+
+  - A prison-issue padlock, guarding something better than rocks.
+
+## At Training Mine (tutorial-mine)
+Copper and tin glint in a cramped cave.
+Entities present (5): Denzel, Copper Rock, Tin Rock, Locked Chest, Mine Tunnel
+Visible choices:
+- `action:entity.denzel.examine` (entity-action on denzel): Examine
+- `action:entity.copper-rock.mine` (entity-action on copper-rock): Mine Copper
+- `action:entity.tin-rock.mine` (entity-action on tin-rock): Mine Tin
+- `action:entity.locked-chest.pick` (entity-action on locked-chest): Pick Lock
+- `action:entity.locked-chest.examine` (entity-action on locked-chest): Examine
+- `action:entity.mine-tunnel.enter-forge` (entity-action on mine-tunnel): Enter Forge
+
+> Chose: `action:entity.locked-chest.pick` — Pick Lock
+
+  - The lock gives all at once, spilling ore, bars, and a dagger better than anything at the anvil.
+
+## End state
+Location: Training Mine (tutorial-mine)
+Flags: {"death-count":0,"tutorial-guide.q1.count":0,"tutorial.miki-cleared":true,"tutorial.bridge-open":true,"tutorial.gommi-asleep":false,"tutorial.bank-visited":false,"tutorial.mining-cleared":true,"tutorial.combat-cleared":false,"tutorial.cage-locked-by-orloth":false,"tutorial.reached-mainland":false,"quest.leave-tutorial-island.accepted":true,"well-fed":false}
+Inventory: {"emberleaf":0,"log":0,"iron-ore":0,"bones":0,"bronze-spear":0,"bronze-dagger":0,"bronze-arrow":0,"bronze-throwing-knife":0,"tutorial-blade":0,"bronze-pickaxe":1,"gold":5,"lockpick":1,"guide-book":1,"small-net":1,"raw-shrimp":0,"cooked-shrimp":2,"herb":0,"bowl":1,"uncooked-sleeping-draught":0,"sleeping-draught":0,"copper-ore":2,"tin-ore":2,"bronze-bar":0,"iron-dagger":1}
+Bank: {}
+Appearance: {"presetId":"default"}
+Spawn location: (default)
+
+RESULT: pass

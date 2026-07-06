@@ -1,38 +1,20 @@
 import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { applyModulesToBundle } from './contentModules';
-import type { ContentBundle, ContentModule } from './types';
-import baseLocale from '../../public/content/universes/base/locales/en.json';
-import baseCore from '../../public/content/universes/base/modules/base-core.json';
-import waysideSupplies from '../../public/content/universes/base/modules/wayside-supplies.json';
-import reset from '../../public/content/universes/base/modules/tutorial-island-reset.json';
-import foundation from '../../public/content/universes/base/modules/tutorial-island-foundation.json';
-import guideHouse from '../../public/content/universes/base/modules/tutorial-island-guide-house.json';
-import survival from '../../public/content/universes/base/modules/tutorial-island-survival.json';
-import bank from '../../public/content/universes/base/modules/tutorial-island-bank.json';
-import mining from '../../public/content/universes/base/modules/tutorial-island-mining.json';
-import combat from '../../public/content/universes/base/modules/tutorial-island-combat.json';
+import type { ContentBundle, ContentModule, UniverseManifest } from './types';
 
-const modules = [
-  baseCore,
-  waysideSupplies,
-  reset,
-  foundation,
-  guideHouse,
-  survival,
-  bank,
-  mining,
-  combat,
-] as ContentModule[];
+const contentRoot = join(process.cwd(), 'public', 'content', 'universes', 'base');
+const readJson = (relativePath: string) =>
+  JSON.parse(readFileSync(join(contentRoot, relativePath), 'utf8').replace(/^﻿/, '')) as unknown;
 
-const bundle = (): ContentBundle => ({
-  manifest: {
-    schemaVersion: 1,
-    id: 'base',
-    version: '0.1.0',
-    author: 'UniversalisRPG',
-    locales: ['en'],
-    files: ['locales/en.json'],
-  },
+const manifest = readJson('universe.json') as UniverseManifest;
+const moduleIds = manifest.modules ?? [];
+const modules = moduleIds.map((id) => readJson(`modules/${id}.json`) as ContentModule);
+const baseLocale = readJson('locales/en.json') as Record<string, string>;
+
+const emptyBundle = (): ContentBundle => ({
+  manifest,
   locations: [],
   entities: [],
   actions: [],
@@ -47,30 +29,49 @@ const bundle = (): ContentBundle => ({
   dropTables: [],
   collectionLogs: [],
   dialogues: [],
+  quests: [],
   locales: { en: baseLocale },
   modules,
-  modulePacks: [{ id: 'starter', modules: modules.map((module) => module.id) }],
+  modulePacks: [{ id: 'starter', modules: moduleIds }],
 });
 
-describe('tutorial island content', () => {
-  it('resolves every tutorial module without errors and replaces the old world', () => {
-    const result = applyModulesToBundle(bundle(), modules, modules.map((module) => module.id));
+describe('tutorial island content (as shipped in universe.json)', () => {
+  it('resolves every registered module with no errors and replaces the old starter world', () => {
+    const result = applyModulesToBundle(emptyBundle(), modules, moduleIds);
     const errors = result.issues.filter((issue) => issue.severity === 'error');
 
     expect(errors).toEqual([]);
-    expect(result.enabledModuleIds).toEqual(modules.map((module) => module.id));
+    expect(result.enabledModuleIds).toEqual(moduleIds);
     expect(result.bundle.locations.find((location) => location.starting)?.id).toBe('tutorial-guide-house');
     expect(result.bundle.locations.map((location) => location.id)).not.toContain('crossroads');
-    expect(result.bundle.locations.every((location) => (location.entities ?? []).length <= 5)).toBe(true);
-    expect(result.bundle.entities?.map((entity) => entity.id)).toEqual(expect.arrayContaining([
-      'miki',
-      'shoals',
-      'front-door',
-      'gommi',
-      'bank-teller',
-      'denzel',
-      'orloth',
-      'portal',
-    ]));
+  });
+
+  it('never shows more than 5 entities at a location', () => {
+    const result = applyModulesToBundle(emptyBundle(), modules, moduleIds);
+    for (const location of result.bundle.locations) {
+      expect((location.entities ?? []).length, `location ${location.id}`).toBeLessThanOrEqual(5);
+    }
+  });
+
+  it('includes an NPC, entity, and interactive object from every story beat', () => {
+    const result = applyModulesToBundle(emptyBundle(), modules, moduleIds);
+    const entityIds = new Set((result.bundle.entities ?? []).map((entity) => entity.id));
+
+    for (const id of ['miki', 'front-door', 'brianna', 'shoals', 'gommi', 'bank-teller', 'denzel', 'locked-chest', 'orloth', 'portal']) {
+      expect(entityIds.has(id), `expected entity "${id}"`).toBe(true);
+    }
+  });
+
+  it('defines the "leave tutorial island" quest with a real derivable status', () => {
+    const result = applyModulesToBundle(emptyBundle(), modules, moduleIds);
+    const quest = result.bundle.quests?.find((candidate) => candidate.id === 'leave-tutorial-island');
+    expect(quest).toBeDefined();
+    expect(quest?.stages.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('seeds the tutorial bank with starting gold and caps inventory at 28 slots', () => {
+    const result = applyModulesToBundle(emptyBundle(), modules, moduleIds);
+    expect(result.bundle.manifest.basePlayer?.bank?.gold).toBe(25);
+    expect(result.bundle.manifest.maxInventorySlots).toBe(28);
   });
 });

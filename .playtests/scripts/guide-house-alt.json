@@ -1,0 +1,7 @@
+[
+  "action:entity.front-door.examine",
+  "action:entity.drawer.search",
+  "action:entity.bookshelf.read",
+  "action:entity.mirror.look",
+  "action:entity.front-door.pick"
+]

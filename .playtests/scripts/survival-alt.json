@@ -1,0 +1,18 @@
+[
+  "action:entity.drawer.search",
+  "action:entity.front-door.pick",
+  "action:travel-house-to-beach",
+  "action:entity.bridge-sign.read",
+  "action:entity.supply-crate.search",
+  "action:entity.shoals.fish",
+  "action:travel-beach-to-hermit-grove",
+  "action:entity.herb-patch.gather",
+  "action:entity.hermit.talk",
+  "action:entity.cracked-bowl.combine",
+  "action:travel-hermit-grove-to-beach",
+  "action:entity.campfire.cook@cook-draught",
+  "action:travel-beach-to-bridge",
+  "action:entity.river.examine",
+  "action:entity.river.use-draught",
+  "action:entity.gommi.examine-asleep"
+]

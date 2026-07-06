@@ -1,0 +1,33 @@
+{
+  "currentLocationId": "tutorial-mine",
+  "discoveredLocationIds": [
+    "tutorial-guide-house",
+    "tutorial-beach",
+    "tutorial-bridge",
+    "tutorial-bank",
+    "tutorial-mine",
+    "tutorial-forge"
+  ],
+  "flags": {
+    "death-count": 0,
+    "tutorial-guide.q1.count": 0,
+    "tutorial.miki-cleared": true,
+    "tutorial.bridge-open": true,
+    "tutorial.gommi-asleep": false,
+    "tutorial.bank-visited": false,
+    "tutorial.mining-cleared": true,
+    "tutorial.combat-cleared": false,
+    "tutorial.cage-locked-by-orloth": false,
+    "tutorial.reached-mainland": false,
+    "quest.leave-tutorial-island.accepted": true,
+    "well-fed": false
+  },
+  "inventory": {
+    "emberleaf": 0, "log": 0, "iron-ore": 0, "bones": 0, "bronze-spear": 0,
+    "bronze-dagger": 1, "bronze-arrow": 0, "bronze-throwing-knife": 0, "tutorial-blade": 0,
+    "bronze-pickaxe": 1, "gold": 0, "lockpick": 0, "guide-book": 0, "small-net": 1,
+    "raw-shrimp": 0, "cooked-shrimp": 1, "herb": 0, "bowl": 1,
+    "uncooked-sleeping-draught": 0, "sleeping-draught": 0,
+    "copper-ore": 0, "tin-ore": 0, "bronze-bar": 0, "iron-dagger": 0
+  }
+}

@@ -116,19 +116,20 @@ export const applyJsonPatch = <T>(value: T, ops: JsonPatchOperation[]): T => {
     if (path === '') return { parent: null as Record<string, unknown> | unknown[] | null, key: '' };
     const parts = path.split('/').slice(1).map(decodePathPart);
     const key = parts.pop() ?? '';
-    let parent = next as Record<string, unknown> | unknown[];
+    let parent: Record<string, unknown> | unknown[] | undefined = next as Record<string, unknown> | unknown[];
     for (const part of parts) {
-      if (Array.isArray(parent)) {
-        parent = parent[Number(part)] as Record<string, unknown> | unknown[];
-      } else {
-        parent = parent[part] as Record<string, unknown> | unknown[];
-      }
+      if (parent === undefined) break;
+      parent = (Array.isArray(parent) ? parent[Number(part)] : parent[part]) as Record<string, unknown> | unknown[] | undefined;
     }
     return { parent, key };
   };
 
   for (const op of ops) {
     const { parent, key } = targetFor(op.path);
+    // A patch targeting a nested path inside an object that does not exist
+    // in this bundle (e.g. a module patching a location owned by a
+    // dependency that is not currently enabled) has nothing to apply to.
+    if (parent === undefined) continue;
     if (parent === null) {
       if (op.op === 'remove') next = undefined;
       else next = structuredClone(op.value);

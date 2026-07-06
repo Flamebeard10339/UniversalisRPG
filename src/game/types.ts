@@ -18,6 +18,7 @@ export type UniverseManifest = {
   experienceCurve?: ExperienceCurveDefinition;
   experience?: ExperienceTrigger[];
   displayProfiles?: DisplayProfileDefinition[];
+  maxInventorySlots?: number;
   ui?: UniverseUiSettings;
   compatibility?: {
     minAppVersion?: string;
@@ -54,6 +55,7 @@ export type DisplayProfileDefinition = {
 
 export type BasePlayerDefinition = {
   inventory?: Record<string, number>;
+  bank?: Record<string, number>;
 };
 
 export type EnemyStatKey =
@@ -170,10 +172,14 @@ export type ActionResult =
   | { kind: 'skill-xp'; skillId: string; amount: number }
   | { kind: 'state-variable'; variable: string; value: boolean | number | string }
   | { kind: 'state-variable-delta'; variable: string; amount: number }
-  | { kind: 'flag'; flagId: string; value: boolean }
+  | { kind: 'flag'; flagId: string; value: boolean; expiresAfterSeconds?: number }
   | { kind: 'relocate'; locationId: string }
   | { kind: 'dialogue'; dialogueId: string }
-  | { kind: 'chat'; messageKey: string; delaySeconds?: number };
+  | { kind: 'chat'; messageKey: string; delaySeconds?: number }
+  | { kind: 'bank-deposit'; itemId: string; amount: number }
+  | { kind: 'bank-withdraw'; itemId: string; amount: number }
+  | { kind: 'set-spawn'; locationId: string }
+  | { kind: 'set-appearance'; presetId: string };
 
 export type GameAction = {
   id: string;
@@ -190,6 +196,9 @@ export type GameAction = {
   maxCompletions?: number;
   enemyId?: string;
   interactionTypeId?: string;
+  chance?: number;
+  failureResults?: ActionResult[];
+  stationId?: string;
 };
 
 export type EntityDefinition = {
@@ -353,6 +362,36 @@ export type DialogueDefinition = {
   nodes: DialogueNode[];
 };
 
+export type QuestStage = {
+  id: string;
+  descriptionKey: string;
+  hintKey?: string;
+  condition: Condition;
+};
+
+export type QuestDefinition = {
+  id: string;
+  titleKey: string;
+  stages: QuestStage[];
+};
+
+export type RecipeIngredient = {
+  itemId: string;
+  amount: number;
+};
+
+export type RecipeDefinition = {
+  id: string;
+  stationId: string;
+  skillId?: string;
+  xpAmount?: number;
+  durationSeconds?: number;
+  inputs: RecipeIngredient[];
+  outputs: RecipeIngredient[];
+  resultMessageKey?: string;
+  extraResults?: ActionResult[];
+};
+
 export type ContentBundle = {
   manifest: UniverseManifest;
   locations: LocationNode[];
@@ -369,6 +408,8 @@ export type ContentBundle = {
   dropTables?: DropTableDefinition[];
   collectionLogs?: CollectionLogDefinition[];
   dialogues?: DialogueDefinition[];
+  quests?: QuestDefinition[];
+  recipes?: RecipeDefinition[];
   locales: Record<string, LocaleDictionary>;
   modules?: ContentModule[];
   modulePacks?: ContentModulePack[];
@@ -391,6 +432,8 @@ export type ModuleDataSectionObject = {
   dropTables?: DropTableDefinition[];
   collectionLogs?: CollectionLogDefinition[];
   dialogues?: DialogueDefinition[];
+  quests?: QuestDefinition[];
+  recipes?: RecipeDefinition[];
   displayProfiles?: DisplayProfileDefinition[];
 };
 
@@ -423,6 +466,8 @@ export type ModuleDataUpdatesObject = ModuleDataSectionObject & {
     collectionLogs?: string[];
     dialogues?: string[];
     dialogueOptions?: Record<string, string[]>;
+    quests?: string[];
+    recipes?: string[];
     displayProfiles?: string[];
     locales?: string[];
   };
@@ -475,12 +520,14 @@ export type ActiveAction = {
   startedAt: number;
   completesAt: number;
   targetHealth: number | null;
+  recipeId?: string;
 };
 
 export type ActionProgress = {
   elapsedMs: number;
   runningSince: number | null;
   targetHealth?: number | null;
+  recipeId?: string;
 };
 
 export type ActiveTravel = {
@@ -605,6 +652,8 @@ export type ActionResolutionContext = {
   dropTables?: DropTableDefinition[];
   collectionLogs?: CollectionLogDefinition[];
   dialogues?: DialogueDefinition[];
+  quests?: QuestDefinition[];
+  recipes?: RecipeDefinition[];
 };
 
 export type ResourcePool = {
@@ -624,7 +673,9 @@ export type UniversePlayState = {
   activeDialogue: ActiveDialogue | null;
   resources: Record<string, number>;
   inventory: Record<string, number>;
+  bank: Record<string, number>;
   flags: Record<string, boolean | number | string>;
+  flagExpirations: Record<string, number>;
   actionCompletions: Record<string, number>;
   collectionLog: Record<string, number>;
   resourcePools: Record<string, ResourcePool>;
@@ -639,6 +690,8 @@ export type UniversePlayState = {
   runLog: RunLogEntry[];
   nextRunLogSequence: number;
   lastTickAt: number;
+  spawnLocationId: string | null;
+  appearance: { presetId: string };
 };
 
 export type RunLogEntry = {
@@ -676,6 +729,7 @@ export type ContributionDraft = {
   dropTables: DropTableDefinition[];
   collectionLogs?: CollectionLogDefinition[];
   dialogues: DialogueDefinition[];
+  quests?: QuestDefinition[];
   locales: Record<string, LocaleDictionary>;
   removed: ContributionRemovedIds;
 };
@@ -695,6 +749,7 @@ export type ContributionRemovedIds = {
   dropTables: string[];
   collectionLogs?: string[];
   dialogues: string[];
+  quests?: string[];
   modules: string[];
 };
 

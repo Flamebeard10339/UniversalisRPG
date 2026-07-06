@@ -52,6 +52,8 @@ export const registerModObjectType = (objectType: string, dataKey: keyof ModuleD
   ['interactionType', 'interactionTypes'],
   ['item', 'items'],
   ['location', 'locations'],
+  ['quest', 'quests'],
+  ['recipe', 'recipes'],
   ['resource', 'resources'],
   ['resourceDefinition', 'resourceDefinitions'],
   ['skill', 'skills'],

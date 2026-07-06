@@ -1,18 +1,19 @@
 import { useEffect, useState } from 'react';
 import type { ContentBundle, GameAction, UniversePlayState } from '../game/types';
-import { entityTitleKey } from '../game/contentIds';
+import { entityTitleKey, itemTitleKey } from '../game/contentIds';
 import { getActionDps, getActionDurationMs, getEnemyAttackDps, isContinuousAction, isInstantAction } from '../game/adversarial';
 import type { Translator } from '../game/i18n';
 import { useNow } from '../hooks/useNow';
 import { canStartAction, isActionVisible } from '../game/conditions';
 import { isPureTravelAction } from '../game/travel';
 import { getActionDescriptionText, getActionTitleText } from '../game/actionLocalization';
+import { availableRecipesForStation, resolveStationAction } from '../game/recipes';
 
 type ActionPanelProps = {
   bundle: ContentBundle;
   debugEnabled: boolean;
   playState: UniversePlayState;
-  onStartAction: (action: GameAction) => void;
+  onStartAction: (action: GameAction, recipeId?: string) => void;
   showTravelActions: boolean;
   t: Translator;
 };
@@ -35,6 +36,7 @@ export const ActionPanel = ({ bundle, debugEnabled, playState, onStartAction, sh
     interactionTypes: bundle.interactionTypes,
     enemies: bundle.enemies,
     dropTables: bundle.dropTables,
+    recipes: bundle.recipes,
   };
   const currentLocation = bundle.locations.find((location) => location.id === playState.currentLocationId);
   const entities = (currentLocation?.entities ?? [])
@@ -52,6 +54,13 @@ export const ActionPanel = ({ bundle, debugEnabled, playState, onStartAction, sh
     .filter((action) => isActionVisible(playState, action, actionContext));
   const actions = [...normalActions, ...entities.flatMap((entity) => entityActions(entity.actionIds))];
   const activeAction = actions.find((action) => action.id === playState.activeAction?.actionId);
+  const activeRecipeItemTitle = (() => {
+    if (!activeAction?.stationId || !playState.activeAction?.recipeId) return null;
+    const recipe = (bundle.recipes ?? []).find((candidate) =>
+      candidate.id === playState.activeAction?.recipeId && candidate.stationId === activeAction.stationId);
+    const itemId = recipe?.inputs[0]?.itemId;
+    return itemId ? t(itemTitleKey(itemId), itemId) : null;
+  })();
   const activeActionIsContinuous = Boolean(activeAction && isContinuousAction(activeAction, actionContext));
   const now = useNow((Boolean(playState.activeAction) && !activeActionIsContinuous) || Object.keys(instantActionPulse).length > 0, 16);
   useEffect(() => {
@@ -81,28 +90,32 @@ export const ActionPanel = ({ bundle, debugEnabled, playState, onStartAction, sh
         : current));
     }, 650);
   };
-  const renderActionButton = (action: GameAction, options: { entityAction?: boolean } = {}) => {
-    const active = playState.activeAction?.actionId === action.id;
+  const renderActionButton = (action: GameAction, options: { entityAction?: boolean; recipeId?: string; titleOverride?: string } = {}) => {
+    const isStationRecipe = action.stationId !== undefined;
+    const recipeMatches = !isStationRecipe || playState.activeAction?.recipeId === options.recipeId;
+    const active = playState.activeAction?.actionId === action.id && recipeMatches;
+    const progressMatches = !isStationRecipe || playState.actionProgress[action.id]?.recipeId === options.recipeId;
     const playerDps = debugEnabled ? getActionDps(playState, action, actionContext) : null;
     const entityDps = debugEnabled ? getEnemyAttackDps(playState, action, actionContext) : null;
-    const actionProgress = getActionProgress(action);
+    const actionProgress = progressMatches ? getActionProgress(action) : 0;
     const requirementsMet = canStartAction(playState, action, actionContext);
     const completions = playState.actionCompletions[action.id] ?? 0;
     const remaining = action.maxCompletions === undefined ? null : Math.max(0, action.maxCompletions - completions);
     const continuous = isContinuousAction(action, actionContext);
     const instant = isInstantAction(action);
-    const pulsing = Boolean(instantActionPulse[action.id] && instantActionPulse[action.id] > now);
+    const buttonKey = options.recipeId ? `${action.id}:${options.recipeId}` : action.id;
+    const pulsing = Boolean(instantActionPulse[buttonKey] && instantActionPulse[buttonKey] > now);
 
     return (
       <button
         className="relative overflow-hidden rounded border border-slate-700 bg-slate-900 p-3 text-left transition hover:border-cyan-500 disabled:cursor-not-allowed disabled:opacity-50"
         disabled={isTravelling || !requirementsMet}
-        key={action.id}
+        key={buttonKey}
         onClick={() => {
           if (instant) {
-            triggerInstantActionPulse(action.id);
+            triggerInstantActionPulse(buttonKey);
           }
-          onStartAction(action);
+          onStartAction(action, options.recipeId);
         }}
         type="button"
       >
@@ -118,7 +131,7 @@ export const ActionPanel = ({ bundle, debugEnabled, playState, onStartAction, sh
             style={{ width: `${actionProgress}%` }}
           />
         )}
-        <span className="relative block text-sm font-semibold text-slate-100">{getActionTitleText(action, bundle, t)}</span>
+        <span className="relative block text-sm font-semibold text-slate-100">{options.titleOverride ?? getActionTitleText(action, bundle, t)}</span>
         {!options.entityAction && (
           <span className="relative mt-1 block text-xs text-slate-400">{getActionDescriptionText(action, bundle, t)}</span>
         )}
@@ -139,6 +152,28 @@ export const ActionPanel = ({ bundle, debugEnabled, playState, onStartAction, sh
     );
   };
 
+  const renderAction = (action: GameAction, options: { entityAction?: boolean } = {}) => {
+    if (!action.stationId) {
+      return renderActionButton(action, options);
+    }
+
+    const recipes = availableRecipesForStation(playState, action.stationId, actionContext);
+    if (recipes.length === 0) {
+      return (
+        <p className="px-2 py-1 text-sm text-slate-500" key={action.id}>{t('actionPanel.noRecipesAvailable')}</p>
+      );
+    }
+
+    return recipes.map((recipe) => {
+      const itemId = recipe.inputs[0]?.itemId;
+      return renderActionButton(resolveStationAction(action, recipe.id, actionContext), {
+        ...options,
+        recipeId: recipe.id,
+        titleOverride: itemId ? t(itemTitleKey(itemId), itemId) : undefined,
+      });
+    });
+  };
+
   return (
     <section className="grid gap-3">
       <div>
@@ -147,13 +182,13 @@ export const ActionPanel = ({ bundle, debugEnabled, playState, onStartAction, sh
           {isTravelling
             ? t('actionPanel.travelling')
             : activeAction
-              ? t('actionPanel.working', { action: getActionTitleText(activeAction, bundle, t) })
+              ? t('actionPanel.working', { action: activeRecipeItemTitle ?? getActionTitleText(activeAction, bundle, t) })
               : t('actionPanel.choose')}
         </p>
       </div>
 
       <div className="grid gap-2">
-        {normalActions.map((action) => renderActionButton(action))}
+        {normalActions.map((action) => renderAction(action))}
         {entities.map((entity) => {
           const expanded = Boolean(expandedEntities[entity.id]);
           const availableActions = entityActions(entity.actionIds);
@@ -173,7 +208,7 @@ export const ActionPanel = ({ bundle, debugEnabled, playState, onStartAction, sh
               {expanded && (
                 <div className="grid gap-2 pl-4">
                   {availableActions.length > 0
-                    ? availableActions.map((action) => renderActionButton(action, { entityAction: true }))
+                    ? availableActions.map((action) => renderAction(action, { entityAction: true }))
                     : <p className="px-2 py-1 text-sm text-slate-500">{t('actionPanel.noEntityActions')}</p>}
                 </div>
               )}

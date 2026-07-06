@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import type { ActionResolutionContext, ContentBundle, EquipmentSlot, GameAction, IdleReport, RunLogEntry, UniversePlayState } from '../game/types';
 import type { AvailableTravelEdge } from '../game/travel';
-import { appendChatMessage, appendRunLog, cancelDialogue, chooseDialogueOption, createInitialPlayState, normalizePlayState, resetInactiveEffectResources, resolveIdleTimers, startAction, startTravel } from '../game/timers';
+import { appendChatMessage, appendRunLog, cancelDialogue, chooseDialogueOption, createInitialPlayState, depositToBank, normalizePlayState, resetInactiveEffectResources, resolveIdleTimers, setAppearancePreset, startAction, startTravel, withdrawFromBank } from '../game/timers';
 import { equipItem, unequipSlot } from '../game/equipment';
 import { load, remove, save } from '../lib/storage';
 import { recordAgentSessionMessage, type AgentSessionMessage } from '../game/agentSession';
@@ -14,7 +14,7 @@ type GameStateStore = {
   setCurrentLocation: (universeId: string, locationId: string) => void;
   travelTo: (universeId: string, path: AvailableTravelEdge[]) => void;
   cancelTravel: (universeId: string) => void;
-  startAction: (universeId: string, action: GameAction, context: ActionResolutionContext) => void;
+  startAction: (universeId: string, action: GameAction, context: ActionResolutionContext, recipeId?: string) => void;
   stopAction: (universeId: string, context: ActionResolutionContext) => void;
   chooseDialogueOption: (universeId: string, context: ActionResolutionContext, optionId?: string) => void;
   cancelDialogue: (universeId: string) => void;
@@ -22,6 +22,9 @@ type GameStateStore = {
   setActionLooping: (universeId: string, enabled: boolean) => void;
   equipItem: (universeId: string, itemId: string, slot: EquipmentSlot, context: ActionResolutionContext) => void;
   unequipSlot: (universeId: string, slot: EquipmentSlot) => void;
+  depositToBank: (universeId: string, context: ActionResolutionContext, itemId: string, amount: number) => void;
+  withdrawFromBank: (universeId: string, context: ActionResolutionContext, itemId: string, amount: number) => void;
+  setAppearance: (universeId: string, presetId: string) => void;
   markInactive: (universeId: string) => void;
   sendChatMessage: (universeId: string, text: string) => void;
   appendSystemMessage: (universeId: string, key: string, params?: Record<string, string | number>) => void;
@@ -134,7 +137,7 @@ export const useGameState = create<GameStateStore>((set, get) => ({
     });
   },
 
-  startAction: (universeId, action, context) => {
+  startAction: (universeId, action, context, recipeId) => {
     set((state) => {
       const current = state.states[universeId];
 
@@ -144,7 +147,7 @@ export const useGameState = create<GameStateStore>((set, get) => ({
 
       const now = Date.now();
       const resolved = cancelDialogue(resolveIdleTimers(current, context, {}, now).state, now);
-      const next = startAction(resolved, action, context, now);
+      const next = startAction(resolved, action, context, now, { recipeId });
       void save(storageKey(universeId), next);
 
       return {
@@ -283,6 +286,36 @@ export const useGameState = create<GameStateStore>((set, get) => ({
       const current = state.states[universeId];
       if (!current?.equipment?.[slot]) return state;
       const next = unequipSlot(current, slot);
+      void save(storageKey(universeId), next);
+      return { states: { ...state.states, [universeId]: next } };
+    });
+  },
+
+  depositToBank: (universeId, context, itemId, amount) => {
+    set((state) => {
+      const current = state.states[universeId];
+      if (!current) return state;
+      const next = depositToBank(current, context, itemId, amount);
+      void save(storageKey(universeId), next);
+      return { states: { ...state.states, [universeId]: next } };
+    });
+  },
+
+  withdrawFromBank: (universeId, context, itemId, amount) => {
+    set((state) => {
+      const current = state.states[universeId];
+      if (!current) return state;
+      const next = withdrawFromBank(current, context, itemId, amount);
+      void save(storageKey(universeId), next);
+      return { states: { ...state.states, [universeId]: next } };
+    });
+  },
+
+  setAppearance: (universeId, presetId) => {
+    set((state) => {
+      const current = state.states[universeId];
+      if (!current) return state;
+      const next = setAppearancePreset(current, presetId);
       void save(storageKey(universeId), next);
       return { states: { ...state.states, [universeId]: next } };
     });

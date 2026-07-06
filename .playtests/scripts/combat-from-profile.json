@@ -1,0 +1,8 @@
+[
+  "action:entity.mine-tunnel.enter-forge",
+  "action:entity.forge-table.continue",
+  "action:entity.orloth.talk",
+  "action:entity.giant-rat.fight",
+  "action:entity.portal.step-through",
+  "action:entity.mainland-greeter.talk"
+]

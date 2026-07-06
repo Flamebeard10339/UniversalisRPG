@@ -1,0 +1,77 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://universalis-rpg.local/schema/quests.schema.json",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "required": ["id", "titleKey", "stages"],
+    "additionalProperties": false,
+    "properties": {
+      "id": { "type": "string", "minLength": 1 },
+      "titleKey": { "type": "string", "minLength": 1 },
+      "stages": {
+        "type": "array",
+        "minItems": 1,
+        "items": { "$ref": "#/$defs/stage" }
+      }
+    }
+  },
+  "$defs": {
+    "comparison": {
+      "enum": ["equal", "greater-than", "less-than"]
+    },
+    "condition": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["kind", "variable", "comparison", "value"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "const": "state-variable" },
+            "variable": { "type": "string", "minLength": 1 },
+            "comparison": { "$ref": "#/$defs/comparison" },
+            "value": { "type": ["number", "boolean", "string"] }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["kind", "conditions"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "enum": ["all", "any"] },
+            "conditions": { "type": "array", "items": { "$ref": "#/$defs/condition" } }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["kind", "condition"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "const": "not" },
+            "condition": { "$ref": "#/$defs/condition" }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["kind", "tag"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "enum": ["item-tag", "equipped-item-tag"] },
+            "tag": { "type": "string", "minLength": 1 }
+          }
+        }
+      ]
+    },
+    "stage": {
+      "type": "object",
+      "required": ["id", "descriptionKey", "condition"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "descriptionKey": { "type": "string", "minLength": 1 },
+        "hintKey": { "type": "string", "minLength": 1 },
+        "condition": { "$ref": "#/$defs/condition" }
+      }
+    }
+  }
+}

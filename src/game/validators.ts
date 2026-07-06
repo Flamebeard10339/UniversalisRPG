@@ -14,6 +14,8 @@ import type {
   ItemDefinition,
   LocaleDictionary,
   LocationNode,
+  RecipeDefinition,
+  RecipeIngredient,
   ResourceDefinition,
   Reward,
   RewardAmount,
@@ -249,9 +251,17 @@ const validateActionResultShape = (value: unknown) => {
   if (value.kind === 'skill-xp') return hasString(value, 'skillId') && hasNumber(value, 'amount');
   if (value.kind === 'state-variable') return hasString(value, 'variable') && (typeof value.value === 'boolean' || typeof value.value === 'number' || typeof value.value === 'string');
   if (value.kind === 'state-variable-delta') return hasString(value, 'variable') && hasNumber(value, 'amount');
-  if (value.kind === 'flag') return hasString(value, 'flagId') && typeof value.value === 'boolean';
+  if (value.kind === 'flag') {
+    return hasString(value, 'flagId')
+      && typeof value.value === 'boolean'
+      && (value.expiresAfterSeconds === undefined || (typeof value.expiresAfterSeconds === 'number' && value.expiresAfterSeconds > 0));
+  }
   if (value.kind === 'relocate') return hasString(value, 'locationId');
   if (value.kind === 'dialogue') return hasString(value, 'dialogueId');
+  if (value.kind === 'bank-deposit') return hasString(value, 'itemId') && hasNumber(value, 'amount');
+  if (value.kind === 'bank-withdraw') return hasString(value, 'itemId') && hasNumber(value, 'amount');
+  if (value.kind === 'set-spawn') return hasString(value, 'locationId');
+  if (value.kind === 'set-appearance') return hasString(value, 'presetId');
   return value.kind === 'chat'
     && hasString(value, 'messageKey')
     && (value.delaySeconds === undefined || (typeof value.delaySeconds === 'number' && value.delaySeconds >= 0 && value.delaySeconds <= 2));
@@ -266,13 +276,16 @@ const validateActionsShape = (actions: unknown): actions is GameAction[] =>
       (action.locationId === undefined || hasString(action, 'locationId')) &&
       (action.role === undefined || action.role === 'optional' || action.role === 'progression' || action.role === 'utility' || action.role === 'travel') &&
       (action.instant === undefined || typeof action.instant === 'boolean') &&
-      (action.instant ? action.durationSeconds === undefined : hasNumber(action, 'durationSeconds')) &&
+      (action.instant || action.stationId !== undefined ? action.durationSeconds === undefined || hasNumber(action, 'durationSeconds') : hasNumber(action, 'durationSeconds')) &&
       Array.isArray(action.rewards) && action.rewards.every(validateRewardShape) &&
       (action.experience === undefined || (Array.isArray(action.experience) && action.experience.every(validateExperienceTriggerShape))) &&
       (action.results === undefined || (Array.isArray(action.results) && action.results.every(validateActionResultShape))) &&
       (action.visibleWhen === undefined || validateConditionShape(action.visibleWhen)) &&
       (action.requirements === undefined || validateConditionShape(action.requirements)) &&
-      (action.maxCompletions === undefined || (Number.isInteger(action.maxCompletions) && Number(action.maxCompletions) >= 1)),
+      (action.maxCompletions === undefined || (Number.isInteger(action.maxCompletions) && Number(action.maxCompletions) >= 1)) &&
+      (action.chance === undefined || (typeof action.chance === 'number' && action.chance >= 0 && action.chance <= 100)) &&
+      (action.failureResults === undefined || (Array.isArray(action.failureResults) && action.failureResults.every(validateActionResultShape))) &&
+      (action.stationId === undefined || hasString(action, 'stationId')),
   );
 
 const validateSkillsShape = (skills: unknown): skills is SkillDefinition[] =>
@@ -399,6 +412,28 @@ const validateDropTablesShape = (dropTables: unknown): dropTables is DropTableDe
       validateDropEntriesShape(dropTable.drops),
     ));
 
+const validateRecipeIngredientsShape = (value: unknown): value is RecipeIngredient[] =>
+  Array.isArray(value) && value.length > 0 && value.every((ingredient) =>
+    isRecord(ingredient) &&
+    hasString(ingredient, 'itemId') &&
+    typeof ingredient.amount === 'number' &&
+    ingredient.amount > 0);
+
+const validateRecipesShape = (recipes: unknown): recipes is RecipeDefinition[] =>
+  recipes === undefined ||
+  (Array.isArray(recipes) &&
+    recipes.every((recipe) =>
+      isRecord(recipe) &&
+      hasString(recipe, 'id') &&
+      hasString(recipe, 'stationId') &&
+      (recipe.skillId === undefined || typeof recipe.skillId === 'string') &&
+      (recipe.xpAmount === undefined || typeof recipe.xpAmount === 'number') &&
+      (recipe.durationSeconds === undefined || (typeof recipe.durationSeconds === 'number' && recipe.durationSeconds > 0)) &&
+      (recipe.resultMessageKey === undefined || typeof recipe.resultMessageKey === 'string') &&
+      (recipe.extraResults === undefined || (Array.isArray(recipe.extraResults) && recipe.extraResults.every(validateActionResultShape))) &&
+      validateRecipeIngredientsShape(recipe.inputs) &&
+      validateRecipeIngredientsShape(recipe.outputs)));
+
 const validateDialogueOptionShape = (value: unknown) => isRecord(value)
   && hasString(value, 'id')
   && hasString(value, 'labelKey')
@@ -517,6 +552,10 @@ export const validateContentShape = (bundle: Partial<ContentBundle>) => {
 
   if (!validateDialoguesShape(bundle.dialogues)) {
     issues.push(error('dialogues.json', 'validation.dialoguesShape'));
+  }
+
+  if (!validateRecipesShape(bundle.recipes)) {
+    issues.push(error('recipes.json', 'validation.recipesShape'));
   }
 
   return issues;
@@ -739,7 +778,7 @@ export const validateContentReferences = (bundle: ContentBundle) => {
     if ((action.results ?? []).filter((result) => result.kind === 'chat').length > 2) {
       issues.push(error(`actions.${action.id}.results`, 'validation.tooManySequentialMessages'));
     }
-    if (!action.instant && (action.durationSeconds ?? 0) <= 0) {
+    if (!action.instant && action.stationId === undefined && (action.durationSeconds ?? 0) <= 0) {
       issues.push(error(`actions.${action.id}.durationSeconds`, 'validation.actionDurationPositive'));
     }
     if (action.interactionTypeId && !interactionTypeIds.has(action.interactionTypeId)) {
@@ -779,6 +818,14 @@ export const validateContentReferences = (bundle: ContentBundle) => {
   for (const dropTable of bundle.dropTables ?? []) {
     if (!isKebabCaseId(dropTable.id)) issues.push(error(`dropTables.${dropTable.id}.id`, 'validation.dropTableIdKebab'));
     validateDropTableEntries(dropTable, `dropTables.${dropTable.id}`, [dropTable.id]);
+  }
+
+  for (const recipe of bundle.recipes ?? []) {
+    const path = `recipes.${recipe.id}`;
+    if (recipe.skillId && !skillIds.has(recipe.skillId)) issues.push(error(`${path}.skillId`, 'validation.unknownSkill', { id: recipe.skillId }));
+    for (const ingredient of [...recipe.inputs, ...recipe.outputs]) {
+      if (!itemIds.has(ingredient.itemId)) issues.push(error(`${path}.itemId`, 'validation.unknownItem', { id: ingredient.itemId }));
+    }
   }
 
   const validateResultReferences = (result: ActionResult, path: string) => {

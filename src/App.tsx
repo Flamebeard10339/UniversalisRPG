@@ -3,8 +3,10 @@ import { useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import { ActionDetails } from './components/ActionDetails';
 import { ActionPanel } from './components/ActionPanel';
 import { ChatPanel } from './components/ChatPanel';
+import { BankPanel } from './components/BankPanel';
 import { CharacterStats } from './components/CharacterStats';
 import { CollectionLogPanel } from './components/CollectionLogPanel';
+import { QuestLogPanel } from './components/QuestLogPanel';
 import { DialoguePanel } from './components/DialoguePanel';
 import { InventoryPanel } from './components/InventoryPanel';
 import { ContributionMode, type ContributionTab } from './components/contribution/ContributionMode';
@@ -47,7 +49,7 @@ const getStartingLocationId = (bundle: NonNullable<ReturnType<typeof useUniverse
 
 type AppTab = 'map' | 'home' | 'character' | 'settings';
 type HomeTab = 'actions' | 'details' | 'workbench';
-type CharacterTab = 'skills' | 'inventory' | 'stats' | 'collectionLog';
+type CharacterTab = 'skills' | 'inventory' | 'bank' | 'stats' | 'quests' | 'collectionLog';
 type QuickWorkbenchSheet = 'add' | 'edit-location';
 type FontSizePreference = 'tiny' | 'small' | 'normal' | 'large' | 'huge';
 type AppearanceSettings = {
@@ -161,6 +163,9 @@ export default function App() {
   const cancelDialogue = useGameState((state) => state.cancelDialogue);
   const equipItem = useGameState((state) => state.equipItem);
   const unequipSlot = useGameState((state) => state.unequipSlot);
+  const depositToBank = useGameState((state) => state.depositToBank);
+  const withdrawFromBank = useGameState((state) => state.withdrawFromBank);
+  const setAppearance = useGameState((state) => state.setAppearance);
   const resolveIdle = useGameState((state) => state.resolveIdle);
   const markInactive = useGameState((state) => state.markInactive);
   const appendSystemMessage = useGameState((state) => state.appendSystemMessage);
@@ -504,14 +509,15 @@ export default function App() {
   const dismissDialogue = () => {
     if (playState?.activeDialogue) cancelDialogue(runtimeUniverseId);
   };
-  const beginAction = (action: (typeof actionContext.actions)[number]) => {
+  const beginAction = (action: (typeof actionContext.actions)[number], recipeId?: string) => {
     if (!bundle) return;
     logPlayerAction('action.start', {
       actionId: action.id,
       locationId: action.locationId,
       universeId: bundle.manifest.id,
+      recipeId,
     });
-    startAction(runtimeUniverseId, action, actionContext);
+    startAction(runtimeUniverseId, action, actionContext, recipeId);
     if (isContinuousAction(action, actionContext) && playState?.activeAction?.actionId !== action.id) {
       setActiveTab('home');
       setHomeTab('details');
@@ -903,7 +909,7 @@ export default function App() {
         {visibleActiveTab === 'character' && (
           <section className="grid gap-4">
             <div className="grid grid-cols-3 gap-2 rounded border border-slate-800 bg-slate-900 p-2">
-              {(['skills', 'inventory', 'stats', 'collectionLog'] as CharacterTab[]).map((tab) => (
+              {(['skills', 'inventory', 'bank', 'stats', 'quests', 'collectionLog'] as CharacterTab[]).map((tab) => (
                 <button
                   className={`rounded px-3 py-2 text-sm font-semibold capitalize ${
                     characterTab === tab ? 'bg-cyan-300 text-slate-950' : 'bg-slate-950 text-slate-300'
@@ -933,8 +939,27 @@ export default function App() {
               />
             )}
 
+            {characterTab === 'bank' && (
+              <BankPanel
+                bundle={bundle}
+                onDeposit={(itemId, amount) => depositToBank(runtimeUniverseId, actionContext, itemId, amount)}
+                onWithdraw={(itemId, amount) => withdrawFromBank(runtimeUniverseId, actionContext, itemId, amount)}
+                playState={playState}
+                t={t}
+              />
+            )}
+
             {characterTab === 'stats' && (
-              <CharacterStats bundle={bundle} playState={playState} t={t} />
+              <CharacterStats
+                bundle={bundle}
+                onSetAppearance={(presetId) => setAppearance(runtimeUniverseId, presetId)}
+                playState={playState}
+                t={t}
+              />
+            )}
+
+            {characterTab === 'quests' && (
+              <QuestLogPanel bundle={bundle} playState={playState} t={t} />
             )}
 
             {characterTab === 'collectionLog' && (

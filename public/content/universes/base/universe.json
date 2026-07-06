@@ -3,9 +3,7 @@
   "id": "base",
   "version": "0.1.0",
   "author": "UniversalisRPG",
-  "locales": [
-    "en"
-  ],
+  "locales": ["en"],
   "combatBalance": {
     "damage-scaler": 0.1
   },
@@ -15,8 +13,12 @@
     "exponential": 2
   },
   "basePlayer": {
-    "inventory": {}
+    "inventory": {},
+    "bank": {
+      "gold": 25
+    }
   },
+  "maxInventorySlots": 28,
   "files": [
     "locales/en.json"
   ],

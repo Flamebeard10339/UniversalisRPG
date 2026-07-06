@@ -1,0 +1,17 @@
+[
+  "action:entity.brianna.talk",
+  "action:entity.supply-crate.search",
+  "action:entity.shoals.fish",
+  "action:entity.shoals.examine",
+  "action:entity.shoals.fish",
+  "action:entity.shoals.examine",
+  "action:entity.shoals.fish",
+  "action:entity.campfire.cook@cook-shrimp",
+  "action:entity.shoals.examine",
+  "action:entity.campfire.cook@cook-shrimp",
+  "action:entity.shoals.examine",
+  "action:entity.campfire.cook@cook-shrimp",
+  "action:entity.campfire.eat",
+  "action:travel-beach-to-bridge",
+  "action:entity.gommi.pay-toll"
+]

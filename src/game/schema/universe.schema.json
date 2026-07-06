@@ -36,6 +36,10 @@
         "inventory": {
           "type": "object",
           "additionalProperties": { "type": "number", "minimum": 0 }
+        },
+        "bank": {
+          "type": "object",
+          "additionalProperties": { "type": "number", "minimum": 0 }
         }
       }
     },
@@ -70,6 +74,7 @@
       },
       "uniqueItems": true
     },
+    "maxInventorySlots": { "type": "integer", "minimum": 1 },
     "ui": {
       "type": "object",
       "additionalProperties": false,
