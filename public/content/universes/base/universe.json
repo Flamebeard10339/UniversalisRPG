@@ -3,7 +3,9 @@
   "id": "base",
   "version": "0.1.0",
   "author": "UniversalisRPG",
-  "locales": ["en"],
+  "locales": [
+    "en"
+  ],
   "combatBalance": {
     "damage-scaler": 0.1
   },
@@ -20,7 +22,14 @@
   ],
   "modules": [
     "base-core",
-    "wayside-supplies"
+    "wayside-supplies",
+    "tutorial-island-reset",
+    "tutorial-island-foundation",
+    "tutorial-island-guide-house",
+    "tutorial-island-survival",
+    "tutorial-island-bank",
+    "tutorial-island-mining",
+    "tutorial-island-combat"
   ],
   "compatibility": {
     "minAppVersion": "0.1.0"

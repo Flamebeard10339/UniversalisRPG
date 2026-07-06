@@ -1,0 +1,679 @@
+{
+  "$schema": "https://universalis-rpg.local/schema/module.schema.json",
+  "id": "tutorial-island-survival",
+  "version": "1.0.0",
+  "universe": "base",
+  "author": "UniversalisRPG",
+  "game_version": "1.0",
+  "dependencies": [
+    "tutorial-island-guide-house"
+  ],
+  "data": {
+    "locations": [
+      {
+        "id": "tutorial-beach",
+        "position": {
+          "x": 180,
+          "y": 0
+        },
+        "entities": [
+          "brianna",
+          "shoals",
+          "campfire",
+          "supply-crate",
+          "bridge-sign"
+        ],
+        "actions": [
+          "travel-beach-to-house",
+          "travel-beach-to-hermit-grove",
+          "travel-beach-to-bridge"
+        ],
+        "tags": [
+          "tutorial",
+          "shore"
+        ]
+      },
+      {
+        "id": "tutorial-hermit-grove",
+        "position": {
+          "x": 180,
+          "y": -120
+        },
+        "entities": [
+          "hermit",
+          "herb-patch",
+          "cracked-bowl"
+        ],
+        "actions": [
+          "travel-hermit-grove-to-beach"
+        ],
+        "tags": [
+          "tutorial",
+          "forest"
+        ]
+      },
+      {
+        "id": "tutorial-bridge",
+        "position": {
+          "x": 360,
+          "y": 0
+        },
+        "entities": [
+          "gommi",
+          "river",
+          "loose-plank"
+        ],
+        "actions": [
+          "travel-bridge-to-beach",
+          "travel-bridge-to-bank"
+        ],
+        "tags": [
+          "tutorial",
+          "river"
+        ]
+      }
+    ],
+    "actions": [
+      {
+        "id": "travel-house-to-beach",
+        "role": "travel",
+        "durationSeconds": 1,
+        "rewards": [],
+        "visibleWhen": {
+          "kind": "state-variable",
+          "variable": "flag:tutorial.miki-cleared",
+          "comparison": "equal",
+          "value": true
+        },
+        "results": [
+          {
+            "kind": "relocate",
+            "locationId": "tutorial-beach"
+          }
+        ]
+      },
+      {
+        "id": "travel-beach-to-house",
+        "role": "travel",
+        "durationSeconds": 1,
+        "rewards": [],
+        "results": [
+          {
+            "kind": "relocate",
+            "locationId": "tutorial-guide-house"
+          }
+        ]
+      },
+      {
+        "id": "travel-beach-to-hermit-grove",
+        "role": "travel",
+        "durationSeconds": 1,
+        "rewards": [],
+        "results": [
+          {
+            "kind": "relocate",
+            "locationId": "tutorial-hermit-grove"
+          }
+        ]
+      },
+      {
+        "id": "travel-hermit-grove-to-beach",
+        "role": "travel",
+        "durationSeconds": 1,
+        "rewards": [],
+        "results": [
+          {
+            "kind": "relocate",
+            "locationId": "tutorial-beach"
+          }
+        ]
+      },
+      {
+        "id": "travel-beach-to-bridge",
+        "role": "travel",
+        "durationSeconds": 1,
+        "rewards": [],
+        "results": [
+          {
+            "kind": "relocate",
+            "locationId": "tutorial-bridge"
+          }
+        ]
+      },
+      {
+        "id": "travel-bridge-to-beach",
+        "role": "travel",
+        "durationSeconds": 1,
+        "rewards": [],
+        "results": [
+          {
+            "kind": "relocate",
+            "locationId": "tutorial-beach"
+          }
+        ]
+      },
+      {
+        "id": "travel-bridge-to-bank",
+        "role": "travel",
+        "durationSeconds": 1,
+        "rewards": [],
+        "visibleWhen": {
+          "kind": "any",
+          "conditions": [
+            {
+              "kind": "state-variable",
+              "variable": "flag:tutorial.bridge-open",
+              "comparison": "equal",
+              "value": true
+            },
+            {
+              "kind": "state-variable",
+              "variable": "flag:tutorial.gommi-asleep",
+              "comparison": "equal",
+              "value": true
+            }
+          ]
+        },
+        "results": [
+          {
+            "kind": "relocate",
+            "locationId": "tutorial-bank"
+          }
+        ]
+      }
+    ],
+    "entities": [
+      {
+        "id": "brianna",
+        "actions": [
+          {
+            "id": "talk",
+            "instant": true,
+            "rewards": [],
+            "results": [
+              {
+                "kind": "dialogue",
+                "dialogueId": "brianna"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "shoals",
+        "actions": [
+          {
+            "id": "fish",
+            "durationSeconds": 1,
+            "rewards": [
+              {
+                "kind": "item",
+                "itemId": "raw-shrimp",
+                "amount": 1
+              },
+              {
+                "kind": "skillXp",
+                "skillId": "fishing",
+                "amount": 4
+              }
+            ],
+            "requirements": {
+              "kind": "state-variable",
+              "variable": "item:small-net",
+              "comparison": "greater-than",
+              "value": 0
+            }
+          },
+          {
+            "id": "examine",
+            "instant": true,
+            "rewards": [],
+            "results": [
+              {
+                "kind": "chat",
+                "messageKey": "chat.entity.shoals.examine"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "campfire",
+        "actions": [
+          {
+            "id": "cook-shrimp",
+            "durationSeconds": 1,
+            "rewards": [
+              {
+                "kind": "skillXp",
+                "skillId": "cooking",
+                "amount": 4
+              }
+            ],
+            "requirements": {
+              "kind": "state-variable",
+              "variable": "item:raw-shrimp",
+              "comparison": "greater-than",
+              "value": 0
+            },
+            "results": [
+              {
+                "kind": "item",
+                "itemId": "raw-shrimp",
+                "amount": -1
+              },
+              {
+                "kind": "item",
+                "itemId": "cooked-shrimp",
+                "amount": 1
+              }
+            ]
+          },
+          {
+            "id": "cook-draught",
+            "durationSeconds": 1,
+            "rewards": [
+              {
+                "kind": "skillXp",
+                "skillId": "cooking",
+                "amount": 6
+              }
+            ],
+            "requirements": {
+              "kind": "state-variable",
+              "variable": "item:uncooked-sleeping-draught",
+              "comparison": "greater-than",
+              "value": 0
+            },
+            "results": [
+              {
+                "kind": "item",
+                "itemId": "uncooked-sleeping-draught",
+                "amount": -1
+              },
+              {
+                "kind": "item",
+                "itemId": "sleeping-draught",
+                "amount": 1
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "supply-crate",
+        "actions": [
+          {
+            "id": "search",
+            "instant": true,
+            "rewards": [],
+            "results": [
+              {
+                "kind": "item",
+                "itemId": "small-net",
+                "amount": 1
+              },
+              {
+                "kind": "item",
+                "itemId": "bowl",
+                "amount": 1
+              },
+              {
+                "kind": "chat",
+                "messageKey": "chat.entity.supply-crate.search"
+              }
+            ],
+            "maxCompletions": 1
+          }
+        ]
+      },
+      {
+        "id": "bridge-sign",
+        "actions": [
+          {
+            "id": "read",
+            "instant": true,
+            "rewards": [],
+            "results": [
+              {
+                "kind": "chat",
+                "messageKey": "chat.entity.bridge-sign.read"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "hermit",
+        "actions": [
+          {
+            "id": "talk",
+            "instant": true,
+            "rewards": [],
+            "results": [
+              {
+                "kind": "dialogue",
+                "dialogueId": "hermit"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "herb-patch",
+        "actions": [
+          {
+            "id": "gather",
+            "durationSeconds": 1,
+            "rewards": [
+              {
+                "kind": "item",
+                "itemId": "herb",
+                "amount": 1
+              },
+              {
+                "kind": "skillXp",
+                "skillId": "fishing",
+                "amount": 1
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "cracked-bowl",
+        "actions": [
+          {
+            "id": "take",
+            "instant": true,
+            "rewards": [],
+            "results": [
+              {
+                "kind": "item",
+                "itemId": "bowl",
+                "amount": 1
+              },
+              {
+                "kind": "chat",
+                "messageKey": "chat.entity.cracked-bowl.take"
+              }
+            ],
+            "maxCompletions": 1
+          }
+        ]
+      },
+      {
+        "id": "river",
+        "actions": [
+          {
+            "id": "use-draught",
+            "instant": true,
+            "rewards": [],
+            "results": [
+              {
+                "kind": "item",
+                "itemId": "sleeping-draught",
+                "amount": -1
+              },
+              {
+                "kind": "flag",
+                "flagId": "tutorial.gommi-asleep",
+                "value": true
+              },
+              {
+                "kind": "chat",
+                "messageKey": "chat.entity.river.use-draught"
+              }
+            ],
+            "requirements": {
+              "kind": "state-variable",
+              "variable": "item:sleeping-draught",
+              "comparison": "greater-than",
+              "value": 0
+            }
+          },
+          {
+            "id": "examine",
+            "instant": true,
+            "rewards": [],
+            "results": [
+              {
+                "kind": "chat",
+                "messageKey": "chat.entity.river.examine"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "gommi",
+        "actions": [
+          {
+            "id": "pay-toll",
+            "instant": true,
+            "rewards": [],
+            "results": [
+              {
+                "kind": "item",
+                "itemId": "cooked-shrimp",
+                "amount": -1
+              },
+              {
+                "kind": "flag",
+                "flagId": "tutorial.bridge-open",
+                "value": true
+              },
+              {
+                "kind": "chat",
+                "messageKey": "chat.entity.gommi.pay-toll"
+              }
+            ],
+            "requirements": {
+              "kind": "state-variable",
+              "variable": "item:cooked-shrimp",
+              "comparison": "greater-than",
+              "value": 0
+            }
+          },
+          {
+            "id": "examine",
+            "instant": true,
+            "rewards": [],
+            "results": [
+              {
+                "kind": "chat",
+                "messageKey": "chat.entity.gommi.examine"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "loose-plank",
+        "actions": [
+          {
+            "id": "examine",
+            "instant": true,
+            "rewards": [],
+            "results": [
+              {
+                "kind": "chat",
+                "messageKey": "chat.entity.loose-plank.examine"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "dialogues": [
+      {
+        "id": "brianna",
+        "startNodeId": "start",
+        "nodes": [
+          {
+            "id": "start",
+            "speakerId": "brianna",
+            "textKey": "dialogue.brianna.start"
+          }
+        ]
+      },
+      {
+        "id": "hermit",
+        "startNodeId": "start",
+        "nodes": [
+          {
+            "id": "start",
+            "speakerId": "hermit",
+            "textKey": "dialogue.hermit.start",
+            "results": [
+              {
+                "kind": "item",
+                "itemId": "uncooked-sleeping-draught",
+                "amount": 1
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "data-updates": {
+    "patches": [
+      {
+        "targetModId": "tutorial-island-guide-house",
+        "objectType": "locations",
+        "objectId": "tutorial-guide-house",
+        "ops": [
+          {
+            "op": "add",
+            "path": "/actions/-",
+            "value": "travel-house-to-beach"
+          }
+        ]
+      }
+    ]
+  },
+  "locale": {
+    "en": {
+      "location.tutorial-beach.title": "Shell Beach",
+      "location.tutorial-beach.description": "Low shoals glitter beside a smoky campfire.",
+      "location.tutorial-beach.exhausted": "The beach settles into gull cries and surf.",
+      "location.tutorial-hermit-grove.title": "Hermit Grove",
+      "location.tutorial-hermit-grove.description": "Herbs grow around a weathered hut beyond the palms.",
+      "location.tutorial-hermit-grove.exhausted": "The grove smells of crushed leaves.",
+      "location.tutorial-bridge.title": "Bridge Toll",
+      "location.tutorial-bridge.description": "A narrow bridge crosses the river. Something large waits below.",
+      "location.tutorial-bridge.exhausted": "The river keeps sliding past.",
+      "entity.brianna.title": "Brianna",
+      "entity.shoals.title": "Shrimp Shoals",
+      "entity.campfire.title": "Campfire",
+      "entity.supply-crate.title": "Supply Crate",
+      "entity.bridge-sign.title": "Bridge Sign",
+      "entity.hermit.title": "Hermit",
+      "entity.herb-patch.title": "Herb Patch",
+      "entity.cracked-bowl.title": "Cracked Bowl",
+      "entity.river.title": "River",
+      "entity.gommi.title": "Gommi",
+      "entity.loose-plank.title": "Loose Plank",
+      "action.entity.brianna.talk.title": "Talk",
+      "action.entity.brianna.talk.description": "Ask about surviving here.",
+      "action.entity.brianna.talk.success": "Brianna keeps it brief: net, shrimp, fire, bridge.",
+      "action.entity.brianna.talk.failure": "Nothing happens.",
+      "action.entity.shoals.fish.title": "Fish",
+      "action.entity.shoals.fish.description": "Sweep the shallows with a small net.",
+      "action.entity.shoals.fish.success": "You catch shrimp.",
+      "action.entity.shoals.fish.failure": "Nothing happens.",
+      "action.entity.shoals.examine.title": "Examine",
+      "action.entity.shoals.examine.description": "Look into the shoals.",
+      "action.entity.shoals.examine.success": "Tiny shadows flicker in the shallows.",
+      "action.entity.shoals.examine.failure": "Nothing happens.",
+      "action.entity.campfire.cook-shrimp.title": "Cook Shrimp",
+      "action.entity.campfire.cook-shrimp.description": "Cook raw shrimp over the campfire.",
+      "action.entity.campfire.cook-shrimp.success": "The shrimp curls pink.",
+      "action.entity.campfire.cook-shrimp.failure": "Nothing happens.",
+      "action.entity.campfire.cook-draught.title": "Cook Draught",
+      "action.entity.campfire.cook-draught.description": "Warm the bitter draught.",
+      "action.entity.campfire.cook-draught.success": "The draught steams softly.",
+      "action.entity.campfire.cook-draught.failure": "Nothing happens.",
+      "action.entity.supply-crate.search.title": "Search",
+      "action.entity.supply-crate.search.description": "Search the open crate.",
+      "action.entity.supply-crate.search.success": "You take the supplies left in plain sight.",
+      "action.entity.supply-crate.search.failure": "Nothing happens.",
+      "action.entity.bridge-sign.read.title": "Read",
+      "action.entity.bridge-sign.read.description": "Read the rough bridge sign.",
+      "action.entity.bridge-sign.read.success": "TOLL: FOOD. Also, no splashing.",
+      "action.entity.bridge-sign.read.failure": "Nothing happens.",
+      "action.entity.hermit.talk.title": "Talk",
+      "action.entity.hermit.talk.description": "Ask the hermit about the river.",
+      "action.entity.hermit.talk.success": "The hermit gestures at herbs, bowls, fish, and fire.",
+      "action.entity.hermit.talk.failure": "Nothing happens.",
+      "action.entity.herb-patch.gather.title": "Gather",
+      "action.entity.herb-patch.gather.description": "Pick a sleepy-smelling herb.",
+      "action.entity.herb-patch.gather.success": "You pick a river herb.",
+      "action.entity.herb-patch.gather.failure": "Nothing happens.",
+      "action.entity.cracked-bowl.take.title": "Take",
+      "action.entity.cracked-bowl.take.description": "Take the cracked bowl.",
+      "action.entity.cracked-bowl.take.success": "It leaks slowly, which is good enough.",
+      "action.entity.cracked-bowl.take.failure": "Nothing happens.",
+      "action.entity.river.use-draught.title": "Use Draught",
+      "action.entity.river.use-draught.description": "Pour the draught into the slow eddy.",
+      "action.entity.river.use-draught.success": "The bridge grows quiet. Very quiet.",
+      "action.entity.river.use-draught.failure": "Nothing happens.",
+      "action.entity.river.examine.title": "Examine",
+      "action.entity.river.examine.description": "Watch the river.",
+      "action.entity.river.examine.success": "The current swirls under the bridge where a cupful might carry far.",
+      "action.entity.river.examine.failure": "Nothing happens.",
+      "action.entity.gommi.pay-toll.title": "Pay Toll",
+      "action.entity.gommi.pay-toll.description": "Offer cooked food at the bridge.",
+      "action.entity.gommi.pay-toll.success": "Gommi accepts the toll and waves you across.",
+      "action.entity.gommi.pay-toll.failure": "Nothing happens.",
+      "action.entity.gommi.examine.title": "Examine",
+      "action.entity.gommi.examine.description": "Look under the bridge.",
+      "action.entity.gommi.examine.success": "Gommi sniffs the air and watches every snack.",
+      "action.entity.gommi.examine.failure": "Nothing happens.",
+      "action.entity.loose-plank.examine.title": "Examine",
+      "action.entity.loose-plank.examine.description": "Check the loose plank.",
+      "action.entity.loose-plank.examine.success": "It wiggles. Not enough to cross, enough to notice.",
+      "action.entity.loose-plank.examine.failure": "Nothing happens.",
+      "action.travel-house-to-beach.title": "Travel to Shell Beach",
+      "action.travel-house-to-beach.description": "Travel to Shell Beach",
+      "action.travel-house-to-beach.success": "You arrive.",
+      "action.travel-house-to-beach.failure": "You lose the path.",
+      "action.travel-beach-to-house.title": "Travel to Guide House",
+      "action.travel-beach-to-house.description": "Travel to Guide House",
+      "action.travel-beach-to-house.success": "You arrive.",
+      "action.travel-beach-to-house.failure": "You lose the path.",
+      "action.travel-beach-to-hermit-grove.title": "Travel to Hermit Grove",
+      "action.travel-beach-to-hermit-grove.description": "Travel to Hermit Grove",
+      "action.travel-beach-to-hermit-grove.success": "You arrive.",
+      "action.travel-beach-to-hermit-grove.failure": "You lose the path.",
+      "action.travel-hermit-grove-to-beach.title": "Travel to Shell Beach",
+      "action.travel-hermit-grove-to-beach.description": "Travel to Shell Beach",
+      "action.travel-hermit-grove-to-beach.success": "You arrive.",
+      "action.travel-hermit-grove-to-beach.failure": "You lose the path.",
+      "action.travel-beach-to-bridge.title": "Travel to Bridge Toll",
+      "action.travel-beach-to-bridge.description": "Travel to Bridge Toll",
+      "action.travel-beach-to-bridge.success": "You arrive.",
+      "action.travel-beach-to-bridge.failure": "You lose the path.",
+      "action.travel-bridge-to-beach.title": "Travel to Shell Beach",
+      "action.travel-bridge-to-beach.description": "Travel to Shell Beach",
+      "action.travel-bridge-to-beach.success": "You arrive.",
+      "action.travel-bridge-to-beach.failure": "You lose the path.",
+      "action.travel-bridge-to-bank.title": "Travel to Island Bank",
+      "action.travel-bridge-to-bank.description": "Travel to Island Bank",
+      "action.travel-bridge-to-bank.success": "You arrive.",
+      "action.travel-bridge-to-bank.failure": "You lose the path.",
+      "dialogue.brianna.start": "Net from the crate, shrimp from the shoals, heat from the fire. Eat one if you get scratched.",
+      "dialogue.hermit.start": "Trolls sleep. Rivers carry. Bitter things become useful when cooked.",
+      "chat.entity.shoals.examine": "Shrimp dart away from your shadow.",
+      "chat.entity.supply-crate.search": "A net and bowl sit on top, practically accusing you of missing them.",
+      "chat.entity.bridge-sign.read": "The word FOOD is carved deeper than the rest.",
+      "chat.entity.cracked-bowl.take": "The bowl leaves a damp ring behind.",
+      "chat.entity.river.use-draught": "Gommi slumps under the bridge, snoring like a sawmill.",
+      "chat.entity.river.examine": "A slow eddy curls under Gommi's bridge.",
+      "chat.entity.gommi.pay-toll": "Gommi eats first and negotiates never.",
+      "chat.entity.gommi.examine": "Big hands. Bigger appetite.",
+      "chat.entity.loose-plank.examine": "A tempting plank, but not a bridge by itself."
+    }
+  }
+}

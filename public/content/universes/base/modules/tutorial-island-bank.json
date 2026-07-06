@@ -1,0 +1,135 @@
+{
+  "$schema": "https://universalis-rpg.local/schema/module.schema.json",
+  "id": "tutorial-island-bank",
+  "version": "1.0.0",
+  "universe": "base",
+  "author": "UniversalisRPG",
+  "game_version": "1.0",
+  "dependencies": [
+    "tutorial-island-survival"
+  ],
+  "data": {
+    "locations": [
+      {
+        "id": "tutorial-bank",
+        "position": {
+          "x": 520,
+          "y": 0
+        },
+        "entities": [
+          "bank-teller",
+          "vault-counter",
+          "trapdoor"
+        ],
+        "actions": [],
+        "tags": [
+          "tutorial",
+          "settlement"
+        ]
+      }
+    ],
+    "entities": [
+      {
+        "id": "bank-teller",
+        "actions": [
+          {
+            "id": "talk",
+            "instant": true,
+            "rewards": [],
+            "results": [
+              {
+                "kind": "dialogue",
+                "dialogueId": "bank-teller"
+              },
+              {
+                "kind": "flag",
+                "flagId": "tutorial.bank-visited",
+                "value": true
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "vault-counter",
+        "actions": [
+          {
+            "id": "withdraw",
+            "instant": true,
+            "rewards": [],
+            "results": [
+              {
+                "kind": "item",
+                "itemId": "gold",
+                "amount": 25
+              },
+              {
+                "kind": "flag",
+                "flagId": "tutorial.bank-visited",
+                "value": true
+              },
+              {
+                "kind": "chat",
+                "messageKey": "chat.entity.vault-counter.withdraw"
+              }
+            ],
+            "maxCompletions": 1
+          }
+        ]
+      },
+      {
+        "id": "trapdoor",
+        "actions": [
+          {
+            "id": "descend",
+            "instant": true,
+            "rewards": [],
+            "results": [
+              {
+                "kind": "relocate",
+                "locationId": "tutorial-mine"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "dialogues": [
+      {
+        "id": "bank-teller",
+        "startNodeId": "start",
+        "nodes": [
+          {
+            "id": "start",
+            "speakerId": "bank-teller",
+            "textKey": "dialogue.bank-teller.start"
+          }
+        ]
+      }
+    ]
+  },
+  "locale": {
+    "en": {
+      "location.tutorial-bank.title": "Island Bank",
+      "location.tutorial-bank.description": "A tidy counter, a ledger, and an open trapdoor share the room.",
+      "location.tutorial-bank.exhausted": "The teller returns to sorting coins.",
+      "entity.bank-teller.title": "Bank Teller",
+      "entity.vault-counter.title": "Vault Counter",
+      "entity.trapdoor.title": "Trapdoor",
+      "action.entity.bank-teller.talk.title": "Talk",
+      "action.entity.bank-teller.talk.description": "Ask about banks.",
+      "action.entity.bank-teller.talk.success": "The teller says banks share storage across the world. Handy.",
+      "action.entity.bank-teller.talk.failure": "Nothing happens.",
+      "action.entity.vault-counter.withdraw.title": "Withdraw Coins",
+      "action.entity.vault-counter.withdraw.description": "Check the starting account.",
+      "action.entity.vault-counter.withdraw.success": "You withdraw the coins kept for new travelers.",
+      "action.entity.vault-counter.withdraw.failure": "Nothing happens.",
+      "action.entity.trapdoor.descend.title": "Descend",
+      "action.entity.trapdoor.descend.description": "Climb down the open trapdoor.",
+      "action.entity.trapdoor.descend.success": "You climb into the cave below.",
+      "action.entity.trapdoor.descend.failure": "Nothing happens.",
+      "dialogue.bank-teller.start": "Inventory is tight. Banks are not. This account has a few coins for the road.",
+      "chat.entity.vault-counter.withdraw": "The ledger already had your name penciled in."
+    }
+  }
+}

@@ -1,0 +1,295 @@
+{
+  "$schema": "https://universalis-rpg.local/schema/module.schema.json",
+  "id": "tutorial-island-guide-house",
+  "version": "1.0.0",
+  "universe": "base",
+  "author": "UniversalisRPG",
+  "game_version": "1.0",
+  "dependencies": [
+    "tutorial-island-foundation"
+  ],
+  "data": {
+    "locations": [
+      {
+        "id": "tutorial-guide-house",
+        "position": {
+          "x": 0,
+          "y": 0
+        },
+        "entities": [
+          "miki",
+          "front-door",
+          "mirror",
+          "drawer",
+          "bookshelf"
+        ],
+        "actions": [],
+        "starting": true,
+        "tags": [
+          "tutorial",
+          "indoors"
+        ]
+      }
+    ],
+    "entities": [
+      {
+        "id": "miki",
+        "actions": [
+          {
+            "id": "talk",
+            "instant": true,
+            "rewards": [],
+            "results": [
+              {
+                "kind": "dialogue",
+                "dialogueId": "miki"
+              }
+            ]
+          },
+          {
+            "id": "examine",
+            "instant": true,
+            "rewards": [],
+            "results": [
+              {
+                "kind": "chat",
+                "messageKey": "chat.entity.miki.examine"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "front-door",
+        "actions": [
+          {
+            "id": "open",
+            "instant": true,
+            "rewards": [],
+            "results": [
+              {
+                "kind": "flag",
+                "flagId": "tutorial.miki-cleared",
+                "value": true
+              },
+              {
+                "kind": "relocate",
+                "locationId": "tutorial-beach"
+              }
+            ],
+            "visibleWhen": {
+              "kind": "state-variable",
+              "variable": "flag:tutorial.miki-cleared",
+              "comparison": "equal",
+              "value": true
+            }
+          },
+          {
+            "id": "pick",
+            "instant": true,
+            "rewards": [],
+            "results": [
+              {
+                "kind": "skill-xp",
+                "skillId": "thieving",
+                "amount": 10
+              },
+              {
+                "kind": "flag",
+                "flagId": "tutorial.miki-cleared",
+                "value": true
+              },
+              {
+                "kind": "relocate",
+                "locationId": "tutorial-beach"
+              }
+            ],
+            "visibleWhen": {
+              "kind": "not",
+              "condition": {
+                "kind": "state-variable",
+                "variable": "flag:tutorial.miki-cleared",
+                "comparison": "equal",
+                "value": true
+              }
+            },
+            "requirements": {
+              "kind": "state-variable",
+              "variable": "item:lockpick",
+              "comparison": "greater-than",
+              "value": 0
+            }
+          },
+          {
+            "id": "examine",
+            "instant": true,
+            "rewards": [],
+            "results": [
+              {
+                "kind": "chat",
+                "messageKey": "chat.entity.front-door.examine"
+              }
+            ],
+            "visibleWhen": {
+              "kind": "not",
+              "condition": {
+                "kind": "state-variable",
+                "variable": "flag:tutorial.miki-cleared",
+                "comparison": "equal",
+                "value": true
+              }
+            }
+          }
+        ]
+      },
+      {
+        "id": "mirror",
+        "actions": [
+          {
+            "id": "examine",
+            "instant": true,
+            "rewards": [],
+            "results": [
+              {
+                "kind": "chat",
+                "messageKey": "chat.entity.mirror.examine"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "drawer",
+        "actions": [
+          {
+            "id": "search",
+            "instant": true,
+            "rewards": [],
+            "results": [
+              {
+                "kind": "item",
+                "itemId": "gold",
+                "amount": 5
+              },
+              {
+                "kind": "item",
+                "itemId": "lockpick",
+                "amount": 1
+              },
+              {
+                "kind": "item",
+                "itemId": "guide-book",
+                "amount": 1
+              },
+              {
+                "kind": "chat",
+                "messageKey": "chat.entity.drawer.search"
+              }
+            ],
+            "maxCompletions": 1
+          }
+        ]
+      },
+      {
+        "id": "bookshelf",
+        "actions": [
+          {
+            "id": "read",
+            "instant": true,
+            "rewards": [],
+            "results": [
+              {
+                "kind": "chat",
+                "messageKey": "chat.entity.bookshelf.read"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "dialogues": [
+      {
+        "id": "miki",
+        "startNodeId": "start",
+        "nodes": [
+          {
+            "id": "start",
+            "speakerId": "miki",
+            "textKey": "dialogue.miki.start",
+            "options": [
+              {
+                "id": "ready",
+                "labelKey": "dialogue.miki.option.ready",
+                "results": [
+                  {
+                    "kind": "flag",
+                    "flagId": "tutorial.miki-cleared",
+                    "value": true
+                  }
+                ],
+                "gotoNodeId": "ready"
+              }
+            ]
+          },
+          {
+            "id": "ready",
+            "speakerId": "miki",
+            "textKey": "dialogue.miki.ready"
+          }
+        ]
+      }
+    ]
+  },
+  "locale": {
+    "en": {
+      "location.tutorial-guide-house.title": "Guide House",
+      "location.tutorial-guide-house.description": "A small room with a locked front door and too many helpful objects.",
+      "location.tutorial-guide-house.exhausted": "The room is quiet now.",
+      "entity.miki.title": "Miki",
+      "entity.front-door.title": "Front Door",
+      "entity.mirror.title": "Mirror",
+      "entity.drawer.title": "Drawer",
+      "entity.bookshelf.title": "Bookshelf",
+      "action.entity.miki.talk.title": "Talk",
+      "action.entity.miki.talk.description": "Ask Miki about the island.",
+      "action.entity.miki.talk.success": "Miki points out the tabs, settings, and short quest hints.",
+      "action.entity.miki.talk.failure": "Nothing happens.",
+      "action.entity.miki.examine.title": "Examine",
+      "action.entity.miki.examine.description": "Look at Miki.",
+      "action.entity.miki.examine.success": "Miki watches the door more than you.",
+      "action.entity.miki.examine.failure": "Nothing happens.",
+      "action.entity.front-door.open.title": "Open",
+      "action.entity.front-door.open.description": "Try the front door.",
+      "action.entity.front-door.open.success": "The door opens onto salt air.",
+      "action.entity.front-door.open.failure": "Nothing happens.",
+      "action.entity.front-door.pick.title": "Pick Lock",
+      "action.entity.front-door.pick.description": "Worry the lock with the lockpick.",
+      "action.entity.front-door.pick.success": "The lock gives with a soft click.",
+      "action.entity.front-door.pick.failure": "Nothing happens.",
+      "action.entity.front-door.examine.title": "Examine",
+      "action.entity.front-door.examine.description": "Check the front door.",
+      "action.entity.front-door.examine.success": "The latch is locked, but the keyhole is scratched.",
+      "action.entity.front-door.examine.failure": "Nothing happens.",
+      "action.entity.mirror.examine.title": "Examine",
+      "action.entity.mirror.examine.description": "Study the mirror.",
+      "action.entity.mirror.examine.success": "The mirror is polished enough to rethink your look.",
+      "action.entity.mirror.examine.failure": "Nothing happens.",
+      "action.entity.drawer.search.title": "Search",
+      "action.entity.drawer.search.description": "Search the small drawer.",
+      "action.entity.drawer.search.success": "You find coins, a lockpick, and a tiny guide book.",
+      "action.entity.drawer.search.failure": "Nothing happens.",
+      "action.entity.bookshelf.read.title": "Read",
+      "action.entity.bookshelf.read.description": "Skim the thin island primer.",
+      "action.entity.bookshelf.read.success": "Quest colors: red starts, yellow reminds, green finishes.",
+      "action.entity.bookshelf.read.failure": "Nothing happens.",
+      "dialogue.miki.start": "Welcome. Keep your map open, poke what looks useful, and ignore any lecture that gets too long.",
+      "dialogue.miki.option.ready": "I can find my way.",
+      "dialogue.miki.ready": "Good. The door is open. Curiosity is allowed here.",
+      "chat.entity.miki.examine": "A guide with one eye on the door.",
+      "chat.entity.front-door.examine": "Locked. The keyhole is scratched by previous impatience.",
+      "chat.entity.mirror.examine": "You can change your appearance later; for now, you look ready enough.",
+      "chat.entity.drawer.search": "The drawer was not locked. That feels deliberate.",
+      "chat.entity.bookshelf.read": "The guide book has diagrams instead of paragraphs. Merciful."
+    }
+  }
+}

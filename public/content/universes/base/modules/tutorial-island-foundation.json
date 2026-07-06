@@ -1,0 +1,177 @@
+{
+  "$schema": "https://universalis-rpg.local/schema/module.schema.json",
+  "id": "tutorial-island-foundation",
+  "version": "1.0.0",
+  "universe": "base",
+  "author": "UniversalisRPG",
+  "game_version": "1.0",
+  "dependencies": [
+    "tutorial-island-reset"
+  ],
+  "data": {
+    "stats": [
+      {
+        "id": "fishing",
+        "base": 6
+      },
+      {
+        "id": "cooking",
+        "base": 6
+      },
+      {
+        "id": "thieving",
+        "base": 6
+      },
+      {
+        "id": "smithing",
+        "base": 6
+      }
+    ],
+    "skills": [
+      {
+        "id": "fishing",
+        "maxLevel": 100,
+        "statId": "fishing"
+      },
+      {
+        "id": "cooking",
+        "maxLevel": 100,
+        "statId": "cooking"
+      },
+      {
+        "id": "thieving",
+        "maxLevel": 100,
+        "statId": "thieving"
+      },
+      {
+        "id": "smithing",
+        "maxLevel": 100,
+        "statId": "smithing"
+      }
+    ],
+    "items": [
+      {
+        "id": "gold"
+      },
+      {
+        "id": "lockpick"
+      },
+      {
+        "id": "guide-book"
+      },
+      {
+        "id": "small-net"
+      },
+      {
+        "id": "raw-shrimp"
+      },
+      {
+        "id": "cooked-shrimp"
+      },
+      {
+        "id": "herb"
+      },
+      {
+        "id": "bowl"
+      },
+      {
+        "id": "uncooked-sleeping-draught"
+      },
+      {
+        "id": "sleeping-draught"
+      },
+      {
+        "id": "copper-ore"
+      },
+      {
+        "id": "tin-ore"
+      },
+      {
+        "id": "bronze-bar"
+      },
+      {
+        "id": "iron-dagger",
+        "tags": "mainhand (1 attack), +5 attack"
+      }
+    ],
+    "flags": [
+      {
+        "id": "tutorial.miki-cleared",
+        "initialValue": false
+      },
+      {
+        "id": "tutorial.bridge-open",
+        "initialValue": false
+      },
+      {
+        "id": "tutorial.gommi-asleep",
+        "initialValue": false
+      },
+      {
+        "id": "tutorial.bank-visited",
+        "initialValue": false
+      },
+      {
+        "id": "tutorial.mining-cleared",
+        "initialValue": false
+      },
+      {
+        "id": "tutorial.combat-cleared",
+        "initialValue": false
+      },
+      {
+        "id": "tutorial.spawn-mainland",
+        "initialValue": false
+      }
+    ]
+  },
+  "locale": {
+    "en": {
+      "collection.category.enemies.title": "Enemies",
+      "skill.fishing.title": "Fishing",
+      "skill.fishing.description": "Catching useful food from water.",
+      "skill.cooking.title": "Cooking",
+      "skill.cooking.description": "Turning raw supplies into safer meals.",
+      "skill.thieving.title": "Thieving",
+      "skill.thieving.description": "Opening what was meant to stay closed.",
+      "skill.smithing.title": "Smithing",
+      "skill.smithing.description": "Smelting metal and shaping gear.",
+      "stat.fishing.title": "Fishing",
+      "stat.fishing.description": "Power applied to fishing actions.",
+      "stat.cooking.title": "Cooking",
+      "stat.cooking.description": "Power applied to cooking actions.",
+      "stat.thieving.title": "Thieving",
+      "stat.thieving.description": "Power applied to locks and sleight of hand.",
+      "stat.smithing.title": "Smithing",
+      "stat.smithing.description": "Power applied to smelting and forging.",
+      "item.gold.title": "Gold",
+      "item.gold.description": "Small bright coins.",
+      "item.lockpick.title": "Lockpick",
+      "item.lockpick.description": "A bent bit of metal for impatient doors.",
+      "item.guide-book.title": "Guide Book",
+      "item.guide-book.description": "A short book with diagrams of tabs, settings, and quest colors.",
+      "item.small-net.title": "Small Net",
+      "item.small-net.description": "A net suited to shallow shoals.",
+      "item.raw-shrimp.title": "Raw Shrimp",
+      "item.raw-shrimp.description": "Fresh and not yet dinner.",
+      "item.cooked-shrimp.title": "Cooked Shrimp",
+      "item.cooked-shrimp.description": "A simple meal that keeps you going.",
+      "item.herb.title": "River Herb",
+      "item.herb.description": "A sleepy-smelling green herb.",
+      "item.bowl.title": "Bowl",
+      "item.bowl.description": "Cracked, but still useful.",
+      "item.uncooked-sleeping-draught.title": "Uncooked Sleeping Draught",
+      "item.uncooked-sleeping-draught.description": "A murky mix that needs heat.",
+      "item.sleeping-draught.title": "Sleeping Draught",
+      "item.sleeping-draught.description": "A warm draught with a suspiciously calm smell.",
+      "item.copper-ore.title": "Copper Ore",
+      "item.copper-ore.description": "A soft reddish ore.",
+      "item.tin-ore.title": "Tin Ore",
+      "item.tin-ore.description": "A pale chunk of tin-bearing stone.",
+      "item.bronze-bar.title": "Bronze Bar",
+      "item.bronze-bar.description": "Freshly smelted bronze.",
+      "item.iron-dagger.title": "Iron Dagger",
+      "item.iron-dagger.description": "A sharp shortcut from Denzel's chest."
+    }
+  }
+}

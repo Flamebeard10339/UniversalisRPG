@@ -4,6 +4,12 @@ import { readFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 
+if (process.argv[2] === 'tutorial-island') {
+  const { runTutorialIslandCli } = await import('./tutorial-island-cli.mjs');
+  await runTutorialIslandCli(process.argv.slice(3));
+  process.exit(0);
+}
+
 const baseUrl = process.env.BASE_URL ?? 'http://127.0.0.1:5173/';
 const executablePath = process.env.EDGE_PATH ?? 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe';
 const preferencePrefix = 'CapacitorStorage.';

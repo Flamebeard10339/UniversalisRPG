@@ -1,0 +1,345 @@
+{
+  "$schema": "https://universalis-rpg.local/schema/module.schema.json",
+  "id": "tutorial-island-combat",
+  "version": "1.0.0",
+  "universe": "base",
+  "author": "UniversalisRPG",
+  "game_version": "1.0",
+  "dependencies": [
+    "tutorial-island-mining"
+  ],
+  "data": {
+    "interactionTypes": [
+      {
+        "id": "training-combat",
+        "sourceStatId": "attack",
+        "targetStatId": "defense",
+        "targetPlayerHealth": true
+      }
+    ],
+    "locations": [
+      {
+        "id": "tutorial-rat-cage",
+        "position": {
+          "x": 840,
+          "y": 140
+        },
+        "entities": [
+          "orloth",
+          "giant-rat",
+          "rat-cage-door",
+          "portal"
+        ],
+        "actions": [],
+        "tags": [
+          "tutorial",
+          "cave"
+        ]
+      },
+      {
+        "id": "mainland-arrival",
+        "position": {
+          "x": 1040,
+          "y": 120
+        },
+        "entities": [
+          "mainland-greeter"
+        ],
+        "actions": [],
+        "tags": [
+          "mainland"
+        ]
+      }
+    ],
+    "entities": [
+      {
+        "id": "orloth",
+        "actions": [
+          {
+            "id": "talk",
+            "instant": true,
+            "rewards": [],
+            "results": [
+              {
+                "kind": "dialogue",
+                "dialogueId": "orloth"
+              }
+            ]
+          },
+          {
+            "id": "fight",
+            "instant": true,
+            "rewards": [],
+            "results": [
+              {
+                "kind": "resource",
+                "resourceId": "health",
+                "amount": -9
+              },
+              {
+                "kind": "skill-xp",
+                "skillId": "attack",
+                "amount": 60
+              },
+              {
+                "kind": "skill-xp",
+                "skillId": "defense",
+                "amount": 30
+              },
+              {
+                "kind": "flag",
+                "flagId": "tutorial.combat-cleared",
+                "value": true
+              },
+              {
+                "kind": "chat",
+                "messageKey": "chat.entity.orloth.fight"
+              }
+            ],
+            "visibleWhen": {
+              "kind": "not",
+              "condition": {
+                "kind": "state-variable",
+                "variable": "flag:tutorial.combat-cleared",
+                "comparison": "equal",
+                "value": true
+              }
+            }
+          }
+        ]
+      },
+      {
+        "id": "giant-rat",
+        "actions": [
+          {
+            "id": "fight",
+            "durationSeconds": 1,
+            "rewards": [
+              {
+                "kind": "skillXp",
+                "skillId": "attack",
+                "amount": 20
+              },
+              {
+                "kind": "skillXp",
+                "skillId": "defense",
+                "amount": 10
+              }
+            ],
+            "interactionTypeId": "training-combat",
+            "enemy": {
+              "interactionTypeId": "training-combat",
+              "stats": {
+                "attack": 2,
+                "defense": 1,
+                "health": 5,
+                "rate": 10
+              },
+              "showHealthBar": true,
+              "rewards": [
+                {
+                  "kind": "skillXp",
+                  "skillId": "attack",
+                  "amount": 20
+                }
+              ]
+            },
+            "results": [
+              {
+                "kind": "flag",
+                "flagId": "tutorial.combat-cleared",
+                "value": true
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "rat-cage-door",
+        "actions": [
+          {
+            "id": "unlock",
+            "instant": true,
+            "rewards": [],
+            "results": [
+              {
+                "kind": "chat",
+                "messageKey": "chat.entity.rat-cage-door.unlock"
+              }
+            ],
+            "requirements": {
+              "kind": "state-variable",
+              "variable": "item:lockpick",
+              "comparison": "greater-than",
+              "value": 0
+            },
+            "visibleWhen": {
+              "kind": "state-variable",
+              "variable": "flag:tutorial.combat-cleared",
+              "comparison": "equal",
+              "value": true
+            }
+          }
+        ]
+      },
+      {
+        "id": "portal",
+        "actions": [
+          {
+            "id": "step-through",
+            "instant": true,
+            "rewards": [],
+            "results": [
+              {
+                "kind": "flag",
+                "flagId": "tutorial.spawn-mainland",
+                "value": true
+              },
+              {
+                "kind": "relocate",
+                "locationId": "mainland-arrival"
+              }
+            ],
+            "visibleWhen": {
+              "kind": "any",
+              "conditions": [
+                {
+                  "kind": "state-variable",
+                  "variable": "flag:tutorial.combat-cleared",
+                  "comparison": "equal",
+                  "value": true
+                },
+                {
+                  "kind": "state-variable",
+                  "variable": "action-completions:entity.giant-rat.fight",
+                  "comparison": "greater-than",
+                  "value": 0
+                }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "mainland-greeter",
+        "actions": [
+          {
+            "id": "talk",
+            "instant": true,
+            "rewards": [],
+            "results": [
+              {
+                "kind": "dialogue",
+                "dialogueId": "mainland-greeter"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "dialogues": [
+      {
+        "id": "orloth",
+        "startNodeId": "start",
+        "nodes": [
+          {
+            "id": "start",
+            "speakerId": "orloth",
+            "textKey": "dialogue.orloth.start"
+          }
+        ]
+      },
+      {
+        "id": "mainland-greeter",
+        "startNodeId": "start",
+        "nodes": [
+          {
+            "id": "start",
+            "speakerId": "mainland-greeter",
+            "textKey": "dialogue.mainland-greeter.start"
+          }
+        ]
+      }
+    ]
+  },
+  "data-updates": {
+    "patches": [
+      {
+        "targetModId": "tutorial-island-mining",
+        "objectType": "entities",
+        "objectId": "forge-table",
+        "ops": [
+          {
+            "op": "add",
+            "path": "/actions/-",
+            "value": {
+              "id": "continue",
+              "instant": true,
+              "rewards": [],
+              "results": [
+                {
+                  "kind": "relocate",
+                  "locationId": "tutorial-rat-cage"
+                }
+              ]
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "locale": {
+    "en": {
+      "location.tutorial-rat-cage.title": "Combat Cage",
+      "location.tutorial-rat-cage.description": "A rat cage, a portal, and a broad-shouldered instructor wait underground.",
+      "location.tutorial-rat-cage.exhausted": "The cage is still.",
+      "location.mainland-arrival.title": "Mainland Pier",
+      "location.mainland-arrival.description": "Open roads begin beyond a salt-stained pier.",
+      "location.mainland-arrival.exhausted": "The pier creaks gently.",
+      "entity.orloth.title": "Orloth",
+      "entity.giant-rat.title": "Giant Rat",
+      "entity.rat-cage-door.title": "Rat Cage Door",
+      "entity.portal.title": "Mainland Portal",
+      "entity.mainland-greeter.title": "Dock Greeter",
+      "action.entity.orloth.talk.title": "Talk",
+      "action.entity.orloth.talk.description": "Ask about combat.",
+      "action.entity.orloth.talk.success": "Orloth says to equip a blade and fight the rat.",
+      "action.entity.orloth.talk.failure": "Nothing happens.",
+      "action.entity.orloth.fight.title": "Fight",
+      "action.entity.orloth.fight.description": "Take a swing at Orloth.",
+      "action.entity.orloth.fight.success": "Orloth laughs, trains you hard, and locks the empty cage.",
+      "action.entity.orloth.fight.failure": "Nothing happens.",
+      "action.entity.giant-rat.fight.title": "Fight",
+      "action.entity.giant-rat.fight.description": "Fight the training rat.",
+      "action.entity.giant-rat.fight.success": "You defeat the rat.",
+      "action.entity.giant-rat.fight.failure": "Nothing happens.",
+      "action.entity.rat-cage-door.unlock.title": "Unlock",
+      "action.entity.rat-cage-door.unlock.description": "Unlock the rat cage.",
+      "action.entity.rat-cage-door.unlock.success": "The cage opens. Orloth is inside, disappointed.",
+      "action.entity.rat-cage-door.unlock.failure": "Nothing happens.",
+      "action.entity.portal.step-through.title": "Step Through",
+      "action.entity.portal.step-through.description": "Leave Tutorial Island.",
+      "action.entity.portal.step-through.success": "The portal drops you on the mainland.",
+      "action.entity.portal.step-through.failure": "Nothing happens.",
+      "action.entity.mainland-greeter.talk.title": "Talk",
+      "action.entity.mainland-greeter.talk.description": "Talk to the dock greeter.",
+      "action.entity.mainland-greeter.talk.success": "Thanks for playing. The rest of the world is next.",
+      "action.entity.mainland-greeter.talk.failure": "Nothing happens.",
+      "dialogue.orloth.start": "Weapons go in equipment. Rats go in cages. Heroes go through portals.",
+      "dialogue.mainland-greeter.start": "Thanks for playing Tutorial Island. Go make trouble somewhere larger.",
+      "interaction.training-combat.title": "Training Combat",
+      "interaction.training-combat.player.hit": "You hit the {target}.",
+      "interaction.training-combat.player.miss": "You miss the {target}.",
+      "interaction.training-combat.player.kill": "You defeat the {target}.",
+      "interaction.training-combat.entity.hit": "The {source} bites you.",
+      "interaction.training-combat.entity.miss": "The {source} misses you.",
+      "interaction.training-combat.entity.kill": "The {source} drops you.",
+      "action.entity.forge-table.continue.title": "Continue",
+      "action.entity.forge-table.continue.description": "Follow the cave toward voices.",
+      "action.entity.forge-table.continue.success": "You reach the combat cage.",
+      "action.entity.forge-table.continue.failure": "The tunnel echoes.",
+      "chat.entity.orloth.fight": "Orloth approves. Your health does not.",
+      "chat.entity.rat-cage-door.unlock": "The cage is empty except for Orloth, who is somehow already disappointed."
+    }
+  }
+}

@@ -237,7 +237,7 @@ describe('loader', () => {
     expect(result.enabledModuleIds).toContain('base-core');
     expect(result.enabledModuleIds).toContain('wayside-supplies');
     expect(result.enabledModuleIds).not.toContain('local-contribution');
-    expect(result.bundle.locations.some((location) => location.id === 'crossroads')).toBe(true);
+    expect(result.bundle.locations.some((location) => location.id === 'tutorial-guide-house')).toBe(true);
     expect(result.bundle.locations.some((location) => location.id === 'bad-camp')).toBe(false);
     expect(result.issues).toContainEqual(expect.objectContaining({
       message: 'validation.moduleConflictDisabled',
@@ -250,7 +250,7 @@ describe('loader', () => {
     )).toBe(false);
   });
 
-  it('does not warn for inherited base-core location localization in a local overlay', async () => {
+  it('does not warn for inherited packaged location localization in a local overlay', async () => {
     installPublicContentFetch();
 
     const bundle = await loadUniverse('base');
@@ -263,9 +263,9 @@ describe('loader', () => {
       'data-updates': [
         {
           type: 'location',
-          id: 'crossroads',
+          id: 'tutorial-guide-house',
           position: { x: 10 },
-          entities: ['goblin'],
+          entities: ['miki'],
         },
       ],
     };
@@ -275,9 +275,9 @@ describe('loader', () => {
     const localContributionIssues = result.issues.filter((issue) => issue.path.startsWith('modules.local-contribution'));
 
     expect(result.enabledModuleIds).toContain('local-contribution');
-    expect(result.bundle.locations.find((location) => location.id === 'crossroads')?.position).toEqual({ x: 10, y: 80 });
+    expect(result.bundle.locations.find((location) => location.id === 'tutorial-guide-house')?.position).toEqual({ x: 10, y: 0 });
     expect(localContributionIssues.some((issue) =>
-      issue.path.startsWith('modules.local-contribution.locale.en.location.crossroads'),
+      issue.path.startsWith('modules.local-contribution.locale.en.location.tutorial-guide-house'),
     )).toBe(false);
   });
 });

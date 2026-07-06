@@ -1,0 +1,401 @@
+{
+  "$schema": "https://universalis-rpg.local/schema/module.schema.json",
+  "id": "tutorial-island-mining",
+  "version": "1.0.0",
+  "universe": "base",
+  "author": "UniversalisRPG",
+  "game_version": "1.0",
+  "dependencies": [
+    "tutorial-island-bank"
+  ],
+  "data": {
+    "locations": [
+      {
+        "id": "tutorial-mine",
+        "position": {
+          "x": 520,
+          "y": 140
+        },
+        "entities": [
+          "denzel",
+          "copper-rock",
+          "tin-rock",
+          "locked-chest",
+          "mine-tunnel"
+        ],
+        "actions": [],
+        "tags": [
+          "tutorial",
+          "cave"
+        ]
+      },
+      {
+        "id": "tutorial-forge",
+        "position": {
+          "x": 680,
+          "y": 140
+        },
+        "entities": [
+          "furnace",
+          "anvil",
+          "forge-table"
+        ],
+        "actions": [],
+        "tags": [
+          "tutorial",
+          "cave"
+        ]
+      }
+    ],
+    "entities": [
+      {
+        "id": "denzel",
+        "actions": [
+          {
+            "id": "talk",
+            "instant": true,
+            "rewards": [],
+            "results": [
+              {
+                "kind": "item",
+                "itemId": "bronze-pickaxe",
+                "amount": 1
+              },
+              {
+                "kind": "dialogue",
+                "dialogueId": "denzel"
+              }
+            ],
+            "maxCompletions": 1
+          },
+          {
+            "id": "examine",
+            "instant": true,
+            "rewards": [],
+            "results": [
+              {
+                "kind": "chat",
+                "messageKey": "chat.entity.denzel.examine"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "copper-rock",
+        "actions": [
+          {
+            "id": "mine",
+            "durationSeconds": 1,
+            "rewards": [
+              {
+                "kind": "item",
+                "itemId": "copper-ore",
+                "amount": 1
+              },
+              {
+                "kind": "skillXp",
+                "skillId": "mining",
+                "amount": 5
+              }
+            ],
+            "requirements": {
+              "kind": "item-tag",
+              "tag": "pickaxe"
+            }
+          }
+        ]
+      },
+      {
+        "id": "tin-rock",
+        "actions": [
+          {
+            "id": "mine",
+            "durationSeconds": 1,
+            "rewards": [
+              {
+                "kind": "item",
+                "itemId": "tin-ore",
+                "amount": 1
+              },
+              {
+                "kind": "skillXp",
+                "skillId": "mining",
+                "amount": 5
+              }
+            ],
+            "requirements": {
+              "kind": "item-tag",
+              "tag": "pickaxe"
+            }
+          }
+        ]
+      },
+      {
+        "id": "locked-chest",
+        "actions": [
+          {
+            "id": "pick",
+            "instant": true,
+            "rewards": [],
+            "results": [
+              {
+                "kind": "resource",
+                "resourceId": "health",
+                "amount": -2
+              },
+              {
+                "kind": "skill-xp",
+                "skillId": "thieving",
+                "amount": 20
+              },
+              {
+                "kind": "item",
+                "itemId": "copper-ore",
+                "amount": 1
+              },
+              {
+                "kind": "item",
+                "itemId": "tin-ore",
+                "amount": 1
+              },
+              {
+                "kind": "item",
+                "itemId": "bronze-bar",
+                "amount": 1
+              },
+              {
+                "kind": "item",
+                "itemId": "iron-dagger",
+                "amount": 1
+              },
+              {
+                "kind": "flag",
+                "flagId": "tutorial.mining-cleared",
+                "value": true
+              },
+              {
+                "kind": "chat",
+                "messageKey": "chat.entity.locked-chest.pick"
+              }
+            ],
+            "requirements": {
+              "kind": "state-variable",
+              "variable": "item:lockpick",
+              "comparison": "greater-than",
+              "value": 0
+            },
+            "maxCompletions": 1
+          },
+          {
+            "id": "examine",
+            "instant": true,
+            "rewards": [],
+            "results": [
+              {
+                "kind": "chat",
+                "messageKey": "chat.entity.locked-chest.examine"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "mine-tunnel",
+        "actions": [
+          {
+            "id": "enter-forge",
+            "instant": true,
+            "rewards": [],
+            "results": [
+              {
+                "kind": "relocate",
+                "locationId": "tutorial-forge"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "furnace",
+        "actions": [
+          {
+            "id": "smelt",
+            "durationSeconds": 1,
+            "rewards": [
+              {
+                "kind": "skillXp",
+                "skillId": "smithing",
+                "amount": 8
+              }
+            ],
+            "requirements": {
+              "kind": "all",
+              "conditions": [
+                {
+                  "kind": "state-variable",
+                  "variable": "item:copper-ore",
+                  "comparison": "greater-than",
+                  "value": 0
+                },
+                {
+                  "kind": "state-variable",
+                  "variable": "item:tin-ore",
+                  "comparison": "greater-than",
+                  "value": 0
+                }
+              ]
+            },
+            "results": [
+              {
+                "kind": "item",
+                "itemId": "copper-ore",
+                "amount": -1
+              },
+              {
+                "kind": "item",
+                "itemId": "tin-ore",
+                "amount": -1
+              },
+              {
+                "kind": "item",
+                "itemId": "bronze-bar",
+                "amount": 1
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "anvil",
+        "actions": [
+          {
+            "id": "smith-dagger",
+            "durationSeconds": 1,
+            "rewards": [
+              {
+                "kind": "skillXp",
+                "skillId": "smithing",
+                "amount": 10
+              }
+            ],
+            "requirements": {
+              "kind": "state-variable",
+              "variable": "item:bronze-bar",
+              "comparison": "greater-than",
+              "value": 0
+            },
+            "results": [
+              {
+                "kind": "item",
+                "itemId": "bronze-bar",
+                "amount": -1
+              },
+              {
+                "kind": "item",
+                "itemId": "bronze-dagger",
+                "amount": 1
+              },
+              {
+                "kind": "flag",
+                "flagId": "tutorial.mining-cleared",
+                "value": true
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "forge-table",
+        "actions": [
+          {
+            "id": "return-mine",
+            "instant": true,
+            "rewards": [],
+            "results": [
+              {
+                "kind": "relocate",
+                "locationId": "tutorial-mine"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "dialogues": [
+      {
+        "id": "denzel",
+        "startNodeId": "start",
+        "nodes": [
+          {
+            "id": "start",
+            "speakerId": "denzel",
+            "textKey": "dialogue.denzel.start"
+          }
+        ]
+      }
+    ]
+  },
+  "locale": {
+    "en": {
+      "location.tutorial-mine.title": "Training Mine",
+      "location.tutorial-mine.description": "Copper and tin glint in a cramped cave.",
+      "location.tutorial-mine.exhausted": "Dust hangs in the lamplight.",
+      "location.tutorial-forge.title": "Cave Forge",
+      "location.tutorial-forge.description": "A furnace and anvil are wedged into a hot alcove.",
+      "location.tutorial-forge.exhausted": "The forge pops and cools.",
+      "entity.denzel.title": "Denzel",
+      "entity.copper-rock.title": "Copper Rock",
+      "entity.tin-rock.title": "Tin Rock",
+      "entity.locked-chest.title": "Locked Chest",
+      "entity.mine-tunnel.title": "Mine Tunnel",
+      "entity.furnace.title": "Furnace",
+      "entity.anvil.title": "Anvil",
+      "entity.forge-table.title": "Forge Table",
+      "action.entity.denzel.talk.title": "Talk",
+      "action.entity.denzel.talk.description": "Ask about mining.",
+      "action.entity.denzel.talk.success": "Denzel gives you a pickaxe and points at the rocks.",
+      "action.entity.denzel.talk.failure": "Nothing happens.",
+      "action.entity.denzel.examine.title": "Examine",
+      "action.entity.denzel.examine.description": "Look at Denzel.",
+      "action.entity.denzel.examine.success": "He mutters about serving his sentence one tutorial at a time.",
+      "action.entity.denzel.examine.failure": "Nothing happens.",
+      "action.entity.copper-rock.mine.title": "Mine Copper",
+      "action.entity.copper-rock.mine.description": "Mine a copper rock.",
+      "action.entity.copper-rock.mine.success": "Copper ore breaks free.",
+      "action.entity.copper-rock.mine.failure": "Nothing happens.",
+      "action.entity.tin-rock.mine.title": "Mine Tin",
+      "action.entity.tin-rock.mine.description": "Mine a tin rock.",
+      "action.entity.tin-rock.mine.success": "Tin ore breaks free.",
+      "action.entity.tin-rock.mine.failure": "Nothing happens.",
+      "action.entity.locked-chest.pick.title": "Pick Lock",
+      "action.entity.locked-chest.pick.description": "Try Denzel's personal chest.",
+      "action.entity.locked-chest.pick.success": "The chest snaps open. Painfully.",
+      "action.entity.locked-chest.pick.failure": "Nothing happens.",
+      "action.entity.locked-chest.examine.title": "Examine",
+      "action.entity.locked-chest.examine.description": "Check the chest.",
+      "action.entity.locked-chest.examine.success": "A prison-issue padlock guards something better than rocks.",
+      "action.entity.locked-chest.examine.failure": "Nothing happens.",
+      "action.entity.mine-tunnel.enter-forge.title": "Enter Forge",
+      "action.entity.mine-tunnel.enter-forge.description": "Walk deeper to the forge alcove.",
+      "action.entity.mine-tunnel.enter-forge.success": "You reach the forge.",
+      "action.entity.mine-tunnel.enter-forge.failure": "Nothing happens.",
+      "action.entity.furnace.smelt.title": "Smelt Bronze",
+      "action.entity.furnace.smelt.description": "Smelt copper and tin into bronze.",
+      "action.entity.furnace.smelt.success": "A bronze bar cools in the mold.",
+      "action.entity.furnace.smelt.failure": "Nothing happens.",
+      "action.entity.anvil.smith-dagger.title": "Smith Dagger",
+      "action.entity.anvil.smith-dagger.description": "Hammer a bronze dagger.",
+      "action.entity.anvil.smith-dagger.success": "A dagger takes shape.",
+      "action.entity.anvil.smith-dagger.failure": "Nothing happens.",
+      "action.entity.forge-table.return-mine.title": "Return",
+      "action.entity.forge-table.return-mine.description": "Return to the mine chamber.",
+      "action.entity.forge-table.return-mine.success": "You return to Denzel's chamber.",
+      "action.entity.forge-table.return-mine.failure": "Nothing happens.",
+      "dialogue.denzel.start": "Copper plus tin makes bronze. Furnace first, anvil second. The chest is private.",
+      "chat.entity.denzel.examine": "Denzel keeps checking the chest, then pretending he did not.",
+      "chat.entity.locked-chest.pick": "The lock bites your knuckles, then gives up its contents.",
+      "chat.entity.locked-chest.examine": "The lock is better than the chest."
+    }
+  }
+}
