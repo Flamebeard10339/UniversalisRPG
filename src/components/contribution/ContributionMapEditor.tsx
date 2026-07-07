@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import ReactFlow, {
   Background,
   Controls,
+  Handle,
+  Position,
   applyNodeChanges,
   type Edge,
   type EdgeProps,
@@ -114,7 +116,12 @@ const locationNodeTypes = {
           : 'border-slate-600 bg-slate-900 text-slate-100 hover:border-cyan-500'
       }`}
     >
+      {/* Travel edges route via manually computed data.sourcePoint/targetPoint, not React Flow's handle
+          geometry, but a source/target Handle must still exist or React Flow can't resolve handle bounds
+          for this node and warns (and re-renders) continuously for every edge that touches it. */}
+      <Handle type="target" position={Position.Left} style={{ visibility: 'hidden' }} />
       <span className="text-sm font-semibold">{data.label}</span>
+      <Handle type="source" position={Position.Right} style={{ visibility: 'hidden' }} />
     </div>
   ),
 };

@@ -584,15 +584,17 @@ export const ModuleEditor = ({ bundle, draft, issues, onMoveModule, onPatch, t, 
   const [importText, setImportText] = useState('');
   const [importError, setImportError] = useState(false);
   const [dependencyText, setDependencyText] = useState('');
-  const packagedModuleIds = new Set((bundle.modules ?? []).map((module) => module.id));
   const removedModules = new Set(draft.removed?.modules ?? []);
-  const draftLocalModules = (draft.modules ?? []).filter((module) => !packagedModuleIds.has(module.id) && !removedModules.has(module.id));
+  const draftLocalModules = (draft.modules ?? []).filter((module) => !removedModules.has(module.id));
   const localIds = new Set(draftLocalModules.map((module) => module.id));
   const issueModuleIds = new Set(issues.map(moduleIdFromIssue).filter((id): id is string => Boolean(id)));
   const issuePackIds = new Set(issues.map(packIdFromIssue).filter((id): id is string => Boolean(id)));
   const allModules = useMemo(() => {
     const baseModules = bundle.modules ?? [];
-    return uniqueById([...draftLocalModules, ...baseModules]).sort((a, b) => String(a[sortMode]).localeCompare(String(b[sortMode])) || a.id.localeCompare(b.id));
+    // A local draft always wins over a packaged module with the same id: re-authoring
+    // an already-promoted module (edit source -> rebuild -> promote) must stay editable,
+    // not silently fall back to the read-only packaged copy once that id exists on disk.
+    return uniqueById([...baseModules, ...draftLocalModules]).sort((a, b) => String(a[sortMode]).localeCompare(String(b[sortMode])) || a.id.localeCompare(b.id));
   }, [bundle.modules, draftLocalModules, sortMode]);
   const modules = useMemo(() => allModules.filter((module) => !filter.trim() || JSON.stringify(module).toLowerCase().includes(filter.trim().toLowerCase())), [allModules, filter]);
   const selectedModule = allModules.find((module) => module.id === selectedModuleId) ?? modules[0] ?? null;
