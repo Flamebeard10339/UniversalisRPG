@@ -1445,8 +1445,13 @@ const completeActionWithResult = (
         interactionTypeId: getInteractionType(action, context)?.id ?? action.interactionTypeId,
       }, now);
       const hitRewards = rollAndApplyRewards(completedHitState, action.rewards, context, now, options.random);
+      const loggedHitState = appendRunLog(hitRewards.state, 'engine', 'action.complete', {
+        actionId: action.id,
+        outcome: 'hit',
+        rewards: hitRewards.rewards,
+      }, now);
       return {
-        state: restartAction(hitRewards.state, action, context, now, targetHealth, recipeId),
+        state: restartAction(loggedHitState, action, context, now, targetHealth, recipeId),
         finished: false,
         outcome: 'hit',
         damage,

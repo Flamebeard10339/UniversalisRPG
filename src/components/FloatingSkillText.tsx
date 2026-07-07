@@ -94,12 +94,12 @@ export const FloatingSkillText = ({ bundle, playState, t }: FloatingSkillTextPro
   }, [now]);
 
   return (
-    <>
+    <div className="pointer-events-none fixed bottom-28 right-8 z-20 flex max-w-[min(22rem,calc(100vw-2rem))] flex-col items-end gap-1">
       {floatingTexts.map((text) => {
         const progress = Math.min(1, Math.max(0, (now - text.createdAt) / text.durationMs));
         return (
           <div
-            className="pointer-events-none fixed bottom-28 right-8 z-20 max-w-[min(22rem,calc(100vw-2rem))] whitespace-normal text-right text-sm font-semibold text-cyan-200 drop-shadow"
+            className="whitespace-normal text-right text-sm font-semibold text-cyan-200 drop-shadow"
             key={text.id}
             style={{
               opacity: 1 - progress,
@@ -110,6 +110,6 @@ export const FloatingSkillText = ({ bundle, playState, t }: FloatingSkillTextPro
           </div>
         );
       })}
-    </>
+    </div>
   );
 };
