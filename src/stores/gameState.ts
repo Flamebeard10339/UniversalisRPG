@@ -455,24 +455,24 @@ export const useGameState = create<GameStateStore>((set, get) => ({
 
   importUniverseState: async (playState) => {
     const normalized = normalizePlayState(playState, playState.universeId, playState.currentLocationId);
-    await save(storageKey(playState.universeId), normalized);
     set((state) => ({
       states: {
         ...state.states,
         [playState.universeId]: normalized,
       },
     }));
+    await save(storageKey(playState.universeId), normalized);
   },
 
   replaceUniverseState: async (universeId, playState) => {
     const normalized = normalizePlayState({ ...playState, universeId }, universeId, playState.currentLocationId);
-    await save(storageKey(universeId), normalized);
     set((state) => ({
       states: {
         ...state.states,
         [universeId]: normalized,
       },
     }));
+    await save(storageKey(universeId), normalized);
   },
 
   resetUniverse: async (universeId, startingLocationId, context) => {
@@ -485,14 +485,14 @@ export const useGameState = create<GameStateStore>((set, get) => ({
           nextRunLogSequence: current.nextRunLogSequence,
         }, 'player', 'run.start', { reason: 'manual-reset', previousRunId: current.runId, startingLocationId })
       : initial;
-    await remove(storageKey(universeId));
-    await save(storageKey(universeId), next);
     set((state) => ({
       states: {
         ...state.states,
         [universeId]: next,
       },
     }));
+    await remove(storageKey(universeId));
+    await save(storageKey(universeId), next);
   },
 
   debugSetFlag: (universeId, flagId, value) => {
