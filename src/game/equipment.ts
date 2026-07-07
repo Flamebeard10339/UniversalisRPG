@@ -28,11 +28,13 @@ const bonusPattern = /^([+-]\d+(?:\.\d+)?)(%)?\s+([a-z][a-z-]*)$/;
 const requirementPattern = /(\d+)\s+([a-z][a-z-]*)/g;
 const durationPattern = /^(\d+)s$/;
 
-export const splitItemTags = (item: ItemDefinition | undefined) =>
-  (item?.tags ?? '')
+export const splitTagString = (tags: string | undefined) =>
+  (tags ?? '')
     .split(',')
     .map((tag) => tag.trim())
     .filter(Boolean);
+
+export const splitItemTags = (item: ItemDefinition | undefined) => splitTagString(item?.tags);
 
 export const parseItemTag = (tag: string): ParsedItemTag => {
   const duration = tag.match(durationPattern);
@@ -61,6 +63,8 @@ export const parseItemTag = (tag: string): ParsedItemTag => {
 
   return { kind: 'tag', tag };
 };
+
+export const parseTagString = (tags: string | undefined): ParsedItemTag[] => splitTagString(tags).map(parseItemTag);
 
 export const getItemTags = (item: ItemDefinition | undefined) => splitItemTags(item).map(parseItemTag);
 

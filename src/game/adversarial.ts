@@ -11,7 +11,8 @@ import {
   sampleCombatDamage,
 } from './combatBalance';
 import { getEnemyStat } from './enemies';
-import { getCharacterStatValue, getSkillTotals } from './characterStats';
+import { getCharacterStatTotals, getCharacterStatValue, getSkillTotals } from './characterStats';
+import { applyCombatTags, getEnemyCombatTags, getPlayerCombatTags } from './combatTags';
 export { getSkillTotals } from './characterStats';
 
 const DEFAULT_RATE = 1;
@@ -97,7 +98,13 @@ export const getActionDps = (
     return null;
   }
 
-  const source = getCharacterStatValue(state, context.stats ?? [], sourceStat.id, context.skills, context.items ?? [], context.manifest?.experienceCurve, context.statModifiers);
+  const totals = getCharacterStatTotals(state, context.stats ?? [], sourceStat.id, context.skills, context.items ?? [], context.manifest?.experienceCurve, context.statModifiers);
+  const source = applyCombatTags(
+    totals.base + totals.added,
+    totals.increased,
+    getPlayerCombatTags(state, context.items ?? [], 'offensiveTags'),
+    getEnemyCombatTags(enemy, 'defensiveTags'),
+  );
   return expectedCombatDamage(source, getEnemyStat(enemy, 'defense'), resolveManifestCombatBalance(context.manifest)).damage /
     (getActionDurationMs(state, action, context) / 1000);
 };
@@ -117,7 +124,13 @@ export const getEnemyAttackDps = (
   }
 
   const target = getCharacterStatValue(state, context.stats ?? [], targetStat.id, context.skills, context.items ?? [], context.manifest?.experienceCurve, context.statModifiers);
-  return expectedCombatDamage(getEnemyStat(enemy, 'attack'), target, resolveManifestCombatBalance(context.manifest), {
+  const source = applyCombatTags(
+    getEnemyStat(enemy, 'attack'),
+    0,
+    getEnemyCombatTags(enemy, 'offensiveTags'),
+    getPlayerCombatTags(state, context.items ?? [], 'defensiveTags'),
+  );
+  return expectedCombatDamage(source, target, resolveManifestCombatBalance(context.manifest), {
     armorPenetration: getEnemyStat(enemy, 'armorPenetration'),
     torpidity: getEnemyStat(enemy, 'torpidity'),
     critChance: getEnemyStat(enemy, 'critChance'),
@@ -138,7 +151,13 @@ export const sampleAdversarialDamage = (
     return null;
   }
 
-  const source = getCharacterStatValue(state, context.stats ?? [], sourceStat.id, context.skills, context.items ?? [], context.manifest?.experienceCurve, context.statModifiers);
+  const totals = getCharacterStatTotals(state, context.stats ?? [], sourceStat.id, context.skills, context.items ?? [], context.manifest?.experienceCurve, context.statModifiers);
+  const source = applyCombatTags(
+    totals.base + totals.added,
+    totals.increased,
+    getPlayerCombatTags(state, context.items ?? [], 'offensiveTags'),
+    getEnemyCombatTags(enemy, 'defensiveTags'),
+  );
   const target = getEnemyStat(enemy, 'defense');
   const sample = sampleCombatDamage(source, target, resolveManifestCombatBalance(context.manifest), {}, random);
 
@@ -166,7 +185,13 @@ export const sampleEnemyAttackDamage = (
   }
 
   const target = getCharacterStatValue(state, context.stats ?? [], targetStat.id, context.skills, context.items ?? [], context.manifest?.experienceCurve, context.statModifiers);
-  const sample = sampleCombatDamage(getEnemyStat(enemy, 'attack'), target, resolveManifestCombatBalance(context.manifest), {
+  const source = applyCombatTags(
+    getEnemyStat(enemy, 'attack'),
+    0,
+    getEnemyCombatTags(enemy, 'offensiveTags'),
+    getPlayerCombatTags(state, context.items ?? [], 'defensiveTags'),
+  );
+  const sample = sampleCombatDamage(source, target, resolveManifestCombatBalance(context.manifest), {
     armorPenetration: getEnemyStat(enemy, 'armorPenetration'),
     torpidity: getEnemyStat(enemy, 'torpidity'),
   }, random);

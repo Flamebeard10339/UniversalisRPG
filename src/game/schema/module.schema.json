@@ -879,6 +879,12 @@
         },
         "tags": {
           "type": "string"
+        },
+        "offensiveTags": {
+          "type": "string"
+        },
+        "defensiveTags": {
+          "type": "string"
         }
       }
     },
@@ -1204,6 +1210,12 @@
         },
         "showHealthBar": {
           "type": "boolean"
+        },
+        "offensiveTags": {
+          "type": "string"
+        },
+        "defensiveTags": {
+          "type": "string"
         },
         "rewards": {
           "type": "array",

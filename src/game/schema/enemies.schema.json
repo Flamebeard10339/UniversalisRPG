@@ -34,6 +34,8 @@
       "critChance": { "type": "number", "minimum": 0, "maximum": 100 },
       "critMultiplier": { "type": "number", "minimum": 1 },
       "showHealthBar": { "type": "boolean" },
+      "offensiveTags": { "type": "string" },
+      "defensiveTags": { "type": "string" },
       "rewards": {
         "type": "array",
         "items": { "$ref": "#/$defs/reward" }

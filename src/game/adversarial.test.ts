@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { getActionDps, getEnemyAttackDps } from './adversarial';
+import { getActionDps, getEnemyAttackDps, sampleAdversarialDamage, sampleEnemyAttackDamage } from './adversarial';
 import { calculateMaxCombatDamage, resolveManifestCombatBalance } from './combatBalance';
 import { getCharacterStatValue } from './characterStats';
 import { getEnemyStat, normalizeEnemyDefinition } from './enemies';
-import type { ActionResolutionContext, EnemyDefinition, GameAction } from './types';
+import type { ActionResolutionContext, EnemyDefinition, GameAction, ItemDefinition } from './types';
 import { createInitialPlayState, resolveIdleTimers, startAction } from './timers';
 
 const enemy = (patch: Partial<EnemyDefinition> & { stats?: Record<string, number> } = {}): EnemyDefinition =>
@@ -240,5 +240,34 @@ describe('adversarial actions', () => {
       'resource.health.empty',
     ]);
     expect(resolved.state.actionProgress[action.id]).toMatchObject({ elapsedMs: 0, targetHealth: null });
+  });
+});
+
+describe('combat offensive/defensive tags', () => {
+  const dagger: ItemDefinition = { id: 'stabbing-dagger', tags: 'mainhand', offensiveTags: 'stab' };
+  const armor: ItemDefinition = { id: 'chain-vest', tags: 'body', defensiveTags: '+3 slash' };
+
+  it('boosts player damage against an enemy weak to the equipped weapon\'s attack type', () => {
+    const weakEnemy = enemy({ defensiveTags: '-10 stab' });
+    const taggedContext: ActionResolutionContext = { ...context, enemies: [weakEnemy], actions: [action], items: [dagger, armor] };
+    const baseState = { ...createInitialPlayState('test', 'arena'), skillXp: { attack: 10 } };
+
+    const withoutWeapon = sampleAdversarialDamage(baseState, action, taggedContext, () => 0);
+    const withWeapon = sampleAdversarialDamage({ ...baseState, equipment: { mainhand: 'stabbing-dagger' } }, action, taggedContext, () => 0);
+
+    expect(withoutWeapon?.source).toBeCloseTo(7.07, 2);
+    expect(withWeapon?.source).toBeCloseTo(17.17, 2);
+  });
+
+  it('reduces incoming enemy damage when player armor resists the enemy\'s attack type', () => {
+    const slashingEnemy = enemy({ stats: { attack: 8, rate: 60 }, offensiveTags: 'slash' });
+    const taggedContext: ActionResolutionContext = { ...context, enemies: [slashingEnemy], actions: [action], items: [dagger, armor] };
+    const state = createInitialPlayState('test', 'arena');
+
+    const withoutArmor = sampleEnemyAttackDamage(state, action, taggedContext, () => 0);
+    const withArmor = sampleEnemyAttackDamage({ ...state, equipment: { body: 'chain-vest' } }, action, taggedContext, () => 0);
+
+    expect(withoutArmor?.source).toBeCloseTo(8, 5);
+    expect(withArmor?.source).toBeCloseTo(5, 5);
   });
 });

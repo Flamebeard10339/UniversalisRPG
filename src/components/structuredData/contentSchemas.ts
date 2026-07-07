@@ -259,6 +259,8 @@ export const itemDefinitionSchema = (): StructuredSchema => ({ kind: 'object', f
   id: { label: 'contribution.column.id', schema: string() },
   maxQuantity: { label: 'contribution.column.maxQuantity', schema: number(1), optional: true },
   tags: { label: 'contribution.column.tags', schema: string(), optional: true },
+  offensiveTags: { label: 'contribution.column.offensiveTags', schema: string(), optional: true },
+  defensiveTags: { label: 'contribution.column.defensiveTags', schema: string(), optional: true },
 } });
 
 export const interactionTypeDefinitionSchema = (bundle: ContentBundle): StructuredSchema => ({ kind: 'object', fields: {
@@ -286,6 +288,8 @@ export const enemyDefinitionSchema = (bundle: ContentBundle): StructuredSchema =
   interactionTypeId: { label: 'contribution.column.interaction', schema: string(bundle.interactionTypes.map((item) => item.id), true) },
   stats: { label: 'contribution.enemyStats.title', schema: enemyStatsSchema(), optional: true, defaultValue: {} },
   showHealthBar: { label: 'contribution.column.showHealth', schema: boolean, optional: true, defaultValue: false },
+  offensiveTags: { label: 'contribution.column.offensiveTags', schema: string(), optional: true },
+  defensiveTags: { label: 'contribution.column.defensiveTags', schema: string(), optional: true },
   rewards: { label: 'contribution.column.rewards', schema: { kind: 'array', listMode: 'free', item: rewardSchema(bundle), createItem: () => ({ kind: 'resource', resourceId: bundle.resourceDefinitions[0]?.id ?? '', amount: 1 }) } },
 } });
 

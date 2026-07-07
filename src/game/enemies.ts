@@ -80,6 +80,8 @@ export const normalizeEnemyDefinition = (enemy: LegacyEnemyDefinition): EnemyDef
     interactionTypeId: enemy.interactionTypeId,
     ...(Object.keys(stats).length > 0 ? { stats } : {}),
     showHealthBar: enemy.showHealthBar ?? true,
+    ...(enemy.offensiveTags !== undefined ? { offensiveTags: enemy.offensiveTags } : {}),
+    ...(enemy.defensiveTags !== undefined ? { defensiveTags: enemy.defensiveTags } : {}),
     rewards: enemy.rewards ?? [],
   };
 };

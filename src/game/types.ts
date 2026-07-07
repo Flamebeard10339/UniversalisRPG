@@ -245,6 +245,8 @@ export type ItemDefinition = {
   id: string;
   maxQuantity?: number;
   tags?: string;
+  offensiveTags?: string;
+  defensiveTags?: string;
   actions?: ItemActionDefinition[];
 };
 
@@ -336,6 +338,8 @@ export type EnemyDefinition = {
   interactionTypeId: string;
   stats?: Partial<Record<EnemyStatKey, number>>;
   showHealthBar?: boolean;
+  offensiveTags?: string;
+  defensiveTags?: string;
   rewards: Reward[];
 };
 

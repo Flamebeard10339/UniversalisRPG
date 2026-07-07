@@ -10,6 +10,8 @@
         "id": { "type": "string", "minLength": 1 },
         "maxQuantity": { "type": "integer", "minimum": 1 },
         "tags": { "type": "string" },
+        "offensiveTags": { "type": "string" },
+        "defensiveTags": { "type": "string" },
         "actions": {
           "type": "array",
           "items": { "$ref": "https://universalis-rpg.local/schema/entities.schema.json#/$defs/action" }

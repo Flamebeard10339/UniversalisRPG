@@ -418,6 +418,8 @@
   "contribution.column.x": "X",
   "contribution.column.y": "Y",
   "contribution.column.tags": "Tags",
+  "contribution.column.offensiveTags": "Offensive Tags",
+  "contribution.column.defensiveTags": "Defensive Tags",
   "contribution.column.start": "Start",
   "contribution.column.remove": "Remove",
   "contribution.column.edit": "Edit",

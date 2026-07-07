@@ -998,6 +998,12 @@ export const validateContentReferences = (bundle: ContentBundle) => {
     if (getEnemyStat(enemy, 'critMultiplier') < 1) {
       issues.push(error(`enemies.${enemy.id}.critMultiplier`, 'validation.critMultiplierMinimum'));
     }
+    if (enemy.offensiveTags !== undefined && typeof enemy.offensiveTags !== 'string') {
+      issues.push(error(`enemies.${enemy.id}.offensiveTags`, 'validation.itemTagsString'));
+    }
+    if (enemy.defensiveTags !== undefined && typeof enemy.defensiveTags !== 'string') {
+      issues.push(error(`enemies.${enemy.id}.defensiveTags`, 'validation.itemTagsString'));
+    }
     for (const key of Object.keys(enemy.stats ?? {})) {
       if (!(ENEMY_STAT_KEYS as string[]).includes(key)) {
         issues.push(error(`enemies.${enemy.id}.stats.${key}`, 'validation.unknownEnemyStat', { id: key }));
@@ -1015,6 +1021,12 @@ export const validateContentReferences = (bundle: ContentBundle) => {
     }
     if (item.tags !== undefined && typeof item.tags !== 'string') {
       issues.push(error(`items.${item.id}.tags`, 'validation.itemTagsString'));
+    }
+    if (item.offensiveTags !== undefined && typeof item.offensiveTags !== 'string') {
+      issues.push(error(`items.${item.id}.offensiveTags`, 'validation.itemTagsString'));
+    }
+    if (item.defensiveTags !== undefined && typeof item.defensiveTags !== 'string') {
+      issues.push(error(`items.${item.id}.defensiveTags`, 'validation.itemTagsString'));
     }
   }
 
