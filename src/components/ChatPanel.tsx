@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { Translator } from '../game/i18n';
 import type { ChatMessage } from '../game/types';
 import { useNow } from '../hooks/useNow';
@@ -6,6 +6,7 @@ import { useNow } from '../hooks/useNow';
 type ChatPanelProps = {
   compressionEnabled: boolean;
   messages: ChatMessage[];
+  onSend?: (text: string) => void;
   t: Translator;
 };
 
@@ -29,7 +30,7 @@ const renderMessageText = (message: ChatMessage, t: Translator) => {
   return t(message.key, message.params);
 };
 
-const normalizeRenderedText = (text: string) => text.replace(/\s+/g, ' ').trim();
+const normalizeRenderedText = (text: string) => text.replace(/[ \t]+/g, ' ').replace(/\n+/g, '\n').trim();
 
 const displayKey = (message: Pick<DisplayMessage, 'author' | 'text'>) =>
   `${message.author}\u0000${message.text}`;
@@ -74,9 +75,10 @@ export const buildDisplayMessages = (
     left.latestCreatedAt - right.latestCreatedAt || left.id - right.id);
 };
 
-export const ChatPanel = ({ compressionEnabled, messages, t }: ChatPanelProps) => {
+export const ChatPanel = ({ compressionEnabled, messages, onSend, t }: ChatPanelProps) => {
   const scrollRef = useRef<HTMLDivElement>(null);
   const stickToBottomRef = useRef(true);
+  const [draft, setDraft] = useState('');
   const hasPendingMessages = messages.some((message) => message.createdAt > Date.now());
   const now = useNow(hasPendingMessages, 100);
   const visibleMessages = [...messages]
@@ -94,12 +96,19 @@ export const ChatPanel = ({ compressionEnabled, messages, t }: ChatPanelProps) =
     if (element) stickToBottomRef.current = element.scrollHeight - element.scrollTop - element.clientHeight < 24;
   };
 
+  const submit = () => {
+    const trimmed = draft.trim();
+    if (!trimmed || !onSend) return;
+    onSend(trimmed);
+    setDraft('');
+  };
+
   return (
-    <section className="grid h-full min-h-0 rounded border border-slate-800 bg-slate-900 p-4" data-testid="chat-panel">
+    <section className="grid h-full min-h-0 grid-rows-[1fr_auto] gap-2 rounded border border-slate-800 bg-slate-900 p-4" data-testid="chat-panel">
       <div className="flex min-h-0 flex-col gap-2 overflow-y-auto rounded bg-slate-950 p-3" onScroll={updateStickiness} ref={scrollRef}>
         {displayMessages.map((message) => (
           <div
-            className={`max-w-[85%] shrink-0 rounded px-3 py-2 text-sm ${
+            className={`max-w-[85%] shrink-0 whitespace-pre-line rounded px-3 py-2 text-sm ${
               message.author === 'player'
                 ? 'ml-auto bg-cyan-400 text-slate-950'
                 : message.author === 'debug'
@@ -112,6 +121,27 @@ export const ChatPanel = ({ compressionEnabled, messages, t }: ChatPanelProps) =
           </div>
         ))}
       </div>
+      {onSend && (
+        <form
+          className="flex gap-2"
+          onSubmit={(event) => {
+            event.preventDefault();
+            submit();
+          }}
+        >
+          <input
+            className="min-w-0 flex-1 rounded border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100"
+            data-testid="chat-input"
+            onChange={(event) => setDraft(event.target.value)}
+            placeholder={t('cli.input.placeholder', 'Type a message or /command')}
+            type="text"
+            value={draft}
+          />
+          <button className="rounded border border-cyan-700 px-4 py-2 text-sm font-semibold text-cyan-100" data-testid="chat-send" type="submit">
+            {t('cli.input.send', 'Send')}
+          </button>
+        </form>
+      )}
     </section>
   );
 };

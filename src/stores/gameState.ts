@@ -31,6 +31,7 @@ type GameStateStore = {
   markInactive: (universeId: string) => void;
   sendChatMessage: (universeId: string, text: string) => void;
   appendSystemMessage: (universeId: string, key: string, params?: Record<string, string | number>) => void;
+  appendChatText: (universeId: string, text: string, author?: 'system' | 'player') => void;
   recordRunEvent: (universeId: string, actor: RunLogEntry['actor'], event: string, data?: Record<string, unknown>) => void;
   recordAgentMessage: (universeId: string, message: AgentSessionMessage) => void;
   clearRunLog: (universeId: string) => void;
@@ -425,6 +426,16 @@ export const useGameState = create<GameStateStore>((set, get) => ({
       const current = state.states[universeId];
       if (!current) return state;
       const next = appendChatMessage(current, { author: 'system', key, params });
+      void save(storageKey(universeId), next);
+      return { states: { ...state.states, [universeId]: next } };
+    });
+  },
+
+  appendChatText: (universeId, text, author = 'system') => {
+    set((state) => {
+      const current = state.states[universeId];
+      if (!current) return state;
+      const next = appendChatMessage(current, { author, text });
       void save(storageKey(universeId), next);
       return { states: { ...state.states, [universeId]: next } };
     });

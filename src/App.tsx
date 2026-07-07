@@ -32,6 +32,7 @@ import {
   resolveDisplayPalette,
 } from './game/displayProfiles';
 import { getInteractionType, isContinuousAction } from './game/adversarial';
+import { executeChatInput, type CliRuntime } from './game/cli';
 import type { ContentBundle, ContentModule, ContentModulePack, ContributionDraft, DisplayColorPalette, DisplayProfileDefinition, EntityDefinition, GameAction, IdleReport, LocationNode, UniversePlayState } from './game/types';
 import { createModEditService, localContributionsModId } from './game/modEditService';
 import { createDraftModStore } from './game/modStore';
@@ -70,6 +71,7 @@ type AppearanceSettings = {
   customDisplayProfile?: DisplayProfileDefinition;
   displayProfileSelections?: Record<string, string>;
   fontSize: FontSizePreference;
+  showGui?: boolean;
   showTravelActions?: boolean;
   theme?: 'system' | 'dark' | 'light';
 };
@@ -131,6 +133,7 @@ export default function App() {
   const [fontSizePreference, setFontSizePreference] = useState<FontSizePreference>('normal');
   const [chatCompressionEnabled, setChatCompressionEnabled] = useState(true);
   const [showTravelActions, setShowTravelActions] = useState(true);
+  const [showGui, setShowGui] = useState(true);
   const [customDisplayProfile, setCustomDisplayProfile] = useState<DisplayProfileDefinition>(() => createCustomDisplayProfile());
   const [displayProfileSelections, setDisplayProfileSelections] = useState<Record<string, string>>({});
   const [themeEditorOpen, setThemeEditorOpen] = useState(false);
@@ -188,6 +191,7 @@ export default function App() {
   const resolveIdle = useGameState((state) => state.resolveIdle);
   const markInactive = useGameState((state) => state.markInactive);
   const appendSystemMessage = useGameState((state) => state.appendSystemMessage);
+  const appendChatText = useGameState((state) => state.appendChatText);
   const importUniverseState = useGameState((state) => state.importUniverseState);
   const replaceUniverseState = useGameState((state) => state.replaceUniverseState);
   const resetUniverse = useGameState((state) => state.resetUniverse);
@@ -232,6 +236,7 @@ export default function App() {
       setFontSizePreference(settings.fontSize ?? 'normal');
       setChatCompressionEnabled(settings.chatCompressionEnabled ?? true);
       setShowTravelActions(settings.showTravelActions ?? true);
+      setShowGui(settings.showGui ?? true);
       setCustomDisplayProfile(settings.customDisplayProfile ?? createCustomDisplayProfile());
       setDisplayProfileSelections(settings.displayProfileSelections ?? {});
       setAppearanceLoaded(true);
@@ -252,9 +257,10 @@ export default function App() {
       customDisplayProfile,
       displayProfileSelections,
       fontSize: fontSizePreference,
+      showGui,
       showTravelActions,
     });
-  }, [appearanceLoaded, bundle, chatCompressionEnabled, customDisplayProfile, displayProfileSelections, fontSizePreference, showTravelActions]);
+  }, [appearanceLoaded, bundle, chatCompressionEnabled, customDisplayProfile, displayProfileSelections, fontSizePreference, showGui, showTravelActions]);
 
   useEffect(() => {
     if (!appearanceLoaded || !bundle || displayProfileSelections[bundle.manifest.id]) {
@@ -550,6 +556,49 @@ export default function App() {
       setActiveTab('home');
       setHomeTab('details');
     }
+  };
+
+  const runCliCommand = (text: string) => {
+    if (!bundle || !playState) return;
+    const runtime: CliRuntime = {
+      getBundle: () => bundle,
+      getPlayState: () => playState,
+      getActionContext: () => actionContext,
+      getTranslator: () => t,
+      isDebugEnabled: () => debugEnabled,
+      appendMessage: (message, author = 'system') => appendChatText(runtimeUniverseId, message, author),
+      startAction: (actionId, recipeId) => {
+        const action = bundle.actions.find((candidate) => candidate.id === actionId);
+        if (action) beginAction(action, recipeId);
+      },
+      chooseDialogueOption: (optionId) => chooseDialogueOption(runtimeUniverseId, actionContext, optionId),
+      equipItem: (itemId, slot) => equipItem(runtimeUniverseId, itemId, slot, actionContext),
+      unequipSlot: (slot) => unequipSlot(runtimeUniverseId, slot, actionContext),
+      eatItem: (itemId) => eatItem(runtimeUniverseId, itemId, actionContext),
+      dropInventoryItem: (itemId) => dropInventoryItem(runtimeUniverseId, itemId, actionContext),
+      pickUpGroundItem: (groundItemId) => pickUpGroundItem(runtimeUniverseId, groundItemId, actionContext),
+      travelTo: (path) => travelTo(runtimeUniverseId, path),
+      changeSetting: (key, value) => {
+        if (key !== 'show-gui') {
+          return { ok: false, message: t('cli.changeSetting.unknownKey', 'Unknown setting: {key}', { key }) };
+        }
+        const normalized = value.trim().toLowerCase();
+        if (normalized !== 'true' && normalized !== 'false') {
+          return { ok: false, message: t('cli.changeSetting.invalidValue', 'Invalid value for {key}: {value}', { key, value }) };
+        }
+        const nextValue = normalized === 'true';
+        if (!nextValue) {
+          appendChatText(runtimeUniverseId, t('cli.showGui.disabled', 'You have disabled the GUI. To re-enable it, type /change-setting show-gui true'));
+        }
+        setShowGui(nextValue);
+        return { ok: true, message: '' };
+      },
+      debugGiveItem: (itemId, amount) => debugGiveItem(runtimeUniverseId, actionContext, itemId, amount),
+      debugSetFlag: (flagId, value) => debugSetFlag(runtimeUniverseId, flagId, value),
+      debugSetSkillXp: (skillId, xp) => debugSetSkillXp(runtimeUniverseId, skillId, xp),
+      teleport: (locationId) => setCurrentLocation(runtimeUniverseId, locationId),
+    };
+    executeChatInput(text, runtime);
   };
   const nextTimerAt = bundle && playState
     ? [
@@ -855,6 +904,14 @@ export default function App() {
           <h1 className="text-lg font-semibold">{t('app.startErrorTitle')}</h1>
           <p className="mt-2 text-sm text-rose-100">{error ? t(error, error) : t('app.noPlayableUniverse')}</p>
         </section>
+      </main>
+    );
+  }
+
+  if (!showGui) {
+    return (
+      <main className="grid h-screen bg-slate-950 p-4 text-slate-100">
+        <ChatPanel compressionEnabled={chatCompressionEnabled} messages={playState.chatMessages} onSend={runCliCommand} t={t} />
       </main>
     );
   }
@@ -1250,6 +1307,22 @@ export default function App() {
                     type="checkbox"
                   />
                 </label>
+                <label className="flex items-center justify-between gap-4">
+                  <span className="text-sm text-slate-300">{t('settings.appearance.showGui')}</span>
+                  <input
+                    checked={showGui}
+                    className="h-5 w-5"
+                    data-testid="show-gui-toggle"
+                    onChange={(event) => {
+                      dismissDialogue();
+                      if (!event.target.checked) {
+                        appendChatText(runtimeUniverseId, t('cli.showGui.disabled', 'You have disabled the GUI. To re-enable it, type /change-setting show-gui true'));
+                      }
+                      setShowGui(event.target.checked);
+                    }}
+                    type="checkbox"
+                  />
+                </label>
               </section>
 
               <section className="grid gap-3 rounded border border-slate-800 bg-slate-950 p-3">
@@ -1427,7 +1500,7 @@ export default function App() {
         visibleActiveTab === 'home' && visibleHomeTab !== 'workbench' && (
           <div className="fixed inset-x-0 bottom-[73px] z-10 h-[33vh] px-4">
             <div className="mx-auto h-full max-w-7xl">
-              <ChatPanel compressionEnabled={chatCompressionEnabled} messages={playState.chatMessages} t={t} />
+              <ChatPanel compressionEnabled={chatCompressionEnabled} messages={playState.chatMessages} onSend={runCliCommand} t={t} />
             </div>
           </div>
         )
