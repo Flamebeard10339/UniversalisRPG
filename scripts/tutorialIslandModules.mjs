@@ -103,8 +103,13 @@ const foundation = {
   data: {
     stats: [stat('fishing'), stat('cooking'), stat('thieving'), stat('smithing')],
     skills: [skill('fishing'), skill('cooking'), skill('thieving'), skill('smithing')],
-    items: Object.entries(itemNames).map(([id, [, , tags]]) =>
-      id === 'note' ? { ...item(id, tags), actions: [action('read', [dialogueResult('note')])] } : item(id, tags)),
+    items: Object.entries(itemNames).map(([id, [, , tags]]) => {
+      if (id === 'note') return { ...item(id, tags), actions: [action('read', [dialogueResult('note')])] };
+      if (id === 'cooked-shrimp') {
+        return { ...item(id, tags), actions: [action('eat', [take('cooked-shrimp'), setFlag('well-fed', 60), chat('chat.item.cooked-shrimp.eat')])] };
+      }
+      return item(id, tags);
+    }),
     flags: [
       flag('tutorial.miki-cleared'),
       flag('tutorial.bridge-open'),
@@ -162,6 +167,8 @@ const foundation = {
       'quest.leave-tutorial-island.stage.complete': 'Whatever is holding the mainland back from you will not last much longer. Keep pushing.',
       'action.item.note.read.title': 'Read', 'action.item.note.read.description': 'Read the handwritten note.',
       'dialogue.note.start': "It reads:\n- Remember to tell them about the Quests tab.\n- Remember to explain the colors: red, yellow, green.\n- Remember to unlock the door before they leave.",
+      'action.item.cooked-shrimp.eat.title': 'Eat', 'action.item.cooked-shrimp.eat.description': 'Eat the cooked shrimp.',
+      'chat.item.cooked-shrimp.eat': 'Warmth spreads. You feel steadier for a while.',
       'modulePack.tutorial-island.title': 'Tutorial Island',
     },
   },
@@ -327,7 +334,6 @@ const survival = {
       ]),
       entity('campfire', [
         station('cook', 'tutorial-campfire'),
-        action('eat', [take('cooked-shrimp'), setFlag('well-fed', 60), chat('chat.entity.campfire.eat')], { requirements: hasItem('cooked-shrimp') }),
       ]),
       entity('supply-crate', [
         action('examine', [chat('chat.entity.supply-crate.examine-neither')], { visibleWhen: not(any(hasFlag('tutorial.crate-net-taken'), hasFlag('tutorial.crate-bowl-taken'))) }),
@@ -409,7 +415,6 @@ const survival = {
       'action.entity.shoals.fish.title': 'Fish', 'action.entity.shoals.fish.description': 'Sweep the shallows with a small net.',
       'action.entity.shoals.examine.title': 'Examine', 'action.entity.shoals.examine.description': 'Look into the shoals.',
       'action.entity.campfire.cook.title': 'Cook', 'action.entity.campfire.cook.description': 'Cook whatever you are carrying that the fire can warm.', 'action.entity.campfire.cook.success': 'It is ready.',
-      'action.entity.campfire.eat.title': 'Eat', 'action.entity.campfire.eat.description': 'Eat a cooked shrimp by the fire.',
       'action.entity.supply-crate.examine.title': 'Examine', 'action.entity.supply-crate.examine.description': 'Examine the open crate.',
       'action.entity.supply-crate.examine-net-only.title': 'Examine', 'action.entity.supply-crate.examine-net-only.description': 'Examine the open crate.',
       'action.entity.supply-crate.examine-bowl-only.title': 'Examine', 'action.entity.supply-crate.examine-bowl-only.description': 'Examine the open crate.',
@@ -428,7 +433,6 @@ const survival = {
       'action.entity.gommi.examine-asleep.title': 'Examine', 'action.entity.gommi.examine-asleep.description': 'Look under the bridge.',
       'action.entity.loose-plank.examine.title': 'Examine', 'action.entity.loose-plank.examine.description': 'Check the loose plank.',
       'chat.entity.shoals.examine': 'Shrimp dart away from your shadow.',
-      'chat.entity.campfire.eat': 'Warmth spreads. You feel steadier for a while.',
       'chat.entity.supply-crate.examine-neither': 'A net and bowl sit on top, practically accusing you of missing them.',
       'chat.entity.supply-crate.examine-net-only': 'A bowl still sits at the bottom of the crate.',
       'chat.entity.supply-crate.examine-bowl-only': 'A small net still sits at the bottom of the crate.',

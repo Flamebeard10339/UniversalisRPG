@@ -78,7 +78,31 @@
         "id": "raw-shrimp"
       },
       {
-        "id": "cooked-shrimp"
+        "id": "cooked-shrimp",
+        "actions": [
+          {
+            "id": "eat",
+            "instant": true,
+            "rewards": [],
+            "results": [
+              {
+                "kind": "item",
+                "itemId": "cooked-shrimp",
+                "amount": -1
+              },
+              {
+                "kind": "flag",
+                "flagId": "well-fed",
+                "value": true,
+                "expiresAfterSeconds": 60
+              },
+              {
+                "kind": "chat",
+                "messageKey": "chat.item.cooked-shrimp.eat"
+              }
+            ]
+          }
+        ]
       },
       {
         "id": "herb"
@@ -319,6 +343,9 @@
       "action.item.note.read.title": "Read",
       "action.item.note.read.description": "Read the handwritten note.",
       "dialogue.note.start": "It reads:\n- Remember to tell them about the Quests tab.\n- Remember to explain the colors: red, yellow, green.\n- Remember to unlock the door before they leave.",
+      "action.item.cooked-shrimp.eat.title": "Eat",
+      "action.item.cooked-shrimp.eat.description": "Eat the cooked shrimp.",
+      "chat.item.cooked-shrimp.eat": "Warmth spreads. You feel steadier for a while.",
       "modulePack.tutorial-island.title": "Tutorial Island"
     }
   }

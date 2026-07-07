@@ -307,6 +307,8 @@ export default function App() {
     enemies: bundle?.enemies ?? [],
     dropTables: bundle?.dropTables ?? [],
     dialogues: bundle?.dialogues ?? [],
+    recipes: bundle?.recipes ?? [],
+    statModifiers: bundle?.statModifiers ?? [],
   }), [bundle]);
   const playState = bundle ? gameStates[runtimeUniverseId] ?? getUniverseState(runtimeUniverseId, startingLocationId, { manifest: bundle.manifest }) : null;
   const copySelectedProfileToCustom = () => {

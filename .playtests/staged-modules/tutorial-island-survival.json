@@ -213,34 +213,6 @@
             "id": "cook",
             "stationId": "tutorial-campfire",
             "rewards": []
-          },
-          {
-            "id": "eat",
-            "instant": true,
-            "rewards": [],
-            "results": [
-              {
-                "kind": "item",
-                "itemId": "cooked-shrimp",
-                "amount": -1
-              },
-              {
-                "kind": "flag",
-                "flagId": "well-fed",
-                "value": true,
-                "expiresAfterSeconds": 60
-              },
-              {
-                "kind": "chat",
-                "messageKey": "chat.entity.campfire.eat"
-              }
-            ],
-            "requirements": {
-              "kind": "state-variable",
-              "variable": "item:cooked-shrimp",
-              "comparison": "greater-than",
-              "value": 0
-            }
           }
         ]
       },
@@ -900,8 +872,6 @@
       "action.entity.campfire.cook.title": "Cook",
       "action.entity.campfire.cook.description": "Cook whatever you are carrying that the fire can warm.",
       "action.entity.campfire.cook.success": "It is ready.",
-      "action.entity.campfire.eat.title": "Eat",
-      "action.entity.campfire.eat.description": "Eat a cooked shrimp by the fire.",
       "action.entity.supply-crate.examine.title": "Examine",
       "action.entity.supply-crate.examine.description": "Examine the open crate.",
       "action.entity.supply-crate.examine-net-only.title": "Examine",
@@ -937,7 +907,6 @@
       "action.entity.loose-plank.examine.title": "Examine",
       "action.entity.loose-plank.examine.description": "Check the loose plank.",
       "chat.entity.shoals.examine": "Shrimp dart away from your shadow.",
-      "chat.entity.campfire.eat": "Warmth spreads. You feel steadier for a while.",
       "chat.entity.supply-crate.examine-neither": "A net and bowl sit on top, practically accusing you of missing them.",
       "chat.entity.supply-crate.examine-net-only": "A bowl still sits at the bottom of the crate.",
       "chat.entity.supply-crate.examine-bowl-only": "A small net still sits at the bottom of the crate.",

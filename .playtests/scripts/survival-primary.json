@@ -24,7 +24,7 @@
   "action:entity.campfire.cook@cook-shrimp",
   "action:entity.shoals.examine",
   "action:entity.campfire.cook@cook-shrimp",
-  "action:entity.campfire.eat",
+  "action:item.cooked-shrimp.eat",
   "action:travel-beach-to-bridge",
   "action:entity.gommi.pay-toll"
 ]

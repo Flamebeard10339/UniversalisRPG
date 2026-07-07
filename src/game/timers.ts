@@ -1008,6 +1008,7 @@ const restartAction = (
   context: ActionResolutionContext,
   now: number,
   targetHealth: number | null,
+  recipeId?: string,
 ) => {
   const completesAt = getEnemy(action, context)
     ? now + CONTINUOUS_ACTION_MAX_MS
@@ -1020,6 +1021,7 @@ const restartAction = (
       startedAt: now,
       completesAt,
       targetHealth,
+      recipeId,
     },
     actionProgress: {
       ...state.actionProgress,
@@ -1027,6 +1029,7 @@ const restartAction = (
         elapsedMs: 0,
         runningSince: now,
         targetHealth,
+        recipeId,
       },
     },
     lastTickAt: now,
@@ -1389,6 +1392,7 @@ const completeActionWithResult = (
   options: { random?: () => number } = {},
   now = Date.now(),
 ): ActionCompletionResult => {
+  const recipeId = state.activeAction?.recipeId;
   state = applyManifestRuntimeSettings(state, context);
   let damage = 0;
   let remainingHealth: number | null = null;
@@ -1412,7 +1416,7 @@ const completeActionWithResult = (
         interactionTypeId: getInteractionType(action, context)?.id ?? action.interactionTypeId,
       }, now);
       return {
-        state: restartAction(missedState, action, context, now, currentHealth),
+        state: restartAction(missedState, action, context, now, currentHealth, recipeId),
         finished: false,
         outcome: 'miss',
         damage,
@@ -1442,7 +1446,7 @@ const completeActionWithResult = (
       }, now);
       const hitRewards = rollAndApplyRewards(completedHitState, action.rewards, context, now, options.random);
       return {
-        state: restartAction(hitRewards.state, action, context, now, targetHealth),
+        state: restartAction(hitRewards.state, action, context, now, targetHealth, recipeId),
         finished: false,
         outcome: 'hit',
         damage,
@@ -1478,7 +1482,7 @@ const completeActionWithResult = (
     const restartTargetHealth = getEnemyStat(enemy, 'health');
 
     return {
-      state: shouldLoop ? restartAction(completedState, action, context, now, restartTargetHealth) : completedState,
+      state: shouldLoop ? restartAction(completedState, action, context, now, restartTargetHealth, recipeId) : completedState,
       finished: true,
       outcome: 'kill',
       damage,
@@ -1550,7 +1554,7 @@ const completeActionWithResult = (
   const restartTargetHealth = null;
 
   return {
-    state: shouldLoop ? restartAction(completedState, action, context, now, restartTargetHealth) : completedState,
+    state: shouldLoop ? restartAction(completedState, action, context, now, restartTargetHealth, recipeId) : completedState,
     finished: true,
     outcome: 'basicSuccess',
     damage,
