@@ -389,6 +389,15 @@ export type StatModifierDefinition = {
   activeWhen: Condition;
 };
 
+export type ActiveBuff = {
+  itemId: string;
+  statId: string;
+  amount: number;
+  kind: 'added' | 'increased';
+  durationSeconds: number;
+  expiresAt: number;
+};
+
 export type RecipeIngredient = {
   itemId: string;
   amount: number;
@@ -694,6 +703,7 @@ export type UniversePlayState = {
   bank: Record<string, number>;
   flags: Record<string, boolean | number | string>;
   flagExpirations: Record<string, number>;
+  activeBuffs: Record<string, ActiveBuff>;
   actionCompletions: Record<string, number>;
   collectionLog: Record<string, number>;
   resourcePools: Record<string, ResourcePool>;

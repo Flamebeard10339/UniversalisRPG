@@ -1,4 +1,4 @@
-import type { ActionResolutionContext, ActionResult, ChatMessage, ConcreteReward, ExperienceEventKind, ExperienceTrigger, GameAction, IdleReport, IdleResolution, ResourceBoundaryBehavior, Reward, RunLogEntry, UniversePlayState } from './types';
+import type { ActionResolutionContext, ActionResult, ChatMessage, ConcreteReward, ExperienceEventKind, ExperienceTrigger, GameAction, IdleReport, IdleResolution, ItemDefinition, ResourceBoundaryBehavior, Reward, RunLogEntry, UniversePlayState } from './types';
 import type { AvailableTravelEdge } from './travel';
 import { getActionDurationMs, getEnemy, getInteractionType, isInstantAction, sampleAdversarialDamage, sampleEnemyAttackDamage } from './adversarial';
 import { getEnemyStat } from './enemies';
@@ -23,6 +23,7 @@ import { skillLevelFromXp } from './skills';
 import { rollRewards } from './rewards';
 import { applyCollectionLogRewards } from './collectionLog';
 import { resolveStationAction } from './recipes';
+import { canEatItem, itemBuffDurationSeconds, itemStatBonuses } from './equipment';
 
 const MAX_CHAT_MESSAGES = 80;
 const MAX_RUN_LOG_ENTRIES = 100;
@@ -132,6 +133,7 @@ export const createInitialPlayState = (
   bank: {},
   flags: {},
   flagExpirations: {},
+  activeBuffs: {},
   actionCompletions: {},
   collectionLog: {
     [locationExploredKey(startingLocationId)]: 1,
@@ -197,6 +199,7 @@ export const normalizePlayState = (
     bank: state.bank ?? {},
     flags: state.flags ?? {},
     flagExpirations: state.flagExpirations ?? {},
+    activeBuffs: state.activeBuffs ?? {},
     actionCompletions: state.actionCompletions ?? {},
     discoveredLocationIds,
     collectionLog,
@@ -1109,6 +1112,33 @@ export const applyItemDelta = (
   };
 };
 
+export const eatItem = (
+  state: UniversePlayState,
+  item: ItemDefinition,
+  now = Date.now(),
+): UniversePlayState => {
+  if (!canEatItem(item) || (state.inventory[item.id] ?? 0) <= 0) return state;
+
+  const durationSeconds = itemBuffDurationSeconds(item) ?? 0;
+  const activeBuffs = { ...state.activeBuffs };
+  for (const bonus of itemStatBonuses(item)) {
+    activeBuffs[`${item.id}:${bonus.statId}`] = {
+      itemId: item.id,
+      statId: bonus.statId,
+      amount: bonus.amount,
+      kind: bonus.kind,
+      durationSeconds,
+      expiresAt: now + durationSeconds * 1000,
+    };
+  }
+
+  return appendChatMessage({
+    ...state,
+    inventory: { ...state.inventory, [item.id]: state.inventory[item.id] - 1 },
+    activeBuffs,
+  }, { author: 'system', key: 'chat.food.eaten' }, now);
+};
+
 const applyBankDelta = (
   state: UniversePlayState,
   itemId: string,
@@ -1802,6 +1832,19 @@ const clearExpiredFlags = (state: UniversePlayState, now: number): UniversePlayS
   return { ...state, flags, flagExpirations };
 };
 
+const clearExpiredBuffs = (state: UniversePlayState, now: number): UniversePlayState => {
+  const activeBuffs = state.activeBuffs ?? {};
+  const expiredIds = Object.entries(activeBuffs).filter(([, buff]) => buff.expiresAt <= now).map(([id]) => id);
+  if (expiredIds.length === 0) return state;
+
+  const nextBuffs = { ...activeBuffs };
+  for (const id of expiredIds) {
+    delete nextBuffs[id];
+  }
+
+  return { ...state, activeBuffs: nextBuffs };
+};
+
 export const resolveIdleTimers = (
   state: UniversePlayState,
   contextOrActions: ActionResolutionContext | GameAction[],
@@ -1816,6 +1859,7 @@ export const resolveIdleTimers = (
 
   state = ensureWorldState(state, context);
   state = clearExpiredFlags(state, now);
+  state = clearExpiredBuffs(state, now);
   if (!state.activeAction) {
     state = resetInactiveEffectResources(state, context, now);
   }

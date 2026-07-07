@@ -1,5 +1,5 @@
 import { itemDescriptionKey, itemTitleKey } from '../game/contentIds';
-import { canEquipItemInSlot, equipmentSlots, formatItemTag, getItemTags, itemSlots, meetsEquipmentRequirements } from '../game/equipment';
+import { canEatItem, canEquipItemInSlot, equipmentSlots, formatItemTag, getItemTags, itemSlots, meetsEquipmentRequirements } from '../game/equipment';
 import { areActionRequirementsMet, isActionVisible } from '../game/conditions';
 import { getActionTitleText } from '../game/actionLocalization';
 import type { ContentBundle, EquipmentSlot, GameAction, UniversePlayState } from '../game/types';
@@ -7,6 +7,7 @@ import type { Translator } from '../game/i18n';
 
 type InventoryPanelProps = {
   bundle: ContentBundle;
+  onEat: (itemId: string) => void;
   onEquip: (itemId: string, slot: EquipmentSlot) => void;
   onStartAction: (action: GameAction) => void;
   onUnequip: (slot: EquipmentSlot) => void;
@@ -14,7 +15,7 @@ type InventoryPanelProps = {
   t: Translator;
 };
 
-export const InventoryPanel = ({ bundle, onEquip, onStartAction, onUnequip, playState, t }: InventoryPanelProps) => {
+export const InventoryPanel = ({ bundle, onEat, onEquip, onStartAction, onUnequip, playState, t }: InventoryPanelProps) => {
   const entries = Object.entries(playState.inventory).filter(([, amount]) => amount > 0);
   const actionContext = {
     manifest: bundle.manifest,
@@ -76,6 +77,7 @@ export const InventoryPanel = ({ bundle, onEquip, onStartAction, onUnequip, play
           {entries.map(([itemId, amount]) => {
             const item = bundle.items.find((candidate) => candidate.id === itemId);
             const slots = itemSlots(item);
+            const eatable = canEatItem(item);
             const availableItemActions = itemActions(itemId);
             return (
               <section className="grid gap-2 rounded border border-slate-800 bg-slate-950 p-3" data-item-id={itemId} key={itemId}>
@@ -95,8 +97,18 @@ export const InventoryPanel = ({ bundle, onEquip, onStartAction, onUnequip, play
                   </div>
                   <span className="text-sm font-semibold text-slate-100">{amount}</span>
                 </div>
-                {(item && slots.length > 0) || availableItemActions.length > 0 ? (
+                {(item && slots.length > 0) || eatable || availableItemActions.length > 0 ? (
                   <div className="flex flex-wrap gap-2">
+                    {item && eatable && (
+                      <button
+                        className="rounded border border-cyan-700 px-3 py-1.5 text-xs font-semibold text-cyan-100"
+                        data-eat-item={item.id}
+                        onClick={() => onEat(item.id)}
+                        type="button"
+                      >
+                        {t('inventory.eat')}
+                      </button>
+                    )}
                     {item && slots.map((slotTag) => {
                       const requirementsMet = meetsEquipmentRequirements(playState, slotTag, bundle.skills, bundle.manifest.experienceCurve);
                       return (

@@ -178,6 +178,7 @@ export default function App() {
   const cancelDialogue = useGameState((state) => state.cancelDialogue);
   const equipItem = useGameState((state) => state.equipItem);
   const unequipSlot = useGameState((state) => state.unequipSlot);
+  const eatItem = useGameState((state) => state.eatItem);
   const depositToBank = useGameState((state) => state.depositToBank);
   const withdrawFromBank = useGameState((state) => state.withdrawFromBank);
   const setCharacterName = useGameState((state) => state.setCharacterName);
@@ -1029,6 +1030,7 @@ export default function App() {
             {characterTab === 'inventory' && (
               <InventoryPanel
                 bundle={bundle}
+                onEat={(itemId) => eatItem(runtimeUniverseId, itemId, actionContext)}
                 onEquip={(itemId, slot) => equipItem(runtimeUniverseId, itemId, slot, actionContext)}
                 onStartAction={beginAction}
                 onUnequip={(slot) => unequipSlot(runtimeUniverseId, slot)}

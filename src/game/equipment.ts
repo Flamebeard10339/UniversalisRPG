@@ -19,12 +19,14 @@ export type EquipmentBonus = {
 export type ParsedItemTag =
   | { kind: 'tag'; tag: string }
   | { kind: 'slot'; slot: EquipmentSlot; requirements: EquipmentRequirement[] }
+  | { kind: 'duration'; seconds: number }
   | EquipmentBonus;
 
 const slotSet = new Set<string>(equipmentSlots);
 const slotTagPattern = /^([a-z][a-z-]*)(?:\s*\((.*)\))?$/;
 const bonusPattern = /^([+-]\d+(?:\.\d+)?)(%)?\s+([a-z][a-z-]*)$/;
 const requirementPattern = /(\d+)\s+([a-z][a-z-]*)/g;
+const durationPattern = /^(\d+)s$/;
 
 export const splitItemTags = (item: ItemDefinition | undefined) =>
   (item?.tags ?? '')
@@ -33,6 +35,11 @@ export const splitItemTags = (item: ItemDefinition | undefined) =>
     .filter(Boolean);
 
 export const parseItemTag = (tag: string): ParsedItemTag => {
+  const duration = tag.match(durationPattern);
+  if (duration) {
+    return { kind: 'duration', seconds: Number(duration[1]) };
+  }
+
   const bonus = tag.match(bonusPattern);
   if (bonus) {
     return {
@@ -68,6 +75,17 @@ export const itemHasTag = (item: ItemDefinition | undefined, tag: string) =>
 
 export const itemSlots = (item: ItemDefinition | undefined) =>
   getItemTags(item).filter((tag): tag is Extract<ParsedItemTag, { kind: 'slot' }> => tag.kind === 'slot');
+
+export const itemStatBonuses = (item: ItemDefinition | undefined) =>
+  getItemTags(item).filter((tag): tag is EquipmentBonus => tag.kind === 'added' || tag.kind === 'increased');
+
+export const itemBuffDurationSeconds = (item: ItemDefinition | undefined) =>
+  getItemTags(item).find((tag): tag is Extract<ParsedItemTag, { kind: 'duration' }> => tag.kind === 'duration')?.seconds;
+
+export const isFoodItem = (item: ItemDefinition | undefined) => itemHasTag(item, 'food');
+
+export const canEatItem = (item: ItemDefinition | undefined) =>
+  isFoodItem(item) && itemStatBonuses(item).length > 0 && itemBuffDurationSeconds(item) !== undefined;
 
 export const equippedItemIds = (state: UniversePlayState) =>
   Object.values(state.equipment ?? {}).filter((itemId): itemId is string => Boolean(itemId));
@@ -129,8 +147,7 @@ export const equippedStatBonuses = (
 ) =>
   equippedItemIds(state)
     .map((itemId) => items.find((item) => item.id === itemId))
-    .flatMap((item) => getItemTags(item))
-    .filter((tag): tag is EquipmentBonus => tag.kind === 'added' || tag.kind === 'increased');
+    .flatMap((item) => itemStatBonuses(item));
 
 export const formatItemTag = (
   tag: ParsedItemTag,
@@ -144,6 +161,7 @@ export const formatItemTag = (
       .join(', ');
     return t('equipment.tag.slotRequirement', { slot: t(`equipment.slot.${tag.slot}`), requirements });
   }
+  if (tag.kind === 'duration') return t('equipment.tag.duration', { seconds: tag.seconds });
   const sign = tag.amount >= 0 ? '+' : '';
   const amount = tag.kind === 'increased' ? `${sign}${tag.amount * 100}%` : `${sign}${tag.amount}`;
   return t('equipment.tag.statBonus', { amount, stat: t(statTitleKey(tag.statId), tag.statId) });

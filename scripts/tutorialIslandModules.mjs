@@ -87,7 +87,7 @@ const itemNames = {
   note: ['Handwritten Note', "A note in someone else's hand, tossed onto a shelf."],
   'small-net': ['Small Net', 'A net suited to shallow shoals.'],
   'raw-shrimp': ['Raw Shrimp', 'Fresh and not yet dinner.'],
-  'cooked-shrimp': ['Cooked Shrimp', 'A simple meal that keeps you going.'],
+  'cooked-shrimp': ['Cooked Shrimp', 'A simple meal that keeps you going.', 'food, +3 regeneration, 60s'],
   herb: ['River Herb', 'A sleepy-smelling green herb.'],
   bowl: ['Bowl', 'Cracked, but still useful.'],
   'uncooked-sleeping-draught': ['Uncooked Sleeping Draught', 'A murky mix that needs heat.'],
@@ -105,9 +105,6 @@ const foundation = {
     skills: [skill('fishing'), skill('cooking'), skill('thieving'), skill('smithing')],
     items: Object.entries(itemNames).map(([id, [, , tags]]) => {
       if (id === 'note') return { ...item(id, tags), actions: [action('read', [dialogueResult('note')])] };
-      if (id === 'cooked-shrimp') {
-        return { ...item(id, tags), actions: [action('eat', [take('cooked-shrimp'), setFlag('well-fed', 60), chat('chat.item.cooked-shrimp.eat')])] };
-      }
       return item(id, tags);
     }),
     flags: [
@@ -120,15 +117,11 @@ const foundation = {
       flag('tutorial.cage-locked-by-orloth'),
       flag('tutorial.reached-mainland'),
       flag('quest.leave-tutorial-island.accepted'),
-      flag('well-fed'),
       flag('tutorial.bookshelf-note-taken'),
       flag('tutorial.drawer-coins-taken'),
       flag('tutorial.drawer-lockpick-taken'),
       flag('tutorial.crate-net-taken'),
       flag('tutorial.crate-bowl-taken'),
-    ],
-    statModifiers: [
-      { id: 'well-fed-regen-buff', statId: 'regeneration', amount: 3, kind: 'added', activeWhen: hasFlag('well-fed') },
     ],
     dialogues: [{ id: 'note', startNodeId: 'start', nodes: [{ id: 'start', narratorKey: 'dialogue.note.start' }] }],
     quests: [{
@@ -167,8 +160,6 @@ const foundation = {
       'quest.leave-tutorial-island.stage.complete': 'Whatever is holding the mainland back from you will not last much longer. Keep pushing.',
       'action.item.note.read.title': 'Read', 'action.item.note.read.description': 'Read the handwritten note.',
       'dialogue.note.start': "It reads:\n- Remember to tell them about the Quests tab.\n- Remember to explain the colors: red, yellow, green.\n- Remember to unlock the door before they leave.",
-      'action.item.cooked-shrimp.eat.title': 'Eat', 'action.item.cooked-shrimp.eat.description': 'Eat the cooked shrimp.',
-      'chat.item.cooked-shrimp.eat': 'Warmth spreads. You feel steadier for a while.',
       'modulePack.tutorial-island.title': 'Tutorial Island',
     },
   },

@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
-import { effectTitleKey, interactionEntityHitKey, interactionEntityKillKey, interactionPlayerHitKey, interactionPlayerKillKey, resourceTitleKey } from '../game/contentIds';
+import { effectTitleKey, interactionEntityHitKey, interactionEntityKillKey, interactionPlayerHitKey, interactionPlayerKillKey, itemTitleKey, resourceTitleKey } from '../game/contentIds';
 import type { ContentBundle, ResourceDefinition, ResourcePool, UniversePlayState } from '../game/types';
 import type { Translator } from '../game/i18n';
+import { formatItemTag } from '../game/equipment';
 import { getEffectRatePerMinute, isEffectApplicable, projectResourcePool } from '../game/resources';
 import { resolveManifestUiSettings } from '../game/universeSettings';
 import { useNow } from '../hooks/useNow';
@@ -144,8 +145,9 @@ export const ResourceStatus = ({ bundle, includeMinimal = true, owner = 'player'
       && (display !== 'minimal' || (includeMinimal && Boolean(playState.activeAction)))
       && (resource.owner ?? 'player') === owner;
   });
+  const buffs = owner === 'player' ? Object.values(playState.activeBuffs ?? {}) : [];
   const [floatingTexts, setFloatingTexts] = useState<ResourceFloatingText[]>([]);
-  const now = useNow(Boolean(playState.activeAction) || floatingTexts.length > 0, 100);
+  const now = useNow(Boolean(playState.activeAction) || floatingTexts.length > 0 || buffs.length > 0, 100);
   const seenMessageIds = useRef<Set<string> | null>(null);
   const floatingDurationMs = resolveManifestUiSettings(bundle.manifest).floatingTextDurationSeconds * 1000;
 
@@ -223,6 +225,34 @@ export const ResourceStatus = ({ bundle, includeMinimal = true, owner = 'player'
             );
           })}
         </div>
+      )}
+
+      {owner === 'player' && (
+        <section className="grid gap-2">
+          <h3 className="text-sm font-semibold text-slate-100">{t('resources.buffs.title')}</h3>
+          {buffs.length === 0 ? (
+            <p className="text-sm text-slate-500">{t('resources.buffs.empty')}</p>
+          ) : (
+            <div className="grid gap-2">
+              {buffs.map((buff) => {
+                const remainingMs = Math.max(0, buff.expiresAt - now);
+                const percent = Math.min(100, Math.max(0, (remainingMs / Math.max(1, buff.durationSeconds * 1000)) * 100));
+
+                return (
+                  <div className="grid gap-1 rounded border border-slate-800 bg-slate-950 p-3" key={`${buff.itemId}:${buff.statId}`}>
+                    <div className="flex items-baseline justify-between gap-3">
+                      <span className="text-sm font-semibold text-slate-100">{formatItemTag(buff, t)}</span>
+                      <span className="text-xs text-slate-400">{t('resources.buffs.source', { item: t(itemTitleKey(buff.itemId), buff.itemId) })}</span>
+                    </div>
+                    <div className="relative h-2 overflow-hidden rounded bg-slate-800">
+                      <div className="absolute inset-y-0 left-0 bg-emerald-400 transition-[width] duration-300" style={{ width: `${percent}%` }} />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </section>
       )}
     </section>
   );
