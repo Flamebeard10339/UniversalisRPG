@@ -12,7 +12,7 @@
       {
         "id": "tutorial-beach",
         "position": {
-          "x": 180,
+          "x": 1,
           "y": 0
         },
         "entities": [
@@ -22,11 +22,7 @@
           "supply-crate",
           "bridge-sign"
         ],
-        "actions": [
-          "travel-beach-to-house",
-          "travel-beach-to-hermit-grove",
-          "travel-beach-to-bridge"
-        ],
+        "actions": [],
         "tags": [
           "tutorial",
           "shore"
@@ -35,17 +31,15 @@
       {
         "id": "tutorial-hermit-grove",
         "position": {
-          "x": 180,
-          "y": -120
+          "x": 2,
+          "y": -1
         },
         "entities": [
           "hermit",
           "herb-patch",
           "cracked-bowl"
         ],
-        "actions": [
-          "travel-hermit-grove-to-beach"
-        ],
+        "actions": [],
         "tags": [
           "tutorial",
           "forest"
@@ -54,7 +48,7 @@
       {
         "id": "tutorial-bridge",
         "position": {
-          "x": 360,
+          "x": 2,
           "y": 0
         },
         "entities": [
@@ -62,92 +56,10 @@
           "river",
           "loose-plank"
         ],
-        "actions": [
-          "travel-bridge-to-beach"
-        ],
+        "actions": [],
         "tags": [
           "tutorial",
           "river"
-        ]
-      }
-    ],
-    "actions": [
-      {
-        "id": "travel-house-to-beach",
-        "role": "travel",
-        "durationSeconds": 1,
-        "rewards": [],
-        "results": [
-          {
-            "kind": "relocate",
-            "locationId": "tutorial-beach"
-          }
-        ],
-        "visibleWhen": {
-          "kind": "state-variable",
-          "variable": "flag:tutorial.miki-cleared",
-          "comparison": "equal",
-          "value": true
-        }
-      },
-      {
-        "id": "travel-beach-to-house",
-        "role": "travel",
-        "durationSeconds": 1,
-        "rewards": [],
-        "results": [
-          {
-            "kind": "relocate",
-            "locationId": "tutorial-guide-house"
-          }
-        ]
-      },
-      {
-        "id": "travel-beach-to-hermit-grove",
-        "role": "travel",
-        "durationSeconds": 1,
-        "rewards": [],
-        "results": [
-          {
-            "kind": "relocate",
-            "locationId": "tutorial-hermit-grove"
-          }
-        ]
-      },
-      {
-        "id": "travel-hermit-grove-to-beach",
-        "role": "travel",
-        "durationSeconds": 1,
-        "rewards": [],
-        "results": [
-          {
-            "kind": "relocate",
-            "locationId": "tutorial-beach"
-          }
-        ]
-      },
-      {
-        "id": "travel-beach-to-bridge",
-        "role": "travel",
-        "durationSeconds": 1,
-        "rewards": [],
-        "results": [
-          {
-            "kind": "relocate",
-            "locationId": "tutorial-bridge"
-          }
-        ]
-      },
-      {
-        "id": "travel-bridge-to-beach",
-        "role": "travel",
-        "durationSeconds": 1,
-        "rewards": [],
-        "results": [
-          {
-            "kind": "relocate",
-            "locationId": "tutorial-beach"
-          }
         ]
       }
     ],
@@ -813,22 +725,6 @@
       }
     ]
   },
-  "data-updates": {
-    "patches": [
-      {
-        "targetModId": "tutorial-island-guide-house",
-        "objectType": "locations",
-        "objectId": "tutorial-guide-house",
-        "ops": [
-          {
-            "op": "add",
-            "path": "/actions/-",
-            "value": "travel-house-to-beach"
-          }
-        ]
-      }
-    ]
-  },
   "locale": {
     "en": {
       "location.tutorial-beach.title": "Shell Beach",
@@ -851,18 +747,6 @@
       "entity.river.title": "River",
       "entity.gommi.title": "Gommi",
       "entity.loose-plank.title": "Loose Plank",
-      "action.travel-house-to-beach.title": "Travel to Shell Beach",
-      "action.travel-house-to-beach.success": "You arrive.",
-      "action.travel-beach-to-house.title": "Travel to Guide House",
-      "action.travel-beach-to-house.success": "You arrive.",
-      "action.travel-beach-to-hermit-grove.title": "Travel to Hermit Grove",
-      "action.travel-beach-to-hermit-grove.success": "You arrive.",
-      "action.travel-hermit-grove-to-beach.title": "Travel to Shell Beach",
-      "action.travel-hermit-grove-to-beach.success": "You arrive.",
-      "action.travel-beach-to-bridge.title": "Travel to Bridge Toll",
-      "action.travel-beach-to-bridge.success": "You arrive.",
-      "action.travel-bridge-to-beach.title": "Travel to Shell Beach",
-      "action.travel-bridge-to-beach.success": "You arrive.",
       "action.entity.brianna.talk.title": "Talk",
       "action.entity.brianna.talk.description": "Ask about surviving here.",
       "action.entity.shoals.fish.title": "Fish",

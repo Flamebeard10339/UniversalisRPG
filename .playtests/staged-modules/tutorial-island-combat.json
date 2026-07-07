@@ -12,8 +12,9 @@
       {
         "id": "tutorial-rat-cage",
         "position": {
-          "x": 840,
-          "y": 140
+          "x": 5,
+          "y": 0,
+          "z": -1
         },
         "entities": [
           "orloth",
@@ -30,8 +31,8 @@
       {
         "id": "mainland-arrival",
         "position": {
-          "x": 1040,
-          "y": 120
+          "x": 20,
+          "y": 0
         },
         "entities": [
           "mainland-greeter"

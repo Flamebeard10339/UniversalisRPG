@@ -88,6 +88,10 @@
           {
             "id": "smithing",
             "base": 6
+          },
+          {
+            "id": "movement-speed",
+            "base": 60
           }
         ],
         "skills": [
@@ -143,30 +147,7 @@
           },
           {
             "id": "cooked-shrimp",
-            "actions": [
-              {
-                "id": "eat",
-                "instant": true,
-                "rewards": [],
-                "results": [
-                  {
-                    "kind": "item",
-                    "itemId": "cooked-shrimp",
-                    "amount": -1
-                  },
-                  {
-                    "kind": "flag",
-                    "flagId": "well-fed",
-                    "value": true,
-                    "expiresAfterSeconds": 60
-                  },
-                  {
-                    "kind": "chat",
-                    "messageKey": "chat.item.cooked-shrimp.eat"
-                  }
-                ]
-              }
-            ]
+            "tags": "food, +3 regeneration, 60s"
           },
           {
             "id": "herb"
@@ -232,10 +213,6 @@
             "initialValue": false
           },
           {
-            "id": "well-fed",
-            "initialValue": false
-          },
-          {
             "id": "tutorial.bookshelf-note-taken",
             "initialValue": false
           },
@@ -254,20 +231,6 @@
           {
             "id": "tutorial.crate-bowl-taken",
             "initialValue": false
-          }
-        ],
-        "statModifiers": [
-          {
-            "id": "well-fed-regen-buff",
-            "statId": "regeneration",
-            "amount": 3,
-            "kind": "added",
-            "activeWhen": {
-              "kind": "state-variable",
-              "variable": "flag:well-fed",
-              "comparison": "equal",
-              "value": true
-            }
           }
         ],
         "dialogues": [
@@ -361,6 +324,8 @@
           "stat.thieving.description": "Power applied to locks and sleight of hand.",
           "stat.smithing.title": "Smithing",
           "stat.smithing.description": "Power applied to smelting and forging.",
+          "stat.movement-speed.title": "Movement Speed",
+          "stat.movement-speed.description": "How quickly you travel between locations.",
           "skill.fishing.title": "Fishing",
           "skill.fishing.description": "Catching food from open water.",
           "skill.cooking.title": "Cooking",
@@ -407,9 +372,6 @@
           "action.item.note.read.title": "Read",
           "action.item.note.read.description": "Read the handwritten note.",
           "dialogue.note.start": "It reads:\n- Remember to tell them about the Quests tab.\n- Remember to explain the colors: red, yellow, green.\n- Remember to unlock the door before they leave.",
-          "action.item.cooked-shrimp.eat.title": "Eat",
-          "action.item.cooked-shrimp.eat.description": "Eat the cooked shrimp.",
-          "chat.item.cooked-shrimp.eat": "Warmth spreads. You feel steadier for a while.",
           "modulePack.tutorial-island.title": "Tutorial Island"
         }
       }
@@ -446,7 +408,9 @@
               "drawer",
               "bookshelf"
             ],
-            "actions": [],
+            "actions": [
+              "wall-house-to-beach"
+            ],
             "starting": true,
             "tags": [
               "tutorial",
@@ -460,6 +424,28 @@
             "sourceStatId": "thieving",
             "targetStatId": "thieving",
             "targetPlayerHealth": false
+          }
+        ],
+        "actions": [
+          {
+            "id": "wall-house-to-beach",
+            "role": "travel",
+            "rewards": [],
+            "results": [
+              {
+                "kind": "relocate",
+                "locationId": "tutorial-beach"
+              }
+            ],
+            "visibleWhen": {
+              "kind": "not",
+              "condition": {
+                "kind": "state-variable",
+                "variable": "flag:tutorial.miki-cleared",
+                "comparison": "equal",
+                "value": true
+              }
+            }
           }
         ],
         "entities": [
@@ -989,6 +975,8 @@
           "action.entity.miki.examine.description": "Look at Miki.",
           "action.entity.front-door.pick.title": "Pick Lock",
           "action.entity.front-door.pick.description": "Work the lock with the lockpick.",
+          "action.wall-house-to-beach.title": "Leave",
+          "action.wall-house-to-beach.description": "Leave the house.",
           "action.entity.front-door.examine.title": "Examine",
           "action.entity.front-door.examine.description": "Check the front door.",
           "action.entity.mirror.look.title": "Look",
@@ -1064,7 +1052,7 @@
           {
             "id": "tutorial-beach",
             "position": {
-              "x": 180,
+              "x": 1,
               "y": 0
             },
             "entities": [
@@ -1074,11 +1062,7 @@
               "supply-crate",
               "bridge-sign"
             ],
-            "actions": [
-              "travel-beach-to-house",
-              "travel-beach-to-hermit-grove",
-              "travel-beach-to-bridge"
-            ],
+            "actions": [],
             "tags": [
               "tutorial",
               "shore"
@@ -1087,17 +1071,15 @@
           {
             "id": "tutorial-hermit-grove",
             "position": {
-              "x": 180,
-              "y": -120
+              "x": 2,
+              "y": -1
             },
             "entities": [
               "hermit",
               "herb-patch",
               "cracked-bowl"
             ],
-            "actions": [
-              "travel-hermit-grove-to-beach"
-            ],
+            "actions": [],
             "tags": [
               "tutorial",
               "forest"
@@ -1106,7 +1088,7 @@
           {
             "id": "tutorial-bridge",
             "position": {
-              "x": 360,
+              "x": 2,
               "y": 0
             },
             "entities": [
@@ -1114,92 +1096,10 @@
               "river",
               "loose-plank"
             ],
-            "actions": [
-              "travel-bridge-to-beach"
-            ],
+            "actions": [],
             "tags": [
               "tutorial",
               "river"
-            ]
-          }
-        ],
-        "actions": [
-          {
-            "id": "travel-house-to-beach",
-            "role": "travel",
-            "durationSeconds": 1,
-            "rewards": [],
-            "results": [
-              {
-                "kind": "relocate",
-                "locationId": "tutorial-beach"
-              }
-            ],
-            "visibleWhen": {
-              "kind": "state-variable",
-              "variable": "flag:tutorial.miki-cleared",
-              "comparison": "equal",
-              "value": true
-            }
-          },
-          {
-            "id": "travel-beach-to-house",
-            "role": "travel",
-            "durationSeconds": 1,
-            "rewards": [],
-            "results": [
-              {
-                "kind": "relocate",
-                "locationId": "tutorial-guide-house"
-              }
-            ]
-          },
-          {
-            "id": "travel-beach-to-hermit-grove",
-            "role": "travel",
-            "durationSeconds": 1,
-            "rewards": [],
-            "results": [
-              {
-                "kind": "relocate",
-                "locationId": "tutorial-hermit-grove"
-              }
-            ]
-          },
-          {
-            "id": "travel-hermit-grove-to-beach",
-            "role": "travel",
-            "durationSeconds": 1,
-            "rewards": [],
-            "results": [
-              {
-                "kind": "relocate",
-                "locationId": "tutorial-beach"
-              }
-            ]
-          },
-          {
-            "id": "travel-beach-to-bridge",
-            "role": "travel",
-            "durationSeconds": 1,
-            "rewards": [],
-            "results": [
-              {
-                "kind": "relocate",
-                "locationId": "tutorial-bridge"
-              }
-            ]
-          },
-          {
-            "id": "travel-bridge-to-beach",
-            "role": "travel",
-            "durationSeconds": 1,
-            "rewards": [],
-            "results": [
-              {
-                "kind": "relocate",
-                "locationId": "tutorial-beach"
-              }
             ]
           }
         ],
@@ -1865,22 +1765,6 @@
           }
         ]
       },
-      "data-updates": {
-        "patches": [
-          {
-            "targetModId": "tutorial-island-guide-house",
-            "objectType": "locations",
-            "objectId": "tutorial-guide-house",
-            "ops": [
-              {
-                "op": "add",
-                "path": "/actions/-",
-                "value": "travel-house-to-beach"
-              }
-            ]
-          }
-        ]
-      },
       "locale": {
         "en": {
           "location.tutorial-beach.title": "Shell Beach",
@@ -1903,18 +1787,6 @@
           "entity.river.title": "River",
           "entity.gommi.title": "Gommi",
           "entity.loose-plank.title": "Loose Plank",
-          "action.travel-house-to-beach.title": "Travel to Shell Beach",
-          "action.travel-house-to-beach.success": "You arrive.",
-          "action.travel-beach-to-house.title": "Travel to Guide House",
-          "action.travel-beach-to-house.success": "You arrive.",
-          "action.travel-beach-to-hermit-grove.title": "Travel to Hermit Grove",
-          "action.travel-beach-to-hermit-grove.success": "You arrive.",
-          "action.travel-hermit-grove-to-beach.title": "Travel to Shell Beach",
-          "action.travel-hermit-grove-to-beach.success": "You arrive.",
-          "action.travel-beach-to-bridge.title": "Travel to Bridge Toll",
-          "action.travel-beach-to-bridge.success": "You arrive.",
-          "action.travel-bridge-to-beach.title": "Travel to Shell Beach",
-          "action.travel-bridge-to-beach.success": "You arrive.",
           "action.entity.brianna.talk.title": "Talk",
           "action.entity.brianna.talk.description": "Ask about surviving here.",
           "action.entity.shoals.fish.title": "Fish",
@@ -2012,7 +1884,7 @@
           {
             "id": "tutorial-bank",
             "position": {
-              "x": 520,
+              "x": 3,
               "y": 0
             },
             "entities": [
@@ -2023,20 +1895,6 @@
             "tags": [
               "tutorial",
               "settlement"
-            ]
-          }
-        ],
-        "actions": [
-          {
-            "id": "travel-bridge-to-bank",
-            "role": "travel",
-            "durationSeconds": 1,
-            "rewards": [],
-            "results": [
-              {
-                "kind": "relocate",
-                "locationId": "tutorial-bank"
-              }
             ]
           }
         ],
@@ -2138,29 +1996,11 @@
           }
         ]
       },
-      "data-updates": {
-        "patches": [
-          {
-            "targetModId": "tutorial-island-survival",
-            "objectType": "locations",
-            "objectId": "tutorial-bridge",
-            "ops": [
-              {
-                "op": "add",
-                "path": "/actions/-",
-                "value": "travel-bridge-to-bank"
-              }
-            ]
-          }
-        ]
-      },
       "locale": {
         "en": {
           "location.tutorial-bank.title": "Island Bank",
           "location.tutorial-bank.description": "A tidy counter and an open trapdoor share the room.",
           "location.tutorial-bank.exhausted": "The teller returns to sorting coins.",
-          "action.travel-bridge-to-bank.title": "Travel to Island Bank",
-          "action.travel-bridge-to-bank.success": "You arrive.",
           "entity.bank-teller.title": "Bank Teller",
           "entity.trapdoor.title": "Trapdoor",
           "action.entity.bank-teller.talk.title": "Talk",
@@ -2200,8 +2040,9 @@
           {
             "id": "tutorial-mine",
             "position": {
-              "x": 520,
-              "y": 140
+              "x": 3,
+              "y": 0,
+              "z": -1
             },
             "entities": [
               "denzel",
@@ -2219,8 +2060,9 @@
           {
             "id": "tutorial-forge",
             "position": {
-              "x": 680,
-              "y": 140
+              "x": 4,
+              "y": 0,
+              "z": -1
             },
             "entities": [
               "furnace",
@@ -2237,7 +2079,6 @@
         "actions": [
           {
             "id": "descend-to-mine",
-            "role": "travel",
             "durationSeconds": 1,
             "rewards": [],
             "results": [
@@ -2666,8 +2507,9 @@
           {
             "id": "tutorial-rat-cage",
             "position": {
-              "x": 840,
-              "y": 140
+              "x": 5,
+              "y": 0,
+              "z": -1
             },
             "entities": [
               "orloth",
@@ -2684,8 +2526,8 @@
           {
             "id": "mainland-arrival",
             "position": {
-              "x": 1040,
-              "y": 120
+              "x": 20,
+              "y": 0
             },
             "entities": [
               "mainland-greeter"

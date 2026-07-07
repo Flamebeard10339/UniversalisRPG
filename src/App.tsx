@@ -5,6 +5,7 @@ import { FloatingSkillText } from './components/FloatingSkillText';
 import { NameEditorModal } from './components/NameEditorModal';
 import { ActionPanel } from './components/ActionPanel';
 import { ChatPanel } from './components/ChatPanel';
+import { MovementArrows } from './components/MovementArrows';
 import { BankPanel } from './components/BankPanel';
 import { CharacterStats } from './components/CharacterStats';
 import { CollectionLogPanel } from './components/CollectionLogPanel';
@@ -921,7 +922,7 @@ export default function App() {
   return (
     <main className={`min-h-screen bg-slate-950 text-slate-100 ${visibleActiveTab === 'home' && visibleHomeTab !== 'workbench' ? 'pb-[calc(33vh+6rem)]' : 'pb-24'}`}>
       <header className="border-b border-slate-800 bg-slate-900/70 px-4 py-3">
-        <div className="mx-auto max-w-7xl">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-3">
           <div>
             <h1 className="text-xl font-semibold">
               {visibleActiveTab === 'settings'
@@ -931,8 +932,17 @@ export default function App() {
                   : `${t(`app.tab.${visibleActiveTab}`)}${visibleActiveTab === 'character' && playState.characterName ? ` - ${playState.characterName}` : ''}`}
             </h1>
             {visibleActiveTab === 'settings' && <p className="text-sm text-slate-400">{t(universeTitleKey(bundle.manifest.id))} - {t(universeDescriptionKey(bundle.manifest.id), '')}</p>}
-            {visibleActiveTab === 'home' && currentLocation && <p className="text-sm text-slate-400">{t(locationDescriptionKey(currentLocation.id), '')}</p>}
           </div>
+          {visibleActiveTab === 'home' && currentLocation && (
+            <button
+              className="shrink-0 rounded border border-slate-700 px-3 py-1.5 text-xs font-semibold text-slate-200"
+              data-testid="examine-location"
+              onClick={() => appendChatText(runtimeUniverseId, t(locationDescriptionKey(currentLocation.id), ''))}
+              type="button"
+            >
+              {t('home.examine', 'Examine')}
+            </button>
+          )}
         </div>
       </header>
 
@@ -1019,6 +1029,7 @@ export default function App() {
                     </div>
                   </section>
                 )}
+                <MovementArrows bundle={bundle} context={actionContext} onMove={beginTravel} playState={playState} t={t} />
                 <section className="rounded border border-slate-800 bg-slate-900 p-4" data-testid="home-action-panel">
                   <ActionPanel
                     debugEnabled={debugEnabled}

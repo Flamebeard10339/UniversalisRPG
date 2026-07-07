@@ -9,6 +9,7 @@ import { areActionRequirementsMet, evaluateCondition, isActionVisible, canStartA
 import { getActionDescriptionText, getActionTitleText } from './actionLocalization';
 import { entityTitleKey, locationDescriptionKey, locationTitleKey, itemTitleKey } from './contentIds';
 import { availableRecipesForStation, resolveStationAction } from './recipes';
+import { isWallAction } from './travel';
 import type { Translator } from './i18n';
 import type {
   ActionResolutionContext,
@@ -100,6 +101,7 @@ export const visibleChoices = (
 
   const locationActions = bundle.actions
     .filter((action) => action.locationId === state.currentLocationId && !entityActionIds.has(action.id))
+    .filter((action) => !isWallAction(action, context))
     .filter((action) => isActionVisible(state, action, context))
     .flatMap((action) => describe(action, 'action'));
 

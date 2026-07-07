@@ -12,7 +12,7 @@
       {
         "id": "tutorial-bank",
         "position": {
-          "x": 520,
+          "x": 3,
           "y": 0
         },
         "entities": [
@@ -23,20 +23,6 @@
         "tags": [
           "tutorial",
           "settlement"
-        ]
-      }
-    ],
-    "actions": [
-      {
-        "id": "travel-bridge-to-bank",
-        "role": "travel",
-        "durationSeconds": 1,
-        "rewards": [],
-        "results": [
-          {
-            "kind": "relocate",
-            "locationId": "tutorial-bank"
-          }
         ]
       }
     ],
@@ -138,29 +124,11 @@
       }
     ]
   },
-  "data-updates": {
-    "patches": [
-      {
-        "targetModId": "tutorial-island-survival",
-        "objectType": "locations",
-        "objectId": "tutorial-bridge",
-        "ops": [
-          {
-            "op": "add",
-            "path": "/actions/-",
-            "value": "travel-bridge-to-bank"
-          }
-        ]
-      }
-    ]
-  },
   "locale": {
     "en": {
       "location.tutorial-bank.title": "Island Bank",
       "location.tutorial-bank.description": "A tidy counter and an open trapdoor share the room.",
       "location.tutorial-bank.exhausted": "The teller returns to sorting coins.",
-      "action.travel-bridge-to-bank.title": "Travel to Island Bank",
-      "action.travel-bridge-to-bank.success": "You arrive.",
       "entity.bank-teller.title": "Bank Teller",
       "entity.trapdoor.title": "Trapdoor",
       "action.entity.bank-teller.talk.title": "Talk",

@@ -3,6 +3,7 @@ export type LocaleDictionary = Record<string, string>;
 export type Position = {
   x: number;
   y: number;
+  z?: number;
 };
 
 export type UniverseManifest = {
@@ -84,6 +85,8 @@ export type UniverseUiSettings = {
   loopActionsByDefault?: boolean;
   travelPathMaxSeconds?: number;
   travelPathMaxNodes?: number;
+  connectivityMode?: 'highly-connected' | 'sparse';
+  distanceBetweenAdjacentTiles?: number;
 };
 
 export type LocationNode = {

@@ -610,6 +610,9 @@
             },
             "y": {
               "type": "number"
+            },
+            "z": {
+              "type": "number"
             }
           }
         },

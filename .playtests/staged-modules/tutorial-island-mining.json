@@ -12,8 +12,9 @@
       {
         "id": "tutorial-mine",
         "position": {
-          "x": 520,
-          "y": 140
+          "x": 3,
+          "y": 0,
+          "z": -1
         },
         "entities": [
           "denzel",
@@ -31,8 +32,9 @@
       {
         "id": "tutorial-forge",
         "position": {
-          "x": 680,
-          "y": 140
+          "x": 4,
+          "y": 0,
+          "z": -1
         },
         "entities": [
           "furnace",
@@ -49,7 +51,6 @@
     "actions": [
       {
         "id": "descend-to-mine",
-        "role": "travel",
         "durationSeconds": 1,
         "rewards": [],
         "results": [

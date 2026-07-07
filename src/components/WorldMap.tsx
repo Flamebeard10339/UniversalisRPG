@@ -19,11 +19,19 @@ const edgeTypes = {
 
 const NODE_WIDTH = 160;
 const NODE_HEIGHT = 56;
+// Locations are now a grid of small integer cells (see travel.ts); scale each
+// cell up to a comfortable pixel spacing for the ReactFlow canvas.
+const GRID_CELL_PIXELS = 220;
 
 type Point = {
   x: number;
   y: number;
 };
+
+const toPixelPosition = (position: Point): Point => ({
+  x: position.x * GRID_CELL_PIXELS,
+  y: position.y * GRID_CELL_PIXELS,
+});
 
 const getNodeCenter = (position: Point): Point => ({
   x: position.x + NODE_WIDTH / 2,
@@ -71,8 +79,8 @@ export const WorldMap = ({ bundle, playState, onTravel, t }: WorldMapProps) => {
     [actionContext, bundle, playState],
   );
   const mapExtent = useMemo(() => {
-    const xs = visibleGraph.locations.map((location) => location.position.x);
-    const ys = visibleGraph.locations.map((location) => location.position.y);
+    const xs = visibleGraph.locations.map((location) => toPixelPosition(location.position).x);
+    const ys = visibleGraph.locations.map((location) => toPixelPosition(location.position).y);
     const margin = 420;
 
     return [
@@ -93,7 +101,7 @@ export const WorldMap = ({ bundle, playState, onTravel, t }: WorldMapProps) => {
 
         return {
           id: location.id,
-          position: location.position,
+          position: toPixelPosition(location.position),
           data: {
             label: (
               <button
@@ -114,7 +122,9 @@ export const WorldMap = ({ bundle, playState, onTravel, t }: WorldMapProps) => {
                 }}
                 type="button"
               >
-                <span className="text-sm font-semibold">{t(locationTitleKey(location.id))}</span>
+                <span className="text-sm font-semibold">
+                  {isDiscovered ? t(locationTitleKey(location.id), location.id) : t('map.undiscoveredLocation', '???')}
+                </span>
               </button>
             ),
           },
@@ -137,8 +147,8 @@ export const WorldMap = ({ bundle, playState, onTravel, t }: WorldMapProps) => {
       visibleGraph.edges.map((edge) => {
         const sourceLocation = visibleGraph.locations.find((location) => location.id === edge.source);
         const targetLocation = visibleGraph.locations.find((location) => location.id === edge.target);
-        const sourceCenter = getNodeCenter(sourceLocation?.position ?? { x: 0, y: 0 });
-        const targetCenter = getNodeCenter(targetLocation?.position ?? { x: 0, y: 0 });
+        const sourceCenter = getNodeCenter(toPixelPosition(sourceLocation?.position ?? { x: 0, y: 0 }));
+        const targetCenter = getNodeCenter(toPixelPosition(targetLocation?.position ?? { x: 0, y: 0 }));
         const active = playState.activeTravel?.actionId === edge.action.id;
         const pathIndex = playState.activeTravel?.pathActionIds.indexOf(edge.action.id) ?? -1;
         const inPath = pathIndex >= 0;

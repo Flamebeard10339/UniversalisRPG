@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createInitialPlayState, resolveDueTimers, startTravel } from './timers';
-import { findTravelPath, getAvailableTravelEdgesForNode, getVisibleTravelGraph } from './travel';
-import type { ActionResolutionContext, GameAction, UniverseUiSettings } from './types';
+import { findTravelPath, getAvailableTravelEdgesForNode, getLocationInDirection, getVisibleTravelGraph } from './travel';
+import type { ActionResolutionContext, GameAction, LocationNode, UniverseUiSettings } from './types';
 
 const travelAction = (id: string, source: string, target: string, durationSeconds = 1, patch: Partial<GameAction> = {}): GameAction => ({
   id,
@@ -110,15 +110,17 @@ describe('travel actions', () => {
 
   it('reports too-far when path limits block a valid route', () => {
     const actions = [
-      travelAction('go-middle', 'start', 'middle', 6),
-      travelAction('go-target', 'middle', 'target', 6),
+      travelAction('go-middle', 'start', 'middle'),
+      travelAction('go-target', 'middle', 'target'),
     ];
     const state = {
       ...createInitialPlayState('test', 'start'),
       discoveredLocationIds: ['start', 'middle'],
     };
 
-    expect(findTravelPath(state, context(actions, { travelPathMaxSeconds: 10 }), 'target').status).toBe('too-far');
+    // Each hop is 1 grid unit at the default movement speed (1s/unit), so the
+    // full 2-hop route takes 2s; capping the budget at 1s must block it.
+    expect(findTravelPath(state, context(actions, { travelPathMaxSeconds: 1 }), 'target').status).toBe('too-far');
   });
 
   it('explores every arrival while resolving a multi-segment travel path', () => {
@@ -143,5 +145,152 @@ describe('travel actions', () => {
     expect(resolved.collectionLog['location:middle:explored']).toBe(1);
     expect(resolved.collectionLog['location:target:explored']).toBe(1);
     expect(resolved.activeTravel).toBeNull();
+  });
+});
+
+describe('highly-connected mode', () => {
+  const gridContext = (locations: LocationNode[], actions: GameAction[] = [], ui: UniverseUiSettings = {}): ActionResolutionContext => ({
+    manifest: {
+      schemaVersion: 1,
+      id: 'test',
+      version: '1',
+      author: 'test',
+      locales: ['en'],
+      files: [],
+      ui: { connectivityMode: 'highly-connected', ...ui },
+    },
+    actions,
+    skills: [],
+    stats: [],
+    locations,
+    entities: [],
+    items: [],
+    flags: [{ id: 'unlocked', initialValue: false }],
+    resourceDefinitions: [],
+    effects: [],
+    interactionTypes: [],
+    enemies: [],
+    dropTables: [],
+    dialogues: [],
+  });
+
+  it('auto-connects every grid-adjacent location, including diagonals', () => {
+    const locations: LocationNode[] = [
+      { id: 'center', position: { x: 0, y: 0 } },
+      { id: 'north', position: { x: 0, y: -1 } },
+      { id: 'northeast', position: { x: 1, y: -1 } },
+      { id: 'far', position: { x: 2, y: 0 } },
+    ];
+    const state = createInitialPlayState('test', 'center');
+    const edges = getAvailableTravelEdgesForNode(state, gridContext(locations), 'center');
+
+    expect(edges.map((edge) => edge.target).sort()).toEqual(['north', 'northeast']);
+    expect(edges.find((edge) => edge.target === 'north')?.travelTimeSeconds).toBeCloseTo(1, 5);
+    expect(edges.find((edge) => edge.target === 'northeast')?.travelTimeSeconds).toBeCloseTo(Math.sqrt(2), 5);
+  });
+
+  it('treats a visible authored travel action between adjacent locations as a wall', () => {
+    const locations: LocationNode[] = [
+      { id: 'center', position: { x: 0, y: 0 } },
+      { id: 'north', position: { x: 0, y: -1 } },
+    ];
+    const wall: GameAction = {
+      id: 'wall-center-to-north',
+      locationId: 'center',
+      role: 'travel',
+      rewards: [],
+      results: [{ kind: 'relocate', locationId: 'north' }],
+    };
+    const state = createInitialPlayState('test', 'center');
+
+    expect(getAvailableTravelEdgesForNode(state, gridContext(locations, [wall]), 'center')).toHaveLength(0);
+  });
+
+  it('opens a wall once its visibleWhen condition is met, mirroring conditional gating', () => {
+    const locations: LocationNode[] = [
+      { id: 'center', position: { x: 0, y: 0 } },
+      { id: 'north', position: { x: 0, y: -1 } },
+    ];
+    const wall: GameAction = {
+      id: 'wall-center-to-north',
+      locationId: 'center',
+      role: 'travel',
+      rewards: [],
+      results: [{ kind: 'relocate', locationId: 'north' }],
+      visibleWhen: { kind: 'not', condition: { kind: 'state-variable', variable: 'flag:unlocked', comparison: 'equal', value: true } },
+    };
+    const locked = createInitialPlayState('test', 'center');
+    const unlocked = { ...locked, flags: { unlocked: true } };
+
+    expect(getAvailableTravelEdgesForNode(locked, gridContext(locations, [wall]), 'center')).toHaveLength(0);
+    expect(getAvailableTravelEdgesForNode(unlocked, gridContext(locations, [wall]), 'center').map((edge) => edge.target)).toEqual(['north']);
+  });
+
+  it('does not connect adjacent locations on a different z-layer', () => {
+    const locations: LocationNode[] = [
+      { id: 'surface', position: { x: 0, y: 0, z: 0 } },
+      { id: 'basement', position: { x: 0, y: 0, z: -1 } },
+    ];
+    const state = createInitialPlayState('test', 'surface');
+
+    expect(getAvailableTravelEdgesForNode(state, gridContext(locations), 'surface')).toHaveLength(0);
+  });
+
+  it('scales travel time by the movement-speed stat', () => {
+    const locations: LocationNode[] = [
+      { id: 'center', position: { x: 0, y: 0 } },
+      { id: 'north', position: { x: 0, y: -1 } },
+    ];
+    const fastContext = gridContext(locations);
+    fastContext.stats = [{ id: 'movement-speed', base: 120 }];
+    const state = createInitialPlayState('test', 'center');
+
+    const edges = getAvailableTravelEdgesForNode(state, fastContext, 'center');
+    expect(edges[0]?.travelTimeSeconds).toBeCloseTo(0.5, 5);
+  });
+
+  it('only shows locations on the current z-layer on the map', () => {
+    const bundle = {
+      manifest: { schemaVersion: 1, id: 'test', version: '1', author: 'test', locales: ['en'], files: [], ui: { connectivityMode: 'highly-connected' as const } },
+      locations: [
+        { id: 'surface', position: { x: 0, y: 0, z: 0 }, starting: true },
+        { id: 'basement', position: { x: 1, y: 0, z: -1 } },
+      ],
+      actions: [],
+      skills: [],
+      stats: [],
+      items: [],
+      flags: [],
+      resourceDefinitions: [],
+      effects: [],
+      interactionTypes: [],
+      enemies: [],
+      locales: { en: {} },
+    };
+    const playState = { ...createInitialPlayState('test', 'surface'), discoveredLocationIds: ['surface', 'basement'] };
+    const graph = getVisibleTravelGraph(bundle, playState, gridContext(bundle.locations));
+
+    expect(graph.locations.map((location) => location.id)).toEqual(['surface']);
+  });
+});
+
+describe('getLocationInDirection', () => {
+  const bundle = {
+    locations: [
+      { id: 'center', position: { x: 0, y: 0 } },
+      { id: 'north', position: { x: 0, y: -1 } },
+      { id: 'southeast', position: { x: 1, y: 1 } },
+      { id: 'other-layer', position: { x: 1, y: 0, z: -1 } },
+    ] as LocationNode[],
+  };
+
+  it('finds the neighboring location in a cardinal direction', () => {
+    expect(getLocationInDirection(bundle, 'center', 'n')?.id).toBe('north');
+    expect(getLocationInDirection(bundle, 'center', 'se')?.id).toBe('southeast');
+  });
+
+  it('returns null when there is no location in that direction, including across z-layers', () => {
+    expect(getLocationInDirection(bundle, 'center', 's')).toBeNull();
+    expect(getLocationInDirection(bundle, 'center', 'e')).toBeNull();
   });
 });

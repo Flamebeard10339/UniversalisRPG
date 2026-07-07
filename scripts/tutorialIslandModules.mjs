@@ -26,7 +26,10 @@ const item = (id, tags) => ({ id, ...(tags ? { tags } : {}) });
 const flag = (id, initialValue = false) => ({ id, initialValue });
 const skill = (id, statId = id) => ({ id, maxLevel: 100, statId });
 const stat = (id, base = 6) => ({ id, base });
-const loc = (id, x, y, entities = [], actions = [], extra = {}) => ({ id, position: { x, y }, entities, actions, ...extra });
+const loc = (id, x, y, entities = [], actions = [], extra = {}) => {
+  const { z, ...rest } = extra;
+  return { id, position: { x, y, ...(z !== undefined ? { z } : {}) }, entities, actions, ...rest };
+};
 const chat = (key) => ({ kind: 'chat', messageKey: key });
 const setFlag = (flagId, expiresAfterSeconds) => ({ kind: 'flag', flagId, value: true, ...(expiresAfterSeconds ? { expiresAfterSeconds } : {}) });
 const take = (itemId, amount = 1) => ({ kind: 'item', itemId, amount: -amount });
@@ -101,7 +104,7 @@ const itemNames = {
 const foundation = {
   ...moduleHeader('tutorial-island-foundation', ['tutorial-island-reset']),
   data: {
-    stats: [stat('fishing'), stat('cooking'), stat('thieving'), stat('smithing')],
+    stats: [stat('fishing'), stat('cooking'), stat('thieving'), stat('smithing'), stat('movement-speed', 60)],
     skills: [skill('fishing'), skill('cooking'), skill('thieving'), skill('smithing')],
     items: Object.entries(itemNames).map(([id, [, , tags]]) => {
       if (id === 'note') return { ...item(id, tags), actions: [action('read', [dialogueResult('note')])] };
@@ -143,6 +146,7 @@ const foundation = {
       'stat.cooking.title': 'Cooking', 'stat.cooking.description': 'Power applied to cooking actions.',
       'stat.thieving.title': 'Thieving', 'stat.thieving.description': 'Power applied to locks and sleight of hand.',
       'stat.smithing.title': 'Smithing', 'stat.smithing.description': 'Power applied to smelting and forging.',
+      'stat.movement-speed.title': 'Movement Speed', 'stat.movement-speed.description': 'How quickly you travel between locations.',
       'skill.fishing.title': 'Fishing', 'skill.fishing.description': 'Catching food from open water.',
       'skill.cooking.title': 'Cooking', 'skill.cooking.description': 'Turning raw supplies into safer meals.',
       'skill.thieving.title': 'Thieving', 'skill.thieving.description': 'Opening what was meant to stay closed.',
@@ -171,9 +175,16 @@ const foundation = {
 const guideHouse = {
   ...moduleHeader('tutorial-island-guide-house', ['tutorial-island-foundation']),
   data: {
-    locations: [loc('tutorial-guide-house', 0, 0, ['miki', 'front-door', 'mirror', 'drawer', 'bookshelf'], [], { starting: true, tags: ['tutorial', 'indoors'] })],
+    locations: [loc('tutorial-guide-house', 0, 0, ['miki', 'front-door', 'mirror', 'drawer', 'bookshelf'], ['wall-house-to-beach'], { starting: true, tags: ['tutorial', 'indoors'] })],
     interactionTypes: [
       { id: 'lockpicking', sourceStatId: 'thieving', targetStatId: 'thieving', targetPlayerHealth: false },
+    ],
+    // The island is a highly-connected grid: adjacent locations are travelable
+    // by default, so this "wall" (not a normal travel action) is what BLOCKS
+    // leaving the house before Miki's quest is accepted. It is present (and
+    // therefore blocking) only while the flag is unset.
+    actions: [
+      { id: 'wall-house-to-beach', role: 'travel', rewards: [], results: [relocate('tutorial-beach')], visibleWhen: not(hasFlag('tutorial.miki-cleared')) },
     ],
     entities: [
       entity('miki', [
@@ -255,6 +266,7 @@ const guideHouse = {
       'action.entity.miki.talk.title': 'Talk', 'action.entity.miki.talk.description': 'Ask Miki about the island.',
       'action.entity.miki.examine.title': 'Examine', 'action.entity.miki.examine.description': 'Look at Miki.',
       'action.entity.front-door.pick.title': 'Pick Lock', 'action.entity.front-door.pick.description': 'Work the lock with the lockpick.',
+      'action.wall-house-to-beach.title': 'Leave', 'action.wall-house-to-beach.description': 'Leave the house.',
       'action.entity.front-door.examine.title': 'Examine', 'action.entity.front-door.examine.description': 'Check the front door.',
       'action.entity.mirror.look.title': 'Look', 'action.entity.mirror.look.description': 'Catch your reflection.',
       'action.entity.drawer.examine.title': 'Examine', 'action.entity.drawer.examine.description': 'Examine the drawer.',
@@ -304,18 +316,14 @@ const guideHouse = {
 const survival = {
   ...moduleHeader('tutorial-island-survival', ['tutorial-island-guide-house']),
   data: {
+    // Highly-connected grid: beach/hermit-grove/bridge are all mutually
+    // grid-adjacent, so no explicit travel actions are needed for them.
     locations: [
-      loc('tutorial-beach', 180, 0, ['brianna', 'shoals', 'campfire', 'supply-crate', 'bridge-sign'], ['travel-beach-to-house', 'travel-beach-to-hermit-grove', 'travel-beach-to-bridge'], { tags: ['tutorial', 'shore'] }),
-      loc('tutorial-hermit-grove', 180, -120, ['hermit', 'herb-patch', 'cracked-bowl'], ['travel-hermit-grove-to-beach'], { tags: ['tutorial', 'forest'] }),
-      loc('tutorial-bridge', 360, 0, ['gommi', 'river', 'loose-plank'], ['travel-bridge-to-beach'], { tags: ['tutorial', 'river'] }),
-    ],
-    actions: [
-      { id: 'travel-house-to-beach', role: 'travel', durationSeconds: 1, rewards: [], results: [relocate('tutorial-beach')], visibleWhen: hasFlag('tutorial.miki-cleared') },
-      { id: 'travel-beach-to-house', role: 'travel', durationSeconds: 1, rewards: [], results: [relocate('tutorial-guide-house')] },
-      { id: 'travel-beach-to-hermit-grove', role: 'travel', durationSeconds: 1, rewards: [], results: [relocate('tutorial-hermit-grove')] },
-      { id: 'travel-hermit-grove-to-beach', role: 'travel', durationSeconds: 1, rewards: [], results: [relocate('tutorial-beach')] },
-      { id: 'travel-beach-to-bridge', role: 'travel', durationSeconds: 1, rewards: [], results: [relocate('tutorial-bridge')] },
-      { id: 'travel-bridge-to-beach', role: 'travel', durationSeconds: 1, rewards: [], results: [relocate('tutorial-beach')] },
+      loc('tutorial-beach', 1, 0, ['brianna', 'shoals', 'campfire', 'supply-crate', 'bridge-sign'], [], { tags: ['tutorial', 'shore'] }),
+      // (2,-1), not (1,-1): kept off guide-house's 8 neighbors on purpose, so
+      // its only ungated exit is straight to the beach (the walled one).
+      loc('tutorial-hermit-grove', 2, -1, ['hermit', 'herb-patch', 'cracked-bowl'], [], { tags: ['tutorial', 'forest'] }),
+      loc('tutorial-bridge', 2, 0, ['gommi', 'river', 'loose-plank'], [], { tags: ['tutorial', 'river'] }),
     ],
     entities: [
       entity('brianna', [action('talk', [dialogueResult('brianna')])]),
@@ -383,11 +391,6 @@ const survival = {
       recipe('cook-draught', 'tutorial-campfire', [ingredient('uncooked-sleeping-draught')], [ingredient('sleeping-draught')], { skillId: 'cooking', xpAmount: 6 }),
     ],
   },
-  'data-updates': {
-    patches: [
-      { targetModId: 'tutorial-island-guide-house', objectType: 'locations', objectId: 'tutorial-guide-house', ops: [{ op: 'add', path: '/actions/-', value: 'travel-house-to-beach' }] },
-    ],
-  },
   locale: {
     en: {
       'location.tutorial-beach.title': 'Shell Beach', 'location.tutorial-beach.description': 'Low shoals glitter beside a smoky campfire.', 'location.tutorial-beach.exhausted': 'The beach settles into gull cries and surf.',
@@ -396,12 +399,6 @@ const survival = {
       'entity.brianna.title': 'Brianna', 'entity.shoals.title': 'Shrimp Shoals', 'entity.campfire.title': 'Campfire', 'entity.supply-crate.title': 'Supply Crate', 'entity.bridge-sign.title': 'Bridge Sign',
       'entity.hermit.title': 'Hermit', 'entity.herb-patch.title': 'Herb Patch', 'entity.cracked-bowl.title': 'Cracked Bowl',
       'entity.river.title': 'River', 'entity.gommi.title': 'Gommi', 'entity.loose-plank.title': 'Loose Plank',
-      'action.travel-house-to-beach.title': 'Travel to Shell Beach', 'action.travel-house-to-beach.success': 'You arrive.',
-      'action.travel-beach-to-house.title': 'Travel to Guide House', 'action.travel-beach-to-house.success': 'You arrive.',
-      'action.travel-beach-to-hermit-grove.title': 'Travel to Hermit Grove', 'action.travel-beach-to-hermit-grove.success': 'You arrive.',
-      'action.travel-hermit-grove-to-beach.title': 'Travel to Shell Beach', 'action.travel-hermit-grove-to-beach.success': 'You arrive.',
-      'action.travel-beach-to-bridge.title': 'Travel to Bridge Toll', 'action.travel-beach-to-bridge.success': 'You arrive.',
-      'action.travel-bridge-to-beach.title': 'Travel to Shell Beach', 'action.travel-bridge-to-beach.success': 'You arrive.',
       'action.entity.brianna.talk.title': 'Talk', 'action.entity.brianna.talk.description': 'Ask about surviving here.',
       'action.entity.shoals.fish.title': 'Fish', 'action.entity.shoals.fish.description': 'Sweep the shallows with a small net.',
       'action.entity.shoals.examine.title': 'Examine', 'action.entity.shoals.examine.description': 'Look into the shoals.',
@@ -462,8 +459,7 @@ const survival = {
 const bank = {
   ...moduleHeader('tutorial-island-bank', ['tutorial-island-survival']),
   data: {
-    locations: [loc('tutorial-bank', 520, 0, ['bank-teller', 'trapdoor'], [], { tags: ['tutorial', 'settlement'] })],
-    actions: [{ id: 'travel-bridge-to-bank', role: 'travel', durationSeconds: 1, rewards: [], results: [relocate('tutorial-bank')] }],
+    locations: [loc('tutorial-bank', 3, 0, ['bank-teller', 'trapdoor'], [], { tags: ['tutorial', 'settlement'] })],
     entities: [
       entity('bank-teller', [action('talk', [dialogueResult('bank-teller'), setFlag('tutorial.bank-visited')])]),
       entity('trapdoor', [action('examine', [chat('chat.entity.trapdoor.examine')])]),
@@ -485,13 +481,9 @@ const bank = {
       ],
     }],
   },
-  'data-updates': {
-    patches: [{ targetModId: 'tutorial-island-survival', objectType: 'locations', objectId: 'tutorial-bridge', ops: [{ op: 'add', path: '/actions/-', value: 'travel-bridge-to-bank' }] }],
-  },
   locale: {
     en: {
       'location.tutorial-bank.title': 'Island Bank', 'location.tutorial-bank.description': 'A tidy counter and an open trapdoor share the room.', 'location.tutorial-bank.exhausted': 'The teller returns to sorting coins.',
-      'action.travel-bridge-to-bank.title': 'Travel to Island Bank', 'action.travel-bridge-to-bank.success': 'You arrive.',
       'entity.bank-teller.title': 'Bank Teller', 'entity.trapdoor.title': 'Trapdoor',
       'action.entity.bank-teller.talk.title': 'Talk', 'action.entity.bank-teller.talk.description': 'Ask about banking.',
       'action.entity.trapdoor.examine.title': 'Examine', 'action.entity.trapdoor.examine.description': 'Look down the open trapdoor.',
@@ -514,10 +506,13 @@ const mining = {
   ...moduleHeader('tutorial-island-mining', ['tutorial-island-bank']),
   data: {
     locations: [
-      loc('tutorial-mine', 520, 140, ['denzel', 'copper-rock', 'tin-rock', 'locked-chest', 'mine-tunnel'], [], { tags: ['tutorial', 'cave'] }),
-      loc('tutorial-forge', 680, 140, ['furnace', 'anvil', 'forge-table'], [], { tags: ['tutorial', 'cave'] }),
+      loc('tutorial-mine', 3, 0, ['denzel', 'copper-rock', 'tin-rock', 'locked-chest', 'mine-tunnel'], [], { z: -1, tags: ['tutorial', 'cave'] }),
+      loc('tutorial-forge', 4, 0, ['furnace', 'anvil', 'forge-table'], [], { z: -1, tags: ['tutorial', 'cave'] }),
     ],
-    actions: [{ id: 'descend-to-mine', role: 'travel', durationSeconds: 1, rewards: [], results: [relocate('tutorial-mine')] }],
+    // Not a highly-connected grid edge: descending through the trapdoor
+    // changes z-layer, which is always an explicit action (like a ladder),
+    // never automatic adjacency.
+    actions: [{ id: 'descend-to-mine', durationSeconds: 1, rewards: [], results: [relocate('tutorial-mine')] }],
     entities: [
       entity('denzel', [
         action('talk', [give('bronze-pickaxe', 1), dialogueResult('denzel')], { maxCompletions: 1 }),
@@ -597,8 +592,10 @@ const combat = {
   ...moduleHeader('tutorial-island-combat', ['tutorial-island-mining']),
   data: {
     locations: [
-      loc('tutorial-rat-cage', 840, 140, ['orloth', 'giant-rat', 'rat-cage-door', 'portal'], [], { tags: ['tutorial', 'cave'] }),
-      loc('mainland-arrival', 1040, 120, ['mainland-greeter'], [], { tags: ['mainland'] }),
+      loc('tutorial-rat-cage', 5, 0, ['orloth', 'giant-rat', 'rat-cage-door', 'portal'], [], { z: -1, tags: ['tutorial', 'cave'] }),
+      // Reached only through the portal's one-off `step-through` teleport, not
+      // grid movement, so its grid position doesn't need to relate to anything.
+      loc('mainland-arrival', 20, 0, ['mainland-greeter'], [], { tags: ['mainland'] }),
     ],
     entities: [
       entity('orloth', [

@@ -24,6 +24,10 @@
       {
         "id": "smithing",
         "base": 6
+      },
+      {
+        "id": "movement-speed",
+        "base": 60
       }
     ],
     "skills": [
@@ -79,30 +83,7 @@
       },
       {
         "id": "cooked-shrimp",
-        "actions": [
-          {
-            "id": "eat",
-            "instant": true,
-            "rewards": [],
-            "results": [
-              {
-                "kind": "item",
-                "itemId": "cooked-shrimp",
-                "amount": -1
-              },
-              {
-                "kind": "flag",
-                "flagId": "well-fed",
-                "value": true,
-                "expiresAfterSeconds": 60
-              },
-              {
-                "kind": "chat",
-                "messageKey": "chat.item.cooked-shrimp.eat"
-              }
-            ]
-          }
-        ]
+        "tags": "food, +3 regeneration, 60s"
       },
       {
         "id": "herb"
@@ -168,10 +149,6 @@
         "initialValue": false
       },
       {
-        "id": "well-fed",
-        "initialValue": false
-      },
-      {
         "id": "tutorial.bookshelf-note-taken",
         "initialValue": false
       },
@@ -190,20 +167,6 @@
       {
         "id": "tutorial.crate-bowl-taken",
         "initialValue": false
-      }
-    ],
-    "statModifiers": [
-      {
-        "id": "well-fed-regen-buff",
-        "statId": "regeneration",
-        "amount": 3,
-        "kind": "added",
-        "activeWhen": {
-          "kind": "state-variable",
-          "variable": "flag:well-fed",
-          "comparison": "equal",
-          "value": true
-        }
       }
     ],
     "dialogues": [
@@ -297,6 +260,8 @@
       "stat.thieving.description": "Power applied to locks and sleight of hand.",
       "stat.smithing.title": "Smithing",
       "stat.smithing.description": "Power applied to smelting and forging.",
+      "stat.movement-speed.title": "Movement Speed",
+      "stat.movement-speed.description": "How quickly you travel between locations.",
       "skill.fishing.title": "Fishing",
       "skill.fishing.description": "Catching food from open water.",
       "skill.cooking.title": "Cooking",
@@ -343,9 +308,6 @@
       "action.item.note.read.title": "Read",
       "action.item.note.read.description": "Read the handwritten note.",
       "dialogue.note.start": "It reads:\n- Remember to tell them about the Quests tab.\n- Remember to explain the colors: red, yellow, green.\n- Remember to unlock the door before they leave.",
-      "action.item.cooked-shrimp.eat.title": "Eat",
-      "action.item.cooked-shrimp.eat.description": "Eat the cooked shrimp.",
-      "chat.item.cooked-shrimp.eat": "Warmth spreads. You feel steadier for a while.",
       "modulePack.tutorial-island.title": "Tutorial Island"
     }
   }

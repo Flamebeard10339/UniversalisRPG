@@ -14,7 +14,8 @@
         "additionalProperties": false,
         "properties": {
           "x": { "type": "number" },
-          "y": { "type": "number" }
+          "y": { "type": "number" },
+          "z": { "type": "number" }
         }
       },
       "starting": { "type": "boolean" },

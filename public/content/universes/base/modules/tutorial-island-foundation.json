@@ -24,6 +24,10 @@
       {
         "id": "smithing",
         "base": 6
+      },
+      {
+        "id": "movement-speed",
+        "base": 60
       }
     ],
     "skills": [
@@ -256,6 +260,8 @@
       "stat.thieving.description": "Power applied to locks and sleight of hand.",
       "stat.smithing.title": "Smithing",
       "stat.smithing.description": "Power applied to smelting and forging.",
+      "stat.movement-speed.title": "Movement Speed",
+      "stat.movement-speed.description": "How quickly you travel between locations.",
       "skill.fishing.title": "Fishing",
       "skill.fishing.description": "Catching food from open water.",
       "skill.cooking.title": "Cooking",

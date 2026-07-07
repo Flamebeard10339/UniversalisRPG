@@ -22,7 +22,9 @@
           "drawer",
           "bookshelf"
         ],
-        "actions": [],
+        "actions": [
+          "wall-house-to-beach"
+        ],
         "starting": true,
         "tags": [
           "tutorial",
@@ -36,6 +38,28 @@
         "sourceStatId": "thieving",
         "targetStatId": "thieving",
         "targetPlayerHealth": false
+      }
+    ],
+    "actions": [
+      {
+        "id": "wall-house-to-beach",
+        "role": "travel",
+        "rewards": [],
+        "results": [
+          {
+            "kind": "relocate",
+            "locationId": "tutorial-beach"
+          }
+        ],
+        "visibleWhen": {
+          "kind": "not",
+          "condition": {
+            "kind": "state-variable",
+            "variable": "flag:tutorial.miki-cleared",
+            "comparison": "equal",
+            "value": true
+          }
+        }
       }
     ],
     "entities": [
@@ -565,6 +589,8 @@
       "action.entity.miki.examine.description": "Look at Miki.",
       "action.entity.front-door.pick.title": "Pick Lock",
       "action.entity.front-door.pick.description": "Work the lock with the lockpick.",
+      "action.wall-house-to-beach.title": "Leave",
+      "action.wall-house-to-beach.description": "Leave the house.",
       "action.entity.front-door.examine.title": "Examine",
       "action.entity.front-door.examine.description": "Check the front door.",
       "action.entity.mirror.look.title": "Look",

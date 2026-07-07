@@ -15,7 +15,7 @@ const itemTagSuggestions = (bundle: ContentBundle) => Array.from(new Set(bundle.
 
 export const locationSchema = (bundle?: ContentBundle): StructuredSchema => ({ kind: 'object', fields: {
   id: { schema: string() },
-  position: { schema: { kind: 'object', fields: { x: { schema: number() }, y: { schema: number() } } } },
+  position: { schema: { kind: 'object', fields: { x: { schema: number() }, y: { schema: number() }, z: { schema: number(), optional: true } } } },
   starting: { schema: boolean, optional: true, defaultValue: false },
   tags: { schema: { kind: 'array', listMode: 'tags', item: string(), createItem: () => '' }, optional: true, defaultValue: [] },
   actions: { schema: { kind: 'array', listMode: 'tags', item: string((bundle?.actions ?? []).map((action) => action.id), true), createItem: () => bundle?.actions?.[0]?.id ?? '' }, optional: true, defaultValue: [] },

@@ -154,7 +154,9 @@ export const validateManifest = (value: unknown): value is UniverseManifest =>
       (value.ui.floatingTextDurationSeconds === undefined || hasNumber(value.ui, 'floatingTextDurationSeconds')) &&
       (value.ui.loopActionsByDefault === undefined || typeof value.ui.loopActionsByDefault === 'boolean') &&
       (value.ui.travelPathMaxSeconds === undefined || hasNumber(value.ui, 'travelPathMaxSeconds')) &&
-      (value.ui.travelPathMaxNodes === undefined || hasNumber(value.ui, 'travelPathMaxNodes'))));
+      (value.ui.travelPathMaxNodes === undefined || hasNumber(value.ui, 'travelPathMaxNodes')) &&
+      (value.ui.connectivityMode === undefined || value.ui.connectivityMode === 'highly-connected' || value.ui.connectivityMode === 'sparse') &&
+      (value.ui.distanceBetweenAdjacentTiles === undefined || hasNumber(value.ui, 'distanceBetweenAdjacentTiles'))));
 
 const validateLocationsShape = (locations: unknown): locations is LocationNode[] =>
   Array.isArray(locations) &&
@@ -165,6 +167,7 @@ const validateLocationsShape = (locations: unknown): locations is LocationNode[]
       isRecord(location.position) &&
       typeof location.position.x === 'number' &&
       typeof location.position.y === 'number' &&
+      (location.position.z === undefined || typeof location.position.z === 'number') &&
       (location.actions === undefined || validateStringArray(location.actions)) &&
       (location.entities === undefined || validateStringArray(location.entities)),
   );
@@ -277,7 +280,7 @@ const validateActionsShape = (actions: unknown): actions is GameAction[] =>
       (action.locationId === undefined || hasString(action, 'locationId')) &&
       (action.role === undefined || action.role === 'optional' || action.role === 'progression' || action.role === 'utility' || action.role === 'travel') &&
       (action.instant === undefined || typeof action.instant === 'boolean') &&
-      (action.instant || action.stationId !== undefined ? action.durationSeconds === undefined || hasNumber(action, 'durationSeconds') : hasNumber(action, 'durationSeconds')) &&
+      (action.instant || action.stationId !== undefined || action.role === 'travel' ? action.durationSeconds === undefined || hasNumber(action, 'durationSeconds') : hasNumber(action, 'durationSeconds')) &&
       Array.isArray(action.rewards) && action.rewards.every(validateRewardShape) &&
       (action.experience === undefined || (Array.isArray(action.experience) && action.experience.every(validateExperienceTriggerShape))) &&
       (action.results === undefined || (Array.isArray(action.results) && action.results.every(validateActionResultShape))) &&
@@ -795,8 +798,11 @@ export const validateContentReferences = (bundle: ContentBundle) => {
     if ((action.results ?? []).filter((result) => result.kind === 'chat').length > 2) {
       issues.push(error(`actions.${action.id}.results`, 'validation.tooManySequentialMessages'));
     }
-    if (!action.instant && action.stationId === undefined && (action.durationSeconds ?? 0) <= 0) {
+    if (!action.instant && action.stationId === undefined && action.role !== 'travel' && (action.durationSeconds ?? 0) <= 0) {
       issues.push(error(`actions.${action.id}.durationSeconds`, 'validation.actionDurationPositive'));
+    }
+    if (action.role === 'travel' && action.durationSeconds !== undefined) {
+      issues.push(warning(`actions.${action.id}.durationSeconds`, 'validation.travelDurationUnused'));
     }
     if (action.interactionTypeId && !interactionTypeIds.has(action.interactionTypeId)) {
       issues.push(error(`actions.${action.id}.interactionTypeId`, 'validation.unknownInteractionType', { id: action.interactionTypeId }));
