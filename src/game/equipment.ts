@@ -116,29 +116,9 @@ export const canEquipItemInSlot = (
   experienceCurve?: ExperienceCurveDefinition,
 ) => {
   if (!item) return false;
-  const equippedElsewhere = Object.entries(state.equipment ?? {})
-    .filter(([candidateSlot, itemId]) => candidateSlot !== slot && itemId === item.id)
-    .length;
-  if ((state.inventory[item.id] ?? 0) <= equippedElsewhere) return false;
+  if ((state.inventory[item.id] ?? 0) <= 0) return false;
   const slotTag = itemSlots(item).find((candidate) => candidate.slot === slot);
   return Boolean(slotTag && meetsEquipmentRequirements(state, slotTag, skills, experienceCurve));
-};
-
-export const equipItem = (
-  state: UniversePlayState,
-  item: ItemDefinition,
-  slot: EquipmentSlot,
-  skills: SkillDefinition[] = [],
-  experienceCurve?: ExperienceCurveDefinition,
-) =>
-  canEquipItemInSlot(state, item, slot, skills, experienceCurve)
-    ? { ...state, equipment: { ...(state.equipment ?? {}), [slot]: item.id }, lastTickAt: Date.now() }
-    : state;
-
-export const unequipSlot = (state: UniversePlayState, slot: EquipmentSlot) => {
-  const equipment = { ...(state.equipment ?? {}) };
-  delete equipment[slot];
-  return { ...state, equipment, lastTickAt: Date.now() };
 };
 
 export const equippedStatBonuses = (

@@ -195,6 +195,7 @@ export type GameAction = {
   visibleWhen?: Condition;
   results?: ActionResult[];
   maxCompletions?: number;
+  respawnSeconds?: number;
   enemyId?: string;
   interactionTypeId?: string;
   chance?: number;
@@ -395,6 +396,14 @@ export type ActiveBuff = {
   amount: number;
   kind: 'added' | 'increased';
   durationSeconds: number;
+  expiresAt: number;
+};
+
+export type GroundItemStack = {
+  id: string;
+  itemId: string;
+  amount: number;
+  locationId: string;
   expiresAt: number;
 };
 
@@ -705,6 +714,9 @@ export type UniversePlayState = {
   flagExpirations: Record<string, number>;
   activeBuffs: Record<string, ActiveBuff>;
   actionCompletions: Record<string, number>;
+  actionExhaustions: Record<string, number[]>;
+  groundItems: GroundItemStack[];
+  nextGroundItemSequence: number;
   collectionLog: Record<string, number>;
   resourcePools: Record<string, ResourcePool>;
   skillXp: Record<string, number>;

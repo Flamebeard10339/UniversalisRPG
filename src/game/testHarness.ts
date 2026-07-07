@@ -64,7 +64,10 @@ export type TestHarnessDeps = {
   resolveIdle: (context: ActionResolutionContext, options: { debugEnabled?: boolean; showReport?: boolean }, now?: number) => IdleReport;
   setCurrentLocation: (locationId: string) => void;
   equipItem: (itemId: string, slot: EquipmentSlot, context: ActionResolutionContext) => void;
-  unequipSlot: (slot: EquipmentSlot) => void;
+  unequipSlot: (slot: EquipmentSlot, context: ActionResolutionContext) => void;
+  eatItem: (itemId: string, context: ActionResolutionContext) => void;
+  dropInventoryItem: (itemId: string, context: ActionResolutionContext) => void;
+  pickUpGroundItem: (groundItemId: string, context: ActionResolutionContext) => void;
   depositToBank: (context: ActionResolutionContext, itemId: string, amount: number) => void;
   withdrawFromBank: (context: ActionResolutionContext, itemId: string, amount: number) => void;
   closeModal: () => void;
@@ -147,6 +150,22 @@ export const createTestHarness = (deps: TestHarnessDeps) => {
       deps.debugGiveItem(deps.getActionContext(), itemId, amount);
       return { ok: true };
     },
+    eat: (itemId: string): Result => {
+      deps.eatItem(itemId, deps.getActionContext());
+      return { ok: true };
+    },
+    drop: (itemId: string): Result => {
+      deps.dropInventoryItem(itemId, deps.getActionContext());
+      return { ok: true };
+    },
+  };
+
+  const groundItems = {
+    get: () => requirePlayState()?.groundItems ?? [],
+    pickUp: (groundItemId: string): Result => {
+      deps.pickUpGroundItem(groundItemId, deps.getActionContext());
+      return { ok: true };
+    },
   };
 
   const bank = {
@@ -180,7 +199,7 @@ export const createTestHarness = (deps: TestHarnessDeps) => {
     },
     unequip: (slot: EquipmentSlot): Result<{ viaDom?: boolean }> => {
       if (deps.dom.clickUnequip(slot)) return { ok: true, viaDom: true };
-      deps.unequipSlot(slot);
+      deps.unequipSlot(slot, deps.getActionContext());
       return { ok: true, viaDom: false };
     },
   };
@@ -373,7 +392,7 @@ export const createTestHarness = (deps: TestHarnessDeps) => {
     }),
   };
 
-  return { state, inventory, bank, equipment, location, profile, choices, dialogue, nav, modal, time, buttons, debug };
+  return { state, inventory, bank, equipment, groundItems, location, profile, choices, dialogue, nav, modal, time, buttons, debug };
 };
 
 export type TestHarnessApi = ReturnType<typeof createTestHarness>;

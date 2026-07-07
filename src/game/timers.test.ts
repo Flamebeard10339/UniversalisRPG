@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { ActionResolutionContext, GameAction } from './types';
-import { appendChatMessage, appendRunLog, applyStateReset, chooseDialogueOption, createInitialPlayState, resolveIdleTimers, startAction } from './timers';
+import { appendChatMessage, appendRunLog, applyStateReset, chooseDialogueOption, createInitialPlayState, dropInventoryItem, pickUpGroundItem, resolveIdleTimers, startAction } from './timers';
 
 describe('appendChatMessage', () => {
   it('uses monotonic ids for messages emitted at the same timestamp', () => {
@@ -199,6 +199,132 @@ describe('instant actions', () => {
     expect(started.actionCompletions.talk).toBe(1);
     expect(started.activeDialogue).toEqual({ dialogueId: 'guide', nodeId: 'start' });
     expect(started.actionProgress.talk).toEqual({ elapsedMs: 0, runningSince: null, targetHealth: null });
+  });
+});
+
+describe('action exhaustion and respawn', () => {
+  const groveContext: ActionResolutionContext = {
+    actions: [],
+    skills: [],
+    stats: [],
+    locations: [{ id: 'grove', position: { x: 0, y: 0 }, starting: true }],
+    items: [],
+    flags: [],
+    resourceDefinitions: [],
+    effects: [],
+    interactionTypes: [],
+    enemies: [],
+  };
+
+  it('permanently exhausts once maxCompletions is reached when no respawnSeconds is set', () => {
+    const action: GameAction = { id: 'pick-lock', locationId: 'grove', instant: true, rewards: [], maxCompletions: 1 };
+    const context = { ...groveContext, actions: [action] };
+    const now = Date.now();
+
+    const afterFirst = startAction(createInitialPlayState('test', 'grove'), action, context, now);
+    expect(afterFirst.actionCompletions['pick-lock']).toBe(1);
+
+    const afterSecond = startAction(afterFirst, action, context, now + 1);
+    expect(afterSecond.actionCompletions['pick-lock']).toBe(1);
+  });
+
+  it('respawns a used-up action after respawnSeconds', () => {
+    const action: GameAction = { id: 'chop-tree', locationId: 'grove', instant: true, rewards: [], maxCompletions: 1, respawnSeconds: 30 };
+    const context = { ...groveContext, actions: [action] };
+    const now = Date.now();
+
+    const afterFirst = startAction(createInitialPlayState('test', 'grove'), action, context, now);
+    expect(afterFirst.actionCompletions['chop-tree']).toBe(1);
+    expect(afterFirst.actionExhaustions['chop-tree']).toEqual([now + 30_000]);
+
+    const stillBlocked = startAction(afterFirst, action, context, now + 10_000);
+    expect(stillBlocked.actionCompletions['chop-tree']).toBe(1);
+
+    const afterRespawn = startAction(afterFirst, action, context, now + 31_000);
+    expect(afterRespawn.actionCompletions['chop-tree']).toBe(2);
+    expect(afterRespawn.actionExhaustions['chop-tree']).toEqual([now + 30_000, now + 31_000 + 30_000]);
+  });
+
+  it('tracks independently-timed respawns per completion when capacity is greater than one', () => {
+    const action: GameAction = { id: 'chop-tree', locationId: 'grove', instant: true, rewards: [], maxCompletions: 3, respawnSeconds: 30 };
+    const context = { ...groveContext, actions: [action] };
+    const now = Date.now();
+
+    let state = startAction(createInitialPlayState('test', 'grove'), action, context, now);
+    expect(state.actionCompletions['chop-tree']).toBe(1);
+
+    state = startAction(state, action, context, now + 5_000);
+    state = startAction(state, action, context, now + 5_100);
+    expect(state.actionCompletions['chop-tree']).toBe(3);
+    expect(state.actionExhaustions['chop-tree']).toEqual([now + 30_000, now + 5_000 + 30_000, now + 5_100 + 30_000]);
+
+    const blocked = startAction(state, action, context, now + 6_000);
+    expect(blocked.actionCompletions['chop-tree']).toBe(3);
+
+    const afterFirstRespawn = startAction(state, action, context, now + 30_001);
+    expect(afterFirstRespawn.actionCompletions['chop-tree']).toBe(4);
+
+    const stillBlocked = startAction(afterFirstRespawn, action, context, now + 30_002);
+    expect(stillBlocked.actionCompletions['chop-tree']).toBe(4);
+  });
+});
+
+describe('ground items', () => {
+  const context: ActionResolutionContext = {
+    actions: [],
+    skills: [],
+    stats: [],
+    locations: [{ id: 'road', position: { x: 0, y: 0 }, starting: true }],
+    items: [{ id: 'log' }],
+    flags: [],
+    resourceDefinitions: [],
+    effects: [],
+    interactionTypes: [],
+    enemies: [],
+  };
+
+  it('drops an inventory item to the ground and lets it be picked back up', () => {
+    const now = Date.now();
+    const state = { ...createInitialPlayState('test', 'road'), inventory: { log: 3 } };
+
+    const dropped = dropInventoryItem(state, context, 'log', now);
+    expect(dropped.inventory.log).toBe(0);
+    expect(dropped.groundItems).toEqual([{ id: 'ground-1', itemId: 'log', amount: 3, locationId: 'road', expiresAt: now + 5 * 60 * 1000 }]);
+
+    const pickedUp = pickUpGroundItem(dropped, context, 'ground-1', now + 1_000);
+    expect(pickedUp.inventory.log).toBe(3);
+    expect(pickedUp.groundItems).toEqual([]);
+  });
+
+  it('does not let a full inventory pick up a ground stack, and posts a chat message', () => {
+    const now = Date.now();
+    const fullContext: ActionResolutionContext = { ...context, manifest: { maxInventorySlots: 1 } as ActionResolutionContext['manifest'] };
+    const state = {
+      ...createInitialPlayState('test', 'road'),
+      inventory: { bones: 1 },
+      groundItems: [{ id: 'ground-1', itemId: 'log', amount: 1, locationId: 'road', expiresAt: now + 1_000 }],
+    };
+
+    const result = pickUpGroundItem(state, fullContext, 'ground-1', now);
+
+    expect(result.inventory.log).toBeUndefined();
+    expect(result.groundItems).toHaveLength(1);
+    expect(result.chatMessages[result.chatMessages.length - 1]?.key).toBe('chat.groundItem.inventoryFull');
+  });
+
+  it('despawns ground items after 5 minutes via idle resolution', () => {
+    const now = Date.now();
+    const state = {
+      ...createInitialPlayState('test', 'road'),
+      groundItems: [{ id: 'ground-1', itemId: 'log', amount: 1, locationId: 'road', expiresAt: now + 1_000 }],
+      lastTickAt: now,
+    };
+
+    const stillThere = resolveIdleTimers(state, context, {}, now + 500);
+    expect(stillThere.state.groundItems).toHaveLength(1);
+
+    const despawned = resolveIdleTimers(state, context, {}, now + 1_500);
+    expect(despawned.state.groundItems).toHaveLength(0);
   });
 });
 

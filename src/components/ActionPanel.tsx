@@ -13,12 +13,14 @@ type ActionPanelProps = {
   bundle: ContentBundle;
   debugEnabled: boolean;
   playState: UniversePlayState;
+  onPickUpGroundItem: (groundItemId: string) => void;
   onStartAction: (action: GameAction, recipeId?: string) => void;
   showTravelActions: boolean;
   t: Translator;
 };
 
-export const ActionPanel = ({ bundle, debugEnabled, playState, onStartAction, showTravelActions, t }: ActionPanelProps) => {
+export const ActionPanel = ({ bundle, debugEnabled, playState, onPickUpGroundItem, onStartAction, showTravelActions, t }: ActionPanelProps) => {
+  const groundItems = playState.groundItems.filter((stack) => stack.locationId === playState.currentLocationId);
   const [expandedEntities, setExpandedEntities] = useState<Record<string, boolean>>({});
   const [instantActionPulse, setInstantActionPulse] = useState<Record<string, number>>({});
   const isTravelling = Boolean(playState.activeTravel);
@@ -188,6 +190,24 @@ export const ActionPanel = ({ bundle, debugEnabled, playState, onStartAction, sh
               : t('actionPanel.choose')}
         </p>
       </div>
+
+      {groundItems.length > 0 && (
+        <div className="grid gap-2">
+          <h3 className="text-sm font-semibold text-slate-100">{t('groundItems.title')}</h3>
+          {groundItems.map((stack) => (
+            <button
+              className="flex items-center justify-between gap-3 rounded border border-slate-700 bg-slate-950 p-3 text-left transition hover:border-cyan-500"
+              data-ground-item-id={stack.id}
+              key={stack.id}
+              onClick={() => onPickUpGroundItem(stack.id)}
+              type="button"
+            >
+              <span className="text-sm font-semibold text-slate-100">{t(itemTitleKey(stack.itemId), stack.itemId)} ({stack.amount})</span>
+              <span className="text-xs font-semibold text-cyan-200">{t('groundItems.pickUp')}</span>
+            </button>
+          ))}
+        </div>
+      )}
 
       <div className="grid gap-2">
         {normalActions.map((action) => renderAction(action))}

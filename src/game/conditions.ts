@@ -47,15 +47,21 @@ export const areActionRequirementsMet = (
   return evaluateCondition(action.requirements, state, context);
 };
 
-export const isActionExhausted = (state: UniversePlayState, action: GameAction) =>
-  action.maxCompletions !== undefined
-  && (state.actionCompletions[action.id] ?? 0) >= action.maxCompletions;
+export const isActionExhausted = (state: UniversePlayState, action: GameAction, now = Date.now()) => {
+  if (action.maxCompletions === undefined) return false;
+  if (action.respawnSeconds === undefined) {
+    return (state.actionCompletions[action.id] ?? 0) >= action.maxCompletions;
+  }
+  const activeExhaustions = (state.actionExhaustions?.[action.id] ?? []).filter((expiresAt) => expiresAt > now).length;
+  return activeExhaustions >= action.maxCompletions;
+};
 
 export const isActionVisible = (
   state: UniversePlayState,
   action: GameAction,
   context: ActionResolutionContext,
-) => !isActionExhausted(state, action)
+  now = Date.now(),
+) => !isActionExhausted(state, action, now)
   && (!action.visibleWhen || evaluateCondition(action.visibleWhen, state, context));
 
 export const isActionAvailableAtCurrentLocation = (
@@ -83,6 +89,7 @@ export const canStartAction = (
   state: UniversePlayState,
   action: GameAction,
   context: ActionResolutionContext,
-) => isActionVisible(state, action, context)
+  now = Date.now(),
+) => isActionVisible(state, action, context, now)
   && isActionAvailableAtCurrentLocation(state, action, context)
   && areActionRequirementsMet(state, action, context);

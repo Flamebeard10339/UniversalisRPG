@@ -1,4 +1,4 @@
-import type { ActionResolutionContext, ActionResult, ChatMessage, ConcreteReward, ExperienceEventKind, ExperienceTrigger, GameAction, IdleReport, IdleResolution, ItemDefinition, ResourceBoundaryBehavior, Reward, RunLogEntry, UniversePlayState } from './types';
+import type { ActionResolutionContext, ActionResult, ChatMessage, ConcreteReward, EquipmentSlot, ExperienceEventKind, ExperienceTrigger, GameAction, IdleReport, IdleResolution, ItemDefinition, ResourceBoundaryBehavior, Reward, RunLogEntry, UniversePlayState } from './types';
 import type { AvailableTravelEdge } from './travel';
 import { getActionDurationMs, getEnemy, getInteractionType, isInstantAction, sampleAdversarialDamage, sampleEnemyAttackDamage } from './adversarial';
 import { getEnemyStat } from './enemies';
@@ -23,7 +23,7 @@ import { skillLevelFromXp } from './skills';
 import { rollRewards } from './rewards';
 import { applyCollectionLogRewards } from './collectionLog';
 import { resolveStationAction } from './recipes';
-import { canEatItem, itemBuffDurationSeconds, itemStatBonuses } from './equipment';
+import { canEatItem, itemBuffDurationSeconds, itemSlots, itemStatBonuses, meetsEquipmentRequirements } from './equipment';
 
 const MAX_CHAT_MESSAGES = 80;
 const MAX_RUN_LOG_ENTRIES = 100;
@@ -135,6 +135,9 @@ export const createInitialPlayState = (
   flagExpirations: {},
   activeBuffs: {},
   actionCompletions: {},
+  actionExhaustions: {},
+  groundItems: [],
+  nextGroundItemSequence: 1,
   collectionLog: {
     [locationExploredKey(startingLocationId)]: 1,
   },
@@ -201,6 +204,9 @@ export const normalizePlayState = (
     flagExpirations: state.flagExpirations ?? {},
     activeBuffs: state.activeBuffs ?? {},
     actionCompletions: state.actionCompletions ?? {},
+    actionExhaustions: state.actionExhaustions ?? {},
+    groundItems: state.groundItems ?? [],
+    nextGroundItemSequence: state.nextGroundItemSequence ?? 1,
     discoveredLocationIds,
     collectionLog,
     statOverrides: state.statOverrides ?? {},
@@ -957,10 +963,10 @@ export const startAction = (
 
   const resolvedAction = action.stationId ? resolveStationAction(action, options.recipeId, context) : action;
 
-  if (!canStartAction(state, resolvedAction, context)) {
+  if (!canStartAction(state, resolvedAction, context, now)) {
     return appendRunLog(state, 'player', 'action.rejected', {
       actionId: action.id,
-      exhausted: isActionExhausted(state, action),
+      exhausted: isActionExhausted(state, action, now),
     }, now);
   }
 
@@ -1137,6 +1143,122 @@ export const eatItem = (
     inventory: { ...state.inventory, [item.id]: state.inventory[item.id] - 1 },
     activeBuffs,
   }, { author: 'system', key: 'chat.food.eaten' }, now);
+};
+
+const canAddInventoryItem = (
+  state: UniversePlayState,
+  context: ActionResolutionContext,
+  itemId: string,
+) => {
+  const maxSlots = context.manifest?.maxInventorySlots;
+  return (state.inventory[itemId] ?? 0) > 0
+    || maxSlots === undefined
+    || occupiedInventorySlots(state.inventory) < maxSlots;
+};
+
+export const equipItem = (
+  state: UniversePlayState,
+  item: ItemDefinition,
+  slot: EquipmentSlot,
+  context: ActionResolutionContext,
+  now = Date.now(),
+): UniversePlayState => {
+  if ((state.inventory[item.id] ?? 0) <= 0) return state;
+
+  const slotTag = itemSlots(item).find((candidate) => candidate.slot === slot);
+  if (!slotTag) return state;
+  if (!meetsEquipmentRequirements(state, slotTag, context.skills, context.manifest?.experienceCurve)) {
+    return appendChatMessage(state, { author: 'system', key: 'chat.equipment.requirementsNotMet' }, now);
+  }
+
+  const previousItemId = state.equipment?.[slot];
+  if (previousItemId && !canAddInventoryItem(state, context, previousItemId)) {
+    return appendChatMessage(state, { author: 'system', key: 'chat.equipment.inventoryFull' }, now);
+  }
+
+  let nextState = applyItemDelta(state, context, item.id, -1);
+  if (previousItemId) {
+    nextState = applyItemDelta(nextState, context, previousItemId, 1);
+  }
+
+  return {
+    ...nextState,
+    equipment: { ...nextState.equipment, [slot]: item.id },
+    lastTickAt: now,
+  };
+};
+
+export const unequipSlot = (
+  state: UniversePlayState,
+  slot: EquipmentSlot,
+  context: ActionResolutionContext,
+  now = Date.now(),
+): UniversePlayState => {
+  const itemId = state.equipment?.[slot];
+  if (!itemId) return state;
+  if (!canAddInventoryItem(state, context, itemId)) {
+    return appendChatMessage(state, { author: 'system', key: 'chat.equipment.inventoryFull' }, now);
+  }
+
+  const nextState = applyItemDelta(state, context, itemId, 1);
+  const equipment = { ...nextState.equipment };
+  delete equipment[slot];
+  return { ...nextState, equipment, lastTickAt: now };
+};
+
+const GROUND_ITEM_DESPAWN_MS = 5 * 60 * 1000;
+
+const spawnGroundItem = (
+  state: UniversePlayState,
+  itemId: string,
+  amount: number,
+  locationId: string,
+  now: number,
+): UniversePlayState => {
+  if (amount <= 0) return state;
+  const sequence = state.nextGroundItemSequence ?? 1;
+  return {
+    ...state,
+    groundItems: [...state.groundItems, {
+      id: `ground-${sequence}`,
+      itemId,
+      amount,
+      locationId,
+      expiresAt: now + GROUND_ITEM_DESPAWN_MS,
+    }],
+    nextGroundItemSequence: sequence + 1,
+  };
+};
+
+export const dropInventoryItem = (
+  state: UniversePlayState,
+  context: ActionResolutionContext,
+  itemId: string,
+  now = Date.now(),
+): UniversePlayState => {
+  const amount = state.inventory[itemId] ?? 0;
+  if (amount <= 0) return state;
+  const nextState = applyItemDelta(state, context, itemId, -amount);
+  return spawnGroundItem(nextState, itemId, amount, state.currentLocationId, now);
+};
+
+export const pickUpGroundItem = (
+  state: UniversePlayState,
+  context: ActionResolutionContext,
+  groundItemId: string,
+  now = Date.now(),
+): UniversePlayState => {
+  const stack = state.groundItems.find((candidate) => candidate.id === groundItemId);
+  if (!stack || stack.locationId !== state.currentLocationId || stack.expiresAt <= now) return state;
+  if (!canAddInventoryItem(state, context, stack.itemId)) {
+    return appendChatMessage(state, { author: 'system', key: 'chat.groundItem.inventoryFull' }, now);
+  }
+
+  const nextState = applyItemDelta(state, context, stack.itemId, stack.amount);
+  return {
+    ...nextState,
+    groundItems: nextState.groundItems.filter((candidate) => candidate.id !== groundItemId),
+  };
 };
 
 const applyBankDelta = (
@@ -1331,8 +1453,8 @@ const appendExhaustedLocationMessage = (
   const hasRemainingOptionalAction = context.actions.some((candidate) =>
     candidate.locationId === action.locationId
     && candidate.role === 'optional'
-    && isActionVisible(state, candidate, context)
-    && !isActionExhausted(state, candidate));
+    && isActionVisible(state, candidate, context, now)
+    && !isActionExhausted(state, candidate, now));
   return hasRemainingOptionalAction
     ? state
     : appendChatMessage(state, { author: 'system', key: locationExhaustedKey(action.locationId) }, now + 1);
@@ -1378,6 +1500,28 @@ const rollAndApplyRewards = (
   };
 };
 
+const rollAndApplyRewardsToGround = (
+  state: UniversePlayState,
+  rewards: Reward[],
+  context: ActionResolutionContext,
+  locationId: string,
+  now: number,
+  random: () => number = Math.random,
+) => {
+  const rolled = rollRewards(rewards, random, context.dropTables ?? []);
+  return {
+    rewards: rolled,
+    state: rolled.reduce((nextState, reward) => {
+      if (reward.kind === 'skillXp') return applyActionResult(nextState, { kind: 'skill-xp', skillId: reward.skillId, amount: reward.amount }, context, now);
+      if (reward.kind === 'item') return spawnGroundItem(nextState, reward.itemId, reward.amount, locationId, now);
+      const resourceExists = context.resourceDefinitions?.some((resource) => resource.id === reward.resourceId);
+      return resourceExists
+        ? applyActionResult(nextState, { kind: 'resource', resourceId: reward.resourceId, amount: reward.amount }, context, now)
+        : spawnGroundItem(nextState, reward.resourceId, reward.amount, locationId, now);
+    }, state),
+  };
+};
+
 const applyActionCompletion = (
   state: UniversePlayState,
   action: GameAction,
@@ -1398,17 +1542,27 @@ const applyActionCompletion = (
         interactionTypeId: getInteractionType(action, context)?.id ?? action.interactionTypeId,
       }, now);
 
+  const withExhaustion = action.respawnSeconds === undefined
+    ? withExperience
+    : {
+        ...withExperience,
+        actionExhaustions: {
+          ...withExperience.actionExhaustions,
+          [action.id]: [...(withExperience.actionExhaustions?.[action.id] ?? []), now + action.respawnSeconds * 1000],
+        },
+      };
+
   return {
     rewards: rewardResult.rewards,
     state: appendRunLog({
-      ...withExperience,
+      ...withExhaustion,
       actionCompletions: {
-        ...withExperience.actionCompletions,
-        [action.id]: (withExperience.actionCompletions[action.id] ?? 0) + 1,
+        ...withExhaustion.actionCompletions,
+        [action.id]: (withExhaustion.actionCompletions[action.id] ?? 0) + 1,
       },
     }, 'engine', 'action.complete', {
       actionId: action.id,
-      completion: (withExperience.actionCompletions[action.id] ?? 0) + 1,
+      completion: (withExhaustion.actionCompletions[action.id] ?? 0) + 1,
       results: action.results ?? [],
       rewards: rewardResult.rewards,
     }, now),
@@ -1491,7 +1645,7 @@ const completeActionWithResult = (
     }
 
     const actionCompletion = applyActionCompletion(damagedState, action, context, now, { random: options.random });
-    const enemyRewards = rollAndApplyRewards(actionCompletion.state, enemy.rewards, context, now, options.random);
+    const enemyRewards = rollAndApplyRewardsToGround(actionCompletion.state, enemy.rewards, context, actionCompletion.state.currentLocationId, now, options.random);
     const killRewards = [...actionCompletion.rewards, ...enemyRewards.rewards];
     state = applyCollectionLogRewards(enemyRewards.state, action, context, killRewards);
     const resolvedState = resetOwnedResourcePools(state, context, 'enemy');
@@ -1513,7 +1667,7 @@ const completeActionWithResult = (
     && !isInstantAction(action)
     && completedState.actionLoopingEnabled
       && (action.locationId === undefined || completedState.currentLocationId === action.locationId)
-      && canStartAction(completedState, action, context);
+      && canStartAction(completedState, action, context, now);
     const restartTargetHealth = getEnemyStat(enemy, 'health');
 
     return {
@@ -1585,7 +1739,7 @@ const completeActionWithResult = (
     && !isInstantAction(action)
     && completedState.actionLoopingEnabled
     && (action.locationId === undefined || completedState.currentLocationId === action.locationId)
-    && canStartAction(completedState, action, context);
+    && canStartAction(completedState, action, context, now);
   const restartTargetHealth = null;
 
   return {
@@ -1845,6 +1999,24 @@ const clearExpiredBuffs = (state: UniversePlayState, now: number): UniversePlayS
   return { ...state, activeBuffs: nextBuffs };
 };
 
+const clearExpiredActionExhaustions = (state: UniversePlayState, now: number): UniversePlayState => {
+  const actionExhaustions = state.actionExhaustions ?? {};
+  let changed = false;
+  const nextExhaustions: Record<string, number[]> = {};
+  for (const [actionId, expirations] of Object.entries(actionExhaustions)) {
+    const active = expirations.filter((expiresAt) => expiresAt > now);
+    if (active.length !== expirations.length) changed = true;
+    if (active.length > 0) nextExhaustions[actionId] = active;
+  }
+
+  return changed ? { ...state, actionExhaustions: nextExhaustions } : state;
+};
+
+const clearExpiredGroundItems = (state: UniversePlayState, now: number): UniversePlayState => {
+  const groundItems = (state.groundItems ?? []).filter((stack) => stack.expiresAt > now);
+  return groundItems.length === (state.groundItems ?? []).length ? state : { ...state, groundItems };
+};
+
 export const resolveIdleTimers = (
   state: UniversePlayState,
   contextOrActions: ActionResolutionContext | GameAction[],
@@ -1860,6 +2032,8 @@ export const resolveIdleTimers = (
   state = ensureWorldState(state, context);
   state = clearExpiredFlags(state, now);
   state = clearExpiredBuffs(state, now);
+  state = clearExpiredActionExhaustions(state, now);
+  state = clearExpiredGroundItems(state, now);
   if (!state.activeAction) {
     state = resetInactiveEffectResources(state, context, now);
   }

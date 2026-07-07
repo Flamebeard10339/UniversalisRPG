@@ -7,6 +7,7 @@ import type { Translator } from '../game/i18n';
 
 type InventoryPanelProps = {
   bundle: ContentBundle;
+  onDrop: (itemId: string) => void;
   onEat: (itemId: string) => void;
   onEquip: (itemId: string, slot: EquipmentSlot) => void;
   onStartAction: (action: GameAction) => void;
@@ -15,7 +16,7 @@ type InventoryPanelProps = {
   t: Translator;
 };
 
-export const InventoryPanel = ({ bundle, onEat, onEquip, onStartAction, onUnequip, playState, t }: InventoryPanelProps) => {
+export const InventoryPanel = ({ bundle, onDrop, onEat, onEquip, onStartAction, onUnequip, playState, t }: InventoryPanelProps) => {
   const entries = Object.entries(playState.inventory).filter(([, amount]) => amount > 0);
   const actionContext = {
     manifest: bundle.manifest,
@@ -97,48 +98,54 @@ export const InventoryPanel = ({ bundle, onEat, onEquip, onStartAction, onUnequi
                   </div>
                   <span className="text-sm font-semibold text-slate-100">{amount}</span>
                 </div>
-                {(item && slots.length > 0) || eatable || availableItemActions.length > 0 ? (
-                  <div className="flex flex-wrap gap-2">
-                    {item && eatable && (
+                <div className="flex flex-wrap gap-2">
+                  {item && eatable && (
+                    <button
+                      className="rounded border border-cyan-700 px-3 py-1.5 text-xs font-semibold text-cyan-100"
+                      data-eat-item={item.id}
+                      onClick={() => onEat(item.id)}
+                      type="button"
+                    >
+                      {t('inventory.eat')}
+                    </button>
+                  )}
+                  {item && slots.map((slotTag) => {
+                    const requirementsMet = meetsEquipmentRequirements(playState, slotTag, bundle.skills, bundle.manifest.experienceCurve);
+                    return (
                       <button
-                        className="rounded border border-cyan-700 px-3 py-1.5 text-xs font-semibold text-cyan-100"
-                        data-eat-item={item.id}
-                        onClick={() => onEat(item.id)}
+                        className="rounded border border-cyan-700 px-3 py-1.5 text-xs font-semibold text-cyan-100 disabled:cursor-not-allowed disabled:border-slate-700 disabled:text-slate-500"
+                        data-equip-slot={slotTag.slot}
+                        data-item-id={item.id}
+                        disabled={!canEquipItemInSlot(playState, item, slotTag.slot, bundle.skills, bundle.manifest.experienceCurve)}
+                        key={`${item.id}-${slotTag.slot}`}
+                        onClick={() => onEquip(item.id, slotTag.slot)}
+                        title={requirementsMet ? undefined : t('equipment.requirementsNotMet')}
                         type="button"
                       >
-                        {t('inventory.eat')}
+                        {t('equipment.equipTo', { slot: t(`equipment.slot.${slotTag.slot}`) })}
                       </button>
-                    )}
-                    {item && slots.map((slotTag) => {
-                      const requirementsMet = meetsEquipmentRequirements(playState, slotTag, bundle.skills, bundle.manifest.experienceCurve);
-                      return (
-                        <button
-                          className="rounded border border-cyan-700 px-3 py-1.5 text-xs font-semibold text-cyan-100 disabled:cursor-not-allowed disabled:border-slate-700 disabled:text-slate-500"
-                          data-equip-slot={slotTag.slot}
-                          data-item-id={item.id}
-                          disabled={!canEquipItemInSlot(playState, item, slotTag.slot, bundle.skills, bundle.manifest.experienceCurve)}
-                          key={`${item.id}-${slotTag.slot}`}
-                          onClick={() => onEquip(item.id, slotTag.slot)}
-                          title={requirementsMet ? undefined : t('equipment.requirementsNotMet')}
-                          type="button"
-                        >
-                          {t('equipment.equipTo', { slot: t(`equipment.slot.${slotTag.slot}`) })}
-                        </button>
-                      );
-                    })}
-                    {availableItemActions.map((action) => (
-                      <button
-                        className="rounded border border-cyan-700 px-3 py-1.5 text-xs font-semibold text-cyan-100"
-                        data-action-id={action.id}
-                        key={action.id}
-                        onClick={() => onStartAction(action)}
-                        type="button"
-                      >
-                        {getActionTitleText(action, bundle, t)}
-                      </button>
-                    ))}
-                  </div>
-                ) : null}
+                    );
+                  })}
+                  {availableItemActions.map((action) => (
+                    <button
+                      className="rounded border border-cyan-700 px-3 py-1.5 text-xs font-semibold text-cyan-100"
+                      data-action-id={action.id}
+                      key={action.id}
+                      onClick={() => onStartAction(action)}
+                      type="button"
+                    >
+                      {getActionTitleText(action, bundle, t)}
+                    </button>
+                  ))}
+                  <button
+                    className="rounded border border-slate-700 px-3 py-1.5 text-xs font-semibold text-slate-300"
+                    data-drop-item={itemId}
+                    onClick={() => onDrop(itemId)}
+                    type="button"
+                  >
+                    {t('inventory.drop')}
+                  </button>
+                </div>
               </section>
             );
           })}

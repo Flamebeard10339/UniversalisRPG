@@ -1,8 +1,7 @@
 import { create } from 'zustand';
 import type { ActionResolutionContext, ContentBundle, EquipmentSlot, GameAction, IdleReport, RunLogEntry, UniversePlayState } from '../game/types';
 import type { AvailableTravelEdge } from '../game/travel';
-import { appendChatMessage, appendRunLog, applyItemDelta, cancelDialogue, chooseDialogueOption, closeModal, createInitialPlayState, depositToBank, eatItem, normalizePlayState, resetInactiveEffectResources, resolveIdleTimers, setCharacterName, startAction, startTravel, withdrawFromBank } from '../game/timers';
-import { equipItem, unequipSlot } from '../game/equipment';
+import { appendChatMessage, appendRunLog, applyItemDelta, cancelDialogue, chooseDialogueOption, closeModal, createInitialPlayState, depositToBank, dropInventoryItem, eatItem, equipItem, normalizePlayState, pickUpGroundItem, resetInactiveEffectResources, resolveIdleTimers, setCharacterName, startAction, startTravel, unequipSlot, withdrawFromBank } from '../game/timers';
 import { load, remove, save } from '../lib/storage';
 import { recordAgentSessionMessage, type AgentSessionMessage } from '../game/agentSession';
 import { hasModuleCleanupChanges, sanitizePlayStateForBundle, type ModuleCleanupReport } from '../game/moduleCleanup';
@@ -21,8 +20,10 @@ type GameStateStore = {
   resolveIdle: (universeId: string, context: ActionResolutionContext, options?: { debugEnabled?: boolean; showReport?: boolean }, now?: number) => IdleReport;
   setActionLooping: (universeId: string, enabled: boolean) => void;
   equipItem: (universeId: string, itemId: string, slot: EquipmentSlot, context: ActionResolutionContext) => void;
-  unequipSlot: (universeId: string, slot: EquipmentSlot) => void;
+  unequipSlot: (universeId: string, slot: EquipmentSlot, context: ActionResolutionContext) => void;
   eatItem: (universeId: string, itemId: string, context: ActionResolutionContext) => void;
+  dropInventoryItem: (universeId: string, itemId: string, context: ActionResolutionContext) => void;
+  pickUpGroundItem: (universeId: string, groundItemId: string, context: ActionResolutionContext) => void;
   depositToBank: (universeId: string, context: ActionResolutionContext, itemId: string, amount: number) => void;
   withdrawFromBank: (universeId: string, context: ActionResolutionContext, itemId: string, amount: number) => void;
   setCharacterName: (universeId: string, name: string) => void;
@@ -285,17 +286,17 @@ export const useGameState = create<GameStateStore>((set, get) => ({
       const current = state.states[universeId];
       const item = context.items?.find((candidate) => candidate.id === itemId);
       if (!current || !item) return state;
-      const next = equipItem(current, item, slot, context.skills, context.manifest?.experienceCurve);
+      const next = equipItem(current, item, slot, context);
       void save(storageKey(universeId), next);
       return { states: { ...state.states, [universeId]: next } };
     });
   },
 
-  unequipSlot: (universeId, slot) => {
+  unequipSlot: (universeId, slot, context) => {
     set((state) => {
       const current = state.states[universeId];
       if (!current?.equipment?.[slot]) return state;
-      const next = unequipSlot(current, slot);
+      const next = unequipSlot(current, slot, context);
       void save(storageKey(universeId), next);
       return { states: { ...state.states, [universeId]: next } };
     });
@@ -307,6 +308,26 @@ export const useGameState = create<GameStateStore>((set, get) => ({
       const item = context.items?.find((candidate) => candidate.id === itemId);
       if (!current || !item) return state;
       const next = eatItem(current, item);
+      void save(storageKey(universeId), next);
+      return { states: { ...state.states, [universeId]: next } };
+    });
+  },
+
+  dropInventoryItem: (universeId, itemId, context) => {
+    set((state) => {
+      const current = state.states[universeId];
+      if (!current) return state;
+      const next = dropInventoryItem(current, context, itemId);
+      void save(storageKey(universeId), next);
+      return { states: { ...state.states, [universeId]: next } };
+    });
+  },
+
+  pickUpGroundItem: (universeId, groundItemId, context) => {
+    set((state) => {
+      const current = state.states[universeId];
+      if (!current) return state;
+      const next = pickUpGroundItem(current, context, groundItemId);
       void save(storageKey(universeId), next);
       return { states: { ...state.states, [universeId]: next } };
     });

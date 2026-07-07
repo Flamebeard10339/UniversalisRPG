@@ -161,9 +161,12 @@ describe('adversarial actions', () => {
     const repeated = resolveIdleTimers(resolved.state, killContext, { random: () => 0 }, startedAt + 10_001);
 
     expect(resolved.state.activeAction).toBeNull();
-    expect(resolved.state.resources).toMatchObject({ fang: 1, trophy: 1 });
+    expect(resolved.state.resources.fang).toBe(1);
+    expect(resolved.state.resources.trophy).toBeUndefined();
+    expect(resolved.state.groundItems).toMatchObject([{ itemId: 'trophy', amount: 1, locationId: 'arena' }]);
     expect(resolved.state.chatMessages[0].key).toBe('interaction.melee-combat.player.kill');
-    expect(repeated.state.resources).toMatchObject({ fang: 1, trophy: 1 });
+    expect(repeated.state.resources.fang).toBe(1);
+    expect(repeated.state.groundItems).toHaveLength(1);
   });
 
   it('starts a looped replacement enemy with fresh enemy-owned resources after a kill', () => {

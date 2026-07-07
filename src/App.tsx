@@ -179,6 +179,8 @@ export default function App() {
   const equipItem = useGameState((state) => state.equipItem);
   const unequipSlot = useGameState((state) => state.unequipSlot);
   const eatItem = useGameState((state) => state.eatItem);
+  const dropInventoryItem = useGameState((state) => state.dropInventoryItem);
+  const pickUpGroundItem = useGameState((state) => state.pickUpGroundItem);
   const depositToBank = useGameState((state) => state.depositToBank);
   const withdrawFromBank = useGameState((state) => state.withdrawFromBank);
   const setCharacterName = useGameState((state) => state.setCharacterName);
@@ -721,7 +723,10 @@ export default function App() {
       resolveIdle: (context, options, now) => resolveIdle(runtimeUniverseId, context, options, now),
       setCurrentLocation: (locationId) => setCurrentLocation(runtimeUniverseId, locationId),
       equipItem: (itemId, slot, context) => equipItem(runtimeUniverseId, itemId, slot, context),
-      unequipSlot: (slot) => unequipSlot(runtimeUniverseId, slot),
+      unequipSlot: (slot, context) => unequipSlot(runtimeUniverseId, slot, context),
+      eatItem: (itemId, context) => eatItem(runtimeUniverseId, itemId, context),
+      dropInventoryItem: (itemId, context) => dropInventoryItem(runtimeUniverseId, itemId, context),
+      pickUpGroundItem: (groundItemId, context) => pickUpGroundItem(runtimeUniverseId, groundItemId, context),
       depositToBank: (context, itemId, amount) => depositToBank(runtimeUniverseId, context, itemId, amount),
       withdrawFromBank: (context, itemId, amount) => withdrawFromBank(runtimeUniverseId, context, itemId, amount),
       closeModal: () => closeModal(runtimeUniverseId),
@@ -748,9 +753,9 @@ export default function App() {
   }, [
     actionContext, bundle, cancelDialogue, characterTab, chooseDialogueOption, closeModal, debugGiveItem,
     debugSetBankItem, debugSetFlag, debugSetInventoryItem, debugSetResource, debugSetSkillXp, depositToBank,
-    equipItem, homeTab, activeTab, replaceUniverseState, resetUniverse, resolveIdle, runtimeUniverseId,
-    setCharacterTopTab, setCurrentLocation, setHomeTopTab, setTab, startAction, startingLocationId, stopAction,
-    t, unequipSlot, withdrawFromBank,
+    dropInventoryItem, eatItem, equipItem, homeTab, activeTab, pickUpGroundItem, replaceUniverseState, resetUniverse,
+    resolveIdle, runtimeUniverseId, setCharacterTopTab, setCurrentLocation, setHomeTopTab, setTab, startAction,
+    startingLocationId, stopAction, t, unequipSlot, withdrawFromBank,
   ]);
 
   useEffect(() => {
@@ -961,6 +966,7 @@ export default function App() {
                   <ActionPanel
                     debugEnabled={debugEnabled}
                     bundle={bundle}
+                    onPickUpGroundItem={(groundItemId) => pickUpGroundItem(runtimeUniverseId, groundItemId, actionContext)}
                     onStartAction={beginAction}
                     playState={playState}
                     showTravelActions={showTravelActions}
@@ -1030,10 +1036,11 @@ export default function App() {
             {characterTab === 'inventory' && (
               <InventoryPanel
                 bundle={bundle}
+                onDrop={(itemId) => dropInventoryItem(runtimeUniverseId, itemId, actionContext)}
                 onEat={(itemId) => eatItem(runtimeUniverseId, itemId, actionContext)}
                 onEquip={(itemId, slot) => equipItem(runtimeUniverseId, itemId, slot, actionContext)}
                 onStartAction={beginAction}
-                onUnequip={(slot) => unequipSlot(runtimeUniverseId, slot)}
+                onUnequip={(slot) => unequipSlot(runtimeUniverseId, slot, actionContext)}
                 playState={playState}
                 t={t}
               />
