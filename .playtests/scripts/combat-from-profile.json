@@ -2,6 +2,10 @@
   "action:entity.mine-tunnel.enter-forge",
   "action:entity.forge-table.continue",
   "action:entity.orloth.talk",
+  "dialogue-option:ask-equip",
+  "dialogue-option:ask-stats",
+  "dialogue-option:continue",
+  "dialogue-option:continue",
   "action:entity.giant-rat.fight",
   "action:entity.portal.step-through",
   "action:entity.mainland-greeter.talk"

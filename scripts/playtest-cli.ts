@@ -124,7 +124,7 @@ const runScripted = (args: Args) => {
   lines.push(`Flags: ${JSON.stringify(state.flags)}`);
   lines.push(`Inventory: ${JSON.stringify(state.inventory)}`);
   lines.push(`Bank: ${JSON.stringify(state.bank)}`);
-  lines.push(`Appearance: ${JSON.stringify(state.appearance)}`);
+  lines.push(`Character name: ${JSON.stringify(state.characterName)}`);
   lines.push(`Spawn location: ${state.spawnLocationId ?? '(default)'}`);
   lines.push('');
   lines.push(problems.length === 0 ? 'RESULT: pass' : 'RESULT: fail');

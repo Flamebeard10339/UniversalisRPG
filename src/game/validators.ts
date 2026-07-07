@@ -21,6 +21,7 @@ import type {
   RewardAmount,
   SkillDefinition,
   StatDefinition,
+  StatModifierDefinition,
   StateFlagDefinition,
   UniverseManifest,
   ValidationIssue,
@@ -261,7 +262,7 @@ const validateActionResultShape = (value: unknown) => {
   if (value.kind === 'bank-deposit') return hasString(value, 'itemId') && hasNumber(value, 'amount');
   if (value.kind === 'bank-withdraw') return hasString(value, 'itemId') && hasNumber(value, 'amount');
   if (value.kind === 'set-spawn') return hasString(value, 'locationId');
-  if (value.kind === 'set-appearance') return hasString(value, 'presetId');
+  if (value.kind === 'open-modal') return hasString(value, 'modalId');
   return value.kind === 'chat'
     && hasString(value, 'messageKey')
     && (value.delaySeconds === undefined || (typeof value.delaySeconds === 'number' && value.delaySeconds >= 0 && value.delaySeconds <= 2));
@@ -314,7 +315,8 @@ const validateItemsShape = (items: unknown): items is ItemDefinition[] =>
     items.every(
       (item) =>
         isRecord(item) &&
-        hasString(item, 'id'),
+        hasString(item, 'id') &&
+        (item.actions === undefined || validateActionsShape(item.actions)),
     ));
 
 const validateFlagsShape = (flags: unknown): flags is StateFlagDefinition[] =>
@@ -433,6 +435,17 @@ const validateRecipesShape = (recipes: unknown): recipes is RecipeDefinition[] =
       (recipe.extraResults === undefined || (Array.isArray(recipe.extraResults) && recipe.extraResults.every(validateActionResultShape))) &&
       validateRecipeIngredientsShape(recipe.inputs) &&
       validateRecipeIngredientsShape(recipe.outputs)));
+
+const validateStatModifiersShape = (statModifiers: unknown): statModifiers is StatModifierDefinition[] =>
+  statModifiers === undefined ||
+  (Array.isArray(statModifiers) &&
+    statModifiers.every((modifier) =>
+      isRecord(modifier) &&
+      hasString(modifier, 'id') &&
+      hasString(modifier, 'statId') &&
+      typeof modifier.amount === 'number' &&
+      (modifier.kind === 'added' || modifier.kind === 'increased') &&
+      validateConditionShape(modifier.activeWhen)));
 
 const validateDialogueOptionShape = (value: unknown) => isRecord(value)
   && hasString(value, 'id')
@@ -556,6 +569,10 @@ export const validateContentShape = (bundle: Partial<ContentBundle>) => {
 
   if (!validateRecipesShape(bundle.recipes)) {
     issues.push(error('recipes.json', 'validation.recipesShape'));
+  }
+
+  if (!validateStatModifiersShape(bundle.statModifiers)) {
+    issues.push(error('stat-modifiers.json', 'validation.statModifiersShape'));
   }
 
   return issues;
@@ -769,7 +786,7 @@ export const validateContentReferences = (bundle: ContentBundle) => {
     if (!isDottedKebabCaseId(action.id)) {
       issues.push(error(`actions.${action.id}.id`, 'validation.actionIdKebab'));
     }
-    if (action.locationId === undefined && !entityActionIds.has(action.id)) {
+    if (action.locationId === undefined && action.itemId === undefined && !entityActionIds.has(action.id)) {
       issues.push(error(`actions.${action.id}.locationId`, 'validation.actionLocationOrEntityRequired'));
     }
     if (action.locationId !== undefined && !locationIds.has(action.locationId)) {
@@ -826,6 +843,10 @@ export const validateContentReferences = (bundle: ContentBundle) => {
     for (const ingredient of [...recipe.inputs, ...recipe.outputs]) {
       if (!itemIds.has(ingredient.itemId)) issues.push(error(`${path}.itemId`, 'validation.unknownItem', { id: ingredient.itemId }));
     }
+  }
+
+  for (const modifier of bundle.statModifiers ?? []) {
+    if (!statIds.has(modifier.statId)) issues.push(error(`statModifiers.${modifier.id}.statId`, 'validation.unknownStat', { id: modifier.statId }));
   }
 
   const validateResultReferences = (result: ActionResult, path: string) => {

@@ -30,6 +30,14 @@
         ]
       }
     ],
+    "interactionTypes": [
+      {
+        "id": "lockpicking",
+        "sourceStatId": "thieving",
+        "targetStatId": "thieving",
+        "targetPlayerHealth": false
+      }
+    ],
     "entities": [
       {
         "id": "miki",
@@ -63,14 +71,27 @@
         "actions": [
           {
             "id": "pick",
-            "instant": true,
-            "rewards": [],
-            "results": [
+            "durationSeconds": 2,
+            "rewards": [
               {
-                "kind": "skill-xp",
+                "kind": "skillXp",
                 "skillId": "thieving",
-                "amount": 10
+                "amount": 4
+              }
+            ],
+            "interactionTypeId": "lockpicking",
+            "enemy": {
+              "interactionTypeId": "lockpicking",
+              "stats": {
+                "attack": 0,
+                "defense": 3,
+                "health": 12,
+                "rate": 0
               },
+              "showHealthBar": true,
+              "rewards": []
+            },
+            "results": [
               {
                 "kind": "flag",
                 "flagId": "tutorial.miki-cleared",
@@ -126,6 +147,10 @@
               {
                 "kind": "chat",
                 "messageKey": "chat.entity.mirror.look"
+              },
+              {
+                "kind": "open-modal",
+                "modalId": "name-editor"
               }
             ]
           }
@@ -135,7 +160,128 @@
         "id": "drawer",
         "actions": [
           {
-            "id": "search",
+            "id": "examine",
+            "instant": true,
+            "rewards": [],
+            "results": [
+              {
+                "kind": "chat",
+                "messageKey": "chat.entity.drawer.examine-neither"
+              }
+            ],
+            "visibleWhen": {
+              "kind": "not",
+              "condition": {
+                "kind": "any",
+                "conditions": [
+                  {
+                    "kind": "state-variable",
+                    "variable": "flag:tutorial.drawer-coins-taken",
+                    "comparison": "equal",
+                    "value": true
+                  },
+                  {
+                    "kind": "state-variable",
+                    "variable": "flag:tutorial.drawer-lockpick-taken",
+                    "comparison": "equal",
+                    "value": true
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "id": "examine-coins-only",
+            "instant": true,
+            "rewards": [],
+            "results": [
+              {
+                "kind": "chat",
+                "messageKey": "chat.entity.drawer.examine-coins-only"
+              }
+            ],
+            "visibleWhen": {
+              "kind": "all",
+              "conditions": [
+                {
+                  "kind": "state-variable",
+                  "variable": "flag:tutorial.drawer-coins-taken",
+                  "comparison": "equal",
+                  "value": true
+                },
+                {
+                  "kind": "not",
+                  "condition": {
+                    "kind": "state-variable",
+                    "variable": "flag:tutorial.drawer-lockpick-taken",
+                    "comparison": "equal",
+                    "value": true
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "id": "examine-lockpick-only",
+            "instant": true,
+            "rewards": [],
+            "results": [
+              {
+                "kind": "chat",
+                "messageKey": "chat.entity.drawer.examine-lockpick-only"
+              }
+            ],
+            "visibleWhen": {
+              "kind": "all",
+              "conditions": [
+                {
+                  "kind": "not",
+                  "condition": {
+                    "kind": "state-variable",
+                    "variable": "flag:tutorial.drawer-coins-taken",
+                    "comparison": "equal",
+                    "value": true
+                  }
+                },
+                {
+                  "kind": "state-variable",
+                  "variable": "flag:tutorial.drawer-lockpick-taken",
+                  "comparison": "equal",
+                  "value": true
+                }
+              ]
+            }
+          },
+          {
+            "id": "examine-both",
+            "instant": true,
+            "rewards": [],
+            "results": [
+              {
+                "kind": "chat",
+                "messageKey": "chat.entity.drawer.examine-both"
+              }
+            ],
+            "visibleWhen": {
+              "kind": "all",
+              "conditions": [
+                {
+                  "kind": "state-variable",
+                  "variable": "flag:tutorial.drawer-coins-taken",
+                  "comparison": "equal",
+                  "value": true
+                },
+                {
+                  "kind": "state-variable",
+                  "variable": "flag:tutorial.drawer-lockpick-taken",
+                  "comparison": "equal",
+                  "value": true
+                }
+              ]
+            }
+          },
+          {
+            "id": "take-coins",
             "instant": true,
             "rewards": [],
             "results": [
@@ -145,20 +291,55 @@
                 "amount": 5
               },
               {
+                "kind": "flag",
+                "flagId": "tutorial.drawer-coins-taken",
+                "value": true
+              },
+              {
+                "kind": "chat",
+                "messageKey": "chat.entity.drawer.take-coins"
+              }
+            ],
+            "visibleWhen": {
+              "kind": "not",
+              "condition": {
+                "kind": "state-variable",
+                "variable": "flag:tutorial.drawer-coins-taken",
+                "comparison": "equal",
+                "value": true
+              }
+            },
+            "maxCompletions": 1
+          },
+          {
+            "id": "take-lockpick",
+            "instant": true,
+            "rewards": [],
+            "results": [
+              {
                 "kind": "item",
                 "itemId": "lockpick",
                 "amount": 1
               },
               {
-                "kind": "item",
-                "itemId": "guide-book",
-                "amount": 1
+                "kind": "flag",
+                "flagId": "tutorial.drawer-lockpick-taken",
+                "value": true
               },
               {
                 "kind": "chat",
-                "messageKey": "chat.entity.drawer.search"
+                "messageKey": "chat.entity.drawer.take-lockpick"
               }
             ],
+            "visibleWhen": {
+              "kind": "not",
+              "condition": {
+                "kind": "state-variable",
+                "variable": "flag:tutorial.drawer-lockpick-taken",
+                "comparison": "equal",
+                "value": true
+              }
+            },
             "maxCompletions": 1
           }
         ]
@@ -167,20 +348,72 @@
         "id": "bookshelf",
         "actions": [
           {
-            "id": "read",
+            "id": "examine",
             "instant": true,
             "rewards": [],
             "results": [
               {
+                "kind": "chat",
+                "messageKey": "chat.entity.bookshelf.examine-with-note"
+              }
+            ],
+            "visibleWhen": {
+              "kind": "not",
+              "condition": {
+                "kind": "state-variable",
+                "variable": "flag:tutorial.bookshelf-note-taken",
+                "comparison": "equal",
+                "value": true
+              }
+            }
+          },
+          {
+            "id": "take-note",
+            "instant": true,
+            "rewards": [],
+            "results": [
+              {
+                "kind": "item",
+                "itemId": "note",
+                "amount": 1
+              },
+              {
                 "kind": "flag",
-                "flagId": "quest.leave-tutorial-island.accepted",
+                "flagId": "tutorial.bookshelf-note-taken",
                 "value": true
               },
               {
                 "kind": "chat",
-                "messageKey": "chat.entity.bookshelf.read"
+                "messageKey": "chat.entity.bookshelf.take-note"
               }
-            ]
+            ],
+            "visibleWhen": {
+              "kind": "not",
+              "condition": {
+                "kind": "state-variable",
+                "variable": "flag:tutorial.bookshelf-note-taken",
+                "comparison": "equal",
+                "value": true
+              }
+            },
+            "maxCompletions": 1
+          },
+          {
+            "id": "examine-taken",
+            "instant": true,
+            "rewards": [],
+            "results": [
+              {
+                "kind": "chat",
+                "messageKey": "chat.entity.bookshelf.examine-taken"
+              }
+            ],
+            "visibleWhen": {
+              "kind": "state-variable",
+              "variable": "flag:tutorial.bookshelf-note-taken",
+              "comparison": "equal",
+              "value": true
+            }
           }
         ]
       }
@@ -196,28 +429,114 @@
             "textKey": "dialogue.miki.start",
             "options": [
               {
-                "id": "ready",
-                "labelKey": "dialogue.miki.option.ready",
+                "id": "ask-quests",
+                "labelKey": "dialogue.miki.option.ask-quests",
+                "gotoNodeId": "explain-quests"
+              },
+              {
+                "id": "ask-colors",
+                "labelKey": "dialogue.miki.option.ask-colors",
+                "gotoNodeId": "explain-colors"
+              },
+              {
+                "id": "impatient",
+                "labelKey": "dialogue.miki.option.impatient",
+                "gotoNodeId": "offer-quest"
+              }
+            ]
+          },
+          {
+            "id": "explain-quests",
+            "speakerId": "miki",
+            "textKey": "dialogue.miki.explain-quests",
+            "options": [
+              {
+                "id": "ask-colors",
+                "labelKey": "dialogue.miki.option.ask-colors",
+                "gotoNodeId": "explain-colors"
+              },
+              {
+                "id": "continue",
+                "labelKey": "dialogue.miki.option.continue",
+                "gotoNodeId": "offer-quest"
+              }
+            ]
+          },
+          {
+            "id": "explain-colors",
+            "speakerId": "miki",
+            "textKey": "dialogue.miki.explain-colors",
+            "options": [
+              {
+                "id": "ask-quests",
+                "labelKey": "dialogue.miki.option.ask-quests",
+                "gotoNodeId": "explain-quests"
+              },
+              {
+                "id": "continue",
+                "labelKey": "dialogue.miki.option.continue",
+                "gotoNodeId": "offer-quest"
+              }
+            ]
+          },
+          {
+            "id": "offer-quest",
+            "speakerId": "miki",
+            "textKey": "dialogue.miki.offer-quest",
+            "options": [
+              {
+                "id": "accept",
+                "labelKey": "dialogue.miki.option.accept",
+                "gotoNodeId": "check-tab-prompt"
+              },
+              {
+                "id": "not-yet",
+                "labelKey": "dialogue.miki.option.not-yet",
+                "gotoNodeId": "maybe-later"
+              }
+            ]
+          },
+          {
+            "id": "maybe-later",
+            "speakerId": "miki",
+            "textKey": "dialogue.miki.maybe-later"
+          },
+          {
+            "id": "check-tab-prompt",
+            "speakerId": "miki",
+            "textKey": "dialogue.miki.check-tab-prompt",
+            "options": [
+              {
+                "id": "checked",
+                "labelKey": "dialogue.miki.option.checked",
                 "results": [
-                  {
-                    "kind": "flag",
-                    "flagId": "tutorial.miki-cleared",
-                    "value": true
-                  },
                   {
                     "kind": "flag",
                     "flagId": "quest.leave-tutorial-island.accepted",
                     "value": true
                   }
                 ],
-                "gotoNodeId": "ready"
+                "gotoNodeId": "accept-node"
               }
             ]
           },
           {
-            "id": "ready",
+            "id": "accept-node",
             "speakerId": "miki",
-            "textKey": "dialogue.miki.ready"
+            "textKey": "dialogue.miki.accept-node",
+            "gotoNodeId": "farewell"
+          },
+          {
+            "id": "farewell",
+            "speakerId": "miki",
+            "textKey": "dialogue.miki.farewell",
+            "results": [
+              {
+                "kind": "flag",
+                "flagId": "tutorial.miki-cleared",
+                "value": true
+              }
+            ]
           }
         ]
       }
@@ -233,30 +552,69 @@
       "entity.mirror.title": "Mirror",
       "entity.drawer.title": "Drawer",
       "entity.bookshelf.title": "Bookshelf",
+      "interaction.lockpicking.title": "Lockpicking",
+      "interaction.lockpicking.player.hit": "You work the lock and feel it give a little.",
+      "interaction.lockpicking.player.miss": "The lockpick slips without catching.",
+      "interaction.lockpicking.player.kill": "The lock finally gives.",
+      "interaction.lockpicking.entity.hit": "The lock does not fight back.",
+      "interaction.lockpicking.entity.miss": "The lock does not fight back.",
+      "interaction.lockpicking.entity.kill": "The lock does not fight back.",
       "action.entity.miki.talk.title": "Talk",
       "action.entity.miki.talk.description": "Ask Miki about the island.",
       "action.entity.miki.examine.title": "Examine",
       "action.entity.miki.examine.description": "Look at Miki.",
       "action.entity.front-door.pick.title": "Pick Lock",
-      "action.entity.front-door.pick.description": "Worry the lock with the lockpick.",
-      "action.entity.front-door.pick.success": "The lock gives with a soft click.",
+      "action.entity.front-door.pick.description": "Work the lock with the lockpick.",
       "action.entity.front-door.examine.title": "Examine",
       "action.entity.front-door.examine.description": "Check the front door.",
       "action.entity.mirror.look.title": "Look",
       "action.entity.mirror.look.description": "Catch your reflection.",
-      "action.entity.drawer.search.title": "Search",
-      "action.entity.drawer.search.description": "Search the small drawer.",
-      "action.entity.bookshelf.read.title": "Read",
-      "action.entity.bookshelf.read.description": "Skim the thin island primer.",
+      "action.entity.drawer.examine.title": "Examine",
+      "action.entity.drawer.examine.description": "Examine the drawer.",
+      "action.entity.drawer.examine-coins-only.title": "Examine",
+      "action.entity.drawer.examine-coins-only.description": "Examine the drawer.",
+      "action.entity.drawer.examine-lockpick-only.title": "Examine",
+      "action.entity.drawer.examine-lockpick-only.description": "Examine the drawer.",
+      "action.entity.drawer.examine-both.title": "Examine",
+      "action.entity.drawer.examine-both.description": "Examine the drawer.",
+      "action.entity.drawer.take-coins.title": "Take coins",
+      "action.entity.drawer.take-coins.description": "Take the coins from the drawer.",
+      "action.entity.drawer.take-lockpick.title": "Take lockpick",
+      "action.entity.drawer.take-lockpick.description": "Take the lockpick from the drawer.",
+      "action.entity.bookshelf.examine.title": "Examine",
+      "action.entity.bookshelf.examine.description": "Examine the bookshelf.",
+      "action.entity.bookshelf.examine-taken.title": "Examine",
+      "action.entity.bookshelf.examine-taken.description": "Examine the bookshelf.",
+      "action.entity.bookshelf.take-note.title": "Take note",
+      "action.entity.bookshelf.take-note.description": "Take the handwritten note.",
       "chat.entity.miki.examine": "A guide with one eye on the door.",
       "chat.entity.front-door.examine": "A heavy door. The keyhole looks scratched, like someone was here before you.",
       "chat.entity.front-door.pick": "The lock gives with a soft click. Whatever is out there, you can reach it now.",
-      "chat.entity.mirror.look": "You catch your reflection. The Character tab has more options if you want a different look.",
-      "chat.entity.drawer.search": "The drawer was not locked. Inside: a few coins, a lockpick, and a small guide book. That feels deliberate.",
-      "chat.entity.bookshelf.read": "The book has diagrams instead of paragraphs: tabs, settings, and quest colors. Red starts, yellow reminds, green finishes.",
-      "dialogue.miki.start": "Welcome. Keep your map open, poke what looks useful, and check the Quests tab if you forget what you were doing. Colors there mean red for not started, yellow for in progress, green for done. Ready to see the island?",
-      "dialogue.miki.option.ready": "I can find my way.",
-      "dialogue.miki.ready": "Good. The door is open. Curiosity is allowed here."
+      "chat.entity.mirror.look": "You catch your reflection. Something about it does not feel like you yet.",
+      "chat.entity.drawer.examine-neither": "You examine the drawer. A drawer full of random stuff. You see some coins on the bottom as well as a worn set of lockpicks.",
+      "chat.entity.drawer.examine-coins-only": "A cluttered drawer with a worn set of lockpicks at the bottom.",
+      "chat.entity.drawer.examine-lockpick-only": "A cluttered drawer with a few coins scattered among the junk.",
+      "chat.entity.drawer.examine-both": "A drawer full of random junk.",
+      "chat.entity.drawer.take-coins": "You take the coins.",
+      "chat.entity.drawer.take-lockpick": "You take the lockpick.",
+      "chat.entity.bookshelf.examine-with-note": "A packed bookshelf with leather bound tomes. There is a handwritten note tossed on the second shelf.",
+      "chat.entity.bookshelf.examine-taken": "A packed bookshelf with leather bound tomes.",
+      "chat.entity.bookshelf.take-note": "You take the note.",
+      "dialogue.miki.start": "Oh — hi. You're the new arrival, right? I'm Miki, I look after new folks passing through here. What's on your mind before you head out?",
+      "dialogue.miki.option.ask-quests": "What's this Quests tab I keep hearing about?",
+      "dialogue.miki.option.ask-colors": "What do the colors mean?",
+      "dialogue.miki.option.impatient": "I'm ready to go, thanks.",
+      "dialogue.miki.option.continue": "Anyway — go on.",
+      "dialogue.miki.explain-quests": "Right, the Quests tab — it's under Character, second row. Anything you take on shows up there with a line about what to do next. Handy when you forget what you were doing five minutes ago. Which, no judgment, happens to everyone here.",
+      "dialogue.miki.explain-colors": "Quick version: red means you haven't started something, yellow means you're partway through, green means it's done. Glance at the dot before you open anything if you just want the status.",
+      "dialogue.miki.offer-quest": "Speaking of which — want an actual task instead of just wandering? I can point you somewhere real.",
+      "dialogue.miki.option.not-yet": "Maybe later.",
+      "dialogue.miki.maybe-later": "Sure thing. Door's right there whenever you want to explore first — come find me again when you're ready.",
+      "dialogue.miki.option.accept": "Go on then, give me something to do.",
+      "dialogue.miki.check-tab-prompt": "Take a look at your Quests tab right now — you'll see it listed, red, since you haven't actually started it yet. Go on, I'll wait.",
+      "dialogue.miki.option.checked": "Okay, I see it.",
+      "dialogue.miki.accept-node": "There — now it should read yellow. That's you, officially underway. Leave Tutorial Island: find your way off this place.",
+      "dialogue.miki.farewell": "Door's unlocked. Go on, get curious."
     }
   }
 }

@@ -8,12 +8,27 @@ import type {
   EntityActionDefinition,
   EntityDefinition,
   GameAction,
+  ItemActionDefinition,
+  ItemDefinition,
   LocationNode,
   ResourceDefinition,
 } from './types';
 
 const entityActionRuntimeId = (entityId: string, actionId: string) =>
   actionId.includes('.') ? actionId : `entity.${entityId}.${actionId}`;
+
+const itemActionRuntimeId = (itemId: string, actionId: string) =>
+  actionId.includes('.') ? actionId : `item.${itemId}.${actionId}`;
+
+const normalizeItemAction = (
+  item: ItemDefinition,
+  action: ItemActionDefinition,
+): GameAction => normalizeGameAction({
+  ...action,
+  id: itemActionRuntimeId(item.id, action.id),
+  itemId: item.id,
+  rewards: action.rewards ?? [],
+});
 
 const actionIdsForEntity = (entity: EntityDefinition) => [
   ...new Set([
@@ -120,6 +135,11 @@ export const normalizeContentBundleStructure = (bundle: ContentBundle): ContentB
       .map((action) => normalizeEntityAction(entity, action))
       .filter((action) => !existingActionIds.has(action.id)),
   );
+  const itemActions = (bundle.items ?? []).flatMap((item) =>
+    (item.actions ?? [])
+      .map((action) => normalizeItemAction(item, action))
+      .filter((action) => !existingActionIds.has(action.id)),
+  );
 
   return {
     ...bundle,
@@ -127,6 +147,7 @@ export const normalizeContentBundleStructure = (bundle: ContentBundle): ContentB
     actions: [
       ...bundle.actions.map((action) => normalizeTopLevelAction(action, bundle.locations)),
       ...entityActions,
+      ...itemActions,
     ],
     effects: [
       ...(bundle.effects ?? []),

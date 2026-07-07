@@ -179,12 +179,13 @@ export type ActionResult =
   | { kind: 'bank-deposit'; itemId: string; amount: number }
   | { kind: 'bank-withdraw'; itemId: string; amount: number }
   | { kind: 'set-spawn'; locationId: string }
-  | { kind: 'set-appearance'; presetId: string };
+  | { kind: 'open-modal'; modalId: string };
 
 export type GameAction = {
   id: string;
   locationId?: string;
   entityId?: string;
+  itemId?: string;
   role?: 'optional' | 'progression' | 'utility' | 'travel';
   durationSeconds?: number;
   instant?: boolean;
@@ -243,6 +244,11 @@ export type ItemDefinition = {
   id: string;
   maxQuantity?: number;
   tags?: string;
+  actions?: ItemActionDefinition[];
+};
+
+export type ItemActionDefinition = Omit<GameAction, 'id' | 'entityId'> & {
+  id: string;
 };
 
 export type StateFlagDefinition = {
@@ -375,6 +381,14 @@ export type QuestDefinition = {
   stages: QuestStage[];
 };
 
+export type StatModifierDefinition = {
+  id: string;
+  statId: string;
+  amount: number;
+  kind: 'added' | 'increased';
+  activeWhen: Condition;
+};
+
 export type RecipeIngredient = {
   itemId: string;
   amount: number;
@@ -410,6 +424,7 @@ export type ContentBundle = {
   dialogues?: DialogueDefinition[];
   quests?: QuestDefinition[];
   recipes?: RecipeDefinition[];
+  statModifiers?: StatModifierDefinition[];
   locales: Record<string, LocaleDictionary>;
   modules?: ContentModule[];
   modulePacks?: ContentModulePack[];
@@ -434,6 +449,7 @@ export type ModuleDataSectionObject = {
   dialogues?: DialogueDefinition[];
   quests?: QuestDefinition[];
   recipes?: RecipeDefinition[];
+  statModifiers?: StatModifierDefinition[];
   displayProfiles?: DisplayProfileDefinition[];
 };
 
@@ -468,6 +484,7 @@ export type ModuleDataUpdatesObject = ModuleDataSectionObject & {
     dialogueOptions?: Record<string, string[]>;
     quests?: string[];
     recipes?: string[];
+    statModifiers?: string[];
     displayProfiles?: string[];
     locales?: string[];
   };
@@ -654,6 +671,7 @@ export type ActionResolutionContext = {
   dialogues?: DialogueDefinition[];
   quests?: QuestDefinition[];
   recipes?: RecipeDefinition[];
+  statModifiers?: StatModifierDefinition[];
 };
 
 export type ResourcePool = {
@@ -691,7 +709,8 @@ export type UniversePlayState = {
   nextRunLogSequence: number;
   lastTickAt: number;
   spawnLocationId: string | null;
-  appearance: { presetId: string };
+  characterName: string;
+  openModalId: string | null;
 };
 
 export type RunLogEntry = {

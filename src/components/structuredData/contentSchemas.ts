@@ -91,7 +91,7 @@ export const resultSchema = (bundle: ContentBundle): StructuredSchema => ({
     'bank-deposit': { label: 'contribution.result.bankDeposit', createValue: () => ({ kind: 'bank-deposit', itemId: bundle.items[0]?.id ?? '', amount: 1 }), schema: { kind: 'object', fields: { kind: { schema: { kind: 'enum', options: ['bank-deposit'] } }, itemId: { schema: string(bundle.items.map((item) => item.id), true) }, amount: { schema: number(0) } } } },
     'bank-withdraw': { label: 'contribution.result.bankWithdraw', createValue: () => ({ kind: 'bank-withdraw', itemId: bundle.items[0]?.id ?? '', amount: 1 }), schema: { kind: 'object', fields: { kind: { schema: { kind: 'enum', options: ['bank-withdraw'] } }, itemId: { schema: string(bundle.items.map((item) => item.id), true) }, amount: { schema: number(0) } } } },
     'set-spawn': { label: 'contribution.result.setSpawn', createValue: () => ({ kind: 'set-spawn', locationId: bundle.locations[0]?.id ?? '' }), schema: { kind: 'object', fields: { kind: { schema: { kind: 'enum', options: ['set-spawn'] } }, locationId: { schema: string(bundle.locations.map((item) => item.id), true) } } } },
-    'set-appearance': { label: 'contribution.result.setAppearance', createValue: () => ({ kind: 'set-appearance', presetId: '' }), schema: { kind: 'object', fields: { kind: { schema: { kind: 'enum', options: ['set-appearance'] } }, presetId: { schema: string() } } } },
+    'open-modal': { label: 'contribution.result.openModal', createValue: () => ({ kind: 'open-modal', modalId: '' }), schema: { kind: 'object', fields: { kind: { schema: { kind: 'enum', options: ['open-modal'] } }, modalId: { schema: string() } } } },
   },
 });
 
@@ -141,6 +141,14 @@ export const recipeSchema = (bundle: ContentBundle): StructuredSchema => ({ kind
   extraResults: { label: 'contribution.column.results', schema: { kind: 'array', listMode: 'free', item: resultSchema(bundle), createItem: () => ({ kind: 'state-variable-delta', variable: stateVariables(bundle)[0] ?? '', amount: 1 }) }, optional: true, defaultValue: [] },
   inputs: { label: 'contribution.column.inputs', schema: { kind: 'array', listMode: 'free', item: recipeIngredientSchema(bundle), createItem: () => ({ itemId: bundle.items[0]?.id ?? '', amount: 1 }) } },
   outputs: { label: 'contribution.column.outputs', schema: { kind: 'array', listMode: 'free', item: recipeIngredientSchema(bundle), createItem: () => ({ itemId: bundle.items[0]?.id ?? '', amount: 1 }) } },
+} });
+
+export const statModifierSchema = (bundle: ContentBundle): StructuredSchema => ({ kind: 'object', fields: {
+  id: { label: 'contribution.column.id', schema: string() },
+  statId: { label: 'contribution.column.stat', schema: string(bundle.stats.map((item) => item.id), true) },
+  amount: { label: 'contribution.column.amount', schema: number() },
+  kind: { label: 'contribution.column.kind', schema: { kind: 'enum', options: ['added', 'increased'] } },
+  activeWhen: { label: 'contribution.column.visibleWhen', schema: conditionSchema(bundle), defaultValue: { kind: 'state-variable', variable: stateVariables(bundle)[0] ?? '', comparison: 'equal', value: 0 } },
 } });
 
 export const dialogueOptionSchema = (bundle: ContentBundle): StructuredSchema => ({ kind: 'object', fields: {
@@ -323,6 +331,7 @@ export const moduleDataSectionSchema = (bundle: ContentBundle): StructuredSchema
   dialogues: { label: 'contribution.data.dialogues', schema: { kind: 'array', listMode: 'free', item: dialogueSchema(bundle), createItem: () => ({ id: 'new-dialogue', startNodeId: 'start', nodes: [{ id: 'start', textKey: 'dialogue.new-dialogue.start' }] }) }, optional: true, defaultValue: [] },
   quests: { label: 'contribution.data.quests', schema: { kind: 'array', listMode: 'free', item: questSchema(bundle), createItem: () => ({ id: 'new-quest', titleKey: '', stages: [{ id: 'start', descriptionKey: '', condition: { kind: 'state-variable', variable: stateVariables(bundle)[0] ?? '', comparison: 'equal', value: 0 } }] }) }, optional: true, defaultValue: [] },
   recipes: { label: 'contribution.data.recipes', schema: { kind: 'array', listMode: 'free', item: recipeSchema(bundle), createItem: () => ({ id: 'new-recipe', stationId: 'new-station', inputs: [{ itemId: bundle.items[0]?.id ?? '', amount: 1 }], outputs: [{ itemId: bundle.items[0]?.id ?? '', amount: 1 }] }) }, optional: true, defaultValue: [] },
+  statModifiers: { label: 'contribution.data.statModifiers', schema: { kind: 'array', listMode: 'free', item: statModifierSchema(bundle), createItem: () => ({ id: 'new-stat-modifier', statId: bundle.stats[0]?.id ?? '', amount: 1, kind: 'added', activeWhen: { kind: 'state-variable', variable: stateVariables(bundle)[0] ?? '', comparison: 'equal', value: 0 } }) }, optional: true, defaultValue: [] },
   displayProfiles: { label: 'contribution.data.displayProfiles', schema: { kind: 'array', listMode: 'free', item: displayProfileSchema(), createItem: () => ({ id: 'new-profile', colors: {} }) }, optional: true, defaultValue: [] },
 } });
 
@@ -370,6 +379,7 @@ export const moduleRemoveSchema = (bundle: ContentBundle): StructuredSchema => (
   dialogueOptions: { label: 'contribution.module.removeDialogueOptions', schema: dialogueOptionRemovalSchema(bundle), optional: true, defaultValue: {} },
   quests: { label: 'contribution.data.quests', schema: idListSchema((bundle.quests ?? []).map((item) => item.id)), optional: true, defaultValue: [] },
   recipes: { label: 'contribution.data.recipes', schema: idListSchema((bundle.recipes ?? []).map((item) => item.id)), optional: true, defaultValue: [] },
+  statModifiers: { label: 'contribution.data.statModifiers', schema: idListSchema((bundle.statModifiers ?? []).map((item) => item.id)), optional: true, defaultValue: [] },
   displayProfiles: { label: 'contribution.data.displayProfiles', schema: idListSchema((bundle.manifest.displayProfiles ?? []).map((item) => item.id)), optional: true, defaultValue: [] },
   locales: { label: 'contribution.module.locale', schema: idListSchema(Object.keys(bundle.locales).flatMap((locale) => Object.keys(bundle.locales[locale] ?? {}))), optional: true, defaultValue: [] },
 } });

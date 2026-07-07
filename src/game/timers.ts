@@ -22,7 +22,6 @@ import { resolveManifestUiSettings } from './universeSettings';
 import { skillLevelFromXp } from './skills';
 import { rollRewards } from './rewards';
 import { applyCollectionLogRewards } from './collectionLog';
-import { DEFAULT_APPEARANCE_PRESET_ID } from './appearance';
 import { resolveStationAction } from './recipes';
 
 const MAX_CHAT_MESSAGES = 80;
@@ -150,7 +149,8 @@ export const createInitialPlayState = (
   nextRunLogSequence: 1,
   lastTickAt: Date.now(),
   spawnLocationId: null,
-  appearance: { presetId: DEFAULT_APPEARANCE_PRESET_ID },
+  characterName: '',
+  openModalId: null,
 });
 
 export const normalizePlayState = (
@@ -212,7 +212,8 @@ export const normalizePlayState = (
     runLog: (state.runLog ?? []).map((entry) => ({ ...entry, runId: entry.runId ?? runId })).slice(-MAX_RUN_LOG_ENTRIES),
     nextRunLogSequence: state.nextRunLogSequence ?? ((state.runLog?.length ?? 0) + 1),
     spawnLocationId: state.spawnLocationId ?? null,
-    appearance: state.appearance ?? { presetId: DEFAULT_APPEARANCE_PRESET_ID },
+    characterName: state.characterName ?? '',
+    openModalId: state.openModalId ?? null,
   };
 };
 
@@ -1137,11 +1138,16 @@ export const withdrawFromBank = (
   return applyItemDelta(applyBankDelta(state, itemId, -available), context, itemId, available);
 };
 
-export const setAppearancePreset = (
+export const setCharacterName = (
   state: UniversePlayState,
-  presetId: string,
+  name: string,
   now = Date.now(),
-): UniversePlayState => ({ ...state, appearance: { presetId }, lastTickAt: now });
+): UniversePlayState => ({ ...state, characterName: name, lastTickAt: now });
+
+export const closeModal = (
+  state: UniversePlayState,
+  now = Date.now(),
+): UniversePlayState => (state.openModalId ? { ...state, openModalId: null, lastTickAt: now } : state);
 
 const findDialogue = (context: ActionResolutionContext, dialogueId: string) =>
   context.dialogues?.find((dialogue) => dialogue.id === dialogueId) ?? null;
@@ -1262,8 +1268,8 @@ const applyActionResult = (
   if (result.kind === 'set-spawn') {
     return { ...state, spawnLocationId: resolveLocationId(state, context, result.locationId) };
   }
-  if (result.kind === 'set-appearance') {
-    return setAppearancePreset(state, result.presetId, now);
+  if (result.kind === 'open-modal') {
+    return { ...state, openModalId: result.modalId, lastTickAt: now };
   }
   return appendChatMessage(
     state,

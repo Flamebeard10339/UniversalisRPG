@@ -300,8 +300,8 @@ describe('new action result kinds', () => {
     expect(issues.some((issue) => issue.message === 'validation.actionsShape')).toBe(false);
   });
 
-  it('accepts a set-appearance result', () => {
-    const issues = actionWith({ results: [{ kind: 'set-appearance', presetId: 'default' }] });
+  it('accepts an open-modal result', () => {
+    const issues = actionWith({ results: [{ kind: 'open-modal', modalId: 'name-editor' }] });
     expect(issues.some((issue) => issue.message === 'validation.actionsShape')).toBe(false);
   });
 

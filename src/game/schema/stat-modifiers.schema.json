@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://universalis-rpg.local/schema/stat-modifiers.schema.json",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "required": ["id", "statId", "amount", "kind", "activeWhen"],
+    "additionalProperties": false,
+    "properties": {
+      "id": { "type": "string", "minLength": 1 },
+      "statId": { "type": "string", "minLength": 1 },
+      "amount": { "type": "number" },
+      "kind": { "enum": ["added", "increased"] },
+      "activeWhen": { "$ref": "https://universalis-rpg.local/schema/quests.schema.json#/$defs/condition" }
+    }
+  }
+}

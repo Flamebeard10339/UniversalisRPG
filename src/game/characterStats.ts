@@ -1,6 +1,7 @@
 import { skillLevelFromXp } from './skills';
 import { equippedStatBonuses } from './equipment';
-import type { ExperienceCurveDefinition, ItemDefinition, SkillEquipmentBonuses, SkillDefinition, SkillTotals, StatDefinition, StatTotals, UniversePlayState } from './types';
+import { getActiveStatModifiers } from './statModifiers';
+import type { ExperienceCurveDefinition, ItemDefinition, SkillEquipmentBonuses, SkillDefinition, SkillTotals, StatDefinition, StatModifierDefinition, StatTotals, UniversePlayState } from './types';
 
 const DEFAULT_RATE = 1;
 
@@ -43,6 +44,7 @@ export const getCharacterStatTotals = (
   skills: SkillDefinition[] = [],
   items: ItemDefinition[] = [],
   experienceCurve?: ExperienceCurveDefinition,
+  statModifiers: StatModifierDefinition[] = [],
 ): StatTotals => {
   if (state.statOverrides?.[statId] !== undefined) {
     const effectiveTotal = state.statOverrides[statId];
@@ -68,8 +70,14 @@ export const getCharacterStatTotals = (
       added: total.added + (bonus.kind === 'added' ? bonus.amount : 0),
       increased: total.increased + (bonus.kind === 'increased' ? bonus.amount : 0),
     }), { added: 0, increased: 0 });
-  const added = skillTotals.added + equipmentBonuses.added;
-  const increased = skillTotals.increased + equipmentBonuses.increased;
+  const modifierContext = { actions: [], enemies: [], interactionTypes: [], items, skills, stats, statModifiers };
+  const modifierBonuses = getActiveStatModifiers(state, modifierContext, statId)
+    .reduce((total, modifier) => ({
+      added: total.added + (modifier.kind === 'added' ? modifier.amount : 0),
+      increased: total.increased + (modifier.kind === 'increased' ? modifier.amount : 0),
+    }), { added: 0, increased: 0 });
+  const added = skillTotals.added + equipmentBonuses.added + modifierBonuses.added;
+  const increased = skillTotals.increased + equipmentBonuses.increased + modifierBonuses.increased;
   const rawTotal = base + added;
   const effectiveTotal = increased < 0
     ? rawTotal / (1 - increased)
@@ -85,4 +93,5 @@ export const getCharacterStatValue = (
   skills: SkillDefinition[] = [],
   items: ItemDefinition[] = [],
   experienceCurve?: ExperienceCurveDefinition,
-) => getCharacterStatTotals(state, stats, statId, skills, items, experienceCurve).effectiveTotal;
+  statModifiers: StatModifierDefinition[] = [],
+) => getCharacterStatTotals(state, stats, statId, skills, items, experienceCurve, statModifiers).effectiveTotal;

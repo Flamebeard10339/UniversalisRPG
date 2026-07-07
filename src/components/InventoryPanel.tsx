@@ -1,18 +1,39 @@
 import { itemDescriptionKey, itemTitleKey } from '../game/contentIds';
 import { canEquipItemInSlot, equipmentSlots, formatItemTag, getItemTags, itemSlots, meetsEquipmentRequirements } from '../game/equipment';
-import type { ContentBundle, EquipmentSlot, UniversePlayState } from '../game/types';
+import { areActionRequirementsMet, isActionVisible } from '../game/conditions';
+import { getActionTitleText } from '../game/actionLocalization';
+import type { ContentBundle, EquipmentSlot, GameAction, UniversePlayState } from '../game/types';
 import type { Translator } from '../game/i18n';
 
 type InventoryPanelProps = {
   bundle: ContentBundle;
   onEquip: (itemId: string, slot: EquipmentSlot) => void;
+  onStartAction: (action: GameAction) => void;
   onUnequip: (slot: EquipmentSlot) => void;
   playState: UniversePlayState;
   t: Translator;
 };
 
-export const InventoryPanel = ({ bundle, onEquip, onUnequip, playState, t }: InventoryPanelProps) => {
+export const InventoryPanel = ({ bundle, onEquip, onStartAction, onUnequip, playState, t }: InventoryPanelProps) => {
   const entries = Object.entries(playState.inventory).filter(([, amount]) => amount > 0);
+  const actionContext = {
+    manifest: bundle.manifest,
+    actions: bundle.actions,
+    skills: bundle.skills,
+    stats: bundle.stats,
+    locations: bundle.locations,
+    entities: bundle.entities,
+    items: bundle.items,
+    flags: bundle.flags,
+    resourceDefinitions: bundle.resourceDefinitions,
+    effects: bundle.effects,
+    interactionTypes: bundle.interactionTypes,
+    enemies: bundle.enemies,
+    dropTables: bundle.dropTables,
+  };
+  const itemActions = (itemId: string) => bundle.actions
+    .filter((action) => action.itemId === itemId)
+    .filter((action) => isActionVisible(playState, action, actionContext) && areActionRequirementsMet(playState, action, actionContext));
 
   return (
     <section className="grid gap-4 rounded border border-slate-800 bg-slate-900 p-4">
@@ -55,6 +76,7 @@ export const InventoryPanel = ({ bundle, onEquip, onUnequip, playState, t }: Inv
           {entries.map(([itemId, amount]) => {
             const item = bundle.items.find((candidate) => candidate.id === itemId);
             const slots = itemSlots(item);
+            const availableItemActions = itemActions(itemId);
             return (
               <section className="grid gap-2 rounded border border-slate-800 bg-slate-950 p-3" key={itemId}>
                 <div className="flex items-start justify-between gap-3">
@@ -73,9 +95,9 @@ export const InventoryPanel = ({ bundle, onEquip, onUnequip, playState, t }: Inv
                   </div>
                   <span className="text-sm font-semibold text-slate-100">{amount}</span>
                 </div>
-                {item && slots.length > 0 && (
+                {(item && slots.length > 0) || availableItemActions.length > 0 ? (
                   <div className="flex flex-wrap gap-2">
-                    {slots.map((slotTag) => {
+                    {item && slots.map((slotTag) => {
                       const requirementsMet = meetsEquipmentRequirements(playState, slotTag, bundle.skills, bundle.manifest.experienceCurve);
                       return (
                         <button
@@ -90,8 +112,18 @@ export const InventoryPanel = ({ bundle, onEquip, onUnequip, playState, t }: Inv
                         </button>
                       );
                     })}
+                    {availableItemActions.map((action) => (
+                      <button
+                        className="rounded border border-cyan-700 px-3 py-1.5 text-xs font-semibold text-cyan-100"
+                        key={action.id}
+                        onClick={() => onStartAction(action)}
+                        type="button"
+                      >
+                        {getActionTitleText(action, bundle, t)}
+                      </button>
+                    ))}
                   </div>
-                )}
+                ) : null}
               </section>
             );
           })}

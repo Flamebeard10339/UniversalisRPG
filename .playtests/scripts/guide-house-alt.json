@@ -1,7 +1,16 @@
 [
+  "action:entity.drawer.examine",
+  "action:entity.drawer.take-lockpick",
+  "action:entity.drawer.examine-lockpick-only",
   "action:entity.front-door.examine",
-  "action:entity.drawer.search",
-  "action:entity.bookshelf.read",
+  "action:entity.front-door.pick",
+  "action:entity.bookshelf.examine",
+  "action:entity.bookshelf.take-note",
+  "action:item.note.read",
+  "dialogue-option:continue",
   "action:entity.mirror.look",
-  "action:entity.front-door.pick"
+  "action:entity.miki.talk",
+  "dialogue-option:impatient",
+  "dialogue-option:not-yet",
+  "dialogue-option:continue"
 ]

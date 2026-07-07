@@ -1,4 +1,22 @@
 [
+  "action:entity.bookshelf.examine",
+  "action:entity.bookshelf.take-note",
+  "action:entity.bookshelf.examine-taken",
+  "action:item.note.read",
+  "dialogue-option:continue",
+  "action:entity.drawer.examine",
+  "action:entity.drawer.take-coins",
+  "action:entity.drawer.examine-coins-only",
+  "action:entity.drawer.take-lockpick",
+  "action:entity.drawer.examine-both",
+  "action:entity.mirror.look",
+  "action:entity.front-door.examine",
   "action:entity.miki.talk",
-  "dialogue-option:ready"
+  "dialogue-option:ask-quests",
+  "dialogue-option:ask-colors",
+  "dialogue-option:continue",
+  "dialogue-option:accept",
+  "dialogue-option:checked",
+  "dialogue-option:continue",
+  "dialogue-option:continue"
 ]

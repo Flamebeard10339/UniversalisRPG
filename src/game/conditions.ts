@@ -63,6 +63,10 @@ export const isActionAvailableAtCurrentLocation = (
   action: GameAction,
   context: ActionResolutionContext,
 ) => {
+  if (action.itemId !== undefined) {
+    // Item actions aren't location-scoped — they're available wherever the item is held.
+    return true;
+  }
   if (action.locationId !== undefined) {
     return action.locationId === state.currentLocationId;
   }

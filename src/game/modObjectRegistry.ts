@@ -58,6 +58,7 @@ export const registerModObjectType = (objectType: string, dataKey: keyof ModuleD
   ['resourceDefinition', 'resourceDefinitions'],
   ['skill', 'skills'],
   ['stat', 'stats'],
+  ['statModifier', 'statModifiers'],
 ].forEach(([objectType, dataKey]) => registerModObjectType(objectType, dataKey as keyof ModuleDataSectionObject));
 
 export const modObjectTypes = () => [...new Set([...registry.values()])];

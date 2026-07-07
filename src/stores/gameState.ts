@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import type { ActionResolutionContext, ContentBundle, EquipmentSlot, GameAction, IdleReport, RunLogEntry, UniversePlayState } from '../game/types';
 import type { AvailableTravelEdge } from '../game/travel';
-import { appendChatMessage, appendRunLog, cancelDialogue, chooseDialogueOption, createInitialPlayState, depositToBank, normalizePlayState, resetInactiveEffectResources, resolveIdleTimers, setAppearancePreset, startAction, startTravel, withdrawFromBank } from '../game/timers';
+import { appendChatMessage, appendRunLog, cancelDialogue, chooseDialogueOption, closeModal, createInitialPlayState, depositToBank, normalizePlayState, resetInactiveEffectResources, resolveIdleTimers, setCharacterName, startAction, startTravel, withdrawFromBank } from '../game/timers';
 import { equipItem, unequipSlot } from '../game/equipment';
 import { load, remove, save } from '../lib/storage';
 import { recordAgentSessionMessage, type AgentSessionMessage } from '../game/agentSession';
@@ -24,7 +24,8 @@ type GameStateStore = {
   unequipSlot: (universeId: string, slot: EquipmentSlot) => void;
   depositToBank: (universeId: string, context: ActionResolutionContext, itemId: string, amount: number) => void;
   withdrawFromBank: (universeId: string, context: ActionResolutionContext, itemId: string, amount: number) => void;
-  setAppearance: (universeId: string, presetId: string) => void;
+  setCharacterName: (universeId: string, name: string) => void;
+  closeModal: (universeId: string) => void;
   markInactive: (universeId: string) => void;
   sendChatMessage: (universeId: string, text: string) => void;
   appendSystemMessage: (universeId: string, key: string, params?: Record<string, string | number>) => void;
@@ -146,7 +147,7 @@ export const useGameState = create<GameStateStore>((set, get) => ({
       }
 
       const now = Date.now();
-      const resolved = cancelDialogue(resolveIdleTimers(current, context, {}, now).state, now);
+      const resolved = closeModal(cancelDialogue(resolveIdleTimers(current, context, {}, now).state, now), now);
       const next = startAction(resolved, action, context, now, { recipeId });
       void save(storageKey(universeId), next);
 
@@ -311,11 +312,21 @@ export const useGameState = create<GameStateStore>((set, get) => ({
     });
   },
 
-  setAppearance: (universeId, presetId) => {
+  setCharacterName: (universeId, name) => {
     set((state) => {
       const current = state.states[universeId];
       if (!current) return state;
-      const next = setAppearancePreset(current, presetId);
+      const next = setCharacterName(current, name);
+      void save(storageKey(universeId), next);
+      return { states: { ...state.states, [universeId]: next } };
+    });
+  },
+
+  closeModal: (universeId) => {
+    set((state) => {
+      const current = state.states[universeId];
+      if (!current?.openModalId) return state;
+      const next = closeModal(current);
       void save(storageKey(universeId), next);
       return { states: { ...state.states, [universeId]: next } };
     });

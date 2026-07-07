@@ -56,7 +56,20 @@
         "id": "lockpick"
       },
       {
-        "id": "guide-book"
+        "id": "note",
+        "actions": [
+          {
+            "id": "read",
+            "instant": true,
+            "rewards": [],
+            "results": [
+              {
+                "kind": "dialogue",
+                "dialogueId": "note"
+              }
+            ]
+          }
+        ]
       },
       {
         "id": "small-net"
@@ -133,20 +146,52 @@
       {
         "id": "well-fed",
         "initialValue": false
+      },
+      {
+        "id": "tutorial.bookshelf-note-taken",
+        "initialValue": false
+      },
+      {
+        "id": "tutorial.drawer-coins-taken",
+        "initialValue": false
+      },
+      {
+        "id": "tutorial.drawer-lockpick-taken",
+        "initialValue": false
+      },
+      {
+        "id": "tutorial.crate-net-taken",
+        "initialValue": false
+      },
+      {
+        "id": "tutorial.crate-bowl-taken",
+        "initialValue": false
       }
     ],
-    "effects": [
+    "statModifiers": [
       {
-        "id": "well-fed-regeneration",
-        "resourceId": "health",
-        "sourceStat": "regeneration",
-        "rateUnit": "per-minute",
+        "id": "well-fed-regen-buff",
+        "statId": "regeneration",
+        "amount": 3,
+        "kind": "added",
         "activeWhen": {
           "kind": "state-variable",
           "variable": "flag:well-fed",
           "comparison": "equal",
           "value": true
         }
+      }
+    ],
+    "dialogues": [
+      {
+        "id": "note",
+        "startNodeId": "start",
+        "nodes": [
+          {
+            "id": "start",
+            "narratorKey": "dialogue.note.start"
+          }
+        ]
       }
     ],
     "quests": [
@@ -160,6 +205,46 @@
             "condition": {
               "kind": "state-variable",
               "variable": "flag:quest.leave-tutorial-island.accepted",
+              "comparison": "equal",
+              "value": true
+            }
+          },
+          {
+            "id": "leave-house",
+            "descriptionKey": "quest.leave-tutorial-island.stage.leave-house",
+            "condition": {
+              "kind": "state-variable",
+              "variable": "flag:tutorial.miki-cleared",
+              "comparison": "equal",
+              "value": true
+            }
+          },
+          {
+            "id": "visit-bank",
+            "descriptionKey": "quest.leave-tutorial-island.stage.visit-bank",
+            "condition": {
+              "kind": "state-variable",
+              "variable": "flag:tutorial.bank-visited",
+              "comparison": "equal",
+              "value": true
+            }
+          },
+          {
+            "id": "clear-mining",
+            "descriptionKey": "quest.leave-tutorial-island.stage.clear-mining",
+            "condition": {
+              "kind": "state-variable",
+              "variable": "flag:tutorial.mining-cleared",
+              "comparison": "equal",
+              "value": true
+            }
+          },
+          {
+            "id": "clear-combat",
+            "descriptionKey": "quest.leave-tutorial-island.stage.clear-combat",
+            "condition": {
+              "kind": "state-variable",
+              "variable": "flag:tutorial.combat-cleared",
               "comparison": "equal",
               "value": true
             }
@@ -200,8 +285,8 @@
       "item.gold.description": "Small bright coins.",
       "item.lockpick.title": "Lockpick",
       "item.lockpick.description": "A bent bit of metal for impatient doors.",
-      "item.guide-book.title": "Guide Book",
-      "item.guide-book.description": "A short book with diagrams of tabs, settings, and quest colors.",
+      "item.note.title": "Handwritten Note",
+      "item.note.description": "A note in someone else's hand, tossed onto a shelf.",
       "item.small-net.title": "Small Net",
       "item.small-net.description": "A net suited to shallow shoals.",
       "item.raw-shrimp.title": "Raw Shrimp",
@@ -225,8 +310,15 @@
       "item.iron-dagger.title": "Iron Dagger",
       "item.iron-dagger.description": "A sharp shortcut from Denzel's chest.",
       "quest.leave-tutorial-island.title": "Leave Tutorial Island",
-      "quest.leave-tutorial-island.stage.accept": "Find your way off the island. Ask around if you are not sure where to start.",
-      "quest.leave-tutorial-island.stage.complete": "Keep heading deeper until the way out opens up.",
+      "quest.leave-tutorial-island.stage.accept": "You have not taken on a task yet. Someone in this house looks like they know the island — try talking to them.",
+      "quest.leave-tutorial-island.stage.leave-house": "Miki the tutorial guide has tasked you with finding a way off of tutorial island. Step one is probably to leave his house.",
+      "quest.leave-tutorial-island.stage.visit-bank": "You have made it outside. Word is there is a bank somewhere along the coast — worth a look before you go much further.",
+      "quest.leave-tutorial-island.stage.clear-mining": "The bank is behind you now. Something below the island — through that trapdoor — is worth investigating.",
+      "quest.leave-tutorial-island.stage.clear-combat": "You have got gear from the cave. Somewhere further in, Denzel mentioned voices — that is probably where you are headed next.",
+      "quest.leave-tutorial-island.stage.complete": "Whatever is holding the mainland back from you will not last much longer. Keep pushing.",
+      "action.item.note.read.title": "Read",
+      "action.item.note.read.description": "Read the handwritten note.",
+      "dialogue.note.start": "It reads:\n- Remember to tell them about the Quests tab.\n- Remember to explain the colors: red, yellow, green.\n- Remember to unlock the door before they leave.",
       "modulePack.tutorial-island.title": "Tutorial Island"
     }
   }

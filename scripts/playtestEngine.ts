@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { applyModulesToBundle } from '../src/game/contentModules';
-import { isActionVisible, canStartAction } from '../src/game/conditions';
+import { areActionRequirementsMet, evaluateCondition, isActionVisible, canStartAction } from '../src/game/conditions';
 import { getActionDescriptionText, getActionTitleText } from '../src/game/actionLocalization';
 import { entityTitleKey, itemTitleKey, locationDescriptionKey, locationTitleKey } from '../src/game/contentIds';
 import { availableRecipesForStation, resolveStationAction } from '../src/game/recipes';
@@ -23,8 +23,9 @@ import type {
 
 export type Choice = {
   choiceId: string;
-  kind: 'action' | 'entity-action' | 'dialogue-option';
+  kind: 'action' | 'entity-action' | 'item-action' | 'dialogue-option';
   entityId?: string;
+  itemId?: string;
   title: string;
   description?: string;
   requirementsMet: boolean;
@@ -76,6 +77,7 @@ const emptyBundle = (universeId: string): ContentBundle => ({
   dialogues: [],
   quests: [],
   recipes: [],
+  statModifiers: [],
   locales: { en: {} },
 });
 
@@ -115,6 +117,7 @@ export const contextFromBundle = (bundle: ContentBundle): ActionResolutionContex
   collectionLogs: bundle.collectionLogs,
   dialogues: bundle.dialogues,
   recipes: bundle.recipes,
+  statModifiers: bundle.statModifiers,
 });
 
 const currentDialogueNode = (bundle: ContentBundle, state: UniversePlayState) => {
@@ -144,15 +147,25 @@ export const visibleChoices = (
   t: ReturnType<typeof createTranslator>,
 ): Choice[] => {
   const dialogueNode = currentDialogueNode(bundle, state);
-  if (dialogueNode?.options?.length) {
-    return dialogueNode.options
-      .filter((option: DialogueOption) => !option.conditions)
-      .map((option) => ({
+  if (dialogueNode) {
+    const options = (dialogueNode.options ?? [])
+      .filter((option: DialogueOption) => !option.conditions || evaluateCondition(option.conditions, state, context));
+    if (options.length > 0) {
+      return options.map((option) => ({
         choiceId: `${DIALOGUE_PREFIX}${option.id}`,
         kind: 'dialogue-option' as const,
         title: t(option.labelKey),
         requirementsMet: true,
       }));
+    }
+    // Mirrors DialoguePanel.tsx: a node with no options always renders a single
+    // "Continue" button, whether or not it has a gotoNodeId.
+    return [{
+      choiceId: `${DIALOGUE_PREFIX}continue`,
+      kind: 'dialogue-option' as const,
+      title: t('dialogue.continue', 'Continue'),
+      requirementsMet: true,
+    }];
   }
 
   const currentLocation = bundle.locations.find((location) => location.id === state.currentLocationId);
@@ -199,7 +212,23 @@ export const visibleChoices = (
       .filter((action) => isActionVisible(state, action, context))
       .flatMap((action) => describe(action, 'entity-action', entity.id)));
 
-  return [...locationActions, ...entityChoices];
+  const heldItemIds = Object.entries(state.inventory ?? {})
+    .filter(([, amount]) => amount > 0)
+    .map(([itemId]) => itemId);
+  const itemChoices = heldItemIds.flatMap((itemId) =>
+    bundle.actions
+      .filter((action) => action.itemId === itemId)
+      .filter((action) => isActionVisible(state, action, context) && areActionRequirementsMet(state, action, context))
+      .map((action) => ({
+        choiceId: `${ACTION_PREFIX}${action.id}`,
+        kind: 'item-action' as const,
+        itemId,
+        title: getActionTitleText(action, bundle, t),
+        description: getActionDescriptionText(action, bundle, t),
+        requirementsMet: true,
+      })));
+
+  return [...locationActions, ...entityChoices, ...itemChoices];
 };
 
 export const describeLocation = (bundle: ContentBundle, state: UniversePlayState, t: ReturnType<typeof createTranslator>) => {

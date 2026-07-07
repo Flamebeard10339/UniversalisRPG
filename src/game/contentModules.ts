@@ -165,6 +165,8 @@ const moduleDataTypeToKey: Record<string, keyof ModuleDataSectionObject> = {
   quests: 'quests',
   recipe: 'recipes',
   recipes: 'recipes',
+  statModifier: 'statModifiers',
+  statModifiers: 'statModifiers',
   displayProfile: 'displayProfiles',
   displayProfiles: 'displayProfiles',
   collectionLog: 'collectionLogs',
@@ -239,6 +241,7 @@ const removableModuleDataKeys = new Set([
   'dialogueOptions',
   'quests',
   'recipes',
+  'statModifiers',
   'displayProfiles',
   'locales',
 ]);
@@ -319,6 +322,7 @@ const emptySectionBundle = (bundle: ContentBundle, section?: ModuleDataSection):
   dialogues: normalizeModuleDataSection(section).dialogues ?? [],
   quests: normalizeModuleDataSection(section).quests ?? [],
   recipes: normalizeModuleDataSection(section).recipes ?? [],
+  statModifiers: normalizeModuleDataSection(section).statModifiers ?? [],
   locales: bundle.locales,
 });
 
@@ -478,6 +482,7 @@ const existingDataIdsFromBundle = (bundle: ContentBundle): ExistingModuleDataIds
   dialogues: new Set((bundle.dialogues ?? []).map((item) => item.id)),
   quests: new Set((bundle.quests ?? []).map((item) => item.id)),
   recipes: new Set((bundle.recipes ?? []).map((item) => item.id)),
+  statModifiers: new Set((bundle.statModifiers ?? []).map((item) => item.id)),
   displayProfiles: new Set((bundle.manifest.displayProfiles ?? []).map((item) => item.id)),
 });
 
@@ -608,6 +613,7 @@ const moduleDataCollisionKeys: Array<keyof ModuleDataSectionObject> = [
   'dialogues',
   'quests',
   'recipes',
+  'statModifiers',
   'displayProfiles',
 ];
 
@@ -875,6 +881,7 @@ const applyDataSection = (bundle: ContentBundle, data?: ModuleDataSection): Cont
     dialogues: mergeById(bundle.dialogues ?? [], section.dialogues),
     quests: mergeById(bundle.quests ?? [], section.quests),
     recipes: mergeById(bundle.recipes ?? [], section.recipes),
+    statModifiers: mergeById(bundle.statModifiers ?? [], section.statModifiers),
   };
 };
 
@@ -902,6 +909,7 @@ const applyDataUpdateSection = (bundle: ContentBundle, data?: ModuleDataSection)
     dialogues: mergePatchById(bundle.dialogues ?? [], section.dialogues),
     quests: mergePatchById(bundle.quests ?? [], section.quests),
     recipes: mergePatchById(bundle.recipes ?? [], section.recipes),
+    statModifiers: mergePatchById(bundle.statModifiers ?? [], section.statModifiers),
   };
 };
 
@@ -953,6 +961,7 @@ const applyDataUpdates = (bundle: ContentBundle, updates?: ModuleDataUpdates): C
     dialogues: removeDialogueOptions(removeById(bundle.dialogues ?? [], removed.dialogues), removed.dialogueOptions),
     quests: removeById(bundle.quests ?? [], removed.quests),
     recipes: removeById(bundle.recipes ?? [], removed.recipes),
+    statModifiers: removeById(bundle.statModifiers ?? [], removed.statModifiers),
     locales: mergeLocales(bundle.locales, updateObject?.locale, removed.locales),
   };
   return applyObjectPatches(applyDataUpdateSection(withoutRemoved, updates), updateObject?.patches);

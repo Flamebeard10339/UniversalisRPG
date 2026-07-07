@@ -173,6 +173,9 @@
           "$ref": "#/$defs/recipeEntry"
         },
         {
+          "$ref": "#/$defs/statModifierEntry"
+        },
+        {
           "$ref": "#/$defs/displayProfileEntry"
         }
       ]
@@ -207,6 +210,7 @@
             "dialogueOptions",
             "quests",
             "recipes",
+            "statModifiers",
             "displayProfiles",
             "locales"
           ]
@@ -305,6 +309,9 @@
         "recipes": {
           "$ref": "https://universalis-rpg.local/schema/recipes.schema.json"
         },
+        "statModifiers": {
+          "$ref": "https://universalis-rpg.local/schema/stat-modifiers.schema.json"
+        },
         "displayProfiles": {
           "type": "array",
           "items": {
@@ -394,6 +401,9 @@
         "recipes": {
           "$ref": "https://universalis-rpg.local/schema/recipes.schema.json"
         },
+        "statModifiers": {
+          "$ref": "https://universalis-rpg.local/schema/stat-modifiers.schema.json"
+        },
         "displayProfiles": {
           "type": "array",
           "items": {
@@ -476,6 +486,9 @@
               "$ref": "#/$defs/idList"
             },
             "recipes": {
+              "$ref": "#/$defs/idList"
+            },
+            "statModifiers": {
               "$ref": "#/$defs/idList"
             },
             "displayProfiles": {
@@ -1413,6 +1426,43 @@
           "items": {
             "$ref": "https://universalis-rpg.local/schema/recipes.schema.json#/$defs/ingredient"
           }
+        }
+      }
+    },
+    "statModifierEntry": {
+      "type": "object",
+      "required": [
+        "id",
+        "statId",
+        "amount",
+        "kind",
+        "activeWhen",
+        "type"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "enum": [
+            "statModifier",
+            "statModifiers"
+          ]
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "statId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "amount": {
+          "type": "number"
+        },
+        "kind": {
+          "enum": ["added", "increased"]
+        },
+        "activeWhen": {
+          "$ref": "https://universalis-rpg.local/schema/quests.schema.json#/$defs/condition"
         }
       }
     },

@@ -14,18 +14,23 @@
     "tutorial.miki-cleared": true,
     "tutorial.bridge-open": true,
     "tutorial.gommi-asleep": false,
-    "tutorial.bank-visited": false,
+    "tutorial.bank-visited": true,
     "tutorial.mining-cleared": true,
     "tutorial.combat-cleared": false,
     "tutorial.cage-locked-by-orloth": false,
     "tutorial.reached-mainland": false,
     "quest.leave-tutorial-island.accepted": true,
-    "well-fed": false
+    "well-fed": false,
+    "tutorial.bookshelf-note-taken": true,
+    "tutorial.drawer-coins-taken": true,
+    "tutorial.drawer-lockpick-taken": true,
+    "tutorial.crate-net-taken": true,
+    "tutorial.crate-bowl-taken": true
   },
   "inventory": {
     "emberleaf": 0, "log": 0, "iron-ore": 0, "bones": 0, "bronze-spear": 0,
     "bronze-dagger": 1, "bronze-arrow": 0, "bronze-throwing-knife": 0, "tutorial-blade": 0,
-    "bronze-pickaxe": 1, "gold": 0, "lockpick": 0, "guide-book": 0, "small-net": 1,
+    "bronze-pickaxe": 1, "gold": 5, "lockpick": 1, "note": 1, "small-net": 1,
     "raw-shrimp": 0, "cooked-shrimp": 1, "herb": 0, "bowl": 1,
     "uncooked-sleeping-draught": 0, "sleeping-draught": 0,
     "copper-ore": 0, "tin-ore": 0, "bronze-bar": 0, "iron-dagger": 0

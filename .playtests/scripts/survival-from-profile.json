@@ -1,6 +1,11 @@
 [
   "action:entity.brianna.talk",
-  "action:entity.supply-crate.search",
+  "dialogue-option:ask-how",
+  "dialogue-option:continue",
+  "dialogue-option:continue",
+  "action:entity.supply-crate.examine",
+  "action:entity.supply-crate.take-net",
+  "action:entity.supply-crate.take-bowl",
   "action:entity.shoals.fish",
   "action:entity.shoals.examine",
   "action:entity.shoals.fish",

@@ -1,6 +1,8 @@
 import { App as CapacitorApp } from '@capacitor/app';
-import { useEffect, useLayoutEffect, useMemo, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { ActionDetails } from './components/ActionDetails';
+import { FloatingSkillText } from './components/FloatingSkillText';
+import { NameEditorModal } from './components/NameEditorModal';
 import { ActionPanel } from './components/ActionPanel';
 import { ChatPanel } from './components/ChatPanel';
 import { BankPanel } from './components/BankPanel';
@@ -37,6 +39,7 @@ import { getNextResourceBoundaryAt } from './game/resources';
 import { aggregateIdleRewards } from './game/rewards';
 import { findTravelPath } from './game/travel';
 import { load, save } from './lib/storage';
+import { useNow } from './hooks/useNow';
 import { useDebugState } from './stores/debugState';
 import { useContributionState } from './stores/contributionState';
 import { contributionRuntimeId } from './stores/contributionPlayState';
@@ -49,7 +52,7 @@ const getStartingLocationId = (bundle: NonNullable<ReturnType<typeof useUniverse
 
 type AppTab = 'map' | 'home' | 'character' | 'settings';
 type HomeTab = 'actions' | 'details' | 'workbench';
-type CharacterTab = 'skills' | 'inventory' | 'bank' | 'stats' | 'quests' | 'collectionLog';
+type CharacterTab = 'skills' | 'inventory' | 'stats' | 'quests' | 'collectionLog';
 type QuickWorkbenchSheet = 'add' | 'edit-location';
 type FontSizePreference = 'tiny' | 'small' | 'normal' | 'large' | 'huge';
 type AppearanceSettings = {
@@ -128,6 +131,8 @@ export default function App() {
   const [quickWorkbenchModuleId, setQuickWorkbenchModuleId] = useState('');
   const [changelogText, setChangelogText] = useState('');
   const [confirmReset, setConfirmReset] = useState(false);
+  const [mapFlashUntil, setMapFlashUntil] = useState(0);
+  const discoveredLocationCountRef = useRef<number | null>(null);
   const [saveExport, setSaveExport] = useState('');
   const [saveImport, setSaveImport] = useState('');
   const [saveMessage, setSaveMessage] = useState('');
@@ -165,7 +170,8 @@ export default function App() {
   const unequipSlot = useGameState((state) => state.unequipSlot);
   const depositToBank = useGameState((state) => state.depositToBank);
   const withdrawFromBank = useGameState((state) => state.withdrawFromBank);
-  const setAppearance = useGameState((state) => state.setAppearance);
+  const setCharacterName = useGameState((state) => state.setCharacterName);
+  const closeModal = useGameState((state) => state.closeModal);
   const resolveIdle = useGameState((state) => state.resolveIdle);
   const markInactive = useGameState((state) => state.markInactive);
   const appendSystemMessage = useGameState((state) => state.appendSystemMessage);
@@ -568,19 +574,16 @@ export default function App() {
 
   const setTab = (tab: AppTab) => {
     logPlayerAction('navigation.tab', { tab });
-    dismissDialogue();
     setActiveTab(tab);
   };
 
   const setHomeTopTab = (tab: HomeTab) => {
     logPlayerAction('navigation.homeTab', { tab });
-    dismissDialogue();
     setHomeTab(tab);
   };
 
   const setCharacterTopTab = (tab: CharacterTab) => {
     logPlayerAction('navigation.characterTab', { tab });
-    dismissDialogue();
     setCharacterTab(tab);
   };
 
@@ -743,6 +746,18 @@ export default function App() {
     }
   }, [actionContext, appActive, bundle, debugEnabled, nextTimerAt, playState, resolveIdle, runtimeUniverseId]);
 
+  useEffect(() => {
+    if (!playState) return;
+    const count = playState.discoveredLocationIds.length;
+    const previous = discoveredLocationCountRef.current;
+    discoveredLocationCountRef.current = count;
+    if (previous !== null && count > previous) {
+      setMapFlashUntil(Date.now() + 1500);
+    }
+  }, [playState]);
+
+  const mapFlashNow = useNow(mapFlashUntil > Date.now(), 100);
+
   if (loading && !bundle) {
     return <main className="grid min-h-screen place-items-center bg-slate-950 text-slate-100">{t('app.loadingUniverse')}</main>;
   }
@@ -770,7 +785,7 @@ export default function App() {
                 ? t('app.title')
                 : visibleActiveTab === 'home' && currentLocation
                   ? t(locationTitleKey(currentLocation.id), currentLocation.id)
-                  : t(`app.tab.${visibleActiveTab}`)}
+                  : `${t(`app.tab.${visibleActiveTab}`)}${visibleActiveTab === 'character' && playState.characterName ? ` - ${playState.characterName}` : ''}`}
             </h1>
             {visibleActiveTab === 'settings' && <p className="text-sm text-slate-400">{t(universeTitleKey(bundle.manifest.id))} - {t(universeDescriptionKey(bundle.manifest.id), '')}</p>}
             {visibleActiveTab === 'home' && currentLocation && <p className="text-sm text-slate-400">{t(locationDescriptionKey(currentLocation.id), '')}</p>}
@@ -909,7 +924,7 @@ export default function App() {
         {visibleActiveTab === 'character' && (
           <section className="grid gap-4">
             <div className="grid grid-cols-3 gap-2 rounded border border-slate-800 bg-slate-900 p-2">
-              {(['skills', 'inventory', 'bank', 'stats', 'quests', 'collectionLog'] as CharacterTab[]).map((tab) => (
+              {(['skills', 'inventory', 'stats', 'quests', 'collectionLog'] as CharacterTab[]).map((tab) => (
                 <button
                   className={`rounded px-3 py-2 text-sm font-semibold capitalize ${
                     characterTab === tab ? 'bg-cyan-300 text-slate-950' : 'bg-slate-950 text-slate-300'
@@ -933,17 +948,8 @@ export default function App() {
               <InventoryPanel
                 bundle={bundle}
                 onEquip={(itemId, slot) => equipItem(runtimeUniverseId, itemId, slot, actionContext)}
+                onStartAction={beginAction}
                 onUnequip={(slot) => unequipSlot(runtimeUniverseId, slot)}
-                playState={playState}
-                t={t}
-              />
-            )}
-
-            {characterTab === 'bank' && (
-              <BankPanel
-                bundle={bundle}
-                onDeposit={(itemId, amount) => depositToBank(runtimeUniverseId, actionContext, itemId, amount)}
-                onWithdraw={(itemId, amount) => withdrawFromBank(runtimeUniverseId, actionContext, itemId, amount)}
                 playState={playState}
                 t={t}
               />
@@ -952,7 +958,6 @@ export default function App() {
             {characterTab === 'stats' && (
               <CharacterStats
                 bundle={bundle}
-                onSetAppearance={(presetId) => setAppearance(runtimeUniverseId, presetId)}
                 playState={playState}
                 t={t}
               />
@@ -1321,16 +1326,20 @@ export default function App() {
         )}
       </div>
 
-      {visibleActiveTab === 'home' && visibleHomeTab !== 'workbench' && (
+      {playState.activeDialogue ? (
         <div className="fixed inset-x-0 bottom-[73px] z-10 h-[33vh] px-4">
           <div className="mx-auto h-full max-w-7xl">
-            {playState.activeDialogue ? (
-              <DialoguePanel context={actionContext} onChoose={(optionId) => chooseDialogueOption(runtimeUniverseId, actionContext, optionId)} playState={playState} t={t} />
-            ) : (
-              <ChatPanel compressionEnabled={chatCompressionEnabled} messages={playState.chatMessages} t={t} />
-            )}
+            <DialoguePanel context={actionContext} onChoose={(optionId) => chooseDialogueOption(runtimeUniverseId, actionContext, optionId)} playState={playState} t={t} />
           </div>
         </div>
+      ) : (
+        visibleActiveTab === 'home' && visibleHomeTab !== 'workbench' && (
+          <div className="fixed inset-x-0 bottom-[73px] z-10 h-[33vh] px-4">
+            <div className="mx-auto h-full max-w-7xl">
+              <ChatPanel compressionEnabled={chatCompressionEnabled} messages={playState.chatMessages} t={t} />
+            </div>
+          </div>
+        )
       )}
 
       {showChangelog && (
@@ -1348,6 +1357,39 @@ export default function App() {
           </section>
         </div>
       )}
+
+      {playState.openModalId === 'name-editor' && (
+        <NameEditorModal
+          initialName={playState.characterName}
+          onClose={() => closeModal(runtimeUniverseId)}
+          onSave={(name) => {
+            setCharacterName(runtimeUniverseId, name);
+            closeModal(runtimeUniverseId);
+          }}
+          t={t}
+        />
+      )}
+
+      {playState.openModalId === 'bank' && (
+        <div className="fixed inset-0 z-20 grid place-items-center bg-slate-950/80 p-4">
+          <div className="w-full max-w-lg">
+            <div className="mb-2 flex justify-end">
+              <button className="rounded border border-slate-600 bg-slate-900 px-3 py-1 text-sm text-slate-100" onClick={() => closeModal(runtimeUniverseId)} type="button">
+                {t('dialog.close')}
+              </button>
+            </div>
+            <BankPanel
+              bundle={bundle}
+              onDeposit={(itemId, amount) => depositToBank(runtimeUniverseId, actionContext, itemId, amount)}
+              onWithdraw={(itemId, amount) => withdrawFromBank(runtimeUniverseId, actionContext, itemId, amount)}
+              playState={playState}
+              t={t}
+            />
+          </div>
+        </div>
+      )}
+
+      <FloatingSkillText bundle={bundle} playState={playState} t={t} />
 
       {idleReport.kind !== 'none' && (
         <div className="fixed inset-0 z-30 grid place-items-center bg-slate-950/80 p-4" onClick={() => setIdleReport(emptyIdleReport)}>
@@ -1489,7 +1531,7 @@ export default function App() {
             <button
               className={`rounded px-3 py-3 text-sm font-semibold capitalize ${
                 visibleActiveTab === tab ? 'bg-cyan-300 text-slate-950' : 'bg-slate-900 text-slate-300'
-              }`}
+              } ${tab === 'map' && mapFlashUntil > mapFlashNow ? 'ring-2 ring-cyan-300 animate-pulse' : ''}`}
               key={tab}
               onClick={() => setTab(tab)}
               type="button"

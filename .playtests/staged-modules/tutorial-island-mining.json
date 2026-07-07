@@ -275,7 +275,58 @@
           {
             "id": "start",
             "speakerId": "denzel",
-            "textKey": "dialogue.denzel.start"
+            "textKey": "dialogue.denzel.start",
+            "options": [
+              {
+                "id": "ask-how",
+                "labelKey": "dialogue.denzel.option.ask-how",
+                "gotoNodeId": "explain-smithing"
+              },
+              {
+                "id": "ask-sentence",
+                "labelKey": "dialogue.denzel.option.ask-sentence",
+                "gotoNodeId": "explain-sentence"
+              },
+              {
+                "id": "impatient",
+                "labelKey": "dialogue.denzel.option.impatient",
+                "gotoNodeId": "close"
+              }
+            ]
+          },
+          {
+            "id": "explain-smithing",
+            "speakerId": "denzel",
+            "textKey": "dialogue.denzel.explain-smithing",
+            "options": [
+              {
+                "id": "ask-sentence",
+                "labelKey": "dialogue.denzel.option.ask-sentence",
+                "gotoNodeId": "explain-sentence"
+              },
+              {
+                "id": "continue",
+                "labelKey": "dialogue.denzel.option.continue",
+                "gotoNodeId": "close"
+              }
+            ]
+          },
+          {
+            "id": "explain-sentence",
+            "speakerId": "denzel",
+            "textKey": "dialogue.denzel.explain-sentence",
+            "options": [
+              {
+                "id": "continue",
+                "labelKey": "dialogue.denzel.option.continue",
+                "gotoNodeId": "close"
+              }
+            ]
+          },
+          {
+            "id": "close",
+            "speakerId": "denzel",
+            "textKey": "dialogue.denzel.close"
           }
         ]
       }
@@ -394,7 +445,14 @@
       "chat.entity.locked-chest.pick": "The lock gives all at once, spilling ore, bars, and a dagger better than anything at the anvil.",
       "chat.entity.locked-chest.fail": "The lock bites back. That was going to leave a mark either way.",
       "chat.entity.locked-chest.examine": "A prison-issue padlock, guarding something better than rocks.",
-      "dialogue.denzel.start": "Copper plus tin makes bronze. Furnace first, anvil second. I'd be out of here already if I hadn't drawn this posting as part of my... sentence. Don't touch the chest."
+      "dialogue.denzel.start": "Pickaxe's yours, don't lose it. Rocks are through there. Anything else before you start swinging?",
+      "dialogue.denzel.option.ask-how": "What am I actually making?",
+      "dialogue.denzel.option.ask-sentence": "Why are you down here, anyway?",
+      "dialogue.denzel.option.impatient": "Nothing, I'm good.",
+      "dialogue.denzel.explain-smithing": "Copper plus tin makes bronze. Furnace first, anvil second — smelt it, then shape it. Simple, if you don't rush the furnace.",
+      "dialogue.denzel.option.continue": "Makes sense.",
+      "dialogue.denzel.explain-sentence": "Let's just say this posting is part of my... sentence. I'd be out of here already if I hadn't drawn it. And don't touch the chest — that's not a hint, that's a rule.",
+      "dialogue.denzel.close": "Go on, then. Rocks won't mine themselves."
     }
   }
 }

@@ -272,9 +272,9 @@
         },
         {
           "type": "object",
-          "required": ["kind", "presetId"],
+          "required": ["kind", "modalId"],
           "additionalProperties": false,
-          "properties": { "kind": { "const": "set-appearance" }, "presetId": { "type": "string", "minLength": 1 } }
+          "properties": { "kind": { "const": "open-modal" }, "modalId": { "type": "string", "minLength": 1 } }
         }
       ]
     }

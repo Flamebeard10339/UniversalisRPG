@@ -40,6 +40,7 @@ const dataKeys: DataKey[] = [
   'dialogues',
   'quests',
   'recipes',
+  'statModifiers',
   'displayProfiles',
 ];
 
@@ -61,6 +62,7 @@ const dataKeyTypes: Record<DataKey, string> = {
   dialogues: 'dialogue',
   quests: 'quest',
   recipes: 'recipe',
+  statModifiers: 'statModifier',
   displayProfiles: 'displayProfile',
 };
 
@@ -86,6 +88,7 @@ const removeTargets: RemoveTarget[] = [
   'dialogueOptions',
   'quests',
   'recipes',
+  'statModifiers',
   'displayProfiles',
   'locales',
 ];

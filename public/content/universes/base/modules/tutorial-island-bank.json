@@ -87,7 +87,52 @@
           {
             "id": "start",
             "speakerId": "bank-teller",
-            "textKey": "dialogue.bank-teller.start"
+            "textKey": "dialogue.bank-teller.start",
+            "options": [
+              {
+                "id": "ask-how",
+                "labelKey": "dialogue.bank-teller.option.ask-how",
+                "gotoNodeId": "explain"
+              },
+              {
+                "id": "show-me",
+                "labelKey": "dialogue.bank-teller.option.show-me",
+                "gotoNodeId": "show-vault"
+              }
+            ]
+          },
+          {
+            "id": "explain",
+            "speakerId": "bank-teller",
+            "textKey": "dialogue.bank-teller.explain",
+            "options": [
+              {
+                "id": "show-me",
+                "labelKey": "dialogue.bank-teller.option.show-me",
+                "gotoNodeId": "show-vault"
+              },
+              {
+                "id": "not-now",
+                "labelKey": "dialogue.bank-teller.option.not-now",
+                "gotoNodeId": "not-now"
+              }
+            ]
+          },
+          {
+            "id": "show-vault",
+            "speakerId": "bank-teller",
+            "textKey": "dialogue.bank-teller.show-vault",
+            "results": [
+              {
+                "kind": "open-modal",
+                "modalId": "bank"
+              }
+            ]
+          },
+          {
+            "id": "not-now",
+            "speakerId": "bank-teller",
+            "textKey": "dialogue.bank-teller.not-now"
           }
         ]
       }
@@ -123,7 +168,13 @@
       "action.entity.trapdoor.examine.title": "Examine",
       "action.entity.trapdoor.examine.description": "Look down the open trapdoor.",
       "chat.entity.trapdoor.examine": "A ladder disappears into the dark below. Someone left it open on purpose.",
-      "dialogue.bank-teller.start": "Every bank shares one account, anywhere in the world. Yours already has a little gold in it — check the Bank tab under Character to move things between it and your pack. Your pack only holds 28 kinds of things at once, so the bank is where the rest goes."
+      "dialogue.bank-teller.start": "Afternoon. Haven't seen you before — first time at a bank?",
+      "dialogue.bank-teller.option.ask-how": "How does this work?",
+      "dialogue.bank-teller.option.show-me": "Show me.",
+      "dialogue.bank-teller.explain": "Every bank shares one account, anywhere in the world — deposit here, withdraw anywhere. Your pack only holds so many different kinds of things at once, so once it fills up, this is where the rest goes. You've already got a little gold sitting in yours.",
+      "dialogue.bank-teller.option.not-now": "Not right now.",
+      "dialogue.bank-teller.show-vault": "Here you go — have a look.",
+      "dialogue.bank-teller.not-now": "Come back whenever. The vault is not going anywhere."
     }
   }
 }

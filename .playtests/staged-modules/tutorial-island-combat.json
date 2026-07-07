@@ -275,7 +275,58 @@
           {
             "id": "start",
             "speakerId": "orloth",
-            "textKey": "dialogue.orloth.start"
+            "textKey": "dialogue.orloth.start",
+            "options": [
+              {
+                "id": "ask-equip",
+                "labelKey": "dialogue.orloth.option.ask-equip",
+                "gotoNodeId": "explain-equip"
+              },
+              {
+                "id": "ask-stats",
+                "labelKey": "dialogue.orloth.option.ask-stats",
+                "gotoNodeId": "explain-stats"
+              },
+              {
+                "id": "impatient",
+                "labelKey": "dialogue.orloth.option.impatient",
+                "gotoNodeId": "close"
+              }
+            ]
+          },
+          {
+            "id": "explain-equip",
+            "speakerId": "orloth",
+            "textKey": "dialogue.orloth.explain-equip",
+            "options": [
+              {
+                "id": "ask-stats",
+                "labelKey": "dialogue.orloth.option.ask-stats",
+                "gotoNodeId": "explain-stats"
+              },
+              {
+                "id": "continue",
+                "labelKey": "dialogue.orloth.option.continue",
+                "gotoNodeId": "close"
+              }
+            ]
+          },
+          {
+            "id": "explain-stats",
+            "speakerId": "orloth",
+            "textKey": "dialogue.orloth.explain-stats",
+            "options": [
+              {
+                "id": "continue",
+                "labelKey": "dialogue.orloth.option.continue",
+                "gotoNodeId": "close"
+              }
+            ]
+          },
+          {
+            "id": "close",
+            "speakerId": "orloth",
+            "textKey": "dialogue.orloth.close"
           }
         ]
       },
@@ -352,7 +403,14 @@
       "chat.entity.orloth.fight": "Orloth laughs, trains you hard, and locks the empty cage behind him. Your health does not thank you for it.",
       "chat.entity.rat-cage-door.unlock-orloth": "The cage is empty except for Orloth, arms crossed, unimpressed with your priorities.",
       "chat.entity.rat-cage-door.unlock": "The cage is empty. The rats already had their say.",
-      "dialogue.orloth.start": "Equipment tab, mainhand slot, any blade you've got. Then it's just you against the rats in that cage — attack wears them down, defense keeps you standing. Stats tab breaks down exactly how much of each you've got, if you want the numbers.",
+      "dialogue.orloth.start": "So, you want to learn to fight. Good instinct, bad cage — those rats won't teach you finesse, but they'll teach you not to die. Questions before you go in?",
+      "dialogue.orloth.option.ask-equip": "What do I actually equip?",
+      "dialogue.orloth.option.ask-stats": "How do I know if I'm winning?",
+      "dialogue.orloth.option.impatient": "No, I'm ready.",
+      "dialogue.orloth.explain-equip": "Equipment tab, mainhand slot — any blade you've got will do for the cage.",
+      "dialogue.orloth.option.continue": "Got it.",
+      "dialogue.orloth.explain-stats": "Attack wears the rats down, defense keeps you standing. Stats tab breaks down exactly how much of each you've got, if you want the numbers instead of a feeling.",
+      "dialogue.orloth.close": "And don't try me directly. I'm not a rat.",
       "dialogue.mainland-greeter.start": "Thanks for playing Tutorial Island. Go make trouble somewhere larger."
     }
   }

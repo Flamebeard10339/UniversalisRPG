@@ -248,7 +248,128 @@
         "id": "supply-crate",
         "actions": [
           {
-            "id": "search",
+            "id": "examine",
+            "instant": true,
+            "rewards": [],
+            "results": [
+              {
+                "kind": "chat",
+                "messageKey": "chat.entity.supply-crate.examine-neither"
+              }
+            ],
+            "visibleWhen": {
+              "kind": "not",
+              "condition": {
+                "kind": "any",
+                "conditions": [
+                  {
+                    "kind": "state-variable",
+                    "variable": "flag:tutorial.crate-net-taken",
+                    "comparison": "equal",
+                    "value": true
+                  },
+                  {
+                    "kind": "state-variable",
+                    "variable": "flag:tutorial.crate-bowl-taken",
+                    "comparison": "equal",
+                    "value": true
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "id": "examine-net-only",
+            "instant": true,
+            "rewards": [],
+            "results": [
+              {
+                "kind": "chat",
+                "messageKey": "chat.entity.supply-crate.examine-net-only"
+              }
+            ],
+            "visibleWhen": {
+              "kind": "all",
+              "conditions": [
+                {
+                  "kind": "state-variable",
+                  "variable": "flag:tutorial.crate-net-taken",
+                  "comparison": "equal",
+                  "value": true
+                },
+                {
+                  "kind": "not",
+                  "condition": {
+                    "kind": "state-variable",
+                    "variable": "flag:tutorial.crate-bowl-taken",
+                    "comparison": "equal",
+                    "value": true
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "id": "examine-bowl-only",
+            "instant": true,
+            "rewards": [],
+            "results": [
+              {
+                "kind": "chat",
+                "messageKey": "chat.entity.supply-crate.examine-bowl-only"
+              }
+            ],
+            "visibleWhen": {
+              "kind": "all",
+              "conditions": [
+                {
+                  "kind": "not",
+                  "condition": {
+                    "kind": "state-variable",
+                    "variable": "flag:tutorial.crate-net-taken",
+                    "comparison": "equal",
+                    "value": true
+                  }
+                },
+                {
+                  "kind": "state-variable",
+                  "variable": "flag:tutorial.crate-bowl-taken",
+                  "comparison": "equal",
+                  "value": true
+                }
+              ]
+            }
+          },
+          {
+            "id": "examine-both",
+            "instant": true,
+            "rewards": [],
+            "results": [
+              {
+                "kind": "chat",
+                "messageKey": "chat.entity.supply-crate.examine-both"
+              }
+            ],
+            "visibleWhen": {
+              "kind": "all",
+              "conditions": [
+                {
+                  "kind": "state-variable",
+                  "variable": "flag:tutorial.crate-net-taken",
+                  "comparison": "equal",
+                  "value": true
+                },
+                {
+                  "kind": "state-variable",
+                  "variable": "flag:tutorial.crate-bowl-taken",
+                  "comparison": "equal",
+                  "value": true
+                }
+              ]
+            }
+          },
+          {
+            "id": "take-net",
             "instant": true,
             "rewards": [],
             "results": [
@@ -258,15 +379,55 @@
                 "amount": 1
               },
               {
+                "kind": "flag",
+                "flagId": "tutorial.crate-net-taken",
+                "value": true
+              },
+              {
+                "kind": "chat",
+                "messageKey": "chat.entity.supply-crate.take-net"
+              }
+            ],
+            "visibleWhen": {
+              "kind": "not",
+              "condition": {
+                "kind": "state-variable",
+                "variable": "flag:tutorial.crate-net-taken",
+                "comparison": "equal",
+                "value": true
+              }
+            },
+            "maxCompletions": 1
+          },
+          {
+            "id": "take-bowl",
+            "instant": true,
+            "rewards": [],
+            "results": [
+              {
                 "kind": "item",
                 "itemId": "bowl",
                 "amount": 1
               },
               {
+                "kind": "flag",
+                "flagId": "tutorial.crate-bowl-taken",
+                "value": true
+              },
+              {
                 "kind": "chat",
-                "messageKey": "chat.entity.supply-crate.search"
+                "messageKey": "chat.entity.supply-crate.take-bowl"
               }
             ],
+            "visibleWhen": {
+              "kind": "not",
+              "condition": {
+                "kind": "state-variable",
+                "variable": "flag:tutorial.crate-bowl-taken",
+                "comparison": "equal",
+                "value": true
+              }
+            },
             "maxCompletions": 1
           }
         ]
@@ -550,7 +711,53 @@
           {
             "id": "start",
             "speakerId": "brianna",
-            "textKey": "dialogue.brianna.start"
+            "textKey": "dialogue.brianna.start",
+            "options": [
+              {
+                "id": "ask-how",
+                "labelKey": "dialogue.brianna.option.ask-how",
+                "gotoNodeId": "explain-food"
+              },
+              {
+                "id": "impatient",
+                "labelKey": "dialogue.brianna.option.impatient",
+                "gotoNodeId": "close"
+              }
+            ]
+          },
+          {
+            "id": "explain-food",
+            "speakerId": "brianna",
+            "textKey": "dialogue.brianna.explain-food",
+            "options": [
+              {
+                "id": "ask-why-eat",
+                "labelKey": "dialogue.brianna.option.ask-why-eat",
+                "gotoNodeId": "explain-buff"
+              },
+              {
+                "id": "continue",
+                "labelKey": "dialogue.brianna.option.continue",
+                "gotoNodeId": "close"
+              }
+            ]
+          },
+          {
+            "id": "explain-buff",
+            "speakerId": "brianna",
+            "textKey": "dialogue.brianna.explain-buff",
+            "options": [
+              {
+                "id": "continue",
+                "labelKey": "dialogue.brianna.option.continue",
+                "gotoNodeId": "close"
+              }
+            ]
+          },
+          {
+            "id": "close",
+            "speakerId": "brianna",
+            "textKey": "dialogue.brianna.close"
           }
         ]
       },
@@ -561,7 +768,36 @@
           {
             "id": "start",
             "speakerId": "hermit",
-            "textKey": "dialogue.hermit.start"
+            "textKey": "dialogue.hermit.start",
+            "options": [
+              {
+                "id": "ask-help",
+                "labelKey": "dialogue.hermit.option.ask-help",
+                "gotoNodeId": "explain-draught"
+              },
+              {
+                "id": "impatient",
+                "labelKey": "dialogue.hermit.option.impatient",
+                "gotoNodeId": "close"
+              }
+            ]
+          },
+          {
+            "id": "explain-draught",
+            "speakerId": "hermit",
+            "textKey": "dialogue.hermit.explain-draught",
+            "options": [
+              {
+                "id": "continue",
+                "labelKey": "dialogue.hermit.option.continue",
+                "gotoNodeId": "close"
+              }
+            ]
+          },
+          {
+            "id": "close",
+            "speakerId": "hermit",
+            "textKey": "dialogue.hermit.close"
           }
         ]
       }
@@ -666,8 +902,18 @@
       "action.entity.campfire.cook.success": "It is ready.",
       "action.entity.campfire.eat.title": "Eat",
       "action.entity.campfire.eat.description": "Eat a cooked shrimp by the fire.",
-      "action.entity.supply-crate.search.title": "Search",
-      "action.entity.supply-crate.search.description": "Search the open crate.",
+      "action.entity.supply-crate.examine.title": "Examine",
+      "action.entity.supply-crate.examine.description": "Examine the open crate.",
+      "action.entity.supply-crate.examine-net-only.title": "Examine",
+      "action.entity.supply-crate.examine-net-only.description": "Examine the open crate.",
+      "action.entity.supply-crate.examine-bowl-only.title": "Examine",
+      "action.entity.supply-crate.examine-bowl-only.description": "Examine the open crate.",
+      "action.entity.supply-crate.examine-both.title": "Examine",
+      "action.entity.supply-crate.examine-both.description": "Examine the open crate.",
+      "action.entity.supply-crate.take-net.title": "Take net",
+      "action.entity.supply-crate.take-net.description": "Take the small net.",
+      "action.entity.supply-crate.take-bowl.title": "Take bowl",
+      "action.entity.supply-crate.take-bowl.description": "Take the bowl.",
       "action.entity.bridge-sign.read.title": "Read",
       "action.entity.bridge-sign.read.description": "Read the rough bridge sign.",
       "action.entity.hermit.talk.title": "Talk",
@@ -692,7 +938,12 @@
       "action.entity.loose-plank.examine.description": "Check the loose plank.",
       "chat.entity.shoals.examine": "Shrimp dart away from your shadow.",
       "chat.entity.campfire.eat": "Warmth spreads. You feel steadier for a while.",
-      "chat.entity.supply-crate.search": "A net and bowl sit on top, practically accusing you of missing them.",
+      "chat.entity.supply-crate.examine-neither": "A net and bowl sit on top, practically accusing you of missing them.",
+      "chat.entity.supply-crate.examine-net-only": "A bowl still sits at the bottom of the crate.",
+      "chat.entity.supply-crate.examine-bowl-only": "A small net still sits at the bottom of the crate.",
+      "chat.entity.supply-crate.examine-both": "An empty supply crate. Nothing left worth taking.",
+      "chat.entity.supply-crate.take-net": "You take the small net.",
+      "chat.entity.supply-crate.take-bowl": "You take the bowl.",
       "chat.entity.bridge-sign.read": "The word FOOD is carved deeper than the rest.",
       "chat.entity.cracked-bowl.take": "The bowl leaves a damp ring behind.",
       "chat.entity.river.use-draught": "Gommi slumps under the bridge, snoring like a sawmill.",
@@ -701,8 +952,20 @@
       "chat.entity.gommi.examine": "Big hands. Bigger appetite. He watches every snack that crosses the bridge.",
       "chat.entity.gommi.examine-asleep": "Gommi is out cold, snoring louder than the river.",
       "chat.entity.loose-plank.examine": "A tempting plank, but it wobbles and would not hold your weight over open water.",
-      "dialogue.brianna.start": "Net from the crate, shrimp from the shoals, heat from the fire. Eat one if you get scratched up — it takes the edge off for a while.",
-      "dialogue.hermit.start": "Fish and herb, mixed in a bowl, then warmed. What comes out sleeps whatever drinks it. Rivers carry things further than people expect."
+      "dialogue.brianna.start": "You look hungry. Don't worry, we all showed up half-starved. Want the rundown?",
+      "dialogue.brianna.option.ask-how": "Sure, what do I do?",
+      "dialogue.brianna.option.impatient": "I'll figure it out.",
+      "dialogue.brianna.explain-food": "Net from the crate, shrimp from the shoals, heat from the campfire. Simple enough once you've done it twice.",
+      "dialogue.brianna.option.ask-why-eat": "Why bother eating, though?",
+      "dialogue.brianna.option.continue": "Got it, thanks.",
+      "dialogue.brianna.explain-buff": "A hot meal makes you feel steadier for a while — your body recovers a bit faster than usual. Worth having a shrimp cooked and ready before you go looking for trouble.",
+      "dialogue.brianna.close": "Good luck out there.",
+      "dialogue.hermit.start": "Hrmph. Another one. What do you want?",
+      "dialogue.hermit.option.ask-help": "I could use some advice.",
+      "dialogue.hermit.option.impatient": "Never mind.",
+      "dialogue.hermit.explain-draught": "Fish and herb, mixed in a bowl, then warmed. What comes out sleeps whatever drinks it. Rivers carry things further than people expect — further than a bridge, even.",
+      "dialogue.hermit.option.continue": "Noted.",
+      "dialogue.hermit.close": "Don't mix up the bowls."
     }
   }
 }
