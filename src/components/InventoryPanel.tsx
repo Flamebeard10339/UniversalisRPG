@@ -44,11 +44,11 @@ export const InventoryPanel = ({ bundle, onEquip, onStartAction, onUnequip, play
             const itemId = playState.equipment?.[slot];
             const item = itemId ? bundle.items.find((candidate) => candidate.id === itemId) : null;
             return (
-              <section className="grid min-h-20 gap-2 rounded border border-slate-800 bg-slate-950 p-3" key={slot}>
+              <section className="grid min-h-20 gap-2 rounded border border-slate-800 bg-slate-950 p-3" data-equipment-slot={slot} key={slot}>
                 <div className="flex items-start justify-between gap-3">
                   <span className="text-xs font-semibold uppercase text-slate-500">{t(`equipment.slot.${slot}`)}</span>
                   {item && (
-                    <button className="rounded border border-slate-700 px-2 py-1 text-xs font-semibold text-slate-200" onClick={() => onUnequip(slot)} type="button">
+                    <button className="rounded border border-slate-700 px-2 py-1 text-xs font-semibold text-slate-200" data-unequip-slot={slot} onClick={() => onUnequip(slot)} type="button">
                       {t('equipment.unequip')}
                     </button>
                   )}
@@ -78,7 +78,7 @@ export const InventoryPanel = ({ bundle, onEquip, onStartAction, onUnequip, play
             const slots = itemSlots(item);
             const availableItemActions = itemActions(itemId);
             return (
-              <section className="grid gap-2 rounded border border-slate-800 bg-slate-950 p-3" key={itemId}>
+              <section className="grid gap-2 rounded border border-slate-800 bg-slate-950 p-3" data-item-id={itemId} key={itemId}>
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <h3 className="text-sm font-semibold text-slate-100">{t(itemTitleKey(itemId), itemId)}</h3>
@@ -102,6 +102,8 @@ export const InventoryPanel = ({ bundle, onEquip, onStartAction, onUnequip, play
                       return (
                         <button
                           className="rounded border border-cyan-700 px-3 py-1.5 text-xs font-semibold text-cyan-100 disabled:cursor-not-allowed disabled:border-slate-700 disabled:text-slate-500"
+                          data-equip-slot={slotTag.slot}
+                          data-item-id={item.id}
                           disabled={!canEquipItemInSlot(playState, item, slotTag.slot, bundle.skills, bundle.manifest.experienceCurve)}
                           key={`${item.id}-${slotTag.slot}`}
                           onClick={() => onEquip(item.id, slotTag.slot)}
@@ -115,6 +117,7 @@ export const InventoryPanel = ({ bundle, onEquip, onStartAction, onUnequip, play
                     {availableItemActions.map((action) => (
                       <button
                         className="rounded border border-cyan-700 px-3 py-1.5 text-xs font-semibold text-cyan-100"
+                        data-action-id={action.id}
                         key={action.id}
                         onClick={() => onStartAction(action)}
                         type="button"

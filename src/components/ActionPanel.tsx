@@ -109,6 +109,8 @@ export const ActionPanel = ({ bundle, debugEnabled, playState, onStartAction, sh
     return (
       <button
         className="relative overflow-hidden rounded border border-slate-700 bg-slate-900 p-3 text-left transition hover:border-cyan-500 disabled:cursor-not-allowed disabled:opacity-50"
+        data-action-id={buttonKey}
+        data-requirements-met={requirementsMet}
         disabled={isTravelling || !requirementsMet}
         key={buttonKey}
         onClick={() => {

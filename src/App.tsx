@@ -46,9 +46,19 @@ import { contributionRuntimeId } from './stores/contributionPlayState';
 import { useGameState } from './stores/gameState';
 import { useUniverseState } from './stores/universeState';
 import { workingLocale } from './components/contribution/contributionLocalization';
+import { createTestHarness, type ProfileFixture } from './game/testHarness';
+import { domAdapter } from './game/testHarnessDom';
 
 const getStartingLocationId = (bundle: NonNullable<ReturnType<typeof useUniverseState.getState>['bundle']>) =>
   bundle.locations.find((location) => location.starting)?.id ?? bundle.locations[0]?.id ?? '';
+
+// Dev-only: fixtures for src/game/testHarness.ts's profile.load/save, so a saved
+// profile can be committed and reused across sessions (see .playtests/profiles/).
+// eager:true keeps this simple (small JSON files, dev-only, tree-shaken out of prod
+// builds since the whole block is import.meta.env.DEV-gated at the call site).
+const profileFixtureModules = import.meta.env.DEV
+  ? import.meta.glob('/.playtests/profiles/*.json', { eager: true, import: 'default' })
+  : {};
 
 type AppTab = 'map' | 'home' | 'character' | 'settings';
 type HomeTab = 'actions' | 'details' | 'workbench';
@@ -181,6 +191,13 @@ export default function App() {
   const sanitizeForBundle = useGameState((state) => state.sanitizeForBundle);
   const recordRunEvent = useGameState((state) => state.recordRunEvent);
   const clearRunLog = useGameState((state) => state.clearRunLog);
+  const setCurrentLocation = useGameState((state) => state.setCurrentLocation);
+  const debugSetFlag = useGameState((state) => state.debugSetFlag);
+  const debugSetResource = useGameState((state) => state.debugSetResource);
+  const debugSetSkillXp = useGameState((state) => state.debugSetSkillXp);
+  const debugSetInventoryItem = useGameState((state) => state.debugSetInventoryItem);
+  const debugGiveItem = useGameState((state) => state.debugGiveItem);
+  const debugSetBankItem = useGameState((state) => state.debugSetBankItem);
   const debugEnabled = useDebugState((state) => state.enabled);
   const debugEntries = useDebugState((state) => state.entries);
   const hydrateDebug = useDebugState((state) => state.hydrate);
@@ -675,6 +692,67 @@ export default function App() {
   }, [bundle, runtimeUniverseId, sanitizeForBundle, startingLocationId]);
 
   useEffect(() => {
+    if (!import.meta.env.DEV || !bundle || !runtimeUniverseId || !startingLocationId) return undefined;
+
+    window.__test = createTestHarness({
+      getBundle: () => bundle,
+      getPlayState: () => useGameState.getState().states[runtimeUniverseId],
+      getActionContext: () => actionContext,
+      getRuntimeUniverseId: () => runtimeUniverseId,
+      getStartingLocationId: () => startingLocationId,
+      getTranslator: () => t,
+      // Unlike getPlayState (backed by Zustand's synchronous getState()), tab state
+      // is plain React useState, so this closure only reflects the last committed
+      // render — calling nav.setTab(...) then getTabs() in the SAME synchronous
+      // script can read one tick stale; a separate follow-up call always sees the
+      // update. Not worth moving tab state into the store just for this.
+      getTabs: () => ({ activeTab, homeTab, characterTab }),
+      dom: domAdapter,
+
+      setTab: (tab) => setTab(tab as AppTab),
+      setHomeTab: (tab) => setHomeTopTab(tab as HomeTab),
+      setCharacterTab: (tab) => setCharacterTopTab(tab as CharacterTab),
+
+      startAction: (action, context, recipeId) => startAction(runtimeUniverseId, action, context, recipeId),
+      stopAction: (context) => stopAction(runtimeUniverseId, context),
+      chooseDialogueOption: (context, optionId) => chooseDialogueOption(runtimeUniverseId, context, optionId),
+      cancelDialogue: () => cancelDialogue(runtimeUniverseId),
+      resolveIdle: (context, options, now) => resolveIdle(runtimeUniverseId, context, options, now),
+      setCurrentLocation: (locationId) => setCurrentLocation(runtimeUniverseId, locationId),
+      equipItem: (itemId, slot, context) => equipItem(runtimeUniverseId, itemId, slot, context),
+      unequipSlot: (slot) => unequipSlot(runtimeUniverseId, slot),
+      depositToBank: (context, itemId, amount) => depositToBank(runtimeUniverseId, context, itemId, amount),
+      withdrawFromBank: (context, itemId, amount) => withdrawFromBank(runtimeUniverseId, context, itemId, amount),
+      closeModal: () => closeModal(runtimeUniverseId),
+      replaceUniverseState: (state) => replaceUniverseState(runtimeUniverseId, state),
+      resetUniverse: () => resetUniverse(runtimeUniverseId, startingLocationId, { manifest: bundle.manifest }),
+      debugSetFlag: (flagId, value) => debugSetFlag(runtimeUniverseId, flagId, value),
+      debugSetResource: (resourceId, current) => debugSetResource(runtimeUniverseId, resourceId, current),
+      debugSetSkillXp: (skillId, xp) => debugSetSkillXp(runtimeUniverseId, skillId, xp),
+      debugSetInventoryItem: (itemId, amount) => debugSetInventoryItem(runtimeUniverseId, itemId, amount),
+      debugGiveItem: (context, itemId, amount) => debugGiveItem(runtimeUniverseId, context, itemId, amount),
+      debugSetBankItem: (itemId, amount) => debugSetBankItem(runtimeUniverseId, itemId, amount),
+
+      listProfileNames: () => Object.keys(profileFixtureModules).map((path) =>
+        path.replace(/^.*\/profiles\//, '').replace(/\.json$/, '')),
+      loadProfileFixture: (name) => {
+        const key = Object.keys(profileFixtureModules).find((path) => path.endsWith(`/profiles/${name}.json`));
+        return key ? (profileFixtureModules[key] as ProfileFixture) : null;
+      },
+    });
+
+    return () => {
+      delete window.__test;
+    };
+  }, [
+    actionContext, bundle, cancelDialogue, characterTab, chooseDialogueOption, closeModal, debugGiveItem,
+    debugSetBankItem, debugSetFlag, debugSetInventoryItem, debugSetResource, debugSetSkillXp, depositToBank,
+    equipItem, homeTab, activeTab, replaceUniverseState, resetUniverse, resolveIdle, runtimeUniverseId,
+    setCharacterTopTab, setCurrentLocation, setHomeTopTab, setTab, startAction, startingLocationId, stopAction,
+    t, unequipSlot, withdrawFromBank,
+  ]);
+
+  useEffect(() => {
     if (!bundle) {
       return undefined;
     }
@@ -845,6 +923,7 @@ export default function App() {
                     className={`min-w-0 rounded px-2 py-2 text-sm font-semibold capitalize ${
                       visibleHomeTab === tab ? 'bg-cyan-300 text-slate-950' : 'bg-slate-950 text-slate-300'
                     }`}
+                    data-home-tab={tab}
                     key={tab}
                     onClick={() => setHomeTopTab(tab)}
                     type="button"
@@ -931,6 +1010,7 @@ export default function App() {
                   className={`rounded px-3 py-2 text-sm font-semibold capitalize ${
                     characterTab === tab ? 'bg-cyan-300 text-slate-950' : 'bg-slate-950 text-slate-300'
                   }`}
+                  data-character-tab={tab}
                   key={tab}
                   onClick={() => setCharacterTopTab(tab)}
                   type="button"
@@ -1534,6 +1614,7 @@ export default function App() {
               className={`rounded px-3 py-3 text-sm font-semibold capitalize ${
                 visibleActiveTab === tab ? 'bg-cyan-300 text-slate-950' : 'bg-slate-900 text-slate-300'
               } ${tab === 'map' && mapFlashUntil > mapFlashNow ? 'ring-2 ring-cyan-300 animate-pulse' : ''}`}
+              data-nav-tab={tab}
               key={tab}
               onClick={() => setTab(tab)}
               type="button"

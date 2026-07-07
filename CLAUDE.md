@@ -121,3 +121,28 @@ this before authoring NPCs, quests, items, or any state-driven UI.
   (mirrors `DialoguePanel.tsx`'s fallback button) even if it has a `gotoNodeId` to
   another node. `visibleChoices` must offer this as a synthetic choice; don't assume a
   no-options node is always terminal.
+- The headless CLI (`scripts/playtestEngine.ts`) and the real app each used to build
+  their own `ActionResolutionContext`/choice-derivation independently — this is
+  exactly what let two real bugs (a hand-built context missing `recipes`/
+  `statModifiers`; `restartAction` dropping `recipeId` on loop) ship silently, since
+  the headless sim's separately-correct context could never surface a bug that only
+  existed in the real app's wiring. `visibleChoices`/`describeLocation` now live once
+  in `src/game/choices.ts`, imported by both. Never re-derive this logic a second
+  time; if a new action/dialogue/UI-affordance kind needs new choice-listing logic,
+  add it there.
+- For verifying real-UI bugs during a session, prefer the dev-only
+  `window.__test` harness (`src/game/testHarness.ts`, mounted from `App.tsx` behind
+  `import.meta.env.DEV`) over ad-hoc `page.evaluate`/screenshot loops: `state.*`/
+  `inventory.*`/`bank.*`/`equipment.*` for direct reads/writes, `location.teleport`,
+  `choices.list()`/`choices.click(id)` (clicks the real DOM button when rendered —
+  falling back to a direct store dispatch only if not found, flagged via `viaDom`),
+  `dialogue.get()`/`choose()`, `nav.setTab`/`setHomeTab`/`setCharacterTab`,
+  `time.skip(seconds)` (resolves idle timers at `Date.now() + seconds*1000` with zero
+  real wait), and `profile.load/save/list` against `.playtests/profiles/*.json` (one
+  fixture per module boundary — reuse an existing one or `profile.save(name)` a new
+  one after manually reaching that point; there's no auto-solver). Every mutating
+  command returns `{ok, error?}` with a short machine-matchable `error` string instead
+  of requiring a screenshot to diagnose failure. When adding a new interactive UI
+  element, give it a `data-action-id`/`data-dialogue-option-id`/`data-nav-tab`-style
+  attribute (see `ActionPanel.tsx`/`DialoguePanel.tsx`/`InventoryPanel.tsx`) so the
+  harness can click it for real instead of only being able to fall back to the store.

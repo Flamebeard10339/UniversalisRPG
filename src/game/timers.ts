@@ -1089,7 +1089,7 @@ type ActionCompletionResult = {
 const occupiedInventorySlots = (inventory: Record<string, number>) =>
   Object.values(inventory).filter((amount) => amount > 0).length;
 
-const applyItemDelta = (
+export const applyItemDelta = (
   state: UniversePlayState,
   context: ActionResolutionContext,
   itemId: string,

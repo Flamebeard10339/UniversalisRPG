@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import type { ActionResolutionContext, ContentBundle, EquipmentSlot, GameAction, IdleReport, RunLogEntry, UniversePlayState } from '../game/types';
 import type { AvailableTravelEdge } from '../game/travel';
-import { appendChatMessage, appendRunLog, cancelDialogue, chooseDialogueOption, closeModal, createInitialPlayState, depositToBank, normalizePlayState, resetInactiveEffectResources, resolveIdleTimers, setCharacterName, startAction, startTravel, withdrawFromBank } from '../game/timers';
+import { appendChatMessage, appendRunLog, applyItemDelta, cancelDialogue, chooseDialogueOption, closeModal, createInitialPlayState, depositToBank, normalizePlayState, resetInactiveEffectResources, resolveIdleTimers, setCharacterName, startAction, startTravel, withdrawFromBank } from '../game/timers';
 import { equipItem, unequipSlot } from '../game/equipment';
 import { load, remove, save } from '../lib/storage';
 import { recordAgentSessionMessage, type AgentSessionMessage } from '../game/agentSession';
@@ -18,7 +18,7 @@ type GameStateStore = {
   stopAction: (universeId: string, context: ActionResolutionContext) => void;
   chooseDialogueOption: (universeId: string, context: ActionResolutionContext, optionId?: string) => void;
   cancelDialogue: (universeId: string) => void;
-  resolveIdle: (universeId: string, context: ActionResolutionContext, options?: { debugEnabled?: boolean; showReport?: boolean }) => IdleReport;
+  resolveIdle: (universeId: string, context: ActionResolutionContext, options?: { debugEnabled?: boolean; showReport?: boolean }, now?: number) => IdleReport;
   setActionLooping: (universeId: string, enabled: boolean) => void;
   equipItem: (universeId: string, itemId: string, slot: EquipmentSlot, context: ActionResolutionContext) => void;
   unequipSlot: (universeId: string, slot: EquipmentSlot) => void;
@@ -36,6 +36,14 @@ type GameStateStore = {
   importUniverseState: (playState: UniversePlayState) => Promise<void>;
   replaceUniverseState: (universeId: string, playState: UniversePlayState) => Promise<void>;
   resetUniverse: (universeId: string, startingLocationId: string, context?: Pick<ActionResolutionContext, 'manifest'>) => Promise<void>;
+  // --- Dev-only mutators for src/game/testHarness.ts (window.__test). Bypass normal
+  // gameplay validation on purpose; never called from production UI code paths. ---
+  debugSetFlag: (universeId: string, flagId: string, value: boolean | number | string) => void;
+  debugSetResource: (universeId: string, resourceId: string, current: number) => void;
+  debugSetSkillXp: (universeId: string, skillId: string, xp: number) => void;
+  debugSetInventoryItem: (universeId: string, itemId: string, amount: number) => void;
+  debugGiveItem: (universeId: string, context: ActionResolutionContext, itemId: string, amount: number) => void;
+  debugSetBankItem: (universeId: string, itemId: string, amount: number) => void;
 };
 
 const storageKey = (universeId: string) => `universalis:play:${universeId}`;
@@ -221,7 +229,7 @@ export const useGameState = create<GameStateStore>((set, get) => ({
     });
   },
 
-  resolveIdle: (universeId, context, options) => {
+  resolveIdle: (universeId, context, options, now) => {
     let report = noIdleReport();
 
     set((state) => {
@@ -231,7 +239,7 @@ export const useGameState = create<GameStateStore>((set, get) => ({
         return state;
       }
 
-      const resolved = resolveIdleTimers(current, context, options);
+      const resolved = resolveIdleTimers(current, context, options, now);
       report = resolved.report;
       const next = resolved.state;
       void save(storageKey(universeId), next);
@@ -473,5 +481,91 @@ export const useGameState = create<GameStateStore>((set, get) => ({
         [universeId]: next,
       },
     }));
+  },
+
+  debugSetFlag: (universeId, flagId, value) => {
+    set((state) => {
+      const current = state.states[universeId];
+      if (!current) return state;
+      const { [flagId]: _removedExpiration, ...flagExpirations } = current.flagExpirations;
+      const next = {
+        ...current,
+        flags: { ...current.flags, [flagId]: value },
+        flagExpirations,
+        lastTickAt: Date.now(),
+      };
+      void save(storageKey(universeId), next);
+      return { states: { ...state.states, [universeId]: next } };
+    });
+  },
+
+  debugSetResource: (universeId, resourceId, current: number) => {
+    set((state) => {
+      const universe = state.states[universeId];
+      const pool = universe?.resourcePools[resourceId];
+      if (!universe || !pool) return state;
+      const next = {
+        ...universe,
+        resourcePools: {
+          ...universe.resourcePools,
+          [resourceId]: { ...pool, current: Math.max(pool.min, Math.min(pool.max, current)) },
+        },
+        lastTickAt: Date.now(),
+      };
+      void save(storageKey(universeId), next);
+      return { states: { ...state.states, [universeId]: next } };
+    });
+  },
+
+  debugSetSkillXp: (universeId, skillId, xp) => {
+    set((state) => {
+      const current = state.states[universeId];
+      if (!current) return state;
+      const next = {
+        ...current,
+        skillXp: { ...current.skillXp, [skillId]: Math.max(0, xp) },
+        lastTickAt: Date.now(),
+      };
+      void save(storageKey(universeId), next);
+      return { states: { ...state.states, [universeId]: next } };
+    });
+  },
+
+  debugSetInventoryItem: (universeId, itemId, amount) => {
+    set((state) => {
+      const current = state.states[universeId];
+      if (!current) return state;
+      const next = {
+        ...current,
+        inventory: { ...current.inventory, [itemId]: Math.max(0, amount) },
+        lastTickAt: Date.now(),
+      };
+      void save(storageKey(universeId), next);
+      return { states: { ...state.states, [universeId]: next } };
+    });
+  },
+
+  debugGiveItem: (universeId, context, itemId, amount) => {
+    set((state) => {
+      const current = state.states[universeId];
+      if (!current) return state;
+      const next = { ...applyItemDelta(current, context, itemId, amount), lastTickAt: Date.now() };
+      void save(storageKey(universeId), next);
+      return { states: { ...state.states, [universeId]: next } };
+    });
+  },
+
+  debugSetBankItem: (universeId, itemId, amount) => {
+    set((state) => {
+      const current = state.states[universeId];
+      if (!current) return state;
+      const next = {
+        ...current,
+        bank: { ...current.bank, [itemId]: Math.max(0, amount) },
+        lastTickAt: Date.now(),
+      };
+      void save(storageKey(universeId), next);
+      return { states: { ...state.states, [universeId]: next } };
+    });
   },
 }));

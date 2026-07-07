@@ -29,7 +29,7 @@ export const DialoguePanel = ({ context, onChoose, playState, t }: DialoguePanel
   const speaker = node.speakerId ? t(`dialogue.${active.dialogueId}.speaker.${node.speakerId}`, node.speakerId) : '';
 
   return (
-    <section className="dialogue-panel grid h-full grid-rows-[1fr_auto] gap-4 rounded-t border border-cyan-800 bg-slate-950/95 p-4 shadow-2xl">
+    <section className="dialogue-panel grid h-full grid-rows-[1fr_auto] gap-4 rounded-t border border-cyan-800 bg-slate-950/95 p-4 shadow-2xl" data-dialogue-panel="">
       <div className="min-h-0 overflow-auto">
         {speaker && <p className="mb-2 text-xs font-semibold uppercase text-cyan-200">{speaker}</p>}
         {node.textKey && <p className="text-base leading-7 text-slate-100">{t(node.textKey)}</p>}
@@ -40,6 +40,7 @@ export const DialoguePanel = ({ context, onChoose, playState, t }: DialoguePanel
           options.map((option, index) => (
             <button
               className="rounded border border-slate-700 bg-slate-900 px-3 py-2 text-left text-sm font-semibold text-slate-100 transition hover:border-cyan-400 hover:text-cyan-100"
+              data-dialogue-option-id={option.id}
               key={option.id}
               onClick={() => onChoose(option.id)}
               type="button"
@@ -51,6 +52,7 @@ export const DialoguePanel = ({ context, onChoose, playState, t }: DialoguePanel
         ) : (
           <button
             className="rounded bg-cyan-400 px-3 py-2 text-sm font-semibold text-slate-950"
+            data-dialogue-continue=""
             onClick={() => onChoose()}
             type="button"
           >
