@@ -43,7 +43,6 @@ export type DslActionDecl = {
 
 export type DslEntityDecl = {
   id: string;
-  examine?: DslText;
   actions: DslActionDecl[];
 };
 
@@ -99,6 +98,13 @@ export type DslInfo = {
   author: string;
   gameVersion: string;
   dependencies: string[];
+  // Bare (undotted) flag identifiers auto-namespace to this pack, so sibling
+  // modules that declare the same pack can share short flag names without
+  // qualification (a dotted flag id is always used exactly as written,
+  // regardless of pack — that's the escape hatch for cross-pack references).
+  // Defaults to `id` when omitted, so a standalone module is still safe by
+  // default.
+  pack?: string;
 };
 
 export type DslModule = {

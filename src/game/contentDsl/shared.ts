@@ -7,7 +7,9 @@ export class DslParseError extends Error {}
 // ---------------------------------------------------------------------------
 // Condition expressions: `a & b`, `a | b`, `!a`. No parens in v0.1.
 // `defaultKind` decides what a bare identifier means (`requires` defaults to
-// item; `hidden if`/`visible if`/`wall ... while` default to flag).
+// item; `hidden if`/`visible if`/`wall ... while`/inline text default to
+// flag). Purely syntactic — pack-scoping of flag ids happens in compiler.ts,
+// which is the only place that knows the current module's pack.
 // ---------------------------------------------------------------------------
 export const parseCondition = (raw: string, defaultKind: 'flag' | 'item'): DslCondition => {
   const text = raw.trim();
@@ -28,6 +30,7 @@ export const parseCondition = (raw: string, defaultKind: 'flag' | 'item'): DslCo
 
 // ---------------------------------------------------------------------------
 // Inline conditional text: `literal {cond: fragment} literal {cond: fragment}`
+// `cond` is a full boolean expression (may reference multiple flags).
 // ---------------------------------------------------------------------------
 export const parseText = (raw: string): DslText => {
   const fragments: DslText = [];
@@ -48,16 +51,24 @@ export const parseText = (raw: string): DslText => {
   return fragments;
 };
 
-// Collects the distinct flag ids referenced by {flag: ...} fragments, in
-// order of first appearance. Only flag conditions are supported inline
-// (item/all/any inline text conditions are out of v0.1 scope).
+// Collects every distinct flag id referenced anywhere in the text's
+// conditions (walking through not/all/any), in order of first appearance.
+// Inline conditional text only supports flag conditions, not item checks.
 export const collectTextFlags = (text: DslText): string[] => {
   const seen: string[] = [];
+  const visit = (cond: DslCondition): void => {
+    if (cond.kind === 'flag') {
+      if (!seen.includes(cond.flagId)) seen.push(cond.flagId);
+    } else if (cond.kind === 'not') {
+      visit(cond.cond);
+    } else if (cond.kind === 'all' || cond.kind === 'any') {
+      cond.conds.forEach(visit);
+    } else {
+      throw new DslParseError('Inline conditional text only supports flag conditions, not item conditions');
+    }
+  };
   for (const fragment of text) {
-    if (fragment.kind !== 'conditional') continue;
-    const cond = fragment.cond.kind === 'not' ? fragment.cond.cond : fragment.cond;
-    if (cond.kind !== 'flag') throw new DslParseError('Inline conditional text only supports flag conditions in v0.1');
-    if (!seen.includes(cond.flagId)) seen.push(cond.flagId);
+    if (fragment.kind === 'conditional') visit(fragment.cond);
   }
   return seen;
 };
@@ -80,16 +91,20 @@ export const renderTextForAssignment = (text: DslText, assignment: Record<string
     .trim();
 
 // ---------------------------------------------------------------------------
-// Tag-lines: comma-separated tags, where a trailing `say`/`examine` tag may
-// contain literal commas because free text always comes last (see grammar).
+// Tag-lines: comma-separated tags. Every keyword that takes a value requires
+// a colon before it (`give: gold 5`, not `give gold 5`) — the one exception
+// is a bare valueless keyword (`once`), since there's nothing to separate.
+// A trailing `say:` tag may contain literal commas because free text always
+// comes last on its own line (see grammar doc) — put other tags before it,
+// or on a separate line entirely.
 // ---------------------------------------------------------------------------
-const TEXT_KEYWORDS = ['say', 'examine'];
+const TEXT_KEYWORDS = ['say'];
 
 export const splitTagLine = (line: string): string[] => {
   const segments: string[] = [];
   let rest = line;
   while (rest.length > 0) {
-    const textMatch = new RegExp(`^\\s*(${TEXT_KEYWORDS.join('|')})\\b`, 'i').exec(rest);
+    const textMatch = new RegExp(`^\\s*(${TEXT_KEYWORDS.join('|')})\\s*:`, 'i').exec(rest);
     if (textMatch) {
       segments.push(rest.trim());
       rest = '';
@@ -107,58 +122,43 @@ export const splitTagLine = (line: string): string[] => {
   return segments.filter((segment) => segment.length > 0);
 };
 
-const MULTI_WORD_KEYWORDS: Array<{ pattern: RegExp; keyword: string }> = [
-  { pattern: /^hidden if\b:?\s*/i, keyword: 'hiddenIf' },
-  { pattern: /^visible if\b:?\s*/i, keyword: 'visibleIf' },
-  { pattern: /^goto dialogue\b:?\s*/i, keyword: 'gotoDialogue' },
-  { pattern: /^open modal\b:?\s*/i, keyword: 'openModal' },
-];
-
 export const parseTag = (segment: string): DslTag => {
-  for (const { pattern, keyword } of MULTI_WORD_KEYWORDS) {
-    const match = pattern.exec(segment);
-    if (!match) continue;
-    const value = segment.slice(match[0].length).trim();
-    if (keyword === 'hiddenIf' || keyword === 'visibleIf') {
-      return { keyword, cond: parseCondition(value, 'flag') };
-    }
-    if (keyword === 'gotoDialogue') return { keyword: 'gotoDialogue', dialogueId: value };
-    return { keyword: 'openModal', modalId: value };
-  }
+  const trimmed = segment.trim();
+  if (/^once$/i.test(trimmed)) return { keyword: 'once' };
 
-  const singleWordMatch = /^([a-zA-Z]+)\b:?\s*(.*)$/.exec(segment);
-  if (!singleWordMatch) throw new DslParseError(`Could not parse tag: "${segment}"`);
-  const [, word, rest] = singleWordMatch;
-  const lower = word.toLowerCase();
+  const dialogueGotoMatch = /^\[\[dialogue\s+([\w-]+)\]\]$/i.exec(trimmed);
+  if (dialogueGotoMatch) return { keyword: 'gotoDialogue', dialogueId: dialogueGotoMatch[1] };
 
-  if (lower === 'give' || lower === 'take') {
-    const [itemId, amountRaw] = rest.trim().split(/\s+/);
-    return { keyword: lower, itemId, amount: amountRaw ? Number(amountRaw) : 1 };
+  const match = /^([a-zA-Z][a-zA-Z ]*?):\s*(.*)$/.exec(trimmed);
+  if (!match) {
+    throw new DslParseError(`Expected "<keyword>: <value>" (or a bare "once" / "[[dialogue x]]"), got: "${segment}"`);
   }
-  if (lower === 'xp') {
-    const [skillId, amountRaw] = rest.trim().split(/\s+/);
+  const keyword = match[1].trim().toLowerCase();
+  const value = match[2].trim();
+
+  if (keyword === 'give' || keyword === 'take') {
+    const [itemId, amountRaw] = value.split(/\s+/);
+    return { keyword, itemId, amount: amountRaw ? Number(amountRaw) : 1 };
+  }
+  if (keyword === 'xp') {
+    const [skillId, amountRaw] = value.split(/\s+/);
     return { keyword: 'xp', skillId, amount: Number(amountRaw) };
   }
-  if (lower === 'set' || lower === 'unset') {
-    return { keyword: lower, flagId: rest.trim() };
-  }
-  if (lower === 'requires') {
-    return { keyword: 'requires', cond: parseCondition(rest, 'item') };
-  }
-  if (lower === 'once') {
-    return { keyword: 'once' };
-  }
-  if (lower === 'say') {
-    return { keyword: 'say', text: parseText(rest.trim()) };
-  }
-  throw new DslParseError(`Unknown tag keyword: "${word}" in "${segment}"`);
+  if (keyword === 'set') return { keyword: 'set', flagId: value };
+  if (keyword === 'unset') return { keyword: 'unset', flagId: value };
+  if (keyword === 'requires') return { keyword: 'requires', cond: parseCondition(value, 'item') };
+  if (keyword === 'hidden if') return { keyword: 'hiddenIf', cond: parseCondition(value, 'flag') };
+  if (keyword === 'visible if') return { keyword: 'visibleIf', cond: parseCondition(value, 'flag') };
+  if (keyword === 'say') return { keyword: 'say', text: parseText(value) };
+  if (keyword === 'open modal') return { keyword: 'openModal', modalId: value };
+  throw new DslParseError(`Unknown tag keyword: "${keyword}" in "${segment}"`);
 };
 
 export const parseTagLine = (line: string): DslTag[] => splitTagLine(line).map(parseTag);
 
-// The `enemy:` long-form field has its own shape: `interactionTypeId, stat value, stat value, ...`
+// The `enemy:` field has its own shape: `interactionTypeId, stat value, stat value, ...`
 export const parseEnemyField = (value: string): { interactionTypeId: string; stats: Record<string, number> } => {
-  const parts = value.split(',').map((part) => part.trim());
+  const parts = value.split(',').map((part) => part.trim()).filter(Boolean);
   const [interactionTypeId, ...statParts] = parts;
   const stats: Record<string, number> = {};
   for (const part of statParts) {

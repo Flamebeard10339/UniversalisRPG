@@ -93,6 +93,7 @@ const parseInfoBlock = (cursor: Cursor): DslInfo => {
     author: fields.author,
     gameVersion: fields.game_version,
     dependencies: fields.dependencies ? fields.dependencies.split(',').map((s) => s.trim()).filter(Boolean) : [],
+    pack: fields.pack || undefined,
   };
 };
 
@@ -118,32 +119,44 @@ const parseAdvancedBlock = (cursor: Cursor): Record<string, unknown> => {
   return JSON.parse(jsonLines.join('\n')) as Record<string, unknown>;
 };
 
-const parseLocationMetadata = (line: string): { x: number; y: number; z?: number; tags: string[]; starting: boolean } => {
-  const segments = line.split(',').map((segment) => segment.trim()).filter(Boolean);
-  let x = 0;
-  let y = 0;
-  let z: number | undefined;
-  let tags: string[] = [];
-  let starting = false;
-  for (const segment of segments) {
-    const match = /^([a-zA-Z]+):?\s*(.*)$/.exec(segment);
-    if (!match) throw new DslParseError(`Invalid location metadata segment: "${segment}"`);
-    const key = match[1].toLowerCase();
-    const value = match[2].trim();
-    if (key === 'x') x = Number(value);
-    else if (key === 'y') y = Number(value);
-    else if (key === 'z') z = Number(value);
-    else if (key === 'tags') tags = value.split(/\s+/).filter(Boolean);
-    else if (key === 'starting' && !value) starting = true;
-    else throw new DslParseError(`Unknown location metadata key: "${key}"`);
+// ---------------------------------------------------------------------------
+// Location: metadata may span multiple non-blank lines before the first
+// `wall`/`## entity`. Recognized fields are `x:`/`y:`/`z:` and the bare
+// keyword `starting`; any other bare word (or space-separated run of words)
+// is a location tag — there's no `tags:` label, unlike every other DSL
+// keyword this is the one place a bare, unrecognized word is *not* an error.
+// ---------------------------------------------------------------------------
+type LocationMeta = { x: number; y: number; z?: number; tags: string[]; starting: boolean };
+
+const applyLocationMetadataLine = (line: string, meta: LocationMeta): void => {
+  for (const segment of line.split(',').map((part) => part.trim()).filter(Boolean)) {
+    const fieldMatch = /^(x|y|z):\s*(.+)$/i.exec(segment);
+    if (fieldMatch) {
+      const key = fieldMatch[1].toLowerCase();
+      const value = Number(fieldMatch[2].trim());
+      if (key === 'x') meta.x = value;
+      else if (key === 'y') meta.y = value;
+      else meta.z = value;
+      continue;
+    }
+    if (/^starting$/i.test(segment)) {
+      meta.starting = true;
+      continue;
+    }
+    meta.tags.push(...segment.split(/\s+/).filter(Boolean));
   }
-  return { x, y, z, tags, starting };
 };
 
 const parseLocationSection = (cursor: Cursor, id: string): DslLocationSection => {
+  const meta: LocationMeta = { x: 0, y: 0, tags: [], starting: false };
   cursor.skipBlank();
-  const meta = parseLocationMetadata(cursor.current!);
-  cursor.index++;
+  while (!cursor.atEnd()) {
+    const trimmed = cursor.current!.trim();
+    if (/^wall\s*->/i.test(trimmed) || /^##\s+entity\b/i.test(trimmed) || /^#\s/.test(trimmed)) break;
+    applyLocationMetadataLine(trimmed, meta);
+    cursor.index++;
+  }
+
   const walls: DslWallDecl[] = [];
   const entities: DslEntityDecl[] = [];
   cursor.skipBlank();
@@ -177,14 +190,6 @@ const parseLocationSection = (cursor: Cursor, id: string): DslLocationSection =>
 
 const parseEntity = (cursor: Cursor, id: string): DslEntityDecl => {
   cursor.skipBlank();
-  let examine: DslEntityDecl['examine'];
-  const examineMatch = !cursor.atEnd() ? /^examine:\s*(.*)$/i.exec(cursor.current!.trim()) : null;
-  if (examineMatch) {
-    examine = parseText(examineMatch[1]);
-    cursor.index++;
-    cursor.skipBlank();
-  }
-
   const actions: DslActionDecl[] = [];
   while (!cursor.atEnd()) {
     const trimmed = cursor.current!.trim();
@@ -195,56 +200,116 @@ const parseEntity = (cursor: Cursor, id: string): DslEntityDecl => {
     if (/^#/.test(trimmed)) break;
     actions.push(parseAction(cursor));
   }
-  return { id, examine, actions };
+  return { id, actions };
 };
 
+// ---------------------------------------------------------------------------
+// Actions: `<title>:[ <inline tags>]` followed by zero or more further-
+// indented continuation lines (each itself a tag-line, or a nested
+// `enemy:`/`on success:` field). No bullet — a new action is just any
+// non-indented, colon-terminated line inside an entity body. `examine:` is
+// pure sugar: its inline text (only) is treated as `say: <text>` rather than
+// a generic tag-line — `examine: foo` and `examine:\n  say: foo` compile
+// identically.
+// ---------------------------------------------------------------------------
 const parseAction = (cursor: Cursor): DslActionDecl => {
   const headerLine = cursor.current!;
   const headerIndent = leadingSpaces(headerLine);
   const trimmed = headerLine.trim();
-  const bulletMatch = /^-\s+(.+)$/.exec(trimmed);
-  if (!bulletMatch) throw new DslParseError(`Expected an action bullet, got: "${headerLine}"`);
-  const body = bulletMatch[1];
+  const headerMatch = /^(.+?):\s*(.*)$/.exec(trimmed);
+  if (!headerMatch) throw new DslParseError(`Expected an action declaration ending in ":", got: "${headerLine}"`);
+  const title = headerMatch[1].trim();
+  const inlineText = headerMatch[2].trim();
   cursor.index++;
 
-  const colonIndex = body.indexOf(':');
-  if (colonIndex !== -1) {
-    const title = body.slice(0, colonIndex).trim();
-    const tags = parseTagLine(body.slice(colonIndex + 1).trim());
-    return { title, tags, onSuccessTags: [] };
-  }
+  const isExamine = title.toLowerCase() === 'examine';
+  const inlineTags: DslTag[] = inlineText.length === 0
+    ? []
+    : isExamine
+      ? [{ keyword: 'say', text: parseText(inlineText) }]
+      : parseTagLine(inlineText);
 
-  const title = body.trim();
+  const { tags: continuationTags, onSuccessTags } = parseActionBody(cursor, headerIndent);
+  return { title, tags: [...inlineTags, ...continuationTags], onSuccessTags };
+};
+
+const parseActionBody = (cursor: Cursor, baseIndent: number): { tags: DslTag[]; onSuccessTags: DslTag[] } => {
   const tags: DslTag[] = [];
   const onSuccessTags: DslTag[] = [];
-  while (!cursor.atEnd()) {
-    const fieldLine = cursor.current!;
-    if (fieldLine.trim().length === 0) {
-      cursor.index++;
-      break;
-    }
-    if (leadingSpaces(fieldLine) <= headerIndent) break;
-    const field = fieldLine.trim();
 
-    const enemyMatch = /^enemy:\s*(.+)$/i.exec(field);
+  while (!cursor.atEnd()) {
+    const line = cursor.current!;
+    if (line.trim().length === 0) {
+      cursor.index++;
+      continue;
+    }
+    if (leadingSpaces(line) <= baseIndent) break;
+    const indent = leadingSpaces(line);
+    const trimmed = line.trim();
+    if (/^#/.test(trimmed)) break;
+
+    const enemyMatch = /^enemy:\s*(.*)$/i.exec(trimmed);
     if (enemyMatch) {
-      const { interactionTypeId, stats } = parseEnemyField(enemyMatch[1]);
+      cursor.index++;
+      const raw = readRawContinuation(cursor, indent, enemyMatch[1]);
+      const { interactionTypeId, stats } = parseEnemyField(raw);
       tags.push({ keyword: 'enemy', interactionTypeId, stats });
-      cursor.index++;
       continue;
     }
-    const onSuccessMatch = /^on success:\s*(.+)$/i.exec(field);
+
+    const onSuccessMatch = /^on success:\s*(.*)$/i.exec(trimmed);
     if (onSuccessMatch) {
-      onSuccessTags.push(...parseTagLine(onSuccessMatch[1]));
       cursor.index++;
+      onSuccessTags.push(...readTagLines(cursor, indent, onSuccessMatch[1]));
       continue;
     }
-    // Any other field line is itself a single tag ("requires: lockpick",
-    // "hidden if: x", "xp: thieving 4", bare "once", ...).
-    tags.push(...parseTagLine(field));
+
+    tags.push(...parseTagLine(trimmed));
     cursor.index++;
   }
-  return { title, tags, onSuccessTags };
+
+  return { tags, onSuccessTags };
+};
+
+// Joins an inline value with every further-indented raw continuation line
+// (used by `enemy:`, whose value is a flat comma list that may be split
+// across lines).
+const readRawContinuation = (cursor: Cursor, baseIndent: number, inlineValue: string): string => {
+  const parts: string[] = [];
+  if (inlineValue.trim()) parts.push(inlineValue.trim());
+  while (!cursor.atEnd()) {
+    const line = cursor.current!;
+    if (line.trim().length === 0) {
+      cursor.index++;
+      continue;
+    }
+    if (leadingSpaces(line) <= baseIndent) break;
+    if (/^#/.test(line.trim())) break;
+    parts.push(line.trim());
+    cursor.index++;
+  }
+  return parts.join(', ');
+};
+
+// Parses an inline value plus every further-indented continuation line, each
+// as its own tag-line (used by `on success:`, whose value is itself a
+// sequence of tags — including, deliberately, multiple `say:` lines in a
+// row for chunked dialogue).
+const readTagLines = (cursor: Cursor, baseIndent: number, inlineValue: string): DslTag[] => {
+  const tags: DslTag[] = [];
+  if (inlineValue.trim()) tags.push(...parseTagLine(inlineValue.trim()));
+  while (!cursor.atEnd()) {
+    const line = cursor.current!;
+    if (line.trim().length === 0) {
+      cursor.index++;
+      continue;
+    }
+    if (leadingSpaces(line) <= baseIndent) break;
+    if (/^#/.test(line.trim())) break;
+    tags.push(...parseTagLine(line.trim()));
+    cursor.index++;
+  }
+  return tags;
 };
 
 const parseDialogueSection = (cursor: Cursor, id: string): DslDialogueSection => {

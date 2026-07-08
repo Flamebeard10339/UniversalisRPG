@@ -4,6 +4,7 @@ version: 1.0.0
 universe: base
 author: UniversalisRPG
 game_version: 1.0
+pack: tutorial-island
 dependencies: tutorial-island-foundation
 
 # advanced
@@ -14,34 +15,38 @@ dependencies: tutorial-island-foundation
 }
 
 # location tutorial-guide-house
-x: 0, y: 0, tags: tutorial indoors, starting
-
-wall -> tutorial-beach while !tutorial.miki-cleared
+x: 0, y: 0
+tutorial indoors, starting
+wall -> tutorial-beach while !miki-cleared
 
 ## entity miki
 examine: A guide with one eye on the door.
-- talk: goto dialogue miki
+talk: [[dialogue miki]]
 
 ## entity front-door
 examine: A heavy door. The keyhole looks scratched, like someone was here before you.
-- pick lock
+pick lock:
   requires: lockpick
-  hidden if: tutorial.miki-cleared
+  hidden if: miki-cleared
   enemy: lockpicking, attack 0, defense 3, health 12, rate 0
   xp: thieving 4
-  on success: set tutorial.miki-cleared, set quest.leave-tutorial-island.accepted, say The lock gives with a soft click. Whatever is out there, you can reach it now.
+  on success:
+    set: miki-cleared
+    set: quest-accepted
+    say: The lock gives with a soft click.
+    say: Whatever is out there, you can reach it now.
 
 ## entity mirror
-- look: open modal name-editor, say You catch your reflection. Something about it does not feel like you yet.
+look: open modal: name-editor, say: You catch your reflection. Something about it does not feel like you yet.
 
 ## entity drawer
-examine: A drawer full of random junk.{!tutorial.drawer-coins-taken: You see some coins on the bottom.}{!tutorial.drawer-lockpick-taken: A worn set of lockpicks.}
-- take coins: give gold 5, set tutorial.drawer-coins-taken, once, say You take the coins.
-- take lockpick: give lockpick, set tutorial.drawer-lockpick-taken, once, say You take the lockpick.
+examine: A drawer full of random junk.{!drawer-coins-taken & drawer-lockpick-taken: You see some coins on the bottom.}{!drawer-lockpick-taken & drawer-coins-taken: You see a set of worn lockpicks at the bottom.}{!drawer-coins-taken & !drawer-lockpick-taken: There are coins and a worn set of lockpicks tucked in the back.}
+take coins: give: gold 5, set: drawer-coins-taken, once, say: You take the coins.
+take lockpick: give: lockpick, set: drawer-lockpick-taken, once, say: You take the lockpick.
 
 ## entity bookshelf
-examine: A packed bookshelf with leather bound tomes.{!tutorial.bookshelf-note-taken: There is a handwritten note tossed on the second shelf.}
-- take note: give note, set tutorial.bookshelf-note-taken, once, say You take the note.
+examine: A packed bookshelf with leather bound tomes.{!bookshelf-note-taken: There is a handwritten note tossed on the second shelf.}
+take note: give: note, set: bookshelf-note-taken, once, say: You take the note.
 
 # dialogue miki
 start (miki): Oh — hi. You're the new arrival, right? I'm Miki, I look after new folks passing through here. What's on your mind before you head out?
@@ -64,10 +69,10 @@ start (miki): Oh — hi. You're the new arrival, right? I'm Miki, I look after n
 [[maybe-later]] (miki): Sure thing. Door's right there whenever you want to explore first — come find me again when you're ready.
 
 [[check-tab-prompt]] (miki): Take a look at your Quests tab right now — you'll see it listed, red, since you haven't actually started it yet. Go on, I'll wait.
-  -> Okay, I see it. [[accept-node]]: set quest.leave-tutorial-island.accepted
+  -> Okay, I see it. [[accept-node]]: set: quest-accepted
 
 [[accept-node]] (miki): There — now it should read yellow. That's you, officially underway. Leave Tutorial Island: find your way off this place.
   goto [[farewell]]
 
 [[farewell]] (miki): Door's unlocked. Go on, get curious.
-  set tutorial.miki-cleared
+  set: miki-cleared
