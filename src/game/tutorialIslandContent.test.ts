@@ -1,16 +1,27 @@
 import { describe, expect, it } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { applyModulesToBundle } from './contentModules';
+import { compileDsl } from './contentDsl/compiler';
 import type { ContentBundle, ContentModule, UniverseManifest } from './types';
 
 const contentRoot = join(process.cwd(), 'public', 'content', 'universes', 'base');
 const readJson = (relativePath: string) =>
   JSON.parse(readFileSync(join(contentRoot, relativePath), 'utf8').replace(/^﻿/, '')) as unknown;
+const readText = (relativePath: string) => readFileSync(join(contentRoot, relativePath), 'utf8').replace(/^﻿/, '');
+
+// A module is authored as either promoted JSON or DSL markdown (see
+// src/game/loader.ts's json-then-md fallback) — mirror that here so this
+// test keeps reading exactly what the app loads at runtime.
+const readModule = (id: string): ContentModule => {
+  const jsonPath = `modules/${id}.json`;
+  if (existsSync(join(contentRoot, jsonPath))) return readJson(jsonPath) as ContentModule;
+  return compileDsl(readText(`modules/${id}.md`)).module;
+};
 
 const manifest = readJson('universe.json') as UniverseManifest;
 const moduleIds = manifest.modules ?? [];
-const modules = moduleIds.map((id) => readJson(`modules/${id}.json`) as ContentModule);
+const modules = moduleIds.map((id) => readModule(id));
 const baseLocale = readJson('locales/en.json') as Record<string, string>;
 
 const emptyBundle = (): ContentBundle => ({

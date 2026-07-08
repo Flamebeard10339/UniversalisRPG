@@ -801,6 +801,12 @@ export type ContributionRemovedIds = {
   modules: string[];
 };
 
+export type ContributionDslModuleFile = {
+  path: string;
+  baselineSource: string;
+  source: string;
+};
+
 export type ContributionPackage = {
   appVersion: string;
   targetModuleId?: string;
@@ -812,6 +818,11 @@ export type ContributionPackage = {
     path: string;
     json: unknown;
   }[];
+  // DSL-authored modules are packaged as a unified diff against each
+  // module's on-disk baseline, not the whole file — a one-line fix in a
+  // large module shouldn't force a reviewer to read the entire thing. See
+  // formatDslModulesDiffBlock in src/lib/githubIssues.ts.
+  dslModules?: ContributionDslModuleFile[];
 };
 
 export type LocalUniverseLibrary = Record<string, ContentBundle>;

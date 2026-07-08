@@ -23,9 +23,13 @@ const installFetch = (responses: Record<string, unknown>) => {
 const installPublicContentFetch = () => {
   vi.stubGlobal('fetch', vi.fn(async (path: string) => {
     try {
-      const jsonText = readFileSync(join(process.cwd(), 'public', path.replace(/^\//, '')), 'utf8').replace(/^\uFEFF/, '');
-      const json = JSON.parse(jsonText) as unknown;
-      return jsonResponse(json);
+      // Serve the raw file text and let the caller decide .json() vs .text()
+      // \u2014 some modules are promoted JSON, some are DSL .md source (see
+      // src/game/loader.ts's json-then-md fallback), and pre-parsing here
+      // would make every .md request 404.
+      const text = readFileSync(join(process.cwd(), 'public', path.replace(/^\//, '')), 'utf8').replace(/^\uFEFF/, '');
+      const contentType = path.endsWith('.json') ? 'application/json' : 'text/plain';
+      return new Response(text, { status: 200, statusText: 'OK', headers: { 'content-type': contentType } });
     } catch {
       return jsonResponse({}, 404);
     }

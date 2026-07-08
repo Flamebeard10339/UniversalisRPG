@@ -1,8 +1,9 @@
 import { useMemo } from 'react';
 import type { Translator } from '../../game/i18n';
-import type { ContentBundle, ContributionDraft, ValidationIssue } from '../../game/types';
+import type { ContentBundle, ContributionDraft, ContributionDslModuleFile, ValidationIssue } from '../../game/types';
 import { changedContributionJsonFiles } from '../../game/contributionFiles';
 import { createPrefilledIssueUrl, formatContributionIssueBody } from '../../lib/githubIssues';
+import { useDslEditorState } from '../../stores/dslEditorState';
 
 type SubmitToGitHubProps = {
   appVersion: string;
@@ -13,6 +14,19 @@ type SubmitToGitHubProps = {
 };
 
 export const SubmitToGitHub = ({ appVersion, bundle, draft, validationIssues, t }: SubmitToGitHubProps) => {
+  const dslDrafts = useDslEditorState((state) => state.drafts);
+  const dslModules: ContributionDslModuleFile[] = useMemo(
+    () =>
+      Object.values(dslDrafts)
+        .filter((dslDraft) => dslDraft.lastValidSource !== undefined && dslDraft.lastValidSource !== dslDraft.baselineSource)
+        .map((dslDraft) => ({
+          path: `modules/${dslDraft.moduleId}.md`,
+          baselineSource: dslDraft.baselineSource,
+          source: dslDraft.lastValidSource!,
+        })),
+    [dslDrafts],
+  );
+
   const contributionPackage = useMemo(
     () => ({
       appVersion,
@@ -21,8 +35,9 @@ export const SubmitToGitHub = ({ appVersion, bundle, draft, validationIssues, t 
       validationIssues,
       t,
       changedFiles: changedContributionJsonFiles(bundle, draft),
+      dslModules,
     }),
-    [appVersion, bundle, draft, t, validationIssues],
+    [appVersion, bundle, draft, dslModules, t, validationIssues],
   );
   const issueBody = useMemo(() => formatContributionIssueBody(contributionPackage), [contributionPackage]);
   const issueUrl = useMemo(() => createPrefilledIssueUrl(contributionPackage), [contributionPackage]);

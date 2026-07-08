@@ -23,6 +23,7 @@ import type {
 import { validateModuleShape } from './contentModules';
 import { validateContentShape, validateManifest } from './validators';
 import { load, save } from '../lib/storage';
+import { compileDsl } from './contentDsl/compiler';
 
 const BASE_CONTENT_PATH = '/content/universes';
 const LOCAL_UNIVERSES_KEY = 'universalis:local-universes';
@@ -82,6 +83,32 @@ const tryLoadJson = async <T>(path: string): Promise<T | null> => {
   return (await response.json()) as T;
 };
 
+const tryLoadText = async (path: string): Promise<string | null> => {
+  const response = await fetch(path);
+  if (response.status === 404) return null;
+  if (!response.ok) {
+    throw new Error(`Unable to load ${path}: ${response.status} ${response.statusText}`);
+  }
+  return response.text();
+};
+
+// A missing static file doesn't always come back as a literal 404 — some
+// dev servers (Vite's included) serve their SPA-fallback index.html with a
+// 200 for any unmatched path, which would otherwise look like a
+// successfully-loaded (but garbage) JSON module. Used specifically by the
+// json-then-md module fallback below, which needs to reliably tell "this
+// isn't JSON, try .md" apart from "this really is invalid JSON."
+const tryLoadModuleJson = async <T>(path: string): Promise<T | null> => {
+  const response = await fetch(path);
+  if (!response.ok) return null;
+  if (!(response.headers.get('content-type') ?? '').includes('json')) return null;
+  try {
+    return (await response.json()) as T;
+  } catch {
+    return null;
+  }
+};
+
 export const loadUniverseManifest = async (universeId: string) => {
   const manifest = await loadJson<unknown>(`${BASE_CONTENT_PATH}/${universeId}/universe.json`);
 
@@ -133,26 +160,34 @@ export const loadUniverse = async (universeId: string): Promise<ContentBundle> =
 
   const { modules, moduleIssues } = await moduleFiles.reduce<Promise<{ modules: ContentModule[]; moduleIssues: ValidationIssue[] }>>(async (promise, moduleFile) => {
     const loaded = await promise;
-    const modulePath = `${basePath}/modules/${moduleFile}`;
+    const moduleId = moduleIdFromFile(moduleFile);
     try {
-      const module = await loadJson<unknown>(modulePath);
+      // Content modules are authored as either JSON (promoted from the
+      // legacy pipeline) or DSL markdown (see src/game/contentDsl/) —
+      // try JSON first, then fall back to compiling the .md source.
+      const jsonModule = await tryLoadModuleJson<unknown>(`${basePath}/modules/${moduleFile}`);
+      let module: unknown = jsonModule;
+      if (module === null) {
+        const source = await tryLoadText(`${basePath}/modules/${moduleId}.md`);
+        if (source === null) {
+          return {
+            ...loaded,
+            moduleIssues: [...loaded.moduleIssues, moduleLoadIssue(moduleFile, 'validation.moduleLoadFailed', { id: moduleId })],
+          };
+        }
+        module = compileDsl(source).module;
+      }
       if (!validateModuleShape(module, moduleFile)) {
         return {
           ...loaded,
-          moduleIssues: [
-            ...loaded.moduleIssues,
-            moduleLoadIssue(moduleFile, 'validation.moduleShapeInvalid', { id: moduleIdFromFile(moduleFile) }),
-          ],
+          moduleIssues: [...loaded.moduleIssues, moduleLoadIssue(moduleFile, 'validation.moduleShapeInvalid', { id: moduleId })],
         };
       }
       return { ...loaded, modules: [...loaded.modules, module] };
     } catch {
       return {
         ...loaded,
-        moduleIssues: [
-          ...loaded.moduleIssues,
-          moduleLoadIssue(moduleFile, 'validation.moduleLoadFailed', { id: moduleIdFromFile(moduleFile) }),
-        ],
+        moduleIssues: [...loaded.moduleIssues, moduleLoadIssue(moduleFile, 'validation.moduleLoadFailed', { id: moduleId })],
       };
     }
   }, Promise.resolve({ modules: [], moduleIssues: moduleIssueSeeds }));

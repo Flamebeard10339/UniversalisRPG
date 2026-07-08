@@ -32,6 +32,22 @@ const leadingSpaces = (line: string): number => {
 
 const isBlank = (line: string | undefined): boolean => line === undefined || line.trim().length === 0;
 
+// Runs a shared.ts sub-parse (parseCondition/parseText/parseTagLine — all
+// line-agnostic by design) and, if it throws, tags the error with which
+// source line the failing text actually came from. Needed because by the
+// time some sub-parses run, `cursor.index` has already advanced past the
+// line whose text is being parsed (e.g. an action header's inline tags are
+// parsed right after `cursor.index++`) — callers must pass the *correct*
+// originating line, not just `cursor.index` blindly.
+const withLine = <T>(lineIndex: number, fn: () => T): T => {
+  try {
+    return fn();
+  } catch (error) {
+    if (error instanceof DslParseError && error.line === undefined) error.line = lineIndex;
+    throw error;
+  }
+};
+
 class Cursor {
   lines: string[];
   index = 0;
@@ -63,7 +79,7 @@ export const parseDsl = (source: string): DslModule => {
     const line = cursor.current!;
     const headerMatch = /^#\s+(info|location|dialogue|advanced|item|quest|recipe)\b\s*(.*)$/.exec(line);
     if (!headerMatch) {
-      throw new DslParseError(`Expected a top-level "# ..." header, got: "${line}"`);
+      throw new DslParseError(`Expected a top-level "# ..." header, got: "${line}"`, cursor.index);
     }
     const [, keyword, rest] = headerMatch;
     cursor.index++;
@@ -93,7 +109,7 @@ const parseInfoBlock = (cursor: Cursor): DslInfo => {
   const fields: Record<string, string> = {};
   while (!cursor.atEnd() && !isBlank(cursor.current) && !/^#/.test(cursor.current!)) {
     const match = /^(\w+):\s*(.*)$/.exec(cursor.current!.trim());
-    if (!match) throw new DslParseError(`Invalid info field: "${cursor.current}"`);
+    if (!match) throw new DslParseError(`Invalid info field: "${cursor.current}"`, cursor.index);
     fields[match[1]] = match[2].trim();
     cursor.index++;
   }
@@ -179,7 +195,8 @@ const parseLocationSection = (cursor: Cursor, id: string): DslLocationSection =>
 
     const wallMatch = /^wall\s*->\s*([\w-]+)\s+while\s+(.+)$/i.exec(trimmed);
     if (wallMatch) {
-      walls.push({ toLocationId: wallMatch[1], cond: parseCondition(wallMatch[2], 'flag') });
+      const cond = withLine(cursor.index, () => parseCondition(wallMatch[2], 'flag'));
+      walls.push({ toLocationId: wallMatch[1], cond });
       cursor.index++;
       cursor.skipBlank();
       continue;
@@ -193,7 +210,7 @@ const parseLocationSection = (cursor: Cursor, id: string): DslLocationSection =>
       continue;
     }
 
-    throw new DslParseError(`Unexpected line in location "${id}": "${line}"`);
+    throw new DslParseError(`Unexpected line in location "${id}": "${line}"`, cursor.index);
   }
 
   return { kind: 'location', id, x: meta.x, y: meta.y, z: meta.z, tags: meta.tags, starting: meta.starting, walls, entities };
@@ -224,11 +241,12 @@ const parseEntity = (cursor: Cursor, id: string): DslEntityDecl => {
 // identically.
 // ---------------------------------------------------------------------------
 const parseAction = (cursor: Cursor): DslActionDecl => {
+  const headerLineIndex = cursor.index;
   const headerLine = cursor.current!;
   const headerIndent = leadingSpaces(headerLine);
   const trimmed = headerLine.trim();
   const headerMatch = /^(.+?):\s*(.*)$/.exec(trimmed);
-  if (!headerMatch) throw new DslParseError(`Expected an action declaration ending in ":", got: "${headerLine}"`);
+  if (!headerMatch) throw new DslParseError(`Expected an action declaration ending in ":", got: "${headerLine}"`, headerLineIndex);
   const title = headerMatch[1].trim();
   const inlineText = headerMatch[2].trim();
   cursor.index++;
@@ -237,8 +255,8 @@ const parseAction = (cursor: Cursor): DslActionDecl => {
   const inlineTags: DslTag[] = inlineText.length === 0
     ? []
     : isExamine
-      ? [{ keyword: 'say', text: parseText(inlineText) }]
-      : parseTagLine(inlineText);
+      ? [{ keyword: 'say', text: withLine(headerLineIndex, () => parseText(inlineText)) }]
+      : withLine(headerLineIndex, () => parseTagLine(inlineText));
 
   const { tags: continuationTags, onSuccessTags, onFailTags } = parseActionBody(cursor, headerIndent);
   return { title, tags: [...inlineTags, ...continuationTags], onSuccessTags, onFailTags };
@@ -271,19 +289,21 @@ const parseActionBody = (cursor: Cursor, baseIndent: number): { tags: DslTag[]; 
 
     const onSuccessMatch = /^on success:\s*(.*)$/i.exec(trimmed);
     if (onSuccessMatch) {
+      const fieldLineIndex = cursor.index;
       cursor.index++;
-      onSuccessTags.push(...readTagLines(cursor, indent, onSuccessMatch[1]));
+      onSuccessTags.push(...readTagLines(cursor, indent, onSuccessMatch[1], fieldLineIndex));
       continue;
     }
 
     const onFailMatch = /^on fail:\s*(.*)$/i.exec(trimmed);
     if (onFailMatch) {
+      const fieldLineIndex = cursor.index;
       cursor.index++;
-      onFailTags.push(...readTagLines(cursor, indent, onFailMatch[1]));
+      onFailTags.push(...readTagLines(cursor, indent, onFailMatch[1], fieldLineIndex));
       continue;
     }
 
-    tags.push(...parseTagLine(trimmed));
+    tags.push(...withLine(cursor.index, () => parseTagLine(trimmed)));
     cursor.index++;
   }
 
@@ -313,10 +333,12 @@ const readRawContinuation = (cursor: Cursor, baseIndent: number, inlineValue: st
 // Parses an inline value plus every further-indented continuation line, each
 // as its own tag-line (used by `on success:`, whose value is itself a
 // sequence of tags — including, deliberately, multiple `say:` lines in a
-// row for chunked dialogue).
-const readTagLines = (cursor: Cursor, baseIndent: number, inlineValue: string): DslTag[] => {
+// row for chunked dialogue). `inlineLineIndex` is the header field's own
+// line (`cursor.index` has typically already moved past it by the time this
+// runs) — continuation lines use their own, already-correct `cursor.index`.
+const readTagLines = (cursor: Cursor, baseIndent: number, inlineValue: string, inlineLineIndex: number): DslTag[] => {
   const tags: DslTag[] = [];
-  if (inlineValue.trim()) tags.push(...parseTagLine(inlineValue.trim()));
+  if (inlineValue.trim()) tags.push(...withLine(inlineLineIndex, () => parseTagLine(inlineValue.trim())));
   while (!cursor.atEnd()) {
     const line = cursor.current!;
     if (line.trim().length === 0) {
@@ -325,7 +347,7 @@ const readTagLines = (cursor: Cursor, baseIndent: number, inlineValue: string): 
     }
     if (leadingSpaces(line) <= baseIndent) break;
     if (/^#/.test(line.trim())) break;
-    tags.push(...parseTagLine(line.trim()));
+    tags.push(...withLine(cursor.index, () => parseTagLine(line.trim())));
     cursor.index++;
   }
   return tags;
@@ -350,7 +372,7 @@ const parseDialogueNode = (cursor: Cursor): DslDialogueNode => {
   const headerLine = cursor.current!.trim();
   const startMatch = /^start\s*(?:\(([\w-]+)\))?:\s*(.*)$/i.exec(headerLine);
   const namedMatch = /^\[\[([\w-]+)\]\]\s*(?:\(([\w-]+)\))?:\s*(.*)$/.exec(headerLine);
-  if (!startMatch && !namedMatch) throw new DslParseError(`Expected a dialogue node header, got: "${headerLine}"`);
+  if (!startMatch && !namedMatch) throw new DslParseError(`Expected a dialogue node header, got: "${headerLine}"`, cursor.index);
   const id = startMatch ? 'start' : namedMatch![1];
   const speakerId = startMatch ? startMatch[1] : namedMatch![2];
   const text = startMatch ? startMatch[2] : namedMatch![3];
@@ -372,7 +394,8 @@ const parseDialogueNode = (cursor: Cursor): DslDialogueNode => {
     const optionMatch = /^->\s*(.+?)\s*\[\[([\w-]+)\]\]\s*(?::\s*(.+))?$/.exec(body);
     if (optionMatch) {
       const [, label, targetNodeId, tagLineStr] = optionMatch;
-      options.push({ label, targetNodeId, tags: tagLineStr ? parseTagLine(tagLineStr) : [] });
+      const tags = tagLineStr ? withLine(cursor.index, () => parseTagLine(tagLineStr)) : [];
+      options.push({ label, targetNodeId, tags });
       cursor.index++;
       continue;
     }
@@ -384,7 +407,7 @@ const parseDialogueNode = (cursor: Cursor): DslDialogueNode => {
       continue;
     }
 
-    enterTags.push(...parseTagLine(body));
+    enterTags.push(...withLine(cursor.index, () => parseTagLine(body)));
     cursor.index++;
   }
 
@@ -456,10 +479,10 @@ const parseQuestSection = (cursor: Cursor, id: string): DslQuestSection => {
     }
 
     const stageMatch = /^stage\s+([\w-]+):\s*(.+)$/i.exec(trimmed);
-    if (!stageMatch) throw new DslParseError(`Expected "stage <id>: <condition>" in quest "${id}", got: "${line}"`);
+    if (!stageMatch) throw new DslParseError(`Expected "stage <id>: <condition>" in quest "${id}", got: "${line}"`, cursor.index);
     const stageIndent = leadingSpaces(line);
     const stageId = stageMatch[1];
-    const cond = parseCondition(stageMatch[2], 'flag');
+    const cond = withLine(cursor.index, () => parseCondition(stageMatch[2], 'flag'));
     cursor.index++;
 
     const descriptionLines: string[] = [];
@@ -543,12 +566,13 @@ const parseRecipeSection = (cursor: Cursor, id: string): DslRecipeSection => {
     const onSuccessMatch = /^on success:\s*(.*)$/i.exec(trimmed);
     if (onSuccessMatch) {
       const indent = leadingSpaces(line);
+      const fieldLineIndex = cursor.index;
       cursor.index++;
-      onSuccessTags = readTagLines(cursor, indent, onSuccessMatch[1]);
+      onSuccessTags = readTagLines(cursor, indent, onSuccessMatch[1], fieldLineIndex);
       continue;
     }
 
-    throw new DslParseError(`Unexpected line in recipe "${id}": "${line}"`);
+    throw new DslParseError(`Unexpected line in recipe "${id}": "${line}"`, cursor.index);
   }
 
   return { kind: 'recipe', id, stationId, inputs, outputs, skillId, xpAmount, onSuccessTags };

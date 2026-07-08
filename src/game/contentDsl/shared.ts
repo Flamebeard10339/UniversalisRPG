@@ -2,7 +2,18 @@
 // tag-lines, and inline conditional text. See docs/content-dsl-grammar.md.
 import type { DslCondition, DslTag, DslText } from './types';
 
-export class DslParseError extends Error {}
+// `line` is 0-indexed (matches Cursor.index) and, for editor red-line
+// highlighting, is set by whichever call site in parser.ts knows which
+// source line the failing text came from (see `withLine` in parser.ts) —
+// functions in this file are line-agnostic by design (they parse isolated
+// strings), so they never set it themselves.
+export class DslParseError extends Error {
+  line?: number;
+  constructor(message: string, line?: number) {
+    super(message);
+    this.line = line;
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Condition expressions: `a & b`, `a | b`, `!a`. No parens in v0.1.

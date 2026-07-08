@@ -11,13 +11,18 @@ dependencies: tutorial-island-foundation
 {
   "interactionTypes": [
     { "id": "lockpicking", "sourceStatId": "thieving", "targetStatId": "thieving", "targetPlayerHealth": false }
+  ],
+  "flags": [
+    { "id": "tutorial-island.bookshelf-note-taken", "initialValue": false },
+    { "id": "tutorial-island.drawer-coins-taken", "initialValue": false },
+    { "id": "tutorial-island.drawer-lockpick-taken", "initialValue": false }
   ]
 }
 
 # location tutorial-guide-house
 x: 0, y: 0
 tutorial indoors, starting
-wall -> tutorial-beach while !miki-cleared
+wall -> tutorial-beach while !tutorial.miki-cleared
 
 ## entity miki
 examine: A guide with one eye on the door.
@@ -27,12 +32,12 @@ talk: [[dialogue miki]]
 examine: A heavy door. The keyhole looks scratched, like someone was here before you.
 pick lock:
   requires: lockpick
-  hidden if: miki-cleared
+  hidden if: tutorial.miki-cleared
   enemy: lockpicking, attack 0, defense 3, health 12, rate 0
   xp: thieving 4
   on success:
-    set: miki-cleared
-    set: quest-accepted
+    set: tutorial.miki-cleared
+    set: quest.leave-tutorial-island.accepted
     say: The lock gives with a soft click.
     say: Whatever is out there, you can reach it now.
 
@@ -69,10 +74,10 @@ start (miki): Oh — hi. You're the new arrival, right? I'm Miki, I look after n
 [[maybe-later]] (miki): Sure thing. Door's right there whenever you want to explore first — come find me again when you're ready.
 
 [[check-tab-prompt]] (miki): Take a look at your Quests tab right now — you'll see it listed, red, since you haven't actually started it yet. Go on, I'll wait.
-  -> Okay, I see it. [[accept-node]]: set: quest-accepted
+  -> Okay, I see it. [[accept-node]]: set: quest.leave-tutorial-island.accepted
 
 [[accept-node]] (miki): There — now it should read yellow. That's you, officially underway. Leave Tutorial Island: find your way off this place.
   goto [[farewell]]
 
 [[farewell]] (miki): Door's unlocked. Go on, get curious.
-  set: miki-cleared
+  set: tutorial.miki-cleared

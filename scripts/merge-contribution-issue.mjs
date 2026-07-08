@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
+import { applyPatch, parsePatch } from 'diff';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const universesRoot = path.join(repoRoot, 'public', 'content', 'universes');
@@ -45,8 +46,19 @@ const writeJson = (filePath, value, dryRun) => {
   }
   return { path: filePath, json: value };
 };
+const writeText = (filePath, text, dryRun) => {
+  if (!dryRun) {
+    fs.mkdirSync(path.dirname(filePath), { recursive: true });
+    fs.writeFileSync(filePath, text);
+  }
+  return { path: filePath };
+};
 
 const changedJsonPattern = /##\s+Changed JSON\s+```json\s*([\s\S]*?)\s*```/i;
+// jsdiff's own multi-file convention (see formatDslModulesDiffBlock in
+// src/lib/githubIssues.ts) — the fenced block may hold one or several
+// concatenated createPatch() outputs; parsePatch() splits them below.
+const dslModulesPattern = /##\s+Changed DSL Modules\s+```diff\s*([\s\S]*?)\s*```/i;
 
 export const parseContributionIssue = (text) => {
   const targetUniverseId = text.match(/##\s+Target universe\s+([^\r\n]+)/i)?.[1]?.trim();
@@ -61,7 +73,8 @@ export const parseContributionIssue = (text) => {
       throw new Error(`Changed JSON entry ${index} must include path and json.`);
     }
   }
-  return { targetUniverseId, changedFiles };
+  const dslDiffText = text.match(dslModulesPattern)?.[1];
+  return { targetUniverseId, changedFiles, dslDiffText };
 };
 
 const moduleIdFromChangedFile = (file) => {
@@ -195,6 +208,52 @@ export const mergeIntoExistingMod = ({ universeId, targetModId, changedFiles, dr
   return { universeId, targetModId, applied, writes: [writeJson(targetPath, targetModule, dryRun)] };
 };
 
+// A DSL module is authored as a complete, self-contained file (not a JSON
+// patch), so merging it never needs patch-application logic the way
+// mergeIntoExistingMod does — it's a plain upsert: write the (patched) text
+// to modules/<id>.md, and register the id in universe.json only if it's
+// new. What DOES need real logic is applying the *unified diff* itself
+// (each module was packaged as a diff against the contributor's baseline,
+// not the whole file — see formatDslModulesDiffBlock) against whatever the
+// file's current on-disk content actually is, so a conflict (the file
+// changed since that baseline) is caught instead of silently overwritten.
+export const upsertDslModules = ({ universeId, dslDiffText, dryRun = false }) => {
+  if (!dslDiffText) throw new Error('No Changed DSL Modules block found in the issue.');
+  const patches = parsePatch(dslDiffText);
+  if (patches.length === 0) throw new Error('Changed DSL Modules block did not contain any file patches.');
+
+  const writes = [];
+  const conflicts = [];
+  const upsertedModuleIds = [];
+
+  for (const patch of patches) {
+    const relativePath = patch.oldFileName ?? patch.newFileName;
+    const moduleId = relativePath?.match(/^modules\/([^/]+)\.md$/i)?.[1];
+    if (!moduleId) {
+      conflicts.push({ path: relativePath ?? '(unknown)', reason: 'Could not determine a module id from the patch file name.' });
+      continue;
+    }
+    const targetPath = path.join(universesRoot, universeId, 'modules', `${moduleId}.md`);
+    const currentText = fs.existsSync(targetPath) ? fs.readFileSync(targetPath, 'utf8') : '';
+    const merged = applyPatch(currentText, patch);
+    if (merged === false) {
+      conflicts.push({ path: relativePath, reason: 'The file changed on disk since this patch was generated — apply manually.' });
+      continue;
+    }
+    writes.push(writeText(targetPath, merged, dryRun));
+    upsertedModuleIds.push(moduleId);
+  }
+
+  const manifestPath = universeManifestPath(universeId);
+  const manifest = readJson(manifestPath);
+  const newModuleIds = upsertedModuleIds.filter((id) => !(manifest.modules ?? []).includes(id));
+  if (newModuleIds.length > 0) {
+    writes.push(writeJson(manifestPath, { ...manifest, modules: [...(manifest.modules ?? []), ...newModuleIds] }, dryRun));
+  }
+
+  return { universeId, moduleIds: upsertedModuleIds, conflicts, writes };
+};
+
 const parseArgs = (argv) => {
   const args = { workflow: '', issue: '', targetModId: '', dryRun: false };
   for (let index = 0; index < argv.length; index += 1) {
@@ -212,10 +271,14 @@ const parseArgs = (argv) => {
 const usage = `Usage:
   node scripts/merge-contribution-issue.mjs --workflow add-mod --issue issue.md [--dry-run]
   node scripts/merge-contribution-issue.mjs --workflow merge-mod --target-mod base-core --issue issue.md [--dry-run]
+  node scripts/merge-contribution-issue.mjs --workflow upsert-dsl --issue issue.md [--dry-run]
 
 Workflows:
-  add-mod    Write changed module JSON into the target universe and add it to universe.json modules.
-  merge-mod  Apply data-updates.patches from changed modules into an existing packaged module.`;
+  add-mod     Write changed module JSON into the target universe and add it to universe.json modules.
+  merge-mod   Apply data-updates.patches from changed modules into an existing packaged module.
+  upsert-dsl  Apply each Changed DSL Modules diff to modules/<id>.md, writing new files or updating
+              existing ones; adds new ids to universe.json. Reports (without writing) any file whose
+              patch no longer applies cleanly, i.e. it changed on disk since the contributor's baseline.`;
 
 export const runCli = (argv = process.argv.slice(2)) => {
   const args = parseArgs(argv);
@@ -228,7 +291,9 @@ export const runCli = (argv = process.argv.slice(2)) => {
     ? addPackagedMods({ universeId: issue.targetUniverseId, changedFiles: issue.changedFiles, dryRun: args.dryRun })
     : args.workflow === 'merge-mod'
       ? mergeIntoExistingMod({ universeId: issue.targetUniverseId, targetModId: args.targetModId, changedFiles: issue.changedFiles, dryRun: args.dryRun })
-      : (() => { throw new Error(`Unknown workflow: ${args.workflow}`); })();
+      : args.workflow === 'upsert-dsl'
+        ? upsertDslModules({ universeId: issue.targetUniverseId, dslDiffText: issue.dslDiffText, dryRun: args.dryRun })
+        : (() => { throw new Error(`Unknown workflow: ${args.workflow}`); })();
   return { text: JSON.stringify({ ...result, writes: result.writes.map((write) => path.relative(repoRoot, write.path)) }, null, 2) };
 };
 

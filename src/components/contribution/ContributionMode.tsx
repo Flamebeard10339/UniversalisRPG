@@ -5,9 +5,11 @@ import { useContributionState } from '../../stores/contributionState';
 import { useUniverseState } from '../../stores/universeState';
 import { ContentDataEditor, type ContentDataTab } from './ContentDataEditor';
 import { ModuleEditor } from './ModuleEditor';
+import { SubmitToGitHub } from './SubmitToGitHub';
 
 type ContributionModeProps = {
   activeTab: ContributionTab;
+  appVersion: string;
   bundle: ContentBundle;
   onTabChange: (tab: ContributionTab) => void;
   validationIssues: ValidationIssue[];
@@ -58,7 +60,9 @@ const emptyDraft = (universeId: string): ContributionDraft => ({
   },
 });
 
-export const ContributionMode = ({ bundle, validationIssues, t }: ContributionModeProps) => {
+const contributionTabs: ContributionTab[] = ['content', 'submit'];
+
+export const ContributionMode = ({ activeTab, appVersion, bundle, onTabChange, validationIssues, t }: ContributionModeProps) => {
   const draft = useContributionState((state) => state.drafts[bundle.manifest.id] ?? emptyDraft(bundle.manifest.id));
   const updateDraft = useContributionState((state) => state.updateDraft);
   const resetDraft = useContributionState((state) => state.resetDraft);
@@ -105,27 +109,50 @@ export const ContributionMode = ({ bundle, validationIssues, t }: ContributionMo
         </button>
       </div>
 
-      <section className="grid gap-4">
-        <ContentDataEditor
-          activeTab={contentTab}
-          baseBundle={baseBundle ?? bundle}
-          bundle={bundle}
-          draft={draft}
-          onPatch={patchDraft}
-          onTabChange={setContentTab}
-          t={t}
-        />
+      <div className="flex gap-2 rounded border border-slate-800 bg-slate-900 p-2" data-testid="contribution-mode-tabs">
+        {contributionTabs.map((tab) => (
+          <button
+            className={`min-w-28 flex-1 rounded px-3 py-2 text-sm font-semibold capitalize ${
+              activeTab === tab ? 'bg-cyan-300 text-slate-950' : 'bg-slate-950 text-slate-300'
+            }`}
+            data-testid={`contribution-mode-tab-${tab}`}
+            key={tab}
+            onClick={() => onTabChange(tab)}
+            type="button"
+          >
+            {t(`contribution.tab.${tab}`)}
+          </button>
+        ))}
+      </div>
 
-        <ModuleEditor
-          bundle={baseBundle ?? bundle}
-          draft={draft}
-          issues={validationIssues}
-          onMoveModule={moveModule}
-          onPatch={patchDraft}
-          t={t}
-          universeIds={manifests.map((manifest) => manifest.id)}
-        />
-      </section>
+      {activeTab === 'content' && (
+        <section className="grid gap-4">
+          <ContentDataEditor
+            activeTab={contentTab}
+            baseBundle={baseBundle ?? bundle}
+            bundle={bundle}
+            draft={draft}
+            issues={validationIssues}
+            onPatch={patchDraft}
+            onTabChange={setContentTab}
+            t={t}
+          />
+
+          <ModuleEditor
+            bundle={baseBundle ?? bundle}
+            draft={draft}
+            issues={validationIssues}
+            onMoveModule={moveModule}
+            onPatch={patchDraft}
+            t={t}
+            universeIds={manifests.map((manifest) => manifest.id)}
+          />
+        </section>
+      )}
+
+      {activeTab === 'submit' && (
+        <SubmitToGitHub appVersion={appVersion} bundle={bundle} draft={draft} t={t} validationIssues={validationIssues} />
+      )}
     </section>
   );
 };

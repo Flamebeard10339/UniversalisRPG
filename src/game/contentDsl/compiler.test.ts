@@ -39,12 +39,12 @@ const foundationStub: ContentModule = {
     stats: [{ id: 'thieving', base: 6 }],
     skills: [{ id: 'thieving', maxLevel: 100, statId: 'thieving' }],
     items: [{ id: 'gold' }, { id: 'lockpick' }, { id: 'note' }],
+    // Guide-house's own local flags (bookshelf/drawer) are declared by the
+    // real module itself now (via its `# advanced` block) — not stubbed
+    // here, or they'd collide as duplicate ids.
     flags: [
-      { id: 'tutorial-island.miki-cleared', initialValue: false },
-      { id: 'tutorial-island.quest-accepted', initialValue: false },
-      { id: 'tutorial-island.drawer-coins-taken', initialValue: false },
-      { id: 'tutorial-island.drawer-lockpick-taken', initialValue: false },
-      { id: 'tutorial-island.bookshelf-note-taken', initialValue: false },
+      { id: 'tutorial.miki-cleared', initialValue: false },
+      { id: 'quest.leave-tutorial-island.accepted', initialValue: false },
     ],
   },
   locale: {
@@ -79,7 +79,7 @@ const beachStub: ContentModule = {
   locale: { en: { 'location.tutorial-beach.title': 'Beach', 'location.tutorial-beach.description': 'Beach.' } },
 };
 
-const samplePath = path.join(__dirname, '../../../scripts/contentDsl/samples/tutorial-island-guide-house.md');
+const samplePath = path.join(__dirname, '../../../public/content/universes/base/modules/tutorial-island-guide-house.md');
 const source = readFileSync(samplePath, 'utf8');
 const { module } = compileDsl(source);
 
@@ -131,7 +131,7 @@ describe('content DSL — guide-house proof', () => {
     expect(wall.results).toEqual([{ kind: 'relocate', locationId: 'tutorial-beach' }]);
     expect(wall.visibleWhen).toEqual({
       kind: 'not',
-      condition: { kind: 'state-variable', variable: 'flag:tutorial-island.miki-cleared', comparison: 'equal', value: true },
+      condition: { kind: 'state-variable', variable: 'flag:tutorial.miki-cleared', comparison: 'equal', value: true },
     });
   });
 
@@ -145,11 +145,11 @@ describe('content DSL — guide-house proof', () => {
     expect(pick.requirements).toEqual({ kind: 'state-variable', variable: 'item:lockpick', comparison: 'greater-than', value: 0 });
     expect(pick.visibleWhen).toEqual({
       kind: 'not',
-      condition: { kind: 'state-variable', variable: 'flag:tutorial-island.miki-cleared', comparison: 'equal', value: true },
+      condition: { kind: 'state-variable', variable: 'flag:tutorial.miki-cleared', comparison: 'equal', value: true },
     });
     expect(pick.results).toEqual([
-      { kind: 'flag', flagId: 'tutorial-island.miki-cleared', value: true },
-      { kind: 'flag', flagId: 'tutorial-island.quest-accepted', value: true },
+      { kind: 'flag', flagId: 'tutorial.miki-cleared', value: true },
+      { kind: 'flag', flagId: 'quest.leave-tutorial-island.accepted', value: true },
       { kind: 'chat', messageKey: 'chat.entity.front-door.pick-lock' },
       { kind: 'chat', messageKey: 'chat.entity.front-door.pick-lock-2' },
     ]);
@@ -230,12 +230,12 @@ describe('content DSL — guide-house proof', () => {
     const farewell = dialogue.nodes.find((node) => node.id === 'farewell')!;
     expect(farewell.options).toBeUndefined();
     expect(farewell.gotoNodeId).toBeUndefined();
-    expect(farewell.results).toEqual([{ kind: 'flag', flagId: 'tutorial-island.miki-cleared', value: true }]);
+    expect(farewell.results).toEqual([{ kind: 'flag', flagId: 'tutorial.miki-cleared', value: true }]);
 
     const checkTabPrompt = dialogue.nodes.find((node) => node.id === 'check-tab-prompt')!;
     expect(checkTabPrompt.options).toHaveLength(1);
     expect(checkTabPrompt.options![0].gotoNodeId).toBe('accept-node');
-    expect(checkTabPrompt.options![0].results).toEqual([{ kind: 'flag', flagId: 'tutorial-island.quest-accepted', value: true }]);
+    expect(checkTabPrompt.options![0].results).toEqual([{ kind: 'flag', flagId: 'quest.leave-tutorial-island.accepted', value: true }]);
   });
 
   it('passes the `interactionTypes` advanced-JSON block through untouched', () => {

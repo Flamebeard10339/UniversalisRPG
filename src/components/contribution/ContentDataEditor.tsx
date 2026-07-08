@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState, type MutableRefObject } from 'react';
 import { locationDescriptionKey, locationTitleKey, toKebabInput } from '../../game/contentIds';
 import type { Translator } from '../../game/i18n';
-import type { BasePlayerDefinition, CombatBalanceDefinition, ContentBundle, ContentModule, ContentModulePack, ContributionDraft, ContributionRemovedIds, DialogueDefinition, DisplayProfileDefinition, DropTableDefinition, EffectDefinition, EnemyDefinition, EntityDefinition, ExperienceCurveDefinition, ExperienceTrigger, GameAction, InteractionTypeDefinition, ItemDefinition, LocationNode, ResourceDefinition, SkillDefinition, StatDefinition, StateFlagDefinition, UniverseUiSettings } from '../../game/types';
-import { editableModuleJsonFiles } from '../../game/contributionFiles';
+import type { BasePlayerDefinition, CombatBalanceDefinition, ContentBundle, ContentModule, ContentModulePack, ContributionDraft, ContributionRemovedIds, DialogueDefinition, DisplayProfileDefinition, DropTableDefinition, EffectDefinition, EnemyDefinition, EntityDefinition, ExperienceCurveDefinition, ExperienceTrigger, GameAction, InteractionTypeDefinition, ItemDefinition, LocationNode, ResourceDefinition, SkillDefinition, StatDefinition, StateFlagDefinition, UniverseUiSettings, ValidationIssue } from '../../game/types';
+import { editableModuleJsonFiles, mergedContributionModules } from '../../game/contributionFiles';
+import { DslModuleEditor } from './DslModuleEditor';
 import { ContributionMapEditor } from './ContributionMapEditor';
 import { DialogueGraphEditor } from './DialogueGraphEditor';
 import { dialogueNarratorKey, dialogueOptionLabelKey, dialogueTextKey, mergeLocalePatch, workingLocale, defaultModuleLocalePatch } from './contributionLocalization';
@@ -23,12 +24,13 @@ type ContentDataEditorProps = {
   baseBundle: ContentBundle;
   bundle: ContentBundle;
   draft: ContributionDraft;
+  issues: ValidationIssue[];
   onPatch: (patch: Partial<Omit<ContributionDraft, 'universeId'>>) => void;
   onTabChange: (tab: ContentDataTab) => void;
   t: Translator;
 };
 
-export type ContentDataTab = 'universe' | 'map' | 'actions' | 'primitives' | 'enemies' | 'resources' | 'json';
+export type ContentDataTab = 'universe' | 'map' | 'actions' | 'primitives' | 'enemies' | 'resources' | 'dsl' | 'json';
 type JsonEditorFile = {
   path: string;
   json: unknown;
@@ -42,7 +44,7 @@ type LayeredRow<T> = {
   source: 'draft' | 'base';
 };
 
-const contentTabs: ContentDataTab[] = ['universe', 'map', 'actions', 'primitives', 'enemies', 'resources', 'json'];
+const contentTabs: ContentDataTab[] = ['universe', 'map', 'actions', 'primitives', 'enemies', 'resources', 'dsl', 'json'];
 
 const uniqueId = (baseId: string, existingIds: string[]) => {
   let index = 1;
@@ -107,10 +109,13 @@ const defaultPatchTargetModId = (bundle: ContentBundle) =>
   bundle.modules?.some((module) => module.id === 'base-core') ? 'base-core' : bundle.manifest.id;
 
 
-export const ContentDataEditor = ({ activeTab, baseBundle, bundle, draft, onPatch, onTabChange, t }: ContentDataEditorProps) => {
+export const ContentDataEditor = ({ activeTab, baseBundle, bundle, draft, issues, onPatch, onTabChange, t }: ContentDataEditorProps) => {
   const [filter, setFilter] = useState('');
   const [selectedActionId, setSelectedActionId] = useState<string | null>(null);
   const [selectedDialogueId, setSelectedDialogueId] = useState<string | null>(null);
+  const dslModuleIds = mergedContributionModules(baseBundle, draft).map((module) => module.id);
+  const [selectedDslModuleId, setSelectedDslModuleId] = useState<string | null>(null);
+  const activeDslModuleId = selectedDslModuleId && dslModuleIds.includes(selectedDslModuleId) ? selectedDslModuleId : dslModuleIds[0] ?? null;
   const actionEditorKeys = useRef<Record<string, string>>({});
   const resourceEditorKeys = useRef<Record<string, string>>({});
   const effectEditorKeys = useRef<Record<string, string>>({});
@@ -961,6 +966,38 @@ export const ContentDataEditor = ({ activeTab, baseBundle, bundle, draft, onPatc
             ))}
           </section>
 
+        </section>
+      )}
+
+      {activeTab === 'dsl' && (
+        <section className="grid gap-3 rounded border border-slate-700 p-2" data-testid="content-dsl-editor">
+          <label className="grid gap-1 text-sm text-slate-300">
+            {t('contribution.dsl.selectModule', 'Mod')}
+            <select
+              className="rounded bg-slate-950 px-3 py-2 text-sm text-slate-100"
+              data-testid="dsl-module-select"
+              onChange={(event) => setSelectedDslModuleId(event.target.value)}
+              value={activeDslModuleId ?? ''}
+            >
+              {dslModuleIds.map((moduleId) => (
+                <option key={moduleId} value={moduleId}>
+                  {moduleId}
+                </option>
+              ))}
+            </select>
+          </label>
+          {activeDslModuleId && (
+            <DslModuleEditor
+              bundle={bundle}
+              draft={draft}
+              issues={issues}
+              key={activeDslModuleId}
+              moduleId={activeDslModuleId}
+              onPatch={onPatch}
+              t={t}
+              universeId={bundle.manifest.id}
+            />
+          )}
         </section>
       )}
 

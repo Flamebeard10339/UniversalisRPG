@@ -1485,7 +1485,7 @@ export default function App() {
                 )}
               </section>
 
-              {contributionMode && <ContributionMode activeTab={contributionTab} bundle={bundle} onTabChange={setContributionTab} validationIssues={validationIssues} t={t} />}
+              {contributionMode && <ContributionMode activeTab={contributionTab} appVersion={APP_VERSION} bundle={bundle} onTabChange={setContributionTab} validationIssues={validationIssues} t={t} />}
 
               <div className="flex items-center justify-between gap-4 rounded border border-rose-900 bg-rose-950/30 p-3">
                 <span>
