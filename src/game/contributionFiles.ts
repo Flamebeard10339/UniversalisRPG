@@ -14,21 +14,24 @@ export const moduleFilePath = (module: Pick<ContentModule, 'id'>) => `modules/${
 export const moduleManifestIds = (bundle: ContentBundle, draft: ContributionDraft) =>
   mergedContributionModules(bundle, draft).map((module) => module.id);
 
-const packagedModuleIds = (bundle: ContentBundle) => new Set((bundle.modules ?? []).map((module) => module.id));
-
-const localDraftModules = (bundle: ContentBundle, draft: ContributionDraft) => {
-  const packagedIds = packagedModuleIds(bundle);
+// A draft module is allowed to share an id with a packaged one — that's how
+// editing a core/shipped module works (uniqueById below keeps the *last*
+// occurrence for a given id, so listing draft modules after base modules
+// makes the draft win). Previously excluded any draft module whose id
+// matched a packaged one, which silently dropped every override of an
+// existing module from both this display and the submission package below.
+const localDraftModules = (draft: ContributionDraft) => {
   const removedModules = new Set(draft.removed?.modules ?? []);
-  return (draft.modules ?? []).filter((module) => !packagedIds.has(module.id) && !removedModules.has(module.id));
+  return (draft.modules ?? []).filter((module) => !removedModules.has(module.id));
 };
 
 export const mergedContributionModules = (bundle: ContentBundle, draft: ContributionDraft) => {
   const baseModules = bundle.modules ?? [];
-  return uniqueById([...localDraftModules(bundle, draft), ...baseModules]).sort((left, right) => left.id.localeCompare(right.id));
+  return uniqueById([...baseModules, ...localDraftModules(draft)]).sort((left, right) => left.id.localeCompare(right.id));
 };
 
 export const changedModuleJsonFiles = (bundle: ContentBundle, draft: ContributionDraft): ContributionJsonFile[] => {
-  const localModules = localDraftModules(bundle, draft);
+  const localModules = localDraftModules(draft);
   if (localModules.length === 0) {
     return [];
   }

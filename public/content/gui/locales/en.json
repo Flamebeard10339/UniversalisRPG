@@ -333,6 +333,8 @@
   "contribution.dsl.showingLastValid": "Showing the last valid version from {time}.",
   "contribution.dsl.revert": "Revert to it",
   "contribution.dsl.validationIssues": "Validation issues in the current preview",
+  "contribution.dsl.moduleConflictDisabled": "This module compiled, but is currently disabled — it conflicts with another module or dependency over \"{key}\". See Validation issues below.",
+  "contribution.dsl.moduleDisabled": "This module compiled, but is currently disabled (a dependency is missing or disabled). See Validation issues below.",
   "contribution.tab.actions": "Actions",
   "contribution.tab.primitives": "Primitives",
   "characterStats.stats.title": "Stats",

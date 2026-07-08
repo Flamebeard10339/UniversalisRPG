@@ -1972,7 +1972,15 @@ describe('content modules', () => {
     expect(result.bundle.items.map((item) => item.id)).toEqual(['draft-item']);
   });
 
-  it('does not let drafted modules replace or remove packaged core modules', () => {
+  it('a removed draft module id wins over a same-id draft replacement (removal takes precedence)', () => {
+    // This is not about protecting packaged/core modules from being edited —
+    // that restriction was intentionally lifted (a draft module CAN replace
+    // a packaged one by id, see the next test). This covers a narrower edge
+    // case: a draft that lists a module id in BOTH `modules` (a replacement)
+    // AND `removed.modules` (a deletion) for the same id. Removal wins, so
+    // the packaged original passes through untouched. The real DSL editor
+    // never produces this combination (editing never marks the edited
+    // module as removed) — it's here purely to lock in the precedence.
     const core = module({
       id: 'base-core',
       data: { items: [{ id: 'core-item' }] },
@@ -2021,11 +2029,59 @@ describe('content modules', () => {
     });
 
     expect(bundleWithDraft.modules?.map((candidate) => candidate.id)).toEqual(['base-core', 'local-patch', 'fake-core']);
+    expect(bundleWithDraft.modules?.find((candidate) => candidate.id === 'base-core')).toBe(core);
 
     const result = applyModulesToBundle(bundleWithDraft, bundleWithDraft.modules ?? [], ['base-core', 'local-patch', 'fake-core']);
     expect(result.enabledModuleIds).toEqual(expect.arrayContaining(['base-core', 'local-patch', 'fake-core']));
     expect(result.enabledModuleIds).toHaveLength(3);
     expect(result.bundle.items.map((item) => item.id)).toEqual(expect.arrayContaining(['core-item', 'local-item', 'fake-core-item']));
+  });
+
+  it('lets a drafted module replace a packaged core module by id (editing core/shipped content)', () => {
+    // The DSL editor's whole "edit any mod, including core ones" feature
+    // depends on this: a draft module with the same id as a packaged one
+    // must override it, not get silently dropped.
+    const core = module({
+      id: 'base-core',
+      data: { items: [{ id: 'core-item' }] },
+      locale: { en: { 'item.core-item.title': 'Core item', 'item.core-item.description': 'From core.' } },
+    });
+    const replacement = module({
+      id: 'base-core',
+      data: { items: [{ id: 'replacement-item' }] },
+      locale: { en: { 'item.replacement-item.title': 'Replacement', 'item.replacement-item.description': 'Edited via DSL.' } },
+    });
+
+    const bundleWithDraft = mergeDraftModulesIntoBundle({
+      ...baseBundle(),
+      modules: [core],
+    }, {
+      universeId: 'test',
+      updatedAt: 1,
+      notes: '',
+      modules: [replacement],
+      modulePacks: [],
+      locations: [],
+      actions: [],
+      skills: [],
+      stats: [],
+      items: [],
+      flags: [],
+      resourceDefinitions: [],
+      effects: [],
+      interactionTypes: [],
+      enemies: [],
+      dropTables: [],
+      dialogues: [],
+      locales: {},
+      removed: { locations: [], actions: [], skills: [], stats: [], items: [], flags: [], resources: [], effects: [], interactionTypes: [], enemies: [], dropTables: [], dialogues: [], modules: [] },
+    });
+
+    expect(bundleWithDraft.modules?.map((candidate) => candidate.id)).toEqual(['base-core']);
+    expect(bundleWithDraft.modules?.find((candidate) => candidate.id === 'base-core')).toBe(replacement);
+
+    const result = applyModulesToBundle(bundleWithDraft, bundleWithDraft.modules ?? [], ['base-core']);
+    expect(result.bundle.items.map((item) => item.id)).toEqual(['replacement-item']);
   });
 
   it('disables a broken overlay while preserving the core module', () => {

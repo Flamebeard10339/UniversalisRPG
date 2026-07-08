@@ -110,7 +110,11 @@ describe('contribution module files', () => {
     ]);
   });
 
-  it('does not package draft modules that shadow packaged modules', () => {
+  it('a removed draft module id wins over a same-id draft replacement (removal takes precedence)', () => {
+    // Not a "packaged/core modules can't be edited" restriction — that was
+    // intentionally lifted, see the next test. This is the narrower case of
+    // a draft that lists the same module id in both `modules` (replacement)
+    // and `removed.modules` (deletion); removal wins.
     const contributionDraft = {
       ...draft(),
       modules: [
@@ -125,5 +129,26 @@ describe('contribution module files', () => {
       'universe.json',
       'modules/draft-module.json',
     ]);
+  });
+
+  it('lets a drafted module replace a packaged module by id (editing core/shipped content)', () => {
+    const contributionDraft = {
+      ...draft(),
+      modules: [
+        ...draft().modules,
+        { id: 'base-module', version: '9.9.9', universe: 'test', author: 'draft', game_version: '1.0' },
+      ],
+    };
+
+    expect(moduleManifestIds(bundle(), contributionDraft)).toEqual(['base-module', 'draft-module', 'removed-module']);
+    expect(changedModuleJsonFiles(bundle(), contributionDraft).map((file) => file.path)).toEqual([
+      'universe.json',
+      'modules/draft-module.json',
+      'modules/base-module.json',
+    ]);
+    expect(changedModuleJsonFiles(bundle(), contributionDraft).find((file) => file.path === 'modules/base-module.json')?.json).toMatchObject({
+      version: '9.9.9',
+      author: 'draft',
+    });
   });
 });

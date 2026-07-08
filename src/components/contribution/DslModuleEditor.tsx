@@ -2,17 +2,19 @@
 // source, with live parse-error red-lining, last-valid caching (so a broken
 // keystroke never reaches the live game — see src/stores/dslEditorState.ts),
 // and context-aware autocomplete (dropdown + ghost text).
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import CodeMirror, { EditorView } from '@uiw/react-codemirror';
 import { autocompletion, completionKeymap } from '@codemirror/autocomplete';
+import { Prec } from '@codemirror/state';
 import { keymap } from '@codemirror/view';
 import { linter, type Diagnostic } from '@codemirror/lint';
 import type { Translator } from '../../game/i18n';
-import type { ContentBundle, ContentModule, ContributionDraft, ValidationIssue } from '../../game/types';
-import { compileDsl } from '../../game/contentDsl/compiler';
+import type { ContentBundle, ContributionDraft, ValidationIssue } from '../../game/types';
+import { compileAndCommitDslModule } from '../../game/contentDsl/applyModuleEdit';
 import { useDslEditorState } from '../../stores/dslEditorState';
 import { dslCompletionSource, scanFlagIdsInSource, type DslCompletionSources } from './dslCompletions';
 import { ghostTextField, ghostTextKeymap, ghostTextUpdateListener } from './dslGhostText';
+import { dslEditorTheme, dslLanguage, dslSyntaxHighlighting } from './dslLanguage';
 
 type DslModuleEditorProps = {
   moduleId: string;
@@ -23,11 +25,6 @@ type DslModuleEditorProps = {
   onPatch: (patch: Partial<Omit<ContributionDraft, 'universeId'>>) => void;
   t: Translator;
 };
-
-const upsertModuleById = (modules: ContentModule[], module: ContentModule): ContentModule[] =>
-  modules.some((candidate) => candidate.id === module.id)
-    ? modules.map((candidate) => (candidate.id === module.id ? module : candidate))
-    : [module, ...modules];
 
 // A missing static file doesn't always come back as a literal 404 — Vite's
 // dev server serves its SPA-fallback index.html with a 200 for any
@@ -94,48 +91,70 @@ export const DslModuleEditor = ({ moduleId, universeId, bundle, draft, issues, o
     };
   }, [moduleId, universeId, hydrate, discardDraft, openDraft]);
 
-  const completionSources: DslCompletionSources = useMemo(
-    () => ({
-      itemIds: (bundle.items ?? []).map((item) => item.id),
-      flagIds: [...(bundle.flags ?? []).map((flag) => flag.id), ...scanFlagIdsInSource(dslDraft?.source ?? '')],
-      dialogueIds: (bundle.dialogues ?? []).map((dialogue) => dialogue.id),
-      moduleIds: [...(bundle.modules ?? []).map((module) => module.id), ...(draft.modules ?? []).map((module) => module.id)],
-      skillIds: bundle.skills.map((skill) => skill.id),
-    }),
-    [bundle, draft.modules, dslDraft?.source],
-  );
+  // Everything the linter/completion callbacks need, other than `moduleId`
+  // itself, is read through this ref rather than baked into `extensions`'s
+  // memo deps below. `bundle`/`draft` change identity on essentially every
+  // keystroke (a successful compile pushes into draft.modules, which
+  // changes `bundle`, which re-renders this component with new props) — if
+  // `extensions` depended on them, CodeMirror would reconfigure on every
+  // keystroke. That doesn't just break click-to-apply on the completion
+  // dropdown (the tooltip's DOM gets torn down mid-interaction) — it can
+  // cascade into a genuine infinite loop: reconfigure -> linter re-fires ->
+  // onPatch -> bundle changes -> re-render -> reconfigure -> ...
+  const latestRef = useRef({ bundle, draft, onPatch, dslDraftSource: dslDraft?.source ?? '' });
+  useEffect(() => {
+    latestRef.current = { bundle, draft, onPatch, dslDraftSource: dslDraft?.source ?? '' };
+  });
+
+  const getCompletionSources = (): DslCompletionSources => {
+    const { bundle: latestBundle, draft: latestDraft, dslDraftSource } = latestRef.current;
+    return {
+      itemIds: (latestBundle.items ?? []).map((item) => item.id),
+      flagIds: [...(latestBundle.flags ?? []).map((flag) => flag.id), ...scanFlagIdsInSource(dslDraftSource)],
+      dialogueIds: (latestBundle.dialogues ?? []).map((dialogue) => dialogue.id),
+      moduleIds: [...(latestBundle.modules ?? []).map((module) => module.id), ...(latestDraft.modules ?? []).map((module) => module.id)],
+      skillIds: latestBundle.skills.map((skill) => skill.id),
+    };
+  };
 
   const extensions = useMemo(
     () => [
       EditorView.lineWrapping,
-      keymap.of(completionKeymap),
-      autocompletion({ override: [dslCompletionSource(completionSources)] }),
+      dslLanguage,
+      dslSyntaxHighlighting,
+      dslEditorTheme,
+      Prec.highest(keymap.of(completionKeymap)),
+      autocompletion({ override: [dslCompletionSource(getCompletionSources)] }),
       ghostTextField,
-      ghostTextUpdateListener(completionSources),
+      ghostTextUpdateListener(getCompletionSources),
       ghostTextKeymap,
       linter(
         (view) => {
           const source = view.state.doc.toString();
-          try {
-            const { module } = compileDsl(source);
+          // Skip re-patching if nothing actually changed since the last
+          // successful compile — avoids bundle churn from a reconfigure or
+          // re-lint that isn't from a real edit.
+          const currentlyValidSource = useDslEditorState.getState().getDraft(moduleId)?.lastValidSource;
+          if (currentlyValidSource === source) {
             setCompileError(null);
-            markValid(moduleId, source, module);
-            onPatch({ modules: upsertModuleById(draft.modules ?? [], module) });
             return [];
-          } catch (error) {
-            const message = error instanceof Error ? error.message : String(error);
-            setCompileError({ message });
-            const line = error instanceof Error && 'line' in error ? (error as { line?: number }).line : undefined;
-            const targetLine = view.state.doc.line(Math.min((line ?? 0) + 1, view.state.doc.lines));
-            const diagnostic: Diagnostic = { from: targetLine.from, to: targetLine.to, severity: 'error', message };
-            return [diagnostic];
           }
+          const { draft: latestDraft, onPatch: latestOnPatch } = latestRef.current;
+          const result = compileAndCommitDslModule(moduleId, source, latestDraft.modules ?? [], latestOnPatch);
+          if (result.ok) {
+            setCompileError(null);
+            return [];
+          }
+          setCompileError({ message: result.error });
+          const targetLine = view.state.doc.line(Math.min((result.line ?? 0) + 1, view.state.doc.lines));
+          const diagnostic: Diagnostic = { from: targetLine.from, to: targetLine.to, severity: 'error', message: result.error };
+          return [diagnostic];
         },
         { delay: 300 },
       ),
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [moduleId, completionSources],
+    [moduleId],
   );
 
   if (availability === 'loading') return <p className="text-sm text-slate-400">{t('contribution.dsl.loading', 'Loading…')}</p>;
@@ -151,6 +170,19 @@ export const DslModuleEditor = ({ moduleId, universeId, bundle, draft, issues, o
   }
 
   const isShowingStale = compileError !== null && dslDraft?.lastValidSource !== undefined && dslDraft.source !== dslDraft.lastValidSource;
+
+  // A module can compile cleanly and still never reach the live game: module
+  // resolution (applyModulesToBundle) disables a module outright when it
+  // conflicts with another module or one of its dependencies is itself
+  // disabled — e.g. referencing a new flag via `set:`/`unset:` without
+  // declaring it in this module's own flags list. That shows up only as a
+  // warning-severity `validation.moduleDisabled`/`moduleConflictDisabled`
+  // issue buried in the general issues list below, with nothing in the
+  // editor itself signaling "this edit didn't take effect" — surface it here
+  // instead of requiring a manual scan of that list.
+  const modulePath = `modules.${moduleId}`;
+  const conflictIssue = issues.find((candidate) => candidate.path === modulePath && candidate.message === 'validation.moduleConflictDisabled');
+  const disabledIssue = conflictIssue ?? issues.find((candidate) => candidate.path === modulePath && candidate.message === 'validation.moduleDisabled');
 
   return (
     <section className="grid gap-3" data-testid="dsl-module-editor">
@@ -174,12 +206,33 @@ export const DslModuleEditor = ({ moduleId, universeId, bundle, draft, issues, o
         </div>
       )}
 
+      {!compileError && disabledIssue && (
+        <div className="rounded border border-amber-500 bg-amber-950/40 p-3 text-sm text-amber-200" data-testid="dsl-module-disabled-banner">
+          {conflictIssue ? (
+            <p>
+              {t(
+                'contribution.dsl.moduleConflictDisabled',
+                'This module compiled, but is currently disabled — it conflicts with another module or dependency over "{key}". See Validation issues below.',
+                { key: conflictIssue.params?.key ?? moduleId },
+              )}
+            </p>
+          ) : (
+            <p>
+              {t(
+                'contribution.dsl.moduleDisabled',
+                'This module compiled, but is currently disabled (a dependency is missing or disabled). See Validation issues below.',
+              )}
+            </p>
+          )}
+        </div>
+      )}
+
       <CodeMirror
         basicSetup={{ closeBrackets: false, autocompletion: false, completionKeymap: false }}
         extensions={extensions}
         height="480px"
         onChange={(value) => setSource(moduleId, value)}
-        theme="dark"
+        theme="none"
         value={dslDraft?.source ?? ''}
       />
 

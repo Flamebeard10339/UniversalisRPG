@@ -103,6 +103,16 @@ const buildDeps = (overrides: Overrides = {}): TestHarnessDeps => {
     debugSetBankItem: vi.fn(),
     listProfileNames: vi.fn(() => ['post-guide-house']),
     loadProfileFixture: vi.fn((name: string) => (name === 'post-guide-house' ? { currentLocationId: 'start', flags: { foo: true } } : null)),
+    getContributionMode: vi.fn(() => false),
+    setContributionMode: vi.fn(),
+    getContributionTab: vi.fn(() => 'content'),
+    setContributionTab: vi.fn(),
+    getEnabledModuleIds: vi.fn(() => ['test']),
+    setModuleEnabled: vi.fn(async () => ({ enabledModuleIds: ['test'] })),
+    getValidationIssues: vi.fn(() => []),
+    getDslDraft: vi.fn(() => null),
+    setDslSource: vi.fn(),
+    applyDslEdit: vi.fn(() => ({ ok: true }) as const),
     ...overrides,
   };
 };
@@ -287,5 +297,32 @@ describe('testHarness time', () => {
     harness.time.skip(30);
     const [, , calledNow] = (deps.resolveIdle as ReturnType<typeof vi.fn>).mock.calls[0];
     expect(calledNow).toBeGreaterThanOrEqual(before + 30_000);
+  });
+});
+
+describe('testHarness contribution/modules/dsl', () => {
+  it('contribution.setEnabled/setTab delegate directly, no DOM lookup', () => {
+    const deps = buildDeps();
+    const harness = createTestHarness(deps);
+    expect(harness.contribution.setEnabled(true)).toEqual({ ok: true });
+    expect(deps.setContributionMode).toHaveBeenCalledWith(true);
+    expect(harness.contribution.setTab('submit')).toEqual({ ok: true });
+    expect(deps.setContributionTab).toHaveBeenCalledWith('submit');
+  });
+
+  it('modules.setEnabled reports whether the request actually stuck', async () => {
+    const deps = buildDeps({ setModuleEnabled: vi.fn(async () => ({ enabledModuleIds: ['test'] })) });
+    const harness = createTestHarness(deps);
+    const result = await harness.modules.setEnabled('conflicting-module', true);
+    expect(result).toEqual({ ok: true, enabledModuleIds: ['test'], applied: false });
+  });
+
+  it('dsl.applyEdit sets the raw source then runs the shared compile-and-commit path', () => {
+    const deps = buildDeps();
+    const harness = createTestHarness(deps);
+    const result = harness.dsl.applyEdit('guide-house', '# info\nid: guide-house\n');
+    expect(deps.setDslSource).toHaveBeenCalledWith('guide-house', '# info\nid: guide-house\n');
+    expect(deps.applyDslEdit).toHaveBeenCalledWith('guide-house', '# info\nid: guide-house\n');
+    expect(result).toEqual({ ok: true });
   });
 });

@@ -1,7 +1,16 @@
 // Lowers a parsed DslModule (parser.ts) into the existing ContentModule JSON
 // shape (src/game/types.ts) — the DSL is a front-end only, the compile target
 // and everything downstream (loader, validators, engine) is unchanged.
-import { toKebabCase } from '../contentIds';
+import {
+  interactionEntityHitKey,
+  interactionEntityKillKey,
+  interactionEntityMissKey,
+  interactionPlayerHitKey,
+  interactionPlayerKillKey,
+  interactionPlayerMissKey,
+  interactionTitleKey,
+  toKebabCase,
+} from '../contentIds';
 import type {
   ActionResult,
   Condition,
@@ -13,6 +22,7 @@ import type {
   EntityActionDefinition,
   EntityDefinition,
   GameAction,
+  InteractionTypeDefinition,
   ItemActionDefinition,
   ItemDefinition,
   LocationNode,
@@ -29,6 +39,7 @@ import type {
   DslCondition,
   DslDialogueSection,
   DslEntityDecl,
+  DslInteractionSection,
   DslItemSection,
   DslLocationSection,
   DslQuestSection,
@@ -46,6 +57,28 @@ class LocaleBuilder {
 const kebab = (text: string): string => toKebabCase(text);
 const titleCase = (text: string): string => (text.length === 0 ? text : text[0].toUpperCase() + text.slice(1));
 const humanize = (id: string): string => titleCase(id.replace(/-/g, ' '));
+
+// Every action requires locale entries for its outcome keys (validators.ts's
+// collectLocalizationKeys checks all of `.title`/`.description`/`.success`/
+// `.failure`, plus `.kill` for adversarial ones — unconditionally, for every
+// action). The DSL grammar has no authoring surface for these yet (there's
+// no `success:`/`failure:` tag), so leaving them unset would either nag the
+// author with a validation warning for every single action, or — worse —
+// silently fall back to displaying the raw locale key to the player. A
+// generic default satisfies the validator and is a strict improvement over
+// that raw-key fallback; an author who cares about specific text still gets
+// there via `on success: say: ...` / `chance:` + `on fail: say: ...`
+// (already-first-class DSL tags), which produce their own separate chat
+// messages independent of this generic one.
+const setDefaultOutcomeLocale = (
+  locale: LocaleBuilder,
+  actionKeyBase: string,
+  outcomes: { success: string; failure: string; kill?: string },
+): void => {
+  locale.set(`${actionKeyBase}.success`, outcomes.success);
+  locale.set(`${actionKeyBase}.failure`, outcomes.failure);
+  if (outcomes.kill !== undefined) locale.set(`${actionKeyBase}.kill`, outcomes.kill);
+};
 
 // A bare (undotted) flag id auto-namespaces to the module's pack, so sibling
 // modules declaring the same `pack:` share short flag names for free; a
@@ -199,6 +232,7 @@ const compileActionVariants = (
     // Station actions have no fixed rewards/results/duration of their own —
     // the UI populates their options from whichever `recipes` entries the
     // player currently holds ingredients for. Every other tag is irrelevant.
+    setDefaultOutcomeLocale(locale, `action.${scope}.${ownerId}.${baseActionId}`, { success: 'Done.', failure: 'Nothing happens.' });
     return [{ id: baseActionId, stationId: stationTag.stationId, rewards: [] }];
   }
 
@@ -226,6 +260,8 @@ const compileActionVariants = (
         : { kind: 'all', conditions: flags.map((flag) => flagCondition(resolveFlagId(flag, pack), assignment[flag])) } as Condition;
     const visibleWhen = combineConditions(baseVisibleWhen, variantCondition);
 
+    const actionKeyBase = `action.${scope}.${ownerId}.${actionId}`;
+
     if (enemyTag) {
       const rewards = decl.tags
         .filter((tag) => tag.keyword === 'give' || tag.keyword === 'xp' || tag.keyword === 'take')
@@ -234,6 +270,11 @@ const compileActionVariants = (
       const results = decl.onSuccessTags
         .map((tag) => tagToActionResult(tag, locale, chatKeyBase, chatCounter, pack, assignment))
         .filter((result): result is ActionResult => result !== null);
+      setDefaultOutcomeLocale(locale, actionKeyBase, {
+        success: 'You hit the {entity}.',
+        failure: 'You miss the {entity}.',
+        kill: 'The {entity} drops.',
+      });
       return {
         id: actionId,
         durationSeconds: 2,
@@ -258,6 +299,8 @@ const compileActionVariants = (
     const failureResults = decl.onFailTags
       .map((tag) => tagToActionResult(tag, locale, `${chatKeyBase}-fail`, { n: 0 }, pack, assignment))
       .filter((result): result is ActionResult => result !== null);
+
+    setDefaultOutcomeLocale(locale, actionKeyBase, { success: 'Done.', failure: 'Nothing happens.' });
 
     return {
       id: actionId,
@@ -310,6 +353,7 @@ const compileLocation = (
     const wallId = `wall-${section.id}-to-${wall.toLocationId}`;
     locale.set(`action.${wallId}.title`, 'Leave');
     locale.set(`action.${wallId}.description`, 'Leave.');
+    setDefaultOutcomeLocale(locale, `action.${wallId}`, { success: 'Done.', failure: 'Nothing happens.' });
     actions.push({
       id: wallId,
       role: 'travel',
@@ -415,6 +459,27 @@ const compileRecipe = (section: DslRecipeSection, locale: LocaleBuilder, pack: s
 };
 
 // ---------------------------------------------------------------------------
+// Interactions: sugar for InteractionTypeDefinition — see docs on
+// parseInteractionSection for why every message field is optional and
+// backfilled with a generic default rather than required.
+// ---------------------------------------------------------------------------
+const compileInteraction = (section: DslInteractionSection, locale: LocaleBuilder): InteractionTypeDefinition => {
+  locale.set(interactionTitleKey(section.id), section.title ?? humanize(section.id));
+  locale.set(interactionPlayerHitKey(section.id), section.playerHit ?? 'You hit the {entity}.');
+  locale.set(interactionPlayerMissKey(section.id), section.playerMiss ?? 'You miss the {entity}.');
+  locale.set(interactionPlayerKillKey(section.id), section.playerKill ?? 'The {entity} drops.');
+  locale.set(interactionEntityHitKey(section.id), section.entityHit ?? 'The {entity} hits you.');
+  locale.set(interactionEntityMissKey(section.id), section.entityMiss ?? 'The {entity} misses.');
+  locale.set(interactionEntityKillKey(section.id), section.entityKill ?? 'The {entity} defeats you.');
+  return {
+    id: section.id,
+    sourceStatId: section.sourceStatId,
+    targetStatId: section.targetStatId,
+    targetPlayerHealth: section.targetPlayerHealth,
+  };
+};
+
+// ---------------------------------------------------------------------------
 // Top level
 // ---------------------------------------------------------------------------
 export const compileDsl = (source: string): { module: ContentModule; locale: Record<string, string> } => {
@@ -429,6 +494,7 @@ export const compileDsl = (source: string): { module: ContentModule; locale: Rec
   const items: ItemDefinition[] = [];
   const quests: QuestDefinition[] = [];
   const recipes: RecipeDefinition[] = [];
+  const interactionTypes: InteractionTypeDefinition[] = [];
   let advanced: Record<string, unknown> = {};
 
   for (const section of dsl.sections) {
@@ -447,8 +513,19 @@ export const compileDsl = (source: string): { module: ContentModule; locale: Rec
       quests.push(compileQuest(section, locale, pack));
     } else if (section.kind === 'recipe') {
       recipes.push(compileRecipe(section, locale, pack));
+    } else if (section.kind === 'interaction') {
+      interactionTypes.push(compileInteraction(section, locale));
     }
   }
+
+  // `# advanced`'s own `interactionTypes` (if any) are merged in alongside
+  // any `# interaction` sections, rather than one clobbering the other —
+  // `# advanced` remains a valid escape hatch for interactionTypes fields
+  // this sugar doesn't cover (e.g. `experience`).
+  const advancedInteractionTypes = Array.isArray(advanced.interactionTypes)
+    ? advanced.interactionTypes as InteractionTypeDefinition[]
+    : [];
+  const { interactionTypes: _advancedInteractionTypes, ...advancedRest } = advanced;
 
   const data: ModuleDataSectionObject = {
     ...(locations.length > 0 ? { locations } : {}),
@@ -458,7 +535,10 @@ export const compileDsl = (source: string): { module: ContentModule; locale: Rec
     ...(items.length > 0 ? { items } : {}),
     ...(quests.length > 0 ? { quests } : {}),
     ...(recipes.length > 0 ? { recipes } : {}),
-    ...advanced,
+    ...(interactionTypes.length > 0 || advancedInteractionTypes.length > 0
+      ? { interactionTypes: [...interactionTypes, ...advancedInteractionTypes] }
+      : {}),
+    ...advancedRest,
   };
 
   const module: ContentModule = {

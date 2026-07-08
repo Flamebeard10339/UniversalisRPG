@@ -9,15 +9,19 @@ dependencies: tutorial-island-foundation
 
 # advanced
 {
-  "interactionTypes": [
-    { "id": "lockpicking", "sourceStatId": "thieving", "targetStatId": "thieving", "targetPlayerHealth": false }
-  ],
   "flags": [
     { "id": "tutorial-island.bookshelf-note-taken", "initialValue": false },
     { "id": "tutorial-island.drawer-coins-taken", "initialValue": false },
     { "id": "tutorial-island.drawer-lockpick-taken", "initialValue": false }
   ]
 }
+
+# interaction lockpicking
+source: thieving
+target: thieving
+targets player health: false
+title: Lockpicking
+player kill: The lock gives with a soft click.
 
 # location tutorial-guide-house
 x: 0, y: 0

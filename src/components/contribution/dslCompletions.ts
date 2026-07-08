@@ -64,7 +64,11 @@ export const bestGhostTextMatch = (typed: string, candidates: string[]): string 
   return matches[0] ?? null;
 };
 
-export const dslCompletionSource = (sources: DslCompletionSources) => (context: CompletionContext): CompletionResult | null => {
+// Takes a *getter* rather than a snapshot: the source function is baked
+// into the editor's `extensions` once per module (see DslModuleEditor.tsx),
+// so it must read live bundle/buffer state on each invocation instead of
+// closing over a value that goes stale the moment the bundle changes.
+export const dslCompletionSource = (getSources: () => DslCompletionSources) => (context: CompletionContext): CompletionResult | null => {
   const line = context.state.doc.lineAt(context.pos);
   const textBeforeCursor = line.text.slice(0, context.pos - line.from);
   const kind = detectCompletionKind(textBeforeCursor);
@@ -76,7 +80,7 @@ export const dslCompletionSource = (sources: DslCompletionSources) => (context: 
 
   return {
     from: word.from,
-    options: sources[kind].map((label) => ({ label, type: 'variable' })),
+    options: getSources()[kind].map((label) => ({ label, type: 'variable' })),
     validFor: /^[\w.-]*$/,
   };
 };

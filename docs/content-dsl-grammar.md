@@ -179,6 +179,50 @@ expression grammar as everywhere else, pack-scoped); the narrative
 description is every further-indented line, joined with a space (prose, not
 a tag-line — there's nothing to parse there).
 
+## `# interaction <id>`
+
+```
+# interaction lockpicking
+source: thieving
+target: thieving
+targets player health: false
+title: Lockpicking
+player kill: The lock gives with a soft click.
+```
+
+Sugar for `InteractionTypeDefinition` — replaces hand-writing this shape as
+raw JSON via `# advanced`. `source:`/`target:` set `sourceStatId`/
+`targetStatId`; `targets player health:` sets `targetPlayerHealth` (defaults
+`true` if omitted — the common combat case; a lockpicking-style interaction
+where the target never fights back sets it `false`, per CLAUDE.md's
+Actions-and-combat section). `title:`, `player hit:`, `player miss:`,
+`player kill:`, `entity hit:`, `entity miss:`, `entity kill:` set the
+corresponding locale entries.
+
+Every message field is optional — the compiler backfills a generic default
+(e.g. "You hit the {entity}.") for any that are left unwritten, rather than
+requiring the author to invent flavor text for an outcome that's either
+uninteresting (a lockpicking "you made progress" tick) or literally
+unreachable (a `targets player health: false` interaction's `entity hit:`,
+since the target never attacks back). Write the fields that matter for a
+given interaction — the lockpicking example above only writes `player kill:`
+(the one moment worth a line: the lock opening) and leaves the rest generic.
+
+If two modules declare `# interaction` sections with the same id, or a
+module also declares `interactionTypes` via its own `# advanced` block, both
+sources are merged into the module's `interactionTypes` array (not
+clobbered) — `# advanced` remains a valid way to set `experience` or other
+fields this sugar doesn't cover.
+
+Every compiled action (not just interactions) gets the same generic-default
+treatment for its own `.success`/`.failure` (and `.kill`, if adversarial)
+locale keys, for the same reason — there's no DSL tag yet for authoring
+those directly, and leaving them unset would otherwise either nag every
+single action with a validation warning or silently show the player a raw
+locale key. An author who wants specific text for a real outcome already has
+it via `on success: say: ...` / `chance:` + `on fail: say: ...`, which
+produce their own separate chat messages independent of this generic one.
+
 ## `# recipe <id>`
 
 ```

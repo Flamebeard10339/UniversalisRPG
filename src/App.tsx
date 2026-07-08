@@ -33,6 +33,7 @@ import {
   resolveDisplayPalette,
 } from './game/displayProfiles';
 import { getInteractionType, isContinuousAction } from './game/adversarial';
+import { compileAndCommitDslModule } from './game/contentDsl/applyModuleEdit';
 import { executeChatInput, type CliRuntime } from './game/cli';
 import type { ContentBundle, ContentModule, ContentModulePack, ContributionDraft, DisplayColorPalette, DisplayProfileDefinition, EntityDefinition, GameAction, IdleReport, LocationNode, UniversePlayState } from './game/types';
 import { createModEditService, localContributionsModId } from './game/modEditService';
@@ -44,6 +45,7 @@ import { load, save } from './lib/storage';
 import { useNow } from './hooks/useNow';
 import { useDebugState } from './stores/debugState';
 import { useContributionState } from './stores/contributionState';
+import { useDslEditorState } from './stores/dslEditorState';
 import { contributionRuntimeId } from './stores/contributionPlayState';
 import { useGameState } from './stores/gameState';
 import { useUniverseState } from './stores/universeState';
@@ -795,6 +797,34 @@ export default function App() {
         const key = Object.keys(profileFixtureModules).find((path) => path.endsWith(`/profiles/${name}.json`));
         return key ? (profileFixtureModules[key] as ProfileFixture) : null;
       },
+
+      getContributionMode: () => contributionMode,
+      setContributionMode: (enabled) => setContributionMode(enabled),
+      getContributionTab: () => contributionTab,
+      setContributionTab: (tab) => setContributionTab(tab as ContributionTab),
+      getEnabledModuleIds: () => [...activeModuleIds],
+      setModuleEnabled: async (moduleId, enabled) => {
+        const requested = new Set(useUniverseState.getState().enabledModules[bundle.manifest.id] ?? bundle.modules?.map((module) => module.id) ?? []);
+        if (enabled) requested.add(moduleId);
+        else requested.delete(moduleId);
+        await setEnabledModules(bundle.manifest.id, [...requested]);
+        return { enabledModuleIds: useUniverseState.getState().enabledModules[bundle.manifest.id] ?? [] };
+      },
+      getValidationIssues: () => useUniverseState.getState().validationIssues,
+
+      getDslDraft: (moduleId) => {
+        const draft = useDslEditorState.getState().getDraft(moduleId);
+        if (!draft) return null;
+        return { baselineSource: draft.baselineSource, source: draft.source, lastValidSource: draft.lastValidSource, updatedAt: draft.updatedAt };
+      },
+      setDslSource: (moduleId, source) => {
+        if (!useDslEditorState.getState().getDraft(moduleId)) useDslEditorState.getState().openDraft(moduleId, source);
+        useDslEditorState.getState().setSource(moduleId, source);
+      },
+      applyDslEdit: (moduleId, source) => {
+        const latestDraft = useContributionState.getState().getDraft(bundle.manifest.id) ?? currentContributionDraft ?? emptyContributionDraft(bundle.manifest.id);
+        return compileAndCommitDslModule(moduleId, source, latestDraft.modules ?? [], patchContributionDraft);
+      },
     });
 
     return () => {
@@ -806,6 +836,8 @@ export default function App() {
     dropInventoryItem, eatItem, equipItem, homeTab, activeTab, pickUpGroundItem, replaceUniverseState, resetUniverse,
     resolveIdle, runtimeUniverseId, setCharacterTopTab, setCurrentLocation, setHomeTopTab, setTab, startAction,
     startingLocationId, stopAction, t, unequipSlot, withdrawFromBank,
+    activeModuleIds, contributionMode, contributionTab, currentContributionDraft, patchContributionDraft,
+    setContributionMode, setContributionTab, setEnabledModules,
   ]);
 
   useEffect(() => {

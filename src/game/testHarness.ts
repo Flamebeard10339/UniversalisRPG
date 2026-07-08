@@ -11,6 +11,7 @@
 import { ACTION_PREFIX, DIALOGUE_PREFIX, RECIPE_SEPARATOR, visibleChoices, currentDialogueNode } from './choices';
 import { skillLevelFromXp } from './skills';
 import { createInitialPlayState } from './timers';
+import type { ApplyDslEditResult } from './contentDsl/applyModuleEdit';
 import type { Translator } from './i18n';
 import type {
   ActionResolutionContext,
@@ -19,6 +20,7 @@ import type {
   GameAction,
   IdleReport,
   UniversePlayState,
+  ValidationIssue,
 } from './types';
 import type { DomButtonInfo } from './testHarnessDom';
 
@@ -82,6 +84,29 @@ export type TestHarnessDeps = {
 
   listProfileNames: () => string[];
   loadProfileFixture: (name: string) => ProfileFixture | null;
+
+  // Contribution mode (the DSL/content editor) and the underlying
+  // enabled-module set are all real app state, but not part of
+  // UniversePlayState — these deps expose them directly so tests never have
+  // to click a checkbox or a tab button to reach them (see the DSL editor's
+  // "content not showing up in-game" investigation: a stale-closure race in
+  // the checkbox's own onChange handler made manual clicking unreliable).
+  getContributionMode: () => boolean;
+  setContributionMode: (enabled: boolean) => void;
+  getContributionTab: () => string;
+  setContributionTab: (tab: string) => void;
+  getEnabledModuleIds: () => string[];
+  setModuleEnabled: (moduleId: string, enabled: boolean) => Promise<{ enabledModuleIds: string[] }>;
+  getValidationIssues: () => ValidationIssue[];
+
+  // DSL module drafts (src/stores/dslEditorState.ts) — `setDslSource` mirrors
+  // typing (raw buffer only), `applyDslEdit` additionally compiles and, on
+  // success, commits into the contribution draft that feeds the live
+  // bundle — the exact same path DslModuleEditor.tsx's linter takes on a
+  // 300ms debounce, just synchronous and without touching CodeMirror.
+  getDslDraft: (moduleId: string) => { baselineSource: string; source: string; lastValidSource?: string; updatedAt: number } | null;
+  setDslSource: (moduleId: string, source: string) => void;
+  applyDslEdit: (moduleId: string, source: string) => ApplyDslEditResult;
 };
 
 // ActionPanel/InventoryPanel render `data-action-id` using `action.id` or
@@ -384,15 +409,58 @@ export const createTestHarness = (deps: TestHarnessDeps) => {
     list: () => deps.dom.listButtons(),
   };
 
+  const contribution = {
+    getState: () => ({ enabled: deps.getContributionMode(), tab: deps.getContributionTab() }),
+    setEnabled: (enabled: boolean): Result => {
+      deps.setContributionMode(enabled);
+      return { ok: true };
+    },
+    setTab: (tab: string): Result => {
+      deps.setContributionTab(tab);
+      return { ok: true };
+    },
+  };
+
+  const modules = {
+    list: (): string[] => deps.getEnabledModuleIds(),
+    // Returns the *actual* resolved enabled-module set after the request, not
+    // just an optimistic echo — module resolution can reject a request (a
+    // dependency conflict, a broken data-updates overlay) and silently keep
+    // it disabled, so `applied` tells the caller whether the id really ended
+    // up in the requested state instead of leaving that to be inferred from
+    // a follow-up read.
+    setEnabled: async (moduleId: string, enabled: boolean): Promise<Result<{ enabledModuleIds: string[]; applied: boolean }>> => {
+      const { enabledModuleIds } = await deps.setModuleEnabled(moduleId, enabled);
+      return { ok: true, enabledModuleIds, applied: enabledModuleIds.includes(moduleId) === enabled };
+    },
+    getIssues: (): ValidationIssue[] => deps.getValidationIssues(),
+  };
+
+  const dsl = {
+    getDraft: (moduleId: string) => deps.getDslDraft(moduleId),
+    setSource: (moduleId: string, source: string): Result => {
+      deps.setDslSource(moduleId, source);
+      return { ok: true };
+    },
+    applyEdit: (moduleId: string, source: string): ApplyDslEditResult => {
+      deps.setDslSource(moduleId, source);
+      return deps.applyDslEdit(moduleId, source);
+    },
+  };
+
   const debug = {
     dump: () => ({
       universeId: deps.getRuntimeUniverseId(),
       playState: requirePlayState(),
       tabs: deps.getTabs(),
+      contribution: contribution.getState(),
+      enabledModuleIds: deps.getEnabledModuleIds(),
+      moduleIds: (deps.getBundle().modules ?? []).map((module) => module.id),
+      locationIds: deps.getBundle().locations.map((location) => location.id),
     }),
   };
 
-  return { state, inventory, bank, equipment, groundItems, location, profile, choices, dialogue, nav, modal, time, buttons, debug };
+  return { state, inventory, bank, equipment, groundItems, location, profile, choices, dialogue, nav, modal, time, buttons, contribution, modules, dsl, debug };
 };
 
 export type TestHarnessApi = ReturnType<typeof createTestHarness>;

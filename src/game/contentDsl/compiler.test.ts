@@ -238,8 +238,19 @@ describe('content DSL — guide-house proof', () => {
     expect(checkTabPrompt.options![0].results).toEqual([{ kind: 'flag', flagId: 'quest.leave-tutorial-island.accepted', value: true }]);
   });
 
-  it('passes the `interactionTypes` advanced-JSON block through untouched', () => {
+  it('compiles the `# interaction lockpicking` section into an InteractionTypeDefinition', () => {
     const interactionTypes = (module.data as { interactionTypes: Array<{ id: string }> }).interactionTypes;
     expect(interactionTypes).toEqual([{ id: 'lockpicking', sourceStatId: 'thieving', targetStatId: 'thieving', targetPlayerHealth: false }]);
+  });
+
+  it('backfills a generic default for interaction message fields the author left unwritten (player hit/miss, all entity.*)', () => {
+    expect(module.locale?.en['interaction.lockpicking.player.hit']).toBeTruthy();
+    expect(module.locale?.en['interaction.lockpicking.player.miss']).toBeTruthy();
+    expect(module.locale?.en['interaction.lockpicking.entity.hit']).toBeTruthy();
+    expect(module.locale?.en['interaction.lockpicking.entity.miss']).toBeTruthy();
+    expect(module.locale?.en['interaction.lockpicking.entity.kill']).toBeTruthy();
+    // The one outcome that's actually meaningful (the lock opening) keeps
+    // its hand-authored text, not the generic default.
+    expect(module.locale?.en['interaction.lockpicking.player.kill']).toBe('The lock gives with a soft click.');
   });
 });

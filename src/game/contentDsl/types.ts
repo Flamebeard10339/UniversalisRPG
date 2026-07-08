@@ -132,13 +132,29 @@ export type DslRecipeSection = {
   onSuccessTags: DslTag[];
 };
 
+export type DslInteractionSection = {
+  kind: 'interaction';
+  id: string;
+  sourceStatId: string;
+  targetStatId: string;
+  targetPlayerHealth: boolean;
+  title?: string;
+  playerHit?: string;
+  playerMiss?: string;
+  playerKill?: string;
+  entityHit?: string;
+  entityMiss?: string;
+  entityKill?: string;
+};
+
 export type DslSection =
   | DslLocationSection
   | DslDialogueSection
   | DslAdvancedSection
   | DslItemSection
   | DslQuestSection
-  | DslRecipeSection;
+  | DslRecipeSection
+  | DslInteractionSection;
 
 export type DslInfo = {
   id: string;

@@ -1178,11 +1178,14 @@ export const mergeDraftModulesIntoBundle = (bundle: ContentBundle, draft: Contri
     return bundle;
   }
 
-  const packagedModuleIds = new Set((bundle.modules ?? []).map((module) => module.id));
+  // A draft module is allowed to share an id with a packaged one — that's
+  // how editing a core/shipped module works (mergeById below overrides by
+  // id, last write wins), not just adding brand-new ones. This was
+  // previously restricted to non-packaged ids only, which silently dropped
+  // every override of an existing module (e.g. any DSL edit to a shipped
+  // module like tutorial-island-guide-house never reached the live bundle).
   const draftRemovedModules = new Set(draft.removed?.modules ?? []);
-  const localDraftModules = (draft.modules ?? [])
-    .filter((module) => !packagedModuleIds.has(module.id))
-    .filter((module) => !draftRemovedModules.has(module.id));
+  const localDraftModules = (draft.modules ?? []).filter((module) => !draftRemovedModules.has(module.id));
 
   return {
     ...bundle,

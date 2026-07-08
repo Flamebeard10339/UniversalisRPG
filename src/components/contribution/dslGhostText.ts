@@ -3,7 +3,8 @@
 // for this (the stable @codemirror/autocomplete only ships the dropdown
 // style) — it's hand-built on view decorations + a state field, the same
 // pattern every "AI ghost text in CodeMirror" implementation uses.
-import { StateEffect, StateField } from '@codemirror/state';
+import { acceptCompletion } from '@codemirror/autocomplete';
+import { Prec, StateEffect, StateField } from '@codemirror/state';
 import { Decoration, EditorView, keymap, WidgetType } from '@codemirror/view';
 import type { DslCompletionSources } from './dslCompletions';
 import { bestGhostTextMatch, detectCompletionKind } from './dslCompletions';
@@ -57,12 +58,21 @@ const acceptGhostText = (view: EditorView): boolean => {
   return true;
 };
 
-export const ghostTextKeymap = keymap.of([{ key: 'Tab', run: acceptGhostText }]);
+// Explicit precedence, not ambient ordering: Tab tries ghost text first,
+// then an open completion-dropdown selection, then falls through (e.g. to
+// indent) if neither applies. Without Prec.highest, whichever of
+// basicSetup's own keymaps (indent-on-tab, etc.) happens to be combined
+// first could silently win instead, which is exactly the kind of
+// library-internal-ordering fragility this is meant to avoid.
+export const ghostTextKeymap = Prec.highest(
+  keymap.of([{ key: 'Tab', run: (view) => acceptGhostText(view) || acceptCompletion(view) }]),
+);
 
 // Recomputes the ghost-text suggestion after every doc/selection change:
 // only when the cursor sits at a recognized field (give:/set:/xp:/...) and
-// there's a single unambiguous best match longer than what's typed.
-export const ghostTextUpdateListener = (sources: DslCompletionSources) =>
+// there's a single unambiguous best match longer than what's typed. Takes a
+// *getter* for the same reason dslCompletionSource does — see there.
+export const ghostTextUpdateListener = (getSources: () => DslCompletionSources) =>
   EditorView.updateListener.of((update) => {
     if (!update.docChanged && !update.selectionSet) return;
     const pos = update.state.selection.main.head;
@@ -73,7 +83,7 @@ export const ghostTextUpdateListener = (sources: DslCompletionSources) =>
 
     const wordMatch = /[\w.-]*$/.exec(textBeforeCursor);
     const typed = wordMatch ? wordMatch[0] : '';
-    const suggestionText = bestGhostTextMatch(typed, sources[kind]);
+    const suggestionText = bestGhostTextMatch(typed, getSources()[kind]);
     if (!suggestionText) return;
 
     const remainder = suggestionText.slice(typed.length);

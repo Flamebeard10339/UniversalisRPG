@@ -13,6 +13,7 @@ import type {
   DslDialogueSection,
   DslEntityDecl,
   DslInfo,
+  DslInteractionSection,
   DslItemSection,
   DslLocationSection,
   DslModule,
@@ -77,7 +78,7 @@ export const parseDsl = (source: string): DslModule => {
   cursor.skipBlank();
   while (!cursor.atEnd()) {
     const line = cursor.current!;
-    const headerMatch = /^#\s+(info|location|dialogue|advanced|item|quest|recipe)\b\s*(.*)$/.exec(line);
+    const headerMatch = /^#\s+(info|location|dialogue|advanced|item|quest|recipe|interaction)\b\s*(.*)$/.exec(line);
     if (!headerMatch) {
       throw new DslParseError(`Expected a top-level "# ..." header, got: "${line}"`, cursor.index);
     }
@@ -97,6 +98,8 @@ export const parseDsl = (source: string): DslModule => {
       sections.push(parseQuestSection(cursor, rest.trim()));
     } else if (keyword === 'recipe') {
       sections.push(parseRecipeSection(cursor, rest.trim()));
+    } else if (keyword === 'interaction') {
+      sections.push(parseInteractionSection(cursor, rest.trim()));
     }
     cursor.skipBlank();
   }
@@ -576,4 +579,58 @@ const parseRecipeSection = (cursor: Cursor, id: string): DslRecipeSection => {
   }
 
   return { kind: 'recipe', id, stationId, inputs, outputs, skillId, xpAmount, onSuccessTags };
+};
+
+// ---------------------------------------------------------------------------
+// Interactions: flat metadata fields sugar for InteractionTypeDefinition +
+// its locale entries — replaces hand-writing this shape as raw JSON via
+// `# advanced`. Every message field (`player hit:`, `entity kill:`, ...) is
+// optional: an interaction like lockpicking where the lock never fights back
+// (`targets player health: false`) has no real "the lock hit you" moment, so
+// the compiler fills in a generic default for whichever ones are omitted
+// (see compiler.ts) rather than forcing the author to invent flavor text for
+// an outcome that will never occur.
+// ---------------------------------------------------------------------------
+const interactionFieldPattern = /^(source|target|targets player health|title|player hit|player miss|player kill|entity hit|entity miss|entity kill):\s*(.*)$/i;
+
+const parseInteractionSection = (cursor: Cursor, id: string): DslInteractionSection => {
+  cursor.skipBlank();
+  let sourceStatId = '';
+  let targetStatId = '';
+  let targetPlayerHealth = true;
+  let title: string | undefined;
+  let playerHit: string | undefined;
+  let playerMiss: string | undefined;
+  let playerKill: string | undefined;
+  let entityHit: string | undefined;
+  let entityMiss: string | undefined;
+  let entityKill: string | undefined;
+
+  while (!cursor.atEnd()) {
+    const line = cursor.current!;
+    const trimmed = line.trim();
+    if (trimmed.length === 0) {
+      cursor.index++;
+      continue;
+    }
+    if (/^#/.test(trimmed)) break;
+
+    const match = interactionFieldPattern.exec(trimmed);
+    if (!match) throw new DslParseError(`Unexpected line in interaction "${id}": "${line}"`, cursor.index);
+    const key = match[1].toLowerCase();
+    const value = match[2].trim();
+    if (key === 'source') sourceStatId = value;
+    else if (key === 'target') targetStatId = value;
+    else if (key === 'targets player health') targetPlayerHealth = /^true$/i.test(value);
+    else if (key === 'title') title = value;
+    else if (key === 'player hit') playerHit = value;
+    else if (key === 'player miss') playerMiss = value;
+    else if (key === 'player kill') playerKill = value;
+    else if (key === 'entity hit') entityHit = value;
+    else if (key === 'entity miss') entityMiss = value;
+    else if (key === 'entity kill') entityKill = value;
+    cursor.index++;
+  }
+
+  return { kind: 'interaction', id, sourceStatId, targetStatId, targetPlayerHealth, title, playerHit, playerMiss, playerKill, entityHit, entityMiss, entityKill };
 };
