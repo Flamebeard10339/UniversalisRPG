@@ -13,13 +13,28 @@ import type {
   EntityActionDefinition,
   EntityDefinition,
   GameAction,
+  ItemActionDefinition,
+  ItemDefinition,
   LocationNode,
   ModuleDataSectionObject,
+  QuestDefinition,
+  QuestStage,
+  RecipeDefinition,
   Reward,
 } from '../types';
 import { parseDsl } from './parser';
 import { collectTextFlags, renderTextForAssignment } from './shared';
-import type { DslActionDecl, DslCondition, DslDialogueSection, DslEntityDecl, DslLocationSection, DslTag, DslText } from './types';
+import type {
+  DslActionDecl,
+  DslCondition,
+  DslDialogueSection,
+  DslEntityDecl,
+  DslItemSection,
+  DslLocationSection,
+  DslQuestSection,
+  DslRecipeSection,
+  DslTag,
+} from './types';
 
 class LocaleBuilder {
   entries: Record<string, string> = {};
@@ -76,6 +91,7 @@ const tagToReward = (tag: DslTag): Reward | null => {
   if (tag.keyword === 'give') return { kind: 'item', itemId: tag.itemId, amount: tag.amount };
   if (tag.keyword === 'take') return { kind: 'item', itemId: tag.itemId, amount: -tag.amount };
   if (tag.keyword === 'xp') return { kind: 'skillXp', skillId: tag.skillId, amount: tag.amount };
+  if (tag.keyword === 'resource') return { kind: 'resource', resourceId: tag.resourceId, amount: tag.amount };
   return null;
 };
 
@@ -92,6 +108,7 @@ const tagToActionResult = (
   if (tag.keyword === 'xp') return { kind: 'skill-xp', skillId: tag.skillId, amount: tag.amount };
   if (tag.keyword === 'set') return { kind: 'flag', flagId: resolveFlagId(tag.flagId, pack), value: true };
   if (tag.keyword === 'unset') return { kind: 'flag', flagId: resolveFlagId(tag.flagId, pack), value: false };
+  if (tag.keyword === 'resource') return { kind: 'resource', resourceId: tag.resourceId, amount: tag.amount };
   if (tag.keyword === 'gotoDialogue') return { kind: 'dialogue', dialogueId: tag.dialogueId };
   if (tag.keyword === 'openModal') return { kind: 'open-modal', modalId: tag.modalId };
   if (tag.keyword === 'say') {
@@ -163,26 +180,44 @@ const allAssignments = (flags: string[]): Record<string, boolean>[] => {
   return assignments;
 };
 
-const compileEntityAction = (entityId: string, decl: DslActionDecl, locale: LocaleBuilder, pack: string): EntityActionDefinition[] => {
+// `scope` only changes the locale-key prefix (`action.entity.x`/`action.item.x`)
+// — entities and items otherwise compile through the identical pipeline.
+// Items never go through the `enemy:` branch (see compileItemAction).
+const compileActionVariants = (
+  scope: 'entity' | 'item',
+  ownerId: string,
+  decl: DslActionDecl,
+  locale: LocaleBuilder,
+  pack: string,
+): Record<string, unknown>[] => {
   const baseActionId = kebab(decl.title);
-  locale.set(`action.entity.${entityId}.${baseActionId}.title`, titleCase(decl.title));
-  locale.set(`action.entity.${entityId}.${baseActionId}.description`, `${titleCase(decl.title)}.`);
+  locale.set(`action.${scope}.${ownerId}.${baseActionId}.title`, titleCase(decl.title));
+  locale.set(`action.${scope}.${ownerId}.${baseActionId}.description`, `${titleCase(decl.title)}.`);
+
+  const stationTag = decl.tags.find((tag): tag is Extract<DslTag, { keyword: 'station' }> => tag.keyword === 'station');
+  if (stationTag) {
+    // Station actions have no fixed rewards/results/duration of their own —
+    // the UI populates their options from whichever `recipes` entries the
+    // player currently holds ingredients for. Every other tag is irrelevant.
+    return [{ id: baseActionId, stationId: stationTag.stationId, rewards: [] }];
+  }
 
   const enemyTag = decl.tags.find((tag): tag is Extract<DslTag, { keyword: 'enemy' }> => tag.keyword === 'enemy');
   const requiresTag = decl.tags.find((tag): tag is Extract<DslTag, { keyword: 'requires' }> => tag.keyword === 'requires');
   const requirements = requiresTag ? toCondition(requiresTag.cond, pack) : undefined;
   const baseVisibleWhen = deriveVisibleWhen(decl.tags, decl.onSuccessTags, baseActionId, pack);
   const maxCompletions = decl.tags.some((tag) => tag.keyword === 'once') ? 1 : undefined;
+  const chanceTag = decl.tags.find((tag): tag is Extract<DslTag, { keyword: 'chance' }> => tag.keyword === 'chance');
 
-  const sayTags = [...decl.tags, ...decl.onSuccessTags].filter((tag): tag is Extract<DslTag, { keyword: 'say' }> => tag.keyword === 'say');
+  const sayTags = [...decl.tags, ...decl.onSuccessTags, ...decl.onFailTags].filter((tag): tag is Extract<DslTag, { keyword: 'say' }> => tag.keyword === 'say');
   const flags = Array.from(new Set(sayTags.flatMap((tag) => collectTextFlags(tag.text))));
   const assignments = flags.length === 0 ? [{}] : allAssignments(flags);
 
   return assignments.map((assignment, index) => {
     const actionId = flags.length === 0 ? baseActionId : index === 0 ? baseActionId : `${baseActionId}-${index + 1}`;
     const chatKeyBase = flags.length === 0
-      ? `chat.entity.${entityId}.${baseActionId}`
-      : `chat.entity.${entityId}.${baseActionId}.${index}`;
+      ? `chat.${scope}.${ownerId}.${baseActionId}`
+      : `chat.${scope}.${ownerId}.${baseActionId}.${index}`;
     const chatCounter = { n: 0 };
     const variantCondition = flags.length === 0
       ? undefined
@@ -220,6 +255,9 @@ const compileEntityAction = (entityId: string, decl: DslActionDecl, locale: Loca
     const results = [...decl.tags, ...decl.onSuccessTags]
       .map((tag) => tagToActionResult(tag, locale, chatKeyBase, chatCounter, pack, assignment))
       .filter((result): result is ActionResult => result !== null);
+    const failureResults = decl.onFailTags
+      .map((tag) => tagToActionResult(tag, locale, `${chatKeyBase}-fail`, { n: 0 }, pack, assignment))
+      .filter((result): result is ActionResult => result !== null);
 
     return {
       id: actionId,
@@ -229,8 +267,21 @@ const compileEntityAction = (entityId: string, decl: DslActionDecl, locale: Loca
       ...(requirements ? { requirements } : {}),
       ...(visibleWhen ? { visibleWhen } : {}),
       ...(maxCompletions ? { maxCompletions } : {}),
+      ...(chanceTag ? { chance: chanceTag.percent } : {}),
+      ...(failureResults.length > 0 ? { failureResults } : {}),
     };
   });
+};
+
+const compileEntityAction = (entityId: string, decl: DslActionDecl, locale: LocaleBuilder, pack: string): EntityActionDefinition[] =>
+  compileActionVariants('entity', entityId, decl, locale, pack) as EntityActionDefinition[];
+
+const compileItemAction = (itemId: string, decl: DslActionDecl, locale: LocaleBuilder, pack: string): ItemActionDefinition[] => {
+  const variants = compileActionVariants('item', itemId, decl, locale, pack);
+  for (const variant of variants) {
+    if ('enemy' in variant) throw new Error(`Item action "${itemId}.${decl.title}" cannot be adversarial (enemy:) — items are always instant.`);
+  }
+  return variants as ItemActionDefinition[];
 };
 
 // ---------------------------------------------------------------------------
@@ -322,6 +373,48 @@ const compileDialogue = (section: DslDialogueSection, locale: LocaleBuilder, pac
 };
 
 // ---------------------------------------------------------------------------
+// Items, quests, recipes
+// ---------------------------------------------------------------------------
+const compileItemSection = (section: DslItemSection, locale: LocaleBuilder, pack: string): ItemDefinition => {
+  locale.set(`item.${section.id}.title`, humanize(section.id));
+  locale.set(`item.${section.id}.description`, `${humanize(section.id)}.`);
+  const actions = section.actions.flatMap((actionDecl) => compileItemAction(section.id, actionDecl, locale, pack));
+  return {
+    id: section.id,
+    ...(section.tagsString ? { tags: section.tagsString } : {}),
+    ...(section.offensiveTagsString ? { offensiveTags: section.offensiveTagsString } : {}),
+    ...(section.defensiveTagsString ? { defensiveTags: section.defensiveTagsString } : {}),
+    ...(actions.length > 0 ? { actions } : {}),
+  };
+};
+
+const compileQuest = (section: DslQuestSection, locale: LocaleBuilder, pack: string): QuestDefinition => {
+  const titleKey = `quest.${section.id}.title`;
+  locale.set(titleKey, section.title);
+  const stages: QuestStage[] = section.stages.map((stage) => {
+    const descriptionKey = `quest.${section.id}.stage.${stage.id}`;
+    locale.set(descriptionKey, stage.description);
+    return { id: stage.id, descriptionKey, condition: toCondition(stage.cond, pack) };
+  });
+  return { id: section.id, titleKey, stages };
+};
+
+const compileRecipe = (section: DslRecipeSection, locale: LocaleBuilder, pack: string): RecipeDefinition => {
+  const extraResults = section.onSuccessTags
+    .map((tag) => tagToActionResult(tag, locale, `chat.recipe.${section.id}`, { n: 0 }, pack, {}))
+    .filter((result): result is ActionResult => result !== null);
+  return {
+    id: section.id,
+    stationId: section.stationId,
+    inputs: section.inputs,
+    outputs: section.outputs,
+    ...(section.skillId ? { skillId: section.skillId } : {}),
+    ...(section.xpAmount !== undefined ? { xpAmount: section.xpAmount } : {}),
+    ...(extraResults.length > 0 ? { extraResults } : {}),
+  };
+};
+
+// ---------------------------------------------------------------------------
 // Top level
 // ---------------------------------------------------------------------------
 export const compileDsl = (source: string): { module: ContentModule; locale: Record<string, string> } => {
@@ -333,6 +426,9 @@ export const compileDsl = (source: string): { module: ContentModule; locale: Rec
   const entities: EntityDefinition[] = [];
   const actions: GameAction[] = [];
   const dialogues: DialogueDefinition[] = [];
+  const items: ItemDefinition[] = [];
+  const quests: QuestDefinition[] = [];
+  const recipes: RecipeDefinition[] = [];
   let advanced: Record<string, unknown> = {};
 
   for (const section of dsl.sections) {
@@ -345,6 +441,12 @@ export const compileDsl = (source: string): { module: ContentModule; locale: Rec
       dialogues.push(compileDialogue(section, locale, pack));
     } else if (section.kind === 'advanced') {
       advanced = { ...advanced, ...section.json };
+    } else if (section.kind === 'item') {
+      items.push(compileItemSection(section, locale, pack));
+    } else if (section.kind === 'quest') {
+      quests.push(compileQuest(section, locale, pack));
+    } else if (section.kind === 'recipe') {
+      recipes.push(compileRecipe(section, locale, pack));
     }
   }
 
@@ -353,6 +455,9 @@ export const compileDsl = (source: string): { module: ContentModule; locale: Rec
     ...(entities.length > 0 ? { entities } : {}),
     ...(actions.length > 0 ? { actions } : {}),
     ...(dialogues.length > 0 ? { dialogues } : {}),
+    ...(items.length > 0 ? { items } : {}),
+    ...(quests.length > 0 ? { quests } : {}),
+    ...(recipes.length > 0 ? { recipes } : {}),
     ...advanced,
   };
 

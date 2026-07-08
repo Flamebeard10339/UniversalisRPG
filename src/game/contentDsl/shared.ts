@@ -151,6 +151,12 @@ export const parseTag = (segment: string): DslTag => {
   if (keyword === 'visible if') return { keyword: 'visibleIf', cond: parseCondition(value, 'flag') };
   if (keyword === 'say') return { keyword: 'say', text: parseText(value) };
   if (keyword === 'open modal') return { keyword: 'openModal', modalId: value };
+  if (keyword === 'chance') return { keyword: 'chance', percent: Number(value.replace(/%$/, '')) };
+  if (keyword === 'station') return { keyword: 'station', stationId: value };
+  if (keyword === 'resource') {
+    const [resourceId, amountRaw] = value.split(/\s+/);
+    return { keyword: 'resource', resourceId, amount: Number(amountRaw) };
+  }
   throw new DslParseError(`Unknown tag keyword: "${keyword}" in "${segment}"`);
 };
 

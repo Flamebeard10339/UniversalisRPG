@@ -129,12 +129,80 @@ below), including a second `say:` right after the first one.
 | `open modal: <modalId>` | `results: [{kind:'open-modal', modalId}]` |
 | `say: <text>` | appends a `chat` result; supports inline conditional text (below) |
 | `enemy: <interactionTypeId>[, <statKey> <value>]*` | sets `interactionTypeId` + inline `enemy` block. Composite — see below. |
-| `on success: <tags>` | (adversarial actions only) tags here become `results`, fired on completion, instead of `rewards` |
+| `on success: <tags>` | (adversarial actions) tags become `results`, fired on completion, instead of `rewards`. (recipes) tags become `extraResults`. |
+| `on fail: <tags>` | (instant `chance:` actions) tags become `failureResults`, fired when the roll fails |
+| `chance: <N>` (e.g. `chance: 50`, `%` optional) | one-shot gamble: the action's main tags become `results` fired on success, `on fail:` becomes `failureResults` — mirrors `action()` + `chance`/`failureResults` today, not a new engine mechanic |
+| `station: <stationId>` | marks the action as a station action — no fixed rewards/results/duration; the UI populates its options from whichever `# recipe` entries the player currently holds ingredients for. All other tags on the same action are ignored. |
+| `resource: <resourceId> <amount>` | grants/drains a resource (e.g. `resource: health -3`) — same instant/adversarial rewards-vs-results split as `give`/`xp` |
 
-Deferred to a later pass: `chance N%` + a `fail:` counterpart (one-shot
-gamble actions, e.g. the mining locked chest), `station:` (recipe stations),
-`respawn:`, arbitrary `max: N` completions, drop-table references inside
-`give:`.
+Deferred to a later pass: `respawn:`, arbitrary `max: N` completions,
+drop-table references inside `give:`.
+
+## `# item <id>`
+
+```
+# item cooked-shrimp
+tags: food, +3 regeneration, 60s
+
+# item note
+read: [[dialogue note]]
+```
+
+Reuses the exact same action-declaration grammar as `## entity` — an item
+action compiles through the identical pipeline (including inline-conditional
+variant expansion), just keyed `action.item.<id>.<actionId>` instead of
+`action.entity.<id>.<actionId>`. The one difference: an item action can't
+carry `enemy:` — items are always instant, matching the engine's
+`ItemActionDefinition` (no `enemy` field, unlike `EntityActionDefinition`).
+
+`tags:`/`offensiveTags:`/`defensiveTags:` are metadata fields whose value is
+a **raw pass-through string** — the existing equipment tag-string grammar
+from `src/game/equipment.ts` (slot tags, `+N`/`+N%` bonuses, duration tags).
+That grammar is untouched and unrelated to this DSL's own tag-line grammar;
+these three fields exist purely to carry it through verbatim.
+
+## `# quest <id>`
+
+```
+# quest leave-tutorial-island
+title: Leave Tutorial Island
+
+stage accept: quest-accepted
+  You have not taken on a task yet. Someone in this house looks like they know the island — try talking to them.
+
+stage leave-house: miki-cleared
+  Miki the tutorial guide has tasked you with finding a way off of tutorial island. Step one is probably to leave his house.
+```
+
+`stage <id>: <condition>` is a header line (condition uses the same
+expression grammar as everywhere else, pack-scoped); the narrative
+description is every further-indented line, joined with a space (prose, not
+a tag-line — there's nothing to parse there).
+
+## `# recipe <id>`
+
+```
+# recipe smelt-bronze
+station: tutorial-furnace
+in: copper-ore
+in: tin-ore
+out: bronze-bar
+skill: smithing 8
+
+# recipe smith-dagger
+station: tutorial-anvil
+in: bronze-bar
+out: bronze-dagger
+skill: smithing 10
+on success:
+  set: mining-cleared
+```
+
+`station:`, `in:`, `out:`, `skill: <skillId> <xpAmount>` are flat metadata
+fields. `in:`/`out:` may repeat across lines — each occurrence appends more
+ingredients (needed when a recipe has more than one input, like smelting
+bronze from separate copper and tin). `on success:` is the same nested
+tag-block as an action's, becoming the recipe's `extraResults`.
 
 ### Composite tags recurse the same way an action does
 
@@ -281,20 +349,29 @@ get a content-addressed suffix (`chat.entity.drawer.examine.0`, `.1`, ...),
 which is **not** stable across reordering the DSL source — a known, accepted
 trade-off, not a bug.
 
-## What proved out in the v0.2 spike
+## What proved out
 
-Implemented and tested (`src/game/contentDsl/compiler.test.ts`) against a
-hand-authored rewrite of `tutorial-island-guide-house`, verified by merging
-the compiled module through the *real* `applyModulesToBundle` pipeline with
-zero validation errors: `info` (+ `pack`), `location` (+ multi-line bare-tag
-metadata, + `wall`), nested `entity` + actions (instant, adversarial/timed
-with inline `enemy:`), the unified colon/indentation action grammar (no
-bullets), `once` + pack-scoped flag-visibility sugar, `examine:` as pure
-`say:` sugar with compound (`&`/`|`) multi-flag inline conditionals,
-multi-line `on success:` with sequential `say:` lines, `[[dialogue x]]`,
-dialogue (multi-node, options, on-enter results, bare `goto`), `open modal:`.
+Implemented and tested against hand-authored rewrites of real Tutorial
+Island content, verified by merging the compiled modules through the *real*
+`applyModulesToBundle` pipeline with zero validation errors in every case:
 
-Not yet implemented: `item`, `quest`, `recipe`, `chance`/`fail`, `station`,
-`respawn`, drop tables, the visual grid-placement GUI for locations, and the
-full editor/live-preview UI. These are the next slices, not blocked by
-anything discovered so far.
+- **`compiler.test.ts`**, against `tutorial-island-guide-house`: `info`
+  (+ `pack`), `location` (+ multi-line bare-tag metadata, + `wall`), nested
+  `entity` + actions (instant, adversarial/timed with inline `enemy:`), the
+  unified colon/indentation action grammar (no bullets), `once` + pack-scoped
+  flag-visibility sugar, `examine:` as pure `say:` sugar with compound
+  (`&`/`|`) multi-flag inline conditionals, multi-line `on success:` with
+  sequential `say:` lines, `[[dialogue x]]`, dialogue (multi-node, options,
+  on-enter results, bare `goto`), `open modal:`.
+- **`coverage.test.ts`**, against slices of `tutorial-island-foundation` and
+  `tutorial-island-mining`: `item` (including tag-string pass-through and
+  item actions sharing the entity-action pipeline), `quest` (staged
+  conditions + narrative descriptions), `recipe` (multi-line `in:`/`out:`,
+  `on success:` → `extraResults`), `chance:` + `on fail:` (the locked-chest
+  one-shot-gamble pattern), `station:`, and the new `resource:` tag.
+
+Not yet implemented: `respawn:`, arbitrary `max: N` completions, drop-table
+references inside `give:`, multi-line dialogue-node body text, the visual
+grid-placement GUI for locations, and the full editor/live-preview UI that
+replaces contribution mode. None of these have hit a design wall — they're
+the next slices.

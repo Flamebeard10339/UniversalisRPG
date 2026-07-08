@@ -29,16 +29,21 @@ export type DslTag =
   | { keyword: 'say'; text: DslText }
   | { keyword: 'gotoDialogue'; dialogueId: string }
   | { keyword: 'openModal'; modalId: string }
-  | { keyword: 'enemy'; interactionTypeId: string; stats: Record<string, number> };
+  | { keyword: 'enemy'; interactionTypeId: string; stats: Record<string, number> }
+  | { keyword: 'chance'; percent: number }
+  | { keyword: 'station'; stationId: string }
+  | { keyword: 'resource'; resourceId: string; amount: number };
 
 export type DslActionDecl = {
   title: string;
-  // Short-form actions: every tag lives here, applied in written order.
-  // Long-form actions: top-level fields (requires/hidden-if/visible-if/enemy/
-  // xp/give/take/once/set) live here; `onSuccessTags` holds the separate
-  // `on success:` field, which becomes the adversarial action's `results`.
+  // Top-level fields (requires/hidden-if/visible-if/enemy/chance/station/xp/
+  // give/take/once/set/say) live here, applied in written order.
+  // `onSuccessTags`/`onFailTags` hold the separate `on success:`/`on fail:`
+  // fields — `on success:` becomes an adversarial action's `results`;
+  // `on fail:` becomes a `chance:` action's `failureResults`.
   tags: DslTag[];
   onSuccessTags: DslTag[];
+  onFailTags: DslTag[];
 };
 
 export type DslEntityDecl = {
@@ -89,7 +94,51 @@ export type DslAdvancedSection = {
   json: Record<string, unknown>;
 };
 
-export type DslSection = DslLocationSection | DslDialogueSection | DslAdvancedSection;
+export type DslItemSection = {
+  kind: 'item';
+  id: string;
+  tagsString?: string;
+  offensiveTagsString?: string;
+  defensiveTagsString?: string;
+  actions: DslActionDecl[];
+};
+
+export type DslQuestStage = {
+  id: string;
+  cond: DslCondition;
+  description: string;
+};
+
+export type DslQuestSection = {
+  kind: 'quest';
+  id: string;
+  title: string;
+  stages: DslQuestStage[];
+};
+
+export type DslRecipeIngredient = {
+  itemId: string;
+  amount: number;
+};
+
+export type DslRecipeSection = {
+  kind: 'recipe';
+  id: string;
+  stationId: string;
+  inputs: DslRecipeIngredient[];
+  outputs: DslRecipeIngredient[];
+  skillId?: string;
+  xpAmount?: number;
+  onSuccessTags: DslTag[];
+};
+
+export type DslSection =
+  | DslLocationSection
+  | DslDialogueSection
+  | DslAdvancedSection
+  | DslItemSection
+  | DslQuestSection
+  | DslRecipeSection;
 
 export type DslInfo = {
   id: string;

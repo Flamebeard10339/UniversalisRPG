@@ -13,8 +13,13 @@ import type {
   DslDialogueSection,
   DslEntityDecl,
   DslInfo,
+  DslItemSection,
   DslLocationSection,
   DslModule,
+  DslQuestSection,
+  DslQuestStage,
+  DslRecipeIngredient,
+  DslRecipeSection,
   DslSection,
   DslTag,
   DslWallDecl,
@@ -56,7 +61,7 @@ export const parseDsl = (source: string): DslModule => {
   cursor.skipBlank();
   while (!cursor.atEnd()) {
     const line = cursor.current!;
-    const headerMatch = /^#\s+(info|location|dialogue|advanced)\b\s*(.*)$/.exec(line);
+    const headerMatch = /^#\s+(info|location|dialogue|advanced|item|quest|recipe)\b\s*(.*)$/.exec(line);
     if (!headerMatch) {
       throw new DslParseError(`Expected a top-level "# ..." header, got: "${line}"`);
     }
@@ -70,6 +75,12 @@ export const parseDsl = (source: string): DslModule => {
       sections.push(parseDialogueSection(cursor, rest.trim()));
     } else if (keyword === 'advanced') {
       sections.push({ kind: 'advanced', json: parseAdvancedBlock(cursor) });
+    } else if (keyword === 'item') {
+      sections.push(parseItemSection(cursor, rest.trim()));
+    } else if (keyword === 'quest') {
+      sections.push(parseQuestSection(cursor, rest.trim()));
+    } else if (keyword === 'recipe') {
+      sections.push(parseRecipeSection(cursor, rest.trim()));
     }
     cursor.skipBlank();
   }
@@ -229,13 +240,14 @@ const parseAction = (cursor: Cursor): DslActionDecl => {
       ? [{ keyword: 'say', text: parseText(inlineText) }]
       : parseTagLine(inlineText);
 
-  const { tags: continuationTags, onSuccessTags } = parseActionBody(cursor, headerIndent);
-  return { title, tags: [...inlineTags, ...continuationTags], onSuccessTags };
+  const { tags: continuationTags, onSuccessTags, onFailTags } = parseActionBody(cursor, headerIndent);
+  return { title, tags: [...inlineTags, ...continuationTags], onSuccessTags, onFailTags };
 };
 
-const parseActionBody = (cursor: Cursor, baseIndent: number): { tags: DslTag[]; onSuccessTags: DslTag[] } => {
+const parseActionBody = (cursor: Cursor, baseIndent: number): { tags: DslTag[]; onSuccessTags: DslTag[]; onFailTags: DslTag[] } => {
   const tags: DslTag[] = [];
   const onSuccessTags: DslTag[] = [];
+  const onFailTags: DslTag[] = [];
 
   while (!cursor.atEnd()) {
     const line = cursor.current!;
@@ -264,11 +276,18 @@ const parseActionBody = (cursor: Cursor, baseIndent: number): { tags: DslTag[]; 
       continue;
     }
 
+    const onFailMatch = /^on fail:\s*(.*)$/i.exec(trimmed);
+    if (onFailMatch) {
+      cursor.index++;
+      onFailTags.push(...readTagLines(cursor, indent, onFailMatch[1]));
+      continue;
+    }
+
     tags.push(...parseTagLine(trimmed));
     cursor.index++;
   }
 
-  return { tags, onSuccessTags };
+  return { tags, onSuccessTags, onFailTags };
 };
 
 // Joins an inline value with every further-indented raw continuation line
@@ -370,4 +389,167 @@ const parseDialogueNode = (cursor: Cursor): DslDialogueNode => {
   }
 
   return { id, speakerId, text, options, gotoNodeId, enterTags };
+};
+
+// ---------------------------------------------------------------------------
+// Items: reuse the same action-declaration grammar as entities. `tags:`/
+// `offensiveTags:`/`defensiveTags:` are metadata fields whose value is a raw
+// pass-through string (the existing equipment tag-string grammar from
+// src/game/equipment.ts, untouched and unrelated to this DSL's own tags) —
+// not parsed as DSL tags themselves.
+// ---------------------------------------------------------------------------
+const parseItemSection = (cursor: Cursor, id: string): DslItemSection => {
+  cursor.skipBlank();
+  let tagsString: string | undefined;
+  let offensiveTagsString: string | undefined;
+  let defensiveTagsString: string | undefined;
+  const actions: DslActionDecl[] = [];
+
+  while (!cursor.atEnd()) {
+    const trimmed = cursor.current!.trim();
+    if (trimmed.length === 0) {
+      cursor.index++;
+      continue;
+    }
+    if (/^#/.test(trimmed)) break;
+
+    const metaMatch = /^(tags|offensiveTags|defensiveTags):\s*(.*)$/i.exec(trimmed);
+    if (metaMatch) {
+      const key = metaMatch[1].toLowerCase();
+      if (key === 'tags') tagsString = metaMatch[2].trim();
+      else if (key === 'offensivetags') offensiveTagsString = metaMatch[2].trim();
+      else defensiveTagsString = metaMatch[2].trim();
+      cursor.index++;
+      continue;
+    }
+
+    actions.push(parseAction(cursor));
+  }
+
+  return { kind: 'item', id, tagsString, offensiveTagsString, defensiveTagsString, actions };
+};
+
+// ---------------------------------------------------------------------------
+// Quests: `stage <id>: <condition>` header, followed by a narrative
+// description spread across one or more further-indented lines (joined with
+// a space — descriptions are prose, not a tag-line).
+// ---------------------------------------------------------------------------
+const parseQuestSection = (cursor: Cursor, id: string): DslQuestSection => {
+  cursor.skipBlank();
+  let title = '';
+  const stages: DslQuestStage[] = [];
+
+  while (!cursor.atEnd()) {
+    const line = cursor.current!;
+    const trimmed = line.trim();
+    if (trimmed.length === 0) {
+      cursor.index++;
+      continue;
+    }
+    if (/^#/.test(trimmed)) break;
+
+    const titleMatch = /^title:\s*(.*)$/i.exec(trimmed);
+    if (titleMatch) {
+      title = titleMatch[1].trim();
+      cursor.index++;
+      continue;
+    }
+
+    const stageMatch = /^stage\s+([\w-]+):\s*(.+)$/i.exec(trimmed);
+    if (!stageMatch) throw new DslParseError(`Expected "stage <id>: <condition>" in quest "${id}", got: "${line}"`);
+    const stageIndent = leadingSpaces(line);
+    const stageId = stageMatch[1];
+    const cond = parseCondition(stageMatch[2], 'flag');
+    cursor.index++;
+
+    const descriptionLines: string[] = [];
+    while (!cursor.atEnd()) {
+      const bodyLine = cursor.current!;
+      if (bodyLine.trim().length === 0) {
+        cursor.index++;
+        continue;
+      }
+      if (leadingSpaces(bodyLine) <= stageIndent) break;
+      descriptionLines.push(bodyLine.trim());
+      cursor.index++;
+    }
+    stages.push({ id: stageId, cond, description: descriptionLines.join(' ') });
+  }
+
+  return { kind: 'quest', id, title, stages };
+};
+
+// ---------------------------------------------------------------------------
+// Recipes: flat metadata fields (`station:`, `in:`, `out:`, `skill:`) — `in:`
+// and `out:` may repeat across lines, each contributing more ingredients
+// (needed for e.g. smelting bronze from two separate ore inputs). `on
+// success:` is the same nested tag-block as an action's, becoming the
+// recipe's `extraResults`.
+// ---------------------------------------------------------------------------
+const parseIngredientList = (value: string): DslRecipeIngredient[] =>
+  value.split(',').map((part) => part.trim()).filter(Boolean).map((part) => {
+    const [itemId, amountRaw] = part.split(/\s+/);
+    return { itemId, amount: amountRaw ? Number(amountRaw) : 1 };
+  });
+
+const parseRecipeSection = (cursor: Cursor, id: string): DslRecipeSection => {
+  cursor.skipBlank();
+  let stationId = '';
+  const inputs: DslRecipeIngredient[] = [];
+  const outputs: DslRecipeIngredient[] = [];
+  let skillId: string | undefined;
+  let xpAmount: number | undefined;
+  let onSuccessTags: DslTag[] = [];
+
+  while (!cursor.atEnd()) {
+    const line = cursor.current!;
+    const trimmed = line.trim();
+    if (trimmed.length === 0) {
+      cursor.index++;
+      continue;
+    }
+    if (/^#/.test(trimmed)) break;
+
+    const stationMatch = /^station:\s*(.*)$/i.exec(trimmed);
+    if (stationMatch) {
+      stationId = stationMatch[1].trim();
+      cursor.index++;
+      continue;
+    }
+
+    const inMatch = /^in:\s*(.*)$/i.exec(trimmed);
+    if (inMatch) {
+      inputs.push(...parseIngredientList(inMatch[1]));
+      cursor.index++;
+      continue;
+    }
+
+    const outMatch = /^out:\s*(.*)$/i.exec(trimmed);
+    if (outMatch) {
+      outputs.push(...parseIngredientList(outMatch[1]));
+      cursor.index++;
+      continue;
+    }
+
+    const skillMatch = /^skill:\s*(.*)$/i.exec(trimmed);
+    if (skillMatch) {
+      const [sid, amountRaw] = skillMatch[1].trim().split(/\s+/);
+      skillId = sid;
+      xpAmount = amountRaw ? Number(amountRaw) : undefined;
+      cursor.index++;
+      continue;
+    }
+
+    const onSuccessMatch = /^on success:\s*(.*)$/i.exec(trimmed);
+    if (onSuccessMatch) {
+      const indent = leadingSpaces(line);
+      cursor.index++;
+      onSuccessTags = readTagLines(cursor, indent, onSuccessMatch[1]);
+      continue;
+    }
+
+    throw new DslParseError(`Unexpected line in recipe "${id}": "${line}"`);
+  }
+
+  return { kind: 'recipe', id, stationId, inputs, outputs, skillId, xpAmount, onSuccessTags };
 };
