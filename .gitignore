@@ -9,6 +9,8 @@ yarn-error.log*
 pnpm-debug.log*
 vite.*.log
 *.local
-task-list.md
+
+backlog.md
+completed-tasks.md
 
 .planning/*
