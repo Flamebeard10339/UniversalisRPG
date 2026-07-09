@@ -47,7 +47,7 @@ export const SubmitToGitHub = ({ appVersion, bundle, draft, validationIssues, t 
   };
 
   return (
-    <section className="grid gap-3 rounded border border-slate-700 p-3">
+    <section className="grid gap-3 grid-rows-[auto_auto_1fr] h-full rounded border border-slate-700 p-3">
       <div>
         <h3 className="text-sm font-semibold text-slate-100">{t('contribution.github.title')}</h3>
         <p className="text-xs text-slate-400">{t('contribution.github.description')}</p>
@@ -60,7 +60,7 @@ export const SubmitToGitHub = ({ appVersion, bundle, draft, validationIssues, t 
           {t('contribution.github.copy')}
         </button>
       </div>
-      <textarea className="min-h-56 rounded bg-slate-950 p-3 text-xs text-slate-300" readOnly value={issueBody} />
+      <textarea className="min-h-0 rounded bg-slate-950 p-3 text-xs text-slate-300" readOnly value={issueBody} />
     </section>
   );
 };

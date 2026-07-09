@@ -937,26 +937,65 @@ export default function App() {
   const visibleActiveTab = !currentLocation ? 'settings' : activeTab === 'edit' && !contributionMode ? 'home' : activeTab;
 
   return (
-    <main className={`min-h-screen bg-slate-950 text-slate-100 ${visibleActiveTab === 'home' ? 'pb-[calc(33vh+6rem)]' : 'pb-24'}`}>
-      <header className="border-b border-slate-800 bg-slate-900/70 px-4 py-3">
-        <div className="mx-auto flex max-w-7xl items-center justify-between gap-3">
-          <div>
-            <h1 className="text-xl font-semibold">
-              {visibleActiveTab === 'settings'
-                ? t('app.title')
-                : visibleActiveTab === 'home' && currentLocation
-                  ? t(locationTitleKey(currentLocation.id), currentLocation.id)
-                  : `${t(`app.tab.${visibleActiveTab}`)}${visibleActiveTab === 'character' && playState.characterName ? ` - ${playState.characterName}` : ''}`}
-            </h1>
-            {visibleActiveTab === 'settings' && <p className="text-sm text-slate-400">{t(universeTitleKey(bundle.manifest.id))} - {t(universeDescriptionKey(bundle.manifest.id), '')}</p>}
+    <main className={`min-h-screen bg-slate-950 text-slate-100 ${visibleActiveTab === 'home' ? 'pb-[calc(33vh+6rem)]' : visibleActiveTab === 'edit' ? 'pb-24 flex flex-col' : 'pb-24'}`}>
+      <header className={`${visibleActiveTab === 'edit' ? 'flex-shrink-0' : ''} border-b border-slate-800 bg-slate-900/70 px-4 py-3`}>
+        {visibleActiveTab === 'edit' && contributionMode ? (
+          <div className="mx-auto flex max-w-7xl items-center justify-between gap-4">
+            <div className="flex-shrink-0">
+              <h1 className="text-xl font-semibold">{t(`app.tab.${visibleActiveTab}`)}</h1>
+            </div>
+            <div className="flex-1 flex justify-center">
+              <div className="flex gap-2 rounded border border-slate-800 bg-slate-900 p-2">
+                {editTabs.map((tab) => (
+                  <button
+                    className={`min-w-28 flex-1 rounded px-3 py-2 text-sm font-semibold capitalize ${
+                      contributionTab === tab ? 'bg-cyan-300 text-slate-950' : 'bg-slate-950 text-slate-300'
+                    }`}
+                    data-edit-mode-tab={tab}
+                    key={tab}
+                    onClick={() => setContributionTab(tab)}
+                    type="button"
+                  >
+                    {t(`contribution.tab.${tab}`)}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="flex-shrink-0">
+              <button
+                className="rounded border border-slate-600 px-3 py-2 text-sm font-semibold text-slate-100 hover:bg-slate-800"
+                data-edit-reset-draft
+                onClick={() => {
+                  const resetFn = useContributionState.getState().resetDraft;
+                  resetFn(bundle.manifest.id);
+                  queueMicrotask(() => useUniverseState.getState().refreshContributionPreview());
+                }}
+                type="button"
+              >
+                {t('contribution.resetDraft')}
+              </button>
+            </div>
           </div>
-          {visibleActiveTab === 'home' && currentLocation && (
-            <ExamineButton onExamine={onExamine} t={t} testId="examine-location" textKey={locationExamineKey(currentLocation.id)} />
-          )}
-        </div>
+        ) : (
+          <div className="mx-auto flex max-w-7xl items-center justify-between gap-3">
+            <div>
+              <h1 className="text-xl font-semibold">
+                {visibleActiveTab === 'settings'
+                  ? t('app.title')
+                  : visibleActiveTab === 'home' && currentLocation
+                    ? t(locationTitleKey(currentLocation.id), currentLocation.id)
+                    : `${t(`app.tab.${visibleActiveTab}`)}${visibleActiveTab === 'character' && playState.characterName ? ` - ${playState.characterName}` : ''}`}
+              </h1>
+              {visibleActiveTab === 'settings' && <p className="text-sm text-slate-400">{t(universeTitleKey(bundle.manifest.id))} - {t(universeDescriptionKey(bundle.manifest.id), '')}</p>}
+            </div>
+            {visibleActiveTab === 'home' && currentLocation && (
+              <ExamineButton onExamine={onExamine} t={t} testId="examine-location" textKey={locationExamineKey(currentLocation.id)} />
+            )}
+          </div>
+        )}
       </header>
 
-      <div className="mx-auto max-w-7xl px-4 py-4">
+      <div className={`flex-1 overflow-hidden ${visibleActiveTab === 'edit' ? 'w-full px-4' : 'mx-auto max-w-7xl px-4 py-4'}`}>
         {visibleActiveTab === 'map' && (
           <section className="grid gap-4">
             <div className="grid h-[calc(100vh-150px)] min-h-[560px] grid-rows-[auto_1fr] gap-4">
@@ -985,15 +1024,17 @@ export default function App() {
         )}
 
         {visibleActiveTab === 'edit' && contributionMode && currentContributionDraft && (
-          <EditMode
-            activeTab={contributionTab}
-            appVersion={APP_VERSION}
-            bundle={bundle}
-            onMapPatch={patchLocalMapModule}
-            onTabChange={setContributionTab}
-            validationIssues={validationIssues}
-            t={t}
-          />
+          <div className="flex flex-col h-full">
+            <EditMode
+              activeTab={contributionTab}
+              appVersion={APP_VERSION}
+              bundle={bundle}
+              onMapPatch={patchLocalMapModule}
+              onTabChange={setContributionTab}
+              validationIssues={validationIssues}
+              t={t}
+            />
+          </div>
         )}
 
         {visibleActiveTab === 'home' && currentLocation && (

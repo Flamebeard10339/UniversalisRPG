@@ -82,65 +82,38 @@ export const EditMode = ({ activeTab, appVersion, bundle, onMapPatch, onTabChang
   };
 
   return (
-    <section className="grid gap-4" data-testid="edit-mode">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h2 className="text-lg font-semibold text-slate-100">{t('contribution.title')}</h2>
-          <p className="text-sm text-slate-400">{t('contribution.description')}</p>
-        </div>
-        <button
-          className="rounded border border-slate-600 px-3 py-2 text-sm font-semibold text-slate-100"
-          onClick={() => {
-            resetDraft(bundle.manifest.id);
-            queueMicrotask(refreshContributionPreview);
-          }}
-          type="button"
-        >
-          {t('contribution.resetDraft')}
-        </button>
+    <section className="grid h-full grid-rows-[1fr] gap-0 overflow-hidden" data-testid="edit-mode">
+      <div className="min-h-0 overflow-y-auto">
+        {activeTab === 'content' && (
+          <ContributionContentTab
+            baseBundle={baseBundle ?? bundle}
+            bundle={bundle}
+            draft={draft}
+            issues={validationIssues}
+            onPatch={patchDraft}
+            t={t}
+          />
+        )}
+
+        {activeTab === 'map' && (
+          <div className="p-4">
+            <ContributionMapEditor
+              bundle={bundle}
+              onActionsChange={(actions) => onMapPatch({ actions })}
+              onEntitiesChange={(entities) => onMapPatch({ entities })}
+              onLocationsChange={(locations) => onMapPatch({ locations })}
+              onLocalesChange={(patch) => onMapPatch({ localePatch: patch })}
+              t={t}
+            />
+          </div>
+        )}
+
+        {activeTab === 'submit' && (
+          <div className="p-4 flex flex-col h-full">
+            <SubmitToGitHub appVersion={appVersion} bundle={bundle} draft={draft} t={t} validationIssues={validationIssues} />
+          </div>
+        )}
       </div>
-
-      <div className="flex gap-2 rounded border border-slate-800 bg-slate-900 p-2" data-testid="edit-mode-tabs">
-        {editTabs.map((tab) => (
-          <button
-            className={`min-w-28 flex-1 rounded px-3 py-2 text-sm font-semibold capitalize ${
-              activeTab === tab ? 'bg-cyan-300 text-slate-950' : 'bg-slate-950 text-slate-300'
-            }`}
-            data-testid={`edit-mode-tab-${tab}`}
-            key={tab}
-            onClick={() => onTabChange(tab)}
-            type="button"
-          >
-            {t(`contribution.tab.${tab}`)}
-          </button>
-        ))}
-      </div>
-
-      {activeTab === 'content' && (
-        <ContributionContentTab
-          baseBundle={baseBundle ?? bundle}
-          bundle={bundle}
-          draft={draft}
-          issues={validationIssues}
-          onPatch={patchDraft}
-          t={t}
-        />
-      )}
-
-      {activeTab === 'map' && (
-        <ContributionMapEditor
-          bundle={bundle}
-          onActionsChange={(actions) => onMapPatch({ actions })}
-          onEntitiesChange={(entities) => onMapPatch({ entities })}
-          onLocationsChange={(locations) => onMapPatch({ locations })}
-          onLocalesChange={(patch) => onMapPatch({ localePatch: patch })}
-          t={t}
-        />
-      )}
-
-      {activeTab === 'submit' && (
-        <SubmitToGitHub appVersion={appVersion} bundle={bundle} draft={draft} t={t} validationIssues={validationIssues} />
-      )}
     </section>
   );
 };
