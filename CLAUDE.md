@@ -95,16 +95,29 @@ this before authoring NPCs, quests, items, or any state-driven UI.
 
 ## Content pipeline
 
-- Never hand-edit the promoted JSON under `public/content/universes/base/modules/*`.
-  Always edit the source (e.g. `scripts/tutorialIslandModules.mjs`) and regenerate
-  through the real editor pipeline (`scripts/build-tutorial-island.mjs` →
-  `scripts/mod-editor-cli.mjs`), then promote the staged output.
+- Content is authored directly as DSL markdown (see `docs/content-dsl-grammar.md` and
+  `scripts/contentDsl/samples/*.md`), edited either by hand or through the in-app DSL
+  editor (Edit tab → Content, `src/components/contribution/DslModuleEditor.tsx`). The
+  DSL compiles to the same `ContentModule` JSON shape (`src/game/types.ts`) that the
+  loader/validators/engine have always consumed — no engine change is required to add
+  DSL content. The old grid-based JSON editors (`ModuleEditor.tsx`,
+  `ContentDataEditor.tsx`) and the Playwright pipeline that drove them
+  (`scripts/build-tutorial-island.mjs` → `scripts/mod-editor-cli.mjs`) have been
+  removed; there is no in-app authoring path left for content that only exists as
+  legacy JSON.
+- `scripts/tutorialIslandModules.mjs` and the promoted JSON under
+  `public/content/universes/base/modules/*.json` are the still-unported remainder of
+  Tutorial Island (only `tutorial-island-guide-house` has been ported to DSL so far).
+  They keep loading and playing fine via `loader.ts`'s JSON-first-then-DSL-compile
+  fallback, but are frozen from an editing standpoint until hand-ported to DSL — do
+  not hand-edit that JSON or resurrect the old pipeline to regenerate it; port the
+  module to a `.md` file instead.
 - After any change that could affect module resolution or validation, actually run
-  the full pipeline (build → promote → `npx vitest run` → headless playtests) rather
-  than trusting an isolated unit test of the new feature. A validation gap in one new
-  action/item can silently disable unrelated modules via the module-conflict-cascade
-  in `resolveAndApplyModules` — this has happened twice and is only caught by running
-  the real thing end to end.
+  the full pipeline (`npx vitest run` → headless playtests) rather than trusting an
+  isolated unit test of the new feature. A validation gap in one new action/item can
+  silently disable unrelated modules via the module-conflict-cascade in
+  `resolveAndApplyModules` — this has happened twice and is only caught by running the
+  real thing end to end.
 - No backwards-compatibility shims for pre-launch content: replacing a field or system
   means deleting the old one everywhere it's referenced, not migrating it or keeping a
   fallback path.

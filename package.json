@@ -12,7 +12,6 @@
     "test": "vitest run --configLoader runner",
     "test:ui": "node scripts/ui-smoke.mjs",
     "merge:issue": "node scripts/merge-contribution-issue.mjs",
-    "mod-editor:cli": "node scripts/mod-editor-cli.mjs",
     "playtest": "tsx scripts/playtest-cli.ts"
   },
   "dependencies": {

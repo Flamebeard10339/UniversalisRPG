@@ -12,14 +12,12 @@ import { CollectionLogPanel } from './components/CollectionLogPanel';
 import { QuestLogPanel } from './components/QuestLogPanel';
 import { DialoguePanel } from './components/DialoguePanel';
 import { InventoryPanel } from './components/InventoryPanel';
-import { ContributionMode, type ContributionTab } from './components/contribution/ContributionMode';
-import { ContributionMapEditor } from './components/contribution/ContributionMapEditor';
-import { ContributionQuickWorkbench } from './components/contribution/ContributionQuickWorkbench';
-import { ContributionWorkbench } from './components/contribution/ContributionWorkbench';
+import { EditMode, type EditTab } from './components/contribution/EditMode';
 import { SkillBars } from './components/SkillBars';
 import { TravelStatus } from './components/TravelStatus';
 import { WorldMap } from './components/WorldMap';
 import { StructuredDataEditor, type StructuredValue } from './components/structuredData/StructuredData';
+import { modulePackSchema } from './components/structuredData/contentSchemas';
 import { interactionTitleKey, itemTitleKey, locationDescriptionKey, locationTitleKey, resourceTitleKey, skillTitleKey, universeDescriptionKey, universeTitleKey } from './game/contentIds';
 import { getActionTitleText } from './game/actionLocalization';
 import {
@@ -64,10 +62,10 @@ const profileFixtureModules = import.meta.env.DEV
   ? import.meta.glob('/.playtests/profiles/*.json', { eager: true, import: 'default' })
   : {};
 
-type AppTab = 'map' | 'home' | 'character' | 'settings';
-type HomeTab = 'actions' | 'details' | 'workbench';
+type AppTab = 'map' | 'home' | 'character' | 'settings' | 'edit';
+type HomeTab = 'actions' | 'details';
 type CharacterTab = 'skills' | 'inventory' | 'stats' | 'quests' | 'collectionLog';
-type QuickWorkbenchSheet = 'add' | 'edit-location';
+type SettingsTab = 'settings' | 'mods';
 type FontSizePreference = 'tiny' | 'small' | 'normal' | 'large' | 'huge';
 type AppearanceSettings = {
   chatCompressionEnabled?: boolean;
@@ -80,21 +78,23 @@ type AppearanceSettings = {
 };
 type ContributionUiSettings = {
   contributionMode?: boolean;
-  contributionTab?: ContributionTab;
+  contributionTab?: EditTab;
   homeTab?: HomeTab;
 };
 const APP_VERSION = '0.1.0';
 const SOURCE_URL = 'https://github.com/Flamebeard10339/UniversalisRPG';
 const appearanceKey = 'universalis:settings:appearance';
 const contributionUiKey = 'universalis:settings:contribution-ui';
-const contributionTabs: ContributionTab[] = ['content'];
-const homeTabs: HomeTab[] = ['actions', 'details', 'workbench'];
+const editTabs: EditTab[] = ['content', 'map', 'submit'];
+const homeTabs: HomeTab[] = ['actions', 'details'];
 const emptyIdleReport: IdleReport = { kind: 'none' };
 const emptyContributionDraft = (universeId: string): ContributionDraft => ({
   universeId, updatedAt: Date.now(), notes: '', basePlayer: undefined, combatBalance: undefined, experienceCurve: undefined, experience: undefined, displayProfiles: undefined, ui: undefined, modules: [], modulePacks: [], locations: [], actions: [], skills: [], stats: [], items: [], flags: [], resourceDefinitions: [], effects: [], interactionTypes: [], enemies: [], dropTables: [], dialogues: [], locales: {},
   removed: { locations: [], actions: [], skills: [], stats: [], items: [], flags: [], resources: [], effects: [], interactionTypes: [], enemies: [], dropTables: [], dialogues: [], modules: [] },
 });
 const colorInputClass = 'h-9 w-12 rounded border border-slate-700 bg-slate-900 p-1';
+
+const uniqueById = <T extends { id: string }>(items: T[]) => [...new Map(items.map((item) => [item.id, item])).values()];
 
 const packModuleIds = (pack: ContentModulePack): string[] => [
   ...(pack.modules ?? []),
@@ -131,8 +131,9 @@ export default function App() {
   const [contributionMode, setContributionMode] = useState(false);
   const [activeTab, setActiveTab] = useState<AppTab>('home');
   const [homeTab, setHomeTab] = useState<HomeTab>('actions');
-  const [contributionTab, setContributionTab] = useState<ContributionTab>('content');
+  const [contributionTab, setContributionTab] = useState<EditTab>('content');
   const [characterTab, setCharacterTab] = useState<CharacterTab>('skills');
+  const [settingsTab, setSettingsTab] = useState<SettingsTab>('settings');
   const [fontSizePreference, setFontSizePreference] = useState<FontSizePreference>('normal');
   const [chatCompressionEnabled, setChatCompressionEnabled] = useState(true);
   const [showTravelActions, setShowTravelActions] = useState(true);
@@ -143,8 +144,6 @@ export default function App() {
   const [appearanceLoaded, setAppearanceLoaded] = useState(false);
   const [contributionUiLoaded, setContributionUiLoaded] = useState(false);
   const [showChangelog, setShowChangelog] = useState(false);
-  const [quickWorkbenchSheet, setQuickWorkbenchSheet] = useState<QuickWorkbenchSheet | null>(null);
-  const [quickWorkbenchModuleId, setQuickWorkbenchModuleId] = useState('');
   const [changelogText, setChangelogText] = useState('');
   const [confirmReset, setConfirmReset] = useState(false);
   const [mapFlashUntil, setMapFlashUntil] = useState(0);
@@ -284,7 +283,7 @@ export default function App() {
       }
       setContributionMode(Boolean(settings.contributionMode));
       if (settings.homeTab && homeTabs.includes(settings.homeTab)) setHomeTab(settings.homeTab);
-      setContributionTab(settings.contributionTab && contributionTabs.includes(settings.contributionTab) ? settings.contributionTab : 'content');
+      setContributionTab(settings.contributionTab && editTabs.includes(settings.contributionTab) ? settings.contributionTab : 'content');
       setContributionUiLoaded(true);
     });
   }, []);
@@ -379,7 +378,6 @@ export default function App() {
     } satisfies DisplayProfileDefinition;
     void navigator.clipboard.writeText(JSON.stringify(themeJson, null, 2));
   };
-  const visibleHomeTab = homeTab === 'workbench' && !contributionMode ? 'actions' : homeTab;
   const currentLocation = bundle?.locations.find((location) => location.id === playState?.currentLocationId);
   const activeModuleIds = bundle ? new Set(enabledModules[bundle.manifest.id] ?? bundle.modules?.map((module) => module.id) ?? []) : new Set<string>();
   const moduleById = new Map((bundle?.modules ?? []).map((module) => [module.id, module]));
@@ -446,29 +444,6 @@ export default function App() {
   const activeAction = bundle?.actions.find((action) => action.id === playState?.activeAction?.actionId) ?? null;
   const activeInteractionType = activeAction ? getInteractionType(activeAction, actionContext) : null;
   const currentContributionDraft = bundle ? contributionDrafts[bundle.manifest.id] ?? emptyContributionDraft(bundle.manifest.id) : null;
-  const packagedContributionModuleIds = new Set((baseBundle?.modules ?? []).map((module) => module.id));
-  const localContributionModules = currentContributionDraft
-    ? currentContributionDraft.modules.filter((module) => !packagedContributionModuleIds.has(module.id))
-    : [];
-  const createLocalContributionModule = (draft: ContributionDraft): ContentModule => {
-    const existingIds = new Set([...(bundle?.modules ?? []).map((module) => module.id), ...(draft.modules ?? []).map((module) => module.id)]);
-    let index = 1;
-    let id = 'local-contribution';
-    while (existingIds.has(id)) {
-      index += 1;
-      id = `local-contribution-${index}`;
-    }
-    return {
-      id,
-      version: '1.0.0',
-      universe: draft.universeId,
-      author: bundle?.manifest.author ?? 'contributor',
-      game_version: '1.0',
-      dependencies: [],
-      data: [],
-      locale: {},
-    };
-  };
   const patchContributionDraft = (patch: Partial<Omit<ContributionDraft, 'universeId'>>) => {
     if (!bundle) return;
     updateContributionDraft(bundle.manifest.id, patch);
@@ -514,30 +489,6 @@ export default function App() {
     if (!latestActiveModuleIds.has(localContributionsModId)) {
       void setEnabledModules(bundle.manifest.id, [...latestActiveModuleIds, localContributionsModId]);
     }
-  };
-  const ensureQuickWorkbenchModule = () => {
-    if (!bundle) return '';
-    const latestDraft = useContributionState.getState().getDraft(bundle.manifest.id) ?? currentContributionDraft ?? emptyContributionDraft(bundle.manifest.id);
-    const latestLocalModules = latestDraft.modules.filter((module) => !packagedContributionModuleIds.has(module.id));
-    const latestActiveModuleIds = new Set(useUniverseState.getState().enabledModules[bundle.manifest.id] ?? bundle.modules?.map((module) => module.id) ?? []);
-    const selected = latestLocalModules.find((module) => module.id === quickWorkbenchModuleId) ?? latestLocalModules[0];
-    if (selected) {
-      if (!latestActiveModuleIds.has(selected.id)) void setEnabledModules(bundle.manifest.id, [...latestActiveModuleIds, selected.id]);
-      return selected.id;
-    }
-    const module = createLocalContributionModule(latestDraft);
-    patchContributionDraft({
-      modules: [module, ...(latestDraft.modules ?? [])],
-      removed: { ...latestDraft.removed, modules: (latestDraft.removed?.modules ?? []).filter((id) => id !== module.id) },
-    });
-    void setEnabledModules(bundle.manifest.id, [...latestActiveModuleIds, module.id]);
-    return module.id;
-  };
-  const openQuickWorkbench = (sheet: QuickWorkbenchSheet) => {
-    const moduleId = ensureQuickWorkbenchModule();
-    if (!moduleId) return;
-    setQuickWorkbenchModuleId(moduleId);
-    setQuickWorkbenchSheet(sheet);
   };
   const logPlayerAction = (event: string, data?: Record<string, unknown>) => {
     logAction(event, data);
@@ -801,7 +752,7 @@ export default function App() {
       getContributionMode: () => contributionMode,
       setContributionMode: (enabled) => setContributionMode(enabled),
       getContributionTab: () => contributionTab,
-      setContributionTab: (tab) => setContributionTab(tab as ContributionTab),
+      setContributionTab: (tab) => setContributionTab(tab as EditTab),
       getEnabledModuleIds: () => [...activeModuleIds],
       setModuleEnabled: async (moduleId, enabled) => {
         const requested = new Set(useUniverseState.getState().enabledModules[bundle.manifest.id] ?? bundle.modules?.map((module) => module.id) ?? []);
@@ -949,10 +900,10 @@ export default function App() {
     );
   }
 
-  const visibleActiveTab = currentLocation ? activeTab : 'settings';
+  const visibleActiveTab = !currentLocation ? 'settings' : activeTab === 'edit' && !contributionMode ? 'home' : activeTab;
 
   return (
-    <main className={`min-h-screen bg-slate-950 text-slate-100 ${visibleActiveTab === 'home' && visibleHomeTab !== 'workbench' ? 'pb-[calc(33vh+6rem)]' : 'pb-24'}`}>
+    <main className={`min-h-screen bg-slate-950 text-slate-100 ${visibleActiveTab === 'home' ? 'pb-[calc(33vh+6rem)]' : 'pb-24'}`}>
       <header className="border-b border-slate-800 bg-slate-900/70 px-4 py-3">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-3">
           <div>
@@ -981,39 +932,40 @@ export default function App() {
       <div className="mx-auto max-w-7xl px-4 py-4">
         {visibleActiveTab === 'map' && (
           <section className="grid gap-4">
-            {contributionMode && bundle && currentContributionDraft ? (
-              <ContributionMapEditor
+            <div className="grid h-[calc(100vh-150px)] min-h-[560px] grid-rows-[auto_1fr] gap-4">
+              <TravelStatus
+                activeTravel={playState.activeTravel}
                 bundle={bundle}
-                onActionsChange={(actions) => patchLocalMapModule({ actions })}
-                onEntitiesChange={(entities) => patchLocalMapModule({ entities })}
-                onLocationsChange={(locations) => patchLocalMapModule({ locations })}
-                onLocalesChange={(patch) => patchLocalMapModule({ localePatch: patch })}
+                currentLocationId={playState.currentLocationId}
+                onCancel={() => {
+                  logPlayerAction('travel.cancel', { universeId: bundle.manifest.id });
+                  cancelTravel(runtimeUniverseId);
+                }}
+                titleWhenIdle
                 t={t}
               />
-            ) : (
-              <div className="grid h-[calc(100vh-150px)] min-h-[560px] grid-rows-[auto_1fr] gap-4">
-                <TravelStatus
-                  activeTravel={playState.activeTravel}
+              <section className="min-h-0 overflow-hidden rounded border border-slate-800 bg-slate-900">
+                <WorldMap
                   bundle={bundle}
-                  currentLocationId={playState.currentLocationId}
-                  onCancel={() => {
-                    logPlayerAction('travel.cancel', { universeId: bundle.manifest.id });
-                    cancelTravel(runtimeUniverseId);
-                  }}
-                  titleWhenIdle
+                  onTravel={beginTravel}
+                  playState={playState}
                   t={t}
                 />
-                <section className="min-h-0 overflow-hidden rounded border border-slate-800 bg-slate-900">
-                  <WorldMap
-                    bundle={bundle}
-                    onTravel={beginTravel}
-                    playState={playState}
-                    t={t}
-                  />
-                </section>
-              </div>
-            )}
+              </section>
+            </div>
           </section>
+        )}
+
+        {visibleActiveTab === 'edit' && contributionMode && currentContributionDraft && (
+          <EditMode
+            activeTab={contributionTab}
+            appVersion={APP_VERSION}
+            bundle={bundle}
+            onMapPatch={patchLocalMapModule}
+            onTabChange={setContributionTab}
+            validationIssues={validationIssues}
+            t={t}
+          />
         )}
 
         {visibleActiveTab === 'home' && currentLocation && (
@@ -1023,10 +975,10 @@ export default function App() {
                 <TravelStatus activeTravel={playState.activeTravel} bundle={bundle} currentLocationId={playState.currentLocationId} t={t} />
               )}
               <div className="grid grid-flow-col auto-cols-fr gap-2 rounded border border-slate-800 bg-slate-900 p-2">
-                {(['actions', 'details', ...(contributionMode ? ['workbench' as const] : [])] as HomeTab[]).map((tab) => (
+                {(['actions', 'details'] as HomeTab[]).map((tab) => (
                   <button
                     className={`min-w-0 rounded px-2 py-2 text-sm font-semibold capitalize ${
-                      visibleHomeTab === tab ? 'bg-cyan-300 text-slate-950' : 'bg-slate-950 text-slate-300'
+                      homeTab === tab ? 'bg-cyan-300 text-slate-950' : 'bg-slate-950 text-slate-300'
                     }`}
                     data-home-tab={tab}
                     key={tab}
@@ -1041,26 +993,8 @@ export default function App() {
               </div>
             </div>
 
-            {visibleHomeTab === 'actions' && (
+            {homeTab === 'actions' && (
               <section className="grid gap-4">
-                {contributionMode && (
-                  <section className="grid gap-2 rounded border border-cyan-800/60 bg-slate-900 p-3">
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                      <div>
-                        <h2 className="text-sm font-semibold text-cyan-100">{t('quickWorkbench.title')}</h2>
-                        <p className="text-xs text-slate-400">{t('quickWorkbench.description')}</p>
-                      </div>
-                      <div className="flex flex-wrap gap-2">
-                        <button className="rounded bg-cyan-300 px-3 py-2 text-sm font-semibold text-slate-950" onClick={() => openQuickWorkbench('add')} type="button">
-                          {t('quickWorkbench.add')}
-                        </button>
-                        <button className="rounded border border-cyan-500 px-3 py-2 text-sm font-semibold text-cyan-100" onClick={() => openQuickWorkbench('edit-location')} type="button">
-                          {t('quickWorkbench.editLocation')}
-                        </button>
-                      </div>
-                    </div>
-                  </section>
-                )}
                 <MovementArrows bundle={bundle} context={actionContext} onMove={beginTravel} playState={playState} t={t} />
                 <section className="rounded border border-slate-800 bg-slate-900 p-4" data-testid="home-action-panel">
                   <ActionPanel
@@ -1076,7 +1010,7 @@ export default function App() {
               </section>
             )}
 
-            {visibleHomeTab === 'details' && (
+            {homeTab === 'details' && (
               <ActionDetails
                 bundle={bundle}
                 onStopAction={() => {
@@ -1086,22 +1020,6 @@ export default function App() {
                   });
                   stopAction(runtimeUniverseId, actionContext);
                 }}
-                playState={playState}
-                t={t}
-              />
-            )}
-
-            {visibleHomeTab === 'workbench' && contributionMode && (
-              <ContributionWorkbench
-                baseBundle={useUniverseState.getState().baseBundle ?? bundle}
-                bundle={bundle}
-                draft={contributionDrafts[bundle.manifest.id] ?? emptyContributionDraft(bundle.manifest.id)}
-                onPatchDraft={(patch) => {
-                  updateContributionDraft(bundle.manifest.id, patch);
-                  queueMicrotask(refreshContributionPreview);
-                }}
-                onPlayAction={beginAction}
-                onReplaceState={(state) => { void replaceUniverseState(runtimeUniverseId, state); }}
                 playState={playState}
                 t={t}
               />
@@ -1169,6 +1087,23 @@ export default function App() {
             <section className="grid gap-4 rounded border border-slate-800 bg-slate-900 p-4">
               <h2 className="text-lg font-semibold text-slate-100">{t('settings.title')}</h2>
 
+              <div className="flex gap-2 rounded border border-slate-800 bg-slate-900 p-2" data-testid="settings-tabs">
+                {(['settings', 'mods'] as SettingsTab[]).map((tab) => (
+                  <button
+                    className={`min-w-24 flex-1 rounded px-3 py-2 text-sm font-semibold capitalize ${
+                      settingsTab === tab ? 'bg-cyan-300 text-slate-950' : 'bg-slate-950 text-slate-300'
+                    }`}
+                    data-testid={`settings-tab-${tab}`}
+                    key={tab}
+                    onClick={() => setSettingsTab(tab)}
+                    type="button"
+                  >
+                    {t(`settings.tab.${tab}`)}
+                  </button>
+                ))}
+              </div>
+
+              {settingsTab === 'settings' && (
               <section className="grid gap-3 rounded border border-slate-800 bg-slate-950 p-3">
                 <h3 className="text-sm font-semibold text-slate-100">{t('settings.universe.title')}</h3>
                 <label className="flex items-center justify-between gap-4">
@@ -1189,7 +1124,10 @@ export default function App() {
                   </select>
                 </label>
               </section>
+              )}
 
+              {settingsTab === 'mods' && (
+              <>
               {(contributionMode || (bundle.modules && bundle.modules.length > 0)) && (
                 <section className="grid gap-3 rounded border border-slate-800 bg-slate-950 p-3">
                   <div className="flex flex-wrap items-start justify-between gap-3">
@@ -1203,6 +1141,7 @@ export default function App() {
                         dismissDialogue();
                         setContributionMode(true);
                         setContributionTab('content');
+                        setTab('edit');
                       }}
                       type="button"
                     >
@@ -1228,6 +1167,26 @@ export default function App() {
                 </section>
               )}
 
+              <section className="grid gap-3 rounded border border-slate-800 bg-slate-950 p-3">
+                <h3 className="text-sm font-semibold text-slate-100">{t('contribution.modules.modpacks')}</h3>
+                <p className="text-xs text-slate-400">{t('contribution.modules.packsDescription')}</p>
+                <StructuredDataEditor
+                  onChange={(value) => patchContributionDraft({ modulePacks: (Array.isArray(value) ? value : []) as unknown as ContentModulePack[] })}
+                  schema={{
+                    kind: 'array',
+                    listMode: 'free',
+                    item: modulePackSchema({ ...bundle, modules: uniqueById([...(bundle.modules ?? []), ...(currentContributionDraft?.modules ?? [])]) }),
+                    createItem: () => ({ id: 'new-pack', modules: bundle.modules?.[0] ? [bundle.modules[0].id] : [] }),
+                  }}
+                  t={t}
+                  value={uniqueById([...(currentContributionDraft?.modulePacks ?? []), ...(bundle.modulePacks ?? [])]) as unknown as StructuredValue}
+                />
+              </section>
+              </>
+              )}
+
+              {settingsTab === 'settings' && (
+              <>
               <section className="grid gap-3 rounded border border-slate-800 bg-slate-950 p-3">
                 <h3 className="text-sm font-semibold text-slate-100">{t('settings.appearance.title')}</h3>
                 <label className="flex items-center justify-between gap-4">
@@ -1517,8 +1476,6 @@ export default function App() {
                 )}
               </section>
 
-              {contributionMode && <ContributionMode activeTab={contributionTab} appVersion={APP_VERSION} bundle={bundle} onTabChange={setContributionTab} validationIssues={validationIssues} t={t} />}
-
               <div className="flex items-center justify-between gap-4 rounded border border-rose-900 bg-rose-950/30 p-3">
                 <span>
                   <span className="block text-sm font-semibold text-rose-100">{t('settings.reset.title')}</span>
@@ -1528,6 +1485,8 @@ export default function App() {
                   {t('settings.reset.button')}
                 </button>
               </div>
+              </>
+              )}
             </section>
           </section>
         )}
@@ -1540,7 +1499,7 @@ export default function App() {
           </div>
         </div>
       ) : (
-        visibleActiveTab === 'home' && visibleHomeTab !== 'workbench' && (
+        visibleActiveTab === 'home' && (
           <div className="fixed inset-x-0 bottom-[73px] z-10 h-[33vh] px-4">
             <div className="mx-auto h-full max-w-7xl">
               <ChatPanel compressionEnabled={chatCompressionEnabled} messages={playState.chatMessages} onSend={runCliCommand} t={t} />
@@ -1704,37 +1663,9 @@ export default function App() {
         </div>
       )}
 
-      {quickWorkbenchSheet && contributionMode && currentContributionDraft && (
-        <ContributionQuickWorkbench
-          baseBundle={baseBundle ?? bundle}
-          bundle={bundle}
-          draft={currentContributionDraft}
-          kind={quickWorkbenchSheet}
-          moduleId={quickWorkbenchModuleId}
-          onClose={() => setQuickWorkbenchSheet(null)}
-          onLocationIdChange={(previousId, nextId) => {
-            if (playState.currentLocationId !== previousId) return;
-            void replaceUniverseState(runtimeUniverseId, {
-              ...playState,
-              currentLocationId: nextId,
-              discoveredLocationIds: playState.discoveredLocationIds.map((id) => id === previousId ? nextId : id),
-              activeAction: null,
-              activeTravel: null,
-            });
-          }}
-          onModuleChange={(moduleId) => {
-            setQuickWorkbenchModuleId(moduleId);
-            if (!activeModuleIds.has(moduleId)) void setEnabledModules(bundle.manifest.id, [...activeModuleIds, moduleId]);
-          }}
-          onPatchDraft={patchContributionDraft}
-          playState={playState}
-          t={t}
-        />
-      )}
-
       <nav className="fixed inset-x-0 bottom-0 border-t border-slate-800 bg-slate-950/95 px-4 py-3 backdrop-blur">
-        <div className="mx-auto grid max-w-2xl grid-cols-4 gap-2">
-          {(['map', 'home', 'character', 'settings'] as AppTab[]).map((tab) => (
+        <div className={`mx-auto grid max-w-2xl gap-2 ${contributionMode ? 'grid-cols-5' : 'grid-cols-4'}`}>
+          {(['map', 'home', 'character', 'settings', ...(contributionMode ? ['edit' as const] : [])] as AppTab[]).map((tab) => (
             <button
               className={`rounded px-3 py-3 text-sm font-semibold capitalize ${
                 visibleActiveTab === tab ? 'bg-cyan-300 text-slate-950' : 'bg-slate-900 text-slate-300'

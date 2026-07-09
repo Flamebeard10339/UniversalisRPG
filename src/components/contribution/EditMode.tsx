@@ -1,22 +1,29 @@
-import { useState } from 'react';
 import type { Translator } from '../../game/i18n';
-import type { ContentBundle, ContributionDraft, ValidationIssue } from '../../game/types';
+import type { ContentBundle, ContributionDraft, EntityDefinition, GameAction, LocationNode, ValidationIssue } from '../../game/types';
 import { useContributionState } from '../../stores/contributionState';
 import { useUniverseState } from '../../stores/universeState';
-import { ContentDataEditor, type ContentDataTab } from './ContentDataEditor';
-import { ModuleEditor } from './ModuleEditor';
+import { ContributionContentTab } from './ContributionContentTab';
+import { ContributionMapEditor } from './ContributionMapEditor';
 import { SubmitToGitHub } from './SubmitToGitHub';
 
-type ContributionModeProps = {
-  activeTab: ContributionTab;
+export type EditTab = 'content' | 'map' | 'submit';
+
+export type MapPatch = {
+  locations?: LocationNode[];
+  actions?: GameAction[];
+  entities?: EntityDefinition[];
+  localePatch?: Record<string, string>;
+};
+
+type EditModeProps = {
+  activeTab: EditTab;
   appVersion: string;
   bundle: ContentBundle;
-  onTabChange: (tab: ContributionTab) => void;
+  onMapPatch: (patch: MapPatch) => void;
+  onTabChange: (tab: EditTab) => void;
   validationIssues: ValidationIssue[];
   t: Translator;
 };
-
-export type ContributionTab = 'content' | 'submit';
 
 const emptyDraft = (universeId: string): ContributionDraft => ({
   universeId,
@@ -60,38 +67,22 @@ const emptyDraft = (universeId: string): ContributionDraft => ({
   },
 });
 
-const contributionTabs: ContributionTab[] = ['content', 'submit'];
+const editTabs: EditTab[] = ['content', 'map', 'submit'];
 
-export const ContributionMode = ({ activeTab, appVersion, bundle, onTabChange, validationIssues, t }: ContributionModeProps) => {
+export const EditMode = ({ activeTab, appVersion, bundle, onMapPatch, onTabChange, validationIssues, t }: EditModeProps) => {
   const draft = useContributionState((state) => state.drafts[bundle.manifest.id] ?? emptyDraft(bundle.manifest.id));
   const updateDraft = useContributionState((state) => state.updateDraft);
   const resetDraft = useContributionState((state) => state.resetDraft);
   const baseBundle = useUniverseState((state) => state.baseBundle);
-  const manifests = useUniverseState((state) => state.manifests);
   const refreshContributionPreview = useUniverseState((state) => state.refreshContributionPreview);
-  const [contentTab, setContentTab] = useState<ContentDataTab>('map');
 
   const patchDraft = (patch: Partial<Omit<ContributionDraft, 'universeId'>>) => {
     updateDraft(bundle.manifest.id, patch);
     queueMicrotask(refreshContributionPreview);
   };
 
-  const moveModule = (module: ContributionDraft['modules'][number], originalId: string, targetUniverseId: string) => {
-    updateDraft(bundle.manifest.id, {
-      modules: (draft.modules ?? []).filter((candidate) => candidate.id !== originalId && candidate.id !== module.id),
-    });
-    const targetDraft = useContributionState.getState().getDraft(targetUniverseId) ?? emptyDraft(targetUniverseId);
-    updateDraft(targetUniverseId, {
-      modules: [
-        { ...module, universe: targetUniverseId },
-        ...(targetDraft.modules ?? []).filter((candidate) => candidate.id !== originalId && candidate.id !== module.id),
-      ],
-    });
-    queueMicrotask(refreshContributionPreview);
-  };
-
   return (
-    <section className="grid gap-4" data-testid="contribution-mode">
+    <section className="grid gap-4" data-testid="edit-mode">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold text-slate-100">{t('contribution.title')}</h2>
@@ -109,13 +100,13 @@ export const ContributionMode = ({ activeTab, appVersion, bundle, onTabChange, v
         </button>
       </div>
 
-      <div className="flex gap-2 rounded border border-slate-800 bg-slate-900 p-2" data-testid="contribution-mode-tabs">
-        {contributionTabs.map((tab) => (
+      <div className="flex gap-2 rounded border border-slate-800 bg-slate-900 p-2" data-testid="edit-mode-tabs">
+        {editTabs.map((tab) => (
           <button
             className={`min-w-28 flex-1 rounded px-3 py-2 text-sm font-semibold capitalize ${
               activeTab === tab ? 'bg-cyan-300 text-slate-950' : 'bg-slate-950 text-slate-300'
             }`}
-            data-testid={`contribution-mode-tab-${tab}`}
+            data-testid={`edit-mode-tab-${tab}`}
             key={tab}
             onClick={() => onTabChange(tab)}
             type="button"
@@ -126,28 +117,25 @@ export const ContributionMode = ({ activeTab, appVersion, bundle, onTabChange, v
       </div>
 
       {activeTab === 'content' && (
-        <section className="grid gap-4">
-          <ContentDataEditor
-            activeTab={contentTab}
-            baseBundle={baseBundle ?? bundle}
-            bundle={bundle}
-            draft={draft}
-            issues={validationIssues}
-            onPatch={patchDraft}
-            onTabChange={setContentTab}
-            t={t}
-          />
+        <ContributionContentTab
+          baseBundle={baseBundle ?? bundle}
+          bundle={bundle}
+          draft={draft}
+          issues={validationIssues}
+          onPatch={patchDraft}
+          t={t}
+        />
+      )}
 
-          <ModuleEditor
-            bundle={baseBundle ?? bundle}
-            draft={draft}
-            issues={validationIssues}
-            onMoveModule={moveModule}
-            onPatch={patchDraft}
-            t={t}
-            universeIds={manifests.map((manifest) => manifest.id)}
-          />
-        </section>
+      {activeTab === 'map' && (
+        <ContributionMapEditor
+          bundle={bundle}
+          onActionsChange={(actions) => onMapPatch({ actions })}
+          onEntitiesChange={(entities) => onMapPatch({ entities })}
+          onLocationsChange={(locations) => onMapPatch({ locations })}
+          onLocalesChange={(patch) => onMapPatch({ localePatch: patch })}
+          t={t}
+        />
       )}
 
       {activeTab === 'submit' && (

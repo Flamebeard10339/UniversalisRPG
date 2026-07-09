@@ -147,6 +147,8 @@ const travelEdgeTypes = {
   },
 };
 
+const locationZ = (location: LocationNode) => location.position.z ?? 0;
+
 export const ContributionMapEditor = ({ bundle, onEntitiesChange, onActionsChange, onLocationsChange, onLocalesChange, t }: ContributionMapEditorProps) => {
   const [snapSize, setSnapSize] = useState(8);
   const [editMode, setEditMode] = useState(false);
@@ -156,8 +158,17 @@ export const ContributionMapEditor = ({ bundle, onEntitiesChange, onActionsChang
   const [pendingLocation, setPendingLocation] = useState<{ id: string; point: { x: number; y: number }; travelFromCurrent: boolean; travelToCurrent: boolean } | null>(null);
   const [createEntityToLocation, setCreateEntityToLocation] = useState(true);
   const [newEntityId, setNewEntityId] = useState('');
+  const [zLayer, setZLayer] = useState(() => {
+    const starting = bundle.locations.find((location) => location.starting);
+    return starting ? locationZ(starting) : 0;
+  });
+  const zLayerOptions = useMemo(
+    () => Array.from(new Set([0, ...bundle.locations.map(locationZ)])).sort((a, b) => a - b),
+    [bundle.locations],
+  );
+  const visibleLocations = useMemo(() => bundle.locations.filter((location) => locationZ(location) === zLayer), [bundle.locations, zLayer]);
   const [locationNodes, setLocationNodes] = useState<Node<SimpleNodeData>[]>(() =>
-    bundle.locations.map((location) => ({
+    visibleLocations.map((location) => ({
       id: location.id,
       type: 'simple',
       position: location.position,
@@ -179,7 +190,7 @@ export const ContributionMapEditor = ({ bundle, onEntitiesChange, onActionsChang
 
   useEffect(() => {
     setLocationNodes(
-      bundle.locations.map((location) => ({
+      visibleLocations.map((location) => ({
         id: location.id,
         type: 'simple',
         position: location.position,
@@ -198,14 +209,14 @@ export const ContributionMapEditor = ({ bundle, onEntitiesChange, onActionsChang
         },
       })),
     );
-  }, [bundle.locations, editMode, selectedLocationId]);
+  }, [visibleLocations, editMode, selectedLocationId]);
 
   const normalizedSnapSize = Math.max(1, Math.round(snapSize) || 1);
   const snapGrid = useMemo<[number, number]>(() => [normalizedSnapSize, normalizedSnapSize], [normalizedSnapSize]);
   const selectedLocation = selectedLocationId ? bundle.locations.find((location) => location.id === selectedLocationId) : undefined;
   const selectedAction = selectedActionId ? bundle.actions.find((action) => action.id === selectedActionId) : undefined;
   const travelEdges = useMemo<Edge<TravelEdgeData>[]>(() => {
-    const locationsById = new Map(bundle.locations.map((location) => [location.id, location]));
+    const locationsById = new Map(visibleLocations.map((location) => [location.id, location]));
 
     return bundle.actions.flatMap((action) => {
       const targetId = getPureTravelDestination(action);
@@ -235,7 +246,7 @@ export const ContributionMapEditor = ({ bundle, onEntitiesChange, onActionsChang
         },
       }];
     });
-  }, [bundle.actions, bundle.locations, selectedActionId]);
+  }, [bundle.actions, visibleLocations, selectedActionId]);
 
   const updateLocation = (patch: Partial<LocationNode>) => {
     if (!selectedLocation) {
@@ -243,6 +254,12 @@ export const ContributionMapEditor = ({ bundle, onEntitiesChange, onActionsChang
     }
 
     onLocationsChange(upsertById(bundle.locations, { ...selectedLocation, ...patch }));
+    if (patch.position && patch.position.z !== undefined && patch.position.z !== zLayer) setZLayer(patch.position.z);
+  };
+
+  const updateSelectedLocationZ = (z: number) => {
+    if (!selectedLocation) return;
+    updateLocation({ position: { ...selectedLocation.position, z } });
   };
 
   const removeSelectedLocation = () => {
@@ -267,6 +284,7 @@ export const ContributionMapEditor = ({ bundle, onEntitiesChange, onActionsChang
       upsertById(bundle.locations, {
         ...location,
         position: {
+          ...location.position,
           x: snap(node.position.x, normalizedSnapSize),
           y: snap(node.position.y, normalizedSnapSize),
         },
@@ -294,7 +312,7 @@ export const ContributionMapEditor = ({ bundle, onEntitiesChange, onActionsChang
 
     const location: LocationNode = {
       id: pendingLocation.id,
-      position: pendingLocation.point,
+      position: zLayer !== 0 ? { ...pendingLocation.point, z: zLayer } : pendingLocation.point,
       tags: [],
     };
     const nextLocations = [...bundle.locations, location];
@@ -392,16 +410,32 @@ export const ContributionMapEditor = ({ bundle, onEntitiesChange, onActionsChang
         </div>
       </div>
 
-      <label className="flex max-w-48 items-center gap-2 text-xs text-slate-400">
-        {t('contribution.mapLayout.gridSnap')}
-        <input
-          className="w-20 rounded bg-slate-950 px-2 py-1 text-sm text-slate-100"
-          min="1"
-          onChange={(event) => setSnapSize(Number(event.target.value))}
-          type="number"
-          value={snapSize}
-        />
-      </label>
+      <div className="flex flex-wrap items-center gap-4">
+        <label className="flex max-w-48 items-center gap-2 text-xs text-slate-400">
+          {t('contribution.mapLayout.gridSnap')}
+          <input
+            className="w-20 rounded bg-slate-950 px-2 py-1 text-sm text-slate-100"
+            min="1"
+            onChange={(event) => setSnapSize(Number(event.target.value))}
+            type="number"
+            value={snapSize}
+          />
+        </label>
+
+        <label className="flex max-w-48 items-center gap-2 text-xs text-slate-400">
+          {t('contribution.mapLayout.zLayer')}
+          <select
+            className="rounded bg-slate-950 px-2 py-1 text-sm text-slate-100"
+            data-testid="map-z-layer-select"
+            onChange={(event) => setZLayer(Number(event.target.value))}
+            value={zLayer}
+          >
+            {zLayerOptions.map((z) => (
+              <option key={z} value={z}>{z}</option>
+            ))}
+          </select>
+        </label>
+      </div>
 
       {editMode && (
         <div className="rounded border border-cyan-900 bg-cyan-950/20 px-3 py-2 text-xs text-cyan-100">
@@ -555,6 +589,17 @@ export const ContributionMapEditor = ({ bundle, onEntitiesChange, onActionsChang
                   {t('contribution.mapLayout.startEdge')}
                 </button>
               </div>
+
+              <label className="grid gap-1 text-xs text-slate-400">
+                <span>{t('contribution.mapLayout.zHeight')}</span>
+                <input
+                  className="rounded bg-slate-950 px-2 py-1.5 text-sm text-slate-100"
+                  data-testid="map-z-height-input"
+                  onChange={(event) => updateSelectedLocationZ(Number(event.target.value))}
+                  type="number"
+                  value={selectedLocation.position.z ?? 0}
+                />
+              </label>
 
               <StructuredDataEditor
                 hiddenKeys={['id']}

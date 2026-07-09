@@ -111,14 +111,25 @@ try {
     }
 
     console.log(`[${viewport.name}] load`);
-    await page.goto(baseUrl, { waitUntil: 'networkidle' });
+    // Vite's dev server keeps an HMR websocket open indefinitely, so
+    // 'networkidle' never resolves — wait for DOM content instead and let
+    // the locator assertions below do their own auto-waiting for hydration.
+    await page.goto(baseUrl, { waitUntil: 'domcontentloaded' });
 
-    const actionVisible = await page.getByText('Gather Rumors', { exact: true }).first().isVisible();
+    // Which action is available first depends on which starting location resolves
+    // (that in turn depends on which modules end up enabled), so check the action
+    // panel renders with real content rather than pinning to one specific action.
+    const actionPanel = page.getByTestId('home-action-panel');
+    const actionVisible = await actionPanel.waitFor({ state: 'visible', timeout: 10_000 })
+      .then(() => actionPanel.getByRole('button').count())
+      .then((count) => count > 0)
+      .catch(() => false);
 
     console.log(`[${viewport.name}] settings`);
     const settingsButton = page.getByRole('button', { name: 'Settings', exact: true });
     if (await settingsButton.count() === 0) console.error({ body: await page.locator('body').innerText(), errors });
     await settingsButton.click();
+    await page.getByTestId('settings-tab-mods').click();
 
     const moduleSettingsVisible = await page.getByText('base-core', { exact: true }).first().isVisible();
     const waysideVisible = await page.getByText('wayside-supplies', { exact: true }).first().isVisible();
@@ -127,45 +138,28 @@ try {
       : true;
 
     console.log(`[${viewport.name}] contribution`);
+    await page.getByTestId('settings-tab-settings').click();
     await page.getByText('Contribution mode', { exact: true }).locator('xpath=ancestor::label').getByRole('checkbox').check();
+    const editTabVisible = await page.locator('nav').getByRole('button', { name: 'Edit', exact: true }).isVisible();
+    await page.locator('nav').getByRole('button', { name: 'Edit', exact: true }).click();
     const contributionVisible = await page.getByText('Contribution Mode', { exact: true }).isVisible();
-    await page.locator('nav').getByRole('button', { name: 'Map', exact: true }).click();
-    const mapLayoutVisible = await page.getByText('Map layout', { exact: true }).first().isVisible();
-    let quickWorkbenchOpens = true;
-    let duplicateLocationEntityTurnsRed = true;
-    let duplicateLocationEntityBlocksConfirm = true;
-    let invalidLocationEntityTurnsRed = true;
-    let invalidLocationEntityBlocksConfirm = true;
-    let invalidEditLocationEntityTurnsRed = true;
-    let invalidEditLocationEntityBlocksConfirm = true;
-    let noNumberedLocalContributionVisible = true;
-    if (viewport.name === 'desktop') {
-      await page.locator('nav').getByRole('button', { name: 'Home', exact: true }).evaluate((button) => button.click());
-      await page.getByRole('button', { name: 'Add', exact: true }).click();
-      quickWorkbenchOpens = await page.getByText('Add content', { exact: true }).isVisible();
-      const quickAddOptions = await page.locator('.quick-workbench-sheet select').nth(1).evaluate((element) =>
-        Array.from(element.options).map((option) => option.value),
-      );
-      duplicateLocationEntityTurnsRed = !quickAddOptions.includes('locations');
-      duplicateLocationEntityBlocksConfirm = !quickAddOptions.includes('enemies');
-      invalidLocationEntityTurnsRed = !quickAddOptions.includes('displayProfiles');
-      invalidLocationEntityBlocksConfirm = !quickAddOptions.includes('locations');
-      invalidEditLocationEntityTurnsRed = !quickAddOptions.includes('enemies');
-      invalidEditLocationEntityBlocksConfirm = !quickAddOptions.includes('displayProfiles');
-      await page.mouse.click(8, 8);
-      await page.locator('nav').getByRole('button', { name: 'Settings', exact: true }).evaluate((button) => button.click());
-      noNumberedLocalContributionVisible = await page.getByText(/^local-contribution-\d+$/).count() === 0;
-    }
-    await page.locator('nav').getByRole('button', { name: 'Settings', exact: true }).click();
-    await page.getByRole('button', { name: 'base-core', exact: true }).first().click();
 
-    console.log(`[${viewport.name}] mod editor`);
-    const detailsVisible = await page.getByRole('button', { name: 'Details', exact: true }).isVisible();
-    await page.getByRole('button', { name: 'Data', exact: true }).click();
-    const coreLocationVisible = await page.getByText('crossroads', { exact: true }).first().isVisible();
-    await page.getByRole('button', { name: 'Raw', exact: true }).click();
-    const rawJson = await page.locator('textarea').last().inputValue();
-    const rawContainsCore = rawJson.includes('"id": "base-core"') && rawJson.includes('"id": "crossroads"');
+    console.log(`[${viewport.name}] edit - map`);
+    await page.getByTestId('edit-mode-tab-map').click();
+    const mapLayoutVisible = await page.getByText('Map layout', { exact: true }).first().isVisible();
+    const zLayerVisible = await page.getByTestId('map-z-layer-select').isVisible();
+
+    console.log(`[${viewport.name}] edit - content`);
+    await page.getByTestId('edit-mode-tab-content').click();
+    await page.getByTestId('dsl-module-select').selectOption('base-core');
+    const notMigratedVisible = await page.getByText(/doesn't have DSL source yet/, { exact: false }).first().isVisible();
+    await page.getByTestId('dsl-module-select').selectOption('tutorial-island-guide-house');
+    const dslEditorVisible = await page.getByTestId('dsl-module-editor').waitFor({ state: 'visible', timeout: 10_000 }).then(() => true).catch(() => false);
+    const dslStatusBannerVisible = await page.getByTestId('dsl-status-banner').isVisible();
+
+    console.log(`[${viewport.name}] edit - submit`);
+    await page.getByTestId('edit-mode-tab-submit').click();
+    const issueBodyVisible = await page.locator('textarea').last().isVisible();
 
     await page.screenshot({ fullPage: true, path: path.join(os.tmpdir(), `universalis-mod-centric-${viewport.name}.png`) });
 
@@ -175,19 +169,14 @@ try {
       moduleSettingsVisible,
       waysideVisible,
       badDraftRecoveryVisible,
-      quickWorkbenchOpens,
-      duplicateLocationEntityTurnsRed,
-      duplicateLocationEntityBlocksConfirm,
-      invalidLocationEntityTurnsRed,
-      invalidLocationEntityBlocksConfirm,
-      invalidEditLocationEntityTurnsRed,
-      invalidEditLocationEntityBlocksConfirm,
-      noNumberedLocalContributionVisible,
+      editTabVisible,
       contributionVisible,
       mapLayoutVisible,
-      detailsVisible,
-      coreLocationVisible,
-      rawContainsCore,
+      zLayerVisible,
+      notMigratedVisible,
+      dslEditorVisible,
+      dslStatusBannerVisible,
+      issueBodyVisible,
       errors,
     });
     await page.close();
@@ -202,19 +191,14 @@ const failed = results.some((result) =>
   !result.moduleSettingsVisible ||
   !result.waysideVisible ||
   !result.badDraftRecoveryVisible ||
-  !result.quickWorkbenchOpens ||
-  !result.duplicateLocationEntityTurnsRed ||
-  !result.duplicateLocationEntityBlocksConfirm ||
-  !result.invalidLocationEntityTurnsRed ||
-  !result.invalidLocationEntityBlocksConfirm ||
-  !result.invalidEditLocationEntityTurnsRed ||
-  !result.invalidEditLocationEntityBlocksConfirm ||
-  !result.noNumberedLocalContributionVisible ||
+  !result.editTabVisible ||
   !result.contributionVisible ||
   !result.mapLayoutVisible ||
-  !result.detailsVisible ||
-  !result.coreLocationVisible ||
-  !result.rawContainsCore ||
+  !result.zLayerVisible ||
+  !result.notMigratedVisible ||
+  !result.dslEditorVisible ||
+  !result.dslStatusBannerVisible ||
+  !result.issueBodyVisible ||
   result.errors.length > 0
 );
 

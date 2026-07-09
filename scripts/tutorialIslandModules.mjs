@@ -1,8 +1,8 @@
-// Content definitions for the Tutorial Island mods.
-// This module only produces DATA. Getting that data into the game happens
-// entirely through the real content editor (see build-tutorial-island.mjs,
-// which drives scripts/mod-editor-cli.mjs's authorModule command) — nothing
-// here writes to public/content directly.
+// Content definitions for the Tutorial Island mods, still in the legacy
+// hand-written-JSON format. This is being phased out in favor of hand-authored
+// DSL markdown modules (see docs/content-dsl-grammar.md and
+// scripts/contentDsl/samples/*.md) — new modules should be authored as DSL
+// directly, not added here.
 
 const moduleHeader = (id, dependencies = []) => ({
   $schema: 'https://universalis-rpg.local/schema/module.schema.json',

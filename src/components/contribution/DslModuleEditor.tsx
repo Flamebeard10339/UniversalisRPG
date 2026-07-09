@@ -23,8 +23,17 @@ type DslModuleEditorProps = {
   draft: ContributionDraft;
   issues: ValidationIssue[];
   onPatch: (patch: Partial<Omit<ContributionDraft, 'universeId'>>) => void;
+  onStatusChange?: (status: DslEditorStatus) => void;
   t: Translator;
 };
+
+// Surfaced to a parent-owned status banner (see ContributionContentTab) instead
+// of being rendered inline here, so the editor's caller can show one fixed-height
+// status surface instead of conditionally-present boxes that shift layout.
+export type DslEditorStatus =
+  | { kind: 'loading' | 'unavailable' | 'good' }
+  | { kind: 'error'; message: string; revert: (() => void) | null }
+  | { kind: 'disabled'; message: string };
 
 // A missing static file doesn't always come back as a literal 404 — Vite's
 // dev server serves its SPA-fallback index.html with a 200 for any
@@ -46,9 +55,7 @@ const fetchModuleDslSource = async (universeId: string, moduleId: string): Promi
   return text;
 };
 
-const formatTime = (timestamp: number) => new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
-export const DslModuleEditor = ({ moduleId, universeId, bundle, draft, issues, onPatch, t }: DslModuleEditorProps) => {
+export const DslModuleEditor = ({ moduleId, universeId, bundle, draft, issues, onPatch, onStatusChange, t }: DslModuleEditorProps) => {
   const [availability, setAvailability] = useState<'loading' | 'available' | 'new' | 'unavailable'>('loading');
   const [compileError, setCompileError] = useState<{ message: string } | null>(null);
 
@@ -90,6 +97,41 @@ export const DslModuleEditor = ({ moduleId, universeId, bundle, draft, issues, o
       cancelled = true;
     };
   }, [moduleId, universeId, hydrate, discardDraft, openDraft]);
+
+  // A module can compile cleanly and still never reach the live game: module
+  // resolution (applyModulesToBundle) disables a module outright when it
+  // conflicts with another module or one of its dependencies is itself
+  // disabled — e.g. referencing a new flag via `set:`/`unset:` without
+  // declaring it in this module's own flags list. That shows up only as a
+  // warning-severity `validation.moduleDisabled`/`moduleConflictDisabled`
+  // issue buried in the general issues list, with nothing else signaling
+  // "this edit didn't take effect" — surface it in the status banner instead
+  // of requiring a manual scan of that list.
+  const modulePath = `modules.${moduleId}`;
+  const conflictIssue = issues.find((candidate) => candidate.path === modulePath && candidate.message === 'validation.moduleConflictDisabled');
+  const disabledIssue = conflictIssue ?? issues.find((candidate) => candidate.path === modulePath && candidate.message === 'validation.moduleDisabled');
+
+  useEffect(() => {
+    if (!onStatusChange) return;
+    if (availability === 'loading') {
+      onStatusChange({ kind: 'loading' });
+    } else if (availability === 'unavailable') {
+      onStatusChange({ kind: 'unavailable' });
+    } else if (compileError) {
+      const canRevert = dslDraft?.lastValidSource !== undefined && dslDraft.source !== dslDraft.lastValidSource;
+      onStatusChange({ kind: 'error', message: compileError.message, revert: canRevert ? () => revertToLastValid(moduleId) : null });
+    } else if (disabledIssue) {
+      onStatusChange({
+        kind: 'disabled',
+        message: conflictIssue
+          ? t('contribution.dsl.moduleConflictDisabled', 'This module compiled, but is currently disabled — it conflicts with another module or dependency over "{key}". See Validation issues below.', { key: conflictIssue.params?.key ?? moduleId })
+          : t('contribution.dsl.moduleDisabled', 'This module compiled, but is currently disabled (a dependency is missing or disabled). See Validation issues below.'),
+      });
+    } else {
+      onStatusChange({ kind: 'good' });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [availability, compileError, conflictIssue, disabledIssue, dslDraft?.lastValidSource, dslDraft?.source, moduleId]);
 
   // Everything the linter/completion callbacks need, other than `moduleId`
   // itself, is read through this ref rather than baked into `extensions`'s
@@ -157,76 +199,10 @@ export const DslModuleEditor = ({ moduleId, universeId, bundle, draft, issues, o
     [moduleId],
   );
 
-  if (availability === 'loading') return <p className="text-sm text-slate-400">{t('contribution.dsl.loading', 'Loading…')}</p>;
-
-  if (availability === 'unavailable') {
-    return (
-      <section className="grid gap-2 rounded border border-slate-700 p-3">
-        <p className="text-sm text-slate-300">
-          {t('contribution.dsl.notMigrated', '"{id}" doesn\'t have DSL source yet — it\'s still authored as raw JSON.', { id: moduleId })}
-        </p>
-      </section>
-    );
-  }
-
-  const isShowingStale = compileError !== null && dslDraft?.lastValidSource !== undefined && dslDraft.source !== dslDraft.lastValidSource;
-
-  // A module can compile cleanly and still never reach the live game: module
-  // resolution (applyModulesToBundle) disables a module outright when it
-  // conflicts with another module or one of its dependencies is itself
-  // disabled — e.g. referencing a new flag via `set:`/`unset:` without
-  // declaring it in this module's own flags list. That shows up only as a
-  // warning-severity `validation.moduleDisabled`/`moduleConflictDisabled`
-  // issue buried in the general issues list below, with nothing in the
-  // editor itself signaling "this edit didn't take effect" — surface it here
-  // instead of requiring a manual scan of that list.
-  const modulePath = `modules.${moduleId}`;
-  const conflictIssue = issues.find((candidate) => candidate.path === modulePath && candidate.message === 'validation.moduleConflictDisabled');
-  const disabledIssue = conflictIssue ?? issues.find((candidate) => candidate.path === modulePath && candidate.message === 'validation.moduleDisabled');
+  if (availability === 'loading' || availability === 'unavailable') return null;
 
   return (
     <section className="grid gap-3" data-testid="dsl-module-editor">
-      {compileError && (
-        <div className="rounded border border-red-500 bg-red-950/40 p-3 text-sm text-red-200">
-          <p>{compileError.message}</p>
-          {isShowingStale && dslDraft?.lastValidSource !== undefined && (
-            <div className="mt-2 flex items-center gap-2">
-              <span>
-                {t('contribution.dsl.showingLastValid', 'Showing the last valid version from {time}.', { time: formatTime(dslDraft.updatedAt) })}
-              </span>
-              <button
-                className="rounded border border-red-400 px-2 py-1 text-xs font-semibold text-red-100"
-                onClick={() => revertToLastValid(moduleId)}
-                type="button"
-              >
-                {t('contribution.dsl.revert', 'Revert to it')}
-              </button>
-            </div>
-          )}
-        </div>
-      )}
-
-      {!compileError && disabledIssue && (
-        <div className="rounded border border-amber-500 bg-amber-950/40 p-3 text-sm text-amber-200" data-testid="dsl-module-disabled-banner">
-          {conflictIssue ? (
-            <p>
-              {t(
-                'contribution.dsl.moduleConflictDisabled',
-                'This module compiled, but is currently disabled — it conflicts with another module or dependency over "{key}". See Validation issues below.',
-                { key: conflictIssue.params?.key ?? moduleId },
-              )}
-            </p>
-          ) : (
-            <p>
-              {t(
-                'contribution.dsl.moduleDisabled',
-                'This module compiled, but is currently disabled (a dependency is missing or disabled). See Validation issues below.',
-              )}
-            </p>
-          )}
-        </div>
-      )}
-
       <CodeMirror
         basicSetup={{ closeBrackets: false, autocompletion: false, completionKeymap: false }}
         extensions={extensions}
