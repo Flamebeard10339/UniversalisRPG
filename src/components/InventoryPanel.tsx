@@ -133,7 +133,7 @@ export const InventoryPanel = ({ bundle, onDrop, onEat, onEquip, onStartAction, 
                       onClick={() => onStartAction(action)}
                       type="button"
                     >
-                      {getActionTitleText(action, bundle, t)}
+                      {getActionTitleText(action, bundle, t, playState, actionContext)}
                     </button>
                   ))}
                   <button

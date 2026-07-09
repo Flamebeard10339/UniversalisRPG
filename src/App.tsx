@@ -219,11 +219,11 @@ export default function App() {
   const updateContributionDraft = useContributionState((state) => state.updateDraft);
   const refreshContributionPreview = useUniverseState((state) => state.refreshContributionPreview);
   const actionTitleFor = (actionId?: string) => {
-    if (!bundle || !actionId) {
+    if (!bundle || !actionId || !playState) {
       return actionId ?? '';
     }
     const action = bundle.actions.find((candidate) => candidate.id === actionId);
-    return action ? getActionTitleText(action, bundle, t) : actionId;
+    return action ? getActionTitleText(action, bundle, t, playState, actionContext) : actionId;
   };
 
   useEffect(() => {

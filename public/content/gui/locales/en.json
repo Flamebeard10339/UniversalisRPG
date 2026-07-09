@@ -193,7 +193,7 @@
   "actionPanel.noRecipesAvailable": "Nothing to use here yet.",
   "groundItems.title": "On the Ground",
   "groundItems.pickUp": "Pick up",
-  "action.travel.title": "Travel to {location}",
+  "action.travel.title": "Travel to {location} ({duration}s)",
   "action.travel.description": "Go to {location}.",
   "actionDetails.empty": "No actions being taken.",
   "actionDetails.player": "Player",

@@ -1,6 +1,6 @@
 import { actionDescriptionKey, actionFailureKey, actionSuccessKey, actionTitleKey, entityTitleKey, locationTitleKey } from './contentIds';
-import { getPureTravelDestination } from './travel';
-import type { ContentBundle, GameAction } from './types';
+import { getPureTravelDestination, getTravelActionDurationSeconds } from './travel';
+import type { ActionResolutionContext, ContentBundle, GameAction, UniversePlayState } from './types';
 import type { Translator } from './i18n';
 
 export const isTravelAction = (action: GameAction) => action.role === 'travel' && Boolean(getPureTravelDestination(action));
@@ -29,10 +29,20 @@ const actionEntityLabel = (action: GameAction, bundle: ContentBundle, t: Transla
   return t(entityTitleKey(action.entityId), entity?.id ?? action.entityId);
 };
 
-export const getActionTitleText = (action: GameAction, bundle: ContentBundle, t: Translator) => {
+export const getActionTitleText = (
+  action: GameAction,
+  bundle: ContentBundle,
+  t: Translator,
+  state: UniversePlayState,
+  context: ActionResolutionContext,
+) => {
   const destinationId = getPureTravelDestination(action);
   if (destinationId) {
-    return t(actionTitleKey(action.id), t('action.travel.title', { location: travelActionLocationLabel(bundle, destinationId, t) }));
+    const duration = Math.round(getTravelActionDurationSeconds(action, state, context) ?? 0);
+    return t(actionTitleKey(action.id), t('action.travel.title', {
+      location: travelActionLocationLabel(bundle, destinationId, t),
+      duration,
+    }));
   }
   const entity = actionEntityLabel(action, bundle, t);
   return entity

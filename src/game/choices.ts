@@ -79,7 +79,7 @@ export const visibleChoices = (
         choiceId: `${ACTION_PREFIX}${action.id}`,
         kind,
         entityId,
-        title: getActionTitleText(action, bundle, t),
+        title: getActionTitleText(action, bundle, t, state, context),
         description: getActionDescriptionText(action, bundle, t),
         requirementsMet: canStartAction(state, action, context),
       }];
@@ -92,7 +92,7 @@ export const visibleChoices = (
         choiceId: `${ACTION_PREFIX}${action.id}${RECIPE_SEPARATOR}${recipe.id}`,
         kind,
         entityId,
-        title: itemId ? t(itemTitleKey(itemId), itemId) : getActionTitleText(action, bundle, t),
+        title: itemId ? t(itemTitleKey(itemId), itemId) : getActionTitleText(action, bundle, t, state, context),
         description: getActionDescriptionText(action, bundle, t),
         requirementsMet: canStartAction(state, resolved, context),
       };
@@ -123,7 +123,7 @@ export const visibleChoices = (
         choiceId: `${ACTION_PREFIX}${action.id}`,
         kind: 'item-action' as const,
         itemId,
-        title: getActionTitleText(action, bundle, t),
+        title: getActionTitleText(action, bundle, t, state, context),
         description: getActionDescriptionText(action, bundle, t),
         requirementsMet: true,
       })));

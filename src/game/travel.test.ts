@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createInitialPlayState, resolveDueTimers, startTravel } from './timers';
-import { findTravelPath, getAvailableTravelEdgesForNode, getLocationInDirection, getVisibleTravelGraph } from './travel';
+import { findTravelPath, getAvailableTravelEdgesForNode, getLocationInDirection, getTravelActionDurationSeconds, getVisibleTravelGraph } from './travel';
 import type { ActionResolutionContext, GameAction, LocationNode, UniverseUiSettings } from './types';
 
 const travelAction = (id: string, source: string, target: string, durationSeconds = 1, patch: Partial<GameAction> = {}): GameAction => ({
@@ -54,6 +54,43 @@ describe('travel actions', () => {
     const edges = getAvailableTravelEdgesForNode(state, context(actions), 'start');
 
     expect(edges.map((edge) => edge.action.id)).toEqual(['go-middle']);
+  });
+
+  it('computes a travel action\'s display duration to match the edge the map/pathfinding would compute', () => {
+    const goMiddle = travelAction('go-middle', 'start', 'middle');
+    const actions = [goMiddle];
+    const state = createInitialPlayState('test', 'start');
+    const testContext = context(actions);
+    const edge = getAvailableTravelEdgesForNode(state, testContext, 'start')[0];
+
+    expect(getTravelActionDurationSeconds(goMiddle, state, testContext)).toBe(edge.travelTimeSeconds);
+  });
+
+  it('resolves the source location from entityId for a free-standing (ladder-style) travel action', () => {
+    const ladderUp: GameAction = {
+      id: 'ladder-up',
+      entityId: 'ladder',
+      role: 'travel',
+      rewards: [],
+      results: [{ kind: 'relocate', locationId: 'middle' }],
+    };
+    const state = createInitialPlayState('test', 'start');
+    const testContext: ActionResolutionContext = {
+      ...context([ladderUp]),
+      locations: [
+        { id: 'start', position: { x: 0, y: 0 }, starting: true, entities: ['ladder'] },
+        { id: 'middle', position: { x: 1, y: 0 } },
+      ],
+    };
+
+    expect(getTravelActionDurationSeconds(ladderUp, state, testContext)).toBeGreaterThan(0);
+  });
+
+  it('returns null for a non-travel action', () => {
+    const notTravel: GameAction = { id: 'chop-tree', locationId: 'start', rewards: [], durationSeconds: 1 };
+    const state = createInitialPlayState('test', 'start');
+
+    expect(getTravelActionDurationSeconds(notTravel, state, context([notTravel]))).toBeNull();
   });
 
   it('pathfinds through explored nodes only', () => {

@@ -135,7 +135,7 @@ export const ActionPanel = ({ bundle, debugEnabled, playState, onPickUpGroundIte
             style={{ width: `${actionProgress}%` }}
           />
         )}
-        <span className="relative block text-sm font-semibold text-slate-100">{options.titleOverride ?? getActionTitleText(action, bundle, t)}</span>
+        <span className="relative block text-sm font-semibold text-slate-100">{options.titleOverride ?? getActionTitleText(action, bundle, t, playState, actionContext)}</span>
         {!options.entityAction && (
           <span className="relative mt-1 block text-xs text-slate-400">{getActionDescriptionText(action, bundle, t)}</span>
         )}
@@ -186,7 +186,7 @@ export const ActionPanel = ({ bundle, debugEnabled, playState, onPickUpGroundIte
           {isTravelling
             ? t('actionPanel.travelling')
             : activeAction
-              ? t('actionPanel.working', { action: activeRecipeItemTitle ?? getActionTitleText(activeAction, bundle, t) })
+              ? t('actionPanel.working', { action: activeRecipeItemTitle ?? getActionTitleText(activeAction, bundle, t, playState, actionContext) })
               : t('actionPanel.choose')}
         </p>
       </div>

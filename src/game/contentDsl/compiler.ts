@@ -370,8 +370,6 @@ const compileLocation = (
   const locationActionIds: string[] = [];
   for (const edge of section.adjacent) {
     const edgeId = `adjacent-${section.id}-to-${edge.toLocationId}`;
-    locale.set(`action.${edgeId}.title`, 'Leave');
-    locale.set(`action.${edgeId}.description`, 'Leave.');
     setDefaultOutcomeLocale(locale, `action.${edgeId}`, { success: 'Done.', failure: 'Nothing happens.' });
 
     actions.push({
