@@ -57,8 +57,8 @@ export const ContributionContentTab = ({ baseBundle, bundle, draft, issues, onPa
 
   return (
     <section className="grid h-full grid-rows-[auto_auto_auto_1fr] gap-3 overflow-hidden" data-testid="edit-content-tab">
-      <div className="flex flex-wrap items-end gap-2">
-        <div className="flex items-end gap-2">
+      <div className="flex flex-wrap items-center gap-2 my-2">
+        <div className="flex items-center gap-2">
           <label className="text-sm text-slate-300 whitespace-nowrap">
             {t('contribution.dsl.selectModule', 'Mod')}
           </label>
@@ -73,7 +73,7 @@ export const ContributionContentTab = ({ baseBundle, bundle, draft, issues, onPa
             ))}
           </select>
         </div>
-        <div className="flex items-end gap-2">
+        <div className="flex items-center gap-2">
           <input
             className="rounded bg-slate-950 px-3 py-2 text-sm text-slate-100"
             onChange={(event) => setNewModuleDraftId(event.target.value)}
