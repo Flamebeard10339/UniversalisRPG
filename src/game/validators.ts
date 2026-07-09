@@ -191,6 +191,16 @@ const validateEntitiesShape = (entities: unknown): entities is EntityDefinition[
 
 const comparisons = new Set(['equal', 'greater-than', 'less-than']);
 
+const validateConditionalTextFragmentShape = (fragment: unknown): boolean => {
+  if (!isRecord(fragment) || !hasString(fragment, 'kind')) return false;
+  if (fragment.kind === 'literal') return hasString(fragment, 'text');
+  if (fragment.kind === 'conditional') return hasString(fragment, 'text') && validateConditionShape(fragment.condition);
+  return false;
+};
+
+const validateConditionalTextShape = (value: unknown): boolean =>
+  Array.isArray(value) && value.every(validateConditionalTextFragmentShape);
+
 const validateConditionShape = (value: unknown): value is Condition => {
   if (!isRecord(value) || !hasString(value, 'kind')) return false;
   if (value.kind === 'all' || value.kind === 'any') {
@@ -265,9 +275,15 @@ const validateActionResultShape = (value: unknown) => {
   if (value.kind === 'bank-withdraw') return hasString(value, 'itemId') && hasNumber(value, 'amount');
   if (value.kind === 'set-spawn') return hasString(value, 'locationId');
   if (value.kind === 'open-modal') return hasString(value, 'modalId');
-  return value.kind === 'chat'
-    && hasString(value, 'messageKey')
-    && (value.delaySeconds === undefined || (typeof value.delaySeconds === 'number' && value.delaySeconds >= 0 && value.delaySeconds <= 2));
+  if (value.kind === 'chat') {
+    return hasString(value, 'messageKey')
+      && (value.delaySeconds === undefined || (typeof value.delaySeconds === 'number' && value.delaySeconds >= 0 && value.delaySeconds <= 2));
+  }
+  if (value.kind === 'conditional-chat') {
+    return validateConditionalTextShape(value.fragments)
+      && (value.delaySeconds === undefined || (typeof value.delaySeconds === 'number' && value.delaySeconds >= 0 && value.delaySeconds <= 2));
+  }
+  return false;
 };
 
 const validateActionsShape = (actions: unknown): actions is GameAction[] =>

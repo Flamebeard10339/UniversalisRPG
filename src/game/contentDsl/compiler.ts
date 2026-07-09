@@ -19,6 +19,8 @@ import {
 import type {
   ActionResult,
   Condition,
+  ConditionalText,
+  ConditionalTextFragment,
   ContentModule,
   DialogueDefinition,
   DialogueNode,
@@ -60,6 +62,7 @@ import type {
   DslSkillSection,
   DslStatSection,
   DslTag,
+  DslText,
 } from './types';
 
 class LocaleBuilder {
@@ -127,6 +130,12 @@ const toCondition = (cond: DslCondition, pack: string): Condition => {
   }
 };
 
+const toConditionalText = (text: DslText, pack: string): ConditionalText =>
+  text.map((fragment: DslText[number]) => {
+    if (fragment.kind === 'literal') return { kind: 'literal', text: fragment.text };
+    return { kind: 'conditional', condition: toCondition((fragment as Extract<DslText[number], { kind: 'conditional' }>).cond, pack), text: fragment.text };
+  });
+
 const combineConditions = (a: Condition | undefined, b: Condition | undefined): Condition | undefined => {
   if (!a) return b;
   if (!b) return a;
@@ -161,13 +170,15 @@ const tagToReward = (tag: DslTag, dropTableIds: Set<string>): Reward | null => {
   return null;
 };
 
+const hasConditionals = (text: DslText): boolean =>
+  text.some((fragment) => fragment.kind === 'conditional');
+
 const tagToActionResult = (
   tag: DslTag,
   locale: LocaleBuilder,
   chatKeyBase: string,
   chatCounter: { n: number },
   pack: string,
-  assignment: Record<string, boolean>,
 ): ActionResult | null => {
   if (tag.keyword === 'give') return { kind: 'item', itemId: tag.itemId, amount: tag.amount };
   if (tag.keyword === 'take') return { kind: 'item', itemId: tag.itemId, amount: -tag.amount };
@@ -180,9 +191,17 @@ const tagToActionResult = (
   if (tag.keyword === 'relocate') return { kind: 'relocate', locationId: tag.locationId };
   if (tag.keyword === 'setSpawn') return { kind: 'set-spawn', locationId: tag.locationId };
   if (tag.keyword === 'say') {
+    if (hasConditionals(tag.text)) {
+      return { kind: 'conditional-chat', fragments: toConditionalText(tag.text, pack) };
+    }
     chatCounter.n += 1;
     const key = chatCounter.n === 1 ? chatKeyBase : `${chatKeyBase}-${chatCounter.n}`;
-    locale.set(key, renderTextForAssignment(tag.text, assignment));
+    const plainText = tag.text
+      .filter((fragment) => fragment.kind === 'literal')
+      .map((fragment) => fragment.text)
+      .join('')
+      .trim();
+    locale.set(key, plainText);
     return { kind: 'chat', messageKey: key };
   }
   return null;
@@ -222,35 +241,11 @@ const deriveVisibleWhen = (tags: DslTag[], onSuccessTags: DslTag[], actionId: st
   return { kind: 'all', conditions: parts };
 };
 
-// ---------------------------------------------------------------------------
-// Entity actions, with inline-conditional-text variant expansion.
-//
-// `examine: text` is pure sugar for an action whose only tag is `say: text`
-// (see parser.ts) — so a `say` tag's inline conditionals are handled once,
-// generically, for *any* action, not as an examine-specific special case.
-// If none of an action's `say` tags reference conditional text, it compiles
-// to exactly one EntityActionDefinition, same as before v0.1's examine sugar
-// existed. If they do, it expands into 2^n variants (n = distinct flags
-// referenced across all its `say` tags) sharing one title key — the
-// visibleWhen-gated-variants pattern CLAUDE.md documents for state-dependent
-// flavor text, generated instead of hand-written.
-// ---------------------------------------------------------------------------
-const allAssignments = (flags: string[]): Record<string, boolean>[] => {
-  const total = 2 ** flags.length;
-  const assignments: Record<string, boolean>[] = [];
-  for (let mask = 0; mask < total; mask++) {
-    const assignment: Record<string, boolean> = {};
-    flags.forEach((flag, index) => {
-      assignment[flag] = Boolean(mask & (1 << index));
-    });
-    assignments.push(assignment);
-  }
-  return assignments;
-};
-
 // `scope` only changes the locale-key prefix (`action.entity.x`/`action.item.x`)
 // — entities and items otherwise compile through the identical pipeline.
 // Items never go through the `enemy:` branch (see compileItemAction).
+// Inline conditionals in `say:` tags are now evaluated at runtime via
+// conditional-chat ActionResult instead of being expanded into 2^n variants.
 const compileActionVariants = (
   scope: 'entity' | 'item',
   ownerId: string,
@@ -275,82 +270,66 @@ const compileActionVariants = (
   const enemyTag = decl.tags.find((tag): tag is Extract<DslTag, { keyword: 'enemy' }> => tag.keyword === 'enemy');
   const requiresTag = decl.tags.find((tag): tag is Extract<DslTag, { keyword: 'requires' }> => tag.keyword === 'requires');
   const requirements = requiresTag ? toCondition(requiresTag.cond, pack) : undefined;
-  const baseVisibleWhen = deriveVisibleWhen(decl.tags, decl.onSuccessTags, baseActionId, pack);
+  const visibleWhen = deriveVisibleWhen(decl.tags, decl.onSuccessTags, baseActionId, pack);
   const maxTag = decl.tags.find((tag): tag is Extract<DslTag, { keyword: 'max' }> => tag.keyword === 'max');
   const maxCompletions = decl.tags.some((tag) => tag.keyword === 'once') ? 1 : maxTag?.count;
   const chanceTag = decl.tags.find((tag): tag is Extract<DslTag, { keyword: 'chance' }> => tag.keyword === 'chance');
 
-  const sayTags = [...decl.tags, ...decl.onSuccessTags, ...decl.onFailTags].filter((tag): tag is Extract<DslTag, { keyword: 'say' }> => tag.keyword === 'say');
-  const flags = Array.from(new Set(sayTags.flatMap((tag) => collectTextFlags(tag.text))));
-  const assignments = flags.length === 0 ? [{}] : allAssignments(flags);
+  const chatKeyBase = `chat.${scope}.${ownerId}.${baseActionId}`;
+  const chatCounter = { n: 0 };
+  const actionKeyBase = `action.${scope}.${ownerId}.${baseActionId}`;
 
-  return assignments.map((assignment, index) => {
-    const actionId = flags.length === 0 ? baseActionId : index === 0 ? baseActionId : `${baseActionId}-${index + 1}`;
-    const chatKeyBase = flags.length === 0
-      ? `chat.${scope}.${ownerId}.${baseActionId}`
-      : `chat.${scope}.${ownerId}.${baseActionId}.${index}`;
-    const chatCounter = { n: 0 };
-    const variantCondition = flags.length === 0
-      ? undefined
-      : flags.length === 1
-        ? flagCondition(resolveFlagId(flags[0], pack), assignment[flags[0]])
-        : { kind: 'all', conditions: flags.map((flag) => flagCondition(resolveFlagId(flag, pack), assignment[flag])) } as Condition;
-    const visibleWhen = combineConditions(baseVisibleWhen, variantCondition);
-
-    const actionKeyBase = `action.${scope}.${ownerId}.${actionId}`;
-
-    if (enemyTag) {
-      const rewards = decl.tags
-        .filter((tag) => tag.keyword === 'give' || tag.keyword === 'xp' || tag.keyword === 'take' || tag.keyword === 'droptable')
-        .map((tag) => tagToReward(tag, dropTableIds))
-        .filter((reward): reward is Reward => reward !== null);
-      const results = decl.onSuccessTags
-        .map((tag) => tagToActionResult(tag, locale, chatKeyBase, chatCounter, pack, assignment))
-        .filter((result): result is ActionResult => result !== null);
-      setDefaultOutcomeLocale(locale, actionKeyBase, {
-        success: 'You hit the {entity}.',
-        failure: 'You miss the {entity}.',
-        kill: 'The {entity} drops.',
-      });
-      return {
-        id: actionId,
-        durationSeconds: 2,
+  if (enemyTag) {
+    const rewards = decl.tags
+      .filter((tag) => tag.keyword === 'give' || tag.keyword === 'xp' || tag.keyword === 'take' || tag.keyword === 'droptable')
+      .map((tag) => tagToReward(tag, dropTableIds))
+      .filter((reward): reward is Reward => reward !== null);
+    const results = decl.onSuccessTags
+      .map((tag) => tagToActionResult(tag, locale, chatKeyBase, chatCounter, pack))
+      .filter((result): result is ActionResult => result !== null);
+    setDefaultOutcomeLocale(locale, actionKeyBase, {
+      success: 'You hit the {entity}.',
+      failure: 'You miss the {entity}.',
+      kill: 'The {entity} drops.',
+    });
+    return [{
+      id: baseActionId,
+      durationSeconds: 2,
+      interactionTypeId: enemyTag.interactionTypeId,
+      enemy: {
         interactionTypeId: enemyTag.interactionTypeId,
-        enemy: {
-          interactionTypeId: enemyTag.interactionTypeId,
-          stats: enemyTag.stats as Partial<Record<EnemyStatKey, number>>,
-          showHealthBar: true,
-          rewards: [],
-        },
-        rewards,
-        results,
-        ...(requirements ? { requirements } : {}),
-        ...(visibleWhen ? { visibleWhen } : {}),
-        ...(maxCompletions ? { maxCompletions } : {}),
-      };
-    }
-
-    const results = [...decl.tags, ...decl.onSuccessTags]
-      .map((tag) => tagToActionResult(tag, locale, chatKeyBase, chatCounter, pack, assignment))
-      .filter((result): result is ActionResult => result !== null);
-    const failureResults = decl.onFailTags
-      .map((tag) => tagToActionResult(tag, locale, `${chatKeyBase}-fail`, { n: 0 }, pack, assignment))
-      .filter((result): result is ActionResult => result !== null);
-
-    setDefaultOutcomeLocale(locale, actionKeyBase, { success: 'Done.', failure: 'Nothing happens.' });
-
-    return {
-      id: actionId,
-      instant: true,
-      rewards: [],
+        stats: enemyTag.stats as Partial<Record<EnemyStatKey, number>>,
+        showHealthBar: true,
+        rewards: [],
+      },
+      rewards,
       results,
       ...(requirements ? { requirements } : {}),
       ...(visibleWhen ? { visibleWhen } : {}),
       ...(maxCompletions ? { maxCompletions } : {}),
-      ...(chanceTag ? { chance: chanceTag.percent } : {}),
-      ...(failureResults.length > 0 ? { failureResults } : {}),
-    };
-  });
+    }];
+  }
+
+  const results = [...decl.tags, ...decl.onSuccessTags]
+    .map((tag) => tagToActionResult(tag, locale, chatKeyBase, chatCounter, pack))
+    .filter((result): result is ActionResult => result !== null);
+  const failureResults = decl.onFailTags
+    .map((tag) => tagToActionResult(tag, locale, `${chatKeyBase}-fail`, { n: 0 }, pack))
+    .filter((result): result is ActionResult => result !== null)
+
+  setDefaultOutcomeLocale(locale, actionKeyBase, { success: 'Done.', failure: 'Nothing happens.' });
+
+  return [{
+    id: baseActionId,
+    instant: true,
+    rewards: [],
+    results,
+    ...(requirements ? { requirements } : {}),
+    ...(visibleWhen ? { visibleWhen } : {}),
+    ...(maxCompletions ? { maxCompletions } : {}),
+    ...(chanceTag ? { chance: chanceTag.percent } : {}),
+    ...(failureResults.length > 0 ? { failureResults } : {}),
+  }];
 };
 
 const compileEntityAction = (entityId: string, decl: DslActionDecl, locale: LocaleBuilder, pack: string, dropTableIds: Set<string>): EntityActionDefinition[] =>
@@ -419,7 +398,6 @@ const compileLocation = (
 // Dialogue
 // ---------------------------------------------------------------------------
 const compileDialogue = (section: DslDialogueSection, locale: LocaleBuilder, pack: string): DialogueDefinition => {
-  const emptyAssignment: Record<string, boolean> = {};
   const nodes: DialogueNode[] = section.nodes.map((node) => {
     const textKey = `dialogue.${section.id}.${node.id}`;
     locale.set(textKey, node.text);
@@ -429,7 +407,7 @@ const compileDialogue = (section: DslDialogueSection, locale: LocaleBuilder, pac
       const labelKey = `dialogue.${section.id}.option.${optionId}`;
       locale.set(labelKey, option.label);
       const results = option.tags
-        .map((tag) => tagToActionResult(tag, locale, `chat.dialogue.${section.id}.${node.id}.${optionId}`, { n: 0 }, pack, emptyAssignment))
+        .map((tag) => tagToActionResult(tag, locale, `chat.dialogue.${section.id}.${node.id}.${optionId}`, { n: 0 }, pack))
         .filter((result): result is ActionResult => result !== null);
       return {
         id: optionId,
@@ -440,7 +418,7 @@ const compileDialogue = (section: DslDialogueSection, locale: LocaleBuilder, pac
     });
 
     const enterResults = node.enterTags
-      .map((tag) => tagToActionResult(tag, locale, `chat.dialogue.${section.id}.${node.id}.enter`, { n: 0 }, pack, emptyAssignment))
+      .map((tag) => tagToActionResult(tag, locale, `chat.dialogue.${section.id}.${node.id}.enter`, { n: 0 }, pack))
       .filter((result): result is ActionResult => result !== null);
 
     return {
@@ -484,7 +462,7 @@ const compileQuest = (section: DslQuestSection, locale: LocaleBuilder, pack: str
 
 const compileRecipe = (section: DslRecipeSection, locale: LocaleBuilder, pack: string): RecipeDefinition => {
   const extraResults = section.onSuccessTags
-    .map((tag) => tagToActionResult(tag, locale, `chat.recipe.${section.id}`, { n: 0 }, pack, {}))
+    .map((tag) => tagToActionResult(tag, locale, `chat.recipe.${section.id}`, { n: 0 }, pack))
     .filter((result): result is ActionResult => result !== null);
   return {
     id: section.id,

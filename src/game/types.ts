@@ -168,6 +168,12 @@ export type Condition =
   | { kind: 'any'; conditions: Condition[] }
   | { kind: 'not'; condition: Condition };
 
+export type ConditionalTextFragment =
+  | { kind: 'literal'; text: string }
+  | { kind: 'conditional'; condition: Condition; text: string };
+
+export type ConditionalText = ConditionalTextFragment[];
+
 export type ActionResult =
   | { kind: 'item'; itemId: string; amount: number }
   | { kind: 'resource'; resourceId: string; amount: number }
@@ -178,6 +184,7 @@ export type ActionResult =
   | { kind: 'relocate'; locationId: string }
   | { kind: 'dialogue'; dialogueId: string }
   | { kind: 'chat'; messageKey: string; delaySeconds?: number }
+  | { kind: 'conditional-chat'; fragments: ConditionalText; delaySeconds?: number }
   | { kind: 'bank-deposit'; itemId: string; amount: number }
   | { kind: 'bank-withdraw'; itemId: string; amount: number }
   | { kind: 'set-spawn'; locationId: string }

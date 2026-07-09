@@ -17,6 +17,7 @@ import {
   skillTitleKey,
 } from './contentIds';
 import { areActionRequirementsMet, canStartAction, evaluateCondition, isActionAvailableAtCurrentLocation, isActionExhausted, isActionVisible } from './conditions';
+import { renderConditionalText } from './conditionalText';
 import { readStateVariable, writeStateVariable } from './stateVariables';
 import { resolveManifestUiSettings } from './universeSettings';
 import { skillLevelFromXp } from './skills';
@@ -1426,11 +1427,23 @@ const applyActionResult = (
   if (result.kind === 'open-modal') {
     return { ...state, openModalId: result.modalId, lastTickAt: now };
   }
-  return appendChatMessage(
-    state,
-    { author: 'system', key: result.messageKey },
-    now + (result.delaySeconds ?? 0) * 1000,
-  );
+  if (result.kind === 'conditional-chat') {
+    const text = renderConditionalText(result.fragments, state, context);
+    if (!text) return state;
+    return appendChatMessage(
+      state,
+      { author: 'system', text },
+      now + (result.delaySeconds ?? 0) * 1000,
+    );
+  }
+  if (result.kind === 'chat') {
+    return appendChatMessage(
+      state,
+      { author: 'system', key: result.messageKey },
+      now + (result.delaySeconds ?? 0) * 1000,
+    );
+  }
+  return state;
 };
 
 const applyResults = (

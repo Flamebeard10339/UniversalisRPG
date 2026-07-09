@@ -108,6 +108,23 @@ const isVisibleUnder = (visibleWhen: Condition | undefined, assignment: Record<s
   return evaluate(visibleWhen);
 };
 
+// Evaluates conditional text fragments against a plain flag-truth map
+const renderConditionalTextTest = (fragments: Array<{ kind: string; text?: string; condition?: Condition }> | undefined, assignment: Record<string, boolean>): string => {
+  if (!fragments) return '';
+  const evaluate = (cond: Condition): boolean => {
+    if (cond.kind === 'state-variable') return assignment[String(cond.variable).replace('flag:', '')] === true;
+    if (cond.kind === 'not') return !evaluate(cond.condition);
+    if (cond.kind === 'all') return cond.conditions.every(evaluate);
+    if (cond.kind === 'any') return cond.conditions.some(evaluate);
+    return false;
+  };
+  return fragments
+    .filter((fragment) => fragment.kind === 'literal' || (fragment.condition && evaluate(fragment.condition)))
+    .map((fragment) => fragment.text ?? '')
+    .join('')
+    .trim();
+};
+
 describe('content DSL — guide-house proof', () => {
   it('merges cleanly through the real module pipeline with zero errors', () => {
     const resolution = applyModulesToBundle(emptyBundle(), [foundationStub, beachStub, module]);
@@ -183,16 +200,18 @@ describe('content DSL — guide-house proof', () => {
     ]);
   });
 
-  it('expands one `examine:` line with three compound (multi-flag &) conditionals into 2^n visibleWhen-gated variants sharing one title key', () => {
+  it('evaluates inline conditionals in say: tags at runtime via conditional-chat ActionResult', () => {
     const drawer = findEntity('drawer');
-    const examineVariants = (drawer.actions ?? []).filter((action) => action.id.startsWith('examine'));
-    expect(examineVariants).toHaveLength(4); // 2 distinct flags referenced across the 3 fragments -> 2^2 variants
-    expect(module.locale?.en['action.entity.drawer.examine.title']).toBe('Examine');
-    const titleKeyUsed = examineVariants.length; // every variant was built from the same locale.set call — see below for the stronger per-state check
+    const examineAction = (drawer.actions ?? []).find((action) => action.id === 'examine');
+    expect(examineAction).toBeDefined();
 
-    // Exactly one variant must be visible for every one of the 4 reachable
-    // states, and its rendered text must match which of the three authored
-    // fragments (or none, i.e. "both taken") applies to that state.
+    // With inline conditionals now evaluated at runtime, there should be only 1 action
+    // instead of 2^n variants, and it should contain a conditional-chat result.
+    const conditionalChatResult = examineAction?.results?.find((r) => r.kind === 'conditional-chat');
+    expect(conditionalChatResult).toBeDefined();
+    expect(conditionalChatResult?.kind).toBe('conditional-chat');
+
+    // Verify the conditional-chat result renders correctly for each state
     const states: Array<{ assignment: Record<string, boolean>; expectFragment: 'neither' | 'coins-only' | 'lockpick-only' | 'both' }> = [
       { assignment: { 'tutorial-island.drawer-coins-taken': false, 'tutorial-island.drawer-lockpick-taken': false }, expectFragment: 'neither' },
       { assignment: { 'tutorial-island.drawer-coins-taken': true, 'tutorial-island.drawer-lockpick-taken': false }, expectFragment: 'lockpick-only' },
@@ -200,15 +219,13 @@ describe('content DSL — guide-house proof', () => {
       { assignment: { 'tutorial-island.drawer-coins-taken': true, 'tutorial-island.drawer-lockpick-taken': true }, expectFragment: 'both' },
     ];
     for (const { assignment, expectFragment } of states) {
-      const visible = examineVariants.filter((action) => isVisibleUnder(action.visibleWhen, assignment));
-      expect(visible).toHaveLength(1);
-      const text = module.locale?.en[(visible[0].results?.[0] as { messageKey: string }).messageKey] ?? '';
+      const fragments = (conditionalChatResult as any)?.fragments;
+      const text = renderConditionalTextTest(fragments, assignment);
       if (expectFragment === 'neither') expect(text).toContain('coins and a worn set of lockpicks tucked in the back');
       if (expectFragment === 'coins-only') expect(text).toContain('You see some coins on the bottom');
       if (expectFragment === 'lockpick-only') expect(text).toContain('You see a set of worn lockpicks at the bottom');
       if (expectFragment === 'both') expect(text.trim()).toBe('A drawer full of random junk.');
     }
-    expect(titleKeyUsed).toBe(4);
   });
 
   it('compiles the dialogue graph with options, on-enter results, and bare goto', () => {
