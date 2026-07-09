@@ -68,24 +68,45 @@ export const ghostTextKeymap = Prec.highest(
   keymap.of([{ key: 'Tab', run: (view) => acceptGhostText(view) || acceptCompletion(view) }]),
 );
 
-// Recomputes the ghost-text suggestion after every doc/selection change:
-// only when the cursor sits at a recognized field (give:/set:/xp:/...) and
-// there's a single unambiguous best match longer than what's typed. Takes a
-// *getter* for the same reason dslCompletionSource does — see there.
+// Pure decision of "what, if anything, should ghost text suggest right now"
+// — kept separate from the CodeMirror update-listener glue below so it's
+// testable without spinning up a real EditorView. Only suggests when the
+// cursor sits at a recognized field (give:/set:/xp:/...) and there's a
+// single unambiguous best match longer than what's typed.
+export const computeGhostTextRemainder = (
+  textBeforeCursor: string,
+  textAfterCursor: string,
+  sources: DslCompletionSources,
+): string | null => {
+  // The cursor sitting inside an already-typed word (more word chars
+  // immediately follow it) means there's nothing to complete — without
+  // this check, `typed` below only ever looks *behind* the cursor, so
+  // placing the cursor mid-word (e.g. between "exam" and "ine" in
+  // "examine") read as if "exam" were the whole word typed so far and
+  // suggested "ine" as ghost text, overlapping the real characters right
+  // after it.
+  if (/^[\w.-]/.test(textAfterCursor)) return null;
+  const kind = detectCompletionKind(textBeforeCursor);
+  if (!kind) return null;
+
+  const wordMatch = /[\w.-]*$/.exec(textBeforeCursor);
+  const typed = wordMatch ? wordMatch[0] : '';
+  const suggestionText = bestGhostTextMatch(typed, sources[kind]);
+  if (!suggestionText) return null;
+
+  return suggestionText.slice(typed.length);
+};
+
+// Recomputes the ghost-text suggestion after every doc/selection change.
+// Takes a *getter* for the same reason dslCompletionSource does — see there.
 export const ghostTextUpdateListener = (getSources: () => DslCompletionSources) =>
   EditorView.updateListener.of((update) => {
     if (!update.docChanged && !update.selectionSet) return;
     const pos = update.state.selection.main.head;
     const line = update.state.doc.lineAt(pos);
     const textBeforeCursor = line.text.slice(0, pos - line.from);
-    const kind = detectCompletionKind(textBeforeCursor);
-    if (!kind) return;
-
-    const wordMatch = /[\w.-]*$/.exec(textBeforeCursor);
-    const typed = wordMatch ? wordMatch[0] : '';
-    const suggestionText = bestGhostTextMatch(typed, getSources()[kind]);
-    if (!suggestionText) return;
-
-    const remainder = suggestionText.slice(typed.length);
+    const textAfterCursor = line.text.slice(pos - line.from);
+    const remainder = computeGhostTextRemainder(textBeforeCursor, textAfterCursor, getSources());
+    if (!remainder) return;
     update.view.dispatch({ effects: setGhostText.of({ pos, text: remainder }) });
   });
