@@ -955,10 +955,10 @@ export default function App() {
           )}
           {visibleActiveTab === 'edit' && contributionMode && (
             <div className="flex items-center gap-2">
-              <div className="flex gap-2 rounded border border-slate-700 bg-slate-950 p-1">
+              <div className="flex gap-2 rounded border border-slate-700 bg-slate-950 p-1 justify-center flex-wrap">
                 {editTabs.map((tab) => (
                   <button
-                    className={`rounded px-3 py-2 text-sm font-semibold capitalize ${
+                    className={`rounded px-4 py-2 text-sm font-semibold capitalize min-w-max sm:min-w-0 sm:flex-1 ${
                       contributionTab === tab ? 'bg-cyan-300 text-slate-950' : 'bg-slate-900 text-slate-300 hover:bg-slate-800'
                     }`}
                     data-edit-mode-tab={tab}
@@ -987,7 +987,7 @@ export default function App() {
         </div>
       </header>
 
-      <div className={`flex-1 overflow-hidden ${visibleActiveTab === 'edit' ? 'w-full' : 'mx-auto max-w-7xl px-4 py-4'}`}>
+      <div className={`flex-1 overflow-hidden ${visibleActiveTab === 'edit' ? 'w-full px-4' : 'mx-auto max-w-7xl px-4 py-4'}`}>
         {visibleActiveTab === 'map' && (
           <section className="grid gap-4">
             <div className="grid h-[calc(100vh-150px)] min-h-[560px] grid-rows-[auto_1fr] gap-4">
