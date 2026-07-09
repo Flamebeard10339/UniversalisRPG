@@ -147,8 +147,11 @@ describe('content DSL — guide-house proof', () => {
     expect(wall.role).toBe('travel');
     expect(wall.results).toEqual([{ kind: 'relocate', locationId: 'tutorial-beach' }]);
     expect(wall.visibleWhen).toEqual({
-      kind: 'not',
-      condition: { kind: 'state-variable', variable: 'flag:tutorial.miki-cleared', comparison: 'equal', value: true },
+      kind: 'all',
+      conditions: [
+        { kind: 'state-variable', variable: 'discovered-location:tutorial-beach', comparison: 'greater-than', value: 0 },
+        { kind: 'not', condition: { kind: 'state-variable', variable: 'flag:tutorial.miki-cleared', comparison: 'equal', value: true } },
+      ],
     });
   });
 
@@ -394,12 +397,18 @@ x: 0, y: 1
     const toOpenRoom = actions.find((action) => action.results?.[0].kind === 'relocate' && (action.results[0] as { locationId: string }).locationId === 'open-room')!;
     const toLockedRoom = actions.find((action) => action.results?.[0].kind === 'relocate' && (action.results[0] as { locationId: string }).locationId === 'locked-room')!;
     expect(toOpenRoom.role).toBe('travel');
-    expect(toOpenRoom.visibleWhen).toBeUndefined();
-    expect(toLockedRoom.visibleWhen).toEqual({
+    expect(toOpenRoom.visibleWhen).toEqual({
       kind: 'state-variable',
-      variable: 'flag:adjacent-proof.start-room-key-taken',
-      comparison: 'equal',
-      value: true,
+      variable: 'discovered-location:open-room',
+      comparison: 'greater-than',
+      value: 0,
+    });
+    expect(toLockedRoom.visibleWhen).toEqual({
+      kind: 'all',
+      conditions: [
+        { kind: 'state-variable', variable: 'discovered-location:locked-room', comparison: 'greater-than', value: 0 },
+        { kind: 'state-variable', variable: 'flag:adjacent-proof.start-room-key-taken', comparison: 'equal', value: true },
+      ],
     });
   });
 });

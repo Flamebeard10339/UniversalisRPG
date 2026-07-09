@@ -667,6 +667,7 @@ export const validateContentReferences = (bundle: ContentBundle) => {
     ...bundle.actions.map((action) => `action-completions:${action.id}`),
     ...(bundle.entities ?? []).flatMap((entity) => (entity.actions ?? []).map((action) => `action-completions:${action.id}`)),
     ...(bundle.items ?? []).flatMap((item) => (item.actions ?? []).map((action) => `action-completions:${action.id}`)),
+    ...bundle.locations.map((location) => `discovered-location:${location.id}`),
     'location',
     'active-action',
     'active-interaction',

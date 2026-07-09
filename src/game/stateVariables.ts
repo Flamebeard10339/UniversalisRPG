@@ -5,13 +5,14 @@ import type { ActionResolutionContext, ContentBundle, UniversePlayState } from '
 
 export type StateVariableValue = boolean | number | string;
 
-export const stateVariableKeys = (bundle: Pick<ContentBundle, 'flags' | 'items' | 'resourceDefinitions' | 'skills' | 'stats' | 'actions'>) => [
+export const stateVariableKeys = (bundle: Pick<ContentBundle, 'flags' | 'items' | 'resourceDefinitions' | 'skills' | 'stats' | 'actions' | 'locations'>) => [
   ...bundle.flags.map((item) => `flag:${item.id}`),
   ...bundle.items.map((item) => `item:${item.id}`),
   ...bundle.resourceDefinitions.map((item) => `resource:${item.id}`),
   ...bundle.skills.map((item) => `skill-level:${item.id}`),
   ...bundle.stats.map((item) => `stat:${item.id}`),
   ...bundle.actions.map((item) => `action-completions:${item.id}`),
+  ...bundle.locations.map((item) => `discovered-location:${item.id}`),
   'location',
   'active-action',
   'active-interaction',
@@ -49,6 +50,7 @@ export const readStateVariable = (
   }
   if (category === 'stat') return getCharacterStatValue(state, context?.stats ?? [], id, context?.skills ?? [], context?.items ?? [], context?.manifest?.experienceCurve);
   if (category === 'action-completions') return state.actionCompletions[id] ?? 0;
+  if (category === 'discovered-location') return state.discoveredLocationIds.includes(id) ? 1 : 0;
   return state.flags[variable] ?? false;
 };
 

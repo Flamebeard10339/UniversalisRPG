@@ -372,12 +372,25 @@ const compileLocation = (
     locale.set(`action.${edgeId}.title`, 'Leave');
     locale.set(`action.${edgeId}.description`, 'Leave.');
     setDefaultOutcomeLocale(locale, `action.${edgeId}`, { success: 'Done.', failure: 'Nothing happens.' });
+
+    // Combine fog-of-war check (target must be discovered) with any existing visibleWhen conditions
+    const fogOfWarCheck: Condition = {
+      kind: 'state-variable',
+      variable: `discovered-location:${edge.toLocationId}`,
+      comparison: 'greater-than',
+      value: 0,
+    };
+    const edgeCondition = edge.cond ? toCondition(edge.cond, pack) : undefined;
+    const visibleWhen = edgeCondition
+      ? { kind: 'all', conditions: [fogOfWarCheck, edgeCondition] }
+      : fogOfWarCheck;
+
     actions.push({
       id: edgeId,
       role: 'travel',
       rewards: [],
       results: [{ kind: 'relocate', locationId: edge.toLocationId }],
-      ...(edge.cond ? { visibleWhen: toCondition(edge.cond, pack) } : {}),
+      visibleWhen,
     });
     locationActionIds.push(edgeId);
   }
