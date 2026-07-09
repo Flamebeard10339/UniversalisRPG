@@ -62,6 +62,51 @@ export const clickElement = (element: HTMLButtonElement | null): boolean => {
   return true;
 };
 
+// document.getAnimations() reports every running CSS animation/transition and
+// Web Animation on the page (e.g. the examine-button flash's `animate-pulse`,
+// a continuous-action's progress fill) — a stable, framework-agnostic signal
+// instead of a per-effect custom poll.
+export const getRunningAnimationCount = (): number => document.getAnimations().length;
+
+// Most "animations" in this app are actually React state flipping a class on
+// and off after a hardcoded setTimeout (instant-action pulse, map/examine
+// flash) rather than a native animation with a `finished` promise — so
+// waiting on document.getAnimations() alone doesn't cover them. This instead
+// waits for the DOM itself (attributes, children, text) to stop changing for
+// `quietMs`, which catches both cases — any CSS animation, class toggle, or
+// re-render — without the caller needing to know which mechanism is in play.
+// Resolves `{settled: true}` once things go quiet, or `{settled: false}` if
+// `timeoutMs` elapses first (the DOM never stopped changing — e.g. a genuine
+// infinite-loop animation like a persistent pulse ring).
+export const waitForDomIdle = (options: { quietMs?: number; timeoutMs?: number } = {}): Promise<{ settled: boolean; waitedMs: number }> => {
+  const quietMs = options.quietMs ?? 300;
+  const timeoutMs = options.timeoutMs ?? 5000;
+  return new Promise((resolve) => {
+    const startedAt = Date.now();
+    let settled = false;
+    let quietTimer: ReturnType<typeof setTimeout>;
+    let hardTimeout: ReturnType<typeof setTimeout>;
+
+    const finish = (result: boolean) => {
+      if (settled) return;
+      settled = true;
+      observer.disconnect();
+      clearTimeout(quietTimer);
+      clearTimeout(hardTimeout);
+      resolve({ settled: result, waitedMs: Date.now() - startedAt });
+    };
+    const scheduleQuiet = () => {
+      clearTimeout(quietTimer);
+      quietTimer = setTimeout(() => finish(true), quietMs);
+    };
+
+    const observer = new MutationObserver(scheduleQuiet);
+    observer.observe(document.body, { subtree: true, childList: true, attributes: true, characterData: true });
+    hardTimeout = setTimeout(() => finish(false), timeoutMs);
+    scheduleQuiet();
+  });
+};
+
 // Ready-to-use adapter matching TestHarnessDeps['dom'] in testHarness.ts — composes
 // the primitives above so App.tsx only needs to wire one object.
 export const domAdapter = {
@@ -77,4 +122,6 @@ export const domAdapter = {
   clickCharacterTab: (tab: string) => clickElement(findCharacterTabButton(tab)),
   clickUnequip: (slot: string) => clickElement(findUnequipButton(slot)),
   clickEquip: (itemId: string, slot: string) => clickElement(findEquipButton(itemId, slot)),
+  getRunningAnimationCount,
+  waitForDomIdle,
 };

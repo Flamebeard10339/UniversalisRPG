@@ -39,7 +39,19 @@ export type TestHarnessDomAdapter = {
   clickCharacterTab: (tab: string) => boolean;
   clickUnequip: (slot: string) => boolean;
   clickEquip: (itemId: string, slot: string) => boolean;
+  getRunningAnimationCount: () => number;
+  waitForDomIdle: (options?: { quietMs?: number; timeoutMs?: number }) => Promise<{ settled: boolean; waitedMs: number }>;
 };
+
+// One entry in a window.__test.batch([...]) call: `path` is a dot-separated
+// lookup into the harness API itself (e.g. "location.teleport",
+// "choices.click"), `args` are passed to it positionally. Lets an agent
+// script a whole multi-step interaction (and its assertions) in a single
+// preview_eval round trip instead of one call per step.
+export type BatchCommand = { path: string; args?: unknown[] };
+export type BatchStepResult =
+  | { path: string; args: unknown[]; ok: true; result: unknown }
+  | { path: string; args: unknown[]; ok: false; error: string };
 
 export type ProfileFixture = Partial<
   Pick<UniversePlayState, 'currentLocationId' | 'discoveredLocationIds' | 'flags' | 'inventory' | 'bank'>
@@ -460,7 +472,51 @@ export const createTestHarness = (deps: TestHarnessDeps) => {
     }),
   };
 
-  return { state, inventory, bank, equipment, groundItems, location, profile, choices, dialogue, nav, modal, time, buttons, contribution, modules, dsl, debug };
+  // See testHarnessDom.ts's waitForDomIdle for why this is a generic
+  // DOM-quiet-period wait rather than a Web-Animations-only check: most
+  // "animations" here are a React-state class toggle on a JS setTimeout, not
+  // a native animation with its own completion signal.
+  const ui = {
+    animations: (): { count: number; settled: boolean } => {
+      const count = deps.dom.getRunningAnimationCount();
+      return { count, settled: count === 0 };
+    },
+    waitForIdle: (options?: { quietMs?: number; timeoutMs?: number }) => deps.dom.waitForDomIdle(options),
+  };
+
+  const api = { state, inventory, bank, equipment, groundItems, location, profile, choices, dialogue, nav, modal, time, buttons, contribution, modules, dsl, debug, ui };
+
+  const resolveBatchTarget = (path: string): unknown =>
+    path.split('.').reduce<unknown>(
+      (current, key) => (current && typeof current === 'object' ? (current as Record<string, unknown>)[key] : undefined),
+      api,
+    );
+
+  // Runs a scripted sequence of harness calls in one round trip (one
+  // preview_eval instead of one per step) — see BatchCommand/BatchStepResult
+  // above. A failed step doesn't abort the batch; every step's outcome comes
+  // back in the results array so the caller can see exactly where things
+  // diverged instead of debugging a mid-sequence exception.
+  const batch = async (commands: BatchCommand[]): Promise<BatchStepResult[]> => {
+    const results: BatchStepResult[] = [];
+    for (const command of commands) {
+      const args = command.args ?? [];
+      const target = resolveBatchTarget(command.path);
+      if (typeof target !== 'function') {
+        results.push({ path: command.path, args, ok: false, error: `not-a-function: ${command.path}` });
+        continue;
+      }
+      try {
+        const result = await (target as (...fnArgs: unknown[]) => unknown)(...args);
+        results.push({ path: command.path, args, ok: true, result });
+      } catch (error) {
+        results.push({ path: command.path, args, ok: false, error: error instanceof Error ? error.message : String(error) });
+      }
+    }
+    return results;
+  };
+
+  return { ...api, batch };
 };
 
 export type TestHarnessApi = ReturnType<typeof createTestHarness>;

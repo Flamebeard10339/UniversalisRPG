@@ -178,6 +178,13 @@ this before authoring NPCs, quests, items, or any state-driven UI.
   in `src/game/choices.ts`, imported by both. Never re-derive this logic a second
   time; if a new action/dialogue/UI-affordance kind needs new choice-listing logic,
   add it there.
+- **Before writing any ad-hoc `preview_eval` script or resorting to
+  `preview_click`/snapshot-index clicking, check whether `window.__test` (below) or
+  `scripts/playtest-cli.ts` already covers it.** The recurring failure mode this
+  guards against: an agent tries snapshot-based clicking, it flakes (stale indices,
+  ambiguous duplicate elements, a click landing before a re-render settles), and only
+  *then* "discovers" the harness that would have avoided the problem entirely — after
+  already burning the attempt. Read this section first, not after.
 - For verifying real-UI bugs during a session, prefer the dev-only
   `window.__test` harness (`src/game/testHarness.ts`, mounted from `App.tsx` behind
   `import.meta.env.DEV`) over ad-hoc `page.evaluate`/screenshot loops: `state.*`/
@@ -194,3 +201,49 @@ this before authoring NPCs, quests, items, or any state-driven UI.
   element, give it a `data-action-id`/`data-dialogue-option-id`/`data-nav-tab`-style
   attribute (see `ActionPanel.tsx`/`DialoguePanel.tsx`/`InventoryPanel.tsx`) so the
   harness can click it for real instead of only being able to fall back to the store.
+- **Don't wait on a fixed `sleep`/timeout to let an effect (a floating-text popup, a
+  flash ring, a chat append) finish before asserting on it.** Use
+  `window.__test.ui.waitForIdle({quietMs?, timeoutMs?})` — resolves once the DOM has
+  gone `quietMs` (default 300) without a mutation, or `{settled:false}` if
+  `timeoutMs` (default 5000) elapses first. This covers both real CSS
+  animations/transitions and the more common case in this codebase, a React state
+  flag flipped by a `setTimeout` (the map/examine-button flash, the instant-action
+  pulse) — either way there's no need to know or hardcode the specific duration.
+  `window.__test.ui.animations()` gives a synchronous `{count, settled}` snapshot of
+  `document.getAnimations()` for a quick inline check instead. An always-true
+  `waitForIdle` result for a *genuinely* infinite-loop animation (like the flash ring
+  while its class is applied) is expected, not a bug — check state instead in that
+  case (e.g. did `discoveredLocationIds` grow).
+- **Batch a whole multi-step check into one round trip** with
+  `window.__test.batch([{path, args}, ...])` — `path` is a dot-path into the harness
+  itself (`"location.teleport"`, `"choices.click"`, `"ui.waitForIdle"`,
+  `"debug.dump"`, ...), run in order, each step's `{ok, result}`/`{ok:false, error}`
+  collected into one returned array; one step throwing doesn't abort the rest. Use
+  this by default for anything beyond a single call — it's both faster (one
+  `preview_eval` instead of N) and produces a single transcript-shaped result you can
+  read back and reuse, instead of a scattered sequence of separate tool calls.
+- For a check worth running again later (a regression you just fixed, a flow you want
+  covered going forward), don't leave it as a one-off `preview_eval` transcript —
+  convert it into a headless playtest: save the same choiceIds (`action:...`/
+  `dialogue-option:...`) `choices.list()`/`window.__test.batch` already validated as
+  a JSON array to `.playtests/scripts/<name>.json`, then
+  `npx tsx scripts/playtest-cli.ts run --modules <comma-separated ids> --module-dir
+  public/content/universes/base/modules --label "<label>" --script
+  .playtests/scripts/<name>.json --out <name>.md` — replays it against the pure
+  engine (zero browser, zero real wait) and writes a transcript to
+  `.playtests/<name>.md`. `readModule` there tries `<id>.json` then falls back to
+  compiling `<id>.md` (every Tutorial Island module is DSL now — see Content
+  Pipeline above), so it works against real shipped content, not just hand-authored
+  JSON stubs. It also flags "more than 5 entities visible at once" per location as a
+  UX-budget warning (not a hard error) — a real, still-open finding as of this
+  writing on `tutorial-guide-house` and `tutorial-mine`. See `.playtests/profiles/*.json`
+  for reusable starting-state fixtures (one per module boundary) and
+  `.playtests/scripts/*.json` for existing examples. This is what makes a manual
+  verification pass reusable instead of throwaway.
+- `npm run test:ui` (`scripts/ui-smoke.mjs`) is a separate, real-browser
+  (`playwright-core` + a hardcoded local Edge path) smoke test predating the
+  `window.__test` harness — it drives the UI via brittle text/role selectors
+  (`page.getByText('wayside-supplies', ...)`, an item that no longer exists in any
+  module) and is not wired into CI. Treat it as stale/unverified, not a source of
+  truth: don't pattern-match its selector style for new checks, and don't trust a
+  pass/fail from it without first confirming the selectors it depends on still exist.

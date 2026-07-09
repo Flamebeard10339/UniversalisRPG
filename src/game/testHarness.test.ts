@@ -75,6 +75,8 @@ const buildDeps = (overrides: Overrides = {}): TestHarnessDeps => {
       clickCharacterTab: vi.fn(() => false),
       clickUnequip: vi.fn(() => false),
       clickEquip: vi.fn(() => false),
+      getRunningAnimationCount: vi.fn(() => 0),
+      waitForDomIdle: vi.fn(async () => ({ settled: true, waitedMs: 0 })),
     },
     setTab: vi.fn(),
     setHomeTab: vi.fn(),
@@ -324,5 +326,54 @@ describe('testHarness contribution/modules/dsl', () => {
     expect(deps.setDslSource).toHaveBeenCalledWith('guide-house', '# info\nid: guide-house\n');
     expect(deps.applyDslEdit).toHaveBeenCalledWith('guide-house', '# info\nid: guide-house\n');
     expect(result).toEqual({ ok: true });
+  });
+});
+
+describe('testHarness ui', () => {
+  it('animations() reports the running count from the DOM adapter', () => {
+    const deps = buildDeps({ dom: { ...buildDeps().dom, getRunningAnimationCount: vi.fn(() => 2) } });
+    const harness = createTestHarness(deps);
+    expect(harness.ui.animations()).toEqual({ count: 2, settled: false });
+  });
+
+  it('waitForIdle() delegates straight to the DOM adapter', async () => {
+    const waitForDomIdle = vi.fn(async () => ({ settled: true, waitedMs: 42 }));
+    const deps = buildDeps({ dom: { ...buildDeps().dom, waitForDomIdle } });
+    const harness = createTestHarness(deps);
+    await expect(harness.ui.waitForIdle({ quietMs: 100 })).resolves.toEqual({ settled: true, waitedMs: 42 });
+    expect(waitForDomIdle).toHaveBeenCalledWith({ quietMs: 100 });
+  });
+});
+
+describe('testHarness batch', () => {
+  it('runs each step against the real harness API and reports per-step results', async () => {
+    const deps = buildDeps();
+    const harness = createTestHarness(deps);
+    const results = await harness.batch([
+      { path: 'state.setFlag', args: ['tutorial.done', true] },
+      { path: 'location.teleport', args: ['nowhere'] },
+    ]);
+    expect(results).toEqual([
+      { path: 'state.setFlag', args: ['tutorial.done', true], ok: true, result: { ok: true } },
+      { path: 'location.teleport', args: ['nowhere'], ok: true, result: { ok: false, error: 'unknown-location' } },
+    ]);
+    expect(deps.debugSetFlag).toHaveBeenCalledWith('tutorial.done', true);
+  });
+
+  it("doesn't abort the batch when one step throws or points at a non-function path", async () => {
+    const deps = buildDeps({
+      debugSetFlag: vi.fn(() => {
+        throw new Error('boom');
+      }),
+    });
+    const harness = createTestHarness(deps);
+    const results = await harness.batch([
+      { path: 'state.setFlag', args: ['x', true] },
+      { path: 'state.does-not-exist' },
+      { path: 'state.getFlags' },
+    ]);
+    expect(results[0]).toEqual({ path: 'state.setFlag', args: ['x', true], ok: false, error: 'boom' });
+    expect(results[1]).toEqual({ path: 'state.does-not-exist', args: [], ok: false, error: 'not-a-function: state.does-not-exist' });
+    expect(results[2]).toMatchObject({ ok: true });
   });
 });

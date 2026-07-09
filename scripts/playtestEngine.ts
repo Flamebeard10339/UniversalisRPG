@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { applyModulesToBundle } from '../src/game/contentModules';
+import { compileDsl } from '../src/game/contentDsl/compiler';
 import { entityTitleKey } from '../src/game/contentIds';
 import {
   ACTION_PREFIX,
@@ -33,18 +34,38 @@ export type TranscriptEvent = {
   text: string;
 };
 
+const stripBom = (text: string) => text.replace(/^﻿/, '');
+
+const tryReadFile = (filePath: string): string | null => {
+  try {
+    return stripBom(readFileSync(filePath, 'utf8'));
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+    return null;
+  }
+};
+
+// Mirrors loader.ts's real json-then-DSL-compile fallback (see CLAUDE.md's
+// Content Pipeline section) — every Tutorial Island module ships as `.md`
+// DSL now, so a `.json`-only reader here would silently fail to find any of
+// them and this CLI would only ever work against hand-authored JSON stubs,
+// not the real shipped content.
 export const readModule = (moduleDirs: string[], moduleId: string): ContentModule => {
   for (const moduleDir of moduleDirs) {
-    const filePath = path.join(moduleDir, `${moduleId}.json`);
-    try {
-      return JSON.parse(readFileSync(filePath, 'utf8')) as ContentModule;
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
-    }
+    const jsonText = tryReadFile(path.join(moduleDir, `${moduleId}.json`));
+    if (jsonText !== null) return JSON.parse(jsonText) as ContentModule;
+    const mdText = tryReadFile(path.join(moduleDir, `${moduleId}.md`));
+    if (mdText !== null) return compileDsl(mdText).module;
   }
   throw new Error(`Module "${moduleId}" not found in: ${moduleDirs.join(', ')}`);
 };
 
+// Known gap: this doesn't load the real universe.json (combatBalance/
+// experienceCurve/ui settings) or content/gui locales, so headless numeric
+// results (durations, damage) can drift from the real app if those get
+// overridden away from their defaults. Fine for choice-availability/flag/
+// result-shape regression coverage (this CLI's actual purpose); revisit if a
+// headless test ever needs numeric parity with the live game.
 const emptyBundle = (universeId: string): ContentBundle => ({
   manifest: {
     schemaVersion: 1,

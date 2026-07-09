@@ -1,0 +1,5 @@
+[
+  "action:entity.stairs-up.ascend",
+  "action:entity.window.look-through",
+  "action:entity.stairs-down.descend"
+]
