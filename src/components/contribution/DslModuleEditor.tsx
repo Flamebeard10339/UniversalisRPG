@@ -202,18 +202,20 @@ export const DslModuleEditor = ({ moduleId, universeId, bundle, draft, issues, o
   if (availability === 'loading' || availability === 'unavailable') return null;
 
   return (
-    <section className="grid gap-3" data-testid="dsl-module-editor">
-      <CodeMirror
-        basicSetup={{ closeBrackets: false, autocompletion: false, completionKeymap: false }}
-        extensions={extensions}
-        height="480px"
-        onChange={(value) => setSource(moduleId, value)}
-        theme="none"
-        value={dslDraft?.source ?? ''}
-      />
+    <section className="grid h-full grid-rows-[1fr_auto] gap-3" data-testid="dsl-module-editor">
+      <div className="min-h-0 overflow-hidden rounded border border-slate-700 bg-slate-950">
+        <CodeMirror
+          basicSetup={{ closeBrackets: false, autocompletion: false, completionKeymap: false }}
+          extensions={extensions}
+          height="100%"
+          onChange={(value) => setSource(moduleId, value)}
+          theme="none"
+          value={dslDraft?.source ?? ''}
+        />
+      </div>
 
       {issues.length > 0 && (
-        <section className="rounded border border-slate-700 p-3">
+        <section className="overflow-y-auto rounded border border-slate-700 bg-slate-900 p-3 max-h-32">
           <h4 className="text-sm font-semibold text-slate-100">{t('contribution.dsl.validationIssues', 'Validation issues in the current preview')}</h4>
           <ul className="mt-1 grid gap-1 text-xs">
             {issues.map((issue, index) => (

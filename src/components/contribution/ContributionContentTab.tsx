@@ -56,7 +56,7 @@ export const ContributionContentTab = ({ baseBundle, bundle, draft, issues, onPa
   };
 
   return (
-    <section className="grid gap-3" data-testid="edit-content-tab">
+    <section className="grid h-full grid-rows-[auto_auto_auto_1fr] gap-3 overflow-hidden" data-testid="edit-content-tab">
       <div className="flex flex-wrap items-end gap-2">
         <label className="grid min-w-40 flex-1 gap-1 text-sm text-slate-300">
           {t('contribution.dsl.selectModule', 'Mod')}
@@ -110,17 +110,19 @@ export const ContributionContentTab = ({ baseBundle, bundle, draft, issues, onPa
       </div>
 
       {activeModuleId && (
-        <DslModuleEditor
-          bundle={bundle}
-          draft={draft}
-          issues={issues}
-          key={activeModuleId}
-          moduleId={activeModuleId}
-          onPatch={onPatch}
-          onStatusChange={setStatus}
-          t={t}
-          universeId={bundle.manifest.id}
-        />
+        <div className="min-h-0 overflow-y-auto">
+          <DslModuleEditor
+            bundle={bundle}
+            draft={draft}
+            issues={issues}
+            key={activeModuleId}
+            moduleId={activeModuleId}
+            onPatch={onPatch}
+            onStatusChange={setStatus}
+            t={t}
+            universeId={bundle.manifest.id}
+          />
+        </div>
       )}
     </section>
   );
