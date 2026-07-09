@@ -382,7 +382,7 @@ export const ContributionMapEditor = ({ bundle, onEntitiesChange, onActionsChang
   };
 
   return (
-    <section className="grid gap-3 rounded border border-slate-700 p-3">
+    <section className="grid gap-3 rounded border border-slate-700 p-3 pt-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h3 className="text-sm font-semibold text-slate-100">{t('contribution.mapLayout.title')}</h3>
