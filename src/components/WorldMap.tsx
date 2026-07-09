@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
-import ReactFlow, { Background, Controls, type Edge, type Node } from 'reactflow';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import ReactFlow, { Background, Controls, Handle, Position, type Edge, type Node, type NodeProps } from 'reactflow';
 import type { ContentBundle, UniversePlayState } from '../game/types';
 import { locationTitleKey } from '../game/contentIds';
 import { useNow } from '../hooks/useNow';
@@ -17,6 +17,28 @@ type WorldMapProps = {
 
 const edgeTypes = {
   travel: TravelEdge,
+};
+
+type LocationNodeData = { label: ReactNode };
+
+// Edges route via manually computed data.sourcePoint/targetPoint (see
+// getRectBoundaryPoint below), not React Flow's own handle geometry — but a
+// source/target Handle must still exist on the node or React Flow can't
+// resolve handle bounds for it and silently skips rendering every edge that
+// touches it, even though the edges prop itself has perfectly valid data
+// (mirrors ContributionMapEditor.tsx's identical node type/comment).
+// `display: 'block'` overrides this app's global `.react-flow__handle {
+// display: none}` (index.css) — without it the handle isn't just invisible,
+// it's removed from layout entirely and unmeasurable, which is the actual
+// bug; `visibility: 'hidden'` alone keeps it invisible without that problem.
+const locationNodeTypes = {
+  location: ({ data }: NodeProps<LocationNodeData>) => (
+    <>
+      <Handle position={Position.Left} style={{ display: 'block', visibility: 'hidden' }} type="target" />
+      {data.label}
+      <Handle position={Position.Right} style={{ display: 'block', visibility: 'hidden' }} type="source" />
+    </>
+  ),
 };
 
 const NODE_WIDTH = 160;
@@ -118,6 +140,7 @@ export const WorldMap = ({ bundle, playState, onTravel, t }: WorldMapProps) => {
 
         return {
           id: location.id,
+          type: 'location',
           position: toPixelPosition(location.position),
           data: {
             label: (
@@ -228,6 +251,7 @@ export const WorldMap = ({ bundle, playState, onTravel, t }: WorldMapProps) => {
         maxZoom={1.35}
         minZoom={0.45}
         nodeExtent={mapExtent}
+        nodeTypes={locationNodeTypes}
         nodesDraggable={false}
         nodesConnectable={false}
         onNodeClick={(_, node) => onTravel(node.id)}

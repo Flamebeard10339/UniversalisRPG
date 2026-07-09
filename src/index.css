@@ -180,12 +180,12 @@ textarea {
   border-radius: 8px;
 }
 
+/* Hidden by default (no visible connection dots); a node that needs React
+   Flow to actually measure its handle bounds (for edge routing) overrides
+   this with an inline `display: 'block'` — see WorldMap.tsx/
+   ContributionMapEditor.tsx's location node types. */
 .react-flow__handle {
   display: none;
-}
-
-.contribution-map .react-flow__handle {
-  display: block;
 }
 
 .continuous-action-progress {

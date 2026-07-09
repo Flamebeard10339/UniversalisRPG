@@ -118,10 +118,13 @@ const locationNodeTypes = {
     >
       {/* Travel edges route via manually computed data.sourcePoint/targetPoint, not React Flow's handle
           geometry, but a source/target Handle must still exist or React Flow can't resolve handle bounds
-          for this node and warns (and re-renders) continuously for every edge that touches it. */}
-      <Handle type="target" position={Position.Left} style={{ visibility: 'hidden' }} />
+          for this node and warns (and re-renders) continuously for every edge that touches it.
+          `display: 'block'` overrides this app's global `.react-flow__handle {display: none}` (index.css)
+          — without it the handle is unmeasurable, not just invisible, which breaks edge rendering
+          entirely (see WorldMap.tsx's identical node type for the player-facing map). */}
+      <Handle type="target" position={Position.Left} style={{ display: 'block', visibility: 'hidden' }} />
       <span className="text-sm font-semibold">{data.label}</span>
-      <Handle type="source" position={Position.Right} style={{ visibility: 'hidden' }} />
+      <Handle type="source" position={Position.Right} style={{ display: 'block', visibility: 'hidden' }} />
     </div>
   ),
 };
