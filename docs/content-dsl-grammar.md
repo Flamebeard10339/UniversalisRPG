@@ -63,12 +63,21 @@ wall -> tutorial-beach while !miki-cleared
 
 Metadata may span multiple non-blank lines (blank lines never carry meaning —
 they're purely visual spacing; use them or don't) up until the first `wall`
-or `## entity` line. Recognized fields: `x:`, `y:`, `z:` (numbers). The bare
-word `starting` marks the location as the universe's start. **Any other bare
-word — this is the one place in the grammar a bare, unrecognized word isn't
-an error** — is a location tag (`tutorial`, `indoors`, `shore`, ...). There's
-no `tags:` label to remember, because everything on that line that isn't a
-recognized field or `starting` already is one.
+or `## entity` line. Recognized fields: `x:`, `y:`, `z:` (numbers), and the
+optional flat text fields `title:`/`description:`/`exhausted:` (each on its
+own line, unlike `x:`/`y:`/`z:` which may share a comma-joined line with tags).
+The bare word `starting` marks the location as the universe's start. **Any
+other bare word — this is the one place in the grammar a bare, unrecognized
+word isn't an error** — is a location tag (`tutorial`, `indoors`, `shore`,
+...). There's no `tags:` label to remember, because everything on that line
+that isn't a recognized field or `starting` already is one.
+
+`title:`/`description:`/`exhausted:` are all optional — a location with none
+of them still compiles, falling back to a humanized id for the first two and
+`"It is quiet now."` for the third, the same generic-default philosophy used
+throughout this grammar. `## entity <id>` sections take the same optional
+`title:` (their own first line, before any actions) with the same
+humanized-id fallback.
 
 `wall -> <locationId> while <condition>` declares a travel wall: an
 auto-named `role: 'travel'` action (`wall-<from>-<to>`) with
@@ -125,6 +134,7 @@ below), including a second `say:` right after the first one.
 | `set: <flagId>` | appends a flag-true result; auto-declares the flag if unseen (see pack scoping) |
 | `unset: <flagId>` | same, flag-false |
 | `once` | `maxCompletions: 1`, plus an auto `visibleWhen` guard: `not(any(hasFlag(f)))` over any flags this action `set:`s, or `not(completed(actionId))` if it sets none. ANDed with any explicit `hidden if:`/`visible if:`. |
+| `max: <N>` | `maxCompletions: N` — unlike `once`, sets no auto `visibleWhen` guard (the engine already stops offering an action once its completions reach `maxCompletions`); use this when you want a repeatable-but-capped action with no completion-based hiding of its own. |
 | `[[dialogue <id>]]` | `results: [{kind:'dialogue', dialogueId}]` — same bracket syntax as a dialogue-node goto, since both mean "jump to X"; which one applies is unambiguous from context (an action's tags vs. a dialogue node's body are always different sections) |
 | `open modal: <modalId>` | `results: [{kind:'open-modal', modalId}]` |
 | `say: <text>` | appends a `chat` result; supports inline conditional text (below) |
@@ -134,17 +144,22 @@ below), including a second `say:` right after the first one.
 | `chance: <N>` (e.g. `chance: 50`, `%` optional) | one-shot gamble: the action's main tags become `results` fired on success, `on fail:` becomes `failureResults` — mirrors `action()` + `chance`/`failureResults` today, not a new engine mechanic |
 | `station: <stationId>` | marks the action as a station action — no fixed rewards/results/duration; the UI populates its options from whichever `# recipe` entries the player currently holds ingredients for. All other tags on the same action are ignored. |
 | `resource: <resourceId> <amount>` | grants/drains a resource (e.g. `resource: health -3`) — same instant/adversarial rewards-vs-results split as `give`/`xp` |
+| `relocate: <locationId>` | `results: [{kind:'relocate', locationId}]` — an unconditional move, for entity actions that are a plain button rather than a highly-connected-grid edge (a ladder, tunnel, or portal). This is the same result `wall ->` produces internally for grid edges; `relocate:` is the tag form for anywhere else an action needs to move the player. |
+| `set spawn: <locationId>` | `results: [{kind:'set-spawn', locationId}]` — moves the player's respawn point, independent of `relocate:` (a one-way "you've moved on for good" moment, like leaving a tutorial area, typically pairs both tags on the same action) |
 
-Deferred to a later pass: `respawn:`, arbitrary `max: N` completions,
-drop-table references inside `give:`.
+Deferred to a later pass: `respawn:`, drop-table references inside `give:`.
 
 ## `# item <id>`
 
 ```
 # item cooked-shrimp
+title: Cooked Shrimp
+description: A simple meal that keeps you going.
 tags: food, +3 regeneration, 60s
 
 # item note
+title: Handwritten Note
+description: A note in someone else's hand, tossed onto a shelf.
 read: [[dialogue note]]
 ```
 
@@ -154,6 +169,16 @@ variant expansion), just keyed `action.item.<id>.<actionId>` instead of
 `action.entity.<id>.<actionId>`. The one difference: an item action can't
 carry `enemy:` — items are always instant, matching the engine's
 `ItemActionDefinition` (no `enemy` field, unlike `EntityActionDefinition`).
+
+`title:`/`description:` are optional flat metadata fields, each written to
+the item's own `item.<id>.title`/`item.<id>.description` locale keys. Both
+are optional — an item with neither still compiles, falling back to a
+humanized version of its id (`small-net` → "Small net") for the title and
+`"<Humanized id>."` for the description, the same generic-default philosophy
+used elsewhere in this grammar (interaction messages, action success/failure).
+
+`maxQuantity:` is an optional flat number, the item's stack cap
+(`ItemDefinition.maxQuantity`) — omit it for an item with no cap.
 
 `tags:`/`offensiveTags:`/`defensiveTags:` are metadata fields whose value is
 a **raw pass-through string** — the existing equipment tag-string grammar
@@ -289,8 +314,13 @@ disjunct  := conjunct ('&' conjunct)*
 conjunct  := '!'? IDENT
 ```
 A bare `IDENT` is a flag check unless it's inside `requires:`, where it's an
-item check. No parentheses in v0.1 — nesting beyond one level of `&`/`|`
-mixing is out of scope until a real case needs it.
+item check — except for the two special-cased `requires:`-only forms
+`tag:<tag>` and `equipped tag:<tag>` (e.g. `requires: tag:pickaxe`, `requires:
+equipped tag:mainhand`), which are item-tag / equipped-item-tag checks
+("holding/wearing anything tagged X") instead of a specific item id — the
+DSL surface for the engine's existing `item-tag`/`equipped-item-tag`
+`Condition` kinds. No parentheses in v0.1 — nesting beyond one level of
+`&`/`|` mixing is out of scope until a real case needs it.
 
 ### Inline conditional text
 
@@ -372,16 +402,46 @@ body), starts a different dialogue by id — see the tag table above.
 ```
 # advanced
 {
+  "stats": [{ "id": "fishing", "base": 6 }],
+  "skills": [{ "id": "fishing", "maxLevel": 100, "statId": "fishing" }],
+  "flags": [{ "id": "tutorial.bank-visited", "initialValue": false }],
   "resources": [...],
   "effects": [...],
-  "interactionTypes": [...]
+  "interactionTypes": [...],
+  "locale": {
+    "stat.fishing.title": "Fishing",
+    "stat.fishing.description": "Power applied to fishing actions."
+  },
+  "data-updates": {
+    "remove": { "locations": ["crossroads"] },
+    "patches": [{ "targetModId": "other-module", "objectType": "entities", "objectId": "x", "ops": [{ "op": "add", "path": "/actions/-", "value": "y" }] }]
+  }
 }
 ```
-Raw JSON, merged directly into the module's `data` object. The intentional
-escape hatch for object kinds that are engine plumbing rather than authoring
-surface (resources, effects, interaction-types, display-profiles,
+Raw JSON, merged directly into the module's `data` object, except for the
+optional `"data-updates"` key, which is instead attached verbatim to the
+module's own `data-updates` field (`ModuleDataUpdates` — removals and
+cross-module JSON-patch edits). It's a second, separate escape hatch from the
+rest of `# advanced`'s JSON for exactly this reason: `data` and
+`data-updates` are two different fields on the compiled `ContentModule`, and
+neither the DSL's own sections (`# location`, `# item`, ...) nor the rest of
+`# advanced` can author the latter.
+
+The remaining keys (merged into `data`) are the intentional escape hatch for
+object kinds that are engine plumbing rather than authoring surface (stats,
+skills, flags, resources, effects, interaction-types, display-profiles,
 combat-balance, experience-curve) — contributors aren't expected to
 hand-write these, so there's no ergonomic pressure to give them DSL sugar.
+
+The optional `"locale"` key is a flat key → text record (same shape as the
+compiler's own generated locale output) merged into the module's `en`
+dictionary — the escape hatch for text that has no other DSL-generated
+locale key, since stats/skills/resources/effects have no compiler-side
+locale generation of their own (unlike items/dialogue/quests, which always
+get *something*, even a humanized fallback). It never overwrites a key any
+other section already generated; if you want to override generated text,
+write it where it's generated (e.g. an item's `title:`/`description:`), not
+here.
 
 ## Localization
 
@@ -414,7 +474,7 @@ Island content, verified by merging the compiled modules through the *real*
   `on success:` → `extraResults`), `chance:` + `on fail:` (the locked-chest
   one-shot-gamble pattern), `station:`, and the new `resource:` tag.
 
-Not yet implemented: `respawn:`, arbitrary `max: N` completions, drop-table
+Not yet implemented: `respawn:`, drop-table
 references inside `give:`, multi-line dialogue-node body text, the visual
 grid-placement GUI for locations, and the full editor/live-preview UI that
 replaces contribution mode. None of these have hit a design wall — they're

@@ -324,3 +324,59 @@ describe('new action result kinds', () => {
     expect(issues.some((issue) => issue.message === 'validation.actionsShape')).toBe(true);
   });
 });
+
+describe('action-completions state variable recognizes entity/item actions', () => {
+  it('accepts a condition referencing an entity action\'s own completion count (not just top-level bundle.actions)', () => {
+    const withEntityAction: ContentBundle = {
+      ...bundle(),
+      entities: [{
+        id: 'cracked-bowl',
+        actions: [{
+          id: 'take',
+          instant: true,
+          rewards: [],
+          results: [{ kind: 'item', itemId: 'bowl', amount: 1 }],
+          maxCompletions: 1,
+          visibleWhen: { kind: 'not', condition: { kind: 'state-variable', variable: 'action-completions:take', comparison: 'greater-than', value: 0 } },
+        }],
+      }],
+    };
+    const issues = validateContentBundle(withEntityAction);
+    expect(issues.some((issue) => issue.message === 'validation.unknownStateVariable')).toBe(false);
+  });
+
+  it('accepts a condition referencing an item action\'s own completion count', () => {
+    const withItemAction: ContentBundle = {
+      ...bundle(),
+      items: [{
+        id: 'note',
+        actions: [{
+          id: 'read',
+          instant: true,
+          rewards: [],
+          results: [],
+          maxCompletions: 1,
+          visibleWhen: { kind: 'not', condition: { kind: 'state-variable', variable: 'action-completions:read', comparison: 'greater-than', value: 0 } },
+        }],
+      }],
+    };
+    const issues = validateContentBundle(withItemAction);
+    expect(issues.some((issue) => issue.message === 'validation.unknownStateVariable')).toBe(false);
+  });
+
+  it('still rejects a condition referencing a truly nonexistent action id', () => {
+    const withBadRef: ContentBundle = {
+      ...bundle(),
+      actions: [{
+        id: 'x',
+        locationId: 'start',
+        instant: true,
+        rewards: [],
+        results: [],
+        visibleWhen: { kind: 'state-variable', variable: 'action-completions:does-not-exist', comparison: 'greater-than', value: 0 },
+      }],
+    };
+    const issues = validateContentBundle(withBadRef);
+    expect(issues.some((issue) => issue.message === 'validation.unknownStateVariable')).toBe(true);
+  });
+});

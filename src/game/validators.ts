@@ -650,6 +650,8 @@ export const validateContentReferences = (bundle: ContentBundle) => {
     ...Array.from(skillIds, (id) => `skill-level:${id}`),
     ...Array.from(statIds, (id) => `stat:${id}`),
     ...bundle.actions.map((action) => `action-completions:${action.id}`),
+    ...(bundle.entities ?? []).flatMap((entity) => (entity.actions ?? []).map((action) => `action-completions:${action.id}`)),
+    ...(bundle.items ?? []).flatMap((item) => (item.actions ?? []).map((action) => `action-completions:${action.id}`)),
     'location',
     'active-action',
     'active-interaction',

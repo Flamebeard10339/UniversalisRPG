@@ -105,13 +105,16 @@ this before authoring NPCs, quests, items, or any state-driven UI.
   (`scripts/build-tutorial-island.mjs` → `scripts/mod-editor-cli.mjs`) have been
   removed; there is no in-app authoring path left for content that only exists as
   legacy JSON.
-- `scripts/tutorialIslandModules.mjs` and the promoted JSON under
-  `public/content/universes/base/modules/*.json` are the still-unported remainder of
-  Tutorial Island (only `tutorial-island-guide-house` has been ported to DSL so far).
-  They keep loading and playing fine via `loader.ts`'s JSON-first-then-DSL-compile
-  fallback, but are frozen from an editing standpoint until hand-ported to DSL — do
-  not hand-edit that JSON or resurrect the old pipeline to regenerate it; port the
-  module to a `.md` file instead.
+- All Tutorial Island modules are now authored as DSL (`public/content/universes/base/
+  modules/tutorial-island-*.md`). `base-core.json` (the non-tutorial starter-world
+  module: crossroads/emberwood/old-quarry) remains hand-written JSON — it leans heavily
+  on engine-configuration shapes the DSL has no sugar for (display profiles, custom
+  resource/effect wiring, interactionType `experience` arrays, nested `dropTable`
+  rewards, branching dialogue with counters), so porting it would mean putting nearly
+  all of it through the `# advanced` raw-JSON escape hatch anyway — little authoring
+  benefit over leaving it as JSON. It keeps loading and playing fine via `loader.ts`'s
+  JSON-first-then-DSL-compile fallback; only port it if/when enough of its shapes gain
+  real DSL sugar to make hand-authoring it actually easier.
 - After any change that could affect module resolution or validation, actually run
   the full pipeline (`npx vitest run` → headless playtests) rather than trusting an
   isolated unit test of the new feature. A validation gap in one new action/item can

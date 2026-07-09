@@ -151,14 +151,25 @@ const parseAdvancedBlock = (cursor: Cursor): Record<string, unknown> => {
 
 // ---------------------------------------------------------------------------
 // Location: metadata may span multiple non-blank lines before the first
-// `wall`/`## entity`. Recognized fields are `x:`/`y:`/`z:` and the bare
-// keyword `starting`; any other bare word (or space-separated run of words)
-// is a location tag — there's no `tags:` label, unlike every other DSL
-// keyword this is the one place a bare, unrecognized word is *not* an error.
+// `wall`/`## entity`. Recognized fields are `x:`/`y:`/`z:`, the optional flat
+// text fields `title:`/`description:`/`exhausted:`, and the bare keyword
+// `starting`; any other bare word (or space-separated run of words) is a
+// location tag — there's no `tags:` label, unlike every other DSL keyword
+// this is the one place a bare, unrecognized word is *not* an error.
 // ---------------------------------------------------------------------------
-type LocationMeta = { x: number; y: number; z?: number; tags: string[]; starting: boolean };
+type LocationMeta = { x: number; y: number; z?: number; tags: string[]; starting: boolean; title?: string; description?: string; exhausted?: string };
 
 const applyLocationMetadataLine = (line: string, meta: LocationMeta): void => {
+  const textFieldMatch = /^(title|description|exhausted):\s*(.*)$/i.exec(line);
+  if (textFieldMatch) {
+    const key = textFieldMatch[1].toLowerCase();
+    const value = textFieldMatch[2].trim();
+    if (key === 'title') meta.title = value;
+    else if (key === 'description') meta.description = value;
+    else meta.exhausted = value;
+    return;
+  }
+
   for (const segment of line.split(',').map((part) => part.trim()).filter(Boolean)) {
     const fieldMatch = /^(x|y|z):\s*(.+)$/i.exec(segment);
     if (fieldMatch) {
@@ -216,11 +227,12 @@ const parseLocationSection = (cursor: Cursor, id: string): DslLocationSection =>
     throw new DslParseError(`Unexpected line in location "${id}": "${line}"`, cursor.index);
   }
 
-  return { kind: 'location', id, x: meta.x, y: meta.y, z: meta.z, tags: meta.tags, starting: meta.starting, walls, entities };
+  return { kind: 'location', id, x: meta.x, y: meta.y, z: meta.z, tags: meta.tags, starting: meta.starting, title: meta.title, description: meta.description, exhausted: meta.exhausted, walls, entities };
 };
 
 const parseEntity = (cursor: Cursor, id: string): DslEntityDecl => {
   cursor.skipBlank();
+  let title: string | undefined;
   const actions: DslActionDecl[] = [];
   while (!cursor.atEnd()) {
     const trimmed = cursor.current!.trim();
@@ -229,9 +241,15 @@ const parseEntity = (cursor: Cursor, id: string): DslEntityDecl => {
       continue;
     }
     if (/^#/.test(trimmed)) break;
+    const titleMatch = /^title:\s*(.*)$/i.exec(trimmed);
+    if (titleMatch) {
+      title = titleMatch[1].trim();
+      cursor.index++;
+      continue;
+    }
     actions.push(parseAction(cursor));
   }
-  return { id, actions };
+  return { id, title, actions };
 };
 
 // ---------------------------------------------------------------------------
@@ -426,6 +444,9 @@ const parseDialogueNode = (cursor: Cursor): DslDialogueNode => {
 // ---------------------------------------------------------------------------
 const parseItemSection = (cursor: Cursor, id: string): DslItemSection => {
   cursor.skipBlank();
+  let title: string | undefined;
+  let description: string | undefined;
+  let maxQuantity: number | undefined;
   let tagsString: string | undefined;
   let offensiveTagsString: string | undefined;
   let defensiveTagsString: string | undefined;
@@ -439,10 +460,13 @@ const parseItemSection = (cursor: Cursor, id: string): DslItemSection => {
     }
     if (/^#/.test(trimmed)) break;
 
-    const metaMatch = /^(tags|offensiveTags|defensiveTags):\s*(.*)$/i.exec(trimmed);
+    const metaMatch = /^(title|description|maxQuantity|tags|offensiveTags|defensiveTags):\s*(.*)$/i.exec(trimmed);
     if (metaMatch) {
       const key = metaMatch[1].toLowerCase();
-      if (key === 'tags') tagsString = metaMatch[2].trim();
+      if (key === 'title') title = metaMatch[2].trim();
+      else if (key === 'description') description = metaMatch[2].trim();
+      else if (key === 'maxquantity') maxQuantity = Number(metaMatch[2].trim());
+      else if (key === 'tags') tagsString = metaMatch[2].trim();
       else if (key === 'offensivetags') offensiveTagsString = metaMatch[2].trim();
       else defensiveTagsString = metaMatch[2].trim();
       cursor.index++;
@@ -452,7 +476,7 @@ const parseItemSection = (cursor: Cursor, id: string): DslItemSection => {
     actions.push(parseAction(cursor));
   }
 
-  return { kind: 'item', id, tagsString, offensiveTagsString, defensiveTagsString, actions };
+  return { kind: 'item', id, title, description, maxQuantity, tagsString, offensiveTagsString, defensiveTagsString, actions };
 };
 
 // ---------------------------------------------------------------------------

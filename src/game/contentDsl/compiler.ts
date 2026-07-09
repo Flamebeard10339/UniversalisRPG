@@ -97,6 +97,10 @@ const toCondition = (cond: DslCondition, pack: string): Condition => {
       return flagCondition(resolveFlagId(cond.flagId, pack), true);
     case 'item':
       return { kind: 'state-variable', variable: `item:${cond.itemId}`, comparison: 'greater-than', value: 0 };
+    case 'item-tag':
+      return { kind: 'item-tag', tag: cond.tag };
+    case 'equipped-item-tag':
+      return { kind: 'equipped-item-tag', tag: cond.tag };
     case 'not':
       return { kind: 'not', condition: toCondition(cond.cond, pack) };
     case 'all':
@@ -144,6 +148,8 @@ const tagToActionResult = (
   if (tag.keyword === 'resource') return { kind: 'resource', resourceId: tag.resourceId, amount: tag.amount };
   if (tag.keyword === 'gotoDialogue') return { kind: 'dialogue', dialogueId: tag.dialogueId };
   if (tag.keyword === 'openModal') return { kind: 'open-modal', modalId: tag.modalId };
+  if (tag.keyword === 'relocate') return { kind: 'relocate', locationId: tag.locationId };
+  if (tag.keyword === 'setSpawn') return { kind: 'set-spawn', locationId: tag.locationId };
   if (tag.keyword === 'say') {
     chatCounter.n += 1;
     const key = chatCounter.n === 1 ? chatKeyBase : `${chatKeyBase}-${chatCounter.n}`;
@@ -240,7 +246,8 @@ const compileActionVariants = (
   const requiresTag = decl.tags.find((tag): tag is Extract<DslTag, { keyword: 'requires' }> => tag.keyword === 'requires');
   const requirements = requiresTag ? toCondition(requiresTag.cond, pack) : undefined;
   const baseVisibleWhen = deriveVisibleWhen(decl.tags, decl.onSuccessTags, baseActionId, pack);
-  const maxCompletions = decl.tags.some((tag) => tag.keyword === 'once') ? 1 : undefined;
+  const maxTag = decl.tags.find((tag): tag is Extract<DslTag, { keyword: 'max' }> => tag.keyword === 'max');
+  const maxCompletions = decl.tags.some((tag) => tag.keyword === 'once') ? 1 : maxTag?.count;
   const chanceTag = decl.tags.find((tag): tag is Extract<DslTag, { keyword: 'chance' }> => tag.keyword === 'chance');
 
   const sayTags = [...decl.tags, ...decl.onSuccessTags, ...decl.onFailTags].filter((tag): tag is Extract<DslTag, { keyword: 'say' }> => tag.keyword === 'say');
@@ -335,14 +342,15 @@ const compileLocation = (
   locale: LocaleBuilder,
   pack: string,
 ): { location: LocationNode; entities: EntityDefinition[]; actions: GameAction[] } => {
-  locale.set(`location.${section.id}.title`, humanize(section.id));
-  locale.set(`location.${section.id}.description`, `${humanize(section.id)}.`);
+  locale.set(`location.${section.id}.title`, section.title ?? humanize(section.id));
+  locale.set(`location.${section.id}.description`, section.description ?? `${humanize(section.id)}.`);
+  locale.set(`location.${section.id}.exhausted`, section.exhausted ?? 'It is quiet now.');
 
   const entities: EntityDefinition[] = [];
   const entityIds: string[] = [];
   for (const entityDecl of section.entities as DslEntityDecl[]) {
     entityIds.push(entityDecl.id);
-    locale.set(`entity.${entityDecl.id}.title`, humanize(entityDecl.id));
+    locale.set(`entity.${entityDecl.id}.title`, entityDecl.title ?? humanize(entityDecl.id));
     const actions: EntityActionDefinition[] = entityDecl.actions.flatMap((actionDecl) => compileEntityAction(entityDecl.id, actionDecl, locale, pack));
     entities.push({ id: entityDecl.id, actions });
   }
@@ -420,11 +428,12 @@ const compileDialogue = (section: DslDialogueSection, locale: LocaleBuilder, pac
 // Items, quests, recipes
 // ---------------------------------------------------------------------------
 const compileItemSection = (section: DslItemSection, locale: LocaleBuilder, pack: string): ItemDefinition => {
-  locale.set(`item.${section.id}.title`, humanize(section.id));
-  locale.set(`item.${section.id}.description`, `${humanize(section.id)}.`);
+  locale.set(`item.${section.id}.title`, section.title ?? humanize(section.id));
+  locale.set(`item.${section.id}.description`, section.description ?? `${humanize(section.id)}.`);
   const actions = section.actions.flatMap((actionDecl) => compileItemAction(section.id, actionDecl, locale, pack));
   return {
     id: section.id,
+    ...(section.maxQuantity !== undefined ? { maxQuantity: section.maxQuantity } : {}),
     ...(section.tagsString ? { tags: section.tagsString } : {}),
     ...(section.offensiveTagsString ? { offensiveTags: section.offensiveTagsString } : {}),
     ...(section.defensiveTagsString ? { defensiveTags: section.defensiveTagsString } : {}),
@@ -525,7 +534,26 @@ export const compileDsl = (source: string): { module: ContentModule; locale: Rec
   const advancedInteractionTypes = Array.isArray(advanced.interactionTypes)
     ? advanced.interactionTypes as InteractionTypeDefinition[]
     : [];
-  const { interactionTypes: _advancedInteractionTypes, ...advancedRest } = advanced;
+  // `# advanced`'s own optional `locale` (a flat key -> text record, same
+  // shape as `locale.entries`) is the escape hatch for text that has no other
+  // DSL-generated locale key — e.g. titles/descriptions for stats/skills/
+  // resources/effects, which (unlike items/dialogue/quests) are pure
+  // `# advanced` passthrough with no compiler-side locale generation of their
+  // own. Applied with `??=` (never overwrites) so it can only fill gaps, not
+  // clobber a key any other section already generated — `# advanced` locale
+  // is for content this DSL has no sugar for, not a general override
+  // mechanism.
+  const advancedLocale = advanced.locale && typeof advanced.locale === 'object' && !Array.isArray(advanced.locale)
+    ? advanced.locale as Record<string, string>
+    : {};
+  for (const [key, value] of Object.entries(advancedLocale)) locale.entries[key] ??= value;
+  // `# advanced`'s own optional `data-updates` key is the escape hatch for
+  // module patches/removals (ModuleDataUpdates) — a second kind of content a
+  // module can carry alongside its own `data`, with no DSL sugar of its own
+  // (cross-module JSON-patch edits and `data-updates.remove` id lists are
+  // both engine plumbing, same rationale as the rest of `# advanced`).
+  const advancedDataUpdates = advanced['data-updates'];
+  const { interactionTypes: _advancedInteractionTypes, locale: _advancedLocale, 'data-updates': _advancedDataUpdates, ...advancedRest } = advanced;
 
   const data: ModuleDataSectionObject = {
     ...(locations.length > 0 ? { locations } : {}),
@@ -549,6 +577,7 @@ export const compileDsl = (source: string): { module: ContentModule; locale: Rec
     game_version: dsl.info.gameVersion,
     ...(dsl.info.dependencies.length > 0 ? { dependencies: dsl.info.dependencies } : {}),
     data,
+    ...(advancedDataUpdates !== undefined ? { 'data-updates': advancedDataUpdates as ContentModule['data-updates'] } : {}),
     locale: { en: locale.entries },
   };
 

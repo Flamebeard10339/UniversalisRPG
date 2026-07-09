@@ -21,6 +21,12 @@ export class DslParseError extends Error {
 // item; `hidden if`/`visible if`/`wall ... while`/inline text default to
 // flag). Purely syntactic — pack-scoping of flag ids happens in compiler.ts,
 // which is the only place that knows the current module's pack.
+//
+// Inside `requires:` specifically, an identifier prefixed `tag:` or
+// `equipped tag:` is an item-tag / equipped-item-tag check (e.g.
+// `requires: tag:pickaxe` — "holding anything tagged pickaxe", not a
+// specific item id) rather than a plain item-id check — the two other
+// `Condition` kinds `requires:` can produce beyond a bare item id.
 // ---------------------------------------------------------------------------
 export const parseCondition = (raw: string, defaultKind: 'flag' | 'item'): DslCondition => {
   const text = raw.trim();
@@ -35,7 +41,12 @@ export const parseCondition = (raw: string, defaultKind: 'flag' | 'item'): DslCo
   const negated = text.startsWith('!');
   const ident = (negated ? text.slice(1) : text).trim();
   if (!ident) throw new DslParseError(`Empty condition term in "${raw}"`);
-  const base: DslCondition = defaultKind === 'item' ? { kind: 'item', itemId: ident } : { kind: 'flag', flagId: ident };
+  let base: DslCondition;
+  const equippedTagMatch = defaultKind === 'item' ? /^equipped\s+tag:\s*(.+)$/i.exec(ident) : null;
+  const tagMatch = defaultKind === 'item' ? /^tag:\s*(.+)$/i.exec(ident) : null;
+  if (equippedTagMatch) base = { kind: 'equipped-item-tag', tag: equippedTagMatch[1].trim() };
+  else if (tagMatch) base = { kind: 'item-tag', tag: tagMatch[1].trim() };
+  else base = defaultKind === 'item' ? { kind: 'item', itemId: ident } : { kind: 'flag', flagId: ident };
   return negated ? { kind: 'not', cond: base } : base;
 };
 
@@ -168,6 +179,9 @@ export const parseTag = (segment: string): DslTag => {
     const [resourceId, amountRaw] = value.split(/\s+/);
     return { keyword: 'resource', resourceId, amount: Number(amountRaw) };
   }
+  if (keyword === 'max') return { keyword: 'max', count: Number(value) };
+  if (keyword === 'relocate') return { keyword: 'relocate', locationId: value };
+  if (keyword === 'set spawn') return { keyword: 'setSpawn', locationId: value };
   throw new DslParseError(`Unknown tag keyword: "${keyword}" in "${segment}"`);
 };
 

@@ -6,11 +6,22 @@ author: UniversalisRPG
 game_version: 1.0
 pack: tutorial-island
 
+# advanced
+{
+  "stats": [{ "id": "thieving", "base": 6 }],
+  "locale": {
+    "stat.thieving.title": "Thieving",
+    "stat.thieving.description": "Power applied to locks and sleight of hand."
+  }
+}
+
 # item gold
 
 # item lockpick
 
 # item note
+title: Handwritten Note
+description: A note in someone else's hand, tossed onto a shelf.
 read: [[dialogue note]]
 
 # item cooked-shrimp

@@ -61,6 +61,13 @@ describe('content DSL — items + quest proof', () => {
     expect(module.locale?.en['action.item.note.read.title']).toBe('Read');
   });
 
+  it('uses explicit title:/description: item text when given, and a humanized fallback otherwise', () => {
+    expect(module.locale?.en['item.note.title']).toBe('Handwritten Note');
+    expect(module.locale?.en['item.note.description']).toBe("A note in someone else's hand, tossed onto a shelf.");
+    expect(module.locale?.en['item.gold.title']).toBe('Gold');
+    expect(module.locale?.en['item.gold.description']).toBe('Gold.');
+  });
+
   it('passes item tag strings through untouched (the existing equipment tag grammar, not this DSL\'s own tags)', () => {
     const items = (module.data as { items: ItemDefinition[] }).items;
     expect(items.find((item) => item.id === 'cooked-shrimp')?.tags).toBe('food, +3 regeneration, 60s');
@@ -75,6 +82,15 @@ describe('content DSL — items + quest proof', () => {
     const leaveHouse = quest.stages.find((stage) => stage.id === 'leave-house')!;
     expect(leaveHouse.condition).toEqual({ kind: 'state-variable', variable: 'flag:tutorial-island.miki-cleared', comparison: 'equal', value: true });
     expect(module.locale?.en[leaveHouse.descriptionKey]).toContain('Miki the tutorial guide has tasked you');
+  });
+
+  it('carries # advanced data through untouched and fills locale gaps for it without overwriting generated keys', () => {
+    const stats = (module.data as { stats: { id: string; base: number }[] }).stats;
+    expect(stats).toEqual([{ id: 'thieving', base: 6 }]);
+    expect(module.locale?.en['stat.thieving.title']).toBe('Thieving');
+    expect(module.locale?.en['stat.thieving.description']).toBe('Power applied to locks and sleight of hand.');
+    // # advanced locale must not clobber a key the item section already generated.
+    expect(module.locale?.en['item.note.title']).toBe('Handwritten Note');
   });
 
   it('compiles a narrator-only dialogue node', () => {
@@ -162,5 +178,25 @@ describe('content DSL — chance/fail + station + recipe proof', () => {
   it('compiles a recipe with `on success:` extraResults', () => {
     const smithDagger = (module.data as { recipes: RecipeDefinition[] }).recipes.find((recipe) => recipe.id === 'smith-dagger')!;
     expect(smithDagger.extraResults).toEqual([{ kind: 'flag', flagId: 'tutorial-island.mining-cleared', value: true }]);
+  });
+});
+
+describe('content DSL — item maxQuantity', () => {
+  it('sets an item stack cap from maxQuantity:', () => {
+    const source = `# info
+id: max-quantity-proof
+version: 1.0.0
+universe: base
+author: test
+game_version: 1.0
+pack: max-quantity-proof
+
+# item wayside-token
+title: Wayside Token
+maxQuantity: 99
+`;
+    const { module } = compileDsl(source);
+    const items = (module.data as { items: ItemDefinition[] }).items;
+    expect(items.find((item) => item.id === 'wayside-token')?.maxQuantity).toBe(99);
   });
 });

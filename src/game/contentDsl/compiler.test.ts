@@ -254,3 +254,192 @@ describe('content DSL — guide-house proof', () => {
     expect(module.locale?.en['interaction.lockpicking.player.kill']).toBe('The lock gives with a soft click.');
   });
 });
+
+describe('content DSL — location/entity title, description, exhausted text', () => {
+  const source = `# info
+id: title-proof
+version: 1.0.0
+universe: base
+author: test
+game_version: 1.0
+pack: title-proof
+
+# location fancy-place
+x: 0, y: 0
+title: The Fancy Place
+description: A place with real flavor text.
+exhausted: The fancy place settles down.
+starting
+
+## entity plain-thing
+examine: Nothing special.
+
+## entity named-thing
+title: A Very Named Thing
+examine: Something special.
+`;
+  const { module } = compileDsl(source);
+
+  it('uses explicit location title/description/exhausted text when given', () => {
+    expect(module.locale?.en['location.fancy-place.title']).toBe('The Fancy Place');
+    expect(module.locale?.en['location.fancy-place.description']).toBe('A place with real flavor text.');
+    expect(module.locale?.en['location.fancy-place.exhausted']).toBe('The fancy place settles down.');
+  });
+
+  it('falls back to a humanized title, generic description, and generic exhausted text otherwise', () => {
+    const source2 = `# info
+id: title-proof-2
+version: 1.0.0
+universe: base
+author: test
+game_version: 1.0
+pack: title-proof-2
+
+# location plain-place
+x: 0, y: 0
+starting
+`;
+    const { module: module2 } = compileDsl(source2);
+    expect(module2.locale?.en['location.plain-place.title']).toBe('Plain place');
+    expect(module2.locale?.en['location.plain-place.description']).toBe('Plain place.');
+    expect(module2.locale?.en['location.plain-place.exhausted']).toBe('It is quiet now.');
+  });
+
+  it('uses an explicit entity title when given, and a humanized fallback otherwise', () => {
+    expect(module.locale?.en['entity.plain-thing.title']).toBe('Plain thing');
+    expect(module.locale?.en['entity.named-thing.title']).toBe('A Very Named Thing');
+  });
+});
+
+describe('content DSL — # advanced data-updates escape hatch', () => {
+  it('attaches # advanced\'s "data-updates" key to the module\'s own data-updates field, not data', () => {
+    const source = `# info
+id: data-updates-proof
+version: 1.0.0
+universe: base
+author: test
+game_version: 1.0
+pack: data-updates-proof
+dependencies: +some-other-module
+
+# advanced
+{
+  "data-updates": {
+    "remove": { "locations": ["old-place"] }
+  }
+}
+`;
+    const { module } = compileDsl(source);
+    expect(module['data-updates']).toEqual({ remove: { locations: ['old-place'] } });
+    expect(module.data).not.toHaveProperty('data-updates');
+  });
+});
+
+describe('content DSL — item-tag / equipped-item-tag requires:', () => {
+  it('parses "requires: tag:X" as an item-tag condition and "requires: equipped tag:X" as equipped-item-tag', () => {
+    const source = `# info
+id: item-tag-proof
+version: 1.0.0
+universe: base
+author: test
+game_version: 1.0
+pack: item-tag-proof
+
+# location somewhere
+x: 0, y: 0
+starting
+
+## entity rock
+mine:
+  requires: tag:pickaxe
+  xp: mining 5
+
+## entity anvil
+smith:
+  requires: equipped tag:mainhand
+  xp: smithing 5
+`;
+    const { module } = compileDsl(source);
+    const entities = (module.data as { entities: EntityDefinition[] }).entities;
+    const mine = entities.find((entity) => entity.id === 'rock')!.actions!.find((action) => action.id === 'mine')!;
+    expect(mine.requirements).toEqual({ kind: 'item-tag', tag: 'pickaxe' });
+    const smith = entities.find((entity) => entity.id === 'anvil')!.actions!.find((action) => action.id === 'smith')!;
+    expect(smith.requirements).toEqual({ kind: 'equipped-item-tag', tag: 'mainhand' });
+  });
+});
+
+describe('content DSL — relocate: tag', () => {
+  it('produces an unconditional relocate result on an entity action', () => {
+    const source = `# info
+id: relocate-proof
+version: 1.0.0
+universe: base
+author: test
+game_version: 1.0
+pack: relocate-proof
+
+# location start-room
+x: 0, y: 0
+starting
+
+## entity tunnel
+enter: relocate: end-room
+`;
+    const { module } = compileDsl(source);
+    const entities = (module.data as { entities: EntityDefinition[] }).entities;
+    const enter = entities.find((entity) => entity.id === 'tunnel')!.actions!.find((action) => action.id === 'enter')!;
+    expect(enter.results).toEqual([{ kind: 'relocate', locationId: 'end-room' }]);
+  });
+});
+
+describe('content DSL — set spawn: tag', () => {
+  it('produces a set-spawn result, independent of relocate:', () => {
+    const source = `# info
+id: set-spawn-proof
+version: 1.0.0
+universe: base
+author: test
+game_version: 1.0
+pack: set-spawn-proof
+
+# location start-room
+x: 0, y: 0
+starting
+
+## entity portal
+step through:
+  set spawn: mainland
+  relocate: mainland
+`;
+    const { module } = compileDsl(source);
+    const entities = (module.data as { entities: EntityDefinition[] }).entities;
+    const step = entities.find((entity) => entity.id === 'portal')!.actions!.find((action) => action.id === 'step-through')!;
+    expect(step.results).toEqual([{ kind: 'set-spawn', locationId: 'mainland' }, { kind: 'relocate', locationId: 'mainland' }]);
+  });
+});
+
+describe('content DSL — max: N tag', () => {
+  it('sets maxCompletions without an auto visibleWhen guard', () => {
+    const source = `# info
+id: max-proof
+version: 1.0.0
+universe: base
+author: test
+game_version: 1.0
+pack: max-proof
+
+# location start-room
+x: 0, y: 0
+starting
+
+## entity dummy
+fight:
+  max: 3
+`;
+    const { module } = compileDsl(source);
+    const entities = (module.data as { entities: EntityDefinition[] }).entities;
+    const fight = entities.find((entity) => entity.id === 'dummy')!.actions!.find((action) => action.id === 'fight')!;
+    expect(fight.maxCompletions).toBe(3);
+    expect(fight.visibleWhen).toBeUndefined();
+  });
+});

@@ -6,6 +6,8 @@
 export type DslCondition =
   | { kind: 'flag'; flagId: string }
   | { kind: 'item'; itemId: string }
+  | { kind: 'item-tag'; tag: string }
+  | { kind: 'equipped-item-tag'; tag: string }
   | { kind: 'not'; cond: DslCondition }
   | { kind: 'all'; conds: DslCondition[] }
   | { kind: 'any'; conds: DslCondition[] };
@@ -23,6 +25,7 @@ export type DslTag =
   | { keyword: 'set'; flagId: string }
   | { keyword: 'unset'; flagId: string }
   | { keyword: 'once' }
+  | { keyword: 'max'; count: number }
   | { keyword: 'requires'; cond: DslCondition }
   | { keyword: 'hiddenIf'; cond: DslCondition }
   | { keyword: 'visibleIf'; cond: DslCondition }
@@ -32,7 +35,9 @@ export type DslTag =
   | { keyword: 'enemy'; interactionTypeId: string; stats: Record<string, number> }
   | { keyword: 'chance'; percent: number }
   | { keyword: 'station'; stationId: string }
-  | { keyword: 'resource'; resourceId: string; amount: number };
+  | { keyword: 'resource'; resourceId: string; amount: number }
+  | { keyword: 'relocate'; locationId: string }
+  | { keyword: 'setSpawn'; locationId: string };
 
 export type DslActionDecl = {
   title: string;
@@ -48,6 +53,7 @@ export type DslActionDecl = {
 
 export type DslEntityDecl = {
   id: string;
+  title?: string;
   actions: DslActionDecl[];
 };
 
@@ -64,6 +70,9 @@ export type DslLocationSection = {
   z?: number;
   tags: string[];
   starting: boolean;
+  title?: string;
+  description?: string;
+  exhausted?: string;
   walls: DslWallDecl[];
   entities: DslEntityDecl[];
 };
@@ -97,6 +106,9 @@ export type DslAdvancedSection = {
 export type DslItemSection = {
   kind: 'item';
   id: string;
+  title?: string;
+  description?: string;
+  maxQuantity?: number;
   tagsString?: string;
   offensiveTagsString?: string;
   defensiveTagsString?: string;
