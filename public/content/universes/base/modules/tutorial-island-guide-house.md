@@ -59,6 +59,29 @@ take lockpick: give: lockpick, set: drawer-lockpick-taken, once, say: You take t
 examine: A packed bookshelf with leather bound tomes.{!bookshelf-note-taken: There is a handwritten note tossed on the second shelf.}
 take note: give: note, set: bookshelf-note-taken, once, say: You take the note.
 
+## entity stairs-up
+title: Stairs
+examine: A narrow staircase leads up to the second floor.
+ascend: relocate: tutorial-guide-house-upstairs, say: You climb the stairs.
+
+# location tutorial-guide-house-upstairs
+x: 0, y: 0, z: 1
+title: Guide House, Upstairs
+examine: A cramped loft above the guide house, a single window looking out.
+tags: tutorial indoors
+
+## entity stairs-down
+title: Stairs
+examine: The staircase back down.
+descend: relocate: tutorial-guide-house, say: You climb back down.
+
+## entity window
+examine: A window looks out over the island.
+look through:
+  discover: tutorial-beach
+  discover: tutorial-bridge
+  say: Through the window you can make out the beach, and further off, a bridge.
+
 # dialogue miki
 start (miki): Oh — hi. You're the new arrival, right? I'm Miki, I look after new folks passing through here. What's on your mind before you head out?
   -> Whats this Quests tab I keep hearing about? [[explain-quests]]

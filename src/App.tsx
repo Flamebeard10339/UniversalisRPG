@@ -148,7 +148,8 @@ export default function App() {
   const [changelogText, setChangelogText] = useState('');
   const [confirmReset, setConfirmReset] = useState(false);
   const [mapFlashUntil, setMapFlashUntil] = useState(0);
-  const discoveredLocationCountRef = useRef<number | null>(null);
+  const [examineFlashUntil, setExamineFlashUntil] = useState(0);
+  const discoveredLocationIdsRef = useRef<string[] | null>(null);
   const [saveExport, setSaveExport] = useState('');
   const [saveImport, setSaveImport] = useState('');
   const [saveMessage, setSaveMessage] = useState('');
@@ -869,15 +870,26 @@ export default function App() {
 
   useEffect(() => {
     if (!playState) return;
-    const count = playState.discoveredLocationIds.length;
-    const previous = discoveredLocationCountRef.current;
-    discoveredLocationCountRef.current = count;
-    if (previous !== null && count > previous) {
-      setMapFlashUntil(Date.now() + 1500);
+    const ids = playState.discoveredLocationIds;
+    const previous = discoveredLocationIdsRef.current;
+    discoveredLocationIdsRef.current = ids;
+    if (previous === null) return;
+    const newlyDiscovered = ids.filter((id) => !previous.includes(id));
+    if (newlyDiscovered.length === 0) return;
+    setMapFlashUntil(Date.now() + 1500);
+    for (const locationId of newlyDiscovered) {
+      const title = t(locationTitleKey(locationId), locationId);
+      const examineText = t(locationExamineKey(locationId), '');
+      const prefix = t('location.discovered', 'You discovered {title}.', { title });
+      appendChatText(runtimeUniverseId, examineText ? `${prefix} ${examineText}` : prefix);
+      if (locationId === playState.currentLocationId) {
+        setExamineFlashUntil(Date.now() + 1500);
+      }
     }
-  }, [playState]);
+  }, [appendChatText, playState, runtimeUniverseId, t]);
 
   const mapFlashNow = useNow(mapFlashUntil > Date.now(), 100);
+  const examineFlashNow = useNow(examineFlashUntil > Date.now(), 100);
 
   if (loading && !bundle) {
     return <main className="grid min-h-screen place-items-center bg-slate-950 text-slate-100">{t('app.loadingUniverse')}</main>;
@@ -989,7 +1001,15 @@ export default function App() {
               {visibleActiveTab === 'settings' && <p className="text-sm text-slate-400">{t(universeTitleKey(bundle.manifest.id))} - {t(universeDescriptionKey(bundle.manifest.id), '')}</p>}
             </div>
             {visibleActiveTab === 'home' && currentLocation && (
-              <ExamineButton onExamine={onExamine} t={t} testId="examine-location" textKey={locationExamineKey(currentLocation.id)} />
+              <ExamineButton
+                className={`shrink-0 rounded border border-slate-700 px-3 py-1.5 text-xs font-semibold text-slate-200 ${
+                  examineFlashUntil > examineFlashNow ? 'ring-2 ring-cyan-300 animate-pulse' : ''
+                }`}
+                onExamine={onExamine}
+                t={t}
+                testId="examine-location"
+                textKey={locationExamineKey(currentLocation.id)}
+              />
             )}
           </div>
         )}

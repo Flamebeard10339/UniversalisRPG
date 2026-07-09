@@ -63,9 +63,10 @@ const foundationStub: ContentModule = {
   },
 };
 
-// The adjacent: edge targets tutorial-beach, which in the real game lives in
-// a different module (tutorial-island-survival) — stub it so reference
-// validation has something to resolve against.
+// The adjacent: edge (and the upstairs window's discover: tags) target
+// tutorial-beach/tutorial-bridge, which in the real game live in a different
+// module (tutorial-island-survival) — stub them so reference validation has
+// something to resolve against.
 const beachStub: ContentModule = {
   id: 'tutorial-island-beach-stub',
   version: '1.0.0',
@@ -74,9 +75,17 @@ const beachStub: ContentModule = {
   game_version: '1.0',
   dependencies: ['tutorial-island-foundation'],
   data: {
-    locations: [{ id: 'tutorial-beach', position: { x: 1, y: 0 }, entities: [], actions: [] }],
+    locations: [
+      { id: 'tutorial-beach', position: { x: 1, y: 0 }, entities: [], actions: [] },
+      { id: 'tutorial-bridge', position: { x: 2, y: 0 }, entities: [], actions: [] },
+    ],
   },
-  locale: { en: { 'location.tutorial-beach.title': 'Beach', 'location.tutorial-beach.description': 'Beach.' } },
+  locale: {
+    en: {
+      'location.tutorial-beach.title': 'Beach', 'location.tutorial-beach.description': 'Beach.',
+      'location.tutorial-bridge.title': 'Bridge', 'location.tutorial-bridge.description': 'Bridge.',
+    },
+  },
 };
 
 const samplePath = path.join(__dirname, '../../../public/content/universes/base/modules/tutorial-island-guide-house.md');
@@ -139,7 +148,7 @@ describe('content DSL — guide-house proof', () => {
     expect(location.position).toEqual({ x: 0, y: 0 });
     expect(location.starting).toBe(true);
     expect(location.tags).toEqual(['tutorial', 'indoors']);
-    expect(new Set(location.entities)).toEqual(new Set(['miki', 'front-door', 'mirror', 'drawer', 'bookshelf']));
+    expect(new Set(location.entities)).toEqual(new Set(['miki', 'front-door', 'mirror', 'drawer', 'bookshelf', 'stairs-up']));
   });
 
   it('compiles `adjacent: ... while ...` into a pack-scoped, visibleWhen-gated travel action', () => {
@@ -147,11 +156,8 @@ describe('content DSL — guide-house proof', () => {
     expect(wall.role).toBe('travel');
     expect(wall.results).toEqual([{ kind: 'relocate', locationId: 'tutorial-beach' }]);
     expect(wall.visibleWhen).toEqual({
-      kind: 'all',
-      conditions: [
-        { kind: 'state-variable', variable: 'discovered-location:tutorial-beach', comparison: 'greater-than', value: 0 },
-        { kind: 'not', condition: { kind: 'state-variable', variable: 'flag:tutorial.miki-cleared', comparison: 'equal', value: true } },
-      ],
+      kind: 'not',
+      condition: { kind: 'state-variable', variable: 'flag:tutorial.miki-cleared', comparison: 'equal', value: true },
     });
   });
 
@@ -397,19 +403,43 @@ x: 0, y: 1
     const toOpenRoom = actions.find((action) => action.results?.[0].kind === 'relocate' && (action.results[0] as { locationId: string }).locationId === 'open-room')!;
     const toLockedRoom = actions.find((action) => action.results?.[0].kind === 'relocate' && (action.results[0] as { locationId: string }).locationId === 'locked-room')!;
     expect(toOpenRoom.role).toBe('travel');
-    expect(toOpenRoom.visibleWhen).toEqual({
-      kind: 'state-variable',
-      variable: 'discovered-location:open-room',
-      comparison: 'greater-than',
-      value: 0,
-    });
+    expect(toOpenRoom.visibleWhen).toBeUndefined();
     expect(toLockedRoom.visibleWhen).toEqual({
-      kind: 'all',
-      conditions: [
-        { kind: 'state-variable', variable: 'discovered-location:locked-room', comparison: 'greater-than', value: 0 },
-        { kind: 'state-variable', variable: 'flag:adjacent-proof.start-room-key-taken', comparison: 'equal', value: true },
-      ],
+      kind: 'state-variable',
+      variable: 'flag:adjacent-proof.start-room-key-taken',
+      comparison: 'equal',
+      value: true,
     });
+  });
+});
+
+describe('content DSL — discover: tag', () => {
+  it('compiles `discover: <locationId>` into a discover-location result, independent of relocate', () => {
+    const source = `# info
+id: discover-proof
+version: 1.0.0
+universe: base
+author: test
+game_version: 1.0
+pack: discover-proof
+
+# location start-room
+x: 0, y: 0
+starting
+
+## entity window
+look through: discover: far-room, say: You spot a distant room through the window.
+
+# location far-room
+x: 5, y: 5
+`;
+    const { module } = compileDsl(source);
+    const window = (module.data as { entities: EntityDefinition[] }).entities.find((entity) => entity.id === 'window')!;
+    const look = window.actions!.find((action) => action.id === 'look-through')!;
+    expect(look.results).toEqual([
+      { kind: 'discover-location', locationId: 'far-room' },
+      { kind: 'chat', messageKey: 'chat.entity.window.look-through' },
+    ]);
   });
 });
 

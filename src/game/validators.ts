@@ -270,6 +270,7 @@ const validateActionResultShape = (value: unknown) => {
       && (value.expiresAfterSeconds === undefined || (typeof value.expiresAfterSeconds === 'number' && value.expiresAfterSeconds > 0));
   }
   if (value.kind === 'relocate') return hasString(value, 'locationId');
+  if (value.kind === 'discover-location') return hasString(value, 'locationId');
   if (value.kind === 'dialogue') return hasString(value, 'dialogueId');
   if (value.kind === 'bank-deposit') return hasString(value, 'itemId') && hasNumber(value, 'amount');
   if (value.kind === 'bank-withdraw') return hasString(value, 'itemId') && hasNumber(value, 'amount');
@@ -851,6 +852,7 @@ export const validateContentReferences = (bundle: ContentBundle) => {
       if (result.kind === 'state-variable' && result.variable === 'location' && result.value !== 'starting-location' && !locationIds.has(String(result.value))) issues.push(error(path, 'validation.unknownLocation', { id: String(result.value) }));
       if (result.kind === 'flag' && !flagIds.has(result.flagId)) issues.push(error(path, 'validation.unknownFlag', { id: result.flagId }));
       if (result.kind === 'relocate' && result.locationId !== 'starting-location' && !locationIds.has(result.locationId)) issues.push(error(path, 'validation.unknownLocation', { id: result.locationId }));
+      if (result.kind === 'discover-location' && result.locationId !== 'starting-location' && !locationIds.has(result.locationId)) issues.push(error(path, 'validation.unknownLocation', { id: result.locationId }));
       if (result.kind === 'dialogue' && !dialogueIds.has(result.dialogueId)) issues.push(error(path, 'validation.unknownDialogue', { id: result.dialogueId }));
       if ('amount' in result && result.amount === 0) issues.push(error(path, 'validation.resultAmountNonZero'));
     }
@@ -881,6 +883,7 @@ export const validateContentReferences = (bundle: ContentBundle) => {
     if (result.kind === 'state-variable' && result.variable === 'location' && result.value !== 'starting-location' && !locationIds.has(String(result.value))) issues.push(error(path, 'validation.unknownLocation', { id: String(result.value) }));
     if (result.kind === 'flag' && !flagIds.has(result.flagId)) issues.push(error(path, 'validation.unknownFlag', { id: result.flagId }));
     if (result.kind === 'relocate' && result.locationId !== 'starting-location' && !locationIds.has(result.locationId)) issues.push(error(path, 'validation.unknownLocation', { id: result.locationId }));
+    if (result.kind === 'discover-location' && result.locationId !== 'starting-location' && !locationIds.has(result.locationId)) issues.push(error(path, 'validation.unknownLocation', { id: result.locationId }));
     if (result.kind === 'dialogue' && !dialogueIds.has(result.dialogueId)) issues.push(error(path, 'validation.unknownDialogue', { id: result.dialogueId }));
     if ('amount' in result && result.amount === 0) issues.push(error(path, 'validation.resultAmountNonZero'));
   };

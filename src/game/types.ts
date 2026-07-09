@@ -182,6 +182,7 @@ export type ActionResult =
   | { kind: 'state-variable-delta'; variable: string; amount: number }
   | { kind: 'flag'; flagId: string; value: boolean; expiresAfterSeconds?: number }
   | { kind: 'relocate'; locationId: string }
+  | { kind: 'discover-location'; locationId: string }
   | { kind: 'dialogue'; dialogueId: string }
   | { kind: 'chat'; messageKey: string; delaySeconds?: number }
   | { kind: 'conditional-chat'; fragments: ConditionalText; delaySeconds?: number }

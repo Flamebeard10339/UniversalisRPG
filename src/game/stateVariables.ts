@@ -79,5 +79,6 @@ export const writeStateVariable = (state: UniversePlayState, variable: string, v
   }
   if (category === 'stat') return { ...state, statOverrides: { ...state.statOverrides, [id]: Number(value) } };
   if (category === 'action-completions') return { ...state, actionCompletions: { ...state.actionCompletions, [id]: Number(value) } };
+  if (category === 'discovered-location') return { ...state, discoveredLocationIds: Array.from(new Set([...state.discoveredLocationIds, id])) };
   return { ...state, flags: { ...state.flags, [variable]: value } };
 };

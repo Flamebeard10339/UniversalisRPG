@@ -673,17 +673,28 @@ const resolveLocationId = (
 
 const locationExploredKey = (locationId: string) => `location:${locationId}:explored`;
 
-const exploreLocation = (
+// Marks a location as fog-of-war-revealed without moving the player there —
+// used both when the player physically arrives somewhere (`exploreLocation`
+// below layers `currentLocationId` on top of this) and for remote reveals
+// (a `discover:` tag, e.g. looking through a window at a distant location).
+const discoverLocation = (
   state: UniversePlayState,
   locationId: string,
 ): UniversePlayState => ({
   ...state,
-  currentLocationId: locationId,
   discoveredLocationIds: Array.from(new Set([...state.discoveredLocationIds, locationId])),
   collectionLog: {
     ...state.collectionLog,
     [locationExploredKey(locationId)]: 1,
   },
+});
+
+const exploreLocation = (
+  state: UniversePlayState,
+  locationId: string,
+): UniversePlayState => ({
+  ...discoverLocation(state, locationId),
+  currentLocationId: locationId,
 });
 
 const selectKeys = <T>(values: Record<string, T>, ids: string[] = []) =>
@@ -1411,6 +1422,9 @@ const applyActionResult = (
       ...exploreLocation(state, locationId),
       activeTravel: null,
     };
+  }
+  if (result.kind === 'discover-location') {
+    return discoverLocation(state, resolveLocationId(state, context, result.locationId));
   }
   if (result.kind === 'dialogue') {
     return startDialogue(state, context, result.dialogueId, now);

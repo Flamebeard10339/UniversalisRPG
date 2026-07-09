@@ -190,6 +190,7 @@ const tagToActionResult = (
   if (tag.keyword === 'openModal') return { kind: 'open-modal', modalId: tag.modalId };
   if (tag.keyword === 'relocate') return { kind: 'relocate', locationId: tag.locationId };
   if (tag.keyword === 'setSpawn') return { kind: 'set-spawn', locationId: tag.locationId };
+  if (tag.keyword === 'discover') return { kind: 'discover-location', locationId: tag.locationId };
   if (tag.keyword === 'say') {
     if (hasConditionals(tag.text)) {
       return { kind: 'conditional-chat', fragments: toConditionalText(tag.text, pack) };
@@ -373,24 +374,12 @@ const compileLocation = (
     locale.set(`action.${edgeId}.description`, 'Leave.');
     setDefaultOutcomeLocale(locale, `action.${edgeId}`, { success: 'Done.', failure: 'Nothing happens.' });
 
-    // Combine fog-of-war check (target must be discovered) with any existing visibleWhen conditions
-    const fogOfWarCheck: Condition = {
-      kind: 'state-variable',
-      variable: `discovered-location:${edge.toLocationId}`,
-      comparison: 'greater-than',
-      value: 0,
-    };
-    const edgeCondition = edge.cond ? toCondition(edge.cond, pack) : undefined;
-    const visibleWhen = edgeCondition
-      ? { kind: 'all', conditions: [fogOfWarCheck, edgeCondition] }
-      : fogOfWarCheck;
-
     actions.push({
       id: edgeId,
       role: 'travel',
       rewards: [],
       results: [{ kind: 'relocate', locationId: edge.toLocationId }],
-      visibleWhen,
+      ...(edge.cond ? { visibleWhen: toCondition(edge.cond, pack) } : {}),
     });
     locationActionIds.push(edgeId);
   }

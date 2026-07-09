@@ -169,6 +169,7 @@
   "welcomeBack.reward.resource": "+{amount} {resource}",
   "welcomeBack.reward.skillXp": "+{amount} XP in {skill}",
   "map.undiscoveredLocation": "???",
+  "location.discovered": "You discovered {title}.",
   "movementArrows.title": "Move",
   "movementArrows.direction.n": "North",
   "movementArrows.direction.s": "South",
