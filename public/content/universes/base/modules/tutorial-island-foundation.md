@@ -5,58 +5,77 @@ universe: base
 author: UniversalisRPG
 game_version: 1.0
 pack: tutorial-island
-dependencies: tutorial-island-reset
+dependencies: base-core
 
 # advanced
 {
-  "stats": [
-    { "id": "fishing", "base": 6 },
-    { "id": "cooking", "base": 6 },
-    { "id": "thieving", "base": 6 },
-    { "id": "smithing", "base": 6 },
-    { "id": "movement-speed", "base": 60 }
-  ],
-  "skills": [
-    { "id": "fishing", "maxLevel": 100, "statId": "fishing" },
-    { "id": "cooking", "maxLevel": 100, "statId": "cooking" },
-    { "id": "thieving", "maxLevel": 100, "statId": "thieving" },
-    { "id": "smithing", "maxLevel": 100, "statId": "smithing" }
-  ],
-  "flags": [
-    { "id": "tutorial.miki-cleared", "initialValue": false },
-    { "id": "tutorial.bridge-open", "initialValue": false },
-    { "id": "tutorial.gommi-asleep", "initialValue": false },
-    { "id": "tutorial.bank-visited", "initialValue": false },
-    { "id": "tutorial.mining-cleared", "initialValue": false },
-    { "id": "tutorial.combat-cleared", "initialValue": false },
-    { "id": "tutorial.cage-locked-by-orloth", "initialValue": false },
-    { "id": "tutorial.reached-mainland", "initialValue": false },
-    { "id": "quest.leave-tutorial-island.accepted", "initialValue": false },
-    { "id": "tutorial.crate-net-taken", "initialValue": false },
-    { "id": "tutorial.crate-bowl-taken", "initialValue": false }
-  ],
   "locale": {
-    "stat.fishing.title": "Fishing",
-    "stat.fishing.description": "Power applied to fishing actions.",
-    "stat.cooking.title": "Cooking",
-    "stat.cooking.description": "Power applied to cooking actions.",
-    "stat.thieving.title": "Thieving",
-    "stat.thieving.description": "Power applied to locks and sleight of hand.",
-    "stat.smithing.title": "Smithing",
-    "stat.smithing.description": "Power applied to smelting and forging.",
-    "stat.movement-speed.title": "Movement Speed",
-    "stat.movement-speed.description": "How quickly you travel between locations.",
-    "skill.fishing.title": "Fishing",
-    "skill.fishing.description": "Catching food from open water.",
-    "skill.cooking.title": "Cooking",
-    "skill.cooking.description": "Turning raw supplies into safer meals.",
-    "skill.thieving.title": "Thieving",
-    "skill.thieving.description": "Opening what was meant to stay closed.",
-    "skill.smithing.title": "Smithing",
-    "skill.smithing.description": "Smelting metal and shaping gear.",
     "modulePack.tutorial-island.title": "Tutorial Island"
   }
 }
+
+# stat mining
+base: 0
+title: Mining
+description: Power applied to mining actions.
+
+# stat smithing
+base: 0
+title: Smithing
+description: Power applied to smelting and forging.
+
+# stat fishing
+base: 0
+title: Fishing
+description: Power applied to fishing actions.
+
+# stat cooking
+base: 0
+title: Cooking
+description: Power applied to cooking actions.
+
+# stat thieving
+base: 0
+title: Thieving
+description: Power applied to locks and sleight of hand.
+
+# stat movement-speed
+base: 60
+title: Movement Speed
+description: How quickly you travel between locations.
+
+# skill mining
+title: Mining
+description: Reading stone, striking ore, and extracting useful minerals.
+
+# skill smithing
+title: Smithing
+description: Smelting metal and shaping gear.
+
+# skill fishing
+title: Fishing
+description: Catching food from open water.
+
+# skill cooking
+title: Cooking
+description: Turning raw supplies into safer meals.
+
+# skill thieving
+title: Thieving
+description: Opening what was meant to stay closed.
+
+# flags
+tutorial.miki-cleared
+tutorial.bridge-open
+tutorial.gommi-asleep
+tutorial.bank-visited
+tutorial.mining-cleared
+tutorial.combat-cleared
+tutorial.cage-locked-by-orloth
+tutorial.reached-mainland
+quest.leave-tutorial-island.accepted
+tutorial.crate-net-taken
+tutorial.crate-bowl-taken
 
 # item gold
 title: Gold

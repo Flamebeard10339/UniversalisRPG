@@ -443,3 +443,151 @@ fight:
     expect(fight.visibleWhen).toBeUndefined();
   });
 });
+
+describe('content DSL — # stat / # skill / # flags sections', () => {
+  it('compiles stats/skills with defaults and locale, and flags with default/explicit initial values', () => {
+    const source = `# info
+id: stat-proof
+version: 1.0.0
+universe: base
+author: test
+game_version: 1.0
+pack: stat-proof
+
+# stat attack
+base: 6
+title: Attack
+description: Power applied to outgoing attacks.
+
+# stat movement-speed
+base: 60
+
+# skill attack
+title: Attack
+description: Accuracy, timing, and pressure in direct conflict.
+
+# skill regeneration
+stat: attack
+max level: 50
+
+# flags
+tutorial.miki-cleared
+death-count: 0
+some-flag: true
+`;
+    const { module, locale } = compileDsl(source);
+    const data = module.data as {
+      stats: { id: string; base: number }[];
+      skills: { id: string; maxLevel: number; statId?: string }[];
+      flags: { id: string; initialValue: boolean | number }[];
+    };
+    expect(data.stats).toEqual([{ id: 'attack', base: 6 }, { id: 'movement-speed', base: 60 }]);
+    expect(data.skills).toEqual([
+      { id: 'attack', maxLevel: 100, statId: 'attack' },
+      { id: 'regeneration', maxLevel: 50, statId: 'attack' },
+    ]);
+    expect(data.flags).toEqual([
+      { id: 'tutorial.miki-cleared', initialValue: false },
+      { id: 'death-count', initialValue: 0 },
+      { id: 'some-flag', initialValue: true },
+    ]);
+    expect(locale['stat.attack.title']).toBe('Attack');
+    expect(locale['stat.attack.description']).toBe('Power applied to outgoing attacks.');
+    expect(locale['stat.movement-speed.title']).toBe('Movement speed');
+    expect(locale['skill.regeneration.title']).toBe('Regeneration');
+  });
+});
+
+describe('content DSL — droptable: tag and # droptable sections', () => {
+  it('reproduces a nested independent/dependent dropTable reward exactly', () => {
+    // Matches the shape base-core's original hand-written goblin fight
+    // reward used: always drop bones, 1/3 chance of a dependent sub-table
+    // choosing between tin-ore and a copper-ore range.
+    const source = `# info
+id: droptable-proof
+version: 1.0.0
+universe: base
+author: test
+game_version: 1.0
+pack: droptable-proof
+
+# item bones
+# item tin-ore
+# item copper-ore
+
+# location start-room
+x: 0, y: 0
+starting
+
+## entity goblin
+fight:
+  enemy: melee-combat, health 10
+  droptable:
+    bones (1)
+    dependent droptable (3):
+      1 tin-ore (4)
+      3-5 copper-ore (3)
+`;
+    const { module } = compileDsl(source);
+    const entities = (module.data as { entities: EntityDefinition[] }).entities;
+    const fight = entities.find((entity) => entity.id === 'goblin')!.actions!.find((action) => action.id === 'fight')!;
+    const dropReward = fight.rewards!.find((reward) => reward.kind === 'dropTable')!;
+    expect(dropReward).toEqual({
+      kind: 'dropTable',
+      mode: 'independent',
+      drops: [
+        { weight: 1, reward: { kind: 'item', itemId: 'bones', amount: 1 } },
+        {
+          weight: 3,
+          drops: [
+            { weight: 4, reward: { kind: 'item', itemId: 'tin-ore', amount: 1 } },
+            { weight: 3, reward: { kind: 'item', itemId: 'copper-ore', amount: { min: 3, max: 5 } } },
+          ],
+        },
+      ],
+    });
+  });
+
+  it('resolves a bare id against a named # droptable section instead of treating it as an item', () => {
+    const source = `# info
+id: droptable-ref-proof
+version: 1.0.0
+universe: base
+author: test
+game_version: 1.0
+pack: droptable-ref-proof
+
+# item bones
+# item rare-sword
+
+# droptable rare-weapon-table
+rare-sword (128)
+
+# location start-room
+x: 0, y: 0
+starting
+
+## entity foobar
+fight:
+  enemy: melee-combat, health 10
+  droptable:
+    bones
+    rare-weapon-table (2)
+`;
+    const { module } = compileDsl(source);
+    const data = module.data as { entities: EntityDefinition[]; dropTables: { id: string; mode: string; drops: unknown[] }[] };
+    const fight = data.entities.find((entity) => entity.id === 'foobar')!.actions!.find((action) => action.id === 'fight')!;
+    const dropReward = fight.rewards!.find((reward) => reward.kind === 'dropTable')!;
+    expect(dropReward).toEqual({
+      kind: 'dropTable',
+      mode: 'independent',
+      drops: [
+        { weight: 1, reward: { kind: 'item', itemId: 'bones', amount: 1 } },
+        { weight: 2, dropTableId: 'rare-weapon-table' },
+      ],
+    });
+    expect(data.dropTables).toEqual([
+      { id: 'rare-weapon-table', mode: 'independent', drops: [{ weight: 128, reward: { kind: 'item', itemId: 'rare-sword', amount: 1 } }] },
+    ]);
+  });
+});

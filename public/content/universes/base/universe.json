@@ -28,8 +28,6 @@
   ],
   "modules": [
     "base-core",
-    "wayside-supplies",
-    "tutorial-island-reset",
     "tutorial-island-foundation",
     "tutorial-island-guide-house",
     "tutorial-island-survival",

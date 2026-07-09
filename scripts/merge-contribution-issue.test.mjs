@@ -8,7 +8,7 @@ const issueBody = `## Target universe
 base
 
 ## Notes
-First test of github issue. This mod only changes the positions of existing locations.
+First test of github issue. This mod only changes the base value of an existing stat.
 
 ## Validation
 No validation issues.
@@ -34,35 +34,25 @@ No validation issues.
         "patches": [
           {
             "targetModId": "base-core",
-            "objectType": "locations",
-            "objectId": "emberwood",
+            "objectType": "stats",
+            "objectId": "action-rate",
             "ops": [
               {
                 "op": "replace",
-                "path": "/position/x",
-                "value": 200
-              },
-              {
-                "op": "replace",
-                "path": "/position/y",
-                "value": 80
+                "path": "/base",
+                "value": 30
               }
             ]
           },
           {
             "targetModId": "base-core",
-            "objectType": "locations",
-            "objectId": "old-quarry",
+            "objectType": "flags",
+            "objectId": "death-count",
             "ops": [
               {
                 "op": "replace",
-                "path": "/position/x",
-                "value": 200
-              },
-              {
-                "op": "replace",
-                "path": "/position/y",
-                "value": 184
+                "path": "/initialValue",
+                "value": 1
               }
             ]
           }
@@ -88,7 +78,7 @@ describe('merge-contribution-issue tooling', () => {
 
     expect(result.moduleIds).toEqual(['local-contributions']);
     expect(result.writes[0].json.id).toBe('local-contributions');
-    expect(result.writes[1].json.modules).toEqual(expect.arrayContaining(['base-core', 'wayside-supplies', 'local-contributions']));
+    expect(result.writes[1].json.modules).toEqual(expect.arrayContaining(['base-core', 'local-contributions']));
   });
 
   it('dry-runs merge-mod by applying addressed patches into base-core data', () => {
@@ -101,12 +91,12 @@ describe('merge-contribution-issue tooling', () => {
     });
 
     const mergedModule = result.writes[0].json;
-    const emberwood = mergedModule.data.find((entry) => entry.type === 'location' && entry.id === 'emberwood');
-    const oldQuarry = mergedModule.data.find((entry) => entry.type === 'location' && entry.id === 'old-quarry');
+    const actionRate = mergedModule.data.find((entry) => entry.type === 'stat' && entry.id === 'action-rate');
+    const deathCount = mergedModule.data.find((entry) => entry.type === 'flag' && entry.id === 'death-count');
 
     expect(result.applied).toBe(2);
-    expect(emberwood.position).toEqual({ x: 200, y: 80 });
-    expect(oldQuarry.position).toEqual({ x: 200, y: 184 });
+    expect(actionRate.base).toBe(30);
+    expect(deathCount.initialValue).toBe(1);
   });
 });
 

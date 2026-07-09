@@ -146,8 +146,9 @@ below), including a second `say:` right after the first one.
 | `resource: <resourceId> <amount>` | grants/drains a resource (e.g. `resource: health -3`) — same instant/adversarial rewards-vs-results split as `give`/`xp` |
 | `relocate: <locationId>` | `results: [{kind:'relocate', locationId}]` — an unconditional move, for entity actions that are a plain button rather than a highly-connected-grid edge (a ladder, tunnel, or portal). This is the same result `wall ->` produces internally for grid edges; `relocate:` is the tag form for anywhere else an action needs to move the player. |
 | `set spawn: <locationId>` | `results: [{kind:'set-spawn', locationId}]` — moves the player's respawn point, independent of `relocate:` (a one-way "you've moved on for good" moment, like leaving a tutorial area, typically pairs both tags on the same action) |
+| `droptable:` | appends a `Reward` of `kind:'dropTable'` — a nested entry-list tag, one level deeper than `enemy:`/`on success:`. Composite — see `# droptable <id>` below. |
 
-Deferred to a later pass: `respawn:`, drop-table references inside `give:`.
+Deferred to a later pass: `respawn:`.
 
 ## `# item <id>`
 
@@ -345,6 +346,101 @@ This is not examine-specific. Since `examine:` is sugar for `say:`, *any*
 action with conditional `say:` text gets this expansion — an action doesn't
 need to be named "examine" to have state-dependent flavor text.
 
+## `# stat <id>`, `# skill <id>`, `# flags`
+
+Sugar for what used to require a raw `# advanced` block — the three pieces
+(stats, skills, flags) that every other module needs at least a little of but
+that don't fit the location/entity/item shape:
+
+```
+# stat attack
+base: 6
+title: Attack
+description: Power applied to outgoing attacks.
+
+# skill attack
+max level: 100
+title: Attack
+description: Accuracy, timing, and pressure in direct conflict.
+
+# flags
+tutorial.miki-cleared
+tutorial.bank-visited
+death-count: 0
+```
+
+- `# stat <id>`: `base:` (defaults to `0`), optional `title:`/`description:`
+  (default to `humanize(id)` / `"<Humanized id>."`, same fallback every other
+  section's title/description use).
+- `# skill <id>`: `stat:` (defaults to the skill's own id — the common case of
+  a same-named backing stat), `max level:` (defaults to `100`, matching every
+  skill in this codebase so far), optional `title:`/`description:`.
+- `# flags`: one *module-wide* bulk section (no id in the header), one flag
+  per line — a bare id defaults to `initialValue: false`; `<id>: <value>`
+  sets an explicit boolean or number (flags aren't only booleans — a counter
+  like `tutorial-guide.q1.count` needs a numeric initial value, matched
+  against with `greater-than`/`less-than` elsewhere). Dotted vs. bare ids
+  follow the same pack-scoping rule as everywhere else flags appear (below).
+
+As with entities (`# advanced.entities` vs. `## entity`), mixing `# stat`/
+`# skill`/`# flags` sugar with `# advanced`'s own `stats`/`skills`/`flags`
+keys in the *same* module isn't supported — the plain object spread means
+whichever comes last wins outright rather than merging. Pick one per module.
+
+## `# droptable <id>` and the `droptable:` tag
+
+Sugar for a `Reward`/`DropTableEntry` of `kind: 'dropTable'` — previously only
+reachable via `# advanced`. Used inline, attached to an adversarial action's
+own reward list:
+
+```
+## entity goblin
+fight:
+  enemy: melee-combat, health 10
+  droptable:
+    bones (1)
+    dependent droptable (3):
+      1 tin-ore (4)
+      3-5 copper-ore (3)
+```
+
+Reads as: always drop one `bones` (an item with no drop amount is 1); 1 in 3
+chance of rolling the nested table, which is itself a 4-in-7 / 3-in-7 choice
+between one `tin-ore` and three-to-five (uniform, inclusive) `copper-ore`.
+
+- `droptable:` attaches an **independent**-mode table to the action — each of
+  its entries has its own separate chance to fire (`weight` means "1 in
+  weight", not a relative share; see `rollReward` in `src/game/rewards.ts`).
+  It only makes sense on an `enemy:` (adversarial) action, since `Reward` is a
+  rewards-list concept, not a `results`/`ActionResult` one.
+- Each entry is `[<amount|min-max> ]<id>[ (<weight>)]` — `<amount>` (a plain
+  number or a `min-max` range) only applies when `<id>` is an item; both
+  `<amount>` and `<weight>` default to `1` when omitted.
+- `dependent droptable (<weight>):` opens a nested, unnamed **dependent**-mode
+  sub-table as one entry of its parent — `weight` here is this whole
+  sub-table's own weight *as seen by its parent* (independent: "1 in weight"
+  chance the sub-table is even rolled; dependent: relative share against
+  sibling entries). Its own children use the exact same entry grammar,
+  recursively, so tables can nest arbitrarily deep (this reproduces the
+  4-level-deep goblin drop table `base-core` used to hand-write as raw JSON).
+- `<id>` is left ambiguous by design until compile time: if it matches a
+  declared `# droptable <id>` (see below), it's a reference to that named
+  table (`dropTableId`); otherwise it's treated as an item id. Droptable ids
+  and item ids therefore share one namespace — don't reuse an item id as a
+  droptable id.
+- `# droptable <id>` declares a **named, reusable** table (compiles to a
+  top-level `DropTableDefinition`, referenced by id from any `droptable:`
+  block, in this module or another). Its body is the same entry grammar as
+  above, with no wrapping keyword needed — the section header is the
+  declaration. Always **independent** mode, matching a `droptable:` tag's own
+  attached table, so referencing one (`<id> (<weight>)`) and inlining a block
+  read the same way — a weight of `128` on a single-entry named table means
+  "1 in 128 chance of that entry", not "1 of 128 shares":
+  ```
+  # droptable rare-weapon-table
+  tutorial-blade (128)
+  ```
+
 ## Flags and pack scoping
 
 A bare (undotted) flag id — in `set:`/`unset:`/`hidden if:`/`visible if:`/
@@ -428,20 +524,23 @@ neither the DSL's own sections (`# location`, `# item`, ...) nor the rest of
 `# advanced` can author the latter.
 
 The remaining keys (merged into `data`) are the intentional escape hatch for
-object kinds that are engine plumbing rather than authoring surface (stats,
-skills, flags, resources, effects, interaction-types, display-profiles,
-combat-balance, experience-curve) — contributors aren't expected to
-hand-write these, so there's no ergonomic pressure to give them DSL sugar.
+object kinds that are engine plumbing rather than authoring surface
+(resources, effects, display-profiles, combat-balance, experience-curve) —
+contributors aren't expected to hand-write these, so there's no ergonomic
+pressure to give them DSL sugar. Stats, skills, and flags used to be in this
+list too, but have their own sugar now (`# stat <id>`, `# skill <id>`,
+`# flags` — see above); `# advanced` remains a valid escape hatch for a stat/
+skill field that sugar doesn't cover (there are none today, but the fallback
+exists for the same reason `# interaction`'s does).
 
 The optional `"locale"` key is a flat key → text record (same shape as the
 compiler's own generated locale output) merged into the module's `en`
 dictionary — the escape hatch for text that has no other DSL-generated
-locale key, since stats/skills/resources/effects have no compiler-side
-locale generation of their own (unlike items/dialogue/quests, which always
-get *something*, even a humanized fallback). It never overwrites a key any
-other section already generated; if you want to override generated text,
-write it where it's generated (e.g. an item's `title:`/`description:`), not
-here.
+locale key, since resources/effects have no compiler-side locale generation
+of their own (unlike items/dialogue/quests/stats/skills, which always get
+*something*, even a humanized fallback). It never overwrites a key any other
+section already generated; if you want to override generated text, write it
+where it's generated (e.g. an item's `title:`/`description:`), not here.
 
 ## Localization
 
@@ -473,9 +572,14 @@ Island content, verified by merging the compiled modules through the *real*
   conditions + narrative descriptions), `recipe` (multi-line `in:`/`out:`,
   `on success:` → `extraResults`), `chance:` + `on fail:` (the locked-chest
   one-shot-gamble pattern), `station:`, and the new `resource:` tag.
+- **`compiler.test.ts`**, standalone proofs: `# stat`/`# skill`/`# flags`
+  (defaults + explicit overrides + locale); `droptable:` reproducing
+  `base-core`'s original hand-written 4-level nested independent/dependent
+  goblin reward exactly; a named `# droptable <id>` referenced by id from a
+  separate `droptable:` block, disambiguated from an item id of the same
+  shape.
 
-Not yet implemented: `respawn:`, drop-table
-references inside `give:`, multi-line dialogue-node body text, the visual
-grid-placement GUI for locations, and the full editor/live-preview UI that
-replaces contribution mode. None of these have hit a design wall — they're
-the next slices.
+Not yet implemented: `respawn:`, multi-line dialogue-node body text, the
+visual grid-placement GUI for locations, and the full editor/live-preview UI
+that replaces contribution mode. None of these have hit a design wall —
+they're the next slices.

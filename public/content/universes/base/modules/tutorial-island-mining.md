@@ -7,27 +7,15 @@ game_version: 1.0
 pack: tutorial-island
 dependencies: tutorial-island-bank
 
-# advanced
-{
-  "actions": [
-    { "id": "descend-to-mine", "durationSeconds": 1, "rewards": [], "results": [{ "kind": "relocate", "locationId": "tutorial-mine" }] }
-  ],
-  "locale": {
-    "action.descend-to-mine.title": "Descend",
-    "action.descend-to-mine.description": "Climb down the open trapdoor.",
-    "action.descend-to-mine.success": "You climb into the cave below."
-  },
-  "data-updates": {
-    "patches": [
-      {
-        "targetModId": "tutorial-island-bank",
-        "objectType": "locations",
-        "objectId": "tutorial-bank",
-        "ops": [{ "op": "add", "path": "/actions/-", "value": "descend-to-mine" }]
-      }
-    ]
-  }
-}
+# item bronze-dagger
+title: Bronze Dagger
+description: A short bronze blade suited to quick strikes.
+tags: mainhand (1 attack), +1 attack
+
+# item bronze-pickaxe
+title: Bronze Pickaxe
+description: A simple pickaxe suitable for ore veins.
+tags: pickaxe, mainhand (1 attack 1 mining), +8 mining, +3 attack, +5% health
 
 # location tutorial-mine
 x: 3, y: 0, z: -1
@@ -75,6 +63,10 @@ examine: A prison-issue padlock, guarding something better than rocks.
 
 ## entity mine-tunnel
 title: Mine Tunnel
+examine: A ladder climbs toward the bank on one side; the tunnel keeps going deeper on the other.
+ascend:
+  say: You climb up to the bank.
+  relocate: tutorial-bank
 enter forge: relocate: tutorial-forge
 
 # location tutorial-forge
@@ -93,6 +85,9 @@ smith: station: tutorial-anvil
 ## entity forge-table
 title: Forge Table
 return mine: relocate: tutorial-mine
+continue:
+  say: You reach the combat cage.
+  relocate: tutorial-rat-cage
 
 # dialogue denzel
 start (denzel): Pickaxe's yours, don't lose it. Rocks are through there. Anything else before you start swinging?

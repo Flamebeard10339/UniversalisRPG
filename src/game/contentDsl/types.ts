@@ -37,7 +37,20 @@ export type DslTag =
   | { keyword: 'station'; stationId: string }
   | { keyword: 'resource'; resourceId: string; amount: number }
   | { keyword: 'relocate'; locationId: string }
-  | { keyword: 'setSpawn'; locationId: string };
+  | { keyword: 'setSpawn'; locationId: string }
+  | { keyword: 'droptable'; entries: DslDropEntry[] };
+
+// One line inside a `droptable:` (or nested `dependent droptable (N):`) block.
+// `id` is left unresolved by the parser — it's either an item id or the id of
+// a `# droptable <id>` section, and only the compiler (which has seen every
+// section) can tell which; `nested` is set instead of `id`/`amount` for a
+// `dependent droptable (N):` line, recursively.
+export type DslDropEntry = {
+  weight: number;
+  id?: string;
+  amount?: number | { min: number; max: number };
+  nested?: DslDropEntry[];
+};
 
 export type DslActionDecl = {
   title: string;
@@ -144,6 +157,34 @@ export type DslRecipeSection = {
   onSuccessTags: DslTag[];
 };
 
+export type DslStatSection = {
+  kind: 'stat';
+  id: string;
+  base: number;
+  title?: string;
+  description?: string;
+};
+
+export type DslSkillSection = {
+  kind: 'skill';
+  id: string;
+  statId?: string;
+  maxLevel?: number;
+  title?: string;
+  description?: string;
+};
+
+export type DslFlagsSection = {
+  kind: 'flags';
+  flags: { id: string; initialValue: boolean | number }[];
+};
+
+export type DslDropTableSection = {
+  kind: 'droptable';
+  id: string;
+  entries: DslDropEntry[];
+};
+
 export type DslInteractionSection = {
   kind: 'interaction';
   id: string;
@@ -166,7 +207,11 @@ export type DslSection =
   | DslItemSection
   | DslQuestSection
   | DslRecipeSection
-  | DslInteractionSection;
+  | DslInteractionSection
+  | DslStatSection
+  | DslSkillSection
+  | DslFlagsSection
+  | DslDropTableSection;
 
 export type DslInfo = {
   id: string;

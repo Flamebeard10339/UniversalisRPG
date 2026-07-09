@@ -9,6 +9,10 @@ import {
   interactionPlayerKillKey,
   interactionPlayerMissKey,
   interactionTitleKey,
+  skillDescriptionKey,
+  skillTitleKey,
+  statDescriptionKey,
+  statTitleKey,
   toKebabCase,
 } from '../contentIds';
 import type {
@@ -18,6 +22,8 @@ import type {
   DialogueDefinition,
   DialogueNode,
   DialogueOption,
+  DropTableDefinition,
+  DropTableEntry,
   EnemyStatKey,
   EntityActionDefinition,
   EntityDefinition,
@@ -31,6 +37,9 @@ import type {
   QuestStage,
   RecipeDefinition,
   Reward,
+  SkillDefinition,
+  StatDefinition,
+  StateFlagDefinition,
 } from '../types';
 import { parseDsl } from './parser';
 import { collectTextFlags, renderTextForAssignment } from './shared';
@@ -38,12 +47,17 @@ import type {
   DslActionDecl,
   DslCondition,
   DslDialogueSection,
+  DslDropEntry,
+  DslDropTableSection,
   DslEntityDecl,
+  DslFlagsSection,
   DslInteractionSection,
   DslItemSection,
   DslLocationSection,
   DslQuestSection,
   DslRecipeSection,
+  DslSkillSection,
+  DslStatSection,
   DslTag,
 } from './types';
 
@@ -124,11 +138,25 @@ const combineConditions = (a: Condition | undefined, b: Condition | undefined): 
 // "inline-conditional variant expansion" below) — irrelevant for every other
 // tag kind, and irrelevant for a `say` whose text has no conditionals.
 // ---------------------------------------------------------------------------
-const tagToReward = (tag: DslTag): Reward | null => {
+// A droptable entry's bare `id` is either an item id or the id of a
+// `# droptable <id>` section — only resolvable now that every section has
+// been seen (see `dropTableIds` in compileDsl). `nested` (from a
+// `dependent droptable (N):` line) always wins first since it has no `id` of
+// its own to disambiguate.
+const entryToDropTableEntry = (entry: DslDropEntry, dropTableIds: Set<string>): DropTableEntry => {
+  if (entry.nested) return { weight: entry.weight, drops: entry.nested.map((child) => entryToDropTableEntry(child, dropTableIds)) };
+  if (entry.id && dropTableIds.has(entry.id)) return { weight: entry.weight, dropTableId: entry.id };
+  return { weight: entry.weight, reward: { kind: 'item', itemId: entry.id!, amount: entry.amount ?? 1 } };
+};
+
+const tagToReward = (tag: DslTag, dropTableIds: Set<string>): Reward | null => {
   if (tag.keyword === 'give') return { kind: 'item', itemId: tag.itemId, amount: tag.amount };
   if (tag.keyword === 'take') return { kind: 'item', itemId: tag.itemId, amount: -tag.amount };
   if (tag.keyword === 'xp') return { kind: 'skillXp', skillId: tag.skillId, amount: tag.amount };
   if (tag.keyword === 'resource') return { kind: 'resource', resourceId: tag.resourceId, amount: tag.amount };
+  if (tag.keyword === 'droptable') {
+    return { kind: 'dropTable', mode: 'independent', drops: tag.entries.map((entry) => entryToDropTableEntry(entry, dropTableIds)) };
+  }
   return null;
 };
 
@@ -228,6 +256,7 @@ const compileActionVariants = (
   decl: DslActionDecl,
   locale: LocaleBuilder,
   pack: string,
+  dropTableIds: Set<string>,
 ): Record<string, unknown>[] => {
   const baseActionId = kebab(decl.title);
   locale.set(`action.${scope}.${ownerId}.${baseActionId}.title`, titleCase(decl.title));
@@ -271,8 +300,8 @@ const compileActionVariants = (
 
     if (enemyTag) {
       const rewards = decl.tags
-        .filter((tag) => tag.keyword === 'give' || tag.keyword === 'xp' || tag.keyword === 'take')
-        .map(tagToReward)
+        .filter((tag) => tag.keyword === 'give' || tag.keyword === 'xp' || tag.keyword === 'take' || tag.keyword === 'droptable')
+        .map((tag) => tagToReward(tag, dropTableIds))
         .filter((reward): reward is Reward => reward !== null);
       const results = decl.onSuccessTags
         .map((tag) => tagToActionResult(tag, locale, chatKeyBase, chatCounter, pack, assignment))
@@ -323,11 +352,11 @@ const compileActionVariants = (
   });
 };
 
-const compileEntityAction = (entityId: string, decl: DslActionDecl, locale: LocaleBuilder, pack: string): EntityActionDefinition[] =>
-  compileActionVariants('entity', entityId, decl, locale, pack) as EntityActionDefinition[];
+const compileEntityAction = (entityId: string, decl: DslActionDecl, locale: LocaleBuilder, pack: string, dropTableIds: Set<string>): EntityActionDefinition[] =>
+  compileActionVariants('entity', entityId, decl, locale, pack, dropTableIds) as EntityActionDefinition[];
 
-const compileItemAction = (itemId: string, decl: DslActionDecl, locale: LocaleBuilder, pack: string): ItemActionDefinition[] => {
-  const variants = compileActionVariants('item', itemId, decl, locale, pack);
+const compileItemAction = (itemId: string, decl: DslActionDecl, locale: LocaleBuilder, pack: string, dropTableIds: Set<string>): ItemActionDefinition[] => {
+  const variants = compileActionVariants('item', itemId, decl, locale, pack, dropTableIds);
   for (const variant of variants) {
     if ('enemy' in variant) throw new Error(`Item action "${itemId}.${decl.title}" cannot be adversarial (enemy:) — items are always instant.`);
   }
@@ -341,6 +370,7 @@ const compileLocation = (
   section: DslLocationSection,
   locale: LocaleBuilder,
   pack: string,
+  dropTableIds: Set<string>,
 ): { location: LocationNode; entities: EntityDefinition[]; actions: GameAction[] } => {
   locale.set(`location.${section.id}.title`, section.title ?? humanize(section.id));
   locale.set(`location.${section.id}.description`, section.description ?? `${humanize(section.id)}.`);
@@ -351,7 +381,7 @@ const compileLocation = (
   for (const entityDecl of section.entities as DslEntityDecl[]) {
     entityIds.push(entityDecl.id);
     locale.set(`entity.${entityDecl.id}.title`, entityDecl.title ?? humanize(entityDecl.id));
-    const actions: EntityActionDefinition[] = entityDecl.actions.flatMap((actionDecl) => compileEntityAction(entityDecl.id, actionDecl, locale, pack));
+    const actions: EntityActionDefinition[] = entityDecl.actions.flatMap((actionDecl) => compileEntityAction(entityDecl.id, actionDecl, locale, pack, dropTableIds));
     entities.push({ id: entityDecl.id, actions });
   }
 
@@ -427,10 +457,10 @@ const compileDialogue = (section: DslDialogueSection, locale: LocaleBuilder, pac
 // ---------------------------------------------------------------------------
 // Items, quests, recipes
 // ---------------------------------------------------------------------------
-const compileItemSection = (section: DslItemSection, locale: LocaleBuilder, pack: string): ItemDefinition => {
+const compileItemSection = (section: DslItemSection, locale: LocaleBuilder, pack: string, dropTableIds: Set<string>): ItemDefinition => {
   locale.set(`item.${section.id}.title`, section.title ?? humanize(section.id));
   locale.set(`item.${section.id}.description`, section.description ?? `${humanize(section.id)}.`);
-  const actions = section.actions.flatMap((actionDecl) => compileItemAction(section.id, actionDecl, locale, pack));
+  const actions = section.actions.flatMap((actionDecl) => compileItemAction(section.id, actionDecl, locale, pack, dropTableIds));
   return {
     id: section.id,
     ...(section.maxQuantity !== undefined ? { maxQuantity: section.maxQuantity } : {}),
@@ -466,6 +496,37 @@ const compileRecipe = (section: DslRecipeSection, locale: LocaleBuilder, pack: s
     ...(extraResults.length > 0 ? { extraResults } : {}),
   };
 };
+
+// ---------------------------------------------------------------------------
+// Stats/skills/flags: flat sugar for what used to require a raw `# advanced`
+// block. A skill's `statId` defaults to its own id (matching the common case
+// of a same-named stat backing it) and `maxLevel` defaults to 100 (every
+// skill in this codebase already uses that).
+// ---------------------------------------------------------------------------
+const compileStat = (section: DslStatSection, locale: LocaleBuilder): StatDefinition => {
+  locale.set(statTitleKey(section.id), section.title ?? humanize(section.id));
+  locale.set(statDescriptionKey(section.id), section.description ?? `${humanize(section.id)}.`);
+  return { id: section.id, base: section.base };
+};
+
+const compileSkill = (section: DslSkillSection, locale: LocaleBuilder): SkillDefinition => {
+  locale.set(skillTitleKey(section.id), section.title ?? humanize(section.id));
+  locale.set(skillDescriptionKey(section.id), section.description ?? `${humanize(section.id)}.`);
+  return { id: section.id, maxLevel: section.maxLevel ?? 100, statId: section.statId ?? section.id };
+};
+
+const compileFlags = (section: DslFlagsSection): StateFlagDefinition[] => section.flags;
+
+// A named, reusable droptable (`# droptable <id>`) is always `independent`
+// mode — the same mode a `droptable:` tag's own attached (unnamed) table
+// uses — so referencing one elsewhere (`<id> (<weight>)`) and inlining a
+// `droptable:` block read the same way: each entry has its own independent
+// 1-in-weight chance to fire.
+const compileDropTable = (section: DslDropTableSection, dropTableIds: Set<string>): DropTableDefinition => ({
+  id: section.id,
+  mode: 'independent',
+  drops: section.entries.map((entry) => entryToDropTableEntry(entry, dropTableIds)),
+});
 
 // ---------------------------------------------------------------------------
 // Interactions: sugar for InteractionTypeDefinition — see docs on
@@ -504,11 +565,23 @@ export const compileDsl = (source: string): { module: ContentModule; locale: Rec
   const quests: QuestDefinition[] = [];
   const recipes: RecipeDefinition[] = [];
   const interactionTypes: InteractionTypeDefinition[] = [];
+  const stats: StatDefinition[] = [];
+  const skills: SkillDefinition[] = [];
+  const flags: StateFlagDefinition[] = [];
+  const dropTables: DropTableDefinition[] = [];
   let advanced: Record<string, unknown> = {};
+
+  // A droptable entry's bare id (item vs. named-droptable reference) can only
+  // be disambiguated once every `# droptable <id>` section has been seen —
+  // collect those ids up front, before compiling anything that might
+  // reference one.
+  const dropTableIds = new Set(
+    dsl.sections.filter((section): section is DslDropTableSection => section.kind === 'droptable').map((section) => section.id),
+  );
 
   for (const section of dsl.sections) {
     if (section.kind === 'location') {
-      const compiled = compileLocation(section, locale, pack);
+      const compiled = compileLocation(section, locale, pack, dropTableIds);
       locations.push(compiled.location);
       entities.push(...compiled.entities);
       actions.push(...compiled.actions);
@@ -517,13 +590,21 @@ export const compileDsl = (source: string): { module: ContentModule; locale: Rec
     } else if (section.kind === 'advanced') {
       advanced = { ...advanced, ...section.json };
     } else if (section.kind === 'item') {
-      items.push(compileItemSection(section, locale, pack));
+      items.push(compileItemSection(section, locale, pack, dropTableIds));
     } else if (section.kind === 'quest') {
       quests.push(compileQuest(section, locale, pack));
     } else if (section.kind === 'recipe') {
       recipes.push(compileRecipe(section, locale, pack));
     } else if (section.kind === 'interaction') {
       interactionTypes.push(compileInteraction(section, locale));
+    } else if (section.kind === 'stat') {
+      stats.push(compileStat(section, locale));
+    } else if (section.kind === 'skill') {
+      skills.push(compileSkill(section, locale));
+    } else if (section.kind === 'flags') {
+      flags.push(...compileFlags(section));
+    } else if (section.kind === 'droptable') {
+      dropTables.push(compileDropTable(section, dropTableIds));
     }
   }
 
@@ -566,6 +647,10 @@ export const compileDsl = (source: string): { module: ContentModule; locale: Rec
     ...(interactionTypes.length > 0 || advancedInteractionTypes.length > 0
       ? { interactionTypes: [...interactionTypes, ...advancedInteractionTypes] }
       : {}),
+    ...(stats.length > 0 ? { stats } : {}),
+    ...(skills.length > 0 ? { skills } : {}),
+    ...(flags.length > 0 ? { flags } : {}),
+    ...(dropTables.length > 0 ? { dropTables } : {}),
     ...advancedRest,
   };
 

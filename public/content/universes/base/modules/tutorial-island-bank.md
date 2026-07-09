@@ -23,6 +23,9 @@ talk:
 ## entity trapdoor
 title: Trapdoor
 examine: A ladder disappears into the dark below. Someone left it open on purpose.
+descend:
+  say: You climb down the ladder.
+  relocate: tutorial-mine
 
 # dialogue bank-teller
 start (bank-teller): Afternoon. Haven't seen you before — first time at a bank?

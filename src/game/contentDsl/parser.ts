@@ -11,7 +11,10 @@ import type {
   DslActionDecl,
   DslDialogueNode,
   DslDialogueSection,
+  DslDropEntry,
+  DslDropTableSection,
   DslEntityDecl,
+  DslFlagsSection,
   DslInfo,
   DslInteractionSection,
   DslItemSection,
@@ -22,6 +25,8 @@ import type {
   DslRecipeIngredient,
   DslRecipeSection,
   DslSection,
+  DslSkillSection,
+  DslStatSection,
   DslTag,
   DslWallDecl,
 } from './types';
@@ -78,7 +83,7 @@ export const parseDsl = (source: string): DslModule => {
   cursor.skipBlank();
   while (!cursor.atEnd()) {
     const line = cursor.current!;
-    const headerMatch = /^#\s+(info|location|dialogue|advanced|item|quest|recipe|interaction)\b\s*(.*)$/.exec(line);
+    const headerMatch = /^#\s+(info|location|dialogue|advanced|item|quest|recipe|interaction|stat|skill|flags|droptable)\b\s*(.*)$/.exec(line);
     if (!headerMatch) {
       throw new DslParseError(`Expected a top-level "# ..." header, got: "${line}"`, cursor.index);
     }
@@ -100,6 +105,14 @@ export const parseDsl = (source: string): DslModule => {
       sections.push(parseRecipeSection(cursor, rest.trim()));
     } else if (keyword === 'interaction') {
       sections.push(parseInteractionSection(cursor, rest.trim()));
+    } else if (keyword === 'stat') {
+      sections.push(parseStatSection(cursor, rest.trim()));
+    } else if (keyword === 'skill') {
+      sections.push(parseSkillSection(cursor, rest.trim()));
+    } else if (keyword === 'flags') {
+      sections.push(parseFlagsSection(cursor));
+    } else if (keyword === 'droptable') {
+      sections.push(parseDropTableSection(cursor, rest.trim()));
     }
     cursor.skipBlank();
   }
@@ -321,6 +334,13 @@ const parseActionBody = (cursor: Cursor, baseIndent: number): { tags: DslTag[]; 
       const fieldLineIndex = cursor.index;
       cursor.index++;
       onFailTags.push(...readTagLines(cursor, indent, onFailMatch[1], fieldLineIndex));
+      continue;
+    }
+
+    const dropTableMatch = /^droptable:\s*$/i.exec(trimmed);
+    if (dropTableMatch) {
+      cursor.index++;
+      tags.push({ keyword: 'droptable', entries: parseDropEntries(cursor, indent) });
       continue;
     }
 
@@ -657,4 +677,145 @@ const parseInteractionSection = (cursor: Cursor, id: string): DslInteractionSect
   }
 
   return { kind: 'interaction', id, sourceStatId, targetStatId, targetPlayerHealth, title, playerHit, playerMiss, playerKill, entityHit, entityMiss, entityKill };
+};
+
+// ---------------------------------------------------------------------------
+// Stats/skills/flags: flat metadata sugar for what used to require a raw
+// `# advanced` block. `# stat`/`# skill` are one-per-declaration, like
+// `# item`; `# flags` is a single bulk section (one id per line) since flags
+// are almost always declared many-at-once with no other body content.
+// ---------------------------------------------------------------------------
+const parseStatSection = (cursor: Cursor, id: string): DslStatSection => {
+  cursor.skipBlank();
+  let base = 0;
+  let title: string | undefined;
+  let description: string | undefined;
+
+  while (!cursor.atEnd()) {
+    const line = cursor.current!;
+    const trimmed = line.trim();
+    if (trimmed.length === 0) {
+      cursor.index++;
+      continue;
+    }
+    if (/^#/.test(trimmed)) break;
+
+    const match = /^(base|title|description):\s*(.*)$/i.exec(trimmed);
+    if (!match) throw new DslParseError(`Unexpected line in stat "${id}": "${line}"`, cursor.index);
+    const key = match[1].toLowerCase();
+    const value = match[2].trim();
+    if (key === 'base') base = Number(value);
+    else if (key === 'title') title = value;
+    else description = value;
+    cursor.index++;
+  }
+
+  return { kind: 'stat', id, base, title, description };
+};
+
+const parseSkillSection = (cursor: Cursor, id: string): DslSkillSection => {
+  cursor.skipBlank();
+  let statId: string | undefined;
+  let maxLevel: number | undefined;
+  let title: string | undefined;
+  let description: string | undefined;
+
+  while (!cursor.atEnd()) {
+    const line = cursor.current!;
+    const trimmed = line.trim();
+    if (trimmed.length === 0) {
+      cursor.index++;
+      continue;
+    }
+    if (/^#/.test(trimmed)) break;
+
+    const match = /^(stat|max level|title|description):\s*(.*)$/i.exec(trimmed);
+    if (!match) throw new DslParseError(`Unexpected line in skill "${id}": "${line}"`, cursor.index);
+    const key = match[1].toLowerCase();
+    const value = match[2].trim();
+    if (key === 'stat') statId = value;
+    else if (key === 'max level') maxLevel = Number(value);
+    else if (key === 'title') title = value;
+    else description = value;
+    cursor.index++;
+  }
+
+  return { kind: 'skill', id, statId, maxLevel, title, description };
+};
+
+const parseFlagsSection = (cursor: Cursor): DslFlagsSection => {
+  cursor.skipBlank();
+  const flags: DslFlagsSection['flags'] = [];
+
+  while (!cursor.atEnd()) {
+    const line = cursor.current!;
+    const trimmed = line.trim();
+    if (trimmed.length === 0) {
+      cursor.index++;
+      continue;
+    }
+    if (/^#/.test(trimmed)) break;
+
+    const match = /^([\w.-]+)(?:\s*:\s*(.*))?$/.exec(trimmed);
+    if (!match) throw new DslParseError(`Expected a flag id (optionally ": <initial value>"), got: "${line}"`, cursor.index);
+    const rawValue = match[2]?.trim();
+    let initialValue: boolean | number = false;
+    if (rawValue !== undefined && rawValue.length > 0) {
+      if (/^true$/i.test(rawValue)) initialValue = true;
+      else if (/^false$/i.test(rawValue)) initialValue = false;
+      else initialValue = Number(rawValue);
+    }
+    flags.push({ id: match[1], initialValue });
+    cursor.index++;
+  }
+
+  return { kind: 'flags', flags };
+};
+
+// ---------------------------------------------------------------------------
+// Droptables: recursive entry-list grammar shared by an action's `droptable:`
+// tag and a standalone `# droptable <id>` (named, reusable) section. Each
+// entry is `[<amount|min-max> ]<id>[ (<weight>)]` (amount/weight both default
+// to 1; `<id>` is left unresolved here — item vs. named-droptable reference
+// is a compiler-time decision, since it needs to have seen every section
+// first) or a nested `dependent droptable (<weight>):` block, recursively.
+// ---------------------------------------------------------------------------
+const DROP_ENTRY_LINE = /^(?:(\d+)(?:-(\d+))?\s+)?([\w.-]+)(?:\s*\((\d+)\))?\s*$/;
+const DEPENDENT_DROPTABLE_LINE = /^dependent droptable\s*\((\d+)\)\s*:\s*$/i;
+
+const parseDropEntries = (cursor: Cursor, baseIndent: number): DslDropEntry[] => {
+  const entries: DslDropEntry[] = [];
+
+  while (!cursor.atEnd()) {
+    const line = cursor.current!;
+    if (line.trim().length === 0) {
+      cursor.index++;
+      continue;
+    }
+    if (leadingSpaces(line) <= baseIndent) break;
+    const indent = leadingSpaces(line);
+    const trimmed = line.trim();
+    if (/^#/.test(trimmed)) break;
+
+    const dependentMatch = DEPENDENT_DROPTABLE_LINE.exec(trimmed);
+    if (dependentMatch) {
+      cursor.index++;
+      entries.push({ weight: Number(dependentMatch[1]), nested: parseDropEntries(cursor, indent) });
+      continue;
+    }
+
+    const entryMatch = DROP_ENTRY_LINE.exec(trimmed);
+    if (!entryMatch) throw new DslParseError(`Expected a droptable entry, got: "${line}"`, cursor.index);
+    const [, minRaw, maxRaw, id, weightRaw] = entryMatch;
+    const amount = minRaw === undefined ? undefined : maxRaw === undefined ? Number(minRaw) : { min: Number(minRaw), max: Number(maxRaw) };
+    entries.push({ weight: weightRaw ? Number(weightRaw) : 1, id, amount });
+    cursor.index++;
+  }
+
+  return entries;
+};
+
+const parseDropTableSection = (cursor: Cursor, id: string): DslDropTableSection => {
+  cursor.skipBlank();
+  return { kind: 'droptable', id, entries: parseDropEntries(cursor, -1) };
 };

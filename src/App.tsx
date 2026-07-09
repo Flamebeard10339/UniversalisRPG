@@ -881,12 +881,44 @@ export default function App() {
     return <main className="grid min-h-screen place-items-center bg-slate-950 text-slate-100">{t('app.loadingUniverse')}</main>;
   }
 
-  if (error || !bundle || !playState) {
+  if (error || !bundle) {
     return (
       <main className="grid min-h-screen place-items-center bg-slate-950 p-6 text-slate-100">
         <section className="max-w-xl rounded border border-rose-800 bg-rose-950/30 p-5">
           <h1 className="text-lg font-semibold">{t('app.startErrorTitle')}</h1>
           <p className="mt-2 text-sm text-rose-100">{error ? t(error, error) : t('app.noPlayableUniverse')}</p>
+        </section>
+      </main>
+    );
+  }
+
+  // A module error severe enough to leave no playable starting location
+  // (e.g. a broken dependency cascade-disabling every tutorial-island
+  // module) would otherwise block the *entire* app, including the one tool
+  // that can fix it. If contribution mode is on, fall through to the Edit
+  // tab instead — it only needs `bundle`/the draft, not a live `playState`.
+  if (!playState) {
+    if (contributionMode && currentContributionDraft) {
+      return (
+        <main className="min-h-screen bg-slate-950 p-4 text-slate-100">
+          <p className="mb-4 rounded border border-amber-800 bg-amber-950/30 p-3 text-sm text-amber-100">{t('app.noPlayableUniverse')}</p>
+          <EditMode
+            activeTab={contributionTab}
+            appVersion={APP_VERSION}
+            bundle={bundle}
+            onMapPatch={patchLocalMapModule}
+            onTabChange={setContributionTab}
+            validationIssues={validationIssues}
+            t={t}
+          />
+        </main>
+      );
+    }
+    return (
+      <main className="grid min-h-screen place-items-center bg-slate-950 p-6 text-slate-100">
+        <section className="max-w-xl rounded border border-rose-800 bg-rose-950/30 p-5">
+          <h1 className="text-lg font-semibold">{t('app.startErrorTitle')}</h1>
+          <p className="mt-2 text-sm text-rose-100">{t('app.noPlayableUniverse')}</p>
         </section>
       </main>
     );

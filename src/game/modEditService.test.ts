@@ -420,14 +420,25 @@ describe('ModEditService', () => {
       'data-updates': {
         patches: [{
           targetModId: 'base-core',
-          objectType: 'locations',
-          objectId: 'crossroads',
+          objectType: 'resources',
+          objectId: 'health',
           ops: [
-            { op: 'remove', path: '/actions/0' },
-            { op: 'add', path: '/actions/-', value: 'entity.ork.examine' },
+            { op: 'add', path: '/onEmpty/0/preserve/inventoryIds', value: ['missing-item'] },
           ],
         }],
       },
+    });
+    // base-core itself has no locations (it's shared engine plumbing for
+    // whatever content module provides the actual starting location) — give
+    // it a minimal synthetic starting location so this stays a check of
+    // this patch against base-core in isolation.
+    const starter = module({
+      id: 'diag-starter',
+      universe: 'base',
+      author: 'test',
+      dependencies: ['+base-core'],
+      data: { locations: [{ id: 'diag-start', position: { x: 0, y: 0 }, starting: true, tags: [], entities: [], actions: [] }] },
+      locale: { en: { 'location.diag-start.title': 'Start', 'location.diag-start.description': 'Start.', 'location.diag-start.exhausted': 'Quiet.' } },
     });
     const rawBundle: ContentBundle = {
       manifest,
@@ -446,13 +457,15 @@ describe('ModEditService', () => {
       collectionLogs: [],
       dialogues: [],
       locales: { en: locale },
-      modules: [core, local],
+      modules: [core, local, starter],
     };
 
-    const result = applyModulesToBundle(rawBundle, [core, local], [localContributionsModId]);
+    const result = applyModulesToBundle(rawBundle, [core, local, starter], [localContributionsModId, 'diag-starter']);
 
-    expect(result.enabledModuleIds).toEqual(['base-core']);
-    expect(result.bundle.locations.find((location) => location.id === 'crossroads')?.actions).toContain('travel-crossroads-to-emberwood');
+    expect(result.enabledModuleIds).toEqual(expect.arrayContaining(['base-core', 'diag-starter']));
+    expect(result.enabledModuleIds).not.toContain(localContributionsModId);
+    const healthResource = result.bundle.resourceDefinitions?.find((resource) => resource.id === 'health');
+    expect(healthResource?.onEmpty?.[0]).not.toHaveProperty('preserve.inventoryIds');
     expect(result.issues).toContainEqual(expect.objectContaining({
       message: 'validation.moduleConflictDisabled',
       path: `modules.${localContributionsModId}`,

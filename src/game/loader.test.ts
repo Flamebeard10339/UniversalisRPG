@@ -206,7 +206,23 @@ describe('loader', () => {
 
     expect(baseCore).toBeDefined();
 
-    const result = applyModulesToBundle(bundle, [baseCore!], ['base-core']);
+    // base-core itself has no locations (it's shared engine plumbing for
+    // whatever content module provides the actual starting location, e.g.
+    // tutorial-island-guide-house) — give it a minimal synthetic starting
+    // location here so this stays a check of base-core's *own* validity in
+    // isolation, not a check of the full shipped tutorial-island content.
+    const starter = {
+      id: 'diag-starter',
+      version: '1.0.0',
+      universe: 'base',
+      author: 'test',
+      game_version: '1.0',
+      dependencies: ['+base-core'],
+      data: { locations: [{ id: 'diag-start', position: { x: 0, y: 0 }, starting: true, tags: [], entities: [], actions: [] }] },
+      locale: { en: { 'location.diag-start.title': 'Start', 'location.diag-start.description': 'Start.', 'location.diag-start.exhausted': 'Quiet.' } },
+    };
+
+    const result = applyModulesToBundle(bundle, [baseCore!, starter], ['base-core', 'diag-starter']);
     const baseCoreIssues = result.issues.filter((issue) => issue.path.startsWith('modules.base-core'));
 
     expect(result.enabledModuleIds).toContain('base-core');
@@ -239,7 +255,6 @@ describe('loader', () => {
     const result = applyModulesToBundle(bundle, modules, modules.map((module) => module.id));
 
     expect(result.enabledModuleIds).toContain('base-core');
-    expect(result.enabledModuleIds).toContain('wayside-supplies');
     expect(result.enabledModuleIds).not.toContain('local-contribution');
     expect(result.bundle.locations.some((location) => location.id === 'tutorial-guide-house')).toBe(true);
     expect(result.bundle.locations.some((location) => location.id === 'bad-camp')).toBe(false);

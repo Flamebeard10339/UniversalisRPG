@@ -7,24 +7,9 @@ game_version: 1.0
 pack: tutorial-island
 dependencies: tutorial-island-mining
 
-# advanced
-{
-  "data-updates": {
-    "patches": [
-      {
-        "targetModId": "tutorial-island-mining",
-        "objectType": "entities",
-        "objectId": "forge-table",
-        "ops": [{ "op": "add", "path": "/actions/-", "value": { "id": "continue", "instant": true, "rewards": [], "results": [{ "kind": "relocate", "locationId": "tutorial-rat-cage" }] } }]
-      }
-    ]
-  },
-  "locale": {
-    "action.entity.forge-table.continue.title": "Continue",
-    "action.entity.forge-table.continue.description": "Follow the cave toward voices.",
-    "action.entity.forge-table.continue.success": "You reach the combat cage."
-  }
-}
+# item bones
+title: Bones
+description: A dusty set of bones.
 
 # location tutorial-rat-cage
 x: 5, y: 0, z: -1
@@ -54,6 +39,11 @@ fight:
   max: 3
   on success:
     set: tutorial.combat-cleared
+  droptable:
+    bones (1)
+    dependent droptable (3):
+      1 tin-ore (4)
+      3-5 copper-ore (3)
 
 ## entity rat-cage-door
 title: Rat Cage Door

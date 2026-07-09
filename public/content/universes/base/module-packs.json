@@ -1,23 +1,9 @@
 [
   {
-    "id": "starter",
-    "modules": [
-      "base-core",
-      "wayside-supplies",
-      "tutorial-island-reset",
-      "tutorial-island-foundation",
-      "tutorial-island-guide-house",
-      "tutorial-island-survival",
-      "tutorial-island-bank",
-      "tutorial-island-mining",
-      "tutorial-island-combat"
-    ]
-  },
-  {
     "id": "tutorial-island",
     "titleKey": "modulePack.tutorial-island.title",
     "modules": [
-      "tutorial-island-reset",
+      "base-core",
       "tutorial-island-foundation",
       "tutorial-island-guide-house",
       "tutorial-island-survival",

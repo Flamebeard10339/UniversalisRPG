@@ -106,15 +106,20 @@ this before authoring NPCs, quests, items, or any state-driven UI.
   removed; there is no in-app authoring path left for content that only exists as
   legacy JSON.
 - All Tutorial Island modules are now authored as DSL (`public/content/universes/base/
-  modules/tutorial-island-*.md`). `base-core.json` (the non-tutorial starter-world
-  module: crossroads/emberwood/old-quarry) remains hand-written JSON — it leans heavily
-  on engine-configuration shapes the DSL has no sugar for (display profiles, custom
-  resource/effect wiring, interactionType `experience` arrays, nested `dropTable`
-  rewards, branching dialogue with counters), so porting it would mean putting nearly
-  all of it through the `# advanced` raw-JSON escape hatch anyway — little authoring
-  benefit over leaving it as JSON. It keeps loading and playing fine via `loader.ts`'s
-  JSON-first-then-DSL-compile fallback; only port it if/when enough of its shapes gain
-  real DSL sugar to make hand-authoring it actually easier.
+  modules/tutorial-island-*.md`). `base-core.json` remains hand-written JSON. It no
+  longer hosts any standalone starter-world content (the old crossroads/emberwood/
+  old-quarry location set was removed) — it's now purely the shared engine-plumbing
+  foundation tutorial-island depends on: `displayProfile`, the universal `health`/
+  `attack`/`defense`/`regeneration`/`action-rate` stats+skills (referenced by its own
+  resources and the `melee-combat` interactionType, so they must live wherever those do
+  — see `docs/content-dsl-grammar.md`'s stat/skill/flag section for why), resources with
+  custom `effects`/`onFull`/`onEmpty` behavior, and an interactionType with an
+  `experience` array. Stats/skills/flags now have DSL sugar (`# stat`, `# skill`,
+  `# flags`) and could be ported; resources/effects/interactionType-`experience`/
+  display-profiles still don't, so porting the rest would mean putting it through the
+  `# advanced` raw-JSON escape hatch anyway. It keeps loading and playing fine via
+  `loader.ts`'s JSON-first-then-DSL-compile fallback; only port it if/when enough of its
+  remaining shapes gain real DSL sugar to make hand-authoring it actually easier.
 - After any change that could affect module resolution or validation, actually run
   the full pipeline (`npx vitest run` → headless playtests) rather than trusting an
   isolated unit test of the new feature. A validation gap in one new action/item can
