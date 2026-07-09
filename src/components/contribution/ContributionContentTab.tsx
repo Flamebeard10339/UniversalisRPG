@@ -112,7 +112,7 @@ export const ContributionContentTab = ({ baseBundle, bundle, draft, issues, onPa
       </div>
 
       {activeModuleId && (
-        <div className="min-h-0 overflow-y-auto">
+        <div className="min-h-0 overflow-y-auto pt-4">
           <DslModuleEditor
             bundle={bundle}
             draft={draft}

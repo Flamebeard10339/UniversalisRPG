@@ -83,7 +83,7 @@ export const EditMode = ({ activeTab, appVersion, bundle, onMapPatch, onTabChang
 
   return (
     <section className="grid h-full grid-rows-[1fr] gap-0 overflow-hidden" data-testid="edit-mode">
-      <div className="min-h-0 overflow-hidden">
+      <div className="min-h-0 overflow-y-auto">
         {activeTab === 'content' && (
           <ContributionContentTab
             baseBundle={baseBundle ?? bundle}
@@ -96,18 +96,22 @@ export const EditMode = ({ activeTab, appVersion, bundle, onMapPatch, onTabChang
         )}
 
         {activeTab === 'map' && (
-          <ContributionMapEditor
-            bundle={bundle}
-            onActionsChange={(actions) => onMapPatch({ actions })}
-            onEntitiesChange={(entities) => onMapPatch({ entities })}
-            onLocationsChange={(locations) => onMapPatch({ locations })}
-            onLocalesChange={(patch) => onMapPatch({ localePatch: patch })}
-            t={t}
-          />
+          <div className="p-4">
+            <ContributionMapEditor
+              bundle={bundle}
+              onActionsChange={(actions) => onMapPatch({ actions })}
+              onEntitiesChange={(entities) => onMapPatch({ entities })}
+              onLocationsChange={(locations) => onMapPatch({ locations })}
+              onLocalesChange={(patch) => onMapPatch({ localePatch: patch })}
+              t={t}
+            />
+          </div>
         )}
 
         {activeTab === 'submit' && (
-          <SubmitToGitHub appVersion={appVersion} bundle={bundle} draft={draft} t={t} validationIssues={validationIssues} />
+          <div className="p-4 flex flex-col h-full">
+            <SubmitToGitHub appVersion={appVersion} bundle={bundle} draft={draft} t={t} validationIssues={validationIssues} />
+          </div>
         )}
       </div>
     </section>
