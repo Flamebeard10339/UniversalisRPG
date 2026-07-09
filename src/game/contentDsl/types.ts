@@ -70,9 +70,13 @@ export type DslEntityDecl = {
   actions: DslActionDecl[];
 };
 
-export type DslWallDecl = {
+// A one-directional edge to another location, declared in this location's
+// `adjacent:` block. `cond` is optional — a bare `<locationId>` line is an
+// unconditional (always-visible) edge; `<locationId> while <condition>` gates
+// it, e.g. a locked door that only opens once a flag is set.
+export type DslAdjacentDecl = {
   toLocationId: string;
-  cond: DslCondition;
+  cond?: DslCondition;
 };
 
 export type DslLocationSection = {
@@ -84,9 +88,9 @@ export type DslLocationSection = {
   tags: string[];
   starting: boolean;
   title?: string;
-  description?: string;
+  examine?: string;
   exhausted?: string;
-  walls: DslWallDecl[];
+  adjacent: DslAdjacentDecl[];
   entities: DslEntityDecl[];
 };
 
@@ -120,7 +124,6 @@ export type DslItemSection = {
   kind: 'item';
   id: string;
   title?: string;
-  description?: string;
   maxQuantity?: number;
   tagsString?: string;
   offensiveTagsString?: string;
@@ -162,7 +165,7 @@ export type DslStatSection = {
   id: string;
   base: number;
   title?: string;
-  description?: string;
+  examine?: string;
 };
 
 export type DslSkillSection = {
@@ -171,7 +174,7 @@ export type DslSkillSection = {
   statId?: string;
   maxLevel?: number;
   title?: string;
-  description?: string;
+  examine?: string;
 };
 
 export type DslFlagsSection = {

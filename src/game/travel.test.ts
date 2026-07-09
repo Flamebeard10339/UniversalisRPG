@@ -148,24 +148,16 @@ describe('travel actions', () => {
   });
 });
 
-describe('highly-connected mode', () => {
-  const gridContext = (locations: LocationNode[], actions: GameAction[] = [], ui: UniverseUiSettings = {}): ActionResolutionContext => ({
-    manifest: {
-      schemaVersion: 1,
-      id: 'test',
-      version: '1',
-      author: 'test',
-      locales: ['en'],
-      files: [],
-      ui: { connectivityMode: 'highly-connected', ...ui },
-    },
+describe('free-standing entity actions as travel edges', () => {
+  const entityContext = (locations: LocationNode[], actions: GameAction[]): ActionResolutionContext => ({
+    manifest: { schemaVersion: 1, id: 'test', version: '1', author: 'test', locales: ['en'], files: [] },
     actions,
     skills: [],
     stats: [],
     locations,
     entities: [],
     items: [],
-    flags: [{ id: 'unlocked', initialValue: false }],
+    flags: [],
     resourceDefinitions: [],
     effects: [],
     interactionTypes: [],
@@ -174,103 +166,91 @@ describe('highly-connected mode', () => {
     dialogues: [],
   });
 
-  it('auto-connects every grid-adjacent location, including diagonals', () => {
+  it('treats a cost-free entity relocate action (a ladder/tunnel/portal) as a travel edge, chat narration included', () => {
     const locations: LocationNode[] = [
-      { id: 'center', position: { x: 0, y: 0 } },
-      { id: 'north', position: { x: 0, y: -1 } },
-      { id: 'northeast', position: { x: 1, y: -1 } },
-      { id: 'far', position: { x: 2, y: 0 } },
-    ];
-    const state = createInitialPlayState('test', 'center');
-    const edges = getAvailableTravelEdgesForNode(state, gridContext(locations), 'center');
-
-    expect(edges.map((edge) => edge.target).sort()).toEqual(['north', 'northeast']);
-    expect(edges.find((edge) => edge.target === 'north')?.travelTimeSeconds).toBeCloseTo(1, 5);
-    expect(edges.find((edge) => edge.target === 'northeast')?.travelTimeSeconds).toBeCloseTo(Math.sqrt(2), 5);
-  });
-
-  it('treats a visible authored travel action between adjacent locations as a wall', () => {
-    const locations: LocationNode[] = [
-      { id: 'center', position: { x: 0, y: 0 } },
-      { id: 'north', position: { x: 0, y: -1 } },
-    ];
-    const wall: GameAction = {
-      id: 'wall-center-to-north',
-      locationId: 'center',
-      role: 'travel',
-      rewards: [],
-      results: [{ kind: 'relocate', locationId: 'north' }],
-    };
-    const state = createInitialPlayState('test', 'center');
-
-    expect(getAvailableTravelEdgesForNode(state, gridContext(locations, [wall]), 'center')).toHaveLength(0);
-  });
-
-  it('opens a wall once its visibleWhen condition is met, mirroring conditional gating', () => {
-    const locations: LocationNode[] = [
-      { id: 'center', position: { x: 0, y: 0 } },
-      { id: 'north', position: { x: 0, y: -1 } },
-    ];
-    const wall: GameAction = {
-      id: 'wall-center-to-north',
-      locationId: 'center',
-      role: 'travel',
-      rewards: [],
-      results: [{ kind: 'relocate', locationId: 'north' }],
-      visibleWhen: { kind: 'not', condition: { kind: 'state-variable', variable: 'flag:unlocked', comparison: 'equal', value: true } },
-    };
-    const locked = createInitialPlayState('test', 'center');
-    const unlocked = { ...locked, flags: { unlocked: true } };
-
-    expect(getAvailableTravelEdgesForNode(locked, gridContext(locations, [wall]), 'center')).toHaveLength(0);
-    expect(getAvailableTravelEdgesForNode(unlocked, gridContext(locations, [wall]), 'center').map((edge) => edge.target)).toEqual(['north']);
-  });
-
-  it('does not connect adjacent locations on a different z-layer', () => {
-    const locations: LocationNode[] = [
-      { id: 'surface', position: { x: 0, y: 0, z: 0 } },
+      { id: 'surface', position: { x: 0, y: 0 }, entities: ['ladder'] },
       { id: 'basement', position: { x: 0, y: 0, z: -1 } },
     ];
+    const ladderAction: GameAction = {
+      id: 'entity.ladder.descend',
+      entityId: 'ladder',
+      instant: true,
+      rewards: [],
+      results: [{ kind: 'chat', messageKey: 'chat.ladder.descend' }, { kind: 'relocate', locationId: 'basement' }],
+    };
+    const state = createInitialPlayState('test', 'surface');
+    const edges = getAvailableTravelEdgesForNode(state, entityContext(locations, [ladderAction]), 'surface');
+
+    expect(edges.map((edge) => edge.target)).toEqual(['basement']);
+    expect(edges[0]?.action.id).toBe('entity.ladder.descend');
+  });
+
+  it('does not treat an entity action with a reward or another effect alongside relocate as pure travel', () => {
+    const locations: LocationNode[] = [
+      { id: 'surface', position: { x: 0, y: 0 }, entities: ['portal'] },
+      { id: 'mainland', position: { x: 5, y: 0 } },
+    ];
+    const portalAction: GameAction = {
+      id: 'entity.portal.step-through',
+      entityId: 'portal',
+      instant: true,
+      rewards: [],
+      results: [{ kind: 'flag', flagId: 'reached-mainland', value: true }, { kind: 'relocate', locationId: 'mainland' }],
+    };
     const state = createInitialPlayState('test', 'surface');
 
-    expect(getAvailableTravelEdgesForNode(state, gridContext(locations), 'surface')).toHaveLength(0);
+    expect(getAvailableTravelEdgesForNode(state, entityContext(locations, [portalAction]), 'surface')).toHaveLength(0);
   });
 
-  it('scales travel time by the movement-speed stat', () => {
+  it('ignores an entity action belonging to an entity not present at the queried location', () => {
     const locations: LocationNode[] = [
-      { id: 'center', position: { x: 0, y: 0 } },
-      { id: 'north', position: { x: 0, y: -1 } },
+      { id: 'surface', position: { x: 0, y: 0 }, entities: [] },
+      { id: 'basement', position: { x: 0, y: 0, z: -1 }, entities: ['ladder'] },
     ];
-    const fastContext = gridContext(locations);
-    fastContext.stats = [{ id: 'movement-speed', base: 120 }];
-    const state = createInitialPlayState('test', 'center');
-
-    const edges = getAvailableTravelEdgesForNode(state, fastContext, 'center');
-    expect(edges[0]?.travelTimeSeconds).toBeCloseTo(0.5, 5);
-  });
-
-  it('only shows locations on the current z-layer on the map', () => {
-    const bundle = {
-      manifest: { schemaVersion: 1, id: 'test', version: '1', author: 'test', locales: ['en'], files: [], ui: { connectivityMode: 'highly-connected' as const } },
-      locations: [
-        { id: 'surface', position: { x: 0, y: 0, z: 0 }, starting: true },
-        { id: 'basement', position: { x: 1, y: 0, z: -1 } },
-      ],
-      actions: [],
-      skills: [],
-      stats: [],
-      items: [],
-      flags: [],
-      resourceDefinitions: [],
-      effects: [],
-      interactionTypes: [],
-      enemies: [],
-      locales: { en: {} },
+    const ladderAction: GameAction = {
+      id: 'entity.ladder.descend',
+      entityId: 'ladder',
+      instant: true,
+      rewards: [],
+      results: [{ kind: 'relocate', locationId: 'basement' }],
     };
+    const state = createInitialPlayState('test', 'surface');
+
+    expect(getAvailableTravelEdgesForNode(state, entityContext(locations, [ladderAction]), 'surface')).toHaveLength(0);
+  });
+});
+
+describe('getVisibleTravelGraph z-layer viewing', () => {
+  const bundle = {
+    manifest: { schemaVersion: 1, id: 'test', version: '1', author: 'test', locales: ['en'], files: [] },
+    locations: [
+      { id: 'surface', position: { x: 0, y: 0, z: 0 }, starting: true },
+      { id: 'basement', position: { x: 1, y: 0, z: -1 } },
+    ],
+    actions: [],
+    skills: [],
+    stats: [],
+    items: [],
+    flags: [],
+    resourceDefinitions: [],
+    effects: [],
+    interactionTypes: [],
+    enemies: [],
+    locales: { en: {} },
+  };
+
+  it('defaults to the current location\'s z-layer', () => {
     const playState = { ...createInitialPlayState('test', 'surface'), discoveredLocationIds: ['surface', 'basement'] };
-    const graph = getVisibleTravelGraph(bundle, playState, gridContext(bundle.locations));
+    const graph = getVisibleTravelGraph(bundle, playState, context([]));
 
     expect(graph.locations.map((location) => location.id)).toEqual(['surface']);
+  });
+
+  it('shows a different, already-discovered layer when an explicit viewZ is given', () => {
+    const playState = { ...createInitialPlayState('test', 'surface'), discoveredLocationIds: ['surface', 'basement'] };
+    const graph = getVisibleTravelGraph(bundle, playState, context([]), -1);
+
+    expect(graph.locations.map((location) => location.id)).toEqual(['basement']);
   });
 });
 

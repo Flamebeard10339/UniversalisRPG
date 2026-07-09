@@ -1,4 +1,4 @@
-import { itemDescriptionKey, itemTitleKey } from '../game/contentIds';
+import { itemTitleKey } from '../game/contentIds';
 import { canEatItem, canEquipItemInSlot, equipmentSlots, formatItemTag, getItemTags, itemSlots, meetsEquipmentRequirements } from '../game/equipment';
 import { areActionRequirementsMet, isActionVisible } from '../game/conditions';
 import { getActionTitleText } from '../game/actionLocalization';
@@ -85,7 +85,6 @@ export const InventoryPanel = ({ bundle, onDrop, onEat, onEquip, onStartAction, 
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <h3 className="text-sm font-semibold text-slate-100">{t(itemTitleKey(itemId), itemId)}</h3>
-                    <p className="mt-1 text-xs text-slate-400">{t(itemDescriptionKey(itemId), '')}</p>
                     {item && getItemTags(item).length > 0 && (
                       <ul className="mt-2 flex flex-wrap gap-1">
                         {getItemTags(item).map((tag, index) => (

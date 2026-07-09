@@ -21,7 +21,7 @@ pack: tutorial-island
 
 # item note
 title: Handwritten Note
-description: A note in someone else's hand, tossed onto a shelf.
+examine: A note in someone else's hand, tossed onto a shelf.
 read: [[dialogue note]]
 
 # item cooked-shrimp

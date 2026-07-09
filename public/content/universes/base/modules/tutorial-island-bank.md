@@ -10,9 +10,12 @@ dependencies: tutorial-island-survival
 # location tutorial-bank
 x: 3, y: 0
 title: Island Bank
-description: A tidy counter and an open trapdoor share the room.
+examine: A tidy counter and an open trapdoor share the room.
 exhausted: The teller returns to sorting coins.
-tutorial settlement
+tags: tutorial settlement
+adjacent:
+  tutorial-bridge
+  tutorial-hermit-grove
 
 ## entity bank-teller
 title: Bank Teller

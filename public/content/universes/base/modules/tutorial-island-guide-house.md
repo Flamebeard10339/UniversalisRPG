@@ -25,8 +25,10 @@ player kill: The lock gives with a soft click.
 
 # location tutorial-guide-house
 x: 0, y: 0
-tutorial indoors, starting
-wall -> tutorial-beach while !tutorial.miki-cleared
+tags: tutorial indoors
+starting
+adjacent:
+  tutorial-beach while !tutorial.miki-cleared
 
 ## entity miki
 examine: A guide with one eye on the door.

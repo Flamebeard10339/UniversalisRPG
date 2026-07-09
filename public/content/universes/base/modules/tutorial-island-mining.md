@@ -9,20 +9,20 @@ dependencies: tutorial-island-bank
 
 # item bronze-dagger
 title: Bronze Dagger
-description: A short bronze blade suited to quick strikes.
+examine: A short bronze blade suited to quick strikes.
 tags: mainhand (1 attack), +1 attack
 
 # item bronze-pickaxe
 title: Bronze Pickaxe
-description: A simple pickaxe suitable for ore veins.
+examine: A simple pickaxe suitable for ore veins.
 tags: pickaxe, mainhand (1 attack 1 mining), +8 mining, +3 attack, +5% health
 
 # location tutorial-mine
 x: 3, y: 0, z: -1
 title: Training Mine
-description: Copper and tin glint in a cramped cave.
+examine: Copper and tin glint in a cramped cave.
 exhausted: Dust hangs in the lamplight.
-tutorial cave
+tags: tutorial cave
 
 ## entity denzel
 talk:
@@ -61,20 +61,24 @@ pick:
     say: The lock bites back. That was going to leave a mark either way.
 examine: A prison-issue padlock, guarding something better than rocks.
 
-## entity mine-tunnel
-title: Mine Tunnel
-examine: A ladder climbs toward the bank on one side; the tunnel keeps going deeper on the other.
+## entity ladder
+title: Ladder
+examine: A ladder with a beam of light illuminating the rungs.
 ascend:
   say: You climb up to the bank.
   relocate: tutorial-bank
+
+## entity mine-tunnel
+title: Mine Tunnel
+examine: The tunnel keeps going deeper on the other side of the cave.
 enter forge: relocate: tutorial-forge
 
 # location tutorial-forge
 x: 4, y: 0, z: -1
 title: Cave Forge
-description: A furnace and anvil are wedged into a hot alcove.
+examine: A furnace and anvil are wedged into a hot alcove.
 exhausted: The forge pops and cools.
-tutorial cave
+tags: tutorial cave
 
 ## entity furnace
 smelt: station: tutorial-furnace

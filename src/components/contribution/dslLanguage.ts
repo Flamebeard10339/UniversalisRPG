@@ -12,28 +12,42 @@ export type DslTokenState = {
   // (which the bare-word key regex below doesn't match anyway) don't get a
   // half-applied style.
   inAdvancedBlock: boolean;
+  // True at sol and right after a comma between comma-separated tags, i.e.
+  // wherever the grammar allows a new `keyword:` to start — false everywhere
+  // else on the line so a stray colon inside a value (e.g. "It reads: ...")
+  // isn't mistaken for another key.
+  expectKey: boolean;
+  // Once a free-text-to-end-of-line keyword (`say:`) has matched, nothing
+  // else on the line is a key, even after a literal comma in that prose.
+  freeTextRestOfLine: boolean;
 };
 
 const sectionHeaderPattern = /^#\s+\S.*$/;
 const objectHeaderPattern = /^##\s+\S.*$/;
-// A line-leading run of letters/digits/spaces/hyphens up to a colon is a tag
-// keyword or action title — both are the same `keyword: value` shape per the
-// grammar ("A keyword that takes a value is always written keyword: value").
-// Tolerates leading indentation itself (rather than relying on a separate
-// eatSpace call first) so an indented continuation tag like `  requires:`
-// still matches at its line's first token() call, while it's still sol().
-const keyPattern = /^[ \t]*[A-Za-z][A-Za-z0-9 -]*:/;
+// A run of letters/digits/spaces/hyphens/underscores up to a colon is a tag
+// keyword, action title, or info field (`game_version:`) — all the same
+// `keyword: value` shape per the grammar ("A keyword that takes a value is
+// always written keyword: value"). Tolerates leading indentation itself
+// (rather than relying on a separate eatSpace call first) so an indented
+// continuation tag like `  requires:` still matches, and is tried anywhere
+// `expectKey` allows it (not just sol), so every key on a comma-separated
+// line (`x: 3, y: 0`) gets matched, not just the first.
+const keyPattern = /^[ \t]*[A-Za-z][A-Za-z0-9 _-]*:/;
+const commaPattern = /^,\s*/;
 const bracketRefPattern = /^\[\[[^\]]*\]\]/;
 const speakerPattern = /^\([^)]*\)/;
 // `\b` only makes sense after "goto" (ends in a word char) — "->" ends in a
 // non-word char, so a following space would never satisfy \b there.
 const arrowPattern = /^(?:->|goto\b)/;
 const inlineConditionalPattern = /^\{[^{}]*\}/;
+const freeTextKeywords = new Set(['say']);
 
-export const dslStartState = (): DslTokenState => ({ inAdvancedBlock: false });
+export const dslStartState = (): DslTokenState => ({ inAdvancedBlock: false, expectKey: true, freeTextRestOfLine: false });
 
 export const dslToken = (stream: StringStream, state: DslTokenState): string | null => {
   if (stream.sol()) {
+    state.expectKey = true;
+    state.freeTextRestOfLine = false;
     if (sectionHeaderPattern.test(stream.string) && !objectHeaderPattern.test(stream.string)) {
       state.inAdvancedBlock = /^#\s+advanced\b/.test(stream.string);
       stream.skipToEnd();
@@ -44,7 +58,6 @@ export const dslToken = (stream: StringStream, state: DslTokenState): string | n
       stream.skipToEnd();
       return 'heading2';
     }
-    if (!state.inAdvancedBlock && stream.match(keyPattern)) return 'propertyName';
   }
 
   if (state.inAdvancedBlock) {
@@ -52,11 +65,28 @@ export const dslToken = (stream: StringStream, state: DslTokenState): string | n
     return null;
   }
 
+  if (state.expectKey && !state.freeTextRestOfLine) {
+    const matched = stream.match(keyPattern);
+    if (matched) {
+      state.expectKey = false;
+      const text = Array.isArray(matched) ? matched[0] : stream.current();
+      const keyword = text.replace(/:\s*$/, '').trim().toLowerCase();
+      if (freeTextKeywords.has(keyword)) state.freeTextRestOfLine = true;
+      return 'propertyName';
+    }
+    state.expectKey = false;
+  }
+
   if (stream.eatSpace()) return null;
   if (stream.match(bracketRefPattern)) return 'link';
   if (stream.match(speakerPattern)) return 'variableName';
   if (stream.match(arrowPattern)) return 'keyword';
   if (stream.match(inlineConditionalPattern)) return 'string';
+
+  if (!state.freeTextRestOfLine && stream.match(commaPattern)) {
+    state.expectKey = true;
+    return null;
+  }
 
   stream.next();
   return null;

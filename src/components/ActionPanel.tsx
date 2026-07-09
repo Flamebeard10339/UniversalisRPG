@@ -5,7 +5,7 @@ import { getActionDps, getActionDurationMs, getEnemyAttackDps, isContinuousActio
 import type { Translator } from '../game/i18n';
 import { useNow } from '../hooks/useNow';
 import { canStartAction, isActionVisible } from '../game/conditions';
-import { isPureTravelAction, isWallAction } from '../game/travel';
+import { isPureTravelAction } from '../game/travel';
 import { getActionDescriptionText, getActionTitleText } from '../game/actionLocalization';
 import { availableRecipesForStation, resolveStationAction } from '../game/recipes';
 
@@ -48,7 +48,6 @@ export const ActionPanel = ({ bundle, debugEnabled, playState, onPickUpGroundIte
   const normalActions = bundle.actions.filter((action) =>
     action.locationId === playState.currentLocationId
     && !entityActionIds.has(action.id)
-    && !isWallAction(action, actionContext)
     && (showTravelActions || !isPureTravelAction(action))
     && isActionVisible(playState, action, actionContext));
   const entityActions = (actionIds: string[] = []) => actionIds

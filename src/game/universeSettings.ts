@@ -4,7 +4,6 @@ export const DEFAULT_FLOATING_TEXT_DURATION_SECONDS = 2;
 export const DEFAULT_LOOP_ACTIONS_BY_DEFAULT = true;
 export const DEFAULT_TRAVEL_PATH_MAX_SECONDS = 1000;
 export const DEFAULT_TRAVEL_PATH_MAX_NODES = 100;
-export const DEFAULT_CONNECTIVITY_MODE = 'sparse';
 export const DEFAULT_DISTANCE_BETWEEN_ADJACENT_TILES = 1;
 
 export const resolveUniverseUiSettings = (
@@ -32,7 +31,6 @@ export const resolveUniverseUiSettings = (
     settings.travelPathMaxNodes > 0
       ? Math.floor(settings.travelPathMaxNodes)
       : DEFAULT_TRAVEL_PATH_MAX_NODES,
-  connectivityMode: settings?.connectivityMode === 'highly-connected' ? 'highly-connected' : DEFAULT_CONNECTIVITY_MODE,
   distanceBetweenAdjacentTiles:
     typeof settings?.distanceBetweenAdjacentTiles === 'number' &&
     Number.isFinite(settings.distanceBetweenAdjacentTiles) &&

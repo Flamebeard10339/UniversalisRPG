@@ -24,7 +24,7 @@ const toLocalizationId = (value: string) =>
 export const locationTitleKey = (id: string) => `location.${toKebabCase(id)}.title`;
 export const universeTitleKey = (id: string) => `universe.${toKebabCase(id)}.title`;
 export const universeDescriptionKey = (id: string) => `universe.${toKebabCase(id)}.description`;
-export const locationDescriptionKey = (id: string) => `location.${toKebabCase(id)}.description`;
+export const locationExamineKey = (id: string) => `location.${toKebabCase(id)}.examine`;
 export const locationExhaustedKey = (id: string) => `location.${toKebabCase(id)}.exhausted`;
 export const entityTitleKey = (id: string) => `entity.${toKebabCase(id)}.title`;
 export const entityDescriptionKey = (id: string) => `entity.${toKebabCase(id)}.description`;
@@ -41,10 +41,9 @@ export const interactionEntityMissKey = (id: string) => `interaction.${toKebabCa
 export const interactionEntityKillKey = (id: string) => `interaction.${toKebabCase(id)}.entity.kill`;
 export const interactionTitleKey = (id: string) => `interaction.${toKebabCase(id)}.title`;
 export const skillTitleKey = (id: string) => `skill.${toKebabCase(id)}.title`;
-export const skillDescriptionKey = (id: string) => `skill.${toKebabCase(id)}.description`;
+export const skillExamineKey = (id: string) => `skill.${toKebabCase(id)}.examine`;
 export const statTitleKey = (id: string) => `stat.${toKebabCase(id)}.title`;
-export const statDescriptionKey = (id: string) => `stat.${toKebabCase(id)}.description`;
+export const statExamineKey = (id: string) => `stat.${toKebabCase(id)}.examine`;
 export const resourceTitleKey = (id: string) => `resource.${toKebabCase(id)}.title`;
 export const effectTitleKey = (id: string) => `effect.${toKebabCase(id)}.title`;
 export const itemTitleKey = (id: string) => `item.${toKebabCase(id)}.title`;
-export const itemDescriptionKey = (id: string) => `item.${toKebabCase(id)}.description`;

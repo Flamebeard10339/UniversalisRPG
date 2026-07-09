@@ -61,11 +61,14 @@ describe('content DSL — items + quest proof', () => {
     expect(module.locale?.en['action.item.note.read.title']).toBe('Read');
   });
 
-  it('uses explicit title:/description: item text when given, and a humanized fallback otherwise', () => {
+  it('uses an explicit title: when given, and a humanized fallback otherwise; an item\'s flavor text is its own examine: action, not a separate field', () => {
     expect(module.locale?.en['item.note.title']).toBe('Handwritten Note');
-    expect(module.locale?.en['item.note.description']).toBe("A note in someone else's hand, tossed onto a shelf.");
     expect(module.locale?.en['item.gold.title']).toBe('Gold');
-    expect(module.locale?.en['item.gold.description']).toBe('Gold.');
+    expect(module.locale?.en['item.note.description']).toBeUndefined();
+    const note = (module.data as { items: ItemDefinition[] }).items.find((item) => item.id === 'note')!;
+    const examineAction = note.actions?.find((action) => action.id === 'examine') as ItemActionDefinition;
+    const chatResult = examineAction.results?.find((result) => result.kind === 'chat') as { messageKey: string };
+    expect(module.locale?.en[chatResult.messageKey]).toBe("A note in someone else's hand, tossed onto a shelf.");
   });
 
   it('passes item tag strings through untouched (the existing equipment tag grammar, not this DSL\'s own tags)', () => {

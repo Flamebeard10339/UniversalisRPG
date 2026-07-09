@@ -10,9 +10,13 @@ dependencies: tutorial-island-guide-house
 # location tutorial-beach
 x: 1, y: 0
 title: Shell Beach
-description: Low shoals glitter beside a smoky campfire.
+examine: Low shoals glitter beside a smoky campfire.
 exhausted: The beach settles into gull cries and surf.
-tutorial shore
+tags: tutorial shore
+adjacent:
+  tutorial-guide-house
+  tutorial-hermit-grove
+  tutorial-bridge
 
 ## entity brianna
 talk: [[dialogue brianna]]
@@ -49,9 +53,13 @@ read: say: The word FOOD is carved deeper than the rest.
 # location tutorial-hermit-grove
 x: 2, y: -1
 title: Hermit Grove
-description: Herbs grow around a weathered hut beyond the palms.
+examine: Herbs grow around a weathered hut beyond the palms.
 exhausted: The grove smells of crushed leaves.
-tutorial forest
+tags: tutorial forest
+adjacent:
+  tutorial-beach
+  tutorial-bridge
+  tutorial-bank
 
 ## entity hermit
 talk: [[dialogue hermit]]
@@ -76,9 +84,13 @@ combine:
 # location tutorial-bridge
 x: 2, y: 0
 title: Bridge Toll
-description: A narrow bridge crosses the river. Something large waits below.
+examine: A narrow bridge crosses the river. Something large waits below.
 exhausted: The river keeps sliding past.
-tutorial river
+tags: tutorial river
+adjacent:
+  tutorial-beach
+  tutorial-hermit-grove
+  tutorial-bank
 
 ## entity river
 use draught:

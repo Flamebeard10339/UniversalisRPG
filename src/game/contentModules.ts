@@ -29,15 +29,14 @@ import {
   interactionPlayerKillKey,
   interactionPlayerMissKey,
   interactionTitleKey,
-  itemDescriptionKey,
   itemTitleKey,
-  locationDescriptionKey,
+  locationExamineKey,
   locationExhaustedKey,
   locationTitleKey,
   resourceTitleKey,
-  skillDescriptionKey,
+  skillExamineKey,
   skillTitleKey,
-  statDescriptionKey,
+  statExamineKey,
   statTitleKey,
 } from './contentIds';
 import { isTravelAction, travelActionLocalizationKeys } from './actionLocalization';
@@ -497,7 +496,7 @@ const newLocalizationRows = <T extends { id?: unknown }>(
 const localizationKeysFromSection = (section?: ModuleDataSection, existingIds?: ExistingModuleDataIds) => [
   ...newLocalizationRows(normalizeModuleDataSection(section).locations, 'locations', existingIds).flatMap((location) => [
     locationTitleKey(location.id),
-    locationDescriptionKey(location.id),
+    locationExamineKey(location.id),
     locationExhaustedKey(location.id),
   ]),
   ...newLocalizationRows(normalizeModuleDataSection(section).entities, 'entities', existingIds).flatMap((entity) => [
@@ -509,9 +508,9 @@ const localizationKeysFromSection = (section?: ModuleDataSection, existingIds?: 
     definition.categoryId ? collectionCategoryTitleKey(definition.categoryId) : null,
   ),
   ...newLocalizationRows(normalizeModuleDataSection(section).actions, 'actions', existingIds).flatMap(localizationKeysFromAction),
-  ...newLocalizationRows(normalizeModuleDataSection(section).skills, 'skills', existingIds).flatMap((skill) => [skillTitleKey(skill.id), skillDescriptionKey(skill.id)]),
-  ...newLocalizationRows(normalizeModuleDataSection(section).stats, 'stats', existingIds).flatMap((stat) => [statTitleKey(stat.id), statDescriptionKey(stat.id)]),
-  ...newLocalizationRows(normalizeModuleDataSection(section).items, 'items', existingIds).flatMap((item) => [itemTitleKey(item.id), itemDescriptionKey(item.id)]),
+  ...newLocalizationRows(normalizeModuleDataSection(section).skills, 'skills', existingIds).flatMap((skill) => [skillTitleKey(skill.id), skillExamineKey(skill.id)]),
+  ...newLocalizationRows(normalizeModuleDataSection(section).stats, 'stats', existingIds).flatMap((stat) => [statTitleKey(stat.id), statExamineKey(stat.id)]),
+  ...newLocalizationRows(normalizeModuleDataSection(section).items, 'items', existingIds).flatMap((item) => [itemTitleKey(item.id)]),
   ...newLocalizationRows(normalizeModuleDataSection(section).interactionTypes, 'interactionTypes', existingIds).flatMap((interactionType) => [
     interactionTitleKey(interactionType.id),
     interactionPlayerHitKey(interactionType.id),

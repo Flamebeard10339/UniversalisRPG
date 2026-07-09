@@ -9,9 +9,10 @@ import {
   interactionPlayerKillKey,
   interactionPlayerMissKey,
   interactionTitleKey,
-  skillDescriptionKey,
+  locationExamineKey,
+  skillExamineKey,
   skillTitleKey,
-  statDescriptionKey,
+  statExamineKey,
   statTitleKey,
   toKebabCase,
 } from '../contentIds';
@@ -373,7 +374,7 @@ const compileLocation = (
   dropTableIds: Set<string>,
 ): { location: LocationNode; entities: EntityDefinition[]; actions: GameAction[] } => {
   locale.set(`location.${section.id}.title`, section.title ?? humanize(section.id));
-  locale.set(`location.${section.id}.description`, section.description ?? `${humanize(section.id)}.`);
+  locale.set(locationExamineKey(section.id), section.examine ?? `${humanize(section.id)}.`);
   locale.set(`location.${section.id}.exhausted`, section.exhausted ?? 'It is quiet now.');
 
   const entities: EntityDefinition[] = [];
@@ -387,19 +388,19 @@ const compileLocation = (
 
   const actions: GameAction[] = [];
   const locationActionIds: string[] = [];
-  for (const wall of section.walls) {
-    const wallId = `wall-${section.id}-to-${wall.toLocationId}`;
-    locale.set(`action.${wallId}.title`, 'Leave');
-    locale.set(`action.${wallId}.description`, 'Leave.');
-    setDefaultOutcomeLocale(locale, `action.${wallId}`, { success: 'Done.', failure: 'Nothing happens.' });
+  for (const edge of section.adjacent) {
+    const edgeId = `adjacent-${section.id}-to-${edge.toLocationId}`;
+    locale.set(`action.${edgeId}.title`, 'Leave');
+    locale.set(`action.${edgeId}.description`, 'Leave.');
+    setDefaultOutcomeLocale(locale, `action.${edgeId}`, { success: 'Done.', failure: 'Nothing happens.' });
     actions.push({
-      id: wallId,
+      id: edgeId,
       role: 'travel',
       rewards: [],
-      results: [{ kind: 'relocate', locationId: wall.toLocationId }],
-      visibleWhen: toCondition(wall.cond, pack),
+      results: [{ kind: 'relocate', locationId: edge.toLocationId }],
+      ...(edge.cond ? { visibleWhen: toCondition(edge.cond, pack) } : {}),
     });
-    locationActionIds.push(wallId);
+    locationActionIds.push(edgeId);
   }
 
   const location: LocationNode = {
@@ -459,7 +460,6 @@ const compileDialogue = (section: DslDialogueSection, locale: LocaleBuilder, pac
 // ---------------------------------------------------------------------------
 const compileItemSection = (section: DslItemSection, locale: LocaleBuilder, pack: string, dropTableIds: Set<string>): ItemDefinition => {
   locale.set(`item.${section.id}.title`, section.title ?? humanize(section.id));
-  locale.set(`item.${section.id}.description`, section.description ?? `${humanize(section.id)}.`);
   const actions = section.actions.flatMap((actionDecl) => compileItemAction(section.id, actionDecl, locale, pack, dropTableIds));
   return {
     id: section.id,
@@ -505,13 +505,13 @@ const compileRecipe = (section: DslRecipeSection, locale: LocaleBuilder, pack: s
 // ---------------------------------------------------------------------------
 const compileStat = (section: DslStatSection, locale: LocaleBuilder): StatDefinition => {
   locale.set(statTitleKey(section.id), section.title ?? humanize(section.id));
-  locale.set(statDescriptionKey(section.id), section.description ?? `${humanize(section.id)}.`);
+  locale.set(statExamineKey(section.id), section.examine ?? `${humanize(section.id)}.`);
   return { id: section.id, base: section.base };
 };
 
 const compileSkill = (section: DslSkillSection, locale: LocaleBuilder): SkillDefinition => {
   locale.set(skillTitleKey(section.id), section.title ?? humanize(section.id));
-  locale.set(skillDescriptionKey(section.id), section.description ?? `${humanize(section.id)}.`);
+  locale.set(skillExamineKey(section.id), section.examine ?? `${humanize(section.id)}.`);
   return { id: section.id, maxLevel: section.maxLevel ?? 100, statId: section.statId ?? section.id };
 };
 

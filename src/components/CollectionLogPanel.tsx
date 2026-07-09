@@ -1,11 +1,13 @@
 import { useState } from 'react';
 import { collectionCategoryTitleKey, collectionDropKey, collectionKillKey, collectionTrackedItemIds } from '../game/collectionLog';
-import { entityTitleKey, itemTitleKey, locationDescriptionKey, locationTitleKey } from '../game/contentIds';
+import { entityTitleKey, itemTitleKey, locationExamineKey, locationTitleKey } from '../game/contentIds';
 import type { ContentBundle, UniversePlayState } from '../game/types';
 import type { Translator } from '../game/i18n';
+import { ExamineButton } from './ExamineButton';
 
 type CollectionLogPanelProps = {
   bundle: ContentBundle;
+  onExamine: (text: string) => void;
   playState: UniversePlayState;
   t: Translator;
 };
@@ -38,7 +40,7 @@ const entriesForBundle = (bundle: ContentBundle, playState: UniversePlayState): 
     }),
   );
 
-export const CollectionLogPanel = ({ bundle, playState, t }: CollectionLogPanelProps) => {
+export const CollectionLogPanel = ({ bundle, onExamine, playState, t }: CollectionLogPanelProps) => {
   const [expandedEntries, setExpandedEntries] = useState<Record<string, boolean>>({});
   const entries = entriesForBundle(bundle, playState);
   const categoryIds = Array.from(new Set(entries.map((entry) => entry.categoryId)));
@@ -61,9 +63,9 @@ export const CollectionLogPanel = ({ bundle, playState, t }: CollectionLogPanelP
         ) : (
           <div className="grid gap-2">
             {exploredLocations.map((location) => (
-              <section className="rounded border border-slate-800 bg-slate-950 p-3" key={location.id}>
+              <section className="flex items-center justify-between gap-3 rounded border border-slate-800 bg-slate-950 p-3" key={location.id}>
                 <h3 className="text-sm font-semibold text-slate-100">{t(locationTitleKey(location.id), location.id)}</h3>
-                <p className="mt-1 text-sm text-slate-400">{t(locationDescriptionKey(location.id), '')}</p>
+                <ExamineButton onExamine={onExamine} t={t} textKey={locationExamineKey(location.id)} />
               </section>
             ))}
           </div>

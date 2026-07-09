@@ -130,8 +130,11 @@ describe('executeChatInput', () => {
   });
 
   it('/do dispatches the numbered action from the most recent /look', () => {
+    // Only 1 item: `travelAction` is a pure travel action (no cost, single
+    // relocate result), which the choice list never surfaces as a numbered
+    // action — travel happens via the map/pathfinding instead.
     const { runtime } = buildRuntime(createInitialPlayState('test', 'start'));
-    executeChatInput('/do 2', runtime);
+    executeChatInput('/do 1', runtime);
     expect(runtime.startAction).toHaveBeenCalledWith('entity.door.pick', undefined);
   });
 

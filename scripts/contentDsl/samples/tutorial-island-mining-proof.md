@@ -17,7 +17,7 @@ dependencies: tutorial-island-mining-proof-stub
 
 # location tutorial-mine
 x: 3, y: 0
-tutorial cave
+tags: tutorial cave
 
 ## entity locked-chest
 examine: A prison-issue padlock, guarding something better than rocks.

@@ -35,9 +35,8 @@ import {
   actionSuccessKey,
   actionTitleKey,
   entityTitleKey,
-  itemDescriptionKey,
   itemTitleKey,
-  locationDescriptionKey,
+  locationExamineKey,
   locationExhaustedKey,
   locationTitleKey,
   effectTitleKey,
@@ -49,9 +48,9 @@ import {
   interactionPlayerMissKey,
   interactionTitleKey,
   resourceTitleKey,
-  skillDescriptionKey,
+  skillExamineKey,
   skillTitleKey,
-  statDescriptionKey,
+  statExamineKey,
   statTitleKey,
   toKebabCase,
   universeDescriptionKey,
@@ -1063,7 +1062,7 @@ export const collectLocalizationKeys = (bundle: ContentBundle) => [
   universeDescriptionKey(bundle.manifest.id),
   ...bundle.locations.flatMap((location) => [
     locationTitleKey(location.id),
-    locationDescriptionKey(location.id),
+    locationExamineKey(location.id),
     bundle.actions.some((action) => action.locationId === location.id && action.role === 'optional')
       ? locationExhaustedKey(location.id)
       : null,
@@ -1081,12 +1080,11 @@ export const collectLocalizationKeys = (bundle: ContentBundle) => [
   ]),
   ...bundle.skills.flatMap((skill) => [
     skillTitleKey(skill.id),
-    skillDescriptionKey(skill.id),
+    skillExamineKey(skill.id),
   ]),
-  ...bundle.stats.flatMap((stat) => [statTitleKey(stat.id), statDescriptionKey(stat.id)]),
+  ...bundle.stats.flatMap((stat) => [statTitleKey(stat.id), statExamineKey(stat.id)]),
   ...(bundle.items ?? []).flatMap((item) => [
     itemTitleKey(item.id),
-    itemDescriptionKey(item.id),
   ]),
   ...bundle.actions.flatMap((action) => (action.results ?? []).flatMap((result) => result.kind === 'chat' ? [result.messageKey] : [])),
   ...(bundle.dialogues ?? []).flatMap((dialogue) => dialogue.nodes.flatMap((node) => [

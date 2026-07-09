@@ -20,7 +20,6 @@
   },
   "maxInventorySlots": 28,
   "ui": {
-    "connectivityMode": "highly-connected",
     "distanceBetweenAdjacentTiles": 1
   },
   "files": [

@@ -9,14 +9,14 @@ dependencies: tutorial-island-mining
 
 # item bones
 title: Bones
-description: A dusty set of bones.
+examine: A dusty set of bones.
 
 # location tutorial-rat-cage
 x: 5, y: 0, z: -1
 title: Combat Cage
-description: A rat cage, a portal, and a broad-shouldered instructor wait underground.
+examine: A rat cage, a portal, and a broad-shouldered instructor wait underground.
 exhausted: The cage is still.
-tutorial cave
+tags: tutorial cave
 
 ## entity orloth
 talk: [[dialogue orloth]]
@@ -67,9 +67,9 @@ step through:
 # location mainland-arrival
 x: 20, y: 0
 title: Mainland Pier
-description: Open roads begin beyond a salt-stained pier.
+examine: Open roads begin beyond a salt-stained pier.
 exhausted: The pier creaks gently.
-mainland
+tags: mainland
 
 ## entity mainland-greeter
 title: Dock Greeter

@@ -1832,7 +1832,6 @@ describe('content modules', () => {
 
     expect(collectModuleLocalizationKeys(quest)).toEqual(expect.arrayContaining([
       'item.quest-token.title',
-      'item.quest-token.description',
       'action.quest-chat.title',
       'action.quest-chat.description',
       'action.quest-chat.success',
@@ -1841,7 +1840,7 @@ describe('content modules', () => {
     ]));
     expect(result.issues.some((issue) =>
       issue.severity === 'warning' &&
-      issue.path === 'modules.quest.locale.en.item.quest-token.description' &&
+      issue.path === 'modules.quest.locale.en.action.quest-chat.description' &&
       issue.message === 'validation.missingLocalization',
     )).toBe(true);
   });

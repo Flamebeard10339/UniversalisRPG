@@ -4,7 +4,6 @@ import {
   actionSuccessKey,
   actionTitleKey,
   effectTitleKey,
-  itemDescriptionKey,
   itemTitleKey,
   interactionEntityHitKey,
   interactionEntityKillKey,
@@ -13,12 +12,12 @@ import {
   interactionPlayerKillKey,
   interactionPlayerMissKey,
   interactionTitleKey,
-  locationDescriptionKey,
+  locationExamineKey,
   locationTitleKey,
   resourceTitleKey,
-  skillDescriptionKey,
+  skillExamineKey,
   skillTitleKey,
-  statDescriptionKey,
+  statExamineKey,
   statTitleKey,
   toKebabInput,
 } from '../../game/contentIds';
@@ -51,7 +50,7 @@ export const defaultModuleLocalePatch = (key: string, id: string) => {
   if (key === 'locations') {
     return {
       [locationTitleKey(id)]: 'New location',
-      [locationDescriptionKey(id)]: 'Describe this location.',
+      [locationExamineKey(id)]: 'Describe this location.',
     };
   }
   if (key === 'actions') {
@@ -65,19 +64,18 @@ export const defaultModuleLocalePatch = (key: string, id: string) => {
   if (key === 'skills') {
     return {
       [skillTitleKey(id)]: 'New skill',
-      [skillDescriptionKey(id)]: 'Describe this skill.',
+      [skillExamineKey(id)]: 'Describe this skill.',
     };
   }
   if (key === 'stats') {
     return {
       [statTitleKey(id)]: 'New stat',
-      [statDescriptionKey(id)]: 'Describe this stat.',
+      [statExamineKey(id)]: 'Describe this stat.',
     };
   }
   if (key === 'items') {
     return {
       [itemTitleKey(id)]: 'New item',
-      [itemDescriptionKey(id)]: 'Describe this item.',
     };
   }
   if (key === 'resources') {
@@ -113,5 +111,5 @@ export const travelActionLocalePatch = (id: string, t: Translator) => ({
 
 export const locationLocalePatch = (id: string, t: Translator) => ({
   [locationTitleKey(id)]: t('contribution.default.locationTitle'),
-  [locationDescriptionKey(id)]: t('contribution.default.locationDescription'),
+  [locationExamineKey(id)]: t('contribution.default.locationDescription'),
 });

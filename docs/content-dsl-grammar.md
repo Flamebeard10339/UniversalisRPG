@@ -53,38 +53,81 @@ load-order), `~foo` (no-load-order), `!foo` (conflict), `foo >= 2.0.0`
 ```
 # location tutorial-guide-house
 x: 0, y: 0
-tutorial indoors, starting
-
-wall -> tutorial-beach while !miki-cleared
+tags: tutorial indoors
+starting
+adjacent:
+  tutorial-beach while !miki-cleared
 
 ## entity miki
 ...
 ```
 
 Metadata may span multiple non-blank lines (blank lines never carry meaning —
-they're purely visual spacing; use them or don't) up until the first `wall`
-or `## entity` line. Recognized fields: `x:`, `y:`, `z:` (numbers), and the
-optional flat text fields `title:`/`description:`/`exhausted:` (each on its
-own line, unlike `x:`/`y:`/`z:` which may share a comma-joined line with tags).
-The bare word `starting` marks the location as the universe's start. **Any
-other bare word — this is the one place in the grammar a bare, unrecognized
-word isn't an error** — is a location tag (`tutorial`, `indoors`, `shore`,
-...). There's no `tags:` label to remember, because everything on that line
-that isn't a recognized field or `starting` already is one.
+they're purely visual spacing; use them or don't) up until the first
+`adjacent:` or `## entity` line. Recognized fields: `x:`, `y:`, `z:`
+(numbers), the optional flat text fields `title:`/`examine:`/`exhausted:`
+(each on its own line, unlike `x:`/`y:`/`z:` which may share a comma-joined
+line), and `tags:` (space/comma-separated words, e.g. `tags: tutorial
+indoors`). The bare word `starting` marks the location as the universe's
+start. As everywhere else in the grammar, an unrecognized bare word is an
+error — tags need the `tags:` label like every other field.
 
-`title:`/`description:`/`exhausted:` are all optional — a location with none
-of them still compiles, falling back to a humanized id for the first two and
+`title:`/`examine:`/`exhausted:` are all optional — a location with none of
+them still compiles, falling back to a humanized id for the first two and
 `"It is quiet now."` for the third, the same generic-default philosophy used
 throughout this grammar. `## entity <id>` sections take the same optional
 `title:` (their own first line, before any actions) with the same
-humanized-id fallback.
+humanized-id fallback. `examine:` (not `description:`) is deliberate — see
+CLAUDE.md's State-driven UI section: item/stat/skill/location flavor text is
+always shown via an Examine affordance that prints to chat, one mechanism
+shared across every object kind that has one, not a per-kind display field.
 
-`wall -> <locationId> while <condition>` declares a travel wall: an
-auto-named `role: 'travel'` action (`wall-<from>-<to>`) with
-`visibleWhen: <condition>` and `results: [relocate(<locationId>)]`, added to
-this location's `actions`. Content, not an engine feature — relies on the
-existing highly-connected-mode wall behavior (`src/game/travel.ts`'s
-`isWallAction`).
+`adjacent:` declares this location's outbound travel edges — explicitly,
+never implicitly. There is no automatic "grid-adjacent locations are
+connected" behavior of any kind (an earlier version of this engine had a
+`connectivityMode` toggle between an implicit-grid-adjacency mode and this
+explicit one; it's gone, and with it the confusing question of "wait, are
+these two locations connected or not?" — the answer is always "check for an
+`adjacent:` line," never "it depends on positions and a global setting").
+Each line is `<locationId>` (an unconditional, always-open edge) or
+`<locationId> while <condition>` (gated, e.g. a locked door), one location id
+per line, indented under the `adjacent:` header. Compiles to an auto-named
+`role: 'travel'` action (`adjacent-<from>-<to>`) with `results:
+[relocate(<locationId>)]` and, if a condition was given, `visibleWhen:
+<condition>` — content, not an engine feature. Edges are one-directional: a
+location that should be reachable both ways needs `adjacent:` entries on
+*both* locations (the return trip is not implied). `x:`/`y:`/`z:` positions
+still matter — they're used to compute travel *time* between two connected
+locations (see `distanceBetweenAdjacentTiles` in the universe manifest) and
+to lay the map out visually — they just no longer imply a connection exists.
+
+### Free travel actions are pathfinding edges
+
+`adjacent:` isn't the only way to declare a travel connection — any action
+that costs and rewards nothing and does nothing but relocate the player (any
+number of `say:`s alongside `relocate:` is fine; narration doesn't cost
+anything) is picked up by the pathfinding map exactly the same way, whether
+it's a location-level `adjacent:` edge or a free-standing `## entity` action
+(a ladder, tunnel, or portal declared on the thing the player actually
+clicks):
+
+```
+# location tutorial-mine
+...
+## entity ladder
+ascend:
+  say: You climb up to the bank.
+  relocate: tutorial-bank
+```
+
+Once the player has discovered both ends, clicking "tutorial-bank" on the map
+from "tutorial-mine" routes through this `ascend:` action automatically — no
+`role: 'travel'` needed (entity actions have no way to set it), no
+`adjacent:` duplication required. An entity action with a reward, a flag
+`set:`, or anything beyond `relocate:`+`say:` is *not* pathfinding-eligible —
+that's deliberate (see CLAUDE.md's Actions and combat / State-driven UI
+sections): a portal that also flips a story flag is a meaningful moment, not
+a free hop, so it stays a manual button.
 
 ## `## entity <id>`
 
@@ -144,7 +187,7 @@ below), including a second `say:` right after the first one.
 | `chance: <N>` (e.g. `chance: 50`, `%` optional) | one-shot gamble: the action's main tags become `results` fired on success, `on fail:` becomes `failureResults` — mirrors `action()` + `chance`/`failureResults` today, not a new engine mechanic |
 | `station: <stationId>` | marks the action as a station action — no fixed rewards/results/duration; the UI populates its options from whichever `# recipe` entries the player currently holds ingredients for. All other tags on the same action are ignored. |
 | `resource: <resourceId> <amount>` | grants/drains a resource (e.g. `resource: health -3`) — same instant/adversarial rewards-vs-results split as `give`/`xp` |
-| `relocate: <locationId>` | `results: [{kind:'relocate', locationId}]` — an unconditional move, for entity actions that are a plain button rather than a highly-connected-grid edge (a ladder, tunnel, or portal). This is the same result `wall ->` produces internally for grid edges; `relocate:` is the tag form for anywhere else an action needs to move the player. |
+| `relocate: <locationId>` | `results: [{kind:'relocate', locationId}]` — an unconditional move, for entity actions that are a plain button rather than a location-level `adjacent:` edge (a ladder, tunnel, or portal). This is the same result `adjacent:` produces internally; `relocate:` is the tag form for anywhere else an action needs to move the player. A cost-free entity action with only this (plus any number of `say:`s) is picked up by the pathfinding map exactly like an `adjacent:` edge — see "Free travel actions are pathfinding edges" below. |
 | `set spawn: <locationId>` | `results: [{kind:'set-spawn', locationId}]` — moves the player's respawn point, independent of `relocate:` (a one-way "you've moved on for good" moment, like leaving a tutorial area, typically pairs both tags on the same action) |
 | `droptable:` | appends a `Reward` of `kind:'dropTable'` — a nested entry-list tag, one level deeper than `enemy:`/`on success:`. Composite — see `# droptable <id>` below. |
 
@@ -155,12 +198,12 @@ Deferred to a later pass: `respawn:`.
 ```
 # item cooked-shrimp
 title: Cooked Shrimp
-description: A simple meal that keeps you going.
+examine: A simple meal that keeps you going.
 tags: food, +3 regeneration, 60s
 
 # item note
 title: Handwritten Note
-description: A note in someone else's hand, tossed onto a shelf.
+examine: A note in someone else's hand, tossed onto a shelf.
 read: [[dialogue note]]
 ```
 
@@ -171,12 +214,14 @@ variant expansion), just keyed `action.item.<id>.<actionId>` instead of
 carry `enemy:` — items are always instant, matching the engine's
 `ItemActionDefinition` (no `enemy` field, unlike `EntityActionDefinition`).
 
-`title:`/`description:` are optional flat metadata fields, each written to
-the item's own `item.<id>.title`/`item.<id>.description` locale keys. Both
-are optional — an item with neither still compiles, falling back to a
-humanized version of its id (`small-net` → "Small net") for the title and
-`"<Humanized id>."` for the description, the same generic-default philosophy
-used elsewhere in this grammar (interaction messages, action success/failure).
+`title:` is an optional flat metadata field, written to the item's own
+`item.<id>.title` locale key (falls back to a humanized version of the id,
+e.g. `small-net` → "Small net"). There's deliberately no `description:`/
+`examine:` metadata field — an item's flavor text is just its own `examine:`
+action, identical in every way to an entity's (same `say:` sugar, same
+`chat.item.<id>.examine` message key), not a second field with its own
+display mechanism. The inventory panel shows it as an Examine button among
+the item's other action buttons, exactly like any other item action.
 
 `maxQuantity:` is an optional flat number, the item's stack cap
 (`ItemDefinition.maxQuantity`) — omit it for an item with no cap.
@@ -307,7 +352,7 @@ mechanism needed for chunking a longer message the way dialogue text does.
 
 ### Condition expressions
 
-Used by `requires:`, `hidden if:`/`visible if:`, `wall ... while`, and inline
+Used by `requires:`, `hidden if:`/`visible if:`, `adjacent: ... while`, and inline
 conditional text:
 ```
 cond      := disjunct ('|' disjunct)*
@@ -356,12 +401,12 @@ that don't fit the location/entity/item shape:
 # stat attack
 base: 6
 title: Attack
-description: Power applied to outgoing attacks.
+examine: Power applied to outgoing attacks.
 
 # skill attack
 max level: 100
 title: Attack
-description: Accuracy, timing, and pressure in direct conflict.
+examine: Accuracy, timing, and pressure in direct conflict.
 
 # flags
 tutorial.miki-cleared
@@ -369,12 +414,14 @@ tutorial.bank-visited
 death-count: 0
 ```
 
-- `# stat <id>`: `base:` (defaults to `0`), optional `title:`/`description:`
+- `# stat <id>`: `base:` (defaults to `0`), optional `title:`/`examine:`
   (default to `humanize(id)` / `"<Humanized id>."`, same fallback every other
-  section's title/description use).
+  section's title/examine text use). `examine:` (not `description:`) is the
+  same "Examine button prints to chat" mechanism items/entities/locations all
+  share — see CLAUDE.md's State-driven UI section.
 - `# skill <id>`: `stat:` (defaults to the skill's own id — the common case of
   a same-named backing stat), `max level:` (defaults to `100`, matching every
-  skill in this codebase so far), optional `title:`/`description:`.
+  skill in this codebase so far), optional `title:`/`examine:`.
 - `# flags`: one *module-wide* bulk section (no id in the header), one flag
   per line — a bare id defaults to `initialValue: false`; `<id>: <value>`
   sets an explicit boolean or number (flags aren't only booleans — a counter
@@ -444,7 +491,7 @@ between one `tin-ore` and three-to-five (uniform, inclusive) `copper-ore`.
 ## Flags and pack scoping
 
 A bare (undotted) flag id — in `set:`/`unset:`/`hidden if:`/`visible if:`/
-`wall ... while`/inline conditional text — auto-namespaces to the current
+`adjacent: ... while`/inline conditional text — auto-namespaces to the current
 module's **pack** (`pack:` from `# info`, defaulting to the module's own
 `id`). A dotted flag id is used exactly as written, with no namespacing
 applied — that's the escape hatch for a flag that's set by one module and
@@ -540,7 +587,8 @@ locale key, since resources/effects have no compiler-side locale generation
 of their own (unlike items/dialogue/quests/stats/skills, which always get
 *something*, even a humanized fallback). It never overwrites a key any other
 section already generated; if you want to override generated text, write it
-where it's generated (e.g. an item's `title:`/`description:`), not here.
+where it's generated (e.g. an item's `title:` or a location's `examine:`),
+not here.
 
 ## Localization
 
@@ -559,13 +607,13 @@ Island content, verified by merging the compiled modules through the *real*
 `applyModulesToBundle` pipeline with zero validation errors in every case:
 
 - **`compiler.test.ts`**, against `tutorial-island-guide-house`: `info`
-  (+ `pack`), `location` (+ multi-line bare-tag metadata, + `wall`), nested
-  `entity` + actions (instant, adversarial/timed with inline `enemy:`), the
-  unified colon/indentation action grammar (no bullets), `once` + pack-scoped
-  flag-visibility sugar, `examine:` as pure `say:` sugar with compound
-  (`&`/`|`) multi-flag inline conditionals, multi-line `on success:` with
-  sequential `say:` lines, `[[dialogue x]]`, dialogue (multi-node, options,
-  on-enter results, bare `goto`), `open modal:`.
+  (+ `pack`), `location` (+ multi-line labeled `tags:` metadata, + `adjacent:`),
+  nested `entity` + actions (instant, adversarial/timed with inline `enemy:`),
+  the unified colon/indentation action grammar (no bullets), `once` +
+  pack-scoped flag-visibility sugar, `examine:` as pure `say:` sugar with
+  compound (`&`/`|`) multi-flag inline conditionals, multi-line `on success:`
+  with sequential `say:` lines, `[[dialogue x]]`, dialogue (multi-node,
+  options, on-enter results, bare `goto`), `open modal:`.
 - **`coverage.test.ts`**, against slices of `tutorial-island-foundation` and
   `tutorial-island-mining`: `item` (including tag-string pass-through and
   item actions sharing the entity-action pipeline), `quest` (staged
@@ -577,7 +625,13 @@ Island content, verified by merging the compiled modules through the *real*
   `base-core`'s original hand-written 4-level nested independent/dependent
   goblin reward exactly; a named `# droptable <id>` referenced by id from a
   separate `droptable:` block, disambiguated from an item id of the same
-  shape.
+  shape; `adjacent:` (bare unconditional edge + gated edge).
+- **`travel.test.ts`**: a cost-free entity relocate action (ladder/tunnel/
+  portal shape) is picked up as a pathfinding edge exactly like an
+  `adjacent:` edge; an entity action with a reward or another effect
+  alongside `relocate:` is not; `getVisibleTravelGraph`'s optional `viewZ`
+  parameter for viewing an already-discovered layer other than the player's
+  current one.
 
 Not yet implemented: `respawn:`, multi-line dialogue-node body text, the
 visual grid-placement GUI for locations, and the full editor/live-preview UI

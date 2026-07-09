@@ -13,12 +13,13 @@ import { QuestLogPanel } from './components/QuestLogPanel';
 import { DialoguePanel } from './components/DialoguePanel';
 import { InventoryPanel } from './components/InventoryPanel';
 import { EditMode, type EditTab } from './components/contribution/EditMode';
+import { ExamineButton } from './components/ExamineButton';
 import { SkillBars } from './components/SkillBars';
 import { TravelStatus } from './components/TravelStatus';
 import { WorldMap } from './components/WorldMap';
 import { StructuredDataEditor, type StructuredValue } from './components/structuredData/StructuredData';
 import { modulePackSchema } from './components/structuredData/contentSchemas';
-import { interactionTitleKey, itemTitleKey, locationDescriptionKey, locationTitleKey, resourceTitleKey, skillTitleKey, universeDescriptionKey, universeTitleKey } from './game/contentIds';
+import { interactionTitleKey, itemTitleKey, locationExamineKey, locationTitleKey, resourceTitleKey, skillTitleKey, universeDescriptionKey, universeTitleKey } from './game/contentIds';
 import { getActionTitleText } from './game/actionLocalization';
 import {
   applyDisplayPalette,
@@ -320,6 +321,7 @@ export default function App() {
       ]
     : [];
   const runtimeUniverseId = bundle ? (contributionMode ? contributionRuntimeId(bundle.manifest.id) : bundle.manifest.id) : '';
+  const onExamine = (text: string) => appendChatText(runtimeUniverseId, text);
   const actionContext = useMemo(() => ({
     manifest: bundle?.manifest,
     actions: bundle?.actions ?? [],
@@ -949,14 +951,7 @@ export default function App() {
             {visibleActiveTab === 'settings' && <p className="text-sm text-slate-400">{t(universeTitleKey(bundle.manifest.id))} - {t(universeDescriptionKey(bundle.manifest.id), '')}</p>}
           </div>
           {visibleActiveTab === 'home' && currentLocation && (
-            <button
-              className="shrink-0 rounded border border-slate-700 px-3 py-1.5 text-xs font-semibold text-slate-200"
-              data-testid="examine-location"
-              onClick={() => appendChatText(runtimeUniverseId, t(locationDescriptionKey(currentLocation.id), ''))}
-              type="button"
-            >
-              {t('home.examine', 'Examine')}
-            </button>
+            <ExamineButton onExamine={onExamine} t={t} testId="examine-location" textKey={locationExamineKey(currentLocation.id)} />
           )}
         </div>
       </header>
@@ -973,6 +968,7 @@ export default function App() {
                   logPlayerAction('travel.cancel', { universeId: bundle.manifest.id });
                   cancelTravel(runtimeUniverseId);
                 }}
+                onExamine={onExamine}
                 titleWhenIdle
                 t={t}
               />
@@ -1079,7 +1075,7 @@ export default function App() {
 
             {characterTab === 'skills' && (
               <section className="rounded border border-slate-800 bg-slate-900 p-4">
-                <SkillBars bundle={bundle} playState={playState} t={t} />
+                <SkillBars bundle={bundle} onExamine={onExamine} playState={playState} t={t} />
               </section>
             )}
 
@@ -1099,6 +1095,7 @@ export default function App() {
             {characterTab === 'stats' && (
               <CharacterStats
                 bundle={bundle}
+                onExamine={onExamine}
                 playState={playState}
                 t={t}
               />
@@ -1109,7 +1106,7 @@ export default function App() {
             )}
 
             {characterTab === 'collectionLog' && (
-              <CollectionLogPanel bundle={bundle} playState={playState} t={t} />
+              <CollectionLogPanel bundle={bundle} onExamine={onExamine} playState={playState} t={t} />
             )}
           </section>
         )}

@@ -8,7 +8,7 @@
 // same gameState.ts store actions the GUI buttons call — the GUI and the CLI
 // are two front ends over one game-logic layer, not two separate ones.
 import { ACTION_PREFIX, DIALOGUE_PREFIX, RECIPE_SEPARATOR, currentDialogueNode, visibleChoices } from './choices';
-import { itemDescriptionKey, itemTitleKey, locationDescriptionKey, locationTitleKey, skillTitleKey, statTitleKey } from './contentIds';
+import { itemTitleKey, locationExamineKey, locationTitleKey, skillTitleKey, statTitleKey } from './contentIds';
 import { canEatItem, equipmentSlots, formatItemTag, getItemTags, itemSlots } from './equipment';
 import { getCharacterStatTotals } from './characterStats';
 import { skillLevelFromXp } from './skills';
@@ -101,7 +101,7 @@ const listActions = (rt: CliRuntime) => {
   } else {
     const location = bundle.locations.find((candidate) => candidate.id === play.currentLocationId);
     if (location) {
-      rt.appendMessage(`${t(locationTitleKey(location.id), location.id)} - ${t(locationDescriptionKey(location.id), '')}`);
+      rt.appendMessage(`${t(locationTitleKey(location.id), location.id)} - ${t(locationExamineKey(location.id), '')}`);
     }
   }
 
@@ -252,7 +252,11 @@ export const cliCommands: CliCommand[] = [
         rt.appendMessage(t('cli.examine.unknownItem', "You don't have anything called \"{name}\".", { name }));
         return;
       }
-      const description = t(itemDescriptionKey(item.id), '');
+      // An item's descriptive text is just its own `examine` action's chat
+      // message — the same mechanism entities use — not a separate field.
+      const examineAction = item.actions?.find((action) => action.id === 'examine');
+      const chatResult = examineAction?.results?.find((result) => result.kind === 'chat');
+      const description = chatResult ? t(chatResult.messageKey, '') : '';
       const tags = getItemTags(item).map((tag) => formatItemTag(tag, t));
       rt.appendMessage([t(itemTitleKey(item.id), item.id), description, tags.length > 0 ? tags.join(', ') : null].filter(Boolean).join(' - '));
     },

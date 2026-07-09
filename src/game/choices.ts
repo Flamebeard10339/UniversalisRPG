@@ -7,9 +7,9 @@
 // copy of this logic would silently recreate that class of bug.
 import { areActionRequirementsMet, evaluateCondition, isActionVisible, canStartAction } from './conditions';
 import { getActionDescriptionText, getActionTitleText } from './actionLocalization';
-import { entityTitleKey, locationDescriptionKey, locationTitleKey, itemTitleKey } from './contentIds';
+import { entityTitleKey, locationExamineKey, locationTitleKey, itemTitleKey } from './contentIds';
 import { availableRecipesForStation, resolveStationAction } from './recipes';
-import { isWallAction } from './travel';
+import { isPureTravelAction } from './travel';
 import type { Translator } from './i18n';
 import type {
   ActionResolutionContext,
@@ -101,7 +101,7 @@ export const visibleChoices = (
 
   const locationActions = bundle.actions
     .filter((action) => action.locationId === state.currentLocationId && !entityActionIds.has(action.id))
-    .filter((action) => !isWallAction(action, context))
+    .filter((action) => !isPureTravelAction(action))
     .filter((action) => isActionVisible(state, action, context))
     .flatMap((action) => describe(action, 'action'));
 
@@ -137,7 +137,7 @@ export const describeLocation = (bundle: ContentBundle, state: UniversePlayState
   return {
     id: state.currentLocationId,
     title: location ? t(locationTitleKey(location.id), location.id) : state.currentLocationId,
-    description: location ? t(locationDescriptionKey(location.id), '') : '',
+    description: location ? t(locationExamineKey(location.id), '') : '',
     entityCount: location?.entities?.length ?? 0,
     entityNames,
   };

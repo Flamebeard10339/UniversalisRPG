@@ -85,7 +85,6 @@ export type UniverseUiSettings = {
   loopActionsByDefault?: boolean;
   travelPathMaxSeconds?: number;
   travelPathMaxNodes?: number;
-  connectivityMode?: 'highly-connected' | 'sparse';
   distanceBetweenAdjacentTiles?: number;
 };
 

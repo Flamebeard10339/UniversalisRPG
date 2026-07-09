@@ -1,11 +1,13 @@
-import { statTitleKey } from '../game/contentIds';
+import { statExamineKey, statTitleKey } from '../game/contentIds';
 import { getCharacterStatTotals } from '../game/characterStats';
 import type { ContentBundle, UniversePlayState } from '../game/types';
 import type { Translator } from '../game/i18n';
+import { ExamineButton } from './ExamineButton';
 import { ResourceStatus } from './ResourceStatus';
 
 type CharacterStatsProps = {
   bundle: ContentBundle;
+  onExamine: (text: string) => void;
   playState: UniversePlayState;
   t: Translator;
 };
@@ -13,7 +15,7 @@ type CharacterStatsProps = {
 const formatNumber = (value: number) =>
   Number.isInteger(value) ? String(value) : value.toFixed(2);
 
-export const CharacterStats = ({ bundle, playState, t }: CharacterStatsProps) => (
+export const CharacterStats = ({ bundle, onExamine, playState, t }: CharacterStatsProps) => (
   <section className="grid gap-4">
     <section className="grid gap-3 rounded border border-slate-800 bg-slate-900 p-4">
       <div>
@@ -28,6 +30,7 @@ export const CharacterStats = ({ bundle, playState, t }: CharacterStatsProps) =>
               <th className="py-2 pr-3 font-medium">{t('characterStats.column.added')}</th>
               <th className="py-2 pr-3 font-medium">{t('characterStats.column.increased')}</th>
               <th className="py-2 pr-3 font-medium">{t('characterStats.column.effective')}</th>
+              <th className="py-2 pr-3 font-medium" />
             </tr>
           </thead>
           <tbody>
@@ -41,6 +44,9 @@ export const CharacterStats = ({ bundle, playState, t }: CharacterStatsProps) =>
                   <td className="py-2 pr-3">{formatNumber(totals.added)}</td>
                   <td className="py-2 pr-3">{formatNumber(totals.increased)}</td>
                   <td className="py-2 pr-3 text-cyan-100">{formatNumber(totals.effectiveTotal)}</td>
+                  <td className="py-2 pr-3">
+                    <ExamineButton onExamine={onExamine} t={t} textKey={statExamineKey(stat.id)} />
+                  </td>
                 </tr>
               );
             })}

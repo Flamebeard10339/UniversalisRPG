@@ -17,52 +17,52 @@ dependencies: base-core
 # stat mining
 base: 0
 title: Mining
-description: Power applied to mining actions.
+examine: Power applied to mining actions.
 
 # stat smithing
 base: 0
 title: Smithing
-description: Power applied to smelting and forging.
+examine: Power applied to smelting and forging.
 
 # stat fishing
 base: 0
 title: Fishing
-description: Power applied to fishing actions.
+examine: Power applied to fishing actions.
 
 # stat cooking
 base: 0
 title: Cooking
-description: Power applied to cooking actions.
+examine: Power applied to cooking actions.
 
 # stat thieving
 base: 0
 title: Thieving
-description: Power applied to locks and sleight of hand.
+examine: Power applied to locks and sleight of hand.
 
 # stat movement-speed
 base: 60
 title: Movement Speed
-description: How quickly you travel between locations.
+examine: How quickly you travel between locations.
 
 # skill mining
 title: Mining
-description: Reading stone, striking ore, and extracting useful minerals.
+examine: Reading stone, striking ore, and extracting useful minerals.
 
 # skill smithing
 title: Smithing
-description: Smelting metal and shaping gear.
+examine: Smelting metal and shaping gear.
 
 # skill fishing
 title: Fishing
-description: Catching food from open water.
+examine: Catching food from open water.
 
 # skill cooking
 title: Cooking
-description: Turning raw supplies into safer meals.
+examine: Turning raw supplies into safer meals.
 
 # skill thieving
 title: Thieving
-description: Opening what was meant to stay closed.
+examine: Opening what was meant to stay closed.
 
 # flags
 tutorial.miki-cleared
@@ -79,61 +79,61 @@ tutorial.crate-bowl-taken
 
 # item gold
 title: Gold
-description: Small bright coins.
+examine: Small bright coins.
 
 # item lockpick
 title: Lockpick
-description: A bent bit of metal for impatient doors.
+examine: A bent bit of metal for impatient doors.
 
 # item note
 title: Handwritten Note
-description: A note in someone else's hand, tossed onto a shelf.
+examine: A note in someone else's hand, tossed onto a shelf.
 read: [[dialogue note]]
 
 # item small-net
 title: Small Net
-description: A net suited to shallow shoals.
+examine: A net suited to shallow shoals.
 
 # item raw-shrimp
 title: Raw Shrimp
-description: Fresh and not yet dinner.
+examine: Fresh and not yet dinner.
 
 # item cooked-shrimp
 title: Cooked Shrimp
-description: A simple meal that keeps you going.
+examine: A simple meal that keeps you going.
 tags: food, +3 regeneration, 60s
 
 # item herb
 title: River Herb
-description: A sleepy-smelling green herb.
+examine: A sleepy-smelling green herb.
 
 # item bowl
 title: Bowl
-description: Cracked, but still useful.
+examine: Cracked, but still useful.
 
 # item uncooked-sleeping-draught
 title: Uncooked Sleeping Draught
-description: A murky mix that needs heat.
+examine: A murky mix that needs heat.
 
 # item sleeping-draught
 title: Sleeping Draught
-description: A warm draught with a suspiciously calm smell.
+examine: A warm draught with a suspiciously calm smell.
 
 # item copper-ore
 title: Copper Ore
-description: A soft reddish ore.
+examine: A soft reddish ore.
 
 # item tin-ore
 title: Tin Ore
-description: A pale chunk of tin-bearing stone.
+examine: A pale chunk of tin-bearing stone.
 
 # item bronze-bar
 title: Bronze Bar
-description: Freshly smelted bronze.
+examine: Freshly smelted bronze.
 
 # item iron-dagger
 title: Iron Dagger
-description: A sharp shortcut from Denzel's chest.
+examine: A sharp shortcut from Denzel's chest.
 tags: mainhand (1 attack), +3 attack
 
 # dialogue note

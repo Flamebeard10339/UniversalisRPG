@@ -28,7 +28,7 @@ import type {
   DslSkillSection,
   DslStatSection,
   DslTag,
-  DslWallDecl,
+  DslAdjacentDecl,
 } from './types';
 
 const leadingSpaces = (line: string): number => {
@@ -165,21 +165,29 @@ const parseAdvancedBlock = (cursor: Cursor): Record<string, unknown> => {
 // ---------------------------------------------------------------------------
 // Location: metadata may span multiple non-blank lines before the first
 // `wall`/`## entity`. Recognized fields are `x:`/`y:`/`z:`, the optional flat
-// text fields `title:`/`description:`/`exhausted:`, and the bare keyword
-// `starting`; any other bare word (or space-separated run of words) is a
-// location tag — there's no `tags:` label, unlike every other DSL keyword
-// this is the one place a bare, unrecognized word is *not* an error.
+// text fields `title:`/`examine:`/`exhausted:`, the labeled `tags:` field
+// (space/comma-separated words), and the bare keyword `starting`. Unlike an
+// earlier version of this grammar, an unrecognized bare word here is an
+// error, same as everywhere else in the DSL — tags need the `tags:` label.
+// `examine:` (not `description:`) matches the same "prints to chat via an
+// Examine button" mechanism items/stats/skills all share — see CLAUDE.md.
 // ---------------------------------------------------------------------------
-type LocationMeta = { x: number; y: number; z?: number; tags: string[]; starting: boolean; title?: string; description?: string; exhausted?: string };
+type LocationMeta = { x: number; y: number; z?: number; tags: string[]; starting: boolean; title?: string; examine?: string; exhausted?: string };
 
-const applyLocationMetadataLine = (line: string, meta: LocationMeta): void => {
-  const textFieldMatch = /^(title|description|exhausted):\s*(.*)$/i.exec(line);
+const applyLocationMetadataLine = (line: string, meta: LocationMeta, lineIndex: number): void => {
+  const textFieldMatch = /^(title|examine|exhausted):\s*(.*)$/i.exec(line);
   if (textFieldMatch) {
     const key = textFieldMatch[1].toLowerCase();
     const value = textFieldMatch[2].trim();
     if (key === 'title') meta.title = value;
-    else if (key === 'description') meta.description = value;
+    else if (key === 'examine') meta.examine = value;
     else meta.exhausted = value;
+    return;
+  }
+
+  const tagsFieldMatch = /^tags:\s*(.*)$/i.exec(line);
+  if (tagsFieldMatch) {
+    meta.tags.push(...tagsFieldMatch[1].split(/[\s,]+/).filter(Boolean));
     return;
   }
 
@@ -197,8 +205,33 @@ const applyLocationMetadataLine = (line: string, meta: LocationMeta): void => {
       meta.starting = true;
       continue;
     }
-    meta.tags.push(...segment.split(/\s+/).filter(Boolean));
+    throw new DslParseError(`Unrecognized location metadata "${segment}" — location tags need a "tags:" label`, lineIndex);
   }
+};
+
+// One line inside a location's `adjacent:` block: a bare `<locationId>` is an
+// unconditional edge; `<locationId> while <condition>` gates it.
+const ADJACENT_ENTRY_LINE = /^([\w-]+)(?:\s+while\s+(.+))?$/i;
+
+const parseAdjacentEntries = (cursor: Cursor, baseIndent: number, locationId: string): DslAdjacentDecl[] => {
+  const entries: DslAdjacentDecl[] = [];
+  while (!cursor.atEnd()) {
+    const line = cursor.current!;
+    if (line.trim().length === 0) {
+      cursor.index++;
+      continue;
+    }
+    if (leadingSpaces(line) <= baseIndent) break;
+    const trimmed = line.trim();
+    if (/^#/.test(trimmed)) break;
+
+    const match = ADJACENT_ENTRY_LINE.exec(trimmed);
+    if (!match) throw new DslParseError(`Expected "<locationId>" or "<locationId> while <condition>" in location "${locationId}"'s adjacent: list, got: "${line}"`, cursor.index);
+    const cond = match[2] ? withLine(cursor.index, () => parseCondition(match[2], 'flag')) : undefined;
+    entries.push({ toLocationId: match[1], cond });
+    cursor.index++;
+  }
+  return entries;
 };
 
 const parseLocationSection = (cursor: Cursor, id: string): DslLocationSection => {
@@ -206,12 +239,12 @@ const parseLocationSection = (cursor: Cursor, id: string): DslLocationSection =>
   cursor.skipBlank();
   while (!cursor.atEnd()) {
     const trimmed = cursor.current!.trim();
-    if (/^wall\s*->/i.test(trimmed) || /^##\s+entity\b/i.test(trimmed) || /^#\s/.test(trimmed)) break;
-    applyLocationMetadataLine(trimmed, meta);
+    if (/^adjacent:\s*$/i.test(trimmed) || /^##\s+entity\b/i.test(trimmed) || /^#\s/.test(trimmed)) break;
+    applyLocationMetadataLine(trimmed, meta, cursor.index);
     cursor.index++;
   }
 
-  const walls: DslWallDecl[] = [];
+  const adjacent: DslAdjacentDecl[] = [];
   const entities: DslEntityDecl[] = [];
   cursor.skipBlank();
 
@@ -220,11 +253,11 @@ const parseLocationSection = (cursor: Cursor, id: string): DslLocationSection =>
     const trimmed = line.trim();
     if (/^#\s/.test(trimmed) && !/^##/.test(trimmed)) break;
 
-    const wallMatch = /^wall\s*->\s*([\w-]+)\s+while\s+(.+)$/i.exec(trimmed);
-    if (wallMatch) {
-      const cond = withLine(cursor.index, () => parseCondition(wallMatch[2], 'flag'));
-      walls.push({ toLocationId: wallMatch[1], cond });
+    const adjacentMatch = /^adjacent:\s*$/i.exec(trimmed);
+    if (adjacentMatch) {
+      const indent = leadingSpaces(line);
       cursor.index++;
+      adjacent.push(...parseAdjacentEntries(cursor, indent, id));
       cursor.skipBlank();
       continue;
     }
@@ -240,7 +273,7 @@ const parseLocationSection = (cursor: Cursor, id: string): DslLocationSection =>
     throw new DslParseError(`Unexpected line in location "${id}": "${line}"`, cursor.index);
   }
 
-  return { kind: 'location', id, x: meta.x, y: meta.y, z: meta.z, tags: meta.tags, starting: meta.starting, title: meta.title, description: meta.description, exhausted: meta.exhausted, walls, entities };
+  return { kind: 'location', id, x: meta.x, y: meta.y, z: meta.z, tags: meta.tags, starting: meta.starting, title: meta.title, examine: meta.examine, exhausted: meta.exhausted, adjacent, entities };
 };
 
 const parseEntity = (cursor: Cursor, id: string): DslEntityDecl => {
@@ -460,12 +493,14 @@ const parseDialogueNode = (cursor: Cursor): DslDialogueNode => {
 // `offensiveTags:`/`defensiveTags:` are metadata fields whose value is a raw
 // pass-through string (the existing equipment tag-string grammar from
 // src/game/equipment.ts, untouched and unrelated to this DSL's own tags) —
-// not parsed as DSL tags themselves.
+// not parsed as DSL tags themselves. There's deliberately no `description:`/
+// `examine:` metadata field here — an item's examine text is just its own
+// `examine:` action (identical to an entity's), not a separate field, so
+// there's exactly one "show descriptive text" mechanism to learn, not two.
 // ---------------------------------------------------------------------------
 const parseItemSection = (cursor: Cursor, id: string): DslItemSection => {
   cursor.skipBlank();
   let title: string | undefined;
-  let description: string | undefined;
   let maxQuantity: number | undefined;
   let tagsString: string | undefined;
   let offensiveTagsString: string | undefined;
@@ -480,11 +515,10 @@ const parseItemSection = (cursor: Cursor, id: string): DslItemSection => {
     }
     if (/^#/.test(trimmed)) break;
 
-    const metaMatch = /^(title|description|maxQuantity|tags|offensiveTags|defensiveTags):\s*(.*)$/i.exec(trimmed);
+    const metaMatch = /^(title|maxQuantity|tags|offensiveTags|defensiveTags):\s*(.*)$/i.exec(trimmed);
     if (metaMatch) {
       const key = metaMatch[1].toLowerCase();
       if (key === 'title') title = metaMatch[2].trim();
-      else if (key === 'description') description = metaMatch[2].trim();
       else if (key === 'maxquantity') maxQuantity = Number(metaMatch[2].trim());
       else if (key === 'tags') tagsString = metaMatch[2].trim();
       else if (key === 'offensivetags') offensiveTagsString = metaMatch[2].trim();
@@ -496,7 +530,7 @@ const parseItemSection = (cursor: Cursor, id: string): DslItemSection => {
     actions.push(parseAction(cursor));
   }
 
-  return { kind: 'item', id, title, description, maxQuantity, tagsString, offensiveTagsString, defensiveTagsString, actions };
+  return { kind: 'item', id, title, maxQuantity, tagsString, offensiveTagsString, defensiveTagsString, actions };
 };
 
 // ---------------------------------------------------------------------------
@@ -689,7 +723,7 @@ const parseStatSection = (cursor: Cursor, id: string): DslStatSection => {
   cursor.skipBlank();
   let base = 0;
   let title: string | undefined;
-  let description: string | undefined;
+  let examine: string | undefined;
 
   while (!cursor.atEnd()) {
     const line = cursor.current!;
@@ -700,17 +734,17 @@ const parseStatSection = (cursor: Cursor, id: string): DslStatSection => {
     }
     if (/^#/.test(trimmed)) break;
 
-    const match = /^(base|title|description):\s*(.*)$/i.exec(trimmed);
+    const match = /^(base|title|examine):\s*(.*)$/i.exec(trimmed);
     if (!match) throw new DslParseError(`Unexpected line in stat "${id}": "${line}"`, cursor.index);
     const key = match[1].toLowerCase();
     const value = match[2].trim();
     if (key === 'base') base = Number(value);
     else if (key === 'title') title = value;
-    else description = value;
+    else examine = value;
     cursor.index++;
   }
 
-  return { kind: 'stat', id, base, title, description };
+  return { kind: 'stat', id, base, title, examine };
 };
 
 const parseSkillSection = (cursor: Cursor, id: string): DslSkillSection => {
@@ -718,7 +752,7 @@ const parseSkillSection = (cursor: Cursor, id: string): DslSkillSection => {
   let statId: string | undefined;
   let maxLevel: number | undefined;
   let title: string | undefined;
-  let description: string | undefined;
+  let examine: string | undefined;
 
   while (!cursor.atEnd()) {
     const line = cursor.current!;
@@ -729,18 +763,18 @@ const parseSkillSection = (cursor: Cursor, id: string): DslSkillSection => {
     }
     if (/^#/.test(trimmed)) break;
 
-    const match = /^(stat|max level|title|description):\s*(.*)$/i.exec(trimmed);
+    const match = /^(stat|max level|title|examine):\s*(.*)$/i.exec(trimmed);
     if (!match) throw new DslParseError(`Unexpected line in skill "${id}": "${line}"`, cursor.index);
     const key = match[1].toLowerCase();
     const value = match[2].trim();
     if (key === 'stat') statId = value;
     else if (key === 'max level') maxLevel = Number(value);
     else if (key === 'title') title = value;
-    else description = value;
+    else examine = value;
     cursor.index++;
   }
 
-  return { kind: 'skill', id, statId, maxLevel, title, description };
+  return { kind: 'skill', id, statId, maxLevel, title, examine };
 };
 
 const parseFlagsSection = (cursor: Cursor): DslFlagsSection => {

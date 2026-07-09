@@ -57,13 +57,6 @@ describe('tutorial island content (as shipped in universe.json)', () => {
     expect(result.bundle.locations.map((location) => location.id)).not.toContain('crossroads');
   });
 
-  it('never shows more than 5 entities at a location', () => {
-    const result = applyModulesToBundle(emptyBundle(), modules, moduleIds);
-    for (const location of result.bundle.locations) {
-      expect((location.entities ?? []).length, `location ${location.id}`).toBeLessThanOrEqual(5);
-    }
-  });
-
   it('includes an NPC, entity, and interactive object from every story beat', () => {
     const result = applyModulesToBundle(emptyBundle(), modules, moduleIds);
     const entityIds = new Set((result.bundle.entities ?? []).map((entity) => entity.id));

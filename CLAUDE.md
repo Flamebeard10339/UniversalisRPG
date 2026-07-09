@@ -6,10 +6,6 @@ this before authoring NPCs, quests, items, or any state-driven UI.
 
 ## Dialogue
 
-- NPC dialogue must read as a real conversation: minimum 3-5 turns, with a branch for
-  curious players (who ask follow-up questions) and impatient players (who want the
-  short path). A flat one-line `textKey` with no options is a defect, not a
-  placeholder — every dialogue-bearing NPC gets a node graph.
 - Dialogue state (`activeDialogue`) is rendered unconditionally, independent of which
   tab is active, the same way the generic modal is (see below). Do not gate dialogue
   rendering behind `visibleActiveTab === 'home'` or similar — anything that can start
@@ -22,11 +18,7 @@ this before authoring NPCs, quests, items, or any state-driven UI.
 
 ## Quests
 
-- Quest stage `descriptionKey`s are narrative progress summaries ("X has tasked you
-  with... step one is probably...") written from the perspective of what the player
-  should do next, not flag names or completion checkboxes.
-- Prefer one stage per real milestone spanning the whole quest, not just an
-  accept/complete pair.
+- Quest stage `descriptionKey`s are narrative progress summaries and hints
 - Quest/stage conditions are runtime flag checks evaluated against live state, not
   merge-time object-id references. It is architecturally safe for a quest defined in
   an early-loading module (e.g. `foundation`) to reference flags that are only ever
@@ -58,6 +50,19 @@ this before authoring NPCs, quests, items, or any state-driven UI.
   exclusive `visibleWhen`-gated action variants that share one display title (see
   `gommi`'s `examine`/`examine-asleep`, or the guide-house drawer/bookshelf), not a new
   dialogue-branch-as-text mechanism. This needs zero engine changes.
+- "Descriptive flavor text for an object" is **one** mechanism, not one per object
+  kind: an Examine affordance that prints text to chat (`src/components/
+  ExamineButton.tsx`), never a static paragraph rendered inline. For entities/items
+  (which already have an action system) this is literally their own `examine:` action
+  — same `say:` sugar, same `chat.<scope>.<id>.examine` message key, rendered as
+  whichever button their other actions already render through (an item's Examine
+  button is just one more entry in `availableItemActions`, nothing item-specific). For
+  stats/skills/locations (no action system to hang it on) it's a locale-key lookup
+  (`statExamineKey`/`skillExamineKey`/`locationExamineKey`) fed through the same
+  `ExamineButton`. The DSL field is `examine:`, never `description:`, on every section
+  that has one (`# item`, `# stat`, `# skill`, `# location`) — a new object kind that
+  needs flavor text gets an `examine:` field or action, not a new "description" field
+  with its own inline-rendered paragraph.
 
 ## Actions and combat
 
@@ -72,6 +77,28 @@ this before authoring NPCs, quests, items, or any state-driven UI.
   continuous/adversarial-action system — `interactionTypeId` + inline `enemy: {...}` +
   `rewards` — with `targetPlayerHealth: false` on the interaction type. This is a
   content-only pattern, not a new engine feature.
+
+## Travel and the map
+
+- Location connectivity is **always explicit**, never grid-position-derived. Every
+  travel edge is a real, authored action (`# location`'s `adjacent:` block, or a
+  free-standing entity action like a ladder/tunnel/portal) — there is no
+  "grid-adjacent locations are automatically connected" behavior and no per-universe
+  toggle for it. If two locations should be walkable between, that requires an
+  explicit edge on at least one of them; if it should work both ways, both locations
+  need one (edges are one-directional, the return trip is never implied). `x`/`y`/`z`
+  positions are for travel-time calculation and map layout only — they never imply a
+  connection.
+- Any action that costs/rewards nothing and only relocates the player (optionally
+  narrating it via `say:`) is automatically a pathfinding edge, whether it's a
+  location-level `adjacent:` edge or a free-standing entity action (a ladder, tunnel,
+  portal) — see `src/game/travel.ts`'s `getPureTravelDestination`. Don't special-case
+  new "free move" content to make it map-navigable; if it's genuinely free (no other
+  results, no rewards), it already is. An action that *also* sets a flag, grants an
+  item, etc. alongside the relocate is deliberately excluded — that's a meaningful
+  moment (a one-way portal that also flips a story flag), not a free hop, so it stays
+  a manual button the player has to click, not something the map silently routes
+  through.
 
 ## Resources and stats
 

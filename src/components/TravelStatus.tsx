@@ -1,13 +1,15 @@
 import type { ActiveTravel, ContentBundle } from '../game/types';
-import { locationDescriptionKey, locationTitleKey } from '../game/contentIds';
+import { locationExamineKey, locationTitleKey } from '../game/contentIds';
 import type { Translator } from '../game/i18n';
 import { useNow } from '../hooks/useNow';
+import { ExamineButton } from './ExamineButton';
 
 type TravelStatusProps = {
   bundle: ContentBundle;
   activeTravel: ActiveTravel | null;
   currentLocationId: string;
   onCancel?: () => void;
+  onExamine?: (text: string) => void;
   titleWhenIdle?: boolean;
   t: Translator;
 };
@@ -29,6 +31,7 @@ export const TravelStatus = ({
   activeTravel,
   currentLocationId,
   onCancel,
+  onExamine,
   titleWhenIdle = false,
   t,
 }: TravelStatusProps) => {
@@ -41,9 +44,9 @@ export const TravelStatus = ({
     }
 
     return (
-      <section className="rounded border border-slate-800 bg-slate-900 p-4">
+      <section className="flex items-start justify-between gap-3 rounded border border-slate-800 bg-slate-900 p-4">
         <h2 className="text-lg font-semibold">{t(locationTitleKey(currentLocation.id))}</h2>
-        <p className="mt-1 text-sm text-slate-400">{t(locationDescriptionKey(currentLocation.id))}</p>
+        {onExamine && <ExamineButton onExamine={onExamine} t={t} textKey={locationExamineKey(currentLocation.id)} />}
       </section>
     );
   }

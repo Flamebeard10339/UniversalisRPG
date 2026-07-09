@@ -1,10 +1,12 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import ReactFlow, { Background, Controls, type Edge, type Node } from 'reactflow';
 import type { ContentBundle, UniversePlayState } from '../game/types';
 import { locationTitleKey } from '../game/contentIds';
 import { useNow } from '../hooks/useNow';
 import { getVisibleTravelGraph } from '../game/travel';
 import { TravelEdge } from './TravelEdge';
+
+const locationZ = (location: { position: { x: number; y: number; z?: number } }) => location.position.z ?? 0;
 
 type WorldMapProps = {
   bundle: ContentBundle;
@@ -74,9 +76,24 @@ export const WorldMap = ({ bundle, playState, onTravel, t }: WorldMapProps) => {
     dropTables: bundle.dropTables,
     dialogues: bundle.dialogues,
   }), [bundle]);
+  const currentLocation = bundle.locations.find((location) => location.id === playState.currentLocationId);
+  const currentZ = locationZ(currentLocation ?? { position: { x: 0, y: 0 } });
+  const [zLayer, setZLayer] = useState(currentZ);
+  // Follow the player to whichever layer they actually travel to, so the map
+  // doesn't keep showing a stale layer after arriving somewhere new — the
+  // dropdown is for peeking at an already-discovered layer, not a fixed view.
+  useEffect(() => setZLayer(currentZ), [currentZ]);
+  const discoveredZLayers = useMemo(
+    () => Array.from(new Set(
+      bundle.locations
+        .filter((location) => playState.discoveredLocationIds.includes(location.id))
+        .map(locationZ),
+    )).sort((a, b) => a - b),
+    [bundle.locations, playState.discoveredLocationIds],
+  );
   const visibleGraph = useMemo(
-    () => getVisibleTravelGraph(bundle, playState, actionContext),
-    [actionContext, bundle, playState],
+    () => getVisibleTravelGraph(bundle, playState, actionContext, zLayer),
+    [actionContext, bundle, playState, zLayer],
   );
   const mapExtent = useMemo(() => {
     const xs = visibleGraph.locations.map((location) => toPixelPosition(location.position).x);
@@ -187,24 +204,41 @@ export const WorldMap = ({ bundle, playState, onTravel, t }: WorldMapProps) => {
   );
 
   return (
-    <ReactFlow
-      nodes={nodes}
-      edges={edges}
-      edgeTypes={edgeTypes}
-      fitView
-      maxZoom={1.35}
-      minZoom={0.45}
-      nodeExtent={mapExtent}
-      nodesDraggable={false}
-      nodesConnectable={false}
-      onNodeClick={(_, node) => onTravel(node.id)}
-      panOnDrag
-      panOnScroll
-      proOptions={{ hideAttribution: true }}
-      translateExtent={mapExtent}
-    >
-      <Background color="#334155" gap={24} />
-      <Controls showInteractive={false} />
-    </ReactFlow>
+    <div className="relative h-full w-full">
+      {discoveredZLayers.length > 1 && (
+        <label className="absolute right-3 top-3 z-10 flex items-center gap-2 rounded border border-slate-700 bg-slate-900/90 px-3 py-1.5 text-xs text-slate-300">
+          {t('map.zLayer', 'Layer')}
+          <select
+            className="rounded bg-slate-950 px-2 py-1 text-sm text-slate-100"
+            data-testid="map-z-layer-select"
+            onChange={(event) => setZLayer(Number(event.target.value))}
+            value={zLayer}
+          >
+            {discoveredZLayers.map((z) => (
+              <option key={z} value={z}>{z}</option>
+            ))}
+          </select>
+        </label>
+      )}
+      <ReactFlow
+        nodes={nodes}
+        edges={edges}
+        edgeTypes={edgeTypes}
+        fitView
+        maxZoom={1.35}
+        minZoom={0.45}
+        nodeExtent={mapExtent}
+        nodesDraggable={false}
+        nodesConnectable={false}
+        onNodeClick={(_, node) => onTravel(node.id)}
+        panOnDrag
+        panOnScroll
+        proOptions={{ hideAttribution: true }}
+        translateExtent={mapExtent}
+      >
+        <Background color="#334155" gap={24} />
+        <Controls showInteractive={false} />
+      </ReactFlow>
+    </div>
   );
 };

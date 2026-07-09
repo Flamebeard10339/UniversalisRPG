@@ -1,7 +1,7 @@
 import { areActionRequirementsMet, isActionVisible } from './conditions';
 import { getCharacterStatValue } from './characterStats';
 import { resolveManifestUiSettings } from './universeSettings';
-import type { ActionResolutionContext, ContentBundle, GameAction, LocationNode, Position, UniversePlayState } from './types';
+import type { ActionResolutionContext, ActionResult, ContentBundle, GameAction, LocationNode, Position, UniversePlayState } from './types';
 
 export type AvailableTravelEdge = {
   action: GameAction;
@@ -21,16 +21,23 @@ const DEFAULT_MOVEMENT_SPEED = 60;
 
 export const travelEdgeId = (action: Pick<GameAction, 'id'>) => `travel:${action.id}`;
 
-export const getPureTravelDestination = (action: GameAction) => {
+// A "pure" travel action costs and rewards nothing and does nothing but move
+// the player (any number of `chat` results alongside the `relocate` are
+// fine — narration doesn't cost anything). This covers both location-level
+// `adjacent:` edges (`role: 'travel'`, but that's incidental — nothing here
+// requires it) and free-standing entity actions that are just a ladder,
+// tunnel, or portal (a `say:` + `relocate:` action with no other tags) — the
+// two are structurally the same thing, just declared in different DSL
+// sections, so this doesn't distinguish them.
+export const getPureTravelDestination = (action: GameAction): string | null => {
   const results = action.results ?? [];
-  const relocate = results[0];
+  const relocateResults = results.filter((result): result is Extract<ActionResult, { kind: 'relocate' }> => result.kind === 'relocate');
+  const otherResults = results.filter((result) => result.kind !== 'relocate' && result.kind !== 'chat');
 
   if (
-    action.role !== 'travel' ||
-    !action.locationId ||
     action.rewards.length > 0 ||
-    results.length !== 1 ||
-    relocate?.kind !== 'relocate' ||
+    relocateResults.length !== 1 ||
+    otherResults.length > 0 ||
     action.experience?.length ||
     action.enemyId ||
     action.interactionTypeId
@@ -38,19 +45,10 @@ export const getPureTravelDestination = (action: GameAction) => {
     return null;
   }
 
-  return relocate.locationId;
+  return relocateResults[0].locationId;
 };
 
 export const isPureTravelAction = (action: GameAction) => getPureTravelDestination(action) !== null;
-
-// In a highly-connected universe every pair of grid-adjacent locations (same
-// z-layer) is traversable by default; an authored `role: 'travel'` action
-// between them is a wall, not a connection, and is only blocking while it is
-// currently visible (so a wall can be conditionally torn down, e.g. once a
-// quest flag is set — the exact inverse of an ordinary sparse-mode travel
-// action being conditionally revealed).
-export const isWallAction = (action: GameAction, context: Pick<ActionResolutionContext, 'manifest'>) =>
-  isPureTravelAction(action) && resolveManifestUiSettings(context.manifest).connectivityMode === 'highly-connected';
 
 const locationZ = (location: Pick<LocationNode, 'position'>) => location.position.z ?? 0;
 
@@ -80,12 +78,6 @@ const computeTravelSeconds = (
   return distanceUnits / (movementSpeed / 60);
 };
 
-const isGridAdjacent = (from: Position, to: Position) => {
-  const dx = Math.abs(to.x - from.x);
-  const dy = Math.abs(to.y - from.y);
-  return dx <= 1 && dy <= 1 && (dx > 0 || dy > 0);
-};
-
 export const getAvailableTravelEdgesForNode = (
   state: UniversePlayState,
   context: ActionResolutionContext,
@@ -106,48 +98,35 @@ export const getAvailableTravelEdgesForNode = (
     travelTimeSeconds: computeTravelSeconds(nodeState, context, sourceLocation.position, targetLocation.position),
   });
 
-  const settings = resolveManifestUiSettings(context.manifest);
+  // Available here means either a location-level edge (an `adjacent:`-
+  // authored action) or a free-standing entity action belonging to one of
+  // this location's own entities (a ladder, tunnel, portal — declared right
+  // where the player interacts with it, not on the location itself).
+  const entityIdsHere = new Set(sourceLocation.entities ?? []);
 
-  if (settings.connectivityMode !== 'highly-connected') {
-    return context.actions.flatMap((action) => {
-      const destination = getPureTravelDestination(action);
-      if (!destination || action.locationId !== locationId) {
-        return [];
-      }
-      if (!isActionVisible(nodeState, action, context) || !areActionRequirementsMet(nodeState, action, context)) {
-        return [];
-      }
-      const targetLocation = context.locations?.find((location) => location.id === destination);
-      if (!targetLocation) return [];
-      return [buildEdge(targetLocation, action)];
-    });
-  }
-
-  const z = locationZ(sourceLocation);
-  const neighbors = (context.locations ?? []).filter((candidate) =>
-    candidate.id !== locationId && locationZ(candidate) === z && isGridAdjacent(sourceLocation.position, candidate.position));
-
-  return neighbors.flatMap((targetLocation) => {
-    const wallAction = context.actions.find((action) =>
-      action.locationId === locationId && getPureTravelDestination(action) === targetLocation.id);
-    if (wallAction && isActionVisible(nodeState, wallAction, context)) {
+  return context.actions.flatMap((action) => {
+    const availableHere = action.locationId === locationId || (action.entityId !== undefined && entityIdsHere.has(action.entityId));
+    if (!availableHere) return [];
+    const destination = getPureTravelDestination(action);
+    if (!destination) return [];
+    if (!isActionVisible(nodeState, action, context) || !areActionRequirementsMet(nodeState, action, context)) {
       return [];
     }
-    const action: GameAction = wallAction ?? {
-      id: `grid-travel:${locationId}:${targetLocation.id}`,
-      locationId,
-      role: 'travel',
-      rewards: [],
-      results: [{ kind: 'relocate', locationId: targetLocation.id }],
-    };
+    const targetLocation = context.locations?.find((location) => location.id === destination);
+    if (!targetLocation) return [];
     return [buildEdge(targetLocation, action)];
   });
 };
 
+// `viewZ` lets the map show a layer other than the player's current one (a
+// z-height selector) — defaults to the current location's z when omitted, so
+// existing callers see no change. Fog-of-war still applies uniformly: only
+// already-discovered locations/edges ever show, on any layer.
 export const getVisibleTravelGraph = (
   bundle: ContentBundle,
   playState: UniversePlayState,
   context: ActionResolutionContext,
+  viewZ?: number,
 ) => {
   const explored = new Set(playState.discoveredLocationIds);
   const visibleLocationIds = new Set<string>(explored);
@@ -165,8 +144,8 @@ export const getVisibleTravelGraph = (
     }
   }
 
-  const currentZ = locationZ(bundle.locations.find((location) => location.id === playState.currentLocationId) ?? { position: { x: 0, y: 0 } });
-  const locations = bundle.locations.filter((location) => visibleLocationIds.has(location.id) && locationZ(location) === currentZ);
+  const targetZ = viewZ ?? locationZ(bundle.locations.find((location) => location.id === playState.currentLocationId) ?? { position: { x: 0, y: 0 } });
+  const locations = bundle.locations.filter((location) => visibleLocationIds.has(location.id) && locationZ(location) === targetZ);
   const visibleOnLayer = new Set(locations.map((location) => location.id));
 
   return {

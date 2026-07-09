@@ -74,6 +74,24 @@ describe('dslLanguage tokenizer', () => {
     expect(tokens.some((token) => token.style === 'string' && token.text === '{!coins-taken: You see coins.}')).toBe(true);
   });
 
+  it('tags every comma-separated key on one line, not just the first', () => {
+    const state = dslStartState();
+    const tokens = tokenizeLine('x: 3, y: 0, z: -1', state);
+    expect(tokens.filter((token) => token.style === 'propertyName').map((token) => token.text)).toEqual(['x:', 'y:', 'z:']);
+  });
+
+  it('tags `game_version:` despite the underscore', () => {
+    const state = dslStartState();
+    const tokens = tokenizeLine('game_version: 1.0', state);
+    expect(tokens[0]).toEqual({ style: 'propertyName', text: 'game_version:' });
+  });
+
+  it('does not re-tag a colon inside a `say:` value even after a literal comma in that prose', () => {
+    const state = dslStartState();
+    const tokens = tokenizeLine('say: It reads: remember, then: go.', state);
+    expect(tokens.filter((token) => token.style === 'propertyName').map((token) => token.text)).toEqual(['say:']);
+  });
+
   it('suppresses key/header detection inside a `# advanced` JSON block until the next header', () => {
     const state = dslStartState();
     expect(tokenizeLine('# advanced', state)).toEqual([{ style: 'heading', text: '# advanced' }]);

@@ -63,8 +63,8 @@ const foundationStub: ContentModule = {
   },
 };
 
-// The wall targets tutorial-beach, which in the real game lives in a
-// different module (tutorial-island-survival) — stub it so reference
+// The adjacent: edge targets tutorial-beach, which in the real game lives in
+// a different module (tutorial-island-survival) — stub it so reference
 // validation has something to resolve against.
 const beachStub: ContentModule = {
   id: 'tutorial-island-beach-stub',
@@ -116,7 +116,7 @@ describe('content DSL — guide-house proof', () => {
     expect(resolution.enabledModuleIds).toContain('tutorial-island-guide-house');
   });
 
-  it('places the location with the right metadata and nested entities (multi-line, bare-word tags, no `tags:` label)', () => {
+  it('places the location with the right metadata and nested entities (multi-line, labeled tags:)', () => {
     const location = (module.data as { locations: LocationNode[] }).locations[0];
     expect(location.id).toBe('tutorial-guide-house');
     expect(location.position).toEqual({ x: 0, y: 0 });
@@ -125,7 +125,7 @@ describe('content DSL — guide-house proof', () => {
     expect(new Set(location.entities)).toEqual(new Set(['miki', 'front-door', 'mirror', 'drawer', 'bookshelf']));
   });
 
-  it('compiles `wall -> ... while ...` into a pack-scoped, visibleWhen-gated travel action', () => {
+  it('compiles `adjacent: ... while ...` into a pack-scoped, visibleWhen-gated travel action', () => {
     const wall = (module.data as { actions: GameAction[] }).actions[0];
     expect(wall.role).toBe('travel');
     expect(wall.results).toEqual([{ kind: 'relocate', locationId: 'tutorial-beach' }]);
@@ -255,7 +255,7 @@ describe('content DSL — guide-house proof', () => {
   });
 });
 
-describe('content DSL — location/entity title, description, exhausted text', () => {
+describe('content DSL — location/entity title, examine, exhausted text', () => {
   const source = `# info
 id: title-proof
 version: 1.0.0
@@ -267,7 +267,7 @@ pack: title-proof
 # location fancy-place
 x: 0, y: 0
 title: The Fancy Place
-description: A place with real flavor text.
+examine: A place with real flavor text.
 exhausted: The fancy place settles down.
 starting
 
@@ -280,13 +280,13 @@ examine: Something special.
 `;
   const { module } = compileDsl(source);
 
-  it('uses explicit location title/description/exhausted text when given', () => {
+  it('uses explicit location title/examine/exhausted text when given', () => {
     expect(module.locale?.en['location.fancy-place.title']).toBe('The Fancy Place');
-    expect(module.locale?.en['location.fancy-place.description']).toBe('A place with real flavor text.');
+    expect(module.locale?.en['location.fancy-place.examine']).toBe('A place with real flavor text.');
     expect(module.locale?.en['location.fancy-place.exhausted']).toBe('The fancy place settles down.');
   });
 
-  it('falls back to a humanized title, generic description, and generic exhausted text otherwise', () => {
+  it('falls back to a humanized title, generic examine text, and generic exhausted text otherwise', () => {
     const source2 = `# info
 id: title-proof-2
 version: 1.0.0
@@ -301,13 +301,89 @@ starting
 `;
     const { module: module2 } = compileDsl(source2);
     expect(module2.locale?.en['location.plain-place.title']).toBe('Plain place');
-    expect(module2.locale?.en['location.plain-place.description']).toBe('Plain place.');
+    expect(module2.locale?.en['location.plain-place.examine']).toBe('Plain place.');
     expect(module2.locale?.en['location.plain-place.exhausted']).toBe('It is quiet now.');
   });
 
   it('uses an explicit entity title when given, and a humanized fallback otherwise', () => {
     expect(module.locale?.en['entity.plain-thing.title']).toBe('Plain thing');
     expect(module.locale?.en['entity.named-thing.title']).toBe('A Very Named Thing');
+  });
+});
+
+describe('content DSL — location tags:', () => {
+  it('parses a labeled tags: field into location.tags', () => {
+    const source = `# info
+id: tags-proof
+version: 1.0.0
+universe: base
+author: test
+game_version: 1.0
+pack: tags-proof
+
+# location tagged-place
+x: 0, y: 0
+tags: tutorial indoors
+starting
+`;
+    const { module } = compileDsl(source);
+    const location = (module.data as { locations: { tags?: string[] }[] }).locations[0];
+    expect(location.tags).toEqual(['tutorial', 'indoors']);
+  });
+
+  it('rejects an unrecognized bare word instead of silently treating it as a tag', () => {
+    const source = `# info
+id: bad-tags-proof
+version: 1.0.0
+universe: base
+author: test
+game_version: 1.0
+pack: bad-tags-proof
+
+# location bad-place
+x: 0, y: 0
+tutorial indoors
+starting
+`;
+    expect(() => compileDsl(source)).toThrow(/tags:/);
+  });
+});
+
+describe('content DSL — adjacent: location grammar', () => {
+  it('compiles a bare (unconditional) entry and a gated entry, both as travel actions', () => {
+    const source = `# info
+id: adjacent-proof
+version: 1.0.0
+universe: base
+author: test
+game_version: 1.0
+pack: adjacent-proof
+
+# location start-room
+x: 0, y: 0
+starting
+adjacent:
+  open-room
+  locked-room while start-room-key-taken
+
+# location open-room
+x: 1, y: 0
+
+# location locked-room
+x: 0, y: 1
+`;
+    const { module } = compileDsl(source);
+    const actions = (module.data as { actions: GameAction[] }).actions;
+    const toOpenRoom = actions.find((action) => action.results?.[0].kind === 'relocate' && (action.results[0] as { locationId: string }).locationId === 'open-room')!;
+    const toLockedRoom = actions.find((action) => action.results?.[0].kind === 'relocate' && (action.results[0] as { locationId: string }).locationId === 'locked-room')!;
+    expect(toOpenRoom.role).toBe('travel');
+    expect(toOpenRoom.visibleWhen).toBeUndefined();
+    expect(toLockedRoom.visibleWhen).toEqual({
+      kind: 'state-variable',
+      variable: 'flag:adjacent-proof.start-room-key-taken',
+      comparison: 'equal',
+      value: true,
+    });
   });
 });
 
@@ -457,14 +533,14 @@ pack: stat-proof
 # stat attack
 base: 6
 title: Attack
-description: Power applied to outgoing attacks.
+examine: Power applied to outgoing attacks.
 
 # stat movement-speed
 base: 60
 
 # skill attack
 title: Attack
-description: Accuracy, timing, and pressure in direct conflict.
+examine: Accuracy, timing, and pressure in direct conflict.
 
 # skill regeneration
 stat: attack
@@ -492,7 +568,7 @@ some-flag: true
       { id: 'some-flag', initialValue: true },
     ]);
     expect(locale['stat.attack.title']).toBe('Attack');
-    expect(locale['stat.attack.description']).toBe('Power applied to outgoing attacks.');
+    expect(locale['stat.attack.examine']).toBe('Power applied to outgoing attacks.');
     expect(locale['stat.movement-speed.title']).toBe('Movement speed');
     expect(locale['skill.regeneration.title']).toBe('Regeneration');
   });
