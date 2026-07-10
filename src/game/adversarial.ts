@@ -13,6 +13,7 @@ import {
 import { getEnemyStat } from './enemies';
 import { getCharacterStatTotals, getCharacterStatValue, getSkillTotals } from './characterStats';
 import { applyCombatTags, getEnemyCombatTags, getPlayerCombatTags } from './combatTags';
+import { getPureTravelDestination, getTravelActionDurationSeconds } from './travel';
 export { getSkillTotals } from './characterStats';
 
 const DEFAULT_RATE = 1;
@@ -82,6 +83,16 @@ export const getActionDurationMs = (
   if (getEnemy(action, context)) {
     const actionsPerMinute = getCharacterStatValue(state, context.stats ?? [], ACTION_RATE_STAT_ID, context.skills, context.items ?? [], context.manifest?.experienceCurve, context.statModifiers) || DEFAULT_ACTIONS_PER_MINUTE;
     return 60_000 / Math.max(EPSILON, actionsPerMinute);
+  }
+  if (getPureTravelDestination(action)) {
+    // A travel action clicked directly (not via the map/pathfinding) used
+    // to always resolve instantly regardless of distance — durationSeconds
+    // was never set on it and getTravelActionDurationSeconds only fed the
+    // "(Ns)" label text. Reusing that same grid-distance/movement-speed
+    // calculation here for real makes a direct click take exactly as long
+    // as the number it displays, matching what map/pathfinding travel
+    // already does.
+    return (getTravelActionDurationSeconds(action, state, context) ?? 0) * 1000;
   }
 
   const { sourceSkill } = getActionStats(action, context);

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { getActionDps, getEnemyAttackDps, isInstantAction, sampleAdversarialDamage, sampleEnemyAttackDamage } from './adversarial';
+import { getActionDps, getActionDurationMs, getEnemyAttackDps, isInstantAction, sampleAdversarialDamage, sampleEnemyAttackDamage } from './adversarial';
+import { getTravelActionDurationSeconds } from './travel';
 import { calculateMaxCombatDamage, resolveManifestCombatBalance } from './combatBalance';
 import { getCharacterStatValue } from './characterStats';
 import { getEnemyStat, normalizeEnemyDefinition } from './enemies';
@@ -265,6 +266,65 @@ describe('isInstantAction', () => {
     const cook = { id: 'cook', durationSeconds: 2, rewards: [] };
     const cookedState = { ...state, actionCompletions: { cook: 5 } };
     expect(isInstantAction(cookedState, cook)).toBe(false);
+  });
+});
+
+describe('getActionDurationMs for travel actions', () => {
+  it('matches getTravelActionDurationSeconds instead of a click always resolving instantly', () => {
+    const goMiddle: GameAction = {
+      id: 'go-middle',
+      locationId: 'start',
+      role: 'travel',
+      rewards: [],
+      results: [{ kind: 'relocate', locationId: 'middle' }],
+    };
+    const travelContext: ActionResolutionContext = {
+      manifest: { schemaVersion: 1, id: 'test', version: '1', author: 'test', locales: ['en'], files: [] },
+      actions: [goMiddle],
+      skills: [],
+      stats: [],
+      locations: [
+        { id: 'start', position: { x: 0, y: 0 }, starting: true },
+        { id: 'middle', position: { x: 3, y: 4 } },
+      ],
+      entities: [],
+      items: [],
+      interactionTypes: [],
+      enemies: [],
+    };
+    const state = createInitialPlayState('test', 'start');
+    const expectedSeconds = getTravelActionDurationSeconds(goMiddle, state, travelContext) ?? 0;
+
+    expect(expectedSeconds).toBeGreaterThan(0);
+    expect(getActionDurationMs(state, goMiddle, travelContext)).toBeCloseTo(expectedSeconds * 1000, 5);
+  });
+
+  it('ignores an authored durationSeconds on a travel action (the validator flags this as unused)', () => {
+    const goMiddle: GameAction = {
+      id: 'go-middle',
+      locationId: 'start',
+      role: 'travel',
+      durationSeconds: 999,
+      rewards: [],
+      results: [{ kind: 'relocate', locationId: 'middle' }],
+    };
+    const travelContext: ActionResolutionContext = {
+      manifest: { schemaVersion: 1, id: 'test', version: '1', author: 'test', locales: ['en'], files: [] },
+      actions: [goMiddle],
+      skills: [],
+      stats: [],
+      locations: [
+        { id: 'start', position: { x: 0, y: 0 }, starting: true },
+        { id: 'middle', position: { x: 1, y: 0 } },
+      ],
+      entities: [],
+      items: [],
+      interactionTypes: [],
+      enemies: [],
+    };
+    const state = createInitialPlayState('test', 'start');
+
+    expect(getActionDurationMs(state, goMiddle, travelContext)).not.toBeCloseTo(999_000, 0);
   });
 });
 
