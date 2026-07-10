@@ -10,7 +10,7 @@
 // "what can the player do" derivation) and this harness together.
 import { ACTION_PREFIX, DIALOGUE_PREFIX, RECIPE_SEPARATOR, visibleChoices, currentDialogueNode } from './choices';
 import { skillLevelFromXp } from './skills';
-import { createInitialPlayState } from './timers';
+import { createInitialPlayState, engineNow } from './timers';
 import type { ApplyDslEditResult } from './contentDsl/applyModuleEdit';
 import type { Translator } from './i18n';
 import type {
@@ -410,8 +410,15 @@ export const createTestHarness = (deps: TestHarnessDeps) => {
   };
 
   const time = {
-    skip: (seconds: number): { ok: true; report: IdleReport } => {
-      const report = deps.resolveIdle(deps.getActionContext(), { debugEnabled: true, showReport: true }, Date.now() + seconds * 1000);
+    // Advances the *simulated* clock by `seconds`, never the real one — the
+    // target is computed from the engine's own last-known tick (engineNow),
+    // not a fresh Date.now() read, so repeated skips compose exactly and a
+    // subsequent real interaction (choices.click) builds on top of the
+    // fast-forwarded state instead of racing it with real wall-clock time.
+    skip: (seconds: number): Result<{ report: IdleReport }> => {
+      const play = requirePlayState();
+      if (!play) return { ok: false, error: 'no-play-state' };
+      const report = deps.resolveIdle(deps.getActionContext(), { debugEnabled: true, showReport: true }, engineNow(play) + seconds * 1000);
       return { ok: true, report };
     },
     now: () => Date.now(),

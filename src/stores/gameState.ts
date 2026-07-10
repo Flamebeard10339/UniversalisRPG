@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import type { ActionResolutionContext, ContentBundle, EquipmentSlot, GameAction, IdleReport, RunLogEntry, UniversePlayState } from '../game/types';
 import type { AvailableTravelEdge } from '../game/travel';
-import { appendChatMessage, appendRunLog, applyItemDelta, cancelDialogue, chooseDialogueOption, closeModal, createInitialPlayState, depositToBank, dropInventoryItem, eatItem, equipItem, normalizePlayState, openModal, pickUpGroundItem, resetInactiveEffectResources, resolveIdleTimers, setCharacterName, startAction, startTravel, unequipSlot, withdrawFromBank } from '../game/timers';
+import { appendChatMessage, appendRunLog, applyItemDelta, cancelDialogue, chooseDialogueOption, closeModal, createInitialPlayState, depositToBank, dropInventoryItem, eatItem, engineNow, equipItem, normalizePlayState, openModal, pickUpGroundItem, resetInactiveEffectResources, resolveIdleTimers, setCharacterName, startAction, startTravel, unequipSlot, withdrawFromBank } from '../game/timers';
 import { load, remove, save } from '../lib/storage';
 import { recordAgentSessionMessage, type AgentSessionMessage } from '../game/agentSession';
 import { hasModuleCleanupChanges, sanitizePlayStateForBundle, type ModuleCleanupReport } from '../game/moduleCleanup';
@@ -137,7 +137,7 @@ export const useGameState = create<GameStateStore>((set, get) => ({
       const next = {
         ...current,
         activeTravel: null,
-        lastTickAt: Date.now(),
+        lastTickAt: engineNow(current),
       };
       void save(storageKey(universeId), next);
 
@@ -158,7 +158,7 @@ export const useGameState = create<GameStateStore>((set, get) => ({
         return state;
       }
 
-      const now = Date.now();
+      const now = engineNow(current);
       const resolved = closeModal(cancelDialogue(resolveIdleTimers(current, context, {}, now).state, now), now);
       const next = startAction(resolved, action, context, now, { recipeId });
       void save(storageKey(universeId), next);
@@ -176,7 +176,7 @@ export const useGameState = create<GameStateStore>((set, get) => ({
     set((state) => {
       const current = state.states[universeId];
       if (!current?.activeDialogue) return state;
-      const next = chooseDialogueOption(current, context, optionId);
+      const next = chooseDialogueOption(current, context, optionId, engineNow(current));
       void save(storageKey(universeId), next);
       return { states: { ...state.states, [universeId]: next } };
     });
@@ -186,7 +186,7 @@ export const useGameState = create<GameStateStore>((set, get) => ({
     set((state) => {
       const current = state.states[universeId];
       if (!current?.activeDialogue) return state;
-      const next = cancelDialogue(current);
+      const next = cancelDialogue(current, engineNow(current));
       void save(storageKey(universeId), next);
       return { states: { ...state.states, [universeId]: next } };
     });
@@ -200,7 +200,7 @@ export const useGameState = create<GameStateStore>((set, get) => ({
         return state;
       }
 
-      const now = Date.now();
+      const now = engineNow(current);
       const resolved = resolveIdleTimers(current, context, {}, now).state;
       if (!resolved.activeAction) {
         void save(storageKey(universeId), resolved);
@@ -243,7 +243,7 @@ export const useGameState = create<GameStateStore>((set, get) => ({
         return state;
       }
 
-      const resolved = resolveIdleTimers(current, context, options, now);
+      const resolved = resolveIdleTimers(current, context, options, now ?? engineNow(current));
       report = resolved.report;
       const next = resolved.state;
       void save(storageKey(universeId), next);
@@ -270,7 +270,7 @@ export const useGameState = create<GameStateStore>((set, get) => ({
       const next = {
         ...current,
         actionLoopingEnabled: enabled,
-        lastTickAt: Date.now(),
+        lastTickAt: engineNow(current),
       };
       void save(storageKey(universeId), next);
 
@@ -288,7 +288,7 @@ export const useGameState = create<GameStateStore>((set, get) => ({
       const current = state.states[universeId];
       const item = context.items?.find((candidate) => candidate.id === itemId);
       if (!current || !item) return state;
-      const next = equipItem(current, item, slot, context);
+      const next = equipItem(current, item, slot, context, engineNow(current));
       void save(storageKey(universeId), next);
       return { states: { ...state.states, [universeId]: next } };
     });
@@ -298,7 +298,7 @@ export const useGameState = create<GameStateStore>((set, get) => ({
     set((state) => {
       const current = state.states[universeId];
       if (!current?.equipment?.[slot]) return state;
-      const next = unequipSlot(current, slot, context);
+      const next = unequipSlot(current, slot, context, engineNow(current));
       void save(storageKey(universeId), next);
       return { states: { ...state.states, [universeId]: next } };
     });
@@ -309,7 +309,7 @@ export const useGameState = create<GameStateStore>((set, get) => ({
       const current = state.states[universeId];
       const item = context.items?.find((candidate) => candidate.id === itemId);
       if (!current || !item) return state;
-      const next = eatItem(current, item);
+      const next = eatItem(current, item, engineNow(current));
       void save(storageKey(universeId), next);
       return { states: { ...state.states, [universeId]: next } };
     });
@@ -319,7 +319,7 @@ export const useGameState = create<GameStateStore>((set, get) => ({
     set((state) => {
       const current = state.states[universeId];
       if (!current) return state;
-      const next = dropInventoryItem(current, context, itemId);
+      const next = dropInventoryItem(current, context, itemId, engineNow(current));
       void save(storageKey(universeId), next);
       return { states: { ...state.states, [universeId]: next } };
     });
@@ -329,7 +329,7 @@ export const useGameState = create<GameStateStore>((set, get) => ({
     set((state) => {
       const current = state.states[universeId];
       if (!current) return state;
-      const next = pickUpGroundItem(current, context, groundItemId);
+      const next = pickUpGroundItem(current, context, groundItemId, engineNow(current));
       void save(storageKey(universeId), next);
       return { states: { ...state.states, [universeId]: next } };
     });
@@ -359,7 +359,7 @@ export const useGameState = create<GameStateStore>((set, get) => ({
     set((state) => {
       const current = state.states[universeId];
       if (!current) return state;
-      const next = setCharacterName(current, name);
+      const next = setCharacterName(current, name, engineNow(current));
       void save(storageKey(universeId), next);
       return { states: { ...state.states, [universeId]: next } };
     });
@@ -369,7 +369,7 @@ export const useGameState = create<GameStateStore>((set, get) => ({
     set((state) => {
       const current = state.states[universeId];
       if (!current) return state;
-      const next = openModal(current, modalId);
+      const next = openModal(current, modalId, engineNow(current));
       void save(storageKey(universeId), next);
       return { states: { ...state.states, [universeId]: next } };
     });
@@ -379,7 +379,7 @@ export const useGameState = create<GameStateStore>((set, get) => ({
     set((state) => {
       const current = state.states[universeId];
       if (!current?.openModalId) return state;
-      const next = closeModal(current);
+      const next = closeModal(current, engineNow(current));
       void save(storageKey(universeId), next);
       return { states: { ...state.states, [universeId]: next } };
     });
@@ -395,7 +395,7 @@ export const useGameState = create<GameStateStore>((set, get) => ({
 
       const next = {
         ...current,
-        lastTickAt: Date.now(),
+        lastTickAt: engineNow(current),
       };
       void save(storageKey(universeId), next);
 
@@ -420,7 +420,7 @@ export const useGameState = create<GameStateStore>((set, get) => ({
       const next = appendChatMessage(current, {
         author: 'player',
         text: trimmed,
-      });
+      }, engineNow(current));
       void save(storageKey(universeId), next);
 
       return {
@@ -436,7 +436,7 @@ export const useGameState = create<GameStateStore>((set, get) => ({
     set((state) => {
       const current = state.states[universeId];
       if (!current) return state;
-      const next = appendChatMessage(current, { author: 'system', key, params });
+      const next = appendChatMessage(current, { author: 'system', key, params }, engineNow(current));
       void save(storageKey(universeId), next);
       return { states: { ...state.states, [universeId]: next } };
     });
@@ -446,7 +446,7 @@ export const useGameState = create<GameStateStore>((set, get) => ({
     set((state) => {
       const current = state.states[universeId];
       if (!current) return state;
-      const next = appendChatMessage(current, { author, text });
+      const next = appendChatMessage(current, { author, text }, engineNow(current));
       void save(storageKey(universeId), next);
       return { states: { ...state.states, [universeId]: next } };
     });
@@ -456,7 +456,7 @@ export const useGameState = create<GameStateStore>((set, get) => ({
     set((state) => {
       const current = state.states[universeId];
       if (!current) return state;
-      const next = appendRunLog(current, actor, event, data);
+      const next = appendRunLog(current, actor, event, data, engineNow(current));
       void save(storageKey(universeId), next);
       return { states: { ...state.states, [universeId]: next } };
     });
@@ -547,7 +547,7 @@ export const useGameState = create<GameStateStore>((set, get) => ({
         ...current,
         flags: { ...current.flags, [flagId]: value },
         flagExpirations,
-        lastTickAt: Date.now(),
+        lastTickAt: engineNow(current),
       };
       void save(storageKey(universeId), next);
       return { states: { ...state.states, [universeId]: next } };
@@ -565,7 +565,7 @@ export const useGameState = create<GameStateStore>((set, get) => ({
           ...universe.resourcePools,
           [resourceId]: { ...pool, current: Math.max(pool.min, Math.min(pool.max, current)) },
         },
-        lastTickAt: Date.now(),
+        lastTickAt: engineNow(universe),
       };
       void save(storageKey(universeId), next);
       return { states: { ...state.states, [universeId]: next } };
@@ -579,7 +579,7 @@ export const useGameState = create<GameStateStore>((set, get) => ({
       const next = {
         ...current,
         skillXp: { ...current.skillXp, [skillId]: Math.max(0, xp) },
-        lastTickAt: Date.now(),
+        lastTickAt: engineNow(current),
       };
       void save(storageKey(universeId), next);
       return { states: { ...state.states, [universeId]: next } };
@@ -593,7 +593,7 @@ export const useGameState = create<GameStateStore>((set, get) => ({
       const next = {
         ...current,
         inventory: { ...current.inventory, [itemId]: Math.max(0, amount) },
-        lastTickAt: Date.now(),
+        lastTickAt: engineNow(current),
       };
       void save(storageKey(universeId), next);
       return { states: { ...state.states, [universeId]: next } };
@@ -604,7 +604,7 @@ export const useGameState = create<GameStateStore>((set, get) => ({
     set((state) => {
       const current = state.states[universeId];
       if (!current) return state;
-      const next = { ...applyItemDelta(current, context, itemId, amount), lastTickAt: Date.now() };
+      const next = { ...applyItemDelta(current, context, itemId, amount), lastTickAt: engineNow(current) };
       void save(storageKey(universeId), next);
       return { states: { ...state.states, [universeId]: next } };
     });
@@ -617,7 +617,7 @@ export const useGameState = create<GameStateStore>((set, get) => ({
       const next = {
         ...current,
         bank: { ...current.bank, [itemId]: Math.max(0, amount) },
-        lastTickAt: Date.now(),
+        lastTickAt: engineNow(current),
       };
       void save(storageKey(universeId), next);
       return { states: { ...state.states, [universeId]: next } };

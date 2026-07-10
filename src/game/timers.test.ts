@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { ActionResolutionContext, GameAction } from './types';
-import { appendChatMessage, appendRunLog, applyStateReset, chooseDialogueOption, createInitialPlayState, dropInventoryItem, pickUpGroundItem, resolveIdleTimers, startAction } from './timers';
+import { appendChatMessage, appendRunLog, applyStateReset, chooseDialogueOption, createInitialPlayState, dropInventoryItem, engineNow, pickUpGroundItem, resolveIdleTimers, startAction } from './timers';
 
 describe('appendChatMessage', () => {
   it('uses monotonic ids for messages emitted at the same timestamp', () => {
@@ -395,6 +395,49 @@ describe('pauseTimersWhileIdle (timeFlowsContinuously)', () => {
 
     expect(resolved.state.activeBuffs).toEqual({});
     expect(resolved.state.groundItems).toHaveLength(0);
+  });
+});
+
+describe('engineNow', () => {
+  it('uses the live clock when the state has not been simulated ahead of it', () => {
+    expect(engineNow({ lastTickAt: 1_000 }, 5_000)).toBe(5_000);
+  });
+
+  it('never returns earlier than the state\'s own last-known tick, even if the live clock reads earlier', () => {
+    // This is the scenario a test-only fast-forward (time.skip) creates: the
+    // simulated clock is pushed ahead of real time, and a subsequent event
+    // must build on top of that simulated future rather than reverting
+    // behind it back to a real-but-chronologically-earlier wall-clock read.
+    expect(engineNow({ lastTickAt: 50_000 }, 5_000)).toBe(50_000);
+  });
+
+  it('keeps a ground item\'s remaining time monotonic across a fast-forward followed by a real action', () => {
+    const start = Date.now();
+    const state = {
+      ...createInitialPlayState('test', 'road'),
+      groundItems: [{ id: 'ground-1', itemId: 'lockpick', amount: 1, locationId: 'road', expiresAt: start + 300_000 }],
+      lastTickAt: start,
+    };
+
+    const context: ActionResolutionContext = {
+      actions: [], skills: [], stats: [], locations: [], items: [], flags: [], resourceDefinitions: [], effects: [], interactionTypes: [], enemies: [],
+      manifest: { ui: { timeFlowsContinuously: false } } as ActionResolutionContext['manifest'],
+    };
+
+    // Simulate 90s forward via the same synthetic-clock arithmetic time.skip
+    // uses (engineNow(state) + delta), not a real Date.now() read.
+    const afterIdle = resolveIdleTimers(state, context, {}, engineNow(state) + 90_000).state;
+    const remainingAfterIdle = afterIdle.groundItems[0].expiresAt - engineNow(afterIdle);
+    expect(remainingAfterIdle).toBe(300_000);
+
+    // A real interaction immediately afterward (a genuine Date.now() read
+    // that is, in this test, necessarily far behind the just-simulated
+    // future) must not undercut lastTickAt — the remaining time must not
+    // *increase* relative to what it was right after the idle skip.
+    const realNow = engineNow(afterIdle, Date.now());
+    expect(realNow).toBeGreaterThanOrEqual(afterIdle.lastTickAt ?? 0);
+    const remainingAfterRealEvent = afterIdle.groundItems[0].expiresAt - realNow;
+    expect(remainingAfterRealEvent).toBeLessThanOrEqual(remainingAfterIdle);
   });
 });
 

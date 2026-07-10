@@ -1,4 +1,4 @@
-import type { UniverseManifest, UniverseUiSettings } from './types';
+import type { UniverseManifest, UniversePlayState, UniverseUiSettings } from './types';
 
 export const DEFAULT_FLOATING_TEXT_DURATION_SECONDS = 2;
 export const DEFAULT_LOOP_ACTIONS_BY_DEFAULT = true;
@@ -52,3 +52,19 @@ export const resolveUniverseUiSettings = (
 export const resolveManifestUiSettings = (
   manifest?: Pick<UniverseManifest, 'ui'>,
 ) => resolveUniverseUiSettings(manifest?.ui);
+
+// resolveIdleTimers (and its pauseTimersWhileIdle) only ever run when
+// something schedules them — an activeAction/activeTravel/resource
+// boundary — so merely re-rendering (switching tabs, anything else that
+// doesn't touch playState) never calls it. A countdown display that reads
+// `expiresAt - Date.now()` directly would keep visibly ticking down purely
+// from re-rendering, even though the underlying state is correctly frozen
+// — the display needs its own "what time is it, for pause purposes" that
+// matches: while paused (timeFlowsContinuously off and no activeAction),
+// freeze at the state's own lastTickAt instead of the live clock, so the
+// number only moves again once something real actually updates playState.
+export const effectiveCountdownNow = (
+  playState: Pick<UniversePlayState, 'activeAction' | 'lastTickAt'>,
+  settings: Pick<Required<UniverseUiSettings>, 'timeFlowsContinuously'>,
+  liveNow: number,
+): number => (!settings.timeFlowsContinuously && !playState.activeAction ? (playState.lastTickAt ?? liveNow) : liveNow);

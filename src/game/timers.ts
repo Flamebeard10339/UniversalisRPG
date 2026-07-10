@@ -59,6 +59,20 @@ type GameExperienceEvent = {
   sourceStat?: string;
 };
 
+// The single reconciliation clamp every player-triggered mutation must use
+// instead of a raw Date.now() read: a new event's timestamp is never
+// earlier than the state's own last-known tick, even if the real wall
+// clock momentarily reads earlier. The only way that happens in practice is
+// the test harness fast-forwarding the simulated clock (time.skip) ahead of
+// real time — a subsequent real interaction must build on top of that
+// simulated future, not silently revert behind it back to raw wall-clock
+// time. In normal (non-test) play state.lastTickAt is always <= Date.now(),
+// so this is a no-op and just returns the live clock.
+export const engineNow = (
+  state: Pick<UniversePlayState, 'lastTickAt'>,
+  liveNow = Date.now(),
+): number => Math.max(state.lastTickAt ?? liveNow, liveNow);
+
 export const appendRunLog = (
   state: UniversePlayState,
   actor: RunLogEntry['actor'],

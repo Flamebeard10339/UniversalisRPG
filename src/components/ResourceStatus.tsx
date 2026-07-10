@@ -4,7 +4,7 @@ import type { ContentBundle, ResourceDefinition, ResourcePool, UniversePlayState
 import type { Translator } from '../game/i18n';
 import { formatItemTag } from '../game/equipment';
 import { getEffectRatePerMinute, isEffectApplicable, projectResourcePool } from '../game/resources';
-import { resolveManifestUiSettings } from '../game/universeSettings';
+import { effectiveCountdownNow, resolveManifestUiSettings } from '../game/universeSettings';
 import { useNow } from '../hooks/useNow';
 
 type ResourceStatusProps = {
@@ -240,7 +240,7 @@ export const ResourceStatus = ({ bundle, includeMinimal = true, owner = 'player'
           ) : (
             <div className="grid gap-2">
               {buffs.map((buff) => {
-                const remainingMs = Math.max(0, buff.expiresAt - now);
+                const remainingMs = Math.max(0, buff.expiresAt - effectiveCountdownNow(playState, uiSettings, now));
                 const percent = Math.min(100, Math.max(0, (remainingMs / Math.max(1, buff.durationSeconds * 1000)) * 100));
 
                 return (

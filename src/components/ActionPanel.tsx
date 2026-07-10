@@ -8,7 +8,7 @@ import { canStartAction, isActionVisible } from '../game/conditions';
 import { isPureTravelAction } from '../game/travel';
 import { getActionDescriptionText, getActionTitleText } from '../game/actionLocalization';
 import { availableRecipesForStation, resolveStationAction } from '../game/recipes';
-import { resolveManifestUiSettings } from '../game/universeSettings';
+import { effectiveCountdownNow, resolveManifestUiSettings } from '../game/universeSettings';
 
 type ActionPanelProps = {
   bundle: ContentBundle;
@@ -205,7 +205,7 @@ export const ActionPanel = ({ bundle, debugEnabled, playState, onPickUpGroundIte
           <h3 className="text-sm font-semibold text-slate-100">{t('groundItems.title')}</h3>
           {groundItems.map((stack) => {
             const remainingSeconds = uiSettings.showGroundItemDuration
-              ? Math.max(0, Math.ceil((stack.expiresAt - groundItemNow) / 1000))
+              ? Math.max(0, Math.ceil((stack.expiresAt - effectiveCountdownNow(playState, uiSettings, groundItemNow)) / 1000))
               : null;
 
             return (
