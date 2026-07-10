@@ -159,7 +159,7 @@ const locationZ = (location: LocationNode) => location.position.z ?? 0;
 
 export const ContributionMapEditor = ({ bundle, onEntitiesChange, onActionsChange, onLocationsChange, onLocalesChange, t }: ContributionMapEditorProps) => {
   const gridSpacingPixels = useMemo(() => getMapGridSpacingPixels({ manifest: bundle.manifest }), [bundle.manifest]);
-  const [snapSize, setSnapSize] = useState(8);
+  const [snapSize, setSnapSize] = useState(220);
   const [selectedLocationId, setSelectedLocationId] = useState<string | null>(null);
   const [selectedActionId, setSelectedActionId] = useState<string | null>(null);
   const [edgeSourceId, setEdgeSourceId] = useState<string | null>(null);
