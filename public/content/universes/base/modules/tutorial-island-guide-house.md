@@ -28,7 +28,7 @@ x: 0, y: 0
 tags: tutorial indoors
 starting
 adjacent:
-  tutorial-beach while !tutorial.miki-cleared
+  tutorial-beach while tutorial.miki-cleared
 
 ## entity miki
 examine: A guide with one eye on the door.

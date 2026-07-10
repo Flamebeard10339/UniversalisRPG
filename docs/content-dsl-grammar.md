@@ -56,7 +56,7 @@ x: 0, y: 0
 tags: tutorial indoors
 starting
 adjacent:
-  tutorial-beach while !miki-cleared
+  tutorial-beach while miki-cleared
 
 ## entity miki
 ...

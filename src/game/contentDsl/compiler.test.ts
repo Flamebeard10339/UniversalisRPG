@@ -156,8 +156,7 @@ describe('content DSL — guide-house proof', () => {
     expect(wall.role).toBe('travel');
     expect(wall.results).toEqual([{ kind: 'relocate', locationId: 'tutorial-beach' }]);
     expect(wall.visibleWhen).toEqual({
-      kind: 'not',
-      condition: { kind: 'state-variable', variable: 'flag:tutorial.miki-cleared', comparison: 'equal', value: true },
+      kind: 'state-variable', variable: 'flag:tutorial.miki-cleared', comparison: 'equal', value: true,
     });
   });
 
