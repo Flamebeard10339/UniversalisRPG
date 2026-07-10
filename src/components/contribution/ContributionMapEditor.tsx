@@ -12,7 +12,7 @@ import ReactFlow, {
   type NodeProps,
 } from 'reactflow';
 import { toKebabInput } from '../../game/contentIds';
-import { getPureTravelDestination, travelEdgeId } from '../../game/travel';
+import { getMapGridSpacingPixels, getPureTravelDestination, toMapGridPosition, toMapPixelPosition, travelEdgeId } from '../../game/travel';
 import type { Translator } from '../../game/i18n';
 import type { ContentBundle, EntityDefinition, GameAction, LocationNode } from '../../game/types';
 import { StructuredDataEditor, type StructuredValue } from '../structuredData/StructuredData';
@@ -44,6 +44,11 @@ const NODE_WIDTH = 176;
 const NODE_HEIGHT = 60;
 
 const snap = (value: number, size: number) => Math.round(value / size) * size;
+// Positions are stored as small (often fractional, after dragging) grid
+// units, not pixels — round after converting a dragged pixel position back
+// to grid units so saved locations don't accumulate floating-point noise
+// (e.g. 0.8000000000000001).
+const roundGridValue = (value: number) => Math.round(value * 1000) / 1000;
 
 const uniqueId = (base: string, existingIds: Set<string>) => {
   let id = base;
@@ -153,8 +158,8 @@ const travelEdgeTypes = {
 const locationZ = (location: LocationNode) => location.position.z ?? 0;
 
 export const ContributionMapEditor = ({ bundle, onEntitiesChange, onActionsChange, onLocationsChange, onLocalesChange, t }: ContributionMapEditorProps) => {
+  const gridSpacingPixels = useMemo(() => getMapGridSpacingPixels({ manifest: bundle.manifest }), [bundle.manifest]);
   const [snapSize, setSnapSize] = useState(8);
-  const [editMode, setEditMode] = useState(false);
   const [selectedLocationId, setSelectedLocationId] = useState<string | null>(null);
   const [selectedActionId, setSelectedActionId] = useState<string | null>(null);
   const [edgeSourceId, setEdgeSourceId] = useState<string | null>(null);
@@ -174,12 +179,12 @@ export const ContributionMapEditor = ({ bundle, onEntitiesChange, onActionsChang
     visibleLocations.map((location) => ({
       id: location.id,
       type: 'simple',
-      position: location.position,
+      position: toMapPixelPosition(location.position, gridSpacingPixels),
       data: {
         label: location.id,
         selected: false,
       },
-      draggable: false,
+      draggable: true,
       style: {
         background: 'transparent',
         border: 'none',
@@ -196,12 +201,12 @@ export const ContributionMapEditor = ({ bundle, onEntitiesChange, onActionsChang
       visibleLocations.map((location) => ({
         id: location.id,
         type: 'simple',
-        position: location.position,
+        position: toMapPixelPosition(location.position, gridSpacingPixels),
         data: {
           label: location.id,
           selected: location.id === selectedLocationId,
         },
-        draggable: editMode,
+        draggable: true,
         style: {
           background: 'transparent',
           border: 'none',
@@ -212,7 +217,7 @@ export const ContributionMapEditor = ({ bundle, onEntitiesChange, onActionsChang
         },
       })),
     );
-  }, [visibleLocations, editMode, selectedLocationId]);
+  }, [gridSpacingPixels, visibleLocations, selectedLocationId]);
 
   const normalizedSnapSize = Math.max(1, Math.round(snapSize) || 1);
   const snapGrid = useMemo<[number, number]>(() => [normalizedSnapSize, normalizedSnapSize], [normalizedSnapSize]);
@@ -233,8 +238,8 @@ export const ContributionMapEditor = ({ bundle, onEntitiesChange, onActionsChang
         return [];
       }
 
-      const sourceCenter = getNodeCenter(sourceLocation.position);
-      const targetCenter = getNodeCenter(targetLocation.position);
+      const sourceCenter = getNodeCenter(toMapPixelPosition(sourceLocation.position, gridSpacingPixels));
+      const targetCenter = getNodeCenter(toMapPixelPosition(targetLocation.position, gridSpacingPixels));
 
       return [{
         id: travelEdgeId(action),
@@ -249,7 +254,7 @@ export const ContributionMapEditor = ({ bundle, onEntitiesChange, onActionsChang
         },
       }];
     });
-  }, [bundle.actions, visibleLocations, selectedActionId]);
+  }, [bundle.actions, gridSpacingPixels, visibleLocations, selectedActionId]);
 
   const updateLocation = (patch: Partial<LocationNode>) => {
     if (!selectedLocation) {
@@ -283,26 +288,30 @@ export const ContributionMapEditor = ({ bundle, onEntitiesChange, onActionsChang
       return;
     }
 
+    // node.position is pixel space (snapped during drag, see onNodeDrag) —
+    // convert back to the small grid units locations are actually stored in.
+    const gridPosition = toMapGridPosition(node.position, gridSpacingPixels);
     onLocationsChange(
       upsertById(bundle.locations, {
         ...location,
         position: {
           ...location.position,
-          x: snap(node.position.x, normalizedSnapSize),
-          y: snap(node.position.y, normalizedSnapSize),
+          x: roundGridValue(gridPosition.x),
+          y: roundGridValue(gridPosition.y),
         },
       }),
     );
   };
 
-  const queueLocationAtPoint = (point: { x: number; y: number }) => {
-    const x = snap(point.x, normalizedSnapSize);
-    const y = snap(point.y, normalizedSnapSize);
+  const queueLocationAtPoint = (pixelPoint: { x: number; y: number }) => {
+    const snappedPixel = { x: snap(pixelPoint.x, normalizedSnapSize), y: snap(pixelPoint.y, normalizedSnapSize) };
+    const gridPosition = toMapGridPosition(snappedPixel, gridSpacingPixels);
+    const point = { x: roundGridValue(gridPosition.x), y: roundGridValue(gridPosition.y) };
     const id = uniqueId(
-      toKebabInput(`location-${Math.round(x)}-${Math.round(y)}`),
+      toKebabInput(`location-${Math.round(point.x)}-${Math.round(point.y)}`),
       new Set(bundle.locations.map((location) => location.id)),
     );
-    setPendingLocation({ id, point: { x, y }, travelFromCurrent: false, travelToCurrent: false });
+    setPendingLocation({ id, point, travelFromCurrent: false, travelToCurrent: false });
     setSelectedLocationId(null);
     setSelectedActionId(null);
     setEdgeSourceId(null);
@@ -343,7 +352,6 @@ export const ContributionMapEditor = ({ bundle, onEntitiesChange, onActionsChang
     onLocalesChange(nextLocalePatch);
     setSelectedLocationId(pendingLocation.id);
     setPendingLocation(null);
-    setEditMode(true);
   };
 
   const cancelPendingLocation = () => {
@@ -360,7 +368,6 @@ export const ContributionMapEditor = ({ bundle, onEntitiesChange, onActionsChang
     onLocalesChange(travelActionLocalePatch(action.id, t));
     setSelectedActionId(action.id);
     setEdgeSourceId(null);
-    setEditMode(true);
   };
 
   const updateSelectedAction = (patch: Partial<GameAction>) => {
@@ -392,13 +399,6 @@ export const ContributionMapEditor = ({ bundle, onEntitiesChange, onActionsChang
           <p className="text-xs text-slate-400">{t('contribution.mapLayout.description')}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <button
-            className={`rounded px-3 py-2 text-sm font-semibold ${editMode ? 'bg-cyan-300 text-slate-950' : 'bg-slate-950 text-slate-200'}`}
-            onClick={() => setEditMode((current) => !current)}
-            type="button"
-          >
-            {editMode ? t('contribution.mapLayout.editModeOn') : t('contribution.mapLayout.editModeOff')}
-          </button>
           <button
             className="rounded border border-slate-600 px-3 py-2 text-sm font-semibold text-slate-100"
             onClick={() => {
@@ -440,34 +440,29 @@ export const ContributionMapEditor = ({ bundle, onEntitiesChange, onActionsChang
         </label>
       </div>
 
-      {editMode && (
-        <div className="rounded border border-cyan-900 bg-cyan-950/20 px-3 py-2 text-xs text-cyan-100">
-          {edgeSourceId
-            ? t('contribution.mapLayout.edgeTargetPrompt', { source: edgeSourceId })
-            : t('contribution.mapLayout.editHint')}
-        </div>
-      )}
+      <div className="rounded border border-cyan-900 bg-cyan-950/20 px-3 py-2 text-xs text-cyan-100">
+        {edgeSourceId
+          ? t('contribution.mapLayout.edgeTargetPrompt', { source: edgeSourceId })
+          : t('contribution.mapLayout.editHint')}
+      </div>
 
       <div className="relative lg:pr-[44%]">
         <div className="contribution-map h-[32rem] overflow-hidden rounded border border-slate-800 bg-slate-950">
           <ReactFlow
             edgeTypes={travelEdgeTypes}
             edges={travelEdges}
-            elementsSelectable={editMode}
+            elementsSelectable
             fitView
             nodeTypes={locationNodeTypes}
             nodes={locationNodes}
             nodesConnectable={false}
-            nodesDraggable={editMode}
+            nodesDraggable
             onEdgeClick={(_, edge) => {
-              if (!editMode) return;
               setSelectedActionId(edge.data?.actionId ?? null);
               setSelectedLocationId(null);
               setEdgeSourceId(null);
             }}
             onNodeClick={(_, node) => {
-              if (!editMode) return;
-
               if (edgeSourceId) {
                 createTravelEdge(edgeSourceId, node.id);
                 return;
@@ -477,7 +472,6 @@ export const ContributionMapEditor = ({ bundle, onEntitiesChange, onActionsChang
               setSelectedActionId(null);
             }}
             onNodeDrag={(_, node) => {
-              if (!editMode) return;
               setSelectedLocationId(node.id);
               setLocationNodes((current) =>
                 current.map((candidate) =>
@@ -494,15 +488,12 @@ export const ContributionMapEditor = ({ bundle, onEntitiesChange, onActionsChang
               );
             }}
             onNodeDragStop={(_, node) => {
-              if (!editMode) return;
               commitNodePosition(node);
             }}
             onNodesChange={(changes: NodeChange[]) => {
-              if (!editMode) return;
               setLocationNodes((current) => applyNodeChanges(changes, current));
             }}
             onPaneClick={(event) => {
-              if (!editMode) return;
               if (edgeSourceId) {
                 setEdgeSourceId(null);
                 return;
@@ -516,9 +507,9 @@ export const ContributionMapEditor = ({ bundle, onEntitiesChange, onActionsChang
             }}
             proOptions={{ hideAttribution: true }}
             snapGrid={snapGrid}
-            snapToGrid={editMode}
-            nodesFocusable={editMode}
-            edgesFocusable={editMode}
+            snapToGrid
+            nodesFocusable
+            edgesFocusable
           >
             <Background color="#334155" gap={24} />
             <Controls showInteractive={false} />
@@ -695,7 +686,7 @@ export const ContributionMapEditor = ({ bundle, onEntitiesChange, onActionsChang
             </div>
           )}
 
-          {editMode && !selectedLocation && !selectedAction && !edgeSourceId && (
+          {!selectedLocation && !selectedAction && !edgeSourceId && (
             <p className="text-xs text-slate-500">{t('contribution.mapLayout.emptySpaceHint')}</p>
           )}
         </aside>

@@ -52,6 +52,29 @@ export const isPureTravelAction = (action: GameAction) => getPureTravelDestinati
 
 const locationZ = (location: Pick<LocationNode, 'position'>) => location.position.z ?? 0;
 
+// Pixels-per-distance-unit at the manifest's default distanceBetweenAdjacentTiles
+// (1) — a pure rendering constant, not something a content author tunes
+// directly. Both the player-facing WorldMap and the contribution
+// ContributionMapEditor derive their pixel spacing from
+// getMapGridSpacingPixels below, so a location's grid position always maps
+// to the same relative layout on both maps, and a universe that widens
+// distanceBetweenAdjacentTiles (making travel between adjacent cells take
+// longer) sees its map grow to match, rather than the two drifting apart.
+const BASE_MAP_PIXELS_PER_DISTANCE_UNIT = 220;
+
+export const getMapGridSpacingPixels = (context: Pick<ActionResolutionContext, 'manifest'>) =>
+  resolveManifestUiSettings(context.manifest).distanceBetweenAdjacentTiles * BASE_MAP_PIXELS_PER_DISTANCE_UNIT;
+
+export const toMapPixelPosition = (position: { x: number; y: number }, gridSpacingPixels: number) => ({
+  x: position.x * gridSpacingPixels,
+  y: position.y * gridSpacingPixels,
+});
+
+export const toMapGridPosition = (pixelPosition: { x: number; y: number }, gridSpacingPixels: number) => ({
+  x: pixelPosition.x / gridSpacingPixels,
+  y: pixelPosition.y / gridSpacingPixels,
+});
+
 const gridDistance = (from: Position, to: Position) => {
   const dx = to.x - from.x;
   const dy = to.y - from.y;

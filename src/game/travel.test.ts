@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createInitialPlayState, resolveDueTimers, startTravel } from './timers';
-import { findTravelPath, getAvailableTravelEdgesForNode, getLocationInDirection, getTravelActionDurationSeconds, getVisibleTravelGraph } from './travel';
+import { findTravelPath, getAvailableTravelEdgesForNode, getLocationInDirection, getMapGridSpacingPixels, getTravelActionDurationSeconds, getVisibleTravelGraph, toMapGridPosition, toMapPixelPosition } from './travel';
 import type { ActionResolutionContext, GameAction, LocationNode, UniverseUiSettings } from './types';
 
 const travelAction = (id: string, source: string, target: string, durationSeconds = 1, patch: Partial<GameAction> = {}): GameAction => ({
@@ -91,6 +91,23 @@ describe('travel actions', () => {
     const state = createInitialPlayState('test', 'start');
 
     expect(getTravelActionDurationSeconds(notTravel, state, context([notTravel]))).toBeNull();
+  });
+
+  it('scales a location\'s small grid position up to comfortable pixel spacing, and back losslessly', () => {
+    const gridSpacingPixels = getMapGridSpacingPixels(context([]));
+    const gridPosition = { x: 2, y: -1 };
+
+    const pixelPosition = toMapPixelPosition(gridPosition, gridSpacingPixels);
+    expect(pixelPosition.x).toBeGreaterThan(gridPosition.x);
+    expect(pixelPosition).toEqual({ x: 2 * gridSpacingPixels, y: -1 * gridSpacingPixels });
+    expect(toMapGridPosition(pixelPosition, gridSpacingPixels)).toEqual(gridPosition);
+  });
+
+  it('widens map pixel spacing when distanceBetweenAdjacentTiles grows, keeping both maps consistent for free', () => {
+    const defaultSpacing = getMapGridSpacingPixels(context([]));
+    const widerSpacing = getMapGridSpacingPixels(context([], { distanceBetweenAdjacentTiles: 2 }));
+
+    expect(widerSpacing).toBe(defaultSpacing * 2);
   });
 
   it('pathfinds through explored nodes only', () => {

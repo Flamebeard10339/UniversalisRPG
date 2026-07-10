@@ -3,7 +3,7 @@ import ReactFlow, { Background, Controls, Handle, Position, type Edge, type Node
 import type { ContentBundle, UniversePlayState } from '../game/types';
 import { locationTitleKey } from '../game/contentIds';
 import { useNow } from '../hooks/useNow';
-import { getVisibleTravelGraph } from '../game/travel';
+import { getMapGridSpacingPixels, getVisibleTravelGraph, toMapPixelPosition } from '../game/travel';
 import { TravelEdge } from './TravelEdge';
 
 const locationZ = (location: { position: { x: number; y: number; z?: number } }) => location.position.z ?? 0;
@@ -43,19 +43,11 @@ const locationNodeTypes = {
 
 const NODE_WIDTH = 160;
 const NODE_HEIGHT = 56;
-// Locations are now a grid of small integer cells (see travel.ts); scale each
-// cell up to a comfortable pixel spacing for the ReactFlow canvas.
-const GRID_CELL_PIXELS = 220;
 
 type Point = {
   x: number;
   y: number;
 };
-
-const toPixelPosition = (position: Point): Point => ({
-  x: position.x * GRID_CELL_PIXELS,
-  y: position.y * GRID_CELL_PIXELS,
-});
 
 const getNodeCenter = (position: Point): Point => ({
   x: position.x + NODE_WIDTH / 2,
@@ -98,6 +90,7 @@ export const WorldMap = ({ bundle, playState, onTravel, t }: WorldMapProps) => {
     dropTables: bundle.dropTables,
     dialogues: bundle.dialogues,
   }), [bundle]);
+  const gridSpacingPixels = useMemo(() => getMapGridSpacingPixels({ manifest: bundle.manifest }), [bundle.manifest]);
   const currentLocation = bundle.locations.find((location) => location.id === playState.currentLocationId);
   const currentZ = locationZ(currentLocation ?? { position: { x: 0, y: 0 } });
   const [zLayer, setZLayer] = useState(currentZ);
@@ -118,15 +111,15 @@ export const WorldMap = ({ bundle, playState, onTravel, t }: WorldMapProps) => {
     [actionContext, bundle, playState, zLayer],
   );
   const mapExtent = useMemo(() => {
-    const xs = visibleGraph.locations.map((location) => toPixelPosition(location.position).x);
-    const ys = visibleGraph.locations.map((location) => toPixelPosition(location.position).y);
+    const xs = visibleGraph.locations.map((location) => toMapPixelPosition(location.position, gridSpacingPixels).x);
+    const ys = visibleGraph.locations.map((location) => toMapPixelPosition(location.position, gridSpacingPixels).y);
     const margin = 420;
 
     return [
       [Math.min(...xs, 0) - margin, Math.min(...ys, 0) - margin],
       [Math.max(...xs, 0) + margin, Math.max(...ys, 0) + margin],
     ] as [[number, number], [number, number]];
-  }, [visibleGraph.locations]);
+  }, [gridSpacingPixels, visibleGraph.locations]);
 
   const nodes = useMemo<Node[]>(
     () =>
@@ -141,7 +134,7 @@ export const WorldMap = ({ bundle, playState, onTravel, t }: WorldMapProps) => {
         return {
           id: location.id,
           type: 'location',
-          position: toPixelPosition(location.position),
+          position: toMapPixelPosition(location.position, gridSpacingPixels),
           data: {
             label: (
               <button
@@ -179,7 +172,7 @@ export const WorldMap = ({ bundle, playState, onTravel, t }: WorldMapProps) => {
           },
         };
       }),
-    [onTravel, playState.activeTravel, playState.currentLocationId, playState.discoveredLocationIds, t, visibleGraph.locations],
+    [gridSpacingPixels, onTravel, playState.activeTravel, playState.currentLocationId, playState.discoveredLocationIds, t, visibleGraph.locations],
   );
 
   const edges = useMemo<Edge[]>(
@@ -187,8 +180,8 @@ export const WorldMap = ({ bundle, playState, onTravel, t }: WorldMapProps) => {
       visibleGraph.edges.map((edge) => {
         const sourceLocation = visibleGraph.locations.find((location) => location.id === edge.source);
         const targetLocation = visibleGraph.locations.find((location) => location.id === edge.target);
-        const sourceCenter = getNodeCenter(toPixelPosition(sourceLocation?.position ?? { x: 0, y: 0 }));
-        const targetCenter = getNodeCenter(toPixelPosition(targetLocation?.position ?? { x: 0, y: 0 }));
+        const sourceCenter = getNodeCenter(toMapPixelPosition(sourceLocation?.position ?? { x: 0, y: 0 }, gridSpacingPixels));
+        const targetCenter = getNodeCenter(toMapPixelPosition(targetLocation?.position ?? { x: 0, y: 0 }, gridSpacingPixels));
         const active = playState.activeTravel?.actionId === edge.action.id;
         const pathIndex = playState.activeTravel?.pathActionIds.indexOf(edge.action.id) ?? -1;
         const inPath = pathIndex >= 0;
@@ -223,7 +216,7 @@ export const WorldMap = ({ bundle, playState, onTravel, t }: WorldMapProps) => {
           },
         };
       }),
-    [now, playState.activeTravel, visibleGraph.edges, visibleGraph.locations],
+    [gridSpacingPixels, now, playState.activeTravel, visibleGraph.edges, visibleGraph.locations],
   );
 
   return (

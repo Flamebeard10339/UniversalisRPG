@@ -98,8 +98,15 @@ per line, indented under the `adjacent:` header. Compiles to an auto-named
 location that should be reachable both ways needs `adjacent:` entries on
 *both* locations (the return trip is not implied). `x:`/`y:`/`z:` positions
 still matter — they're used to compute travel *time* between two connected
-locations (see `distanceBetweenAdjacentTiles` in the universe manifest) and
-to lay the map out visually — they just no longer imply a connection exists.
+locations and to lay out both the player-facing map and the contribution
+map editor visually — they just no longer imply a connection exists.
+Positions are small integer grid cells, scaled up to comfortable pixel
+spacing by `getMapGridSpacingPixels` in `src/game/travel.ts` — the one
+function both maps call, so they can never drift apart, and dragging a
+node in the editor writes back the same small grid units, not raw pixels.
+`distanceBetweenAdjacentTiles` (universe manifest) is the single "how far
+apart are grid cells" knob for both purposes: raising it makes travel
+between adjacent cells take longer *and* widens the map to match.
 
 ### Free travel actions are pathfinding edges
 
