@@ -8,7 +8,7 @@
 // same gameState.ts store actions the GUI buttons call — the GUI and the CLI
 // are two front ends over one game-logic layer, not two separate ones.
 import { ACTION_PREFIX, DIALOGUE_PREFIX, RECIPE_SEPARATOR, currentDialogueNode, visibleChoices } from './choices';
-import { itemTitleKey, locationExamineKey, locationTitleKey, skillTitleKey, statTitleKey } from './contentIds';
+import { entityTitleKey, itemTitleKey, locationExamineKey, locationTitleKey, skillTitleKey, statTitleKey } from './contentIds';
 import { canEatItem, equipmentSlots, formatItemTag, getItemTags, itemSlots } from './equipment';
 import { getCharacterStatTotals } from './characterStats';
 import { skillLevelFromXp } from './skills';
@@ -112,7 +112,22 @@ const listActions = (rt: CliRuntime) => {
     return;
   }
 
-  const lines = choices.map((choice, index) => `${index + 1}. ${choice.title}${choice.requirementsMet ? '' : ` (${t('cli.look.locked', 'requirements not met')})`}`);
+  // Unlike the GUI (where an entity's actions are visually grouped under its
+  // own name), this is a flat numbered list — many entities/items share the
+  // exact same action title (every entity has an "Examine", multiple items
+  // can too), so without qualifying by target, "3. Examine" and "5. Examine"
+  // are indistinguishable to a human or an agent picking a number.
+  const targetLabel = (choice: (typeof choices)[number]) =>
+    choice.entityId
+      ? t(entityTitleKey(choice.entityId), choice.entityId)
+      : choice.itemId
+        ? t(itemTitleKey(choice.itemId), choice.itemId)
+        : null;
+  const lines = choices.map((choice, index) => {
+    const target = targetLabel(choice);
+    const label = target ? `${target}: ${choice.title}` : choice.title;
+    return `${index + 1}. ${label}${choice.requirementsMet ? '' : ` (${t('cli.look.locked', 'requirements not met')})`}`;
+  });
   rt.appendMessage(lines.join('\n'));
 };
 

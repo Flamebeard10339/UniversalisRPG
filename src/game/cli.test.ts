@@ -130,6 +130,16 @@ describe('executeChatInput', () => {
     expect(messages[1].text).toContain('cooked-shrimp');
   });
 
+  it('/look qualifies each numbered action with its entity/item, not just the bare (often duplicate) action title', () => {
+    const { runtime, messages } = buildRuntime(createInitialPlayState('test', 'start'));
+    executeChatInput('/look', runtime);
+    // The GUI can tell two entities' identically-titled "Examine" actions
+    // apart because they're grouped under separate entity headers; a flat
+    // numbered CLI list can't unless each line names its target.
+    // messages[1] is the location description; messages[2] is the action list.
+    expect(messages[2].text).toContain('door:');
+  });
+
   it('/do dispatches the numbered action from the most recent /look', () => {
     // Only 1 item: `travelAction` is a pure travel action (no cost, single
     // relocate result), which the choice list never surfaces as a numbered
