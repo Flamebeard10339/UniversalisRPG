@@ -84,7 +84,9 @@
         "travelPathMaxSeconds": { "type": "number", "exclusiveMinimum": 0 },
         "travelPathMaxNodes": { "type": "integer", "minimum": 1 },
         "connectivityMode": { "enum": ["highly-connected", "sparse"] },
-        "distanceBetweenAdjacentTiles": { "type": "number", "exclusiveMinimum": 0 }
+        "distanceBetweenAdjacentTiles": { "type": "number", "exclusiveMinimum": 0 },
+        "timeFlowsContinuously": { "type": "boolean" },
+        "showGroundItemDuration": { "type": "boolean" }
       }
     },
     "compatibility": {

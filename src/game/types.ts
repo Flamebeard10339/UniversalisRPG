@@ -86,6 +86,11 @@ export type UniverseUiSettings = {
   travelPathMaxSeconds?: number;
   travelPathMaxNodes?: number;
   distanceBetweenAdjacentTiles?: number;
+  // When false, buff/ground-item countdowns only advance while the player
+  // has an activeAction, instead of decaying in real time regardless of
+  // what the player is doing (see pauseTimersWhileIdle in timers.ts).
+  timeFlowsContinuously?: boolean;
+  showGroundItemDuration?: boolean;
 };
 
 export type LocationNode = {

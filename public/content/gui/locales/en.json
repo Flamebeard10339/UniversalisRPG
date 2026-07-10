@@ -195,6 +195,7 @@
   "actionPanel.noRecipesAvailable": "Nothing to use here yet.",
   "groundItems.title": "On the Ground",
   "groundItems.pickUp": "Pick up",
+  "groundItems.remaining": "{seconds}s remaining",
   "action.travel.title": "Travel to {location} ({duration}s)",
   "action.travel.description": "Go to {location}.",
   "actionDetails.empty": "No actions being taken.",

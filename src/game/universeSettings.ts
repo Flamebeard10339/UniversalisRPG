@@ -5,6 +5,8 @@ export const DEFAULT_LOOP_ACTIONS_BY_DEFAULT = true;
 export const DEFAULT_TRAVEL_PATH_MAX_SECONDS = 1000;
 export const DEFAULT_TRAVEL_PATH_MAX_NODES = 100;
 export const DEFAULT_DISTANCE_BETWEEN_ADJACENT_TILES = 1;
+export const DEFAULT_TIME_FLOWS_CONTINUOUSLY = true;
+export const DEFAULT_SHOW_GROUND_ITEM_DURATION = true;
 
 export const resolveUniverseUiSettings = (
   settings?: UniverseUiSettings,
@@ -37,6 +39,14 @@ export const resolveUniverseUiSettings = (
     settings.distanceBetweenAdjacentTiles > 0
       ? settings.distanceBetweenAdjacentTiles
       : DEFAULT_DISTANCE_BETWEEN_ADJACENT_TILES,
+  timeFlowsContinuously:
+    typeof settings?.timeFlowsContinuously === 'boolean'
+      ? settings.timeFlowsContinuously
+      : DEFAULT_TIME_FLOWS_CONTINUOUSLY,
+  showGroundItemDuration:
+    typeof settings?.showGroundItemDuration === 'boolean'
+      ? settings.showGroundItemDuration
+      : DEFAULT_SHOW_GROUND_ITEM_DURATION,
 });
 
 export const resolveManifestUiSettings = (

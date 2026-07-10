@@ -147,9 +147,14 @@ export const ResourceStatus = ({ bundle, includeMinimal = true, owner = 'player'
   });
   const buffs = owner === 'player' ? Object.values(playState.activeBuffs ?? {}) : [];
   const [floatingTexts, setFloatingTexts] = useState<ResourceFloatingText[]>([]);
-  const now = useNow(Boolean(playState.activeAction) || floatingTexts.length > 0 || buffs.length > 0, 100);
+  const uiSettings = resolveManifestUiSettings(bundle.manifest);
+  // When timeFlowsContinuously is off, a buff's remaining time only
+  // advances while the player is doing something (pauseTimersWhileIdle in
+  // timers.ts) — ticking this display every 100ms regardless would show a
+  // countdown running while genuinely idle, contradicting that pause.
+  const now = useNow(Boolean(playState.activeAction) || floatingTexts.length > 0 || (uiSettings.timeFlowsContinuously && buffs.length > 0), 100);
   const seenMessageIds = useRef<Set<string> | null>(null);
-  const floatingDurationMs = resolveManifestUiSettings(bundle.manifest).floatingTextDurationSeconds * 1000;
+  const floatingDurationMs = uiSettings.floatingTextDurationSeconds * 1000;
 
   useEffect(() => {
     if (seenMessageIds.current === null) {

@@ -20,7 +20,8 @@
   },
   "maxInventorySlots": 28,
   "ui": {
-    "distanceBetweenAdjacentTiles": 1
+    "distanceBetweenAdjacentTiles": 1,
+    "timeFlowsContinuously": false
   },
   "files": [
     "locales/en.json"

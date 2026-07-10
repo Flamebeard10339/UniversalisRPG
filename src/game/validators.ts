@@ -155,7 +155,9 @@ export const validateManifest = (value: unknown): value is UniverseManifest =>
       (value.ui.travelPathMaxSeconds === undefined || hasNumber(value.ui, 'travelPathMaxSeconds')) &&
       (value.ui.travelPathMaxNodes === undefined || hasNumber(value.ui, 'travelPathMaxNodes')) &&
       (value.ui.connectivityMode === undefined || value.ui.connectivityMode === 'highly-connected' || value.ui.connectivityMode === 'sparse') &&
-      (value.ui.distanceBetweenAdjacentTiles === undefined || hasNumber(value.ui, 'distanceBetweenAdjacentTiles'))));
+      (value.ui.distanceBetweenAdjacentTiles === undefined || hasNumber(value.ui, 'distanceBetweenAdjacentTiles')) &&
+      (value.ui.timeFlowsContinuously === undefined || typeof value.ui.timeFlowsContinuously === 'boolean') &&
+      (value.ui.showGroundItemDuration === undefined || typeof value.ui.showGroundItemDuration === 'boolean')));
 
 const validateLocationsShape = (locations: unknown): locations is LocationNode[] =>
   Array.isArray(locations) &&

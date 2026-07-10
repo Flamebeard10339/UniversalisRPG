@@ -8,6 +8,7 @@ import { canStartAction, isActionVisible } from '../game/conditions';
 import { isPureTravelAction } from '../game/travel';
 import { getActionDescriptionText, getActionTitleText } from '../game/actionLocalization';
 import { availableRecipesForStation, resolveStationAction } from '../game/recipes';
+import { resolveManifestUiSettings } from '../game/universeSettings';
 
 type ActionPanelProps = {
   bundle: ContentBundle;
@@ -24,6 +25,14 @@ export const ActionPanel = ({ bundle, debugEnabled, playState, onPickUpGroundIte
   const [expandedEntities, setExpandedEntities] = useState<Record<string, boolean>>({});
   const [instantActionPulse, setInstantActionPulse] = useState<Record<string, number>>({});
   const isTravelling = Boolean(playState.activeTravel);
+  const uiSettings = resolveManifestUiSettings(bundle.manifest);
+  // When timeFlowsContinuously is off, a ground item's remaining time only
+  // advances while the player is doing something (pauseTimersWhileIdle in
+  // timers.ts) — a fast/continuous tick here would show a countdown running
+  // while genuinely idle, contradicting that pause. 1s granularity is
+  // plenty for a "245s remaining" label (unlike the 16ms `now` below, which
+  // exists for smooth action-progress bars).
+  const groundItemNow = useNow(Boolean(playState.activeAction) || (uiSettings.timeFlowsContinuously && groundItems.length > 0), 1000);
   const actionContext = {
     manifest: bundle.manifest,
     actions: bundle.actions,
@@ -194,18 +203,29 @@ export const ActionPanel = ({ bundle, debugEnabled, playState, onPickUpGroundIte
       {groundItems.length > 0 && (
         <div className="grid gap-2">
           <h3 className="text-sm font-semibold text-slate-100">{t('groundItems.title')}</h3>
-          {groundItems.map((stack) => (
-            <button
-              className="flex items-center justify-between gap-3 rounded border border-slate-700 bg-slate-950 p-3 text-left transition hover:border-cyan-500"
-              data-ground-item-id={stack.id}
-              key={stack.id}
-              onClick={() => onPickUpGroundItem(stack.id)}
-              type="button"
-            >
-              <span className="text-sm font-semibold text-slate-100">{t(itemTitleKey(stack.itemId), stack.itemId)} ({stack.amount})</span>
-              <span className="text-xs font-semibold text-cyan-200">{t('groundItems.pickUp')}</span>
-            </button>
-          ))}
+          {groundItems.map((stack) => {
+            const remainingSeconds = uiSettings.showGroundItemDuration
+              ? Math.max(0, Math.ceil((stack.expiresAt - groundItemNow) / 1000))
+              : null;
+
+            return (
+              <button
+                className="flex items-center justify-between gap-3 rounded border border-slate-700 bg-slate-950 p-3 text-left transition hover:border-cyan-500"
+                data-ground-item-id={stack.id}
+                key={stack.id}
+                onClick={() => onPickUpGroundItem(stack.id)}
+                type="button"
+              >
+                <span className="grid">
+                  <span className="text-sm font-semibold text-slate-100">{t(itemTitleKey(stack.itemId), stack.itemId)} ({stack.amount})</span>
+                  {remainingSeconds !== null && (
+                    <span className="text-xs text-slate-500">{t('groundItems.remaining', { seconds: remainingSeconds })}</span>
+                  )}
+                </span>
+                <span className="text-xs font-semibold text-cyan-200">{t('groundItems.pickUp')}</span>
+              </button>
+            );
+          })}
         </div>
       )}
 

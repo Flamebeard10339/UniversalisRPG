@@ -328,6 +328,76 @@ describe('ground items', () => {
   });
 });
 
+describe('pauseTimersWhileIdle (timeFlowsContinuously)', () => {
+  const pausedContext: ActionResolutionContext = {
+    actions: [],
+    skills: [],
+    stats: [],
+    locations: [{ id: 'road', position: { x: 0, y: 0 }, starting: true }],
+    items: [{ id: 'log' }],
+    flags: [],
+    resourceDefinitions: [],
+    effects: [],
+    interactionTypes: [],
+    enemies: [],
+    manifest: { ui: { timeFlowsContinuously: false } } as ActionResolutionContext['manifest'],
+  };
+  const continuousContext: ActionResolutionContext = { ...pausedContext, manifest: undefined };
+
+  it('does not expire a buff or a ground item while idle when timeFlowsContinuously is off', () => {
+    const now = Date.now();
+    const state = {
+      ...createInitialPlayState('test', 'road'),
+      activeBuffs: { 'log:attack': { itemId: 'log', statId: 'attack', amount: 1, kind: 'added' as const, durationSeconds: 10, expiresAt: now + 10_000 } },
+      groundItems: [{ id: 'ground-1', itemId: 'log', amount: 1, locationId: 'road', expiresAt: now + 10_000 }],
+      lastTickAt: now,
+    };
+
+    // 20s of real (idle) time passes — both would already be expired under
+    // the old always-decaying behavior.
+    const resolved = resolveIdleTimers(state, pausedContext, {}, now + 20_000);
+
+    expect(Object.keys(resolved.state.activeBuffs)).toEqual(['log:attack']);
+    expect(resolved.state.groundItems).toHaveLength(1);
+    // The deadline itself moved forward by the idle gap, preserving the
+    // original 10s of *active* remaining time rather than just ignoring
+    // the check outright.
+    expect(resolved.state.activeBuffs['log:attack'].expiresAt).toBe(now + 30_000);
+    expect(resolved.state.groundItems[0].expiresAt).toBe(now + 30_000);
+  });
+
+  it('still expires a buff or ground item once its active-time budget is actually spent', () => {
+    const now = Date.now();
+    const state = {
+      ...createInitialPlayState('test', 'road'),
+      activeAction: { actionId: 'chop-tree', startedAt: now, completesAt: now + 60_000, targetHealth: null },
+      activeBuffs: { 'log:attack': { itemId: 'log', statId: 'attack', amount: 1, kind: 'added' as const, durationSeconds: 10, expiresAt: now + 10_000 } },
+      groundItems: [{ id: 'ground-1', itemId: 'log', amount: 1, locationId: 'road', expiresAt: now + 10_000 }],
+      lastTickAt: now,
+    };
+
+    const resolved = resolveIdleTimers(state, pausedContext, {}, now + 20_000);
+
+    expect(resolved.state.activeBuffs).toEqual({});
+    expect(resolved.state.groundItems).toHaveLength(0);
+  });
+
+  it('keeps decaying in real time regardless of activity when timeFlowsContinuously is on (default)', () => {
+    const now = Date.now();
+    const state = {
+      ...createInitialPlayState('test', 'road'),
+      activeBuffs: { 'log:attack': { itemId: 'log', statId: 'attack', amount: 1, kind: 'added' as const, durationSeconds: 10, expiresAt: now + 10_000 } },
+      groundItems: [{ id: 'ground-1', itemId: 'log', amount: 1, locationId: 'road', expiresAt: now + 10_000 }],
+      lastTickAt: now,
+    };
+
+    const resolved = resolveIdleTimers(state, continuousContext, {}, now + 20_000);
+
+    expect(resolved.state.activeBuffs).toEqual({});
+    expect(resolved.state.groundItems).toHaveLength(0);
+  });
+});
+
 describe('dialogue timers', () => {
   it('starts dialogue from an action and applies continue, option, branch, and item effects', () => {
     const action: GameAction = {

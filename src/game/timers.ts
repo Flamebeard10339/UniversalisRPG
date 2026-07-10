@@ -2079,6 +2079,42 @@ const clearExpiredGroundItems = (state: UniversePlayState, now: number): Univers
   return groundItems.length === (state.groundItems ?? []).length ? state : { ...state, groundItems };
 };
 
+// Buff/ground-item expiresAt are fixed wall-clock deadlines set once at
+// creation time — by default they decay in real time regardless of what
+// the player is doing. When timeFlowsContinuously is off (this project's
+// own base universe sets it false), push every deadline forward by however
+// much of [lastTickAt, now] was idle, so the *active* time remaining is
+// unaffected by an idle gap, instead of just skipping the expiry check
+// (which would let the deadline drift arbitrarily far into the past and
+// then expire everything at once the moment the player returns).
+// Reuses Boolean(state.activeAction) as the whole-interval active/idle
+// signal — the same simplification applyActiveEffects/
+// resetInactiveEffectResources already make for resource-effect gating,
+// not a second "is the player active" concept.
+const pauseTimersWhileIdle = (
+  state: UniversePlayState,
+  context: ActionResolutionContext,
+  now: number,
+): UniversePlayState => {
+  if (resolveManifestUiSettings(context.manifest).timeFlowsContinuously) return state;
+  if (state.activeAction) return state;
+
+  const idleMs = Math.max(0, now - (state.lastTickAt ?? now));
+  if (idleMs <= 0) return state;
+
+  const activeBuffs = state.activeBuffs ?? {};
+  const groundItems = state.groundItems ?? [];
+  if (Object.keys(activeBuffs).length === 0 && groundItems.length === 0) return state;
+
+  return {
+    ...state,
+    activeBuffs: Object.fromEntries(
+      Object.entries(activeBuffs).map(([id, buff]) => [id, { ...buff, expiresAt: buff.expiresAt + idleMs }]),
+    ),
+    groundItems: groundItems.map((stack) => ({ ...stack, expiresAt: stack.expiresAt + idleMs })),
+  };
+};
+
 export const resolveIdleTimers = (
   state: UniversePlayState,
   contextOrActions: ActionResolutionContext | GameAction[],
@@ -2093,6 +2129,7 @@ export const resolveIdleTimers = (
 
   state = ensureWorldState(state, context);
   state = clearExpiredFlags(state, now);
+  state = pauseTimersWhileIdle(state, context, now);
   state = clearExpiredBuffs(state, now);
   state = clearExpiredActionExhaustions(state, now);
   state = clearExpiredGroundItems(state, now);
