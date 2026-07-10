@@ -183,6 +183,7 @@ export const parseTag = (segment: string): DslTag => {
   if (keyword === 'relocate') return { keyword: 'relocate', locationId: value };
   if (keyword === 'set spawn') return { keyword: 'setSpawn', locationId: value };
   if (keyword === 'discover') return { keyword: 'discover', locationId: value };
+  if (keyword === 'takes') return { keyword: 'takes', seconds: Number(value.replace(/s$/i, '')) };
   throw new DslParseError(`Unknown tag keyword: "${keyword}" in "${segment}"`);
 };
 

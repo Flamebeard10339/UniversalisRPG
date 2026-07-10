@@ -48,7 +48,12 @@ export const isContinuousAction = (
   context: ActionResolutionContext,
 ) => Boolean(getEnemy(action, context));
 
-export const isInstantAction = (action: GameAction) => Boolean(action.instant);
+// `instantAfterFirstCompletion` makes the action instant on every completion
+// after its first (see the field's own doc comment on GameAction) — used by
+// examine's discovery-moment timing, so state must be threaded through here.
+export const isInstantAction = (state: UniversePlayState, action: GameAction) =>
+  Boolean(action.instant)
+  || (Boolean(action.instantAfterFirstCompletion) && (state.actionCompletions[action.id] ?? 0) > 0);
 
 export const getActionStats = (
   action: GameAction,
@@ -71,7 +76,7 @@ export const getActionDurationMs = (
   action: GameAction,
   context: ActionResolutionContext,
 ) => {
-  if (isInstantAction(action)) {
+  if (isInstantAction(state, action)) {
     return 0;
   }
   if (getEnemy(action, context)) {

@@ -199,6 +199,11 @@ export type GameAction = {
   role?: 'optional' | 'progression' | 'utility' | 'travel';
   durationSeconds?: number;
   instant?: boolean;
+  // Only the action's first completion takes durationSeconds; every
+  // completion after that resolves instantly (regardless of `instant`,
+  // which is meaningless combined with this). Used for the discovery
+  // moment on an entity's examine action — see isInstantAction.
+  instantAfterFirstCompletion?: boolean;
   rewards: Reward[];
   experience?: ExperienceTrigger[];
   requirements?: Condition; // TODO: check what the UI looks like for a visible action that fails the requirements.

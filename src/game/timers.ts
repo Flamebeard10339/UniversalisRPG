@@ -983,7 +983,7 @@ export const startAction = (
   }
 
   const pausedState = pauseRunningAction(state, now, context);
-  if (isInstantAction(resolvedAction)) {
+  if (isInstantAction(pausedState, resolvedAction)) {
     const started = appendRunLog(pausedState, 'player', 'action.start', { actionId: action.id, locationId: action.locationId }, now);
     return completeActionWithResult(started, resolvedAction, context, { random: options.random ?? Math.random }, now).state;
   }
@@ -1697,7 +1697,7 @@ const completeActionWithResult = (
     };
     const startsDialogue = (action.results ?? []).some((result) => result.kind === 'dialogue');
     const shouldLoop = !startsDialogue
-    && !isInstantAction(action)
+    && !isInstantAction(completedState, action)
     && completedState.actionLoopingEnabled
       && (action.locationId === undefined || completedState.currentLocationId === action.locationId)
       && canStartAction(completedState, action, context, now);
@@ -1769,7 +1769,7 @@ const completeActionWithResult = (
   };
   const startsDialogue = (action.results ?? []).some((result) => result.kind === 'dialogue');
   const shouldLoop = !startsDialogue
-    && !isInstantAction(action)
+    && !isInstantAction(completedState, action)
     && completedState.actionLoopingEnabled
     && (action.locationId === undefined || completedState.currentLocationId === action.locationId)
     && canStartAction(completedState, action, context, now);
@@ -1854,7 +1854,7 @@ const getActionMessage = (
   action: GameAction,
   context: ActionResolutionContext,
   outcome: ActionCompletionResult['outcome'],
-) => {
+): string | null => {
   const enemy = getEnemy(action, context);
   const interactionType = getInteractionType(action, context);
 
@@ -1872,6 +1872,25 @@ const getActionMessage = (
 
   if (outcome === 'kill') {
     return actionKillKey(action.id);
+  }
+
+  // A plain (non-adversarial) action that already narrates this outcome
+  // through its own say:/chat results doesn't also need the generic
+  // action.<id>.success/.failure fallback appended on top — that fallback
+  // exists for actions with no narration of their own (a bare `give: gold
+  // 5`), not to double up on an authored (or compiler-synthesized, e.g.
+  // every examine action) say:. This only ever applies to this plain
+  // branch — the enemy/interactionType messages above are always the
+  // primary combat narration, never a redundant duplicate.
+  // Only an *immediate* narration counts — a delayed one (delaySeconds set)
+  // arrives later and isn't a substitute for feedback at the moment of
+  // completion, so the generic fallback should still fire alongside it (see
+  // "timestamps delayed narration..." in timers.test.ts).
+  const ownResults = outcome === 'chanceFailure' ? action.failureResults : action.results;
+  const hasOwnMessage = (ownResults ?? []).some((result) =>
+    (result.kind === 'chat' || result.kind === 'conditional-chat') && !result.delaySeconds);
+  if (hasOwnMessage) {
+    return null;
   }
 
   return outcome === 'hit' || outcome === 'basicSuccess'
@@ -2147,7 +2166,7 @@ export const resolveIdleTimers = (
     action = resolveStationAction(action, state.activeAction.recipeId, context);
   }
 
-  if (isInstantAction(action)) {
+  if (isInstantAction(state, action)) {
     const completion = completeActionWithResult(state, action, context, { random: options.random }, now);
     const enemy = getEnemy(action, context);
     const messageKey = getActionMessage(action, context, completion.outcome);

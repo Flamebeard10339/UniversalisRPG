@@ -39,11 +39,13 @@ take net:
   give: small-net
   set: tutorial.crate-net-taken
   once
+  takes: 2s
   say: You take the small net.
 take bowl:
   give: bowl
   set: tutorial.crate-bowl-taken
   once
+  takes: 2s
   say: You take the bowl.
 
 ## entity bridge-sign

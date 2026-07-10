@@ -56,13 +56,35 @@ export const isActionExhausted = (state: UniversePlayState, action: GameAction, 
   return activeExhaustions >= action.maxCompletions;
 };
 
+// An entity's own actions (other than its examine action) stay hidden
+// until that entity has been examined at least once — the discoverable-
+// entities gate. Entities always get an examine action (authored or
+// compiler-synthesized — see contentDsl/compiler.ts's compileLocation), so
+// `hasExamine` only ever protects against a hand-authored JSON entity that
+// predates this and genuinely has none; such an entity is left ungated
+// rather than permanently locked.
+const isEntityDiscoveredForAction = (
+  state: UniversePlayState,
+  action: GameAction,
+  context: ActionResolutionContext,
+) => {
+  if (action.entityId === undefined) return true;
+  const examineActionId = `entity.${action.entityId}.examine`;
+  if (action.id === examineActionId) return true;
+  const entity = context.entities?.find((candidate) => candidate.id === action.entityId);
+  const hasExamine = Boolean(entity?.actionIds?.includes(examineActionId));
+  if (!hasExamine) return true;
+  return (state.actionCompletions[examineActionId] ?? 0) > 0;
+};
+
 export const isActionVisible = (
   state: UniversePlayState,
   action: GameAction,
   context: ActionResolutionContext,
   now = Date.now(),
 ) => !isActionExhausted(state, action, now)
-  && (!action.visibleWhen || evaluateCondition(action.visibleWhen, state, context));
+  && (!action.visibleWhen || evaluateCondition(action.visibleWhen, state, context))
+  && isEntityDiscoveredForAction(state, action, context);
 
 export const isActionAvailableAtCurrentLocation = (
   state: UniversePlayState,

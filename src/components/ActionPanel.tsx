@@ -104,7 +104,7 @@ export const ActionPanel = ({ bundle, debugEnabled, playState, onPickUpGroundIte
     const completions = playState.actionCompletions[action.id] ?? 0;
     const remaining = action.maxCompletions === undefined ? null : Math.max(0, action.maxCompletions - completions);
     const continuous = isContinuousAction(action, actionContext);
-    const instant = isInstantAction(action);
+    const instant = isInstantAction(playState, action);
     const buttonKey = options.recipeId ? `${action.id}:${options.recipeId}` : action.id;
     const pulsing = Boolean(instantActionPulse[buttonKey] && instantActionPulse[buttonKey] > now);
 
@@ -214,20 +214,49 @@ export const ActionPanel = ({ bundle, debugEnabled, playState, onPickUpGroundIte
         {entities.map((entity) => {
           const expanded = Boolean(expandedEntities[entity.id]);
           const availableActions = entityActions(entity.actionIds);
+          // isActionVisible already hides every non-examine entity action
+          // until the entity's own examine has completed once, so
+          // availableActions only ever contains the examine action itself
+          // pre-discovery — the header below only needs to know whether
+          // that's still the case to decide what a click on it should do.
+          const examineActionId = `entity.${entity.id}.examine`;
+          const examineAction = availableActions.find((action) => action.id === examineActionId);
+          const discovered = (playState.actionCompletions[examineActionId] ?? 0) > 0;
+          const examining = playState.activeAction?.actionId === examineActionId;
+          const examineProgress = examineAction ? getActionProgress(examineAction) : 0;
+          const examineAvailable = examineAction ? canStartAction(playState, examineAction, actionContext) : false;
+
           return (
             <div className="grid gap-2 rounded border border-slate-700 bg-slate-950 p-2" key={entity.id}>
               <button
-                aria-expanded={expanded}
-                className="flex min-w-0 items-center gap-3 rounded px-2 py-2 text-left transition hover:bg-slate-900"
-                onClick={() => setExpandedEntities((current) => ({ ...current, [entity.id]: !current[entity.id] }))}
+                aria-expanded={discovered ? expanded : undefined}
+                className="relative flex min-w-0 items-center gap-3 overflow-hidden rounded px-2 py-2 text-left transition hover:bg-slate-900 disabled:cursor-not-allowed disabled:opacity-50"
+                data-entity-id={entity.id}
+                disabled={isTravelling || (!discovered && !examineAvailable)}
+                onClick={() => {
+                  if (!discovered) {
+                    if (examineAction) {
+                      onStartAction(examineAction);
+                      // Marked expanded now (not once discovery lands) so the
+                      // action list simply appears the instant the examine
+                      // finishes, instead of needing a second click.
+                      setExpandedEntities((current) => ({ ...current, [entity.id]: true }));
+                    }
+                    return;
+                  }
+                  setExpandedEntities((current) => ({ ...current, [entity.id]: !current[entity.id] }));
+                }}
                 type="button"
               >
-                <span className="w-4 shrink-0 text-cyan-200">{expanded ? 'v' : '>'}</span>
-                <span className="min-w-0 flex-1">
+                {!discovered && examining && (
+                  <span className="absolute inset-y-0 left-0 bg-cyan-400/25" style={{ width: `${examineProgress}%` }} />
+                )}
+                <span className="relative w-4 shrink-0 text-cyan-200">{discovered ? (expanded ? 'v' : '>') : '?'}</span>
+                <span className="relative min-w-0 flex-1">
                   <span className="block truncate text-sm font-semibold text-slate-100">{t(entityTitleKey(entity.id))}</span>
                 </span>
               </button>
-              {expanded && (
+              {discovered && expanded && (
                 <div className="grid gap-2 pl-4">
                   {availableActions.length > 0
                     ? availableActions.map((action) => renderAction(action, { entityAction: true }))

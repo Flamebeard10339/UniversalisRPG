@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { getActionDps, getEnemyAttackDps, sampleAdversarialDamage, sampleEnemyAttackDamage } from './adversarial';
+import { getActionDps, getEnemyAttackDps, isInstantAction, sampleAdversarialDamage, sampleEnemyAttackDamage } from './adversarial';
 import { calculateMaxCombatDamage, resolveManifestCombatBalance } from './combatBalance';
 import { getCharacterStatValue } from './characterStats';
 import { getEnemyStat, normalizeEnemyDefinition } from './enemies';
@@ -240,6 +240,31 @@ describe('adversarial actions', () => {
       'resource.health.empty',
     ]);
     expect(resolved.state.actionProgress[action.id]).toMatchObject({ elapsedMs: 0, targetHealth: null });
+  });
+});
+
+describe('isInstantAction', () => {
+  const state = createInitialPlayState('test', 'arena');
+
+  it('is true for a plain instant action regardless of completions', () => {
+    expect(isInstantAction(state, { id: 'plain', instant: true, rewards: [] })).toBe(true);
+  });
+
+  it('is false for a timed action with no completions yet', () => {
+    const examine = { id: 'examine', durationSeconds: 2, instantAfterFirstCompletion: true, rewards: [] };
+    expect(isInstantAction(state, examine)).toBe(false);
+  });
+
+  it('becomes true after the first completion when instantAfterFirstCompletion is set', () => {
+    const examine = { id: 'examine', durationSeconds: 2, instantAfterFirstCompletion: true, rewards: [] };
+    const examinedState = { ...state, actionCompletions: { examine: 1 } };
+    expect(isInstantAction(examinedState, examine)).toBe(true);
+  });
+
+  it('stays false after completions for a plain timed action with no instantAfterFirstCompletion', () => {
+    const cook = { id: 'cook', durationSeconds: 2, rewards: [] };
+    const cookedState = { ...state, actionCompletions: { cook: 5 } };
+    expect(isInstantAction(cookedState, cook)).toBe(false);
   });
 });
 

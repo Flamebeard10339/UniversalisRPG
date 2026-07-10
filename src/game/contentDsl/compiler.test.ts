@@ -188,6 +188,13 @@ describe('content DSL — guide-house proof', () => {
     expect(talk.results).toEqual([{ kind: 'dialogue', dialogueId: 'miki' }]);
   });
 
+  it('compiles examine: as timed-on-first-completion-only by default, unlike other instant actions', () => {
+    const examine = findEntityAction('miki', 'examine');
+    expect(examine.instant).toBeUndefined();
+    expect(examine.durationSeconds).toBe(2);
+    expect(examine.instantAfterFirstCompletion).toBe(true);
+  });
+
   it('preserves result ordering for multi-tag instant actions (say must be last per grammar, so open-modal comes first)', () => {
     const look = findEntityAction('mirror', 'look');
     expect(look.results?.[0]).toEqual({ kind: 'open-modal', modalId: 'name-editor' });
@@ -333,6 +340,73 @@ starting
   it('uses an explicit entity title when given, and a humanized fallback otherwise', () => {
     expect(module.locale?.en['entity.plain-thing.title']).toBe('Plain thing');
     expect(module.locale?.en['entity.named-thing.title']).toBe('A Very Named Thing');
+  });
+});
+
+describe('content DSL — takes: tag and entity examine auto-synthesis', () => {
+  const source = `# info
+id: takes-proof
+version: 1.0.0
+universe: base
+author: test
+game_version: 1.0
+pack: takes-proof
+
+# location workshop
+x: 0, y: 0
+starting
+
+## entity crate
+examine: A supply crate.
+take net:
+  give: small-net
+  takes: 2s
+  say: You take the net.
+
+## entity mannequin
+talk: [[dialogue mannequin]]
+
+# dialogue mannequin
+start (mannequin): ...
+`;
+  const { module } = compileDsl(source);
+  const findEntity = (id: string): EntityDefinition => {
+    const entity = (module.data as { entities: EntityDefinition[] }).entities.find((candidate) => candidate.id === id);
+    if (!entity) throw new Error(`entity not found: ${id}`);
+    return entity;
+  };
+  const findAction = (entityId: string, actionId: string): EntityActionDefinition => {
+    const action = findEntity(entityId).actions?.find((candidate) => candidate.id === actionId);
+    if (!action) throw new Error(`action not found: ${entityId}.${actionId}`);
+    return action;
+  };
+
+  it('compiles `takes: <N>s` into a plain (not first-completion-only) timed action', () => {
+    const takeNet = findAction('crate', 'take-net');
+    expect(takeNet.instant).toBeUndefined();
+    expect(takeNet.instantAfterFirstCompletion).toBeUndefined();
+    expect(takeNet.durationSeconds).toBe(2);
+  });
+
+  it('lets an explicit `takes:` tag override examine\'s default duration while keeping it first-completion-only', () => {
+    const source2 = source.replace('examine: A supply crate.', 'examine:\n  say: A supply crate.\n  takes: 5s');
+    const { module: module2 } = compileDsl(source2);
+    const examine = (module2.data as { entities: EntityDefinition[] }).entities
+      .find((entity) => entity.id === 'crate')?.actions?.find((action) => action.id === 'examine');
+    expect(examine?.durationSeconds).toBe(5);
+    expect(examine?.instantAfterFirstCompletion).toBe(true);
+  });
+
+  it('auto-synthesizes a default examine action for an entity that declares none', () => {
+    const examine = findAction('mannequin', 'examine');
+    expect(examine.durationSeconds).toBe(2);
+    expect(examine.instantAfterFirstCompletion).toBe(true);
+    expect(module.locale?.en['chat.entity.mannequin.examine']).toBe('Mannequin.');
+  });
+
+  it('does not synthesize a duplicate examine for an entity that already declares one', () => {
+    const crate = findEntity('crate');
+    expect(crate.actions?.filter((action) => action.id === 'examine')).toHaveLength(1);
   });
 });
 

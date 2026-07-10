@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { evaluateCondition } from './conditions';
+import { evaluateCondition, isActionVisible } from './conditions';
 import { createInitialPlayState } from './timers';
 import { xpRequiredForLevel } from './skills';
 
@@ -40,5 +40,40 @@ describe('state-variable conditions', () => {
     expect(evaluateCondition(itemTag, state, { ...context, items })).toBe(true);
     expect(evaluateCondition(equippedTag, state, { ...context, items })).toBe(false);
     expect(evaluateCondition(equippedTag, equipped, { ...context, items })).toBe(true);
+  });
+});
+
+describe('isActionVisible entity discoverability gate', () => {
+  const examineAction = { id: 'entity.crate.examine', entityId: 'crate', rewards: [] };
+  const takeAction = { id: 'entity.crate.take', entityId: 'crate', rewards: [] };
+  const crate = { id: 'crate', actionIds: ['entity.crate.examine', 'entity.crate.take'] };
+  const gateContext = { ...context, entities: [crate] };
+
+  it('hides a non-examine entity action until the entity has been examined, but keeps examine itself visible', () => {
+    const state = createInitialPlayState('test', 'start');
+
+    expect(isActionVisible(state, takeAction, gateContext)).toBe(false);
+    expect(isActionVisible(state, examineAction, gateContext)).toBe(true);
+  });
+
+  it('reveals the rest of the entity\'s actions once examine has completed once', () => {
+    const state = { ...createInitialPlayState('test', 'start'), actionCompletions: { 'entity.crate.examine': 1 } };
+
+    expect(isActionVisible(state, takeAction, gateContext)).toBe(true);
+  });
+
+  it('leaves an action ungated if its entity has no examine action declared', () => {
+    const bareEntity = { id: 'sign', actionIds: ['entity.sign.read'] };
+    const readAction = { id: 'entity.sign.read', entityId: 'sign', rewards: [] };
+    const state = createInitialPlayState('test', 'start');
+
+    expect(isActionVisible(state, readAction, { ...context, entities: [bareEntity] })).toBe(true);
+  });
+
+  it('does not gate item actions', () => {
+    const itemAction = { id: 'item.potion.drink', itemId: 'potion', rewards: [] };
+    const state = createInitialPlayState('test', 'start');
+
+    expect(isActionVisible(state, itemAction, context)).toBe(true);
   });
 });

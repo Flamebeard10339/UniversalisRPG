@@ -1,0 +1,8 @@
+[
+  "action:entity.bookshelf.examine",
+  "action:entity.bookshelf.take-note",
+  "action:entity.drawer.examine",
+  "action:entity.drawer.take-coins",
+  "action:entity.drawer.take-lockpick",
+  "action:entity.bookshelf.examine"
+]

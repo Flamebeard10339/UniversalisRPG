@@ -158,6 +158,19 @@ exactly the same thing as writing `examine:` alone followed by an indented
 is the *only* place inline text is auto-wrapped as `say:`; everywhere else,
 if you want a chat message you write `say:` yourself.
 
+An entity's (or item's) `examine:` action is always timed on its first
+completion only (2s by default, or the duration from an explicit `takes:`
+tag on it) and instant on every completion after that — this is what makes
+examining an entity for the first time feel like a real "discovery" beat,
+and it doubles as the discoverability gate: every one of an entity's *other*
+actions stays hidden until that entity's own `examine:` has completed at
+least once (`isActionVisible` in `src/game/conditions.ts`; the examine
+action itself is always visible, never gated behind itself). An entity with
+no authored `examine:` at all gets a default one synthesized automatically
+(humanized-id flavor text, same as a location's own examine fallback) so
+this gate always has something to unlock behind — you never need to write
+`examine:` on every entity just to make its other actions reachable.
+
 ## Tags
 
 A tag is `keyword: value`, or the bare word `once`, or the bracket form
@@ -191,6 +204,7 @@ below), including a second `say:` right after the first one.
 | `set spawn: <locationId>` | `results: [{kind:'set-spawn', locationId}]` — moves the player's respawn point, independent of `relocate:` (a one-way "you've moved on for good" moment, like leaving a tutorial area, typically pairs both tags on the same action) |
 | `discover: <locationId>` | `results: [{kind:'discover-location', locationId}]` — reveals a location on the map (fog-of-war) without moving the player there; for remote reveals like looking through a window or reading a map. Idempotent. Arriving at a location via `relocate:`/`adjacent:` already discovers it too — `discover:` is only for revealing somewhere the player isn't standing in. |
 | `droptable:` | appends a `Reward` of `kind:'dropTable'` — a nested entry-list tag, one level deeper than `enemy:`/`on success:`. Composite — see `# droptable <id>` below. |
+| `takes: <N>s` | makes an otherwise-instant action take real time instead — `durationSeconds: N`, `instant` omitted. Uses the same `activeAction`/`actionProgress` machinery (and progress-bar UI) that adversarial actions and `# recipe` station actions already use; this is content-only, no new engine mechanism. `examine:` gets this by default (2s) even with no `takes:` tag written — see below; an explicit `takes:` tag on `examine:` overrides the duration but keeps the first-completion-only behavior. |
 
 Deferred to a later pass: `respawn:`.
 

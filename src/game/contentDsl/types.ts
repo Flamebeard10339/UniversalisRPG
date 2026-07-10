@@ -39,6 +39,7 @@ export type DslTag =
   | { keyword: 'relocate'; locationId: string }
   | { keyword: 'setSpawn'; locationId: string }
   | { keyword: 'discover'; locationId: string }
+  | { keyword: 'takes'; seconds: number }
   | { keyword: 'droptable'; entries: DslDropEntry[] };
 
 // One line inside a `droptable:` (or nested `dependent droptable (N):`) block.

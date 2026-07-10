@@ -1324,4 +1324,29 @@ describe('resolveIdleTimers', () => {
     expect(messages.find((message) => message.key === 'location.room.exhausted')?.createdAt).toBe(2_001);
     expect(messages.find((message) => message.key === 'event.second-beat')?.createdAt).toBe(3_000);
   });
+
+  it('skips the generic action.<id>.success fallback when the action already narrates itself immediately (unlike a delayed one)', () => {
+    const startedAt = 1_000;
+    const action: GameAction = {
+      id: 'examine-crate',
+      locationId: 'room',
+      durationSeconds: 1,
+      instantAfterFirstCompletion: true,
+      rewards: [],
+      results: [{ kind: 'chat', messageKey: 'entity.crate.examine' }],
+    };
+    const context: ActionResolutionContext = {
+      actions: [action],
+      skills: [],
+      locations: [{ id: 'room', position: { x: 0, y: 0 }, starting: true }],
+      interactionTypes: [],
+      enemies: [],
+    };
+    const state = startAction(createInitialPlayState('test-universe', 'room'), action, context, startedAt);
+
+    const resolved = resolveIdleTimers(state, context, {}, startedAt + 1_000);
+
+    expect(resolved.state.chatMessages.map((message) => message.key)).toEqual(['entity.crate.examine']);
+    expect(resolved.state.actionCompletions['examine-crate']).toBe(1);
+  });
 });

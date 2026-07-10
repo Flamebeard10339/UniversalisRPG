@@ -242,6 +242,11 @@ const deriveVisibleWhen = (tags: DslTag[], onSuccessTags: DslTag[], actionId: st
   return { kind: 'all', conditions: parts };
 };
 
+// `examine:` gets this duration by default (first completion only — see
+// `instantAfterFirstCompletion`) even with no `takes:` tag authored, so
+// every entity's examine doubles as its discovery gate for free.
+const DEFAULT_EXAMINE_DURATION_SECONDS = 2;
+
 // `scope` only changes the locale-key prefix (`action.entity.x`/`action.item.x`)
 // — entities and items otherwise compile through the identical pipeline.
 // Items never go through the `enemy:` branch (see compileItemAction).
@@ -320,9 +325,22 @@ const compileActionVariants = (
 
   setDefaultOutcomeLocale(locale, actionKeyBase, { success: 'Done.', failure: 'Nothing happens.' });
 
+  const takesTag = decl.tags.find((tag): tag is Extract<DslTag, { keyword: 'takes' }> => tag.keyword === 'takes');
+  // Every examine action is timed on its first completion only, whether or
+  // not the author wrote a `takes:` tag — that first completion is what
+  // gates the rest of the entity's actions open (see isActionVisible). An
+  // explicit `takes:` tag on examine overrides the default duration but
+  // keeps the first-completion-only behavior; on any other action it just
+  // makes that action take real time, every time.
+  const timing = baseActionId === 'examine'
+    ? { durationSeconds: takesTag?.seconds ?? DEFAULT_EXAMINE_DURATION_SECONDS, instantAfterFirstCompletion: true }
+    : takesTag
+      ? { durationSeconds: takesTag.seconds }
+      : { instant: true };
+
   return [{
     id: baseActionId,
-    instant: true,
+    ...timing,
     rewards: [],
     results,
     ...(requirements ? { requirements } : {}),
@@ -362,7 +380,19 @@ const compileLocation = (
   for (const entityDecl of section.entities as DslEntityDecl[]) {
     entityIds.push(entityDecl.id);
     locale.set(`entity.${entityDecl.id}.title`, entityDecl.title ?? humanize(entityDecl.id));
-    const actions: EntityActionDefinition[] = entityDecl.actions.flatMap((actionDecl) => compileEntityAction(entityDecl.id, actionDecl, locale, pack, dropTableIds));
+    const declaredActions: DslActionDecl[] = entityDecl.actions.some((action) => action.title.toLowerCase() === 'examine')
+      ? entityDecl.actions
+      // Every entity needs an examine action — it's the discovery gate the
+      // rest of its actions hide behind (isActionVisible) — so one with no
+      // authored examine gets this default, identical in shape to writing
+      // `examine: <Title>.` by hand.
+      : [...entityDecl.actions, {
+          title: 'examine',
+          tags: [{ keyword: 'say' as const, text: [{ kind: 'literal' as const, text: `${entityDecl.title ?? humanize(entityDecl.id)}.` }] }],
+          onSuccessTags: [],
+          onFailTags: [],
+        }];
+    const actions: EntityActionDefinition[] = declaredActions.flatMap((actionDecl) => compileEntityAction(entityDecl.id, actionDecl, locale, pack, dropTableIds));
     entities.push({ id: entityDecl.id, actions });
   }
 
