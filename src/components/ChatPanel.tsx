@@ -5,11 +5,14 @@ import { useNow } from '../hooks/useNow';
 
 type ChatPanelProps = {
   compressionEnabled: boolean;
+  // Height (px) of the messages+input area below the resize handle; omit
+  // for a plain full-height chat with no handle/resize behavior at all
+  // (the "GUI hidden" text-adventure mode). 0 is a valid, fully-collapsed
+  // value — the handle stays visible so the player can drag it back open.
+  contentHeight?: number;
   messages: ChatMessage[];
-  minimized?: boolean;
   onResizeHandlePointerDown?: (event: React.PointerEvent) => void;
   onSend?: (text: string) => void;
-  onToggleMinimize?: () => void;
   t: Translator;
 };
 
@@ -78,7 +81,7 @@ export const buildDisplayMessages = (
     left.latestCreatedAt - right.latestCreatedAt || left.id - right.id);
 };
 
-export const ChatPanel = ({ compressionEnabled, messages, minimized, onResizeHandlePointerDown, onSend, onToggleMinimize, t }: ChatPanelProps) => {
+export const ChatPanel = ({ compressionEnabled, contentHeight, messages, onResizeHandlePointerDown, onSend, t }: ChatPanelProps) => {
   const scrollRef = useRef<HTMLDivElement>(null);
   const stickToBottomRef = useRef(true);
   const [draft, setDraft] = useState('');
@@ -106,44 +109,31 @@ export const ChatPanel = ({ compressionEnabled, messages, minimized, onResizeHan
     setDraft('');
   };
 
-  const hasHandleRow = Boolean(onResizeHandlePointerDown || onToggleMinimize);
-
   return (
     <section
-      className={`grid h-full min-h-0 gap-2 rounded border border-slate-800 bg-slate-900 p-4 ${
-        hasHandleRow ? (minimized ? 'grid-rows-[auto_auto]' : 'grid-rows-[auto_1fr_auto]') : 'grid-rows-[1fr_auto]'
-      }`}
+      className={`grid h-full min-h-0 rounded border border-slate-800 bg-slate-900 ${onResizeHandlePointerDown ? 'grid-rows-[auto_auto]' : 'grid-rows-[1fr]'}`}
       data-testid="chat-panel"
     >
-      {hasHandleRow && (
-        <div className="flex items-center justify-between gap-2">
-          {onToggleMinimize ? (
-            <button
-              aria-expanded={!minimized}
-              className="rounded px-1.5 py-0.5 text-xs font-semibold text-slate-400 hover:text-slate-200"
-              data-testid="chat-toggle-minimize"
-              onClick={onToggleMinimize}
-              type="button"
-            >
-              {minimized ? t('chat.expand', 'Show chat') : t('chat.minimize', 'Minimize')}
-            </button>
-          ) : (
-            <span />
-          )}
-          {onResizeHandlePointerDown && !minimized && (
-            <button
-              aria-label={t('chat.resizeHandle', 'Drag to resize chat')}
-              className="cursor-ns-resize touch-none select-none rounded px-2 py-0.5 text-xs font-semibold text-slate-500 hover:text-slate-300"
-              data-testid="chat-resize-handle"
-              onPointerDown={onResizeHandlePointerDown}
-              type="button"
-            >
-              <span aria-hidden="true">⋯</span>
-            </button>
-          )}
+      {onResizeHandlePointerDown && (
+        // The whole bar (not just a small button) is the drag target — a
+        // large, unambiguous mobile touch target — with a centered dash as
+        // the only visual affordance; dragging it down to 0 height is how
+        // the player minimizes chat, no separate button needed.
+        <div
+          aria-label={t('chat.resizeHandle', 'Drag to resize chat')}
+          className="flex h-11 shrink-0 cursor-ns-resize touch-none select-none items-center justify-center rounded-t"
+          data-testid="chat-resize-handle"
+          onPointerDown={onResizeHandlePointerDown}
+          role="button"
+          tabIndex={0}
+        >
+          <span aria-hidden="true" className="h-1 w-10 rounded-full bg-slate-600" />
         </div>
       )}
-      {!minimized && (
+      <div
+        className={`grid h-full min-h-0 grid-rows-[1fr_auto] gap-2 overflow-hidden p-4 ${onResizeHandlePointerDown ? 'pt-0' : ''}`}
+        style={contentHeight !== undefined ? { height: contentHeight } : undefined}
+      >
         <div className="flex min-h-0 flex-col gap-2 overflow-y-auto rounded bg-slate-950 p-3" onScroll={updateStickiness} ref={scrollRef}>
           {displayMessages.map((message) => (
             <div
@@ -160,28 +150,28 @@ export const ChatPanel = ({ compressionEnabled, messages, minimized, onResizeHan
             </div>
           ))}
         </div>
-      )}
-      {onSend && (
-        <form
-          className="flex gap-2"
-          onSubmit={(event) => {
-            event.preventDefault();
-            submit();
-          }}
-        >
-          <input
-            className="min-w-0 flex-1 rounded border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100"
-            data-testid="chat-input"
-            onChange={(event) => setDraft(event.target.value)}
-            placeholder={t('cli.input.placeholder', 'Type a message or /command')}
-            type="text"
-            value={draft}
-          />
-          <button className="rounded border border-cyan-700 px-4 py-2 text-sm font-semibold text-cyan-100" data-testid="chat-send" type="submit">
-            {t('cli.input.send', 'Send')}
-          </button>
-        </form>
-      )}
+        {onSend && (
+          <form
+            className="flex gap-2"
+            onSubmit={(event) => {
+              event.preventDefault();
+              submit();
+            }}
+          >
+            <input
+              className="min-w-0 flex-1 rounded border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100"
+              data-testid="chat-input"
+              onChange={(event) => setDraft(event.target.value)}
+              placeholder={t('cli.input.placeholder', 'Type a message or /command')}
+              type="text"
+              value={draft}
+            />
+            <button className="rounded border border-cyan-700 px-4 py-2 text-sm font-semibold text-cyan-100" data-testid="chat-send" type="submit">
+              {t('cli.input.send', 'Send')}
+            </button>
+          </form>
+        )}
+      </div>
     </section>
   );
 };

@@ -5,7 +5,7 @@ import { FloatingSkillText } from './components/FloatingSkillText';
 import { NameEditorModal } from './components/NameEditorModal';
 import { ActionPanel } from './components/ActionPanel';
 import { ChatPanel } from './components/ChatPanel';
-import { MovementArrowsDrawer } from './components/MovementArrowsDrawer';
+import { MovementArrowsPanel } from './components/MovementArrowsPanel';
 import { BankPanel } from './components/BankPanel';
 import { CharacterStats } from './components/CharacterStats';
 import { CollectionLogPanel } from './components/CollectionLogPanel';
@@ -71,7 +71,6 @@ type FontSizePreference = 'tiny' | 'small' | 'normal' | 'large' | 'huge';
 type AppearanceSettings = {
   chatCompressionEnabled?: boolean;
   chatHeightVh?: number;
-  chatMinimized?: boolean;
   customDisplayProfile?: DisplayProfileDefinition;
   displayProfileSelections?: Record<string, string>;
   fontSize: FontSizePreference;
@@ -91,7 +90,9 @@ const contributionUiKey = 'universalis:settings:contribution-ui';
 const editTabs: EditTab[] = ['content', 'map', 'submit'];
 const homeTabs: HomeTab[] = ['actions', 'details'];
 const DEFAULT_CHAT_HEIGHT_VH = 33;
-const MIN_CHAT_HEIGHT_VH = 15;
+// 0 is a valid, intentional value — dragging the handle all the way down is
+// how the player minimizes chat (no separate minimize control).
+const MIN_CHAT_HEIGHT_VH = 0;
 const MAX_CHAT_HEIGHT_VH = 70;
 const clampChatHeightVh = (value: number) => Math.min(MAX_CHAT_HEIGHT_VH, Math.max(MIN_CHAT_HEIGHT_VH, value));
 const emptyIdleReport: IdleReport = { kind: 'none' };
@@ -144,7 +145,6 @@ export default function App() {
   const [fontSizePreference, setFontSizePreference] = useState<FontSizePreference>('normal');
   const [chatCompressionEnabled, setChatCompressionEnabled] = useState(true);
   const [chatHeightVh, setChatHeightVh] = useState(DEFAULT_CHAT_HEIGHT_VH);
-  const [chatMinimized, setChatMinimized] = useState(false);
   const chatResizeDragRef = useRef<{ startY: number; startHeightVh: number } | null>(null);
   const [showTravelActions, setShowTravelActions] = useState(true);
   const [showGui, setShowGui] = useState(true);
@@ -249,7 +249,6 @@ export default function App() {
       setFontSizePreference(settings.fontSize ?? 'normal');
       setChatCompressionEnabled(settings.chatCompressionEnabled ?? true);
       setChatHeightVh(clampChatHeightVh(settings.chatHeightVh ?? DEFAULT_CHAT_HEIGHT_VH));
-      setChatMinimized(settings.chatMinimized ?? false);
       setShowTravelActions(settings.showTravelActions ?? true);
       setShowGui(settings.showGui ?? true);
       setCustomDisplayProfile(settings.customDisplayProfile ?? createCustomDisplayProfile());
@@ -270,14 +269,13 @@ export default function App() {
     void save(appearanceKey, {
       chatCompressionEnabled,
       chatHeightVh,
-      chatMinimized,
       customDisplayProfile,
       displayProfileSelections,
       fontSize: fontSizePreference,
       showGui,
       showTravelActions,
     });
-  }, [appearanceLoaded, bundle, chatCompressionEnabled, chatHeightVh, chatMinimized, customDisplayProfile, displayProfileSelections, fontSizePreference, showGui, showTravelActions]);
+  }, [appearanceLoaded, bundle, chatCompressionEnabled, chatHeightVh, customDisplayProfile, displayProfileSelections, fontSizePreference, showGui, showTravelActions]);
 
   useEffect(() => {
     if (!appearanceLoaded || !bundle || displayProfileSelections[bundle.manifest.id]) {
@@ -632,7 +630,6 @@ export default function App() {
   // it's anchored to the bottom of the screen — hence startY - clientY below.
   const onChatResizeHandlePointerDown = (event: React.PointerEvent) => {
     chatResizeDragRef.current = { startHeightVh: chatHeightVh, startY: event.clientY };
-    if (chatMinimized) setChatMinimized(false);
 
     const handleMove = (moveEvent: PointerEvent) => {
       const drag = chatResizeDragRef.current;
@@ -1623,24 +1620,25 @@ export default function App() {
         </div>
       ) : (
         visibleActiveTab === 'home' && (
-          <div className="fixed inset-x-0 bottom-[73px] z-10 px-4" style={{ height: chatMinimized ? 'auto' : `${chatHeightVh}vh` }}>
-            <div className="mx-auto h-full max-w-7xl">
+          // Movement arrows and chat are stacked as siblings in one column
+          // (not independently fixed-positioned) so movement sits directly
+          // against chat's own top edge — wherever that is, given chat's
+          // height is user-resizable — instead of floating at a fixed
+          // screen position that could overlap chat's content.
+          <div className="fixed inset-x-0 bottom-[73px] z-10 flex w-full flex-col px-4">
+            <MovementArrowsPanel bundle={bundle} context={actionContext} onMove={beginTravel} playState={playState} t={t} />
+            <div className="mx-auto w-full max-w-7xl">
               <ChatPanel
                 compressionEnabled={chatCompressionEnabled}
+                contentHeight={(chatHeightVh / 100) * window.innerHeight}
                 messages={playState.chatMessages}
-                minimized={chatMinimized}
                 onResizeHandlePointerDown={onChatResizeHandlePointerDown}
                 onSend={runCliCommand}
-                onToggleMinimize={() => setChatMinimized((current) => !current)}
                 t={t}
               />
             </div>
           </div>
         )
-      )}
-
-      {visibleActiveTab === 'home' && currentLocation && (
-        <MovementArrowsDrawer bundle={bundle} context={actionContext} onMove={beginTravel} playState={playState} t={t} />
       )}
 
       {showChangelog && (
