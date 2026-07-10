@@ -6,7 +6,10 @@ import { useNow } from '../hooks/useNow';
 type ChatPanelProps = {
   compressionEnabled: boolean;
   messages: ChatMessage[];
+  minimized?: boolean;
+  onResizeHandlePointerDown?: (event: React.PointerEvent) => void;
   onSend?: (text: string) => void;
+  onToggleMinimize?: () => void;
   t: Translator;
 };
 
@@ -75,7 +78,7 @@ export const buildDisplayMessages = (
     left.latestCreatedAt - right.latestCreatedAt || left.id - right.id);
 };
 
-export const ChatPanel = ({ compressionEnabled, messages, onSend, t }: ChatPanelProps) => {
+export const ChatPanel = ({ compressionEnabled, messages, minimized, onResizeHandlePointerDown, onSend, onToggleMinimize, t }: ChatPanelProps) => {
   const scrollRef = useRef<HTMLDivElement>(null);
   const stickToBottomRef = useRef(true);
   const [draft, setDraft] = useState('');
@@ -103,24 +106,61 @@ export const ChatPanel = ({ compressionEnabled, messages, onSend, t }: ChatPanel
     setDraft('');
   };
 
+  const hasHandleRow = Boolean(onResizeHandlePointerDown || onToggleMinimize);
+
   return (
-    <section className="grid h-full min-h-0 grid-rows-[1fr_auto] gap-2 rounded border border-slate-800 bg-slate-900 p-4" data-testid="chat-panel">
-      <div className="flex min-h-0 flex-col gap-2 overflow-y-auto rounded bg-slate-950 p-3" onScroll={updateStickiness} ref={scrollRef}>
-        {displayMessages.map((message) => (
-          <div
-            className={`max-w-[85%] shrink-0 whitespace-pre-line rounded px-3 py-2 text-sm ${
-              message.author === 'player'
-                ? 'ml-auto bg-cyan-400 text-slate-950'
-                : message.author === 'debug'
-                  ? 'bg-amber-950 text-amber-100'
-                  : 'bg-slate-800 text-slate-200'
-            }`}
-            key={`${message.author}:${message.id}:${message.text}`}
-          >
-            {message.count > 1 ? `${message.text} (${message.count})` : message.text}
-          </div>
-        ))}
-      </div>
+    <section
+      className={`grid h-full min-h-0 gap-2 rounded border border-slate-800 bg-slate-900 p-4 ${
+        hasHandleRow ? (minimized ? 'grid-rows-[auto_auto]' : 'grid-rows-[auto_1fr_auto]') : 'grid-rows-[1fr_auto]'
+      }`}
+      data-testid="chat-panel"
+    >
+      {hasHandleRow && (
+        <div className="flex items-center justify-between gap-2">
+          {onToggleMinimize ? (
+            <button
+              aria-expanded={!minimized}
+              className="rounded px-1.5 py-0.5 text-xs font-semibold text-slate-400 hover:text-slate-200"
+              data-testid="chat-toggle-minimize"
+              onClick={onToggleMinimize}
+              type="button"
+            >
+              {minimized ? t('chat.expand', 'Show chat') : t('chat.minimize', 'Minimize')}
+            </button>
+          ) : (
+            <span />
+          )}
+          {onResizeHandlePointerDown && !minimized && (
+            <button
+              aria-label={t('chat.resizeHandle', 'Drag to resize chat')}
+              className="cursor-ns-resize touch-none select-none rounded px-2 py-0.5 text-xs font-semibold text-slate-500 hover:text-slate-300"
+              data-testid="chat-resize-handle"
+              onPointerDown={onResizeHandlePointerDown}
+              type="button"
+            >
+              <span aria-hidden="true">⋯</span>
+            </button>
+          )}
+        </div>
+      )}
+      {!minimized && (
+        <div className="flex min-h-0 flex-col gap-2 overflow-y-auto rounded bg-slate-950 p-3" onScroll={updateStickiness} ref={scrollRef}>
+          {displayMessages.map((message) => (
+            <div
+              className={`max-w-[85%] shrink-0 whitespace-pre-line rounded px-3 py-2 text-sm ${
+                message.author === 'player'
+                  ? 'ml-auto bg-cyan-400 text-slate-950'
+                  : message.author === 'debug'
+                    ? 'bg-amber-950 text-amber-100'
+                    : 'bg-slate-800 text-slate-200'
+              }`}
+              key={`${message.author}:${message.id}:${message.text}`}
+            >
+              {message.count > 1 ? `${message.text} (${message.count})` : message.text}
+            </div>
+          ))}
+        </div>
+      )}
       {onSend && (
         <form
           className="flex gap-2"

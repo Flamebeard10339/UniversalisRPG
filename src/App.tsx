@@ -5,7 +5,7 @@ import { FloatingSkillText } from './components/FloatingSkillText';
 import { NameEditorModal } from './components/NameEditorModal';
 import { ActionPanel } from './components/ActionPanel';
 import { ChatPanel } from './components/ChatPanel';
-import { MovementArrows } from './components/MovementArrows';
+import { MovementArrowsDrawer } from './components/MovementArrowsDrawer';
 import { BankPanel } from './components/BankPanel';
 import { CharacterStats } from './components/CharacterStats';
 import { CollectionLogPanel } from './components/CollectionLogPanel';
@@ -70,6 +70,8 @@ type SettingsTab = 'settings' | 'mods';
 type FontSizePreference = 'tiny' | 'small' | 'normal' | 'large' | 'huge';
 type AppearanceSettings = {
   chatCompressionEnabled?: boolean;
+  chatHeightVh?: number;
+  chatMinimized?: boolean;
   customDisplayProfile?: DisplayProfileDefinition;
   displayProfileSelections?: Record<string, string>;
   fontSize: FontSizePreference;
@@ -88,6 +90,10 @@ const appearanceKey = 'universalis:settings:appearance';
 const contributionUiKey = 'universalis:settings:contribution-ui';
 const editTabs: EditTab[] = ['content', 'map', 'submit'];
 const homeTabs: HomeTab[] = ['actions', 'details'];
+const DEFAULT_CHAT_HEIGHT_VH = 33;
+const MIN_CHAT_HEIGHT_VH = 15;
+const MAX_CHAT_HEIGHT_VH = 70;
+const clampChatHeightVh = (value: number) => Math.min(MAX_CHAT_HEIGHT_VH, Math.max(MIN_CHAT_HEIGHT_VH, value));
 const emptyIdleReport: IdleReport = { kind: 'none' };
 const emptyContributionDraft = (universeId: string): ContributionDraft => ({
   universeId, updatedAt: Date.now(), notes: '', basePlayer: undefined, combatBalance: undefined, experienceCurve: undefined, experience: undefined, displayProfiles: undefined, ui: undefined, modules: [], modulePacks: [], locations: [], actions: [], skills: [], stats: [], items: [], flags: [], resourceDefinitions: [], effects: [], interactionTypes: [], enemies: [], dropTables: [], dialogues: [], locales: {},
@@ -137,6 +143,9 @@ export default function App() {
   const [settingsTab, setSettingsTab] = useState<SettingsTab>('settings');
   const [fontSizePreference, setFontSizePreference] = useState<FontSizePreference>('normal');
   const [chatCompressionEnabled, setChatCompressionEnabled] = useState(true);
+  const [chatHeightVh, setChatHeightVh] = useState(DEFAULT_CHAT_HEIGHT_VH);
+  const [chatMinimized, setChatMinimized] = useState(false);
+  const chatResizeDragRef = useRef<{ startY: number; startHeightVh: number } | null>(null);
   const [showTravelActions, setShowTravelActions] = useState(true);
   const [showGui, setShowGui] = useState(true);
   const [customDisplayProfile, setCustomDisplayProfile] = useState<DisplayProfileDefinition>(() => createCustomDisplayProfile());
@@ -239,6 +248,8 @@ export default function App() {
       }
       setFontSizePreference(settings.fontSize ?? 'normal');
       setChatCompressionEnabled(settings.chatCompressionEnabled ?? true);
+      setChatHeightVh(clampChatHeightVh(settings.chatHeightVh ?? DEFAULT_CHAT_HEIGHT_VH));
+      setChatMinimized(settings.chatMinimized ?? false);
       setShowTravelActions(settings.showTravelActions ?? true);
       setShowGui(settings.showGui ?? true);
       setCustomDisplayProfile(settings.customDisplayProfile ?? createCustomDisplayProfile());
@@ -258,13 +269,15 @@ export default function App() {
     if (!appearanceLoaded) return;
     void save(appearanceKey, {
       chatCompressionEnabled,
+      chatHeightVh,
+      chatMinimized,
       customDisplayProfile,
       displayProfileSelections,
       fontSize: fontSizePreference,
       showGui,
       showTravelActions,
     });
-  }, [appearanceLoaded, bundle, chatCompressionEnabled, customDisplayProfile, displayProfileSelections, fontSizePreference, showGui, showTravelActions]);
+  }, [appearanceLoaded, bundle, chatCompressionEnabled, chatHeightVh, chatMinimized, customDisplayProfile, displayProfileSelections, fontSizePreference, showGui, showTravelActions]);
 
   useEffect(() => {
     if (!appearanceLoaded || !bundle || displayProfileSelections[bundle.manifest.id]) {
@@ -613,6 +626,27 @@ export default function App() {
   const setCharacterTopTab = (tab: CharacterTab) => {
     logPlayerAction('navigation.characterTab', { tab });
     setCharacterTab(tab);
+  };
+
+  // Dragging the handle up (screen Y decreasing) should grow the panel, since
+  // it's anchored to the bottom of the screen — hence startY - clientY below.
+  const onChatResizeHandlePointerDown = (event: React.PointerEvent) => {
+    chatResizeDragRef.current = { startHeightVh: chatHeightVh, startY: event.clientY };
+    if (chatMinimized) setChatMinimized(false);
+
+    const handleMove = (moveEvent: PointerEvent) => {
+      const drag = chatResizeDragRef.current;
+      if (!drag) return;
+      const deltaVh = ((drag.startY - moveEvent.clientY) / window.innerHeight) * 100;
+      setChatHeightVh(clampChatHeightVh(drag.startHeightVh + deltaVh));
+    };
+    const handleUp = () => {
+      chatResizeDragRef.current = null;
+      window.removeEventListener('pointermove', handleMove);
+      window.removeEventListener('pointerup', handleUp);
+    };
+    window.addEventListener('pointermove', handleMove);
+    window.addEventListener('pointerup', handleUp);
   };
 
   const exportSave = async () => {
@@ -989,27 +1023,48 @@ export default function App() {
             </div>
           </div>
         ) : (
-          <div className="mx-auto flex max-w-7xl items-center justify-between gap-3">
-            <div>
-              <h1 className="text-xl font-semibold">
-                {visibleActiveTab === 'settings'
-                  ? t('app.title')
-                  : visibleActiveTab === 'home' && currentLocation
-                    ? t(locationTitleKey(currentLocation.id), currentLocation.id)
-                    : `${t(`app.tab.${visibleActiveTab}`)}${visibleActiveTab === 'character' && playState.characterName ? ` - ${playState.characterName}` : ''}`}
-              </h1>
-              {visibleActiveTab === 'settings' && <p className="text-sm text-slate-400">{t(universeTitleKey(bundle.manifest.id))} - {t(universeDescriptionKey(bundle.manifest.id), '')}</p>}
+          <div className="mx-auto grid max-w-7xl gap-3">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <h1 className="text-xl font-semibold">
+                  {visibleActiveTab === 'settings'
+                    ? t('app.title')
+                    : visibleActiveTab === 'home' && currentLocation
+                      ? t(locationTitleKey(currentLocation.id), currentLocation.id)
+                      : `${t(`app.tab.${visibleActiveTab}`)}${visibleActiveTab === 'character' && playState.characterName ? ` - ${playState.characterName}` : ''}`}
+                </h1>
+                {visibleActiveTab === 'settings' && <p className="text-sm text-slate-400">{t(universeTitleKey(bundle.manifest.id))} - {t(universeDescriptionKey(bundle.manifest.id), '')}</p>}
+              </div>
+              {visibleActiveTab === 'home' && currentLocation && (
+                <ExamineButton
+                  className={`shrink-0 rounded border border-slate-700 px-3 py-1.5 text-xs font-semibold text-slate-200 ${
+                    examineFlashUntil > examineFlashNow ? 'ring-2 ring-cyan-300 animate-pulse' : ''
+                  }`}
+                  onExamine={onExamine}
+                  t={t}
+                  testId="examine-location"
+                  textKey={locationExamineKey(currentLocation.id)}
+                />
+              )}
             </div>
             {visibleActiveTab === 'home' && currentLocation && (
-              <ExamineButton
-                className={`shrink-0 rounded border border-slate-700 px-3 py-1.5 text-xs font-semibold text-slate-200 ${
-                  examineFlashUntil > examineFlashNow ? 'ring-2 ring-cyan-300 animate-pulse' : ''
-                }`}
-                onExamine={onExamine}
-                t={t}
-                testId="examine-location"
-                textKey={locationExamineKey(currentLocation.id)}
-              />
+              <div className="grid grid-flow-col auto-cols-fr gap-2">
+                {(['actions', 'details'] as HomeTab[]).map((tab) => (
+                  <button
+                    className={`min-w-0 rounded px-2 py-1.5 text-sm font-semibold capitalize ${
+                      homeTab === tab ? 'bg-cyan-300 text-slate-950' : 'bg-slate-950 text-slate-300'
+                    }`}
+                    data-home-tab={tab}
+                    key={tab}
+                    onClick={() => setHomeTopTab(tab)}
+                    type="button"
+                  >
+                    {tab === 'details' && activeInteractionType
+                      ? t(interactionTitleKey(activeInteractionType.id), t('home.tab.details'))
+                      : t(`home.tab.${tab}`)}
+                  </button>
+                ))}
+              </div>
             )}
           </div>
         )}
@@ -1059,43 +1114,21 @@ export default function App() {
 
         {visibleActiveTab === 'home' && currentLocation && (
           <section className="grid gap-4">
-            <div className="grid gap-4">
-              {playState.activeTravel && (
-                <TravelStatus activeTravel={playState.activeTravel} bundle={bundle} currentLocationId={playState.currentLocationId} t={t} />
-              )}
-              <div className="grid grid-flow-col auto-cols-fr gap-2 rounded border border-slate-800 bg-slate-900 p-2">
-                {(['actions', 'details'] as HomeTab[]).map((tab) => (
-                  <button
-                    className={`min-w-0 rounded px-2 py-2 text-sm font-semibold capitalize ${
-                      homeTab === tab ? 'bg-cyan-300 text-slate-950' : 'bg-slate-950 text-slate-300'
-                    }`}
-                    data-home-tab={tab}
-                    key={tab}
-                    onClick={() => setHomeTopTab(tab)}
-                    type="button"
-                  >
-                    {tab === 'details' && activeInteractionType
-                      ? t(interactionTitleKey(activeInteractionType.id), t('home.tab.details'))
-                      : t(`home.tab.${tab}`)}
-                  </button>
-                ))}
-              </div>
-            </div>
+            {playState.activeTravel && (
+              <TravelStatus activeTravel={playState.activeTravel} bundle={bundle} currentLocationId={playState.currentLocationId} t={t} />
+            )}
 
             {homeTab === 'actions' && (
-              <section className="grid gap-4">
-                <MovementArrows bundle={bundle} context={actionContext} onMove={beginTravel} playState={playState} t={t} />
-                <section className="rounded border border-slate-800 bg-slate-900 p-4" data-testid="home-action-panel">
-                  <ActionPanel
-                    debugEnabled={debugEnabled}
-                    bundle={bundle}
-                    onPickUpGroundItem={(groundItemId) => pickUpGroundItem(runtimeUniverseId, groundItemId, actionContext)}
-                    onStartAction={beginAction}
-                    playState={playState}
-                    showTravelActions={showTravelActions}
-                    t={t}
-                  />
-                </section>
+              <section className="rounded border border-slate-800 bg-slate-900 p-4" data-testid="home-action-panel">
+                <ActionPanel
+                  debugEnabled={debugEnabled}
+                  bundle={bundle}
+                  onPickUpGroundItem={(groundItemId) => pickUpGroundItem(runtimeUniverseId, groundItemId, actionContext)}
+                  onStartAction={beginAction}
+                  playState={playState}
+                  showTravelActions={showTravelActions}
+                  t={t}
+                />
               </section>
             )}
 
@@ -1590,12 +1623,24 @@ export default function App() {
         </div>
       ) : (
         visibleActiveTab === 'home' && (
-          <div className="fixed inset-x-0 bottom-[73px] z-10 h-[33vh] px-4">
+          <div className="fixed inset-x-0 bottom-[73px] z-10 px-4" style={{ height: chatMinimized ? 'auto' : `${chatHeightVh}vh` }}>
             <div className="mx-auto h-full max-w-7xl">
-              <ChatPanel compressionEnabled={chatCompressionEnabled} messages={playState.chatMessages} onSend={runCliCommand} t={t} />
+              <ChatPanel
+                compressionEnabled={chatCompressionEnabled}
+                messages={playState.chatMessages}
+                minimized={chatMinimized}
+                onResizeHandlePointerDown={onChatResizeHandlePointerDown}
+                onSend={runCliCommand}
+                onToggleMinimize={() => setChatMinimized((current) => !current)}
+                t={t}
+              />
             </div>
           </div>
         )
+      )}
+
+      {visibleActiveTab === 'home' && currentLocation && (
+        <MovementArrowsDrawer bundle={bundle} context={actionContext} onMove={beginTravel} playState={playState} t={t} />
       )}
 
       {showChangelog && (
