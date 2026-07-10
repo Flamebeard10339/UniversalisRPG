@@ -36,7 +36,7 @@ export const MovementArrows = ({ bundle, context, playState, onMove, t }: Moveme
   );
 
   return (
-    <section className="grid gap-2 rounded border border-slate-800 bg-slate-900 p-4">
+    <section className="grid gap-2 p-4 pt-0">
       <h2 className="text-base font-semibold text-slate-100">{t('movementArrows.title', 'Move')}</h2>
       <div className="grid w-fit grid-cols-3 gap-2">
         {grid.map((direction, index) => {

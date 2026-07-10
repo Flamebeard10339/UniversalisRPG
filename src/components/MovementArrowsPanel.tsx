@@ -24,11 +24,15 @@ const FALLBACK_PANEL_HEIGHT_PX = 220;
 // Stacked directly above the chat panel (a sibling in the same fixed
 // bottom-of-screen column, not an independently-positioned overlay) so it's
 // always right where the chat's own resize handle is, however tall chat
-// currently is, and never covers chat's own content. Collapsed by default;
-// dragging or tapping the handle expands the arrow grid upward, above the
-// handle, rather than sliding in from a side. Sized to its own content and
-// right-aligned, not stretched full-width, so it reads as a small attached
-// control rather than a second full-width bar.
+// currently is, and never covers chat's own content. Collapsed by default.
+// One seamless bordered panel with the handle at the *top* (mirrors
+// ChatPanel's own handle-then-content layout) — the arrow grid expands
+// downward from the handle, and since this whole panel sits directly above
+// chat with its bottom edge pinned there, the handle rides up together with
+// the panel's own top edge as it opens, instead of staying fixed at the
+// bottom below a separately-bordered arrows box. Sized to its own content
+// and right-aligned, not stretched full-width, so it reads as a small
+// attached control rather than a second full-width bar.
 export const MovementArrowsPanel = ({ bundle, context, onMove, playState, t }: MovementArrowsPanelProps) => {
   const [open, setOpen] = useState(false);
   const [dragHeight, setDragHeight] = useState<number | null>(null);
@@ -100,11 +104,24 @@ export const MovementArrowsPanel = ({ bundle, context, onMove, playState, t }: M
 
   return (
     <div className="mx-auto flex w-full max-w-7xl justify-end">
-      {/* w-max (not items-end on the parent): shrink-wraps to the arrow
-          grid's own natural width so the handle below — which is w-full,
-          i.e. 100% of *this* div — matches it exactly, instead of each
-          child sizing independently. */}
-      <div className="w-max">
+      {/* w-max (not items-end on the parent): shrink-wraps to the handle's
+          own natural width so the whole panel reads as one small
+          right-aligned control. overflow-hidden + rounded-t on this single
+          wrapper (not on the handle and content separately) is what makes
+          it one seamless box instead of two stacked, separately-bordered
+          ones. */}
+      <div className="w-max overflow-hidden rounded-t border border-b-0 border-slate-700 bg-slate-900">
+        <button
+          aria-expanded={open}
+          aria-label={open ? t('movementArrows.collapse', 'Hide movement') : t('movementArrows.expand', 'Show movement')}
+          className="flex h-11 w-full touch-none select-none items-center justify-center text-slate-400"
+          data-testid="movement-panel-handle"
+          onClick={onHandleClick}
+          onPointerDown={onHandlePointerDown}
+          type="button"
+        >
+          <span aria-hidden="true" className="h-1 w-10 rounded-full bg-slate-600" />
+        </button>
         <div
           className="overflow-hidden"
           style={{ transition: dragHeight === null ? 'height 200ms ease-out' : 'none', visibility: revealed ? 'visible' : 'hidden', height }}
@@ -113,17 +130,6 @@ export const MovementArrowsPanel = ({ bundle, context, onMove, playState, t }: M
             <MovementArrows bundle={bundle} context={context} onMove={onMove} playState={playState} t={t} />
           </div>
         </div>
-        <button
-          aria-expanded={open}
-          aria-label={open ? t('movementArrows.collapse', 'Hide movement') : t('movementArrows.expand', 'Show movement')}
-          className="flex h-11 w-full touch-none select-none items-center justify-center rounded-t border border-b-0 border-slate-700 bg-slate-900 text-slate-400"
-          data-testid="movement-panel-handle"
-          onClick={onHandleClick}
-          onPointerDown={onHandlePointerDown}
-          type="button"
-        >
-          <span aria-hidden="true" className="h-1 w-10 rounded-full bg-slate-600" />
-        </button>
       </div>
     </div>
   );
