@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { ActionResolutionContext, GameAction } from './types';
+import type { ActionResolutionContext, GameAction, UniversePlayState } from './types';
 import { appendChatMessage, appendRunLog, applyStateReset, chooseDialogueOption, createInitialPlayState, dropInventoryItem, engineNow, pickUpGroundItem, resolveIdleTimers, startAction } from './timers';
 
 describe('appendChatMessage', () => {
@@ -949,6 +949,97 @@ describe('resolveIdleTimers', () => {
     expect(resolved.state.resourcePools.health.current).toBe(210);
     expect(resolved.state.skillXp.regeneration).toBe(10);
     expect(resolved.state.skillXp['troll-blood']).toBe(100);
+  });
+
+  it('batches fractional effect-sourced skill XP instead of granting it on every tick', () => {
+    const context: ActionResolutionContext = {
+      manifest: {
+        schemaVersion: 1, id: 'test-universe', version: '1', author: 'test', locales: ['en'], files: [],
+        experience: [{ event: 'health-regenerated', skillId: 'regeneration', sourceStat: 'regeneration' }],
+      },
+      actions: [{ id: 'tick', locationId: 'test-location', durationSeconds: 2, rewards: [] }],
+      skills: [{ id: 'regeneration', maxLevel: 100, statId: 'regeneration', addedPerLevel: 0, increasedPerLevel: 0 }],
+      // regeneration stat 15 => 15 health/min => 15 * (2/60) = 0.5 health (and therefore 0.5 XP,
+      // since the trigger has no amount/amountPerUnit override) per 2s tick — an exact binary
+      // fraction, so accumulation across ticks doesn't pick up floating-point drift.
+      stats: [{ id: 'health', base: 10_000 }, { id: 'regeneration', base: 15 }],
+      resourceDefinitions: [{ id: 'health', sourceStat: 'health', initialValue: 'full' }],
+      effects: [{ id: 'health-regeneration', resourceId: 'health', sourceStat: 'regeneration' }],
+      interactionTypes: [],
+      enemies: [],
+    };
+    const action = context.actions[0];
+    let now = 1_000;
+    let state: UniversePlayState = {
+      ...startAction(createInitialPlayState('test-universe', 'test-location'), action, context, now),
+      actionLoopingEnabled: true,
+      resourcePools: { health: { current: 0, min: 0, max: 10_000 } },
+    };
+
+    for (let tick = 0; tick < 4; tick += 1) {
+      now += 2_000;
+      state = resolveIdleTimers(state, context, {}, now).state;
+    }
+
+    // 4 ticks * 0.5 = 2.0 accrued after 8s — already past the >=1 floor, but
+    // the 10s window hasn't elapsed yet, so nothing is granted or shown.
+    expect(state.skillXp.regeneration).toBeUndefined();
+    expect(state.pendingEffectXp.regeneration?.amount).toBeCloseTo(2.0);
+    expect(state.runLog.some((entry) => entry.event === 'skill.xp-event')).toBe(false);
+
+    now += 2_000;
+    state = resolveIdleTimers(state, context, {}, now).state;
+
+    // 5th tick crosses the 10s window with 2.5 accrued — flushes as a single grant.
+    expect(state.skillXp.regeneration).toBeCloseTo(2.5);
+    expect(state.pendingEffectXp.regeneration).toBeUndefined();
+    const xpEvents = state.runLog.filter((entry) => entry.event === 'skill.xp-event');
+    expect(xpEvents).toHaveLength(1);
+    expect(xpEvents[0].data?.amount).toBeCloseTo(2.5);
+  });
+
+  it('keeps deferring past the batch window until at least 1 XP has accrued, then flushes on the next tick', () => {
+    const context: ActionResolutionContext = {
+      manifest: {
+        schemaVersion: 1, id: 'test-universe', version: '1', author: 'test', locales: ['en'], files: [],
+        experience: [{ event: 'health-regenerated', skillId: 'regeneration', sourceStat: 'regeneration' }],
+      },
+      actions: [{ id: 'tick', locationId: 'test-location', durationSeconds: 2, rewards: [] }],
+      skills: [{ id: 'regeneration', maxLevel: 100, statId: 'regeneration', addedPerLevel: 0, increasedPerLevel: 0 }],
+      // 3.75 health/min => 3.75 * (2/60) = 0.125 XP per 2s tick (an exact
+      // binary fraction) — 8 ticks (16s, well past the 10s window) are
+      // needed before the total reaches the >=1 floor.
+      stats: [{ id: 'health', base: 10_000 }, { id: 'regeneration', base: 3.75 }],
+      resourceDefinitions: [{ id: 'health', sourceStat: 'health', initialValue: 'full' }],
+      effects: [{ id: 'health-regeneration', resourceId: 'health', sourceStat: 'regeneration' }],
+      interactionTypes: [],
+      enemies: [],
+    };
+    const action = context.actions[0];
+    let now = 1_000;
+    let state: UniversePlayState = {
+      ...startAction(createInitialPlayState('test-universe', 'test-location'), action, context, now),
+      actionLoopingEnabled: true,
+      resourcePools: { health: { current: 0, min: 0, max: 10_000 } },
+    };
+
+    for (let tick = 0; tick < 7; tick += 1) {
+      now += 2_000;
+      state = resolveIdleTimers(state, context, {}, now).state;
+    }
+
+    // 7 ticks (14s, past the window) * 0.125 = 0.875 — still under 1, so it
+    // keeps deferring instead of flushing a fractional amount.
+    expect(state.skillXp.regeneration).toBeUndefined();
+    expect(state.pendingEffectXp.regeneration?.amount).toBeCloseTo(0.875);
+
+    now += 2_000;
+    state = resolveIdleTimers(state, context, {}, now).state;
+
+    // 8th tick reaches exactly 1.0 — flushes on this tick, not held for a
+    // fresh 10s window on top of the one it already overshot.
+    expect(state.skillXp.regeneration).toBeCloseTo(1.0);
+    expect(state.pendingEffectXp.regeneration).toBeUndefined();
   });
 
   it('grants interaction damage experience and preserves action experience', () => {

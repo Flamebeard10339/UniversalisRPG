@@ -86,7 +86,8 @@
         "connectivityMode": { "enum": ["highly-connected", "sparse"] },
         "distanceBetweenAdjacentTiles": { "type": "number", "exclusiveMinimum": 0 },
         "timeFlowsContinuously": { "type": "boolean" },
-        "showGroundItemDuration": { "type": "boolean" }
+        "showGroundItemDuration": { "type": "boolean" },
+        "effectXpBatchSeconds": { "type": "number", "exclusiveMinimum": 0 }
       }
     },
     "compatibility": {

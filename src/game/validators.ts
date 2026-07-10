@@ -157,7 +157,8 @@ export const validateManifest = (value: unknown): value is UniverseManifest =>
       (value.ui.connectivityMode === undefined || value.ui.connectivityMode === 'highly-connected' || value.ui.connectivityMode === 'sparse') &&
       (value.ui.distanceBetweenAdjacentTiles === undefined || hasNumber(value.ui, 'distanceBetweenAdjacentTiles')) &&
       (value.ui.timeFlowsContinuously === undefined || typeof value.ui.timeFlowsContinuously === 'boolean') &&
-      (value.ui.showGroundItemDuration === undefined || typeof value.ui.showGroundItemDuration === 'boolean')));
+      (value.ui.showGroundItemDuration === undefined || typeof value.ui.showGroundItemDuration === 'boolean') &&
+      (value.ui.effectXpBatchSeconds === undefined || hasNumber(value.ui, 'effectXpBatchSeconds'))));
 
 const validateLocationsShape = (locations: unknown): locations is LocationNode[] =>
   Array.isArray(locations) &&

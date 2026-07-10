@@ -91,6 +91,12 @@ export type UniverseUiSettings = {
   // what the player is doing (see pauseTimersWhileIdle in timers.ts).
   timeFlowsContinuously?: boolean;
   showGroundItemDuration?: boolean;
+  // How long (in seconds) effect-sourced skill XP (health regen ticking
+  // "Regeneration" XP, etc.) accrues in a hidden buffer before being
+  // granted and shown as a single floating-text popup, instead of a
+  // fractional "0.01 Regeneration" popup on every tick. See
+  // bufferEffectXp in timers.ts.
+  effectXpBatchSeconds?: number;
 };
 
 export type LocationNode = {
@@ -750,6 +756,7 @@ export type UniversePlayState = {
   collectionLog: Record<string, number>;
   resourcePools: Record<string, ResourcePool>;
   skillXp: Record<string, number>;
+  pendingEffectXp: Record<string, { amount: number; bufferStartedAt: number }>;
   statOverrides: Record<string, number>;
   equipmentSkillBonuses: Record<string, SkillEquipmentBonuses>;
   equipment: Partial<Record<EquipmentSlot, string>>;

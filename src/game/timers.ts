@@ -159,6 +159,7 @@ export const createInitialPlayState = (
   },
   resourcePools: {},
   skillXp: {},
+  pendingEffectXp: {},
   statOverrides: {},
   equipmentSkillBonuses: {},
   equipment: {},
@@ -214,6 +215,7 @@ export const normalizePlayState = (
     activeTravel,
     activeDialogue: state.activeDialogue ?? null,
     resourcePools: state.resourcePools ?? {},
+    pendingEffectXp: state.pendingEffectXp ?? {},
     inventory: { ...(state.resources ?? {}), ...(state.inventory ?? {}) },
     bank: state.bank ?? {},
     flags: state.flags ?? {},
@@ -397,6 +399,77 @@ const applySkillXpResult = (
   now: number,
 ) => grantSkillXp(state, context, skillId, amount, now);
 
+const flushEffectXp = (
+  state: UniversePlayState,
+  context: ActionResolutionContext,
+  skillId: string,
+  now: number,
+): UniversePlayState => {
+  const pending = state.pendingEffectXp[skillId];
+  if (!pending) return state;
+
+  const { [skillId]: _flushed, ...pendingEffectXp } = state.pendingEffectXp;
+  let nextState = grantSkillXp({ ...state, pendingEffectXp }, context, skillId, pending.amount, now);
+  nextState = appendRunLog(nextState, 'engine', 'skill.xp-event', {
+    actionId: '',
+    amount: pending.amount,
+    event: 'effect-xp-batch',
+    skillId,
+    eventAmount: pending.amount,
+    effectId: '',
+    interactionTypeId: '',
+    resourceId: '',
+    sourceStat: '',
+  }, now);
+
+  return nextState;
+};
+
+// Effect-sourced XP (health regen ticking "Regeneration" XP, etc.) arrives
+// in tiny fractional amounts on every effect tick — granting/showing it
+// immediately produces an ugly "0.01 Regeneration" popup on every tick.
+// Buffer it per skill instead and only grant+show it once at least
+// effectXpBatchSeconds has passed *and* at least 1 whole point has accrued;
+// if the window elapses with <1 accrued, keep waiting (don't reset the
+// window) rather than flushing a fractional amount early. No dedicated
+// timer: this only runs when an effect tick already calls in here via
+// applyActiveEffects, piggybacking on the engine's existing event-driven
+// scheduling instead of polling on its own.
+const bufferEffectXp = (
+  state: UniversePlayState,
+  context: ActionResolutionContext,
+  skillId: string,
+  amount: number,
+  now: number,
+): UniversePlayState => {
+  if (amount <= 0) return state;
+
+  const existing = state.pendingEffectXp[skillId];
+  // Seed a fresh buffer's start from state.lastTickAt (the start of the
+  // interval this whole resolveIdleTimers call is catching up), not `now`
+  // (the moment this particular tick happens to land) — otherwise a single
+  // large catch-up tick spanning well over the batch window (the player
+  // was away, or the window between engine ticks is wide) would compute a
+  // buffer age of 0 and wait an extra window before showing XP it already
+  // fully earned.
+  const bufferStartedAt = existing?.bufferStartedAt ?? state.lastTickAt ?? now;
+  const nextAmount = (existing?.amount ?? 0) + amount;
+  const buffered = {
+    ...state,
+    pendingEffectXp: {
+      ...state.pendingEffectXp,
+      [skillId]: { amount: nextAmount, bufferStartedAt },
+    },
+  };
+
+  const batchMs = resolveManifestUiSettings(context.manifest).effectXpBatchSeconds * 1000;
+  if (now - bufferStartedAt < batchMs || nextAmount < 1) {
+    return buffered;
+  }
+
+  return flushEffectXp(buffered, context, skillId, now);
+};
+
 const emitExperienceEvent = (
   state: UniversePlayState,
   action: GameAction | null,
@@ -412,6 +485,11 @@ const emitExperienceEvent = (
     }
 
     const amount = experienceAmount(trigger, event);
+    if (event.effectId !== undefined) {
+      nextState = bufferEffectXp(nextState, context, trigger.skillId, amount, now);
+      continue;
+    }
+
     nextState = grantSkillXp(nextState, context, trigger.skillId, amount, now);
     nextState = appendRunLog(nextState, 'engine', 'skill.xp-event', {
       actionId: event.actionId ?? action?.id ?? '',
@@ -802,12 +880,20 @@ const applyResourceBehaviors = (
       nextState = stopRunningAction(nextState, now, context);
     }
 
+    // A resource boundary can be crossed *while applying an effect's own
+    // rate-based delta* (e.g. an enemy's attack-rate resource filling up
+    // triggers this same 'enemy-attack' behavior) — options.effectId there
+    // belongs to that outer effect, not to whatever discrete, unrelated
+    // event this boundary behavior itself causes. Pass only `random`
+    // through so a nested combat hit/action-completion never inherits an
+    // effectId it doesn't own (which would wrongly route its XP into
+    // bufferEffectXp's fractional-effect batching).
     if (behavior.kind === 'complete-action') {
-      nextState = completeActiveActionWithMessage(nextState, context, options, now);
+      nextState = completeActiveActionWithMessage(nextState, context, { random: options.random }, now);
     }
 
     if (behavior.kind === 'enemy-attack') {
-      nextState = applyEnemyAttackWithMessage(nextState, context, options, now);
+      nextState = applyEnemyAttackWithMessage(nextState, context, { random: options.random }, now);
     }
 
     if (behavior.kind === 'refill') {
