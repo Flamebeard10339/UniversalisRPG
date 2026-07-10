@@ -1,39 +1,39 @@
-import type { ContentBundle, UniversePlayState } from '../game/types';
-import { skillExamineKey, skillTitleKey } from '../game/contentIds';
-import type { Translator } from '../game/i18n';
+import { skillTitleKey } from '../game/contentIds';
 import { skillLevelProgressFromXp } from '../game/skills';
-import { ExamineButton } from './ExamineButton';
+import type { ContentBundle, UniversePlayState } from '../game/types';
+import type { Translator } from '../game/i18n';
 
 type SkillBarsProps = {
   bundle: ContentBundle;
-  onExamine: (text: string) => void;
+  onOpenSkill: (skillId: string) => void;
   playState: UniversePlayState;
   t: Translator;
 };
 
-export const SkillBars = ({ bundle, onExamine, playState, t }: SkillBarsProps) => (
+export const SkillBars = ({ bundle, onOpenSkill, playState, t }: SkillBarsProps) => (
   <section className="grid gap-3">
     <h2 className="text-base font-semibold text-slate-100">{t('skillBars.title')}</h2>
-    <div className="grid gap-3">
+    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
       {bundle.skills.map((skill) => {
         const xp = playState.skillXp[skill.id] ?? 0;
         const progress = skillLevelProgressFromXp(xp, bundle.manifest.experienceCurve);
         const level = Math.min(skill.maxLevel, progress.level);
+        const percent = level >= skill.maxLevel ? 100 : progress.percent;
 
         return (
-          <div className="grid gap-1" key={skill.id}>
-            <div className="flex items-baseline justify-between gap-3">
-              <span className="text-sm font-medium text-slate-100">{t(skillTitleKey(skill.id))}</span>
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-slate-400">Lv {level}</span>
-                <ExamineButton onExamine={onExamine} t={t} textKey={skillExamineKey(skill.id)} />
-              </div>
+          <button
+            className="grid gap-1 rounded border border-slate-800 bg-slate-950 p-3 text-center transition hover:border-cyan-500"
+            data-skill-id={skill.id}
+            key={skill.id}
+            onClick={() => onOpenSkill(skill.id)}
+            type="button"
+          >
+            <span className="text-xs font-medium text-slate-400">{t(skillTitleKey(skill.id))}</span>
+            <span className="text-xl font-semibold text-cyan-100">{level}</span>
+            <div className="h-1 overflow-hidden rounded bg-slate-800">
+              <div className="h-full bg-emerald-300" style={{ width: `${percent}%` }} />
             </div>
-            <div className="h-2 overflow-hidden rounded bg-slate-800">
-              <div className="h-full bg-emerald-300" style={{ width: `${progress.percent}%` }} />
-            </div>
-            <p className="text-xs text-slate-500">{xp} xp</p>
-          </div>
+          </button>
         );
       })}
     </div>

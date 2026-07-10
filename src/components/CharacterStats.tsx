@@ -21,7 +21,7 @@ export const CharacterStats = ({ bundle, onOpenStat, playState, t }: CharacterSt
 
           return (
             <button
-              className="grid gap-1 rounded border border-slate-800 bg-slate-950 p-3 text-left transition hover:border-cyan-500"
+              className="grid gap-1 rounded border border-slate-800 bg-slate-950 p-3 text-center transition hover:border-cyan-500"
               data-stat-id={stat.id}
               key={stat.id}
               onClick={() => onOpenStat(stat.id)}

@@ -9,6 +9,7 @@ import { MovementArrowsPanel } from './components/MovementArrowsPanel';
 import { BankPanel } from './components/BankPanel';
 import { CharacterStats } from './components/CharacterStats';
 import { StatDetailModal } from './components/StatDetailModal';
+import { SkillDetailModal } from './components/SkillDetailModal';
 import { CollectionLogPanel } from './components/CollectionLogPanel';
 import { QuestLogPanel } from './components/QuestLogPanel';
 import { DialoguePanel } from './components/DialoguePanel';
@@ -1168,7 +1169,12 @@ export default function App() {
 
             {characterTab === 'skills' && (
               <section className="rounded border border-slate-800 bg-slate-900 p-4">
-                <SkillBars bundle={bundle} onExamine={onExamine} playState={playState} t={t} />
+                <SkillBars
+                  bundle={bundle}
+                  onOpenSkill={(skillId) => openModal(runtimeUniverseId, `skill-detail:${skillId}`)}
+                  playState={playState}
+                  t={t}
+                />
               </section>
             )}
 
@@ -1696,6 +1702,16 @@ export default function App() {
           onClose={() => closeModal(runtimeUniverseId)}
           playState={playState}
           statId={playState.openModalId.slice('stat-detail:'.length)}
+          t={t}
+        />
+      )}
+
+      {playState.openModalId?.startsWith('skill-detail:') && (
+        <SkillDetailModal
+          bundle={bundle}
+          onClose={() => closeModal(runtimeUniverseId)}
+          playState={playState}
+          skillId={playState.openModalId.slice('skill-detail:'.length)}
           t={t}
         />
       )}
