@@ -5,10 +5,12 @@ import { useNow } from '../hooks/useNow';
 
 type ChatPanelProps = {
   compressionEnabled: boolean;
-  // Height (px) of the messages+input area below the resize handle; omit
+  // Height (px) of the message-history box below the resize handle; omit
   // for a plain full-height chat with no handle/resize behavior at all
   // (the "GUI hidden" text-adventure mode). 0 is a valid, fully-collapsed
-  // value — the handle stays visible so the player can drag it back open.
+  // value. Only the history box collapses — the handle and the input/send
+  // row are never part of this and always stay visible, so there's always
+  // a way to both drag the panel back open and to type/send a message.
   contentHeight?: number;
   messages: ChatMessage[];
   onResizeHandlePointerDown?: (event: React.PointerEvent) => void;
@@ -111,7 +113,7 @@ export const ChatPanel = ({ compressionEnabled, contentHeight, messages, onResiz
 
   return (
     <section
-      className={`grid h-full min-h-0 rounded border border-slate-800 bg-slate-900 ${onResizeHandlePointerDown ? 'grid-rows-[auto_auto]' : 'grid-rows-[1fr]'}`}
+      className={`grid h-full min-h-0 rounded border border-slate-800 bg-slate-900 ${onResizeHandlePointerDown ? 'grid-rows-[auto_auto_auto]' : 'grid-rows-[1fr_auto]'}`}
       data-testid="chat-panel"
     >
       {onResizeHandlePointerDown && (
@@ -130,11 +132,15 @@ export const ChatPanel = ({ compressionEnabled, contentHeight, messages, onResiz
           <span aria-hidden="true" className="h-1 w-10 rounded-full bg-slate-600" />
         </div>
       )}
+      {/* Only the message history collapses (down to 0) — the resize
+          handle above and the input/send row below are never squeezed by
+          it, so there's always a way to reopen the panel and always a way
+          to type, regardless of how far the history is collapsed. */}
       <div
-        className={`grid h-full min-h-0 grid-rows-[1fr_auto] gap-2 overflow-hidden p-4 ${onResizeHandlePointerDown ? 'pt-0' : ''}`}
+        className={`min-h-0 overflow-hidden px-4 ${onResizeHandlePointerDown ? '' : 'pt-4'}`}
         style={contentHeight !== undefined ? { height: contentHeight } : undefined}
       >
-        <div className="flex min-h-0 flex-col gap-2 overflow-y-auto rounded bg-slate-950 p-3" onScroll={updateStickiness} ref={scrollRef}>
+        <div className="flex h-full min-h-0 flex-col gap-2 overflow-y-auto rounded bg-slate-950 p-3" onScroll={updateStickiness} ref={scrollRef}>
           {displayMessages.map((message) => (
             <div
               className={`max-w-[85%] shrink-0 whitespace-pre-line rounded px-3 py-2 text-sm ${
@@ -150,28 +156,28 @@ export const ChatPanel = ({ compressionEnabled, contentHeight, messages, onResiz
             </div>
           ))}
         </div>
-        {onSend && (
-          <form
-            className="flex gap-2"
-            onSubmit={(event) => {
-              event.preventDefault();
-              submit();
-            }}
-          >
-            <input
-              className="min-w-0 flex-1 rounded border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100"
-              data-testid="chat-input"
-              onChange={(event) => setDraft(event.target.value)}
-              placeholder={t('cli.input.placeholder', 'Type a message or /command')}
-              type="text"
-              value={draft}
-            />
-            <button className="rounded border border-cyan-700 px-4 py-2 text-sm font-semibold text-cyan-100" data-testid="chat-send" type="submit">
-              {t('cli.input.send', 'Send')}
-            </button>
-          </form>
-        )}
       </div>
+      {onSend && (
+        <form
+          className="flex gap-2 p-4 pt-2"
+          onSubmit={(event) => {
+            event.preventDefault();
+            submit();
+          }}
+        >
+          <input
+            className="min-w-0 flex-1 rounded border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100"
+            data-testid="chat-input"
+            onChange={(event) => setDraft(event.target.value)}
+            placeholder={t('cli.input.placeholder', 'Type a message or /command')}
+            type="text"
+            value={draft}
+          />
+          <button className="rounded border border-cyan-700 px-4 py-2 text-sm font-semibold text-cyan-100" data-testid="chat-send" type="submit">
+            {t('cli.input.send', 'Send')}
+          </button>
+        </form>
+      )}
     </section>
   );
 };

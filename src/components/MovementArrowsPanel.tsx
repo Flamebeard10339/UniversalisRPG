@@ -26,12 +26,20 @@ const FALLBACK_PANEL_HEIGHT_PX = 220;
 // always right where the chat's own resize handle is, however tall chat
 // currently is, and never covers chat's own content. Collapsed by default;
 // dragging or tapping the handle expands the arrow grid upward, above the
-// handle, rather than sliding in from a side.
+// handle, rather than sliding in from a side. Sized to its own content and
+// right-aligned, not stretched full-width, so it reads as a small attached
+// control rather than a second full-width bar.
 export const MovementArrowsPanel = ({ bundle, context, onMove, playState, t }: MovementArrowsPanelProps) => {
   const [open, setOpen] = useState(false);
   const [dragHeight, setDragHeight] = useState<number | null>(null);
   const [panelHeight, setPanelHeight] = useState(FALLBACK_PANEL_HEIGHT_PX);
   const panelRef = useRef<HTMLDivElement>(null);
+  // Tracks whether the in-progress pointer gesture moved past the tap
+  // threshold, so the plain onClick fallback below (kept for devices/
+  // browsers where a drag's pointerup doesn't reliably reach a window
+  // listener) knows to skip toggling for a gesture the drag logic already
+  // resolved.
+  const draggedRef = useRef(false);
 
   useEffect(() => {
     const element = panelRef.current;
@@ -44,28 +52,43 @@ export const MovementArrowsPanel = ({ bundle, context, onMove, playState, t }: M
   const onHandlePointerDown = (event: React.PointerEvent) => {
     const startY = event.clientY;
     const baseHeight = dragHeight ?? (open ? panelHeight : 0);
-    let maxDelta = 0;
+    draggedRef.current = false;
 
     const handleMove = (moveEvent: PointerEvent) => {
       const deltaY = startY - moveEvent.clientY; // dragging up expands the panel upward
-      maxDelta = Math.max(maxDelta, Math.abs(deltaY));
+      if (Math.abs(deltaY) >= TAP_THRESHOLD_PX) draggedRef.current = true;
       setDragHeight(Math.min(panelHeight, Math.max(0, baseHeight + deltaY)));
     };
     const handleUp = (upEvent: PointerEvent) => {
       window.removeEventListener('pointermove', handleMove);
       window.removeEventListener('pointerup', handleUp);
-      setDragHeight(null);
-      if (maxDelta < TAP_THRESHOLD_PX) {
-        setOpen((current) => !current);
+      if (!draggedRef.current) {
+        // Not a real drag — let the click handler (below) do the toggle,
+        // so a plain tap only flips open/closed once.
+        setDragHeight(null);
         return;
       }
       const deltaY = startY - upEvent.clientY;
       const finalHeight = Math.min(panelHeight, Math.max(0, baseHeight + deltaY));
+      setDragHeight(null);
       setOpen(finalHeight > panelHeight / 2);
     };
 
     window.addEventListener('pointermove', handleMove);
     window.addEventListener('pointerup', handleUp);
+  };
+
+  // A plain click, kept alongside the pointerdown/move/up drag tracking
+  // above, so tapping still works even in a browser/device combination
+  // where a drag's pointerup doesn't fire (click is a much older, more
+  // universally reliable event). Skips toggling if the drag logic already
+  // resolved this same gesture.
+  const onHandleClick = () => {
+    if (draggedRef.current) {
+      draggedRef.current = false;
+      return;
+    }
+    setOpen((current) => !current);
   };
 
   const height = dragHeight ?? (open ? panelHeight : 0);
@@ -76,25 +99,31 @@ export const MovementArrowsPanel = ({ bundle, context, onMove, playState, t }: M
   const revealed = height > 0;
 
   return (
-    <div className="mx-auto w-full max-w-7xl">
-      <div
-        className="flex justify-end overflow-hidden"
-        style={{ transition: dragHeight === null ? 'height 200ms ease-out' : 'none', visibility: revealed ? 'visible' : 'hidden', height }}
-      >
-        <div className="pb-2" ref={panelRef}>
-          <MovementArrows bundle={bundle} context={context} onMove={onMove} playState={playState} t={t} />
+    <div className="mx-auto flex w-full max-w-7xl justify-end">
+      {/* w-max (not items-end on the parent): shrink-wraps to the arrow
+          grid's own natural width so the handle below — which is w-full,
+          i.e. 100% of *this* div — matches it exactly, instead of each
+          child sizing independently. */}
+      <div className="w-max">
+        <div
+          className="overflow-hidden"
+          style={{ transition: dragHeight === null ? 'height 200ms ease-out' : 'none', visibility: revealed ? 'visible' : 'hidden', height }}
+        >
+          <div className="pb-2" ref={panelRef}>
+            <MovementArrows bundle={bundle} context={context} onMove={onMove} playState={playState} t={t} />
+          </div>
         </div>
-      </div>
-      <div
-        aria-expanded={open}
-        aria-label={open ? t('movementArrows.collapse', 'Hide movement') : t('movementArrows.expand', 'Show movement')}
-        className="flex h-11 touch-none select-none items-center justify-center rounded-t border border-b-0 border-slate-700 bg-slate-900 text-slate-400"
-        data-testid="movement-panel-handle"
-        onPointerDown={onHandlePointerDown}
-        role="button"
-        tabIndex={0}
-      >
-        <span aria-hidden="true" className="h-1 w-10 rounded-full bg-slate-600" />
+        <button
+          aria-expanded={open}
+          aria-label={open ? t('movementArrows.collapse', 'Hide movement') : t('movementArrows.expand', 'Show movement')}
+          className="flex h-11 w-full touch-none select-none items-center justify-center rounded-t border border-b-0 border-slate-700 bg-slate-900 text-slate-400"
+          data-testid="movement-panel-handle"
+          onClick={onHandleClick}
+          onPointerDown={onHandlePointerDown}
+          type="button"
+        >
+          <span aria-hidden="true" className="h-1 w-10 rounded-full bg-slate-600" />
+        </button>
       </div>
     </div>
   );
