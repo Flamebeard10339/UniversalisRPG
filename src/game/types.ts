@@ -685,6 +685,12 @@ export type StatTotals = {
   effectiveTotal: number;
 };
 
+export type StatSource =
+  | { added: number; increased: number; itemId: string; kind: 'equipment' }
+  | { added: number; increased: number; durationSeconds: number; expiresAt: number; itemId: string; kind: 'buff' }
+  | { added: number; increased: number; kind: 'modifier'; modifierId: string }
+  | { added: number; increased: number; kind: 'skill'; skillId: string };
+
 export type ActionResolutionContext = {
   actions: GameAction[];
   skills: SkillDefinition[];

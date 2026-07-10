@@ -1,57 +1,37 @@
-import { statExamineKey, statTitleKey } from '../game/contentIds';
+import { statTitleKey } from '../game/contentIds';
 import { getCharacterStatTotals } from '../game/characterStats';
 import type { ContentBundle, UniversePlayState } from '../game/types';
 import type { Translator } from '../game/i18n';
-import { ExamineButton } from './ExamineButton';
 import { ResourceStatus } from './ResourceStatus';
 
 type CharacterStatsProps = {
   bundle: ContentBundle;
-  onExamine: (text: string) => void;
+  onOpenStat: (statId: string) => void;
   playState: UniversePlayState;
   t: Translator;
 };
 
-const formatNumber = (value: number) =>
-  Number.isInteger(value) ? String(value) : value.toFixed(2);
-
-export const CharacterStats = ({ bundle, onExamine, playState, t }: CharacterStatsProps) => (
+export const CharacterStats = ({ bundle, onOpenStat, playState, t }: CharacterStatsProps) => (
   <section className="grid gap-4">
     <section className="grid gap-3 rounded border border-slate-800 bg-slate-900 p-4">
-      <div>
-        <h2 className="text-base font-semibold text-slate-100">{t('characterStats.stats.title')}</h2>
-      </div>
-      <div className="grid gap-2 overflow-x-auto">
-        <table className="w-full min-w-[720px] border-collapse text-left text-xs">
-          <thead className="text-slate-400">
-            <tr className="border-b border-slate-800">
-              <th className="py-2 pr-3 font-medium">{t('characterStats.column.stat')}</th>
-              <th className="py-2 pr-3 font-medium">{t('characterStats.column.base')}</th>
-              <th className="py-2 pr-3 font-medium">{t('characterStats.column.added')}</th>
-              <th className="py-2 pr-3 font-medium">{t('characterStats.column.increased')}</th>
-              <th className="py-2 pr-3 font-medium">{t('characterStats.column.effective')}</th>
-              <th className="py-2 pr-3 font-medium" />
-            </tr>
-          </thead>
-          <tbody>
-            {bundle.stats.map((stat) => {
-              const totals = getCharacterStatTotals(playState, bundle.stats, stat.id, bundle.skills, bundle.items, bundle.manifest.experienceCurve, bundle.statModifiers);
+      <h2 className="text-base font-semibold text-slate-100">{t('characterStats.stats.title')}</h2>
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
+        {bundle.stats.map((stat) => {
+          const totals = getCharacterStatTotals(playState, bundle.stats, stat.id, bundle.skills, bundle.items, bundle.manifest.experienceCurve, bundle.statModifiers);
 
-              return (
-                <tr className="border-b border-slate-800/80 text-slate-200" key={stat.id}>
-                  <td className="py-2 pr-3 font-semibold text-slate-100">{t(statTitleKey(stat.id), stat.id)}</td>
-                  <td className="py-2 pr-3">{formatNumber(totals.base)}</td>
-                  <td className="py-2 pr-3">{formatNumber(totals.added)}</td>
-                  <td className="py-2 pr-3">{formatNumber(totals.increased)}</td>
-                  <td className="py-2 pr-3 text-cyan-100">{formatNumber(totals.effectiveTotal)}</td>
-                  <td className="py-2 pr-3">
-                    <ExamineButton onExamine={onExamine} t={t} textKey={statExamineKey(stat.id)} />
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+          return (
+            <button
+              className="grid gap-1 rounded border border-slate-800 bg-slate-950 p-3 text-left transition hover:border-cyan-500"
+              data-stat-id={stat.id}
+              key={stat.id}
+              onClick={() => onOpenStat(stat.id)}
+              type="button"
+            >
+              <span className="text-xs font-medium text-slate-400">{t(statTitleKey(stat.id), stat.id)}</span>
+              <span className="text-xl font-semibold text-cyan-100">{Math.trunc(totals.effectiveTotal)}</span>
+            </button>
+          );
+        })}
       </div>
     </section>
 

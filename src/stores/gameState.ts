@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import type { ActionResolutionContext, ContentBundle, EquipmentSlot, GameAction, IdleReport, RunLogEntry, UniversePlayState } from '../game/types';
 import type { AvailableTravelEdge } from '../game/travel';
-import { appendChatMessage, appendRunLog, applyItemDelta, cancelDialogue, chooseDialogueOption, closeModal, createInitialPlayState, depositToBank, dropInventoryItem, eatItem, equipItem, normalizePlayState, pickUpGroundItem, resetInactiveEffectResources, resolveIdleTimers, setCharacterName, startAction, startTravel, unequipSlot, withdrawFromBank } from '../game/timers';
+import { appendChatMessage, appendRunLog, applyItemDelta, cancelDialogue, chooseDialogueOption, closeModal, createInitialPlayState, depositToBank, dropInventoryItem, eatItem, equipItem, normalizePlayState, openModal, pickUpGroundItem, resetInactiveEffectResources, resolveIdleTimers, setCharacterName, startAction, startTravel, unequipSlot, withdrawFromBank } from '../game/timers';
 import { load, remove, save } from '../lib/storage';
 import { recordAgentSessionMessage, type AgentSessionMessage } from '../game/agentSession';
 import { hasModuleCleanupChanges, sanitizePlayStateForBundle, type ModuleCleanupReport } from '../game/moduleCleanup';
@@ -27,6 +27,7 @@ type GameStateStore = {
   depositToBank: (universeId: string, context: ActionResolutionContext, itemId: string, amount: number) => void;
   withdrawFromBank: (universeId: string, context: ActionResolutionContext, itemId: string, amount: number) => void;
   setCharacterName: (universeId: string, name: string) => void;
+  openModal: (universeId: string, modalId: string) => void;
   closeModal: (universeId: string) => void;
   markInactive: (universeId: string) => void;
   sendChatMessage: (universeId: string, text: string) => void;
@@ -359,6 +360,16 @@ export const useGameState = create<GameStateStore>((set, get) => ({
       const current = state.states[universeId];
       if (!current) return state;
       const next = setCharacterName(current, name);
+      void save(storageKey(universeId), next);
+      return { states: { ...state.states, [universeId]: next } };
+    });
+  },
+
+  openModal: (universeId, modalId) => {
+    set((state) => {
+      const current = state.states[universeId];
+      if (!current) return state;
+      const next = openModal(current, modalId);
       void save(storageKey(universeId), next);
       return { states: { ...state.states, [universeId]: next } };
     });

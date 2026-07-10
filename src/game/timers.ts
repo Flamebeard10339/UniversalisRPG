@@ -1316,6 +1316,12 @@ export const closeModal = (
   now = Date.now(),
 ): UniversePlayState => (state.openModalId ? { ...state, openModalId: null, lastTickAt: now } : state);
 
+export const openModal = (
+  state: UniversePlayState,
+  modalId: string,
+  now = Date.now(),
+): UniversePlayState => ({ ...state, openModalId: modalId, lastTickAt: now });
+
 const findDialogue = (context: ActionResolutionContext, dialogueId: string) =>
   context.dialogues?.find((dialogue) => dialogue.id === dialogueId) ?? null;
 

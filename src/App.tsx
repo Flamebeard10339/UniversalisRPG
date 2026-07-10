@@ -8,6 +8,7 @@ import { ChatPanel } from './components/ChatPanel';
 import { MovementArrowsPanel } from './components/MovementArrowsPanel';
 import { BankPanel } from './components/BankPanel';
 import { CharacterStats } from './components/CharacterStats';
+import { StatDetailModal } from './components/StatDetailModal';
 import { CollectionLogPanel } from './components/CollectionLogPanel';
 import { QuestLogPanel } from './components/QuestLogPanel';
 import { DialoguePanel } from './components/DialoguePanel';
@@ -200,6 +201,7 @@ export default function App() {
   const depositToBank = useGameState((state) => state.depositToBank);
   const withdrawFromBank = useGameState((state) => state.withdrawFromBank);
   const setCharacterName = useGameState((state) => state.setCharacterName);
+  const openModal = useGameState((state) => state.openModal);
   const closeModal = useGameState((state) => state.closeModal);
   const resolveIdle = useGameState((state) => state.resolveIdle);
   const markInactive = useGameState((state) => state.markInactive);
@@ -1186,7 +1188,7 @@ export default function App() {
             {characterTab === 'stats' && (
               <CharacterStats
                 bundle={bundle}
-                onExamine={onExamine}
+                onOpenStat={(statId) => openModal(runtimeUniverseId, `stat-detail:${statId}`)}
                 playState={playState}
                 t={t}
               />
@@ -1686,6 +1688,16 @@ export default function App() {
             />
           </div>
         </div>
+      )}
+
+      {playState.openModalId?.startsWith('stat-detail:') && (
+        <StatDetailModal
+          bundle={bundle}
+          onClose={() => closeModal(runtimeUniverseId)}
+          playState={playState}
+          statId={playState.openModalId.slice('stat-detail:'.length)}
+          t={t}
+        />
       )}
 
       <FloatingSkillText bundle={bundle} playState={playState} t={t} />

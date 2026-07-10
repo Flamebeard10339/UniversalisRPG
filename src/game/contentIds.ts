@@ -44,6 +44,7 @@ export const skillTitleKey = (id: string) => `skill.${toKebabCase(id)}.title`;
 export const skillExamineKey = (id: string) => `skill.${toKebabCase(id)}.examine`;
 export const statTitleKey = (id: string) => `stat.${toKebabCase(id)}.title`;
 export const statExamineKey = (id: string) => `stat.${toKebabCase(id)}.examine`;
+export const statModifierTitleKey = (id: string) => `stat-modifier.${toKebabCase(id)}.title`;
 export const resourceTitleKey = (id: string) => `resource.${toKebabCase(id)}.title`;
 export const effectTitleKey = (id: string) => `effect.${toKebabCase(id)}.title`;
 export const itemTitleKey = (id: string) => `item.${toKebabCase(id)}.title`;
