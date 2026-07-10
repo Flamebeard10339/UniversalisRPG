@@ -568,6 +568,9 @@ export default function App() {
       debugSetFlag: (flagId, value) => debugSetFlag(runtimeUniverseId, flagId, value),
       debugSetSkillXp: (skillId, xp) => debugSetSkillXp(runtimeUniverseId, skillId, xp),
       teleport: (locationId) => setCurrentLocation(runtimeUniverseId, locationId),
+      resetUniverse: () => {
+        void resetUniverse(runtimeUniverseId, startingLocationId, { manifest: bundle.manifest });
+      },
     };
     executeChatInput(text, runtime);
   };

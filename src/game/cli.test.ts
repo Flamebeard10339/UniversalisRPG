@@ -74,6 +74,7 @@ const buildRuntime = (playState: UniversePlayState, overrides: Partial<CliRuntim
     debugSetFlag: vi.fn(),
     debugSetSkillXp: vi.fn(),
     teleport: vi.fn(),
+    resetUniverse: vi.fn(),
     ...overrides,
   };
   return { runtime, messages };
@@ -178,6 +179,13 @@ describe('executeChatInput', () => {
     const { runtime } = buildRuntime(createInitialPlayState('test', 'start'), { isDebugEnabled: () => true });
     executeChatInput('/cheat give cooked-shrimp 5', runtime);
     expect(runtime.debugGiveItem).toHaveBeenCalledWith('cooked-shrimp', 5);
+  });
+
+  it('resets the universe via /cheat reset', () => {
+    const { runtime, messages } = buildRuntime(createInitialPlayState('test', 'start'), { isDebugEnabled: () => true });
+    executeChatInput('/cheat reset', runtime);
+    expect(runtime.resetUniverse).toHaveBeenCalled();
+    expect(messages[messages.length - 1].text).toContain('reset');
   });
 
   it('/help omits cheat commands unless debug mode is enabled', () => {

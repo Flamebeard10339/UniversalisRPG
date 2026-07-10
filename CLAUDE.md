@@ -247,3 +247,14 @@ this before authoring NPCs, quests, items, or any state-driven UI.
   module) and is not wired into CI. Treat it as stale/unverified, not a source of
   truth: don't pattern-match its selector style for new checks, and don't trust a
   pass/fail from it without first confirming the selectors it depends on still exist.
+- **Manually clearing browser storage does not reliably give you a fresh state** —
+  use `/cheat reset` (or the Settings tab's Reset Universe button) instead.
+  `markInactive` (`src/stores/gameState.ts`) saves the tab's current in-memory state
+  to `localStorage` on `visibilitychange`/`pagehide`, which — by design, so a
+  returning player's away-time is tracked accurately — also fires during a reload or
+  tab close. If you clear storage and then reload/close the tab, that save re-writes
+  the pre-clear state back to disk *during the reload itself*, so the next load looks
+  like clearing "didn't work" even though it genuinely did for a moment. `resetUniverse`
+  doesn't have this race (it sets fresh state immediately, no reload involved), which
+  is also why `/cheat reset` — not "clear storage and reload" — is the right way to get
+  a genuinely clean starting state before any manual verification pass in this app.

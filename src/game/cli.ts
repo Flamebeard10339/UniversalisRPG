@@ -39,6 +39,7 @@ export type CliRuntime = {
   debugSetFlag: (flagId: string, value: boolean | number | string) => void;
   debugSetSkillXp: (skillId: string, xp: number) => void;
   teleport: (locationId: string) => void;
+  resetUniverse: () => void;
 };
 
 export type CliCommand = {
@@ -427,13 +428,18 @@ export const cliCommands: CliCommand[] = [
   },
   {
     name: 'cheat',
-    usage: '/cheat <give|set-flag|set-xp|teleport> ...',
+    usage: '/cheat <give|set-flag|set-xp|teleport|reset> ...',
     description: 'Debug-only cheat commands.',
     cheat: true,
     run: (args, rt) => {
       const t = rt.getTranslator();
       const [sub, ...rest] = args;
 
+      if (sub === 'reset') {
+        rt.resetUniverse();
+        rt.appendMessage(t('cli.cheat.resetComplete', 'Universe save reset.'));
+        return;
+      }
       if (sub === 'give') {
         const amount = Number(rest[rest.length - 1]);
         const hasAmount = Number.isFinite(amount) && rest.length > 1;
@@ -467,7 +473,7 @@ export const cliCommands: CliCommand[] = [
         rt.teleport(location.id);
         return;
       }
-      rt.appendMessage(t('cli.cheat.usage', 'Usage: /cheat <give|set-flag|set-xp|teleport> ...'));
+      rt.appendMessage(t('cli.cheat.usage', 'Usage: /cheat <give|set-flag|set-xp|teleport|reset> ...'));
     },
   },
 ];
