@@ -1349,4 +1349,31 @@ describe('resolveIdleTimers', () => {
     expect(resolved.state.chatMessages.map((message) => message.key)).toEqual(['entity.crate.examine']);
     expect(resolved.state.actionCompletions['examine-crate']).toBe(1);
   });
+
+  it('shows no generic completion message for a travel action, matching map/pathfinding travel\'s own silence', () => {
+    const startedAt = 1_000;
+    const action: GameAction = {
+      id: 'go-middle',
+      locationId: 'room',
+      role: 'travel',
+      rewards: [],
+      results: [{ kind: 'relocate', locationId: 'middle' }],
+    };
+    const context: ActionResolutionContext = {
+      actions: [action],
+      skills: [],
+      locations: [
+        { id: 'room', position: { x: 0, y: 0 }, starting: true },
+        { id: 'middle', position: { x: 3, y: 4 } },
+      ],
+      interactionTypes: [],
+      enemies: [],
+    };
+    const state = startAction(createInitialPlayState('test-universe', 'room'), action, context, startedAt);
+
+    const resolved = resolveIdleTimers(state, context, {}, startedAt + 10_000);
+
+    expect(resolved.state.chatMessages).toEqual([]);
+    expect(resolved.state.currentLocationId).toBe('middle');
+  });
 });

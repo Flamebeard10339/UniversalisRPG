@@ -1,5 +1,6 @@
 import type { ActionResolutionContext, ActionResult, ChatMessage, ConcreteReward, EquipmentSlot, ExperienceEventKind, ExperienceTrigger, GameAction, IdleReport, IdleResolution, ItemDefinition, ResourceBoundaryBehavior, Reward, RunLogEntry, UniversePlayState } from './types';
 import type { AvailableTravelEdge } from './travel';
+import { getPureTravelDestination } from './travel';
 import { getActionDurationMs, getEnemy, getInteractionType, isInstantAction, sampleAdversarialDamage, sampleEnemyAttackDamage } from './adversarial';
 import { getEnemyStat } from './enemies';
 import { getEffectDeltaPerMinute, getResourceMaxForContext, isEffectApplicable } from './resources';
@@ -1872,6 +1873,15 @@ const getActionMessage = (
 
   if (outcome === 'kill') {
     return actionKillKey(action.id);
+  }
+
+  // Map/pathfinding-driven travel (completeDueTravelSegments) never shows a
+  // chat message on arrival — it only writes to the internal runLog. A
+  // travel action clicked directly from the action list should behave
+  // identically instead of showing a generic "Done." the map path never
+  // would; the location view updating is feedback enough.
+  if (getPureTravelDestination(action)) {
+    return null;
   }
 
   // A plain (non-adversarial) action that already narrates this outcome
