@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { ContentBundle, UniverseManifest, ValidationIssue } from '../game/types';
+import type { ContentBundle, ContributionDraft, UniverseManifest, ValidationIssue } from '../game/types';
 import { applyModulesToBundle } from '../game/contentModules';
 import { normalizeContentBundleStructure } from '../game/contentNormalization';
 import {
@@ -12,6 +12,7 @@ import {
 import { mergeDraftModulesIntoBundle, mergeValidDraftIntoBundle, validateContentBundle } from '../game/validators';
 import { load, save } from '../lib/storage';
 import { useContributionState } from './contributionState';
+import { useDslEditorState } from './dslEditorState';
 import { useGameState } from './gameState';
 import type { ModuleCleanupReport } from '../game/moduleCleanup';
 import { migrateMonolithicBundleToCoreModule } from '../game/moduleMigration';
@@ -79,7 +80,51 @@ const enabledWithProtectedCore = (baseBundle: ContentBundle, enabledModules: Rec
   return Array.from(new Set([...protectedIds, ...requested]));
 };
 
-const applyModulesAndDraft = (bundle: ContentBundle | null, enabledModules: Record<string, string[]>, localePreference: LocalePreference) => {
+const resolveDraftModules = (
+  bundle: ContentBundle,
+  draft: ContributionDraft | null,
+  enabledModules: Record<string, string[]>,
+  localePreference: LocalePreference,
+) => {
+  const bundleWithDraftModules = mergeDraftModulesIntoBundle(bundle, draft);
+  return applyModulesToBundle(
+    bundleWithDraftModules,
+    bundleWithDraftModules.modules ?? [],
+    enabledWithProtectedCore(bundle, enabledModules),
+    resolveLocale(bundleWithDraftModules, localePreference),
+  );
+};
+
+// A module id shows up here whenever it's disabled at all — including a
+// pre-existing/unrelated disablement this specific draft had nothing to do
+// with. That's fine: markPlayable only ever advances forward on a *clean*
+// resolution, so there's nothing to fall back to for a module that's never
+// resolved cleanly this session, and the substitution below is a no-op for
+// it (nothing worse than today).
+const disabledModuleIds = (issues: ValidationIssue[]): Set<string> =>
+  new Set(
+    issues
+      .filter((issue) => issue.message === 'validation.moduleDisabled' || issue.message === 'validation.moduleConflictDisabled')
+      .map((issue) => issue.path.match(/modules\.([^.]+)$/)?.[1])
+      .filter((id): id is string => Boolean(id)),
+  );
+
+// A DSL edit that compiles cleanly can still trip a semantic
+// module-conflict-disable cascade (e.g. the flag-scoping bug this guards
+// against — see compiler.test.ts's "pack-scopes a bare # flags
+// declaration..." case) — compileDsl alone can't see that, since it only
+// knows about the module in isolation, not how it merges with everything
+// else. Left unguarded, that cascade can drop the player's current
+// location out of the bundle entirely and strand the whole app on a
+// Settings-only view with no way back short of clearing storage — worse,
+// the broken draft persists across reloads, so simply reloading doesn't
+// help either. If the draft-as-authored resolution disables a module that
+// has a last-known-playable version, use that version for the *live*
+// bundle instead, while still surfacing the draft-as-authored issues (not
+// the fallback's) so the editor keeps showing the real problem.
+// Exported for universeState.test.ts's direct coverage of the fallback
+// behavior; not otherwise used outside this module.
+export const applyModulesAndDraft = (bundle: ContentBundle | null, enabledModules: Record<string, string[]>, localePreference: LocalePreference) => {
   if (!bundle) {
     return {
       bundle: null,
@@ -89,20 +134,31 @@ const applyModulesAndDraft = (bundle: ContentBundle | null, enabledModules: Reco
   }
 
   const draft = useContributionState.getState().getDraft(bundle.manifest.id);
-  const bundleWithDraftModules = mergeDraftModulesIntoBundle(bundle, draft);
-  const moduleResolution = applyModulesToBundle(
-    bundleWithDraftModules,
-    bundleWithDraftModules.modules ?? [],
-    enabledWithProtectedCore(bundle, enabledModules),
-    resolveLocale(bundleWithDraftModules, localePreference),
-  );
+  const draftModules = draft?.modules ?? [];
+  const attempted = resolveDraftModules(bundle, draft, enabledModules, localePreference);
+  const disabled = disabledModuleIds(attempted.issues);
+  const brokenDraftModules = draftModules.filter((module) => disabled.has(module.id));
+
+  let moduleResolution = attempted;
+
+  if (brokenDraftModules.length > 0) {
+    const fallbackModules = draftModules.map((module) => (disabled.has(module.id)
+      ? useDslEditorState.getState().getDraft(module.id)?.lastPlayableModule ?? module
+      : module));
+    moduleResolution = resolveDraftModules(bundle, { ...(draft as ContributionDraft), modules: fallbackModules }, enabledModules, localePreference);
+  } else {
+    for (const module of draftModules) {
+      useDslEditorState.getState().markPlayable(module.id, module);
+    }
+  }
+
   const draftMerge = mergeValidDraftIntoBundle(moduleResolution.bundle, draft);
   const merged = normalizeContentBundleStructure(draftMerge.bundle);
 
   return {
     bundle: merged,
     enabledModuleIds: moduleResolution.enabledModuleIds,
-    validationIssues: [...moduleResolution.issues, ...draftMerge.issues, ...validateContentBundle(merged)],
+    validationIssues: [...attempted.issues, ...draftMerge.issues, ...validateContentBundle(merged)],
   };
 };
 

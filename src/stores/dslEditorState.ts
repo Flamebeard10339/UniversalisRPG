@@ -22,6 +22,18 @@ export type DslModuleDraft = {
   // compiled output — undefined until the first successful compile.
   lastValidSource?: string;
   lastValidModule?: ContentModule;
+  // The most recent compiled module that, once merged into the live
+  // bundle, didn't newly disable itself or any other module (see
+  // markPlayable in universeState.ts). This deliberately lags behind
+  // lastValidModule: a syntactically-clean compile can still trigger a
+  // semantic module-conflict-disable cascade (e.g. an undeclared flag
+  // reference) that compileDsl alone has no way to see — lastValidModule
+  // would already have moved on to the broken version by then.
+  // lastPlayableModule only advances on confirmed-safe versions, so it's
+  // what the live (gameplay) bundle falls back to while a bad edit is
+  // still being fixed — undefined until the module's first resolution
+  // that didn't disable anything.
+  lastPlayableModule?: ContentModule;
   updatedAt: number;
 };
 
@@ -33,6 +45,7 @@ type DslEditorStateStore = {
   openDraft: (moduleId: string, baselineSource: string) => void;
   setSource: (moduleId: string, source: string) => void;
   markValid: (moduleId: string, source: string, module: ContentModule) => void;
+  markPlayable: (moduleId: string, module: ContentModule) => void;
   revertToLastValid: (moduleId: string) => void;
 };
 
@@ -86,6 +99,16 @@ export const useDslEditorState = create<DslEditorStateStore>((set, get) => ({
       const existing = state.drafts[moduleId];
       if (!existing) return state;
       const next: DslModuleDraft = { ...existing, lastValidSource: source, lastValidModule: module, updatedAt: Date.now() };
+      void save(storageKey(moduleId), next);
+      return { drafts: { ...state.drafts, [moduleId]: next } };
+    });
+  },
+
+  markPlayable: (moduleId, module) => {
+    set((state) => {
+      const existing = state.drafts[moduleId];
+      if (!existing) return state;
+      const next: DslModuleDraft = { ...existing, lastPlayableModule: module };
       void save(storageKey(moduleId), next);
       return { drafts: { ...state.drafts, [moduleId]: next } };
     });

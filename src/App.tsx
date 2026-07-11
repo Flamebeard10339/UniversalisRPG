@@ -806,7 +806,13 @@ export default function App() {
       getDslDraft: (moduleId) => {
         const draft = useDslEditorState.getState().getDraft(moduleId);
         if (!draft) return null;
-        return { baselineSource: draft.baselineSource, source: draft.source, lastValidSource: draft.lastValidSource, updatedAt: draft.updatedAt };
+        return {
+          baselineSource: draft.baselineSource,
+          source: draft.source,
+          lastValidSource: draft.lastValidSource,
+          hasLastPlayableModule: draft.lastPlayableModule !== undefined,
+          updatedAt: draft.updatedAt,
+        };
       },
       setDslSource: (moduleId, source) => {
         if (!useDslEditorState.getState().getDraft(moduleId)) useDslEditorState.getState().openDraft(moduleId, source);

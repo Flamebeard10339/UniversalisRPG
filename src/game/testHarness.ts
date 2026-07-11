@@ -116,7 +116,7 @@ export type TestHarnessDeps = {
   // success, commits into the contribution draft that feeds the live
   // bundle — the exact same path DslModuleEditor.tsx's linter takes on a
   // 300ms debounce, just synchronous and without touching CodeMirror.
-  getDslDraft: (moduleId: string) => { baselineSource: string; source: string; lastValidSource?: string; updatedAt: number } | null;
+  getDslDraft: (moduleId: string) => { baselineSource: string; source: string; lastValidSource?: string; hasLastPlayableModule: boolean; updatedAt: number } | null;
   setDslSource: (moduleId: string, source: string) => void;
   applyDslEdit: (moduleId: string, source: string) => ApplyDslEditResult;
 };
