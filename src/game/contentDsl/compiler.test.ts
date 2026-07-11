@@ -693,13 +693,54 @@ some-flag: true
     ]);
     expect(data.flags).toEqual([
       { id: 'tutorial.miki-cleared', initialValue: false },
-      { id: 'death-count', initialValue: 0 },
-      { id: 'some-flag', initialValue: true },
+      { id: 'stat-proof.death-count', initialValue: 0 },
+      { id: 'stat-proof.some-flag', initialValue: true },
     ]);
     expect(locale['stat.attack.title']).toBe('Attack');
     expect(locale['stat.attack.examine']).toBe('Power applied to outgoing attacks.');
     expect(locale['stat.movement-speed.title']).toBe('Movement speed');
     expect(locale['skill.regeneration.title']).toBe('Regeneration');
+  });
+
+  it('pack-scopes a bare # flags declaration to the exact same id a bare set:/hidden-if reference to it resolves to', () => {
+    // Regression for a real crash: a module declaring `# flags\nfoo` while
+    // also doing `set: foo`/`hidden if: foo` elsewhere used to compile the
+    // *declaration* as bare `foo` but the *reference* as pack-scoped
+    // `<pack>.foo` — two different flag ids, one declared-but-unused and one
+    // referenced-but-undeclared. The latter trips the undeclared-flag
+    // module-conflict-cascade (validateModuleSemanticChanges), which the
+    // contribution editor didn't degrade from gracefully.
+    const source = `# info
+id: flag-scope-proof
+version: 1.0.0
+universe: base
+author: test
+game_version: 1.0
+pack: flag-scope-proof
+
+# flags
+taken
+
+# location proof-location
+x: 0, y: 0
+starting
+
+## entity chest
+examine: A chest.{!taken: It looks untouched.}
+open: set: taken, once, say: You open it.
+`;
+    const { module } = compileDsl(source);
+    const data = module.data as {
+      flags: { id: string; initialValue: boolean | number }[];
+      entities: { id: string; actions: { id: string; results?: { kind: string; flagId?: string }[] }[] }[];
+    };
+
+    const declaredFlagId = data.flags[0].id;
+    const openAction = data.entities[0].actions.find((action) => action.id === 'open');
+    const setResult = openAction?.results?.find((result) => result.kind === 'flag');
+
+    expect(declaredFlagId).toBe('flag-scope-proof.taken');
+    expect(setResult?.flagId).toBe(declaredFlagId);
   });
 });
 

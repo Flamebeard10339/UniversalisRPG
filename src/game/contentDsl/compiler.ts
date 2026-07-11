@@ -523,7 +523,15 @@ const compileSkill = (section: DslSkillSection, locale: LocaleBuilder): SkillDef
   return { id: section.id, maxLevel: section.maxLevel ?? 100, statId: section.statId ?? section.id };
 };
 
-const compileFlags = (section: DslFlagsSection): StateFlagDefinition[] => section.flags;
+// A bare flag id declared here must resolve to the exact same id a bare
+// `set:`/`unset:`/condition reference to it resolves to elsewhere in the
+// module (resolveFlagId) — otherwise the declaration and every reference to
+// it silently diverge into two different flag ids (one declared-but-unused,
+// one referenced-but-undeclared), which triggers the undeclared-flag
+// module-conflict-cascade (see validateModuleSemanticChanges) instead of a
+// clean compile.
+const compileFlags = (section: DslFlagsSection, pack: string): StateFlagDefinition[] =>
+  section.flags.map((flag) => ({ ...flag, id: resolveFlagId(flag.id, pack) }));
 
 // A named, reusable droptable (`# droptable <id>`) is always `independent`
 // mode — the same mode a `droptable:` tag's own attached (unnamed) table
@@ -610,7 +618,7 @@ export const compileDsl = (source: string): { module: ContentModule; locale: Rec
     } else if (section.kind === 'skill') {
       skills.push(compileSkill(section, locale));
     } else if (section.kind === 'flags') {
-      flags.push(...compileFlags(section));
+      flags.push(...compileFlags(section, pack));
     } else if (section.kind === 'droptable') {
       dropTables.push(compileDropTable(section, dropTableIds));
     }
