@@ -831,9 +831,12 @@ export type ContributionRemovedIds = {
   modules: string[];
 };
 
+// Full, self-contained module source — not a diff. A GitHub issue needs to
+// be plug-and-play (drop the file in and test it directly), which a diff
+// alone can't be without a merge step first; see formatDslModulesBlock in
+// src/lib/githubIssues.ts.
 export type ContributionDslModuleFile = {
   path: string;
-  baselineSource: string;
   source: string;
 };
 
@@ -844,14 +847,6 @@ export type ContributionPackage = {
   validationIssues: ValidationIssue[];
   notes: string;
   t?: (key: string, fallbackOrParams?: string | Record<string, string | number>, params?: Record<string, string | number>) => string;
-  changedFiles: {
-    path: string;
-    json: unknown;
-  }[];
-  // DSL-authored modules are packaged as a unified diff against each
-  // module's on-disk baseline, not the whole file — a one-line fix in a
-  // large module shouldn't force a reviewer to read the entire thing. See
-  // formatDslModulesDiffBlock in src/lib/githubIssues.ts.
   dslModules?: ContributionDslModuleFile[];
 };
 

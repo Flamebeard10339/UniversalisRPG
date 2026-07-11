@@ -588,9 +588,57 @@ optional `"data-updates"` key, which is instead attached verbatim to the
 module's own `data-updates` field (`ModuleDataUpdates` — removals and
 cross-module JSON-patch edits). It's a second, separate escape hatch from the
 rest of `# advanced`'s JSON for exactly this reason: `data` and
-`data-updates` are two different fields on the compiled `ContentModule`, and
-neither the DSL's own sections (`# location`, `# item`, ...) nor the rest of
-`# advanced` can author the latter.
+`data-updates` are two different fields on the compiled `ContentModule`.
+Editing an existing entity/item in another module now has its own sugar
+(`# patch <targetModuleId>`, below) — this hand-written `"patches"` form is
+still there for the object kinds `# patch` doesn't cover yet (locations,
+stats, skills, ...), or field-level (rather than whole-object) JSON-Patch
+ops.
+
+## `# patch <targetModuleId>`
+
+```
+# patch tutorial-island-guide-house
+## entity front-door
+examine: A newly reinforced door — the workshop clearly did a pass on it.
+pick lock:
+  requires: lockpick
+  xp: thieving 8
+  on success:
+    set: tutorial.miki-cleared
+    say: The lock gives with a soft click.
+
+## item bronze-dagger
+tags: mainhand (1 attack), +2 attack
+```
+
+Edits an entity/item owned by *another* module (`<targetModuleId>`) —
+without touching that module's own file — for a contribution to content you
+don't own. Body is a sequence of `## entity <id>` / `## item <id>` blocks:
+same grammar as a location's nested entities / a top-level `# item`
+(including the "every entity gets an examine action, even an unauthored
+one" default), just `##`-prefixed here since each is a sub-declaration of
+what's being patched rather than a standalone top-level section.
+
+Compiles to whole-object `data-updates.patches` entries (`ModuleObjectPatch`,
+`op: 'replace'` at the object's own root) — sugar for what previously
+required hand-writing this shape inside `# advanced`, not a new engine
+capability; the engine already applies `data-updates.patches` purely at
+runtime (`applyObjectPatches` in `contentModules.ts`), regardless of which
+module declares them, so patching an entity never requires merging into the
+target module's own file. **A patch replaces the target wholesale** — same
+semantics `data-updates`'s own JSON-authored entity/item merging already has
+for array-valued fields like `actions` (`mergePatchValue` in
+`contentModules.ts`) — redeclare every action you want to keep, not just the
+one you're changing. A `# patch` targeting an entity/item that doesn't exist
+in the target module fails validation (`moduleUpdateTargetMissing`) rather
+than silently creating it — this sugar is for *editing existing* content;
+add brand-new entities/items in your own module's `# location`/`# item`
+instead.
+
+Only `## entity`/`## item` are covered today; patching a location, stat,
+skill, or other object kind still needs `# advanced`'s raw
+`"data-updates": {"patches": [...]}` form above.
 
 The remaining keys (merged into `data`) are the intentional escape hatch for
 object kinds that are engine plumbing rather than authoring surface

@@ -20,6 +20,7 @@ import type {
   DslItemSection,
   DslLocationSection,
   DslModule,
+  DslPatchSection,
   DslQuestSection,
   DslQuestStage,
   DslRecipeIngredient,
@@ -83,7 +84,7 @@ export const parseDsl = (source: string): DslModule => {
   cursor.skipBlank();
   while (!cursor.atEnd()) {
     const line = cursor.current!;
-    const headerMatch = /^#\s+(info|location|dialogue|advanced|item|quest|recipe|interaction|stat|skill|flags|droptable)\b\s*(.*)$/.exec(line);
+    const headerMatch = /^#\s+(info|location|dialogue|advanced|item|quest|recipe|interaction|stat|skill|flags|droptable|patch)\b\s*(.*)$/.exec(line);
     if (!headerMatch) {
       throw new DslParseError(`Expected a top-level "# ..." header, got: "${line}"`, cursor.index);
     }
@@ -113,6 +114,8 @@ export const parseDsl = (source: string): DslModule => {
       sections.push(parseFlagsSection(cursor));
     } else if (keyword === 'droptable') {
       sections.push(parseDropTableSection(cursor, rest.trim()));
+    } else if (keyword === 'patch') {
+      sections.push(parsePatchSection(cursor, rest.trim()));
     }
     cursor.skipBlank();
   }
@@ -852,4 +855,49 @@ const parseDropEntries = (cursor: Cursor, baseIndent: number): DslDropEntry[] =>
 const parseDropTableSection = (cursor: Cursor, id: string): DslDropTableSection => {
   cursor.skipBlank();
   return { kind: 'droptable', id, entries: parseDropEntries(cursor, -1) };
+};
+
+// ---------------------------------------------------------------------------
+// Patch: edits an entity/item owned by another module (`targetModuleId`),
+// without touching that module's own file — see DslPatchSection's doc
+// comment in types.ts for the compiled semantics. Body is a sequence of
+// `## entity <id>`/`## item <id>` blocks — `##`-prefixed like a location's
+// nested entities (even though `# item` is a top-level header everywhere
+// else), since these are sub-declarations of what's being patched, not
+// standalone top-level sections.
+// ---------------------------------------------------------------------------
+const parsePatchSection = (cursor: Cursor, targetModuleId: string): DslPatchSection => {
+  cursor.skipBlank();
+  const entities: DslEntityDecl[] = [];
+  const items: DslItemSection[] = [];
+
+  while (!cursor.atEnd()) {
+    const line = cursor.current!;
+    const trimmed = line.trim();
+    if (trimmed.length === 0) {
+      cursor.index++;
+      continue;
+    }
+    if (/^#\s/.test(trimmed) && !/^##/.test(trimmed)) break;
+
+    const entityHeaderMatch = /^##\s+entity\s+([\w-]+)\s*$/i.exec(trimmed);
+    if (entityHeaderMatch) {
+      cursor.index++;
+      entities.push(parseEntity(cursor, entityHeaderMatch[1]));
+      cursor.skipBlank();
+      continue;
+    }
+
+    const itemHeaderMatch = /^##\s+item\s+([\w-]+)\s*$/i.exec(trimmed);
+    if (itemHeaderMatch) {
+      cursor.index++;
+      items.push(parseItemSection(cursor, itemHeaderMatch[1]));
+      cursor.skipBlank();
+      continue;
+    }
+
+    throw new DslParseError(`Expected "## entity <id>" or "## item <id>" in patch "${targetModuleId}", got: "${line}"`, cursor.index);
+  }
+
+  return { kind: 'patch', targetModuleId, entities, items };
 };

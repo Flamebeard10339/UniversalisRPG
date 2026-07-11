@@ -2,39 +2,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
-import { applyPatch, parsePatch } from 'diff';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const universesRoot = path.join(repoRoot, 'public', 'content', 'universes');
 
-const typeAliases = new Map([
-  ['actions', ['action', 'actions']],
-  ['collectionLogs', ['collectionLog', 'collectionLogs']],
-  ['dialogues', ['dialogue', 'dialogues']],
-  ['displayProfiles', ['displayProfile', 'displayProfiles']],
-  ['dropTables', ['dropTable', 'dropTables']],
-  ['effects', ['effect', 'effects']],
-  ['enemies', ['enemy', 'enemies']],
-  ['entities', ['entity', 'entities']],
-  ['flags', ['flag', 'flags']],
-  ['interactionTypes', ['interactionType', 'interactionTypes']],
-  ['items', ['item', 'items']],
-  ['locations', ['location', 'locations']],
-  ['resources', ['resource', 'resources', 'resourceDefinition', 'resourceDefinitions']],
-  ['resourceDefinitions', ['resource', 'resources', 'resourceDefinition', 'resourceDefinitions']],
-  ['skills', ['skill', 'skills']],
-  ['stats', ['stat', 'stats']],
-]);
-
-const canonicalObjectType = (objectType) => {
-  for (const [canonical, aliases] of typeAliases) {
-    if (canonical === objectType || aliases.includes(objectType)) return canonical;
-  }
-  return objectType;
-};
-
-const moduleFileName = (moduleId) => `${moduleId}.json`;
-const modulePath = (universeId, moduleId) => path.join(universesRoot, universeId, 'modules', moduleFileName(moduleId));
+const modulePath = (universeId, moduleId) => path.join(universesRoot, universeId, 'modules', `${moduleId}.md`);
 const universeManifestPath = (universeId) => path.join(universesRoot, universeId, 'universe.json');
 
 const readJson = (filePath) => JSON.parse(fs.readFileSync(filePath, 'utf8'));
@@ -54,213 +26,95 @@ const writeText = (filePath, text, dryRun) => {
   return { path: filePath };
 };
 
-const changedJsonPattern = /##\s+Changed JSON\s+```json\s*([\s\S]*?)\s*```/i;
-// jsdiff's own multi-file convention (see formatDslModulesDiffBlock in
-// src/lib/githubIssues.ts) — the fenced block may hold one or several
-// concatenated createPatch() outputs; parsePatch() splits them below.
-const dslModulesPattern = /##\s+Changed DSL Modules\s+```diff\s*([\s\S]*?)\s*```/i;
+// Each changed/new DSL module is embedded as its complete, self-contained
+// source under a '### <path>' heading (see formatDslModulesBlock in
+// src/lib/githubIssues.ts) — a plug-and-play file, not a diff, so parsing it
+// back out is a plain extraction, no patch-application logic needed.
+const dslModulesSectionPattern = /##\s+Changed DSL Modules\s*\n([\s\S]*)$/i;
+const dslModuleBlockPattern = /###\s+([^\r\n]+)\r?\n```md\r?\n([\s\S]*?)\r?\n```/g;
 
 export const parseContributionIssue = (text) => {
   const targetUniverseId = text.match(/##\s+Target universe\s+([^\r\n]+)/i)?.[1]?.trim();
-  const changedJson = text.match(changedJsonPattern)?.[1];
   if (!targetUniverseId) throw new Error('Issue body is missing "Target universe".');
-  if (!changedJson) throw new Error('Issue body is missing a Changed JSON code block.');
 
-  const changedFiles = JSON.parse(changedJson);
-  if (!Array.isArray(changedFiles)) throw new Error('Changed JSON must be an array.');
-  for (const [index, file] of changedFiles.entries()) {
-    if (!file || typeof file !== 'object' || typeof file.path !== 'string' || !('json' in file)) {
-      throw new Error(`Changed JSON entry ${index} must include path and json.`);
+  const dslModules = [];
+  const dslSectionMatch = text.match(dslModulesSectionPattern);
+  if (dslSectionMatch) {
+    for (const match of dslSectionMatch[1].matchAll(dslModuleBlockPattern)) {
+      dslModules.push({ path: match[1].trim(), source: match[2] });
     }
   }
-  const dslDiffText = text.match(dslModulesPattern)?.[1];
-  return { targetUniverseId, changedFiles, dslDiffText };
+
+  return { targetUniverseId, dslModules };
 };
 
-const moduleIdFromChangedFile = (file) => {
-  const match = file.path.match(/^modules\/([^/]+)\.json$/i);
-  const moduleId = match?.[1] ?? (file.json && typeof file.json === 'object' ? file.json.id : undefined);
-  if (typeof moduleId !== 'string' || moduleId.trim().length === 0) {
-    throw new Error(`Cannot determine module id from ${file.path}.`);
-  }
-  return moduleId;
+const MODULE_VERSION_PATTERN = /^(\d+)\.(\d+)\.(\d+)$/;
+
+const bumpPatchVersion = (version) => {
+  const match = MODULE_VERSION_PATTERN.exec(version);
+  if (!match) return null;
+  const [, major, minor, patch] = match;
+  return `${major}.${minor}.${Number(patch) + 1}`;
 };
 
-export const addPackagedMods = ({ universeId, changedFiles, dryRun = false }) => {
-  const moduleFiles = changedFiles.filter((file) => /^modules\/[^/]+\.json$/i.test(file.path));
-  if (moduleFiles.length === 0) throw new Error('No module JSON files found in Changed JSON.');
+const withVersion = (source, version) => source.replace(/^(version:\s*)\S+/m, `$1${version}`);
 
-  const manifestPath = universeManifestPath(universeId);
-  const manifest = readJson(manifestPath);
-  const moduleIds = moduleFiles.map(moduleIdFromChangedFile);
-  const nextModules = Array.from(new Set([...(manifest.modules ?? []), ...moduleIds]));
+// A DSL module is authored as a complete, self-contained file — merging it
+// is a plain upsert (write the text to modules/<id>.md, register the id in
+// universe.json only if it's new), never patch-application: unlike the
+// retired JSON-patch workflows, there's no "does this still apply cleanly"
+// question, since the incoming source always fully replaces whatever's on
+// disk. A module whose file already exists gets its version bumped from
+// whatever's currently on disk (not whatever the contributor's session had,
+// which may be stale if something else merged in the meantime) — a brand
+// new module keeps the version the contributor declared.
+export const upsertDslModules = ({ universeId, dslModules, dryRun = false }) => {
+  if (!dslModules || dslModules.length === 0) throw new Error('No Changed DSL Modules block found in the issue.');
+
   const writes = [];
+  const moduleIds = [];
+  const bumped = [];
+  const newModuleIds = [];
 
-  for (const file of moduleFiles) {
-    const moduleId = moduleIdFromChangedFile(file);
-    writes.push(writeJson(modulePath(universeId, moduleId), file.json, dryRun));
-  }
-  writes.push(writeJson(manifestPath, { ...manifest, modules: nextModules }, dryRun));
+  for (const file of dslModules) {
+    const moduleId = file.path.match(/^modules\/([^/]+)\.md$/i)?.[1];
+    if (!moduleId) throw new Error(`Could not determine a module id from "${file.path}".`);
 
-  return { universeId, moduleIds, writes };
-};
+    const targetPath = modulePath(universeId, moduleId);
+    const exists = fs.existsSync(targetPath);
+    const currentText = exists ? fs.readFileSync(targetPath, 'utf8') : null;
+    if (currentText === file.source) continue;
 
-const decodePathPart = (value) => value.replace(/~1/g, '/').replace(/~0/g, '~');
-
-const applyJsonPatch = (value, ops) => {
-  let next = structuredClone(value);
-  const targetFor = (patchPath) => {
-    if (patchPath === '') return { parent: null, key: '' };
-    const parts = patchPath.split('/').slice(1).map(decodePathPart);
-    const key = parts.pop() ?? '';
-    let parent = next;
-    for (const part of parts) parent = Array.isArray(parent) ? parent[Number(part)] : parent[part];
-    return { parent, key };
-  };
-
-  for (const op of ops) {
-    const { parent, key } = targetFor(op.path);
-    if (parent === null) {
-      if (op.op === 'remove') next = undefined;
-      else next = structuredClone(op.value);
-      continue;
-    }
-    if (Array.isArray(parent)) {
-      const index = key === '-' ? parent.length : Number(key);
-      if (op.op === 'remove') parent.splice(index, 1);
-      else if (op.op === 'add') parent.splice(index, 0, structuredClone(op.value));
-      else parent[index] = structuredClone(op.value);
-    } else if (op.op === 'remove') {
-      delete parent[key];
+    let nextSource = file.source;
+    if (exists) {
+      const currentVersion = currentText.match(/^version:\s*(\S+)/m)?.[1];
+      const nextVersion = currentVersion ? bumpPatchVersion(currentVersion) : null;
+      if (currentVersion && nextVersion) {
+        nextSource = withVersion(file.source, nextVersion);
+        bumped.push({ moduleId, from: currentVersion, to: nextVersion });
+      }
     } else {
-      parent[key] = structuredClone(op.value);
+      newModuleIds.push(moduleId);
     }
-  }
-  return next;
-};
 
-const typedDataEntryMatches = (entry, objectType, objectId) =>
-  entry && typeof entry === 'object' &&
-  entry.id === objectId &&
-  typeAliases.get(canonicalObjectType(objectType))?.includes(entry.type);
-
-const findTypedDataEntryIndex = (data, objectType, objectId) =>
-  data.findIndex((entry) => typedDataEntryMatches(entry, objectType, objectId));
-
-const findObjectDataEntryIndex = (data, objectType, objectId) => {
-  const key = canonicalObjectType(objectType);
-  const rows = data[key] ?? [];
-  return { key, index: rows.findIndex((entry) => entry?.id === objectId) };
-};
-
-const applyPatchToModuleData = (targetModule, patch) => {
-  if (!targetModule.data) targetModule.data = [];
-
-  if (Array.isArray(targetModule.data)) {
-    const index = findTypedDataEntryIndex(targetModule.data, patch.objectType, patch.objectId);
-    const current = index >= 0 ? targetModule.data[index] : undefined;
-    const patched = applyJsonPatch(current, patch.ops);
-    if (patched === undefined) {
-      if (index >= 0) targetModule.data.splice(index, 1);
-      return;
-    }
-    const aliases = typeAliases.get(canonicalObjectType(patch.objectType));
-    const nextEntry = { ...patched, type: patched.type ?? aliases?.[0] ?? patch.objectType, id: patch.objectId };
-    if (index >= 0) targetModule.data[index] = nextEntry;
-    else targetModule.data.push(nextEntry);
-    return;
+    writes.push(writeText(targetPath, nextSource, dryRun));
+    moduleIds.push(moduleId);
   }
 
-  const { key, index } = findObjectDataEntryIndex(targetModule.data, patch.objectType, patch.objectId);
-  const rows = targetModule.data[key] ?? [];
-  const current = index >= 0 ? rows[index] : undefined;
-  const patched = applyJsonPatch(current, patch.ops);
-  if (patched === undefined) {
-    targetModule.data[key] = rows.filter((_, rowIndex) => rowIndex !== index);
-  } else if (index >= 0) {
-    targetModule.data[key] = rows.map((row, rowIndex) => rowIndex === index ? { ...patched, id: patch.objectId } : row);
-  } else {
-    targetModule.data[key] = [...rows, { ...patched, id: patch.objectId }];
-  }
-};
-
-export const mergeIntoExistingMod = ({ universeId, targetModId, changedFiles, dryRun = false }) => {
-  if (!targetModId) throw new Error('merge-mod requires --target-mod <module-id>.');
-  const contributionModules = changedFiles
-    .filter((file) => /^modules\/[^/]+\.json$/i.test(file.path))
-    .map((file) => file.json);
-  if (contributionModules.length === 0) throw new Error('No module JSON files found in Changed JSON.');
-
-  const targetPath = modulePath(universeId, targetModId);
-  const targetModule = readJson(targetPath);
-  let applied = 0;
-
-  for (const module of contributionModules) {
-    const patches = module?.['data-updates']?.patches ?? [];
-    for (const patch of patches) {
-      if (patch.targetModId !== targetModId) continue;
-      applyPatchToModuleData(targetModule, patch);
-      applied += 1;
-    }
-  }
-
-  if (applied === 0) throw new Error(`No patches targeted ${targetModId}.`);
-  return { universeId, targetModId, applied, writes: [writeJson(targetPath, targetModule, dryRun)] };
-};
-
-// A DSL module is authored as a complete, self-contained file (not a JSON
-// patch), so merging it never needs patch-application logic the way
-// mergeIntoExistingMod does — it's a plain upsert: write the (patched) text
-// to modules/<id>.md, and register the id in universe.json only if it's
-// new. What DOES need real logic is applying the *unified diff* itself
-// (each module was packaged as a diff against the contributor's baseline,
-// not the whole file — see formatDslModulesDiffBlock) against whatever the
-// file's current on-disk content actually is, so a conflict (the file
-// changed since that baseline) is caught instead of silently overwritten.
-export const upsertDslModules = ({ universeId, dslDiffText, dryRun = false }) => {
-  if (!dslDiffText) throw new Error('No Changed DSL Modules block found in the issue.');
-  const patches = parsePatch(dslDiffText);
-  if (patches.length === 0) throw new Error('Changed DSL Modules block did not contain any file patches.');
-
-  const writes = [];
-  const conflicts = [];
-  const upsertedModuleIds = [];
-
-  for (const patch of patches) {
-    const relativePath = patch.oldFileName ?? patch.newFileName;
-    const moduleId = relativePath?.match(/^modules\/([^/]+)\.md$/i)?.[1];
-    if (!moduleId) {
-      conflicts.push({ path: relativePath ?? '(unknown)', reason: 'Could not determine a module id from the patch file name.' });
-      continue;
-    }
-    const targetPath = path.join(universesRoot, universeId, 'modules', `${moduleId}.md`);
-    const currentText = fs.existsSync(targetPath) ? fs.readFileSync(targetPath, 'utf8') : '';
-    const merged = applyPatch(currentText, patch);
-    if (merged === false) {
-      conflicts.push({ path: relativePath, reason: 'The file changed on disk since this patch was generated — apply manually.' });
-      continue;
-    }
-    writes.push(writeText(targetPath, merged, dryRun));
-    upsertedModuleIds.push(moduleId);
-  }
-
-  const manifestPath = universeManifestPath(universeId);
-  const manifest = readJson(manifestPath);
-  const newModuleIds = upsertedModuleIds.filter((id) => !(manifest.modules ?? []).includes(id));
   if (newModuleIds.length > 0) {
+    const manifestPath = universeManifestPath(universeId);
+    const manifest = readJson(manifestPath);
     writes.push(writeJson(manifestPath, { ...manifest, modules: [...(manifest.modules ?? []), ...newModuleIds] }, dryRun));
   }
 
-  return { universeId, moduleIds: upsertedModuleIds, conflicts, writes };
+  return { universeId, moduleIds, bumped, writes };
 };
 
 const parseArgs = (argv) => {
-  const args = { workflow: '', issue: '', targetModId: '', dryRun: false };
+  const args = { issue: '', dryRun: false };
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
-    if (arg === '--workflow') args.workflow = argv[++index] ?? '';
-    else if (arg === '--issue') args.issue = argv[++index] ?? '';
-    else if (arg === '--target-mod') args.targetModId = argv[++index] ?? '';
+    if (arg === '--issue') args.issue = argv[++index] ?? '';
     else if (arg === '--dry-run') args.dryRun = true;
     else if (arg === '--help' || arg === '-h') args.help = true;
     else throw new Error(`Unknown argument: ${arg}`);
@@ -269,31 +123,21 @@ const parseArgs = (argv) => {
 };
 
 const usage = `Usage:
-  node scripts/merge-contribution-issue.mjs --workflow add-mod --issue issue.md [--dry-run]
-  node scripts/merge-contribution-issue.mjs --workflow merge-mod --target-mod base-core --issue issue.md [--dry-run]
-  node scripts/merge-contribution-issue.mjs --workflow upsert-dsl --issue issue.md [--dry-run]
+  node scripts/merge-contribution-issue.mjs --issue issue.md [--dry-run]
 
-Workflows:
-  add-mod     Write changed module JSON into the target universe and add it to universe.json modules.
-  merge-mod   Apply data-updates.patches from changed modules into an existing packaged module.
-  upsert-dsl  Apply each Changed DSL Modules diff to modules/<id>.md, writing new files or updating
-              existing ones; adds new ids to universe.json. Reports (without writing) any file whose
-              patch no longer applies cleanly, i.e. it changed on disk since the contributor's baseline.`;
+Applies each "## Changed DSL Modules" file in a submitted contribution issue
+(src/lib/githubIssues.ts's formatContributionIssueBody) to
+public/content/universes/<universe>/modules/<id>.md: writes a new file and
+registers it in universe.json if it doesn't exist yet, or overwrites an
+existing one and bumps its version's patch number.`;
 
 export const runCli = (argv = process.argv.slice(2)) => {
   const args = parseArgs(argv);
   if (args.help) return { text: usage };
-  if (!args.workflow) throw new Error('Missing --workflow.');
   if (!args.issue) throw new Error('Missing --issue.');
   const issueText = args.issue === '-' ? fs.readFileSync(0, 'utf8') : fs.readFileSync(args.issue, 'utf8');
   const issue = parseContributionIssue(issueText);
-  const result = args.workflow === 'add-mod'
-    ? addPackagedMods({ universeId: issue.targetUniverseId, changedFiles: issue.changedFiles, dryRun: args.dryRun })
-    : args.workflow === 'merge-mod'
-      ? mergeIntoExistingMod({ universeId: issue.targetUniverseId, targetModId: args.targetModId, changedFiles: issue.changedFiles, dryRun: args.dryRun })
-      : args.workflow === 'upsert-dsl'
-        ? upsertDslModules({ universeId: issue.targetUniverseId, dslDiffText: issue.dslDiffText, dryRun: args.dryRun })
-        : (() => { throw new Error(`Unknown workflow: ${args.workflow}`); })();
+  const result = upsertDslModules({ universeId: issue.targetUniverseId, dslModules: issue.dslModules, dryRun: args.dryRun });
   return { text: JSON.stringify({ ...result, writes: result.writes.map((write) => path.relative(repoRoot, write.path)) }, null, 2) };
 };
 

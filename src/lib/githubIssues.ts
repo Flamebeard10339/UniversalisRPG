@@ -1,18 +1,17 @@
-import { createPatch } from 'diff';
 import type { ContributionDslModuleFile, ContributionPackage } from '../game/types';
 
 const REPOSITORY_URL = 'https://github.com/Flamebeard10339/UniversalisRPG';
 
 export const createContributionPackage = (pack: ContributionPackage) => pack;
 
-// Each DSL module is packaged as a unified diff against its own on-disk
-// baseline (not the whole file) — a one-line fix in a large module
-// shouldn't force a reviewer to read the entire thing. Concatenating
-// multiple createPatch() outputs is jsdiff's own multi-file convention;
-// parsePatch() on the receiving end (scripts/merge-contribution-issue.mjs)
-// splits it back into per-file patches with no bespoke splitting logic.
-export const formatDslModulesDiffBlock = (dslModules: ContributionDslModuleFile[]): string =>
-  dslModules.map((file) => createPatch(file.path, file.baselineSource, file.source)).join('\n');
+// Each changed/new DSL module is embedded as its complete, self-contained
+// source — not a diff — so a reviewer can drop the file in and test it
+// directly (a diff alone requires a merge step first before it's runnable).
+// One '### <path>' heading + fenced block per file, in a fixed, greppable
+// shape parseContributionIssue (scripts/merge-contribution-issue.mjs) reads
+// back out — no reliance on any diff-tool's own multi-file convention.
+export const formatDslModulesBlock = (dslModules: ContributionDslModuleFile[]): string =>
+  dslModules.map((file) => `### ${file.path}\n\`\`\`md\n${file.source}\n\`\`\``).join('\n\n');
 
 export const formatContributionIssueBody = (pack: ContributionPackage) => {
   const t = pack.t ?? ((key: string, fallbackOrParams?: string | Record<string, string | number>) =>
@@ -35,13 +34,8 @@ export const formatContributionIssueBody = (pack: ContributionPackage) => {
     '',
     `## ${t('github.appVersion')}`,
     pack.appVersion,
-    '',
-    `## ${t('github.changedJson')}`,
-    '```json',
-    JSON.stringify(pack.changedFiles, null, 2),
-    '```',
     ...(dslModules.length > 0
-      ? ['', `## ${t('github.changedDslModules')}`, '```diff', formatDslModulesDiffBlock(dslModules), '```']
+      ? ['', `## ${t('github.changedDslModules')}`, '', formatDslModulesBlock(dslModules)]
       : []),
   ].join('\n');
 };

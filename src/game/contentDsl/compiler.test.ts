@@ -540,6 +540,131 @@ dependencies: +some-other-module
   });
 });
 
+describe('content DSL — # patch <targetModuleId>', () => {
+  it('compiles a patched entity to a whole-object data-updates.patches replace, identical in shape to a normal ## entity', () => {
+    const source = `# info
+id: patch-proof
+version: 1.0.0
+universe: base
+author: test
+game_version: 1.0
+pack: patch-proof
+
+# patch other-module
+## entity front-door
+examine: A newly reinforced door.
+pick lock:
+  requires: lockpick
+  xp: thieving 8
+`;
+    const { module } = compileDsl(source);
+    expect(module.data).not.toHaveProperty('entities');
+    const patches = module['data-updates'] as { patches: { targetModId: string; objectType: string; objectId: string; ops: unknown[] }[] };
+    expect(patches.patches).toHaveLength(1);
+    expect(patches.patches[0]).toMatchObject({ targetModId: 'other-module', objectType: 'entity', objectId: 'front-door' });
+    const [op] = patches.patches[0].ops as { op: string; path: string; value: { id: string; actions: { id: string }[] } }[];
+    expect(op).toMatchObject({ op: 'replace', path: '' });
+    expect(op.value.id).toBe('front-door');
+    expect(op.value.actions.map((action) => action.id)).toEqual(['examine', 'pick-lock']);
+  });
+
+  it('compiles a patched item the same way a normal # item would', () => {
+    const source = `# info
+id: patch-item-proof
+version: 1.0.0
+universe: base
+author: test
+game_version: 1.0
+pack: patch-item-proof
+
+# patch other-module
+## item bronze-dagger
+tags: mainhand (1 attack), +2 attack
+`;
+    const { module } = compileDsl(source);
+    const patches = module['data-updates'] as { patches: { targetModId: string; objectType: string; objectId: string }[] };
+    expect(patches.patches).toHaveLength(1);
+    expect(patches.patches[0]).toMatchObject({ targetModId: 'other-module', objectType: 'item', objectId: 'bronze-dagger' });
+  });
+
+  it('gives a patched entity the same default examine action a normal ## entity gets when none is authored', () => {
+    const source = `# info
+id: patch-examine-proof
+version: 1.0.0
+universe: base
+author: test
+game_version: 1.0
+pack: patch-examine-proof
+
+# patch other-module
+## entity npc
+talk: [[dialogue npc]]
+`;
+    const { module } = compileDsl(source);
+    const patches = module['data-updates'] as { patches: { ops: { value: { actions: { id: string }[] } }[] }[] };
+    const actionIds = patches.patches[0].ops[0].value.actions.map((action) => action.id);
+    expect(actionIds).toContain('examine');
+  });
+
+  it('appends # patch-compiled patches onto whatever # advanced already declared, instead of clobbering either', () => {
+    const source = `# info
+id: patch-merge-proof
+version: 1.0.0
+universe: base
+author: test
+game_version: 1.0
+pack: patch-merge-proof
+
+# advanced
+{
+  "data-updates": {
+    "remove": { "locations": ["old-place"] },
+    "patches": [{ "targetModId": "hand-written-target", "objectType": "flag", "objectId": "x", "ops": [{ "op": "replace", "path": "", "value": true }] }]
+  }
+}
+
+# patch other-module
+## entity npc
+examine: Someone new.
+`;
+    const { module } = compileDsl(source);
+    const dataUpdates = module['data-updates'] as { remove: { locations: string[] }; patches: { targetModId: string }[] };
+    expect(dataUpdates.remove).toEqual({ locations: ['old-place'] });
+    expect(dataUpdates.patches.map((patch) => patch.targetModId)).toEqual(['hand-written-target', 'other-module']);
+  });
+
+  it('end to end: a patch module edits an entity owned by another module, applied purely at runtime via the real applyModulesToBundle', () => {
+    const owner: ContentModule = {
+      id: 'owner-module', version: '1.0.0', universe: 'base', author: 'test', game_version: '1.0',
+      data: {
+        locations: [{ id: 'start', position: { x: 0, y: 0 }, starting: true, entities: ['gate-keeper'] }],
+        entities: [{ id: 'gate-keeper', actions: [{ id: 'examine', instant: true, rewards: [], results: [] }] }],
+      },
+    };
+    const patchSource = `# info
+id: patch-e2e-proof
+version: 1.0.0
+universe: base
+author: test
+game_version: 1.0
+pack: patch-e2e-proof
+dependencies: owner-module
+
+# patch owner-module
+## entity gate-keeper
+examine: A gatekeeper, freshly reworked by the community.
+wave: say: The gatekeeper waves back.
+`;
+    const { module: patchModule } = compileDsl(patchSource);
+
+    const result = applyModulesToBundle(emptyBundle(), [owner, patchModule]);
+    expect(result.issues.filter((issue) => issue.severity === 'error')).toEqual([]);
+    const gateKeeper = result.bundle.entities?.find((entity) => entity.id === 'gate-keeper');
+    if (!gateKeeper?.actions) throw new Error('gate-keeper entity/actions missing from merged bundle');
+    expect(gateKeeper.actions.map((action) => action.id)).toEqual(['examine', 'wave']);
+  });
+});
+
 describe('content DSL — item-tag / equipped-item-tag requires:', () => {
   it('parses "requires: tag:X" as an item-tag condition and "requires: equipped tag:X" as equipped-item-tag', () => {
     const source = `# info

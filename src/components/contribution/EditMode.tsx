@@ -110,7 +110,7 @@ export const EditMode = ({ activeTab, appVersion, bundle, onMapPatch, onTabChang
 
         {activeTab === 'submit' && (
           <div className="p-4 flex flex-col h-full">
-            <SubmitToGitHub appVersion={appVersion} bundle={bundle} draft={draft} t={t} validationIssues={validationIssues} />
+            <SubmitToGitHub appVersion={appVersion} bundle={bundle} draft={draft} onPatch={patchDraft} t={t} validationIssues={validationIssues} />
           </div>
         )}
       </div>

@@ -36,6 +36,9 @@ import type {
   ItemDefinition,
   LocationNode,
   ModuleDataSectionObject,
+  ModuleDataUpdates,
+  ModuleDataUpdatesObject,
+  ModuleObjectPatch,
   QuestDefinition,
   QuestStage,
   RecipeDefinition,
@@ -57,6 +60,7 @@ import type {
   DslInteractionSection,
   DslItemSection,
   DslLocationSection,
+  DslPatchSection,
   DslQuestSection,
   DslRecipeSection,
   DslSkillSection,
@@ -354,6 +358,28 @@ const compileActionVariants = (
 const compileEntityAction = (entityId: string, decl: DslActionDecl, locale: LocaleBuilder, pack: string, dropTableIds: Set<string>): EntityActionDefinition[] =>
   compileActionVariants('entity', entityId, decl, locale, pack, dropTableIds) as EntityActionDefinition[];
 
+// Every entity needs an examine action — it's the discovery gate the rest
+// of its actions hide behind (isActionVisible) — so one with no authored
+// examine gets this default, identical in shape to writing
+// `examine: <Title>.` by hand. Shared by compileLocation's own entities and
+// compilePatchSection's (a patched entity is still an entity).
+const ensureExamineAction = (entityDecl: DslEntityDecl): DslActionDecl[] =>
+  entityDecl.actions.some((action) => action.title.toLowerCase() === 'examine')
+    ? entityDecl.actions
+    : [...entityDecl.actions, {
+        title: 'examine',
+        tags: [{ keyword: 'say' as const, text: [{ kind: 'literal' as const, text: `${entityDecl.title ?? humanize(entityDecl.id)}.` }] }],
+        onSuccessTags: [],
+        onFailTags: [],
+      }];
+
+const compileEntity = (entityDecl: DslEntityDecl, locale: LocaleBuilder, pack: string, dropTableIds: Set<string>): EntityDefinition => {
+  locale.set(`entity.${entityDecl.id}.title`, entityDecl.title ?? humanize(entityDecl.id));
+  const actions: EntityActionDefinition[] = ensureExamineAction(entityDecl)
+    .flatMap((actionDecl) => compileEntityAction(entityDecl.id, actionDecl, locale, pack, dropTableIds));
+  return { id: entityDecl.id, actions };
+};
+
 const compileItemAction = (itemId: string, decl: DslActionDecl, locale: LocaleBuilder, pack: string, dropTableIds: Set<string>): ItemActionDefinition[] => {
   const variants = compileActionVariants('item', itemId, decl, locale, pack, dropTableIds);
   for (const variant of variants) {
@@ -379,21 +405,7 @@ const compileLocation = (
   const entityIds: string[] = [];
   for (const entityDecl of section.entities as DslEntityDecl[]) {
     entityIds.push(entityDecl.id);
-    locale.set(`entity.${entityDecl.id}.title`, entityDecl.title ?? humanize(entityDecl.id));
-    const declaredActions: DslActionDecl[] = entityDecl.actions.some((action) => action.title.toLowerCase() === 'examine')
-      ? entityDecl.actions
-      // Every entity needs an examine action — it's the discovery gate the
-      // rest of its actions hide behind (isActionVisible) — so one with no
-      // authored examine gets this default, identical in shape to writing
-      // `examine: <Title>.` by hand.
-      : [...entityDecl.actions, {
-          title: 'examine',
-          tags: [{ keyword: 'say' as const, text: [{ kind: 'literal' as const, text: `${entityDecl.title ?? humanize(entityDecl.id)}.` }] }],
-          onSuccessTags: [],
-          onFailTags: [],
-        }];
-    const actions: EntityActionDefinition[] = declaredActions.flatMap((actionDecl) => compileEntityAction(entityDecl.id, actionDecl, locale, pack, dropTableIds));
-    entities.push({ id: entityDecl.id, actions });
+    entities.push(compileEntity(entityDecl, locale, pack, dropTableIds));
   }
 
   const actions: GameAction[] = [];
@@ -545,6 +557,36 @@ const compileDropTable = (section: DslDropTableSection, dropTableIds: Set<string
 });
 
 // ---------------------------------------------------------------------------
+// Patch: an entity/item declared here compiles exactly as it would under
+// `# location`/`# item` (same compileEntity/compileItemSection, same
+// locale keys, same "entity always gets an examine" default) — the only
+// difference is the *output*: instead of landing in this module's own
+// `data`, it becomes a whole-object data-updates.patches replace targeting
+// section.targetModuleId, applied purely at runtime by the engine's
+// existing applyObjectPatches (contentModules.ts) regardless of which
+// module declares it.
+// ---------------------------------------------------------------------------
+const compilePatchSection = (
+  section: DslPatchSection,
+  locale: LocaleBuilder,
+  pack: string,
+  dropTableIds: Set<string>,
+): ModuleObjectPatch[] => [
+  ...section.entities.map((entityDecl): ModuleObjectPatch => ({
+    targetModId: section.targetModuleId,
+    objectType: 'entity',
+    objectId: entityDecl.id,
+    ops: [{ op: 'replace', path: '', value: compileEntity(entityDecl, locale, pack, dropTableIds) }],
+  })),
+  ...section.items.map((itemSection): ModuleObjectPatch => ({
+    targetModId: section.targetModuleId,
+    objectType: 'item',
+    objectId: itemSection.id,
+    ops: [{ op: 'replace', path: '', value: compileItemSection(itemSection, locale, pack, dropTableIds) }],
+  })),
+];
+
+// ---------------------------------------------------------------------------
 // Interactions: sugar for InteractionTypeDefinition — see docs on
 // parseInteractionSection for why every message field is optional and
 // backfilled with a generic default rather than required.
@@ -585,6 +627,7 @@ export const compileDsl = (source: string): { module: ContentModule; locale: Rec
   const skills: SkillDefinition[] = [];
   const flags: StateFlagDefinition[] = [];
   const dropTables: DropTableDefinition[] = [];
+  const patches: ModuleObjectPatch[] = [];
   let advanced: Record<string, unknown> = {};
 
   // A droptable entry's bare id (item vs. named-droptable reference) can only
@@ -621,6 +664,8 @@ export const compileDsl = (source: string): { module: ContentModule; locale: Rec
       flags.push(...compileFlags(section, pack));
     } else if (section.kind === 'droptable') {
       dropTables.push(compileDropTable(section, dropTableIds));
+    } else if (section.kind === 'patch') {
+      patches.push(...compilePatchSection(section, locale, pack, dropTableIds));
     }
   }
 
@@ -645,11 +690,21 @@ export const compileDsl = (source: string): { module: ContentModule; locale: Rec
     : {};
   for (const [key, value] of Object.entries(advancedLocale)) locale.entries[key] ??= value;
   // `# advanced`'s own optional `data-updates` key is the escape hatch for
-  // module patches/removals (ModuleDataUpdates) — a second kind of content a
-  // module can carry alongside its own `data`, with no DSL sugar of its own
-  // (cross-module JSON-patch edits and `data-updates.remove` id lists are
-  // both engine plumbing, same rationale as the rest of `# advanced`).
+  // module removals and cross-module patches this DSL has no sugar for
+  // beyond entities/items (`data-updates.remove` id lists, or a patch
+  // targeting a location/stat/skill/etc.) — `data-updates.remove`/`.locale`
+  // engine plumbing, same rationale as the rest of `# advanced`. `# patch`
+  // sections' own compiled patches are appended onto whatever `# advanced`
+  // already declared (patches is just an array, so this is a safe merge,
+  // not a "pick one" restriction like stat/skill/flags sugar vs. `#
+  // advanced` have) rather than either clobbering the other.
   const advancedDataUpdates = advanced['data-updates'];
+  const advancedDataUpdatesObject = advancedDataUpdates && typeof advancedDataUpdates === 'object' && !Array.isArray(advancedDataUpdates)
+    ? advancedDataUpdates as ModuleDataUpdatesObject
+    : undefined;
+  const dataUpdates: ModuleDataUpdates | undefined = patches.length > 0
+    ? { ...(advancedDataUpdatesObject ?? {}), patches: [...(advancedDataUpdatesObject?.patches ?? []), ...patches] }
+    : advancedDataUpdates as ContentModule['data-updates'] | undefined;
   const { interactionTypes: _advancedInteractionTypes, locale: _advancedLocale, 'data-updates': _advancedDataUpdates, ...advancedRest } = advanced;
 
   const data: ModuleDataSectionObject = {
@@ -678,7 +733,7 @@ export const compileDsl = (source: string): { module: ContentModule; locale: Rec
     game_version: dsl.info.gameVersion,
     ...(dsl.info.dependencies.length > 0 ? { dependencies: dsl.info.dependencies } : {}),
     data,
-    ...(advancedDataUpdates !== undefined ? { 'data-updates': advancedDataUpdates as ContentModule['data-updates'] } : {}),
+    ...(dataUpdates !== undefined ? { 'data-updates': dataUpdates } : {}),
     locale: { en: locale.entries },
   };
 

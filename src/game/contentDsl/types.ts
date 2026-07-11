@@ -205,6 +205,24 @@ export type DslInteractionSection = {
   entityKill?: string;
 };
 
+// Edits an entity/item that lives in *another* module — a community
+// contribution to a module the author doesn't own, without merging into
+// its file directly. Compiles to whole-object data-updates.patches entries
+// (see compilePatchSection in compiler.ts), which the engine already
+// applies purely at runtime (see applyObjectPatches in contentModules.ts) —
+// this is DSL sugar for a pattern the JSON-only `# advanced` escape hatch
+// already supported, not a new engine capability. A patched entity/item
+// *replaces* the target wholesale (same semantics `data-updates.data`'s own
+// entity/item merging already has for array-valued fields like `actions` —
+// see mergePatchValue in contentModules.ts) — redeclare every action you
+// want kept, not just the one you're changing.
+export type DslPatchSection = {
+  kind: 'patch';
+  targetModuleId: string;
+  entities: DslEntityDecl[];
+  items: DslItemSection[];
+};
+
 export type DslSection =
   | DslLocationSection
   | DslDialogueSection
@@ -216,7 +234,8 @@ export type DslSection =
   | DslStatSection
   | DslSkillSection
   | DslFlagsSection
-  | DslDropTableSection;
+  | DslDropTableSection
+  | DslPatchSection;
 
 export type DslInfo = {
   id: string;
