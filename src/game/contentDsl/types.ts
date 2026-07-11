@@ -238,12 +238,57 @@ export type DslInteractionSection = {
 // applyModulesToBundle pipeline, not just reasoned about. This is exactly
 // the "take over ownership of a flag from another module" case `remove
 // flags:` exists for in the first place.
+// A single `## upsert location <id>` op inside a `# patch`. Only the fields
+// the author actually wrote are present — the compiler emits one JSON-Patch
+// `replace` op per present structural field (position/tags/entities) and
+// routes text fields (title/examine/exhausted) to this module's own locale
+// (overriding the target's by load order, exactly as a `## replace entity`'s
+// renamed title already does). Adjacency is deliberately NOT patchable here:
+// a location's `adjacent:` compiles to whole travel-action objects + locale +
+// an action-id list, not a single field, so it has no clean field-level patch
+// shape — edit it in the target module directly, or add a free-standing
+// travel entity in your own module.
+export type DslLocationPatchFields = {
+  x?: number;
+  y?: number;
+  z?: number;
+  starting?: boolean;
+  title?: string;
+  examine?: string;
+  exhausted?: string;
+  tags?: string[];
+  // The full, resulting entity-id list for the location — a whole-list
+  // `replace`, not a delta, because a `# patch` module can't see the target's
+  // current list to compute one. Used when a patch adds/removes an entity
+  // from a core location (a dangling id in `entities` is a hard
+  // `unknownEntity` validation error, so membership must stay in sync with
+  // `## upsert entity`/`## remove entity` in the same patch).
+  entities?: string[];
+};
+
+export type DslLocationPatch = { id: string; fields: DslLocationPatchFields };
+
+// Edits content owned by *another* module (`targetModuleId`) without touching
+// its file — see the grammar doc's `# patch` section. Body is a sequence of
+// granular `## <op> <kind> <id>` ops:
+//   ## upsert location <id>   field-level merge (only the written fields)
+//   ## upsert|replace entity <id>   whole-object entity (redeclare all actions)
+//   ## upsert|replace item <id>     whole-object item
+//   ## upsert flag <id>[: value]    declare/take-over a flag via .patches
+//   ## remove location|entity|item|flag <id>   drop it (data-updates.remove)
+// plus a nested `flags:` block (same grammar as `# flags`). Entity/item
+// upsert and replace compile identically (whole-object `replace` at path ''):
+// the engine appends the object if the target doesn't have it and replaces it
+// wholesale if it does, so "upsert" (may be new) vs "replace" (must exist) is
+// an authoring-intent distinction, not a compile-time one.
 export type DslPatchSection = {
   kind: 'patch';
   targetModuleId: string;
+  locationPatches: DslLocationPatch[];
   entities: DslEntityDecl[];
   items: DslItemSection[];
   flags: { id: string; initialValue: boolean | number }[];
+  removeLocations: string[];
   removeEntities: string[];
   removeItems: string[];
   removeFlags: string[];

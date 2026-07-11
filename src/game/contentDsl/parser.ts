@@ -18,6 +18,8 @@ import type {
   DslInfo,
   DslInteractionSection,
   DslItemSection,
+  DslLocationPatch,
+  DslLocationPatchFields,
   DslLocationSection,
   DslModule,
   DslPatchSection,
@@ -858,21 +860,15 @@ const parseDropTableSection = (cursor: Cursor, id: string): DslDropTableSection 
 };
 
 // ---------------------------------------------------------------------------
-// Patch: edits an entity/item owned by another module (`targetModuleId`),
-// without touching that module's own file — see DslPatchSection's doc
-// comment in types.ts for the compiled semantics. Body is a sequence of
-// `## entity <id>`/`## item <id>` blocks — `##`-prefixed like a location's
-// nested entities (even though `# item` is a top-level header everywhere
-// else), since these are sub-declarations of what's being patched, not
-// standalone top-level sections — plus flat `remove <type>: <id>[, ...]`
-// metadata lines for dropping something from the target outright (there's
-// no "## remove" sub-declaration grammar to write a body for, so this is a
-// field like `# item`'s `title:`, not a nested block), and a nested
-// `flags:` list (same one-id-per-line grammar as `parseFlagsSection`,
-// under a bare `flags:` header like `adjacent:`'s indented list) for
-// declaring flags *through* the patch mechanism.
+// Patch: edits content owned by another module (`targetModuleId`) without
+// touching its file — see DslPatchSection's doc comment in types.ts for the
+// compiled semantics. Body is a sequence of granular
+// `## <upsert|replace|remove> <location|entity|item|flag> <id>` ops (each with
+// the same body a `# location`/`## entity`/`# item` header would take, or none
+// for `remove`), plus a nested `flags:` list (same one-id-per-line grammar as
+// `parseFlagsSection`) for declaring/taking-over flags through the patch
+// mechanism.
 // ---------------------------------------------------------------------------
-const REMOVE_LINE = /^remove\s+(entities|items|flags):\s*(.*)$/i;
 const PATCH_FLAG_LINE = /^([\w.-]+)(?:\s*:\s*(.*))?$/;
 
 const parsePatchFlagsEntries = (cursor: Cursor, baseIndent: number, targetModuleId: string): DslPatchSection['flags'] => {
@@ -902,11 +898,77 @@ const parsePatchFlagsEntries = (cursor: Cursor, baseIndent: number, targetModule
   return flags;
 };
 
+// A `## upsert location <id>` body: the same field lines a `# location`
+// header accepts (x/y/z/starting, `title:`/`examine:`/`exhausted:`, `tags:`),
+// plus a patch-only `entities:` comma/space list (the full resulting entity-id
+// list). Only fields actually written are recorded, so the compiler can emit a
+// single op per changed field rather than clobbering unmentioned ones.
+const parseLocationPatchFields = (cursor: Cursor, locationId: string): DslLocationPatchFields => {
+  const fields: DslLocationPatchFields = {};
+  while (!cursor.atEnd()) {
+    const line = cursor.current!;
+    const trimmed = line.trim();
+    if (trimmed.length === 0) {
+      cursor.index++;
+      continue;
+    }
+    if (/^#/.test(trimmed)) break;
+
+    const textFieldMatch = /^(title|examine|exhausted):\s*(.*)$/i.exec(trimmed);
+    if (textFieldMatch) {
+      const value = textFieldMatch[2].trim();
+      const key = textFieldMatch[1].toLowerCase();
+      if (key === 'title') fields.title = value;
+      else if (key === 'examine') fields.examine = value;
+      else fields.exhausted = value;
+      cursor.index++;
+      continue;
+    }
+
+    const tagsFieldMatch = /^tags:\s*(.*)$/i.exec(trimmed);
+    if (tagsFieldMatch) {
+      fields.tags = tagsFieldMatch[1].split(/[\s,]+/).filter(Boolean);
+      cursor.index++;
+      continue;
+    }
+
+    const entitiesFieldMatch = /^entities:\s*(.*)$/i.exec(trimmed);
+    if (entitiesFieldMatch) {
+      fields.entities = entitiesFieldMatch[1].split(/[\s,]+/).filter(Boolean);
+      cursor.index++;
+      continue;
+    }
+
+    for (const segment of trimmed.split(',').map((part) => part.trim()).filter(Boolean)) {
+      const positionMatch = /^(x|y|z):\s*(.+)$/i.exec(segment);
+      if (positionMatch) {
+        const value = Number(positionMatch[2].trim());
+        const key = positionMatch[1].toLowerCase();
+        if (key === 'x') fields.x = value;
+        else if (key === 'y') fields.y = value;
+        else fields.z = value;
+        continue;
+      }
+      if (/^starting$/i.test(segment)) {
+        fields.starting = true;
+        continue;
+      }
+      throw new DslParseError(`Unrecognized location field "${segment}" in "## upsert location ${locationId}" — location tags need a "tags:" label`, cursor.index);
+    }
+    cursor.index++;
+  }
+  return fields;
+};
+
+const PATCH_OP_HEADER = /^##\s+(upsert|replace|remove)\s+(location|entity|item|flag)\s+([\w.-]+?)(?:\s*:\s*(.*))?\s*$/i;
+
 const parsePatchSection = (cursor: Cursor, targetModuleId: string): DslPatchSection => {
   cursor.skipBlank();
+  const locationPatches: DslLocationPatch[] = [];
   const entities: DslEntityDecl[] = [];
   const items: DslItemSection[] = [];
   const flags: DslPatchSection['flags'] = [];
+  const removeLocations: string[] = [];
   const removeEntities: string[] = [];
   const removeItems: string[] = [];
   const removeFlags: string[] = [];
@@ -920,18 +982,6 @@ const parsePatchSection = (cursor: Cursor, targetModuleId: string): DslPatchSect
     }
     if (/^#\s/.test(trimmed) && !/^##/.test(trimmed)) break;
 
-    const removeMatch = REMOVE_LINE.exec(trimmed);
-    if (removeMatch) {
-      const ids = removeMatch[2].split(',').map((part) => part.trim()).filter(Boolean);
-      if (ids.length === 0) throw new DslParseError(`"remove ${removeMatch[1]}:" needs at least one id in patch "${targetModuleId}", got: "${line}"`, cursor.index);
-      const type = removeMatch[1].toLowerCase();
-      if (type === 'entities') removeEntities.push(...ids);
-      else if (type === 'items') removeItems.push(...ids);
-      else removeFlags.push(...ids);
-      cursor.index++;
-      continue;
-    }
-
     const flagsHeaderMatch = /^flags:\s*$/i.exec(trimmed);
     if (flagsHeaderMatch) {
       const indent = leadingSpaces(line);
@@ -941,24 +991,51 @@ const parsePatchSection = (cursor: Cursor, targetModuleId: string): DslPatchSect
       continue;
     }
 
-    const entityHeaderMatch = /^##\s+entity\s+([\w-]+)\s*$/i.exec(trimmed);
-    if (entityHeaderMatch) {
-      cursor.index++;
-      entities.push(parseEntity(cursor, entityHeaderMatch[1]));
+    const opMatch = PATCH_OP_HEADER.exec(trimmed);
+    if (!opMatch) {
+      throw new DslParseError(`Expected "## <upsert|replace|remove> <location|entity|item|flag> <id>" or "flags:" in patch "${targetModuleId}", got: "${line}"`, cursor.index);
+    }
+    const op = opMatch[1].toLowerCase();
+    const kind = opMatch[2].toLowerCase();
+    const id = opMatch[3];
+    const inlineValue = opMatch[4]?.trim();
+    cursor.index++;
+
+    if (op === 'remove') {
+      if (kind === 'location') removeLocations.push(id);
+      else if (kind === 'entity') removeEntities.push(id);
+      else if (kind === 'item') removeItems.push(id);
+      else removeFlags.push(id);
+      continue;
+    }
+
+    if (kind === 'flag') {
+      let initialValue: boolean | number = false;
+      if (inlineValue !== undefined && inlineValue.length > 0) {
+        if (/^true$/i.test(inlineValue)) initialValue = true;
+        else if (/^false$/i.test(inlineValue)) initialValue = false;
+        else initialValue = Number(inlineValue);
+      }
+      flags.push({ id, initialValue });
+      continue;
+    }
+
+    if (kind === 'location') {
+      locationPatches.push({ id, fields: parseLocationPatchFields(cursor, id) });
       cursor.skipBlank();
       continue;
     }
 
-    const itemHeaderMatch = /^##\s+item\s+([\w-]+)\s*$/i.exec(trimmed);
-    if (itemHeaderMatch) {
-      cursor.index++;
-      items.push(parseItemSection(cursor, itemHeaderMatch[1]));
+    if (kind === 'entity') {
+      entities.push(parseEntity(cursor, id));
       cursor.skipBlank();
       continue;
     }
 
-    throw new DslParseError(`Expected "remove <entities|items|flags>: <id>[, ...]", "flags:", "## entity <id>", or "## item <id>" in patch "${targetModuleId}", got: "${line}"`, cursor.index);
+    // kind === 'item'
+    items.push(parseItemSection(cursor, id));
+    cursor.skipBlank();
   }
 
-  return { kind: 'patch', targetModuleId, entities, items, flags, removeEntities, removeItems, removeFlags };
+  return { kind: 'patch', targetModuleId, locationPatches, entities, items, flags, removeLocations, removeEntities, removeItems, removeFlags };
 };

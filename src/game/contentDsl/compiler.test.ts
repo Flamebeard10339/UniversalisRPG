@@ -551,7 +551,7 @@ game_version: 1.0
 pack: patch-proof
 
 # patch other-module
-## entity front-door
+## replace entity front-door
 examine: A newly reinforced door.
 pick lock:
   requires: lockpick
@@ -578,7 +578,7 @@ game_version: 1.0
 pack: patch-item-proof
 
 # patch other-module
-## item bronze-dagger
+## replace item bronze-dagger
 tags: mainhand (1 attack), +2 attack
 `;
     const { module } = compileDsl(source);
@@ -597,7 +597,7 @@ game_version: 1.0
 pack: patch-examine-proof
 
 # patch other-module
-## entity npc
+## upsert entity npc
 talk: [[dialogue npc]]
 `;
     const { module } = compileDsl(source);
@@ -624,7 +624,7 @@ pack: patch-merge-proof
 }
 
 # patch other-module
-## entity npc
+## replace entity npc
 examine: Someone new.
 `;
     const { module } = compileDsl(source);
@@ -651,7 +651,7 @@ pack: patch-e2e-proof
 dependencies: owner-module
 
 # patch owner-module
-## entity gate-keeper
+## replace entity gate-keeper
 examine: A gatekeeper, freshly reworked by the community.
 wave: say: The gatekeeper waves back.
 `;
@@ -664,7 +664,7 @@ wave: say: The gatekeeper waves back.
     expect(gateKeeper.actions.map((action) => action.id)).toEqual(['examine', 'wave']);
   });
 
-  it('compiles "remove <type>: <id>, <id>" to data-updates.remove, pack-scoping bare flag ids like everywhere else', () => {
+  it('compiles "## remove <kind> <id>" to data-updates.remove, pack-scoping bare flag ids like everywhere else', () => {
     const source = `# info
 id: patch-remove-proof
 version: 1.0.0
@@ -674,18 +674,50 @@ game_version: 1.0
 pack: patch-remove-proof
 
 # patch other-module
-remove entities: old-guard
-remove items: rusty-key
-remove flags: other-pack.legacy-flag, bare-flag
+## remove location old-place
+## remove entity old-guard
+## remove item rusty-key
+## remove flag other-pack.legacy-flag
+## remove flag bare-flag
 `;
     const { module } = compileDsl(source);
-    const dataUpdates = module['data-updates'] as { remove: { entities: string[]; items: string[]; flags: string[] } };
+    const dataUpdates = module['data-updates'] as { remove: { locations: string[]; entities: string[]; items: string[]; flags: string[] } };
+    expect(dataUpdates.remove.locations).toEqual(['old-place']);
     expect(dataUpdates.remove.entities).toEqual(['old-guard']);
     expect(dataUpdates.remove.items).toEqual(['rusty-key']);
     // "other-pack.legacy-flag" is dotted, used as-is; "bare-flag" is bare,
     // pack-scoped to *this* module's own pack (patch-remove-proof) — same
     // rule as set:/unset:/# flags everywhere else.
     expect(dataUpdates.remove.flags).toEqual(['other-pack.legacy-flag', 'patch-remove-proof.bare-flag']);
+  });
+
+  it('compiles "## upsert location" to per-field position patches plus locale overrides for title/examine', () => {
+    const source = `# info
+id: patch-location-proof
+version: 1.0.0
+universe: base
+author: test
+game_version: 1.0
+pack: patch-location-proof
+
+# patch other-module
+## upsert location town-square
+x: 1
+title: New Town Square
+examine: A freshly cobbled plaza.
+entities: fountain, notice-board
+`;
+    const { module } = compileDsl(source);
+    const patches = module['data-updates'] as { patches: { objectType: string; objectId: string; ops: { op: string; path: string; value: unknown }[] }[] };
+    expect(patches.patches).toHaveLength(1);
+    expect(patches.patches[0]).toMatchObject({ objectType: 'location', objectId: 'town-square' });
+    // Only the structural fields become ops; title/examine go to locale.
+    expect(patches.patches[0].ops).toEqual([
+      { op: 'replace', path: '/position/x', value: 1 },
+      { op: 'replace', path: '/entities', value: ['fountain', 'notice-board'] },
+    ]);
+    expect(module.locale?.en['location.town-square.title']).toBe('New Town Square');
+    expect(module.locale?.en['location.town-square.examine']).toBe('A freshly cobbled plaza.');
   });
 
   it('end to end: a patch module takes over ownership of a flag — removes the owner\'s declaration and redeclares it via # patch\'s own flags:, without a moduleConflictDisabled collision', () => {
@@ -719,7 +751,7 @@ pack: tutorial-island-guide-house-mod
 dependencies: tutorial-island-guide-house
 
 # patch tutorial-island-guide-house
-remove flags: tutorial-island.bookshelf-note-taken
+## remove flag tutorial-island.bookshelf-note-taken
 
 flags:
   tutorial-island.bookshelf-note-taken

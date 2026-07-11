@@ -599,12 +599,16 @@ ops.
 
 ```
 # patch tutorial-island-guide-house
-remove flags: tutorial-island.bookshelf-note-taken
+## remove flag tutorial-island.bookshelf-note-taken
 
 flags:
   tutorial-island.bookshelf-note-taken
 
-## entity front-door
+## upsert location tutorial-guide-house
+x: 1
+entities: miki, front-door, drawer, bookshelf, stairs-up, birdcage
+
+## replace entity front-door
 examine: A newly reinforced door — the workshop clearly did a pass on it.
 pick lock:
   requires: lockpick
@@ -613,63 +617,81 @@ pick lock:
     set: tutorial.miki-cleared
     say: The lock gives with a soft click.
 
-## item bronze-dagger
+## upsert entity birdcage
+examine: A gilded cage someone left behind.
+
+## remove entity mirror
+
+## replace item bronze-dagger
 tags: mainhand (1 attack), +2 attack
 ```
 
-Edits an entity/item/flag owned by *another* module (`<targetModuleId>`) —
-without touching that module's own file — for a contribution to content you
-don't own. This is the DSL's whole answer to "how do I edit an existing
-module": a contribution is always a new, small, self-contained module of
-its own (`dependencies: <targetModuleId>` in its own `# info`), never a
-direct edit to the target's file — see "Content contributions" below for
-why that matters for the GitHub submission flow specifically.
+Edits content owned by *another* module (`<targetModuleId>`) — without
+touching that module's own file — for a contribution to content you don't
+own. This is the DSL's whole answer to "how do I edit an existing module": a
+contribution is always a new, small, self-contained module of its own
+(`dependencies: <targetModuleId>` in its own `# info`), never a direct edit
+to the target's file — see "Content contributions" below for why that
+matters for the GitHub submission flow specifically.
 
-- `## entity <id>` / `## item <id>` — same grammar as a location's nested
-  entities / a top-level `# item` (including the "every entity gets an
-  examine action, even an unauthored one" default), just `##`-prefixed
-  here since each is a sub-declaration of what's being patched rather than
-  a standalone top-level section. Compiles to a whole-object
-  `data-updates.patches` entry (`ModuleObjectPatch`, `op: 'replace'` at the
-  object's own root) — sugar for what previously required hand-writing
-  this shape inside `# advanced`, not a new engine capability; the engine
-  already applies `data-updates.patches` purely at runtime
-  (`applyObjectPatches` in `contentModules.ts`), regardless of which
-  module declares them. **A patch replaces the target wholesale** — same
-  semantics `data-updates`'s own JSON-authored entity/item merging already
-  has for array-valued fields like `actions` (`mergePatchValue` in
-  `contentModules.ts`) — redeclare every action you want to keep, not just
-  the one you're changing. Targeting an entity/item that doesn't exist in
-  the target module fails validation (`moduleUpdateTargetMissing`) rather
-  than silently creating it — this sugar is for *editing existing*
-  content; add brand-new entities/items in your own module's
-  `# location`/`# item` instead.
-- `remove <entities|items|flags>: <id>[, <id>...]` — drops something from
-  the target outright (`data-updates.remove`). A bare flag id here is
-  pack-scoped to *this* module's own pack like everywhere else flags
-  appear — almost never what's meant when removing something owned by
-  `targetModuleId`, so use the fully-qualified `<theirPack>.<flag>` form.
+The body is a sequence of granular
+`## <upsert|replace|remove> <location|entity|item|flag> <id>` ops (plus the
+nested `flags:` block described last). Every op compiles to a
+`data-updates.patches` (`ModuleObjectPatch`) or `data-updates.remove` entry —
+the engine already applies both purely at runtime (`applyObjectPatches` /
+`applyDataUpdates` in `contentModules.ts`), so this is sugar over an existing
+capability, not a new one.
+
+- `## replace|upsert entity <id>` / `## replace|upsert item <id>` — same
+  grammar as a location's nested entities / a top-level `# item` (including
+  the "every entity gets an examine action, even an unauthored one"
+  default). Compiles to a whole-object `op: 'replace'` at the object's own
+  root. **A patch replaces the target wholesale** — same semantics
+  `mergePatchValue` already has for array-valued fields like `actions` —
+  redeclare every action you want to keep, not just the one you're changing.
+  `replace` and `upsert` compile identically; the engine appends the object
+  when the target lacks it and replaces it when present, so the distinction
+  is authoring intent (`replace` = must exist, `upsert` = may be new), not a
+  compile-time difference.
+- `## upsert location <id>` — field-level, *not* whole-object: only the
+  fields you write are touched. `x`/`y`/`z`/`starting`/`tags`/`entities`
+  become one JSON-Patch `replace` op each (e.g. `x: 1` →
+  `{op:'replace', path:'/position/x', value:1}`); `title`/`examine`/
+  `exhausted` become plain locale entries in this module's own locale
+  (which overrides the target's, since the patch module loads after its
+  `dependencies:` target). `entities:` is a comma/space list giving the
+  location's **full resulting** entity-id list — a patch module can't see
+  the target's current list to compute a delta, and a dangling id left in
+  `entities` (or a new entity never added to it) is a hard `unknownEntity`
+  validation error, so keep membership in sync with any `## upsert entity`/
+  `## remove entity` in the same patch. Adjacency is deliberately not
+  patchable here (a location's `adjacent:` compiles to whole travel-action
+  objects, not a field) — edit it in the target module, or add a
+  free-standing travel entity in your own module.
+- `## remove <location|entity|item|flag> <id>` — drops something from the
+  target outright (`data-updates.remove`). A bare flag id here is pack-scoped
+  to *this* module's own pack like everywhere else flags appear — almost
+  never what's meant when removing something owned by `targetModuleId`, so
+  use the fully-qualified `<theirPack>.<flag>` form.
 - `flags:` — a nested, indented list, one flag id per line (same grammar
   as the top-level `# flags` section: a bare id defaults to
   `initialValue: false`, `<id>: <value>` sets an explicit one). **Declares
   through the patch mechanism** (`data-updates.patches`, `op: 'replace'`,
-  same as `## entity`/`## item` above) — deliberately *not* through this
-  module's own `data.flags`, even though a plain `# flags` section would
-  parse identically. This is required, not stylistic: two independent
-  modules declaring the same id in their own `data.flags` is a hard
+  same as the object ops above) — deliberately *not* through this module's
+  own `data.flags`, even though a plain `# flags` section would parse
+  identically. This is required, not stylistic: two independent modules
+  declaring the same id in their own `data.flags` is a hard
   `moduleConflictDisabled` collision (`validateModuleDataCollisions`),
-  checked before any `data-updates` ever run — it fires even when this
-  same patch section is also removing the other module's declaration of
-  that id in the same breath. Routing through `.patches` instead sails
-  past that check entirely (verified against the real
-  `applyModulesToBundle` pipeline, not just reasoned about). Use a bare id
-  to redeclare a flag under this module's own pack (`resolveFlagId`
-  applies, same scoping as everywhere else); use the fully-qualified form
-  to redeclare — take over — a flag that's being removed from
-  `targetModuleId` above, exactly the `remove flags:` example shown here.
+  checked before any `data-updates` ever run — it fires even when this same
+  patch section is also removing the other module's declaration of that id
+  in the same breath. Routing through `.patches` instead sails past that
+  check entirely (verified against the real `applyModulesToBundle`
+  pipeline). Use a bare id to redeclare a flag under this module's own pack;
+  use the fully-qualified form to take over a flag being removed from
+  `targetModuleId` above, exactly the `## remove flag` example shown here.
 
-Only `## entity`/`## item`/`flags:` are covered today; patching a
-location, stat, skill, or other object kind still needs `# advanced`'s raw
+`location`/`entity`/`item`/`flag` are covered today; patching a stat, skill,
+or other object kind still needs `# advanced`'s raw
 `"data-updates": {"patches": [...]}`/`{"remove": {...}}` form above.
 
 ### Content contributions

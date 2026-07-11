@@ -34,6 +34,7 @@ import type {
   InteractionTypeDefinition,
   ItemActionDefinition,
   ItemDefinition,
+  JsonPatchOperation,
   LocationNode,
   ModuleDataSectionObject,
   ModuleDataUpdates,
@@ -59,6 +60,7 @@ import type {
   DslFlagsSection,
   DslInteractionSection,
   DslItemSection,
+  DslLocationPatch,
   DslLocationSection,
   DslPatchSection,
   DslQuestSection,
@@ -585,7 +587,34 @@ const compileDropTable = (section: DslDropTableSection, dropTableIds: Set<string
 // ---------------------------------------------------------------------------
 type CompiledPatchSection = {
   patches: ModuleObjectPatch[];
-  remove: { entities?: string[]; items?: string[]; flags?: string[] };
+  remove: { locations?: string[]; entities?: string[]; items?: string[]; flags?: string[] };
+};
+
+// A `## upsert location` op splits: structural fields (position/starting/tags/
+// entities) become JSON-Patch `replace` ops on the target `location` object,
+// while text fields (title/examine/exhausted) become plain locale entries in
+// this module's own locale — the patch module loads after its `dependencies:`
+// target, so those override the target's, no data-updates needed (same way a
+// `## replace entity`'s renamed title already works).
+const compileLocationPatch = (
+  patch: DslLocationPatch,
+  targetModuleId: string,
+  locale: LocaleBuilder,
+): ModuleObjectPatch | null => {
+  const { id, fields } = patch;
+  if (fields.title !== undefined) locale.set(`location.${id}.title`, fields.title);
+  if (fields.examine !== undefined) locale.set(locationExamineKey(id), fields.examine);
+  if (fields.exhausted !== undefined) locale.set(`location.${id}.exhausted`, fields.exhausted);
+
+  const ops: JsonPatchOperation[] = [];
+  if (fields.x !== undefined) ops.push({ op: 'replace', path: '/position/x', value: fields.x });
+  if (fields.y !== undefined) ops.push({ op: 'replace', path: '/position/y', value: fields.y });
+  if (fields.z !== undefined) ops.push({ op: 'replace', path: '/position/z', value: fields.z });
+  if (fields.starting !== undefined) ops.push({ op: 'replace', path: '/starting', value: fields.starting });
+  if (fields.tags !== undefined) ops.push({ op: 'replace', path: '/tags', value: fields.tags });
+  if (fields.entities !== undefined) ops.push({ op: 'replace', path: '/entities', value: fields.entities });
+  if (ops.length === 0) return null;
+  return { targetModId: targetModuleId, objectType: 'location', objectId: id, ops };
 };
 
 const compilePatchSection = (
@@ -595,6 +624,9 @@ const compilePatchSection = (
   dropTableIds: Set<string>,
 ): CompiledPatchSection => ({
   patches: [
+    ...section.locationPatches
+      .map((patch) => compileLocationPatch(patch, section.targetModuleId, locale))
+      .filter((patch): patch is ModuleObjectPatch => patch !== null),
     ...section.entities.map((entityDecl): ModuleObjectPatch => ({
       targetModId: section.targetModuleId,
       objectType: 'entity',
@@ -618,6 +650,7 @@ const compilePatchSection = (
     }),
   ],
   remove: {
+    ...(section.removeLocations.length > 0 ? { locations: section.removeLocations } : {}),
     ...(section.removeEntities.length > 0 ? { entities: section.removeEntities } : {}),
     ...(section.removeItems.length > 0 ? { items: section.removeItems } : {}),
     ...(section.removeFlags.length > 0 ? { flags: section.removeFlags.map((flagId) => resolveFlagId(flagId, pack)) } : {}),
@@ -666,6 +699,7 @@ export const compileDsl = (source: string): { module: ContentModule; locale: Rec
   const flags: StateFlagDefinition[] = [];
   const dropTables: DropTableDefinition[] = [];
   const patches: ModuleObjectPatch[] = [];
+  const removeLocations: string[] = [];
   const removeEntities: string[] = [];
   const removeItems: string[] = [];
   const removeFlags: string[] = [];
@@ -708,6 +742,7 @@ export const compileDsl = (source: string): { module: ContentModule; locale: Rec
     } else if (section.kind === 'patch') {
       const compiled = compilePatchSection(section, locale, pack, dropTableIds);
       patches.push(...compiled.patches);
+      if (compiled.remove.locations) removeLocations.push(...compiled.remove.locations);
       if (compiled.remove.entities) removeEntities.push(...compiled.remove.entities);
       if (compiled.remove.items) removeItems.push(...compiled.remove.items);
       if (compiled.remove.flags) removeFlags.push(...compiled.remove.flags);
@@ -750,6 +785,7 @@ export const compileDsl = (source: string): { module: ContentModule; locale: Rec
     : undefined;
   const mergedRemove = {
     ...advancedDataUpdatesObject?.remove,
+    ...(removeLocations.length > 0 ? { locations: [...(advancedDataUpdatesObject?.remove?.locations ?? []), ...removeLocations] } : {}),
     ...(removeEntities.length > 0 ? { entities: [...(advancedDataUpdatesObject?.remove?.entities ?? []), ...removeEntities] } : {}),
     ...(removeItems.length > 0 ? { items: [...(advancedDataUpdatesObject?.remove?.items ?? []), ...removeItems] } : {}),
     ...(removeFlags.length > 0 ? { flags: [...(advancedDataUpdatesObject?.remove?.flags ?? []), ...removeFlags] } : {}),
