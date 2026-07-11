@@ -216,11 +216,37 @@ export type DslInteractionSection = {
 // entity/item merging already has for array-valued fields like `actions` —
 // see mergePatchValue in contentModules.ts) — redeclare every action you
 // want kept, not just the one you're changing.
+//
+// `remove <type>: <id>[, <id>...]` (entities/items/flags) — the same
+// scoping rule as everywhere else flags appear applies to removeFlags'
+// ids: a bare id resolves against *this* module's own pack (almost never
+// what you want when removing something owned by targetModuleId — use the
+// fully-qualified `<theirPack>.<flag>` form). Reuses the existing
+// data-updates.remove mechanism (ModuleDataUpdatesObject); no new engine
+// capability here either.
+//
+// A nested `flags:` block (same one-id-per-line grammar as the top-level
+// `# flags` section) declares flags *through the patch mechanism*
+// (data-updates.patches, `op: 'replace'`) rather than this module's own
+// plain `data.flags` — required, not stylistic: two independent modules
+// declaring the same id in their own `data.flags` is a hard
+// moduleConflictDisabled collision (validateModuleDataCollisions) even
+// when one of them is also removing the other's declaration in the same
+// breath, since data collisions are checked before any data-updates ever
+// run. Going through `.patches` (with `op: 'replace'`, not `'add'`) sails
+// past that check entirely — verified empirically against the real
+// applyModulesToBundle pipeline, not just reasoned about. This is exactly
+// the "take over ownership of a flag from another module" case `remove
+// flags:` exists for in the first place.
 export type DslPatchSection = {
   kind: 'patch';
   targetModuleId: string;
   entities: DslEntityDecl[];
   items: DslItemSection[];
+  flags: { id: string; initialValue: boolean | number }[];
+  removeEntities: string[];
+  removeItems: string[];
+  removeFlags: string[];
 };
 
 export type DslSection =

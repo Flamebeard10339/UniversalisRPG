@@ -831,10 +831,11 @@ export type ContributionRemovedIds = {
   modules: string[];
 };
 
-// Full, self-contained module source — not a diff. A GitHub issue needs to
-// be plug-and-play (drop the file in and test it directly), which a diff
-// alone can't be without a merge step first; see formatDslModulesBlock in
-// src/lib/githubIssues.ts.
+// Full, self-contained module source — always small by construction (a
+// contribution edits existing content via `# patch <targetModuleId>`
+// rather than a direct edit to the target's own file, so there's no large
+// "before" to diff against and nothing here beyond what's actually being
+// added/changed). See formatDslModulesBlock in src/lib/githubIssues.ts.
 export type ContributionDslModuleFile = {
   path: string;
   source: string;

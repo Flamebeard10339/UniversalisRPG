@@ -564,27 +564,65 @@ const compileDropTable = (section: DslDropTableSection, dropTableIds: Set<string
 // `data`, it becomes a whole-object data-updates.patches replace targeting
 // section.targetModuleId, applied purely at runtime by the engine's
 // existing applyObjectPatches (contentModules.ts) regardless of which
-// module declares it.
+// module declares it. `remove <type>:` ids become data-updates.remove
+// entries the same way — removeFlags' ids go through the same
+// pack-scoping (resolveFlagId) every other flag reference gets, so a bare
+// id removes a flag owned by *this* module's own pack (rare — almost
+// always the fully-qualified `<theirPack>.<flag>` form is what's meant
+// here, since the whole point is removing something owned by
+// targetModuleId).
+//
+// A nested `flags:` declaration ALSO compiles to a data-updates.patches
+// entry (`op: 'replace'`), not this module's own `data.flags` — required,
+// not stylistic: two modules independently declaring the same id in their
+// own `data.flags` is a hard collision (validateModuleDataCollisions),
+// checked before any data-updates run, so it fires even when this same
+// patch section is also removing the other module's declaration of that
+// id in the same breath. Going through `.patches` sails past that check
+// (verified against the real applyModulesToBundle pipeline) — this is
+// exactly the "take over ownership of a flag from another module" case
+// `remove flags:` exists for.
 // ---------------------------------------------------------------------------
+type CompiledPatchSection = {
+  patches: ModuleObjectPatch[];
+  remove: { entities?: string[]; items?: string[]; flags?: string[] };
+};
+
 const compilePatchSection = (
   section: DslPatchSection,
   locale: LocaleBuilder,
   pack: string,
   dropTableIds: Set<string>,
-): ModuleObjectPatch[] => [
-  ...section.entities.map((entityDecl): ModuleObjectPatch => ({
-    targetModId: section.targetModuleId,
-    objectType: 'entity',
-    objectId: entityDecl.id,
-    ops: [{ op: 'replace', path: '', value: compileEntity(entityDecl, locale, pack, dropTableIds) }],
-  })),
-  ...section.items.map((itemSection): ModuleObjectPatch => ({
-    targetModId: section.targetModuleId,
-    objectType: 'item',
-    objectId: itemSection.id,
-    ops: [{ op: 'replace', path: '', value: compileItemSection(itemSection, locale, pack, dropTableIds) }],
-  })),
-];
+): CompiledPatchSection => ({
+  patches: [
+    ...section.entities.map((entityDecl): ModuleObjectPatch => ({
+      targetModId: section.targetModuleId,
+      objectType: 'entity',
+      objectId: entityDecl.id,
+      ops: [{ op: 'replace', path: '', value: compileEntity(entityDecl, locale, pack, dropTableIds) }],
+    })),
+    ...section.items.map((itemSection): ModuleObjectPatch => ({
+      targetModId: section.targetModuleId,
+      objectType: 'item',
+      objectId: itemSection.id,
+      ops: [{ op: 'replace', path: '', value: compileItemSection(itemSection, locale, pack, dropTableIds) }],
+    })),
+    ...section.flags.map((flag): ModuleObjectPatch => {
+      const flagId = resolveFlagId(flag.id, pack);
+      return {
+        targetModId: section.targetModuleId,
+        objectType: 'flag',
+        objectId: flagId,
+        ops: [{ op: 'replace', path: '', value: { id: flagId, initialValue: flag.initialValue } }],
+      };
+    }),
+  ],
+  remove: {
+    ...(section.removeEntities.length > 0 ? { entities: section.removeEntities } : {}),
+    ...(section.removeItems.length > 0 ? { items: section.removeItems } : {}),
+    ...(section.removeFlags.length > 0 ? { flags: section.removeFlags.map((flagId) => resolveFlagId(flagId, pack)) } : {}),
+  },
+});
 
 // ---------------------------------------------------------------------------
 // Interactions: sugar for InteractionTypeDefinition — see docs on
@@ -628,6 +666,9 @@ export const compileDsl = (source: string): { module: ContentModule; locale: Rec
   const flags: StateFlagDefinition[] = [];
   const dropTables: DropTableDefinition[] = [];
   const patches: ModuleObjectPatch[] = [];
+  const removeEntities: string[] = [];
+  const removeItems: string[] = [];
+  const removeFlags: string[] = [];
   let advanced: Record<string, unknown> = {};
 
   // A droptable entry's bare id (item vs. named-droptable reference) can only
@@ -665,7 +706,11 @@ export const compileDsl = (source: string): { module: ContentModule; locale: Rec
     } else if (section.kind === 'droptable') {
       dropTables.push(compileDropTable(section, dropTableIds));
     } else if (section.kind === 'patch') {
-      patches.push(...compilePatchSection(section, locale, pack, dropTableIds));
+      const compiled = compilePatchSection(section, locale, pack, dropTableIds);
+      patches.push(...compiled.patches);
+      if (compiled.remove.entities) removeEntities.push(...compiled.remove.entities);
+      if (compiled.remove.items) removeItems.push(...compiled.remove.items);
+      if (compiled.remove.flags) removeFlags.push(...compiled.remove.flags);
     }
   }
 
@@ -690,20 +735,32 @@ export const compileDsl = (source: string): { module: ContentModule; locale: Rec
     : {};
   for (const [key, value] of Object.entries(advancedLocale)) locale.entries[key] ??= value;
   // `# advanced`'s own optional `data-updates` key is the escape hatch for
-  // module removals and cross-module patches this DSL has no sugar for
-  // beyond entities/items (`data-updates.remove` id lists, or a patch
-  // targeting a location/stat/skill/etc.) — `data-updates.remove`/`.locale`
-  // engine plumbing, same rationale as the rest of `# advanced`. `# patch`
-  // sections' own compiled patches are appended onto whatever `# advanced`
-  // already declared (patches is just an array, so this is a safe merge,
-  // not a "pick one" restriction like stat/skill/flags sugar vs. `#
-  // advanced` have) rather than either clobbering the other.
+  // cross-module patches/removals this DSL has no sugar for beyond
+  // entities/items/flags (a patch targeting a location/stat/skill/etc., or
+  // removing something `# patch`'s own `remove <type>:` doesn't cover) —
+  // `data-updates.locale` engine plumbing, same rationale as the rest of
+  // `# advanced`. `# patch` sections' own compiled patches/removals are
+  // merged onto whatever `# advanced` already declared (each field is just
+  // an array, so this is a safe union, not a "pick one" restriction like
+  // stat/skill/flags sugar vs. `# advanced` have) rather than either
+  // clobbering the other.
   const advancedDataUpdates = advanced['data-updates'];
   const advancedDataUpdatesObject = advancedDataUpdates && typeof advancedDataUpdates === 'object' && !Array.isArray(advancedDataUpdates)
     ? advancedDataUpdates as ModuleDataUpdatesObject
     : undefined;
-  const dataUpdates: ModuleDataUpdates | undefined = patches.length > 0
-    ? { ...(advancedDataUpdatesObject ?? {}), patches: [...(advancedDataUpdatesObject?.patches ?? []), ...patches] }
+  const mergedRemove = {
+    ...advancedDataUpdatesObject?.remove,
+    ...(removeEntities.length > 0 ? { entities: [...(advancedDataUpdatesObject?.remove?.entities ?? []), ...removeEntities] } : {}),
+    ...(removeItems.length > 0 ? { items: [...(advancedDataUpdatesObject?.remove?.items ?? []), ...removeItems] } : {}),
+    ...(removeFlags.length > 0 ? { flags: [...(advancedDataUpdatesObject?.remove?.flags ?? []), ...removeFlags] } : {}),
+  };
+  const hasRemovals = Object.keys(mergedRemove).length > 0;
+  const dataUpdates: ModuleDataUpdates | undefined = patches.length > 0 || hasRemovals
+    ? {
+        ...(advancedDataUpdatesObject ?? {}),
+        ...(patches.length > 0 ? { patches: [...(advancedDataUpdatesObject?.patches ?? []), ...patches] } : {}),
+        ...(hasRemovals ? { remove: mergedRemove } : {}),
+      }
     : advancedDataUpdates as ContentModule['data-updates'] | undefined;
   const { interactionTypes: _advancedInteractionTypes, locale: _advancedLocale, 'data-updates': _advancedDataUpdates, ...advancedRest } = advanced;
 

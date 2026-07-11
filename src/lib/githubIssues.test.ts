@@ -1,18 +1,20 @@
-// A GitHub contribution issue needs to be plug-and-play — a reviewer drops
-// the file in and tests it directly. A diff alone isn't runnable without a
-// merge step first, so each changed/new DSL module is embedded as its
-// complete, self-contained source instead.
+// A contribution is always a small, self-contained new module (edits to
+// existing content go through `# patch <targetModuleId>`, never a direct
+// edit to the target's own file — see docs/content-dsl-grammar.md) — so
+// there's never a large "before" to diff against, and the GitHub issue
+// embeds each changed/new module's complete source directly: concise by
+// construction, and plug-and-play (no merge step needed to test it).
 import { describe, expect, it } from 'vitest';
-import { formatContributionIssueBody, formatDslModulesBlock } from './githubIssues';
+import { createPrefilledIssueUrl, formatContributionIssueBody, formatDslModulesBlock } from './githubIssues';
 
 describe('DSL module packaging', () => {
   it('embeds the full source of each module under its own path heading', () => {
     const block = formatDslModulesBlock([
-      { path: 'modules/tutorial-island-guide-house.md', source: '# info\nid: tutorial-island-guide-house\n' },
+      { path: 'modules/tutorial-island-guide-house-mod.md', source: '# info\nid: tutorial-island-guide-house-mod\n' },
     ]);
-    expect(block).toContain('### modules/tutorial-island-guide-house.md');
+    expect(block).toContain('### modules/tutorial-island-guide-house-mod.md');
     expect(block).toContain('```md');
-    expect(block).toContain('# info\nid: tutorial-island-guide-house\n');
+    expect(block).toContain('# info\nid: tutorial-island-guide-house-mod\n');
   });
 
   it('packages multiple changed modules as separate, individually headed blocks', () => {
@@ -42,12 +44,24 @@ describe('DSL module packaging', () => {
     expect(withDsl).toContain('```md');
   });
 
-  it('never includes a Changed JSON section (retired in favor of full DSL source)', () => {
+  it('never includes a Changed JSON section or a diff of the target module', () => {
     const body = formatContributionIssueBody({
       appVersion: '1.0.0', targetUniverseId: 'base', notes: '', validationIssues: [],
       dslModules: [{ path: 'modules/x.md', source: 'b\n' }],
     });
     expect(body).not.toContain('Changed JSON');
     expect(body).not.toContain('```json');
+    expect(body).not.toContain('```diff');
+  });
+});
+
+describe('createPrefilledIssueUrl', () => {
+  it('never puts the body in the URL — GitHub silently rejects issues/new URLs beyond a modest length', () => {
+    const url = createPrefilledIssueUrl({
+      appVersion: '1.0.0', targetUniverseId: 'base', notes: '', validationIssues: [],
+      dslModules: [{ path: 'modules/x.md', source: 'x'.repeat(10_000) }],
+    });
+    expect(url).not.toContain('body=');
+    expect(url.length).toBeLessThan(500);
   });
 });

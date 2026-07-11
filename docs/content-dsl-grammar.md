@@ -599,6 +599,11 @@ ops.
 
 ```
 # patch tutorial-island-guide-house
+remove flags: tutorial-island.bookshelf-note-taken
+
+flags:
+  tutorial-island.bookshelf-note-taken
+
 ## entity front-door
 examine: A newly reinforced door — the workshop clearly did a pass on it.
 pick lock:
@@ -612,33 +617,75 @@ pick lock:
 tags: mainhand (1 attack), +2 attack
 ```
 
-Edits an entity/item owned by *another* module (`<targetModuleId>`) —
+Edits an entity/item/flag owned by *another* module (`<targetModuleId>`) —
 without touching that module's own file — for a contribution to content you
-don't own. Body is a sequence of `## entity <id>` / `## item <id>` blocks:
-same grammar as a location's nested entities / a top-level `# item`
-(including the "every entity gets an examine action, even an unauthored
-one" default), just `##`-prefixed here since each is a sub-declaration of
-what's being patched rather than a standalone top-level section.
+don't own. This is the DSL's whole answer to "how do I edit an existing
+module": a contribution is always a new, small, self-contained module of
+its own (`dependencies: <targetModuleId>` in its own `# info`), never a
+direct edit to the target's file — see "Content contributions" below for
+why that matters for the GitHub submission flow specifically.
 
-Compiles to whole-object `data-updates.patches` entries (`ModuleObjectPatch`,
-`op: 'replace'` at the object's own root) — sugar for what previously
-required hand-writing this shape inside `# advanced`, not a new engine
-capability; the engine already applies `data-updates.patches` purely at
-runtime (`applyObjectPatches` in `contentModules.ts`), regardless of which
-module declares them, so patching an entity never requires merging into the
-target module's own file. **A patch replaces the target wholesale** — same
-semantics `data-updates`'s own JSON-authored entity/item merging already has
-for array-valued fields like `actions` (`mergePatchValue` in
-`contentModules.ts`) — redeclare every action you want to keep, not just the
-one you're changing. A `# patch` targeting an entity/item that doesn't exist
-in the target module fails validation (`moduleUpdateTargetMissing`) rather
-than silently creating it — this sugar is for *editing existing* content;
-add brand-new entities/items in your own module's `# location`/`# item`
-instead.
+- `## entity <id>` / `## item <id>` — same grammar as a location's nested
+  entities / a top-level `# item` (including the "every entity gets an
+  examine action, even an unauthored one" default), just `##`-prefixed
+  here since each is a sub-declaration of what's being patched rather than
+  a standalone top-level section. Compiles to a whole-object
+  `data-updates.patches` entry (`ModuleObjectPatch`, `op: 'replace'` at the
+  object's own root) — sugar for what previously required hand-writing
+  this shape inside `# advanced`, not a new engine capability; the engine
+  already applies `data-updates.patches` purely at runtime
+  (`applyObjectPatches` in `contentModules.ts`), regardless of which
+  module declares them. **A patch replaces the target wholesale** — same
+  semantics `data-updates`'s own JSON-authored entity/item merging already
+  has for array-valued fields like `actions` (`mergePatchValue` in
+  `contentModules.ts`) — redeclare every action you want to keep, not just
+  the one you're changing. Targeting an entity/item that doesn't exist in
+  the target module fails validation (`moduleUpdateTargetMissing`) rather
+  than silently creating it — this sugar is for *editing existing*
+  content; add brand-new entities/items in your own module's
+  `# location`/`# item` instead.
+- `remove <entities|items|flags>: <id>[, <id>...]` — drops something from
+  the target outright (`data-updates.remove`). A bare flag id here is
+  pack-scoped to *this* module's own pack like everywhere else flags
+  appear — almost never what's meant when removing something owned by
+  `targetModuleId`, so use the fully-qualified `<theirPack>.<flag>` form.
+- `flags:` — a nested, indented list, one flag id per line (same grammar
+  as the top-level `# flags` section: a bare id defaults to
+  `initialValue: false`, `<id>: <value>` sets an explicit one). **Declares
+  through the patch mechanism** (`data-updates.patches`, `op: 'replace'`,
+  same as `## entity`/`## item` above) — deliberately *not* through this
+  module's own `data.flags`, even though a plain `# flags` section would
+  parse identically. This is required, not stylistic: two independent
+  modules declaring the same id in their own `data.flags` is a hard
+  `moduleConflictDisabled` collision (`validateModuleDataCollisions`),
+  checked before any `data-updates` ever run — it fires even when this
+  same patch section is also removing the other module's declaration of
+  that id in the same breath. Routing through `.patches` instead sails
+  past that check entirely (verified against the real
+  `applyModulesToBundle` pipeline, not just reasoned about). Use a bare id
+  to redeclare a flag under this module's own pack (`resolveFlagId`
+  applies, same scoping as everywhere else); use the fully-qualified form
+  to redeclare — take over — a flag that's being removed from
+  `targetModuleId` above, exactly the `remove flags:` example shown here.
 
-Only `## entity`/`## item` are covered today; patching a location, stat,
-skill, or other object kind still needs `# advanced`'s raw
-`"data-updates": {"patches": [...]}` form above.
+Only `## entity`/`## item`/`flags:` are covered today; patching a
+location, stat, skill, or other object kind still needs `# advanced`'s raw
+`"data-updates": {"patches": [...]}`/`{"remove": {...}}` form above.
+
+### Content contributions
+
+A GitHub contribution issue embeds each new/changed DSL module's complete
+source verbatim (`formatDslModulesBlock` in `src/lib/githubIssues.ts`) —
+not a diff, and never the target module's own source. That's only
+concise *and* plug-and-play at the same time because a contribution is
+always a `# patch`-based module of its own: it's inherently small (nothing
+in it except what's actually being added/changed), and it's inherently
+runnable on its own (drop the file into `modules/`, register the id in
+`universe.json` — see `scripts/merge-contribution-issue.mjs` — no merge
+into any other file required). A direct edit to an existing module's own
+file doesn't have this property (the "diff vs. plug-and-play" tension a
+naive read of the two requirements above suggests is a false one — it only
+shows up if contributions edit files directly, which they don't).
 
 The remaining keys (merged into `data`) are the intentional escape hatch for
 object kinds that are engine plumbing rather than authoring surface

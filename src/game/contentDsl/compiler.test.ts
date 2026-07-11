@@ -663,6 +663,79 @@ wave: say: The gatekeeper waves back.
     if (!gateKeeper?.actions) throw new Error('gate-keeper entity/actions missing from merged bundle');
     expect(gateKeeper.actions.map((action) => action.id)).toEqual(['examine', 'wave']);
   });
+
+  it('compiles "remove <type>: <id>, <id>" to data-updates.remove, pack-scoping bare flag ids like everywhere else', () => {
+    const source = `# info
+id: patch-remove-proof
+version: 1.0.0
+universe: base
+author: test
+game_version: 1.0
+pack: patch-remove-proof
+
+# patch other-module
+remove entities: old-guard
+remove items: rusty-key
+remove flags: other-pack.legacy-flag, bare-flag
+`;
+    const { module } = compileDsl(source);
+    const dataUpdates = module['data-updates'] as { remove: { entities: string[]; items: string[]; flags: string[] } };
+    expect(dataUpdates.remove.entities).toEqual(['old-guard']);
+    expect(dataUpdates.remove.items).toEqual(['rusty-key']);
+    // "other-pack.legacy-flag" is dotted, used as-is; "bare-flag" is bare,
+    // pack-scoped to *this* module's own pack (patch-remove-proof) — same
+    // rule as set:/unset:/# flags everywhere else.
+    expect(dataUpdates.remove.flags).toEqual(['other-pack.legacy-flag', 'patch-remove-proof.bare-flag']);
+  });
+
+  it('end to end: a patch module takes over ownership of a flag — removes the owner\'s declaration and redeclares it via # patch\'s own flags:, without a moduleConflictDisabled collision', () => {
+    // Reproduces (corrected) the original guide-house flags migration this
+    // session's earlier bug fix concerned: declaring the same flag id via
+    // plain data.flags in two independent modules is a hard collision
+    // (validateModuleDataCollisions runs before any data-updates.remove
+    // ever does) — the fix is declaring it through # patch's flags:
+    // instead, which compiles through data-updates.patches, not data.flags.
+    const owner: ContentModule = {
+      id: 'tutorial-island-guide-house', version: '1.0.0', universe: 'base', author: 'test', game_version: '1.0',
+      data: {
+        locations: [{ id: 'tutorial-guide-house', position: { x: 0, y: 0 }, starting: true, entities: ['bookshelf'] }],
+        entities: [{
+          id: 'bookshelf',
+          actions: [
+            { id: 'examine', instant: true, rewards: [], results: [] },
+            { id: 'take-note', instant: true, rewards: [], results: [{ kind: 'flag', flagId: 'tutorial-island.bookshelf-note-taken', value: true }] },
+          ],
+        }],
+        flags: [{ id: 'tutorial-island.bookshelf-note-taken', initialValue: false }],
+      },
+    };
+    const patchSource = `# info
+id: tutorial-island-guide-house-mod
+version: 1.0.0
+universe: base
+author: test
+game_version: 1.0
+pack: tutorial-island-guide-house-mod
+dependencies: tutorial-island-guide-house
+
+# patch tutorial-island-guide-house
+remove flags: tutorial-island.bookshelf-note-taken
+
+flags:
+  tutorial-island.bookshelf-note-taken
+`;
+    const { module: patchModule } = compileDsl(patchSource);
+
+    const result = applyModulesToBundle(emptyBundle(), [owner, patchModule]);
+
+    expect(result.issues.filter((issue) => issue.severity === 'error')).toEqual([]);
+    expect(result.issues.filter((issue) => issue.message === 'validation.moduleConflictDisabled')).toEqual([]);
+    expect(result.bundle.flags?.filter((flag) => flag.id === 'tutorial-island.bookshelf-note-taken')).toHaveLength(1);
+    // The owner's own action referencing the flag still resolves — the
+    // flag was relocated, not orphaned.
+    const bookshelf = result.bundle.entities?.find((entity) => entity.id === 'bookshelf');
+    expect(bookshelf?.actions?.some((action) => action.id === 'take-note')).toBe(true);
+  });
 });
 
 describe('content DSL — item-tag / equipped-item-tag requires:', () => {

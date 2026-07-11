@@ -61,12 +61,12 @@ export const SubmitToGitHub = ({ appVersion, bundle, draft, onPatch, validationI
         />
       </div>
       <div className="flex flex-wrap gap-2">
-        <a className="rounded bg-emerald-400 px-3 py-2 text-sm font-semibold text-slate-950" href={issueUrl} rel="noreferrer" target="_blank">
-          {t('contribution.github.open')}
-        </a>
-        <button className="rounded border border-slate-600 px-3 py-2 text-sm font-semibold text-slate-100" onClick={copyIssueBody} type="button">
+        <button className="rounded bg-emerald-400 px-3 py-2 text-sm font-semibold text-slate-950" onClick={copyIssueBody} type="button">
           {t('contribution.github.copy')}
         </button>
+        <a className="rounded border border-slate-600 px-3 py-2 text-sm font-semibold text-slate-100" href={issueUrl} rel="noreferrer" target="_blank">
+          {t('contribution.github.open')}
+        </a>
       </div>
       <textarea className="min-h-0 rounded bg-slate-950 p-3 text-xs text-slate-300" readOnly value={issueBody} />
     </section>

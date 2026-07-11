@@ -864,12 +864,52 @@ const parseDropTableSection = (cursor: Cursor, id: string): DslDropTableSection 
 // `## entity <id>`/`## item <id>` blocks — `##`-prefixed like a location's
 // nested entities (even though `# item` is a top-level header everywhere
 // else), since these are sub-declarations of what's being patched, not
-// standalone top-level sections.
+// standalone top-level sections — plus flat `remove <type>: <id>[, ...]`
+// metadata lines for dropping something from the target outright (there's
+// no "## remove" sub-declaration grammar to write a body for, so this is a
+// field like `# item`'s `title:`, not a nested block), and a nested
+// `flags:` list (same one-id-per-line grammar as `parseFlagsSection`,
+// under a bare `flags:` header like `adjacent:`'s indented list) for
+// declaring flags *through* the patch mechanism.
 // ---------------------------------------------------------------------------
+const REMOVE_LINE = /^remove\s+(entities|items|flags):\s*(.*)$/i;
+const PATCH_FLAG_LINE = /^([\w.-]+)(?:\s*:\s*(.*))?$/;
+
+const parsePatchFlagsEntries = (cursor: Cursor, baseIndent: number, targetModuleId: string): DslPatchSection['flags'] => {
+  const flags: DslPatchSection['flags'] = [];
+  while (!cursor.atEnd()) {
+    const line = cursor.current!;
+    if (line.trim().length === 0) {
+      cursor.index++;
+      continue;
+    }
+    if (leadingSpaces(line) <= baseIndent) break;
+    const trimmed = line.trim();
+    if (/^#/.test(trimmed)) break;
+
+    const match = PATCH_FLAG_LINE.exec(trimmed);
+    if (!match) throw new DslParseError(`Expected a flag id (optionally ": <initial value>") in patch "${targetModuleId}"'s flags: list, got: "${line}"`, cursor.index);
+    const rawValue = match[2]?.trim();
+    let initialValue: boolean | number = false;
+    if (rawValue !== undefined && rawValue.length > 0) {
+      if (/^true$/i.test(rawValue)) initialValue = true;
+      else if (/^false$/i.test(rawValue)) initialValue = false;
+      else initialValue = Number(rawValue);
+    }
+    flags.push({ id: match[1], initialValue });
+    cursor.index++;
+  }
+  return flags;
+};
+
 const parsePatchSection = (cursor: Cursor, targetModuleId: string): DslPatchSection => {
   cursor.skipBlank();
   const entities: DslEntityDecl[] = [];
   const items: DslItemSection[] = [];
+  const flags: DslPatchSection['flags'] = [];
+  const removeEntities: string[] = [];
+  const removeItems: string[] = [];
+  const removeFlags: string[] = [];
 
   while (!cursor.atEnd()) {
     const line = cursor.current!;
@@ -879,6 +919,27 @@ const parsePatchSection = (cursor: Cursor, targetModuleId: string): DslPatchSect
       continue;
     }
     if (/^#\s/.test(trimmed) && !/^##/.test(trimmed)) break;
+
+    const removeMatch = REMOVE_LINE.exec(trimmed);
+    if (removeMatch) {
+      const ids = removeMatch[2].split(',').map((part) => part.trim()).filter(Boolean);
+      if (ids.length === 0) throw new DslParseError(`"remove ${removeMatch[1]}:" needs at least one id in patch "${targetModuleId}", got: "${line}"`, cursor.index);
+      const type = removeMatch[1].toLowerCase();
+      if (type === 'entities') removeEntities.push(...ids);
+      else if (type === 'items') removeItems.push(...ids);
+      else removeFlags.push(...ids);
+      cursor.index++;
+      continue;
+    }
+
+    const flagsHeaderMatch = /^flags:\s*$/i.exec(trimmed);
+    if (flagsHeaderMatch) {
+      const indent = leadingSpaces(line);
+      cursor.index++;
+      flags.push(...parsePatchFlagsEntries(cursor, indent, targetModuleId));
+      cursor.skipBlank();
+      continue;
+    }
 
     const entityHeaderMatch = /^##\s+entity\s+([\w-]+)\s*$/i.exec(trimmed);
     if (entityHeaderMatch) {
@@ -896,8 +957,8 @@ const parsePatchSection = (cursor: Cursor, targetModuleId: string): DslPatchSect
       continue;
     }
 
-    throw new DslParseError(`Expected "## entity <id>" or "## item <id>" in patch "${targetModuleId}", got: "${line}"`, cursor.index);
+    throw new DslParseError(`Expected "remove <entities|items|flags>: <id>[, ...]", "flags:", "## entity <id>", or "## item <id>" in patch "${targetModuleId}", got: "${line}"`, cursor.index);
   }
 
-  return { kind: 'patch', targetModuleId, entities, items };
+  return { kind: 'patch', targetModuleId, entities, items, flags, removeEntities, removeItems, removeFlags };
 };
