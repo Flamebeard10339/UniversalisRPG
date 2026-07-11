@@ -26,12 +26,35 @@ const writeText = (filePath, text, dryRun) => {
   return { path: filePath };
 };
 
-// Each changed/new DSL module is embedded as its complete, self-contained
-// source under a '### <path>' heading (see formatDslModulesBlock in
-// src/lib/githubIssues.ts) — a plug-and-play file, not a diff, so parsing it
-// back out is a plain extraction, no patch-application logic needed.
+// The contribution is embedded as a single multi-module DSL file under a
+// '### <path>' heading (see formatDslModulesBlock in src/lib/githubIssues.ts) —
+// a plug-and-play bundle, not a diff. Each contained module is delimited by its
+// `# info` header; its real filename comes from its own `id:`, so the '<path>'
+// heading is just a container label (buildContributionBundle writes
+// 'modules/contribution.md'), not where anything lands.
 const dslModulesSectionPattern = /##\s+Changed DSL Modules\s*\n([\s\S]*)$/i;
 const dslModuleBlockPattern = /###\s+([^\r\n]+)\r?\n```md\r?\n([\s\S]*?)\r?\n```/g;
+
+// Splits a bundle into one source string per module on `# info` boundaries —
+// the inverse of buildContributionBundle's join (kept in lockstep with
+// parseModules in src/game/contentDsl/contributionBundle.ts).
+const splitModules = (text) => {
+  const lines = text.split(/\r?\n/);
+  const modules = [];
+  let current = null;
+  for (const line of lines) {
+    if (/^#\s+info\b/i.test(line)) {
+      if (current) modules.push(current);
+      current = [line];
+    } else if (current) {
+      current.push(line);
+    }
+  }
+  if (current) modules.push(current);
+  return modules.map((moduleLines) => moduleLines.join('\n').trim()).filter((source) => source.length > 0);
+};
+
+const moduleIdFromSource = (source) => source.match(/^id:\s*(\S+)/m)?.[1] ?? null;
 
 export const parseContributionIssue = (text) => {
   const targetUniverseId = text.match(/##\s+Target universe\s+([^\r\n]+)/i)?.[1]?.trim();
@@ -41,7 +64,11 @@ export const parseContributionIssue = (text) => {
   const dslSectionMatch = text.match(dslModulesSectionPattern);
   if (dslSectionMatch) {
     for (const match of dslSectionMatch[1].matchAll(dslModuleBlockPattern)) {
-      dslModules.push({ path: match[1].trim(), source: match[2] });
+      for (const source of splitModules(match[2])) {
+        const id = moduleIdFromSource(source);
+        if (!id) throw new Error('A contributed module is missing an "id:" in its "# info" block.');
+        dslModules.push({ id, source });
+      }
     }
   }
 
@@ -59,15 +86,14 @@ const bumpPatchVersion = (version) => {
 
 const withVersion = (source, version) => source.replace(/^(version:\s*)\S+/m, `$1${version}`);
 
-// A DSL module is authored as a complete, self-contained file — merging it
-// is a plain upsert (write the text to modules/<id>.md, register the id in
-// universe.json only if it's new), never patch-application: unlike the
-// retired JSON-patch workflows, there's no "does this still apply cleanly"
-// question, since the incoming source always fully replaces whatever's on
-// disk. A module whose file already exists gets its version bumped from
-// whatever's currently on disk (not whatever the contributor's session had,
-// which may be stale if something else merged in the meantime) — a brand
-// new module keeps the version the contributor declared.
+// Each contributed module (already split out of the bundle by
+// parseContributionIssue, so it's a complete, self-contained file — an authored
+// module verbatim, or an auto-generated `<coreId>-PATCHES`) is merged by plain
+// upsert: write the text to modules/<its own id>.md, register the id in
+// universe.json only if it's new. Never patch-application — the incoming source
+// always fully replaces whatever's on disk. An existing file gets its version
+// bumped from what's currently on disk (not the contributor's possibly-stale
+// session value); a brand-new module keeps the version it declared.
 export const upsertDslModules = ({ universeId, dslModules, dryRun = false }) => {
   if (!dslModules || dslModules.length === 0) throw new Error('No Changed DSL Modules block found in the issue.');
 
@@ -77,8 +103,8 @@ export const upsertDslModules = ({ universeId, dslModules, dryRun = false }) => 
   const newModuleIds = [];
 
   for (const file of dslModules) {
-    const moduleId = file.path.match(/^modules\/([^/]+)\.md$/i)?.[1];
-    if (!moduleId) throw new Error(`Could not determine a module id from "${file.path}".`);
+    const moduleId = file.id;
+    if (!moduleId) throw new Error('A contributed module is missing an "id:" in its "# info" block.');
 
     const targetPath = modulePath(universeId, moduleId);
     const exists = fs.existsSync(targetPath);
@@ -125,11 +151,13 @@ const parseArgs = (argv) => {
 const usage = `Usage:
   node scripts/merge-contribution-issue.mjs --issue issue.md [--dry-run]
 
-Applies each "## Changed DSL Modules" file in a submitted contribution issue
-(src/lib/githubIssues.ts's formatContributionIssueBody) to
-public/content/universes/<universe>/modules/<id>.md: writes a new file and
-registers it in universe.json if it doesn't exist yet, or overwrites an
-existing one and bumps its version's patch number.`;
+Splits the multi-module bundle in a submitted contribution issue's
+"## Changed DSL Modules" block (src/lib/githubIssues.ts's
+formatContributionIssueBody) into its individual modules and applies each to
+public/content/universes/<universe>/modules/<its own id>.md: writes a new file
+and registers it in universe.json if it doesn't exist yet (both authored
+modules and auto-generated <coreId>-PATCHES modules), or overwrites an existing
+one and bumps its version's patch number.`;
 
 export const runCli = (argv = process.argv.slice(2)) => {
   const args = parseArgs(argv);

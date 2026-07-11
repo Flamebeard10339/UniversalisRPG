@@ -24,32 +24,25 @@ const moduleBlock = (moduleFilePath, source) => `## Changed DSL Modules
 ${source}
 \`\`\``;
 
+const infoBlock = (id) => `# info\nid: ${id}\nversion: 1.0.0\nuniverse: base\nauthor: test\ngame_version: 1.0`;
+
 describe('merge-contribution-issue tooling — parsing', () => {
-  it('parses the target universe and embedded full-source DSL module blocks', () => {
-    const source = '# info\nid: local-contributions\nversion: 1.0.0\nuniverse: base\nauthor: test\ngame_version: 1.0\n';
-    const parsed = parseContributionIssue(dslIssueBody(moduleBlock('modules/local-contributions.md', source)));
+  it('parses the target universe and the id of a single-module bundle', () => {
+    const source = `${infoBlock('local-contributions')}\n`;
+    const parsed = parseContributionIssue(dslIssueBody(moduleBlock('modules/contribution.md', source)));
 
     expect(parsed.targetUniverseId).toBe('base');
-    expect(parsed.dslModules).toEqual([{ path: 'modules/local-contributions.md', source }]);
+    expect(parsed.dslModules).toEqual([{ id: 'local-contributions', source: infoBlock('local-contributions') }]);
   });
 
-  it('parses multiple module blocks from one issue', () => {
-    const block = `## Changed DSL Modules
-
-### modules/a.md
-\`\`\`md
-a-source
-\`\`\`
-
-### modules/b.md
-\`\`\`md
-b-source
-\`\`\``;
-    const parsed = parseContributionIssue(dslIssueBody(block));
-    expect(parsed.dslModules).toEqual([
-      { path: 'modules/a.md', source: 'a-source' },
-      { path: 'modules/b.md', source: 'b-source' },
-    ]);
+  it('splits a multi-module bundle into one entry per contained module, id-from-# info', () => {
+    // The container path ('modules/contribution.md') is irrelevant — each
+    // module's real id comes from its own `# info`.
+    const bundle = `${infoBlock('my-new-wing')}\n\n# item lantern\ntitle: Lantern\n\n${infoBlock('tutorial-island-guide-house-PATCHES')}\n\n# patch tutorial-island-guide-house\n## remove entity mirror\n`;
+    const parsed = parseContributionIssue(dslIssueBody(moduleBlock('modules/contribution.md', bundle)));
+    expect(parsed.dslModules.map((module) => module.id)).toEqual(['my-new-wing', 'tutorial-island-guide-house-PATCHES']);
+    expect(parsed.dslModules[0].source).toContain('# item lantern');
+    expect(parsed.dslModules[1].source).toContain('## remove entity mirror');
   });
 
   it('returns no DSL modules when the issue has no Changed DSL Modules section', () => {
@@ -76,7 +69,7 @@ describe('merge-contribution-issue tooling — DSL upsert', () => {
     try {
       const result = upsertDslModules({
         universeId: 'base',
-        dslModules: [{ path: 'modules/merge-issue-scratch-module.md', source: newModuleSource }],
+        dslModules: [{ id: 'merge-issue-scratch-module', source: newModuleSource }],
         dryRun: false,
       });
 
@@ -100,7 +93,7 @@ describe('merge-contribution-issue tooling — DSL upsert', () => {
 
     const result = upsertDslModules({
       universeId: 'base',
-      dslModules: [{ path: 'modules/tutorial-island-guide-house.md', source: editedSource }],
+      dslModules: [{ id: 'tutorial-island-guide-house', source: editedSource }],
       dryRun: true,
     });
 
@@ -117,7 +110,7 @@ describe('merge-contribution-issue tooling — DSL upsert', () => {
 
     const result = upsertDslModules({
       universeId: 'base',
-      dslModules: [{ path: 'modules/tutorial-island-guide-house.md', source: currentSource }],
+      dslModules: [{ id: 'tutorial-island-guide-house', source: currentSource }],
       dryRun: true,
     });
 
