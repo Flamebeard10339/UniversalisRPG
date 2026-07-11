@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { applyModulesToBundle } from '../contentModules';
 import type { ContentBundle } from '../types';
 import { compileDsl } from './compiler';
-import { diffModuleToPatch, type PatchModuleInfo } from './contributionPatch';
+import { diffModuleToPatch } from './contributionPatch';
 
 const emptyBundle = (): ContentBundle => ({
   manifest: { schemaVersion: 1, id: 'base', version: '1.0.0', author: 'test', locales: ['en'], files: [] },
@@ -20,7 +20,6 @@ const emptyBundle = (): ContentBundle => ({
   locales: { en: {} },
 });
 
-const INFO: PatchModuleInfo = { version: '1.0.0', universe: 'base', author: 'test', gameVersion: '1.0' };
 
 const BASE = `# info
 id: core-town
@@ -57,12 +56,12 @@ tags: +1 attack
 
 describe('diffModuleToPatch', () => {
   it('returns null when nothing changed', () => {
-    expect(diffModuleToPatch(BASE, BASE, 'core-town', INFO).moduleSource).toBeNull();
+    expect(diffModuleToPatch(BASE, BASE, 'core-town').moduleSource).toBeNull();
   });
 
   it('emits only the changed field for a location move, as ## upsert location', () => {
     const edited = BASE.replace('x: 0, y: 0', 'x: 1, y: 0');
-    const { moduleSource } = diffModuleToPatch(BASE, edited, 'core-town', INFO);
+    const { moduleSource } = diffModuleToPatch(BASE, edited, 'core-town');
     expect(moduleSource).toContain('# patch core-town');
     expect(moduleSource).toContain('## upsert location town-square\nx: 1');
     // Unchanged fields are not re-emitted.
@@ -74,7 +73,7 @@ describe('diffModuleToPatch', () => {
     const edited = BASE
       .replace('## entity mirror\nexamine: You see yourself.\n\n', '')
       .replace('title: Statue', 'title: Bronze Statue');
-    const { moduleSource } = diffModuleToPatch(BASE, edited, 'core-town', INFO) as { moduleSource: string };
+    const { moduleSource } = diffModuleToPatch(BASE, edited, 'core-town') as { moduleSource: string };
     expect(moduleSource).toContain('## replace entity statue\ntitle: Bronze Statue');
     expect(moduleSource).toContain('## remove entity mirror');
     // Membership change is captured on the location op.
@@ -84,7 +83,7 @@ describe('diffModuleToPatch', () => {
 
   it('warns (does not silently drop) an edit the patch grammar cannot express', () => {
     const edited = BASE.replace('# item coin\ntitle: Coin\ntags: +1 attack\n', '# dialogue elder\nstart (elder): Hello.\n');
-    const { warnings } = diffModuleToPatch(BASE, edited, 'core-town', INFO);
+    const { warnings } = diffModuleToPatch(BASE, edited, 'core-town');
     expect(warnings.some((warning) => warning.includes('dialogue'))).toBe(true);
   });
 
@@ -103,7 +102,7 @@ describe('diffModuleToPatch', () => {
     // Location membership is implicit in the nested `## entity` order (base:
     // fountain/statue/mirror; edited: fountain/bench/statue) — the differ
     // derives the `entities:` list op from that, no membership line needed.
-    const { moduleSource, warnings } = diffModuleToPatch(BASE, edited, 'core-town', INFO);
+    const { moduleSource, warnings } = diffModuleToPatch(BASE, edited, 'core-town');
     expect(warnings).toEqual([]);
     if (!moduleSource) throw new Error('expected a patch module');
 

@@ -4,15 +4,13 @@ const REPOSITORY_URL = 'https://github.com/Flamebeard10339/UniversalisRPG';
 
 export const createContributionPackage = (pack: ContributionPackage) => pack;
 
-// A contribution is always a small, self-contained new module — even one
-// that edits existing content does so via `# patch <targetModuleId>`
-// (docs/content-dsl-grammar.md), never a direct edit to the target's own
-// file. That means there's never a large "before" to diff against: the
-// whole module IS the minimal, complete representation of the change, and
-// it never contains text from the module(s) it patches beyond what it
-// explicitly overrides. One '### <path>' heading + fenced block per file,
-// in a fixed, greppable shape parseContributionIssue
-// (scripts/merge-contribution-issue.mjs) reads back out.
+// The contribution is one multi-module DSL file (buildContributionBundle):
+// modules the author wrote from scratch, verbatim, plus an auto-generated
+// `<coreId>-PATCHES` module for each shipped module they edited. It never
+// contains a shipped module's own file — an edit to shipped content is only
+// ever the small `# patch` delta. Emitted as one '### <path>' heading + fenced
+// block, the fixed, greppable shape parseContributionIssue
+// (scripts/merge-contribution-issue.mjs) splits back into per-module files.
 export const formatDslModulesBlock = (dslModules: ContributionDslModuleFile[]): string =>
   dslModules.map((file) => `### ${file.path}\n\`\`\`md\n${file.source}\n\`\`\``).join('\n\n');
 
@@ -24,6 +22,7 @@ export const formatContributionIssueBody = (pack: ContributionPackage) => {
       ? t('github.noValidationIssues')
       : pack.validationIssues.map((issue) => `- ${issue.severity}: ${issue.path} - ${t(issue.message, issue.params)}`).join('\n');
   const dslModules = pack.dslModules ?? [];
+  const warnings = pack.warnings ?? [];
 
   return [
     `## ${t('github.targetUniverse')}`,
@@ -34,6 +33,9 @@ export const formatContributionIssueBody = (pack: ContributionPackage) => {
     '',
     `## ${t('github.validation')}`,
     validationSummary,
+    ...(warnings.length > 0
+      ? ['', `## ${t('github.warnings', 'Packaging warnings')}`, ...warnings.map((warning) => `- ${warning}`)]
+      : []),
     '',
     `## ${t('github.appVersion')}`,
     pack.appVersion,

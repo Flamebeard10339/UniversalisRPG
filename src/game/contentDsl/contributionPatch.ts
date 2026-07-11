@@ -27,13 +27,6 @@ export type ContributionPatchResult = {
   warnings: string[];
 };
 
-export type PatchModuleInfo = {
-  version: string;
-  universe: string;
-  author: string;
-  gameVersion: string;
-};
-
 type Block = { level: 1 | 2; kind: string; id: string; ownerLocationId?: string; text: string };
 
 const HEADER = /^(#{1,2})\s+([a-z]+)(?:\s+(\S.*?))?\s*$/i;
@@ -116,7 +109,6 @@ export const diffModuleToPatch = (
   baselineSource: string,
   currentSource: string,
   targetModuleId: string,
-  info: PatchModuleInfo,
 ): ContributionPatchResult => {
   const baseModule = parseDsl(baselineSource);
   const curModule = parseDsl(currentSource);
@@ -181,13 +173,16 @@ export const diffModuleToPatch = (
 
   if (ops.length === 0) return { moduleSource: null, warnings };
 
+  // The patch module inherits universe/author/game_version from the module it
+  // targets (a fresh 1.0.0 of its own), so it slots into the same universe
+  // without the caller having to supply them.
   const header = [
     '# info',
     `id: ${targetModuleId}-PATCHES`,
-    `version: ${info.version}`,
-    `universe: ${info.universe}`,
-    `author: ${info.author}`,
-    `game_version: ${info.gameVersion}`,
+    'version: 1.0.0',
+    `universe: ${baseModule.info.universe}`,
+    `author: ${baseModule.info.author}`,
+    `game_version: ${baseModule.info.gameVersion}`,
     `dependencies: ${targetModuleId}`,
     '',
     `# patch ${targetModuleId}`,

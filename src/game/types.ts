@@ -849,6 +849,10 @@ export type ContributionPackage = {
   notes: string;
   t?: (key: string, fallbackOrParams?: string | Record<string, string | number>, params?: Record<string, string | number>) => string;
   dslModules?: ContributionDslModuleFile[];
+  // Non-fatal notices from packaging (e.g. an edit the # patch grammar can't
+  // express) — surfaced in the issue body so a reviewer sees what didn't make
+  // it into the bundle.
+  warnings?: string[];
 };
 
 export type LocalUniverseLibrary = Record<string, ContentBundle>;
