@@ -627,17 +627,17 @@ const compilePatchSection = (
     ...section.locationPatches
       .map((patch) => compileLocationPatch(patch, section.targetModuleId, locale))
       .filter((patch): patch is ModuleObjectPatch => patch !== null),
-    ...section.entities.map((entityDecl): ModuleObjectPatch => ({
+    ...section.entities.map(({ op, decl }): ModuleObjectPatch => ({
       targetModId: section.targetModuleId,
       objectType: 'entity',
-      objectId: entityDecl.id,
-      ops: [{ op: 'replace', path: '', value: compileEntity(entityDecl, locale, pack, dropTableIds) }],
+      objectId: decl.id,
+      ops: [{ op: op === 'upsert' ? 'add' : 'replace', path: '', value: compileEntity(decl, locale, pack, dropTableIds) }],
     })),
-    ...section.items.map((itemSection): ModuleObjectPatch => ({
+    ...section.items.map(({ op, decl }): ModuleObjectPatch => ({
       targetModId: section.targetModuleId,
       objectType: 'item',
-      objectId: itemSection.id,
-      ops: [{ op: 'replace', path: '', value: compileItemSection(itemSection, locale, pack, dropTableIds) }],
+      objectId: decl.id,
+      ops: [{ op: op === 'upsert' ? 'add' : 'replace', path: '', value: compileItemSection(decl, locale, pack, dropTableIds) }],
     })),
     ...section.flags.map((flag): ModuleObjectPatch => {
       const flagId = resolveFlagId(flag.id, pack);

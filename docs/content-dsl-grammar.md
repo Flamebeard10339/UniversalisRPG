@@ -645,14 +645,17 @@ capability, not a new one.
 - `## replace|upsert entity <id>` / `## replace|upsert item <id>` — same
   grammar as a location's nested entities / a top-level `# item` (including
   the "every entity gets an examine action, even an unauthored one"
-  default). Compiles to a whole-object `op: 'replace'` at the object's own
-  root. **A patch replaces the target wholesale** — same semantics
+  default). **A patch replaces the target wholesale** — same semantics
   `mergePatchValue` already has for array-valued fields like `actions` —
   redeclare every action you want to keep, not just the one you're changing.
-  `replace` and `upsert` compile identically; the engine appends the object
-  when the target lacks it and replaces it when present, so the distinction
-  is authoring intent (`replace` = must exist, `upsert` = may be new), not a
-  compile-time difference.
+  `upsert` *adds a new* object (compiles to a JSON-Patch `add` at path '',
+  which validation accepts only when the id is free — a typo fails loudly as
+  a `duplicateId` rather than silently editing the wrong object); `replace`
+  edits an *existing* one (`replace` at path '', which must resolve, else
+  `moduleUpdateTargetMissing`). At runtime both just set the whole object, so
+  the split is the create-vs-edit validation guard — which is why an
+  auto-generated patch uses `upsert` for content it added and `replace` for
+  content it changed.
 - `## upsert location <id>` — field-level, *not* whole-object: only the
   fields you write are touched. `x`/`y`/`z`/`starting`/`tags`/`entities`
   become one JSON-Patch `replace` op each (e.g. `x: 1` →

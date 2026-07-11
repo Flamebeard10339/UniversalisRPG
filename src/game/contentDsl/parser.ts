@@ -965,8 +965,8 @@ const PATCH_OP_HEADER = /^##\s+(upsert|replace|remove)\s+(location|entity|item|f
 const parsePatchSection = (cursor: Cursor, targetModuleId: string): DslPatchSection => {
   cursor.skipBlank();
   const locationPatches: DslLocationPatch[] = [];
-  const entities: DslEntityDecl[] = [];
-  const items: DslItemSection[] = [];
+  const entities: DslPatchSection['entities'] = [];
+  const items: DslPatchSection['items'] = [];
   const flags: DslPatchSection['flags'] = [];
   const removeLocations: string[] = [];
   const removeEntities: string[] = [];
@@ -1026,14 +1026,15 @@ const parsePatchSection = (cursor: Cursor, targetModuleId: string): DslPatchSect
       continue;
     }
 
+    const verb = op === 'upsert' ? 'upsert' : 'replace';
     if (kind === 'entity') {
-      entities.push(parseEntity(cursor, id));
+      entities.push({ op: verb, decl: parseEntity(cursor, id) });
       cursor.skipBlank();
       continue;
     }
 
     // kind === 'item'
-    items.push(parseItemSection(cursor, id));
+    items.push({ op: verb, decl: parseItemSection(cursor, id) });
     cursor.skipBlank();
   }
 

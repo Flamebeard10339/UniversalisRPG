@@ -276,17 +276,22 @@ export type DslLocationPatch = { id: string; fields: DslLocationPatchFields };
 //   ## upsert|replace item <id>     whole-object item
 //   ## upsert flag <id>[: value]    declare/take-over a flag via .patches
 //   ## remove location|entity|item|flag <id>   drop it (data-updates.remove)
-// plus a nested `flags:` block (same grammar as `# flags`). Entity/item
-// upsert and replace compile identically (whole-object `replace` at path ''):
-// the engine appends the object if the target doesn't have it and replaces it
-// wholesale if it does, so "upsert" (may be new) vs "replace" (must exist) is
-// an authoring-intent distinction, not a compile-time one.
+// plus a nested `flags:` block (same grammar as `# flags`). `upsert` adds a
+// *new* object to the target — it compiles to a JSON-Patch `add` at path '',
+// which validation only accepts when the id doesn't already exist (a typo'd
+// id fails loudly as a duplicate rather than silently editing the wrong
+// thing). `replace` edits an *existing* one (`replace` at path '', which must
+// resolve). At runtime both just set the whole object, so the split is purely
+// the create-vs-edit validation guard — which is exactly why the differ picks
+// `upsert` for content it added and `replace` for content it changed.
+export type DslPatchObject<T> = { op: 'upsert' | 'replace'; decl: T };
+
 export type DslPatchSection = {
   kind: 'patch';
   targetModuleId: string;
   locationPatches: DslLocationPatch[];
-  entities: DslEntityDecl[];
-  items: DslItemSection[];
+  entities: DslPatchObject<DslEntityDecl>[];
+  items: DslPatchObject<DslItemSection>[];
   flags: { id: string; initialValue: boolean | number }[];
   removeLocations: string[];
   removeEntities: string[];
