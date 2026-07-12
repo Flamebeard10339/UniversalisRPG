@@ -122,40 +122,13 @@ this before authoring NPCs, quests, items, or any state-driven UI.
 
 ## Content pipeline
 
-- Content is authored directly as DSL markdown (see `docs/content-dsl-grammar.md` and
-  `scripts/contentDsl/samples/*.md`), edited either by hand or through the in-app DSL
-  editor (Edit tab → Content, `src/components/contribution/DslModuleEditor.tsx`). The
-  DSL compiles to the same `ContentModule` JSON shape (`src/game/types.ts`) that the
-  loader/validators/engine have always consumed — no engine change is required to add
-  DSL content. The old grid-based JSON editors (`ModuleEditor.tsx`,
-  `ContentDataEditor.tsx`) and the Playwright pipeline that drove them
-  (`scripts/build-tutorial-island.mjs` → `scripts/mod-editor-cli.mjs`) have been
-  removed; there is no in-app authoring path left for content that only exists as
-  legacy JSON.
-- All Tutorial Island modules are now authored as DSL (`public/content/universes/base/
-  modules/tutorial-island-*.md`). `base-core.json` remains hand-written JSON. It no
-  longer hosts any standalone starter-world content (the old crossroads/emberwood/
-  old-quarry location set was removed) — it's now purely the shared engine-plumbing
-  foundation tutorial-island depends on: `displayProfile`, the universal `health`/
-  `attack`/`defense`/`regeneration`/`action-rate` stats+skills (referenced by its own
-  resources and the `melee-combat` interactionType, so they must live wherever those do
-  — see `docs/content-dsl-grammar.md`'s stat/skill/flag section for why), resources with
-  custom `effects`/`onFull`/`onEmpty` behavior, and an interactionType with an
-  `experience` array. Stats/skills/flags now have DSL sugar (`# stat`, `# skill`,
-  `# flags`) and could be ported; resources/effects/interactionType-`experience`/
-  display-profiles still don't, so porting the rest would mean putting it through the
-  `# advanced` raw-JSON escape hatch anyway. It keeps loading and playing fine via
-  `loader.ts`'s JSON-first-then-DSL-compile fallback; only port it if/when enough of its
-  remaining shapes gain real DSL sugar to make hand-authoring it actually easier.
-- After any change that could affect module resolution or validation, actually run
-  the full pipeline (`npx vitest run` → headless playtests) rather than trusting an
-  isolated unit test of the new feature. A validation gap in one new action/item can
-  silently disable unrelated modules via the module-conflict-cascade in
-  `resolveAndApplyModules` — this has happened twice and is only caught by running the
-  real thing end to end.
-- No backwards-compatibility shims for pre-launch content: replacing a field or system
-  means deleting the old one everywhere it's referenced, not migrating it or keeping a
-  fallback path.
+The DSL/JSON content-authoring pipeline (grammar, parser, compiler, loader,
+validation/merge engine, and the GitHub contribution/patch system built on top
+of it) was deleted wholesale on 2026-07-11 and is being redesigned from
+scratch on the `dsl-rewrite` branch — see `docs/dsl-rewrite/postmortem.md` for
+why, and `docs/dsl-rewrite/implementation-plan.md` for the rewrite plan. No
+backwards-compatibility shims or migration path from the old format: the new
+system starts clean and content is being hand-authored fresh against it.
 
 ## Testing discipline
 
@@ -224,22 +197,15 @@ this before authoring NPCs, quests, items, or any state-driven UI.
   read back and reuse, instead of a scattered sequence of separate tool calls.
 - For a check worth running again later (a regression you just fixed, a flow you want
   covered going forward), don't leave it as a one-off `preview_eval` transcript —
-  convert it into a headless playtest: save the same choiceIds (`action:...`/
-  `dialogue-option:...`) `choices.list()`/`window.__test.batch` already validated as
-  a JSON array to `.playtests/scripts/<name>.json`, then
-  `npx tsx scripts/playtest-cli.ts run --modules <comma-separated ids> --module-dir
-  public/content/universes/base/modules --label "<label>" --script
-  .playtests/scripts/<name>.json --out <name>.md` — replays it against the pure
-  engine (zero browser, zero real wait) and writes a transcript to
-  `.playtests/<name>.md`. `readModule` there tries `<id>.json` then falls back to
-  compiling `<id>.md` (every Tutorial Island module is DSL now — see Content
-  Pipeline above), so it works against real shipped content, not just hand-authored
-  JSON stubs. It also flags "more than 5 entities visible at once" per location as a
-  UX-budget warning (not a hard error) — a real, still-open finding as of this
-  writing on `tutorial-guide-house` and `tutorial-mine`. See `.playtests/profiles/*.json`
-  for reusable starting-state fixtures (one per module boundary) and
-  `.playtests/scripts/*.json` for existing examples. This is what makes a manual
-  verification pass reusable instead of throwaway.
+  convert it into a headless playtest via `scripts/playtest-cli.ts`/`scripts/
+  playtestEngine.ts`, which replay a saved choiceId script against the pure engine
+  (zero browser, zero real wait) and write a transcript. **This tooling is currently
+  nonfunctional**: its `readModule`/`loadStagedBundle` functions depend on the DSL/
+  JSON content pipeline deleted on 2026-07-11 (see `docs/dsl-rewrite/postmortem.md`),
+  and the `.playtests/` fixtures (`profiles/*.json`, `scripts/*.json`) were deleted
+  along with it since they were tied to now-gone content. Once the pipeline rewrite
+  (`docs/dsl-rewrite/implementation-plan.md`) has a working loader, rewire these two
+  scripts to it and re-establish this workflow rather than reinventing it.
 - `npm run test:ui` (`scripts/ui-smoke.mjs`) is a separate, real-browser
   (`playwright-core` + a hardcoded local Edge path) smoke test predating the
   `window.__test` harness — it drives the UI via brittle text/role selectors

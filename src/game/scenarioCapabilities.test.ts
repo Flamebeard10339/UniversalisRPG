@@ -3,8 +3,6 @@ import type { ActionResolutionContext, GameAction, UniversePlayState } from './t
 import { canStartAction, isActionVisible } from './conditions';
 import { completeAction, createInitialPlayState, resolveIdleTimers, startAction } from './timers';
 import { recordAgentSessionMessage } from './agentSession';
-import { validateContentBundle, validateContentShape } from './validators';
-import type { ContentBundle } from './types';
 
 const pickupWater: GameAction = {
   id: 'pick-up-water',
@@ -73,43 +71,6 @@ const context: ActionResolutionContext = {
 };
 
 describe('Derelict Extant scenario capabilities', () => {
-  it('validates recursive capability JSON and rejects malformed conditions', () => {
-    const conditionalAction: GameAction = {
-      ...pickupWater,
-      visibleWhen: {
-        kind: 'all',
-        conditions: [
-          { kind: 'state-variable', variable: 'flag:torn-suit', comparison: 'equal', value: false },
-          { kind: 'not', condition: { kind: 'state-variable', variable: 'item:water-bottle', comparison: 'greater-than', value: 4 } },
-        ],
-      },
-      results: [
-        { kind: 'resource', resourceId: 'air', amount: -2 },
-        { kind: 'relocate', locationId: 'corridor' },
-      ],
-    };
-    const bundle: ContentBundle = {
-      manifest: context.manifest!,
-      locations: context.locations!,
-      actions: [conditionalAction],
-      skills: context.skills,
-      stats: context.stats!,
-      items: context.items!,
-      flags: context.flags!,
-      resourceDefinitions: context.resourceDefinitions!,
-      effects: [],
-      interactionTypes: [],
-      enemies: [],
-      locales: { en: {} },
-    };
-
-    expect(validateContentBundle(bundle).filter((issue) => issue.severity === 'error')).toEqual([]);
-    expect(validateContentShape({
-      ...bundle,
-      actions: [{ ...conditionalAction, visibleWhen: { kind: 'unknown' } }],
-    } as unknown as ContentBundle)).toContainEqual(expect.objectContaining({ path: 'actions.json' }));
-  });
-
   it('supports finite location actions, inventory consumption, resource deltas, conditions, and relocation', () => {
     let state: UniversePlayState = {
       ...createInitialPlayState('test', 'storage'),
