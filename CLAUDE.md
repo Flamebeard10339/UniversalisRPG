@@ -1,126 +1,66 @@
-# Game Design Principles
+# Mission
 
-Durable lessons from Tutorial Island content-review cycles. These are principles to
-apply to *all* future content and engine work, not a changelog of past fixes — read
-this before authoring NPCs, quests, items, or any state-driven UI.
+Optimize for correctness, bounded scope, reuse, architectural coherence, strong evidence, and clean review—not patch volume. Passing tests is necessary. Avoid patches that accrue technical debt. Prefer self documenting code over comments or updating repository context. 
 
-## Dialogue
+Track which systems commits impact and prompt an independent system audit when un-audited commits > 10. Keep independent systems independent. Do not create systems that are required to be manually kept in sync. 
 
-- Dialogue state (`activeDialogue`) is rendered unconditionally, independent of which
-  tab is active, the same way the generic modal is (see below). Do not gate dialogue
-  rendering behind `visibleActiveTab === 'home'` or similar — anything that can start
-  a dialogue (item actions, entity actions, future systems) may be triggered from any
-  tab, and the player must be able to see and finish that conversation regardless of
-  where they triggered it from. Do not auto-cancel an active dialogue as a side effect
-  of plain tab/sub-tab navigation; only cancel it for actions that meaningfully replace
-  the whole screen (entering contribution mode, changing the display profile, starting
-  a new action/travel).
+Do not bloat CLAUDE.md with over 200 lines of instructions. 
 
-## Quests
+`.planning/.scratch.md` contains open thoughts, `backlog.md` for vetted work, `completed-tasks.md` contains the archive. 
 
-- Quest stage `descriptionKey`s are narrative progress summaries and hints
-- Quest/stage conditions are runtime flag checks evaluated against live state, not
-  merge-time object-id references. It is architecturally safe for a quest defined in
-  an early-loading module (e.g. `foundation`) to reference flags that are only ever
-  set by modules that load later — there is no forward-reference validation problem,
-  unlike object-id references (entities, items, actions) which do need to resolve at
-  merge time.
+# Repository systems
+1. Content pipeline through DSL markdown files (commits since audit: 0)
+  1. Contribution system: editor, validation/merge engine
+  2. DSL system: grammar, parser, compiler, loader
+2. User interface (commits since audit: 0)
+  1. Main tabs: Map, Home, Character, Settings, Edit 
+  2. Modals: dialogue, skills, stats
+  3. Experience: floating text
+3. Game Engine (commits since audit: 0)
+  1. Core: State-driven UI, offline progression, travel and locations
+  2. Data structures: locations, dialogue, quests, actions, resources, stats, skills, flags 
+4. Build & deployment (commits since audit: 0)
+  1. Web: Vite build, tag-triggered publish to itch.io (`.github/workflows/publish.yml`)
+  2. Android: Capacitor sync + Gradle release build, APK signing, attached to the GitHub release
+5. Testing procedure (commits since audit: 0)
+  1. Human testing: cli.ts, dev-mode
+  2. Agent testing: `window.__test` harness (`testHarness.ts`), `scripts/playtest-cli.ts` headless engine (nonfunctional pending DSL rewrite — see Content pipeline TODO), `agentSession.ts` GM/agent message protocol
 
-## State-driven UI
+# Audit prompt
+Audit the {repository-system} for correctness in the context of the last {N} commits impacting the system and global repository architecture. 
 
-- Any state-driven popup (name editor, bank vault, future dialogs) shares one generic
-  mechanism: `UniversePlayState.openModalId: string | null` plus an
-  `{kind:'open-modal', modalId:string}` `ActionResult`, rendered unconditionally near
-  the app root. Add a new `modalId` case, not a new boolean field, when a new popup is
-  needed. Reserve ad-hoc `useState` booleans for popups with zero game-state
-  involvement (e.g. a purely local confirm dialog).
-- Item actions (`item.<itemId>.<actionId>`) are a first-class, reusable pattern for
-  anything an item needs to "do" (read a note, drink a potion, etc.), mirroring entity
-  actions (`entity.<entityId>.<actionId>`) exactly in shape.
-- Item actions are **not location-scoped**. `isActionAvailableAtCurrentLocation` must
-  treat any action with `itemId` set as always available — an item can be used
-  wherever it's held. If you add a new "scope" concept to actions (item-scoped,
-  entity-scoped, station-scoped, etc.), make sure the availability check has an
-  explicit early-return for it; a missing case here silently rejects every action of
-  that kind everywhere; it can look like it renders correctly (a button appears) while
-  actually being unusable, so exercise it end-to-end (headless playtest *and* a manual
-  click) rather than trusting that the button is visible.
-- Repeatable state-dependent flavor text (e.g. "examine this thing, get a different
-  description depending on what you've already taken from it") uses mutually
-  exclusive `visibleWhen`-gated action variants that share one display title (see
-  `gommi`'s `examine`/`examine-asleep`, or the guide-house drawer/bookshelf), not a new
-  dialogue-branch-as-text mechanism. This needs zero engine changes.
-- "Descriptive flavor text for an object" is **one** mechanism, not one per object
-  kind: an Examine affordance that prints text to chat (`src/components/
-  ExamineButton.tsx`), never a static paragraph rendered inline. For entities/items
-  (which already have an action system) this is literally their own `examine:` action
-  — same `say:` sugar, same `chat.<scope>.<id>.examine` message key, rendered as
-  whichever button their other actions already render through (an item's Examine
-  button is just one more entry in `availableItemActions`, nothing item-specific). For
-  stats/skills/locations (no action system to hang it on) it's a locale-key lookup
-  (`statExamineKey`/`skillExamineKey`/`locationExamineKey`) fed through the same
-  `ExamineButton`. The DSL field is `examine:`, never `description:`, on every section
-  that has one (`# item`, `# stat`, `# skill`, `# location`) — a new object kind that
-  needs flavor text gets an `examine:` field or action, not a new "description" field
-  with its own inline-rendered paragraph.
+Do not assume the implementation approach is correct. Look specifically for:
 
-## Actions and combat
+- a simpler existing pattern that should have been reused.
+- scope drift;
+- CI, test, coverage, lint, type, or security weakening;
+- unmet acceptance criteria;
+- duplicated utilities or domain concepts;
+- architecture-boundary violations;
+- tests that repeat the implementation's assumptions;
+- missing edge cases;
+- public API, data, security, performance, or rollback risks;
+- cross-system effects;
 
-- Adversarial/continuous (enemy-shaped) actions and instant `chance`+`failureResults`
-  actions are two intentionally different design tools: a graduated skill check with
-  visible progress (health bar, multiple hits, XP per hit) versus a one-shot gamble
-  (single roll, binary success/fail). Don't unify them for consistency's sake — e.g.
-  the guide-house front door (adversarial lockpicking) and the mining locked chest
-  (chance-based lockpicking) are both intentional, and represent different flavors of
-  the same skill on purpose.
-- A "the target never fights back" action (e.g. picking a lock) still reuses the full
-  continuous/adversarial-action system — `interactionTypeId` + inline `enemy: {...}` +
-  `rewards` — with `targetPlayerHealth: false` on the interaction type. This is a
-  content-only pattern, not a new engine feature.
+Report findings by severity with file references and evidence.
 
-## Travel and the map
+# Additional repository context (maximum 300 tokens)
+- "descriptive flavor text for an object" is **one** mechanism
+- modals are rendered unconditionally with guaranteed closing behavior
+- quest/stage conditions are runtime flag checks evaluated against live state
+- location/item/entity actions (`<obj>.<objId>.<actionId>`) are first-class patterns for anything the object can 'do'
+- item actions are not location-scoped, location and entity actions are
+- enemy-shaped actions and instant actions are two intentionally different design tools
+- location connectivity is always explicit and directional
+- travel actions without cost or reward are treated as pathfinding edges for multi step map navigation
+- all skill-XP-granting moments must produce floating text
+- progress signals get lightweight UI acknowledgement (e.g. map tab flashing on location discovery)
+- prefer expanding `scripts/playtest-cli.ts` over writing ad-hoc preview_eval scripts
+- prefer the dev-only `window.__test` harness (`src/game/testHarness.ts`, mounted from `App.tsx` behind `import.meta.env.DEV`) over ad-hoc `page.evaluate`/screenshot loops
+- prefer batching multi-step checks into one round trip with `window.__test.batch([{path, args}, ...])`
+- manually clearing browser storage does not reliably give you a fresh state. Use `/cheat reset`
 
-- Location connectivity is **always explicit**, never grid-position-derived. Every
-  travel edge is a real, authored action (`# location`'s `adjacent:` block, or a
-  free-standing entity action like a ladder/tunnel/portal) — there is no
-  "grid-adjacent locations are automatically connected" behavior and no per-universe
-  toggle for it. If two locations should be walkable between, that requires an
-  explicit edge on at least one of them; if it should work both ways, both locations
-  need one (edges are one-directional, the return trip is never implied). `x`/`y`/`z`
-  positions are for travel-time calculation and map layout only — they never imply a
-  connection.
-- Any action that costs/rewards nothing and only relocates the player (optionally
-  narrating it via `say:`) is automatically a pathfinding edge, whether it's a
-  location-level `adjacent:` edge or a free-standing entity action (a ladder, tunnel,
-  portal) — see `src/game/travel.ts`'s `getPureTravelDestination`. Don't special-case
-  new "free move" content to make it map-navigable; if it's genuinely free (no other
-  results, no rewards), it already is. An action that *also* sets a flag, grants an
-  item, etc. alongside the relocate is deliberately excluded — that's a meaningful
-  moment (a one-way portal that also flips a story flag), not a free hop, so it stays
-  a manual button the player has to click, not something the map silently routes
-  through.
-
-## Resources and stats
-
-- Never add a second effect that regenerates/drains a resource already covered by an
-  existing effect on the same stat (e.g. don't add a second `regeneration`-keyed
-  health effect for a "well fed" buff when the base health resource already has one).
-  Buff the stat instead via a `StatModifierDefinition` (`statId`, `amount`, `kind:
-  'added'|'increased'`, `activeWhen`), which composes with whatever effects already
-  read that stat.
-
-## UI feedback guarantees
-
-- Any skill-XP-granting moment — whether it flows through `action.rewards`
-  (`kind:'skillXp'`), an `ExperienceTrigger` (`skill.xp-event` run-log entries), or an
-  inline `{kind:'skill-xp',...}` `ActionResult` — must produce floating text. This is
-  a blanket UI guarantee across every skill and every action shape, not a
-  combat-only feature.
-- Any new "resource pool" or "location discovery" style progress signal should get an
-  equivalent lightweight UI acknowledgement (e.g. the map tab flashing when a new
-  location is discovered) rather than requiring the player to notice it themselves.
-
-## Content pipeline
+# Content pipeline TODO
 
 The DSL/JSON content-authoring pipeline (grammar, parser, compiler, loader,
 validation/merge engine, and the GitHub contribution/patch system built on top
@@ -130,97 +70,15 @@ why, and `docs/dsl-rewrite/implementation-plan.md` for the rewrite plan. No
 backwards-compatibility shims or migration path from the old format: the new
 system starts clean and content is being hand-authored fresh against it.
 
-## Testing discipline
+For a check worth running again later (a regression you just fixed, a flow you want
+covered going forward), don't leave it as a one-off `preview_eval` transcript —
+convert it into a headless playtest via `scripts/playtest-cli.ts`/`scripts/
+playtestEngine.ts`, which replay a saved choiceId script against the pure engine
+(zero browser, zero real wait) and write a transcript. **This tooling is currently
+nonfunctional**: its `readModule`/`loadStagedBundle` functions depend on the DSL/
+JSON content pipeline deleted on 2026-07-11 (see `docs/dsl-rewrite/postmortem.md`),
+and the `.playtests/` fixtures (`profiles/*.json`, `scripts/*.json`) were deleted
+along with it since they were tied to now-gone content. Once the pipeline rewrite
+(`docs/dsl-rewrite/implementation-plan.md`) has a working loader, rewire these two
+scripts to it and re-establish this workflow rather than reinventing it.
 
-- The headless playtest harness (`scripts/playtestEngine.ts`'s `visibleChoices`) must
-  stay in sync with whatever the real UI can trigger. When a new action *kind* is
-  added (item actions, station/recipe actions, etc.), add the matching branch to
-  `visibleChoices` in the same change — otherwise the new content is untestable and
-  bugs in it (like the item-action location-gating bug above) only surface in manual
-  testing, or not at all.
-- A dialogue node with no `options` still needs a "Continue" affordance to close
-  (mirrors `DialoguePanel.tsx`'s fallback button) even if it has a `gotoNodeId` to
-  another node. `visibleChoices` must offer this as a synthetic choice; don't assume a
-  no-options node is always terminal.
-- The headless CLI (`scripts/playtestEngine.ts`) and the real app each used to build
-  their own `ActionResolutionContext`/choice-derivation independently — this is
-  exactly what let two real bugs (a hand-built context missing `recipes`/
-  `statModifiers`; `restartAction` dropping `recipeId` on loop) ship silently, since
-  the headless sim's separately-correct context could never surface a bug that only
-  existed in the real app's wiring. `visibleChoices`/`describeLocation` now live once
-  in `src/game/choices.ts`, imported by both. Never re-derive this logic a second
-  time; if a new action/dialogue/UI-affordance kind needs new choice-listing logic,
-  add it there.
-- **Before writing any ad-hoc `preview_eval` script or resorting to
-  `preview_click`/snapshot-index clicking, check whether `window.__test` (below) or
-  `scripts/playtest-cli.ts` already covers it.** The recurring failure mode this
-  guards against: an agent tries snapshot-based clicking, it flakes (stale indices,
-  ambiguous duplicate elements, a click landing before a re-render settles), and only
-  *then* "discovers" the harness that would have avoided the problem entirely — after
-  already burning the attempt. Read this section first, not after.
-- For verifying real-UI bugs during a session, prefer the dev-only
-  `window.__test` harness (`src/game/testHarness.ts`, mounted from `App.tsx` behind
-  `import.meta.env.DEV`) over ad-hoc `page.evaluate`/screenshot loops: `state.*`/
-  `inventory.*`/`bank.*`/`equipment.*` for direct reads/writes, `location.teleport`,
-  `choices.list()`/`choices.click(id)` (clicks the real DOM button when rendered —
-  falling back to a direct store dispatch only if not found, flagged via `viaDom`),
-  `dialogue.get()`/`choose()`, `nav.setTab`/`setHomeTab`/`setCharacterTab`,
-  `time.skip(seconds)` (resolves idle timers at `Date.now() + seconds*1000` with zero
-  real wait), and `profile.load/save/list` against `.playtests/profiles/*.json` (one
-  fixture per module boundary — reuse an existing one or `profile.save(name)` a new
-  one after manually reaching that point; there's no auto-solver). Every mutating
-  command returns `{ok, error?}` with a short machine-matchable `error` string instead
-  of requiring a screenshot to diagnose failure. When adding a new interactive UI
-  element, give it a `data-action-id`/`data-dialogue-option-id`/`data-nav-tab`-style
-  attribute (see `ActionPanel.tsx`/`DialoguePanel.tsx`/`InventoryPanel.tsx`) so the
-  harness can click it for real instead of only being able to fall back to the store.
-- **Don't wait on a fixed `sleep`/timeout to let an effect (a floating-text popup, a
-  flash ring, a chat append) finish before asserting on it.** Use
-  `window.__test.ui.waitForIdle({quietMs?, timeoutMs?})` — resolves once the DOM has
-  gone `quietMs` (default 300) without a mutation, or `{settled:false}` if
-  `timeoutMs` (default 5000) elapses first. This covers both real CSS
-  animations/transitions and the more common case in this codebase, a React state
-  flag flipped by a `setTimeout` (the map/examine-button flash, the instant-action
-  pulse) — either way there's no need to know or hardcode the specific duration.
-  `window.__test.ui.animations()` gives a synchronous `{count, settled}` snapshot of
-  `document.getAnimations()` for a quick inline check instead. An always-true
-  `waitForIdle` result for a *genuinely* infinite-loop animation (like the flash ring
-  while its class is applied) is expected, not a bug — check state instead in that
-  case (e.g. did `discoveredLocationIds` grow).
-- **Batch a whole multi-step check into one round trip** with
-  `window.__test.batch([{path, args}, ...])` — `path` is a dot-path into the harness
-  itself (`"location.teleport"`, `"choices.click"`, `"ui.waitForIdle"`,
-  `"debug.dump"`, ...), run in order, each step's `{ok, result}`/`{ok:false, error}`
-  collected into one returned array; one step throwing doesn't abort the rest. Use
-  this by default for anything beyond a single call — it's both faster (one
-  `preview_eval` instead of N) and produces a single transcript-shaped result you can
-  read back and reuse, instead of a scattered sequence of separate tool calls.
-- For a check worth running again later (a regression you just fixed, a flow you want
-  covered going forward), don't leave it as a one-off `preview_eval` transcript —
-  convert it into a headless playtest via `scripts/playtest-cli.ts`/`scripts/
-  playtestEngine.ts`, which replay a saved choiceId script against the pure engine
-  (zero browser, zero real wait) and write a transcript. **This tooling is currently
-  nonfunctional**: its `readModule`/`loadStagedBundle` functions depend on the DSL/
-  JSON content pipeline deleted on 2026-07-11 (see `docs/dsl-rewrite/postmortem.md`),
-  and the `.playtests/` fixtures (`profiles/*.json`, `scripts/*.json`) were deleted
-  along with it since they were tied to now-gone content. Once the pipeline rewrite
-  (`docs/dsl-rewrite/implementation-plan.md`) has a working loader, rewire these two
-  scripts to it and re-establish this workflow rather than reinventing it.
-- `npm run test:ui` (`scripts/ui-smoke.mjs`) is a separate, real-browser
-  (`playwright-core` + a hardcoded local Edge path) smoke test predating the
-  `window.__test` harness — it drives the UI via brittle text/role selectors
-  (`page.getByText('wayside-supplies', ...)`, an item that no longer exists in any
-  module) and is not wired into CI. Treat it as stale/unverified, not a source of
-  truth: don't pattern-match its selector style for new checks, and don't trust a
-  pass/fail from it without first confirming the selectors it depends on still exist.
-- **Manually clearing browser storage does not reliably give you a fresh state** —
-  use `/cheat reset` (or the Settings tab's Reset Universe button) instead.
-  `markInactive` (`src/stores/gameState.ts`) saves the tab's current in-memory state
-  to `localStorage` on `visibilitychange`/`pagehide`, which — by design, so a
-  returning player's away-time is tracked accurately — also fires during a reload or
-  tab close. If you clear storage and then reload/close the tab, that save re-writes
-  the pre-clear state back to disk *during the reload itself*, so the next load looks
-  like clearing "didn't work" even though it genuinely did for a moment. `resetUniverse`
-  doesn't have this race (it sets fresh state immediately, no reload involved), which
-  is also why `/cheat reset` — not "clear storage and reload" — is the right way to get
-  a genuinely clean starting state before any manual verification pass in this app.
