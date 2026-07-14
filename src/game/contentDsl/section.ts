@@ -8,20 +8,30 @@ export interface Field<T, Self> {
   default?: (self: Self) => T;
 }
 
-export interface SectionSchema<H extends { id: string }, Flags extends keyof H = never> {
+// An open-ended, dynamically-labelled collection (e.g. an entity's actions):
+// each `<label>:` that is not a fixed field becomes one entry `{ label, ...body }`.
+export interface EntryBody {
+  parse(cursor: Cursor): object;
+  parseBlock(lines: RawLine[]): object;
+  printBlock(value: object): string[];
+}
+
+export interface SectionSchema<H extends { id: string }, Flags extends keyof H = never, Entries extends keyof H = never> {
   kind: string;
-  fields: { [K in Exclude<keyof H, 'id' | Flags>]: Field<H[K], H> };
-  clauses?: Exclude<keyof H, 'id' | Flags>;
-  bare?: Exclude<keyof H, 'id' | Flags>;
+  fields: { [K in Exclude<keyof H, 'id' | Flags | Entries>]: Field<H[K], H> };
+  clauses?: Exclude<keyof H, 'id' | Flags | Entries>;
+  bare?: Exclude<keyof H, 'id' | Flags | Entries>;
   flags?: readonly Flags[];
-  exclusive?: readonly (readonly Exclude<keyof H, 'id' | Flags>[])[];
+  entries?: { into: Entries; body: EntryBody };
+  exclusive?: readonly (readonly Exclude<keyof H, 'id' | Flags | Entries>[])[];
 }
 
 export type Authored<H extends { id: string }> = { id: string } & Partial<Omit<H, 'id'>>;
 
 type AnyFields = Record<string, { codec: Codec<unknown>; default?: (self: unknown) => unknown }>;
+type EntryConfig = { into: string; body: EntryBody };
 
-const KEY = /(?<key>[a-z][a-z0-9-]*):/;
+const KEY = /(?<key>[a-z][a-z0-9 -]*?):/;
 const WORD = /[a-z][a-z0-9-]*/;
 
 function parseBlock(codec: Codec<unknown>, children: RawLine[], span: Span): unknown {
@@ -29,7 +39,7 @@ function parseBlock(codec: Codec<unknown>, children: RawLine[], span: Span): unk
   return (codec as ListCodec<unknown>).parseBlock(children);
 }
 
-export function parseSection<H extends { id: string }, F extends keyof H = never>(section: RawSection, schema: SectionSchema<H, F>): Authored<H> {
+export function parseSection<H extends { id: string }, F extends keyof H = never, E extends keyof H = never>(section: RawSection, schema: SectionSchema<H, F, E>): Authored<H> {
   if (section.kind !== schema.kind) throw new DslError(`expected # ${schema.kind}, got # ${section.kind}`, section.span);
   if (!section.id) throw new DslError(`# ${schema.kind} requires an id`, section.span);
 
@@ -37,8 +47,9 @@ export function parseSection<H extends { id: string }, F extends keyof H = never
   const flags = (schema.flags ?? []) as readonly string[];
   const clauses = schema.clauses as string | undefined;
   const bare = schema.bare as string | undefined;
+  const entries = schema.entries as EntryConfig | undefined;
   const authored: Record<string, unknown> = { id: section.id };
-  for (const line of section.body) parseLine(line, fields, flags, clauses, bare, schema.kind, authored);
+  for (const line of section.body) parseLine(line, fields, flags, clauses, bare, entries, schema.kind, authored);
 
   if (schema.exclusive) {
     const active = schema.exclusive.filter((group) => (group as readonly string[]).some((key) => authored[key] !== undefined));
@@ -50,7 +61,7 @@ export function parseSection<H extends { id: string }, F extends keyof H = never
   return authored as Authored<H>;
 }
 
-function parseLine(line: RawLine, fields: AnyFields, flags: readonly string[], clauses: string | undefined, bare: string | undefined, kind: string, authored: Record<string, unknown>): void {
+function parseLine(line: RawLine, fields: AnyFields, flags: readonly string[], clauses: string | undefined, bare: string | undefined, entries: EntryConfig | undefined, kind: string, authored: Record<string, unknown>): void {
   const cursor = new Cursor(line.text, 0, line.span.start);
 
   while (!cursor.done) {
@@ -58,18 +69,21 @@ function parseLine(line: RawLine, fields: AnyFields, flags: readonly string[], c
     if (cursor.done) break;
 
     const key = cursor.peek(KEY)?.groups?.key;
-    if (key !== undefined) {
+    if (key !== undefined && key !== clauses && key !== bare && (fields[key] || entries !== undefined)) {
       const keySpan = { start: cursor.abs(cursor.pos), end: cursor.abs(cursor.pos + key.length) };
-      if (key === clauses || key === bare || !fields[key]) throw new DslError(`unknown ${kind} field: ${key}`, keySpan);
-      if (authored[key] !== undefined) throw new DslError(`${kind} field ${key} is defined more than once`, keySpan);
       cursor.take(KEY);
       cursor.take(/[ \t]*/);
-      if (!cursor.done) {
-        authored[key] = fields[key].codec.parse(cursor);
-      } else if (line.children.length > 0) {
-        authored[key] = parseBlock(fields[key].codec, line.children, line.span);
+      if (fields[key]) {
+        if (authored[key] !== undefined) throw new DslError(`${kind} field ${key} is defined more than once`, keySpan);
+        if (!cursor.done) authored[key] = fields[key].codec.parse(cursor);
+        else if (line.children.length > 0) authored[key] = parseBlock(fields[key].codec, line.children, line.span);
+        // an empty value with no block is unspecified: leave the field absent
+      } else {
+        const body = cursor.done ? entries!.body.parseBlock(line.children) : entries!.body.parse(cursor);
+        ((authored[entries!.into] ??= []) as object[]).push({ label: key, ...body });
       }
-      // an empty value with no block is unspecified: leave the field absent
+    } else if (key !== undefined && key !== clauses && key !== bare) {
+      throw new DslError(`unknown ${kind} field: ${key}`, { start: cursor.abs(cursor.pos), end: cursor.abs(cursor.pos + key.length) });
     } else {
       const word = cursor.peek(WORD)?.[0];
       if (word !== undefined && flags.includes(word)) {
@@ -90,7 +104,7 @@ function parseLine(line: RawLine, fields: AnyFields, flags: readonly string[], c
   }
 }
 
-export function printSection<H extends { id: string }, F extends keyof H = never>(authored: Authored<H>, schema: SectionSchema<H, F>): string {
+export function printSection<H extends { id: string }, F extends keyof H = never, E extends keyof H = never>(authored: Authored<H>, schema: SectionSchema<H, F, E>): string {
   const fields = schema.fields as unknown as AnyFields;
   const read = authored as Record<string, unknown>;
   const lines = [`# ${schema.kind} ${authored.id}`];
@@ -108,10 +122,17 @@ export function printSection<H extends { id: string }, F extends keyof H = never
   for (const flag of (schema.flags ?? []) as readonly string[]) {
     if (read[flag] === true) lines.push(flag);
   }
+  if (schema.entries) {
+    const entries = schema.entries as EntryConfig;
+    for (const entry of (read[entries.into] as { label: string }[] | undefined) ?? []) {
+      lines.push(`${entry.label}:`);
+      for (const bodyLine of entries.body.printBlock(entry)) lines.push(`  ${bodyLine}`);
+    }
+  }
   return lines.join('\n');
 }
 
-export function hydrateSection<H extends { id: string }, F extends keyof H = never>(authored: Authored<H>, schema: SectionSchema<H, F>): H {
+export function hydrateSection<H extends { id: string }, F extends keyof H = never, E extends keyof H = never>(authored: Authored<H>, schema: SectionSchema<H, F, E>): H {
   const fields = schema.fields as unknown as AnyFields;
   const read = authored as Record<string, unknown>;
   const view = { id: authored.id } as H;
@@ -134,6 +155,10 @@ export function hydrateSection<H extends { id: string }, F extends keyof H = nev
   }
   for (const flag of (schema.flags ?? []) as readonly string[]) {
     Object.defineProperty(view, flag, { enumerable: true, value: read[flag] ?? false });
+  }
+  if (schema.entries) {
+    const into = (schema.entries as EntryConfig).into;
+    Object.defineProperty(view, into, { enumerable: true, value: read[into] ?? [] });
   }
   return view;
 }

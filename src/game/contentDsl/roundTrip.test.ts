@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { Cursor, DslError } from './codec';
 import { condition } from './condition';
+import { entitySchema } from './entity';
 import { itemSchema } from './item';
 import { locationSchema } from './location';
 import { parseModule, printModule } from './module';
@@ -11,7 +12,7 @@ import { splitSections } from './structure';
 import { tagClause } from './tagClause';
 import { text } from './values';
 
-function parseOne<H extends { id: string }, F extends keyof H = never>(source: string, schema: SectionSchema<H, F>) {
+function parseOne<H extends { id: string }, F extends keyof H = never, E extends keyof H = never>(source: string, schema: SectionSchema<H, F, E>) {
   const sections = splitSections(source);
   expect(sections).toHaveLength(1);
   return parseSection(sections[0], schema);
@@ -240,6 +241,60 @@ describe('empty values round-trip away (L7)', () => {
     const absent = parseOne('# location void\nx: 0', locationSchema);
     expect(empty).toEqual(absent);
     expect(printSection(empty, locationSchema)).toBe('# location void\nx: 0');
+  });
+});
+
+describe('entity actions', () => {
+  it('parses an inline action, canonicalizing to a block', () => {
+    const stairs = parseOne('# entity stairs-up\ntitle: Stairs\nascend: relocate: guide-house-upstairs, say: You climb the stairs.', entitySchema);
+    expect(stairs.actions).toEqual([
+      {
+        label: 'ascend',
+        results: [
+          { kind: 'relocate', location: 'guide-house-upstairs' },
+          { kind: 'say', text: 'You climb the stairs.' },
+        ],
+      },
+    ]);
+    expect(printSection(stairs, entitySchema)).toBe('# entity stairs-up\ntitle: Stairs\nascend:\n  relocate: guide-house-upstairs\n  say: You climb the stairs.');
+  });
+
+  it('parses a space-labelled action written as a block, round-tripping it', () => {
+    const source = ['# entity window', 'examine: A window looks out over the island.', 'look through:', '  discover: beach', '  discover: bridge', '  say: Through the window you can make out the beach, and further off, a bridge.'].join('\n');
+    const window = parseOne(source, entitySchema);
+    expect(window.actions).toEqual([
+      {
+        label: 'look through',
+        results: [
+          { kind: 'discover', location: 'beach' },
+          { kind: 'discover', location: 'bridge' },
+          { kind: 'say', text: 'Through the window you can make out the beach, and further off, a bridge.' },
+        ],
+      },
+    ]);
+    expect(printSection(window, entitySchema)).toBe(source);
+  });
+
+  it('parses every result verb, canonicalizing set/unset to the colon form', () => {
+    const source = ['# entity chest', 'loot:', '  set drawers-open', '  unset: sealed', '  give: 12 coins', '  take: 5 cooked-shrimp', '  xp: thieving 4', '  open modal: name-editor'].join('\n');
+    const chest = parseOne(source, entitySchema);
+    expect(chest.actions?.[0].results).toEqual([
+      { kind: 'set', variable: 'drawers-open' },
+      { kind: 'unset', variable: 'sealed' },
+      { kind: 'give', item: 'coins', amount: 12 },
+      { kind: 'take', item: 'cooked-shrimp', amount: 5 },
+      { kind: 'xp', skill: 'thieving', amount: 4 },
+      { kind: 'open-modal', modal: 'name-editor' },
+    ]);
+    expect(printSection(chest, entitySchema)).toBe('# entity chest\nloot:\n  set: drawers-open\n  unset: sealed\n  give: 12 coins\n  take: 5 cooked-shrimp\n  xp: thieving 4\n  open modal: name-editor');
+  });
+
+  it('defaults an entity title from its id and takes no actions', () => {
+    const miki = parseOne('# entity miki\nexamine: A tall man with brown wavy hair.', entitySchema);
+    expect(miki.actions).toBeUndefined();
+    const hydrated = hydrateSection(miki, entitySchema);
+    expect(hydrated.title).toBe('Miki');
+    expect(hydrated.actions).toEqual([]);
   });
 });
 

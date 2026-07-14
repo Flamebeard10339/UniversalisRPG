@@ -1,4 +1,5 @@
 import { DslError } from './codec';
+import { entitySchema } from './entity';
 import { itemSchema } from './item';
 import { locationSchema } from './location';
 import { Authored, SectionSchema, parseSection, printSection } from './section';
@@ -6,7 +7,7 @@ import { skillSchema } from './skill';
 import { statSchema } from './stat';
 import { splitSections } from './structure';
 
-const SCHEMAS = [itemSchema, statSchema, skillSchema, locationSchema] as unknown as SectionSchema<{ id: string }>[];
+const SCHEMAS = [itemSchema, statSchema, skillSchema, locationSchema, entitySchema] as unknown as SectionSchema<{ id: string }>[];
 const byKind = new Map(SCHEMAS.map((schema) => [schema.kind, schema]));
 
 export interface ModuleSection {
