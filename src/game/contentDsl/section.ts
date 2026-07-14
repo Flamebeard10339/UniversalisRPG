@@ -1,3 +1,4 @@
+// Generic engine: field value-types are erased internally via the AnyFields casts; the rejected alternative was a hand-written parser per section kind.
 import { Codec, Cursor, DslError, Span } from './codec';
 import { ListCodec } from './list';
 import { RawLine, RawSection } from './structure';
@@ -11,7 +12,9 @@ export interface SectionSchema<H extends { id: string }, Flags extends keyof H =
   kind: string;
   fields: { [K in Exclude<keyof H, 'id' | Flags>]: Field<H[K], H> };
   clauses?: Exclude<keyof H, 'id' | Flags>;
+  bare?: Exclude<keyof H, 'id' | Flags>;
   flags?: readonly Flags[];
+  exclusive?: readonly (readonly Exclude<keyof H, 'id' | Flags>[])[];
 }
 
 export type Authored<H extends { id: string }> = { id: string } & Partial<Omit<H, 'id'>>;
@@ -33,12 +36,21 @@ export function parseSection<H extends { id: string }, F extends keyof H = never
   const fields = schema.fields as unknown as AnyFields;
   const flags = (schema.flags ?? []) as readonly string[];
   const clauses = schema.clauses as string | undefined;
+  const bare = schema.bare as string | undefined;
   const authored: Record<string, unknown> = { id: section.id };
-  for (const line of section.body) parseLine(line, fields, flags, clauses, schema.kind, authored);
+  for (const line of section.body) parseLine(line, fields, flags, clauses, bare, schema.kind, authored);
+
+  if (schema.exclusive) {
+    const active = schema.exclusive.filter((group) => (group as readonly string[]).some((key) => authored[key] !== undefined));
+    if (active.length > 1) {
+      const names = active.flat().filter((key) => authored[key as string] !== undefined);
+      throw new DslError(`# ${schema.kind} ${section.id}: ${names.join(' and ')} cannot both be set`, section.span);
+    }
+  }
   return authored as Authored<H>;
 }
 
-function parseLine(line: RawLine, fields: AnyFields, flags: readonly string[], clauses: string | undefined, kind: string, authored: Record<string, unknown>): void {
+function parseLine(line: RawLine, fields: AnyFields, flags: readonly string[], clauses: string | undefined, bare: string | undefined, kind: string, authored: Record<string, unknown>): void {
   const cursor = new Cursor(line.text, 0, line.span.start);
 
   while (!cursor.done) {
@@ -47,11 +59,17 @@ function parseLine(line: RawLine, fields: AnyFields, flags: readonly string[], c
 
     const key = cursor.peek(KEY)?.groups?.key;
     if (key !== undefined) {
-      if (key === clauses || !fields[key]) throw new DslError(`unknown ${kind} field: ${key}`, { start: cursor.abs(cursor.pos), end: cursor.abs(cursor.pos + key.length) });
+      const keySpan = { start: cursor.abs(cursor.pos), end: cursor.abs(cursor.pos + key.length) };
+      if (key === clauses || key === bare || !fields[key]) throw new DslError(`unknown ${kind} field: ${key}`, keySpan);
+      if (authored[key] !== undefined) throw new DslError(`${kind} field ${key} is defined more than once`, keySpan);
       cursor.take(KEY);
       cursor.take(/[ \t]*/);
-      const codec = fields[key].codec;
-      authored[key] = cursor.done ? parseBlock(codec, line.children, line.span) : codec.parse(cursor);
+      if (!cursor.done) {
+        authored[key] = fields[key].codec.parse(cursor);
+      } else if (line.children.length > 0) {
+        authored[key] = parseBlock(fields[key].codec, line.children, line.span);
+      }
+      // an empty value with no block is unspecified: leave the field absent
     } else {
       const word = cursor.peek(WORD)?.[0];
       if (word !== undefined && flags.includes(word)) {
@@ -60,6 +78,9 @@ function parseLine(line: RawLine, fields: AnyFields, flags: readonly string[], c
       } else if (clauses !== undefined) {
         const element = (fields[clauses].codec as ListCodec<unknown>).element;
         ((authored[clauses] ??= []) as unknown[]).push(element.parse(cursor));
+      } else if (bare !== undefined) {
+        if (authored[bare] !== undefined) throw new DslError(`${kind} ${bare} is defined more than once`, { start: cursor.abs(cursor.pos), end: cursor.abs(line.text.length) });
+        authored[bare] = fields[bare].codec.parse(cursor);
       } else {
         throw new DslError(`unexpected content: ${JSON.stringify(cursor.rest())}`, { start: cursor.abs(cursor.pos), end: cursor.abs(line.text.length) });
       }
@@ -77,8 +98,9 @@ export function printSection<H extends { id: string }, F extends keyof H = never
   for (const key of Object.keys(fields)) {
     const value = read[key];
     if (value === undefined) continue;
-    if (key === schema.clauses) {
-      if ((value as unknown[]).length > 0) lines.push(fields[key].codec.print(value));
+    if (Array.isArray(value) && value.length === 0) continue;
+    if (key === schema.clauses || key === schema.bare) {
+      lines.push(fields[key].codec.print(value));
     } else {
       lines.push(`${key}: ${fields[key].codec.print(value)}`);
     }

@@ -201,6 +201,48 @@ describe('starting flag', () => {
   });
 });
 
+describe('greedy fields are line-terminal (M1)', () => {
+  it('lets a free-text field consume the rest of its line, including a would-be field', () => {
+    const beach = parseOne('# location beach\nx: 1, y: 0\ntitle: Sunny, warm, x: 9', locationSchema);
+    expect(beach.title).toBe('Sunny, warm, x: 9');
+    expect(beach.x).toBe(1);
+  });
+});
+
+describe('position has one interpretation (M2)', () => {
+  it('parses a relative position from a bare directional line', () => {
+    const dock = parseOne('# location dock\neast of bridge', locationSchema);
+    expect(dock.relative).toEqual({ direction: 'east', of: 'bridge' });
+    expect(dock.x).toBeUndefined();
+    expect(printSection(dock, locationSchema)).toBe('# location dock\neast of bridge');
+  });
+
+  it('rejects a location that defines position two ways', () => {
+    expect(() => parseOne('# location dock\nx: 0, y: 0\neast of bridge', locationSchema)).toThrow(/cannot both be set/);
+  });
+
+  it('rejects a field defined twice', () => {
+    expect(() => parseOne('# location dock\nx: 0\nx: 1', locationSchema)).toThrow(/defined more than once/);
+  });
+});
+
+describe('empty values round-trip away (L7)', () => {
+  it('treats an empty keyed value as unspecified, defaulting on hydration', () => {
+    const loc = parseOne('# location void\nx: \ny: 0', locationSchema);
+    expect(loc.x).toBeUndefined();
+    expect(loc.y).toBe(0);
+    expect(hydrateSection(loc, locationSchema).x).toBe(0);
+    expect(printSection(loc, locationSchema)).toBe('# location void\ny: 0');
+  });
+
+  it('makes an empty entities block indistinguishable from an absent one', () => {
+    const empty = parseOne('# location void\nx: 0\nentities:', locationSchema);
+    const absent = parseOne('# location void\nx: 0', locationSchema);
+    expect(empty).toEqual(absent);
+    expect(printSection(empty, locationSchema)).toBe('# location void\nx: 0');
+  });
+});
+
 describe('condition grammar', () => {
   const parse = (source: string) => condition.parse(new Cursor(source));
   const ref = (...path: string[]) => ({ kind: 'reference' as const, reference: { path } });

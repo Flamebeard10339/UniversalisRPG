@@ -1,8 +1,15 @@
-import { Codec } from './codec';
+import { Codec, DslError } from './codec';
 import { Condition, condition } from './condition';
 import { list } from './list';
 import { SectionSchema } from './section';
 import { humanize, id, number, text } from './values';
+
+export type Direction = 'north' | 'south' | 'east' | 'west' | 'up' | 'down';
+
+export interface Relative {
+  direction: Direction;
+  of: string;
+}
 
 export interface Edge {
   target: string;
@@ -19,6 +26,7 @@ export interface Location {
   entities: string[];
   adjacent: Edge[];
   starting: boolean;
+  relative?: Relative;
 }
 
 const edge: Codec<Edge> = {
@@ -32,6 +40,18 @@ const edge: Codec<Edge> = {
   print: (value) => (value.condition ? `${value.target} while ${condition.print(value.condition)}` : value.target),
 };
 
+const DIRECTION = /north|south|east|west|up|down/;
+
+const relative: Codec<Relative> = {
+  parse(cursor) {
+    const direction = cursor.take(DIRECTION);
+    if (direction === null) throw new DslError('expected a direction', { start: cursor.abs(cursor.pos), end: cursor.abs(cursor.pos) });
+    if (cursor.take(/[ \t]+of[ \t]+/) === null) throw new DslError("expected 'of' after a direction", { start: cursor.abs(cursor.pos), end: cursor.abs(cursor.pos) });
+    return { direction: direction as Direction, of: id.parse(cursor) };
+  },
+  print: (value) => `${value.direction} of ${value.of}`,
+};
+
 export const locationSchema: SectionSchema<Location, 'starting'> = {
   kind: 'location',
   fields: {
@@ -42,6 +62,12 @@ export const locationSchema: SectionSchema<Location, 'starting'> = {
     examine: { codec: text },
     entities: { codec: list(id), default: () => [] },
     adjacent: { codec: list(edge), default: () => [] },
+    relative: { codec: relative },
   },
   flags: ['starting'],
+  bare: 'relative',
+  exclusive: [
+    ['x', 'y', 'z'],
+    ['relative'],
+  ],
 };
