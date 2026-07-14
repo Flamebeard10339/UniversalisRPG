@@ -1,4 +1,4 @@
-import { ActionResult, actionResult } from './actionResult';
+import { ActionResult, actionResult, startsResult } from './actionResult';
 import { Cursor, DslError } from './codec';
 import { Condition, condition } from './condition';
 import { list } from './list';
@@ -46,10 +46,10 @@ function parseActionLine(line: RawLine, action: Omit<Action, 'label'>): void {
     return;
   }
 
-  try {
+  if (startsResult(cursor)) {
     action.results.push(...results.parse(cursor));
-  } catch {
-    action.tags = (action.tags ?? []).concat(tagClauses.parse(new Cursor(line.text, 0, line.span.start)));
+  } else {
+    action.tags = (action.tags ?? []).concat(tagClauses.parse(cursor));
   }
 }
 

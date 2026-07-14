@@ -59,6 +59,10 @@ function printResult(result: ActionResult): string {
   }
 }
 
+export function startsResult(cursor: Cursor): boolean {
+  return cursor.peek(/(?:say|give|take|xp|relocate|discover|open modal):|(?:set|unset)[: \t]/) !== null;
+}
+
 export const actionResult: Codec<ActionResult> = {
   parse: parseResult,
   print: printResult,

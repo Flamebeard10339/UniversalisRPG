@@ -356,6 +356,10 @@ describe('entity action modifiers', () => {
     expect(() => parseOne('# entity chest\nopen:\n  hidden if: a\n  hidden if: b\n  say: hi', entitySchema)).toThrow(/hidden if is defined more than once/);
     expect(() => parseOne('# entity chest\nopen:\n  on success:\n    say: a\n  on success:\n    say: b', entitySchema)).toThrow(/on success is defined more than once/);
   });
+
+  it('surfaces result-related errors for malformed results, not tag errors', () => {
+    expect(() => parseOne('# entity chest\nopen:\n  give:', entitySchema)).toThrow(/expected an id/);
+  });
 });
 
 describe('condition grammar', () => {
