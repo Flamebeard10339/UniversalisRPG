@@ -298,6 +298,66 @@ describe('entity actions', () => {
   });
 });
 
+describe('entity action modifiers', () => {
+  const ref = (...path: string[]) => ({ kind: 'reference' as const, reference: { path } });
+
+  it('parses requires, hidden if, bare tags and on success, canonicalizing require to requires', () => {
+    const source = ['# entity front-door', 'examine: A heavy wooden door.', 'pick lock:', '  requires: lockpick', '  hidden if: unlocked', '  once, 4s', '  xp: thieving 4', '  on success:', '    set: unlocked', '    say: The lock gives with a soft click.', '    say: Whatever is out there, you can reach it now.'].join('\n');
+    const door = parseOne(source, entitySchema);
+    expect(door.actions).toEqual([
+      {
+        label: 'pick lock',
+        requires: ref('lockpick'),
+        hiddenIf: ref('unlocked'),
+        tags: [
+          { kind: 'keyword', value: 'once' },
+          { kind: 'duration', seconds: 4 },
+        ],
+        results: [{ kind: 'xp', skill: 'thieving', amount: 4 }],
+        onSuccess: [
+          { kind: 'set', variable: 'unlocked' },
+          { kind: 'say', text: 'The lock gives with a soft click.' },
+          { kind: 'say', text: 'Whatever is out there, you can reach it now.' },
+        ],
+      },
+    ]);
+    expect(printSection(door, entitySchema)).toBe(source);
+
+    const spelledOut = parseOne(source.replace('requires: lockpick', 'require: lockpick'), entitySchema);
+    expect(spelledOut).toEqual(door);
+  });
+
+  it('parses a require with only a result, and a bare once tag after a result line', () => {
+    const source = ['# entity dresser', 'search drawers:', '  require: drawers-open', '  say: You search the drawers.'].join('\n');
+    const dresser = parseOne(source, entitySchema);
+    expect(dresser.actions).toEqual([
+      {
+        label: 'search drawers',
+        requires: ref('drawers-open'),
+        results: [{ kind: 'say', text: 'You search the drawers.' }],
+      },
+    ]);
+    expect(printSection(dresser, entitySchema)).toBe('# entity dresser\nsearch drawers:\n  requires: drawers-open\n  say: You search the drawers.');
+
+    const takeCoins = parseOne(['# entity dresser', 'take coins:', '  give: 12 coins', '  once'].join('\n'), entitySchema);
+    expect(takeCoins.actions).toEqual([
+      {
+        label: 'take coins',
+        tags: [{ kind: 'keyword', value: 'once' }],
+        results: [{ kind: 'give', item: 'coins', amount: 12 }],
+      },
+    ]);
+    expect(printSection(takeCoins, entitySchema)).toBe('# entity dresser\ntake coins:\n  once\n  give: 12 coins');
+    expect(parseOne(printSection(takeCoins, entitySchema), entitySchema)).toEqual(takeCoins);
+  });
+
+  it('rejects requires, hidden if, and on success each defined more than once', () => {
+    expect(() => parseOne('# entity chest\nopen:\n  requires: a\n  require: b\n  say: hi', entitySchema)).toThrow(/requires is defined more than once/);
+    expect(() => parseOne('# entity chest\nopen:\n  hidden if: a\n  hidden if: b\n  say: hi', entitySchema)).toThrow(/hidden if is defined more than once/);
+    expect(() => parseOne('# entity chest\nopen:\n  on success:\n    say: a\n  on success:\n    say: b', entitySchema)).toThrow(/on success is defined more than once/);
+  });
+});
+
 describe('condition grammar', () => {
   const parse = (source: string) => condition.parse(new Cursor(source));
   const ref = (...path: string[]) => ({ kind: 'reference' as const, reference: { path } });
