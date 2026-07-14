@@ -7,6 +7,9 @@ game-version: 0.1.0
 pack: 
 dependencies: core
 
+# variables
+bridge-open=false
+
 # location guide-house
 x: 0, y: 0
 starting
@@ -22,32 +25,40 @@ talk: [[dialogue miki]]
 # dialogue miki
 owner=miki
 
-start: Oh — hi. You're the new arrival, right? I'm Miki, I look after new folks passing through here. What's on your mind before you head out?
-  -> Whats this Quests tab I keep hearing about? [[explain-quests]]
-  -> What do the colors mean? [[explain-colors]]
-  -> I'm ready to go, thanks. [[offer-quest]]
+start: Greetings adventurer! Welcome to UniversalisRPG. My name is Miki, the tutorial guide, and I am here to guide you through your first baby steps through this wonderful world! What say you I show you how the questing system works, eh?
+  -> Okay. [[explain-quests]]
 
-[[explain-quests]]: Right, the Quests tab — it's under Character, second row. Anything you take on shows up there with a line about what to do next. Handy when you forget what you were doing five minutes ago. Which, no judgment, happens to everyone here.
-  -> What do the colors mean? [[explain-colors]]
-  -> Anyway — go on. [[offer-quest]]
+[[explain-quests]]: Right, the Quests tab. You can find it in your Character sheet on the second row. You'll find your quest journal there with color coded quests based on your progress. Quests you haven't started yet are red. Quests you have will show up as yellow. And any quest you complete will be green. Go check it out!
+  -> Give me a second, I'll be back in a moment. 
+  -> No, I prefer if you just finish the explanation first. [[explain-quests-2]]
+  
+## Need a nice way to say that the next time you talk to miki, dialogue starts here
+## Need a better way to define conditionals based on previous choices
+[[explain-quests-2]]: {choice: No, I prefer if you just finish the explanation first.: Fair enough.} You can open a quest to see your journal which will show you what you've done and what you need to do next. Handy when you forget what you were doing five minutes ago. Which, no judgment, happens to everyone here.
+  -> Ha, ha. I can be pretty forgetful, yeah. [[offer-quest]]
+  -> Right... [[offer-quest]]
 
-[[explain-colors]]: Quick version: red means you haven't started something, yellow means you're partway through, green means it's done. Glance at the dot before you open anything if you just want the status.
-  -> Whats this Quests tab I keep hearing about? [[explain-quests]]
-  -> Anyway — go on. [[offer-quest]]
+[[offer-quest]]: Wonderful! Now that you have the basics, I think you are ready for your first quest. Don't worry, it will be a simple one. Just an actual task to get your feet wet. Better than just wandering around, I assure you. 
+  [[ahem]]
 
-[[offer-quest]]: Speaking of which — want an actual task instead of just wandering? I can point you somewhere real.
-  -> Go on then, give me something to do. [[check-tab-prompt]]
-  -> Maybe later. [[maybe-later]]
+[[ahem]]: *Ahem*. 
+  [[ready?]]
 
-[[maybe-later]]: Sure thing. Door's right there whenever you want to explore first — come find me again when you're ready.
+[[ready?]]: Are you ready?
+  -> Yes. 
+    [[get-quest]]
+  -> No. 
+    [[get-quest]]
 
-[[check-tab-prompt]]: Take a look at your Quests tab right now — you'll see it listed, red, since you haven't actually started it yet. Go on, I'll wait.
-  -> Okay, I see it. [[accept-node]]: set: quest.leave-tutorial-island.accepted
+[[get-quest]]: Wonderful! I task thee, grand adventurer to... drum roll please. Escape tutorial Island. That's right. Get off the island and you'll get a reward. Oh yeah, didn't mention that yet. Quests give rewards. 
+  leave-tutorial-island.start
+  -> Awesome. I'll get to it. [[talk-to-brii]]
+  -> What are the rewards for this quest? [[not-telling]]
 
-[[accept-node]]: There — now it should read yellow. That's you, officially underway. Leave Tutorial Island: find your way off this place.
-  goto [[farewell]]
-
-[[farewell]]: Door's unlocked. Go on, get curious.
+[[not-telling]]: Ha! That's a good one. You're such a cutey! 
+  [[talk-to-brii]]
+  
+[[talk-to-brii]]: Go outside and talk to Brii. She is our resident survival expert and she will walk you through the ins and outs of skills. Good luck. 
   set: miki-cleared
 
 # entity front-door
@@ -130,55 +141,107 @@ title: A beach that hasn't been implemented yet.
 examine: Wow, isn't this place empty?
 adjacent: guide-house, bridge
 
+# entity campfire
+examine: A gently crackling campfire perfect for cooking. 
+cook: station: stove
+
+# recipe cooked-shrimp
+station: stove
+in: raw-shrimp
+out: cooked-shrimp
+skill: cooking 4
+
 # location bridge
 x: 2, y: 0
 title: A bridge that hasn't been implemented yet. 
 examine: Wow, isn't this place empty?
-adjacent: beach
+adjacent: 
+  beach
+  bank while bridge-open
+
+# item bones
+title: Bones
+examine: A dusty set of bones.
+
+# entity small-rat
+fight:
+  enemy, melee-combat, attack 1, defense 1, health 2, rate 25
+  droptable:
+    bones
+
+# entity bridge-troll
+examine: A tall, knobbly creature adept at crushing weaponry
+talk:
+  [[dialogue troll]]
+pay toll:
+  requires: 5 cooked-shrimp and dialogue.bridge-troll.what-toll
+  take: 5 cooked-shrimp
+  set: bridge-open
+  dialogue: [[dialogue troll.pay-toll]]
+fight:
+  hidden if: not troll-antagonized
+  enemy: melee-combat, attack 55, defense 110, health 100, rate 25, regeneration 110
+  on success:
+    set: bridge-open
+  droptable:
+    bones (1)
+    dependent droptable (3):
+      1 tin-ore (4)
+      3-5 copper-ore (3)
+
+# dialogue troll
+owner=bridge-troll
+start: I's hears's a pesky human! Want to cross me bridge does he? Well then, if'n za little human knows anyfing, you'd betta pay the toll!
+  -> What toll? [[what-toll]]
+  -> No chance! [[no-toll-no-pass]]
+
+[[what-toll]]: The Bridge Toll! Gimmi fives cooked shirmps and you pass.
+  -> Alright
+    bridge-troll.pay-toll
+  -> That's highway robbery! [[robbery]]
+
+[[robbery]]: Smart little feller aren't ya. That's the point. 
+  -> Leave
+  -> What if I don't want to pay the toll? [[no-toll-no-pass]]
+
+[[no-toll-no-pass]]: {robbery: Do's you now...} Well no toll, no pass. Simple rules make easy memory. 
+  set: bridge-troll.toll-available
+
+[[pay-toll]]: Mmmm. Delicious. Alls rights. You pass. 
+
+## entity shoals
+title: Shrimp Shoals
+fish:
+  requires: small-net
+  xp: fishing 4
+  give: raw-shrimp 1
+examine: Shrimp dart away from your shadow.
+
+# entity supply-crate
+title: Supply Crate
+examine: A net and bowl sit on top. {crate-net-taken & !crate-bowl-taken: A bowl still sits at the bottom of the crate.}{!crate-net-taken & crate-bowl-taken: A small net still sits at the bottom of the crate.}{crate-net-taken & crate-bowl-taken: An empty supply crate. Nothing left worth taking.}
+take net:
+  give: small-net
+  set: crate-net-taken
+  once
+  takes: 2s
+  say: You take the small net.
+take bowl:
+  give: bowl
+  set: crate-bowl-taken
+  once
+  takes: 2s
+  say: You take the bowl.
+
+# entity bridge-sign
+title: Bridge Sign
+read: say: "Billy's Bridge of Food". The word FOOD is carved deeper than the rest.
 
 # quest leave-tutorial-island
-title: Leave Tutorial Island
+start: I can start this quest by speaking to Miki, the Tutorial Guide to start this quest. 
+talked-to-miki: Miki asked me to take a look at the mirror in his house. 
+not-returned-to-miki: I should go talk to him when I'm done. 
+finished-house: I'm done in this house. I should go out and find the Survival Expert on the island. Miki said her name was Brii.
+summary: I was tasked by Miki to escape tutorial island to prove that I am fit to be an adventurer. I spoke to Miki and Brii and I know how to play the game. 
 
-## Quests are a list of named text fields. Dialogue can show/hide/complete them.
-
-I can start this quest by speaking to Miki, the Tutorial Guide to start this quest. 
-  show: not started
-
-// received quest from miki
-Miki asked me to take a look at the mirror in his house. 
-  show: progress=1
-  done: 1<progress<=3
-
-// looked at mirror
-I should go talk to him when I'm done. 
-  show: progress=1 or progress=2
-
-// talk to miki
-I should go out and find the Survival Expert on the island. Miki said her name was Brii.
-  show: progress=3
-
-
-I was tasked by Miki to escape tutorial island to prove that I am fit to be an adventurer. I took the boat to the mainland and 
-  show: 
-
-
-
-
-{show-cond: strikethrough-condition: text}
-
-stage accept: quest.leave-tutorial-island.accepted
-  
-stage leave-house: tutorial.miki-cleared
-  Miki the tutorial guide has tasked you with finding a way off of tutorial island. Step one is probably to leave his house.
-
-stage visit-bank: tutorial.bank-visited
-  You have made it outside. Word is there is a bank somewhere along the coast — worth a look before you go much further.
-
-stage clear-mining: tutorial.mining-cleared
-  The bank is behind you now. Something below the island — through that trapdoor — is worth investigating.
-
-stage clear-combat: tutorial.combat-cleared
-  You have got gear from the cave. Somewhere further in, Denzel mentioned voices — that is probably where you are headed next.
-
-stage complete: tutorial.reached-mainland
-  Whatever is holding the mainland back from you will not last much longer. Keep pushing.
+# location bank
