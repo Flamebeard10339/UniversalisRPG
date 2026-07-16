@@ -10,7 +10,7 @@ export interface Stat {
 export const statSchema: SectionSchema<Stat> = {
   kind: 'stat',
   fields: {
-    title: { codec: text, default: (self) => humanize(self.id) },
-    base: { codec: number, default: () => 0 },
+    title: { parser: text, default: (self) => humanize(self.id) },
+    base: { parser: number, default: () => 0 },
   },
 };

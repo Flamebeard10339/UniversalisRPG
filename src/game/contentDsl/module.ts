@@ -1,8 +1,8 @@
-import { DslError } from './codec';
 import { entitySchema } from './entity';
 import { itemSchema } from './item';
 import { locationSchema } from './location';
-import { Authored, SectionSchema, parseSection, printSection } from './section';
+import { DslError } from './parser';
+import { Authored, SectionSchema, parseSection } from './section';
 import { skillSchema } from './skill';
 import { statSchema } from './stat';
 import { splitSections } from './structure';
@@ -21,14 +21,4 @@ export function parseModule(source: string): ModuleSection[] {
     if (!schema) throw new DslError(`unknown section kind: ${section.kind}`, section.span);
     return { kind: section.kind, value: parseSection(section, schema) };
   });
-}
-
-export function printModule(sections: ModuleSection[]): string {
-  return sections
-    .map(({ kind, value }) => {
-      const schema = byKind.get(kind);
-      if (!schema) throw new DslError(`unknown section kind: ${kind}`);
-      return printSection(value, schema);
-    })
-    .join('\n\n');
 }

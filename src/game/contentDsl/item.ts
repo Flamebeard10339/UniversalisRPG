@@ -15,9 +15,9 @@ export type AuthoredItem = Authored<Item>;
 export const itemSchema: SectionSchema<Item> = {
   kind: 'item',
   fields: {
-    title: { codec: text, default: (self) => humanize(self.id) },
-    examine: { codec: text, default: (self) => `This is an ${self.title}.` },
-    tags: { codec: list(tagClause), default: () => [] },
+    title: { parser: text, default: (self) => humanize(self.id) },
+    examine: { parser: text, default: (self) => `This is an ${self.title}.` },
+    tags: { parser: list(tagClause), default: () => [] },
   },
   clauses: 'tags',
 };

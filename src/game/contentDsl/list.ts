@@ -1,12 +1,12 @@
-import { Codec, Cursor } from './codec';
+import { Cursor, Parser } from './parser';
 import { RawLine } from './structure';
 
-export interface ListCodec<E> extends Codec<E[]> {
-  element: Codec<E>;
+export interface ListParser<E> extends Parser<E[]> {
+  element: Parser<E>;
   parseBlock(lines: RawLine[]): E[];
 }
 
-export function list<E>(element: Codec<E>): ListCodec<E> {
+export function list<E>(element: Parser<E>): ListParser<E> {
   const parseInline = (cursor: Cursor): E[] => {
     const items: E[] = [];
     do {
@@ -19,7 +19,6 @@ export function list<E>(element: Codec<E>): ListCodec<E> {
   return {
     element,
     parse: parseInline,
-    print: (items) => items.map((item) => element.print(item)).join(', '),
     parseBlock: (lines) => lines.flatMap((line) => parseInline(new Cursor(line.text, 0, line.span.start))),
   };
 }

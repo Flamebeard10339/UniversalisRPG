@@ -1,4 +1,4 @@
-import { DslError, Span } from './codec';
+import { DslError, Span } from './parser';
 
 export interface RawLine {
   text: string;
@@ -32,7 +32,7 @@ export function splitSections(source: string): RawSection[] {
       stack = [];
       continue;
     }
-    if (raw.trim() === '') continue;
+    if (raw.trim() === '' || raw.trim().startsWith('//')) continue;
     if (!current) throw new DslError(`content before first section: ${raw}`, { start: lineStart, end: lineStart + raw.length });
 
     const indent = raw.length - raw.trimStart().length;

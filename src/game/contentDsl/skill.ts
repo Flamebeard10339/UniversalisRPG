@@ -10,7 +10,7 @@ export interface Skill {
 export const skillSchema: SectionSchema<Skill> = {
   kind: 'skill',
   fields: {
-    title: { codec: text, default: (self) => humanize(self.id) },
-    'stat-id': { codec: text },
+    title: { parser: text, default: (self) => humanize(self.id) },
+    'stat-id': { parser: text },
   },
 };

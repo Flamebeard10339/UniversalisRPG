@@ -1,4 +1,4 @@
-import { Codec, DslError, Span } from './codec';
+import { DslError, Parser, Span } from './parser';
 
 export type TagClause =
   | { kind: 'keyword'; value: string }
@@ -35,25 +35,10 @@ function parseClause(raw: string, span: Span): TagClause {
   throw new DslError(`unrecognized tag clause: ${JSON.stringify(raw)}`, span);
 }
 
-function printClause(clause: TagClause): string {
-  switch (clause.kind) {
-    case 'keyword':
-      return clause.value;
-    case 'stat-bonus':
-      return `${clause.amount >= 0 ? '+' : ''}${clause.amount}${clause.percent ? '%' : ''} ${clause.statId}`;
-    case 'duration': {
-      const minutes = Math.floor(clause.seconds / SECONDS_PER_MINUTE);
-      const seconds = clause.seconds % SECONDS_PER_MINUTE;
-      return `${minutes ? `${minutes}m` : ''}${seconds || minutes === 0 ? `${seconds}s` : ''}`;
-    }
-  }
-}
-
-export const tagClause: Codec<TagClause> = {
+export const tagClause: Parser<TagClause> = {
   parse(cursor) {
     const start = cursor.pos;
     const raw = (cursor.take(/[^,\n]+/) ?? '').trim();
     return parseClause(raw, { start: cursor.abs(start), end: cursor.abs(cursor.pos) });
   },
-  print: printClause,
 };

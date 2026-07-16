@@ -1,4 +1,4 @@
-import { Codec, Cursor, DslError } from './codec';
+import { Cursor, DslError, Parser } from './parser';
 import { id, number } from './values';
 
 export type ActionResult =
@@ -36,34 +36,10 @@ function parseResult(cursor: Cursor): ActionResult {
   throw new DslError(`unrecognized action result: ${JSON.stringify(cursor.rest())}`, { start: cursor.abs(cursor.pos), end: cursor.abs(cursor.pos) });
 }
 
-function printResult(result: ActionResult): string {
-  switch (result.kind) {
-    case 'say':
-      return `say: ${result.text}`;
-    case 'set':
-      return `set: ${result.variable}`;
-    case 'unset':
-      return `unset: ${result.variable}`;
-    case 'give':
-      return result.amount !== undefined ? `give: ${result.amount} ${result.item}` : `give: ${result.item}`;
-    case 'take':
-      return result.amount !== undefined ? `take: ${result.amount} ${result.item}` : `take: ${result.item}`;
-    case 'xp':
-      return `xp: ${result.skill} ${result.amount}`;
-    case 'relocate':
-      return `relocate: ${result.location}`;
-    case 'discover':
-      return `discover: ${result.location}`;
-    case 'open-modal':
-      return `open modal: ${result.modal}`;
-  }
-}
-
 export function startsResult(cursor: Cursor): boolean {
   return cursor.peek(/(?:say|give|take|xp|relocate|discover|open modal):|(?:set|unset)[: \t]/) !== null;
 }
 
-export const actionResult: Codec<ActionResult> = {
+export const actionResult: Parser<ActionResult> = {
   parse: parseResult,
-  print: printResult,
 };
