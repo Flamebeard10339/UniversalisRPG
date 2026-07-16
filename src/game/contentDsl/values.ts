@@ -20,6 +20,9 @@ export const id: Parser<string> = {
   },
 };
 
+// A dotted state path: `bridge-open`, `front-door.unlocked`, `quest.x.accepted`.
+export const REFERENCE = /[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9-]*)*/;
+
 export const humanize = (id: string): string =>
   id
     .split('-')

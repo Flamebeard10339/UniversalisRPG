@@ -19,6 +19,8 @@ function parseOne<H extends { id: string }, F extends keyof H = never, E extends
 }
 
 const ref = (...path: string[]) => ({ kind: 'reference' as const, reference: { path } });
+const literal = (text: string) => ({ kind: 'literal' as const, text });
+const interpolate = (...path: string[]) => ({ kind: 'interpolate' as const, reference: { path } });
 
 describe('items and tag clauses', () => {
   it('parses a bare-clause list, keeping duration and stat-bonus shapes', () => {
@@ -204,6 +206,94 @@ describe('entity action modifiers', () => {
 
   it('surfaces result-related errors for malformed results, not tag errors', () => {
     expect(() => parseOne('# entity chest\nopen:\n  give:', entitySchema)).toThrow(/expected an id/);
+  });
+});
+
+describe('dialogue', () => {
+  it('parses owner, nodes, beats, effects, menus, and node metadata', () => {
+    const source = [
+      '# dialogue miki',
+      'owner = miki',
+      '',
+      'node greeting:',
+      '  when: not tutorial.quest-given',
+      '  Greetings, adventurer!',
+      '  What do you say I show you the ropes?',
+      '  set: tutorial.quest-given',
+      '  -> Sounds good.',
+      "  -> I'd rather not.",
+      '    set: tutorial.snubbed',
+      '    goto snub',
+      '',
+      'node remind-mirror:',
+      '  when: tutorial.quest-given',
+      '  sticky',
+      '  again: The mirror is still waiting.',
+      '  The mirror awaits you.',
+      '',
+      'node snub:',
+      '  Hmph. Suit yourself.',
+    ].join('\n');
+
+    const [section] = parseModule(source);
+    expect(section.value).toEqual({
+      id: 'miki',
+      owner: 'miki',
+      nodes: [
+        {
+          name: 'greeting',
+          when: { kind: 'not', condition: ref('tutorial', 'quest-given') },
+          steps: [
+            { kind: 'say', segments: [literal('Greetings, adventurer!')] },
+            { kind: 'say', segments: [literal('What do you say I show you the ropes?')] },
+            { kind: 'effect', result: { kind: 'set', variable: 'tutorial.quest-given' } },
+            {
+              kind: 'menu',
+              choices: [
+                { segments: [literal('Sounds good.')], effects: [] },
+                { segments: [literal("I'd rather not.")], effects: [{ kind: 'set', variable: 'tutorial.snubbed' }], goto: 'snub' },
+              ],
+            },
+          ],
+        },
+        {
+          name: 'remind-mirror',
+          when: ref('tutorial', 'quest-given'),
+          sticky: true,
+          again: [literal('The mirror is still waiting.')],
+          steps: [{ kind: 'say', segments: [literal('The mirror awaits you.')] }],
+        },
+        { name: 'snub', steps: [{ kind: 'say', segments: [literal('Hmph. Suit yourself.')] }] },
+      ],
+    });
+  });
+
+  it('parses a guarded, consuming choice and a visit-count when: as a comparison', () => {
+    const source = ['# dialogue troll', 'owner = bridge-troll', '', 'node toll:', '  when: toll.visits >= 5', '  Pay the toll!', '  -> Here, five shrimp.  (when has-shrimp)', '    take: 5 cooked-shrimp', '    goto paid'].join('\n');
+    const [{ value }] = parseModule(source) as { value: { nodes: { when: unknown; steps: unknown[] }[] } }[];
+    expect(value.nodes[0].when).toEqual({ kind: 'comparison', left: { path: ['toll', 'visits'] }, operator: '>=', right: 5 });
+    expect(value.nodes[0].steps[1]).toEqual({
+      kind: 'menu',
+      choices: [{ segments: [literal('Here, five shrimp.')], when: ref('has-shrimp'), effects: [{ kind: 'take', item: 'cooked-shrimp', amount: 5 }], goto: 'paid' }],
+    });
+  });
+
+  it('parses an interpolation, a conditional fragment, and a literal/interpolation mix', () => {
+    const source = [
+      '# dialogue miki',
+      'owner = miki',
+      '',
+      'node greeting:',
+      '  There you are — {player.name}, is it?',
+      '  {tutorial.snubbed: You already made your choice.}',
+      '  Welcome to {location.name}, {player.name}.',
+    ].join('\n');
+
+    const [{ value }] = parseModule(source) as { value: { nodes: { steps: { kind: string; segments: unknown[] }[] }[] } }[];
+    const steps = value.nodes[0].steps;
+    expect(steps[0].segments).toEqual([literal('There you are — '), interpolate('player', 'name'), literal(', is it?')]);
+    expect(steps[1].segments).toEqual([{ kind: 'conditional', condition: ref('tutorial', 'snubbed'), text: 'You already made your choice.' }]);
+    expect(steps[2].segments).toEqual([literal('Welcome to '), interpolate('location', 'name'), literal(', '), interpolate('player', 'name'), literal('.')]);
   });
 });
 

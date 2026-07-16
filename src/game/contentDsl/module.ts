@@ -1,24 +1,35 @@
+import { parseDialogue } from './dialogue';
 import { entitySchema } from './entity';
 import { itemSchema } from './item';
 import { locationSchema } from './location';
 import { DslError } from './parser';
-import { Authored, SectionSchema, parseSection } from './section';
+import { parseSection } from './section';
 import { skillSchema } from './skill';
 import { statSchema } from './stat';
-import { splitSections } from './structure';
+import { RawSection, splitSections } from './structure';
+import { parseTest } from './test';
 
-const SCHEMAS = [itemSchema, statSchema, skillSchema, locationSchema, entitySchema] as unknown as SectionSchema<{ id: string }>[];
-const byKind = new Map(SCHEMAS.map((schema) => [schema.kind, schema]));
+// Most kinds are a SectionSchema walked by the generic engine; a few (dialogue)
+// have a grammar too far from key/value to fit it and bring their own parser.
+const PARSERS: Record<string, (section: RawSection) => object> = {
+  item: (section) => parseSection(section, itemSchema),
+  stat: (section) => parseSection(section, statSchema),
+  skill: (section) => parseSection(section, skillSchema),
+  location: (section) => parseSection(section, locationSchema),
+  entity: (section) => parseSection(section, entitySchema),
+  dialogue: parseDialogue,
+  test: parseTest,
+};
 
 export interface ModuleSection {
   kind: string;
-  value: Authored<{ id: string }>;
+  value: object;
 }
 
 export function parseModule(source: string): ModuleSection[] {
   return splitSections(source).map((section) => {
-    const schema = byKind.get(section.kind);
-    if (!schema) throw new DslError(`unknown section kind: ${section.kind}`, section.span);
-    return { kind: section.kind, value: parseSection(section, schema) };
+    const parse = PARSERS[section.kind];
+    if (!parse) throw new DslError(`unknown section kind: ${section.kind}`, section.span);
+    return { kind: section.kind, value: parse(section) };
   });
 }

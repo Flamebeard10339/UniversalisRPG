@@ -1,5 +1,5 @@
 import { Cursor, DslError, Parser } from './parser';
-import { number } from './values';
+import { number, REFERENCE } from './values';
 
 export interface Reference {
   path: string[];
@@ -14,7 +14,6 @@ export type Condition =
   | { kind: 'comparison'; left: Reference; operator: ComparisonOperator; right: number }
   | { kind: 'reference'; reference: Reference };
 
-const REFERENCE = /[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9-]*)*/;
 const COMPARISON = /[ \t]*(>=|<=|>|<|=)[ \t]*/;
 
 function parseReference(cursor: Cursor): Reference {
