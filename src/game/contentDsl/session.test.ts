@@ -33,6 +33,19 @@ describe('session', () => {
     expect(session.state.flags['tutorial.mirror-done']).toBe(true);
     expect(ids(v)).not.toContain('use:entity.mirror.look in');
 
+    v = apply(session, 'talk:miki');
+    expect(v.inDialogue).toBe(false);
+    expect(session.state.inventory['jug-of-water']).toBe(1);
+    expect(session.state.inventory['pot-of-flour']).toBe(1);
+
+    expect(ids(v)).toContain('craft:dough');
+    v = apply(session, 'craft:dough');
+    expect(session.state.inventory.dough).toBe(1);
+
+    expect(ids(v)).toContain('craft:bread');
+    v = apply(session, 'craft:bread');
+    expect(session.state.inventory.bread).toBe(1);
+
     v = apply(session, 'use:entity.stairs.ascend');
     expect(v.location.id).toBe('guide-house-upstairs');
     expect(ids(v)).toContain('use:entity.dresser.search drawer');

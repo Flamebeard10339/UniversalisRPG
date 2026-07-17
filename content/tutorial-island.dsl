@@ -41,6 +41,19 @@ shield, offhand, +2 defense
 examine: A bent sliver of metal, worn smooth from use.
 thieving-tool
 
+# item jug-of-water
+examine: A clay jug of clean water.
+
+# item pot-of-flour
+examine: A small pot of milled flour.
+
+# item dough
+examine: A ball of raw dough, ready for the oven.
+
+# item bread
+examine: A warm, golden loaf.
+food, +5 regeneration, 90s
+
 // --- locations ---
 
 # location guide-house
@@ -52,7 +65,7 @@ adjacent:
   basement
   beach while front-door.unlocked
 entities:
-  miki, front-door, stairs, mirror
+  miki, front-door, stairs, mirror, oven
 
 # location guide-house-upstairs
 x: 0, y: 0, z: 1
@@ -99,6 +112,9 @@ look in:
   open modal: character-creation
   set: tutorial.mirror-done
 
+# entity oven
+examine: A stone oven, its coals still glowing.
+
 # entity stairs
 title: Stairs
 ascend: relocate: guide-house-upstairs, say: You climb to the second floor.
@@ -129,6 +145,21 @@ fight:
     add: tutorial.rats-killed 1
     say: You put down another rat.
 
+// --- recipes ---
+
+# recipe dough
+in: jug-of-water, pot-of-flour
+out: dough
+skill: cooking 2
+say: You knead water and flour into a ball of dough.
+
+# recipe bread
+station: oven
+in: dough
+out: bread
+skill: cooking 4
+say: The oven bakes your dough into a golden loaf.
+
 // --- dialogue ---
 
 # dialogue miki
@@ -156,18 +187,26 @@ node remind-mirror:
 node buffs:
   when: tutorial.mirror-done
   once
-  again: The oven's waiting, {player.name} - a jug of water and a pot of flour make dough.
+  again: Knead that dough and get it in the oven, {player.name} - water and flour won't bake themselves.
   There you are, {player.name}. A fine name.
-  Some foods grant a temporary edge. Let me show you baking sometime - for now, eat something and watch your stats.
+  give: jug-of-water
+  give: pot-of-flour
+  Water and flour make dough - knead them together, then bake the dough in the oven.
+  Give it a go. I'll wait.
+
+node baked:
+  when: tutorial.mirror-done and has bread and not tutorial.made-bread
+  once
+  A warm loaf! Well done, {player.name}.
+  Some foods grant a temporary edge. Eat that bread and watch your stats.
+  That warm feeling? A buff. It fades, so spend it well.
   xp: cooking 3
   set: tutorial.made-bread
-  Give it a go. I'll wait.
 
 node skills:
   when: tutorial.made-bread
   once
   again: Still those rats, {player.name}? Downstairs, in the basement.
-  That warm feeling? A buff. It fades, so spend it well.
   Every swing and catch builds a skill, and skills raise your stats.
   Here, gear changes your stats the moment you equip it.
   give: iron-sword
@@ -201,9 +240,16 @@ choose: Sounds good. Teach me.
 expect: tutorial.quest-given
 
 # test miki-route-full
+travel: guide-house
 run: tutorial-quest-given
 use: entity.mirror.look in
 expect: tutorial.mirror-done
+talk: miki
+expect: has jug-of-water
+craft: dough
+expect: has dough
+craft: bread
+expect: has bread
 talk: miki
 expect: tutorial.made-bread
 use: entity.giant-rats.fight

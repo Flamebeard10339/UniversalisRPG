@@ -1,7 +1,8 @@
 import { Action } from './entity';
-import { DialogueSession, GameState, Registry, RuntimeError, choose, createGameState, evaluateCondition, renderSegments, talk, useAction } from './runtime';
+import { craft, DialogueSession, GameState, Registry, RuntimeError, choose, createGameState, evaluateCondition, recipeCraftable, renderSegments, talk, useAction } from './runtime';
+import { humanize } from './values';
 
-export type PlayChoiceKind = 'talk' | 'action' | 'travel' | 'dialogue';
+export type PlayChoiceKind = 'talk' | 'action' | 'travel' | 'dialogue' | 'craft';
 
 export interface PlayChoice {
   id: string;
@@ -73,6 +74,12 @@ function locationChoices(session: PlaySession): PlayChoice[] {
     }
   }
 
+  for (const recipe of registry.recipes.values()) {
+    if (!recipeCraftable(recipe, registry, state)) continue;
+    const detail = recipe.station ? registry.entities.get(recipe.station)?.title : undefined;
+    choices.push({ id: `craft:${recipe.id}`, kind: 'craft', label: `Craft ${humanize(recipe.id)}`, detail });
+  }
+
   for (const edge of location.adjacent) {
     if (edge.condition && !evaluateCondition(edge.condition, state)) continue;
     const target = registry.locations.get(edge.target);
@@ -124,6 +131,10 @@ function dispatch(session: PlaySession, choice: PlayChoice): void {
     }
     case 'travel': {
       session.state.location = choice.id.slice('travel:'.length);
+      return;
+    }
+    case 'craft': {
+      craft(choice.id.slice('craft:'.length), session.registry, session.state);
       return;
     }
   }

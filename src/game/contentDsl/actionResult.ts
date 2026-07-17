@@ -1,5 +1,5 @@
 import { Cursor, DslError, Parser } from './parser';
-import { id, number, REFERENCE } from './values';
+import { id, number, quantified, REFERENCE } from './values';
 
 export type ActionResult =
   | { kind: 'say'; text: string }
@@ -14,10 +14,7 @@ export type ActionResult =
   | { kind: 'open-modal'; modal: string };
 
 function parseGiveTake(kind: 'give' | 'take', cursor: Cursor): ActionResult {
-  const amount = cursor.take(/\d+/);
-  if (amount !== null) cursor.take(/[ \t]+/);
-  const item = id.parse(cursor);
-  return amount !== null ? { kind, item, amount: Number(amount) } : { kind, item };
+  return { kind, ...quantified.parse(cursor) };
 }
 
 function parseVariable(cursor: Cursor): string {

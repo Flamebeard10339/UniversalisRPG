@@ -3,6 +3,7 @@ import { entitySchema } from './entity';
 import { itemSchema } from './item';
 import { locationSchema } from './location';
 import { DslError } from './parser';
+import { recipeSchema } from './recipe';
 import { parseSection } from './section';
 import { skillSchema } from './skill';
 import { statSchema } from './stat';
@@ -17,6 +18,7 @@ const PARSERS: Record<string, (section: RawSection) => object> = {
   skill: (section) => parseSection(section, skillSchema),
   location: (section) => parseSection(section, locationSchema),
   entity: (section) => parseSection(section, entitySchema),
+  recipe: (section) => parseSection(section, recipeSchema),
   dialogue: parseDialogue,
   test: parseTest,
 };

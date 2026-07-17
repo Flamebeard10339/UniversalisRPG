@@ -5,6 +5,7 @@ import { Action, Entity, entitySchema } from './entity';
 import { Item, itemSchema } from './item';
 import { Location, locationSchema } from './location';
 import { parseModule } from './module';
+import { Recipe, recipeSchema } from './recipe';
 import { scopeEntity } from './scope';
 import { Authored, hydrateSection } from './section';
 import { Skill, skillSchema } from './skill';
@@ -32,6 +33,7 @@ export interface Registry {
   items: Map<string, Item>;
   stats: Map<string, Stat>;
   skills: Map<string, Skill>;
+  recipes: Map<string, Recipe>;
   dialogues: Map<string, Dialogue>;
   dialoguesByOwner: Map<string, Dialogue>;
   tests: Map<string, Test>;
@@ -44,6 +46,7 @@ export function loadModule(source: string): Registry {
     items: new Map(),
     stats: new Map(),
     skills: new Map(),
+    recipes: new Map(),
     dialogues: new Map(),
     dialoguesByOwner: new Map(),
     tests: new Map(),
@@ -74,6 +77,11 @@ export function loadModule(source: string): Registry {
       case 'skill': {
         const skill = hydrateSection(section.value as Authored<Skill>, skillSchema);
         registry.skills.set(skill.id, skill);
+        break;
+      }
+      case 'recipe': {
+        const recipe = hydrateSection(section.value as Authored<Recipe>, recipeSchema);
+        registry.recipes.set(recipe.id, recipe);
         break;
       }
       case 'dialogue': {
@@ -298,6 +306,25 @@ export function useAction(obj: string, objId: string, actionId: string, registry
   for (const result of action.onSuccess ?? []) applyResult(result, state);
 }
 
+export function recipeCraftable(recipe: Recipe, registry: Registry, state: GameState): boolean {
+  for (const input of recipe.in) if ((state.inventory[input.item] ?? 0) < (input.amount ?? 1)) return false;
+  if (recipe.station) {
+    const loc = registry.locations.get(state.location);
+    if (!loc || !loc.entities.includes(recipe.station)) return false;
+  }
+  return true;
+}
+
+export function craft(recipeId: string, registry: Registry, state: GameState): void {
+  const recipe = registry.recipes.get(recipeId);
+  if (!recipe) throw new RuntimeError(`unknown recipe: ${recipeId}`);
+  if (!recipeCraftable(recipe, registry, state)) throw new RuntimeError(`recipe not craftable: ${recipeId}`);
+  for (const input of recipe.in) applyResult({ kind: 'take', item: input.item, amount: input.amount }, state);
+  for (const output of recipe.out) applyResult({ kind: 'give', item: output.item, amount: output.amount }, state);
+  if (recipe.skill) applyResult({ kind: 'xp', skill: recipe.skill.skill, amount: recipe.skill.amount }, state);
+  if (recipe.say) state.log.push(recipe.say);
+}
+
 export interface TestResult {
   passed: boolean;
   failure?: string;
@@ -330,6 +357,9 @@ export function runTest(testId: string, registry: Registry, state: GameState, st
       case 'travel':
         if (!registry.locations.has(directive.location)) throw new RuntimeError(`unknown location: ${directive.location}`);
         state.location = directive.location;
+        break;
+      case 'craft':
+        craft(directive.recipe, registry, state);
         break;
       case 'expect':
         if (!evaluateCondition(directive.condition, state)) return { passed: false, failure: describeCondition(directive.condition) };

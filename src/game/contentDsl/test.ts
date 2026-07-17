@@ -8,6 +8,7 @@ export type Directive =
   | { kind: 'choose'; text: string }
   | { kind: 'use'; obj: string; objId: string; actionId: string }
   | { kind: 'travel'; location: string }
+  | { kind: 'craft'; recipe: string }
   | { kind: 'expect'; condition: Condition };
 
 export interface Test {
@@ -20,6 +21,7 @@ const TALK = /^talk:[ \t]*(?<id>[a-z][a-z0-9-]*)$/;
 const CHOOSE = /^choose:[ \t]*(?<text>.*)$/;
 const USE = /^use:[ \t]*(?<obj>[a-z][a-z0-9-]*)\.(?<objId>[a-z][a-z0-9-]*)\.(?<actionId>.+)$/;
 const TRAVEL = /^travel:[ \t]*(?<id>[a-z][a-z0-9-]*)$/;
+const CRAFT = /^craft:[ \t]*(?<id>[a-z][a-z0-9-]*)$/;
 const EXPECT = /^expect:[ \t]*(?<cond>.+)$/;
 
 export function parseTest(section: RawSection): Test {
@@ -34,6 +36,7 @@ export function parseTest(section: RawSection): Test {
     const choose = CHOOSE.exec(line.text)?.groups;
     const use = USE.exec(line.text)?.groups;
     const travel = TRAVEL.exec(line.text)?.groups;
+    const craft = CRAFT.exec(line.text)?.groups;
     const expect = EXPECT.exec(line.text)?.groups;
 
     if (run) directives.push({ kind: 'run', test: run.id });
@@ -41,6 +44,7 @@ export function parseTest(section: RawSection): Test {
     else if (choose) directives.push({ kind: 'choose', text: choose.text });
     else if (use) directives.push({ kind: 'use', obj: use.obj, objId: use.objId, actionId: use.actionId });
     else if (travel) directives.push({ kind: 'travel', location: travel.id });
+    else if (craft) directives.push({ kind: 'craft', recipe: craft.id });
     else if (expect) directives.push({ kind: 'expect', condition: condition.parse(new Cursor(expect.cond)) });
     else throw new DslError(`unexpected line in # test: ${JSON.stringify(line.text)}`, line.span);
   }

@@ -28,3 +28,17 @@ export const humanize = (id: string): string =>
     .split('-')
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
     .join(' ');
+
+export interface Quantified {
+  item: string;
+  amount?: number;
+}
+
+export const quantified: Parser<Quantified> = {
+  parse(cursor) {
+    const amount = cursor.take(/\d+/);
+    if (amount !== null) cursor.take(/[ \t]+/);
+    const item = id.parse(cursor);
+    return amount !== null ? { item, amount: Number(amount) } : { item };
+  },
+};
