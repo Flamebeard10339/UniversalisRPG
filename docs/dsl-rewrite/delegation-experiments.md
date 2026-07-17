@@ -27,8 +27,14 @@ the result was correct, and what the review caught.
 | 8 | Sonnet 5 | Author tutorial-island content + friction report | 101.7k | 26 | 522s | medium (grammar doc + questline given) | Content parses and runs; friction report high-signal — confirmed the predicted item-possession gap |
 
 | 9 | Sonnet 5 | Add the `has` inventory-possession condition (grammar + runtime + content + doc + tests) | 77.2k | 37 | 179s | medium-high (feature fully specified) | Correct, one-shot; integration stayed green |
+| 10 | Sonnet 5 (cold spawn) | Build `session.ts` interactive-play layer over `runtime.ts` (choice enumeration + apply) + tests | 99.9k | 25 | 470s | high (full interface + enumeration rules + test route specified) | Correct, one-shot; only minimal runtime change (export `useAction`); test drives the full real route through the choice API |
+| 11 | Sonnet 5 (**warm resume** via SendMessage, continues #10) | Rewire `playtest-cli.ts` onto `loadModule`+`session.ts`, delete obsolete `playtestEngine.ts` | 82.5k | 37 | 692s | high (steps + arg surface specified) | Correct, one-shot; replays full Miki route green. **But warm resume was not cheaper — see warm-swarm finding.** |
 
-Rows 4 and 5 (and 7 and 8) each ran **in parallel** as two background Sonnet agents on disjoint files.
+| 12 | Sonnet 5 (cold spawn) | Counter/tally `add:` effect (grammar+runtime+tests) + bare-field error message | 125.1k | 58 | 562s | high (2 labeled pieces, exact content edits) | A1/A2/error-msg correct & green; **correctly STOPPED** on the content-wiring piece — proved empirically that the exact edit I specified collides with entity auto-scoping (`add` unscoped while a sibling `hidden if` scopes → the rat gate never trips → infinitely farmable). A **planner spec error**, caught by the STOP escape hatch + the "verify empirically" instruction, not an agent error. |
+
+| 13 | Sonnet 5 (cold spawn) | Finish counter/tally: scope `add:` in scope.ts + wire `tutorial.rats-killed` content ripple + grammar.md | 62.4k | 28 | 153s | high (3 labeled pieces, exact edits, resolution pre-decided by planner) | Correct, one-shot, no STOP; 59 green, replay green, tsc clean. The follow-up to row 12's STOP — a planner-designed resolution executed cleanly. |
+
+Rows 4 and 5 (and 7 and 8) each ran **in parallel** as two background Sonnet agents on disjoint files. Rows 10 and 11 were the **warm-swarm probe**: 11 continued 10's agent via `SendMessage` instead of a fresh spawn. Rows 12→13 are the **STOP-then-cold-respawn pattern**: chunk 1 took two cold spawns — 12 correctly stopped on a planner spec error (125k), 13 executed the corrected spec (62k) — instead of warm-resuming 12. Validates the no-warm-resume rule: a fresh cold spawn on a fixed spec cost *less* than dragging 12's 125k transcript forward would have, and kept the two diffs cleanly separable for review.
 
 ## Findings so far (directional, not settled)
 
@@ -106,6 +112,43 @@ bounded new component with clear requirements delegates fine; a design that must
 reconcile the whole architecture (the one-directional pivot) does not, because
 that whole-system view is exactly what a cold spawn can't rebuild.
 
+### Warm-swarm (SendMessage continuation) — the token savings did not materialize
+The hypothesis (handoff goal 2): spawning fresh re-pays a ~40–108k cold-start
+re-read every time, so keeping an agent warm and dispatching follow-ups via
+`SendMessage` (which continues it *with context intact*) should dodge that tax.
+Rows 10→11 tested it: 11 continued 10's agent instead of cold-spawning.
+
+**Result: warm resume was *not* cheaper.** Task 11 was the *smaller* task (rewire
+one script vs. build a layer + tests), yet cost **82.5k tokens / 37 tool calls /
+692s** — more tool calls and more wall-time than the from-scratch task 10 (99.9k /
+25 / 470s), and only ~17k fewer tokens despite being a lighter job. The agent
+*did* reuse context correctly (it re-read only `playtest-cli.ts` +
+`playtestEngine.ts` + one grep; it did **not** re-read `runtime.ts`/`session.ts`/
+content — it held them from task 10). So context continuity is real and the
+file-re-reads were genuinely avoided.
+
+**Why it still cost so much:** a `SendMessage` resume carries the *entire prior
+transcript* (~100k from task 10) forward as a context prefix that is re-ingested
+on every subsequent model turn. Over 37 turns spanning 692s — far past the
+~5-minute prompt-cache TTL, so repeated cache misses — reprocessing that retained
+transcript dwarfed the handful of file-reads it saved. The retained context is a
+*liability* here, not an asset, because the shared code it replaces (a few hundred
+lines) is cheap to just re-read cold.
+
+**And the main-context budget is identical either way** — only the ~1k summary
+returns to the delegator whether the sub is cold or warm. So there is *no*
+main-context argument for warm over cold; the whole appeal was total-token
+savings, which didn't appear.
+
+**Revised guidance:** for **bounded, well-specced coding tasks**, prefer a **cold
+spawn per task** — the spec *is* the context, and re-reading a few files is cheaper
+than dragging a large transcript. Reserve `SendMessage` continuation for cases
+where the agent must retain a **large, hard-to-respec working state** that a spec
+can't cheaply reconstitute (a long debugging thread with accumulated hypotheses;
+an iterative design conversation), and keep the follow-ups **inside the cache
+window** so the retained prefix stays cached. Warm-swarm is a *state-preservation*
+tool, not a *cost-reduction* one.
+
 ## Working heuristic (revise as data accrues)
 
 - **Non-trivial, self-contained feature →** delegate to Sonnet; context offload
@@ -120,6 +163,9 @@ that whole-system view is exactly what a cold spawn can't rebuild.
   can't cheaply rebuild the architecture-wide view. Keep it in the main thread.
 - **Parallel agents →** split on disjoint files; expect an occasional induced
   duplication to clean up on review.
+- **Warm resume (`SendMessage`) →** not a cost play: use it only to preserve a
+  large working state a fresh spec can't cheaply rebuild, and keep follow-ups
+  inside the cache window. For bounded, well-specced tasks, cold-spawn each.
 
 ## Break-even, stated once
 
@@ -130,6 +176,9 @@ enough to bound that cold-start. Cheaper models lower the right-hand side.
 ## Open experiments
 
 - [ ] Low-spec Haiku probe (intent-only small task) — find the reliability edge.
+- [x] Warm-swarm probe (rows 10→11): `SendMessage` continuation is *not* cheaper
+      than cold-spawn for bounded tasks — the retained transcript costs more than
+      the file-reads it saves. It's a state-preservation tool, not a cost play.
 - [x] A design-heavy delegation (row 5) — the "poor fit" hypothesis narrowed to
       *system-wide* design, not *local* design.
 - [ ] Track review *rework rate*: how often the review sends work back

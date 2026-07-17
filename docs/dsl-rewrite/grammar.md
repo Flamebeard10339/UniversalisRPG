@@ -205,6 +205,7 @@ The verbs available anywhere an effect fires — an entity action's results,
 | `say:` | `say: <text>` | rest of line is free text |
 | `set` | `set: <ref>` or `set <ref>` | colon optional |
 | `unset` | `unset: <ref>` or `unset <ref>` | colon optional |
+| `add:` | `add: <ref> [<amount>]` | amount optional, defaults to 1; increments a numeric flag, treating a non-numeric or absent base as 0 |
 | `give:` | `give: [<n>] <item-id>` | amount optional |
 | `take:` | `take: [<n>] <item-id>` | amount optional |
 | `xp:` | `xp: <skill-id> <n>` | both required |
@@ -223,6 +224,15 @@ give: 12 coins
 take: 5 cooked-shrimp
 xp: thieving 4
 ```
+
+```
+add: tutorial.rats-killed 1
+```
+
+A counter read by another owner — a dialogue checking a `when:`, a different
+entity's `hidden if:` — must use a **qualified** name like `tutorial.rats-killed`,
+never a bare one, so entity auto-scoping (see Scoping inside an entity above)
+can't silently rewrite it to a single owner's namespace.
 
 ### Tag clauses
 
