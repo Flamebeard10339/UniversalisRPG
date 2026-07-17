@@ -28,6 +28,7 @@ stat-id: attack
 # item cooked-shrimp
 examine: A simple meal.
 food, +3 regeneration, 60s
+eat: take: 1 cooked-shrimp, say: You eat the shrimp. Simple, warm, and better than it looks.
 
 # item iron-sword
 examine: A well-balanced blade, standard adventurer's kit.
@@ -53,6 +54,7 @@ examine: A ball of raw dough, ready for the oven.
 # item bread
 examine: A warm, golden loaf.
 food, +5 regeneration, 90s
+eat: take: 1 bread, say: You tear into the warm loaf - simple, filling, and worth the trouble.
 
 // --- locations ---
 
@@ -198,8 +200,7 @@ node baked:
   when: tutorial.mirror-done and has bread and not tutorial.made-bread
   once
   A warm loaf! Well done, {player.name}.
-  Some foods grant a temporary edge. Eat that bread and watch your stats.
-  That warm feeling? A buff. It fades, so spend it well.
+  Keep it in your pack - eat it whenever you're hungry.
   set: tutorial.made-bread
 
 node skills:

@@ -38,6 +38,17 @@ the result was correct, and what the review caught.
 
 | 15 | Sonnet 5 (cold spawn) | `take:` affordability gate + `on failure:` branch (entity.ts parse + runtime `useAction` atomic-fail + inventory floor) + tests | 88.7k | 45 | 313s | high (exact `useAction` logic handed over, design pre-ratified) | Correct, one-shot; 68→77 green, tsc byte-identical error set (zero new). One **correct** self-flagged deviation: extended `scope.ts` to entity-scope `onFailure` refs like `onSuccess` (else a bare `set:` in `on failure:` would scope inconsistently — a latent bug, not a design question) with a locking `scope.test.ts` case. Exactly the adjacent-consistency fix a good agent *should* make and flag, not grave-digging. No planner edits needed; review = read diff + independent test run. |
 
+## Session usage snapshots
+
+Whole-session totals (not per-delegation), logged at recycle points to calibrate
+the "% of 5-hour budget per turn" recycle signal from the operating agreement.
+
+| Date | Orchestrator model | 5h budget used | Weekly budget used | Session cost | Active / wall time | Opus / Sonnet split | Cache hit | Rows covered | Note |
+|------|--------------------|---------------:|--------------------|--------------|---------------------|----------------------|-----------|---------------|------|
+| 2026-07-17 | Opus (this session) | 77% | 36% (all models) | $10.72 | 31m44s / 1h8m | 55% / 45% | 96% | 8–15 | Recycle point; switching next chunk to a Sonnet orchestrator as a new experiment (cheaper turn rate, testing whether planning/review quality holds without Opus) |
+
+| 16 | Sonnet 5 (cold spawn, **Sonnet orchestrator** — first non-Opus planner) | Extract shared `action.ts` from `entity.ts`; give items an `actions:` block (schema wiring); wire `eat` on `bread`/`cooked-shrimp` (consume+narrate only, buff explicitly deferred); doc + tests | 77.1k | 44 | 257s | high (exact extraction target, exact wiring pattern to mirror, exact content shape, explicit out-of-scope list) | Correct, one-shot; 77→78 green (confirmed independently), tsc byte-identical (64/64). Dispatch worked with zero `runtime.ts`/`session.ts` changes, as the orchestrator's ground-truth survey predicted — agent verified this empirically per instructions rather than assuming. One good unprompted catch: the `baked` dialogue node promised a stat "buff" from eating that this task deliberately didn't implement, so the agent rewrote those two lines to avoid the game lying to the player — correct scope judgment, not scope creep. |
+
 Rows 4 and 5 (and 7 and 8) each ran **in parallel** as two background Sonnet agents on disjoint files. Rows 10 and 11 were the **warm-swarm probe**: 11 continued 10's agent via `SendMessage` instead of a fresh spawn. Rows 12→13 are the **STOP-then-cold-respawn pattern**: chunk 1 took two cold spawns — 12 correctly stopped on a planner spec error (125k), 13 executed the corrected spec (62k) — instead of warm-resuming 12. Validates the no-warm-resume rule: a fresh cold spawn on a fixed spec cost *less* than dragging 12's 125k transcript forward would have, and kept the two diffs cleanly separable for review.
 
 ## Findings so far (directional, not settled)

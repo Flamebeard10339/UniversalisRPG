@@ -109,4 +109,26 @@ describe('session', () => {
     expect(() => apply(session, 'travel:beach')).toThrow();
     expect(() => apply(session, 'nonsense')).toThrow();
   });
+
+  it('dispatches an item action through the choice-list API', () => {
+    const module = `
+# location camp
+x: 0, y: 0
+starting
+
+# item bread
+eat: take: 1 bread, say: You eat the bread.
+`;
+    const registry = loadModule(module);
+    const session = startSession(registry);
+    session.state.inventory.bread = 1;
+
+    let v = view(session);
+    expect(ids(v)).toContain('use:item.bread.eat');
+
+    v = apply(session, 'use:item.bread.eat');
+    expect(v.said).toContain('You eat the bread.');
+    expect(session.state.inventory.bread).toBe(0);
+    expect(ids(v)).not.toContain('use:item.bread.eat');
+  });
 });

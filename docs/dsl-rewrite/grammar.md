@@ -258,18 +258,26 @@ item:
   title: text, defaults to the id humanized
   examine: text, defaults to "This is an <title>."
   tags: bare clause list (tag clauses)
+  <label>: entries — everything else, keyed by label — become actions
 ```
 
 ```
 # item cooked-shrimp
 examine: A simple meal.
 food, +3 regeneration, 60s
+eat: take: 1 cooked-shrimp, say: You eat the shrimp.
 ```
 
 `title` defaults to `Cooked Shrimp`. `examine`, if you omit it, defaults to a
 sentence built from the (possibly also-defaulted) title — literally `This is
 an <Title>.`, article and all, regardless of the title's first letter; write
 your own `examine:` to control the wording.
+
+Items support the identical `actions:` entry grammar as entities (see
+`### entity` below) — inline or block form, `requires:`/`hidden if:`/tags/
+`on success:`/`on failure:`, and the same `take:` affordability rule. An item
+action is invoked as `item.<item-id>.<action-id>` and, like entity actions,
+is only offered to the player while the item is in inventory.
 
 ### stat
 
