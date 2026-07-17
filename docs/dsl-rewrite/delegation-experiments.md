@@ -23,7 +23,12 @@ the result was correct, and what the review caught.
 | 5 | Sonnet 5 | **Design** + implement the `# test` kind (composable test grammar) | 74.2k | 24 | 171s | medium (starting vocab given, design left open) | Correct; coherent minimal grammar, independently reused repo conventions (`<obj>.<objId>.<actionId>`, the condition grammar) |
 | 6 | Sonnet 5 | Write the complete grammar reference (doc synthesized from the parsers) | 107.9k | 35 | 431s | medium | Doc correct + rigorous — it verified examples against the running parser; but its one novel "discovery" mis-framed load-bearing code as dead, and review corrected the framing before it entered the canonical doc |
 
-Rows 4 and 5 ran **in parallel** as two background Sonnet agents on disjoint files.
+| 7 | Sonnet 5 | Build the headless runtime (load + condition eval + effects + dialogue stepper + `# test` runner) | 93.8k | 29 | 357s | high (7 concrete pieces specified) | Green on its own 9 tests — but they missed two cases real content needs (once/sticky effect-refire, menu fall-through); both surfaced only at integration |
+| 8 | Sonnet 5 | Author tutorial-island content + friction report | 101.7k | 26 | 522s | medium (grammar doc + questline given) | Content parses and runs; friction report high-signal — confirmed the predicted item-possession gap |
+
+| 9 | Sonnet 5 | Add the `has` inventory-possession condition (grammar + runtime + content + doc + tests) | 77.2k | 37 | 179s | medium-high (feature fully specified) | Correct, one-shot; integration stayed green |
+
+Rows 4 and 5 (and 7 and 8) each ran **in parallel** as two background Sonnet agents on disjoint files.
 
 ## Findings so far (directional, not settled)
 
@@ -72,6 +77,24 @@ the tactic traded conflict-safety for an induced duplication that review then
 consolidated. Lesson: parallelize on disjoint files freely, but budget a small
 review-cleanup when the tasks would naturally share a primitive.
 
+### A large delegation's own tests are not enough QA — integrate against real input
+Row 7 (the runtime) was the most *system-wide* delegation yet, and it came back
+green on its own 9 tests. But those tests were internally consistent and
+*incomplete*: the runtime re-fired effects on a node revisit and abandoned a node
+after a menu choice, and **neither showed until row 8's real authored content ran
+through it** (integration). Lesson: for a big delegation, "the agent's tests
+pass" proves self-consistency, not correctness — the review must run it against
+an independent, real input. This also sharpens the design-heavy finding below:
+the runtime was system-wide *and* delegated fine — the decisive factor was the
+7-piece spec, not the scope.
+
+### Friction reports are a distinct delegation payload
+Row 8's real deliverable wasn't the content, it was the friction report — a
+language model authoring against the grammar for the first time is a usable
+instrument for *intuitiveness*. It independently confirmed the predicted
+item-possession gap (`requires: lockpick` reads as "holding one" but is a bare
+flag) and surfaced a bare-vs-qualified reference ambiguity we hadn't decided.
+
 ### Design-heavy delegation — the "poor fit" claim was too broad
 Row 5 was the design-heavy experiment. Given requirements, a starting vocabulary,
 and world context (via `.planning/` files), a cold Sonnet agent produced a
@@ -110,5 +133,6 @@ enough to bound that cold-start. Cheaper models lower the right-hand side.
 - [x] A design-heavy delegation (row 5) — the "poor fit" hypothesis narrowed to
       *system-wide* design, not *local* design.
 - [ ] Track review *rework rate*: how often the review sends work back
-      (so far 0/6 fully sent back; 1/6 needed a code consolidation, 1/6 a
-      doc-framing correction — both caught on review, neither by the agent).
+      (so far 0/8 fully sent back; fixes caught on review: 1 code consolidation,
+      1 doc-framing correction, 2 runtime bugs — the last two only via
+      integration against real content, not the agent's own tests).

@@ -163,6 +163,14 @@ A dotted path of lowercase-kebab segments: `bridge-open`, `front-door.unlocked`,
 flags, nested object properties, or (by convention, not special parser
 support) a dialogue node's visit counter.
 
+**Scoping inside an entity.** In an entity's own action block, a *bare*
+(single-segment) reference is scoped to that entity at load: `unlocked` written
+inside `# entity front-door` becomes `front-door.unlocked`. Everywhere else — a
+location's `adjacent … while`, another entity, a dialogue — you write the
+qualified `front-door.unlocked`. Only bare references are scoped; `has <item>`
+names an item rather than entity state, so it is never scoped. An editor
+enforces the same rule, so bare references inside a block are unambiguous.
+
 ### Conditions
 
 Used anywhere a `when:`/`requires:`/`hidden if:` grammar is documented below.
@@ -173,11 +181,18 @@ Used anywhere a `when:`/`requires:`/`hidden if:` grammar is documented below.
 - `not <condition>` negates.
 - `<a> and <b>`, `<a> or <b>` combine (left-to-right list, no parentheses;
   `and` binds tighter than `or`).
+- `has <item-id>` / `has <n> <item-id>` is a live inventory check: true when
+  the player holds at least that many (`has` alone means at least 1). Checked
+  before an ordinary reference, so a hyphenated item id like `has-shrimp`
+  still parses as a plain reference — only `has` followed by whitespace is
+  this predicate.
 
 ```
 not tutorial.quest-given
 toll.visits >= 5
 active-interaction and combat-interaction
+has lockpick
+has 5 cooked-shrimp
 ```
 
 ### Action results
@@ -486,9 +501,6 @@ or otherwise implied by the design but not yet accepted by the code:
   parseable: the `=`/`>`/`<` comparison operators require a numeric
   right-hand side (`number.parse`). A condition like
   `{player.race = elf: ...}` from the strawman will throw today.
-- **Item-count predicates** — there's no `has 5 shrimp`-style condition. The
-  troll toll's `(when has-shrimp)` in the worked example is an ordinary
-  boolean flag, not a live inventory check; something else must set it.
 - **A quest `start:` verb** — the action-result grammar has no `start:`; the
   strawman's `start: escape-island` isn't representable yet. Quest/stage
   state is, for now, plain flags read by ordinary conditions.
@@ -500,9 +512,9 @@ or otherwise implied by the design but not yet accepted by the code:
 - The strawman's `[label]` explicit jump target (for reconvergence outside a
   choice) doesn't exist in the parser — only `goto <node-name>` (a whole
   node) is supported, not a mid-node label.
-- The strawman shows quest effects (`start:`) and inventory-count guards
-  (`has 5 cooked-shrimp`) as already-integrated; both are still open, per
-  above.
+- The strawman shows a quest effect (`start:`) as already-integrated; it's
+  still open, per above. Its inventory-count guard (`has 5 cooked-shrimp`) is
+  now supported — see Conditions above.
 - Everything else checked — node resume semantics, `once`/`sticky`/`again`,
   `owner =`, comma-packed fields, the `x/y/z` vs relative-position exclusivity,
   tag-clause shape dispatch, `require`/`requires` aliasing — matched the
