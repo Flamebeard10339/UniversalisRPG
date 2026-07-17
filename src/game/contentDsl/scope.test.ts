@@ -23,4 +23,10 @@ describe('entity reference scoping', () => {
       { kind: 'give', item: 'coins' },
     ]);
   });
+
+  it('qualifies a bare add to the entity', () => {
+    const rat = entity(['# entity giant-rats', 'fight:', '  on success:', '    add: kills 1'].join('\n'));
+    const [action] = rat.actions;
+    expect(action.onSuccess).toEqual([{ kind: 'add', variable: 'giant-rats.kills', amount: 1 }]);
+  });
 });

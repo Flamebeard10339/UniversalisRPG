@@ -58,7 +58,15 @@ describe('session', () => {
     expect(ids(v)).toContain('use:entity.giant-rats.fight');
 
     v = apply(session, 'use:entity.giant-rats.fight');
-    expect(session.state.flags['tutorial.killed-rats']).toBe(true);
+    expect(session.state.flags['tutorial.rats-killed']).toBe(1);
+    expect(ids(v)).toContain('use:entity.giant-rats.fight');
+
+    v = apply(session, 'use:entity.giant-rats.fight');
+    expect(session.state.flags['tutorial.rats-killed']).toBe(2);
+    expect(ids(v)).toContain('use:entity.giant-rats.fight');
+
+    v = apply(session, 'use:entity.giant-rats.fight');
+    expect(session.state.flags['tutorial.rats-killed']).toBe(3);
     expect(ids(v)).not.toContain('use:entity.giant-rats.fight');
 
     v = apply(session, 'use:entity.stairs-up.ascend');

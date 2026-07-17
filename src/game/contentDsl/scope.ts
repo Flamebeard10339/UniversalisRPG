@@ -29,7 +29,7 @@ function scopeCondition(condition: Condition, owner: string): Condition {
 }
 
 function scopeResult(result: ActionResult, owner: string): ActionResult {
-  if ((result.kind === 'set' || result.kind === 'unset') && !result.variable.includes('.')) {
+  if ((result.kind === 'set' || result.kind === 'unset' || result.kind === 'add') && !result.variable.includes('.')) {
     return { ...result, variable: `${owner}.${result.variable}` };
   }
   return result;

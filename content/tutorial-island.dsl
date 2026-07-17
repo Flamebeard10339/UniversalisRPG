@@ -123,12 +123,11 @@ search drawer:
 title: Giant Rats
 examine: Three hunched rats claw at overturned crates, eyes red in the dark.
 fight:
-  hidden if: tutorial.killed-rats
-  once
+  hidden if: tutorial.rats-killed >= 3
   xp: melee 5
   on success:
-    set: tutorial.killed-rats
-    say: You put down the last of the rats, breathing hard.
+    add: tutorial.rats-killed 1
+    say: You put down another rat.
 
 // --- dialogue ---
 
@@ -181,7 +180,7 @@ node skills-annoyed:
   Are you deaf, {player.name}? Rats. Basement. Now.
 
 node sendoff:
-  when: tutorial.killed-rats
+  when: tutorial.rats-killed >= 3
   once
   again: Still here? The boat to the mainland won't wait forever.
   Ha! Barely a scratch on you. You're a natural.
@@ -208,7 +207,9 @@ expect: tutorial.mirror-done
 talk: miki
 expect: tutorial.made-bread
 use: entity.giant-rats.fight
-expect: tutorial.killed-rats
+use: entity.giant-rats.fight
+use: entity.giant-rats.fight
+expect: tutorial.rats-killed >= 3
 talk: miki
 expect: tutorial.miki-complete
 expect: front-door.unlocked

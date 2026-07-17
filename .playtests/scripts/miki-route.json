@@ -9,6 +9,8 @@
   "talk:miki",
   "use:entity.stairs.descend",
   "use:entity.giant-rats.fight",
+  "use:entity.giant-rats.fight",
+  "use:entity.giant-rats.fight",
   "use:entity.stairs-up.ascend",
   "talk:miki",
   "travel:beach"
