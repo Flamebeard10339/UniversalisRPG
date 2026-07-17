@@ -198,7 +198,8 @@ has 5 cooked-shrimp
 ### Action results
 
 The verbs available anywhere an effect fires — an entity action's results,
-`on success:`, a dialogue beat/effect, a choice's indented effects:
+`on success:`, `on failure:`, a dialogue beat/effect, a choice's indented
+effects:
 
 | Verb | Form | Notes |
 |---|---|---|
@@ -207,7 +208,7 @@ The verbs available anywhere an effect fires — an entity action's results,
 | `unset` | `unset: <ref>` or `unset <ref>` | colon optional |
 | `add:` | `add: <ref> [<amount>]` | amount optional, defaults to 1; increments a numeric flag, treating a non-numeric or absent base as 0 |
 | `give:` | `give: [<n>] <item-id>` | amount optional |
-| `take:` | `take: [<n>] <item-id>` | amount optional |
+| `take:` | `take: [<n>] <item-id>` | amount optional; inventory floors at 0, never goes negative |
 | `xp:` | `xp: <skill-id> <n>` | both required |
 | `relocate:` | `relocate: <location-id>` | |
 | `discover:` | `discover: <location-id>` | |
@@ -421,7 +422,28 @@ pick lock:
   marks the action single-use with a 4-second duration.
 - any result-verb line becomes part of `results`, fired when the action runs.
 - `on success:` — a further list of results (inline or as its own block),
-  fired only if the action's own results succeeded.
+  fired only when the action succeeds (see below).
+- `on failure:` — mirrors `on success:` exactly (inline or block form, at
+  most once), fired only when the action fails on an unaffordable `take:`.
+
+**`take:` implies affordability.** An action whose `results` include one or
+more `take:` verbs is a soft-take: before anything is applied, each item's
+required amount (summed across every `take:` on that item in the action) is
+checked against current inventory. No separate `requires: has …` is needed —
+`take:` already gates on affordability.
+
+- **Affordable:** `results` apply (consuming the taken items), then
+  `on success:` fires, exactly as an action with no `take:` always has.
+- **Unaffordable:** the action fails atomically — none of `results` apply (no
+  take, no set, no say, nothing), `on success:` is skipped, and `on failure:`
+  fires instead. If no `on failure:` is authored, a generated line is logged:
+  `You don't have enough <item-title>.`
+- The action stays **visible** either way — failing gracefully, not hiding,
+  is the point. To hide an action the player can't afford, author an explicit
+  `requires: has …`, which remains a hard gate (throws, per Conditions above)
+  independent of this affordability check.
+- An action with no `take:` is unaffected: `results` always apply and
+  `on success:` always fires, as before.
 
 An "enemy-shaped" action (one with a `requires:`/combat-flavored tags) and an
 instant action (a bare `results` list with no modifiers) are both just
