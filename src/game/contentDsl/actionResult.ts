@@ -5,6 +5,7 @@ export type ActionResult =
   | { kind: 'say'; text: string }
   | { kind: 'set'; variable: string }
   | { kind: 'unset'; variable: string }
+  | { kind: 'add'; variable: string; amount: number }
   | { kind: 'give'; item: string; amount?: number }
   | { kind: 'take'; item: string; amount?: number }
   | { kind: 'xp'; skill: string; amount: number }
@@ -25,10 +26,18 @@ function parseVariable(cursor: Cursor): string {
   return raw;
 }
 
+function parseAdd(cursor: Cursor): ActionResult {
+  const variable = parseVariable(cursor);
+  cursor.take(/[ \t]+/);
+  const amount = cursor.take(/\d+/);
+  return { kind: 'add', variable, amount: amount !== null ? Number(amount) : 1 };
+}
+
 function parseResult(cursor: Cursor): ActionResult {
   if (cursor.take(/say:[ \t]*/) !== null) return { kind: 'say', text: cursor.take(/[^\n]*/) ?? '' };
   if (cursor.take(/set[: \t][ \t]*/) !== null) return { kind: 'set', variable: parseVariable(cursor) };
   if (cursor.take(/unset[: \t][ \t]*/) !== null) return { kind: 'unset', variable: parseVariable(cursor) };
+  if (cursor.take(/add:[ \t]*/) !== null) return parseAdd(cursor);
   if (cursor.take(/give:[ \t]*/) !== null) return parseGiveTake('give', cursor);
   if (cursor.take(/take:[ \t]*/) !== null) return parseGiveTake('take', cursor);
   if (cursor.take(/xp:[ \t]*/) !== null) {
@@ -43,7 +52,7 @@ function parseResult(cursor: Cursor): ActionResult {
 }
 
 export function startsResult(cursor: Cursor): boolean {
-  return cursor.peek(/(?:say|give|take|xp|relocate|discover|open modal):|(?:set|unset)[: \t]/) !== null;
+  return cursor.peek(/(?:say|add|give|take|xp|relocate|discover|open modal):|(?:set|unset)[: \t]/) !== null;
 }
 
 export const actionResult: Parser<ActionResult> = {

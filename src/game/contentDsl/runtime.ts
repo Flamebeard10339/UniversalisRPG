@@ -164,6 +164,12 @@ export function applyResult(result: ActionResult, state: GameState): void {
     case 'unset':
       delete state.flags[result.variable];
       break;
+    case 'add': {
+      const current = state.flags[result.variable];
+      const base = typeof current === 'number' ? current : 0;
+      state.flags[result.variable] = base + result.amount;
+      break;
+    }
     case 'give':
       state.inventory[result.item] = (state.inventory[result.item] ?? 0) + (result.amount ?? 1);
       break;

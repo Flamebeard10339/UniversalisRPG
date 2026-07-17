@@ -81,6 +81,8 @@ function parseLine(line: RawLine, fields: AnyFields, flags: readonly string[], c
         const body = cursor.done ? entries!.body.parseBlock(line.children) : entries!.body.parse(cursor);
         ((authored[entries!.into] ??= []) as object[]).push({ label: key, ...body });
       }
+    } else if (key !== undefined && (key === clauses || key === bare)) {
+      throw new DslError(`${kind} field ${key} must be written bare, without a '${key}:' label`, { start: cursor.abs(cursor.pos), end: cursor.abs(cursor.pos + key.length) });
     } else if (key !== undefined && key !== clauses && key !== bare) {
       throw new DslError(`unknown ${kind} field: ${key}`, { start: cursor.abs(cursor.pos), end: cursor.abs(cursor.pos + key.length) });
     } else {

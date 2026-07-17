@@ -32,6 +32,10 @@ describe('items and tag clauses', () => {
       { kind: 'duration', seconds: 60 },
     ]);
   });
+
+  it('rejects a labelled tags: with a message naming it as a bare field, not a tag-clause parse error', () => {
+    expect(() => parseOne('# item cooked-shrimp\nexamine: A simple meal.\ntags: food', itemSchema)).toThrow("item field tags must be written bare, without a 'tags:' label");
+  });
 });
 
 describe('multi-kind dispatch', () => {
@@ -169,6 +173,14 @@ describe('entity actions', () => {
       { kind: 'take', item: 'cooked-shrimp', amount: 5 },
       { kind: 'xp', skill: 'thieving', amount: 4 },
       { kind: 'open-modal', modal: 'name-editor' },
+    ]);
+  });
+
+  it('parses add: with and without an explicit amount, defaulting to 1', () => {
+    const source = ['# entity chest', 'loot:', '  add: rats-killed', '  add: coins-found 5'].join('\n');
+    expect(parseOne(source, entitySchema).actions?.[0].results).toEqual([
+      { kind: 'add', variable: 'rats-killed', amount: 1 },
+      { kind: 'add', variable: 'coins-found', amount: 5 },
     ]);
   });
 

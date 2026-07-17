@@ -117,6 +117,29 @@ describe('applyResult', () => {
     expect(state.inventory['cooked-shrimp']).toBe(3);
   });
 
+  it('adds to a numeric flag, treating an absent or boolean-true base as 0', () => {
+    const state = createGameState();
+    applyResult({ kind: 'add', variable: 'rats-killed', amount: 1 }, state);
+    expect(state.flags['rats-killed']).toBe(1);
+    applyResult({ kind: 'add', variable: 'rats-killed', amount: 1 }, state);
+    expect(state.flags['rats-killed']).toBe(2);
+
+    state.flags.snubbed = true;
+    applyResult({ kind: 'add', variable: 'snubbed', amount: 3 }, state);
+    expect(state.flags.snubbed).toBe(3);
+  });
+
+  it('flips a >= count condition true once enough add: increments land', () => {
+    const state = createGameState();
+    const condition: Condition = { kind: 'comparison', left: { path: ['rats-killed'] }, operator: '>=', right: 3 };
+    expect(evaluateCondition(condition, state)).toBe(false);
+    applyResult({ kind: 'add', variable: 'rats-killed', amount: 1 }, state);
+    applyResult({ kind: 'add', variable: 'rats-killed', amount: 1 }, state);
+    expect(evaluateCondition(condition, state)).toBe(false);
+    applyResult({ kind: 'add', variable: 'rats-killed', amount: 1 }, state);
+    expect(evaluateCondition(condition, state)).toBe(true);
+  });
+
   it('accumulates xp and moves location on relocate/discover', () => {
     const state = createGameState();
     applyResult({ kind: 'xp', skill: 'thieving', amount: 4 }, state);
