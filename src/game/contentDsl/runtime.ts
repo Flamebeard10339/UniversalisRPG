@@ -279,7 +279,7 @@ function findActionOwner(obj: string, objId: string, registry: Registry): unknow
   }
 }
 
-function useAction(obj: string, objId: string, actionId: string, registry: Registry, state: GameState): void {
+export function useAction(obj: string, objId: string, actionId: string, registry: Registry, state: GameState): void {
   const target = findActionOwner(obj, objId, registry) as { actions?: Action[] } | undefined;
   if (!target) throw new RuntimeError(`unknown ${obj}: ${objId}`);
 

@@ -14,3 +14,6 @@ backlog.md
 completed-tasks.md
 
 .planning/*
+
+# Generated playtest transcripts (scripts/*.json fixtures are kept)
+.playtests/*.md
