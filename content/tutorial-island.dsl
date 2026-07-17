@@ -200,7 +200,6 @@ node baked:
   A warm loaf! Well done, {player.name}.
   Some foods grant a temporary edge. Eat that bread and watch your stats.
   That warm feeling? A buff. It fades, so spend it well.
-  xp: cooking 3
   set: tutorial.made-bread
 
 node skills:
