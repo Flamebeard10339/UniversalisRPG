@@ -307,6 +307,15 @@ describe('condition grammar', () => {
     expect(parse('active-interaction and combat-interaction')).toEqual({ kind: 'and', conditions: [ref('active-interaction'), ref('combat-interaction')] });
     expect(parse('stat.attack>10')).toEqual({ kind: 'comparison', left: { path: ['stat', 'attack'] }, operator: '>', right: 10 });
   });
+
+  it('parses has as a live inventory-count predicate, defaulting count to 1', () => {
+    expect(parse('has lockpick')).toEqual({ kind: 'has', item: 'lockpick', count: 1 });
+    expect(parse('has 5 cooked-shrimp')).toEqual({ kind: 'has', item: 'cooked-shrimp', count: 5 });
+  });
+
+  it('parses a hyphenated id starting with has- as a plain reference, not the has predicate', () => {
+    expect(parse('has-shrimp')).toEqual(ref('has-shrimp'));
+  });
 });
 
 describe('the authored / derived boundary', () => {

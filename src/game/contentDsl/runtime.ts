@@ -5,6 +5,7 @@ import { Action, Entity, entitySchema } from './entity';
 import { Item, itemSchema } from './item';
 import { Location, locationSchema } from './location';
 import { parseModule } from './module';
+import { scopeEntity } from './scope';
 import { Authored, hydrateSection } from './section';
 import { Skill, skillSchema } from './skill';
 import { Stat, statSchema } from './stat';
@@ -51,7 +52,7 @@ export function loadModule(source: string): Registry {
   for (const section of parseModule(source)) {
     switch (section.kind) {
       case 'entity': {
-        const entity = hydrateSection(section.value as Authored<Entity>, entitySchema);
+        const entity = scopeEntity(hydrateSection(section.value as Authored<Entity>, entitySchema));
         registry.entities.set(entity.id, entity);
         break;
       }
@@ -130,6 +131,8 @@ export function evaluateCondition(condition: Condition, state: GameState): boole
       return condition.conditions.every((c) => evaluateCondition(c, state));
     case 'or':
       return condition.conditions.some((c) => evaluateCondition(c, state));
+    case 'has':
+      return (state.inventory[condition.item] ?? 0) >= condition.count;
   }
 }
 
@@ -145,6 +148,8 @@ export function describeCondition(condition: Condition): string {
       return condition.conditions.map(describeCondition).join(' and ');
     case 'or':
       return condition.conditions.map(describeCondition).join(' or ');
+    case 'has':
+      return condition.count === 1 ? `has ${condition.item}` : `has ${condition.count} ${condition.item}`;
   }
 }
 

@@ -84,12 +84,12 @@ examine: A weathered man in patched leather, quick to smile.
 # entity front-door
 examine: A heavy wooden door, bound in iron.
 pick lock:
-  requires: lockpick
-  hidden if: front-door.unlocked
+  requires: has lockpick
+  hidden if: unlocked
   once, 4s
   xp: thieving 4
   on success:
-    set: front-door.unlocked
+    set: unlocked
     say: The lock clicks open.
 
 # entity mirror
@@ -117,7 +117,6 @@ examine: A dusty dresser, one drawer left slightly ajar.
 search drawer:
   once
   give: lockpick
-  set: lockpick
   say: Tucked beneath old linens, a set of worn lockpicks.
 
 # entity giant-rats

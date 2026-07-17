@@ -87,6 +87,18 @@ describe('evaluateCondition', () => {
     expect(evaluateCondition({ kind: 'and', conditions: [ref('a'), ref('b')] }, state)).toBe(false);
     expect(evaluateCondition({ kind: 'or', conditions: [ref('a'), ref('b')] }, state)).toBe(true);
   });
+
+  it('checks a has condition against live inventory counts', () => {
+    const state = createGameState();
+    expect(evaluateCondition({ kind: 'has', item: 'lockpick', count: 1 }, state)).toBe(false);
+    state.inventory.lockpick = 1;
+    expect(evaluateCondition({ kind: 'has', item: 'lockpick', count: 1 }, state)).toBe(true);
+    expect(evaluateCondition({ kind: 'has', item: 'cooked-shrimp', count: 5 }, state)).toBe(false);
+    state.inventory['cooked-shrimp'] = 4;
+    expect(evaluateCondition({ kind: 'has', item: 'cooked-shrimp', count: 5 }, state)).toBe(false);
+    state.inventory['cooked-shrimp'] = 5;
+    expect(evaluateCondition({ kind: 'has', item: 'cooked-shrimp', count: 5 }, state)).toBe(true);
+  });
 });
 
 describe('applyResult', () => {
