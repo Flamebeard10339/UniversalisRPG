@@ -216,6 +216,22 @@ describe('entity action modifiers', () => {
     expect(() => parseOne('# entity chest\nopen:\n  on success:\n    say: a\n  on success:\n    say: b', entitySchema)).toThrow(/on success is defined more than once/);
   });
 
+  it('parses on failure inline and as a block, and rejects it defined more than once', () => {
+    const inline = parseOne('# entity chest\nopen:\n  take: 5 cooked-shrimp\n  on failure: say: Not enough shrimp.', entitySchema);
+    expect(inline.actions).toEqual([
+      {
+        label: 'open',
+        results: [{ kind: 'take', item: 'cooked-shrimp', amount: 5 }],
+        onFailure: [{ kind: 'say', text: 'Not enough shrimp.' }],
+      },
+    ]);
+
+    const block = parseOne('# entity chest\nopen:\n  take: 5 cooked-shrimp\n  on failure:\n    say: Not enough shrimp.\n    set: chest-jammed', entitySchema);
+    expect(block.actions?.[0].onFailure).toEqual([{ kind: 'say', text: 'Not enough shrimp.' }, { kind: 'set', variable: 'chest-jammed' }]);
+
+    expect(() => parseOne('# entity chest\nopen:\n  on failure:\n    say: a\n  on failure:\n    say: b', entitySchema)).toThrow(/on failure is defined more than once/);
+  });
+
   it('surfaces result-related errors for malformed results, not tag errors', () => {
     expect(() => parseOne('# entity chest\nopen:\n  give:', entitySchema)).toThrow(/expected an id/);
   });

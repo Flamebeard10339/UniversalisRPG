@@ -29,4 +29,10 @@ describe('entity reference scoping', () => {
     const [action] = rat.actions;
     expect(action.onSuccess).toEqual([{ kind: 'add', variable: 'giant-rats.kills', amount: 1 }]);
   });
+
+  it('qualifies a bare set inside on failure, mirroring on success', () => {
+    const chest = entity(['# entity chest', 'loot:', '  take: 2 cooked-shrimp', '  on failure:', '    set: jammed'].join('\n'));
+    const [action] = chest.actions;
+    expect(action.onFailure).toEqual([{ kind: 'set', variable: 'chest.jammed' }]);
+  });
 });

@@ -182,7 +182,7 @@ export function applyResult(result: ActionResult, state: GameState): void {
       state.inventory[result.item] = (state.inventory[result.item] ?? 0) + (result.amount ?? 1);
       break;
     case 'take':
-      state.inventory[result.item] = (state.inventory[result.item] ?? 0) - (result.amount ?? 1);
+      state.inventory[result.item] = Math.max(0, (state.inventory[result.item] ?? 0) - (result.amount ?? 1));
       break;
     case 'xp':
       state.xp[result.skill] = (state.xp[result.skill] ?? 0) + result.amount;
@@ -301,6 +301,16 @@ export function useAction(obj: string, objId: string, actionId: string, registry
   if (!action) throw new RuntimeError(`unknown action ${JSON.stringify(actionId)} on ${obj}.${objId}`);
   if (action.requires && !evaluateCondition(action.requires, state)) throw new RuntimeError(`action requires unmet: ${obj}.${objId}.${actionId}`);
   if (action.hiddenIf && evaluateCondition(action.hiddenIf, state)) throw new RuntimeError(`action hidden: ${obj}.${objId}.${actionId}`);
+
+  const required = new Map<string, number>();
+  for (const r of action.results) if (r.kind === 'take') required.set(r.item, (required.get(r.item) ?? 0) + (r.amount ?? 1));
+  let shortfall: string | undefined;
+  for (const [item, need] of required) if ((state.inventory[item] ?? 0) < need) { shortfall = item; break; }
+  if (shortfall !== undefined) {
+    if (action.onFailure) for (const result of action.onFailure) applyResult(result, state);
+    else state.log.push(`You don't have enough ${registry.items.get(shortfall)?.title ?? shortfall}.`);
+    return;
+  }
 
   for (const result of action.results) applyResult(result, state);
   for (const result of action.onSuccess ?? []) applyResult(result, state);

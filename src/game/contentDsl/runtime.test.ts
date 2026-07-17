@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { Condition } from './condition';
-import { applyResult, createGameState, evaluateCondition, loadModule, renderSegments, runTest } from './runtime';
+import { applyResult, createGameState, evaluateCondition, loadModule, renderSegments, runTest, useAction } from './runtime';
 
 const MODULE = `
 # location guide-house
@@ -117,6 +117,13 @@ describe('applyResult', () => {
     expect(state.inventory['cooked-shrimp']).toBe(3);
   });
 
+  it('floors take at 0, never driving inventory negative', () => {
+    const state = createGameState();
+    applyResult({ kind: 'give', item: 'cooked-shrimp', amount: 2 }, state);
+    applyResult({ kind: 'take', item: 'cooked-shrimp', amount: 5 }, state);
+    expect(state.inventory['cooked-shrimp']).toBe(0);
+  });
+
   it('adds to a numeric flag, treating an absent or boolean-true base as 0', () => {
     const state = createGameState();
     applyResult({ kind: 'add', variable: 'rats-killed', amount: 1 }, state);
@@ -148,6 +155,103 @@ describe('applyResult', () => {
     expect(state.xp.thieving).toBe(4);
     expect(state.location).toBe('beach');
     expect(state.flags['bank.discovered']).toBe(true);
+  });
+});
+
+describe('useAction: take affordability and graceful failure', () => {
+  const TAKE_MODULE = `
+# item cooked-shrimp
+title: Cooked Shrimp
+
+# entity brazier
+light:
+  take: 2 cooked-shrimp
+  set: brazier-lit
+  on success:
+    say: The brazier roars to life.
+
+# entity shrine
+offer:
+  take: 2 cooked-shrimp
+  set: shrine-offered
+  on success:
+    say: The shrine glows.
+  on failure:
+    say: The shrine rejects your empty hands.
+
+# entity feast
+prepare:
+  take: 2 cooked-shrimp
+  take: 2 cooked-shrimp
+  on success:
+    say: A feast is laid out.
+
+# entity door
+open:
+  relocate: hallway
+  say: The door creaks open.
+  on success:
+    say: You step through.
+`;
+
+  it('consumes items and fires on success when affordable', () => {
+    const registry = loadModule(TAKE_MODULE);
+    const state = createGameState();
+    state.inventory['cooked-shrimp'] = 2;
+    useAction('entity', 'brazier', 'light', registry, state);
+    expect(state.inventory['cooked-shrimp']).toBe(0);
+    expect(state.flags['brazier.brazier-lit']).toBe(true);
+    expect(state.log).toEqual(['The brazier roars to life.']);
+  });
+
+  it('fires an authored on failure, applies nothing else, and leaves inventory untouched when unaffordable', () => {
+    const registry = loadModule(TAKE_MODULE);
+    const state = createGameState();
+    state.inventory['cooked-shrimp'] = 1;
+    useAction('entity', 'shrine', 'offer', registry, state);
+    expect(state.inventory['cooked-shrimp']).toBe(1);
+    expect(state.flags['shrine.shrine-offered']).toBeUndefined();
+    expect(state.log).toEqual(['The shrine rejects your empty hands.']);
+  });
+
+  it('falls back to a generated message naming the item title when no on failure is authored', () => {
+    const registry = loadModule(TAKE_MODULE);
+    const state = createGameState();
+    useAction('entity', 'brazier', 'light', registry, state);
+    expect(state.inventory['cooked-shrimp'] ?? 0).toBe(0);
+    expect(state.flags['brazier.brazier-lit']).toBeUndefined();
+    expect(state.log).toEqual(["You don't have enough Cooked Shrimp."]);
+  });
+
+  it('fails atomically: an unaffordable action does not apply its other results', () => {
+    const registry = loadModule(TAKE_MODULE);
+    const state = createGameState();
+    useAction('entity', 'shrine', 'offer', registry, state);
+    expect(state.flags['shrine.shrine-offered']).toBeUndefined();
+  });
+
+  it('sums multiple take: results on the same item before checking affordability', () => {
+    const registry = loadModule(TAKE_MODULE);
+
+    const short = createGameState();
+    short.inventory['cooked-shrimp'] = 3;
+    useAction('entity', 'feast', 'prepare', registry, short);
+    expect(short.inventory['cooked-shrimp']).toBe(3);
+    expect(short.log).toEqual(["You don't have enough Cooked Shrimp."]);
+
+    const enough = createGameState();
+    enough.inventory['cooked-shrimp'] = 4;
+    useAction('entity', 'feast', 'prepare', registry, enough);
+    expect(enough.inventory['cooked-shrimp']).toBe(0);
+    expect(enough.log).toEqual(['A feast is laid out.']);
+  });
+
+  it('fires on success as before for an action with no take:', () => {
+    const registry = loadModule(TAKE_MODULE);
+    const state = createGameState();
+    useAction('entity', 'door', 'open', registry, state);
+    expect(state.location).toBe('hallway');
+    expect(state.log).toEqual(['The door creaks open.', 'You step through.']);
   });
 });
 

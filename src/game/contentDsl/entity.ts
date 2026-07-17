@@ -14,6 +14,7 @@ export interface Action {
   tags?: TagClause[];
   results: ActionResult[];
   onSuccess?: ActionResult[];
+  onFailure?: ActionResult[];
 }
 
 export interface Entity {
@@ -43,6 +44,12 @@ function parseActionLine(line: RawLine, action: Omit<Action, 'label'>): void {
     if (action.onSuccess !== undefined) throw new DslError('action on success is defined more than once', line.span);
     if (!cursor.done) action.onSuccess = results.parse(cursor);
     else if (line.children.length > 0) action.onSuccess = results.parseBlock(line.children);
+    return;
+  }
+  if (cursor.take(/on failure:[ \t]*/) !== null) {
+    if (action.onFailure !== undefined) throw new DslError('action on failure is defined more than once', line.span);
+    if (!cursor.done) action.onFailure = results.parse(cursor);
+    else if (line.children.length > 0) action.onFailure = results.parseBlock(line.children);
     return;
   }
 
