@@ -303,6 +303,43 @@ stat-id: attack
 `mining` above ends up with an undefined `stat-id` after hydration — unlike
 `title`, this field simply has no default.
 
+### recipe
+
+```
+recipe:
+  station: entity id, no default (stays absent if unset)
+  in: list of "[<n>] <item-id>", defaults to []
+  out: list of "[<n>] <item-id>", defaults to []
+  skill: "<skill-id> <n>", no default
+  say: text, no default
+```
+
+```
+# recipe dough
+in: jug-of-water, pot-of-flour
+out: dough
+skill: cooking 2
+say: You knead water and flour into a ball of dough.
+
+# recipe bread
+station: oven
+in: dough
+out: bread
+skill: cooking 4
+say: The oven bakes your dough into a golden loaf.
+```
+
+`in`/`out` share the same `[<n>] <item-id>` shape as `give:`/`take:` (amount
+optional, defaults to 1); like `adjacent:`/`entities:`, authors write each on
+its own line rather than packing the whole list after the label on one line.
+
+A recipe with no `station:` is craftable from inventory alone, anywhere. A
+recipe with `station:` is craftable only when the player's current location
+lists that entity id in its `entities:`. Recipes are pure declarative data —
+crafting consumes `in`, produces `out`, grants the `skill:` xp if present, and
+appends `say:` to the log if present. There is no `on craft:` effect block;
+recipes cannot set flags or fire arbitrary results.
+
 ### location
 
 ```
@@ -485,12 +522,13 @@ test:
   choose: <choice-text>
   use: <obj-kind>.<obj-id>.<action-id>   action-id may contain spaces
   travel: <location-id>
+  craft: <recipe-id>
   expect: <condition>
 ```
 
 Each directive is a single line — an indented line under a directive is a
-parse error. The parser accepts this grammar today; there is no runner yet
-(see below).
+parse error. `runTest` (in `runtime.ts`) executes a parsed `Test` against the
+engine, composing `run:` sub-tests with cycle-guarding.
 
 ```
 # test tutorial-quest-given
@@ -514,8 +552,6 @@ or otherwise implied by the design but not yet accepted by the code:
 - **A quest `start:` verb** — the action-result grammar has no `start:`; the
   strawman's `start: escape-island` isn't representable yet. Quest/stage
   state is, for now, plain flags read by ordinary conditions.
-- **`# test` execution** — the grammar above parses; there's no runner that
-  executes a parsed `Test` against the engine yet.
 
 ## Notes for reconciliation
 

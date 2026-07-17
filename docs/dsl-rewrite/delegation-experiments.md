@@ -34,6 +34,8 @@ the result was correct, and what the review caught.
 
 | 13 | Sonnet 5 (cold spawn) | Finish counter/tally: scope `add:` in scope.ts + wire `tutorial.rats-killed` content ripple + grammar.md | 62.4k | 28 | 153s | high (3 labeled pieces, exact edits, resolution pre-decided by planner) | Correct, one-shot, no STOP; 59 green, replay green, tsc clean. The follow-up to row 12's STOP — a planner-designed resolution executed cleanly. |
 
+| 14 | Sonnet 5 (cold spawn) | Declarative `# recipe` kind (parser/runtime/session/`craft:` test directive) + wire tutorial-island bread flow to real crafting + tests | 142.2k | 85 | 708s | high (full grammar + exact seams + content rewrite + node-ordering spec, design pre-ratified in Opus) | Correct, one-shot; 59→68 green, tsc clean (only pre-existing deleted-pipeline errors). Reused `values.quantified` across give/take as told. Flagged 3 deviations honestly — one necessary (`travel:` prefix, since `runTest` never sets a start location), two judgment calls kicked up to the planner (a stale doc line left untouched; the dialogue/recipe cooking-xp double-grant). Review made two integration edits: removed the redundant dialogue xp, fixed the stale doc line. No rework sent back. Largest chunk yet (142k) and still reviewable — the design-ratified-first, exact-seams spec kept it single-pass. |
+
 Rows 4 and 5 (and 7 and 8) each ran **in parallel** as two background Sonnet agents on disjoint files. Rows 10 and 11 were the **warm-swarm probe**: 11 continued 10's agent via `SendMessage` instead of a fresh spawn. Rows 12→13 are the **STOP-then-cold-respawn pattern**: chunk 1 took two cold spawns — 12 correctly stopped on a planner spec error (125k), 13 executed the corrected spec (62k) — instead of warm-resuming 12. Validates the no-warm-resume rule: a fresh cold spawn on a fixed spec cost *less* than dragging 12's 125k transcript forward would have, and kept the two diffs cleanly separable for review.
 
 ## Findings so far (directional, not settled)
@@ -182,6 +184,7 @@ enough to bound that cold-start. Cheaper models lower the right-hand side.
 - [x] A design-heavy delegation (row 5) — the "poor fit" hypothesis narrowed to
       *system-wide* design, not *local* design.
 - [ ] Track review *rework rate*: how often the review sends work back
-      (so far 0/8 fully sent back; fixes caught on review: 1 code consolidation,
-      1 doc-framing correction, 2 runtime bugs — the last two only via
-      integration against real content, not the agent's own tests).
+      (so far 0/9 fully sent back; fixes caught on review: 1 code consolidation,
+      2 doc-accuracy corrections, 2 runtime bugs, 1 content-balance edit — the
+      runtime bugs only via integration against real content, not the agent's
+      own tests).
