@@ -15,15 +15,21 @@ import { Test } from './test';
 
 export class RuntimeError extends Error {}
 
-// A spannable/repeating action currently in flight. `progress` is seconds
-// already elapsed toward the *next* completion — not an absolute deadline —
-// so a mid-flight speed change just changes how the remaining progress maps
-// to a completion instant, instead of requiring the deadline to be rewritten.
+// A spannable/repeating action currently in flight, resolved as a sequence
+// of attempts against one target with health (a "fight"). `progress` is
+// seconds already elapsed toward the *next attempt's* completion — not an
+// absolute deadline — so a mid-flight speed change just changes how the
+// remaining progress maps to a completion instant, instead of requiring the
+// deadline to be rewritten. `attemptsMade`/`healthRemaining` track the
+// current fight so a live step can split mid-fight and resume exactly where
+// it left off (see resolveSegment's fight math below).
 export interface ActiveAction {
   ownerRef: string; // "<obj>.<objId>", e.g. "entity.oven"
   actionLabel: string;
   progress: number;
   repeating: boolean;
+  healthRemaining: number;
+  attemptsMade: number;
 }
 
 // A timed stat modifier (from eating food, etc). `kind: 'added'` sums flat
@@ -47,10 +53,37 @@ export interface GameState {
   time: number;
   activeAction: ActiveAction | null;
   activeBuffs: Record<string, ActiveBuff>;
+  // Deterministic PRNG cursor (an LCG state), advanced only when resolving an
+  // attempt of an action that HAS an `accuracy` stat — deterministic actions
+  // never draw, so state.rng is untouched and existing behavior is
+  // byte-identical. Living in state (not a function parameter) is what keeps
+  // resolve() associative: the draws are counted in attempt order regardless
+  // of how a caller splits a resolve() span into smaller calls.
+  rng: number;
 }
 
+// Nonzero seed: an LCG's state only degenerates if it lands on a genuine
+// fixed point, which this seed/multiplier/increment combination does not.
+const DEFAULT_RNG_SEED = 20260718;
+
 export function createGameState(location = ''): GameState {
-  return { flags: {}, inventory: {}, location, visits: {}, xp: {}, log: [], time: 0, activeAction: null, activeBuffs: {} };
+  return { flags: {}, inventory: {}, location, visits: {}, xp: {}, log: [], time: 0, activeAction: null, activeBuffs: {}, rng: DEFAULT_RNG_SEED };
+}
+
+// A small LCG (same shape as glibc's rand()). Advances state.rng and returns
+// a value in [0, 1). This is the ONLY source of randomness resolve() ever
+// draws from — see the `rng` field comment above for why that matters.
+const RNG_MULTIPLIER = 1103515245;
+const RNG_INCREMENT = 12345;
+const RNG_MODULUS = 2147483648; // 2^31
+
+function nextRandom(state: GameState): number {
+  state.rng = (state.rng * RNG_MULTIPLIER + RNG_INCREMENT) % RNG_MODULUS;
+  return state.rng / RNG_MODULUS;
+}
+
+function clamp01(value: number): number {
+  return Math.min(1, Math.max(0, value));
 }
 
 // THE single seam through which simulated time advances. Live drivers (a
@@ -360,9 +393,42 @@ export function statValue(statId: string, state: GameState, registry: Registry):
   return (base + added) * (1 + increased);
 }
 
-function actionDuration(action: Action, state: GameState, registry: Registry): number {
-  const speed = action.speedStat ? statValue(action.speedStat, state, registry) : 1;
+// Seconds per ATTEMPT (not per fight) — the axis `speed:` scales. Replaces
+// the old one-attempt-equals-one-completion `actionDuration`.
+function attemptDuration(action: Action, state: GameState, registry: Registry): number {
+  const speed = action.speed ? statValue(action.speed, state, registry) : 1;
   return (action.time ?? 0) / speed;
+}
+
+type FightOutcome = 'completion' | 'escape';
+
+interface FightParams {
+  duration: number; // seconds per attempt
+  abilityAmount: number; // health subtracted per successful attempt
+  escapeAfter: number; // raw escape-after threshold (Infinity if absent)
+  attemptsToResolve: number; // DETERMINISTIC-path only: attempts in one fight assuming every attempt hits
+  outcome: FightOutcome; // DETERMINISTIC-path only: which end a guaranteed-hit fight reaches first
+}
+
+// The degenerate case (no accuracy/ability/health/escape after) resolves to
+// duration = time:/speed, attemptsToResolve = 1, outcome = 'completion' —
+// byte-identical to the pre-fight-model action shape. `attemptsToResolve`/
+// `outcome` assume every attempt hits, so they're only valid for the
+// deterministic path (no accuracy) — the stochastic path decides completion
+// vs escape per attempt at runtime instead (see resolveStochasticSegment),
+// using `escapeAfter` directly.
+function fightParams(action: Action, state: GameState, registry: Registry): FightParams {
+  const health = action.health ?? 1;
+  const escapeAfter = action.escapeAfter ?? Infinity;
+  const abilityAmount = action.ability ? statValue(action.ability, state, registry) : 1;
+  const neededForCompletion = Math.ceil(health / abilityAmount);
+  return {
+    duration: attemptDuration(action, state, registry),
+    abilityAmount,
+    escapeAfter,
+    attemptsToResolve: Math.min(neededForCompletion, escapeAfter),
+    outcome: neededForCompletion <= escapeAfter ? 'completion' : 'escape',
+  };
 }
 
 // How many completions' worth of input the current inventory can afford.
@@ -409,15 +475,22 @@ function applyResultBatch(result: ActionResult, count: number, state: GameState)
   }
 }
 
-function applyActionCompletions(action: Action, count: number, state: GameState): void {
+// Applies `count` fights' worth of ONE outcome's result list, batched (see
+// applyResultBatch) — never by looping per fight, since count can be
+// enormous. `results`/`onSuccess` fire on a completion outcome; `onEscape`
+// fires on an escape outcome — the two are mutually exclusive per fight.
+// Firing per *segment* instead of per *fight* would break associativity: the
+// live driver (many small resolve() calls) would fire it far more often than
+// the REPL (one big call) — the exact REPL/live divergence resolve() exists
+// to prevent.
+function applyFightBatch(action: Action, count: number, outcome: FightOutcome, state: GameState): void {
   if (count <= 0) return;
-  for (const result of action.results) applyResultBatch(result, count, state);
-  // onSuccess batches per completion exactly like results — numeric verbs
-  // (give/take/xp/add) scale by count, log-like verbs fire once. Firing it
-  // once per *segment* instead would break associativity: the live driver
-  // (many small resolve() calls) would fire it far more often than the REPL
-  // (one big call) — the exact REPL/live divergence resolve() exists to prevent.
-  for (const result of action.onSuccess ?? []) applyResultBatch(result, count, state);
+  if (outcome === 'completion') {
+    for (const result of action.results) applyResultBatch(result, count, state);
+    for (const result of action.onSuccess ?? []) applyResultBatch(result, count, state);
+  } else {
+    for (const result of action.onEscape ?? []) applyResultBatch(result, count, state);
+  }
 }
 
 const EPSILON = 1e-9;
@@ -434,27 +507,136 @@ function nextBoundary(state: GameState, registry: Registry, toTime: number): num
   }
   if (state.activeAction) {
     const action = findActiveAction(state.activeAction, registry);
-    const duration = actionDuration(action, state, registry);
-    if (state.activeAction.repeating) {
-      const limit = inputLimit(action, state);
-      if (Number.isFinite(limit)) {
-        const runway = limit * duration - state.activeAction.progress;
-        const limitInstant = state.time + Math.max(0, runway);
-        if (limitInstant < boundary) boundary = limitInstant;
+    // A stochastic action (has `accuracy`) can't contribute a closed-form
+    // boundary here — how long a fight takes is a random variable, not a
+    // fixed function of state. resolveSegment simulates it attempt-by-attempt
+    // instead, bounded only by whatever boundary buff-expiry/toTime already
+    // gives (see the stochastic branch of resolveSegment below).
+    if (!action.accuracy) {
+      const { duration, attemptsToResolve } = fightParams(action, state, registry);
+      const remainingAttempts = attemptsToResolve - state.activeAction.attemptsMade;
+      if (state.activeAction.repeating) {
+        const limit = inputLimit(action, state);
+        if (Number.isFinite(limit)) {
+          // Time to finish the fight already in flight, plus (limit - 1)
+          // more full fights after it — generalizes the old
+          // `limit * duration - progress` to attempt-scoped progress.
+          const runway = remainingAttempts * duration - state.activeAction.progress + Math.max(0, limit - 1) * attemptsToResolve * duration;
+          const limitInstant = state.time + Math.max(0, runway);
+          if (limitInstant < boundary) boundary = limitInstant;
+        }
+      } else {
+        const completionInstant = state.time + Math.max(0, remainingAttempts * duration - state.activeAction.progress);
+        if (completionInstant < boundary) boundary = completionInstant;
       }
-    } else {
-      const completionInstant = state.time + Math.max(0, duration - state.activeAction.progress);
-      if (completionInstant < boundary) boundary = completionInstant;
     }
   }
   return boundary;
 }
 
-// Advances state.time to segEnd, applying a repeating action's completions
-// in closed form (one floor() division for the whole segment, however many
-// completions that represents) instead of looping per completion. A
-// non-repeating action just accrues progress here; its completion fires as
-// a boundary event (see applyDueBoundaries) once progress reaches duration.
+// Advances state.time to segEnd for a DETERMINISTIC action (no accuracy —
+// outcome and fight length are known in closed form). Generalizes the old
+// per-completion floor() to per-attempt: `attemptsThisSegment` folds into
+// however many whole FIGHTS that represents (`fights`), applied as one
+// batch, with the remainder carried as attemptsMade/healthRemaining/progress
+// for the fight still in flight — never by looping per attempt or per fight,
+// however large the count.
+function resolveDeterministicSegment(state: GameState, registry: Registry, action: Action, segEnd: number): void {
+  const active = state.activeAction!;
+  const segLen = segEnd - state.time;
+  const { duration, abilityAmount, attemptsToResolve, outcome } = fightParams(action, state, registry);
+  const health = action.health ?? 1;
+
+  if (active.repeating && duration <= 0) {
+    throw new RuntimeError(`repeating action ${active.ownerRef}.${active.actionLabel} resolved a non-positive duration (${duration}) — give it a positive time: or a positive speed stat`);
+  }
+
+  const totalAttemptTime = active.progress + segLen;
+  const attemptsThisSegment = duration > 0 ? Math.floor(totalAttemptTime / duration) : 0;
+  const newProgress = totalAttemptTime - attemptsThisSegment * duration;
+
+  if (active.repeating) {
+    const totalAttempts = active.attemptsMade + attemptsThisSegment;
+    const fights = Math.floor(totalAttempts / attemptsToResolve);
+    const remainder = totalAttempts - fights * attemptsToResolve;
+    applyFightBatch(action, fights, outcome, state);
+    active.attemptsMade = remainder;
+    active.healthRemaining = health - remainder * abilityAmount;
+    active.progress = newProgress;
+  } else {
+    // A non-repeating fight fires its (single) outcome as a boundary event
+    // (see applyDueBoundaries) once attemptsMade reaches attemptsToResolve —
+    // clamped here (never wrapped/reset) so that check can still see it.
+    active.attemptsMade = Math.min(active.attemptsMade + attemptsThisSegment, attemptsToResolve);
+    active.healthRemaining = health - active.attemptsMade * abilityAmount;
+    active.progress = newProgress;
+  }
+}
+
+// Advances state.time to segEnd for a STOCHASTIC action (has accuracy) by
+// simulating attempt-by-attempt, drawing nextRandom(state) once per attempt
+// actually performed. This can't be batched in closed form — a fight's
+// length is a random variable — but O(attempts) is fine here: it's bounded
+// by the segment length and (for a repeating action) input affordability,
+// both finite. Each attempt's draw happens in strict chronological order
+// off state.rng, so splitting the overall resolve() into smaller calls can
+// never change which draw powers which attempt (see the `rng` field comment
+// on GameState) — that's what keeps this path associative.
+function resolveStochasticSegment(state: GameState, registry: Registry, action: Action, segEnd: number): void {
+  const active = state.activeAction!;
+
+  for (;;) {
+    const { duration, abilityAmount, escapeAfter } = fightParams(action, state, registry);
+    if (duration <= 0) {
+      throw new RuntimeError(`action ${active.ownerRef}.${active.actionLabel} resolved a non-positive attempt duration (${duration}) — give it a positive time: or a positive speed stat`);
+    }
+    if (active.repeating && inputLimit(action, state) <= 0) {
+      state.activeAction = null;
+      return;
+    }
+
+    const timeForNextAttempt = duration - active.progress;
+    if (state.time + timeForNextAttempt > segEnd) {
+      // The next attempt wouldn't finish within this segment — accrue
+      // partial progress up to segEnd and stop; a later resolve() call picks
+      // up exactly here.
+      const elapsed = segEnd - state.time;
+      active.progress += elapsed;
+      advanceTime(state, elapsed);
+      return;
+    }
+
+    advanceTime(state, timeForNextAttempt);
+    active.progress = 0;
+    active.attemptsMade++;
+    const accuracyValue = clamp01(statValue(action.accuracy!, state, registry));
+    const hit = nextRandom(state) < accuracyValue;
+    if (hit) active.healthRemaining -= abilityAmount;
+
+    // Decided per attempt, at runtime — NOT via the deterministic path's
+    // precomputed `outcome` (which assumes every attempt hits): health
+    // exhaustion always means completion; running out of attempts before
+    // that always means escape, regardless of what a guaranteed-hit fight
+    // would have done.
+    let fightOutcome: FightOutcome | null = null;
+    if (active.healthRemaining <= EPSILON) fightOutcome = 'completion';
+    else if (active.attemptsMade >= escapeAfter) fightOutcome = 'escape';
+
+    if (fightOutcome) {
+      applyFightBatch(action, 1, fightOutcome, state);
+      if (active.repeating) {
+        active.healthRemaining = action.health ?? 1;
+        active.attemptsMade = 0;
+      } else {
+        state.activeAction = null;
+        return;
+      }
+    }
+
+    if (state.time >= segEnd) return;
+  }
+}
+
 function resolveSegment(state: GameState, registry: Registry, segEnd: number): void {
   if (!state.activeAction) {
     advanceTime(state, segEnd - state.time);
@@ -462,20 +644,13 @@ function resolveSegment(state: GameState, registry: Registry, segEnd: number): v
   }
 
   const action = findActiveAction(state.activeAction, registry);
-  const segLen = segEnd - state.time;
-
-  if (state.activeAction.repeating) {
-    const duration = actionDuration(action, state, registry);
-    if (duration <= 0) {
-      throw new RuntimeError(`repeating action ${state.activeAction.ownerRef}.${state.activeAction.actionLabel} resolved a non-positive duration (${duration}) — give it a positive time: or a positive speed stat`);
-    }
-    const completions = Math.floor((state.activeAction.progress + segLen) / duration);
-    applyActionCompletions(action, completions, state);
-    state.activeAction.progress = state.activeAction.progress + segLen - completions * duration;
-  } else {
-    state.activeAction.progress += segLen;
+  if (action.accuracy) {
+    resolveStochasticSegment(state, registry, action, segEnd);
+    return;
   }
-  advanceTime(state, segLen);
+
+  resolveDeterministicSegment(state, registry, action, segEnd);
+  advanceTime(state, segEnd - state.time);
 }
 
 // Fires whatever is due exactly at `at` and keeps re-checking until nothing
@@ -495,17 +670,27 @@ function applyDueBoundaries(state: GameState, registry: Registry, at: number): v
 
     if (state.activeAction) {
       const action = findActiveAction(state.activeAction, registry);
-      if (state.activeAction.repeating) {
-        if (inputLimit(action, state) <= 0) {
-          state.activeAction = null;
-          changed = true;
-        }
-      } else {
-        const duration = actionDuration(action, state, registry);
-        if (state.activeAction.progress + EPSILON >= duration) {
-          applyActionCompletions(action, 1, state);
-          state.activeAction = null;
-          changed = true;
+      // A stochastic action (has accuracy) fires and clears/rearms itself
+      // entirely inside resolveStochasticSegment — nothing due here for it.
+      if (!action.accuracy) {
+        if (state.activeAction.repeating) {
+          if (inputLimit(action, state) <= 0) {
+            state.activeAction = null;
+            changed = true;
+          }
+        } else {
+          const { duration, attemptsToResolve, outcome } = fightParams(action, state, registry);
+          // duration <= 0 means every attempt is instantaneous — fire
+          // immediately regardless of attemptsMade, matching the old
+          // always-true `progress + EPSILON >= duration` check for a
+          // zero-`time:` action (whose toTime === state.time in useAction,
+          // so resolveSegment's closed form never even runs to advance
+          // attemptsMade — this is the only place such an action can fire).
+          if (state.activeAction.attemptsMade >= attemptsToResolve || duration <= 0) {
+            applyFightBatch(action, 1, outcome, state);
+            state.activeAction = null;
+            changed = true;
+          }
         }
       }
     }
@@ -520,16 +705,15 @@ function applyDueBoundaries(state: GameState, registry: Registry, at: number): v
 // bit-for-bit identical to resolve(s, t2) — one big jump equals any sequence
 // of smaller steps summing to the same target. It walks forward in SEGMENTS
 // bounded by the next discrete event, never in fixed dt steps, so a
-// segment's completions are always computed in closed form.
+// deterministic segment's completions are always computed in closed form.
 //
-// `random` is accepted but unused in Pass 1 — every action here is
-// deterministic (no `chance:`). A later pass adding chance-based actions
-// would draw from it only at a discrete completion instant (never per fixed
-// step, and never inside the closed-form batch math above, since a
-// chance-gated completion can't be batched — each one becomes its own
-// boundary).
-export function resolve(state: GameState, registry: Registry, toTime: number, random?: () => number): void {
-  void random;
+// Randomness (for actions with `accuracy`) is drawn only from state.rng, at
+// a discrete attempt boundary, never inside the closed-form batch math above
+// — a chance-gated fight can't be batched, so it resolves attempt-by-attempt
+// instead (see resolveStochasticSegment). Because the draws live in state
+// and advance strictly in attempt order, splitting this call into smaller
+// ones can't change which draw powers which attempt, preserving associativity.
+export function resolve(state: GameState, registry: Registry, toTime: number): void {
   if (toTime < state.time) throw new RuntimeError(`resolve: toTime (${toTime}) must be >= state.time (${state.time})`);
   applyDueBoundaries(state, registry, state.time);
   while (state.time < toTime) {
@@ -586,13 +770,18 @@ export function useAction(obj: string, objId: string, actionId: string, registry
   }
 
   const repeating = action.repeating === true;
-  const duration = actionDuration(action, state, registry);
+  const duration = attemptDuration(action, state, registry);
   if (repeating && duration <= 0) {
     throw new RuntimeError(`repeating action ${obj}.${objId}.${actionId} needs a positive time: after speed scaling`);
   }
 
-  state.activeAction = { ownerRef: `${obj}.${objId}`, actionLabel: actionId, progress: 0, repeating };
-  resolve(state, registry, state.time + duration);
+  state.activeAction = { ownerRef: `${obj}.${objId}`, actionLabel: actionId, progress: 0, repeating, healthRemaining: action.health ?? 1, attemptsMade: 0 };
+  // Synchronously resolve exactly the first natural unit of play: one full
+  // fight when it's known in closed form (deterministic), or just the first
+  // attempt when it isn't (stochastic — a fight's length is a random
+  // variable, so there's no fixed "one fight" span to jump straight to).
+  const firstUnit = action.accuracy ? duration : fightParams(action, state, registry).attemptsToResolve * duration;
+  resolve(state, registry, state.time + firstUnit);
 
   if (obj === 'item' && !repeating && required.has(objId)) {
     const item = registry.items.get(objId);

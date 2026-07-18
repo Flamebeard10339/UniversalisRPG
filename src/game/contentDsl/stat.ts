@@ -1,5 +1,5 @@
 import { SectionSchema } from './section';
-import { humanize, number, text } from './values';
+import { decimal, humanize, text } from './values';
 
 export interface Stat {
   id: string;
@@ -11,6 +11,6 @@ export const statSchema: SectionSchema<Stat> = {
   kind: 'stat',
   fields: {
     title: { parser: text, default: (self) => humanize(self.id) },
-    base: { parser: number, default: () => 0 },
+    base: { parser: decimal, default: () => 0 },
   },
 };

@@ -35,4 +35,10 @@ describe('entity reference scoping', () => {
     const [action] = chest.actions;
     expect(action.onFailure).toEqual([{ kind: 'set', variable: 'chest.jammed' }]);
   });
+
+  it('qualifies a bare set inside on escape, mirroring on success/on failure (locking the adjacent-consistency fix)', () => {
+    const oven = entity(['# entity oven', 'cook:', '  escape after 1', '  on escape:', '    set: burnt', '    give: ash'].join('\n'));
+    const [action] = oven.actions;
+    expect(action.onEscape).toEqual([{ kind: 'set', variable: 'oven.burnt' }, { kind: 'give', item: 'ash' }]);
+  });
 });

@@ -42,6 +42,7 @@ export function scopeEntity(entity: Entity): Entity {
     action.results = action.results.map((result) => scopeResult(result, entity.id));
     if (action.onSuccess) action.onSuccess = action.onSuccess.map((result) => scopeResult(result, entity.id));
     if (action.onFailure) action.onFailure = action.onFailure.map((result) => scopeResult(result, entity.id));
+    if (action.onEscape) action.onEscape = action.onEscape.map((result) => scopeResult(result, entity.id));
   }
   return entity;
 }
