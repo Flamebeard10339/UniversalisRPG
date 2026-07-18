@@ -19,6 +19,9 @@ export default defineConfig({
       // repo (including test files); they are separate working trees, not
       // part of this run.
       '**/.claude/worktrees/**',
+      // attic/ holds quarantined pre-rewrite GUI salvage — intentionally not
+      // type-checked or tested (see attic/README.md).
+      'attic/**',
     ],
   },
 });
