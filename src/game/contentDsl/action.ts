@@ -14,6 +14,7 @@ export interface Action {
   results: ActionResult[];
   onSuccess?: ActionResult[];
   onFailure?: ActionResult[];
+  time?: number;
 }
 
 const results = list(actionResult);
@@ -42,6 +43,13 @@ function parseActionLine(line: RawLine, action: Omit<Action, 'label'>): void {
     if (action.onFailure !== undefined) throw new DslError('action on failure is defined more than once', line.span);
     if (!cursor.done) action.onFailure = results.parse(cursor);
     else if (line.children.length > 0) action.onFailure = results.parseBlock(line.children);
+    return;
+  }
+  if (cursor.take(/time:[ \t]*/) !== null) {
+    if (action.time !== undefined) throw new DslError('action time is defined more than once', line.span);
+    const raw = cursor.take(/\d+(?:\.\d+)?/);
+    if (raw === null) throw new DslError('action time requires a non-negative number', line.span);
+    action.time = Number(raw);
     return;
   }
 

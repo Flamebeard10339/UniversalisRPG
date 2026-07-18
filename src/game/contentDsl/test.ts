@@ -9,7 +9,8 @@ export type Directive =
   | { kind: 'use'; obj: string; objId: string; actionId: string }
   | { kind: 'travel'; location: string }
   | { kind: 'craft'; recipe: string }
-  | { kind: 'expect'; condition: Condition };
+  | { kind: 'expect'; condition: Condition }
+  | { kind: 'wait'; seconds: number };
 
 export interface Test {
   id: string;
@@ -23,6 +24,7 @@ const USE = /^use:[ \t]*(?<obj>[a-z][a-z0-9-]*)\.(?<objId>[a-z][a-z0-9-]*)\.(?<a
 const TRAVEL = /^travel:[ \t]*(?<id>[a-z][a-z0-9-]*)$/;
 const CRAFT = /^craft:[ \t]*(?<id>[a-z][a-z0-9-]*)$/;
 const EXPECT = /^expect:[ \t]*(?<cond>.+)$/;
+const WAIT = /^wait:[ \t]*(?<seconds>\d+(?:\.\d+)?)$/;
 
 export function parseTest(section: RawSection): Test {
   if (!section.id) throw new DslError('# test requires an id', section.span);
@@ -38,6 +40,7 @@ export function parseTest(section: RawSection): Test {
     const travel = TRAVEL.exec(line.text)?.groups;
     const craft = CRAFT.exec(line.text)?.groups;
     const expect = EXPECT.exec(line.text)?.groups;
+    const wait = WAIT.exec(line.text)?.groups;
 
     if (run) directives.push({ kind: 'run', test: run.id });
     else if (talk) directives.push({ kind: 'talk', entity: talk.id });
@@ -46,6 +49,7 @@ export function parseTest(section: RawSection): Test {
     else if (travel) directives.push({ kind: 'travel', location: travel.id });
     else if (craft) directives.push({ kind: 'craft', recipe: craft.id });
     else if (expect) directives.push({ kind: 'expect', condition: condition.parse(new Cursor(expect.cond)) });
+    else if (wait) directives.push({ kind: 'wait', seconds: Number(wait.seconds) });
     else throw new DslError(`unexpected line in # test: ${JSON.stringify(line.text)}`, line.span);
   }
 

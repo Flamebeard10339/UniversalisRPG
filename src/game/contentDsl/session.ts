@@ -1,5 +1,5 @@
 import { Action } from './entity';
-import { craft, DialogueSession, GameState, Registry, RuntimeError, choose, createGameState, evaluateCondition, recipeCraftable, renderSegments, talk, useAction } from './runtime';
+import { advanceTime, craft, DialogueSession, GameState, Registry, RuntimeError, choose, createGameState, evaluateCondition, recipeCraftable, renderSegments, talk, useAction } from './runtime';
 import { humanize } from './values';
 
 export type PlayChoiceKind = 'talk' | 'action' | 'travel' | 'dialogue' | 'craft';
@@ -17,6 +17,7 @@ export interface PlayView {
   inDialogue: boolean;
   said: string[];
   choices: PlayChoice[];
+  time: number;
 }
 
 export interface PlaySession {
@@ -168,6 +169,7 @@ export function view(session: PlaySession): PlayView {
     inDialogue: session.dialogue !== null && session.dialogue.choices !== null,
     said,
     choices: computeChoices(session),
+    time: state.time,
   };
 }
 
@@ -175,5 +177,11 @@ export function apply(session: PlaySession, choiceId: string): PlayView {
   const choice = computeChoices(session).find((c) => c.id === choiceId);
   if (!choice) throw new RuntimeError(`unavailable choice: ${JSON.stringify(choiceId)}`);
   dispatch(session, choice);
+  return view(session);
+}
+
+// Maps to a future CLI `/wait <s>` command — not built here.
+export function wait(session: PlaySession, seconds: number): PlayView {
+  advanceTime(session.state, seconds);
   return view(session);
 }

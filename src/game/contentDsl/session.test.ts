@@ -100,6 +100,10 @@ describe('session', () => {
 
     v = apply(session, 'travel:beach');
     expect(v.location.id).toBe('beach');
+
+    // tutorial-island.dsl authors no `time:` on any action, so the whole
+    // playthrough above should leave the simulated clock untouched.
+    expect(v.time).toBe(0);
   });
 
   it('throws a clear error on an unavailable or unknown choice id', () => {

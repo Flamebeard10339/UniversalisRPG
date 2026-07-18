@@ -21,10 +21,21 @@ export interface GameState {
   visits: Record<string, number>;
   xp: Record<string, number>;
   log: string[];
+  time: number;
 }
 
 export function createGameState(location = ''): GameState {
-  return { flags: {}, inventory: {}, location, visits: {}, xp: {}, log: [] };
+  return { flags: {}, inventory: {}, location, visits: {}, xp: {}, log: [], time: 0 };
+}
+
+// THE single seam through which simulated time advances. Live drivers (a
+// wall-clock loop, an offline-catch-up calculation) will later inject real
+// elapsed seconds here, and timed-buff expiry will later plug in here too —
+// the pure runtime itself never reads a real clock; it only ever moves
+// forward when something calls this.
+export function advanceTime(state: GameState, seconds: number): void {
+  if (seconds < 0) throw new RuntimeError(`advanceTime: seconds must be non-negative, got ${seconds}`);
+  state.time += seconds;
 }
 
 export interface Registry {
@@ -104,6 +115,7 @@ export function loadModule(source: string): Registry {
 // "References") — the one exception the engine itself maintains is `<node-name>.visits`.
 function resolveReference(reference: Reference, state: GameState): boolean | number | undefined {
   const { path } = reference;
+  if (path.length === 1 && path[0] === 'time') return state.time;
   if (path.length === 2 && path[1] === 'visits') return state.visits[path[0]] ?? 0;
   return state.flags[path.join('.')];
 }
@@ -314,6 +326,7 @@ export function useAction(obj: string, objId: string, actionId: string, registry
 
   for (const result of action.results) applyResult(result, state);
   for (const result of action.onSuccess ?? []) applyResult(result, state);
+  advanceTime(state, action.time ?? 0);
 }
 
 export function recipeCraftable(recipe: Recipe, registry: Registry, state: GameState): boolean {
@@ -373,6 +386,9 @@ export function runTest(testId: string, registry: Registry, state: GameState, st
         break;
       case 'expect':
         if (!evaluateCondition(directive.condition, state)) return { passed: false, failure: describeCondition(directive.condition) };
+        break;
+      case 'wait':
+        advanceTime(state, directive.seconds);
         break;
     }
   }

@@ -163,6 +163,12 @@ A dotted path of lowercase-kebab segments: `bridge-open`, `front-door.unlocked`,
 flags, nested object properties, or (by convention, not special parser
 support) a dialogue node's visit counter.
 
+**`time`** is a reserved bare reference: it always reads the engine's
+simulated-time clock (seconds elapsed, a plain running total — see [Action
+results](#action-results) for how it advances), never a flag. Don't author a
+flag literally named `time`; a bare `time` reference always resolves to the
+clock, the same way `<node-name>.visits` always resolves to a visit counter.
+
 **Scoping inside an entity.** In an entity's own action block, a *bare*
 (single-segment) reference is scoped to that entity at load: `unlocked` written
 inside `# entity front-door` becomes `front-door.unlocked`. Everywhere else — a
@@ -433,6 +439,12 @@ pick lock:
   fired only when the action succeeds (see below).
 - `on failure:` — mirrors `on success:` exactly (inline or block form, at
   most once), fired only when the action fails on an unaffordable `take:`.
+- `time:` — `time: <non-negative number>` (integer or decimal), at most
+  once. Advances the engine's simulated-time clock by that many seconds when
+  the action succeeds; defaults to `0` (time-neutral) if omitted. An
+  unaffordable action (the `take:` shortfall branch) never advances time,
+  regardless of `time:`. See the reserved `time` reference under
+  [References](#references) for reading the clock back.
 
 **`take:` implies affordability.** An action whose `results` include one or
 more `take:` verbs is a soft-take: before anything is applied, each item's
@@ -554,6 +566,7 @@ test:
   travel: <location-id>
   craft: <recipe-id>
   expect: <condition>
+  wait: <non-negative number>            advances the simulated-time clock
 ```
 
 Each directive is a single line — an indented line under a directive is a
@@ -568,6 +581,16 @@ choose: Sounds good.
 use: entity.front-door.pick lock
 travel: beach
 expect: tutorial.quest-given
+```
+
+`wait:` advances the same simulated-time clock an action's `time:` does —
+useful for asserting time-gated content without authoring a real `time:`
+action:
+
+```
+# test rest-passes-an-hour
+wait: 3600
+expect: time >= 3600
 ```
 
 ## Not yet supported
