@@ -22,21 +22,17 @@ the result was correct, and what the review caught.
 | 4 | Sonnet 5 | Dialogue `{…}` text fragments → literal/interpolate/conditional segments | 74.0k | 21 | 217s | medium-high (forms + examples + files constrained) | Correct; forced to duplicate the REFERENCE regex (couldn't touch condition.ts), which it self-flagged |
 | 5 | Sonnet 5 | **Design** + implement the `# test` kind (composable test grammar) | 74.2k | 24 | 171s | medium (starting vocab given, design left open) | Correct; coherent minimal grammar, independently reused repo conventions (`<obj>.<objId>.<actionId>`, the condition grammar) |
 | 6 | Sonnet 5 | Write the complete grammar reference (doc synthesized from the parsers) | 107.9k | 35 | 431s | medium | Doc correct + rigorous — it verified examples against the running parser; but its one novel "discovery" mis-framed load-bearing code as dead, and review corrected the framing before it entered the canonical doc |
-
 | 7 | Sonnet 5 | Build the headless runtime (load + condition eval + effects + dialogue stepper + `# test` runner) | 93.8k | 29 | 357s | high (7 concrete pieces specified) | Green on its own 9 tests — but they missed two cases real content needs (once/sticky effect-refire, menu fall-through); both surfaced only at integration |
 | 8 | Sonnet 5 | Author tutorial-island content + friction report | 101.7k | 26 | 522s | medium (grammar doc + questline given) | Content parses and runs; friction report high-signal — confirmed the predicted item-possession gap |
-
 | 9 | Sonnet 5 | Add the `has` inventory-possession condition (grammar + runtime + content + doc + tests) | 77.2k | 37 | 179s | medium-high (feature fully specified) | Correct, one-shot; integration stayed green |
 | 10 | Sonnet 5 (cold spawn) | Build `session.ts` interactive-play layer over `runtime.ts` (choice enumeration + apply) + tests | 99.9k | 25 | 470s | high (full interface + enumeration rules + test route specified) | Correct, one-shot; only minimal runtime change (export `useAction`); test drives the full real route through the choice API |
 | 11 | Sonnet 5 (**warm resume** via SendMessage, continues #10) | Rewire `playtest-cli.ts` onto `loadModule`+`session.ts`, delete obsolete `playtestEngine.ts` | 82.5k | 37 | 692s | high (steps + arg surface specified) | Correct, one-shot; replays full Miki route green. **But warm resume was not cheaper — see warm-swarm finding.** |
-
 | 12 | Sonnet 5 (cold spawn) | Counter/tally `add:` effect (grammar+runtime+tests) + bare-field error message | 125.1k | 58 | 562s | high (2 labeled pieces, exact content edits) | A1/A2/error-msg correct & green; **correctly STOPPED** on the content-wiring piece — proved empirically that the exact edit I specified collides with entity auto-scoping (`add` unscoped while a sibling `hidden if` scopes → the rat gate never trips → infinitely farmable). A **planner spec error**, caught by the STOP escape hatch + the "verify empirically" instruction, not an agent error. |
-
 | 13 | Sonnet 5 (cold spawn) | Finish counter/tally: scope `add:` in scope.ts + wire `tutorial.rats-killed` content ripple + grammar.md | 62.4k | 28 | 153s | high (3 labeled pieces, exact edits, resolution pre-decided by planner) | Correct, one-shot, no STOP; 59 green, replay green, tsc clean. The follow-up to row 12's STOP — a planner-designed resolution executed cleanly. |
-
 | 14 | Sonnet 5 (cold spawn) | Declarative `# recipe` kind (parser/runtime/session/`craft:` test directive) + wire tutorial-island bread flow to real crafting + tests | 142.2k | 85 | 708s | high (full grammar + exact seams + content rewrite + node-ordering spec, design pre-ratified in Opus) | Correct, one-shot; 59→68 green, tsc clean (only pre-existing deleted-pipeline errors). Reused `values.quantified` across give/take as told. Flagged 3 deviations honestly — one necessary (`travel:` prefix, since `runTest` never sets a start location), two judgment calls kicked up to the planner (a stale doc line left untouched; the dialogue/recipe cooking-xp double-grant). Review made two integration edits: removed the redundant dialogue xp, fixed the stale doc line. No rework sent back. Largest chunk yet (142k) and still reviewable — the design-ratified-first, exact-seams spec kept it single-pass. |
-
 | 15 | Sonnet 5 (cold spawn) | `take:` affordability gate + `on failure:` branch (entity.ts parse + runtime `useAction` atomic-fail + inventory floor) + tests | 88.7k | 45 | 313s | high (exact `useAction` logic handed over, design pre-ratified) | Correct, one-shot; 68→77 green, tsc byte-identical error set (zero new). One **correct** self-flagged deviation: extended `scope.ts` to entity-scope `onFailure` refs like `onSuccess` (else a bare `set:` in `on failure:` would scope inconsistently — a latent bug, not a design question) with a locking `scope.test.ts` case. Exactly the adjacent-consistency fix a good agent *should* make and flag, not grave-digging. No planner edits needed; review = read diff + independent test run. |
+| 17 | Sonnet 5 (cold spawn, Opus orchestrator) | **Branch-closeout Chunk 1 — decommission.** Delete dead legacy play/contribution wiring (9 files: legacy stores + contribution components) + quarantine salvageable GUI to `attic/` (App.tsx, ContributionMapEditor, testHarness trio via `git mv`) + placeholder `main.tsx` + strip 3 dangling package.json scripts, to get the non-compiling branch to tsc-0 + test-green | 51.7k | 25 | 160s | high (exact keep/quarantine/delete file lists ratified from a prior read-only survey; hard caps + STOP escape hatch) | Correct, one-shot. 64 tsc errors → 0; build green; 249 tests pass; quarantined suite confirmed not run; contentDsl core untouched. Change surface matched the ratified table exactly — review (git status + contentDsl-touch grep) caught nothing. Preceded by a separate read-only Explore survey that produced the decision table (the survey/ratify gate that de-risked mass deletion); two earlier broad Explore surveys were killed mid-run by a 5h-budget session limit, recovered as partial output. |
+| 18 | Sonnet 5 (cold spawn, Opus orchestrator) | **Branch-closeout Chunk 2 — deterministic time substrate.** `GameState.time` + pure `advanceTime` seam; `Action.time:` cost (parse + apply on success-path only); session `wait()` + `PlayView.time`; bare `time` reference; `wait:` test directive; tests + grammar.md. Wall-clock injection / buffs / regen / travel+craft time all explicitly deferred | 89.0k | 39 | 251s | high (7 labeled sub-pieces P1–P7, exact seams + placement, explicit deferred list + scope caps, design pre-ratified in Opus incl. 3 ratified decisions) | Correct, one-shot; 249→260 green (+11), tsc 0, no regressions, purity preserved (no Date.now). Review (read diff) confirmed the two subtle points — time-cost lands only on the success path, `time` reference precedes `visits`. Good adjacent judgment flagged: used an inline decimal regex rather than reuse the integer-only shared `number` parser (out of scope to touch). One verify misfire (ran `npm run playtest` with no required args → misread the arg error as "CLI broken"; harmless, suite covers it). No planner rework. |
 
 ## Session usage snapshots
 
@@ -46,6 +42,39 @@ the "% of 5-hour budget per turn" recycle signal from the operating agreement.
 | Date | Orchestrator model | 5h budget used | Weekly budget used | Session cost | Active / wall time | Opus / Sonnet split | Cache hit | Rows covered | Note |
 |------|--------------------|---------------:|--------------------|--------------|---------------------|----------------------|-----------|---------------|------|
 | 2026-07-17 | Opus (this session) | 77% | 36% (all models) | $10.72 | 31m44s / 1h8m | 55% / 45% | 96% | 8–15 | Recycle point; switching next chunk to a Sonnet orchestrator as a new experiment (cheaper turn rate, testing whether planning/review quality holds without Opus) |
+| 2026-07-17 | Sonnet 5 (first orchestrator run) | 89% (started this convo at 79%, cross-session rolling window) | 37% (all models) | $3.18 total ($0.41 at model-switch checkpoint, so ~$2.77 marginal for the full chunk below) | 8m29s / 11m18s (this chunk: ~7m8s active) | 100% Sonnet | 95% | 16 | One full orchestrator cycle for row 16: Explore-agent ground-truth survey (no stale-memory trust) + design/scope decision + delegation spec + independent review (diff read + own test run) + docs/memory bookkeeping + commit. See verdict below. |
+
+### Verdict — Sonnet-orchestrator trial #1 (n=1, promising but not conclusive)
+
+**Quality held.** No sign of degradation vs. the Opus-orchestrated rows: the
+Explore-agent survey caught that `runtime.ts`/`session.ts` already anticipated
+item actions (contradicting the stale memory summary, which didn't know this)
+— i.e. it verified ground truth instead of trusting a prior write-up, exactly
+per house rule. It surfaced a genuine architecture fork (the disconnected
+legacy timer/buff engine) unprompted and made a defensible scope cut (defer
+the buff, ship item-actions + consume-and-narrate) rather than either ignoring
+the gap or improvising a design that would collide with the legacy system.
+The delegation spec was exact-seams enough that the coding agent one-shot it
+with zero rework, and review caught nothing wrong on an independent diff read
++ own test run before commit.
+
+**Cost is not yet a clean comparison.** The $10.72 Opus baseline (rows 8–15)
+covers 8 delegations plus a full day's accumulated planning context; this
+$2.77 marginal cost is one delegation's full cycle from a cold start. Not
+apples-to-apples — no matched same-scope Opus chunk to diff against. What IS
+notable: the *orchestrator's own overhead* (survey + design + review +
+bookkeeping, not the sub-agent's 77.1k tokens) was the majority of that
+$2.77, and it's the exact category the operating agreement predicted would be
+~5x cheaper under Sonnet. Need several more chunks, ideally with the same
+shape, to get a real read.
+
+**Operational note:** the 5h budget was already at 77% (Opus session) before
+this conversation started, and this one chunk pushed it to 89% — leaving
+minimal headroom before the 2h reset. A Sonnet orchestrator is cheaper per
+turn, but a long-running conversation still accumulates the cache-read
+quadratic (4.2M cache-read tokens this session) — the recycle discipline
+from the operating agreement still applies, just with more turns available
+per budget unit, not unlimited ones.
 
 | 16 | Sonnet 5 (cold spawn, **Sonnet orchestrator** — first non-Opus planner) | Extract shared `action.ts` from `entity.ts`; give items an `actions:` block (schema wiring); wire `eat` on `bread`/`cooked-shrimp` (consume+narrate only, buff explicitly deferred); doc + tests | 77.1k | 44 | 257s | high (exact extraction target, exact wiring pattern to mirror, exact content shape, explicit out-of-scope list) | Correct, one-shot; 77→78 green (confirmed independently), tsc byte-identical (64/64). Dispatch worked with zero `runtime.ts`/`session.ts` changes, as the orchestrator's ground-truth survey predicted — agent verified this empirically per instructions rather than assuming. One good unprompted catch: the `baked` dialogue node promised a stat "buff" from eating that this task deliberately didn't implement, so the agent rewrote those two lines to avoid the game lying to the player — correct scope judgment, not scope creep. |
 
