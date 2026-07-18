@@ -1,5 +1,5 @@
 import { Action } from './entity';
-import { advanceTime, craft, DialogueSession, GameState, Registry, RuntimeError, choose, createGameState, evaluateCondition, recipeCraftable, renderSegments, talk, useAction } from './runtime';
+import { craft, DialogueSession, GameState, Registry, RuntimeError, choose, createGameState, evaluateCondition, recipeCraftable, renderSegments, resolve, talk, useAction } from './runtime';
 import { humanize } from './values';
 
 export type PlayChoiceKind = 'talk' | 'action' | 'travel' | 'dialogue' | 'craft';
@@ -180,8 +180,7 @@ export function apply(session: PlaySession, choiceId: string): PlayView {
   return view(session);
 }
 
-// Maps to a future CLI `/wait <s>` command — not built here.
 export function wait(session: PlaySession, seconds: number): PlayView {
-  advanceTime(session.state, seconds);
+  resolve(session.state, session.registry, session.state.time + seconds);
   return view(session);
 }

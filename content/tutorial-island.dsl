@@ -13,6 +13,9 @@ base: 5
 
 # stat regeneration
 
+# stat cooking-speed
+base: 1
+
 // --- skills ---
 
 # skill thieving
@@ -55,6 +58,9 @@ examine: A ball of raw dough, ready for the oven.
 examine: A warm, golden loaf.
 food, +5 regeneration, 90s
 eat: take: 1 bread, say: You tear into the warm loaf - simple, filling, and worth the trouble.
+
+# item roasted-chestnut
+examine: A chestnut roasted soft and sweet in the oven's embers.
 
 // --- locations ---
 
@@ -116,6 +122,13 @@ look in:
 
 # entity oven
 examine: A stone oven, its coals still glowing.
+roast chestnuts:
+  repeating
+  speed: cooking-speed
+  time: 4
+  give: 1 roasted-chestnut
+  on success:
+    say: Another chestnut pops from the embers, roasted through.
 
 # entity stairs
 title: Stairs

@@ -10,9 +10,32 @@ import { scopeEntity } from './scope';
 import { Authored, hydrateSection } from './section';
 import { Skill, skillSchema } from './skill';
 import { Stat, statSchema } from './stat';
+import { TagClause } from './tagClause';
 import { Test } from './test';
 
 export class RuntimeError extends Error {}
+
+// A spannable/repeating action currently in flight. `progress` is seconds
+// already elapsed toward the *next* completion — not an absolute deadline —
+// so a mid-flight speed change just changes how the remaining progress maps
+// to a completion instant, instead of requiring the deadline to be rewritten.
+export interface ActiveAction {
+  ownerRef: string; // "<obj>.<objId>", e.g. "entity.oven"
+  actionLabel: string;
+  progress: number;
+  repeating: boolean;
+}
+
+// A timed stat modifier (from eating food, etc). `kind: 'added'` sums flat
+// onto the stat's base; `kind: 'increased'` sums as a fraction multiplied
+// across the total (see statValue below) — the same two-bucket stacking
+// legacy stat modifiers used.
+export interface ActiveBuff {
+  statId: string;
+  amount: number;
+  kind: 'added' | 'increased';
+  expiresAt: number;
+}
 
 export interface GameState {
   flags: Record<string, boolean | number>;
@@ -22,10 +45,12 @@ export interface GameState {
   xp: Record<string, number>;
   log: string[];
   time: number;
+  activeAction: ActiveAction | null;
+  activeBuffs: Record<string, ActiveBuff>;
 }
 
 export function createGameState(location = ''): GameState {
-  return { flags: {}, inventory: {}, location, visits: {}, xp: {}, log: [], time: 0 };
+  return { flags: {}, inventory: {}, location, visits: {}, xp: {}, log: [], time: 0, activeAction: null, activeBuffs: {} };
 }
 
 // THE single seam through which simulated time advances. Live drivers (a
@@ -305,6 +330,237 @@ function findActionOwner(obj: string, objId: string, registry: Registry): unknow
   }
 }
 
+function parseOwnerRef(ownerRef: string): { obj: string; objId: string } {
+  const dot = ownerRef.indexOf('.');
+  return { obj: ownerRef.slice(0, dot), objId: ownerRef.slice(dot + 1) };
+}
+
+function findActiveAction(active: ActiveAction, registry: Registry): Action {
+  const { obj, objId } = parseOwnerRef(active.ownerRef);
+  const owner = findActionOwner(obj, objId, registry) as { actions?: Action[] } | undefined;
+  if (!owner) throw new RuntimeError(`unknown ${obj}: ${objId}`);
+  const action = owner.actions?.find((a) => a.label === active.actionLabel);
+  if (!action) throw new RuntimeError(`unknown action ${JSON.stringify(active.actionLabel)} on ${active.ownerRef}`);
+  return action;
+}
+
+// base + Σ(added modifiers), then × (1 + Σ(increased modifiers)) — mirrors
+// the legacy engine's stat-modifier stacking rule (src/game/characterStats.ts),
+// re-expressed on the contentDsl schema. An active buff is just another
+// modifier source alongside the stat's own base.
+export function statValue(statId: string, state: GameState, registry: Registry): number {
+  const base = registry.stats.get(statId)?.base ?? 0;
+  let added = 0;
+  let increased = 0;
+  for (const buff of Object.values(state.activeBuffs)) {
+    if (buff.statId !== statId) continue;
+    if (buff.kind === 'added') added += buff.amount;
+    else increased += buff.amount;
+  }
+  return (base + added) * (1 + increased);
+}
+
+function actionDuration(action: Action, state: GameState, registry: Registry): number {
+  const speed = action.speedStat ? statValue(action.speedStat, state, registry) : 1;
+  return (action.time ?? 0) / speed;
+}
+
+// How many completions' worth of input the current inventory can afford.
+// Items have no finite stack/inventory cap in this schema (Pass 1), so only
+// the `take:` side can ever bound a repeating action — the output side is
+// treated as unbounded rather than inventing a cap the schema doesn't have.
+function inputLimit(action: Action, state: GameState): number {
+  const perCompletion = new Map<string, number>();
+  for (const result of action.results) {
+    if (result.kind === 'take') perCompletion.set(result.item, (perCompletion.get(result.item) ?? 0) + (result.amount ?? 1));
+  }
+  let limit = Infinity;
+  for (const [item, need] of perCompletion) {
+    if (need <= 0) continue;
+    limit = Math.min(limit, Math.floor((state.inventory[item] ?? 0) / need));
+  }
+  return limit;
+}
+
+// Applies one action's `results` as though it completed `count` times, in a
+// single batch — never by looping `count` times (count can be enormous).
+// Numeric verbs (give/take/xp/add) scale by count; one-shot log-like verbs
+// (say, set, unset, relocate, discover, open-modal) fire at most once per
+// batch, so a large K never spams the log with repeated identical lines.
+function applyResultBatch(result: ActionResult, count: number, state: GameState): void {
+  switch (result.kind) {
+    case 'give':
+      state.inventory[result.item] = (state.inventory[result.item] ?? 0) + (result.amount ?? 1) * count;
+      return;
+    case 'take':
+      state.inventory[result.item] = Math.max(0, (state.inventory[result.item] ?? 0) - (result.amount ?? 1) * count);
+      return;
+    case 'xp':
+      state.xp[result.skill] = (state.xp[result.skill] ?? 0) + result.amount * count;
+      return;
+    case 'add': {
+      const current = state.flags[result.variable];
+      const base = typeof current === 'number' ? current : 0;
+      state.flags[result.variable] = base + result.amount * count;
+      return;
+    }
+    default:
+      applyResult(result, state);
+  }
+}
+
+function applyActionCompletions(action: Action, count: number, state: GameState): void {
+  if (count <= 0) return;
+  for (const result of action.results) applyResultBatch(result, count, state);
+  // onSuccess batches per completion exactly like results — numeric verbs
+  // (give/take/xp/add) scale by count, log-like verbs fire once. Firing it
+  // once per *segment* instead would break associativity: the live driver
+  // (many small resolve() calls) would fire it far more often than the REPL
+  // (one big call) — the exact REPL/live divergence resolve() exists to prevent.
+  for (const result of action.onSuccess ?? []) applyResultBatch(result, count, state);
+}
+
+const EPSILON = 1e-9;
+
+// The earliest instant in [state.time, toTime] at which something discrete
+// needs to happen: a buff expiring, a repeating action running out of
+// input, or a non-repeating action completing. Returns toTime if nothing
+// discrete happens before it — that's what lets resolve() cross a huge span
+// of idle time in a single step.
+function nextBoundary(state: GameState, registry: Registry, toTime: number): number {
+  let boundary = toTime;
+  for (const buff of Object.values(state.activeBuffs)) {
+    if (buff.expiresAt < boundary) boundary = buff.expiresAt;
+  }
+  if (state.activeAction) {
+    const action = findActiveAction(state.activeAction, registry);
+    const duration = actionDuration(action, state, registry);
+    if (state.activeAction.repeating) {
+      const limit = inputLimit(action, state);
+      if (Number.isFinite(limit)) {
+        const runway = limit * duration - state.activeAction.progress;
+        const limitInstant = state.time + Math.max(0, runway);
+        if (limitInstant < boundary) boundary = limitInstant;
+      }
+    } else {
+      const completionInstant = state.time + Math.max(0, duration - state.activeAction.progress);
+      if (completionInstant < boundary) boundary = completionInstant;
+    }
+  }
+  return boundary;
+}
+
+// Advances state.time to segEnd, applying a repeating action's completions
+// in closed form (one floor() division for the whole segment, however many
+// completions that represents) instead of looping per completion. A
+// non-repeating action just accrues progress here; its completion fires as
+// a boundary event (see applyDueBoundaries) once progress reaches duration.
+function resolveSegment(state: GameState, registry: Registry, segEnd: number): void {
+  if (!state.activeAction) {
+    advanceTime(state, segEnd - state.time);
+    return;
+  }
+
+  const action = findActiveAction(state.activeAction, registry);
+  const segLen = segEnd - state.time;
+
+  if (state.activeAction.repeating) {
+    const duration = actionDuration(action, state, registry);
+    if (duration <= 0) {
+      throw new RuntimeError(`repeating action ${state.activeAction.ownerRef}.${state.activeAction.actionLabel} resolved a non-positive duration (${duration}) — give it a positive time: or a positive speed stat`);
+    }
+    const completions = Math.floor((state.activeAction.progress + segLen) / duration);
+    applyActionCompletions(action, completions, state);
+    state.activeAction.progress = state.activeAction.progress + segLen - completions * duration;
+  } else {
+    state.activeAction.progress += segLen;
+  }
+  advanceTime(state, segLen);
+}
+
+// Fires whatever is due exactly at `at` and keeps re-checking until nothing
+// more is due at that same instant (e.g. a buff expiring the moment an
+// action also completes). Also what lets a zero-duration action fire its
+// completion immediately, before resolve() has consumed any segment at all.
+function applyDueBoundaries(state: GameState, registry: Registry, at: number): void {
+  for (;;) {
+    let changed = false;
+
+    for (const key of Object.keys(state.activeBuffs)) {
+      if (state.activeBuffs[key].expiresAt <= at) {
+        delete state.activeBuffs[key];
+        changed = true;
+      }
+    }
+
+    if (state.activeAction) {
+      const action = findActiveAction(state.activeAction, registry);
+      if (state.activeAction.repeating) {
+        if (inputLimit(action, state) <= 0) {
+          state.activeAction = null;
+          changed = true;
+        }
+      } else {
+        const duration = actionDuration(action, state, registry);
+        if (state.activeAction.progress + EPSILON >= duration) {
+          applyActionCompletions(action, 1, state);
+          state.activeAction = null;
+          changed = true;
+        }
+      }
+    }
+
+    if (!changed) return;
+  }
+}
+
+// THE single seam every driver (REPL, session, a future live loop) calls
+// through to advance simulated time. The invariant that makes this safe to
+// call at any granularity: resolve(resolve(s, t1), t2) for t1 <= t2 is
+// bit-for-bit identical to resolve(s, t2) — one big jump equals any sequence
+// of smaller steps summing to the same target. It walks forward in SEGMENTS
+// bounded by the next discrete event, never in fixed dt steps, so a
+// segment's completions are always computed in closed form.
+//
+// `random` is accepted but unused in Pass 1 — every action here is
+// deterministic (no `chance:`). A later pass adding chance-based actions
+// would draw from it only at a discrete completion instant (never per fixed
+// step, and never inside the closed-form batch math above, since a
+// chance-gated completion can't be batched — each one becomes its own
+// boundary).
+export function resolve(state: GameState, registry: Registry, toTime: number, random?: () => number): void {
+  void random;
+  if (toTime < state.time) throw new RuntimeError(`resolve: toTime (${toTime}) must be >= state.time (${state.time})`);
+  applyDueBoundaries(state, registry, state.time);
+  while (state.time < toTime) {
+    const segEnd = nextBoundary(state, registry, toTime);
+    resolveSegment(state, registry, segEnd);
+    applyDueBoundaries(state, registry, segEnd);
+  }
+}
+
+// The inert `food, +N <stat>, <duration>` item tags become live here: an
+// item action that consumes (take:s) the very item it's defined on is what
+// "eating" means in this schema, and — if the item carries the `food`
+// keyword tag — grants each of its stat-bonus tags as a timed buff whose
+// clock starts the moment eating completes.
+function grantFoodBuff(item: Item, state: GameState): void {
+  if (!item.tags.some((tag) => tag.kind === 'keyword' && tag.value === 'food')) return;
+
+  const durationTag = item.tags.find((tag): tag is Extract<TagClause, { kind: 'duration' }> => tag.kind === 'duration');
+  const duration = durationTag?.seconds ?? 0;
+
+  for (const tag of item.tags) {
+    if (tag.kind !== 'stat-bonus') continue;
+    state.activeBuffs[`${item.id}:${tag.statId}`] = {
+      statId: tag.statId,
+      amount: tag.percent ? tag.amount / 100 : tag.amount,
+      kind: tag.percent ? 'increased' : 'added',
+      expiresAt: state.time + duration,
+    };
+  }
+}
+
 export function useAction(obj: string, objId: string, actionId: string, registry: Registry, state: GameState): void {
   const target = findActionOwner(obj, objId, registry) as { actions?: Action[] } | undefined;
   if (!target) throw new RuntimeError(`unknown ${obj}: ${objId}`);
@@ -314,6 +570,11 @@ export function useAction(obj: string, objId: string, actionId: string, registry
   if (action.requires && !evaluateCondition(action.requires, state)) throw new RuntimeError(`action requires unmet: ${obj}.${objId}.${actionId}`);
   if (action.hiddenIf && evaluateCondition(action.hiddenIf, state)) throw new RuntimeError(`action hidden: ${obj}.${objId}.${actionId}`);
 
+  // Same "take: implies affordability" gate as before, checked once up
+  // front for a single completion's worth — this only gates whether the
+  // action is allowed to *start* at all. A repeating action running out of
+  // input mid-flight is handled inside resolve()'s K-limiting math instead,
+  // not here, and doesn't fire onFailure — it just quietly ends.
   const required = new Map<string, number>();
   for (const r of action.results) if (r.kind === 'take') required.set(r.item, (required.get(r.item) ?? 0) + (r.amount ?? 1));
   let shortfall: string | undefined;
@@ -324,9 +585,19 @@ export function useAction(obj: string, objId: string, actionId: string, registry
     return;
   }
 
-  for (const result of action.results) applyResult(result, state);
-  for (const result of action.onSuccess ?? []) applyResult(result, state);
-  advanceTime(state, action.time ?? 0);
+  const repeating = action.repeating === true;
+  const duration = actionDuration(action, state, registry);
+  if (repeating && duration <= 0) {
+    throw new RuntimeError(`repeating action ${obj}.${objId}.${actionId} needs a positive time: after speed scaling`);
+  }
+
+  state.activeAction = { ownerRef: `${obj}.${objId}`, actionLabel: actionId, progress: 0, repeating };
+  resolve(state, registry, state.time + duration);
+
+  if (obj === 'item' && !repeating && required.has(objId)) {
+    const item = registry.items.get(objId);
+    if (item) grantFoodBuff(item, state);
+  }
 }
 
 export function recipeCraftable(recipe: Recipe, registry: Registry, state: GameState): boolean {
@@ -388,7 +659,7 @@ export function runTest(testId: string, registry: Registry, state: GameState, st
         if (!evaluateCondition(directive.condition, state)) return { passed: false, failure: describeCondition(directive.condition) };
         break;
       case 'wait':
-        advanceTime(state, directive.seconds);
+        resolve(state, registry, state.time + directive.seconds);
         break;
     }
   }

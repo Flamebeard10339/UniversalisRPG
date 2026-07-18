@@ -5,6 +5,7 @@ import { Cursor, DslError } from './parser';
 import { EntryBody } from './section';
 import { RawLine } from './structure';
 import { TagClause, tagClause } from './tagClause';
+import { id } from './values';
 
 export interface Action {
   label: string;
@@ -15,6 +16,13 @@ export interface Action {
   onSuccess?: ActionResult[];
   onFailure?: ActionResult[];
   time?: number;
+  // The stat whose value scales this action's duration (time: / statValue),
+  // e.g. a cooking-speed stat. Absent means a fixed multiplier of 1.
+  speedStat?: string;
+  // A `repeating` bare tag (see below) makes this a spannable, looping
+  // action instead of a one-shot: resolve() re-arms it after each
+  // completion instead of clearing it.
+  repeating?: boolean;
 }
 
 const results = list(actionResult);
@@ -52,6 +60,11 @@ function parseActionLine(line: RawLine, action: Omit<Action, 'label'>): void {
     action.time = Number(raw);
     return;
   }
+  if (cursor.take(/speed:[ \t]*/) !== null) {
+    if (action.speedStat !== undefined) throw new DslError('action speed is defined more than once', line.span);
+    action.speedStat = id.parse(cursor);
+    return;
+  }
 
   if (startsResult(cursor)) {
     action.results.push(...results.parse(cursor));
@@ -65,6 +78,10 @@ export const actionBody: EntryBody = {
   parseBlock: (lines) => {
     const action: Omit<Action, 'label'> = { results: [] };
     for (const line of lines) parseActionLine(line, action);
+    // `repeating` is an ordinary bare tag clause (like `once`) but the
+    // resolver needs to branch on it directly, so it's also lifted onto its
+    // own field here rather than staying inert like `once` currently is.
+    if (action.tags?.some((tag) => tag.kind === 'keyword' && tag.value === 'repeating')) action.repeating = true;
     return action;
   },
 };

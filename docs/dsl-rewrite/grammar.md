@@ -246,7 +246,7 @@ can't silently rewrite it to a single owner's namespace.
 A comma-separated micro-grammar, disambiguated by shape (never by keyword
 lookup), used for item tags and for an entity action's modifiers:
 
-- a bare word → keyword: `mainhand`, `once`, `food`
+- a bare word → keyword: `mainhand`, `once`, `food`, `repeating`
 - `+<n>[%] <stat-id>` or `-<n>[%] <stat-id>` → a stat bonus: `+3 regeneration`, `+2% attack`
 - `<n>m<n>s` (either half optional) → a duration: `4s`, `1m40s`, `1m`
 
@@ -254,6 +254,14 @@ lookup), used for item tags and for an entity action's modifiers:
 food, +3 regeneration, 60s
 once, 4s
 ```
+
+Two of these clauses are live, not just parsed data:
+
+- An item tagged `food` grants its stat-bonus clauses as **timed buffs** the
+  moment an action *eats* it — see [Eating](#eating) below.
+- An entity/item action tagged `repeating` is a **spannable, looping**
+  action rather than a one-shot — see `time:`/`speed:` and
+  [Spannable & repeating actions](#spannable--repeating-actions) below.
 
 ## 4. Kinds
 
@@ -440,11 +448,16 @@ pick lock:
 - `on failure:` — mirrors `on success:` exactly (inline or block form, at
   most once), fired only when the action fails on an unaffordable `take:`.
 - `time:` — `time: <non-negative number>` (integer or decimal), at most
-  once. Advances the engine's simulated-time clock by that many seconds when
-  the action succeeds; defaults to `0` (time-neutral) if omitted. An
-  unaffordable action (the `take:` shortfall branch) never advances time,
-  regardless of `time:`. See the reserved `time` reference under
-  [References](#references) for reading the clock back.
+  once. The action **occupies** that many seconds (scaled by `speed:` below)
+  before its results apply; defaults to `0` (instant) if omitted. An
+  unaffordable action (the `take:` shortfall branch) never starts, let alone
+  advances time, regardless of `time:`. See the reserved `time` reference
+  under [References](#references) for reading the clock back.
+- `speed:` — `speed: <stat-id>`, at most once. Names an existing `# stat`
+  whose current value scales this action's duration: `time: / statValue(<stat-id>)`.
+  Omitted means a fixed multiplier of `1`. A stat named this way needs its
+  own `base:` (a stat's default base is `0`, which would make the action
+  take forever) — see [stat](#stat).
 
 **`take:` implies affordability.** An action whose `results` include one or
 more `take:` verbs is a soft-take: before anything is applied, each item's
@@ -469,6 +482,56 @@ An "enemy-shaped" action (one with a `requires:`/combat-flavored tags) and an
 instant action (a bare `results` list with no modifiers) are both just
 entities — the design distinction between them is intentional at the content
 level, not a grammar-level one.
+
+#### Spannable & repeating actions
+
+A plain action (no `repeating` tag) *spans* `time:` seconds and fires its
+`results`/`on success:` exactly once at the end — starting it occupies the
+engine until that single completion, same as before, just no longer
+instantaneous under the hood.
+
+A `repeating` action instead loops for as long as it stays active: every
+`time:` seconds (scaled by `speed:`) it fires another completion of its
+`results` (not `on success:` — a repeating action's `on success:`, if
+authored, fires at most once per `resolve()`/`wait` call, never once per
+completion, so a long wait can't spam the log). Starting one via an action
+choice produces exactly one completion and leaves it running; a later
+`/wait` (or the session `wait()`/test `wait:` directive) continues it.
+Running out of a `take:` input mid-run quietly ends it — no `on failure:`,
+since it already succeeded at starting.
+
+```
+# entity oven
+roast chestnuts:
+  repeating
+  speed: cooking-speed
+  time: 4
+  give: 1 roasted-chestnut
+```
+
+Whatever a repeating action `take:`s bounds how many completions the current
+inventory affords; there's no separate limit to author. Output items have no
+stack cap in this schema, so only inputs can end a repeating action early.
+
+#### Eating
+
+An item tagged `food` (see [Tag clauses](#tag-clauses)) that consumes itself
+— a `take: 1 <its-own-item-id>` inside one of its own actions, conventionally
+named `eat` — grants each of its stat-bonus tags as a **timed buff** the
+instant that action completes, expiring `duration` seconds later (the
+duration tag on the same line):
+
+```
+# item cooked-shrimp
+food, +3 regeneration, 60s
+eat: take: 1 cooked-shrimp, say: You eat the shrimp.
+```
+
+A stat's live value (read by `speed:` above, and by anything else that needs
+it) is its `base:` plus every active buff's `added` amount, then multiplied
+by `1 +` the sum of every active buff's `increased` amount — a percent
+stat-bonus tag (`+100% cooking-speed`) is `increased`; a flat one (`+3
+regeneration`) is `added`.
 
 ### dialogue
 
