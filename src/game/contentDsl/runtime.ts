@@ -12,6 +12,7 @@ import { Skill, skillSchema } from './skill';
 import { Stat, statSchema } from './stat';
 import { TagClause } from './tagClause';
 import { Test } from './test';
+import { humanize } from './values';
 
 export class RuntimeError extends Error {}
 
@@ -103,6 +104,10 @@ export interface Registry {
   stats: Map<string, Stat>;
   skills: Map<string, Skill>;
   recipes: Map<string, Recipe>;
+  // Each recipe's Action form (see recipeAction below), compiled once here at
+  // load time and looked up by findActionOwner('recipe', ...) — never
+  // recompiled per findActiveAction call.
+  recipeActions: Map<string, Action>;
   dialogues: Map<string, Dialogue>;
   dialoguesByOwner: Map<string, Dialogue>;
   tests: Map<string, Test>;
@@ -116,6 +121,7 @@ export function loadModule(source: string): Registry {
     stats: new Map(),
     skills: new Map(),
     recipes: new Map(),
+    recipeActions: new Map(),
     dialogues: new Map(),
     dialoguesByOwner: new Map(),
     tests: new Map(),
@@ -151,6 +157,7 @@ export function loadModule(source: string): Registry {
       case 'recipe': {
         const recipe = hydrateSection(section.value as Authored<Recipe>, recipeSchema);
         registry.recipes.set(recipe.id, recipe);
+        registry.recipeActions.set(recipe.id, recipeAction(recipe));
         break;
       }
       case 'dialogue': {
@@ -358,6 +365,10 @@ function findActionOwner(obj: string, objId: string, registry: Registry): unknow
       return registry.items.get(objId);
     case 'location':
       return registry.locations.get(objId);
+    case 'recipe': {
+      const action = registry.recipeActions.get(objId);
+      return action ? { actions: [action] } : undefined;
+    }
     default:
       return undefined;
   }
@@ -789,23 +800,72 @@ export function useAction(obj: string, objId: string, actionId: string, registry
   }
 }
 
+// Compiles a recipe into a B1 Action so it runs through the same
+// resolve()/fight machinery as a repeating entity action: a craft is a
+// single-attempt (health: 1) fight whose "target" is the input stack rather
+// than a monster. Called once per recipe at loadModule time (see the
+// `recipe` case above) — never recomputed per findActiveAction call.
+function recipeAction(recipe: Recipe): Action {
+  const takes: ActionResult[] = recipe.in.map((q) => ({ kind: 'take', item: q.item, amount: q.amount }));
+  const gives: ActionResult[] = recipe.out.map((q) => ({ kind: 'give', item: q.item, amount: q.amount }));
+  const results: ActionResult[] = [...takes, ...gives];
+  if (recipe.skill) results.push({ kind: 'xp', skill: recipe.skill.skill, amount: recipe.skill.amount });
+  if (recipe.say) results.push({ kind: 'say', text: recipe.say });
+
+  const time = recipe.time ?? 0;
+  const action: Action = {
+    label: `Craft ${humanize(recipe.id)}`,
+    results,
+    time,
+    speed: recipe.speed,
+    accuracy: recipe.accuracy,
+    health: 1,
+    repeating: time > 0,
+  };
+
+  if (recipe.accuracy) {
+    // A craft is a single-attempt fight: a miss on that one attempt fails
+    // the whole craft to `burnt` instead of retrying. The fail path
+    // consumes the SAME inputs as the success path (kept symmetric with
+    // `results`' take entries) so inputLimit — which only reads
+    // `results` — still correctly bounds a repeating burn-capable craft.
+    action.escapeAfter = 1;
+    const burnt: ActionResult[] = recipe.burnt.map((q) => ({ kind: 'give', item: q.item, amount: q.amount }));
+    action.onEscape = [...takes, ...burnt];
+  }
+
+  return action;
+}
+
 export function recipeCraftable(recipe: Recipe, registry: Registry, state: GameState): boolean {
   for (const input of recipe.in) if ((state.inventory[input.item] ?? 0) < (input.amount ?? 1)) return false;
   if (recipe.station) {
     const loc = registry.locations.get(state.location);
-    if (!loc || !loc.entities.includes(recipe.station)) return false;
+    if (!loc) return false;
+    const hasStation = loc.entities.some((entityId) => registry.entities.get(entityId)?.stations.includes(recipe.station!));
+    if (!hasStation) return false;
   }
   return true;
 }
 
+// Mirrors useAction's structure (arm, resolve the first natural unit) but
+// does NOT repeat its take-affordability gate — recipeCraftable already
+// gates inputs (and station capability) above.
 export function craft(recipeId: string, registry: Registry, state: GameState): void {
   const recipe = registry.recipes.get(recipeId);
   if (!recipe) throw new RuntimeError(`unknown recipe: ${recipeId}`);
   if (!recipeCraftable(recipe, registry, state)) throw new RuntimeError(`recipe not craftable: ${recipeId}`);
-  for (const input of recipe.in) applyResult({ kind: 'take', item: input.item, amount: input.amount }, state);
-  for (const output of recipe.out) applyResult({ kind: 'give', item: output.item, amount: output.amount }, state);
-  if (recipe.skill) applyResult({ kind: 'xp', skill: recipe.skill.skill, amount: recipe.skill.amount }, state);
-  if (recipe.say) state.log.push(recipe.say);
+
+  const action = registry.recipeActions.get(recipeId)!;
+  const repeating = action.repeating === true;
+  const duration = attemptDuration(action, state, registry);
+  if (repeating && duration <= 0) {
+    throw new RuntimeError(`repeating recipe ${recipeId} needs a positive time: after speed scaling`);
+  }
+
+  state.activeAction = { ownerRef: `recipe.${recipeId}`, actionLabel: action.label, progress: 0, repeating, healthRemaining: action.health ?? 1, attemptsMade: 0 };
+  const firstUnit = action.accuracy ? duration : fightParams(action, state, registry).attemptsToResolve * duration;
+  resolve(state, registry, state.time + firstUnit);
 }
 
 export interface TestResult {

@@ -122,6 +122,7 @@ look in:
 
 # entity oven
 examine: A stone oven, its coals still glowing.
+stations: oven
 roast chestnuts:
   repeating
   speed: cooking-speed

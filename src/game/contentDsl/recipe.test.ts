@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { craft, createGameState, loadModule, Registry, RuntimeError, recipeCraftable } from './runtime';
+import { craft, createGameState, loadModule, Registry, RuntimeError, recipeCraftable, resolve } from './runtime';
 import { startSession, view } from './session';
 
 const MODULE = `
@@ -19,6 +19,7 @@ examine: A warm loaf.
 
 # entity oven
 examine: A stone oven.
+stations: oven
 
 # location guide-house
 x: 0, y: 0
@@ -78,6 +79,11 @@ describe('craft', () => {
     expect(state.inventory.bread).toBe(1);
     expect(state.xp.cooking).toBe(4);
     expect(state.log).toContain('The oven bakes your dough into a golden loaf.');
+    // bread has no time:, so it compiles to an instant, non-repeating craft
+    // (B1's duration<=0 boundary fires synchronously inside craft()'s
+    // resolve() call) — byte-identical to the old direct-apply craft().
+    expect(state.time).toBe(0);
+    expect(state.activeAction).toBeNull();
   });
 
   it('throws when an input is missing', () => {
@@ -137,5 +143,149 @@ describe('session craft choices', () => {
     v = view(session);
     expect(v.choices.map((c) => c.id)).toContain('craft:dough');
     expect(v.choices.map((c) => c.id)).not.toContain('craft:bread');
+  });
+});
+
+// Gate: a recipe requiring a capability is craftable only at a location
+// containing an entity that offers it, and NOT at a location without one —
+// independent of the "bread"/"oven" fixture above, using a differently-named
+// capability ("stove") to prove the match is on the capability id, not a
+// coincidence of reusing the word "oven" on both sides.
+const STATION_MODULE = `
+# item water
+examine: A splash of water.
+
+# item broth
+examine: A simple vegetable broth.
+
+# entity stovetop
+examine: A small camp stove.
+stations: stove
+
+# location camp
+x: 2, y: 0
+entities:
+  stovetop
+
+# location clearing
+x: 3, y: 0
+
+# recipe soup
+station: stove
+in: water
+out: broth
+
+# recipe stew
+in: water
+out: broth
+`;
+
+describe('recipe station capability', () => {
+  it('a station-gated recipe is craftable where the capability is present, not where it is absent; a stationless recipe is craftable anywhere', () => {
+    const registry = loadModule(STATION_MODULE);
+    const soup = registry.recipes.get('soup')!;
+    const stew = registry.recipes.get('stew')!;
+
+    const atCamp = createGameState('camp');
+    atCamp.inventory.water = 1;
+    expect(recipeCraftable(soup, registry, atCamp)).toBe(true);
+
+    const atClearing = createGameState('clearing');
+    atClearing.inventory.water = 1;
+    expect(recipeCraftable(soup, registry, atClearing)).toBe(false);
+
+    // Stationless: craftable at both, purely on input affordability.
+    expect(recipeCraftable(stew, registry, atCamp)).toBe(true);
+    expect(recipeCraftable(stew, registry, atClearing)).toBe(true);
+  });
+});
+
+// Gate: a time>0 recipe compiles to a repeating, spannable craft — craft()
+// produces exactly one completion and leaves a `recipe.<id>` activeAction
+// that a later resolve()/wait continues, exactly like a repeating entity
+// action (the time:0 instant-craft path is covered above, in the `craft`
+// describe block, which also asserts no lingering activeAction).
+const SPANNABLE_MODULE = `
+# item raw-clay
+examine: A lump of raw clay.
+
+# item clay-brick
+examine: A fired clay brick.
+
+# location kiln-yard
+x: 0, y: 0
+starting
+
+# recipe brick
+time: 2
+in: raw-clay
+out: clay-brick
+`;
+
+describe('spannable repeating craft', () => {
+  it('craft() on a time>0 recipe fires one completion then leaves an activeAction a later resolve() continues', () => {
+    const registry = loadModule(SPANNABLE_MODULE);
+    const state = createGameState('kiln-yard');
+    state.inventory['raw-clay'] = 3;
+
+    craft('brick', registry, state);
+    expect(state.inventory['clay-brick']).toBe(1);
+    expect(state.inventory['raw-clay']).toBe(2);
+    expect(state.time).toBe(2);
+    expect(state.activeAction).toEqual({ ownerRef: 'recipe.brick', actionLabel: 'Craft Brick', progress: 0, repeating: true, healthRemaining: 1, attemptsMade: 0 });
+
+    resolve(state, registry, 6); // two more completions' worth of time
+    expect(state.inventory['clay-brick']).toBe(3);
+    expect(state.inventory['raw-clay']).toBe(0);
+    expect(state.activeAction).toBeNull(); // input exhausted mid-way through the span
+  });
+});
+
+// Gate: a repeating, accuracy-gated recipe with a `burnt` output produces
+// both outcomes over many crafts, each consuming exactly one input, success
+// + burnt totaling the craft count — the same distribution shape as a
+// stochastic entity fight (see resolve.test.ts), reached through craft().
+const BURN_MODULE = `
+# stat kiln-accuracy
+base: 0.6
+
+# item raw-clay
+examine: A lump of raw clay.
+
+# item clay-tile
+examine: A fired clay tile.
+
+# item slag
+examine: A ruined, half-melted lump of clay.
+
+# location kiln-yard
+x: 0, y: 0
+starting
+
+# recipe tile
+time: 1
+accuracy: kiln-accuracy
+in: raw-clay
+out: clay-tile
+burnt: slag
+`;
+
+describe('burn: accuracy < 1 with a burnt output', () => {
+  it('produces both fired and burnt outcomes over many crafts, each consuming exactly one input, fired + burnt totaling the craft count', () => {
+    const registry = loadModule(BURN_MODULE);
+    const attempts = 500;
+    const state = createGameState('kiln-yard');
+    state.inventory['raw-clay'] = attempts;
+
+    craft('tile', registry, state);
+    resolve(state, registry, attempts * 10); // generous horizon; input exhausts well before this
+
+    const fired = state.inventory['clay-tile'] ?? 0;
+    const burnt = state.inventory['slag'] ?? 0;
+    expect(state.inventory['raw-clay']).toBe(0);
+    expect(fired).toBeGreaterThan(0);
+    expect(burnt).toBeGreaterThan(0);
+    expect(fired + burnt).toBe(attempts);
+    expect(state.activeAction).toBeNull();
   });
 });

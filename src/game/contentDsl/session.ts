@@ -77,7 +77,13 @@ function locationChoices(session: PlaySession): PlayChoice[] {
 
   for (const recipe of registry.recipes.values()) {
     if (!recipeCraftable(recipe, registry, state)) continue;
-    const detail = recipe.station ? registry.entities.get(recipe.station)?.title : undefined;
+    // recipe.station is a capability, not an entity id — show the title of
+    // the present entity that provides it, falling back to the humanized
+    // capability id if none is found (shouldn't happen once recipeCraftable
+    // has already confirmed one is present).
+    const detail = recipe.station
+      ? (location.entities.map((entityId) => registry.entities.get(entityId)).find((entity) => entity?.stations.includes(recipe.station!))?.title ?? humanize(recipe.station))
+      : undefined;
     choices.push({ id: `craft:${recipe.id}`, kind: 'craft', label: `Craft ${humanize(recipe.id)}`, detail });
   }
 
