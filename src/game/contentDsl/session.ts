@@ -18,6 +18,7 @@ export interface PlayView {
   said: string[];
   choices: PlayChoice[];
   time: number;
+  pendingModal?: string;
 }
 
 export interface PlaySession {
@@ -175,6 +176,7 @@ export function view(session: PlaySession): PlayView {
     said,
     choices: computeChoices(session),
     time: state.time,
+    pendingModal: state.pendingModal,
   };
 }
 
@@ -187,5 +189,14 @@ export function apply(session: PlaySession, choiceId: string): PlayView {
 
 export function wait(session: PlaySession, seconds: number): PlayView {
   resolve(session.state, session.registry, session.state.time + seconds);
+  return view(session);
+}
+
+// Called by a driver (session/play-cli) once it has collected whatever the
+// pending modal needed from the player. Currently the only modal is
+// character-creation, so this is the one place `state.player` is set.
+export function submitModal(session: PlaySession, data: { name: string; race: string }): PlayView {
+  session.state.player = { name: data.name, race: data.race };
+  session.state.pendingModal = undefined;
   return view(session);
 }

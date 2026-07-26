@@ -56,6 +56,10 @@ export interface GameState {
   // a caller splits a resolve() span; see the associativity invariant on
   // resolve().
   rng: number;
+  player: { name: string; race: string };
+  // Set by `open-modal`, cleared once the driver (session/play-cli) collects
+  // whatever the modal needed and calls back in (e.g. submitModal).
+  pendingModal?: string;
 }
 
 // Nonzero seed: an LCG degenerates only at a genuine fixed point, which this
@@ -63,7 +67,7 @@ export interface GameState {
 const DEFAULT_RNG_SEED = 20260718;
 
 export function createGameState(location = ''): GameState {
-  return { flags: {}, inventory: {}, location, visits: {}, xp: {}, log: [], time: 0, activeAction: null, activeBuffs: {}, rng: DEFAULT_RNG_SEED };
+  return { flags: {}, inventory: {}, location, visits: {}, xp: {}, log: [], time: 0, activeAction: null, activeBuffs: {}, rng: DEFAULT_RNG_SEED, player: { name: '', race: '' } };
 }
 
 // A small LCG (same shape as glibc's rand()): advances state.rng and returns a
@@ -168,15 +172,16 @@ export function loadModule(source: string): Registry {
 
 // References are flat dotted keys, not nested lookups (grammar.md "References");
 // the one exception the engine maintains is `<node-name>.visits`.
-function resolveReference(reference: Reference, state: GameState): boolean | number | undefined {
+function resolveReference(reference: Reference, state: GameState): boolean | number | string | undefined {
   const { path } = reference;
   if (path.length === 1 && path[0] === 'time') return state.time;
   if (path.length === 2 && path[1] === 'visits') return state.visits[path[0]] ?? 0;
+  if (path.length === 2 && path[0] === 'player') return state.player[path[1] as 'name' | 'race'];
   return state.flags[path.join('.')];
 }
 
-function truthy(value: boolean | number | undefined): boolean {
-  return value !== undefined && value !== false && value !== 0;
+function truthy(value: boolean | number | string | undefined): boolean {
+  return value !== undefined && value !== false && value !== 0 && value !== '';
 }
 
 export function evaluateCondition(condition: Condition, state: GameState): boolean {
@@ -262,6 +267,7 @@ export function applyResult(result: ActionResult, state: GameState): void {
       break;
     case 'open-modal':
       state.log.push(`modal:${result.modal}`);
+      state.pendingModal = result.modal;
       break;
   }
 }

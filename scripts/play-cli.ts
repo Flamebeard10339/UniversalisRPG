@@ -3,7 +3,7 @@ import path from 'node:path';
 import { createInterface } from 'node:readline/promises';
 import { pathToFileURL } from 'node:url';
 import { loadModule, RuntimeError, type GameState } from '../src/game/contentDsl/runtime';
-import { apply, startSession, view, wait, type PlayChoice, type PlaySession, type PlayView } from '../src/game/contentDsl/session';
+import { apply, startSession, submitModal, view, wait, type PlayChoice, type PlaySession, type PlayView } from '../src/game/contentDsl/session';
 
 const repoRoot = path.join(import.meta.dirname, '..');
 const defaultContent = 'content/tutorial-island.dsl';
@@ -108,6 +108,23 @@ function loadContent(files: string[]): string {
   return files.map((file) => readFileSync(path.resolve(repoRoot, file), 'utf8')).join('\n');
 }
 
+const RACES = ['Human', 'Elf', 'Dwarf', 'Orc'];
+
+// Multiple sequential reads for one modal — handled here in the shell, not in
+// the pure handleCommand, since it needs to await readline input mid-flow.
+async function promptCharacterCreation(rl: ReturnType<typeof createInterface>): Promise<{ name: string; race: string }> {
+  const rawName = (await rl.question('Name: ')).trim();
+  const name = rawName === '' ? 'Adventurer' : rawName;
+
+  console.log('Race:');
+  RACES.forEach((race, index) => console.log(`  ${index + 1}) ${race}`));
+  const rawRace = (await rl.question('Race: ')).trim();
+  const index = Number(rawRace);
+  const race = Number.isInteger(index) && index >= 1 && index <= RACES.length ? RACES[index - 1] : 'Human';
+
+  return { name, race };
+}
+
 async function main(): Promise<void> {
   const arg = process.argv[2];
   const files = (arg ?? defaultContent).split(',').map((file) => file.trim()).filter(Boolean);
@@ -124,6 +141,11 @@ async function main(): Promise<void> {
       const result = handleCommand(session, current, line);
       if (result.output.length > 0) console.log(result.output.join('\n'));
       if (result.view) current = result.view;
+      if (current.pendingModal === 'character-creation') {
+        const data = await promptCharacterCreation(rl);
+        current = submitModal(session, data);
+        console.log(formatView(current).join('\n'));
+      }
       if (result.quit) break;
       process.stdout.write('> ');
     }

@@ -1,7 +1,7 @@
 import { readFileSync } from 'fs';
 import { describe, expect, it } from 'vitest';
 import { loadModule } from './runtime';
-import { apply, PlayView, startSession, view } from './session';
+import { apply, PlayView, startSession, submitModal, view } from './session';
 
 const source = readFileSync('content/tutorial-island.dsl', 'utf8');
 
@@ -134,5 +134,39 @@ eat: take: 1 bread, say: You eat the bread.
     expect(v.said).toContain('You eat the bread.');
     expect(session.state.inventory.bread).toBe(0);
     expect(ids(v)).not.toContain('use:item.bread.eat');
+  });
+
+  it('surfaces a pending modal from open modal:, and submitModal captures player name/race and clears it', () => {
+    const module = `
+# location camp
+x: 0, y: 0
+starting
+entities:
+  mirror
+
+# entity mirror
+look in: open modal: character-creation
+
+# dialogue mirror-greeting
+owner = mirror
+
+node greeting:
+  when: not greeted
+  set: greeted
+  There you are, {player.name}, {player.race}.
+`;
+    const registry = loadModule(module);
+    const session = startSession(registry);
+
+    let v = apply(session, 'use:entity.mirror.look in');
+    expect(v.pendingModal).toBe('character-creation');
+    expect(session.state.player).toEqual({ name: '', race: '' });
+
+    v = submitModal(session, { name: 'Rowan', race: 'Elf' });
+    expect(v.pendingModal).toBeUndefined();
+    expect(session.state.player).toEqual({ name: 'Rowan', race: 'Elf' });
+
+    v = apply(session, 'talk:mirror');
+    expect(v.said).toContain('There you are, Rowan, Elf.');
   });
 });

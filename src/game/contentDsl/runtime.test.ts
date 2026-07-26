@@ -156,6 +156,13 @@ describe('applyResult', () => {
     expect(state.location).toBe('beach');
     expect(state.flags['bank.discovered']).toBe(true);
   });
+
+  it('logs and sets pendingModal on open-modal', () => {
+    const state = createGameState();
+    applyResult({ kind: 'open-modal', modal: 'character-creation' }, state);
+    expect(state.log).toContain('modal:character-creation');
+    expect(state.pendingModal).toBe('character-creation');
+  });
 });
 
 describe('useAction: take affordability and graceful failure', () => {
@@ -268,5 +275,27 @@ describe('renderSegments', () => {
       state,
     );
     expect(rendered).toBe('Hello  already answered');
+  });
+
+  it('interpolates player.name and player.race from state.player', () => {
+    const state = createGameState();
+    state.player = { name: 'Rowan', race: 'Elf' };
+    const rendered = renderSegments(
+      [
+        { kind: 'literal', text: 'There you are, ' },
+        { kind: 'interpolate', reference: { path: ['player', 'name'] } },
+        { kind: 'literal', text: ', ' },
+        { kind: 'interpolate', reference: { path: ['player', 'race'] } },
+        { kind: 'literal', text: '.' },
+      ],
+      state,
+    );
+    expect(rendered).toBe('There you are, Rowan, Elf.');
+  });
+
+  it('renders an unset player.name as empty text', () => {
+    const state = createGameState();
+    const rendered = renderSegments([{ kind: 'interpolate', reference: { path: ['player', 'name'] } }], state);
+    expect(rendered).toBe('');
   });
 });
