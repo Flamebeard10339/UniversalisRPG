@@ -723,7 +723,20 @@ function grantFoodBuff(item: Item, state: GameState): void {
   }
 }
 
-export function useAction(obj: string, objId: string, actionId: string, registry: Registry, state: GameState): void {
+// Result of arming a spannable action/craft: `armed: false` means a take-gate
+// failure already logged its onFailure/shortfall message (nothing to resolve);
+// `armed: true` means state.activeAction is now set and `firstUnit` is the
+// span (from state.time) the *first* natural unit of play covers — a caller
+// that wants the instant behavior of today calls resolve() with it right
+// away, a live driver instead drives `wait()` toward it over real time.
+type ArmResult = { armed: true; firstUnit: number } | { armed: false };
+
+// Everything useAction did before its resolve() call: gating (requires/
+// hiddenIf throw, take-affordability failure logs and returns un-armed) and
+// arming state.activeAction. Extracted so a live driver can arm a spannable
+// action WITHOUT resolving its first unit instantly (see actionFirstUnit for
+// the side-effect-free duration probe that decides whether to do so).
+export function armAction(obj: string, objId: string, actionId: string, registry: Registry, state: GameState): ArmResult {
   const target = findActionOwner(obj, objId, registry) as { actions?: Action[] } | undefined;
   if (!target) throw new RuntimeError(`unknown ${obj}: ${objId}`);
 
@@ -743,7 +756,7 @@ export function useAction(obj: string, objId: string, actionId: string, registry
   if (shortfall !== undefined) {
     if (action.onFailure) for (const result of action.onFailure) applyResult(result, state);
     else state.log.push(`You don't have enough ${registry.items.get(shortfall)?.title ?? shortfall}.`);
-    return;
+    return { armed: false };
   }
 
   const repeating = action.repeating === true;
@@ -753,15 +766,39 @@ export function useAction(obj: string, objId: string, actionId: string, registry
   }
 
   state.activeAction = { ownerRef: `${obj}.${objId}`, actionLabel: actionId, progress: 0, repeating, healthRemaining: action.health ?? 1, attemptsMade: 0 };
-  // Resolve exactly the first natural unit of play: one full fight when it's
-  // closed-form (deterministic), or just the first attempt when it isn't
-  // (stochastic — fight length is random, so there's no fixed span to jump to).
+  // The first natural unit of play: one full fight when it's closed-form
+  // (deterministic), or just the first attempt when it isn't (stochastic —
+  // fight length is random, so there's no fixed span to jump to).
   const firstUnit = action.accuracy ? duration : fightPlan(action, state, registry).attemptsToResolve * duration;
-  resolve(state, registry, state.time + firstUnit);
+  return { armed: true, firstUnit };
+}
 
-  if (obj === 'item' && !repeating && required.has(objId)) {
-    const item = registry.items.get(objId);
-    if (item) grantFoodBuff(item, state);
+// Side-effect-free probe: the same firstUnit armAction would compute, without
+// arming or mutating anything, so a driver can decide instant-vs-spannable
+// before committing to arm. Returns 0 if the action can't be found — a
+// caller then falls back to the instant path, which reproduces whatever
+// error/behavior looking it up for real would have produced.
+export function actionFirstUnit(obj: string, objId: string, actionId: string, registry: Registry, state: GameState): number {
+  const target = findActionOwner(obj, objId, registry) as { actions?: Action[] } | undefined;
+  const action = target?.actions?.find((a) => a.label === actionId);
+  if (!action) return 0;
+  const duration = attemptDuration(action, state, registry);
+  return action.accuracy ? duration : fightPlan(action, state, registry).attemptsToResolve * duration;
+}
+
+export function useAction(obj: string, objId: string, actionId: string, registry: Registry, state: GameState): void {
+  const armed = armAction(obj, objId, actionId, registry, state);
+  if (!armed.armed) return;
+  resolve(state, registry, state.time + armed.firstUnit);
+
+  if (obj === 'item') {
+    const target = findActionOwner(obj, objId, registry) as { actions?: Action[] } | undefined;
+    const action = target?.actions?.find((a) => a.label === actionId);
+    const takesSelf = action?.results.some((r) => r.kind === 'take' && r.item === objId) ?? false;
+    if (action && action.repeating !== true && takesSelf) {
+      const item = registry.items.get(objId);
+      if (item) grantFoodBuff(item, state);
+    }
   }
 }
 
@@ -811,9 +848,11 @@ export function recipeCraftable(recipe: Recipe, registry: Registry, state: GameS
   return true;
 }
 
-// Mirrors useAction (arm, resolve the first unit) but skips its take gate —
-// recipeCraftable already gates inputs and capability.
-export function craft(recipeId: string, registry: Registry, state: GameState): void {
+// Mirrors armAction (arm without resolving) but skips its take gate —
+// recipeCraftable already gates inputs and capability, so this ArmResult
+// never actually comes back armed: false today; the union is kept for
+// symmetry with armAction/ArmResult.
+export function armCraft(recipeId: string, registry: Registry, state: GameState): ArmResult {
   const recipe = registry.recipes.get(recipeId);
   if (!recipe) throw new RuntimeError(`unknown recipe: ${recipeId}`);
   if (!recipeCraftable(recipe, registry, state)) throw new RuntimeError(`recipe not craftable: ${recipeId}`);
@@ -827,7 +866,22 @@ export function craft(recipeId: string, registry: Registry, state: GameState): v
 
   state.activeAction = { ownerRef: `recipe.${recipeId}`, actionLabel: action.label, progress: 0, repeating, healthRemaining: action.health ?? 1, attemptsMade: 0 };
   const firstUnit = action.accuracy ? duration : fightPlan(action, state, registry).attemptsToResolve * duration;
-  resolve(state, registry, state.time + firstUnit);
+  return { armed: true, firstUnit };
+}
+
+// Side-effect-free probe mirroring actionFirstUnit, for a recipe's compiled
+// Action. Returns 0 if the recipe (or its compiled action) isn't found.
+export function craftFirstUnit(recipeId: string, registry: Registry, state: GameState): number {
+  const action = registry.recipeActions.get(recipeId);
+  if (!action) return 0;
+  const duration = attemptDuration(action, state, registry);
+  return action.accuracy ? duration : fightPlan(action, state, registry).attemptsToResolve * duration;
+}
+
+export function craft(recipeId: string, registry: Registry, state: GameState): void {
+  const armed = armCraft(recipeId, registry, state);
+  if (!armed.armed) return;
+  resolve(state, registry, state.time + armed.firstUnit);
 }
 
 export interface TestResult {

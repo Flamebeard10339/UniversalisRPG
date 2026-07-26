@@ -1,7 +1,7 @@
 import { readFileSync } from 'fs';
 import { describe, expect, it } from 'vitest';
 import { loadModule } from './runtime';
-import { apply, PlayView, startSession, submitModal, view } from './session';
+import { apply, beginAction, PlayView, startSession, submitModal, view } from './session';
 
 const source = readFileSync('content/tutorial-island.dsl', 'utf8');
 
@@ -168,5 +168,80 @@ node greeting:
 
     v = apply(session, 'talk:mirror');
     expect(v.said).toContain('There you are, Rowan, Elf.');
+  });
+});
+
+describe('beginAction: arms a spannable action/craft instead of resolving it, but still completes an instant one', () => {
+  const module = `
+# location camp
+x: 0, y: 0
+starting
+entities:
+  oven
+
+# entity oven
+roast:
+  repeating
+  time: 4
+  give: 1 roasted-chestnut
+
+# item bread
+eat: take: 1 bread, say: You eat the bread.
+
+# recipe dough
+time: 2
+out: 1 dough
+
+# recipe mix
+out: 1 mix
+`;
+
+  it('leaves a spannable entity action armed — activeAction set, progress 0, time and inventory unchanged', () => {
+    const registry = loadModule(module);
+    const session = startSession(registry);
+
+    const v = beginAction(session, 'use:entity.oven.roast');
+    expect(session.state.activeAction).not.toBeNull();
+    expect(session.state.activeAction?.progress).toBe(0);
+    expect(session.state.time).toBe(0);
+    expect(session.state.inventory['roasted-chestnut'] ?? 0).toBe(0);
+    expect(v.time).toBe(0);
+  });
+
+  it('completes an instant item action (no time:) immediately, same as apply', () => {
+    const registry = loadModule(module);
+    const session = startSession(registry);
+    session.state.inventory.bread = 1;
+
+    const v = beginAction(session, 'use:item.bread.eat');
+    expect(session.state.activeAction).toBeNull();
+    expect(session.state.inventory.bread).toBe(0);
+    expect(v.said).toContain('You eat the bread.');
+  });
+
+  it('leaves a spannable craft (time: 2) armed without resolving it', () => {
+    const registry = loadModule(module);
+    const session = startSession(registry);
+
+    const v = beginAction(session, 'craft:dough');
+    expect(session.state.activeAction).not.toBeNull();
+    expect(session.state.time).toBe(0);
+    expect(session.state.inventory.dough ?? 0).toBe(0);
+    expect(v.time).toBe(0);
+  });
+
+  it('completes an instant craft (no time:) immediately, same as apply', () => {
+    const registry = loadModule(module);
+    const session = startSession(registry);
+
+    beginAction(session, 'craft:mix');
+    expect(session.state.activeAction).toBeNull();
+    expect(session.state.inventory.mix).toBe(1);
+  });
+
+  it('throws on an unavailable or unknown choice id, same as apply', () => {
+    const registry = loadModule(module);
+    const session = startSession(registry);
+    expect(() => beginAction(session, 'nonsense')).toThrow();
   });
 });

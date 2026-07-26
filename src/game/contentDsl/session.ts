@@ -1,5 +1,23 @@
 import { Action } from './entity';
-import { craft, DialogueSession, GameState, Registry, RuntimeError, choose, createGameState, evaluateCondition, recipeCraftable, renderSegments, resolve, talk, useAction } from './runtime';
+import {
+  actionFirstUnit,
+  armAction,
+  armCraft,
+  craft,
+  craftFirstUnit,
+  DialogueSession,
+  GameState,
+  Registry,
+  RuntimeError,
+  choose,
+  createGameState,
+  evaluateCondition,
+  recipeCraftable,
+  renderSegments,
+  resolve,
+  talk,
+  useAction,
+} from './runtime';
 import { humanize } from './values';
 
 export type PlayChoiceKind = 'talk' | 'action' | 'travel' | 'dialogue' | 'craft';
@@ -183,6 +201,48 @@ export function view(session: PlaySession): PlayView {
 export function apply(session: PlaySession, choiceId: string): PlayView {
   const choice = computeChoices(session).find((c) => c.id === choiceId);
   if (!choice) throw new RuntimeError(`unavailable choice: ${JSON.stringify(choiceId)}`);
+  dispatch(session, choice);
+  return view(session);
+}
+
+// Like apply(), but for a spannable action/craft it only ARMS the fight
+// (state.activeAction set) instead of resolving its first unit instantly — a
+// live driver then drives it forward over real time via wait(). talk/
+// dialogue/travel choices, and any action/craft whose first unit resolves in
+// zero simulated time (an instant item action, a zero-time craft), still go
+// through the ordinary instant dispatch()/apply() path unchanged — including
+// the food-buff-on-eating side effect that lives in useAction, outside
+// resolve(). After beginAction, session.state.activeAction is non-null IFF a
+// spannable action is now in flight.
+export function beginAction(session: PlaySession, choiceId: string): PlayView {
+  const choice = computeChoices(session).find((c) => c.id === choiceId);
+  if (!choice) throw new RuntimeError(`unavailable choice: ${JSON.stringify(choiceId)}`);
+
+  if (choice.kind === 'craft') {
+    const recipeId = choice.id.slice('craft:'.length);
+    if (craftFirstUnit(recipeId, session.registry, session.state) > 0) {
+      armCraft(recipeId, session.registry, session.state);
+      return view(session);
+    }
+    dispatch(session, choice);
+    return view(session);
+  }
+
+  if (choice.kind === 'action') {
+    const match = /^use:([a-z]+)\.([a-z0-9-]+)\.(.+)$/.exec(choice.id);
+    if (!match) throw new RuntimeError(`malformed action choice id: ${choice.id}`);
+    const [, obj, objId, label] = match;
+    if (actionFirstUnit(obj, objId, label, session.registry, session.state) > 0) {
+      // If the take-gate fails, armAction logs the failure and leaves
+      // activeAction unset; either way there's nothing left to resolve here.
+      armAction(obj, objId, label, session.registry, session.state);
+      return view(session);
+    }
+    dispatch(session, choice);
+    return view(session);
+  }
+
+  // talk/dialogue/travel: unaffected by live mode, stays instant.
   dispatch(session, choice);
   return view(session);
 }

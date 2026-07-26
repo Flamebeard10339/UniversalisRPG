@@ -1,6 +1,19 @@
 import { describe, expect, it } from 'vitest';
 import { Condition } from './condition';
-import { applyResult, createGameState, evaluateCondition, loadModule, renderSegments, runTest, useAction } from './runtime';
+import {
+  actionFirstUnit,
+  applyResult,
+  armAction,
+  armCraft,
+  craft,
+  craftFirstUnit,
+  createGameState,
+  evaluateCondition,
+  loadModule,
+  renderSegments,
+  runTest,
+  useAction,
+} from './runtime';
 
 const MODULE = `
 # location guide-house
@@ -297,5 +310,104 @@ describe('renderSegments', () => {
     const state = createGameState();
     const rendered = renderSegments([{ kind: 'interpolate', reference: { path: ['player', 'name'] } }], state);
     expect(rendered).toBe('');
+  });
+});
+
+describe('armAction / actionFirstUnit: arming a spannable action without resolving it (live-mode support)', () => {
+  const MODULE = `
+# entity oven
+roast:
+  repeating
+  time: 4
+  give: 1 roasted-chestnut
+
+# entity door
+open:
+  say: The door creaks open.
+`;
+
+  it('actionFirstUnit reports the first-unit duration for a spannable action without mutating state', () => {
+    const registry = loadModule(MODULE);
+    const state = createGameState();
+    const duration = actionFirstUnit('entity', 'oven', 'roast', registry, state);
+    expect(duration).toBe(4);
+    expect(state.activeAction).toBeNull();
+    expect(state.time).toBe(0);
+  });
+
+  it('actionFirstUnit reports 0 for an instant action (no time:)', () => {
+    const registry = loadModule(MODULE);
+    const state = createGameState();
+    expect(actionFirstUnit('entity', 'door', 'open', registry, state)).toBe(0);
+  });
+
+  it('actionFirstUnit falls back to 0 for an unknown action or object, mutating nothing', () => {
+    const registry = loadModule(MODULE);
+    const state = createGameState();
+    expect(actionFirstUnit('entity', 'oven', 'bogus', registry, state)).toBe(0);
+    expect(actionFirstUnit('entity', 'no-such-entity', 'anything', registry, state)).toBe(0);
+    expect(state.activeAction).toBeNull();
+  });
+
+  it('armAction sets activeAction and reports firstUnit WITHOUT resolving any of it', () => {
+    const registry = loadModule(MODULE);
+    const state = createGameState();
+    const result = armAction('entity', 'oven', 'roast', registry, state);
+    expect(result).toEqual({ armed: true, firstUnit: 4 });
+    expect(state.activeAction).toEqual({ ownerRef: 'entity.oven', actionLabel: 'roast', progress: 0, repeating: true, healthRemaining: 1, attemptsMade: 0 });
+    expect(state.time).toBe(0);
+    expect(state.inventory['roasted-chestnut'] ?? 0).toBe(0);
+  });
+
+  it('useAction (armAction immediately followed by resolve) still completes the first unit instantly, unchanged', () => {
+    const registry = loadModule(MODULE);
+    const state = createGameState();
+    useAction('entity', 'oven', 'roast', registry, state);
+    expect(state.time).toBe(4);
+    expect(state.inventory['roasted-chestnut']).toBe(1);
+    // repeating: stays armed for a live driver (or another wait()) to continue.
+    expect(state.activeAction).not.toBeNull();
+  });
+});
+
+describe('armCraft / craftFirstUnit', () => {
+  const MODULE = `
+# item raw-shrimp
+examine: Fresh-caught shrimp, raw.
+
+# recipe cook
+time: 2
+in: 1 raw-shrimp
+out: 1 cooked-shrimp
+`;
+
+  it('craftFirstUnit reports the duration without mutating state', () => {
+    const registry = loadModule(MODULE);
+    const state = createGameState();
+    state.inventory['raw-shrimp'] = 1;
+    expect(craftFirstUnit('cook', registry, state)).toBe(2);
+    expect(state.activeAction).toBeNull();
+  });
+
+  it('craftFirstUnit falls back to 0 for an unknown recipe', () => {
+    const registry = loadModule(MODULE);
+    const state = createGameState();
+    expect(craftFirstUnit('no-such-recipe', registry, state)).toBe(0);
+  });
+
+  it('armCraft arms without resolving; craft() (armCraft + resolve) still completes as before', () => {
+    const registry = loadModule(MODULE);
+    const state = createGameState();
+    state.inventory['raw-shrimp'] = 1;
+
+    const armed = armCraft('cook', registry, state);
+    expect(armed).toEqual({ armed: true, firstUnit: 2 });
+    expect(state.time).toBe(0);
+    expect(state.inventory['cooked-shrimp'] ?? 0).toBe(0);
+    expect(state.inventory['raw-shrimp']).toBe(1); // not consumed until resolve()
+
+    craft('cook', registry, state);
+    expect(state.time).toBe(2);
+    expect(state.inventory['cooked-shrimp']).toBe(1);
   });
 });
