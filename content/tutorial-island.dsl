@@ -3,6 +3,13 @@
 // Paths 2/3 (thieving, fishing) are only stubbed where Path 1 shares their props
 // (front door, dresser, lockpick) so the world stays internally consistent.
 
+// --- variables ---
+
+// Seconds of real-time travel per unit of straight-line distance between
+// locations; the beach sits one unit east of the guide house's front door.
+# variable travel-seconds-per-unit
+value: 5
+
 // --- stats ---
 
 # stat attack

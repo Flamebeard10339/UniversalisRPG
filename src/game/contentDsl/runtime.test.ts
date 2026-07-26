@@ -12,6 +12,7 @@ import {
   loadModule,
   renderSegments,
   runTest,
+  travelSecondsPerUnit,
   useAction,
 } from './runtime';
 
@@ -73,6 +74,23 @@ describe('runTest', () => {
     const result = runTest('failing', registry, state);
     expect(result.passed).toBe(false);
     expect(result.failure).toBe('unlocked');
+  });
+});
+
+describe('travelSecondsPerUnit', () => {
+  it('reads the authored travel-seconds-per-unit variable', () => {
+    const registry = loadModule('# variable travel-seconds-per-unit\nvalue: 7');
+    expect(travelSecondsPerUnit(registry)).toBe(7);
+  });
+
+  it('falls back to the engine default when content omits the variable', () => {
+    const registry = loadModule('# location camp\nx: 0, y: 0\nstarting');
+    expect(travelSecondsPerUnit(registry)).toBe(5);
+  });
+
+  it('falls back to the default when the variable is declared with an empty value', () => {
+    const registry = loadModule('# variable travel-seconds-per-unit');
+    expect(travelSecondsPerUnit(registry)).toBe(5);
   });
 });
 

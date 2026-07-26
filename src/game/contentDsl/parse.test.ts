@@ -9,6 +9,7 @@ import { SectionSchema, hydrateSection, parseSection } from './section';
 import { skillSchema } from './skill';
 import { statSchema } from './stat';
 import { splitSections } from './structure';
+import { variableSchema } from './variable';
 import { tagClause } from './tagClause';
 import { text } from './values';
 
@@ -78,6 +79,19 @@ describe('stat and skill', () => {
     const skill = parseOne('# skill mining', skillSchema);
     expect(skill['stat-id']).toBeUndefined();
     expect(hydrateSection(skill, skillSchema).title).toBe('Mining');
+  });
+});
+
+describe('variable', () => {
+  it('parses a decimal value', () => {
+    const variable = parseOne('# variable travel-seconds-per-unit\nvalue: 5', variableSchema);
+    expect(variable).toEqual({ id: 'travel-seconds-per-unit', value: 5 });
+  });
+
+  it('leaves an omitted value absent so the consumer applies its own fallback', () => {
+    const variable = parseOne('# variable travel-seconds-per-unit', variableSchema);
+    expect(variable.value).toBeUndefined();
+    expect(hydrateSection(variable, variableSchema).value).toBeUndefined();
   });
 });
 

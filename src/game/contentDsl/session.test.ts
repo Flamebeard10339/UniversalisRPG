@@ -1,6 +1,6 @@
 import { readFileSync } from 'fs';
 import { describe, expect, it } from 'vitest';
-import { loadModule } from './runtime';
+import { loadModule, travelSecondsPerUnit } from './runtime';
 import { apply, beginAction, cancelAction, PlayView, startSession, submitModal, view, wait } from './session';
 
 const source = readFileSync('content/tutorial-island.dsl', 'utf8');
@@ -102,10 +102,13 @@ describe('session', () => {
     expect(v.location.id).toBe('beach');
 
     // The route's mechanical sim-time: dough (2s) + bread (3s) + three rat
-    // fights (3s each) + the beach journey (1 unit east × 5s/unit = 5s) = 19s.
-    // Talking, the mirror and ascend/descend (instant stairs actions) cost
-    // nothing. This doubles as a measured-playtime invariant.
-    expect(v.time).toBe(19);
+    // fights (3s each) + the beach journey (1 unit east × the authored
+    // travel-seconds-per-unit). Talking, the mirror and ascend/descend (instant
+    // stairs actions) cost nothing. This doubles as a measured-playtime
+    // invariant; the beach leg is derived from content so it tracks the authored
+    // variable rather than a hardcoded pace.
+    const beachJourney = 1 * travelSecondsPerUnit(registry);
+    expect(v.time).toBe(2 + 3 + 3 * 3 + beachJourney);
   });
 
   it('throws a clear error on an unavailable or unknown choice id', () => {
@@ -250,8 +253,12 @@ out: 1 mix
 
 describe('travel is a distance-timed journey', () => {
   // beach sits one unit east of camp, so a journey between them lasts
-  // 1 × TRAVEL_SECONDS_PER_UNIT (5s).
+  // 1 × the authored travel-seconds-per-unit. A distinctive value (7, not the
+  // engine default) proves the journey time is read from content, not baked in.
   const module = `
+# variable travel-seconds-per-unit
+value: 7
+
 # location camp
 x: 0, y: 0
 starting
@@ -267,16 +274,18 @@ adjacent:
   it('apply relocates instantly in real time while accruing the journey sim-time', () => {
     const registry = loadModule(module);
     const session = startSession(registry);
+    const journey = 1 * travelSecondsPerUnit(registry);
 
     const v = apply(session, 'travel:beach');
     expect(v.location.id).toBe('beach');
-    expect(v.time).toBe(5);
+    expect(v.time).toBe(journey);
     expect(session.state.activeAction).toBeNull();
   });
 
   it('beginAction arms the journey spannably — location and time unchanged until driven', () => {
     const registry = loadModule(module);
     const session = startSession(registry);
+    const journey = 1 * travelSecondsPerUnit(registry);
 
     const v = beginAction(session, 'travel:beach');
     expect(session.state.activeAction).not.toBeNull();
@@ -284,10 +293,10 @@ adjacent:
     expect(session.state.time).toBe(0);
     expect(v.location.id).toBe('camp');
 
-    const arrived = wait(session, 5);
+    const arrived = wait(session, journey);
     expect(arrived.location.id).toBe('beach');
     expect(session.state.activeAction).toBeNull();
-    expect(session.state.time).toBe(5);
+    expect(session.state.time).toBe(journey);
   });
 });
 

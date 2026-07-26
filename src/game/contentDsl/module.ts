@@ -9,6 +9,7 @@ import { skillSchema } from './skill';
 import { statSchema } from './stat';
 import { RawSection, splitSections } from './structure';
 import { parseTest } from './test';
+import { variableSchema } from './variable';
 
 // Most kinds are a SectionSchema walked by the generic engine; a few (dialogue)
 // have a grammar too far from key/value to fit it and bring their own parser.
@@ -19,6 +20,7 @@ const PARSERS: Record<string, (section: RawSection) => object> = {
   location: (section) => parseSection(section, locationSchema),
   entity: (section) => parseSection(section, entitySchema),
   recipe: (section) => parseSection(section, recipeSchema),
+  variable: (section) => parseSection(section, variableSchema),
   dialogue: parseDialogue,
   test: parseTest,
 };

@@ -13,6 +13,7 @@ import { Stat, statSchema } from './stat';
 import { TagClause } from './tagClause';
 import { Test } from './test';
 import { humanize } from './values';
+import { Variable, variableSchema } from './variable';
 
 export class RuntimeError extends Error {}
 
@@ -105,6 +106,8 @@ export interface Registry {
   dialogues: Map<string, Dialogue>;
   dialoguesByOwner: Map<string, Dialogue>;
   tests: Map<string, Test>;
+  // Authored numeric constants (see travelSecondsPerUnit and friends).
+  variables: Map<string, Variable>;
 }
 
 export function loadModule(source: string): Registry {
@@ -119,6 +122,7 @@ export function loadModule(source: string): Registry {
     dialogues: new Map(),
     dialoguesByOwner: new Map(),
     tests: new Map(),
+    variables: new Map(),
   };
 
   for (const section of parseModule(source)) {
@@ -163,6 +167,11 @@ export function loadModule(source: string): Registry {
       case 'test': {
         const test = section.value as Test;
         registry.tests.set(test.id, test);
+        break;
+      }
+      case 'variable': {
+        const variable = hydrateSection(section.value as Authored<Variable>, variableSchema);
+        registry.variables.set(variable.id, variable);
         break;
       }
     }
@@ -389,9 +398,15 @@ function findActionOwner(obj: string, objId: string, registry: Registry): unknow
 }
 
 // Seconds of travel per unit of straight-line coordinate distance. A travel
-// edge's journey lasts distance × this factor (see travelAction); tune here to
-// pace real-time travel.
-const TRAVEL_SECONDS_PER_UNIT = 5;
+// edge's journey lasts distance × this factor (see travelAction). Authored as
+// `# variable travel-seconds-per-unit`; content that omits it falls back to this
+// default so a bare module still paces travel sensibly.
+const TRAVEL_SECONDS_PER_UNIT = 'travel-seconds-per-unit';
+const DEFAULT_TRAVEL_SECONDS_PER_UNIT = 5;
+
+export function travelSecondsPerUnit(registry: Registry): number {
+  return registry.variables.get(TRAVEL_SECONDS_PER_UNIT)?.value ?? DEFAULT_TRAVEL_SECONDS_PER_UNIT;
+}
 
 function locationDistance(a: Location, b: Location): number {
   return Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z);
@@ -414,7 +429,7 @@ function travelAction(originId: string, destId: string, registry: Registry): Act
   return {
     label: `Travel to ${dest.title}`,
     results: [{ kind: 'relocate', location: destId }],
-    time: locationDistance(origin, dest) * TRAVEL_SECONDS_PER_UNIT,
+    time: locationDistance(origin, dest) * travelSecondsPerUnit(registry),
     health: 1,
   };
 }
