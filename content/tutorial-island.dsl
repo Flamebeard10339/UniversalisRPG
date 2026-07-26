@@ -156,6 +156,7 @@ title: Giant Rats
 examine: Three hunched rats claw at overturned crates, eyes red in the dark.
 fight:
   hidden if: tutorial.rats-killed >= 3
+  time: 3
   xp: melee 5
   on success:
     add: tutorial.rats-killed 1
@@ -167,6 +168,7 @@ fight:
 in: jug-of-water, pot-of-flour
 out: dough
 skill: cooking 2
+time: 2
 say: You knead water and flour into a ball of dough.
 
 # recipe bread
@@ -174,6 +176,7 @@ station: oven
 in: dough
 out: bread
 skill: cooking 4
+time: 3
 say: The oven bakes your dough into a golden loaf.
 
 // --- dialogue ---

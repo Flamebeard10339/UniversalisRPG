@@ -249,15 +249,24 @@ function loadContent(files: string[]): string {
 
 const RACES = ['Human', 'Elf', 'Dwarf', 'Orc'];
 
+async function nextLine(it: AsyncIterator<string>): Promise<string> {
+  const result = await it.next();
+  return result.done ? '' : result.value;
+}
+
 // Multiple sequential reads for one modal — handled here in the shell, not in
-// the pure handleCommand, since it needs to await readline input mid-flow.
-async function promptCharacterCreation(rl: ReturnType<typeof createInterface>): Promise<{ name: string; race: string }> {
-  const rawName = (await rl.question('Name: ')).trim();
+// the pure handleCommand, since it needs to await input mid-flow. Reads from
+// the SAME async iterator the main loop drives (rl.question drops piped lines
+// on Node 24; the iterator does not), so piped/agent-driven runs can answer it.
+async function promptCharacterCreation(it: AsyncIterator<string>): Promise<{ name: string; race: string }> {
+  process.stdout.write('Name: ');
+  const rawName = (await nextLine(it)).trim();
   const name = rawName === '' ? 'Adventurer' : rawName;
 
   console.log('Race:');
   RACES.forEach((race, index) => console.log(`  ${index + 1}) ${race}`));
-  const rawRace = (await rl.question('Race: ')).trim();
+  process.stdout.write('Race: ');
+  const rawRace = (await nextLine(it)).trim();
   const index = Number(rawRace);
   const race = Number.isInteger(index) && index >= 1 && index <= RACES.length ? RACES[index - 1] : 'Human';
 
@@ -323,7 +332,7 @@ async function main(): Promise<void> {
       // them (an instant action reached via beginAction in live mode can open
       // one just like apply() can) — see character-creation's mirror trigger.
       if (current.pendingModal === 'character-creation') {
-        const data = await promptCharacterCreation(rl);
+        const data = await promptCharacterCreation(it);
         current = submitModal(session, data);
         console.log(formatView(current).join('\n'));
       }

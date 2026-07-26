@@ -101,9 +101,10 @@ describe('session', () => {
     v = apply(session, 'travel:beach');
     expect(v.location.id).toBe('beach');
 
-    // tutorial-island.dsl authors no `time:` on any action, so the whole
-    // playthrough above should leave the simulated clock untouched.
-    expect(v.time).toBe(0);
+    // The route's mechanical sim-time: dough (2s) + bread (3s) + three rat
+    // fights (3s each) = 14s. Talking, travel, the mirror and ascend/descend
+    // are instant. This doubles as a measured-playtime invariant.
+    expect(v.time).toBe(14);
   });
 
   it('throws a clear error on an unavailable or unknown choice id', () => {
