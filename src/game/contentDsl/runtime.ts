@@ -3,7 +3,7 @@ import { Condition, Reference } from './condition';
 import { Choice, Dialogue, DialogueNode, TextSegment } from './dialogue';
 import { Action, Entity, entitySchema } from './entity';
 import { Item, itemSchema } from './item';
-import { Location, locationSchema } from './location';
+import { Location, locationSchema, resolveCoordinates } from './location';
 import { parseModule } from './module';
 import { Recipe, recipeSchema } from './recipe';
 import { scopeEntity } from './scope';
@@ -167,6 +167,9 @@ export function loadModule(source: string): Registry {
       }
     }
   }
+  // Locations placed with `<direction> of <other>` may reference an origin that
+  // parsed later, so absolute coordinates are resolved once all locations exist.
+  resolveCoordinates(registry.locations);
   return registry;
 }
 
@@ -365,9 +368,47 @@ function findActionOwner(obj: string, objId: string, registry: Registry): unknow
       const action = registry.recipeActions.get(objId);
       return action ? { actions: [action] } : undefined;
     }
+    case 'travel': {
+      // objId encodes `<origin>.<dest>` (the origin travelled from — see
+      // travelAction on why it's needed); split on the first dot, since ids
+      // themselves never contain one.
+      const dot = objId.indexOf('.');
+      return { actions: [travelAction(objId.slice(0, dot), objId.slice(dot + 1), registry)] };
+    }
     default:
       return undefined;
   }
+}
+
+// Seconds of travel per unit of straight-line coordinate distance. A travel
+// edge's journey lasts distance × this factor (see travelAction); tune here to
+// pace real-time travel.
+const TRAVEL_SECONDS_PER_UNIT = 1;
+
+function locationDistance(a: Location, b: Location): number {
+  return Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z);
+}
+
+// A journey along a travel edge, modelled as a one-attempt deterministic fight
+// (health 1, no accuracy) whose single result relocates the player on
+// completion. This lets travel reuse the whole resolve()/fight machinery for
+// free: it becomes a spannable action like any other, so `--live` renders it as
+// a real-time transition and the instant driver (agent CLI / tests) accrues its
+// sim-time. The origin is encoded in the ownerRef rather than read from
+// state.location because state.location stays the origin until the relocate
+// fires; the distance comes from the registry's resolved coordinates, so the
+// action can be rebuilt from the ownerRef alone with no state.
+function travelAction(originId: string, destId: string, registry: Registry): Action {
+  const origin = registry.locations.get(originId);
+  const dest = registry.locations.get(destId);
+  if (!origin) throw new RuntimeError(`unknown travel origin: ${originId}`);
+  if (!dest) throw new RuntimeError(`unknown travel destination: ${destId}`);
+  return {
+    label: `Travel to ${dest.title}`,
+    results: [{ kind: 'relocate', location: destId }],
+    time: locationDistance(origin, dest) * TRAVEL_SECONDS_PER_UNIT,
+    health: 1,
+  };
 }
 
 function parseOwnerRef(ownerRef: string): { obj: string; objId: string } {
@@ -802,6 +843,39 @@ export function useAction(obj: string, objId: string, actionId: string, registry
   }
 }
 
+// Travel wrappers: adapt an (origin, dest) pair to the generic action machinery
+// through the synthetic `travel` owner (travelAction / findActionOwner), so
+// travel gains spannable/real-time behavior with no bespoke resolver. A journey
+// from an unset origin (a fresh state that has never been anywhere, e.g. a test
+// that travels before startSession) is a plain placement, not a journey.
+
+// Side-effect-free probe of a journey's span; 0 for an unset origin so callers
+// route it through the instant path (which just places the player).
+export function travelFirstUnit(origin: string, dest: string, registry: Registry, state: GameState): number {
+  if (!origin) return 0;
+  const { label } = travelAction(origin, dest, registry);
+  return actionFirstUnit('travel', `${origin}.${dest}`, label, registry, state);
+}
+
+// Arms the journey without resolving it, for a live driver to advance over real
+// time. Only called with a real origin (a distance-0 or unset journey takes the
+// instant path instead, see beginAction).
+export function armTravel(origin: string, dest: string, registry: Registry, state: GameState): void {
+  const { label } = travelAction(origin, dest, registry);
+  armAction('travel', `${origin}.${dest}`, label, registry, state);
+}
+
+// Arms and resolves the journey in one call (instant in real time, sim-time
+// accrues) — the agent-CLI / test path, mirroring useAction/craft.
+export function useTravel(origin: string, dest: string, registry: Registry, state: GameState): void {
+  if (!origin) {
+    state.location = dest;
+    return;
+  }
+  const { label } = travelAction(origin, dest, registry);
+  useAction('travel', `${origin}.${dest}`, label, registry, state);
+}
+
 // Compiles a recipe into an Action so a craft runs through the same
 // resolve()/fight machinery as a repeating entity action: a single-attempt
 // (health: 1) fight whose "target" is the input stack. Called once per recipe
@@ -915,7 +989,7 @@ export function runTest(testId: string, registry: Registry, state: GameState, st
         break;
       case 'travel':
         if (!registry.locations.has(directive.location)) throw new RuntimeError(`unknown location: ${directive.location}`);
-        state.location = directive.location;
+        useTravel(state.location, directive.location, registry, state);
         break;
       case 'craft':
         craft(directive.recipe, registry, state);

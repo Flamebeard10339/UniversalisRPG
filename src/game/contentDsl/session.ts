@@ -3,6 +3,7 @@ import {
   actionFirstUnit,
   armAction,
   armCraft,
+  armTravel,
   craft,
   craftFirstUnit,
   DialogueSession,
@@ -16,7 +17,9 @@ import {
   renderSegments,
   resolve,
   talk,
+  travelFirstUnit,
   useAction,
+  useTravel,
 } from './runtime';
 import { humanize } from './values';
 
@@ -155,7 +158,7 @@ function dispatch(session: PlaySession, choice: PlayChoice): void {
       return;
     }
     case 'travel': {
-      session.state.location = choice.id.slice('travel:'.length);
+      useTravel(session.state.location, choice.id.slice('travel:'.length), session.registry, session.state);
       return;
     }
     case 'craft': {
@@ -205,12 +208,13 @@ export function apply(session: PlaySession, choiceId: string): PlayView {
   return view(session);
 }
 
-// Like apply(), but for a spannable action/craft it only ARMS the fight
+// Like apply(), but for a spannable action/craft/travel it only ARMS the fight
 // (state.activeAction set) instead of resolving its first unit instantly — a
-// live driver then drives it forward over real time via wait(). talk/
-// dialogue/travel choices, and any action/craft whose first unit resolves in
-// zero simulated time (an instant item action, a zero-time craft), still go
-// through the ordinary instant dispatch()/apply() path unchanged — including
+// live driver then drives it forward over real time via wait(). A journey
+// (travel) is spannable when its distance is positive; talk/dialogue choices,
+// and any action/craft/travel whose first unit resolves in zero simulated time
+// (an instant item action, a zero-time craft, a zero-distance journey), still
+// go through the ordinary instant dispatch()/apply() path unchanged — including
 // the food-buff-on-eating side effect that lives in useAction, outside
 // resolve(). After beginAction, session.state.activeAction is non-null IFF a
 // spannable action is now in flight.
@@ -242,7 +246,18 @@ export function beginAction(session: PlaySession, choiceId: string): PlayView {
     return view(session);
   }
 
-  // talk/dialogue/travel: unaffected by live mode, stays instant.
+  if (choice.kind === 'travel') {
+    const dest = choice.id.slice('travel:'.length);
+    const origin = session.state.location;
+    if (travelFirstUnit(origin, dest, session.registry, session.state) > 0) {
+      armTravel(origin, dest, session.registry, session.state);
+      return view(session);
+    }
+    dispatch(session, choice);
+    return view(session);
+  }
+
+  // talk/dialogue: instant regardless of live mode.
   dispatch(session, choice);
   return view(session);
 }

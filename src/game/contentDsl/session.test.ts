@@ -1,7 +1,7 @@
 import { readFileSync } from 'fs';
 import { describe, expect, it } from 'vitest';
 import { loadModule } from './runtime';
-import { apply, beginAction, PlayView, startSession, submitModal, view } from './session';
+import { apply, beginAction, PlayView, startSession, submitModal, view, wait } from './session';
 
 const source = readFileSync('content/tutorial-island.dsl', 'utf8');
 
@@ -102,9 +102,10 @@ describe('session', () => {
     expect(v.location.id).toBe('beach');
 
     // The route's mechanical sim-time: dough (2s) + bread (3s) + three rat
-    // fights (3s each) = 14s. Talking, travel, the mirror and ascend/descend
-    // are instant. This doubles as a measured-playtime invariant.
-    expect(v.time).toBe(14);
+    // fights (3s each) + the beach journey (1 unit east × 5s/unit = 5s) = 19s.
+    // Talking, the mirror and ascend/descend (instant stairs actions) cost
+    // nothing. This doubles as a measured-playtime invariant.
+    expect(v.time).toBe(19);
   });
 
   it('throws a clear error on an unavailable or unknown choice id', () => {
@@ -244,5 +245,48 @@ out: 1 mix
     const registry = loadModule(module);
     const session = startSession(registry);
     expect(() => beginAction(session, 'nonsense')).toThrow();
+  });
+});
+
+describe('travel is a distance-timed journey', () => {
+  // beach sits one unit east of camp, so a journey between them lasts
+  // 1 × TRAVEL_SECONDS_PER_UNIT (5s).
+  const module = `
+# location camp
+x: 0, y: 0
+starting
+adjacent:
+  beach
+
+# location beach
+east of camp
+adjacent:
+  camp
+`;
+
+  it('apply relocates instantly in real time while accruing the journey sim-time', () => {
+    const registry = loadModule(module);
+    const session = startSession(registry);
+
+    const v = apply(session, 'travel:beach');
+    expect(v.location.id).toBe('beach');
+    expect(v.time).toBe(5);
+    expect(session.state.activeAction).toBeNull();
+  });
+
+  it('beginAction arms the journey spannably — location and time unchanged until driven', () => {
+    const registry = loadModule(module);
+    const session = startSession(registry);
+
+    const v = beginAction(session, 'travel:beach');
+    expect(session.state.activeAction).not.toBeNull();
+    expect(session.state.location).toBe('camp');
+    expect(session.state.time).toBe(0);
+    expect(v.location.id).toBe('camp');
+
+    const arrived = wait(session, 5);
+    expect(arrived.location.id).toBe('beach');
+    expect(session.state.activeAction).toBeNull();
+    expect(session.state.time).toBe(5);
   });
 });

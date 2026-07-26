@@ -50,6 +50,56 @@ const relative: Parser<Relative> = {
   },
 };
 
+const DIRECTION_VECTORS: Record<Direction, [number, number, number]> = {
+  north: [0, 1, 0],
+  south: [0, -1, 0],
+  east: [1, 0, 0],
+  west: [-1, 0, 0],
+  up: [0, 0, 1],
+  down: [0, 0, -1],
+};
+
+// Resolves every location authored as `<direction> of <other>` into absolute
+// x/y/z, walking one unit step from its origin's coordinates. Origins may
+// themselves be relative, so this recurses to place an origin before the
+// location that depends on it (insertion order alone isn't enough). Hydrated
+// fields are read-only getters, so each resolved location is replaced in the
+// map with a plain-valued copy rather than mutated. Throws on an unknown origin
+// or a relative cycle.
+export function resolveCoordinates(locations: Map<string, Location>): void {
+  const placing = new Set<string>();
+  const coords = new Map<string, [number, number, number]>();
+
+  const place = (location: Location): [number, number, number] => {
+    const cached = coords.get(location.id);
+    if (cached) return cached;
+    if (!location.relative) {
+      const absolute: [number, number, number] = [location.x, location.y, location.z];
+      coords.set(location.id, absolute);
+      return absolute;
+    }
+    if (placing.has(location.id)) throw new DslError(`location coordinates form a cycle at '${location.id}'`);
+    placing.add(location.id);
+
+    const origin = locations.get(location.relative.of);
+    if (!origin) throw new DslError(`location '${location.id}' is placed relative to unknown location '${location.relative.of}'`);
+    const [ox, oy, oz] = place(origin);
+    const [dx, dy, dz] = DIRECTION_VECTORS[location.relative.direction];
+    const stepped: [number, number, number] = [ox + dx, oy + dy, oz + dz];
+
+    placing.delete(location.id);
+    coords.set(location.id, stepped);
+    return stepped;
+  };
+
+  for (const location of locations.values()) place(location);
+  for (const location of [...locations.values()]) {
+    if (!location.relative) continue;
+    const [x, y, z] = coords.get(location.id)!;
+    locations.set(location.id, { ...location, x, y, z, relative: undefined });
+  }
+}
+
 export const locationSchema: SectionSchema<Location, 'starting'> = {
   kind: 'location',
   fields: {
