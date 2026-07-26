@@ -52,7 +52,7 @@ describe('recipe parsing', () => {
   it('parses a stationless recipe', () => {
     const registry = loaded();
     const dough = registry.recipes.get('dough')!;
-    expect(dough.station).toBeUndefined();
+    expect(dough.requiresCapability).toBeUndefined();
     expect(dough.in).toEqual([{ item: 'jug-of-water' }, { item: 'pot-of-flour' }]);
     expect(dough.out).toEqual([{ item: 'dough' }]);
     expect(dough.skill).toEqual({ skill: 'cooking', amount: 2 });
@@ -62,7 +62,7 @@ describe('recipe parsing', () => {
   it('parses a stationed recipe', () => {
     const registry = loaded();
     const bread = registry.recipes.get('bread')!;
-    expect(bread.station).toBe('oven');
+    expect(bread.requiresCapability).toBe('oven');
     expect(bread.in).toEqual([{ item: 'dough' }]);
     expect(bread.out).toEqual([{ item: 'bread' }]);
     expect(bread.skill).toEqual({ skill: 'cooking', amount: 4 });

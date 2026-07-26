@@ -6,6 +6,7 @@ import { RawLine, RawSection } from './structure';
 export interface Field<T, Self> {
   parser: Parser<NonNullable<T>>;
   default?: (self: Self) => T;
+  keyword?: string; // DSL surface keyword, when it differs from the field name
 }
 
 // An open-ended, dynamically-labelled collection (e.g. an entity's actions):
@@ -27,7 +28,7 @@ export interface SectionSchema<H extends { id: string }, Flags extends keyof H =
 
 export type Authored<H extends { id: string }> = { id: string } & Partial<Omit<H, 'id'>>;
 
-type AnyFields = Record<string, { parser: Parser<unknown>; default?: (self: unknown) => unknown }>;
+type AnyFields = Record<string, { parser: Parser<unknown>; default?: (self: unknown) => unknown; keyword?: string }>;
 type EntryConfig = { into: string; body: EntryBody };
 
 const KEY = /(?<key>[a-z][a-z0-9 -]*?):/;
@@ -43,12 +44,14 @@ export function parseSection<H extends { id: string }, F extends keyof H = never
   if (!section.id) throw new DslError(`# ${schema.kind} requires an id`, section.span);
 
   const fields = schema.fields as unknown as AnyFields;
+  const byKeyword: Record<string, string> = {};
+  for (const name of Object.keys(fields)) byKeyword[fields[name].keyword ?? name] = name;
   const flags = (schema.flags ?? []) as readonly string[];
   const clauses = schema.clauses as string | undefined;
   const bare = schema.bare as string | undefined;
   const entries = schema.entries as EntryConfig | undefined;
   const authored: Record<string, unknown> = { id: section.id };
-  for (const line of section.body) parseLine(line, fields, flags, clauses, bare, entries, schema.kind, authored);
+  for (const line of section.body) parseLine(line, fields, byKeyword, flags, clauses, bare, entries, schema.kind, authored);
 
   if (schema.exclusive) {
     const active = schema.exclusive.filter((group) => (group as readonly string[]).some((key) => authored[key] !== undefined));
@@ -60,7 +63,7 @@ export function parseSection<H extends { id: string }, F extends keyof H = never
   return authored as Authored<H>;
 }
 
-function parseLine(line: RawLine, fields: AnyFields, flags: readonly string[], clauses: string | undefined, bare: string | undefined, entries: EntryConfig | undefined, kind: string, authored: Record<string, unknown>): void {
+function parseLine(line: RawLine, fields: AnyFields, byKeyword: Record<string, string>, flags: readonly string[], clauses: string | undefined, bare: string | undefined, entries: EntryConfig | undefined, kind: string, authored: Record<string, unknown>): void {
   const cursor = new Cursor(line.text, 0, line.span.start);
 
   while (!cursor.done) {
@@ -68,22 +71,24 @@ function parseLine(line: RawLine, fields: AnyFields, flags: readonly string[], c
     if (cursor.done) break;
 
     const key = cursor.peek(KEY)?.groups?.key;
-    if (key !== undefined && key !== clauses && key !== bare && (fields[key] || entries !== undefined)) {
+    const name = key !== undefined ? byKeyword[key] : undefined;
+    const labelsBareField = name !== undefined && (name === clauses || name === bare);
+    if (key !== undefined && !labelsBareField && (name !== undefined || entries !== undefined)) {
       const keySpan = { start: cursor.abs(cursor.pos), end: cursor.abs(cursor.pos + key.length) };
       cursor.take(KEY);
       cursor.take(/[ \t]*/);
-      if (fields[key]) {
-        if (authored[key] !== undefined) throw new DslError(`${kind} field ${key} is defined more than once`, keySpan);
-        if (!cursor.done) authored[key] = fields[key].parser.parse(cursor);
-        else if (line.children.length > 0) authored[key] = parseBlock(fields[key].parser, line.children, line.span);
+      if (name !== undefined) {
+        if (authored[name] !== undefined) throw new DslError(`${kind} field ${key} is defined more than once`, keySpan);
+        if (!cursor.done) authored[name] = fields[name].parser.parse(cursor);
+        else if (line.children.length > 0) authored[name] = parseBlock(fields[name].parser, line.children, line.span);
         // an empty value with no block is unspecified: leave the field absent
       } else {
         const body = cursor.done ? entries!.body.parseBlock(line.children) : entries!.body.parse(cursor);
         ((authored[entries!.into] ??= []) as object[]).push({ label: key, ...body });
       }
-    } else if (key !== undefined && (key === clauses || key === bare)) {
-      throw new DslError(`${kind} field ${key} must be written bare, without a '${key}:' label`, { start: cursor.abs(cursor.pos), end: cursor.abs(cursor.pos + key.length) });
-    } else if (key !== undefined && key !== clauses && key !== bare) {
+    } else if (labelsBareField) {
+      throw new DslError(`${kind} field ${key} must be written bare, without a '${key}:' label`, { start: cursor.abs(cursor.pos), end: cursor.abs(cursor.pos + key!.length) });
+    } else if (key !== undefined) {
       throw new DslError(`unknown ${kind} field: ${key}`, { start: cursor.abs(cursor.pos), end: cursor.abs(cursor.pos + key.length) });
     } else {
       const word = cursor.peek(WORD)?.[0];

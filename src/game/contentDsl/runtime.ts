@@ -403,28 +403,33 @@ interface FightParams {
   duration: number; // seconds per attempt
   abilityAmount: number; // health subtracted per successful attempt
   escapeAfter: number; // raw escape-after threshold (Infinity if absent)
-  attemptsToResolve: number; // DETERMINISTIC-path only: attempts in one fight assuming every attempt hits
-  outcome: FightOutcome; // DETERMINISTIC-path only: which end a guaranteed-hit fight reaches first
 }
 
-// The degenerate case (no accuracy/ability/health/escape after) resolves to
-// duration = time:/speed, attemptsToResolve = 1, outcome = 'completion' —
-// byte-identical to the pre-fight-model action shape. `attemptsToResolve`/
-// `outcome` assume every attempt hits, so they're only valid for the
-// deterministic path (no accuracy) — the stochastic path decides completion
-// vs escape per attempt at runtime instead (see resolveStochasticSegment),
-// using `escapeAfter` directly.
+// A deterministic (no-accuracy) fight has a closed-form length and end,
+// computed assuming every attempt hits. These two fields are meaningless once
+// an attempt can miss, so only the deterministic path takes a DeterministicFightPlan
+// — the stochastic path decides completion vs escape per attempt at runtime
+// (resolveStochasticSegment) off the plain FightParams.
+interface DeterministicFightPlan extends FightParams {
+  attemptsToResolve: number; // attempts to end one fight
+  outcome: FightOutcome; // which end the fight reaches first
+}
+
 function fightParams(action: Action, state: GameState, registry: Registry): FightParams {
-  const health = action.health ?? 1;
-  const escapeAfter = action.escapeAfter ?? Infinity;
-  const abilityAmount = action.ability ? statValue(action.ability, state, registry) : 1;
-  const neededForCompletion = Math.ceil(health / abilityAmount);
   return {
     duration: attemptDuration(action, state, registry),
-    abilityAmount,
-    escapeAfter,
-    attemptsToResolve: Math.min(neededForCompletion, escapeAfter),
-    outcome: neededForCompletion <= escapeAfter ? 'completion' : 'escape',
+    abilityAmount: action.ability ? statValue(action.ability, state, registry) : 1,
+    escapeAfter: action.escapeAfter ?? Infinity,
+  };
+}
+
+function fightPlan(action: Action, state: GameState, registry: Registry): DeterministicFightPlan {
+  const params = fightParams(action, state, registry);
+  const neededForCompletion = Math.ceil((action.health ?? 1) / params.abilityAmount);
+  return {
+    ...params,
+    attemptsToResolve: Math.min(neededForCompletion, params.escapeAfter),
+    outcome: neededForCompletion <= params.escapeAfter ? 'completion' : 'escape',
   };
 }
 
@@ -500,7 +505,7 @@ function nextBoundary(state: GameState, registry: Registry, toTime: number): num
     // is random. resolveStochasticSegment simulates it attempt-by-attempt,
     // bounded only by whatever buff-expiry/toTime already gives.
     if (!action.accuracy) {
-      const { duration, attemptsToResolve } = fightParams(action, state, registry);
+      const { duration, attemptsToResolve } = fightPlan(action, state, registry);
       const remainingAttempts = attemptsToResolve - state.activeAction.attemptsMade;
       if (state.activeAction.repeating) {
         const limit = inputLimit(action, state);
@@ -528,7 +533,7 @@ function nextBoundary(state: GameState, registry: Registry, toTime: number): num
 function resolveDeterministicSegment(state: GameState, registry: Registry, action: Action, segEnd: number): void {
   const active = state.activeAction!;
   const segLen = segEnd - state.time;
-  const { duration, abilityAmount, attemptsToResolve, outcome } = fightParams(action, state, registry);
+  const { duration, abilityAmount, attemptsToResolve, outcome } = fightPlan(action, state, registry);
   const health = action.health ?? 1;
 
   if (active.repeating && duration <= 0) {
@@ -656,7 +661,7 @@ function applyDueBoundaries(state: GameState, registry: Registry, at: number): v
             changed = true;
           }
         } else {
-          const { duration, attemptsToResolve, outcome } = fightParams(action, state, registry);
+          const { duration, attemptsToResolve, outcome } = fightPlan(action, state, registry);
           // duration <= 0 means every attempt is instantaneous — fire
           // immediately regardless of attemptsMade. This is the only place a
           // zero-`time:` action fires: its toTime === state.time in useAction,
@@ -745,7 +750,7 @@ export function useAction(obj: string, objId: string, actionId: string, registry
   // Resolve exactly the first natural unit of play: one full fight when it's
   // closed-form (deterministic), or just the first attempt when it isn't
   // (stochastic — fight length is random, so there's no fixed span to jump to).
-  const firstUnit = action.accuracy ? duration : fightParams(action, state, registry).attemptsToResolve * duration;
+  const firstUnit = action.accuracy ? duration : fightPlan(action, state, registry).attemptsToResolve * duration;
   resolve(state, registry, state.time + firstUnit);
 
   if (obj === 'item' && !repeating && required.has(objId)) {
@@ -791,11 +796,11 @@ function recipeAction(recipe: Recipe): Action {
 
 export function recipeCraftable(recipe: Recipe, registry: Registry, state: GameState): boolean {
   for (const input of recipe.in) if ((state.inventory[input.item] ?? 0) < (input.amount ?? 1)) return false;
-  if (recipe.station) {
+  if (recipe.requiresCapability) {
     const loc = registry.locations.get(state.location);
     if (!loc) return false;
-    const hasStation = loc.entities.some((entityId) => registry.entities.get(entityId)?.stations.includes(recipe.station!));
-    if (!hasStation) return false;
+    const provided = loc.entities.some((entityId) => registry.entities.get(entityId)?.capabilities.includes(recipe.requiresCapability!));
+    if (!provided) return false;
   }
   return true;
 }
@@ -815,7 +820,7 @@ export function craft(recipeId: string, registry: Registry, state: GameState): v
   }
 
   state.activeAction = { ownerRef: `recipe.${recipeId}`, actionLabel: action.label, progress: 0, repeating, healthRemaining: action.health ?? 1, attemptsMade: 0 };
-  const firstUnit = action.accuracy ? duration : fightParams(action, state, registry).attemptsToResolve * duration;
+  const firstUnit = action.accuracy ? duration : fightPlan(action, state, registry).attemptsToResolve * duration;
   resolve(state, registry, state.time + firstUnit);
 }
 

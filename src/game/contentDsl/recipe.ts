@@ -5,9 +5,7 @@ import { decimal, id, number, Quantified, quantified, text } from './values';
 
 export interface Recipe {
   id: string;
-  // A required capability id (see Entity.stations in entity.ts), not an
-  // entity id — absent means craftable anywhere.
-  station?: string;
+  requiresCapability?: string; // absent means craftable anywhere
   in: Quantified[];
   out: Quantified[];
   skill?: { skill: string; amount: number };
@@ -34,7 +32,7 @@ const recipeSkill: Parser<{ skill: string; amount: number }> = {
 export const recipeSchema: SectionSchema<Recipe> = {
   kind: 'recipe',
   fields: {
-    station: { parser: id },
+    requiresCapability: { parser: id, keyword: 'station' },
     in: { parser: list(quantified), default: () => [] },
     out: { parser: list(quantified), default: () => [] },
     skill: { parser: recipeSkill },
