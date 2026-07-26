@@ -306,6 +306,14 @@ function findNode(dialogue: Dialogue, name: string): DialogueNode {
 
 // A `menu` step hands control back for a choice; the node then resumes at the
 // step after it, so a choice with no goto falls through to the rest of the node.
+//
+// TODO(dialogue-pacing): consecutive `say` beats between menus are all pushed to
+// the log in one turn, so a multi-line node dumps everything at once with no
+// "continue" beat (the playtest praised the first, gated dialogue but found the
+// rest a wall of text). Two options the playtest raised: (a) treat each say beat
+// as an implicit single-choice "continue" menu so the player advances line by
+// line; (b) model dialogue as a first-class modal (pendingModal) so a GUI need
+// not reverse-engineer pacing. Deferred as an out-of-MVP dialogue-engine change.
 function runSteps(dialogue: Dialogue, node: DialogueNode, state: GameState, start: number, replay: boolean): DialogueSession {
   for (let i = start; i < node.steps.length; i++) {
     const step = node.steps[i];
@@ -383,7 +391,7 @@ function findActionOwner(obj: string, objId: string, registry: Registry): unknow
 // Seconds of travel per unit of straight-line coordinate distance. A travel
 // edge's journey lasts distance × this factor (see travelAction); tune here to
 // pace real-time travel.
-const TRAVEL_SECONDS_PER_UNIT = 1;
+const TRAVEL_SECONDS_PER_UNIT = 5;
 
 function locationDistance(a: Location, b: Location): number {
   return Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z);

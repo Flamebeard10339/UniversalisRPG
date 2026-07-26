@@ -1,7 +1,7 @@
 import { readFileSync } from 'fs';
 import { describe, expect, it } from 'vitest';
 import { loadModule } from './runtime';
-import { apply, beginAction, PlayView, startSession, submitModal, view, wait } from './session';
+import { apply, beginAction, cancelAction, PlayView, startSession, submitModal, view, wait } from './session';
 
 const source = readFileSync('content/tutorial-island.dsl', 'utf8');
 
@@ -288,5 +288,81 @@ adjacent:
     expect(arrived.location.id).toBe('beach');
     expect(session.state.activeAction).toBeNull();
     expect(session.state.time).toBe(5);
+  });
+});
+
+describe('travel edges aliased by a free entity relocate are hidden', () => {
+  it('hides a travel edge that a stairs-like entity already offers as a free relocate', () => {
+    const registry = loadModule(source);
+    const session = startSession(registry);
+    session.state.location = 'guide-house';
+
+    const choiceIds = ids(view(session));
+    // The stairs entity relocates to both floors, so the duplicate vertical
+    // travel edges are suppressed in favor of ascend/descend.
+    expect(choiceIds).toContain('use:entity.stairs.ascend');
+    expect(choiceIds).toContain('use:entity.stairs.descend');
+    expect(choiceIds).not.toContain('travel:basement');
+    expect(choiceIds).not.toContain('travel:guide-house-upstairs');
+  });
+
+  it('keeps an unaliased edge, and one whose relocate is not free (has a cost)', () => {
+    const module = `
+# location camp
+x: 0, y: 0
+starting
+adjacent:
+  cave
+  summit
+entities:
+  gate
+
+# location cave
+x: 1, y: 0
+
+# location summit
+x: 0, y: 1
+
+# entity gate
+enter:
+  take: 1 coin
+  relocate: cave
+`;
+    const registry = loadModule(module);
+    const session = startSession(registry);
+    session.state.inventory.coin = 1;
+
+    const choiceIds = ids(view(session));
+    // gate.enter relocates to cave but costs a coin, so it is not a free alias —
+    // the travel edge to cave stays; and nothing aliases summit.
+    expect(choiceIds).toContain('travel:cave');
+    expect(choiceIds).toContain('travel:summit');
+  });
+});
+
+describe('cancelAction', () => {
+  it('drops the action in flight, keeping units already completed and un-consumed inputs', () => {
+    const registry = loadModule(source);
+    const session = startSession(registry);
+    session.state.location = 'guide-house';
+    session.state.inventory.dough = 2; // two loaves' worth
+
+    beginAction(session, 'craft:bread');
+    wait(session, 4); // one full 3s bake done, a second one 1s in
+    expect(session.state.inventory.bread).toBe(1);
+    expect(session.state.activeAction).not.toBeNull();
+
+    const v = cancelAction(session);
+    expect(session.state.activeAction).toBeNull();
+    expect(session.state.inventory.bread).toBe(1); // no partial credit for the aborted bake
+    expect(session.state.inventory.dough).toBe(1); // its input was not consumed
+    expect(v.choices.length).toBeGreaterThan(0); // back to ordinary choices
+  });
+
+  it('is a no-op when nothing is active', () => {
+    const registry = loadModule(source);
+    const session = startSession(registry);
+    expect(() => cancelAction(session)).not.toThrow();
+    expect(session.state.activeAction).toBeNull();
   });
 });

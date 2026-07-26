@@ -1,4 +1,5 @@
 import { Action } from './entity';
+import { Location } from './location';
 import {
   actionFirstUnit,
   armAction,
@@ -61,6 +62,28 @@ function availableActions(owner: Actable, state: GameState): Action[] {
   return (owner.actions ?? []).filter((action) => actionAvailable(action, state));
 }
 
+// A "free travel action" is pure movement: its results only relocate (plus
+// optional flavor `say`), with no rewards, costs, or branching outcomes — the
+// stairs' ascend/descend are the canonical case. Such an action is an alias for
+// a travel edge to the same destination.
+function isFreeTravelAction(action: Action, target: string): boolean {
+  const relocatesToTarget = action.results.some((r) => r.kind === 'relocate' && r.location === target);
+  if (!relocatesToTarget) return false;
+  const onlyMovement = action.results.every((r) => r.kind === 'relocate' || r.kind === 'say');
+  const noBranches = !action.onSuccess && !action.onFailure && !action.onEscape;
+  return onlyMovement && noBranches;
+}
+
+// True when an entity present here already offers a free relocate to `target`,
+// so the travel edge to it would just duplicate that entity's action.
+function entityAliasesTravelTo(location: Location, target: string, registry: Registry, state: GameState): boolean {
+  return location.entities.some((entityId) => {
+    const entity = registry.entities.get(entityId);
+    if (!entity) return false;
+    return availableActions(entity, state).some((action) => isFreeTravelAction(action, target));
+  });
+}
+
 function canTalk(entityId: string, registry: Registry, state: GameState): boolean {
   const dialogue = registry.dialoguesByOwner.get(entityId);
   if (!dialogue) return false;
@@ -97,6 +120,12 @@ function locationChoices(session: PlaySession): PlayChoice[] {
     }
   }
 
+  // TODO(inventory-crafting): every craftable recipe surfaces here as a
+  // location action, so a stationless recipe (e.g. mixing dough) clutters the
+  // room's action list. The playtest wanted stationless crafts to live on the
+  // inventory/items involved instead — surfaced when you act on an ingredient,
+  // not on the location. Deferred: it needs an item-scoped craft affordance
+  // (which held item exposes which recipes) rather than the flat location scan.
   for (const recipe of registry.recipes.values()) {
     if (!recipeCraftable(recipe, registry, state)) continue;
     // Label the craft with the title of a present entity providing the
@@ -110,6 +139,10 @@ function locationChoices(session: PlaySession): PlayChoice[] {
 
   for (const edge of location.adjacent) {
     if (edge.condition && !evaluateCondition(edge.condition, state)) continue;
+    // Suppress a travel edge that an entity here already exposes as a free
+    // relocate (e.g. the stairs' ascend/descend) — they're aliases for the same
+    // move, so showing both duplicates the option (playtest feedback #2).
+    if (entityAliasesTravelTo(location, edge.target, registry, state)) continue;
     const target = registry.locations.get(edge.target);
     choices.push({ id: `travel:${edge.target}`, kind: 'travel', label: `Travel to ${target?.title ?? edge.target}` });
   }
@@ -264,6 +297,16 @@ export function beginAction(session: PlaySession, choiceId: string): PlayView {
 
 export function wait(session: PlaySession, seconds: number): PlayView {
   resolve(session.state, session.registry, session.state.time + seconds);
+  return view(session);
+}
+
+// First-class cancellation: abandon the action in flight, mid-progress. Any
+// units it already completed on earlier resolve() ticks stay applied; the
+// partly-done current attempt is discarded (no partial credit). Sim-time is not
+// rewound — the player spent the time they spent. A no-op when nothing is
+// active, so a driver can call it unconditionally.
+export function cancelAction(session: PlaySession): PlayView {
+  session.state.activeAction = null;
   return view(session);
 }
 

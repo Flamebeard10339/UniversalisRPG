@@ -18,6 +18,15 @@ export interface Action {
   // Applies instead of results/onSuccess when a fight ends by running out of
   // attempts (escape after:) rather than by exhausting the target's health.
   onEscape?: ActionResult[];
+  // Seconds the action occupies (0 / absent = instant). TODO(default-duration):
+  // the playtest suggested a small nonzero default (~0.5s) so every action feels
+  // weighty. Not done here on purpose: an absent `time:` is currently the seam
+  // that distinguishes an INSTANT action (mirror/stairs/eat — a deliberate
+  // design tool per CLAUDE.md) from a spannable one, and beginAction routes on
+  // `firstUnit > 0`. Flipping the default to 0.5 turns every instant action
+  // spannable and shifts every timing assertion (session.test's ~19s Miki
+  // route, resolve.test). Needs a design call on which actions stay instant
+  // before changing the default.
   time?: number;
   // The stat whose value scales this action's per-attempt duration (time: /
   // statValue) — attempts per second, e.g. a cooking-speed stat. Absent

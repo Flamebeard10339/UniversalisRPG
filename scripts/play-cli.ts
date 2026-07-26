@@ -3,7 +3,7 @@ import path from 'node:path';
 import { createInterface } from 'node:readline/promises';
 import { pathToFileURL } from 'node:url';
 import { actionFirstUnit, craftFirstUnit, loadModule, RuntimeError, type ActiveAction, type GameState } from '../src/game/contentDsl/runtime';
-import { apply, beginAction, startSession, submitModal, view, wait, type PlayChoice, type PlaySession, type PlayView } from '../src/game/contentDsl/session';
+import { apply, beginAction, cancelAction, startSession, submitModal, view, wait, type PlayChoice, type PlaySession, type PlayView } from '../src/game/contentDsl/session';
 
 const repoRoot = path.join(import.meta.dirname, '..');
 const defaultContent = 'content/tutorial-island.dsl';
@@ -17,12 +17,26 @@ export interface CommandResult {
 const HELP_LINES = [
   'Commands:',
   '  <N>          choose option N',
+  '  /look        re-read the current location description',
+  '  /inventory   show your inventory and skill xp',
   '  /wait <s>    advance simulated time by <s> seconds',
   '  /speed <n>   set the live-mode time multiplier (default 1)',
   '  /state       show location, elapsed sim-time, flags, inventory, xp',
   '  /help        show this help',
   '  /quit, /q    show final state and exit',
 ];
+
+// TODO(quest-journal): there is no `/quests` command because quests are not a
+// first-class DSL concept yet — quest progress is emergent from flags
+// (`tutorial.quest-given`, `tutorial.made-bread`, …) set by dialogue nodes. The
+// playtest wanted a discoverable quest journal. Building one properly means a
+// `# quest` section kind (objectives + completion conditions over flags) plus a
+// `/quests` renderer here; deferred as out of MVP scope.
+
+// Locations whose full description has already been shown this run. A location's
+// examine text prints only the first time the player arrives (re-printing it
+// every turn was flagged as noise in the playtest); /look reprints it on demand.
+const shownLocations = new Set<string>();
 
 // --live-mode real-time multiplier: 1 sim-second per real-second by default.
 // Set via /speed, read by runLiveAction/liveTick. Module-level because it's a
@@ -31,8 +45,10 @@ let speedMultiplier = 1;
 
 function formatChoices(choices: PlayChoice[]): string[] {
   return choices.map((choice, index) => {
-    const detail = choice.detail ? ` — ${choice.detail}` : '';
-    return `  ${index + 1}) ${choice.label}${detail}`;
+    // Lead with the thing being acted on ("Oven: roast chestnuts") rather than
+    // the bare verb — the playtest found "roast chestnuts — Oven" harder to scan.
+    const label = choice.detail ? `${choice.detail}: ${choice.label}` : choice.label;
+    return `  ${index + 1}) ${label}`;
   });
 }
 
@@ -40,21 +56,27 @@ function formatView(v: PlayView): string[] {
   const lines: string[] = [];
   for (const said of v.said) lines.push(said);
   lines.push(`${v.location.title} (${v.location.id})`);
-  lines.push(v.location.description);
+  if (!shownLocations.has(v.location.id)) {
+    shownLocations.add(v.location.id);
+    if (v.location.description) lines.push(v.location.description);
+  }
   if (v.entities.length > 0) lines.push(`Here: ${v.entities.map((entity) => entity.title).join(', ')}`);
   lines.push(...formatChoices(v.choices));
   lines.push(`[time: ${v.time}s]`);
   return lines;
 }
 
-function formatState(state: GameState): string[] {
+function formatInventory(state: GameState): string[] {
   const inventory = Object.fromEntries(Object.entries(state.inventory).filter(([, count]) => count > 0));
+  return [`Inventory: ${JSON.stringify(inventory)}`, `XP: ${JSON.stringify(state.xp)}`];
+}
+
+function formatState(state: GameState): string[] {
   return [
     `Location: ${state.location}`,
     `Elapsed simulated time: ${state.time}s`,
     `Flags: ${JSON.stringify(state.flags)}`,
-    `Inventory: ${JSON.stringify(inventory)}`,
-    `XP: ${JSON.stringify(state.xp)}`,
+    ...formatInventory(state),
   ];
 }
 
@@ -71,6 +93,18 @@ export function handleCommand(session: PlaySession, currentView: PlayView, line:
 
   if (trimmed === '/state') {
     return { output: formatState(session.state), quit: false };
+  }
+
+  if (trimmed === '/inventory' || trimmed === '/inv') {
+    return { output: formatInventory(session.state), quit: false };
+  }
+
+  if (trimmed === '/look') {
+    // Drop the current location from the shown-set so formatView reprints its
+    // description (and re-adds it), gating it behind an explicit examine after
+    // the first arrival.
+    shownLocations.delete(currentView.location.id);
+    return { view: currentView, output: formatView(currentView), quit: false };
   }
 
   if (trimmed === '/quit' || trimmed === '/q') {
@@ -164,83 +198,106 @@ export function liveTick(session: PlaySession, elapsedMs: number, multiplier: nu
   }
   const duration = cycleDuration(session, after);
   const bar = duration > 0 ? progressBar(after.progress / duration) : progressBar(1);
-  const line = `${label}... ${bar} attempts:${after.attemptsMade} health:${after.healthRemaining.toFixed(1)}  [time: ${session.state.time.toFixed(1)}s]`;
+  // Show combat detail only once it means something: hits landed, or a target
+  // with more than one hitpoint being worn down. A plain single-hit action
+  // (roast, craft, most fights) would otherwise always read "attempts:0
+  // health:1.0", which looks stuck — the moving bar carries the progress.
+  // TODO(resource-bars): the playtest wanted every combatant's resource bars —
+  // the player's health/energy and a real enemy health bar. That needs the
+  // Pass-2 numeric-stats / resource-pool engine (GameState has no player HP or
+  // pools yet), so richer bars are deferred until that lands.
+  const showCombat = after.attemptsMade > 0 || after.healthRemaining < 1;
+  const detail = showCombat ? ` hits:${after.attemptsMade} target-hp:${after.healthRemaining.toFixed(1)}` : '';
+  const line = `${label}... ${bar}${detail}  [time: ${session.state.time.toFixed(1)}s]`;
   return { active: true, line };
 }
 
 const LIVE_TICK_MS = 200;
 
-function delay(ms: number): Promise<void> {
-  return new Promise((resolvePromise) => setTimeout(resolvePromise, ms));
-}
-
 type LineResult = IteratorResult<string>;
 
-// Out-parameter for runLiveAction's leftover pending read (see below on why
-// this can't just be the function's return value).
-interface PendingLineBox {
-  line: Promise<LineResult> | null;
-}
-
-// Real-time shell around liveTick: ticks roughly every LIVE_TICK_MS of real
-// time, converting elapsed real time to simulated seconds (scaled by
-// speedMultiplier). Ends when either the action completes on its own
-// (liveTick reports active: false — the natural end for a non-repeating
-// action, or a repeating one that ran out of input) or a line of input
-// arrives (Enter, with or without text — the only way to stop a repeating
-// action, which never self-completes); either way the line's CONTENT is
-// discarded, it only serves as an interrupt signal.
+// Real-time shell around liveTick: ticks every LIVE_TICK_MS of real time,
+// converting elapsed real time to simulated seconds (scaled by
+// speedMultiplier). It ends either when the action completes on its own
+// (liveTick reports active: false) or when the player cancels it. Only reached
+// on an interactive TTY (see the liveMode gate in main) — a piped run resolves
+// spannable actions instantly instead.
 //
-// Concurrency note: `it` is the SAME AsyncIterator driving the caller's main
-// command loop (see main()) — readline's async iterator hands lines to
-// whichever `next()` call is outstanding, in the order those calls were
-// made, regardless of whether anyone ever awaits the result. So this
-// function must never call it.next() and then abandon the resulting promise
-// unconsumed — a line that arrives later would be delivered to that
-// abandoned promise instead of to main()'s next read, and get silently
-// lost. Concretely: if the loop exits because the line arrived, that
-// resolved promise's line has been "used up" as the stop signal, so
-// out.line is left null (main() starts a fresh read next). If the loop
-// exits because the action completed naturally, the read we started is
-// still pending, so out.line is set to that SAME promise for main() to
-// await instead of issuing a new read — this is also what makes a
-// piped/non-TTY run terminate rather than hang: once stdin ends, that
-// pending read (like any subsequent one) resolves with done: true, which
-// both loops already treat as "stop".
-//
-// out.line is an out-PARAMETER, not this (async) function's return value,
-// deliberately: `await` recursively unwraps nested promises/thenables, so an
-// async function that itself returned `Promise<LineResult> | null` would
-// have that inner promise silently flattened away by the caller's `await` —
-// i.e. main() would end up blocking on the pending read instead of getting
-// it back unresolved. Routing it through a plain mutable box sidesteps that.
-async function runLiveAction(session: PlaySession, it: AsyncIterator<string>, out: PendingLineBox): Promise<void> {
-  let lastTick = Date.now();
-  let pendingLine: Promise<LineResult> | null = it.next();
-  let stoppedByUser = false;
+// Cancellation is first-class and always available: ANY keypress stops the
+// action immediately, no Enter required. Getting a raw keypress here needs three
+// things done in order, and ALL of them matter:
+//   1. rl.pause() so readline stops its own line-editing/echo (which would fight
+//      the \r-redrawn progress bar). But pause() also puts the tty back into
+//      cooked mode and pauses the stream, so on its own it makes single keys
+//      un-deliverable — hence 2 and 3.
+//   2. setRawMode(true) so the tty delivers each keystroke immediately instead
+//      of buffering a whole line until Enter.
+//   3. input.resume() — the non-obvious one. Attaching a 'data' listener only
+//      auto-switches a stream to flowing mode for the FIRST data listener;
+//      readline already installed one, so our listener would otherwise sit on a
+//      paused stream and never fire. This was the bug that made keys do nothing.
+// On cleanup the tty's raw state is restored to what it was before (readline
+// wants it raw again for the next line) and readline is resumed. Ctrl-C won't
+// raise SIGINT in raw mode, so it's honored here as an explicit quit.
+function runLiveAction(session: PlaySession, rl: ReturnType<typeof createInterface>): Promise<void> {
+  return new Promise((resolvePromise) => {
+    const input = process.stdin;
+    const isTTY = Boolean(input.isTTY);
+    const wasRaw = Boolean(input.isRaw);
+    rl.pause();
+    if (isTTY) input.setRawMode(true);
+    input.resume();
+    process.stdout.write('(press any key to stop)\n');
 
-  while (session.state.activeAction) {
-    const winner = await Promise.race([pendingLine!.then((): 'line' => 'line'), delay(LIVE_TICK_MS).then((): 'tick' => 'tick')]);
+    let lastTick = Date.now();
+    let settled = false;
+    let cancelled = false;
 
-    if (winner === 'line') {
-      stoppedByUser = true;
-      session.state.activeAction = null;
-      pendingLine = null;
-      break;
-    }
+    const finish = (): void => {
+      if (settled) return;
+      settled = true;
+      clearInterval(timer);
+      input.off('data', onData);
+      input.off('end', onEnd);
+      if (isTTY) input.setRawMode(wasRaw);
+      process.stdout.write('\n');
+      if (cancelled) {
+        cancelAction(session);
+        console.log('Stopped.');
+      }
+      console.log(formatView(view(session)).join('\n'));
+      rl.resume();
+      resolvePromise();
+    };
 
-    const now = Date.now();
-    const elapsedMs = now - lastTick;
-    lastTick = now;
-    const tick = liveTick(session, elapsedMs, speedMultiplier);
-    process.stdout.write(`\r\x1b[K${tick.line}`);
-    if (!tick.active) break;
-  }
+    const onData = (chunk: Buffer): void => {
+      if (isTTY && chunk.length === 1 && chunk[0] === 0x03) {
+        // Ctrl-C: restore the terminal and exit, since raw mode swallowed the
+        // usual SIGINT.
+        input.setRawMode(false);
+        rl.close();
+        process.exit(130);
+      }
+      cancelled = true;
+      finish();
+    };
+    const onEnd = (): void => {
+      cancelled = true;
+      finish();
+    };
 
-  process.stdout.write('\n');
-  if (stoppedByUser) console.log('Stopped.');
-  console.log(formatView(view(session)).join('\n'));
-  out.line = pendingLine;
+    input.on('data', onData);
+    input.on('end', onEnd);
+
+    const timer = setInterval(() => {
+      const now = Date.now();
+      const elapsedMs = now - lastTick;
+      lastTick = now;
+      const tick = liveTick(session, elapsedMs, speedMultiplier);
+      process.stdout.write(`\r\x1b[K${tick.line}`);
+      if (!tick.active) finish();
+    }, LIVE_TICK_MS);
+  });
 }
 
 function loadContent(files: string[]): string {
@@ -275,7 +332,13 @@ async function promptCharacterCreation(it: AsyncIterator<string>): Promise<{ nam
 
 async function main(): Promise<void> {
   const rawArgs = process.argv.slice(2);
-  const liveMode = rawArgs.includes('--live');
+  // Real-time play needs an interactive terminal to render the progress bar and
+  // catch the keypress that cancels an action. On a piped/non-TTY run there's no
+  // one watching or able to press a key, and an infinitely-repeating action
+  // would tick forever, so --live there falls back to the instant path (each
+  // spannable action resolves to its natural first-unit completion at once,
+  // exactly like the default agent mode).
+  const liveMode = rawArgs.includes('--live') && Boolean(process.stdin.isTTY);
   const arg = rawArgs.find((a) => !a.startsWith('--'));
   const files = (arg ?? defaultContent).split(',').map((file) => file.trim()).filter(Boolean);
   const registry = loadModule(loadContent(files));
@@ -283,12 +346,13 @@ async function main(): Promise<void> {
 
   let current = view(session);
   console.log(formatView(current).join('\n'));
+  console.log('\nType /help for commands (/state and /inventory show your progress).');
 
   const rl = createInterface({ input: process.stdin, output: process.stdout });
-  // A manual asyncIterator (rather than `for await (const line of rl)`) so
-  // runLiveAction can borrow the SAME iterator mid-loop to race input against
-  // real-time ticks, then hand control back — see runLiveAction's doc comment
-  // on why the pending-read handoff matters.
+  // A manual asyncIterator (rather than `for await (const line of rl)`) so a
+  // read can be started and later awaited across iterations. During a live
+  // action runLiveAction pauses this readline and drives stdin itself, then
+  // resumes it, so the loop keeps reading lines normally afterward.
   const it = rl[Symbol.asyncIterator]();
   try {
     process.stdout.write('> ');
@@ -298,6 +362,10 @@ async function main(): Promise<void> {
       const { value: line, done } = await pendingLine;
       pendingLine = null;
       if (done) break;
+
+      // A blank line between the command just entered and its result, so each
+      // turn reads as a distinct block (playtest feedback #1).
+      console.log('');
 
       const trimmed = line.trim();
       const index = Number(trimmed);
@@ -309,9 +377,9 @@ async function main(): Promise<void> {
         try {
           const next = beginAction(session, choice.id);
           if (session.state.activeAction) {
-            const box: PendingLineBox = { line: null };
-            await runLiveAction(session, it, box);
-            pendingLine = box.line;
+            // runLiveAction pauses rl for the duration and resumes it before
+            // resolving, so the loop's next it.next() reads normally.
+            await runLiveAction(session, rl);
             current = view(session);
           } else {
             console.log(formatView(next).join('\n'));
