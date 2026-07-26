@@ -16,14 +16,11 @@ import { humanize } from './values';
 
 export class RuntimeError extends Error {}
 
-// A spannable/repeating action currently in flight, resolved as a sequence
-// of attempts against one target with health (a "fight"). `progress` is
-// seconds already elapsed toward the *next attempt's* completion — not an
-// absolute deadline — so a mid-flight speed change just changes how the
-// remaining progress maps to a completion instant, instead of requiring the
-// deadline to be rewritten. `attemptsMade`/`healthRemaining` track the
-// current fight so a live step can split mid-fight and resume exactly where
-// it left off (see resolveSegment's fight math below).
+// A repeating/spannable action in flight: a sequence of attempts against one
+// target with `healthRemaining` (a "fight"). `progress` is seconds elapsed
+// toward the *next attempt*, not an absolute deadline, so a mid-flight speed
+// change re-maps the remaining progress instead of rewriting a deadline.
+// `attemptsMade`/`healthRemaining` let a split mid-fight resume exactly.
 export interface ActiveAction {
   ownerRef: string; // "<obj>.<objId>", e.g. "entity.oven"
   actionLabel: string;
@@ -33,10 +30,9 @@ export interface ActiveAction {
   attemptsMade: number;
 }
 
-// A timed stat modifier (from eating food, etc). `kind: 'added'` sums flat
-// onto the stat's base; `kind: 'increased'` sums as a fraction multiplied
-// across the total (see statValue below) — the same two-bucket stacking
-// legacy stat modifiers used.
+// A timed stat modifier (from eating food, etc). `added` sums flat onto the
+// stat's base; `increased` sums as a fraction applied multiplicatively (see
+// statValue).
 export interface ActiveBuff {
   statId: string;
   amount: number;
@@ -54,26 +50,24 @@ export interface GameState {
   time: number;
   activeAction: ActiveAction | null;
   activeBuffs: Record<string, ActiveBuff>;
-  // Deterministic PRNG cursor (an LCG state), advanced only when resolving an
-  // attempt of an action that HAS an `accuracy` stat — deterministic actions
-  // never draw, so state.rng is untouched and existing behavior is
-  // byte-identical. Living in state (not a function parameter) is what keeps
-  // resolve() associative: the draws are counted in attempt order regardless
-  // of how a caller splits a resolve() span into smaller calls.
+  // Deterministic PRNG cursor (LCG state), advanced only when resolving an
+  // attempt of an `accuracy` action — deterministic actions never draw. Living
+  // in state (not a parameter) counts draws in attempt order regardless of how
+  // a caller splits a resolve() span; see the associativity invariant on
+  // resolve().
   rng: number;
 }
 
-// Nonzero seed: an LCG's state only degenerates if it lands on a genuine
-// fixed point, which this seed/multiplier/increment combination does not.
+// Nonzero seed: an LCG degenerates only at a genuine fixed point, which this
+// seed/multiplier/increment combination avoids.
 const DEFAULT_RNG_SEED = 20260718;
 
 export function createGameState(location = ''): GameState {
   return { flags: {}, inventory: {}, location, visits: {}, xp: {}, log: [], time: 0, activeAction: null, activeBuffs: {}, rng: DEFAULT_RNG_SEED };
 }
 
-// A small LCG (same shape as glibc's rand()). Advances state.rng and returns
-// a value in [0, 1). This is the ONLY source of randomness resolve() ever
-// draws from — see the `rng` field comment above for why that matters.
+// A small LCG (same shape as glibc's rand()): advances state.rng and returns a
+// value in [0, 1).
 const RNG_MULTIPLIER = 1103515245;
 const RNG_INCREMENT = 12345;
 const RNG_MODULUS = 2147483648; // 2^31
@@ -87,11 +81,8 @@ function clamp01(value: number): number {
   return Math.min(1, Math.max(0, value));
 }
 
-// THE single seam through which simulated time advances. Live drivers (a
-// wall-clock loop, an offline-catch-up calculation) will later inject real
-// elapsed seconds here, and timed-buff expiry will later plug in here too —
-// the pure runtime itself never reads a real clock; it only ever moves
-// forward when something calls this.
+// The single seam through which simulated time advances: the pure runtime
+// never reads a real clock, it only moves forward when something calls this.
 export function advanceTime(state: GameState, seconds: number): void {
   if (seconds < 0) throw new RuntimeError(`advanceTime: seconds must be non-negative, got ${seconds}`);
   state.time += seconds;
@@ -104,9 +95,8 @@ export interface Registry {
   stats: Map<string, Stat>;
   skills: Map<string, Skill>;
   recipes: Map<string, Recipe>;
-  // Each recipe's Action form (see recipeAction below), compiled once here at
-  // load time and looked up by findActionOwner('recipe', ...) — never
-  // recompiled per findActiveAction call.
+  // Each recipe's compiled Action form (see recipeAction), built once at load
+  // and looked up by findActionOwner('recipe', ...).
   recipeActions: Map<string, Action>;
   dialogues: Map<string, Dialogue>;
   dialoguesByOwner: Map<string, Dialogue>;
@@ -176,8 +166,8 @@ export function loadModule(source: string): Registry {
   return registry;
 }
 
-// References are flat dotted keys by convention, not nested lookups (see grammar.md
-// "References") — the one exception the engine itself maintains is `<node-name>.visits`.
+// References are flat dotted keys, not nested lookups (grammar.md "References");
+// the one exception the engine maintains is `<node-name>.visits`.
 function resolveReference(reference: Reference, state: GameState): boolean | number | undefined {
   const { path } = reference;
   if (path.length === 1 && path[0] === 'time') return state.time;
@@ -388,9 +378,7 @@ function findActiveAction(active: ActiveAction, registry: Registry): Action {
   return action;
 }
 
-// base + Σ(added modifiers), then × (1 + Σ(increased modifiers)) — mirrors
-// the legacy engine's stat-modifier stacking rule (src/game/characterStats.ts),
-// re-expressed on the contentDsl schema. An active buff is just another
+// base + Σ(added), then × (1 + Σ(increased)). An active buff is just another
 // modifier source alongside the stat's own base.
 export function statValue(statId: string, state: GameState, registry: Registry): number {
   const base = registry.stats.get(statId)?.base ?? 0;
@@ -404,8 +392,6 @@ export function statValue(statId: string, state: GameState, registry: Registry):
   return (base + added) * (1 + increased);
 }
 
-// Seconds per ATTEMPT (not per fight) — the axis `speed:` scales. Replaces
-// the old one-attempt-equals-one-completion `actionDuration`.
 function attemptDuration(action: Action, state: GameState, registry: Registry): number {
   const speed = action.speed ? statValue(action.speed, state, registry) : 1;
   return (action.time ?? 0) / speed;
@@ -442,10 +428,9 @@ function fightParams(action: Action, state: GameState, registry: Registry): Figh
   };
 }
 
-// How many completions' worth of input the current inventory can afford.
-// Items have no finite stack/inventory cap in this schema (Pass 1), so only
-// the `take:` side can ever bound a repeating action — the output side is
-// treated as unbounded rather than inventing a cap the schema doesn't have.
+// How many completions the current inventory can afford. Only the `take:` side
+// can bound a repeating action — items have no stack cap in this schema (Pass
+// 1), so the output side is treated as unbounded.
 function inputLimit(action: Action, state: GameState): number {
   const perCompletion = new Map<string, number>();
   for (const result of action.results) {
@@ -459,11 +444,9 @@ function inputLimit(action: Action, state: GameState): number {
   return limit;
 }
 
-// Applies one action's `results` as though it completed `count` times, in a
-// single batch — never by looping `count` times (count can be enormous).
-// Numeric verbs (give/take/xp/add) scale by count; one-shot log-like verbs
-// (say, set, unset, relocate, discover, open-modal) fire at most once per
-// batch, so a large K never spams the log with repeated identical lines.
+// Applies one action's `results` as if it completed `count` times, in a single
+// batch (count can be enormous). Numeric verbs (give/take/xp/add) scale by
+// count; one-shot verbs (say/set/unset/relocate/discover/open-modal) fire once.
 function applyResultBatch(result: ActionResult, count: number, state: GameState): void {
   switch (result.kind) {
     case 'give':
@@ -486,14 +469,10 @@ function applyResultBatch(result: ActionResult, count: number, state: GameState)
   }
 }
 
-// Applies `count` fights' worth of ONE outcome's result list, batched (see
-// applyResultBatch) — never by looping per fight, since count can be
-// enormous. `results`/`onSuccess` fire on a completion outcome; `onEscape`
-// fires on an escape outcome — the two are mutually exclusive per fight.
-// Firing per *segment* instead of per *fight* would break associativity: the
-// live driver (many small resolve() calls) would fire it far more often than
-// the REPL (one big call) — the exact REPL/live divergence resolve() exists
-// to prevent.
+// Applies `count` fights' worth of one outcome, batched (see applyResultBatch),
+// never per fight. `results`/`onSuccess` fire on completion, `onEscape` on
+// escape (mutually exclusive per fight). Firing per *fight*, not per segment,
+// is what keeps resolve() associative.
 function applyFightBatch(action: Action, count: number, outcome: FightOutcome, state: GameState): void {
   if (count <= 0) return;
   if (outcome === 'completion') {
@@ -507,10 +486,9 @@ function applyFightBatch(action: Action, count: number, outcome: FightOutcome, s
 const EPSILON = 1e-9;
 
 // The earliest instant in [state.time, toTime] at which something discrete
-// needs to happen: a buff expiring, a repeating action running out of
-// input, or a non-repeating action completing. Returns toTime if nothing
-// discrete happens before it — that's what lets resolve() cross a huge span
-// of idle time in a single step.
+// must happen (a buff expiring, a repeating action running out of input, a
+// non-repeating action completing), or toTime if nothing does — what lets
+// resolve() cross a huge idle span in one step.
 function nextBoundary(state: GameState, registry: Registry, toTime: number): number {
   let boundary = toTime;
   for (const buff of Object.values(state.activeBuffs)) {
@@ -518,11 +496,9 @@ function nextBoundary(state: GameState, registry: Registry, toTime: number): num
   }
   if (state.activeAction) {
     const action = findActiveAction(state.activeAction, registry);
-    // A stochastic action (has `accuracy`) can't contribute a closed-form
-    // boundary here — how long a fight takes is a random variable, not a
-    // fixed function of state. resolveSegment simulates it attempt-by-attempt
-    // instead, bounded only by whatever boundary buff-expiry/toTime already
-    // gives (see the stochastic branch of resolveSegment below).
+    // A stochastic action (accuracy) has no closed-form boundary — fight length
+    // is random. resolveStochasticSegment simulates it attempt-by-attempt,
+    // bounded only by whatever buff-expiry/toTime already gives.
     if (!action.accuracy) {
       const { duration, attemptsToResolve } = fightParams(action, state, registry);
       const remainingAttempts = attemptsToResolve - state.activeAction.attemptsMade;
@@ -545,13 +521,10 @@ function nextBoundary(state: GameState, registry: Registry, toTime: number): num
   return boundary;
 }
 
-// Advances state.time to segEnd for a DETERMINISTIC action (no accuracy —
-// outcome and fight length are known in closed form). Generalizes the old
-// per-completion floor() to per-attempt: `attemptsThisSegment` folds into
-// however many whole FIGHTS that represents (`fights`), applied as one
-// batch, with the remainder carried as attemptsMade/healthRemaining/progress
-// for the fight still in flight — never by looping per attempt or per fight,
-// however large the count.
+// Advances state.time to segEnd for a deterministic action (no accuracy —
+// outcome and fight length known in closed form). Whole fights this segment
+// covers are applied as one batch; the remainder is carried as
+// attemptsMade/healthRemaining/progress for the fight still in flight.
 function resolveDeterministicSegment(state: GameState, registry: Registry, action: Action, segEnd: number): void {
   const active = state.activeAction!;
   const segLen = segEnd - state.time;
@@ -575,24 +548,20 @@ function resolveDeterministicSegment(state: GameState, registry: Registry, actio
     active.healthRemaining = health - remainder * abilityAmount;
     active.progress = newProgress;
   } else {
-    // A non-repeating fight fires its (single) outcome as a boundary event
-    // (see applyDueBoundaries) once attemptsMade reaches attemptsToResolve —
-    // clamped here (never wrapped/reset) so that check can still see it.
+    // A non-repeating fight fires its single outcome as a boundary event
+    // (applyDueBoundaries) once attemptsMade reaches attemptsToResolve —
+    // clamped here, never wrapped, so that check can still see it.
     active.attemptsMade = Math.min(active.attemptsMade + attemptsThisSegment, attemptsToResolve);
     active.healthRemaining = health - active.attemptsMade * abilityAmount;
     active.progress = newProgress;
   }
 }
 
-// Advances state.time to segEnd for a STOCHASTIC action (has accuracy) by
-// simulating attempt-by-attempt, drawing nextRandom(state) once per attempt
-// actually performed. This can't be batched in closed form — a fight's
-// length is a random variable — but O(attempts) is fine here: it's bounded
-// by the segment length and (for a repeating action) input affordability,
-// both finite. Each attempt's draw happens in strict chronological order
-// off state.rng, so splitting the overall resolve() into smaller calls can
-// never change which draw powers which attempt (see the `rng` field comment
-// on GameState) — that's what keeps this path associative.
+// Advances state.time to segEnd for a stochastic action (accuracy) by
+// simulating attempt-by-attempt, drawing nextRandom(state) once per attempt.
+// A fight's length is random, so this can't be batched; O(attempts) is bounded
+// by segment length and input affordability. Draws happen in strict attempt
+// order off state.rng, which keeps this path associative (see resolve()).
 function resolveStochasticSegment(state: GameState, registry: Registry, action: Action, segEnd: number): void {
   const active = state.activeAction!;
 
@@ -624,11 +593,8 @@ function resolveStochasticSegment(state: GameState, registry: Registry, action: 
     const hit = nextRandom(state) < accuracyValue;
     if (hit) active.healthRemaining -= abilityAmount;
 
-    // Decided per attempt, at runtime — NOT via the deterministic path's
-    // precomputed `outcome` (which assumes every attempt hits): health
-    // exhaustion always means completion; running out of attempts before
-    // that always means escape, regardless of what a guaranteed-hit fight
-    // would have done.
+    // Outcome is decided per attempt, not via the deterministic plan: health
+    // exhaustion means completion; running out of attempts first means escape.
     let fightOutcome: FightOutcome | null = null;
     if (active.healthRemaining <= EPSILON) fightOutcome = 'completion';
     else if (active.attemptsMade >= escapeAfter) fightOutcome = 'escape';
@@ -681,8 +647,8 @@ function applyDueBoundaries(state: GameState, registry: Registry, at: number): v
 
     if (state.activeAction) {
       const action = findActiveAction(state.activeAction, registry);
-      // A stochastic action (has accuracy) fires and clears/rearms itself
-      // entirely inside resolveStochasticSegment — nothing due here for it.
+      // A stochastic action fires and rearms itself inside
+      // resolveStochasticSegment — nothing due here for it.
       if (!action.accuracy) {
         if (state.activeAction.repeating) {
           if (inputLimit(action, state) <= 0) {
@@ -692,11 +658,9 @@ function applyDueBoundaries(state: GameState, registry: Registry, at: number): v
         } else {
           const { duration, attemptsToResolve, outcome } = fightParams(action, state, registry);
           // duration <= 0 means every attempt is instantaneous — fire
-          // immediately regardless of attemptsMade, matching the old
-          // always-true `progress + EPSILON >= duration` check for a
-          // zero-`time:` action (whose toTime === state.time in useAction,
-          // so resolveSegment's closed form never even runs to advance
-          // attemptsMade — this is the only place such an action can fire).
+          // immediately regardless of attemptsMade. This is the only place a
+          // zero-`time:` action fires: its toTime === state.time in useAction,
+          // so resolveSegment's closed form never runs to advance attemptsMade.
           if (state.activeAction.attemptsMade >= attemptsToResolve || duration <= 0) {
             applyFightBatch(action, 1, outcome, state);
             state.activeAction = null;
@@ -710,20 +674,14 @@ function applyDueBoundaries(state: GameState, registry: Registry, at: number): v
   }
 }
 
-// THE single seam every driver (REPL, session, a future live loop) calls
-// through to advance simulated time. The invariant that makes this safe to
-// call at any granularity: resolve(resolve(s, t1), t2) for t1 <= t2 is
-// bit-for-bit identical to resolve(s, t2) — one big jump equals any sequence
-// of smaller steps summing to the same target. It walks forward in SEGMENTS
-// bounded by the next discrete event, never in fixed dt steps, so a
-// deterministic segment's completions are always computed in closed form.
-//
-// Randomness (for actions with `accuracy`) is drawn only from state.rng, at
-// a discrete attempt boundary, never inside the closed-form batch math above
-// — a chance-gated fight can't be batched, so it resolves attempt-by-attempt
-// instead (see resolveStochasticSegment). Because the draws live in state
-// and advance strictly in attempt order, splitting this call into smaller
-// ones can't change which draw powers which attempt, preserving associativity.
+// THE single seam every driver (REPL, session, a future live loop) calls to
+// advance simulated time. Core invariant (proved in resolve.test.ts):
+// resolve(resolve(s, t1), t2) === resolve(s, t2) for t1 <= t2 — one big jump
+// equals any sequence of smaller steps to the same target. It walks forward in
+// segments bounded by the next discrete event, never fixed dt steps, so a
+// deterministic segment resolves in closed form. Randomness (accuracy actions)
+// is drawn only from state.rng at attempt boundaries, in strict attempt order,
+// so splitting the call can't change which draw powers which attempt.
 export function resolve(state: GameState, registry: Registry, toTime: number): void {
   if (toTime < state.time) throw new RuntimeError(`resolve: toTime (${toTime}) must be >= state.time (${state.time})`);
   applyDueBoundaries(state, registry, state.time);
@@ -734,11 +692,9 @@ export function resolve(state: GameState, registry: Registry, toTime: number): v
   }
 }
 
-// The inert `food, +N <stat>, <duration>` item tags become live here: an
-// item action that consumes (take:s) the very item it's defined on is what
-// "eating" means in this schema, and — if the item carries the `food`
-// keyword tag — grants each of its stat-bonus tags as a timed buff whose
-// clock starts the moment eating completes.
+// Turns the inert `food, +N <stat>, <duration>` item tags into live buffs:
+// eating (an item action that take:s the item it's defined on) grants each
+// stat-bonus tag as a timed buff whose clock starts when eating completes.
 function grantFoodBuff(item: Item, state: GameState): void {
   if (!item.tags.some((tag) => tag.kind === 'keyword' && tag.value === 'food')) return;
 
@@ -765,11 +721,10 @@ export function useAction(obj: string, objId: string, actionId: string, registry
   if (action.requires && !evaluateCondition(action.requires, state)) throw new RuntimeError(`action requires unmet: ${obj}.${objId}.${actionId}`);
   if (action.hiddenIf && evaluateCondition(action.hiddenIf, state)) throw new RuntimeError(`action hidden: ${obj}.${objId}.${actionId}`);
 
-  // Same "take: implies affordability" gate as before, checked once up
-  // front for a single completion's worth — this only gates whether the
-  // action is allowed to *start* at all. A repeating action running out of
-  // input mid-flight is handled inside resolve()'s K-limiting math instead,
-  // not here, and doesn't fire onFailure — it just quietly ends.
+  // take: implies affordability — checked once up front for one completion's
+  // worth; this only gates whether the action may START. A repeating action
+  // running out of input mid-flight is handled in resolve()'s limiting math,
+  // not here, and ends quietly without firing onFailure.
   const required = new Map<string, number>();
   for (const r of action.results) if (r.kind === 'take') required.set(r.item, (required.get(r.item) ?? 0) + (r.amount ?? 1));
   let shortfall: string | undefined;
@@ -787,10 +742,9 @@ export function useAction(obj: string, objId: string, actionId: string, registry
   }
 
   state.activeAction = { ownerRef: `${obj}.${objId}`, actionLabel: actionId, progress: 0, repeating, healthRemaining: action.health ?? 1, attemptsMade: 0 };
-  // Synchronously resolve exactly the first natural unit of play: one full
-  // fight when it's known in closed form (deterministic), or just the first
-  // attempt when it isn't (stochastic — a fight's length is a random
-  // variable, so there's no fixed "one fight" span to jump straight to).
+  // Resolve exactly the first natural unit of play: one full fight when it's
+  // closed-form (deterministic), or just the first attempt when it isn't
+  // (stochastic — fight length is random, so there's no fixed span to jump to).
   const firstUnit = action.accuracy ? duration : fightParams(action, state, registry).attemptsToResolve * duration;
   resolve(state, registry, state.time + firstUnit);
 
@@ -800,11 +754,10 @@ export function useAction(obj: string, objId: string, actionId: string, registry
   }
 }
 
-// Compiles a recipe into a B1 Action so it runs through the same
-// resolve()/fight machinery as a repeating entity action: a craft is a
-// single-attempt (health: 1) fight whose "target" is the input stack rather
-// than a monster. Called once per recipe at loadModule time (see the
-// `recipe` case above) — never recomputed per findActiveAction call.
+// Compiles a recipe into an Action so a craft runs through the same
+// resolve()/fight machinery as a repeating entity action: a single-attempt
+// (health: 1) fight whose "target" is the input stack. Called once per recipe
+// at load (see the `recipe` case above).
 function recipeAction(recipe: Recipe): Action {
   const takes: ActionResult[] = recipe.in.map((q) => ({ kind: 'take', item: q.item, amount: q.amount }));
   const gives: ActionResult[] = recipe.out.map((q) => ({ kind: 'give', item: q.item, amount: q.amount }));
@@ -824,11 +777,10 @@ function recipeAction(recipe: Recipe): Action {
   };
 
   if (recipe.accuracy) {
-    // A craft is a single-attempt fight: a miss on that one attempt fails
-    // the whole craft to `burnt` instead of retrying. The fail path
-    // consumes the SAME inputs as the success path (kept symmetric with
-    // `results`' take entries) so inputLimit — which only reads
-    // `results` — still correctly bounds a repeating burn-capable craft.
+    // A craft is a single-attempt fight: a miss fails the whole craft to
+    // `burnt` instead of retrying. The fail path consumes the SAME inputs as
+    // success, so inputLimit (which reads only `results`) still bounds a
+    // repeating burn-capable craft.
     action.escapeAfter = 1;
     const burnt: ActionResult[] = recipe.burnt.map((q) => ({ kind: 'give', item: q.item, amount: q.amount }));
     action.onEscape = [...takes, ...burnt];
@@ -848,9 +800,8 @@ export function recipeCraftable(recipe: Recipe, registry: Registry, state: GameS
   return true;
 }
 
-// Mirrors useAction's structure (arm, resolve the first natural unit) but
-// does NOT repeat its take-affordability gate — recipeCraftable already
-// gates inputs (and station capability) above.
+// Mirrors useAction (arm, resolve the first unit) but skips its take gate —
+// recipeCraftable already gates inputs and capability.
 export function craft(recipeId: string, registry: Registry, state: GameState): void {
   const recipe = registry.recipes.get(recipeId);
   if (!recipe) throw new RuntimeError(`unknown recipe: ${recipeId}`);

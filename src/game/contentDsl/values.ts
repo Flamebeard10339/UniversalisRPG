@@ -12,10 +12,9 @@ export const number: Parser<number> = {
   },
 };
 
-// Like `number` but accepts a fractional part. Used where a value is
-// inherently non-integer (a stat's base doubling as a probability, e.g.
-// `# stat cook-success base: 0.7`) — item/xp/flag counts stay on the
-// integer-only `number` above.
+// Like `number` but accepts a fractional part, for values that are inherently
+// non-integer (e.g. a stat base doubling as a probability). Item/xp/flag counts
+// stay on the integer-only `number` above.
 export const decimal: Parser<number> = {
   parse: (cursor) => {
     const raw = cursor.take(/-?\d+(?:\.\d+)?/);
