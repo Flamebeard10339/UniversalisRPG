@@ -270,7 +270,9 @@ export function describeCondition(condition: Condition): string {
   }
 }
 
-export function applyResult(result: ActionResult, state: GameState): void {
+// Takes the registry because a pool result needs the resource's live max and
+// its on empty/on full blocks; every other verb reads state alone.
+export function applyResult(result: ActionResult, state: GameState, registry: Registry): void {
   switch (result.kind) {
     case 'say':
       state.log.push(result.text);
@@ -306,6 +308,12 @@ export function applyResult(result: ActionResult, state: GameState): void {
       state.log.push(`modal:${result.modal}`);
       state.pendingModal = result.modal;
       break;
+    case 'pool': {
+      const resource = requireResource(registry, result.resource);
+      const current = state.resources[resource.id] ?? 0;
+      setPoolLevel(state, registry, resource, current, current + result.delta, statValue(resource.max, state, registry));
+      break;
+    }
   }
 }
 
@@ -348,7 +356,7 @@ function findNode(dialogue: Dialogue, name: string): DialogueNode {
 // as an implicit single-choice "continue" menu so the player advances line by
 // line; (b) model dialogue as a first-class modal (pendingModal) so a GUI need
 // not reverse-engineer pacing. Deferred as an out-of-MVP dialogue-engine change.
-function runSteps(dialogue: Dialogue, node: DialogueNode, state: GameState, start: number, replay: boolean): DialogueSession {
+function runSteps(dialogue: Dialogue, node: DialogueNode, registry: Registry, state: GameState, start: number, replay: boolean): DialogueSession {
   for (let i = start; i < node.steps.length; i++) {
     const step = node.steps[i];
     switch (step.kind) {
@@ -356,10 +364,10 @@ function runSteps(dialogue: Dialogue, node: DialogueNode, state: GameState, star
         if (replay) state.log.push(renderSegments(step.segments, state));
         break;
       case 'effect':
-        if (replay) applyResult(step.result, state);
+        if (replay) applyResult(step.result, state, registry);
         break;
       case 'goto':
-        return enterNode(dialogue, findNode(dialogue, step.target), state);
+        return enterNode(dialogue, findNode(dialogue, step.target), registry, state);
       case 'menu':
         return { dialogue, node, resumeIndex: i + 1, replay, choices: step.choices };
     }
@@ -369,11 +377,11 @@ function runSteps(dialogue: Dialogue, node: DialogueNode, state: GameState, star
 
 // On a revisit, only a `sticky` node replays its beats and effects; otherwise
 // they fire once and later visits show `again` instead.
-function enterNode(dialogue: Dialogue, node: DialogueNode, state: GameState): DialogueSession {
+function enterNode(dialogue: Dialogue, node: DialogueNode, registry: Registry, state: GameState): DialogueSession {
   const visit = (state.visits[node.name] = (state.visits[node.name] ?? 0) + 1);
   const replay = visit === 1 || node.sticky === true;
   if (!replay && node.again) state.log.push(renderSegments(node.again, state));
-  return runSteps(dialogue, node, state, 0, replay);
+  return runSteps(dialogue, node, registry, state, 0, replay);
 }
 
 export function talk(entityId: string, registry: Registry, state: GameState): DialogueSession {
@@ -385,17 +393,17 @@ export function talk(entityId: string, registry: Registry, state: GameState): Di
     if (node.when && evaluateCondition(node.when, state)) chosen = node;
   }
   if (!chosen) throw new RuntimeError(`no reachable node in dialogue: ${dialogue.id}`);
-  return enterNode(dialogue, chosen, state);
+  return enterNode(dialogue, chosen, registry, state);
 }
 
-export function choose(text: string, session: DialogueSession, state: GameState): DialogueSession {
+export function choose(text: string, session: DialogueSession, registry: Registry, state: GameState): DialogueSession {
   if (!session.choices) throw new RuntimeError('no active menu to choose from');
   const match = session.choices.find((c) => (!c.when || evaluateCondition(c.when, state)) && renderSegments(c.segments, state) === text);
   if (!match) throw new RuntimeError(`no choice matches: ${JSON.stringify(text)}`);
 
-  for (const effect of match.effects) applyResult(effect, state);
-  if (match.goto) return enterNode(session.dialogue, findNode(session.dialogue, match.goto), state);
-  return runSteps(session.dialogue, session.node, state, session.resumeIndex, session.replay);
+  for (const effect of match.effects) applyResult(effect, state, registry);
+  if (match.goto) return enterNode(session.dialogue, findNode(session.dialogue, match.goto), registry, state);
+  return runSteps(session.dialogue, session.node, registry, state, session.resumeIndex, session.replay);
 }
 
 function findActionOwner(obj: string, objId: string, registry: Registry): unknown {
@@ -620,7 +628,7 @@ function inputLimit(action: Action, state: GameState): number {
 // Applies one action's `results` as if it completed `count` times, in a single
 // batch (count can be enormous). Numeric verbs (give/take/xp/add) scale by
 // count; one-shot verbs (say/set/unset/relocate/discover/open-modal) fire once.
-function applyResultBatch(result: ActionResult, count: number, state: GameState): void {
+function applyResultBatch(result: ActionResult, count: number, state: GameState, registry: Registry, deltas: PoolDeltas): void {
   switch (result.kind) {
     case 'give':
       state.inventory[result.item] = (state.inventory[result.item] ?? 0) + (result.amount ?? 1) * count;
@@ -637,8 +645,13 @@ function applyResultBatch(result: ActionResult, count: number, state: GameState)
       state.flags[result.variable] = base + result.amount * count;
       return;
     }
+    case 'pool':
+      // Accrued, never written here — the segment settles it (see PoolDeltas).
+      requireResource(registry, result.resource);
+      deltas.set(result.resource, (deltas.get(result.resource) ?? 0) + result.delta * count);
+      return;
     default:
-      applyResult(result, state);
+      applyResult(result, state, registry);
   }
 }
 
@@ -646,13 +659,13 @@ function applyResultBatch(result: ActionResult, count: number, state: GameState)
 // never per fight. `results`/`onSuccess` fire on completion, `onEscape` on
 // escape (mutually exclusive per fight). Firing per *fight*, not per segment,
 // is what keeps resolve() associative.
-function applyFightBatch(action: Action, count: number, outcome: FightOutcome, state: GameState): void {
+function applyFightBatch(action: Action, count: number, outcome: FightOutcome, state: GameState, registry: Registry, deltas: PoolDeltas): void {
   if (count <= 0) return;
   if (outcome === 'completion') {
-    for (const result of action.results) applyResultBatch(result, count, state);
-    for (const result of action.onSuccess ?? []) applyResultBatch(result, count, state);
+    for (const result of action.results) applyResultBatch(result, count, state, registry, deltas);
+    for (const result of action.onSuccess ?? []) applyResultBatch(result, count, state, registry, deltas);
   } else {
-    for (const result of action.onEscape ?? []) applyResultBatch(result, count, state);
+    for (const result of action.onEscape ?? []) applyResultBatch(result, count, state, registry, deltas);
   }
 }
 
@@ -681,30 +694,79 @@ function captureResourceRates(state: GameState, registry: Registry): ResourceSna
   return snapshots;
 }
 
-// Integrates each snapshotted pool over `dt` seconds of constant rate (rates are
-// per MINUTE, hence dt/60). A plain pool clamps to [0, max]. A pool with `on
-// full` is a rollover meter: it empties and fires its effects ⌊raw/max⌋ times,
-// batched per rollover (associative across arbitrary splits — the same guarantee
-// applyFightBatch gives fight completions). `on empty` fires once as a pool
-// crosses from >0 to 0; that firing is exact because nextBoundary puts a
-// boundary at the emptying instant, so the crossing always lands on a segment end.
-function integrateResources(state: GameState, snapshots: ResourceSnapshot[], dt: number): void {
-  const dtMinutes = dt / SECONDS_PER_MINUTE;
-  for (const { resource, ratePerMinute, max } of snapshots) {
-    const current = state.resources[resource.id] ?? 0;
-    const raw = current + ratePerMinute * dtMinutes;
-    if (ratePerMinute > 0 && resource.onFull.length > 0 && max > 0) {
-      const fires = Math.floor(raw / max);
-      if (fires > 0) for (const result of resource.onFull) applyResultBatch(result, fires, state);
-      state.resources[resource.id] = raw - fires * max;
-    } else {
-      const clamped = Math.min(max, Math.max(0, raw));
-      if (ratePerMinute < 0 && current > EPSILON && clamped <= EPSILON && resource.onEmpty.length > 0) {
-        for (const result of resource.onEmpty) applyResult(result, state);
-      }
-      state.resources[resource.id] = clamped;
-    }
+// THE single seam that moves a pool's level. Both ways a pool can move — rate
+// integration over a segment, and an instantaneous drain/restore — land here, so
+// the rollover and on-empty rules cannot drift apart between them.
+//
+// A plain pool clamps to [0, max]. A pool with `on full` is a rollover meter:
+// it empties and fires its effects ⌊raw/max⌋ times, batched per rollover
+// (associative across arbitrary splits — the same guarantee applyFightBatch
+// gives fight completions). `on empty` fires once as a pool crosses from >0 to
+// 0; for a draining rate that firing is exact, because nextBoundary puts a
+// boundary at the emptying instant so the crossing lands on a segment end.
+function setPoolLevel(state: GameState, registry: Registry, resource: Resource, current: number, raw: number, max: number): void {
+  if (raw > current && resource.onFull.length > 0 && max > 0) {
+    const fires = Math.floor(raw / max);
+    state.resources[resource.id] = raw - fires * max;
+    if (fires > 0) for (const result of resource.onFull) applyResultNow(result, fires, state, registry);
+    return;
   }
+  const clamped = Math.min(max, Math.max(0, raw));
+  state.resources[resource.id] = clamped;
+  if (raw < current && current > EPSILON && clamped <= EPSILON && resource.onEmpty.length > 0) {
+    for (const result of resource.onEmpty) applyResultNow(result, 1, state, registry);
+  }
+}
+
+// Instantaneous pool changes (`drain:`/`restore:`) accrued over one segment,
+// keyed by resource id. They are NOT written as they happen: a segment settles
+// each pool once, summing its discrete deltas with its integrated rate before a
+// single clamp. Clamping per write is what breaks resolve()'s associativity —
+// draining a pool to 0 and then regenerating gives a different level than
+// letting the two net out, so where a caller happened to split the span would
+// change the answer.
+type PoolDeltas = Map<string, number>;
+
+function requireResource(registry: Registry, resourceId: string): Resource {
+  const resource = registry.resources.get(resourceId);
+  if (!resource) throw new RuntimeError(`unknown resource: ${resourceId}`);
+  return resource;
+}
+
+// Writes every pool the segment touched — those with a nonzero rate, those with
+// a discrete delta, and those with both. Iterates the registry rather than the
+// delta map so the order pools settle in (and therefore the order their on
+// empty / on full effects fire in) can't depend on how the span was split.
+// `dt` is the segment's elapsed seconds; rates are per MINUTE, hence dt/60.
+function settlePools(state: GameState, registry: Registry, snapshots: ResourceSnapshot[], dt: number, deltas: PoolDeltas): void {
+  const dtMinutes = dt / SECONDS_PER_MINUTE;
+  const rated = new Map(snapshots.map((snapshot) => [snapshot.resource.id, snapshot]));
+
+  for (const resource of registry.resources.values()) {
+    const snapshot = rated.get(resource.id);
+    const delta = deltas.get(resource.id) ?? 0;
+    // Skipping untouched pools is what keeps an idle world crossing huge spans
+    // in O(1).
+    if (!snapshot && delta === 0) continue;
+    const current = state.resources[resource.id] ?? 0;
+    const raw = current + delta + (snapshot ? snapshot.ratePerMinute * dtMinutes : 0);
+    setPoolLevel(state, registry, resource, current, raw, snapshot?.max ?? statValue(resource.max, state, registry));
+  }
+}
+
+// Applies results that fire OUTSIDE a resolver segment — an instant action, a
+// boundary firing, a rollover handler. There is no segment to fold into, so any
+// pool write settles on the spot.
+function applyResultNow(result: ActionResult, count: number, state: GameState, registry: Registry): void {
+  const deltas: PoolDeltas = new Map();
+  applyResultBatch(result, count, state, registry, deltas);
+  settlePools(state, registry, [], 0, deltas);
+}
+
+function applyFightBatchNow(action: Action, count: number, outcome: FightOutcome, state: GameState, registry: Registry): void {
+  const deltas: PoolDeltas = new Map();
+  applyFightBatch(action, count, outcome, state, registry, deltas);
+  settlePools(state, registry, [], 0, deltas);
 }
 
 // Clamps every pool into [0, its live max]; called once a boundary settles, so a
@@ -774,7 +836,7 @@ function nextBoundary(state: GameState, registry: Registry, toTime: number): num
 // outcome and fight length known in closed form). Whole fights this segment
 // covers are applied as one batch; the remainder is carried as
 // attemptsMade/healthRemaining/progress for the fight still in flight.
-function resolveDeterministicSegment(state: GameState, registry: Registry, action: Action, segEnd: number): void {
+function resolveDeterministicSegment(state: GameState, registry: Registry, action: Action, segEnd: number, deltas: PoolDeltas): void {
   const active = state.activeAction!;
   const segLen = segEnd - state.time;
   const { duration, abilityAmount, attemptsToResolve, outcome } = fightPlan(action, state, registry);
@@ -792,7 +854,7 @@ function resolveDeterministicSegment(state: GameState, registry: Registry, actio
     const totalAttempts = active.attemptsMade + attemptsThisSegment;
     const fights = Math.floor(totalAttempts / attemptsToResolve);
     const remainder = totalAttempts - fights * attemptsToResolve;
-    applyFightBatch(action, fights, outcome, state);
+    applyFightBatch(action, fights, outcome, state, registry, deltas);
     active.attemptsMade = remainder;
     active.healthRemaining = health - remainder * abilityAmount;
     active.progress = newProgress;
@@ -811,7 +873,7 @@ function resolveDeterministicSegment(state: GameState, registry: Registry, actio
 // A fight's length is random, so this can't be batched; O(attempts) is bounded
 // by segment length and input affordability. Draws happen in strict attempt
 // order off state.rng, which keeps this path associative (see resolve()).
-function resolveStochasticSegment(state: GameState, registry: Registry, action: Action, segEnd: number): void {
+function resolveStochasticSegment(state: GameState, registry: Registry, action: Action, segEnd: number, deltas: PoolDeltas): void {
   const active = state.activeAction!;
 
   for (;;) {
@@ -849,7 +911,7 @@ function resolveStochasticSegment(state: GameState, registry: Registry, action: 
     else if (active.attemptsMade >= escapeAfter) fightOutcome = 'escape';
 
     if (fightOutcome) {
-      applyFightBatch(action, 1, fightOutcome, state);
+      applyFightBatch(action, 1, fightOutcome, state, registry, deltas);
       if (active.repeating) {
         active.healthRemaining = action.health ?? 1;
         active.attemptsMade = 0;
@@ -868,25 +930,28 @@ function resolveSegment(state: GameState, registry: Registry, segEnd: number): v
   // Snapshot resource rates now, while the active action's modifiers are still
   // in force — the stochastic path can clear the action before we integrate.
   const snapshots = captureResourceRates(state, registry);
+  // Discrete pool writes this segment's completions produce; settled together
+  // with the integrated rates below, never as they happen (see PoolDeltas).
+  const deltas: PoolDeltas = new Map();
 
   if (!state.activeAction) {
     advanceTime(state, segEnd - start);
   } else {
     const action = findActiveAction(state.activeAction, registry);
     if (action.accuracy) {
-      resolveStochasticSegment(state, registry, action, segEnd);
+      resolveStochasticSegment(state, registry, action, segEnd, deltas);
     } else {
-      resolveDeterministicSegment(state, registry, action, segEnd);
+      resolveDeterministicSegment(state, registry, action, segEnd, deltas);
       advanceTime(state, segEnd - state.time);
     }
   }
 
-  // Integrate over the time the segment actually consumed: a stochastic action
+  // Settle over the time the segment actually consumed: a stochastic action
   // that exhausts its input mid-segment stops early, and its untouched tail
   // resolves as a later action-less segment where rates are re-snapshotted (so
   // an action's drain stops the instant the action does).
   const elapsed = state.time - start;
-  if (elapsed > 0) integrateResources(state, snapshots, elapsed);
+  if (elapsed > 0 || deltas.size > 0) settlePools(state, registry, snapshots, Math.max(0, elapsed), deltas);
 }
 
 // Fires whatever is due exactly at `at` and keeps re-checking until nothing
@@ -921,7 +986,7 @@ function applyDueBoundaries(state: GameState, registry: Registry, at: number): v
           // zero-`time:` action fires: its toTime === state.time in useAction,
           // so resolveSegment's closed form never runs to advance attemptsMade.
           if (state.activeAction.attemptsMade >= attemptsToResolve || duration <= 0) {
-            applyFightBatch(action, 1, outcome, state);
+            applyFightBatchNow(action, 1, outcome, state, registry);
             state.activeAction = null;
             changed = true;
           }
@@ -1020,7 +1085,7 @@ export function armAction(obj: string, objId: string, actionId: string, registry
   let shortfall: string | undefined;
   for (const [item, need] of required) if ((state.inventory[item] ?? 0) < need) { shortfall = item; break; }
   if (shortfall !== undefined) {
-    if (action.onFailure) for (const result of action.onFailure) applyResult(result, state);
+    if (action.onFailure) for (const result of action.onFailure) applyResult(result, state, registry);
     else state.log.push(`You don't have enough ${registry.items.get(shortfall)?.title ?? shortfall}.`);
     return { armed: false };
   }

@@ -352,7 +352,7 @@ export function applyDirective(session: PlaySession, directive: Directive): { fa
     }
     case 'choose': {
       if (!session.dialogue) throw new RuntimeError('choose with no active dialogue');
-      const result = choose(directive.text, session.dialogue, state);
+      const result = choose(directive.text, session.dialogue, registry, state);
       session.dialogue = result.choices ? result : null;
       return {};
     }

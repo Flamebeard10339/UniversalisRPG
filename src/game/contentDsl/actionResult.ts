@@ -11,7 +11,11 @@ export type ActionResult =
   | { kind: 'xp'; skill: string; amount: number }
   | { kind: 'relocate'; location: string }
   | { kind: 'discover'; location: string }
-  | { kind: 'open-modal'; modal: string };
+  | { kind: 'open-modal'; modal: string }
+  // An instantaneous level change on a `# resource` pool, from `drain:` or
+  // `restore:`. One signed kind rather than two, matching how a pool's rate is
+  // already a single signed stat instead of separate regen and drain.
+  | { kind: 'pool'; resource: string; delta: number };
 
 function parseGiveTake(kind: 'give' | 'take', cursor: Cursor): ActionResult {
   return { kind, ...quantified.parse(cursor) };
@@ -30,6 +34,17 @@ function parseAdd(cursor: Cursor): ActionResult {
   return { kind: 'add', variable, amount: amount !== null ? Number(amount) : 1 };
 }
 
+// `drain: 5 health` / `restore: 2.5 focus`. The amount is written unsigned and
+// the verb carries the direction, so a pool can never be drained by a negative
+// restore; it is a decimal because pools are float (an int pool would round a
+// slow regeneration rate to zero every tick and never recover).
+function parsePool(sign: 1 | -1, cursor: Cursor): ActionResult {
+  const raw = cursor.take(/\d+(?:\.\d+)?/);
+  if (raw === null) throw new DslError('expected an amount and a resource, as in `drain: 5 health`', { start: cursor.abs(cursor.pos), end: cursor.abs(cursor.pos) });
+  cursor.take(/[ \t]+/);
+  return { kind: 'pool', resource: id.parse(cursor), delta: sign * Number(raw) };
+}
+
 function parseResult(cursor: Cursor): ActionResult {
   if (cursor.take(/say:[ \t]*/) !== null) return { kind: 'say', text: cursor.take(/[^\n]*/) ?? '' };
   if (cursor.take(/set[: \t][ \t]*/) !== null) return { kind: 'set', variable: parseVariable(cursor) };
@@ -42,6 +57,8 @@ function parseResult(cursor: Cursor): ActionResult {
     cursor.take(/[ \t]+/);
     return { kind: 'xp', skill, amount: number.parse(cursor) };
   }
+  if (cursor.take(/drain:[ \t]*/) !== null) return parsePool(-1, cursor);
+  if (cursor.take(/restore:[ \t]*/) !== null) return parsePool(1, cursor);
   if (cursor.take(/relocate:[ \t]*/) !== null) return { kind: 'relocate', location: id.parse(cursor) };
   if (cursor.take(/discover:[ \t]*/) !== null) return { kind: 'discover', location: id.parse(cursor) };
   if (cursor.take(/open modal:[ \t]*/) !== null) return { kind: 'open-modal', modal: id.parse(cursor) };
@@ -49,7 +66,7 @@ function parseResult(cursor: Cursor): ActionResult {
 }
 
 export function startsResult(cursor: Cursor): boolean {
-  return cursor.peek(/(?:say|add|give|take|xp|relocate|discover|open modal):|(?:set|unset)[: \t]/) !== null;
+  return cursor.peek(/(?:say|add|give|take|xp|drain|restore|relocate|discover|open modal):|(?:set|unset)[: \t]/) !== null;
 }
 
 export const actionResult: Parser<ActionResult> = {

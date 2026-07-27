@@ -13,14 +13,14 @@ Do not bloat CLAUDE.md with over 200 lines of instructions.
 A feature large enough to span sessions gets a tracked deliverable log at `docs/<feature>/deliverable-log.md` (spec, chunk status, open decisions); `backlog.md` keeps only a pointer to it. Read the log before touching that feature's code. On merge, archive the log and lift anything unfinished back into `backlog.md`. Currently live: `docs/combat/deliverable-log.md`. 
 
 # Repository systems
-1. Content pipeline through DSL markdown files (commits since audit: 2)
+1. Content pipeline through DSL markdown files (commits since audit: 3)
   1. Contribution system: editor, validation/merge engine
   2. DSL system: grammar, parser, compiler, loader
 2. User interface (commits since audit: 0)
   1. Main tabs: Map, Home, Character, Settings, Edit 
   2. Modals: dialogue, skills, stats
   3. Experience: floating text
-3. Game Engine (commits since audit: 5)
+3. Game Engine (commits since audit: 6)
   1. Core: State-driven UI, offline progression, travel and locations
   2. Data structures: locations, dialogue, quests, actions, resources, stats, skills, flags 
 4. Build & deployment (commits since audit: 0)

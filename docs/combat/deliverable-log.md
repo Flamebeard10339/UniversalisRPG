@@ -12,7 +12,7 @@ this file and lift anything unfinished back into `backlog.md`.
 | Chunk | State |
 | --- | --- |
 | 1. Ranged stats + `dr` | done — stat layer live, `hitDamage` staged for chunk 2 |
-| 2. Direct pool write | not started |
+| 2. Direct pool write | done — `drain:` / `restore:` results |
 | 3. Encounter state / second actor | not started |
 | 4. Per-actor cadences in the resolver | not started |
 | 5. Opposed roll (Elo) | not started |
@@ -221,6 +221,36 @@ applying an instantaneous pool delta — the one real architectural change in th
 **Pools stay float and only damage truncates**: an int pool would round a low regeneration
 rate to zero every tick and never recover at all.
 
+**Built in chunk 2** as the `drain:` / `restore:` results (`actionResult.ts`), parsed into
+one signed `{ kind: 'pool', resource, delta }` — mirroring how a pool's rate is already one
+signed stat rather than separate regen and drain. The amount is written unsigned and the
+verb carries the direction, so a pool can never be drained by a negative restore.
+
+**This overturns grammar.md's "nothing writes a pool level directly"** (line ~418), which
+now needs rewording — user owns that file.
+
+Two things the build turned up that the spec did not anticipate:
+
+- **Applying a result now needs the registry.** A pool write reads the resource's live max
+  and its `on empty`/`on full` blocks, so `applyResult`/`applyResultBatch` and the dialogue
+  path (`runSteps`/`enterNode`/`choose`) all take a `Registry`. `choose(text, session,
+  registry, state)` is the only exported signature that moved.
+- **Clamping per write is not associative, and it silently broke the core invariant.**
+  A pool that is drained per completion *and* regenerating moves in both directions inside
+  one segment; writing each drain immediately floors the pool at 0 and then lets the rate
+  refill it. Measured on a 25s span (start 30, +1/s regen, 2 drained per second): one jump
+  gave 25, the same span split in two gave 10. The fix is that a segment accumulates its
+  discrete deltas (`PoolDeltas`) and settles each pool **once**, summing deltas with the
+  integrated rate before a single clamp — 5 either way. `settlePools` iterates the registry
+  rather than the delta map so the order pools settle in, and therefore the order their
+  handlers fire in, cannot depend on where the span was split. Results firing outside a
+  segment (dialogue, instant actions, boundaries, rollover handlers) settle on the spot via
+  `applyResultNow`/`applyFightBatchNow`.
+
+Gated by `resolve.test.ts`'s new "direct pool writes stay associative alongside a rate"
+describe, on both the deterministic and the stochastic path; the two pre-existing
+associativity tests now assert `resources` as well, which they never did.
+
 ### Resolver consequence — combat does not batch
 
 Sampling per attempt draws from `state.rng`, so a ranged-damage attack can no longer use the
@@ -317,6 +347,9 @@ belong under the existing "grammar.md update (STALE)" backlog item.
 - Tag clauses — `+3-6 attack` / `-3-6 dr` alongside `+3 attack`. Percent bonuses stay
   rangeless, and a descending range is an error.
 - `# variable min-damage` — the floor on a landed hit (default 1, never below 1).
+- Action results — `drain: <n> <resource-id>` and `restore: <n> <resource-id>`, valid
+  anywhere a result fires. The amount is an unsigned decimal (pools are float).
+- The `# resource` prose stating that nothing writes a pool level directly is now wrong.
 
 ## Open decisions (not blocking chunk 1)
 

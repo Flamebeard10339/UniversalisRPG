@@ -133,37 +133,41 @@ describe('evaluateCondition', () => {
 });
 
 describe('applyResult', () => {
+  // Only a `pool` result reads content; every other verb touches state alone,
+  // so these gates run against an empty registry.
+  const registry = loadModule('');
+
   it('sets and unsets flags', () => {
     const state = createGameState();
-    applyResult({ kind: 'set', variable: 'unlocked' }, state);
+    applyResult({ kind: 'set', variable: 'unlocked' }, state, registry);
     expect(state.flags.unlocked).toBe(true);
-    applyResult({ kind: 'unset', variable: 'unlocked' }, state);
+    applyResult({ kind: 'unset', variable: 'unlocked' }, state, registry);
     expect(state.flags.unlocked).toBeUndefined();
   });
 
   it('gives and takes inventory counts', () => {
     const state = createGameState();
-    applyResult({ kind: 'give', item: 'cooked-shrimp', amount: 5 }, state);
-    applyResult({ kind: 'take', item: 'cooked-shrimp', amount: 2 }, state);
+    applyResult({ kind: 'give', item: 'cooked-shrimp', amount: 5 }, state, registry);
+    applyResult({ kind: 'take', item: 'cooked-shrimp', amount: 2 }, state, registry);
     expect(state.inventory['cooked-shrimp']).toBe(3);
   });
 
   it('floors take at 0, never driving inventory negative', () => {
     const state = createGameState();
-    applyResult({ kind: 'give', item: 'cooked-shrimp', amount: 2 }, state);
-    applyResult({ kind: 'take', item: 'cooked-shrimp', amount: 5 }, state);
+    applyResult({ kind: 'give', item: 'cooked-shrimp', amount: 2 }, state, registry);
+    applyResult({ kind: 'take', item: 'cooked-shrimp', amount: 5 }, state, registry);
     expect(state.inventory['cooked-shrimp']).toBe(0);
   });
 
   it('adds to a numeric flag, treating an absent or boolean-true base as 0', () => {
     const state = createGameState();
-    applyResult({ kind: 'add', variable: 'rats-killed', amount: 1 }, state);
+    applyResult({ kind: 'add', variable: 'rats-killed', amount: 1 }, state, registry);
     expect(state.flags['rats-killed']).toBe(1);
-    applyResult({ kind: 'add', variable: 'rats-killed', amount: 1 }, state);
+    applyResult({ kind: 'add', variable: 'rats-killed', amount: 1 }, state, registry);
     expect(state.flags['rats-killed']).toBe(2);
 
     state.flags.snubbed = true;
-    applyResult({ kind: 'add', variable: 'snubbed', amount: 3 }, state);
+    applyResult({ kind: 'add', variable: 'snubbed', amount: 3 }, state, registry);
     expect(state.flags.snubbed).toBe(3);
   });
 
@@ -171,18 +175,18 @@ describe('applyResult', () => {
     const state = createGameState();
     const condition: Condition = { kind: 'comparison', left: { path: ['rats-killed'] }, operator: '>=', right: 3 };
     expect(evaluateCondition(condition, state)).toBe(false);
-    applyResult({ kind: 'add', variable: 'rats-killed', amount: 1 }, state);
-    applyResult({ kind: 'add', variable: 'rats-killed', amount: 1 }, state);
+    applyResult({ kind: 'add', variable: 'rats-killed', amount: 1 }, state, registry);
+    applyResult({ kind: 'add', variable: 'rats-killed', amount: 1 }, state, registry);
     expect(evaluateCondition(condition, state)).toBe(false);
-    applyResult({ kind: 'add', variable: 'rats-killed', amount: 1 }, state);
+    applyResult({ kind: 'add', variable: 'rats-killed', amount: 1 }, state, registry);
     expect(evaluateCondition(condition, state)).toBe(true);
   });
 
   it('accumulates xp and moves location on relocate/discover', () => {
     const state = createGameState();
-    applyResult({ kind: 'xp', skill: 'thieving', amount: 4 }, state);
-    applyResult({ kind: 'relocate', location: 'beach' }, state);
-    applyResult({ kind: 'discover', location: 'bank' }, state);
+    applyResult({ kind: 'xp', skill: 'thieving', amount: 4 }, state, registry);
+    applyResult({ kind: 'relocate', location: 'beach' }, state, registry);
+    applyResult({ kind: 'discover', location: 'bank' }, state, registry);
     expect(state.xp.thieving).toBe(4);
     expect(state.location).toBe('beach');
     expect(state.flags['bank.discovered']).toBe(true);
@@ -190,7 +194,7 @@ describe('applyResult', () => {
 
   it('logs and sets pendingModal on open-modal', () => {
     const state = createGameState();
-    applyResult({ kind: 'open-modal', modal: 'character-creation' }, state);
+    applyResult({ kind: 'open-modal', modal: 'character-creation' }, state, registry);
     expect(state.log).toContain('modal:character-creation');
     expect(state.pendingModal).toBe('character-creation');
   });

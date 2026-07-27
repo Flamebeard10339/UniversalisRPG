@@ -77,6 +77,38 @@ chop:
   time: 1
   give: 1 wood
 
+# stat max-vigor
+base: 100
+
+# stat vigor-regen
+base: 60
+
+# resource vigor
+rate: vigor-regen
+max: max-vigor
+start: 30
+
+# entity grindstone
+// A repeating action that DRAINS a pool per completion while that same pool
+// regenerates on its own. Two directions inside one segment is exactly what a
+// per-write clamp gets wrong (drain to 0, then regen, versus letting the two
+// net out), so this is the associativity gate for the direct pool write.
+sharpen:
+  repeating
+  time: 1
+  drain: 2 vigor
+  give: 1 edge
+
+# entity whetstone
+// The same drain on the stochastic path, where completions land at random
+// attempt counts instead of a closed-form cadence.
+grind:
+  repeating
+  time: 1
+  accuracy: cook-success
+  drain: 2 vigor
+  give: 1 edge
+
 # entity kiln
 // A repeating ENTITY action that carries an on-success block — the one action
 // shape a recipe can't express (recipe results are a fixed take/give/xp/say
@@ -155,6 +187,7 @@ describe('resolve: associativity (the core invariant)', () => {
       // not as a batching gate; xp is what actually exercises batching.)
       expect(folded.flags).toEqual(oneShot.flags);
       expect(folded.xp).toEqual(oneShot.xp);
+      expect(folded.resources).toEqual(oneShot.resources);
     }
   });
 
@@ -189,6 +222,82 @@ describe('resolve: associativity (the core invariant)', () => {
       expect(folded.time).toBe(oneShot.time);
       expect(folded.inventory).toEqual(oneShot.inventory);
       expect(folded.activeAction).toEqual(oneShot.activeAction);
+      expect(folded.resources).toEqual(oneShot.resources);
+    }
+  });
+});
+
+// A pool being drained per completion while it also regenerates is the one
+// shape where clamping is not associative: writing each drain immediately floors
+// the pool at 0 and then lets the rate refill it, so where a caller split the
+// span changes the level. The resolver settles a segment's discrete writes and
+// its integrated rate together, once, for exactly this reason.
+describe('resolve: direct pool writes stay associative alongside a rate', () => {
+  function draining(registry: Registry, entityId: string, label: string): GameState {
+    const state = createGameState('nowhere');
+    initResources(state, registry);
+    state.activeAction = { ownerRef: `entity.${entityId}`, actionLabel: label, progress: 0, repeating: true, healthRemaining: 1, attemptsMade: 0 };
+    return state;
+  }
+
+  // vigor: starts 30, regenerates +60/min (+1/s), drained 2 per completion at
+  // one completion per second — net -1/s, so 25s leaves it mid-range at 5
+  // rather than saturated at either end, where any two answers would agree.
+  const HORIZON = 25;
+
+  it('holds for a deterministic repeating drain across random split points', () => {
+    const registry = loaded();
+    const oneShot = draining(registry, 'grindstone', 'sharpen');
+    resolve(oneShot, registry, HORIZON);
+    // 30 - (2 x 25 completions) + 25s of regen. Pinning the value rules out the
+    // clamp-per-write reading, which floors at 0 mid-span and refills to 25.
+    expect(oneShot.resources['vigor']).toBeCloseTo(5, 6);
+    expect(oneShot.inventory['edge']).toBe(25);
+
+    let seed = 11;
+    const rand = () => {
+      seed = (seed * 1103515245 + 12345) % 2147483648;
+      return seed / 2147483648;
+    };
+
+    for (let trial = 0; trial < 25; trial++) {
+      const waypoints = new Set<number>();
+      for (let i = 0; i < 3 + Math.floor(rand() * 5); i++) waypoints.add(rand() * HORIZON);
+      const sorted = [...waypoints].filter((t) => t > 0 && t < HORIZON).sort((a, b) => a - b);
+      sorted.push(HORIZON);
+
+      const folded = draining(registry, 'grindstone', 'sharpen');
+      for (const t of sorted) resolve(folded, registry, t);
+
+      expect(folded.inventory).toEqual(oneShot.inventory);
+      expect(folded.resources['vigor']).toBeCloseTo(oneShot.resources['vigor'], 6);
+    }
+  });
+
+  it('holds for a stochastic drain, where completions land at random attempt counts', () => {
+    const registry = loaded();
+    const oneShot = draining(registry, 'whetstone', 'grind');
+    resolve(oneShot, registry, HORIZON);
+    expect(oneShot.inventory['edge']).toBeGreaterThan(0); // misses alone would make this vacuous
+
+    let seed = 13;
+    const rand = () => {
+      seed = (seed * 1103515245 + 12345) % 2147483648;
+      return seed / 2147483648;
+    };
+
+    for (let trial = 0; trial < 25; trial++) {
+      const waypoints = new Set<number>();
+      for (let i = 0; i < 3 + Math.floor(rand() * 5); i++) waypoints.add(rand() * HORIZON);
+      const sorted = [...waypoints].filter((t) => t > 0 && t < HORIZON).sort((a, b) => a - b);
+      sorted.push(HORIZON);
+
+      const folded = draining(registry, 'whetstone', 'grind');
+      for (const t of sorted) resolve(folded, registry, t);
+
+      expect(folded.rng).toBe(oneShot.rng);
+      expect(folded.inventory).toEqual(oneShot.inventory);
+      expect(folded.resources['vigor']).toBeCloseTo(oneShot.resources['vigor'], 6);
     }
   });
 });
