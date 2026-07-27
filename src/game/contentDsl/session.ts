@@ -9,6 +9,8 @@ import {
   craftFirstUnit,
   describeCondition,
   DialogueSession,
+  encounterView,
+  EncounterView,
   evaluateCondition,
   GameState,
   Registry,
@@ -47,6 +49,10 @@ export interface PlayView {
   choices: PlayChoice[];
   time: number;
   resources: Array<{ id: string; title: string; current: number; max: number; display: ResourceDisplay }>;
+  // The fight in flight, or null. Separate from `resources` because those are
+  // the player's own persistent pools while this is scoped to an encounter and
+  // vanishes with it.
+  encounter: EncounterView | null;
   pendingModal?: string;
 }
 
@@ -230,6 +236,7 @@ export function view(session: PlaySession): PlayView {
     choices: computeChoices(session),
     time: state.time,
     resources: sessionResources(session),
+    encounter: encounterView(state, registry),
     pendingModal: state.pendingModal,
   };
 }

@@ -12,11 +12,28 @@ value: 5
 
 // --- stats ---
 
+// The player's sheet. An entity that fights names its own values for these in a
+// `stats:` block; anything it doesn't name falls through to the base here, which
+// is how the player — who has no `# entity` of their own — works at all.
 # stat attack
 base: 10
 
+// Flat damage reduction, subtracted from each incoming hit. Named `defense`
+// because that is what a player calls it; an action points at it with `dr:`.
 # stat defense
 base: 5
+
+// The two sides of the opposed roll. A gap of 100 is worth about a 91% chance
+// (see `contest-spread`), so the player at 100 against a rat's 40 lands ~80%.
+# stat accuracy
+base: 100
+
+# stat evasion
+
+// Attacks per minute. `time: 60` + `speed: attack-rate` on an action turns this
+// into seconds per swing: 25/min is one swing every 2.4s.
+# stat attack-rate
+base: 25
 
 # stat regeneration
 
@@ -28,9 +45,8 @@ base: 1
 
 // --- resources ---
 
-// Health drains while you fight (the rat's `fight` carries a -regeneration tag,
-// so net regeneration goes negative for the fight's duration) and recovers from
-// the regeneration a meal grants. Rates are per minute.
+// Health falls to the rats' bites and recovers from the regeneration a meal
+// grants. Rates are per minute.
 # resource health
 rate: regeneration
 max: max-health
@@ -117,7 +133,7 @@ examine: A damp cellar, crates stacked against the walls.
 adjacent:
   guide-house
 entities:
-  giant-rats, stairs-up
+  giant-rat, stairs-up
 
 # location beach
 east of guide-house
@@ -179,17 +195,40 @@ search drawer:
   give: lockpick
   say: Tucked beneath old linens, a set of worn lockpicks.
 
-# entity giant-rats
-title: Giant Rats
-examine: Three hunched rats claw at overturned crates, eyes red in the dark.
+// A real fight, and the shape every combattable thing in the game shares: its
+// own stat sheet, a swing of its own on its own clock, and a pool that runs out.
+// The two actions are the same action seen from either end — `speed`, `ability`
+// and `accuracy` read whoever is swinging, `target`, `dr` and `evasion` whoever
+// is being hit — so `fight` and `bite` differ only in who runs them.
+//
+// 20 health against the player's 10 a hit is two hits, ~2.5 swings at 80%, so a
+// rat falls in about six seconds and lands a bite or two on the way out.
+# entity giant-rat
+title: Giant Rat
+examine: A hunched rat claws at an overturned crate, eyes red in the dark.
+stats: attack 8, defense 0, max-health 20, attack-rate 16, accuracy 60, evasion 40
 fight:
   hidden if: tutorial.rats-killed >= 3
-  time: 3
-  -120 regeneration
+  time: 60
+  speed: attack-rate
+  accuracy: accuracy
+  evasion: evasion
+  ability: attack
+  dr: defense
+  target: health
   xp: melee 5
   on success:
     add: tutorial.rats-killed 1
     say: You put down another rat.
+bite:
+  retaliates
+  time: 60
+  speed: attack-rate
+  accuracy: accuracy
+  evasion: evasion
+  ability: attack
+  dr: defense
+  target: health
 
 // --- recipes ---
 
@@ -298,9 +337,14 @@ craft: bread
 assert: has bread
 talk: miki
 assert: tutorial.made-bread
-use: entity.giant-rats.fight
-use: entity.giant-rats.fight
-use: entity.giant-rats.fight
+// A rat takes a few swings to put down, so each `use:` starts the fight and the
+// `wait:` lets it play out — 30s is far longer than the ~6s it actually needs.
+use: entity.giant-rat.fight
+wait: 30
+use: entity.giant-rat.fight
+wait: 30
+use: entity.giant-rat.fight
+wait: 30
 assert: tutorial.rats-killed >= 3
 talk: miki
 assert: tutorial.miki-complete

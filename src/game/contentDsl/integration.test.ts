@@ -25,21 +25,27 @@ describe('tutorial-island content', () => {
 });
 
 describe('tutorial-island health resource (Pass 2 end-to-end)', () => {
-  it('starts full, drains while fighting the rats, then regenerates from a meal as time passes', () => {
+  it('starts full, drains as the rat bites back, then regenerates from a meal as time passes', () => {
     const { state } = startSession(registry);
     expect(state.resources['health']).toBe(30); // full = statValue(max-health) at start
 
-    // The rats' `fight` carries a `-120 regeneration` tag, so net regeneration is
-    // -120/min (-2/s) for the 3s fight => health drops by 6.
-    useAction('entity', 'giant-rats', 'fight', registry, state);
-    expect(state.time).toBe(3);
-    expect(state.resources['health']).toBeCloseTo(24, 6);
+    // A real fight now rather than the Pass-2 `-120 regeneration` drain tag: one
+    // `use:` is one swing at 25/min, and the rat answers on its own 16/min clock.
+    useAction('entity', 'giant-rat', 'fight', registry, state);
+    expect(state.time).toBeCloseTo(2.4, 6);
+
+    resolve(state, registry, 120); // far longer than the ~6s the rat lasts
+    const afterFighting = state.resources['health'];
+    expect(state.flags['tutorial.rats-killed']).toBe(1);
+    expect(afterFighting).toBeLessThan(30); // it got its bites in
+    expect(state.log.some((line) => line.startsWith('The Giant Rat hits you for '))).toBe(true);
+    expect(state.log.some((line) => line.startsWith('You hit the Giant Rat for '))).toBe(true);
 
     // A meal grants +3 regeneration/min for 60s (exactly what grantFoodBuff does
     // when a food item is eaten); health then rises as time passes — a standing
     // buff needs no active action to tick.
     state.activeBuffs['cooked-shrimp:regeneration'] = { statId: 'regeneration', amount: point(3), kind: 'added', expiresAt: state.time + 60 };
     resolve(state, registry, state.time + 60);
-    expect(state.resources['health']).toBeCloseTo(27, 6); // +3 over the minute, still under the 30 cap
+    expect(state.resources['health']).toBeCloseTo(Math.min(30, afterFighting + 3), 6);
   });
 });

@@ -908,6 +908,77 @@ function retaliationOf(actorId: string, registry: Registry): Action | undefined 
   return registry.entities.get(actorId)?.actions.find((candidate) => candidate.retaliates);
 }
 
+function actorTitle(actorId: string, registry: Registry): string {
+  return registry.entities.get(actorId)?.title ?? humanize(actorId);
+}
+
+// One combatant as a driver needs to draw it. `cadence` is the fraction of the
+// way to its next swing, which is the meter the CLI's 8-stage glyph renderer was
+// built for and never had a source; it is null for a target that doesn't swing
+// back and so keeps no clock.
+export interface EncounterFoe {
+  id: string;
+  title: string;
+  resource: string;
+  current: number;
+  max: number;
+  cadence: number | null;
+}
+
+export interface EncounterView {
+  cadence: number;
+  foes: EncounterFoe[];
+}
+
+// The fight in flight, for display only — the read-only twin of participants().
+// Everything here is derived on the spot from the encounter and the actors'
+// sheets; nothing is stored for the sake of being shown, so a driver that never
+// calls this costs nothing. Null unless a real fight (a `target:` action) is
+// running.
+export function encounterView(state: GameState, registry: Registry): EncounterView | null {
+  const active = state.activeAction;
+  if (!active) return null;
+  const action = findActiveAction(active, registry);
+  if (!action.target) return null;
+
+  const fractionOf = (cadence: Cadence, actorId: string, swing: Action): number => {
+    const duration = attemptDuration(swing, state, registry, actorId);
+    return duration > 0 ? Math.min(1, cadence.progress / duration) : 1;
+  };
+  const resource = requireResource(registry, action.target);
+
+  const foes: EncounterFoe[] = [];
+  for (const [actorId, actor] of Object.entries(active.actors ?? {})) {
+    const retaliation = retaliationOf(actorId, registry);
+    foes.push({
+      id: actorId,
+      title: actorTitle(actorId, registry),
+      resource: resource.id,
+      current: actor.resources[resource.id] ?? 0,
+      max: statValue(resource.max, state, registry, actorId),
+      cadence: actor.cadence && retaliation ? fractionOf(actor.cadence, actorId, retaliation) : null,
+    });
+  }
+  return { cadence: fractionOf(active, PLAYER, action), foes };
+}
+
+// Blow-by-blow narration, engine-side: a fight is the one place the player has
+// to see every attempt as it lands, and there is nothing content could usefully
+// say about a number the resolver has just rolled. Only a `target:` action
+// narrates — a craft attempt is not a swing at anything.
+//
+// The player is always one side of a fight, so the two directions are two
+// sentences rather than a general combat-log grammar.
+function logSwing(state: GameState, registry: Registry, self: string, other: string, damage: number | null): void {
+  if (self === PLAYER) {
+    const title = actorTitle(other, registry);
+    state.log.push(damage === null ? `You miss the ${title}.` : `You hit the ${title} for ${damage}.`);
+  } else {
+    const title = actorTitle(self, registry);
+    state.log.push(damage === null ? `The ${title} misses you.` : `The ${title} hits you for ${damage}.`);
+  }
+}
+
 function poolLevel(state: GameState, registry: Registry, actorId: string, resourceId: string): number {
   requireResource(registry, resourceId);
   if (actorId === PLAYER) return state.resources[resourceId] ?? 0;
@@ -1092,8 +1163,10 @@ function resolveAttempt(participant: Participant, state: GameState, registry: Re
       action.dr ? sampleStat(action.dr, state, registry, other) : 0,
       registry,
     );
+    logSwing(state, registry, self, other, dealt);
     return damagePool(state, registry, other, action.target, dealt, deltas) <= EPSILON;
   }
+  logSwing(state, registry, self, other, null);
   return poolLevel(state, registry, other, action.target) <= EPSILON;
 }
 

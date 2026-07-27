@@ -68,19 +68,20 @@ describe('session', () => {
 
     v = apply(session, 'use:entity.stairs.descend');
     expect(v.location.id).toBe('basement');
-    expect(ids(v)).toContain('use:entity.giant-rats.fight');
+    expect(ids(v)).toContain('use:entity.giant-rat.fight');
 
-    v = apply(session, 'use:entity.giant-rats.fight');
-    expect(session.state.flags['tutorial.rats-killed']).toBe(1);
-    expect(ids(v)).toContain('use:entity.giant-rats.fight');
+    // A real fight: one `use:` is one swing, so each rat needs the clock to run
+    // on. 30s is far longer than the ~6s one actually lasts.
+    for (let killed = 1; killed <= 3; killed++) {
+      v = apply(session, 'use:entity.giant-rat.fight');
+      expect(v.encounter).not.toBeNull();
+      expect(v.encounter!.foes.map((foe) => foe.title)).toEqual(['Giant Rat']);
 
-    v = apply(session, 'use:entity.giant-rats.fight');
-    expect(session.state.flags['tutorial.rats-killed']).toBe(2);
-    expect(ids(v)).toContain('use:entity.giant-rats.fight');
-
-    v = apply(session, 'use:entity.giant-rats.fight');
-    expect(session.state.flags['tutorial.rats-killed']).toBe(3);
-    expect(ids(v)).not.toContain('use:entity.giant-rats.fight');
+      v = wait(session, 30);
+      expect(session.state.flags['tutorial.rats-killed']).toBe(killed);
+      expect(v.encounter).toBeNull(); // the fight is over, so is the readout
+    }
+    expect(ids(v)).not.toContain('use:entity.giant-rat.fight');
 
     v = apply(session, 'use:entity.stairs-up.ascend');
     expect(v.location.id).toBe('guide-house');
@@ -102,13 +103,18 @@ describe('session', () => {
     expect(v.location.id).toBe('beach');
 
     // The route's mechanical sim-time: dough (2s) + bread (3s) + three rat
-    // fights (3s each) + the beach journey (1 unit east × the authored
+    // fights + the beach journey (1 unit east × the authored
     // travel-seconds-per-unit). Talking, the mirror and ascend/descend (instant
     // stairs actions) cost nothing. This doubles as a measured-playtime
     // invariant; the beach leg is derived from content so it tracks the authored
     // variable rather than a hardcoded pace.
+    //
+    // A rat costs the opening swing (60/25 = 2.4s) plus the 30s waited out above
+    // — the loop above waits a fixed span rather than exactly as long as the
+    // fight, so this measures the route as driven, not the fights themselves.
     const beachJourney = 1 * travelSecondsPerUnit(registry);
-    expect(v.time).toBe(2 + 3 + 3 * 3 + beachJourney);
+    const ratRound = 60 / 25 + 30;
+    expect(v.time).toBeCloseTo(2 + 3 + 3 * ratRound + beachJourney, 9);
   });
 
   it('throws a clear error on an unavailable or unknown choice id', () => {

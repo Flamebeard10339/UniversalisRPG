@@ -3,7 +3,7 @@ import path from 'node:path';
 import { createInterface } from 'node:readline/promises';
 import { pathToFileURL } from 'node:url';
 import { DslError } from '../src/game/contentDsl/parser';
-import { actionFirstUnit, craftFirstUnit, describeCondition, loadModule, RuntimeError, type ActiveAction, type GameState } from '../src/game/contentDsl/runtime';
+import { actionFirstUnit, craftFirstUnit, describeCondition, encounterView, loadModule, RuntimeError, type ActiveAction, type GameState } from '../src/game/contentDsl/runtime';
 import {
   apply,
   applyDirective,
@@ -114,6 +114,20 @@ function formatResources(resources: PlayView['resources']): string[] {
   return lines;
 }
 
+// A fight renders as the player's own pools do — each foe's targeted pool as a
+// labelled bar — plus a row of swing meters. A cadence is already a fraction, so
+// the same 8-stage glyph renderer takes it against a max of 1: this is the
+// consumer `display: minimal` was built for and never had.
+function formatEncounter(encounter: PlayView['encounter']): string[] {
+  if (!encounter) return [];
+  const lines = encounter.foes.map((foe) => `${foe.title}: ${fullBar(foe.current, foe.max)}`);
+  const meters = [`Your swing ${minimalGlyph(encounter.cadence, 1)}`];
+  for (const foe of encounter.foes) {
+    if (foe.cadence !== null) meters.push(`${foe.title} ${minimalGlyph(foe.cadence, 1)}`);
+  }
+  return [...lines, meters.join('   ')];
+}
+
 function formatView(v: PlayView): string[] {
   const lines: string[] = [];
   for (const said of v.said) lines.push(said);
@@ -124,6 +138,7 @@ function formatView(v: PlayView): string[] {
   }
   if (v.entities.length > 0) lines.push(`Here: ${v.entities.map((entity) => entity.title).join(', ')}`);
   lines.push(...formatResources(v.resources));
+  lines.push(...formatEncounter(v.encounter));
   lines.push(...formatChoices(v.choices));
   lines.push(`[time: ${v.time}s]`);
   return lines;
@@ -142,6 +157,7 @@ function formatState(session: PlaySession): string[] {
     `Flags: ${JSON.stringify(state.flags)}`,
     ...formatInventory(state),
     ...formatResources(sessionResources(session)),
+    ...formatEncounter(encounterView(state, session.registry)),
   ];
 }
 
@@ -497,6 +513,22 @@ export interface LiveTickResult {
 // one-line progress render. No timers/readline here — see runLiveAction for
 // the real-time shell that ticks this on a wall-clock interval and reacts to
 // input.
+// Both sides of a fight on the one line live mode redraws: the player's `full`
+// pools and each foe's targeted pool, as current/max. Bars would not fit beside
+// the progress bar, so the numbers carry it; the full-width bars live in the
+// turn-by-turn view (formatEncounter). Empty when no fight is running, which is
+// what makes it usable as a fallback test.
+function liveCombatDetail(session: PlaySession): string {
+  const encounter = encounterView(session.state, session.registry);
+  if (!encounter) return '';
+  const mine = sessionResources(session).filter((r) => r.display === 'full');
+  const parts = [
+    ...mine.map((r) => ` ${r.title} ${tidy(r.current)}/${tidy(r.max)}`),
+    ...encounter.foes.map((foe) => ` ${foe.title} ${tidy(foe.current)}/${tidy(foe.max)}`),
+  ];
+  return parts.join('');
+}
+
 export function liveTick(session: PlaySession, elapsedMs: number, multiplier: number): LiveTickResult {
   const before = session.state.activeAction;
   const label = before?.actionLabel ?? 'action';
@@ -509,16 +541,15 @@ export function liveTick(session: PlaySession, elapsedMs: number, multiplier: nu
   }
   const duration = cycleDuration(session, after);
   const bar = duration > 0 ? progressBar(after.progress / duration) : progressBar(1);
-  // Show combat detail only once it means something: hits landed, or a target
+  // In a real fight the combatants' own pools are the detail worth showing (the
+  // playtest asked for exactly this), and `healthRemaining` means nothing there
+  // — it belongs to the older single-target hit counter. Otherwise fall back to
+  // that counter, and only once it means something: hits landed, or a target
   // with more than one hitpoint being worn down. A plain single-hit action
-  // (roast, craft, most fights) would otherwise always read "attempts:0
-  // health:1.0", which looks stuck — the moving bar carries the progress.
-  // TODO(resource-bars): the playtest wanted every combatant's resource bars —
-  // the player's health/energy and a real enemy health bar. That needs the
-  // Pass-2 numeric-stats / resource-pool engine (GameState has no player HP or
-  // pools yet), so richer bars are deferred until that lands.
+  // (roast, craft) would read "hits:0 target-hp:1.0" forever, which looks stuck
+  // — the moving bar already carries its progress.
   const showCombat = after.attemptsMade > 0 || after.healthRemaining < 1;
-  const detail = showCombat ? ` hits:${after.attemptsMade} target-hp:${after.healthRemaining.toFixed(1)}` : '';
+  const detail = liveCombatDetail(session) || (showCombat ? ` hits:${after.attemptsMade} target-hp:${after.healthRemaining.toFixed(1)}` : '');
   const line = `${label}... ${bar}${detail}  [time: ${session.state.time.toFixed(1)}s]`;
   return { active: true, line };
 }

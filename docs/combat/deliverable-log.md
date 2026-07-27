@@ -17,7 +17,7 @@ this file and lift anything unfinished back into `backlog.md`.
 | 4. Per-actor cadences in the resolver | done — the rat swings back on its own clock |
 | 5. Opposed roll (Elo) | done — one contest behind every chance in the game |
 | 6. Stop-when-start-conditions-fail | done — `stop` result + re-checked `requires:` |
-| 7. CLI readouts | not started |
+| 7. CLI readouts | done — and the tutorial rat is a real fight |
 | Droptables (separable) | not started |
 | Skill levels + XP events (separable) | not started |
 
@@ -308,10 +308,8 @@ Known gaps left for chunk 4, where the resolver becomes actor-aware anyway:
 - **`action.health` and `target:` are two code paths**, which the consolidation section says
   they should not be. Unifying them means every action carrying an implicit pool; deferred
   rather than half-done.
-- **Tutorial content is deliberately untouched.** Making the rat a real target now would
-  churn the Miki-route timing assertions three times over (again at chunk 4 for cadence, again
-  at chunk 5 for the Elo roll). The mechanism is proven on a dedicated fixture in
-  `encounter.test.ts`; the rat gets its sheet once, when its sheet is complete.
+- ~~**Tutorial content is deliberately untouched.**~~ DONE in chunk 7, which is when the
+  sheet was complete — the Miki-route assertions moved exactly once, as intended.
 
 ### Encounters end when their start conditions stop holding
 
@@ -418,6 +416,65 @@ derived meter or a small dedicated readout.
 As the simulation ticks the player should see health as a `full` bar, attack rate as the
 `minimal` glyph, and per-hit lines: `The {enemy.name} hit you for {damage}` /
 `You hit the {enemy.name} for {damage}`.
+
+**Built in chunk 7**, and with it **the deliverable itself**: the tutorial rat is a real
+fight. Driven through `play-cli` end to end, a rat now reads:
+
+```
+You hit the Giant Rat for 10.
+Health: █████████░ 27/30
+Giant Rat: █████░░░░░ 10/20
+Your swing ▇   Giant Rat ▂
+```
+
+- **`encounterView(state, registry)`** is the read-only twin of `participants()` — the fight
+  in flight as a driver needs to draw it, derived on the spot from the encounter and the
+  actors' sheets. Nothing is stored for the sake of being shown, so a driver that never calls
+  it costs nothing, and there is no display state to keep in sync with the resolver.
+- **The cadence fraction is what `display: minimal` was waiting for.** A cadence is already a
+  fraction, so the existing 8-stage glyph renderer takes it against a max of 1 — no second
+  meter renderer, and the Pass-2 leftover closes without new machinery.
+- **Per-hit lines are engine-emitted** (`logSwing`), following `armAction`'s "You don't have
+  enough X." precedent. Only a `target:` action narrates — a craft attempt is not a swing at
+  anything. Misses are narrated too: with the Elo roll live, a swing that silently vanishes
+  reads as a bug.
+- **`liveTick`'s TODO(resource-bars) is closed.** It asked for "every combatant's resource
+  bars … deferred until the Pass-2 resource-pool engine lands", which it now has. Live mode
+  shows both sides' pools on its one redrawn line; the full-width bars live in the
+  turn-by-turn view.
+
+**The rat's sheet, at last** — `stats: attack 8, defense 0, max-health 20, attack-rate 16,
+accuracy 60, evasion 40`, with `fight` and `bite` as the same action seen from either end.
+Two hits at ~80% puts one down in about six seconds and it lands a bite or two on the way
+out. Three things worth recording about the conversion:
+
+- **The `-120 regeneration` hack is gone.** That tag existed only because nothing could write
+  a pool directly; real damage replaces it, which is what the Pass-2 invariant note predicted.
+- **`dr:` points at a stat called `defense`.** The engine field and the stat id are different
+  things, so the player-facing name survives without duplicating the concept.
+- **`accuracy: accuracy` / `evasion: evasion` is deliberate, not a tautology.** Both sides use
+  the *same* stat id and it resolves against a different actor each way — that is exactly what
+  makes one action shape serve both directions.
+- **One `use:` is now one swing, not one kill**, since a stochastic fight's first unit is a
+  single attempt. The tutorial `# test` and `session.test.ts` drive `use:` + `wait:` instead.
+
+## What is left when chunks 1–7 are done
+
+The combat core ships. Still open, and all of it was deferred deliberately rather than missed:
+
+- **Enemy pools do not integrate their rate stat** — `captureResourceRates`/`settlePools` are
+  player-scoped, so a regenerating enemy isn't expressible yet.
+- **`action.health` and `target:` remain two code paths**, which the consolidation section
+  says they shouldn't be. Unifying them means every action carrying an implicit pool.
+- **`rate:` sugar** for `time: 60` + `speed:`. Authoring a literal `time: 60` to mean "per
+  minute" is folklore, and the tutorial now has four actions carrying it.
+- **Equipment is inert.** `iron-sword`'s `+2 attack` and `wooden-shield`'s `+2 defense` are
+  parsed and ignored — only `food` tags become buffs (`grantFoodBuff`). The tutorial hands the
+  player both and neither does anything, which is now visible in a way it wasn't before, since
+  the numbers are on screen. The stat channels are all there; what's missing is an equip verb.
+- **A stochastic fight's `on empty:` is still segment-granular in one case**: a pool emptied by
+  a *modifier* rather than by a hit. A hit is now exact (chunk 6 ends the segment on it).
+- The two separable companions below.
 
 ## Separable companion items
 
