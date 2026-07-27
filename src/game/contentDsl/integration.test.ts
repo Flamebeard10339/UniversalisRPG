@@ -1,6 +1,7 @@
 import { readFileSync } from 'fs';
 import { describe, expect, it } from 'vitest';
-import { createGameState, loadModule, runTest } from './runtime';
+import { createGameState, loadModule } from './runtime';
+import { runTest } from './session';
 
 // End-to-end: authored content (content/tutorial-island.dsl) loaded and its
 // # test scripts executed through the runtime — parser, hydration, and runtime

@@ -1,7 +1,7 @@
 import { readFileSync } from 'fs';
 import { describe, expect, it } from 'vitest';
-import { loadModule, travelSecondsPerUnit } from './runtime';
-import { apply, beginAction, cancelAction, PlayView, startSession, submitModal, view, wait } from './session';
+import { createGameState, loadModule, travelSecondsPerUnit } from './runtime';
+import { apply, beginAction, cancelAction, PlayView, runTest, startSession, submitModal, view, wait } from './session';
 
 const source = readFileSync('content/tutorial-island.dsl', 'utf8');
 
@@ -373,5 +373,61 @@ describe('cancelAction', () => {
     const session = startSession(registry);
     expect(() => cancelAction(session)).not.toThrow();
     expect(session.state.activeAction).toBeNull();
+  });
+});
+
+describe('runTest: begin:/wait:/cancel directives', () => {
+  const module = `
+# location workshop
+x: 0, y: 0
+starting
+entities:
+  oven
+
+# entity oven
+roast:
+  repeating
+  time: 4
+  give: 1 roasted-chestnut
+
+# test roast-instant
+travel: workshop
+use: entity.oven.roast
+
+# test roast-begin-then-wait
+travel: workshop
+begin: use entity.oven.roast
+wait: 4
+
+# test roast-begin-partial-cancel
+travel: workshop
+begin: use entity.oven.roast
+wait: 2
+cancel
+`;
+
+  it('begin: a repeating action then wait: to completion reproduces the same end state as an instant use:', () => {
+    const registry = loadModule(module);
+
+    const instantState = createGameState();
+    expect(runTest('roast-instant', registry, instantState)).toEqual({ passed: true });
+
+    const armedState = createGameState();
+    expect(runTest('roast-begin-then-wait', registry, armedState)).toEqual({ passed: true });
+
+    expect(armedState.time).toBe(instantState.time);
+    expect(armedState.inventory).toEqual(instantState.inventory);
+    expect(armedState.activeAction).toEqual(instantState.activeAction);
+  });
+
+  it('begin: + a partial wait: + cancel leaves the action stopped mid-flight', () => {
+    const registry = loadModule(module);
+    const state = createGameState();
+
+    expect(runTest('roast-begin-partial-cancel', registry, state)).toEqual({ passed: true });
+
+    expect(state.activeAction).toBeNull();
+    expect(state.inventory['roasted-chestnut'] ?? 0).toBe(0);
+    expect(state.time).toBe(2);
   });
 });

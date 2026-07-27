@@ -11,10 +11,10 @@ import {
   evaluateCondition,
   loadModule,
   renderSegments,
-  runTest,
   travelSecondsPerUnit,
   useAction,
 } from './runtime';
+import { runTest } from './session';
 
 const MODULE = `
 # location guide-house
@@ -50,12 +50,12 @@ run: enter
 talk: miki
 choose: Sounds good.
 use: entity.front-door.open
-expect: quest-given
+assert: quest-given
 
 # test failing
 talk: miki
 choose: I would rather not.
-expect: unlocked
+assert: unlocked
 `;
 
 describe('runTest', () => {

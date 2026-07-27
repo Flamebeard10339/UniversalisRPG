@@ -261,26 +261,26 @@ node snub:
 # test tutorial-quest-given
 talk: miki
 choose: Sounds good. Teach me.
-expect: tutorial.quest-given
+assert: tutorial.quest-given
 
 # test miki-route-full
 travel: guide-house
 run: tutorial-quest-given
 use: entity.mirror.look in
-expect: tutorial.mirror-done
+assert: tutorial.mirror-done
 talk: miki
-expect: has jug-of-water
+assert: has jug-of-water
 craft: dough
-expect: has dough
+assert: has dough
 craft: bread
-expect: has bread
+assert: has bread
 talk: miki
-expect: tutorial.made-bread
+assert: tutorial.made-bread
 use: entity.giant-rats.fight
 use: entity.giant-rats.fight
 use: entity.giant-rats.fight
-expect: tutorial.rats-killed >= 3
+assert: tutorial.rats-killed >= 3
 talk: miki
-expect: tutorial.miki-complete
-expect: front-door.unlocked
+assert: tutorial.miki-complete
+assert: front-door.unlocked
 travel: beach

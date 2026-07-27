@@ -7,13 +7,14 @@ import {
   armTravel,
   craft,
   craftFirstUnit,
+  describeCondition,
   DialogueSession,
+  evaluateCondition,
   GameState,
   Registry,
   RuntimeError,
   choose,
   createGameState,
-  evaluateCondition,
   recipeCraftable,
   renderSegments,
   resolve,
@@ -22,6 +23,8 @@ import {
   useAction,
   useTravel,
 } from './runtime';
+import { compareSave, loadSave, startingLocationId } from './save';
+import { Directive } from './test';
 import { humanize } from './values';
 
 export type PlayChoiceKind = 'talk' | 'action' | 'travel' | 'dialogue' | 'craft';
@@ -203,8 +206,8 @@ function dispatch(session: PlaySession, choice: PlayChoice): void {
 
 export function startSession(registry: Registry, state: GameState = createGameState()): PlaySession {
   if (!state.location) {
-    const starting = [...registry.locations.values()].find((location) => location.starting);
-    if (starting) state.location = starting.id;
+    const starting = startingLocationId(registry);
+    if (starting) state.location = starting;
   }
   return { registry, state, dialogue: null, logCursor: state.log.length };
 }
@@ -317,4 +320,118 @@ export function submitModal(session: PlaySession, data: { name: string; race: st
   session.state.player = { name: data.name, race: data.race };
   session.state.pendingModal = undefined;
   return view(session);
+}
+
+// The choice id beginAction's live path expects, for the same use/travel/craft
+// payload a `begin:` test directive carries.
+function choiceIdFor(inner: Extract<Directive, { kind: 'use' | 'travel' | 'craft' }>): string {
+  switch (inner.kind) {
+    case 'use':
+      return `use:${inner.obj}.${inner.objId}.${inner.actionId}`;
+    case 'travel':
+      return `travel:${inner.location}`;
+    case 'craft':
+      return `craft:${inner.recipe}`;
+  }
+}
+
+// Executes one test directive against a live session — the single seam shared
+// by runTest (headless) and, later, the interactive CLI, so there is one
+// command vocabulary and one place gameplay/assertion semantics live. `run:`
+// is excluded: it recurses into another test, which only runTest knows how to
+// do (cyclic-run detection, stack tracking), so applyDirective throws if asked
+// to execute one.
+export function applyDirective(session: PlaySession, directive: Directive): { failure?: string } {
+  const { registry, state } = session;
+
+  switch (directive.kind) {
+    case 'run':
+      throw new RuntimeError('run: is handled by runTest, not applyDirective');
+    case 'talk': {
+      const result = talk(directive.entity, registry, state);
+      session.dialogue = result.choices ? result : null;
+      return {};
+    }
+    case 'choose': {
+      if (!session.dialogue) throw new RuntimeError('choose with no active dialogue');
+      const result = choose(directive.text, session.dialogue, state);
+      session.dialogue = result.choices ? result : null;
+      return {};
+    }
+    case 'use':
+      useAction(directive.obj, directive.objId, directive.actionId, registry, state);
+      return {};
+    case 'travel':
+      if (!registry.locations.has(directive.location)) throw new RuntimeError(`unknown location: ${directive.location}`);
+      useTravel(state.location, directive.location, registry, state);
+      return {};
+    case 'craft':
+      craft(directive.recipe, registry, state);
+      return {};
+    case 'begin':
+      beginAction(session, choiceIdFor(directive.inner));
+      return {};
+    case 'assert':
+      if (!evaluateCondition(directive.condition, state)) return { failure: describeCondition(directive.condition) };
+      return {};
+    case 'expect': {
+      const saved = registry.saves.get(directive.save);
+      if (!saved) throw new RuntimeError(`unknown save: ${directive.save}`);
+      const diffs = compareSave(state, saved, registry);
+      if (diffs.length > 0) return { failure: `save mismatch ${directive.save}: ${diffs.join('; ')}` };
+      return {};
+    }
+    case 'load': {
+      const saved = registry.saves.get(directive.save);
+      if (!saved) throw new RuntimeError(`unknown save: ${directive.save}`);
+      loadSave(state, saved, registry);
+      session.dialogue = null;
+      session.logCursor = state.log.length;
+      return {};
+    }
+    case 'cancel':
+      // Not cancelAction(session): that also builds a PlayView via view(),
+      // which requires a resolvable session.state.location. A test's state
+      // (built without startSession, see runTest) may never have one set, so
+      // this stays a direct mutation — exactly what runTest did pre-refactor.
+      state.activeAction = null;
+      return {};
+    case 'wait':
+      // Not wait(session, seconds): same view()/location constraint as cancel
+      // above (e.g. runtime.test.ts's wait-enough test asserts on state.time
+      // alone, with no location ever set).
+      resolve(state, registry, state.time + directive.seconds);
+      return {};
+  }
+}
+
+export interface TestResult {
+  passed: boolean;
+  failure?: string;
+}
+
+// Runs a `# test` script directive-by-directive through applyDirective, the
+// same executor a live driver uses — so a headless test and an interactive
+// session can never drift onto two different command vocabularies. Builds its
+// own PlaySession directly (not via startSession) because startSession sets a
+// fresh state's location to the registry's starting location, which would
+// break a test that begins with its own `travel:` from an unset location.
+export function runTest(testId: string, registry: Registry, state: GameState, stack: readonly string[] = []): TestResult {
+  if (stack.includes(testId)) throw new RuntimeError(`cyclic test run: ${[...stack, testId].join(' -> ')}`);
+  const test = registry.tests.get(testId);
+  if (!test) throw new RuntimeError(`unknown test: ${testId}`);
+
+  const session: PlaySession = { registry, state, dialogue: null, logCursor: state.log.length };
+
+  for (const directive of test.directives) {
+    if (directive.kind === 'run') {
+      const result = runTest(directive.test, registry, state, [...stack, testId]);
+      if (!result.passed) return result;
+      continue;
+    }
+    const result = applyDirective(session, directive);
+    if (result.failure) return { passed: false, failure: result.failure };
+  }
+
+  return { passed: true };
 }

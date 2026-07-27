@@ -5,7 +5,7 @@ import { DslError } from './parser';
 const ref = (...path: string[]) => ({ kind: 'reference' as const, reference: { path } });
 
 describe('test: composable in-game scripts', () => {
-  it('parses a run composition alongside the other directives and an expect', () => {
+  it('parses a run composition alongside the other directives and an assert', () => {
     const source = [
       '# test tutorial-quest-given',
       'run: enter-guide-house',
@@ -13,7 +13,7 @@ describe('test: composable in-game scripts', () => {
       'choose: Sounds good.',
       'use: entity.front-door.pick lock',
       'travel: beach',
-      'expect: tutorial.quest-given',
+      'assert: tutorial.quest-given',
     ].join('\n');
 
     const [section] = parseModule(source);
@@ -25,17 +25,17 @@ describe('test: composable in-game scripts', () => {
         { kind: 'choose', text: 'Sounds good.' },
         { kind: 'use', obj: 'entity', objId: 'front-door', actionId: 'pick lock' },
         { kind: 'travel', location: 'beach' },
-        { kind: 'expect', condition: ref('tutorial', 'quest-given') },
+        { kind: 'assert', condition: ref('tutorial', 'quest-given') },
       ],
     });
   });
 
-  it('parses an expect with a comparison and a negated condition', () => {
-    const source = ['# test rat-hunt', 'expect: skills.combat.visits >= 3', 'expect: not tutorial.snubbed'].join('\n');
+  it('parses an assert with a comparison and a negated condition', () => {
+    const source = ['# test rat-hunt', 'assert: skills.combat.visits >= 3', 'assert: not tutorial.snubbed'].join('\n');
     const [section] = parseModule(source) as { value: { directives: unknown[] } }[];
     expect(section.value.directives).toEqual([
-      { kind: 'expect', condition: { kind: 'comparison', left: { path: ['skills', 'combat', 'visits'] }, operator: '>=', right: 3 } },
-      { kind: 'expect', condition: { kind: 'not', condition: ref('tutorial', 'snubbed') } },
+      { kind: 'assert', condition: { kind: 'comparison', left: { path: ['skills', 'combat', 'visits'] }, operator: '>=', right: 3 } },
+      { kind: 'assert', condition: { kind: 'not', condition: ref('tutorial', 'snubbed') } },
     ]);
   });
 
@@ -49,5 +49,34 @@ describe('test: composable in-game scripts', () => {
 
   it('rejects an unrecognized directive', () => {
     expect(() => parseModule('# test bad\nsing: a song')).toThrow(/unexpected line in # test/);
+  });
+});
+
+describe('begin: arm-only directive', () => {
+  it('parses begin: use/travel/craft into a begin directive wrapping the matching inner one', () => {
+    const source = [
+      '# test arming',
+      'begin: use entity.giant-rats.fight',
+      'begin: travel beach',
+      'begin: craft dough',
+    ].join('\n');
+
+    const [section] = parseModule(source);
+    expect(section.value).toEqual({
+      id: 'arming',
+      directives: [
+        { kind: 'begin', inner: { kind: 'use', obj: 'entity', objId: 'giant-rats', actionId: 'fight' } },
+        { kind: 'begin', inner: { kind: 'travel', location: 'beach' } },
+        { kind: 'begin', inner: { kind: 'craft', recipe: 'dough' } },
+      ],
+    });
+  });
+
+  it('rejects an unknown begin: verb', () => {
+    expect(() => parseModule('# test bad\nbegin: talk miki')).toThrow(DslError);
+  });
+
+  it('rejects a malformed begin: payload', () => {
+    expect(() => parseModule('# test bad\nbegin: use entity.giant-rats')).toThrow(DslError);
   });
 });

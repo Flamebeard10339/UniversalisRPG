@@ -2,8 +2,23 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { createInterface } from 'node:readline/promises';
 import { pathToFileURL } from 'node:url';
-import { actionFirstUnit, craftFirstUnit, loadModule, RuntimeError, type ActiveAction, type GameState } from '../src/game/contentDsl/runtime';
-import { apply, beginAction, cancelAction, startSession, submitModal, view, wait, type PlayChoice, type PlaySession, type PlayView } from '../src/game/contentDsl/session';
+import { DslError } from '../src/game/contentDsl/parser';
+import { actionFirstUnit, craftFirstUnit, describeCondition, loadModule, RuntimeError, type ActiveAction, type GameState } from '../src/game/contentDsl/runtime';
+import {
+  apply,
+  applyDirective,
+  beginAction,
+  runTest,
+  startSession,
+  submitModal,
+  view,
+  wait,
+  type PlayChoice,
+  type PlaySession,
+  type PlayView,
+} from '../src/game/contentDsl/session';
+import { serializeSave, type SaveDiff, type SavedGame } from '../src/game/contentDsl/save';
+import { parseDirectiveLine, type Directive } from '../src/game/contentDsl/test';
 
 const repoRoot = path.join(import.meta.dirname, '..');
 const defaultContent = 'content/tutorial-island.dsl';
@@ -12,6 +27,11 @@ export interface CommandResult {
   view?: PlayView;
   output: string[];
   quit: boolean;
+  // The canonical colon-form directive string for a gameplay action just
+  // performed (typed directive or numbered choice), e.g. `travel: beach` or
+  // `use: entity.oven.roast` — undefined for read-only meta commands,
+  // /test/run, and assertions. Consumed by a later chunk's session recorder.
+  recorded?: string;
 }
 
 const HELP_LINES = [
@@ -22,6 +42,14 @@ const HELP_LINES = [
   '  /wait <s>    advance simulated time by <s> seconds',
   '  /speed <n>   set the live-mode time multiplier (default 1)',
   '  /state       show location, elapsed sim-time, flags, inventory, xp',
+  '  /test <id>   run a # test by id and report PASSED/FAILED',
+  '  /load <id>   load a # save by id',
+  '  /expect <id> assert current state matches a # save by id',
+  '  /assert <c>  assert a condition against current state',
+  '  /cancel      cancel the in-flight spannable action, if any',
+  '  <directive>  any raw directive line (talk:/use:/travel:/craft:/begin:/…)',
+  '  /create-test <id>       emit a # test from what you just did in this session',
+  '  /create-valid-test <id> same, plus a # save + expect: regression assertion',
   '  /help        show this help',
   '  /quit, /q    show final state and exit',
 ];
@@ -80,7 +108,197 @@ function formatState(state: GameState): string[] {
   ];
 }
 
-export function handleCommand(session: PlaySession, currentView: PlayView, line: string): CommandResult {
+// Runs a `# test` by id through the shared runTest executor (step 3 of
+// handleCommand, reached from both `/test <id>` and a typed `run: <id>`
+// directive) — the one place PASSED/FAILED gets printed, so the two entry
+// points can't drift. runTest mutates session.state in place (tests set their
+// own state via `load:`, which is intended), so afterward we clear any stale
+// dialogue and reprint the resulting view.
+function runTestCommand(session: PlaySession, testId: string): CommandResult {
+  try {
+    const result = runTest(testId, session.registry, session.state);
+    session.dialogue = null;
+    const next = view(session);
+    const message = result.passed ? `Test '${testId}' PASSED` : `Test '${testId}' FAILED: ${result.failure}`;
+    return { view: next, output: [message, ...formatView(next)], quit: false };
+  } catch (err) {
+    if (err instanceof RuntimeError) return { output: [`Error: ${err.message}`], quit: false };
+    throw err;
+  }
+}
+
+// The payload half of a `begin:` directive, reconstructed back into its
+// source syntax (`use x.y.z` / `travel x` / `craft x`) for `recorded`.
+function beginInnerText(inner: Extract<Directive, { kind: 'use' | 'travel' | 'craft' }>): string {
+  switch (inner.kind) {
+    case 'use':
+      return `use ${inner.obj}.${inner.objId}.${inner.actionId}`;
+    case 'travel':
+      return `travel ${inner.location}`;
+    case 'craft':
+      return `craft ${inner.recipe}`;
+  }
+}
+
+// The canonical colon-form directive string for CommandResult.recorded,
+// covering every Directive kind handleCommand routes through applyDirective
+// (i.e. everything except run/assert/expect, which are handled — and
+// recorded — separately).
+function canonicalDirective(directive: Directive): string {
+  switch (directive.kind) {
+    case 'talk':
+      return `talk: ${directive.entity}`;
+    case 'choose':
+      return `choose: ${directive.text}`;
+    case 'use':
+      return `use: ${directive.obj}.${directive.objId}.${directive.actionId}`;
+    case 'travel':
+      return `travel: ${directive.location}`;
+    case 'craft':
+      return `craft: ${directive.recipe}`;
+    case 'begin':
+      return `begin: ${beginInnerText(directive.inner)}`;
+    case 'load':
+      return `load: ${directive.save}`;
+    case 'cancel':
+      return 'cancel';
+    case 'wait':
+      return `wait: ${directive.seconds}`;
+    default:
+      throw new Error(`canonicalDirective: unexpected directive kind: ${(directive as Directive).kind}`);
+  }
+}
+
+// The canonical colon-form directive for a numbered PlayChoice, mirroring
+// canonicalDirective's mapping so a numbered choice and its typed-directive
+// equivalent record identically. `dialogue` records the choice's rendered
+// label (via `choose:`) rather than its index, since the index is only
+// stable within one menu render — the label survives menu reordering.
+function recordedForChoice(choice: PlayChoice): string {
+  switch (choice.kind) {
+    case 'talk':
+      return `talk: ${choice.id.slice('talk:'.length)}`;
+    case 'action':
+      return `use: ${choice.id.slice('use:'.length)}`;
+    case 'travel':
+      return `travel: ${choice.id.slice('travel:'.length)}`;
+    case 'craft':
+      return `craft: ${choice.id.slice('craft:'.length)}`;
+    case 'dialogue':
+      return `choose: ${choice.label}`;
+  }
+}
+
+// Captures a session so it can be turned into a pasteable `# test` afterward.
+// `history` is the ordered canonical directive strings performed so far
+// (populated by handleCommand's single recording choke point below, and by
+// main()'s live-mode numbered-choice branch); `startSave` is a snapshot of
+// state taken once, before the first command, so a replay of the recording
+// starts from the same place this session did.
+//
+// TODO(modal-recording): modal interactions are NOT captured in the recording.
+// A modal (currently only character-creation, opened by `open-modal` and
+// answered via submitModal — see main()'s pendingModal handling) is resolved
+// outside the directive vocabulary, so nothing is pushed to `history` for it.
+// Consequences: (1) a session that went through character creation records no
+// name/race, and a replay starts from `<id>-start` which predates the modal,
+// leaving `state.player` unset; (2) any future modal-gated branch can't be
+// reproduced by a recorded test. Fix in a future session by making modal
+// submission a first-class directive (e.g. `modal: {"name":"Kira","race":"Elf"}`
+// or `submit-modal: name=Kira race=Elf`), parsed by parseDirectiveLine and
+// executed by applyDirective (calling submitModal), and recorded like any other
+// directive — so the recorder, runTest, and the CLI all stay on one vocabulary.
+export interface Recorder {
+  history: string[];
+  startSave: string;
+}
+
+// The flat `{version, ...diff}` JSON a `# save` body carries (see
+// serializeSave), reconstituted into the in-memory SavedGame shape without
+// going through parseSaveSection (which wants a parsed RawSection, not a raw
+// string) — this is exactly parseSaveSection's post-JSON.parse step.
+function savedGameFromSerialized(serialized: string): SavedGame {
+  const { version, ...diff } = JSON.parse(serialized) as { version: number } & Record<string, unknown>;
+  return { version, diff: diff as SaveDiff };
+}
+
+// A `# save <id>` block: header line, then the single-line JSON body, in the
+// exact shape parseSaveSection expects — pasting this straight into a `.dsl`
+// file round-trips through loadModule.
+function saveBlock(id: string, serialized: string): string[] {
+  return [`# save ${id}`, serialized];
+}
+
+// Backs both /create-test and /create-valid-test. Assembles a `# test <id>`
+// from the recorder's history — prepending `load: <id>-start` (and a matching
+// `# save` snapshot of session start) unless the recording already begins
+// with its own `load:`, and, for `valid`, appending `expect: <id>-end` plus a
+// `# save <id>-end` snapshot of the CURRENT state. Registers everything into
+// the live registry so `/test <id>` works immediately, and returns the
+// paste-ready block text. Never throws: any failure comes back as an
+// `Error: …` output line, so callers don't need a try/catch.
+function buildCreateTest(session: PlaySession, recorder: Recorder, id: string, opts: { valid: boolean }): { output: string[] } {
+  if (recorder.history.length === 0) {
+    return { output: [`Error: nothing recorded yet`] };
+  }
+
+  const startSaveId = `${id}-start`;
+  const endSaveId = `${id}-end`;
+  const first = recorder.history[0];
+  const usesStartSave = !(first.startsWith('load:') || first.startsWith('load '));
+
+  const idTaken =
+    session.registry.tests.has(id) ||
+    (usesStartSave && session.registry.saves.has(startSaveId)) ||
+    (opts.valid && session.registry.saves.has(endSaveId));
+  if (idTaken) {
+    return { output: [`Error: test '${id}' already exists`] };
+  }
+
+  const lines = [...recorder.history];
+  if (usesStartSave) lines.unshift(`load: ${startSaveId}`);
+  if (opts.valid) lines.push(`expect: ${endSaveId}`);
+
+  const directives: Directive[] = [];
+  for (const directiveLine of lines) {
+    const directive = parseDirectiveLine(directiveLine);
+    if (!directive) return { output: [`Error: internal: recorded line does not parse: ${directiveLine}`] };
+    directives.push(directive);
+  }
+
+  const endSaveSerialized = opts.valid ? serializeSave(session.state, session.registry) : undefined;
+
+  if (usesStartSave) session.registry.saves.set(startSaveId, savedGameFromSerialized(recorder.startSave));
+  if (endSaveSerialized !== undefined) session.registry.saves.set(endSaveId, savedGameFromSerialized(endSaveSerialized));
+  session.registry.tests.set(id, { id, directives });
+
+  const output: string[] = [`Created test '${id}' (${recorder.history.length} steps).`, ''];
+  if (usesStartSave) output.push(...saveBlock(startSaveId, recorder.startSave), '');
+  if (endSaveSerialized !== undefined) output.push(...saveBlock(endSaveId, endSaveSerialized), '');
+  output.push(`# test ${id}`, ...lines);
+  return { output };
+}
+
+// The `begin:` inner-payload text (`use x.y.z` / `travel x` / `craft x`, no
+// colon after the verb) for a PlayChoice about to be armed as a spannable
+// action in live mode. Derived from recordedForChoice's mapping — which
+// differs only by the colon — rather than duplicating it.
+function beginInnerForChoice(choice: PlayChoice): string {
+  return recordedForChoice(choice).replace(': ', ' ');
+}
+
+// Trims an elapsed sim-seconds float to a few decimals for a recorded `wait:`
+// directive, dropping trailing zeros (`1` not `1.000`) — WAIT's grammar
+// accepts either.
+function formatElapsed(seconds: number): string {
+  return Number(seconds.toFixed(3)).toString();
+}
+
+// The pure command handler, unaware of any recorder: every existing meta/
+// directive/numbered-choice behavior lives here unchanged. handleCommand below
+// wraps it with the two /create-test commands and the single recording choke
+// point.
+function handleGameplayCommand(session: PlaySession, currentView: PlayView, line: string): CommandResult {
   const trimmed = line.trim();
 
   if (trimmed === '') {
@@ -121,15 +339,52 @@ export function handleCommand(session: PlaySession, currentView: PlayView, line:
     return { output: [`Speed set to ${multiplier}x.`], quit: false };
   }
 
-  if (trimmed.startsWith('/wait')) {
-    const rest = trimmed.slice('/wait'.length).trim();
-    const seconds = Number(rest);
-    if (rest === '' || Number.isNaN(seconds) || seconds < 0) {
-      return { output: [`Error: /wait requires a non-negative number of seconds, got ${JSON.stringify(rest)}`], quit: false };
+  if (trimmed.startsWith('/test')) {
+    const testId = trimmed.slice('/test'.length).trim();
+    if (testId === '') return { output: [`Error: /test requires an id`], quit: false };
+    return runTestCommand(session, testId);
+  }
+
+  // Slash aliases for directives: rewrite to the colon form the shared parser
+  // understands, then fall through to the shared directive handling below —
+  // no bespoke gameplay logic lives here anymore (/wait's old hand-rolled
+  // handler included).
+  let toParse = trimmed;
+  if (trimmed === '/cancel') toParse = 'cancel';
+  else if (trimmed.startsWith('/load')) toParse = `load: ${trimmed.slice('/load'.length).trim()}`;
+  else if (trimmed.startsWith('/expect')) toParse = `expect: ${trimmed.slice('/expect'.length).trim()}`;
+  else if (trimmed.startsWith('/assert')) toParse = `assert: ${trimmed.slice('/assert'.length).trim()}`;
+  else if (trimmed.startsWith('/wait')) toParse = `wait: ${trimmed.slice('/wait'.length).trim()}`;
+
+  let directive: Directive | null;
+  try {
+    directive = parseDirectiveLine(toParse);
+  } catch (err) {
+    if (err instanceof RuntimeError || err instanceof DslError) return { output: [`Error: ${err.message}`], quit: false };
+    throw err;
+  }
+
+  if (directive) {
+    if (directive.kind === 'run') {
+      return runTestCommand(session, directive.test);
     }
+
+    if (directive.kind === 'assert' || directive.kind === 'expect') {
+      const label = directive.kind === 'expect' ? directive.save : describeCondition(directive.condition);
+      try {
+        const result = applyDirective(session, directive);
+        if (result.failure) return { output: [`⚠ ${result.failure}`], quit: false };
+        return { output: [`✓ ${label} matches`], quit: false };
+      } catch (err) {
+        if (err instanceof RuntimeError) return { output: [`Error: ${err.message}`], quit: false };
+        throw err;
+      }
+    }
+
     try {
-      const next = wait(session, seconds);
-      return { view: next, output: formatView(next), quit: false };
+      applyDirective(session, directive);
+      const next = view(session);
+      return { view: next, output: formatView(next), quit: false, recorded: canonicalDirective(directive) };
     } catch (err) {
       if (err instanceof RuntimeError) return { output: [`Error: ${err.message}`], quit: false };
       throw err;
@@ -147,11 +402,44 @@ export function handleCommand(session: PlaySession, currentView: PlayView, line:
   const choice = currentView.choices[index - 1];
   try {
     const next = apply(session, choice.id);
-    return { view: next, output: formatView(next), quit: false };
+    return { view: next, output: formatView(next), quit: false, recorded: recordedForChoice(choice) };
   } catch (err) {
     if (err instanceof RuntimeError) return { output: [`Error: ${err.message}`], quit: false };
     throw err;
   }
+}
+
+// Entry point used by both the REPL and the tests. Wraps handleGameplayCommand
+// with the two /create-test commands (handled here directly, since they need
+// the recorder rather than producing a `recorded` directive) and the single
+// choke point that appends a gameplay result's `recorded` string onto the
+// recorder's history — the one place this happens, so it can't drift out of
+// sync between the numbered-choice and typed-directive paths.
+// `recorder` defaults to a throwaway so existing callers/tests that don't care
+// about recording keep working unchanged.
+export function handleCommand(
+  session: PlaySession,
+  currentView: PlayView,
+  line: string,
+  recorder: Recorder = { history: [], startSave: '' },
+): CommandResult {
+  const trimmed = line.trim();
+
+  if (trimmed.startsWith('/create-valid-test')) {
+    const id = trimmed.slice('/create-valid-test'.length).trim();
+    if (id === '') return { output: [`Error: /create-valid-test requires an id`], quit: false };
+    return { ...buildCreateTest(session, recorder, id, { valid: true }), quit: false };
+  }
+
+  if (trimmed.startsWith('/create-test')) {
+    const id = trimmed.slice('/create-test'.length).trim();
+    if (id === '') return { output: [`Error: /create-test requires an id`], quit: false };
+    return { ...buildCreateTest(session, recorder, id, { valid: false }), quit: false };
+  }
+
+  const result = handleGameplayCommand(session, currentView, line);
+  if (result.recorded !== undefined) recorder.history.push(result.recorded);
+  return result;
 }
 
 function progressBar(fraction: number, width = 20): string {
@@ -239,8 +527,10 @@ type LineResult = IteratorResult<string>;
 // On cleanup the tty's raw state is restored to what it was before (readline
 // wants it raw again for the next line) and readline is resumed. Ctrl-C won't
 // raise SIGINT in raw mode, so it's honored here as an explicit quit.
-function runLiveAction(session: PlaySession, rl: ReturnType<typeof createInterface>): Promise<void> {
-  return new Promise((resolvePromise) => {
+// Resolves with whether the action was cancelled (vs. completing on its own),
+// so main()'s recorder can push a `cancel` directive when appropriate.
+function runLiveAction(session: PlaySession, rl: ReturnType<typeof createInterface>): Promise<{ cancelled: boolean }> {
+  return new Promise<{ cancelled: boolean }>((resolvePromise) => {
     const input = process.stdin;
     const isTTY = Boolean(input.isTTY);
     const wasRaw = Boolean(input.isRaw);
@@ -262,12 +552,15 @@ function runLiveAction(session: PlaySession, rl: ReturnType<typeof createInterfa
       if (isTTY) input.setRawMode(wasRaw);
       process.stdout.write('\n');
       if (cancelled) {
-        cancelAction(session);
+        // A mid-action keypress cancels through the SAME path as a typed
+        // `/cancel`: both dispatch the `cancel` directive through applyDirective,
+        // so there is one cancellation code path for humans, agents, and tests.
+        applyDirective(session, { kind: 'cancel' });
         console.log('Stopped.');
       }
       console.log(formatView(view(session)).join('\n'));
       rl.resume();
-      resolvePromise();
+      resolvePromise({ cancelled });
     };
 
     const onData = (chunk: Buffer): void => {
@@ -343,6 +636,9 @@ async function main(): Promise<void> {
   const files = (arg ?? defaultContent).split(',').map((file) => file.trim()).filter(Boolean);
   const registry = loadModule(loadContent(files));
   const session = startSession(registry);
+  // Snapshotted once, before any command, so /create-test's `<id>-start` save
+  // reproduces exactly where this session began — see the Recorder doc comment.
+  const recorder: Recorder = { history: [], startSave: serializeSave(session.state, registry) };
 
   let current = view(session);
   console.log(formatView(current).join('\n'));
@@ -377,20 +673,26 @@ async function main(): Promise<void> {
         try {
           const next = beginAction(session, choice.id);
           if (session.state.activeAction) {
+            recorder.history.push(`begin: ${beginInnerForChoice(choice)}`);
+            const t0 = session.state.time;
             // runLiveAction pauses rl for the duration and resumes it before
             // resolving, so the loop's next it.next() reads normally.
-            await runLiveAction(session, rl);
+            const { cancelled } = await runLiveAction(session, rl);
             current = view(session);
+            const elapsed = session.state.time - t0;
+            if (elapsed > 0) recorder.history.push(`wait: ${formatElapsed(elapsed)}`);
+            if (cancelled) recorder.history.push('cancel');
           } else {
             console.log(formatView(next).join('\n'));
             current = next;
+            recorder.history.push(recordedForChoice(choice));
           }
         } catch (err) {
           if (err instanceof RuntimeError) console.log(`Error: ${err.message}`);
           else throw err;
         }
       } else {
-        const result = handleCommand(session, current, line);
+        const result = handleCommand(session, current, line, recorder);
         if (result.output.length > 0) console.log(result.output.join('\n'));
         if (result.view) current = result.view;
         quit = result.quit;

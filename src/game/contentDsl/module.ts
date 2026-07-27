@@ -4,6 +4,7 @@ import { itemSchema } from './item';
 import { locationSchema } from './location';
 import { DslError } from './parser';
 import { recipeSchema } from './recipe';
+import { parseSaveSection } from './save';
 import { parseSection } from './section';
 import { skillSchema } from './skill';
 import { statSchema } from './stat';
@@ -23,6 +24,7 @@ const PARSERS: Record<string, (section: RawSection) => object> = {
   variable: (section) => parseSection(section, variableSchema),
   dialogue: parseDialogue,
   test: parseTest,
+  save: parseSaveSection,
 };
 
 export interface ModuleSection {

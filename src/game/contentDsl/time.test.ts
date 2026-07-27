@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { advanceTime, createGameState, evaluateCondition, loadModule, renderSegments, runTest, RuntimeError, useAction } from './runtime';
-import { startSession, view, wait } from './session';
+import { advanceTime, createGameState, evaluateCondition, loadModule, renderSegments, RuntimeError, useAction } from './runtime';
+import { runTest, startSession, view, wait } from './session';
 
 describe('advanceTime', () => {
   it('accrues seconds onto state.time', () => {
@@ -114,11 +114,11 @@ starting
 
 # test wait-enough
 wait: 61
-expect: time > 60
+assert: time > 60
 
 # test wait-not-enough
 wait: 30
-expect: time > 60
+assert: time > 60
 `;
 
   it('passes when the waited duration satisfies the expectation', () => {

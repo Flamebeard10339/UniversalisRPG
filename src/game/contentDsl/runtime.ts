@@ -6,6 +6,7 @@ import { Item, itemSchema } from './item';
 import { Location, locationSchema, resolveCoordinates } from './location';
 import { parseModule } from './module';
 import { Recipe, recipeSchema } from './recipe';
+import { SavedGame } from './save';
 import { scopeEntity } from './scope';
 import { Authored, hydrateSection } from './section';
 import { Skill, skillSchema } from './skill';
@@ -108,6 +109,7 @@ export interface Registry {
   tests: Map<string, Test>;
   // Authored numeric constants (see travelSecondsPerUnit and friends).
   variables: Map<string, Variable>;
+  saves: Map<string, SavedGame>;
 }
 
 export function loadModule(source: string): Registry {
@@ -123,6 +125,7 @@ export function loadModule(source: string): Registry {
     dialoguesByOwner: new Map(),
     tests: new Map(),
     variables: new Map(),
+    saves: new Map(),
   };
 
   for (const section of parseModule(source)) {
@@ -172,6 +175,11 @@ export function loadModule(source: string): Registry {
       case 'variable': {
         const variable = hydrateSection(section.value as Authored<Variable>, variableSchema);
         registry.variables.set(variable.id, variable);
+        break;
+      }
+      case 'save': {
+        const { id, saved } = section.value as { id: string; saved: SavedGame };
+        registry.saves.set(id, saved);
         break;
       }
     }
@@ -979,51 +987,4 @@ export function craft(recipeId: string, registry: Registry, state: GameState): v
   const armed = armCraft(recipeId, registry, state);
   if (!armed.armed) return;
   resolve(state, registry, state.time + armed.firstUnit);
-}
-
-export interface TestResult {
-  passed: boolean;
-  failure?: string;
-}
-
-export function runTest(testId: string, registry: Registry, state: GameState, stack: readonly string[] = []): TestResult {
-  if (stack.includes(testId)) throw new RuntimeError(`cyclic test run: ${[...stack, testId].join(' -> ')}`);
-  const test = registry.tests.get(testId);
-  if (!test) throw new RuntimeError(`unknown test: ${testId}`);
-
-  let session: DialogueSession | null = null;
-
-  for (const directive of test.directives) {
-    switch (directive.kind) {
-      case 'run': {
-        const result = runTest(directive.test, registry, state, [...stack, testId]);
-        if (!result.passed) return result;
-        break;
-      }
-      case 'talk':
-        session = talk(directive.entity, registry, state);
-        break;
-      case 'choose':
-        if (!session) throw new RuntimeError('choose with no active dialogue');
-        session = choose(directive.text, session, state);
-        break;
-      case 'use':
-        useAction(directive.obj, directive.objId, directive.actionId, registry, state);
-        break;
-      case 'travel':
-        if (!registry.locations.has(directive.location)) throw new RuntimeError(`unknown location: ${directive.location}`);
-        useTravel(state.location, directive.location, registry, state);
-        break;
-      case 'craft':
-        craft(directive.recipe, registry, state);
-        break;
-      case 'expect':
-        if (!evaluateCondition(directive.condition, state)) return { passed: false, failure: describeCondition(directive.condition) };
-        break;
-      case 'wait':
-        resolve(state, registry, state.time + directive.seconds);
-        break;
-    }
-  }
-  return { passed: true };
 }
