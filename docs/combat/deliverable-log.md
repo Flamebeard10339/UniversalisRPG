@@ -495,6 +495,127 @@ The combat core ships. Still open, and all of it was deferred deliberately rathe
   a *modifier* rather than by a hit. A hit is now exact (chunk 6 ends the segment on it).
 - The two separable companions below.
 
+## Design feedback from the chunk-7 playthrough
+
+Raised by the user after driving the finished rat fight. None of it is a defect in what
+chunks 1–7 shipped; all of it is authoring-surface and scope work that the finished fight made
+visible. Recorded here so the next pass starts from it rather than rediscovering it.
+
+### F1 — every enemy re-authors the same six clauses
+
+The rat's `fight` and `bite` differ only in the `retaliates` tag, and `cadence.test.ts`'s
+punchbag repeats the same block a third time. The ask is a template — an action *kind* an
+entity names, rather than clauses each entity copies:
+
+```dsl
+# entitytype basic-enemy
+fight:
+  repeating
+  time: 60
+  speed: attack-rate
+  target: health
+  ability: attack
+  dr: dr
+retaliation:
+  retaliates
+  time: 60
+  speed: attack-rate
+  target: health
+  ability: attack
+  dr: dr
+
+# entity giant-rat
+type enemy:
+  stats: attack 4, dr 2, max-health 1000, attack-rate 16
+  give: 1 rat-tail
+
+# entity punchingbag
+type enemy:
+  stats: max-health 24, dr 0
+```
+
+The point is blast radius: with two dozen enemies authored by copy, changing how enemies work
+means crawling every `.dsl`, and one enemy that fights subtly wrong — or one cooking recipe
+unlike all the others — is a bug nothing catches.
+
+Three engine facts that constrain the design, none of them blocking:
+
+- **The precedent already exists.** `recipeAction` (`runtime.ts:1506`) compiles a non-action
+  section into an `Action` at load, once, and stashes it in `registry.recipeActions`. A
+  `# entitytype` compiles the same way — at load, into each entity's own `actions` array —
+  so this needs no new resolver concept and no runtime indirection.
+- **The compiled actions must be per-entity copies, never shared references.** `scopeEntity`
+  (`scope.ts:38`) mutates `action.requires`/`results` in place to prefix the owning entity's
+  id. One template `Action` object reachable from two entities would be scoped twice and bind
+  to the wrong one.
+- **A templated action still has to be findable by label.** `findActiveAction` resolves an
+  in-flight action by `ownerRef` + `actionLabel` against the owner's `actions` array, so the
+  template's `fight:` / `retaliation:` names have to survive into that array as stable labels.
+  The sketch already does this; it is a constraint on any alternative shape.
+
+The open question the sketch surfaces and does not answer: **what does an override attach
+to?** `stats:` belongs to the entity, but `give: 1 rat-tail` is a result on `fight` — so the
+body of `type enemy:` is addressing two different scopes at once. Settling that (per-action
+override blocks? results merged into a named template action?) is the actual design work.
+(Transcription detail: the sketch declares `# entitytype basic-enemy` and then references
+`type enemy:`; the names need to agree.)
+
+### F2 — `time:` has drifted, and the three-way taxonomy it should express
+
+The user's report: *"my understanding of what time is in relation to actions has drifted. I
+don't understand what `time: 60` is supposed to refer to in `cadence.test.ts`."* That is a
+correct reading of a real inconsistency, and it has a precise location.
+
+`time:` is **seconds per attempt**, divided by `speed:` (`attemptDuration`, `runtime.ts:647`).
+One unit of an action lasts `attemptsToResolve × duration`, where `attemptsToResolve` is
+`min(ceil(health / ability), escapeAfter)`. With the defaults — `health` 1, `ability` 1 — that
+is exactly **one** attempt, so for every ordinary action `time:` *is* the whole duration, and
+reads naturally as one. The moment an action becomes multi-attempt (`health:` or `target:`),
+`time:` silently stops meaning "how long this takes" and becomes "60, chosen so the `speed:`
+stat reads as per-minute". Same field, two meanings, no marker at the seam. The `rate:` sugar
+already in Open decisions is a partial answer; it renames the folklore without settling the
+axis underneath.
+
+The three kinds the user wants to author, and how each is expressed today:
+
+| kind | example | today | exit |
+| --- | --- | --- | --- |
+| instant | dialogue, equipping, eating | no `time:` | n/a |
+| duration | travel, cooking a shrimp | `time:`, no `repeating` | completion |
+| infinite | combat | `repeating` | `stop` / `requires:` false / inputs exhausted / `escape after` |
+
+So all three exist — but the axis is implicit and split across two unrelated fields. `repeating`
+is a bare tag whose name says "loops", not "runs until an exit condition fires", and
+`beginAction` routes instant-vs-spannable on `firstUnit > 0` rather than on anything authored.
+Worth noting: `escape after` is authorable and **no content uses it**, so the one exit
+condition that is explicit today is also the one that has never been exercised outside tests.
+A named kind per row — which is what "interaction kinds are named by the content" already
+argues for elsewhere in this log — would make the taxonomy the authored thing and `time:`
+unambiguous within each.
+
+### F3 — a second `retaliates` action is silently dead content
+
+**Answered, and it is the unhelpful answer.** `retaliationOf` (`runtime.ts:907`) is
+`entity.actions.find(a => a.retaliates)` — first in authoring order wins. `freshActor`
+allocates exactly one `cadence`, and `participants()` pushes exactly one entry per actor, so
+every later `retaliates` action is unreachable. Load raises nothing.
+
+Verified: a boss authored with `claw` and `tail-sweep`, both at 60/min, swings **5** times in
+5 seconds, not 10. `tail-sweep` never fires.
+
+The user's instinct that a spell rotation is out of scope for this pass is right — but the
+current behaviour is the worst of the three options, because it fails silently. The cheap fix
+is to reject a second `retaliates` action at load, beside the existing "retaliation requires a
+`target:`" check (`runtime.ts:177`), which costs nothing and reserves the grammar. Multiple
+cadences per actor are then a later, deliberate change rather than something an author
+discovers by noticing their boss hits at half speed.
+
+### F4 — equipment is inert
+
+Already recorded above under "What is left when chunks 1–7 are done"; not duplicated here.
+Worth reading alongside F1, since both are authoring-surface work that chunk 7's on-screen
+numbers made visible.
+
 ## Separable companion items
 
 ### Droptables (reinstate; removed in the rewrite)
