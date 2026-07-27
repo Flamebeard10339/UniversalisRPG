@@ -48,6 +48,15 @@ cook:
   repeating
   give: 1 cooked-shrimp
 
+# entity shrine
+// A typo'd speed stat reads 0, not an error, so this action's attempt duration
+// is 1/0 = Infinity, which every "non-positive duration" guard passes happily.
+chant:
+  repeating
+  time: 1
+  speed: cooking-sped
+  give: 1 blessing
+
 // A skill and a difficulty, never an authored probability: the pair is
 // contested through hitChance, and a gap of 40 over a spread of 100 lands at
 // 1/(1+10^-0.4) = 0.7153 — lopsided enough that both outcomes show up.
@@ -425,6 +434,20 @@ describe('useAction/craft integration: repeating actions, eating grants a live b
     const registry = loaded();
     const state = createGameState('nowhere');
     expect(() => useAction('entity', 'broken-oven', 'cook', registry, state)).toThrow(RuntimeError);
+  });
+
+  // A speed stat that reads 0 — a typo, or a declared `# stat` with no base: —
+  // makes the attempt duration Infinity, which slips through every `<= 0` guard
+  // and drives state.time to Infinity while NaN-ing the whole activeAction. NaN
+  // serializes to null, so the wreckage would survive a save round-trip instead
+  // of failing loudly.
+  it('an action whose speed stat reads 0 refuses to start rather than resolving an infinite attempt duration', () => {
+    const registry = loaded();
+    const state = createGameState('nowhere');
+
+    expect(() => useAction('entity', 'shrine', 'chant', registry, state)).toThrow(/impossible attempt duration/);
+    expect(state.time).toBe(0);
+    expect(state.activeAction).toBeNull();
   });
 });
 

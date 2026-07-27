@@ -644,9 +644,24 @@ export function initResources(state: GameState, registry: Registry): void {
   }
 }
 
+// The one place a duration is divided by a speed stat, and therefore the one
+// place that division can go wrong. A speed of 0 is an ordinary authoring
+// accident — a typo'd stat id reads 0 (statRange falls through to point(0)), and
+// so does a declared `# stat` with no `base:` — and it yields Infinity, which
+// every downstream `<= 0` guard happily passes. That poisons state.time and NaNs
+// the whole activeAction, and NaN serializes to null, so the wreck survives a
+// save round-trip instead of failing loudly. It fails loudly here instead.
+//
+// Zero stays legal: an action with no `time:` is instant, which is a real thing.
 function attemptDuration(action: Action, state: GameState, registry: Registry, actorId: string = PLAYER): number {
   const speed = action.speed ? statValue(action.speed, state, registry, actorId) : 1;
-  return (action.time ?? 0) / speed;
+  const duration = (action.time ?? 0) / speed;
+  if (!Number.isFinite(duration) || duration < 0) {
+    throw new RuntimeError(
+      `action ${action.label} resolved an impossible attempt duration (${duration}) from time: ${action.time ?? 0} and speed stat ${action.speed ?? '1'} = ${speed}`,
+    );
+  }
+  return duration;
 }
 
 type FightOutcome = 'completion' | 'escape';
