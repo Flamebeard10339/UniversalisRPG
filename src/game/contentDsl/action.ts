@@ -40,6 +40,16 @@ export interface Action {
   // The stat whose value is subtracted from the target's remaining health
   // per successful attempt. Absent defaults to a magnitude of 1.
   ability?: string;
+  // The pool ON THE TARGET ACTOR that a successful attempt drains — `health` on
+  // a rat, `integrity` on a lock. The target actor is the entity this action
+  // belongs to. Naming a pool is what makes an action a real fight: it ends when
+  // that pool reaches 0 rather than when `health:` attempts are spent, damage is
+  // sampled per hit (ability minus dr, see hitDamage), and it always resolves
+  // attempt-by-attempt because a sampled sum has no closed form to batch.
+  target?: string;
+  // The stat ON THE TARGET whose value is subtracted from each incoming hit.
+  // Absent means no reduction. Only meaningful alongside `target:`.
+  dr?: string;
   // The target's hitpoints for one fight. Absent defaults to 1 — combined
   // with the accuracy/ability defaults above, this makes an action with none
   // of these fields a fight that always completes in exactly one hit (i.e.
@@ -118,6 +128,16 @@ function parseActionLine(line: RawLine, action: Omit<Action, 'label'>): void {
   if (cursor.take(/ability:[ \t]*/) !== null) {
     if (action.ability !== undefined) throw new DslError('action ability is defined more than once', line.span);
     action.ability = id.parse(cursor);
+    return;
+  }
+  if (cursor.take(/target:[ \t]*/) !== null) {
+    if (action.target !== undefined) throw new DslError('action target is defined more than once', line.span);
+    action.target = id.parse(cursor);
+    return;
+  }
+  if (cursor.take(/dr:[ \t]*/) !== null) {
+    if (action.dr !== undefined) throw new DslError('action dr is defined more than once', line.span);
+    action.dr = id.parse(cursor);
     return;
   }
   if (cursor.take(/health:[ \t]*/) !== null) {

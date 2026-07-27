@@ -8,7 +8,8 @@ import { RawSection } from './structure';
 // 2: a flat stat buff's `amount` became a range ({min, max}) rather than a
 //    number, so a v1 save with food active would otherwise poison every stat
 //    reading it with NaN.
-export const SAVE_VERSION = 2;
+// 3: activeAction carries the encounter's non-player actors and their pools.
+export const SAVE_VERSION = 3;
 
 // A save is a sparse diff against initialState(registry): a brand-new game
 // saves as `{}`. `log` is transcript, not state, and is never part of a save.

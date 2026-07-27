@@ -161,7 +161,7 @@ open:
   give: 1 gold
 
 # save empty
-{"version":2}
+{"version":3}
 
 # test load-and-match
 load: empty

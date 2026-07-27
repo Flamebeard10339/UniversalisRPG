@@ -415,10 +415,7 @@ on empty:
 
 The pool changes at **`statValue(rate)` per minute** — one stat, signed: a
 positive net value regenerates, a negative one drains. There is no separate
-"regen" and "drain", and nothing writes a pool level directly. To make an
-action affect a pool, give the **action a stat-bonus tag** on the pool's rate
-stat — the exact same tag-clause grammar and buff machinery as food and
-equipment (a buff is just temporary equipment):
+"regen" and "drain". 
 
 ```
 # entity rat

@@ -32,7 +32,24 @@ export interface ActiveAction {
   repeating: boolean;
   healthRemaining: number;
   attemptsMade: number;
+  // Non-player actors taking part, keyed by entity id. Absent for a solo action
+  // (cooking, travel, chopping); a `target:` action puts the entity it fights in
+  // here. Their pools live with the encounter and not in state.resources because
+  // they are scoped to the fight — they vanish with it, the player's persist.
+  actors?: Record<string, ActorState>;
 }
+
+// A non-player participant's sheet. Only pool levels are stored: its stats come
+// from its `# entity` block and its maxima are derived live from those stats,
+// exactly as the player's are.
+export interface ActorState {
+  resources: Record<string, number>;
+}
+
+// Who a stat or a pool belongs to. Actors are addressed by entity id; the player
+// is this reserved id and simply has no `# entity`, so every base it reads falls
+// through to the global `# stat` defaults.
+export const PLAYER = 'player';
 
 // A timed stat modifier (from eating food, etc). `added` sums flat onto the
 // stat's base and may be a range (`+3-6 attack`); `increased` sums as a
@@ -507,20 +524,27 @@ function findActiveAction(active: ActiveAction, registry: Registry): Action {
 //
 // Note a percent bonus multiplies whatever flat bonuses are present, so `+10%
 // dr` with no added dr is deliberately nothing at all (0 × 1.1 = 0).
-export function statRange(statId: string, state: GameState, registry: Registry): Range {
-  let added = registry.stats.get(statId)?.base ?? point(0);
+export function statRange(statId: string, state: GameState, registry: Registry, actorId: string = PLAYER): Range {
+  // An actor's own `stats:` block replaces the global default; the player names
+  // nothing and so reads the default for everything.
+  let added = registry.entities.get(actorId)?.stats[statId] ?? registry.stats.get(statId)?.base ?? point(0);
   let increased = 0;
-  for (const buff of Object.values(state.activeBuffs)) {
-    if (buff.statId !== statId) continue;
-    if (buff.kind === 'added') added = addRanges(added, buff.amount);
-    else increased += buff.amount;
-  }
-  if (state.activeAction) {
-    const action = findActiveAction(state.activeAction, registry);
-    for (const tag of action.tags ?? []) {
-      if (tag.kind !== 'stat-bonus' || tag.statId !== statId) continue;
-      if (tag.percent) increased += tag.amount / 100;
-      else added = addRanges(added, tag.amount);
+  // Buffs and the active action's tags are the PLAYER's: food the player ate,
+  // and the action the player is performing. A non-player actor carries neither
+  // in this pass, so it reads its declared sheet and nothing else.
+  if (actorId === PLAYER) {
+    for (const buff of Object.values(state.activeBuffs)) {
+      if (buff.statId !== statId) continue;
+      if (buff.kind === 'added') added = addRanges(added, buff.amount);
+      else increased += buff.amount;
+    }
+    if (state.activeAction) {
+      const action = findActiveAction(state.activeAction, registry);
+      for (const tag of action.tags ?? []) {
+        if (tag.kind !== 'stat-bonus' || tag.statId !== statId) continue;
+        if (tag.percent) increased += tag.amount / 100;
+        else added = addRanges(added, tag.amount);
+      }
     }
   }
   return scaleRange(added, 1 + increased);
@@ -530,8 +554,8 @@ export function statRange(statId: string, state: GameState, registry: Registry):
 // itself whenever nothing about it is ranged. Everything that needs a number
 // without consuming randomness reads this — pool maxima, rates, attempt
 // durations — so a ranged stat can never make a duration or a ceiling jitter.
-export function statValue(statId: string, state: GameState, registry: Registry): number {
-  return midpoint(statRange(statId, state, registry));
+export function statValue(statId: string, state: GameState, registry: Registry, actorId: string = PLAYER): number {
+  return midpoint(statRange(statId, state, registry, actorId));
 }
 
 // One roll of the stat, for the per-attempt uses where the range is the point
@@ -539,8 +563,8 @@ export function statValue(statId: string, state: GameState, registry: Registry):
 // the stat's interval is non-degenerate and none at all when it isn't — a count
 // that is a deterministic function of state, which is what keeps resolve()
 // associative (see the invariant on resolve()).
-export function sampleStat(statId: string, state: GameState, registry: Registry): number {
-  const range = statRange(statId, state, registry);
+export function sampleStat(statId: string, state: GameState, registry: Registry, actorId: string = PLAYER): number {
+  const range = statRange(statId, state, registry, actorId);
   return isPoint(range) ? range.min : sampleRange(range, nextRandom(state));
 }
 
@@ -574,6 +598,15 @@ function attemptDuration(action: Action, state: GameState, registry: Registry): 
 }
 
 type FightOutcome = 'completion' | 'escape';
+
+// An action resolves attempt-by-attempt instead of in closed form when what an
+// attempt does isn't knowable ahead of it: a miss chance, or damage sampled
+// against a target's pool. Both are authored fields, never derived from live
+// state, so this can't flip partway through a fight and strand a batch that was
+// planned under the other reading.
+function resolvesPerAttempt(action: Action): boolean {
+  return action.accuracy !== undefined || action.target !== undefined;
+}
 
 interface FightParams {
   duration: number; // seconds per attempt
@@ -754,6 +787,36 @@ function settlePools(state: GameState, registry: Registry, snapshots: ResourceSn
   }
 }
 
+// An encounter actor's pools at full strength, filled the way initResources
+// fills the player's — each pool's authored `start`, or that ACTOR's own max.
+function freshActor(actorId: string, state: GameState, registry: Registry): ActorState {
+  const resources: Record<string, number> = {};
+  for (const resource of registry.resources.values()) {
+    resources[resource.id] = resource.start ?? statValue(resource.max, state, registry, actorId);
+  }
+  return { resources };
+}
+
+function actorInEncounter(state: GameState, actorId: string): ActorState {
+  const actor = state.activeAction?.actors?.[actorId];
+  if (!actor) throw new RuntimeError(`actor is not in the encounter: ${actorId}`);
+  return actor;
+}
+
+// A hit landing on a target actor's pool; returns the level it leaves behind.
+// Deliberately NOT setPoolLevel: a resource's `on empty`/`on full` blocks are
+// authored from the player's point of view ("You slump to the floor"), so firing
+// them for an enemy would put the player's words in its mouth. An enemy reaching
+// 0 is expressed by the fight completing and its `on success:` running.
+function damageActorPool(state: GameState, registry: Registry, actorId: string, resourceId: string, amount: number): number {
+  const resource = requireResource(registry, resourceId);
+  const pools = actorInEncounter(state, actorId).resources;
+  const max = statValue(resource.max, state, registry, actorId);
+  const level = Math.min(max, Math.max(0, (pools[resource.id] ?? 0) - amount));
+  pools[resource.id] = level;
+  return level;
+}
+
 // Applies results that fire OUTSIDE a resolver segment — an instant action, a
 // boundary firing, a rollover handler. There is no segment to fold into, so any
 // pool write settles on the spot.
@@ -796,7 +859,7 @@ function nextBoundary(state: GameState, registry: Registry, toTime: number): num
     // A stochastic action (accuracy) has no closed-form boundary — fight length
     // is random. resolveStochasticSegment simulates it attempt-by-attempt,
     // bounded only by whatever buff-expiry/toTime already gives.
-    if (!action.accuracy) {
+    if (!resolvesPerAttempt(action)) {
       const { duration, attemptsToResolve } = fightPlan(action, state, registry);
       const remainingAttempts = attemptsToResolve - state.activeAction.attemptsMade;
       if (state.activeAction.repeating) {
@@ -875,6 +938,8 @@ function resolveDeterministicSegment(state: GameState, registry: Registry, actio
 // order off state.rng, which keeps this path associative (see resolve()).
 function resolveStochasticSegment(state: GameState, registry: Registry, action: Action, segEnd: number, deltas: PoolDeltas): void {
   const active = state.activeAction!;
+  // A `target:` action fights the entity whose action it is.
+  const targetId = parseOwnerRef(active.ownerRef).objId;
 
   for (;;) {
     const { duration, abilityAmount, escapeAfter } = fightParams(action, state, registry);
@@ -900,20 +965,40 @@ function resolveStochasticSegment(state: GameState, registry: Registry, action: 
     advanceTime(state, timeForNextAttempt);
     active.progress = 0;
     active.attemptsMade++;
-    const accuracyValue = clamp01(statValue(action.accuracy!, state, registry));
-    const hit = nextRandom(state) < accuracyValue;
-    if (hit) active.healthRemaining -= abilityAmount;
+    // Draws per attempt, always in this order: the hit roll, then the damage
+    // roll, then the reduction roll. An action with no accuracy stat cannot
+    // miss and draws nothing for the first.
+    const hit = action.accuracy === undefined || nextRandom(state) < clamp01(statValue(action.accuracy, state, registry));
 
-    // Outcome is decided per attempt, not via the deterministic plan: health
-    // exhaustion means completion; running out of attempts first means escape.
+    let depleted: boolean;
+    if (action.target) {
+      if (hit) {
+        const dealt = hitDamage(
+          action.ability ? sampleStat(action.ability, state, registry) : 1,
+          action.dr ? sampleStat(action.dr, state, registry, targetId) : 0,
+          registry,
+        );
+        depleted = damageActorPool(state, registry, targetId, action.target, dealt) <= EPSILON;
+      } else {
+        depleted = actorInEncounter(state, targetId).resources[action.target] <= EPSILON;
+      }
+    } else {
+      if (hit) active.healthRemaining -= abilityAmount;
+      depleted = active.healthRemaining <= EPSILON;
+    }
+
+    // Outcome is decided per attempt, not via the deterministic plan: a depleted
+    // target means completion; running out of attempts first means escape.
     let fightOutcome: FightOutcome | null = null;
-    if (active.healthRemaining <= EPSILON) fightOutcome = 'completion';
+    if (depleted) fightOutcome = 'completion';
     else if (active.attemptsMade >= escapeAfter) fightOutcome = 'escape';
 
     if (fightOutcome) {
       applyFightBatch(action, 1, fightOutcome, state, registry, deltas);
       if (active.repeating) {
-        active.healthRemaining = action.health ?? 1;
+        // A fresh target steps up: its pools refill from its own stats.
+        if (action.target) active.actors![targetId] = freshActor(targetId, state, registry);
+        else active.healthRemaining = action.health ?? 1;
         active.attemptsMade = 0;
       } else {
         state.activeAction = null;
@@ -938,7 +1023,7 @@ function resolveSegment(state: GameState, registry: Registry, segEnd: number): v
     advanceTime(state, segEnd - start);
   } else {
     const action = findActiveAction(state.activeAction, registry);
-    if (action.accuracy) {
+    if (resolvesPerAttempt(action)) {
       resolveStochasticSegment(state, registry, action, segEnd, deltas);
     } else {
       resolveDeterministicSegment(state, registry, action, segEnd, deltas);
@@ -971,9 +1056,9 @@ function applyDueBoundaries(state: GameState, registry: Registry, at: number): v
 
     if (state.activeAction) {
       const action = findActiveAction(state.activeAction, registry);
-      // A stochastic action fires and rearms itself inside
+      // A per-attempt action fires and rearms itself inside
       // resolveStochasticSegment — nothing due here for it.
-      if (!action.accuracy) {
+      if (!resolvesPerAttempt(action)) {
         if (state.activeAction.repeating) {
           if (inputLimit(action, state) <= 0) {
             state.activeAction = null;
@@ -1064,7 +1149,7 @@ type ArmResult = { armed: true; firstUnit: number } | { armed: false };
 // (stochastic — fight length is random, so there's no fixed span to jump to).
 function firstUnitSpan(action: Action, state: GameState, registry: Registry): number {
   const duration = attemptDuration(action, state, registry);
-  return action.accuracy ? duration : fightPlan(action, state, registry).attemptsToResolve * duration;
+  return resolvesPerAttempt(action) ? duration : fightPlan(action, state, registry).attemptsToResolve * duration;
 }
 
 export function armAction(obj: string, objId: string, actionId: string, registry: Registry, state: GameState): ArmResult {
@@ -1097,6 +1182,9 @@ export function armAction(obj: string, objId: string, actionId: string, registry
   }
 
   state.activeAction = { ownerRef: `${obj}.${objId}`, actionLabel: actionId, progress: 0, repeating, healthRemaining: action.health ?? 1, attemptsMade: 0 };
+  // A `target:` action opens an encounter: the thing being fought joins with its
+  // own pools, filled from its own stats.
+  if (action.target) state.activeAction.actors = { [objId]: freshActor(objId, state, registry) };
   return { armed: true, firstUnit: firstUnitSpan(action, state, registry) };
 }
 

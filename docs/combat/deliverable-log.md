@@ -13,7 +13,7 @@ this file and lift anything unfinished back into `backlog.md`.
 | --- | --- |
 | 1. Ranged stats + `dr` | done — stat layer live, `hitDamage` staged for chunk 2 |
 | 2. Direct pool write | done — `drain:` / `restore:` results |
-| 3. Encounter state / second actor | not started |
+| 3. Encounter state / second actor | done — enemy has a sheet and takes real damage |
 | 4. Per-actor cadences in the resolver | not started |
 | 5. Opposed roll (Elo) | not started |
 | 6. Stop-when-start-conditions-fail | not started |
@@ -199,6 +199,46 @@ An encounter is a set of actors, each carrying its own stats, resources and atta
    there — but its *shape* changes, which means bumping `SAVE_VERSION` (it fails loudly on
    mismatch by design).
 
+**Built in chunk 3** — points 1, 2 and 4. Point 3 (per-actor cadences) is chunk 4.
+
+- **An actor sheet is `stats:` on `# entity`** — `stats: attack 4-7, dr 2, max-health 20`,
+  an *assignment* rather than the `+4-7 attack` bonus tag clauses carry. An actor states
+  what its stat IS; a bonus states how much something shifts it. Anything an entity doesn't
+  name falls through to the global `# stat` default, which is exactly how the player — who
+  names nothing, and has no `# entity` — goes on working untouched.
+- **`statRange`/`statValue`/`sampleStat` take a trailing `actorId`, defaulting to `PLAYER`**,
+  so no existing call site moved. Buffs and the running action's stat-bonus tags apply to
+  the player only: they are food the player ate and the action the player is performing.
+- **Actor pools live on `ActiveAction.actors`**, keyed by entity id, filled at arm time from
+  that actor's own stats. They are scoped to the fight and vanish with it; the player's pools
+  stay in `state.resources` and persist. `SAVE_VERSION` → 3.
+- **`target:` + `dr:` on an action** make it a real fight: `target:` names the pool on the
+  fought entity that a hit drains, `dr:` the stat on that entity subtracted from the hit.
+  Damage is `hitDamage(sampleStat(ability, player), sampleStat(dr, target))` — chunk 1's
+  function, now with a caller. The fight ends when the pool reaches 0.
+- **Routing is authored, never derived.** `resolvesPerAttempt(action)` is
+  `accuracy !== undefined || target !== undefined` — both authored fields, so it cannot flip
+  partway through a fight and strand a batch planned under the other reading. This was the
+  open risk chunk 1 flagged, and naming `target:` settles it: sampled damage has no closed
+  form, so a `target:` action always resolves attempt-by-attempt. `action.health` and the old
+  closed-form path are untouched for everything else (cooking, chopping, travel).
+- **An actor's pool write does not run the resource's `on empty`/`on full` blocks.** Those
+  are authored from the player's point of view ("You slump to the floor"); firing them for a
+  felled enemy would put the player's words in its mouth. An enemy reaching 0 is expressed by
+  the fight completing and its `on success:` running.
+
+Known gaps left for chunk 4, where the resolver becomes actor-aware anyway:
+
+- **Enemy pools do not integrate their rate stat.** `captureResourceRates`/`settlePools`/
+  `clampResources` are player-scoped, so a regenerating enemy is not yet expressible.
+- **`action.health` and `target:` are two code paths**, which the consolidation section says
+  they should not be. Unifying them means every action carrying an implicit pool; deferred
+  rather than half-done.
+- **Tutorial content is deliberately untouched.** Making the rat a real target now would
+  churn the Miki-route timing assertions three times over (again at chunk 4 for cadence, again
+  at chunk 5 for the Elo roll). The mechanism is proven on a dedicated fixture in
+  `encounter.test.ts`; the rat gets its sheet once, when its sheet is complete.
+
 ### Encounters end when their start conditions stop holding
 
 Out of bait stops fishing, out of health stops fighting (with optional lose-inventory /
@@ -350,6 +390,9 @@ belong under the existing "grammar.md update (STALE)" backlog item.
 - Action results — `drain: <n> <resource-id>` and `restore: <n> <resource-id>`, valid
   anywhere a result fires. The amount is an unsigned decimal (pools are float).
 - The `# resource` prose stating that nothing writes a pool level directly is now wrong.
+- `# entity` — `stats: <stat-id> <range>, ...`, this actor's own bases.
+- Actions — `target: <resource-id>` (the pool on the fought entity a hit drains) and
+  `dr: <stat-id>` (the stat on that entity subtracted from each hit).
 
 ## Open decisions (not blocking chunk 1)
 
