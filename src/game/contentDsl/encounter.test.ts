@@ -83,7 +83,7 @@ describe('# entity stats: — an actor sheet', () => {
   it('parses assignments into ranges, point or interval alike', () => {
     const registry = loaded();
     expect(registry.entities.get('training-dummy')!.stats).toEqual({ 'max-health': point(12), dr: point(2) });
-    expect(loadModule('# entity ogre\nstats: attack 4-7').entities.get('ogre')!.stats).toEqual({ attack: { min: 4, max: 7 } });
+    expect(loadModule('# stat attack\n# entity ogre\nstats: attack 4-7').entities.get('ogre')!.stats).toEqual({ attack: { min: 4, max: 7 } });
   });
 
   it('leaves an entity that declares nothing with an empty sheet', () => {

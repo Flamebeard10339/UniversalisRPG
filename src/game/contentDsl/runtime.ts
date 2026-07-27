@@ -149,6 +149,62 @@ export interface Registry {
   saves: Map<string, SavedGame>;
 }
 
+type ReferenceKind = 'stat' | 'resource' | 'entity' | 'location';
+
+// Every id one section uses to name another, resolved against the registry once,
+// after everything has parsed (so forward references are fine).
+//
+// Until this ran, a typo failed in one of two ways and neither named the
+// author's mistake. An unknown RESOURCE surfaced as `unknown resource: helth`
+// from deep inside a live fight, many actions after the module loaded clean. An
+// unknown STAT never failed at all: statRange falls through entity.stats →
+// # stat → point(0), so `speed: attack-rat` silently read 0 and the resolver
+// divided by it. That is C1's whole cause class, closed at the source here while
+// attemptDuration keeps the guard for the stat that is declared but has no base:.
+function validateReferences(registry: Registry): void {
+  const known: Record<ReferenceKind, ReadonlyMap<string, unknown>> = {
+    stat: registry.stats,
+    resource: registry.resources,
+    entity: registry.entities,
+    location: registry.locations,
+  };
+  const check = (kind: ReferenceKind, id: string | undefined, where: string): void => {
+    if (id === undefined || known[kind].has(id)) return;
+    throw new RuntimeError(`${where} names an unknown ${kind}: ${id}`);
+  };
+  const checkAction = (action: Action, where: string): void => {
+    check('stat', action.speed, `${where} speed:`);
+    check('stat', action.accuracy, `${where} accuracy:`);
+    check('stat', action.evasion, `${where} evasion:`);
+    check('stat', action.ability, `${where} ability:`);
+    check('stat', action.dr, `${where} dr:`);
+    check('resource', action.target, `${where} target:`);
+  };
+  const actionsOf = (where: string, actions: Action[]): void => {
+    for (const action of actions) checkAction(action, `${where} action ${JSON.stringify(action.label)}`);
+  };
+
+  for (const entity of registry.entities.values()) {
+    // A sheet entry naming no # stat is not an error the runtime would ever
+    // reach — it just never gets read, because the action asking for that stat
+    // asks for the correctly-spelled one and falls through to its global default.
+    for (const statId of Object.keys(entity.stats)) check('stat', statId, `# entity ${entity.id} stats:`);
+    actionsOf(`# entity ${entity.id}`, entity.actions);
+  }
+  for (const item of registry.items.values()) actionsOf(`# item ${item.id}`, item.actions);
+  // Recipes are checked through their compiled Action rather than their authored
+  // fields, so recipeAction's forwarding is covered by the same six checks.
+  for (const [recipeId, action] of registry.recipeActions) checkAction(action, `# recipe ${recipeId}`);
+  for (const resource of registry.resources.values()) {
+    check('stat', resource.max, `# resource ${resource.id} max:`);
+    check('stat', resource.rate, `# resource ${resource.id} rate:`);
+  }
+  for (const location of registry.locations.values()) {
+    for (const entityId of location.entities) check('entity', entityId, `# location ${location.id} entities:`);
+    for (const edge of location.adjacent) check('location', edge.target, `# location ${location.id} adjacent:`);
+  }
+}
+
 export function loadModule(source: string): Registry {
   const registry: Registry = {
     entities: new Map(),
@@ -244,6 +300,7 @@ export function loadModule(source: string): Registry {
   // Locations placed with `<direction> of <other>` may reference an origin that
   // parsed later, so absolute coordinates are resolved once all locations exist.
   resolveCoordinates(registry.locations);
+  validateReferences(registry);
   return registry;
 }
 

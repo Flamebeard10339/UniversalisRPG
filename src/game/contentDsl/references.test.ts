@@ -1,0 +1,107 @@
+import { describe, expect, it } from 'vitest';
+import { loadModule, RuntimeError } from './runtime';
+
+// Content ids resolved against the registry at load, so a typo is a content
+// error at the moment it is written rather than a failure much later somewhere
+// else. Before this ran there were two failure modes and neither named the
+// mistake: an unknown RESOURCE surfaced as `unknown resource: helth` from deep
+// inside a live fight, and an unknown STAT never failed at all — it silently
+// read 0, which is how a typo'd `speed:` came to divide by zero (see C1).
+const VALID = `
+# stat attack
+base: 10
+
+# stat dr
+
+# stat max-health
+base: 30
+
+# stat regeneration
+
+# stat attack-rate
+base: 25
+
+# resource health
+rate: regeneration
+max: max-health
+
+# item straw
+examine: A fistful of straw.
+
+# location den
+x: 0, y: 0
+starting
+entities: training-dummy
+
+# entity training-dummy
+stats: max-health 12, dr 2
+strike:
+  repeating
+  time: 60
+  speed: attack-rate
+  target: health
+  ability: attack
+  dr: dr
+`;
+
+function loading(replace: string, withText: string): () => void {
+  return () => loadModule(VALID.replace(replace, withText));
+}
+
+describe('load-time reference resolution', () => {
+  it('loads content whose references all resolve', () => {
+    expect(() => loadModule(VALID)).not.toThrow();
+  });
+
+  it('names the section and the field it failed in', () => {
+    expect(loading('speed: attack-rate', 'speed: attack-rat')).toThrow(
+      /# entity training-dummy action "strike" speed: names an unknown stat: attack-rat/,
+    );
+  });
+
+  // Each of the six is a separate field on Action and each fell through to a
+  // different silent default, so they are pinned individually rather than as one
+  // representative case.
+  it.each([
+    ['speed: attack-rate', 'speed: nope', /unknown stat: nope/],
+    ['ability: attack', 'ability: nope', /unknown stat: nope/],
+    ['dr: dr', 'dr: nope', /unknown stat: nope/],
+    ['target: health', 'target: helth', /unknown resource: helth/],
+    ['  time: 60', '  time: 60\n  accuracy: nope', /unknown stat: nope/],
+    ['  time: 60', '  time: 60\n  evasion: nope', /unknown stat: nope/],
+  ])('rejects %s → %s', (from, to, message) => {
+    expect(loading(from, to)).toThrow(message);
+  });
+
+  it('rejects a pool whose max: or rate: names no stat', () => {
+    expect(loading('max: max-health', 'max: max-helth')).toThrow(/# resource health max: names an unknown stat: max-helth/);
+    expect(loading('rate: regeneration', 'rate: regen')).toThrow(/# resource health rate: names an unknown stat: regen/);
+  });
+
+  it('rejects a location pointing at an entity or a neighbour that does not exist', () => {
+    expect(loading('entities: training-dummy', 'entities: training-dumy')).toThrow(/# location den entities: names an unknown entity: training-dumy/);
+    expect(loading('starting', 'starting\nadjacent: beach')).toThrow(/# location den adjacent: names an unknown location: beach/);
+  });
+
+  // A sheet entry naming no # stat is never read: the action asking for that
+  // stat asks for the correctly-spelled one and falls through to its global
+  // default, so the override silently does nothing.
+  it('rejects an actor sheet assigning a stat nobody declared', () => {
+    expect(loading('stats: max-health 12, dr 2', 'stats: max-health 12, drr 2')).toThrow(/# entity training-dummy stats: names an unknown stat: drr/);
+  });
+
+  it('checks an item action and a recipe the same way', () => {
+    expect(loading('examine: A fistful of straw.', 'examine: A fistful of straw.\neat:\n  time: 1\n  speed: nope\n  take: 1 straw')).toThrow(
+      /# item straw action "eat" speed: names an unknown stat: nope/,
+    );
+    expect(() => loadModule(`${VALID}\n# recipe weave\ntime: 1\nspeed: nope\nout: 1 straw\n`)).toThrow(/# recipe weave speed: names an unknown stat: nope/);
+  });
+
+  it('resolves forward references, since the pass runs once everything has parsed', () => {
+    expect(() => loadModule('# entity ogre\nstats: rage 3\nroar:\n  time: 1\n  ability: rage\n\n# stat rage\n')).not.toThrow();
+  });
+
+  it('raises a RuntimeError, the same failure kind the rest of load uses', () => {
+    expect(loading('target: health', 'target: helth')).toThrow(RuntimeError);
+  });
+});

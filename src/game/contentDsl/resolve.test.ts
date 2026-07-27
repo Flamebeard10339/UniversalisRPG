@@ -59,13 +59,18 @@ cook:
   repeating
   give: 1 cooked-shrimp
 
+// Declared, so the load-time reference pass is satisfied, but with no base: —
+// which the stat schema defaults to 0. A typo'd stat id is a load error now;
+// this is the case that survives it, and the tutorial ships two such stats.
+# stat rusty-speed
+
 # entity shrine
-// A typo'd speed stat reads 0, not an error, so this action's attempt duration
-// is 1/0 = Infinity, which every "non-positive duration" guard passes happily.
+// Speed 0 makes this action's attempt duration 1/0 = Infinity, which every
+// "non-positive duration" guard passes happily.
 chant:
   repeating
   time: 1
-  speed: cooking-sped
+  speed: rusty-speed
   give: 1 blessing
 
 // A skill and a difficulty, never an authored probability: the pair is
