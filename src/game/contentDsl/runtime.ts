@@ -9,7 +9,7 @@ import { addRanges, isPoint, midpoint, point, Range, sampleRange, scaleRange } f
 import { Recipe, recipeSchema } from './recipe';
 import { Resource, resourceSchema } from './resource';
 import { SavedGame } from './save';
-import { scopeEntity } from './scope';
+import { scopeEntity, scopeLocation } from './scope';
 import { Authored, hydrateSection } from './section';
 import { Skill, skillSchema } from './skill';
 import { Stat, statSchema } from './stat';
@@ -202,6 +202,7 @@ function validateReferences(registry: Registry): void {
   for (const location of registry.locations.values()) {
     for (const entityId of location.entities) check('entity', entityId, `# location ${location.id} entities:`);
     for (const edge of location.adjacent) check('location', edge.target, `# location ${location.id} adjacent:`);
+    actionsOf(`# location ${location.id}`, location.actions);
   }
 }
 
@@ -238,7 +239,7 @@ export function loadModule(source: string): Registry {
         break;
       }
       case 'location': {
-        const location = hydrateSection(section.value as Authored<Location>, locationSchema);
+        const location = scopeLocation(hydrateSection(section.value as Authored<Location>, locationSchema));
         registry.locations.set(location.id, location);
         break;
       }

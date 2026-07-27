@@ -1,6 +1,8 @@
+import { Action } from './action';
 import { ActionResult } from './actionResult';
 import { Condition, Reference } from './condition';
 import { Entity } from './entity';
+import { Location } from './location';
 
 // Inside an entity's own action block a bare (single-segment) reference names
 // that entity's state: `unlocked` inside `front-door` means `front-door.unlocked`.
@@ -35,14 +37,27 @@ function scopeResult(result: ActionResult, owner: string): ActionResult {
   return result;
 }
 
-export function scopeEntity(entity: Entity): Entity {
-  for (const action of entity.actions) {
-    if (action.requires) action.requires = scopeCondition(action.requires, entity.id);
-    if (action.hiddenIf) action.hiddenIf = scopeCondition(action.hiddenIf, entity.id);
-    action.results = action.results.map((result) => scopeResult(result, entity.id));
-    if (action.onSuccess) action.onSuccess = action.onSuccess.map((result) => scopeResult(result, entity.id));
-    if (action.onFailure) action.onFailure = action.onFailure.map((result) => scopeResult(result, entity.id));
-    if (action.onEscape) action.onEscape = action.onEscape.map((result) => scopeResult(result, entity.id));
+// Both kinds of location-scoped owner — an entity and the place itself — bind
+// their actions' bare references the same way, so the rule lives once here.
+// Items are deliberately not scoped: an item travels with the player and its
+// bare references are global.
+function scopeActions(actions: Action[], owner: string): void {
+  for (const action of actions) {
+    if (action.requires) action.requires = scopeCondition(action.requires, owner);
+    if (action.hiddenIf) action.hiddenIf = scopeCondition(action.hiddenIf, owner);
+    action.results = action.results.map((result) => scopeResult(result, owner));
+    if (action.onSuccess) action.onSuccess = action.onSuccess.map((result) => scopeResult(result, owner));
+    if (action.onFailure) action.onFailure = action.onFailure.map((result) => scopeResult(result, owner));
+    if (action.onEscape) action.onEscape = action.onEscape.map((result) => scopeResult(result, owner));
   }
+}
+
+export function scopeEntity(entity: Entity): Entity {
+  scopeActions(entity.actions, entity.id);
   return entity;
+}
+
+export function scopeLocation(location: Location): Location {
+  scopeActions(location.actions, location.id);
+  return location;
 }

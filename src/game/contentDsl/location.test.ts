@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { Direction, Location, resolveCoordinates } from './location';
+import { loadModule } from './runtime';
+import { apply, startSession, view } from './session';
 
 function loc(id: string, over: Partial<Location> = {}): Location {
-  return { id, x: 0, y: 0, z: 0, title: id, entities: [], adjacent: [], starting: false, ...over };
+  return { id, x: 0, y: 0, z: 0, title: id, entities: [], adjacent: [], actions: [], starting: false, ...over };
 }
 
 function relative(id: string, direction: Direction, of: string): Location {
@@ -52,5 +54,49 @@ describe('resolveCoordinates', () => {
 
   it('throws on a relative cycle', () => {
     expect(() => place(relative('a', 'east', 'b'), relative('b', 'west', 'a'))).toThrow(/cycle/);
+  });
+});
+
+// The runtime carried `use:location.<id>.<action>` all along — session emitted
+// the choice id and findActionOwner resolved it — but locationSchema declared no
+// entries, so authoring one was a parse error and the whole path was dead. An
+// `as unknown as Actable` cast in session.ts is what kept tsc from noticing.
+const WITH_ACTIONS = `
+# location shore
+x: 0, y: 0
+starting
+search tideline:
+  time: 2
+  give: 1 driftwood
+  set: searched
+light beacon:
+  requires: searched
+  say: The beacon catches.
+
+# item driftwood
+examine: Salt-bleached and dry.
+`;
+
+describe('a location’s own actions', () => {
+  it('parses them and offers them beside the entities standing there', () => {
+    const registry = loadModule(WITH_ACTIONS);
+    expect(registry.locations.get('shore')!.actions.map((a) => a.label)).toEqual(['search tideline', 'light beacon']);
+
+    const session = startSession(registry);
+    const ids = view(session).choices.map((c) => c.id);
+    expect(ids).toContain('use:location.shore.search tideline');
+    // `requires:` gates a location action off the list exactly as it does an
+    // entity's, and its bare reference is scoped to the location.
+    expect(ids).not.toContain('use:location.shore.light beacon');
+  });
+
+  it('runs one, scoping its bare references to the location that owns it', () => {
+    const session = startSession(loadModule(WITH_ACTIONS));
+
+    const v = apply(session, 'use:location.shore.search tideline');
+    expect(session.state.inventory['driftwood']).toBe(1);
+    expect(session.state.flags['shore.searched']).toBe(true);
+    expect(session.state.time).toBe(2);
+    expect(v.choices.map((c) => c.id)).toContain('use:location.shore.light beacon');
   });
 });

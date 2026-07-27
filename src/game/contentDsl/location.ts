@@ -1,3 +1,4 @@
+import { Action, actionBody } from './action';
 import { Condition, condition } from './condition';
 import { list } from './list';
 import { DslError, Parser } from './parser';
@@ -27,6 +28,10 @@ export interface Location {
   adjacent: Edge[];
   starting: boolean;
   relative?: Relative;
+  // Things the place itself can do, as opposed to something standing in it —
+  // the same `<obj>.<objId>.<actionId>` shape entities and items carry, and
+  // location-scoped like an entity's rather than travelling with the player.
+  actions: Action[];
 }
 
 const edge: Parser<Edge> = {
@@ -100,7 +105,7 @@ export function resolveCoordinates(locations: Map<string, Location>): void {
   }
 }
 
-export const locationSchema: SectionSchema<Location, 'starting'> = {
+export const locationSchema: SectionSchema<Location, 'starting', 'actions'> = {
   kind: 'location',
   fields: {
     x: { parser: number, default: () => 0 },
@@ -118,4 +123,5 @@ export const locationSchema: SectionSchema<Location, 'starting'> = {
     ['x', 'y', 'z'],
     ['relative'],
   ],
+  entries: { into: 'actions', body: actionBody },
 };

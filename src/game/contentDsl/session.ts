@@ -123,7 +123,7 @@ function locationChoices(session: PlaySession): PlayChoice[] {
     }
   }
 
-  for (const action of availableActions(location as unknown as Actable, state)) {
+  for (const action of availableActions(location, state)) {
     choices.push({ id: `use:location.${location.id}.${action.label}`, kind: 'action', label: action.label, detail: location.title });
   }
 
@@ -131,7 +131,7 @@ function locationChoices(session: PlaySession): PlayChoice[] {
     if (count <= 0) continue;
     const item = registry.items.get(itemId);
     if (!item) continue;
-    for (const action of availableActions(item as unknown as Actable, state)) {
+    for (const action of availableActions(item, state)) {
       choices.push({ id: `use:item.${itemId}.${action.label}`, kind: 'action', label: action.label, detail: item.title });
     }
   }
