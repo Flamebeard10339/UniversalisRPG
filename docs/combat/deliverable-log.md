@@ -14,7 +14,7 @@ this file and lift anything unfinished back into `backlog.md`.
 | 1. Ranged stats + `dr` | done — stat layer live, `hitDamage` staged for chunk 2 |
 | 2. Direct pool write | done — `drain:` / `restore:` results |
 | 3. Encounter state / second actor | done — enemy has a sheet and takes real damage |
-| 4. Per-actor cadences in the resolver | not started |
+| 4. Per-actor cadences in the resolver | done — the rat swings back on its own clock |
 | 5. Opposed roll (Elo) | not started |
 | 6. Stop-when-start-conditions-fail | not started |
 | 7. CLI readouts | not started |
@@ -194,6 +194,48 @@ An encounter is a set of actors, each carrying its own stats, resources and atta
    stream (2.4s vs 3.75s interleaving), so `nextBoundary` needs a boundary per actor, and
    `progress`/`attemptsMade` become per-actor rather than the single cadence `ActiveAction`
    models.
+
+**Built in chunk 4.** The acceptance case runs: 2.4s player against a 3.75s rat, and a
+`+25% attack-rate` buff mid-fight taking the player to 1.92s.
+
+- **A retaliation is one of the entity's own actions, tagged `retaliates`** — the existing
+  bare-flag lift (`BOOLEAN_ACTION_FLAGS`), so no new grammar mechanism. It is filtered out of
+  the player's choice list and run by the resolver on its owner's clock. The action shape is
+  identical in both directions; only the perspective flips: `speed`/`ability`/`accuracy` read
+  whoever is swinging, `target`/`dr` read whoever is being hit. Load rejects a `retaliates`
+  action with no `target:`.
+- **Attack rate needed no new duration axis**, as the spec predicted: `time: 60` plus
+  `speed:` on a per-minute rate stat already means attempts-per-minute, and the `+25%` is the
+  ordinary `increased` channel.
+- **The per-attempt resolver is now an event queue.** It jumps to whichever attempt lands
+  soonest, credits that span to *every* participant's progress, and resolves only the one
+  that came due. Ties fall to a fixed roster order (player first, then actors in arm order),
+  compared with an EPSILON margin — 2.4 and 3.75 genuinely collide at t=60, and float noise
+  must not be what decides who swings first.
+- **Storage stays asymmetric on purpose.** The player's cadence remains
+  `ActiveAction.progress`/`attemptsMade`; an actor's lives in `ActorState.cadence`. The
+  resolver builds a uniform `Participant[]` over both, so the asymmetry never reaches the
+  scheduling logic, and the closed-form path — one swinger, no encounter — is untouched.
+- **The player's damage goes through the segment's `PoolDeltas`, not a direct write**, because
+  the player's health is also being integrated by its rate stat over that same segment; that
+  is precisely the collision chunk 2 had to fix. An enemy's pool has no rate to collide with
+  and the completion check must read it back immediately, so that one is written directly.
+- **The fight's outcome is still the player's action's.** Its results, `escapeAfter` and
+  `repeating` own the fight; a retaliation is a damage source. A fresh target stands up with
+  pools refilled *and its clock restarted*, so it never inherits the dead one's half-swing.
+
+**The invariant did break, loudly, and is fixed.** Progress accrues across arbitrarily many
+segments, so a participant that has been idle for many splits can land a hair past its own
+duration — `state.time + (duration - progress)` then computes an instant in the *past* and
+`advanceTime` threw on `-1.1e-13`. An overdue swing is now floored at "now". Verified over
+2000 random split patterns (horizon 1000s, up to 13 splits each, collision instants forced
+in): zero mismatches on time, rng, attempt counts and inventory, and zero float drift on
+progress or pool levels.
+
+**In-flight rate change: absolute carry**, now a stated choice rather than an accident.
+`progress` is elapsed seconds, so a 2.4s swing 1.2s in that speeds up to 1.92s has **0.72s**
+left — not 0.96s (preserving the completed fraction) and not 1.2s (a fixed deadline). All
+three are pinned by tests. Removes that entry from Open decisions below.
 4. **This is a save-format change.** `activeAction` is persisted as a deep-diffed scalar
    field (`save.ts:67`/`104`/`128`), so encounter state serializes for free once it lives
    there — but its *shape* changes, which means bumping `SAVE_VERSION` (it fails loudly on
@@ -393,15 +435,16 @@ belong under the existing "grammar.md update (STALE)" backlog item.
 - `# entity` — `stats: <stat-id> <range>, ...`, this actor's own bases.
 - Actions — `target: <resource-id>` (the pool on the fought entity a hit drains) and
   `dr: <stat-id>` (the stat on that entity subtracted from each hit).
+- Actions — a `retaliates` bare tag, alongside `repeating`: the owner's own move in a fight,
+  kept out of the player's choice list and run on the owner's cadence. Requires `target:`.
+- Attack rate is authored as `time: 60` + `speed: <per-minute rate stat>`; no new field.
 
 ## Open decisions (not blocking chunk 1)
 
-- **In-flight swing when the rate changes.** `progress` is accumulated absolute seconds, so
-  equipping a haste weapon mid-swing currently makes the current swing finish sooner
-  (absolute carry). The alternative is rescaling progress to preserve the completed
-  *fraction*. Absolute carry is what's already implemented — make it a stated choice rather
-  than an accident, because mid-encounter rate changes are a first-class MVP feature.
+- ~~**In-flight swing when the rate changes.**~~ SETTLED in chunk 4: absolute carry, chosen
+  deliberately and pinned by tests against both alternatives.
 - **`rate:` sugar** for `time: 60` + `speed: <stat>` — worth it, but not required to ship.
+  Still opaque without it: `time: 60` meaning "per minute" is authoring folklore.
 - **Whether `action.health` survives as sugar** for trivial one-hit targets, or is removed
   outright.
 

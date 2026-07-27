@@ -60,6 +60,9 @@ export interface PlaySession {
 type Actable = { actions?: Action[] };
 
 function actionAvailable(action: Action, state: GameState): boolean {
+  // A retaliation is the owner's own move in a fight, run by the resolver on
+  // that owner's cadence — never something the player picks off a list.
+  if (action.retaliates) return false;
   if (action.requires && !evaluateCondition(action.requires, state)) return false;
   if (action.hiddenIf && evaluateCondition(action.hiddenIf, state)) return false;
   return true;

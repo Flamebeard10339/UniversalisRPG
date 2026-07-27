@@ -63,6 +63,13 @@ export interface Action {
   // action instead of a one-shot: resolve() re-arms a fresh fight after each
   // completion or escape instead of clearing it.
   repeating?: boolean;
+  // A `retaliates` bare tag marks this as the OWNER's own move in an encounter
+  // rather than something the player invokes: it is kept out of the player's
+  // choice list, and while its owner is in a fight it runs on that owner's
+  // cadence against the player. The fields read the same way either direction —
+  // `speed`/`ability` off whoever is swinging, `target`/`dr` off whoever is
+  // being hit — so only the perspective flips.
+  retaliates?: boolean;
 }
 
 const results = list(actionResult);
@@ -73,7 +80,7 @@ const tagClauses = list(tagClause);
 // inert like an ordinary tag (e.g. `once`). `repeating` is the only one
 // today, but the lift itself isn't hardcoded to it — extending this list is
 // what adds a new one.
-const BOOLEAN_ACTION_FLAGS = ['repeating'] as const;
+const BOOLEAN_ACTION_FLAGS = ['repeating', 'retaliates'] as const;
 type BooleanActionField = (typeof BOOLEAN_ACTION_FLAGS)[number];
 const BOOLEAN_ACTION_FLAG_SET: ReadonlySet<string> = new Set<string>(BOOLEAN_ACTION_FLAGS);
 
