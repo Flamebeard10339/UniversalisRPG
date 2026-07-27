@@ -458,6 +458,25 @@ out. Three things worth recording about the conversion:
 - **One `use:` is now one swing, not one kill**, since a stochastic fight's first unit is a
   single attempt. The tutorial `# test` and `session.test.ts` drive `use:` + `wait:` instead.
 
+## Open audit findings — read before the next chunk
+
+`docs/audits/game-engine-2026-07-27.md` audits the Game Engine across the 11 commits from
+Pass 2 through chunk 7. It is a live list: work items are resolved out of it, not out of this
+log. Four of them land squarely on combat code and one breaks this file's stated invariant:
+
+- **C1** — an action whose `speed:` stat reads 0 (a typo, or a `# stat` with no `base:`, of
+  which the tutorial ships two) drives `state.time` to `Infinity` and NaNs `activeAction`.
+- **C2/C3** — `stop` as an *action result* (as opposed to inside `on empty:`, which is all
+  that is tested) crashes the stochastic resolver and is batched away on the deterministic
+  one: `resolve(s, 100)` gives 100 completions where 100 stepped calls give 1. That is a
+  direct violation of the associativity invariant in "The one invariant everything here can
+  break" above.
+- **M1** — food buffs never apply on the armed/live path (`beginAction`), only via `useAction`.
+- **M2** — an encounter actor's pools are filled from the player-facing `# resource start:`
+  rather than that actor's own max.
+
+Findings this log already tracks as deliberate deferrals are excluded from the audit.
+
 ## What is left when chunks 1–7 are done
 
 The combat core ships. Still open, and all of it was deferred deliberately rather than missed:

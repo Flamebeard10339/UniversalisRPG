@@ -20,7 +20,7 @@ A feature large enough to span sessions gets a tracked deliverable log at `docs/
   1. Main tabs: Map, Home, Character, Settings, Edit 
   2. Modals: dialogue, skills, stats
   3. Experience: floating text
-3. Game Engine (commits since audit: 11)
+3. Game Engine (commits since audit: 0 — `docs/audits/game-engine-2026-07-27.md`)
   1. Core: State-driven UI, offline progression, travel and locations
   2. Data structures: locations, dialogue, quests, actions, resources, stats, skills, flags 
 4. Build & deployment (commits since audit: 0)
