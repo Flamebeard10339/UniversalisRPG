@@ -5,6 +5,7 @@ import { Action, Entity, entitySchema } from './entity';
 import { Item, itemSchema } from './item';
 import { Location, locationSchema, resolveCoordinates } from './location';
 import { parseModule } from './module';
+import { addRanges, isPoint, midpoint, point, Range, sampleRange, scaleRange } from './range';
 import { Recipe, recipeSchema } from './recipe';
 import { Resource, resourceSchema } from './resource';
 import { SavedGame } from './save';
@@ -34,14 +35,15 @@ export interface ActiveAction {
 }
 
 // A timed stat modifier (from eating food, etc). `added` sums flat onto the
-// stat's base; `increased` sums as a fraction applied multiplicatively (see
-// statValue).
-export interface ActiveBuff {
+// stat's base and may be a range (`+3-6 attack`); `increased` sums as a
+// fraction applied multiplicatively and never is (see statRange).
+interface TimedModifier {
   statId: string;
-  amount: number;
-  kind: 'added' | 'increased';
   expiresAt: number;
 }
+export type ActiveBuff =
+  | (TimedModifier & { kind: 'added'; amount: Range })
+  | (TimedModifier & { kind: 'increased'; amount: number });
 
 export interface GameState {
   flags: Record<string, boolean | number>;
@@ -431,6 +433,16 @@ export function travelSecondsPerUnit(registry: Registry): number {
   return registry.variables.get(TRAVEL_SECONDS_PER_UNIT)?.value ?? DEFAULT_TRAVEL_SECONDS_PER_UNIT;
 }
 
+// The least damage a landed hit can deal, however much damage reduction the
+// target has (see hitDamage). Authored as `# variable min-damage`; it is held
+// at 1 or above because a floor of 0 makes a fight unwinnable and unendable.
+const MIN_DAMAGE = 'min-damage';
+const DEFAULT_MIN_DAMAGE = 1;
+
+export function minDamage(registry: Registry): number {
+  return Math.max(1, registry.variables.get(MIN_DAMAGE)?.value ?? DEFAULT_MIN_DAMAGE);
+}
+
 function locationDistance(a: Location, b: Location): number {
   return Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z);
 }
@@ -471,20 +483,28 @@ function findActiveAction(active: ActiveAction, registry: Registry): Action {
   return action;
 }
 
-// base + Σ(added), then × (1 + Σ(increased)). Modifiers come from two sources,
-// both flowing through the same math: timed buffs (eaten food / future
-// equipment), and the currently-active action's own stat-bonus tags — which act
-// as modifiers ONLY while that action runs (they vanish the instant activeAction
-// clears, with no add/remove bookkeeping). This is how an action drains or
-// boosts a resource: e.g. an attack tagged `-5 regeneration` pushes the health
-// pool's rate stat negative for the fight's duration and nothing more.
-export function statValue(statId: string, state: GameState, registry: Registry): number {
-  const base = registry.stats.get(statId)?.base ?? 0;
-  let added = 0;
+// (base + Σ(added)) × (1 + Σ(increased)), as an interval: base and the flat
+// bonuses may each be a range, and they are summed endpoint-wise into a single
+// interval that is sampled ONCE. Scaling the interval by the increased factor
+// before sampling is the same distribution as scaling a sample of it, so this
+// is exactly the authored rule `sample(base + Σadded) × (1 + Σincreased)`.
+//
+// Modifiers come from two sources, both flowing through the same math: timed
+// buffs (eaten food / future equipment), and the currently-active action's own
+// stat-bonus tags — which act as modifiers ONLY while that action runs (they
+// vanish the instant activeAction clears, with no add/remove bookkeeping). This
+// is how an action drains or boosts a resource: e.g. an attack tagged
+// `-5 regeneration` pushes the health pool's rate stat negative for the fight's
+// duration and nothing more.
+//
+// Note a percent bonus multiplies whatever flat bonuses are present, so `+10%
+// dr` with no added dr is deliberately nothing at all (0 × 1.1 = 0).
+export function statRange(statId: string, state: GameState, registry: Registry): Range {
+  let added = registry.stats.get(statId)?.base ?? point(0);
   let increased = 0;
   for (const buff of Object.values(state.activeBuffs)) {
     if (buff.statId !== statId) continue;
-    if (buff.kind === 'added') added += buff.amount;
+    if (buff.kind === 'added') added = addRanges(added, buff.amount);
     else increased += buff.amount;
   }
   if (state.activeAction) {
@@ -492,10 +512,37 @@ export function statValue(statId: string, state: GameState, registry: Registry):
     for (const tag of action.tags ?? []) {
       if (tag.kind !== 'stat-bonus' || tag.statId !== statId) continue;
       if (tag.percent) increased += tag.amount / 100;
-      else added += tag.amount;
+      else added = addRanges(added, tag.amount);
     }
   }
-  return (base + added) * (1 + increased);
+  return scaleRange(added, 1 + increased);
+}
+
+// The stat's deterministic value: its expected value, identical to the stat
+// itself whenever nothing about it is ranged. Everything that needs a number
+// without consuming randomness reads this — pool maxima, rates, attempt
+// durations — so a ranged stat can never make a duration or a ceiling jitter.
+export function statValue(statId: string, state: GameState, registry: Registry): number {
+  return midpoint(statRange(statId, state, registry));
+}
+
+// One roll of the stat, for the per-attempt uses where the range is the point
+// (damage, damage reduction). RNG contract: this consumes exactly one draw when
+// the stat's interval is non-degenerate and none at all when it isn't — a count
+// that is a deterministic function of state, which is what keeps resolve()
+// associative (see the invariant on resolve()).
+export function sampleStat(statId: string, state: GameState, registry: Registry): number {
+  const range = statRange(statId, state, registry);
+  return isPoint(range) ? range.min : sampleRange(range, nextRandom(state));
+}
+
+// Flat damage reduction: `dr` is an ordinary stat, subtracted from the incoming
+// hit, and the result truncates to an int. The floor is not balance tuning —
+// `escapeAfter` defaults to Infinity, so a fight whose damage reaches 0 would
+// never deplete the target and never end, locking the player in the action with
+// time advancing and nothing to show for it.
+export function hitDamage(attack: number, dr: number, registry: Registry): number {
+  return Math.max(minDamage(registry), Math.trunc(attack - dr));
 }
 
 // Fills any pool the state doesn't already carry with its starting level: the
@@ -927,12 +974,10 @@ function grantFoodBuff(item: Item, state: GameState): void {
 
   for (const tag of item.tags) {
     if (tag.kind !== 'stat-bonus') continue;
-    state.activeBuffs[`${item.id}:${tag.statId}`] = {
-      statId: tag.statId,
-      amount: tag.percent ? tag.amount / 100 : tag.amount,
-      kind: tag.percent ? 'increased' : 'added',
-      expiresAt: state.time + duration,
-    };
+    const expiresAt = state.time + duration;
+    state.activeBuffs[`${item.id}:${tag.statId}`] = tag.percent
+      ? { statId: tag.statId, kind: 'increased', amount: tag.amount / 100, expiresAt }
+      : { statId: tag.statId, kind: 'added', amount: tag.amount, expiresAt };
   }
 }
 

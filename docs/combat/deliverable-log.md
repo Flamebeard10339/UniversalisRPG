@@ -11,7 +11,7 @@ this file and lift anything unfinished back into `backlog.md`.
 
 | Chunk | State |
 | --- | --- |
-| 1. Ranged stats + `dr` | not started |
+| 1. Ranged stats + `dr` | done — stat layer live, `hitDamage` staged for chunk 2 |
 | 2. Direct pool write | not started |
 | 3. Encounter state / second actor | not started |
 | 4. Per-actor cadences in the resolver | not started |
@@ -60,6 +60,28 @@ statValue(s) = sample(s.base + Σs.added) × (1 + Σs.increased)
 Bonus grammar extends to match — `+3 attack` and `+3-6 attack` are both legal on buffs and
 equipment; percent/`increased` bonuses do **not** take a range.
 
+**Settled while building chunk 1** (`range.ts`, `statRange`/`statValue`/`sampleStat`):
+
+- **Reading a stat and rolling a stat are separate calls.** `statValue` keeps its signature
+  and returns the interval's **midpoint** — its expected value, bit-identical to the old
+  result for any unranged stat — so pool maxima, rates and attempt durations can never
+  jitter or consume randomness. `sampleStat` is the explicit per-attempt roll. A literal
+  "every read samples" would have put draws inside `attemptDuration` and `captureResourceRates`,
+  which the batching paths call at planning time; the draw count would then stop being a
+  function of state and the associativity invariant would break silently.
+- **One draw per sampled stat, not one per contributing source.** Intervals are summed
+  endpoint-wise first and sampled once, exactly as the formula is written. `sampleStat`
+  draws when the summed interval is non-degenerate and not at all when it isn't.
+- **`+6-3 attack` and `+3-6% attack` are parse errors**, and the leading sign covers both
+  bounds, so `-3-6 dr` means −6…−3.
+
+Still open for chunk 2/3: sampled damage cannot use the closed-form batch path
+(`applyFightBatch`), so an action whose `ability`/`dr` is ranged has to route to the
+attempt-by-attempt resolver the way an `accuracy` action does. Route on something that
+cannot flip mid-fight — the deterministic path recomputes `healthRemaining` from
+`attemptsMade × ability`, which would clobber accumulated random damage if a fight switched
+paths partway through.
+
 ### Defense — flat damage reduction, named `dr`
 
 An ordinary stat under the rule above, subtracted from the incoming hit. No special
@@ -71,6 +93,10 @@ damage = max(minDamage, trunc(statValue(attack) − statValue(dr)))
 
 `+10% dr` with no added dr does exactly nothing (`0 × 1.1 = 0`); `+0-10 dr` with `+10% dr`
 reduces the hit by `0` to `11`. Damage truncates to int.
+
+**Built in chunk 1** as `hitDamage(attack, dr, registry)` (`runtime.ts`), with the floor
+authored as `# variable min-damage` (engine default 1, held at ≥ 1 whatever content says).
+It has no caller yet on purpose — the hit it applies lands on a pool, which is chunk 2.
 
 `minDamage` (≥ 1) is not just balance: `escapeAfter` defaults to **Infinity**
 (`action.ts:51`), so a fight whose damage floors at 0 — `dr` ≥ the attacker's max roll —
@@ -280,6 +306,17 @@ runtime reads it**, and there is no level curve at all; only raw `state.xp[skill
 - Nice pairing worth keeping: stats grow linearly in level while level grows logarithmically
   in xp, and the Elo curve needs linear stat *gaps* to matter — so each 10-level block is a
   meaningful, roughly constant power spike rather than an inflation spiral.
+
+## Grammar surface added here
+
+`grammar.md` is user-owned, so these are recorded rather than documented in place; they
+belong under the existing "grammar.md update (STALE)" backlog item.
+
+- `# stat` — `base:` accepts `4-7` as well as `5` (both bounds may be negative or
+  fractional: `-7--4`, `0.5-1.5`).
+- Tag clauses — `+3-6 attack` / `-3-6 dr` alongside `+3 attack`. Percent bonuses stay
+  rangeless, and a descending range is an error.
+- `# variable min-damage` — the floor on a landed hit (default 1, never below 1).
 
 ## Open decisions (not blocking chunk 1)
 

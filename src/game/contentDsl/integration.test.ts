@@ -1,5 +1,6 @@
 import { readFileSync } from 'fs';
 import { describe, expect, it } from 'vitest';
+import { point } from './range';
 import { createGameState, loadModule, resolve, useAction } from './runtime';
 import { runTest, startSession } from './session';
 
@@ -37,7 +38,7 @@ describe('tutorial-island health resource (Pass 2 end-to-end)', () => {
     // A meal grants +3 regeneration/min for 60s (exactly what grantFoodBuff does
     // when a food item is eaten); health then rises as time passes — a standing
     // buff needs no active action to tick.
-    state.activeBuffs['cooked-shrimp:regeneration'] = { statId: 'regeneration', amount: 3, kind: 'added', expiresAt: state.time + 60 };
+    state.activeBuffs['cooked-shrimp:regeneration'] = { statId: 'regeneration', amount: point(3), kind: 'added', expiresAt: state.time + 60 };
     resolve(state, registry, state.time + 60);
     expect(state.resources['health']).toBeCloseTo(27, 6); // +3 over the minute, still under the 30 cap
   });

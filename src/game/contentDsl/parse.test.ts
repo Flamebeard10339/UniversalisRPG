@@ -5,6 +5,7 @@ import { itemSchema } from './item';
 import { locationSchema } from './location';
 import { parseModule } from './module';
 import { Cursor, DslError } from './parser';
+import { point } from './range';
 import { SectionSchema, hydrateSection, parseSection } from './section';
 import { skillSchema } from './skill';
 import { statSchema } from './stat';
@@ -29,7 +30,7 @@ describe('items and tag clauses', () => {
     expect(shrimp.examine).toBe('A simple meal.');
     expect(shrimp.tags).toEqual([
       { kind: 'keyword', value: 'food' },
-      { kind: 'stat-bonus', statId: 'regeneration', amount: 3, percent: false },
+      { kind: 'stat-bonus', statId: 'regeneration', amount: point(3), percent: false },
       { kind: 'duration', seconds: 60 },
     ]);
   });
@@ -72,7 +73,7 @@ describe('stat and skill', () => {
     expect(stat).toEqual({ id: 'attack' });
     const hydrated = hydrateSection(stat, statSchema);
     expect(hydrated.title).toBe('Attack');
-    expect(hydrated.base).toBe(0);
+    expect(hydrated.base).toEqual(point(0));
   });
 
   it('leaves a gathering skill stat-id undefined, since it has no default', () => {
@@ -399,7 +400,7 @@ describe('tag-clause micro-grammar', () => {
 
   it('picks the clause shape by syntax, never by keyword lookup', () => {
     expect(clause('mainhand')).toEqual({ kind: 'keyword', value: 'mainhand' });
-    expect(clause('+3 regeneration')).toEqual({ kind: 'stat-bonus', statId: 'regeneration', amount: 3, percent: false });
+    expect(clause('+3 regeneration')).toEqual({ kind: 'stat-bonus', statId: 'regeneration', amount: point(3), percent: false });
     expect(clause('+2% attack')).toEqual({ kind: 'stat-bonus', statId: 'attack', amount: 2, percent: true });
     expect(clause('1m40s')).toEqual({ kind: 'duration', seconds: 100 });
   });
