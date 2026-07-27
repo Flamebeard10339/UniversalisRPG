@@ -167,40 +167,28 @@ function computeChoices(session: PlaySession): PlayChoice[] {
   return locationChoices(session);
 }
 
-function dispatch(session: PlaySession, choice: PlayChoice): void {
+// The single converter from a PlayChoice to the structured Directive that
+// applyDirective executes. Every gameplay choice maps to exactly one directive,
+// so apply()/beginAction and the test/CLI directive path share one executor and
+// one command vocabulary — there is no second switch over choice kinds. A
+// dialogue choice carries its already-rendered label as the `choose:` text;
+// choose() re-matches by rendered text, so the label round-trips.
+export function choiceToDirective(choice: PlayChoice): Directive {
   switch (choice.kind) {
-    case 'talk': {
-      const entityId = choice.id.slice('talk:'.length);
-      const result = talk(entityId, session.registry, session.state);
-      session.dialogue = result.choices ? result : null;
-      return;
-    }
-    case 'dialogue': {
-      const dialogueSession = session.dialogue;
-      if (!dialogueSession || !dialogueSession.choices) throw new RuntimeError('no active dialogue menu');
-      const index = Number(choice.id.slice('dialogue:'.length));
-      const raw = dialogueSession.choices[index];
-      if (!raw) throw new RuntimeError(`no dialogue choice at index: ${index}`);
-      const text = renderSegments(raw.segments, session.state);
-      const result = choose(text, dialogueSession, session.state);
-      session.dialogue = result.choices ? result : null;
-      return;
-    }
+    case 'talk':
+      return { kind: 'talk', entity: choice.id.slice('talk:'.length) };
     case 'action': {
       const match = /^use:([a-z]+)\.([a-z0-9-]+)\.(.+)$/.exec(choice.id);
       if (!match) throw new RuntimeError(`malformed action choice id: ${choice.id}`);
-      const [, obj, objId, label] = match;
-      useAction(obj, objId, label, session.registry, session.state);
-      return;
+      const [, obj, objId, actionId] = match;
+      return { kind: 'use', obj, objId, actionId };
     }
-    case 'travel': {
-      useTravel(session.state.location, choice.id.slice('travel:'.length), session.registry, session.state);
-      return;
-    }
-    case 'craft': {
-      craft(choice.id.slice('craft:'.length), session.registry, session.state);
-      return;
-    }
+    case 'travel':
+      return { kind: 'travel', location: choice.id.slice('travel:'.length) };
+    case 'craft':
+      return { kind: 'craft', recipe: choice.id.slice('craft:'.length) };
+    case 'dialogue':
+      return { kind: 'choose', text: choice.label };
   }
 }
 
@@ -240,7 +228,7 @@ export function view(session: PlaySession): PlayView {
 export function apply(session: PlaySession, choiceId: string): PlayView {
   const choice = computeChoices(session).find((c) => c.id === choiceId);
   if (!choice) throw new RuntimeError(`unavailable choice: ${JSON.stringify(choiceId)}`);
-  dispatch(session, choice);
+  applyDirective(session, choiceToDirective(choice));
   return view(session);
 }
 
@@ -257,44 +245,29 @@ export function apply(session: PlaySession, choiceId: string): PlayView {
 export function beginAction(session: PlaySession, choiceId: string): PlayView {
   const choice = computeChoices(session).find((c) => c.id === choiceId);
   if (!choice) throw new RuntimeError(`unavailable choice: ${JSON.stringify(choiceId)}`);
+  const directive = choiceToDirective(choice);
+  const { registry, state } = session;
 
-  if (choice.kind === 'craft') {
-    const recipeId = choice.id.slice('craft:'.length);
-    if (craftFirstUnit(recipeId, session.registry, session.state) > 0) {
-      armCraft(recipeId, session.registry, session.state);
-      return view(session);
-    }
-    dispatch(session, choice);
+  // A spannable verb whose first unit takes positive sim-time is ARMED for a
+  // live driver to advance over real time. Everything else — talk/dialogue, or
+  // a zero-time craft/action or zero-distance journey — falls through to
+  // applyDirective, the same instant executor apply() uses.
+  if (directive.kind === 'craft' && craftFirstUnit(directive.recipe, registry, state) > 0) {
+    armCraft(directive.recipe, registry, state);
+    return view(session);
+  }
+  if (directive.kind === 'use' && actionFirstUnit(directive.obj, directive.objId, directive.actionId, registry, state) > 0) {
+    // If the take-gate fails, armAction logs the failure and leaves
+    // activeAction unset; either way there's nothing left to resolve here.
+    armAction(directive.obj, directive.objId, directive.actionId, registry, state);
+    return view(session);
+  }
+  if (directive.kind === 'travel' && travelFirstUnit(state.location, directive.location, registry, state) > 0) {
+    armTravel(state.location, directive.location, registry, state);
     return view(session);
   }
 
-  if (choice.kind === 'action') {
-    const match = /^use:([a-z]+)\.([a-z0-9-]+)\.(.+)$/.exec(choice.id);
-    if (!match) throw new RuntimeError(`malformed action choice id: ${choice.id}`);
-    const [, obj, objId, label] = match;
-    if (actionFirstUnit(obj, objId, label, session.registry, session.state) > 0) {
-      // If the take-gate fails, armAction logs the failure and leaves
-      // activeAction unset; either way there's nothing left to resolve here.
-      armAction(obj, objId, label, session.registry, session.state);
-      return view(session);
-    }
-    dispatch(session, choice);
-    return view(session);
-  }
-
-  if (choice.kind === 'travel') {
-    const dest = choice.id.slice('travel:'.length);
-    const origin = session.state.location;
-    if (travelFirstUnit(origin, dest, session.registry, session.state) > 0) {
-      armTravel(origin, dest, session.registry, session.state);
-      return view(session);
-    }
-    dispatch(session, choice);
-    return view(session);
-  }
-
-  // talk/dialogue: instant regardless of live mode.
-  dispatch(session, choice);
+  applyDirective(session, directive);
   return view(session);
 }
 

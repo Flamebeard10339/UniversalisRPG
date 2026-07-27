@@ -8,6 +8,7 @@ import {
   apply,
   applyDirective,
   beginAction,
+  choiceToDirective,
   runTest,
   startSession,
   submitModal,
@@ -127,17 +128,12 @@ function runTestCommand(session: PlaySession, testId: string): CommandResult {
   }
 }
 
-// The payload half of a `begin:` directive, reconstructed back into its
-// source syntax (`use x.y.z` / `travel x` / `craft x`) for `recorded`.
+// The payload half of a `begin:` directive in its source syntax
+// (`use x.y.z` / `travel x` / `craft x`) — the canonical colon form of the
+// inner directive with the verb's `: ` collapsed to a space, rather than a
+// second hand-maintained encoding of the same three verbs.
 function beginInnerText(inner: Extract<Directive, { kind: 'use' | 'travel' | 'craft' }>): string {
-  switch (inner.kind) {
-    case 'use':
-      return `use ${inner.obj}.${inner.objId}.${inner.actionId}`;
-    case 'travel':
-      return `travel ${inner.location}`;
-    case 'craft':
-      return `craft ${inner.recipe}`;
-  }
+  return canonicalDirective(inner).replace(': ', ' ');
 }
 
 // The canonical colon-form directive string for CommandResult.recorded,
@@ -169,24 +165,15 @@ function canonicalDirective(directive: Directive): string {
   }
 }
 
-// The canonical colon-form directive for a numbered PlayChoice, mirroring
-// canonicalDirective's mapping so a numbered choice and its typed-directive
-// equivalent record identically. `dialogue` records the choice's rendered
-// label (via `choose:`) rather than its index, since the index is only
-// stable within one menu render — the label survives menu reordering.
+// The canonical colon-form directive for a numbered PlayChoice: the choice is
+// turned into the same structured Directive apply()/beginAction execute, then
+// encoded by the same canonicalDirective a typed directive uses — so a numbered
+// choice and its typed-directive equivalent record identically, through one
+// mapping instead of a parallel switch. A dialogue choice records its rendered
+// label (via `choose:`, see choiceToDirective) rather than its menu index,
+// which is only stable within one render.
 function recordedForChoice(choice: PlayChoice): string {
-  switch (choice.kind) {
-    case 'talk':
-      return `talk: ${choice.id.slice('talk:'.length)}`;
-    case 'action':
-      return `use: ${choice.id.slice('use:'.length)}`;
-    case 'travel':
-      return `travel: ${choice.id.slice('travel:'.length)}`;
-    case 'craft':
-      return `craft: ${choice.id.slice('craft:'.length)}`;
-    case 'dialogue':
-      return `choose: ${choice.label}`;
-  }
+  return canonicalDirective(choiceToDirective(choice));
 }
 
 // Captures a session so it can be turned into a pasteable `# test` afterward.
