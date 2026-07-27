@@ -227,6 +227,22 @@ Delegate when the implementation churn you'd otherwise absorb into the main
 context exceeds the cold-start re-derivation cost, and the task is self-contained
 enough to bound that cold-start. Cheaper models lower the right-hand side.
 
+## Context-cost curve (folded from context-cost-log.md)
+
+Separate 3-turn probe of the quadratic hypothesis — does an Opus *planning* turn
+cost more as session context grows? Ran one session 124k→189k context, recording
+5h-budget delta per turn: a heavy turn at 124k cost +10%; a light turn that
+spawned nothing still cost +8% at 189k. Conclusions, all reinforcing the
+recycle-early discipline above:
+
+- **The per-turn floor rises with context** — carrying the context outweighs the
+  work done. The session hit 35% of the 5h budget in ~4 turns at only ~18% context.
+- **Delegation shifts ~40% of spend to Sonnet but does not stop the Opus-context
+  climb (still 60%).** Necessary but not sufficient — the orchestrator must be
+  recycled, not just kept lean.
+- **Budget, not context %, is the binding limit.** Recycle triggers should key
+  off the budget meter (35% budget reached at 18% context).
+
 ## Open experiments
 
 - [ ] Low-spec Haiku probe (intent-only small task) — find the reliability edge.

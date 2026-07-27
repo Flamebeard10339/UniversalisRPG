@@ -15,15 +15,12 @@ Android via Capacitor, and open source community content contributions.
 ## Content Rules
 
 - Do not hard-code game content in TypeScript.
-- Never hard-code English UI strings in the codebase. Use localization ids in
-  code and put display text in JSON localization files, including GUI text.
-- Never create another persistence path for saving data. Only use the already 
+- Game content is authored as `.dsl` files under `content/` (e.g.
+  `content/tutorial-island.dsl`), parsed by `src/game/contentDsl/`. See
+  `docs/dsl-rewrite/grammar.md` for the authoritative grammar.
+- Never create another persistence path for saving data. Only use the already
   existing local-universe storage API.
-- Locations, edges, actions, skills, and localizations live under
-  `public/content/universes/*`.
-- Shared app/UI localization lives under `public/content/gui/locales/`.
-- Add or update schemas in `src/game/schema/` when changing JSON shape.
-- Keep saves and contribution drafts isolated by universe id.
+- Keep saves isolated by universe id.
 
 ## Code Style
 
