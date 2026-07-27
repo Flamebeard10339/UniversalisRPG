@@ -42,7 +42,7 @@ examine: A moment of grace.
 # location den
 x: 0, y: 0
 starting
-entities: giant-rat, shrine, beacon, training-post, treadmill
+entities: giant-rat, shrine, beacon, training-post, treadmill, altar, straw-man
 
 # entity giant-rat
 stats: attack 10, dr 0, max-health 1000, attack-rate 16
@@ -94,6 +94,38 @@ run:
   time: 1
   -60 regeneration
   give: 1 blessing
+
+// The two entities below carry stop in the ACTION's own results rather than in
+// a pool's on-empty block. Same verb, different home, and the home is what used
+// to break it: an action's results run inside the resolver, where a batched span
+// applies them N times over and a captured local holds the ActiveAction.
+
+# entity altar
+// Deterministic and repeating — the shape that batches. One completion a second
+// over a 100s span is 100 batched completions, of which exactly one may happen.
+chant:
+  repeating
+  time: 1
+  give: 1 blessing
+  on success:
+    say: You have had enough.
+    stop
+
+# entity straw-man
+// The same request on the per-attempt path, and with stop inline among the
+// results rather than in an on-success block. 20 health at 10 a swing is two
+// swings at 2.4s, so the fight ends at t=4.8 exactly despite resolving
+// attempt-by-attempt.
+stats: max-health 20, dr 0
+spar:
+  repeating
+  time: 60
+  speed: attack-rate
+  target: health
+  ability: attack
+  dr: dr
+  give: 1 rat-tail
+  stop
 `;
 
 // The same world with nothing declaring health fatal — the control that shows
@@ -186,6 +218,69 @@ describe('a pool running out stops the fight', () => {
       expect(state.activeAction).toEqual(oneShot.activeAction);
       expect(state.inventory).toEqual(oneShot.inventory);
       expect(state.log).toEqual(oneShot.log);
+    }
+  });
+});
+
+// `stop` in a pool's `on empty:` block fires from settlePools, after whichever
+// resolver has already returned. In an ACTION's own results it fires from inside
+// the resolver instead, which is a different problem twice over: the batched
+// path had already applied the whole span's completions before the one-shot verb
+// ran, and the per-attempt path went on using a local ActiveAction that
+// state.activeAction no longer held.
+describe('`stop` among an action’s own results', () => {
+  function stopping(entity: string, action: string): { registry: Registry; state: GameState } {
+    const s = started();
+    armAction('entity', entity, action, s.registry, s.state);
+    return s;
+  }
+
+  it('ends a batched deterministic action at its first completion, not after the span’s worth', () => {
+    const { registry, state } = stopping('altar', 'chant');
+    resolve(state, registry, 100);
+
+    expect(state.inventory['blessing']).toBe(1);
+    expect(state.log.filter((line) => line === 'You have had enough.')).toHaveLength(1);
+    expect(state.activeAction).toBeNull();
+    expect(state.time).toBe(100);
+  });
+
+  it('gives the same answer jumped as stepped, which is the invariant it used to break', () => {
+    const jumped = stopping('altar', 'chant');
+    resolve(jumped.state, jumped.registry, 100);
+
+    const stepped = stopping('altar', 'chant');
+    for (let t = 1; t <= 100; t++) resolve(stepped.state, stepped.registry, t);
+
+    expect(stepped.state.inventory).toEqual(jumped.state.inventory);
+    expect(stepped.state.log).toEqual(jumped.state.log);
+    expect(stepped.state.activeAction).toEqual(jumped.state.activeAction);
+    expect(stepped.state.time).toBe(jumped.state.time);
+  });
+
+  it('ends a per-attempt fight without leaving the resolver holding a felled one', () => {
+    const { registry, state } = stopping('straw-man', 'spar');
+    resolve(state, registry, 300);
+
+    expect(state.inventory['rat-tail']).toBe(1);
+    expect(state.activeAction).toBeNull();
+    expect(state.time).toBe(300);
+    expect(state.log.filter((line) => line.startsWith('You hit the Straw Man'))).toHaveLength(2);
+  });
+
+  it('lands the per-attempt stop at the same instant however the span is split', () => {
+    const jumped = stopping('straw-man', 'spar');
+    resolve(jumped.state, jumped.registry, 300);
+
+    for (const splits of [[4.8, 300], [2.4, 5, 300], [1, 2, 3, 4, 5, 60, 300], [0.5, 4.7, 4.9, 300]]) {
+      const { registry, state } = stopping('straw-man', 'spar');
+      for (const t of splits) resolve(state, registry, t);
+
+      expect(state.rng).toBe(jumped.state.rng);
+      expect(state.inventory).toEqual(jumped.state.inventory);
+      expect(state.log).toEqual(jumped.state.log);
+      expect(state.activeAction).toEqual(jumped.state.activeAction);
+      expect(state.resources).toEqual(jumped.state.resources);
     }
   });
 });

@@ -355,6 +355,10 @@ export function applyResult(result: ActionResult, state: GameState, registry: Re
       break;
     }
     case 'stop':
+      // Only reachable outside a resolver segment — an instant action, a
+      // dialogue step. Inside one, applyResultBatch intercepts `stop` and
+      // records it on the segment instead, because the resolver holds the
+      // ActiveAction as a local and this write would go behind its back.
       state.activeAction = null;
       break;
   }
@@ -748,7 +752,7 @@ function inputLimit(action: Action, state: GameState): number {
 // Applies one action's `results` as if it completed `count` times, in a single
 // batch (count can be enormous). Numeric verbs (give/take/xp/add) scale by
 // count; one-shot verbs (say/set/unset/relocate/discover/open-modal) fire once.
-function applyResultBatch(result: ActionResult, count: number, state: GameState, registry: Registry, deltas: PoolDeltas): void {
+function applyResultBatch(result: ActionResult, count: number, state: GameState, registry: Registry, effects: SegmentEffects): void {
   switch (result.kind) {
     case 'give':
       state.inventory[result.item] = (state.inventory[result.item] ?? 0) + (result.amount ?? 1) * count;
@@ -768,24 +772,45 @@ function applyResultBatch(result: ActionResult, count: number, state: GameState,
     case 'pool':
       // Accrued, never written here — the segment settles it (see PoolDeltas).
       requireResource(registry, result.resource);
-      deltas.set(result.resource, (deltas.get(result.resource) ?? 0) + result.delta * count);
+      effects.deltas.set(result.resource, (effects.deltas.get(result.resource) ?? 0) + result.delta * count);
+      return;
+    case 'stop':
+      // Recorded, never applied here (see SegmentEffects). Idempotent, so
+      // neither a batched count nor a rollover firing N times can stop an
+      // action "more" than once.
+      effects.stopped = true;
       return;
     default:
       applyResult(result, state, registry);
   }
 }
 
+// Whether the results this outcome fires ask the action to stop. A `stop`
+// anywhere among them means the action ends at the FIRST completion, so a span
+// long enough to batch N of them must apply exactly one.
+function stopsOnOutcome(action: Action, outcome: FightOutcome): boolean {
+  const stops = (results?: ActionResult[]): boolean => results?.some((result) => result.kind === 'stop') ?? false;
+  return outcome === 'completion' ? stops(action.results) || stops(action.onSuccess) : stops(action.onEscape);
+}
+
 // Applies `count` fights' worth of one outcome, batched (see applyResultBatch),
 // never per fight. `results`/`onSuccess` fire on completion, `onEscape` on
 // escape (mutually exclusive per fight). Firing per *fight*, not per segment,
 // is what keeps resolve() associative.
-function applyFightBatch(action: Action, count: number, outcome: FightOutcome, state: GameState, registry: Registry, deltas: PoolDeltas): void {
+// A `stop` among the results caps the batch at one completion. Without the cap
+// a batched path could not stop anything — the whole span had already happened
+// by the time the one-shot verb ran, so resolve(s, 100) applied 100 completions
+// where 100 stepped calls applied 1. nextBoundary independently lands the
+// segment on that first completion, so time stops there too; this cap is what
+// holds if the two ever disagree.
+function applyFightBatch(action: Action, count: number, outcome: FightOutcome, state: GameState, registry: Registry, effects: SegmentEffects): void {
   if (count <= 0) return;
+  if (stopsOnOutcome(action, outcome)) count = 1;
   if (outcome === 'completion') {
-    for (const result of action.results) applyResultBatch(result, count, state, registry, deltas);
-    for (const result of action.onSuccess ?? []) applyResultBatch(result, count, state, registry, deltas);
+    for (const result of action.results) applyResultBatch(result, count, state, registry, effects);
+    for (const result of action.onSuccess ?? []) applyResultBatch(result, count, state, registry, effects);
   } else {
-    for (const result of action.onEscape ?? []) applyResultBatch(result, count, state, registry, deltas);
+    for (const result of action.onEscape ?? []) applyResultBatch(result, count, state, registry, effects);
   }
 }
 
@@ -846,6 +871,25 @@ function setPoolLevel(state: GameState, registry: Registry, resource: Resource, 
 // letting the two net out, so where a caller happened to split the span would
 // change the answer.
 type PoolDeltas = Map<string, number>;
+
+// What a segment accumulates while it runs and settles at its end: the pool
+// deltas above, and whether anything applied inside it asked the action in
+// flight to stop.
+//
+// `stop` is a control-flow verb, not a write, and treating it as one put a
+// data-application function behind the resolver's back. resolveStochasticSegment
+// holds the ActiveAction as a local and goes on mutating it after a batch, so an
+// applyResult that nulled state.activeAction left the two disagreeing and the
+// next participants() dereferenced null. Only the resolver ends an action the
+// resolver is running; this flag is how it finds out it should.
+interface SegmentEffects {
+  deltas: PoolDeltas;
+  stopped: boolean;
+}
+
+function newSegmentEffects(): SegmentEffects {
+  return { deltas: new Map(), stopped: false };
+}
 
 function requireResource(registry: Registry, resourceId: string): Resource {
   const resource = registry.resources.get(resourceId);
@@ -1029,18 +1073,23 @@ function damagePool(state: GameState, registry: Registry, actorId: string, resou
 }
 
 // Applies results that fire OUTSIDE a resolver segment — an instant action, a
-// boundary firing, a rollover handler. There is no segment to fold into, so any
-// pool write settles on the spot.
+// boundary firing, a rollover or on-empty handler. There is no segment to fold
+// into, so any pool write settles on the spot and a `stop` takes effect on the
+// spot: no resolver is mid-loop holding an ActiveAction that could disagree.
+// This is the path a `# resource`'s `on empty:` stop travels, which is how
+// content declares a pool fatal.
 function applyResultNow(result: ActionResult, count: number, state: GameState, registry: Registry): void {
-  const deltas: PoolDeltas = new Map();
-  applyResultBatch(result, count, state, registry, deltas);
-  settlePools(state, registry, [], 0, deltas);
+  const effects = newSegmentEffects();
+  applyResultBatch(result, count, state, registry, effects);
+  settlePools(state, registry, [], 0, effects.deltas);
+  if (effects.stopped) state.activeAction = null;
 }
 
 function applyFightBatchNow(action: Action, count: number, outcome: FightOutcome, state: GameState, registry: Registry): void {
-  const deltas: PoolDeltas = new Map();
-  applyFightBatch(action, count, outcome, state, registry, deltas);
-  settlePools(state, registry, [], 0, deltas);
+  const effects = newSegmentEffects();
+  applyFightBatch(action, count, outcome, state, registry, effects);
+  settlePools(state, registry, [], 0, effects.deltas);
+  if (effects.stopped) state.activeAction = null;
 }
 
 // Clamps every pool into [0, its live max]; called once a boundary settles, so a
@@ -1071,9 +1120,13 @@ function nextBoundary(state: GameState, registry: Registry, toTime: number): num
     // is random. resolveStochasticSegment simulates it attempt-by-attempt,
     // bounded only by whatever buff-expiry/toTime already gives.
     if (!resolvesPerAttempt(action)) {
-      const { duration, attemptsToResolve } = fightPlan(action, state, registry);
+      const { duration, attemptsToResolve, outcome } = fightPlan(action, state, registry);
       const remainingAttempts = attemptsToResolve - state.activeAction.attemptsMade;
-      if (state.activeAction.repeating) {
+      // An action that stops on its own outcome is, for boundary purposes, not
+      // repeating: it ends at its first completion, so the segment must land
+      // there. Otherwise the span would batch straight past the stop with the
+      // action's stat modifiers snapshotted for the whole of it.
+      if (state.activeAction.repeating && !stopsOnOutcome(action, outcome)) {
         const limit = inputLimit(action, state);
         if (Number.isFinite(limit)) {
           // Time to finish the fight already in flight, plus (limit - 1)
@@ -1110,7 +1163,7 @@ function nextBoundary(state: GameState, registry: Registry, toTime: number): num
 // outcome and fight length known in closed form). Whole fights this segment
 // covers are applied as one batch; the remainder is carried as
 // attemptsMade/healthRemaining/progress for the fight still in flight.
-function resolveDeterministicSegment(state: GameState, registry: Registry, action: Action, segEnd: number, deltas: PoolDeltas): void {
+function resolveDeterministicSegment(state: GameState, registry: Registry, action: Action, segEnd: number, effects: SegmentEffects): void {
   const active = state.activeAction!;
   const segLen = segEnd - state.time;
   const { duration, abilityAmount, attemptsToResolve, outcome } = fightPlan(action, state, registry);
@@ -1128,7 +1181,14 @@ function resolveDeterministicSegment(state: GameState, registry: Registry, actio
     const totalAttempts = active.attemptsMade + attemptsThisSegment;
     const fights = Math.floor(totalAttempts / attemptsToResolve);
     const remainder = totalAttempts - fights * attemptsToResolve;
-    applyFightBatch(action, fights, outcome, state, registry, deltas);
+    applyFightBatch(action, fights, outcome, state, registry, effects);
+    // The batch capped itself at one completion and that completion asked to
+    // stop: the action ends here rather than carrying a remainder it will never
+    // swing. nextBoundary put segEnd on this instant, so time is already right.
+    if (effects.stopped) {
+      state.activeAction = null;
+      return;
+    }
     active.attemptsMade = remainder;
     active.healthRemaining = health - remainder * abilityAmount;
     active.progress = newProgress;
@@ -1193,7 +1253,7 @@ function resolveAttempt(participant: Participant, state: GameState, registry: Re
 // and a 3.75s rat interleave naturally out of that, with no shared tick.
 //
 // O(attempts) is bounded by segment length and input affordability.
-function resolveStochasticSegment(state: GameState, registry: Registry, action: Action, segEnd: number, deltas: PoolDeltas): void {
+function resolveStochasticSegment(state: GameState, registry: Registry, action: Action, segEnd: number, effects: SegmentEffects): void {
   const active = state.activeAction!;
 
   for (;;) {
@@ -1237,7 +1297,7 @@ function resolveStochasticSegment(state: GameState, registry: Registry, action: 
     for (const participant of roster) participant.cadence.progress += elapsed;
     advanceTime(state, elapsed);
 
-    const depleted = resolveAttempt(next, state, registry, deltas);
+    const depleted = resolveAttempt(next, state, registry, effects.deltas);
 
     // Only the player's swing decides the fight: its action owns the results,
     // the escape counter and the repeat. A retaliation is only a damage source.
@@ -1256,7 +1316,15 @@ function resolveStochasticSegment(state: GameState, registry: Registry, action: 
     else if (active.attemptsMade >= (action.escapeAfter ?? Infinity)) fightOutcome = 'escape';
 
     if (fightOutcome) {
-      applyFightBatch(action, 1, fightOutcome, state, registry, deltas);
+      applyFightBatch(action, 1, fightOutcome, state, registry, effects);
+      // The outcome asked to stop, so nothing rearms and this local `active`
+      // goes out of scope still holding the fight it just ended. Reading the
+      // flag here is what keeps it and state.activeAction from disagreeing —
+      // the next participants() would dereference the null.
+      if (effects.stopped) {
+        state.activeAction = null;
+        return;
+      }
       if (active.repeating) {
         // A fresh target steps up: pools refilled from its own stats, clock
         // restarted, so it does not inherit the dead one's half-finished swing.
@@ -1278,18 +1346,19 @@ function resolveSegment(state: GameState, registry: Registry, segEnd: number): v
   // Snapshot resource rates now, while the active action's modifiers are still
   // in force — the stochastic path can clear the action before we integrate.
   const snapshots = captureResourceRates(state, registry);
-  // Discrete pool writes this segment's completions produce; settled together
-  // with the integrated rates below, never as they happen (see PoolDeltas).
-  const deltas: PoolDeltas = new Map();
+  // What this segment's completions produce but do not apply as they happen:
+  // discrete pool writes, settled once below, and a `stop` request, honoured by
+  // whichever resolver is running (see SegmentEffects).
+  const effects = newSegmentEffects();
 
   if (!state.activeAction) {
     advanceTime(state, segEnd - start);
   } else {
     const action = findActiveAction(state.activeAction, registry);
     if (resolvesPerAttempt(action)) {
-      resolveStochasticSegment(state, registry, action, segEnd, deltas);
+      resolveStochasticSegment(state, registry, action, segEnd, effects);
     } else {
-      resolveDeterministicSegment(state, registry, action, segEnd, deltas);
+      resolveDeterministicSegment(state, registry, action, segEnd, effects);
       advanceTime(state, segEnd - state.time);
     }
   }
@@ -1299,7 +1368,7 @@ function resolveSegment(state: GameState, registry: Registry, segEnd: number): v
   // resolves as a later action-less segment where rates are re-snapshotted (so
   // an action's drain stops the instant the action does).
   const elapsed = state.time - start;
-  if (elapsed > 0 || deltas.size > 0) settlePools(state, registry, snapshots, Math.max(0, elapsed), deltas);
+  if (elapsed > 0 || effects.deltas.size > 0) settlePools(state, registry, snapshots, Math.max(0, elapsed), effects.deltas);
 }
 
 // Fires whatever is due exactly at `at` and keeps re-checking until nothing
