@@ -785,26 +785,57 @@ function fightPlan(action: Action, state: GameState, registry: Registry): Determ
 // content chose, not something the engine knows. Content declares which pool is
 // fatal by putting `stop` in that resource's `on empty:` block.
 function actionStillValid(action: Action, active: ActiveAction, state: GameState): boolean {
-  if (action.requires && !evaluateCondition(action.requires, state)) return false;
+  if (!requiresMet(action, state)) return false;
   // Inputs only bound a REPEATING action — a single completion's worth was
   // already checked when it armed, and isn't consumed until it completes.
-  return !active.repeating || inputLimit(action, state) > 0;
+  return !active.repeating || inputLimit(action, state).completions > 0;
 }
 
-// How many completions the current inventory can afford. Only the `take:` side
-// can bound a repeating action — items have no stack cap in this schema (Pass
-// 1), so the output side is treated as unbounded.
-function inputLimit(action: Action, state: GameState): number {
-  const perCompletion = new Map<string, number>();
+// The two conditions every "may this action run" question is built from. The
+// three sites that ask compose them differently on purpose — armAction refuses
+// to START a hidden action, one already under way ignores visibility (a rat
+// fight must not abort mid-swing because the kill count removed it from the
+// list), and the choice list additionally hides retaliations — so they stay
+// separate predicates rather than collapsing into one with flags. What they must
+// not do is each restate what an absent clause means, which is what this fixes.
+export function requiresMet(action: Action, state: GameState): boolean {
+  return !action.requires || evaluateCondition(action.requires, state);
+}
+
+export function actionVisible(action: Action, state: GameState): boolean {
+  return !action.hiddenIf || !evaluateCondition(action.hiddenIf, state);
+}
+
+// One completion's worth of `take:` cost, as item → amount. Only the take side
+// can bound anything — items have no stack cap in this schema (Pass 1), so the
+// output side is unbounded.
+function perCompletionCost(action: Action): Map<string, number> {
+  const cost = new Map<string, number>();
   for (const result of action.results) {
-    if (result.kind === 'take') perCompletion.set(result.item, (perCompletion.get(result.item) ?? 0) + (result.amount ?? 1));
+    if (result.kind === 'take') cost.set(result.item, (cost.get(result.item) ?? 0) + (result.amount ?? 1));
   }
-  let limit = Infinity;
-  for (const [item, need] of perCompletion) {
+  return cost;
+}
+
+// How many completions the current inventory affords, and — when that is under
+// one — which item fell short, so armAction can tell the player what they need.
+// Both are the same reduction over the same map, and asking for the count or the
+// name used to mean writing it out again.
+interface InputLimit {
+  completions: number;
+  short?: string;
+}
+
+function inputLimit(action: Action, state: GameState): InputLimit {
+  let completions = Infinity;
+  let short: string | undefined;
+  for (const [item, need] of perCompletionCost(action)) {
     if (need <= 0) continue;
-    limit = Math.min(limit, Math.floor((state.inventory[item] ?? 0) / need));
+    const affords = Math.floor((state.inventory[item] ?? 0) / need);
+    if (affords < 1 && short === undefined) short = item;
+    completions = Math.min(completions, affords);
   }
-  return limit;
+  return { completions, short };
 }
 
 // Applies one action's `results` as if it completed `count` times, in a single
@@ -1188,7 +1219,7 @@ function nextBoundary(state: GameState, registry: Registry, toTime: number): num
       // there. Otherwise the span would batch straight past the stop with the
       // action's stat modifiers snapshotted for the whole of it.
       if (state.activeAction.repeating && !stopsOnOutcome(action, outcome)) {
-        const limit = inputLimit(action, state);
+        const limit = inputLimit(action, state).completions;
         if (Number.isFinite(limit)) {
           // Time to finish the fight already in flight, plus (limit - 1)
           // more full fights after it — generalizes the old
@@ -1576,17 +1607,14 @@ export function armAction(obj: string, objId: string, actionId: string, registry
 
   const action = target.actions?.find((a) => a.label === actionId);
   if (!action) throw new RuntimeError(`unknown action ${JSON.stringify(actionId)} on ${obj}.${objId}`);
-  if (action.requires && !evaluateCondition(action.requires, state)) throw new RuntimeError(`action requires unmet: ${obj}.${objId}.${actionId}`);
-  if (action.hiddenIf && evaluateCondition(action.hiddenIf, state)) throw new RuntimeError(`action hidden: ${obj}.${objId}.${actionId}`);
+  if (!requiresMet(action, state)) throw new RuntimeError(`action requires unmet: ${obj}.${objId}.${actionId}`);
+  if (!actionVisible(action, state)) throw new RuntimeError(`action hidden: ${obj}.${objId}.${actionId}`);
 
   // take: implies affordability — checked once up front for one completion's
   // worth; this only gates whether the action may START. A repeating action
   // running out of input mid-flight is handled in resolve()'s limiting math,
   // not here, and ends quietly without firing onFailure.
-  const required = new Map<string, number>();
-  for (const r of action.results) if (r.kind === 'take') required.set(r.item, (required.get(r.item) ?? 0) + (r.amount ?? 1));
-  let shortfall: string | undefined;
-  for (const [item, need] of required) if ((state.inventory[item] ?? 0) < need) { shortfall = item; break; }
+  const { short: shortfall } = inputLimit(action, state);
   if (shortfall !== undefined) {
     if (action.onFailure) for (const result of action.onFailure) applyResult(result, state, registry);
     else state.log.push(`You don't have enough ${registry.items.get(shortfall)?.title ?? shortfall}.`);
@@ -1698,7 +1726,12 @@ function recipeAction(recipe: Recipe): Action {
 }
 
 export function recipeCraftable(recipe: Recipe, registry: Registry, state: GameState): boolean {
-  for (const input of recipe.in) if ((state.inventory[input.item] ?? 0) < (input.amount ?? 1)) return false;
+  // Through the compiled action, not `recipe.in`: recipeAction turns those
+  // inputs into the take: results the rest of the engine bounds a craft by, so
+  // reading them here again would be the same list under two owners.
+  const action = registry.recipeActions.get(recipe.id);
+  if (!action) throw new RuntimeError(`unknown recipe: ${recipe.id}`);
+  if (inputLimit(action, state).short !== undefined) return false;
   if (recipe.requiresCapability) {
     const loc = registry.locations.get(state.location);
     if (!loc) return false;

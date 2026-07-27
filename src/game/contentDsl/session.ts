@@ -2,6 +2,7 @@ import { Action } from './entity';
 import { Location } from './location';
 import {
   actionFirstUnit,
+  actionVisible,
   armAction,
   armCraft,
   armTravel,
@@ -20,6 +21,7 @@ import {
   initResources,
   recipeCraftable,
   renderSegments,
+  requiresMet,
   resolve,
   statValue,
   talk,
@@ -65,13 +67,13 @@ export interface PlaySession {
 
 type Actable = { actions?: Action[] };
 
+// Offering an action is armAction's gate plus one more: a retaliation is the
+// owner's own move in a fight, run by the resolver on that owner's cadence and
+// never something the player picks off a list. The two shared conditions come
+// from the runtime rather than being restated here.
 function actionAvailable(action: Action, state: GameState): boolean {
-  // A retaliation is the owner's own move in a fight, run by the resolver on
-  // that owner's cadence — never something the player picks off a list.
   if (action.retaliates) return false;
-  if (action.requires && !evaluateCondition(action.requires, state)) return false;
-  if (action.hiddenIf && evaluateCondition(action.hiddenIf, state)) return false;
-  return true;
+  return requiresMet(action, state) && actionVisible(action, state);
 }
 
 function availableActions(owner: Actable, state: GameState): Action[] {
