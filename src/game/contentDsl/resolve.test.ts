@@ -48,14 +48,21 @@ cook:
   repeating
   give: 1 cooked-shrimp
 
-# stat cook-success
-base: 0.7
+// A skill and a difficulty, never an authored probability: the pair is
+// contested through hitChance, and a gap of 40 over a spread of 100 lands at
+// 1/(1+10^-0.4) = 0.7153 — lopsided enough that both outcomes show up.
+# stat cooking
+base: 100
+
+# stat shrimp-complexity
+base: 60
 
 # item burnt-shrimp
 examine: A blackened, inedible husk of what used to be shrimp.
 
 # recipe grill-cook
-accuracy: cook-success
+accuracy: cooking
+evasion: shrimp-complexity
 time: 1
 in: 1 raw-shrimp
 out: 1 cooked-shrimp
@@ -105,7 +112,7 @@ sharpen:
 grind:
   repeating
   time: 1
-  accuracy: cook-success
+  accuracy: cooking
   drain: 2 vigor
   give: 1 edge
 
@@ -422,7 +429,7 @@ describe('useAction/craft integration: repeating actions, eating grants a live b
 });
 
 // Fixtures for the fight-model gates: `grill-cook` is a STOCHASTIC repeating
-// craft (accuracy: cook-success @ 0.7 — a miss on the one attempt a craft
+// craft (cooking 100 vs shrimp-complexity 60 ⇒ ~0.72 — a miss on the one attempt a craft
 // gets immediately fails to `burnt` instead of cooking it, since recipeAction
 // always compiles accuracy => escape after 1); `tree` is a DETERMINISTIC
 // multi-hit repeating fight (health: 3, ability: chop-power @ 1/hit, no

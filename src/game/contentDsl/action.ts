@@ -32,11 +32,17 @@ export interface Action {
   // statValue) — attempts per second, e.g. a cooking-speed stat. Absent
   // means a fixed multiplier of 1.
   speed?: string;
-  // The stat whose value is used DIRECTLY (clamped to [0,1]) as the
-  // probability that each attempt against the target succeeds. Absent means
-  // every attempt is a certain, deterministic hit — no randomness is drawn
-  // for this action at all (see runtime.ts's resolve()/RNG contract).
+  // The attacker's skill in the opposed roll that decides whether each attempt
+  // lands (see hitChance in runtime.ts). Absent means every attempt is a
+  // certain, deterministic hit — no randomness is drawn for this action at all
+  // (see runtime.ts's resolve()/RNG contract). A stat is never read as a raw
+  // probability: the chance always comes out of this stat against `evasion:`,
+  // so the difficulty of a task lives in the thing being attempted.
   accuracy?: string;
+  // The stat ON THE TARGET opposed to `accuracy:` — a rat's dodge, a dish's
+  // complexity, a lock's resistance. Absent means the target opposes nothing,
+  // so the attempt is decided by the attacker's skill against zero.
+  evasion?: string;
   // The stat whose value is subtracted from the target's remaining health
   // per successful attempt. Absent defaults to a magnitude of 1.
   ability?: string;
@@ -130,6 +136,11 @@ function parseActionLine(line: RawLine, action: Omit<Action, 'label'>): void {
   if (cursor.take(/accuracy:[ \t]*/) !== null) {
     if (action.accuracy !== undefined) throw new DslError('action accuracy is defined more than once', line.span);
     action.accuracy = id.parse(cursor);
+    return;
+  }
+  if (cursor.take(/evasion:[ \t]*/) !== null) {
+    if (action.evasion !== undefined) throw new DslError('action evasion is defined more than once', line.span);
+    action.evasion = id.parse(cursor);
     return;
   }
   if (cursor.take(/ability:[ \t]*/) !== null) {

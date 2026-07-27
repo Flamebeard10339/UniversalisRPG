@@ -246,8 +246,11 @@ describe('spannable repeating craft', () => {
 // + burnt totaling the craft count — the same distribution shape as a
 // stochastic entity fight (see resolve.test.ts), reached through craft().
 const BURN_MODULE = `
-# stat kiln-accuracy
-base: 0.6
+# stat firing
+base: 80
+
+# stat tile-complexity
+base: 60
 
 # item raw-clay
 examine: A lump of raw clay.
@@ -264,7 +267,8 @@ starting
 
 # recipe tile
 time: 1
-accuracy: kiln-accuracy
+accuracy: firing
+evasion: tile-complexity
 in: raw-clay
 out: clay-tile
 burnt: slag

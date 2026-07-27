@@ -16,6 +16,10 @@ export interface Recipe {
   time?: number;
   speed?: string;
   accuracy?: string;
+  // The dish's difficulty in the opposed roll, contested against `accuracy:`
+  // (Action.evasion — the same field a rat's dodge uses). Absent means the
+  // craft opposes nothing and the cook's skill decides alone.
+  evasion?: string;
   // Escape-path output when accuracy is set — a missed attempt fails to this
   // instead of retrying (recipeAction compiles accuracy => escapeAfter: 1).
   burnt: Quantified[];
@@ -40,6 +44,7 @@ export const recipeSchema: SectionSchema<Recipe> = {
     time: { parser: decimal },
     speed: { parser: id },
     accuracy: { parser: id },
+    evasion: { parser: id },
     burnt: { parser: list(quantified), default: () => [] },
   },
 };

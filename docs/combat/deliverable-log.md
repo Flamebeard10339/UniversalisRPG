@@ -15,7 +15,7 @@ this file and lift anything unfinished back into `backlog.md`.
 | 2. Direct pool write | done — `drain:` / `restore:` results |
 | 3. Encounter state / second actor | done — enemy has a sheet and takes real damage |
 | 4. Per-actor cadences in the resolver | done — the rat swings back on its own clock |
-| 5. Opposed roll (Elo) | not started |
+| 5. Opposed roll (Elo) | done — one contest behind every chance in the game |
 | 6. Stop-when-start-conditions-fail | not started |
 | 7. CLI readouts | not started |
 | Droptables (separable) | not started |
@@ -125,6 +125,38 @@ Flat authored probabilities are deliberately **not** expressible here: the chanc
 succeeding at a task is always derived from task difficulty vs player skill. Droptables are
 the other half of that story and they *are* flat-authored. The split is by purpose —
 contested outcomes are derived, loot selection is authored.
+
+**Built in chunk 5** as `hitChance(accuracy, evasion, registry)`, the one roll behind every
+contested outcome. `contest.test.ts` covers the curve and the perspective.
+
+- **The flat reading of `accuracy:` is gone, not kept alongside.** `accuracy:` is now the
+  attacker's skill stat and `evasion:` the stat on the target opposed to it — exactly the
+  `dr:` pattern, read off `other` rather than `self`. There is therefore only *one*
+  derivation of a hit chance and nothing for the engine to switch on. This cost no content
+  churn at all: the tutorial authors no `accuracy:` anywhere, and only two test fixtures
+  read a stat as a probability (`cook-success 0.7`, `kiln-accuracy 0.6`). Both became honest
+  skill/difficulty pairs (`cooking 100` vs `shrimp-complexity 60` ⇒ 0.7153).
+- **Absent `evasion:` is evasion 0**, not a second code path — an unopposed target, decided
+  by the attacker's skill against nothing.
+- **`# variable contest-spread`** (default 100) gives the spec's anchors exactly: equal
+  stats 0.5, +100 → 0.909, +200 → 0.990. It divides the gap, so a non-positive authored
+  value is rejected at load rather than producing a NaN threshold deep in the resolver. An
+  *absent* value still means "engine default", per the DSL's empty==absent rule.
+- **Recipes gained `evasion:` too**, forwarded by `recipeAction` to the same action field, so
+  cooking-vs-dish-complexity is expressible now rather than waiting on the skill system. A
+  recipe isn't an entity, so its `evasion:` stat falls through to the global `# stat`
+  default — the same fall-through the player relies on.
+- **The roll costs exactly zero new RNG**, as predicted. Both sides are read with
+  `statValue`, never `sampleStat`, so the draw count per attempt is unchanged and the one
+  uniform already drawn simply gets a derived threshold. Pinned by a test that replays the
+  LCG 2000 times by hand and matches `state.rng` exactly. Sampling the stats instead would
+  put a range roll and the contest roll inside one decision — two sources of variance for
+  one outcome.
+
+**One thing the curve does not actually do:** it is asymptotic in exact arithmetic but not in
+a double. Past roughly ±16 spreads the near side rounds to exactly 1, so "never certain" is
+false as written. Pinned rather than guarded against — a 16-spread gap is a 1-in-10^16
+outcome, and the resolver draws from `[0, 1)`, so "always hits" is the correct reading.
 
 ### Interaction kinds are named by the content
 
@@ -438,6 +470,11 @@ belong under the existing "grammar.md update (STALE)" backlog item.
 - Actions — a `retaliates` bare tag, alongside `repeating`: the owner's own move in a fight,
   kept out of the player's choice list and run on the owner's cadence. Requires `target:`.
 - Attack rate is authored as `time: 60` + `speed: <per-minute rate stat>`; no new field.
+- Actions — `evasion: <stat-id>`, the stat on the target opposed to `accuracy:`. `accuracy:`
+  itself changed meaning: it is the attacker's skill stat, never a probability.
+- `# recipe` — `evasion: <stat-id>`, the dish's difficulty, forwarded to the action field.
+- `# variable contest-spread` — the stat gap worth ~91% in the opposed roll (default 100,
+  must be positive).
 
 ## Open decisions (not blocking chunk 1)
 

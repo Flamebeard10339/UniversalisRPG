@@ -123,10 +123,6 @@ function nextRandom(state: GameState): number {
   return state.rng / RNG_MODULUS;
 }
 
-function clamp01(value: number): number {
-  return Math.min(1, Math.max(0, value));
-}
-
 // The single seam through which simulated time advances: the pure runtime
 // never reads a real clock, it only moves forward when something calls this.
 export function advanceTime(state: GameState, seconds: number): void {
@@ -230,6 +226,11 @@ export function loadModule(source: string): Registry {
       }
       case 'variable': {
         const variable = hydrateSection(section.value as Authored<Variable>, variableSchema);
+        // An absent value means "leave it at the engine default" (the DSL's
+        // empty==absent rule), so only an authored one is worth rejecting.
+        if (variable.id === CONTEST_SPREAD && variable.value !== undefined && variable.value <= 0) {
+          throw new RuntimeError(`# variable ${CONTEST_SPREAD} must be positive, got ${variable.value} — it divides the stat gap in every opposed roll`);
+        }
         registry.variables.set(variable.id, variable);
         break;
       }
@@ -488,6 +489,32 @@ const DEFAULT_MIN_DAMAGE = 1;
 
 export function minDamage(registry: Registry): number {
   return Math.max(1, registry.variables.get(MIN_DAMAGE)?.value ?? DEFAULT_MIN_DAMAGE);
+}
+
+// The stat gap that buys roughly a 91% chance in the opposed roll below, and so
+// the dial for how sharply skill converts to success: smaller makes a small
+// edge decisive, larger flattens the curve. Authored as `# variable
+// contest-spread`, and rejected at load if it isn't positive (see loadModule) —
+// it divides the gap, so zero has no meaning to fall back on.
+const CONTEST_SPREAD = 'contest-spread';
+const DEFAULT_CONTEST_SPREAD = 100;
+
+export function contestSpread(registry: Registry): number {
+  return registry.variables.get(CONTEST_SPREAD)?.value ?? DEFAULT_CONTEST_SPREAD;
+}
+
+// THE opposed roll — every contested outcome in the game runs through it: a
+// sword landing, a dish coming out cooked rather than burnt, a lock giving.
+// A logistic curve on the gap between the two stats, so equal stats are a coin
+// flip, +spread wins ~91%, +2×spread ~99%, and no gap ever reaches certainty in
+// either direction.
+//
+// A stat is deliberately never readable as a raw probability. The chance of
+// succeeding at something is always derived from that thing's difficulty
+// against the actor's skill, which puts difficulty in a stat where gear, buffs
+// and levels can move it — an authored 0.7 would be inert.
+export function hitChance(accuracy: number, evasion: number, registry: Registry): number {
+  return 1 / (1 + 10 ** ((evasion - accuracy) / contestSpread(registry)));
 }
 
 function locationDistance(a: Location, b: Location): number {
@@ -1012,13 +1039,24 @@ function resolveDeterministicSegment(state: GameState, registry: Registry, actio
 // Draws happen in a fixed order — hit roll, damage roll, reduction roll — and an
 // action with no accuracy stat cannot miss and draws nothing for the first. The
 // count per attempt is therefore a function of state alone, which is what lets
-// per-attempt randomness live under resolve()'s associativity invariant.
+// per-attempt randomness live under resolve()'s associativity invariant. The
+// opposed roll costs nothing extra here: both sides of the contest are read
+// with statValue (no draw), so it only changes what the one uniform is compared
+// against. Sampling them instead would put the range roll and the contest roll
+// in the same decision, which is two sources of variance for one outcome.
 function resolveAttempt(participant: Participant, state: GameState, registry: Registry, deltas: PoolDeltas): boolean {
   const { self, other, action, cadence } = participant;
   cadence.progress = 0;
   cadence.attemptsMade++;
 
-  const hit = action.accuracy === undefined || nextRandom(state) < clamp01(statValue(action.accuracy, state, registry, self));
+  const hit =
+    action.accuracy === undefined ||
+    nextRandom(state) <
+      hitChance(
+        statValue(action.accuracy, state, registry, self),
+        action.evasion ? statValue(action.evasion, state, registry, other) : 0,
+        registry,
+      );
 
   if (!action.target) {
     if (hit) state.activeAction!.healthRemaining -= fightParams(action, state, registry).abilityAmount;
@@ -1378,6 +1416,7 @@ function recipeAction(recipe: Recipe): Action {
     time,
     speed: recipe.speed,
     accuracy: recipe.accuracy,
+    evasion: recipe.evasion,
     health: 1,
     repeating: time > 0,
   };
