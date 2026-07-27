@@ -298,8 +298,13 @@ export function beginAction(session: PlaySession, choiceId: string): PlayView {
   return view(session);
 }
 
+// Both wait() and cancelAction() are the view-returning face of the same
+// mutation applyDirective performs for a `wait:`/`cancel` test directive —
+// they route through it so the semantics live in exactly one place (a driver
+// callable, unlike the directive path, always has a resolvable location, so
+// building a PlayView here is safe).
 export function wait(session: PlaySession, seconds: number): PlayView {
-  resolve(session.state, session.registry, session.state.time + seconds);
+  applyDirective(session, { kind: 'wait', seconds });
   return view(session);
 }
 
@@ -309,7 +314,7 @@ export function wait(session: PlaySession, seconds: number): PlayView {
 // rewound — the player spent the time they spent. A no-op when nothing is
 // active, so a driver can call it unconditionally.
 export function cancelAction(session: PlaySession): PlayView {
-  session.state.activeAction = null;
+  applyDirective(session, { kind: 'cancel' });
   return view(session);
 }
 
@@ -390,16 +395,15 @@ export function applyDirective(session: PlaySession, directive: Directive): { fa
       return {};
     }
     case 'cancel':
-      // Not cancelAction(session): that also builds a PlayView via view(),
-      // which requires a resolvable session.state.location. A test's state
-      // (built without startSession, see runTest) may never have one set, so
-      // this stays a direct mutation — exactly what runTest did pre-refactor.
+      // The single home of cancellation's mutation: cancelAction() wraps this
+      // with a view(). Kept view-free here because a test's state (built
+      // without startSession, see runTest) may have no resolvable location.
       state.activeAction = null;
       return {};
     case 'wait':
-      // Not wait(session, seconds): same view()/location constraint as cancel
-      // above (e.g. runtime.test.ts's wait-enough test asserts on state.time
-      // alone, with no location ever set).
+      // The single home of time advancement's mutation: wait() wraps this with
+      // a view(). View-free here for the same reason as cancel above (e.g.
+      // runtime.test.ts asserts on state.time with no location ever set).
       resolve(state, registry, state.time + directive.seconds);
       return {};
   }
