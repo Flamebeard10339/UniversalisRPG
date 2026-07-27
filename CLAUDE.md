@@ -45,6 +45,7 @@ Do not assume the implementation approach is correct. Look specifically for:
 - missing edge cases;
 - public API, data, security, performance, or rollback risks;
 - cross-system effects;
+- comments that restate self-documenting code;
 
 Report findings by severity with file references and evidence.
 
