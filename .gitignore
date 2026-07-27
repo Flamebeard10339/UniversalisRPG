@@ -10,7 +10,6 @@ pnpm-debug.log*
 vite.*.log
 *.local
 
-backlog.md
 completed-tasks.md
 
 .planning/*
