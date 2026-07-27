@@ -458,24 +458,39 @@ out. Three things worth recording about the conversion:
 - **One `use:` is now one swing, not one kill**, since a stochastic fight's first unit is a
   single attempt. The tutorial `# test` and `session.test.ts` drive `use:` + `wait:` instead.
 
-## Open audit findings — read before the next chunk
+## Audit findings — CLEARED
 
 `docs/audits/game-engine-2026-07-27.md` audits the Game Engine across the 11 commits from
 Pass 2 through chunk 7. It is a live list: work items are resolved out of it, not out of this
-log. Four of them land squarely on combat code and one breaks this file's stated invariant:
+log. **Its whole suggested order (1–6) is done** — `593318c`…`48fba00`, twelve findings
+including all four criticals; only L1, L2, L4 and L6 remain there, none of them blocking.
+Suite: 289 tests / 19 files.
 
-- **C1** — an action whose `speed:` stat reads 0 (a typo, or a `# stat` with no `base:`, of
-  which the tutorial ships two) drives `state.time` to `Infinity` and NaNs `activeAction`.
-- **C2/C3** — `stop` as an *action result* (as opposed to inside `on empty:`, which is all
-  that is tested) crashes the stochastic resolver and is batched away on the deterministic
-  one: `resolve(s, 100)` gives 100 completions where 100 stepped calls give 1. That is a
-  direct violation of the associativity invariant in "The one invariant everything here can
-  break" above.
-- **M1** — food buffs never apply on the armed/live path (`beginAction`), only via `useAction`.
-- **M2** — an encounter actor's pools are filled from the player-facing `# resource start:`
-  rather than that actor's own max.
+Two of them mattered to this file specifically:
 
-Findings this log already tracks as deliberate deferrals are excluded from the audit.
+- **C2/C3 was a live violation of "the one invariant everything here can break".** `stop`
+  authored as an *action result* — as opposed to inside `on empty:`, which is all that was
+  ever tested — crashed the per-attempt resolver and was batched away on the deterministic
+  one, where `resolve(s, 100)` gave 100 completions against 100 stepped calls' 1. `stop` is
+  now recorded on the segment and honoured by the resolver, never written into
+  `state.activeAction` from inside a data-application function, and `nextBoundary` lands the
+  segment on the stopping completion so time stops where the action does. Four cases in
+  `stopping.test.ts` gate it, two of them associativity.
+- **C1's other half is still a runtime guard.** A typo'd stat id is now a load error
+  (`validateReferences`), but a stat that is *declared* with no `base:` reads 0 legitimately,
+  and the tutorial ships two. `attemptDuration` rejects the resulting infinite duration.
+
+Also worth knowing before the next chunk, since both change what the authoring surface
+affords:
+
+- **Every id a section uses to name another is resolved at load.** A misspelled `target:`,
+  `dr:`, `ability:`, `accuracy:`, `evasion:`, `speed:`, a pool's `max:`/`rate:`, a location's
+  `entities:`/`adjacent:`, and an actor sheet's stat keys all fail at load naming the section
+  and field. New combat grammar should extend `validateReferences` rather than trusting a
+  fall-through.
+- **An actor's pools fill from its own max, never from `# resource start:`** (M2), and
+  **completing an action, not `useAction`, is where per-completion side effects belong**
+  (M1) — the armed path never returns through `useAction`.
 
 ## What is left when chunks 1–7 are done
 
@@ -704,7 +719,14 @@ belong under the existing "grammar.md update (STALE)" backlog item.
   must be positive).
 - Action results — a bare `stop`, abandoning whatever action is in flight. Valid anywhere a
   result fires; its home is a `# resource`'s `on empty:` block, which is how content declares
-  a pool fatal.
+  a pool fatal. In an action's *own* results it ends that action at its first completion, so
+  a repeating action carrying one runs exactly once.
+- `# location` — actions, the same `<label>:` block entities carry, reached as
+  `use:location.<id>.<label>`. Bare references inside one scope to the location, exactly as
+  an entity's scope to the entity. (Reinstated in the schema; the runtime path was always
+  there.)
+- Every id naming another section is checked at load, so a misspelling is a content error
+  where it is written rather than a silent 0 or a `RuntimeError` mid-fight.
 
 ## Open decisions (not blocking chunk 1)
 

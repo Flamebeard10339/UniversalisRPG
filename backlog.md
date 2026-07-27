@@ -320,6 +320,13 @@ landed. These are the genuinely-open forward items at merge time:
   questions, chunk status and implementation order. Read that file, not this line, before
   touching combat code. Deliverable: the rat encounter becomes a real fight (rat 16×/min vs
   player 25×/min, +25%-attack-rate weapon) instead of the Pass-2 health-drain placeholder.
+- **Offline progression.** Never written, and CLAUDE.md listed it under Game Engine → Core as
+  though it were (found by the 2026-07-27 audit's inventory check; the line has been
+  corrected). There is no wall-clock reconciliation anywhere in `src/game` — the only
+  `Date.now()` in the repo is `play-cli`'s `--live` render loop. `resolve()` is the seam that
+  would carry it: reconciling means calling it with the elapsed wall-clock span on load, which
+  the associativity invariant already makes safe. Open questions are policy, not mechanism —
+  whether a fight keeps swinging while the game is closed, and whether a span is capped.
 - **Exploratory play-bot (`playbot.ts`).** Standalone Node loop holding a live session,
   calling the LLM API each turn to play and report bugs/softlocks/immersion. Design
   decided, not implemented. Related: port the old agentSession GM shape onto
