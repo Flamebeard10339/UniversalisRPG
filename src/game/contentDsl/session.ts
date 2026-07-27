@@ -268,10 +268,14 @@ export function apply(session: PlaySession, choiceId: string): PlayView {
 // (travel) is spannable when its distance is positive; talk/dialogue choices,
 // and any action/craft/travel whose first unit resolves in zero simulated time
 // (an instant item action, a zero-time craft, a zero-distance journey), still
-// go through the ordinary instant dispatch()/apply() path unchanged — including
-// the food-buff-on-eating side effect that lives in useAction, outside
-// resolve(). After beginAction, session.state.activeAction is non-null IFF a
-// spannable action is now in flight.
+// go through the ordinary instant dispatch()/apply() path unchanged. After
+// beginAction, session.state.activeAction is non-null IFF a spannable action is
+// now in flight.
+//
+// Nothing that completing an action does may live in useAction, because this
+// path never returns through it. Eating's food buff did, and so a stew with a
+// `time:` buffed in instant mode and not at all here; it now hangs off the
+// action's completion inside resolve(), which both paths reach.
 export function beginAction(session: PlaySession, choiceId: string): PlayView {
   const choice = computeChoices(session).find((c) => c.id === choiceId);
   if (!choice) throw new RuntimeError(`unavailable choice: ${JSON.stringify(choiceId)}`);

@@ -918,13 +918,16 @@ function settlePools(state: GameState, registry: Registry, snapshots: ResourceSn
   }
 }
 
-// An encounter actor's pools at full strength, filled the way initResources
-// fills the player's — each pool's authored `start`, or that ACTOR's own max.
-// It keeps a clock only if it has a `retaliates` action to swing on it.
+// An encounter actor's pools, each filled to that ACTOR's own max. Deliberately
+// not initResources' rule: `start` is where a pool begins on a fresh game, a
+// player-lifecycle concept with no meaning for something that stands up
+// mid-fight. Honouring it made a `# resource health` with `start: 5` spawn every
+// rat at 5 however much max-health its own sheet claimed.
+// The actor keeps a clock only if it has a `retaliates` action to swing on it.
 function freshActor(actorId: string, state: GameState, registry: Registry): ActorState {
   const resources: Record<string, number> = {};
   for (const resource of registry.resources.values()) {
-    resources[resource.id] = resource.start ?? statValue(resource.max, state, registry, actorId);
+    resources[resource.id] = statValue(resource.max, state, registry, actorId);
   }
   const swings = retaliationOf(actorId, registry) !== undefined;
   return swings ? { resources, cadence: { progress: 0, attemptsMade: 0 } } : { resources };
@@ -1332,6 +1335,7 @@ function resolveStochasticSegment(state: GameState, registry: Registry, action: 
         else active.healthRemaining = action.health ?? 1;
         active.attemptsMade = 0;
       } else {
+        grantActionFoodBuff(state, registry);
         state.activeAction = null;
         return;
       }
@@ -1402,6 +1406,7 @@ function applyDueBoundaries(state: GameState, registry: Registry, at: number): v
           // so resolveSegment's closed form never runs to advance attemptsMade.
           if (state.activeAction.attemptsMade >= attemptsToResolve || duration <= 0) {
             applyFightBatchNow(action, 1, outcome, state, registry);
+            grantActionFoodBuff(state, registry);
             state.activeAction = null;
             changed = true;
           }
@@ -1463,6 +1468,27 @@ function grantFoodBuff(item: Item, state: GameState): void {
       ? { statId: tag.statId, kind: 'increased', amount: tag.amount / 100, expiresAt }
       : { statId: tag.statId, kind: 'added', amount: tag.amount, expiresAt };
   }
+}
+
+// The action in flight, if it is an item eating itself, grants that item's food
+// tags — called as the action COMPLETES, which is where the buff's clock has to
+// start and, more to the point, the one moment both ways of starting an action
+// pass through. Hanging it off useAction instead meant a food whose eat action
+// carried a `time:` buffed correctly in instant mode and not at all in --live,
+// because beginAction arms directly and never returns through useAction. Every
+// food in the tutorial happens to be instant, which is the only reason that
+// never showed.
+function grantActionFoodBuff(state: GameState, registry: Registry): void {
+  const active = state.activeAction;
+  if (!active) return;
+  const { obj, objId } = parseOwnerRef(active.ownerRef);
+  if (obj !== 'item') return;
+  const item = registry.items.get(objId);
+  if (!item) return;
+  // Eating is the item consuming itself. A repeating action isn't a meal.
+  if (active.repeating) return;
+  if (!findActiveAction(active, registry).results.some((r) => r.kind === 'take' && r.item === objId)) return;
+  grantFoodBuff(item, state);
 }
 
 // Result of arming a spannable action/craft: `armed: false` means a take-gate
@@ -1534,20 +1560,14 @@ export function actionFirstUnit(obj: string, objId: string, actionId: string, re
   return firstUnitSpan(action, state, registry);
 }
 
+// Arms and resolves the first unit in one call — the instant/agent path. The
+// food-buff-on-eating side effect used to live here; it now hangs off the
+// action's completion inside resolve() (grantActionFoodBuff), which is the one
+// moment this path and beginAction's armed path both reach.
 export function useAction(obj: string, objId: string, actionId: string, registry: Registry, state: GameState): void {
   const armed = armAction(obj, objId, actionId, registry, state);
   if (!armed.armed) return;
   resolve(state, registry, state.time + armed.firstUnit);
-
-  if (obj === 'item') {
-    const target = findActionOwner(obj, objId, registry) as { actions?: Action[] } | undefined;
-    const action = target?.actions?.find((a) => a.label === actionId);
-    const takesSelf = action?.results.some((r) => r.kind === 'take' && r.item === objId) ?? false;
-    if (action && action.repeating !== true && takesSelf) {
-      const item = registry.items.get(objId);
-      if (item) grantFoodBuff(item, state);
-    }
-  }
 }
 
 // Travel wrappers: adapt an (origin, dest) pair to the generic action machinery

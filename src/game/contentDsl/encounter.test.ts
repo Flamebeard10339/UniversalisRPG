@@ -119,6 +119,19 @@ describe('encounter state', () => {
     expect(state.resources['health']).toBe(30);
   });
 
+  // `start:` is where a pool begins on a fresh game — a player-lifecycle
+  // concept. An actor stands up mid-fight and has no fresh game to begin, so
+  // honouring it spawned every enemy at the player's starting level however much
+  // max-health its own sheet claimed.
+  it('fills an actor from its own max even when the resource declares a start:', () => {
+    const registry = loadModule(MODULE.replace('max: max-health\n', 'max: max-health\nstart: 5\n'));
+    const state = started(registry);
+    expect(state.resources['health']).toBe(5); // the player does begin there
+
+    armAction('entity', 'training-dummy', 'strike', registry, state);
+    expect(state.activeAction!.actors!['training-dummy'].resources.health).toBe(12);
+  });
+
   it('opens no encounter for an action that names no target', () => {
     const registry = loaded();
     const state = started(registry);

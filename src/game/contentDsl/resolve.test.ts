@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ActiveAction, craft, createGameState, GameState, initResources, loadModule, Registry, resolve, RuntimeError, statValue, useAction } from './runtime';
+import { ActiveAction, armAction, craft, createGameState, GameState, initResources, loadModule, Registry, resolve, RuntimeError, statValue, useAction } from './runtime';
 
 // Fixture for the resolver tests: a speed stat, a food item that doubles it
 // for a fixed window, an unbounded repeating cook recipe (campfire-cook — no
@@ -23,6 +23,17 @@ base: 1
 examine: A root that quickens the hands at the stove.
 food, +100% cooking-speed, 500s
 eat: take: 1 quickroot, say: You chew the root. Your hands feel quick.
+
+// Quickroot is eaten instantly; stew takes 3s to eat. That difference is the
+// whole point: it is what routes stew to the ARMED path in a live driver, which
+// is where the buff used to be dropped on the floor.
+# item stew
+examine: Thick, hot, and slow to get through.
+food, +100% cooking-speed, 60s
+eat:
+  time: 3
+  take: 1 stew
+  say: You work through the bowl.
 
 # item raw-shrimp
 examine: Fresh-caught shrimp, raw.
@@ -419,6 +430,31 @@ describe('useAction/craft integration: repeating actions, eating grants a live b
     expect(state.log).toContain('You chew the root. Your hands feel quick.');
     expect(state.activeBuffs['quickroot:cooking-speed']).toEqual({ statId: 'cooking-speed', amount: 1, kind: 'increased', expiresAt: 500 });
     expect(statValue('cooking-speed', state, registry)).toBe(2);
+  });
+
+  // The buff hangs off the action COMPLETING, not off the verb that started it.
+  // While it lived in useAction, a food whose eat action carried a `time:` was
+  // buffed in instant mode and not at all once a live driver armed it and waited
+  // — and every food in the tutorial happens to be instant, so nothing showed it.
+  it('grants a slow meal’s buff on the armed path as well as the instant one, with the clock starting when the bowl is empty', () => {
+    const registry = loaded();
+
+    const instant = createGameState('nowhere');
+    instant.inventory['stew'] = 1;
+    useAction('item', 'stew', 'eat', registry, instant);
+
+    const armed = createGameState('nowhere');
+    armed.inventory['stew'] = 1;
+    armAction('item', 'stew', 'eat', registry, armed); // what beginAction does for a live driver
+    resolve(armed, registry, 10);
+
+    for (const state of [instant, armed]) {
+      expect(state.inventory['stew']).toBe(0);
+      expect(statValue('cooking-speed', state, registry)).toBe(2);
+      // 3s to eat, then a 60s window — the clock starts at the last spoonful,
+      // not when the bowl was picked up.
+      expect(state.activeBuffs['stew:cooking-speed'].expiresAt).toBe(63);
+    }
   });
 
   it('a plain non-repeating action with a real time: cost still advances state.time by exactly that much in one call, as before', () => {
