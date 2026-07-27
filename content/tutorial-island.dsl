@@ -35,9 +35,14 @@ base: 1
 rate: regeneration
 max: max-health
 display: full
+// `stop` is what makes running out of health end whatever you were doing —
+// the engine has no privileged pool, so this block is where health becomes the
+// fatal one. Anything else that should happen on blacking out (dropping what
+// you carried, waking up elsewhere) belongs here beside it.
 on empty:
   say: You slump to the floor, spent. (You should have eaten something.)
   set: fainted
+  stop
 
 // --- skills ---
 

@@ -354,6 +354,9 @@ export function applyResult(result: ActionResult, state: GameState, registry: Re
       setPoolLevel(state, registry, resource, current, current + result.delta, statValue(resource.max, state, registry));
       break;
     }
+    case 'stop':
+      state.activeAction = null;
+      break;
   }
 }
 
@@ -689,6 +692,26 @@ function fightPlan(action: Action, state: GameState, registry: Registry): Determ
     attemptsToResolve: Math.min(neededForCompletion, params.escapeAfter),
     outcome: neededForCompletion <= params.escapeAfter ? 'completion' : 'escape',
   };
+}
+
+// Whether an action in flight may keep running — the same gate that let it
+// start, re-checked rather than trusted for the action's whole life. The
+// circumstances that made it legal can stop holding while it runs: the bait runs
+// out, a quest flag flips, the forge goes cold.
+//
+// `hidden if:` is deliberately NOT part of this. It decides whether an action is
+// OFFERED, which is why armAction refuses to start a hidden one; an action
+// already under way is a different question, and a rat fight shouldn't abort
+// mid-swing because the third rat's kill-count made the option disappear.
+//
+// Running out of a POOL is not here either, and cannot be: `health` is a name
+// content chose, not something the engine knows. Content declares which pool is
+// fatal by putting `stop` in that resource's `on empty:` block.
+function actionStillValid(action: Action, active: ActiveAction, state: GameState): boolean {
+  if (action.requires && !evaluateCondition(action.requires, state)) return false;
+  // Inputs only bound a REPEATING action — a single completion's worth was
+  // already checked when it armed, and isn't consumed until it completes.
+  return !active.repeating || inputLimit(action, state) > 0;
 }
 
 // How many completions the current inventory can afford. Only the `take:` side
@@ -1086,7 +1109,7 @@ function resolveStochasticSegment(state: GameState, registry: Registry, action: 
   const active = state.activeAction!;
 
   for (;;) {
-    if (active.repeating && inputLimit(action, state) <= 0) {
+    if (!actionStillValid(action, active, state)) {
       state.activeAction = null;
       return;
     }
@@ -1129,11 +1152,14 @@ function resolveStochasticSegment(state: GameState, registry: Registry, action: 
     const depleted = resolveAttempt(next, state, registry, deltas);
 
     // Only the player's swing decides the fight: its action owns the results,
-    // the escape counter and the repeat. A retaliation is a damage source, and
-    // the player's pool running out ends the fight through the start-condition
-    // check rather than here.
+    // the escape counter and the repeat. A retaliation is only a damage source.
     if (next.self !== PLAYER) {
-      if (state.time >= segEnd) return;
+      // Except when it empties the pool it drains: the segment ends right here
+      // so that pool settles at the instant it ran out rather than at whatever
+      // distant instant the caller's span happens to end. That is what lets its
+      // `on empty:` block fire on time — and whether running out is fatal to the
+      // fight is the block's call, via `stop`, not the resolver's.
+      if (depleted || state.time >= segEnd) return;
       continue;
     }
 
@@ -1205,15 +1231,13 @@ function applyDueBoundaries(state: GameState, registry: Registry, at: number): v
 
     if (state.activeAction) {
       const action = findActiveAction(state.activeAction, registry);
-      // A per-attempt action fires and rearms itself inside
-      // resolveStochasticSegment — nothing due here for it.
-      if (!resolvesPerAttempt(action)) {
-        if (state.activeAction.repeating) {
-          if (inputLimit(action, state) <= 0) {
-            state.activeAction = null;
-            changed = true;
-          }
-        } else {
+      if (!actionStillValid(action, state.activeAction, state)) {
+        state.activeAction = null;
+        changed = true;
+      } else if (!resolvesPerAttempt(action)) {
+        // A per-attempt action fires and rearms itself inside
+        // resolveStochasticSegment — nothing else is due here for it.
+        if (!state.activeAction.repeating) {
           const { duration, attemptsToResolve, outcome } = fightPlan(action, state, registry);
           // duration <= 0 means every attempt is instantaneous — fire
           // immediately regardless of attemptsMade. This is the only place a
@@ -1258,7 +1282,11 @@ export function resolve(state: GameState, registry: Registry, toTime: number): v
   while (state.time < toTime) {
     const segEnd = nextBoundary(state, registry, toTime);
     resolveSegment(state, registry, segEnd);
-    applyDueBoundaries(state, registry, segEnd);
+    // Boundaries are settled at the instant the segment actually reached, not
+    // at the one it was aimed at: a segment can stop short (input exhausted, a
+    // pool emptied), and firing at segEnd would expire buffs that still had
+    // time left on them.
+    applyDueBoundaries(state, registry, state.time);
   }
 }
 

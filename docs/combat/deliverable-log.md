@@ -16,7 +16,7 @@ this file and lift anything unfinished back into `backlog.md`.
 | 3. Encounter state / second actor | done — enemy has a sheet and takes real damage |
 | 4. Per-actor cadences in the resolver | done — the rat swings back on its own clock |
 | 5. Opposed roll (Elo) | done — one contest behind every chance in the game |
-| 6. Stop-when-start-conditions-fail | not started |
+| 6. Stop-when-start-conditions-fail | done — `stop` result + re-checked `requires:` |
 | 7. CLI readouts | not started |
 | Droptables (separable) | not started |
 | Skill levels + XP events (separable) | not started |
@@ -321,9 +321,39 @@ adding any: `inputLimit(action, state) <= 0` already clears `state.activeAction`
 `runtime.ts:776`/`867`. Widen that one check to re-evaluate the action's full start
 condition (inputs *and* `requires:` *and* actor health > 0) each attempt.
 
-Today nothing clears `activeAction` on death — the four clear sites
-(`runtime.ts:776/810/867/878`) are all completion or out-of-input, so a player at 0 health
-keeps swinging forever.
+**Built in chunk 6** as two independent mechanisms, because the spec's one sentence is
+actually two different questions. `stopping.test.ts` covers both.
+
+- **`requires:` is re-checked, not trusted for the action's life.** `actionStillValid` is the
+  shared predicate behind every clear site — the same gate `armAction` applies, minus
+  visibility — and it now runs per attempt on the stochastic path and at every boundary on
+  the deterministic one. Previously only `inputLimit` was re-checked, and only for a
+  repeating action.
+- **`hidden if:` is deliberately excluded.** It decides whether an action is *offered*,
+  which is why `armAction` refuses to start a hidden one; an action already under way is a
+  different question, and the tutorial's rat fight (`hidden if: rats-killed >= 3`) must not
+  abort mid-swing because the third kill made the option disappear from the list.
+- **Running out of a pool could not go in that predicate**, and this is the real finding:
+  `health` is a name *content* chose. An engine that stops a fight when "health" empties has
+  invented a privileged resource and a second place the DSL and the runtime must agree. So
+  the answer is a **`stop` action result** — content declares which pool is fatal by putting
+  `stop` in that resource's `on empty:` block, and the spec's "optional lose-inventory /
+  teleport-to-spawn behavior" is then just `take:`/`relocate:` sitting beside it, needing
+  nothing new at all. The tutorial's `# resource health` now carries it.
+- **A retaliation that empties a pool ends the segment on the spot.** Without this the whole
+  feature would be dead on arrival: a stochastic segment has no closed-form boundary, so the
+  player's damage sits in `PoolDeltas` until the span ends — `resolve(state, 300)` would
+  black the player out at t=300 having swung for 300s. Ending the segment at the emptying
+  attempt makes `on empty:` fire at the instant it happened. The deterministic path already
+  had this for free, since `nextBoundary` lands a segment on a draining pool's zero.
+- **`applyDueBoundaries` now fires at the instant the segment actually reached**, not the one
+  it aimed at. A pre-existing latent bug that the second early-return path made reachable:
+  `resolve()` passed `segEnd` while a segment that stopped short left `state.time` behind it,
+  expiring buffs that still had time on them.
+
+Gated by an associativity case pinning death at the same instant across four split patterns,
+and by a control fixture with no `stop`: there, the player keeps swinging at 0 health and
+fells the rat at 240s. Stopping is authored, and the test proves the engine isn't imposing it.
 
 ### Pools need a direct write
 
@@ -475,6 +505,9 @@ belong under the existing "grammar.md update (STALE)" backlog item.
 - `# recipe` — `evasion: <stat-id>`, the dish's difficulty, forwarded to the action field.
 - `# variable contest-spread` — the stat gap worth ~91% in the opposed roll (default 100,
   must be positive).
+- Action results — a bare `stop`, abandoning whatever action is in flight. Valid anywhere a
+  result fires; its home is a `# resource`'s `on empty:` block, which is how content declares
+  a pool fatal.
 
 ## Open decisions (not blocking chunk 1)
 

@@ -15,7 +15,13 @@ export type ActionResult =
   // An instantaneous level change on a `# resource` pool, from `drain:` or
   // `restore:`. One signed kind rather than two, matching how a pool's rate is
   // already a single signed stat instead of separate regen and drain.
-  | { kind: 'pool'; resource: string; delta: number };
+  | { kind: 'pool'; resource: string; delta: number }
+  // Abandons whatever action is in flight, mid-progress — the same abandonment
+  // a player-initiated cancel performs. It is how content declares that a
+  // circumstance is fatal to an encounter: `stop` in a pool's `on empty:` block
+  // is what makes running out of health end a fight, and running out of bait
+  // end a fishing trip. The engine has no privileged pool of its own.
+  | { kind: 'stop' };
 
 function parseGiveTake(kind: 'give' | 'take', cursor: Cursor): ActionResult {
   return { kind, ...quantified.parse(cursor) };
@@ -62,11 +68,12 @@ function parseResult(cursor: Cursor): ActionResult {
   if (cursor.take(/relocate:[ \t]*/) !== null) return { kind: 'relocate', location: id.parse(cursor) };
   if (cursor.take(/discover:[ \t]*/) !== null) return { kind: 'discover', location: id.parse(cursor) };
   if (cursor.take(/open modal:[ \t]*/) !== null) return { kind: 'open-modal', modal: id.parse(cursor) };
+  if (cursor.take(/stop(?![\w-])/) !== null) return { kind: 'stop' };
   throw new DslError(`unrecognized action result: ${JSON.stringify(cursor.rest())}`, { start: cursor.abs(cursor.pos), end: cursor.abs(cursor.pos) });
 }
 
 export function startsResult(cursor: Cursor): boolean {
-  return cursor.peek(/(?:say|add|give|take|xp|drain|restore|relocate|discover|open modal):|(?:set|unset)[: \t]/) !== null;
+  return cursor.peek(/(?:say|add|give|take|xp|drain|restore|relocate|discover|open modal):|(?:set|unset)[: \t]|stop(?![\w-])/) !== null;
 }
 
 export const actionResult: Parser<ActionResult> = {
