@@ -56,8 +56,7 @@ Report findings by severity with file references and evidence.
 - all skill-XP-granting moments must produce floating text
 - progress signals get lightweight UI acknowledgement (e.g. map tab flashing on location discovery)
 - prefer expanding `scripts/playtest-cli.ts` over writing ad-hoc preview_eval scripts
-- prefer the dev-only `window.__test` harness (`src/game/testHarness.ts`, mounted from `App.tsx` behind `import.meta.env.DEV`) over ad-hoc `page.evaluate`/screenshot loops
-- prefer batching multi-step checks into one round trip with `window.__test.batch([{path, args}, ...])`
+- the dev-only `window.__test` browser harness (batched checks via `window.__test.batch([...])`) was removed with the legacy GUI; pending the GUI rebuild, reintroduce it rather than reaching for ad-hoc `page.evaluate`/screenshot loops
 - manually clearing browser storage does not reliably give you a fresh state. Use `/cheat reset`
 
 # Content pipeline TODO
