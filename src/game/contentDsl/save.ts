@@ -22,9 +22,40 @@ export interface SavedGame {
   diff: SaveDiff;
 }
 
-// The record-shaped fields of GameState: diffed key-by-key so a save only
-// carries the entries that actually changed, not whole-object replacement.
-const RECORD_FIELDS = ['flags', 'inventory', 'xp', 'visits', 'activeBuffs', 'resources'] as const;
+// Every field of GameState a save carries, and how it is carried: `record`
+// fields are diffed key-by-key so a save holds only the entries that changed,
+// `scalar` fields whole. `log` is transcript, not state, and is the one
+// deliberate omission.
+//
+// This is a Record over the exhaustive key type on purpose. diffing, loading and
+// comparing each used to keep their own hand-written list of fields, and three
+// passes in a row had to thread a new field through all of them by hand — the
+// "systems required to be manually kept in sync" CLAUDE.md prohibits. A field
+// missed that way is worse than lost: compareSave reports no difference for it.
+// Adding one to GameState is now a type error here until it is classified.
+type SaveField = Exclude<keyof GameState, 'log'>;
+
+const SAVE_FIELDS: Record<SaveField, 'record' | 'scalar'> = {
+  flags: 'record',
+  inventory: 'record',
+  xp: 'record',
+  visits: 'record',
+  activeBuffs: 'record',
+  resources: 'record',
+  location: 'scalar',
+  time: 'scalar',
+  rng: 'scalar',
+  player: 'scalar',
+  activeAction: 'scalar',
+  pendingModal: 'scalar',
+};
+
+function fieldsOfKind(kind: 'record' | 'scalar'): SaveField[] {
+  return (Object.keys(SAVE_FIELDS) as SaveField[]).filter((field) => SAVE_FIELDS[field] === kind);
+}
+
+const RECORD_FIELDS = fieldsOfKind('record');
+const SCALAR_FIELDS = fieldsOfKind('scalar');
 
 function deepEqual(a: unknown, b: unknown): boolean {
   return JSON.stringify(a) === JSON.stringify(b);
@@ -63,13 +94,9 @@ export function diffState(state: GameState, baseline: GameState): SaveDiff {
     const recordDiff = diffRecord(state[field] as Record<string, unknown>, baseline[field] as Record<string, unknown>);
     if (recordDiff) diff[field] = recordDiff;
   }
-
-  if (state.location !== baseline.location) diff.location = state.location;
-  if (state.time !== baseline.time) diff.time = state.time;
-  if (state.rng !== baseline.rng) diff.rng = state.rng;
-  if (!deepEqual(state.player, baseline.player)) diff.player = state.player;
-  if (!deepEqual(state.activeAction, baseline.activeAction)) diff.activeAction = state.activeAction;
-  if (state.pendingModal !== baseline.pendingModal) diff.pendingModal = state.pendingModal;
+  for (const field of SCALAR_FIELDS) {
+    if (!deepEqual(state[field], baseline[field])) diff[field] = state[field];
+  }
 
   return diff as SaveDiff;
 }
@@ -92,21 +119,19 @@ function checkVersion(saved: SavedGame): void {
 export function loadSave(state: GameState, saved: SavedGame, registry: Registry): void {
   checkVersion(saved);
   const base = initialState(registry);
-  const diff = saved.diff;
+  const diff = saved.diff as Record<string, unknown>;
+  const target = state as unknown as Record<string, unknown>;
+  const baseline = base as unknown as Record<string, unknown>;
 
-  state.flags = { ...base.flags, ...diff.flags };
-  state.inventory = { ...base.inventory, ...diff.inventory };
-  state.xp = { ...base.xp, ...diff.xp };
-  state.visits = { ...base.visits, ...diff.visits };
-  state.activeBuffs = { ...base.activeBuffs, ...diff.activeBuffs };
-  state.resources = { ...base.resources, ...diff.resources };
+  for (const field of RECORD_FIELDS) {
+    target[field] = { ...(baseline[field] as object), ...(diff[field] as object) };
+  }
+  for (const field of SCALAR_FIELDS) {
+    // `in` rather than `!== undefined`: a diff can legitimately carry an
+    // explicit undefined (pendingModal cleared against a baseline that had one).
+    target[field] = field in diff ? diff[field] : baseline[field];
+  }
   state.log = base.log;
-  state.location = diff.location ?? base.location;
-  state.time = diff.time ?? base.time;
-  state.rng = diff.rng ?? base.rng;
-  state.player = diff.player ?? base.player;
-  state.activeAction = diff.activeAction !== undefined ? diff.activeAction : base.activeAction;
-  state.pendingModal = 'pendingModal' in diff ? diff.pendingModal : base.pendingModal;
 }
 
 function describeValue(value: unknown): string {
@@ -129,8 +154,7 @@ export function compareSave(state: GameState, saved: SavedGame, registry: Regist
     }
   }
 
-  const scalarFields = ['location', 'time', 'rng', 'pendingModal', 'player', 'activeAction'] as const;
-  for (const field of scalarFields) {
+  for (const field of SCALAR_FIELDS) {
     if (!deepEqual(current[field], expected[field])) diffs.push(`${field}: ${describeValue(current[field])} vs ${describeValue(expected[field])}`);
   }
 
