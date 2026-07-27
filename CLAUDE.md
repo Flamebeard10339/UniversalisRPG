@@ -16,15 +16,15 @@ Do not bloat CLAUDE.md with over 200 lines of instructions.
   1. Main tabs: Map, Home, Character, Settings, Edit 
   2. Modals: dialogue, skills, stats
   3. Experience: floating text
-3. Game Engine (commits since audit: 0)
+3. Game Engine (commits since audit: 3)
   1. Core: State-driven UI, offline progression, travel and locations
   2. Data structures: locations, dialogue, quests, actions, resources, stats, skills, flags 
 4. Build & deployment (commits since audit: 0)
   1. Web: Vite build, tag-triggered publish to itch.io (`.github/workflows/publish.yml`)
   2. Android: Capacitor sync + Gradle release build, APK signing, attached to the GitHub release
-5. Testing procedure (commits since audit: 0)
-  1. Human testing: cli.ts, dev-mode
-  2. Agent testing: `window.__test` harness (`testHarness.ts`), `scripts/playtest-cli.ts` headless engine (nonfunctional pending DSL rewrite — see Content pipeline TODO), `agentSession.ts` GM/agent message protocol
+5. Testing procedure (commits since audit: 1)
+  1. Human/agent testing: `scripts/play-cli.ts` interactive REPL over `startSession`/`view`/`apply` (live `--live` real-time + instant piped/agent mode), named `# test` scripts run via `/test`
+  2. `scripts/playtest-cli.ts` headless engine (nonfunctional pending DSL rewrite — see Content pipeline TODO)
 
 # Audit prompt
 Audit the {repository-system} for correctness in the context of the last {N} commits impacting the system and global repository architecture. 
