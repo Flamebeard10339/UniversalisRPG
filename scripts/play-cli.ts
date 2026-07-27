@@ -10,6 +10,7 @@ import {
   beginAction,
   choiceToDirective,
   runTest,
+  sessionResources,
   startSession,
   submitModal,
   view,
@@ -81,6 +82,38 @@ function formatChoices(choices: PlayChoice[]): string[] {
   });
 }
 
+// A `full` pool renders as a labelled bar; the `minimal` pools collapse to one
+// row of single characters, each stepping through 8 stages by fill fraction —
+// a compact, always-moving readout (e.g. an attack-rate meter).
+const MINIMAL_STAGES = ['▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'];
+const BAR_WIDTH = 10;
+
+function fillRatio(current: number, max: number): number {
+  return max > 0 ? Math.min(1, Math.max(0, current / max)) : 0;
+}
+
+function tidy(n: number): string {
+  return Number.isInteger(n) ? String(n) : n.toFixed(1);
+}
+
+function fullBar(current: number, max: number): string {
+  const filled = Math.round(fillRatio(current, max) * BAR_WIDTH);
+  return `${'█'.repeat(filled)}${'░'.repeat(BAR_WIDTH - filled)} ${tidy(current)}/${tidy(max)}`;
+}
+
+function minimalGlyph(current: number, max: number): string {
+  const stage = Math.min(MINIMAL_STAGES.length - 1, Math.floor(fillRatio(current, max) * MINIMAL_STAGES.length));
+  return MINIMAL_STAGES[stage];
+}
+
+function formatResources(resources: PlayView['resources']): string[] {
+  const lines: string[] = [];
+  for (const r of resources) if (r.display === 'full') lines.push(`${r.title}: ${fullBar(r.current, r.max)}`);
+  const minimal = resources.filter((r) => r.display === 'minimal');
+  if (minimal.length > 0) lines.push(minimal.map((r) => `${r.title} ${minimalGlyph(r.current, r.max)}`).join('   '));
+  return lines;
+}
+
 function formatView(v: PlayView): string[] {
   const lines: string[] = [];
   for (const said of v.said) lines.push(said);
@@ -90,6 +123,7 @@ function formatView(v: PlayView): string[] {
     if (v.location.description) lines.push(v.location.description);
   }
   if (v.entities.length > 0) lines.push(`Here: ${v.entities.map((entity) => entity.title).join(', ')}`);
+  lines.push(...formatResources(v.resources));
   lines.push(...formatChoices(v.choices));
   lines.push(`[time: ${v.time}s]`);
   return lines;
@@ -100,12 +134,14 @@ function formatInventory(state: GameState): string[] {
   return [`Inventory: ${JSON.stringify(inventory)}`, `XP: ${JSON.stringify(state.xp)}`];
 }
 
-function formatState(state: GameState): string[] {
+function formatState(session: PlaySession): string[] {
+  const { state } = session;
   return [
     `Location: ${state.location}`,
     `Elapsed simulated time: ${state.time}s`,
     `Flags: ${JSON.stringify(state.flags)}`,
     ...formatInventory(state),
+    ...formatResources(sessionResources(session)),
   ];
 }
 
@@ -297,7 +333,7 @@ function handleGameplayCommand(session: PlaySession, currentView: PlayView, line
   }
 
   if (trimmed === '/state') {
-    return { output: formatState(session.state), quit: false };
+    return { output: formatState(session), quit: false };
   }
 
   if (trimmed === '/inventory' || trimmed === '/inv') {
@@ -313,7 +349,7 @@ function handleGameplayCommand(session: PlaySession, currentView: PlayView, line
   }
 
   if (trimmed === '/quit' || trimmed === '/q') {
-    return { output: formatState(session.state), quit: true };
+    return { output: formatState(session), quit: true };
   }
 
   if (trimmed.startsWith('/speed')) {

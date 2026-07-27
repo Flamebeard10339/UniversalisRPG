@@ -11,6 +11,12 @@ starting
 # item gold
 title: Gold
 
+# stat max-health
+base: 10
+
+# resource health
+max: max-health
+
 # entity chest
 open:
   give: 1 gold
@@ -71,7 +77,9 @@ describe('loadSave', () => {
     const state = initialState(registry);
     state.inventory.bread = 3;
     state.flags['tutorial.done'] = true;
+    state.resources.health = 4; // a damaged pool must survive the round trip, not reset to full
     const serialized = serializeSave(state, registry);
+    expect(JSON.parse(serialized).resources).toEqual({ health: 4 });
 
     const { saved } = parseSaveSection({
       kind: 'save',

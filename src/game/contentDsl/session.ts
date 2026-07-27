@@ -15,14 +15,17 @@ import {
   RuntimeError,
   choose,
   createGameState,
+  initResources,
   recipeCraftable,
   renderSegments,
   resolve,
+  statValue,
   talk,
   travelFirstUnit,
   useAction,
   useTravel,
 } from './runtime';
+import { ResourceDisplay } from './resource';
 import { compareSave, loadSave, startingLocationId } from './save';
 import { Directive } from './test';
 import { humanize } from './values';
@@ -43,6 +46,7 @@ export interface PlayView {
   said: string[];
   choices: PlayChoice[];
   time: number;
+  resources: Array<{ id: string; title: string; current: number; max: number; display: ResourceDisplay }>;
   pendingModal?: string;
 }
 
@@ -197,6 +201,7 @@ export function startSession(registry: Registry, state: GameState = createGameSt
     const starting = startingLocationId(registry);
     if (starting) state.location = starting;
   }
+  initResources(state, registry);
   return { registry, state, dialogue: null, logCursor: state.log.length };
 }
 
@@ -221,8 +226,23 @@ export function view(session: PlaySession): PlayView {
     said,
     choices: computeChoices(session),
     time: state.time,
+    resources: sessionResources(session),
     pendingModal: state.pendingModal,
   };
+}
+
+// Every declared pool with its live max derived from stats (so a +max buff
+// widens the bar). Split out from view() with no side effects, so a driver can
+// re-read the pools (e.g. play-cli's /state) without consuming the log cursor.
+export function sessionResources(session: PlaySession): PlayView['resources'] {
+  const { registry, state } = session;
+  return [...registry.resources.values()].map((resource) => ({
+    id: resource.id,
+    title: resource.title,
+    current: state.resources[resource.id] ?? 0,
+    max: statValue(resource.max, state, registry),
+    display: resource.display,
+  }));
 }
 
 export function apply(session: PlaySession, choiceId: string): PlayView {

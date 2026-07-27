@@ -255,13 +255,17 @@ food, +3 regeneration, 60s
 once, 4s
 ```
 
-Two of these clauses are live, not just parsed data:
+Three of these clauses are live, not just parsed data:
 
 - An item tagged `food` grants its stat-bonus clauses as **timed buffs** the
   moment an action *eats* it — see [Eating](#eating) below.
 - An entity/item action tagged `repeating` is a **spannable, looping**
   action rather than a one-shot — see `time:`/`speed:` and
   [Spannable & repeating actions](#spannable--repeating-actions) below.
+- An action's stat-bonus clauses are **modifiers that apply only while that
+  action runs** — the same math as a buff, with no add/remove bookkeeping (they
+  vanish the instant the action stops). This is how an action drains or feeds a
+  pool — see [resource](#resource) below.
 
 ## 4. Kinds
 
@@ -383,6 +387,57 @@ lists that entity id in its `entities:`. Recipes are pure declarative data —
 crafting consumes `in`, produces `out`, grants the `skill:` xp if present, and
 appends `say:` to the log if present. There is no `on craft:` effect block;
 recipes cannot set flags or fire arbitrary results.
+
+### resource
+
+A depleting/regenerating pool the engine integrates over time — health, energy,
+a rage meter. Its `current` level lives in game state; its maximum is always
+derived live from a stat, so a buff to that stat raises the ceiling.
+
+```
+resource:
+  rate: stat id, no default (absent = a static pool that never moves on its own)
+  max:  stat id, REQUIRED (max = statValue(max), live)
+  start: number, no default (absent = start full, i.e. at max)
+  display: full | minimal, defaults to full
+  on empty: result block — fires once when current falls from >0 to 0
+  on full:  result block — presence makes it a rollover meter (see below)
+```
+
+```
+# resource health
+rate: regeneration
+max: max-health
+on empty:
+  say: You black out.
+  set: fainted
+```
+
+The pool changes at **`statValue(rate)` per minute** — one stat, signed: a
+positive net value regenerates, a negative one drains. There is no separate
+"regen" and "drain", and nothing writes a pool level directly. To make an
+action affect a pool, give the **action a stat-bonus tag** on the pool's rate
+stat — the exact same tag-clause grammar and buff machinery as food and
+equipment (a buff is just temporary equipment):
+
+```
+# entity rat
+attack:
+  repeating
+  time: 1
+  -5 regeneration          # net regeneration goes negative WHILE attacking => health drains
+  give: 1 rat-tail
+```
+
+`on empty` fires its effects once when the pool empties; `on full` turns the
+pool into a rollover meter — on reaching `max` it resets to 0 and fires its
+effects (batched per rollover if the pool fills several times at once). A pool
+with neither block simply clamps at 0/`max`. `display: minimal` renders as a
+single character stepping through ~8 stages (for a fast, always-moving readout);
+`full` renders a labelled bar.
+
+> Units note: resource rates are **per minute**. Tag-clause *durations* (`60s`,
+> `1m40s`) stay in seconds — only the rate magnitude is per-minute.
 
 ### location
 

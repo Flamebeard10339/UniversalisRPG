@@ -20,8 +20,24 @@ base: 5
 
 # stat regeneration
 
+# stat max-health
+base: 30
+
 # stat cooking-speed
 base: 1
+
+// --- resources ---
+
+// Health drains while you fight (the rat's `fight` carries a -regeneration tag,
+// so net regeneration goes negative for the fight's duration) and recovers from
+// the regeneration a meal grants. Rates are per minute.
+# resource health
+rate: regeneration
+max: max-health
+display: full
+on empty:
+  say: You slump to the floor, spent. (You should have eaten something.)
+  set: fainted
 
 // --- skills ---
 
@@ -164,6 +180,7 @@ examine: Three hunched rats claw at overturned crates, eyes red in the dark.
 fight:
   hidden if: tutorial.rats-killed >= 3
   time: 3
+  -120 regeneration
   xp: melee 5
   on success:
     add: tutorial.rats-killed 1

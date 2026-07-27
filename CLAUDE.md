@@ -4,27 +4,29 @@ Optimize for correctness, bounded scope, reuse, architectural coherence, strong 
 
 Track which systems commits impact and prompt an independent system audit when un-audited commits > 10. Keep independent systems independent. Do not create systems that are required to be manually kept in sync. 
 
+Make commits after each logical chunk. 
+
 Do not bloat CLAUDE.md with over 200 lines of instructions. 
 
 `.planning/.scratch.md` contains open thoughts, `backlog.md` for vetted work, `completed-tasks.md` contains the archive. 
 
 # Repository systems
-1. Content pipeline through DSL markdown files (commits since audit: 0)
+1. Content pipeline through DSL markdown files (commits since audit: 1)
   1. Contribution system: editor, validation/merge engine
   2. DSL system: grammar, parser, compiler, loader
 2. User interface (commits since audit: 0)
   1. Main tabs: Map, Home, Character, Settings, Edit 
   2. Modals: dialogue, skills, stats
   3. Experience: floating text
-3. Game Engine (commits since audit: 3)
+3. Game Engine (commits since audit: 4)
   1. Core: State-driven UI, offline progression, travel and locations
   2. Data structures: locations, dialogue, quests, actions, resources, stats, skills, flags 
 4. Build & deployment (commits since audit: 0)
   1. Web: Vite build, tag-triggered publish to itch.io (`.github/workflows/publish.yml`)
   2. Android: Capacitor sync + Gradle release build, APK signing, attached to the GitHub release
-5. Testing procedure (commits since audit: 1)
+5. Testing procedure (commits since audit: 2)
   1. Human/agent testing: `scripts/play-cli.ts` interactive REPL over `startSession`/`view`/`apply` (live `--live` real-time + instant piped/agent mode), named `# test` scripts run via `/test`
-  2. `scripts/playtest-cli.ts` headless engine (nonfunctional pending DSL rewrite — see Content pipeline TODO)
+  2. `scripts/playtest-cli.ts` headless replay of a saved choiceId script through `startSession`/`apply`, writing a transcript (zero browser, zero real wait)
 
 # Audit prompt
 Audit the {repository-system} for correctness in the context of the last {N} commits impacting the system and global repository architecture. 
@@ -59,25 +61,4 @@ Report findings by severity with file references and evidence.
 - the dev-only `window.__test` browser harness (batched checks via `window.__test.batch([...])`) was removed with the legacy GUI; pending the GUI rebuild, reintroduce it rather than reaching for ad-hoc `page.evaluate`/screenshot loops
 - manually clearing browser storage does not reliably give you a fresh state. Use `/cheat reset`
 
-# Content pipeline TODO
-
-The DSL/JSON content-authoring pipeline (grammar, parser, compiler, loader,
-validation/merge engine, and the GitHub contribution/patch system built on top
-of it) was deleted wholesale on 2026-07-11 and is being redesigned from
-scratch on the `dsl-rewrite` branch — see `docs/dsl-rewrite/postmortem.md` for
-why, and `docs/dsl-rewrite/implementation-plan.md` for the rewrite plan. No
-backwards-compatibility shims or migration path from the old format: the new
-system starts clean and content is being hand-authored fresh against it.
-
-For a check worth running again later (a regression you just fixed, a flow you want
-covered going forward), don't leave it as a one-off `preview_eval` transcript —
-convert it into a headless playtest via `scripts/playtest-cli.ts`/`scripts/
-playtestEngine.ts`, which replay a saved choiceId script against the pure engine
-(zero browser, zero real wait) and write a transcript. **This tooling is currently
-nonfunctional**: its `readModule`/`loadStagedBundle` functions depend on the DSL/
-JSON content pipeline deleted on 2026-07-11 (see `docs/dsl-rewrite/postmortem.md`),
-and the `.playtests/` fixtures (`profiles/*.json`, `scripts/*.json`) were deleted
-along with it since they were tied to now-gone content. Once the pipeline rewrite
-(`docs/dsl-rewrite/implementation-plan.md`) has a working loader, rewire these two
-scripts to it and re-establish this workflow rather than reinventing it.
 

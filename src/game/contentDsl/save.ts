@@ -1,5 +1,5 @@
 import { DslError } from './parser';
-import { createGameState, GameState, Registry, RuntimeError } from './runtime';
+import { createGameState, GameState, initResources, Registry, RuntimeError } from './runtime';
 import { RawSection } from './structure';
 
 // Versioned so a future format change fails loudly instead of silently
@@ -20,7 +20,7 @@ export interface SavedGame {
 
 // The record-shaped fields of GameState: diffed key-by-key so a save only
 // carries the entries that actually changed, not whole-object replacement.
-const RECORD_FIELDS = ['flags', 'inventory', 'xp', 'visits', 'activeBuffs'] as const;
+const RECORD_FIELDS = ['flags', 'inventory', 'xp', 'visits', 'activeBuffs', 'resources'] as const;
 
 function deepEqual(a: unknown, b: unknown): boolean {
   return JSON.stringify(a) === JSON.stringify(b);
@@ -47,6 +47,7 @@ export function initialState(registry: Registry): GameState {
   const state = createGameState();
   const starting = startingLocationId(registry);
   if (starting) state.location = starting;
+  initResources(state, registry);
   return state;
 }
 
@@ -94,6 +95,7 @@ export function loadSave(state: GameState, saved: SavedGame, registry: Registry)
   state.xp = { ...base.xp, ...diff.xp };
   state.visits = { ...base.visits, ...diff.visits };
   state.activeBuffs = { ...base.activeBuffs, ...diff.activeBuffs };
+  state.resources = { ...base.resources, ...diff.resources };
   state.log = base.log;
   state.location = diff.location ?? base.location;
   state.time = diff.time ?? base.time;

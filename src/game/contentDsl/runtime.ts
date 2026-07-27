@@ -6,6 +6,7 @@ import { Item, itemSchema } from './item';
 import { Location, locationSchema, resolveCoordinates } from './location';
 import { parseModule } from './module';
 import { Recipe, recipeSchema } from './recipe';
+import { Resource, resourceSchema } from './resource';
 import { SavedGame } from './save';
 import { scopeEntity } from './scope';
 import { Authored, hydrateSection } from './section';
@@ -52,6 +53,12 @@ export interface GameState {
   time: number;
   activeAction: ActiveAction | null;
   activeBuffs: Record<string, ActiveBuff>;
+  // Current level of each `# resource` pool, keyed by resource id. The pool's
+  // max is not stored — it's always derived live via statValue(resource.max),
+  // so a +max buff raises the ceiling without rewriting saved state. Populated
+  // from each resource's start value by initResources (createGameState leaves it
+  // empty because it has no registry).
+  resources: Record<string, number>;
   // Deterministic PRNG cursor (LCG state), advanced only when resolving an
   // attempt of an `accuracy` action — deterministic actions never draw. Living
   // in state (not a parameter) counts draws in attempt order regardless of how
@@ -69,7 +76,7 @@ export interface GameState {
 const DEFAULT_RNG_SEED = 20260718;
 
 export function createGameState(location = ''): GameState {
-  return { flags: {}, inventory: {}, location, visits: {}, xp: {}, log: [], time: 0, activeAction: null, activeBuffs: {}, rng: DEFAULT_RNG_SEED, player: { name: '', race: '' } };
+  return { flags: {}, inventory: {}, location, visits: {}, xp: {}, log: [], time: 0, activeAction: null, activeBuffs: {}, resources: {}, rng: DEFAULT_RNG_SEED, player: { name: '', race: '' } };
 }
 
 // A small LCG (same shape as glibc's rand()): advances state.rng and returns a
@@ -104,6 +111,7 @@ export interface Registry {
   // Each recipe's compiled Action form (see recipeAction), built once at load
   // and looked up by findActionOwner('recipe', ...).
   recipeActions: Map<string, Action>;
+  resources: Map<string, Resource>;
   dialogues: Map<string, Dialogue>;
   dialoguesByOwner: Map<string, Dialogue>;
   tests: Map<string, Test>;
@@ -121,6 +129,7 @@ export function loadModule(source: string): Registry {
     skills: new Map(),
     recipes: new Map(),
     recipeActions: new Map(),
+    resources: new Map(),
     dialogues: new Map(),
     dialoguesByOwner: new Map(),
     tests: new Map(),
@@ -159,6 +168,12 @@ export function loadModule(source: string): Registry {
         const recipe = hydrateSection(section.value as Authored<Recipe>, recipeSchema);
         registry.recipes.set(recipe.id, recipe);
         registry.recipeActions.set(recipe.id, recipeAction(recipe));
+        break;
+      }
+      case 'resource': {
+        const resource = hydrateSection(section.value as Authored<Resource>, resourceSchema);
+        if (!resource.max) throw new RuntimeError(`# resource ${resource.id} requires a max: stat`);
+        registry.resources.set(resource.id, resource);
         break;
       }
       case 'dialogue': {
@@ -456,8 +471,13 @@ function findActiveAction(active: ActiveAction, registry: Registry): Action {
   return action;
 }
 
-// base + Σ(added), then × (1 + Σ(increased)). An active buff is just another
-// modifier source alongside the stat's own base.
+// base + Σ(added), then × (1 + Σ(increased)). Modifiers come from two sources,
+// both flowing through the same math: timed buffs (eaten food / future
+// equipment), and the currently-active action's own stat-bonus tags — which act
+// as modifiers ONLY while that action runs (they vanish the instant activeAction
+// clears, with no add/remove bookkeeping). This is how an action drains or
+// boosts a resource: e.g. an attack tagged `-5 regeneration` pushes the health
+// pool's rate stat negative for the fight's duration and nothing more.
 export function statValue(statId: string, state: GameState, registry: Registry): number {
   const base = registry.stats.get(statId)?.base ?? 0;
   let added = 0;
@@ -467,7 +487,30 @@ export function statValue(statId: string, state: GameState, registry: Registry):
     if (buff.kind === 'added') added += buff.amount;
     else increased += buff.amount;
   }
+  if (state.activeAction) {
+    const action = findActiveAction(state.activeAction, registry);
+    for (const tag of action.tags ?? []) {
+      if (tag.kind !== 'stat-bonus' || tag.statId !== statId) continue;
+      if (tag.percent) increased += tag.amount / 100;
+      else added += tag.amount;
+    }
+  }
   return (base + added) * (1 + increased);
+}
+
+// Fills any pool the state doesn't already carry with its starting level: the
+// authored `start` if given, else full (the live max). Called wherever a fresh
+// baseline is built (save's initialState) or a live session begins (session's
+// startSession); createGameState can't do it because it has no registry. Only
+// missing pools are set, so a state loaded from a save keeps its levels — and a
+// save that predates a newly-added resource gains it at full (free migration).
+// At init there are no buffs, so max == the base stat.
+export function initResources(state: GameState, registry: Registry): void {
+  for (const resource of registry.resources.values()) {
+    if (state.resources[resource.id] === undefined) {
+      state.resources[resource.id] = resource.start ?? statValue(resource.max, state, registry);
+    }
+  }
 }
 
 function attemptDuration(action: Action, state: GameState, registry: Registry): number {
@@ -567,11 +610,73 @@ function applyFightBatch(action: Action, count: number, outcome: FightOutcome, s
 }
 
 const EPSILON = 1e-9;
+const SECONDS_PER_MINUTE = 60;
+
+// A resource's rate/max snapshot taken at a segment's start, while the
+// (possibly about-to-clear) active action's modifiers are still in force. The
+// rate is constant across a segment — stat values only change at boundaries —
+// so this snapshot drives the whole segment's closed-form integration.
+interface ResourceSnapshot {
+  resource: Resource;
+  ratePerMinute: number;
+  max: number;
+}
+
+// Only pools with a nonzero net rate move; a static or net-zero pool is skipped
+// entirely, which is what keeps an idle world crossing huge spans in O(1).
+function captureResourceRates(state: GameState, registry: Registry): ResourceSnapshot[] {
+  const snapshots: ResourceSnapshot[] = [];
+  for (const resource of registry.resources.values()) {
+    const ratePerMinute = resource.rate ? statValue(resource.rate, state, registry) : 0;
+    if (ratePerMinute === 0) continue;
+    snapshots.push({ resource, ratePerMinute, max: statValue(resource.max, state, registry) });
+  }
+  return snapshots;
+}
+
+// Integrates each snapshotted pool over `dt` seconds of constant rate (rates are
+// per MINUTE, hence dt/60). A plain pool clamps to [0, max]. A pool with `on
+// full` is a rollover meter: it empties and fires its effects ⌊raw/max⌋ times,
+// batched per rollover (associative across arbitrary splits — the same guarantee
+// applyFightBatch gives fight completions). `on empty` fires once as a pool
+// crosses from >0 to 0; that firing is exact because nextBoundary puts a
+// boundary at the emptying instant, so the crossing always lands on a segment end.
+function integrateResources(state: GameState, snapshots: ResourceSnapshot[], dt: number): void {
+  const dtMinutes = dt / SECONDS_PER_MINUTE;
+  for (const { resource, ratePerMinute, max } of snapshots) {
+    const current = state.resources[resource.id] ?? 0;
+    const raw = current + ratePerMinute * dtMinutes;
+    if (ratePerMinute > 0 && resource.onFull.length > 0 && max > 0) {
+      const fires = Math.floor(raw / max);
+      if (fires > 0) for (const result of resource.onFull) applyResultBatch(result, fires, state);
+      state.resources[resource.id] = raw - fires * max;
+    } else {
+      const clamped = Math.min(max, Math.max(0, raw));
+      if (ratePerMinute < 0 && current > EPSILON && clamped <= EPSILON && resource.onEmpty.length > 0) {
+        for (const result of resource.onEmpty) applyResult(result, state);
+      }
+      state.resources[resource.id] = clamped;
+    }
+  }
+}
+
+// Clamps every pool into [0, its live max]; called once a boundary settles, so a
+// max-shrinking event (e.g. a +max buff expiring) can't leave a pool above its
+// new ceiling.
+function clampResources(state: GameState, registry: Registry): void {
+  for (const resource of registry.resources.values()) {
+    const level = state.resources[resource.id];
+    if (level === undefined) continue;
+    const max = statValue(resource.max, state, registry);
+    state.resources[resource.id] = Math.min(max, Math.max(0, level));
+  }
+}
 
 // The earliest instant in [state.time, toTime] at which something discrete
 // must happen (a buff expiring, a repeating action running out of input, a
-// non-repeating action completing), or toTime if nothing does — what lets
-// resolve() cross a huge idle span in one step.
+// non-repeating action completing, a draining pool with `on empty` hitting 0),
+// or toTime if nothing does — what lets resolve() cross a huge idle span in one
+// step.
 function nextBoundary(state: GameState, registry: Registry, toTime: number): number {
   let boundary = toTime;
   for (const buff of Object.values(state.activeBuffs)) {
@@ -600,6 +705,20 @@ function nextBoundary(state: GameState, registry: Registry, toTime: number): num
         if (completionInstant < boundary) boundary = completionInstant;
       }
     }
+  }
+  // A draining pool with an `on empty` handler must break the segment exactly
+  // when it hits 0, so onEmpty fires once at the right instant. A pool without
+  // an on-empty handler just clamps silently and needs no boundary; nor does a
+  // filling pool (its rollover is closed-form and associative in-segment).
+  for (const resource of registry.resources.values()) {
+    if (resource.onEmpty.length === 0 || !resource.rate) continue;
+    const ratePerMinute = statValue(resource.rate, state, registry);
+    if (ratePerMinute >= 0) continue;
+    const current = state.resources[resource.id] ?? 0;
+    if (current <= EPSILON) continue;
+    const drainPerSecond = -ratePerMinute / SECONDS_PER_MINUTE;
+    const emptyInstant = state.time + current / drainPerSecond;
+    if (emptyInstant < boundary) boundary = emptyInstant;
   }
   return boundary;
 }
@@ -698,19 +817,29 @@ function resolveStochasticSegment(state: GameState, registry: Registry, action: 
 }
 
 function resolveSegment(state: GameState, registry: Registry, segEnd: number): void {
+  const start = state.time;
+  // Snapshot resource rates now, while the active action's modifiers are still
+  // in force — the stochastic path can clear the action before we integrate.
+  const snapshots = captureResourceRates(state, registry);
+
   if (!state.activeAction) {
-    advanceTime(state, segEnd - state.time);
-    return;
+    advanceTime(state, segEnd - start);
+  } else {
+    const action = findActiveAction(state.activeAction, registry);
+    if (action.accuracy) {
+      resolveStochasticSegment(state, registry, action, segEnd);
+    } else {
+      resolveDeterministicSegment(state, registry, action, segEnd);
+      advanceTime(state, segEnd - state.time);
+    }
   }
 
-  const action = findActiveAction(state.activeAction, registry);
-  if (action.accuracy) {
-    resolveStochasticSegment(state, registry, action, segEnd);
-    return;
-  }
-
-  resolveDeterministicSegment(state, registry, action, segEnd);
-  advanceTime(state, segEnd - state.time);
+  // Integrate over the time the segment actually consumed: a stochastic action
+  // that exhausts its input mid-segment stops early, and its untouched tail
+  // resolves as a later action-less segment where rates are re-snapshotted (so
+  // an action's drain stops the instant the action does).
+  const elapsed = state.time - start;
+  if (elapsed > 0) integrateResources(state, snapshots, elapsed);
 }
 
 // Fires whatever is due exactly at `at` and keeps re-checking until nothing
@@ -753,7 +882,12 @@ function applyDueBoundaries(state: GameState, registry: Registry, at: number): v
       }
     }
 
-    if (!changed) return;
+    if (!changed) {
+      // Once the boundary has settled, re-clamp pools so a max shrunk by an
+      // expired buff can't leave one above its new ceiling.
+      clampResources(state, registry);
+      return;
+    }
   }
 }
 
@@ -764,7 +898,14 @@ function applyDueBoundaries(state: GameState, registry: Registry, at: number): v
 // segments bounded by the next discrete event, never fixed dt steps, so a
 // deterministic segment resolves in closed form. Randomness (accuracy actions)
 // is drawn only from state.rng at attempt boundaries, in strict attempt order,
-// so splitting the call can't change which draw powers which attempt.
+// so splitting the call can't change which draw powers which attempt. Resource
+// pools (Pass 2) integrate per segment at a constant per-minute rate and stay
+// associative the same way — with two accepted, bounded limitations: an `on
+// full` handler is assumed segment-preserving (inventory/counter/say; one that
+// mutated a rate-referenced stat would be non-associative), and a stochastic
+// (accuracy) action whose modifier empties a pool mid-fight fires `on empty` at
+// segment granularity, not the exact fractional attempt instant (deterministic
+// paths are exact — nextBoundary lands the segment on the emptying instant).
 export function resolve(state: GameState, registry: Registry, toTime: number): void {
   if (toTime < state.time) throw new RuntimeError(`resolve: toTime (${toTime}) must be >= state.time (${state.time})`);
   applyDueBoundaries(state, registry, state.time);

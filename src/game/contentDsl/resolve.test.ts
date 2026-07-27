@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ActiveAction, craft, createGameState, GameState, loadModule, Registry, resolve, RuntimeError, statValue, useAction } from './runtime';
+import { ActiveAction, craft, createGameState, GameState, initResources, loadModule, Registry, resolve, RuntimeError, statValue, useAction } from './runtime';
 
 // Fixture for the resolver tests: a speed stat, a food item that doubles it
 // for a fixed window, an unbounded repeating cook recipe (campfire-cook — no
@@ -453,5 +453,157 @@ describe('resolve: onSuccess batches per completion, not per segment (Pass-1 reg
     // skill id stays global.
     expect(oneShot.flags['kiln.bricks-fired']).toBe(1000);
     expect(oneShot.xp['smithing']).toBe(2000);
+  });
+});
+
+// ── Pass 2: resource pools + effects(rate) ─────────────────────────────────
+// Rates are per MINUTE (Δ = statValue(rate)·dt/60). A pool changes only through
+// its rate stat; an action drains/boosts one purely by carrying a stat-bonus
+// tag on that stat (same buff machinery as food). `engine.run` fills a rollover
+// meter (`spark`, +240/min into a cap-3 pool) and drains a plain pool (`hp`,
+// -120/min from 100 => empties at t=50) while it runs, and gives a cog per
+// completion — so one fixture exercises rollover batching, on-empty, action
+// modifiers, and fight-completion batching together.
+const RESOURCE_MODULE = `
+# stat regen-rate
+base: 0
+
+# stat max-hp
+base: 100
+
+# item ember
+
+# item cog
+
+# resource hp
+rate: regen-rate
+max: max-hp
+on empty:
+  set: fainted
+
+# stat spark-rate
+base: 0
+
+# stat spark-cap
+base: 3
+
+# resource spark
+rate: spark-rate
+max: spark-cap
+start: 0
+on full:
+  give: 1 ember
+
+# entity engine
+run:
+  repeating
+  time: 1
+  -120 regen-rate
+  +240 spark-rate
+  give: 1 cog
+`;
+
+describe('resolve: rollover meter (test 2 — pure onFull = empty, batched)', () => {
+  it('a +2.5/min pool with max 1, starting empty, rolls over exactly floor(2.5)=2 times in one minute and ends at 0.5', () => {
+    const registry = loadModule(`
+# stat charge-rate
+base: 2.5
+# stat charge-cap
+base: 1
+# item spark
+# resource charge
+rate: charge-rate
+max: charge-cap
+start: 0
+on full:
+  give: 1 spark
+`);
+    const state = createGameState();
+    initResources(state, registry);
+
+    resolve(state, registry, 60); // one minute
+
+    expect(state.inventory['spark']).toBe(2);
+    expect(state.resources['charge']).toBeCloseTo(0.5, 9);
+    expect(state.time).toBe(60);
+  });
+});
+
+describe('resolve: net-zero / idle drain falls out (test 3 — O(1) over a huge span)', () => {
+  it('a pool whose rate stat nets to zero never moves and resolve() crosses a billion seconds in O(1)', () => {
+    const registry = loadModule(`
+# stat still-rate
+base: 0
+# stat still-cap
+base: 5
+# resource pond
+rate: still-rate
+max: still-cap
+on empty:
+  set: dry
+`);
+    const state = createGameState();
+    initResources(state, registry); // pond = 5 (full)
+
+    const started = performance.now();
+    resolve(state, registry, 1_000_000_000);
+    const elapsedMs = performance.now() - started;
+
+    expect(state.resources['pond']).toBe(5); // never moved: net rate 0 => no boundary
+    expect(state.flags['dry']).toBeUndefined();
+    expect(state.time).toBe(1_000_000_000);
+    expect(elapsedMs).toBeLessThan(50); // a couple of segments, not a fixed-dt march
+  });
+});
+
+describe('resolve: resource associativity (the invariant, extended to pools)', () => {
+  it('resource levels, on-empty, and rollover fires all match one-shot vs arbitrary splits, including the exact empty instant', () => {
+    const registry = loadModule(RESOURCE_MODULE);
+
+    function fresh(): GameState {
+      const state = createGameState();
+      initResources(state, registry); // hp = 100 (full), spark = 0
+      state.activeAction = { ownerRef: 'entity.engine', actionLabel: 'run', progress: 0, repeating: true, healthRemaining: 1, attemptsMade: 0 };
+      return state;
+    }
+
+    const oneShot = fresh();
+    resolve(oneShot, registry, 55);
+    // Sanity on the fixture: hp empties at t=50 and stays there; spark rolled over.
+    expect(oneShot.flags['fainted']).toBe(true);
+    expect(oneShot.resources['hp']).toBe(0);
+    expect(oneShot.inventory['cog']).toBe(55); // one completion per second
+    expect(oneShot.inventory['ember']).toBeGreaterThan(0);
+
+    let seed = 2026;
+    const rand = () => {
+      seed = (seed * 1103515245 + 12345) % 2147483648;
+      return seed / 2147483648;
+    };
+
+    for (let trial = 0; trial < 25; trial++) {
+      const waypoints = new Set<number>([50]); // force a split exactly on the emptying instant
+      const splitCount = 3 + Math.floor(rand() * 5);
+      for (let i = 0; i < splitCount; i++) waypoints.add(rand() * 55);
+      const sorted = [...waypoints].filter((t) => t > 0 && t < 55).sort((a, b) => a - b);
+      sorted.push(55);
+
+      const folded = fresh();
+      for (const t of sorted) resolve(folded, registry, t);
+
+      expect(folded.time).toBe(oneShot.time);
+      // Discrete outcomes must be bit-exact regardless of split: rollover fire
+      // count (ember), completion count (cog), and the single on-empty flag.
+      expect(folded.inventory).toEqual(oneShot.inventory);
+      expect(folded.flags).toEqual(oneShot.flags);
+      expect(folded.xp).toEqual(oneShot.xp);
+      expect(folded.activeAction).toEqual(oneShot.activeAction);
+      // Continuous pool levels reconverge within float tolerance (the carried
+      // rollover remainder accrues tiny per-split float error — an accepted,
+      // bounded limitation, not a divergence).
+      for (const id of Object.keys(oneShot.resources)) {
+        expect(folded.resources[id]).toBeCloseTo(oneShot.resources[id], 6);
+      }
+    }
   });
 });
