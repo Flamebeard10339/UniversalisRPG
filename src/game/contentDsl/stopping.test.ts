@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { point } from './range';
 import { armAction, createGameState, GameState, initResources, loadModule, Registry, resolve } from './runtime';
 
 // An action outliving the circumstances that let it start is the bug this
@@ -31,6 +32,16 @@ max: max-health
 on empty:
   say: You black out.
   take: 1 rat-tail
+  stop
+
+// A pool whose ceiling is entirely buff-granted: max-vigor has no base:, so when
+// the buff lapses the max falls to 0 and the pool has nowhere to be but empty.
+# stat max-vigor
+
+# resource vigor
+max: max-vigor
+on empty:
+  say: Your vigor gutters out.
   stop
 
 # item rat-tail
@@ -203,6 +214,25 @@ describe('a pool running out stops the fight', () => {
     expect(state.inventory['blessing']).toBe(30);
     expect(state.resources['health']).toBe(0);
     expect(state.activeAction).toBeNull();
+  });
+
+  // A pool can also empty because its CEILING fell, not because anything drained
+  // it. clampResources used to write state.resources directly, which made it a
+  // third way a pool could move past setPoolLevel — the seam that owns the
+  // on-empty rule — so a max shrinking to 0 zeroed the pool in silence.
+  it('fires on empty: when a shrinking max squeezes a pool to nothing', () => {
+    const { registry, state } = started();
+    armAction('entity', 'beacon', 'tend', registry, state);
+    state.activeBuffs['elixir:max-vigor'] = { statId: 'max-vigor', amount: point(20), kind: 'added', expiresAt: 10 };
+    state.resources['vigor'] = 20;
+
+    resolve(state, registry, 20);
+
+    expect(state.resources['vigor']).toBe(0);
+    expect(state.log).toContain('Your vigor gutters out.');
+    // And the stop beside it took effect: 10 blessings, not 20.
+    expect(state.activeAction).toBeNull();
+    expect(state.inventory['blessing']).toBe(10);
   });
 
   it('lands death at the same instant however the span is split', () => {

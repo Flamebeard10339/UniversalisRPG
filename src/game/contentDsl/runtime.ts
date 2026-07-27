@@ -1184,15 +1184,24 @@ function applyFightBatchNow(action: Action, count: number, outcome: FightOutcome
   if (effects.stopped) state.activeAction = null;
 }
 
-// Clamps every pool into [0, its live max]; called once a boundary settles, so a
-// max-shrinking event (e.g. a +max buff expiring) can't leave a pool above its
-// new ceiling.
+// Re-seats every pool under its live max; called once a boundary settles, so a
+// max-shrinking event (a +max buff expiring, a max stat driven down) can't leave
+// a pool above its new ceiling.
+//
+// It goes through setPoolLevel like every other way a pool moves. Writing
+// state.resources directly made this a THIRD way, past the seam setPoolLevel
+// documents itself as being — and the rules had duly drifted: a max shrinking to
+// 0 silently zeroed the pool, so the `stop` in its `on empty:` never fired and
+// the fight it was meant to end carried on with the player at nothing.
 function clampResources(state: GameState, registry: Registry): void {
   for (const resource of registry.resources.values()) {
     const level = state.resources[resource.id];
     if (level === undefined) continue;
     const max = statValue(resource.max, state, registry);
-    state.resources[resource.id] = Math.min(max, Math.max(0, level));
+    // A ceiling only ever pushes a level down, so this can never read as a
+    // rollover. Passing the ceiling-limited level as the destination is what
+    // lets setPoolLevel see the fall and fire `on empty` at the bottom of it.
+    setPoolLevel(state, registry, resource, level, Math.min(max, level), max);
   }
 }
 
