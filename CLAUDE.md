@@ -4,7 +4,19 @@ Optimize for correctness, bounded scope, reuse, architectural coherence, strong 
 
 Track which systems commits impact and prompt an independent system audit when un-audited commits > 10. Keep independent systems independent. Do not create systems that are required to be manually kept in sync. 
 
-Make commits after each logical chunk. Only write comments that record a *decision*, not a *mechanism*. If a mechanistic comment is required, then the code is not self-documenting and must be rethought. 
+Make commits after each logical chunk.
+
+# Comments
+
+Comments are capped at 5% of a file's lines, gated by `npm run comment-budget` in CI. This is a hard budget, not an aspiration: spend it on the few facts that earn it.
+
+Keep a comment only if the fact is **owned by this file**, **not derivable from reading it**, and expressible as neither a name, a type, nor a test. Otherwise it has a destination — rename it, type it, test it, or leave it in the commit message and the audit log. Deleting it loses nothing; git holds every word.
+
+Never describe another module's contract. That comment drifts the moment its owner changes, and the owner is the ground truth a reader should go to instead.
+
+Never close an audit finding by writing its rationale into the source. The finding lives in `docs/audits/`, its fix lives in the code, and every behavioural claim it makes lives in a test. A comment restating a finding is a third copy that cannot be executed and will rot.
+
+Strip passes must pass `npm run comment-only -- <base>`, which proves no code changed. Renames go in their own commit so that proof stays honest.
 
 Do not bloat CLAUDE.md with over 200 lines of instructions. 
 
