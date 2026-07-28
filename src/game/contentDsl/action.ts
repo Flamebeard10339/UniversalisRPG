@@ -33,7 +33,7 @@ export interface Action {
   // means a fixed multiplier of 1.
   speed?: string;
   // The attacker's skill in the opposed roll that decides whether each attempt
-  // lands (see hitChance in runtime.ts). Absent means every attempt is a
+  // lands (see hitChance in stats.ts). Absent means every attempt is a
   // certain, deterministic hit — no randomness is drawn for this action at all
   // (see runtime.ts's resolve()/RNG contract). A stat is never read as a raw
   // probability: the chance always comes out of this stat against `evasion:`,

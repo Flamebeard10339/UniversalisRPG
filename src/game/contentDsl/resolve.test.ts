@@ -14,7 +14,7 @@ import { loadModule, Registry } from './registry';
 //
 // campfire/smokehouse/grill are RECIPES, not entity actions: a "craft" (turn
 // inputs into outputs) is exactly what recipes model now (see recipeAction in
-// runtime.ts), and driving these gates through the recipe path is the point
+// registry.ts), and driving these gates through the recipe path is the point
 // of this rewrite. `tree` stays a plain entity action — see the comment above
 // its definition below for why a multi-hit fight isn't a recipe.
 const MODULE = `

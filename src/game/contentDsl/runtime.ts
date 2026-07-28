@@ -122,8 +122,7 @@ function nextBoundary(state: GameState, registry: Registry, toTime: number): num
         const limit = inputLimit(action, state).completions;
         if (Number.isFinite(limit)) {
           // Time to finish the fight already in flight, plus (limit - 1)
-          // more full fights after it — generalizes the old
-          // `limit * duration - progress` to attempt-scoped progress.
+          // more full fights after it.
           const runway = remainingAttempts * duration - player.progress + Math.max(0, limit - 1) * attemptsToResolve * duration;
           const limitInstant = state.time + Math.max(0, runway);
           if (limitInstant < boundary) boundary = limitInstant;
@@ -152,9 +151,8 @@ function nextBoundary(state: GameState, registry: Registry, toTime: number): num
 }
 
 // Advances state.time to segEnd for a deterministic action (no accuracy —
-// outcome and fight length known in closed form). Whole fights this segment
-// covers are applied as one batch; the remainder is carried as
-// attemptsMade/healthRemaining/progress for the fight still in flight.
+// outcome and fight length known in closed form), applying whole fights as one
+// batch however many the span covers.
 function resolveDeterministicSegment(segment: Segment, action: Action, segEnd: number): void {
   const { state, registry } = segment;
   const active = state.activeAction!;
@@ -541,11 +539,19 @@ export function armAction(obj: string, objId: string, actionId: string, registry
   return { armed: true, firstUnit: firstUnitSpan(action, state, registry) };
 }
 
-// Side-effect-free probe: the same firstUnit armAction would compute, without
-// arming or mutating anything, so a driver can decide instant-vs-spannable
-// before committing to arm. Returns 0 if the action can't be found — a
-// caller then falls back to the instant path, which reproduces whatever
-// error/behavior looking it up for real would have produced.
+// Side-effect-free probe of an action's first unit, for a driver deciding
+// instant-vs-spannable before committing to arm. Returns 0 if the action can't
+// be found — a caller then falls back to the instant path, which reproduces
+// whatever error looking it up for real would have produced.
+//
+// This is NOT the number armAction will return. statRange folds the ACTIVE
+// action's own stat-bonus tags into every stat it reads, so an action that
+// modifies its own `speed:` reads differently through the two paths: a `time: 8`
+// action with a `+100% cooking-speed` tag probes 8 here and runs at 4 once
+// armed. Only the sign is safe to route on, which is all beginAction asks —
+// `time:` is a fixed field, so zero here means zero armed and vice versa.
+// TODO(L1): arm first and route on armAction's own return value, so nothing
+// depends on a quantity computed before the action it depends on exists.
 export function actionFirstUnit(obj: string, objId: string, actionId: string, registry: Registry, state: GameState): number {
   const target = findActionOwner(obj, objId, registry) as { actions?: Action[] } | undefined;
   const action = target?.actions?.find((a) => a.label === actionId);

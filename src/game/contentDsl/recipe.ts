@@ -12,7 +12,7 @@ export interface Recipe {
   say?: string;
   // Seconds per attempt (mirrors Action.time). Absent/0 compiles to an
   // instant, non-repeating craft (today's behavior); >0 compiles to a
-  // repeating, spannable craft — see recipeAction in runtime.ts.
+  // repeating, spannable craft — see recipeAction in registry.ts.
   time?: number;
   speed?: string;
   accuracy?: string;
