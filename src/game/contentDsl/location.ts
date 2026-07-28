@@ -62,7 +62,7 @@ const DIRECTION_VECTORS: Record<Direction, [number, number, number]> = {
   down: [0, 0, -1],
 };
 
-export function resolveCoordinates(locations: Map<string, Location>): void {
+export function recursivelyResolveRelativeCoordinates(locations: Map<string, Location>): void {
   const placing = new Set<string>();
   const coords = new Map<string, [number, number, number]>();
 

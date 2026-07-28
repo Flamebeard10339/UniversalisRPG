@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { Direction, Location, resolveCoordinates } from './location';
+import { Direction, Location, locationSchema, recursivelyResolveRelativeCoordinates } from './location';
+import { Authored, hydrateSection } from './section';
 import { loadModule } from './registry';
 import { apply, startSession, view } from './session';
 
@@ -13,11 +14,11 @@ function relative(id: string, direction: Direction, of: string): Location {
 
 function place(...locations: Location[]): Map<string, Location> {
   const map = new Map(locations.map((location) => [location.id, location]));
-  resolveCoordinates(map);
+  recursivelyResolveRelativeCoordinates(map);
   return map;
 }
 
-describe('resolveCoordinates', () => {
+describe('recursivelyResolveRelativeCoordinates', () => {
   it('leaves an absolute location untouched', () => {
     const map = place(loc('home', { x: 3, y: -2, z: 1 }));
     expect(map.get('home')).toMatchObject({ x: 3, y: -2, z: 1 });
@@ -50,6 +51,17 @@ describe('resolveCoordinates', () => {
 
   it('throws on a relative reference to an unknown origin', () => {
     expect(() => place(relative('beach', 'east', 'nowhere'))).toThrow(/unknown location 'nowhere'/);
+  });
+
+  it('resolves hydrated locations, whose coordinates are read-only getters', () => {
+    const home = hydrateSection({ id: 'home' } as Authored<Location>, locationSchema);
+    const east = hydrateSection({ id: 'east-of-home', relative: { direction: 'east', of: 'home' } } as Authored<Location>, locationSchema);
+    expect(() => {
+      (east as { x: number }).x = 99;
+    }).toThrow(TypeError);
+
+    const map = place(home, east);
+    expect(map.get('east-of-home')).toMatchObject({ x: 1, y: 0, z: 0 });
   });
 
   it('throws on a relative cycle', () => {

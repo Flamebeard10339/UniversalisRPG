@@ -3,7 +3,7 @@ import { Action } from './action';
 import { Dialogue } from './dialogue';
 import { Entity, entitySchema } from './entity';
 import { Item, itemSchema } from './item';
-import { Location, locationSchema, resolveCoordinates } from './location';
+import { Location, locationSchema, recursivelyResolveRelativeCoordinates } from './location';
 import { parseModule } from './module';
 import { Recipe, recipeSchema } from './recipe';
 import { Resource, resourceSchema } from './resource';
@@ -270,7 +270,7 @@ export function loadModule(source: string): Registry {
   }
   // Locations placed with `<direction> of <other>` may reference an origin that
   // parsed later, so absolute coordinates are resolved once all locations exist.
-  resolveCoordinates(registry.locations);
+  recursivelyResolveRelativeCoordinates(registry.locations);
   validateTuning(registry.variables);
   validateReferences(registry);
   return registry;
