@@ -1,0 +1,764 @@
+import { describe, expect, it } from 'vitest';
+import { ActiveAction, armAction, craft, createGameState, GameState, initResources, PLAYER, resolve, RuntimeError, statValue, useAction } from './runtime';
+import { newCadence } from './encounter';
+import { loadModule, Registry } from '../content/registry';
+
+// Fixtures: campfire-cook (no in:, so an infinite input limit), smokehouse-cook
+// (in: raw-shrimp bounds it), grill-cook (accuracy-gated, burns on a miss),
+// torch (non-repeating with a real time:), broken-oven (repeating with no time:,
+// for the positive-duration guard), and tree (a deterministic multi-hit fight).
+// The three cooks are recipes because turning inputs into outputs is what a
+// recipe models; tree stays an entity action, for the reason given at its use.
+const MODULE = `
+# stat cooking-speed
+base: 1
+
+# item quickroot
+examine: A root that quickens the hands at the stove.
+food, +100% cooking-speed, 500s
+eat: take: 1 quickroot, say: You chew the root. Your hands feel quick.
+
+// Quickroot is eaten instantly; stew takes 3s to eat. That difference is the
+// whole point: it is what routes stew to the ARMED path in a live driver, which
+// is where the buff used to be dropped on the floor.
+# item stew
+examine: Thick, hot, and slow to get through.
+food, +100% cooking-speed, 60s
+eat:
+  time: 3
+  take: 1 stew
+  say: You work through the bowl.
+
+# item raw-shrimp
+examine: Fresh-caught shrimp, raw.
+
+# item cooked-shrimp
+examine: Hot and pink.
+
+# item blessing
+examine: A warm certainty.
+
+# item wood
+examine: A split log.
+
+# item edge
+examine: A keen edge, ground in.
+
+# item brick
+examine: Fired clay.
+
+# skill smithing
+
+# skill cooking
+
+# recipe campfire-cook
+speed: cooking-speed
+time: 1
+out: 1 cooked-shrimp
+skill: cooking 3
+
+# recipe smokehouse-cook
+time: 1
+in: 1 raw-shrimp
+out: 1 cooked-shrimp
+
+# entity torch
+light:
+  time: 5
+  say: The torch flares to life.
+
+# entity broken-oven
+cook:
+  repeating
+  give: 1 cooked-shrimp
+
+// Declared, so the load-time reference pass is satisfied, but with no base: —
+// which the stat schema defaults to 0. A typo'd stat id is a load error now;
+// this is the case that survives it, and the tutorial ships two such stats.
+# stat rusty-speed
+
+# entity shrine
+// Speed 0 makes this action's attempt duration 1/0 = Infinity, which every
+// "non-positive duration" guard passes happily.
+chant:
+  repeating
+  time: 1
+  speed: rusty-speed
+  give: 1 blessing
+
+// A skill and a difficulty, never an authored probability: the pair is
+// contested through hitChance, and a gap of 40 over a spread of 100 lands at
+// 1/(1+10^-0.4) = 0.7153 — lopsided enough that both outcomes show up.
+# stat cooking
+base: 100
+
+# stat shrimp-complexity
+base: 60
+
+# item burnt-shrimp
+examine: A blackened, inedible husk of what used to be shrimp.
+
+# recipe grill-cook
+accuracy: cooking
+evasion: shrimp-complexity
+time: 1
+in: 1 raw-shrimp
+out: 1 cooked-shrimp
+burnt: 1 burnt-shrimp
+
+# stat chop-power
+base: 1
+
+# entity tree
+// Deterministic multi-hit fight against a health pool (health: 3, always
+// exactly 3 attempts) is combat-shaped, not a craft: it wears down a
+// target's hitpoints rather than converting an input stack into an output
+// stack, so it stays a plain repeating entity action instead of becoming a
+// recipe (recipes always compile to health: 1 — see recipeAction).
+chop:
+  repeating
+  health: 3
+  ability: chop-power
+  time: 1
+  give: 1 wood
+
+# stat max-vigor
+base: 100
+
+# stat vigor-regen
+base: 60
+
+# resource vigor
+rate: vigor-regen
+max: max-vigor
+start: 30
+
+# entity grindstone
+// A repeating action that DRAINS a pool per completion while that same pool
+// regenerates on its own. Two directions inside one segment is exactly what a
+// per-write clamp gets wrong (drain to 0, then regen, versus letting the two
+// net out), so this is the associativity gate for the direct pool write.
+sharpen:
+  repeating
+  time: 1
+  drain: 2 vigor
+  give: 1 edge
+
+# entity whetstone
+// The same drain on the stochastic path, where completions land at random
+// attempt counts instead of a closed-form cadence.
+grind:
+  repeating
+  time: 1
+  accuracy: cooking
+  drain: 2 vigor
+  give: 1 edge
+
+# entity kiln
+// A repeating ENTITY action that carries an on-success block — the one action
+// shape a recipe can't express (recipe results are a fixed take/give/xp/say
+// list, no onSuccess block). Kept as a standing regression guard for the
+// Pass-1 bug where onSuccess fired once per SEGMENT instead of once per
+// completion (non-associative: live driver over-fires vs the REPL). The
+// cooking gates above moved to recipes, which would otherwise have left that
+// exact bug class untested even though onSuccess is still live content.
+fire:
+  repeating
+  time: 1
+  give: 1 brick
+  on success:
+    add: bricks-fired 1
+    xp: smithing 2
+`;
+
+function loaded(): Registry {
+  return loadModule(MODULE);
+}
+
+// Looked up from the registry rather than hardcoded, so these gates do not
+// depend on guessing the compiled action's label text.
+function recipeActive(registry: Registry, recipeId: string): ActiveAction {
+  const action = registry.recipeActions.get(recipeId)!;
+  return { ownerRef: `recipe.${recipeId}`, actionLabel: action.label, repeating: action.repeating === true, healthRemaining: action.health ?? 1, cadences: { [PLAYER]: newCadence() } };
+}
+
+function withCampfireCooking(registry: Registry, buffed: boolean): GameState {
+  const state = createGameState('nowhere');
+  if (buffed) {
+    state.activeBuffs['quickroot:cooking-speed'] = { statId: 'cooking-speed', amount: 1, kind: 'increased', expiresAt: 500 };
+  }
+  state.activeAction = recipeActive(registry, 'campfire-cook');
+  return state;
+}
+
+describe('resolve: associativity (the core invariant)', () => {
+  it('resolve(resolve(s, t1), t2) === resolve(s, t2) for random split points, including the buff-expiry instant and mid-completion splits', () => {
+    const registry = loaded();
+
+    // One big jump, straight to t=1000.
+    const oneShot = withCampfireCooking(registry, true);
+    resolve(oneShot, registry, 1000);
+
+    // Seeded so a failure reproduces without depending on Math.random.
+    let seed = 42;
+    const rand = () => {
+      seed = (seed * 1103515245 + 12345) % 2147483648;
+      return seed / 2147483648;
+    };
+
+    for (let trial = 0; trial < 25; trial++) {
+      const waypoints = new Set<number>([500]); // force a split exactly at the buff's expiry
+      const splitCount = 3 + Math.floor(rand() * 5);
+      for (let i = 0; i < splitCount; i++) waypoints.add(rand() * 1000); // random mid-completion splits (duration is 0.5 and 1, so these rarely land on a boundary)
+      const sorted = [...waypoints].filter((t) => t > 0 && t < 1000).sort((a, b) => a - b);
+      sorted.push(1000);
+
+      const folded = withCampfireCooking(registry, true);
+      for (const t of sorted) resolve(folded, registry, t);
+
+      expect(folded.time).toBe(oneShot.time);
+      expect(folded.inventory).toEqual(oneShot.inventory);
+      expect(folded.activeAction).toEqual(oneShot.activeAction);
+      expect(folded.activeBuffs).toEqual(oneShot.activeBuffs);
+      // xp must batch per completion, not per segment: this is what catches a
+      // non-associative batch where a live driver over-fires against the REPL.
+      expect(folded.flags).toEqual(oneShot.flags);
+      expect(folded.xp).toEqual(oneShot.xp);
+      expect(folded.resources).toEqual(oneShot.resources);
+    }
+  });
+
+  it('also holds when the action is input-limited partway through (an early split can land exactly on the exhaustion instant)', () => {
+    const registry = loaded();
+
+    function withSmokehouse(rawShrimp: number): GameState {
+      const state = createGameState('nowhere');
+      state.inventory['raw-shrimp'] = rawShrimp;
+      state.activeAction = recipeActive(registry, 'smokehouse-cook');
+      return state;
+    }
+
+    const oneShot = withSmokehouse(28);
+    resolve(oneShot, registry, 1000);
+
+    let seed = 7;
+    const rand = () => {
+      seed = (seed * 1103515245 + 12345) % 2147483648;
+      return seed / 2147483648;
+    };
+
+    for (let trial = 0; trial < 15; trial++) {
+      const waypoints = new Set<number>([28]); // exactly the exhaustion instant
+      for (let i = 0; i < 4; i++) waypoints.add(rand() * 1000);
+      const sorted = [...waypoints].filter((t) => t > 0 && t < 1000).sort((a, b) => a - b);
+      sorted.push(1000);
+
+      const folded = withSmokehouse(28);
+      for (const t of sorted) resolve(folded, registry, t);
+
+      expect(folded.time).toBe(oneShot.time);
+      expect(folded.inventory).toEqual(oneShot.inventory);
+      expect(folded.activeAction).toEqual(oneShot.activeAction);
+      expect(folded.resources).toEqual(oneShot.resources);
+    }
+  });
+});
+
+// The one shape where clamping is not associative: writing each drain immediately
+// floors the pool at 0 and lets the rate refill it, so the split changes the level.
+describe('resolve: direct pool writes stay associative alongside a rate', () => {
+  function draining(registry: Registry, entityId: string, label: string): GameState {
+    const state = createGameState('nowhere');
+    initResources(state, registry);
+    state.activeAction = { ownerRef: `entity.${entityId}`, actionLabel: label, repeating: true, healthRemaining: 1, cadences: { [PLAYER]: newCadence() } };
+    return state;
+  }
+
+  // Starts 30, +60/min, drained 2 per completion at one a second — net -1/s, so
+  // 25s leaves it mid-range rather than saturated where any two answers agree.
+  const HORIZON = 25;
+
+  it('holds for a deterministic repeating drain across random split points', () => {
+    const registry = loaded();
+    const oneShot = draining(registry, 'grindstone', 'sharpen');
+    resolve(oneShot, registry, HORIZON);
+    // Pinning the value rules out the clamp-per-write reading, which refills to 25.
+    expect(oneShot.resources['vigor']).toBeCloseTo(5, 6);
+    expect(oneShot.inventory['edge']).toBe(25);
+
+    let seed = 11;
+    const rand = () => {
+      seed = (seed * 1103515245 + 12345) % 2147483648;
+      return seed / 2147483648;
+    };
+
+    for (let trial = 0; trial < 25; trial++) {
+      const waypoints = new Set<number>();
+      for (let i = 0; i < 3 + Math.floor(rand() * 5); i++) waypoints.add(rand() * HORIZON);
+      const sorted = [...waypoints].filter((t) => t > 0 && t < HORIZON).sort((a, b) => a - b);
+      sorted.push(HORIZON);
+
+      const folded = draining(registry, 'grindstone', 'sharpen');
+      for (const t of sorted) resolve(folded, registry, t);
+
+      expect(folded.inventory).toEqual(oneShot.inventory);
+      expect(folded.resources['vigor']).toBeCloseTo(oneShot.resources['vigor'], 6);
+    }
+  });
+
+  it('holds for a stochastic drain, where completions land at random attempt counts', () => {
+    const registry = loaded();
+    const oneShot = draining(registry, 'whetstone', 'grind');
+    resolve(oneShot, registry, HORIZON);
+    expect(oneShot.inventory['edge']).toBeGreaterThan(0); // misses alone would make this vacuous
+
+    let seed = 13;
+    const rand = () => {
+      seed = (seed * 1103515245 + 12345) % 2147483648;
+      return seed / 2147483648;
+    };
+
+    for (let trial = 0; trial < 25; trial++) {
+      const waypoints = new Set<number>();
+      for (let i = 0; i < 3 + Math.floor(rand() * 5); i++) waypoints.add(rand() * HORIZON);
+      const sorted = [...waypoints].filter((t) => t > 0 && t < HORIZON).sort((a, b) => a - b);
+      sorted.push(HORIZON);
+
+      const folded = draining(registry, 'whetstone', 'grind');
+      for (const t of sorted) resolve(folded, registry, t);
+
+      expect(folded.rng).toBe(oneShot.rng);
+      expect(folded.inventory).toEqual(oneShot.inventory);
+      expect(folded.resources['vigor']).toBeCloseTo(oneShot.resources['vigor'], 6);
+    }
+  });
+});
+
+describe('resolve: repeating action, speed stat, and timed buff (test 1 from the design brief)', () => {
+  it('produces exactly 1500 cooked-shrimp over 1000s: 1000 while a x2-speed buff is active (500s @ 0.5s/completion), then 500 more after it expires (500s @ 1s/completion)', () => {
+    const registry = loaded();
+    const state = withCampfireCooking(registry, true);
+
+    resolve(state, registry, 1000);
+
+    expect(state.inventory['cooked-shrimp']).toBe(1500);
+    expect(state.time).toBe(1000);
+    expect(state.activeAction).toEqual(recipeActive(registry, 'campfire-cook'));
+    expect(state.activeBuffs).toEqual({});
+  });
+
+  it('produces only 500 over the same 1000s with no buff (speed stays 1 throughout)', () => {
+    const registry = loaded();
+    const state = withCampfireCooking(registry, false);
+
+    resolve(state, registry, 1000);
+
+    expect(state.inventory['cooked-shrimp']).toBe(1000);
+  });
+});
+
+describe('resolve: input-limited repeating action ends in O(1) segments (test 4)', () => {
+  it('wait(1_000_000) with only 28 raw-shrimp yields exactly 28 cooked, 0 raw, and a cleared activeAction — quickly', () => {
+    const registry = loaded();
+    const state = createGameState('nowhere');
+    state.inventory['raw-shrimp'] = 28;
+    state.activeAction = recipeActive(registry, 'smokehouse-cook');
+
+    const started = performance.now();
+    resolve(state, registry, 1_000_000);
+    const elapsedMs = performance.now() - started;
+
+    expect(state.inventory['cooked-shrimp']).toBe(28);
+    expect(state.inventory['raw-shrimp']).toBe(0);
+    expect(state.activeAction).toBeNull();
+    // The point of the closed-form segment math is that cost is independent of the
+    // target time and the completion count. A generous ceiling catches a fixed-dt.
+    expect(elapsedMs).toBeLessThan(50);
+  });
+
+  it('resolves the same in a single call when input runs out before the first segment boundary would otherwise land', () => {
+    const registry = loaded();
+    const state = createGameState('nowhere');
+    state.inventory['raw-shrimp'] = 0;
+    state.activeAction = recipeActive(registry, 'smokehouse-cook');
+
+    resolve(state, registry, 100);
+
+    expect(state.inventory['cooked-shrimp'] ?? 0).toBe(0);
+    expect(state.activeAction).toBeNull();
+    expect(state.time).toBe(100);
+  });
+});
+
+describe('resolve: buff expiry', () => {
+  it('the buff is present and boosts the stat right up until expiresAt, then is gone', () => {
+    const registry = loaded();
+    const state = createGameState('nowhere');
+    state.activeBuffs['quickroot:cooking-speed'] = { statId: 'cooking-speed', amount: 1, kind: 'increased', expiresAt: 500 };
+
+    resolve(state, registry, 499);
+    expect(statValue('cooking-speed', state, registry)).toBe(2);
+    expect(state.activeBuffs['quickroot:cooking-speed']).toBeDefined();
+
+    resolve(state, registry, 500);
+    expect(state.activeBuffs['quickroot:cooking-speed']).toBeUndefined();
+    expect(statValue('cooking-speed', state, registry)).toBe(1);
+  });
+});
+
+describe('useAction/craft integration: repeating actions, eating grants a live buff, and existing semantics are preserved', () => {
+  it('craft() on a repeating recipe produces exactly one completion, then stays active for a later resolve()/wait to continue', () => {
+    const registry = loaded();
+    const state = createGameState('nowhere');
+    expect(() => craft('smokehouse-cook', registry, state)).toThrow(RuntimeError); // no raw-shrimp: recipeCraftable gate fails atomically
+    expect(state.activeAction).toBeNull();
+
+    state.inventory['raw-shrimp'] = 10;
+    craft('smokehouse-cook', registry, state);
+    expect(state.activeAction).toEqual(recipeActive(registry, 'smokehouse-cook'));
+    expect(state.inventory['cooked-shrimp']).toBe(1);
+    expect(state.inventory['raw-shrimp']).toBe(9);
+    expect(state.time).toBe(1);
+  });
+
+  it('eating a food item grants its tags as a live timed buff via the ordinary self-consuming eat action', () => {
+    const registry = loaded();
+    const state = createGameState('nowhere');
+    state.inventory['quickroot'] = 1;
+
+    useAction('item', 'quickroot', 'eat', registry, state);
+
+    expect(state.inventory['quickroot']).toBe(0);
+    expect(state.log).toContain('You chew the root. Your hands feel quick.');
+    expect(state.activeBuffs['quickroot:cooking-speed']).toEqual({ statId: 'cooking-speed', amount: 1, kind: 'increased', expiresAt: 500 });
+    expect(statValue('cooking-speed', state, registry)).toBe(2);
+  });
+
+  // While this hung off useAction, a food with a `time:` buffed in instant mode
+  // and not at all once a live driver armed it.
+  it('grants a slow meal’s buff on the armed path as well as the instant one, with the clock starting when the bowl is empty', () => {
+    const registry = loaded();
+
+    const instant = createGameState('nowhere');
+    instant.inventory['stew'] = 1;
+    useAction('item', 'stew', 'eat', registry, instant);
+
+    const armed = createGameState('nowhere');
+    armed.inventory['stew'] = 1;
+    armAction('item', 'stew', 'eat', registry, armed); // what beginAction does for a live driver
+    resolve(armed, registry, 10);
+
+    for (const state of [instant, armed]) {
+      expect(state.inventory['stew']).toBe(0);
+      expect(statValue('cooking-speed', state, registry)).toBe(2);
+      // The 60s window starts at the last spoonful, not when the bowl was picked up.
+      expect(state.activeBuffs['stew:cooking-speed'].expiresAt).toBe(63);
+    }
+  });
+
+  it('a plain non-repeating action with a real time: cost still advances state.time by exactly that much in one call, as before', () => {
+    const registry = loaded();
+    const state = createGameState('nowhere');
+    useAction('entity', 'torch', 'light', registry, state);
+    expect(state.time).toBe(5);
+    expect(state.activeAction).toBeNull();
+    expect(state.log).toEqual(['The torch flares to life.']);
+  });
+
+  it('a repeating action with no time: (duration resolves to 0) refuses to start rather than looping forever', () => {
+    const registry = loaded();
+    const state = createGameState('nowhere');
+    expect(() => useAction('entity', 'broken-oven', 'cook', registry, state)).toThrow(RuntimeError);
+  });
+
+  // A speed stat reading 0 makes the duration Infinity, which slips through every
+  // `<= 0` guard; the resulting NaN serializes to null and survives a save.
+  it('an action whose speed stat reads 0 refuses to start rather than resolving an infinite attempt duration', () => {
+    const registry = loaded();
+    const state = createGameState('nowhere');
+
+    expect(() => useAction('entity', 'shrine', 'chant', registry, state)).toThrow(/impossible attempt duration/);
+    expect(state.time).toBe(0);
+    expect(state.activeAction).toBeNull();
+  });
+});
+
+// grill-cook is STOCHASTIC (cooking 100 vs complexity 60 => ~0.72, and a miss on
+// the one attempt a craft gets fails to `burnt`, since accuracy compiles to
+// escape after 1). tree is DETERMINISTIC: health 3 at 1/hit is always 3 attempts.
+function withGrillCooking(registry: Registry, rawShrimp: number): GameState {
+  const state = createGameState('nowhere');
+  state.inventory['raw-shrimp'] = rawShrimp;
+  state.activeAction = recipeActive(registry, 'grill-cook');
+  return state;
+}
+
+function withTreeChopping(): GameState {
+  const state = createGameState('nowhere');
+  state.activeAction = { ownerRef: 'entity.tree', actionLabel: 'chop', repeating: true, healthRemaining: 3, cadences: { [PLAYER]: newCadence() } };
+  return state;
+}
+
+describe('resolve: stochastic associativity — the accuracy/RNG core gate', () => {
+  it('resolve(resolve(s,t1),t2) === resolve(s,t2) for random split points, including mid-fight splits, matching time/inventory/flags/xp/log/activeAction/activeBuffs AND rng', () => {
+    const registry = loaded();
+
+    const oneShot = withGrillCooking(registry, 100_000);
+    resolve(oneShot, registry, 200);
+
+    // A separate seeded LCG for split points, distinct from the state.rng under test.
+    let seed = 99;
+    const rand = () => {
+      seed = (seed * 1103515245 + 12345) % 2147483648;
+      return seed / 2147483648;
+    };
+
+    for (let trial = 0; trial < 25; trial++) {
+      const waypoints = new Set<number>();
+      const splitCount = 3 + Math.floor(rand() * 6);
+      for (let i = 0; i < splitCount; i++) waypoints.add(rand() * 200); // random mid-attempt splits (duration is 1s, these rarely land on an attempt boundary)
+      const sorted = [...waypoints].filter((t) => t > 0 && t < 200).sort((a, b) => a - b);
+      sorted.push(200);
+
+      const folded = withGrillCooking(registry, 100_000);
+      for (const t of sorted) resolve(folded, registry, t);
+
+      expect(folded.time).toBe(oneShot.time);
+      expect(folded.inventory).toEqual(oneShot.inventory);
+      expect(folded.flags).toEqual(oneShot.flags);
+      expect(folded.xp).toEqual(oneShot.xp);
+      expect(folded.log.length).toBe(oneShot.log.length);
+      expect(folded.activeAction).toEqual(oneShot.activeAction);
+      expect(folded.activeBuffs).toEqual(oneShot.activeBuffs);
+      // The draw deciding attempt N must be the SAME draw however the calls split.
+      // An RNG keyed by segment count instead of attempt order would break here.
+      expect(folded.rng).toBe(oneShot.rng);
+    }
+  });
+});
+
+describe('resolve: raw-to-burnt outcome distribution (accuracy < 1, escape after 1)', () => {
+  it('produces both cooked and burnt outcomes over many fights, each consuming exactly one raw input, cooked + burnt totaling the fight count', () => {
+    const registry = loaded();
+    const fights = 500;
+    const state = withGrillCooking(registry, fights);
+
+    resolve(state, registry, fights * 10); // generous horizon; input runs out well before this
+
+    const cooked = state.inventory['cooked-shrimp'] ?? 0;
+    const burnt = state.inventory['burnt-shrimp'] ?? 0;
+    expect(state.inventory['raw-shrimp']).toBe(0);
+    expect(cooked).toBeGreaterThan(0);
+    expect(burnt).toBeGreaterThan(0);
+    expect(cooked + burnt).toBe(fights);
+    expect(state.activeAction).toBeNull();
+  });
+});
+
+describe('resolve: deterministic multi-hit fights (health > 1, no accuracy)', () => {
+  it('a health:3/ability:1 fight takes exactly ceil(3/1)=3 attempts; a mid-fight split carries healthRemaining/attemptsMade and reproduces the one-shot result', () => {
+    const registry = loaded();
+
+    const oneShot = withTreeChopping();
+    resolve(oneShot, registry, 3); // exactly one full fight (3 attempts * 1s)
+    expect(oneShot.inventory['wood']).toBe(1);
+    expect(oneShot.activeAction).toEqual({ ownerRef: 'entity.tree', actionLabel: 'chop', repeating: true, healthRemaining: 3, cadences: { [PLAYER]: newCadence() } }); // rearmed fresh
+
+    const midFight = withTreeChopping();
+    resolve(midFight, registry, 1); // 1 of 3 attempts
+    expect(midFight.activeAction).toEqual({ ownerRef: 'entity.tree', actionLabel: 'chop', repeating: true, healthRemaining: 2, cadences: { player: { progress: 0, attemptsMade: 1 } } });
+    expect(midFight.inventory['wood'] ?? 0).toBe(0);
+
+    resolve(midFight, registry, 2); // 2 of 3 attempts
+    expect(midFight.activeAction).toEqual({ ownerRef: 'entity.tree', actionLabel: 'chop', repeating: true, healthRemaining: 1, cadences: { player: { progress: 0, attemptsMade: 2 } } });
+
+    resolve(midFight, registry, 3); // completes the fight
+    expect(midFight.inventory['wood']).toBe(1);
+    expect(midFight.activeAction).toEqual(oneShot.activeAction);
+    expect(midFight.time).toBe(oneShot.time);
+  });
+});
+
+describe('resolve: onSuccess batches per completion, not per segment (Pass-1 regression guard on entity actions)', () => {
+  it('a repeating entity action with on success: matches one-shot vs random splits on flags AND xp — the exact non-associative onSuccess bug', () => {
+    const registry = loaded();
+
+    function withKilnFiring(): GameState {
+      const state = createGameState('nowhere');
+      state.activeAction = { ownerRef: 'entity.kiln', actionLabel: 'fire', repeating: true, healthRemaining: 1, cadences: { [PLAYER]: newCadence() } };
+      return state;
+    }
+
+    const oneShot = withKilnFiring();
+    resolve(oneShot, registry, 1000); // 1000 completions at 1s each
+
+    let seed = 123;
+    const rand = () => {
+      seed = (seed * 1103515245 + 12345) % 2147483648;
+      return seed / 2147483648;
+    };
+
+    for (let trial = 0; trial < 20; trial++) {
+      const waypoints = new Set<number>();
+      const splitCount = 3 + Math.floor(rand() * 5);
+      for (let i = 0; i < splitCount; i++) waypoints.add(rand() * 1000); // mid-completion splits
+      const sorted = [...waypoints].filter((t) => t > 0 && t < 1000).sort((a, b) => a - b);
+      sorted.push(1000);
+
+      const folded = withKilnFiring();
+      for (const t of sorted) resolve(folded, registry, t);
+
+      expect(folded.inventory).toEqual(oneShot.inventory); // give (results) batches per completion
+      expect(folded.flags).toEqual(oneShot.flags); // add: (onSuccess) — would over-fire if batched per segment
+      expect(folded.xp).toEqual(oneShot.xp); // xp: (onSuccess) — same
+    }
+    // `add: bricks-fired` is entity-scoped to `kiln.bricks-fired`; xp stays global.
+    expect(oneShot.flags['kiln.bricks-fired']).toBe(1000);
+    expect(oneShot.xp['smithing']).toBe(2000);
+  });
+});
+
+// Rates are per MINUTE. `engine.run` fills a rollover meter (spark, +240/min into
+// a cap-3 pool) and drains a plain one (hp, -120/min from 100, empty at t=50)
+// while it runs, so one fixture covers rollover, on-empty and completion batching.
+const RESOURCE_MODULE = `
+# stat regen-rate
+base: 0
+
+# stat max-hp
+base: 100
+
+# item ember
+
+# item cog
+
+# resource hp
+rate: regen-rate
+max: max-hp
+on empty:
+  set: fainted
+
+# stat spark-rate
+base: 0
+
+# stat spark-cap
+base: 3
+
+# resource spark
+rate: spark-rate
+max: spark-cap
+start: 0
+on full:
+  give: 1 ember
+
+# entity engine
+run:
+  repeating
+  time: 1
+  -120 regen-rate
+  +240 spark-rate
+  give: 1 cog
+`;
+
+describe('resolve: rollover meter (test 2 — pure onFull = empty, batched)', () => {
+  it('a +2.5/min pool with max 1, starting empty, rolls over exactly floor(2.5)=2 times in one minute and ends at 0.5', () => {
+    const registry = loadModule(`
+# stat charge-rate
+base: 2.5
+# stat charge-cap
+base: 1
+# item spark
+# resource charge
+rate: charge-rate
+max: charge-cap
+start: 0
+on full:
+  give: 1 spark
+`);
+    const state = createGameState();
+    initResources(state, registry);
+
+    resolve(state, registry, 60); // one minute
+
+    expect(state.inventory['spark']).toBe(2);
+    expect(state.resources['charge']).toBeCloseTo(0.5, 9);
+    expect(state.time).toBe(60);
+  });
+});
+
+describe('resolve: net-zero / idle drain falls out (test 3 — O(1) over a huge span)', () => {
+  it('a pool whose rate stat nets to zero never moves and resolve() crosses a billion seconds in O(1)', () => {
+    const registry = loadModule(`
+# stat still-rate
+base: 0
+# stat still-cap
+base: 5
+# resource pond
+rate: still-rate
+max: still-cap
+on empty:
+  set: dry
+`);
+    const state = createGameState();
+    initResources(state, registry); // pond = 5 (full)
+
+    const started = performance.now();
+    resolve(state, registry, 1_000_000_000);
+    const elapsedMs = performance.now() - started;
+
+    expect(state.resources['pond']).toBe(5); // never moved: net rate 0 => no boundary
+    expect(state.flags['dry']).toBeUndefined();
+    expect(state.time).toBe(1_000_000_000);
+    expect(elapsedMs).toBeLessThan(50); // a couple of segments, not a fixed-dt march
+  });
+});
+
+describe('resolve: resource associativity (the invariant, extended to pools)', () => {
+  it('resource levels, on-empty, and rollover fires all match one-shot vs arbitrary splits, including the exact empty instant', () => {
+    const registry = loadModule(RESOURCE_MODULE);
+
+    function fresh(): GameState {
+      const state = createGameState();
+      initResources(state, registry); // hp = 100 (full), spark = 0
+      state.activeAction = { ownerRef: 'entity.engine', actionLabel: 'run', repeating: true, healthRemaining: 1, cadences: { [PLAYER]: newCadence() } };
+      return state;
+    }
+
+    const oneShot = fresh();
+    resolve(oneShot, registry, 55);
+    // Sanity on the fixture: hp empties at t=50 and stays there; spark rolled over.
+    expect(oneShot.flags['fainted']).toBe(true);
+    expect(oneShot.resources['hp']).toBe(0);
+    expect(oneShot.inventory['cog']).toBe(55); // one completion per second
+    expect(oneShot.inventory['ember']).toBeGreaterThan(0);
+
+    let seed = 2026;
+    const rand = () => {
+      seed = (seed * 1103515245 + 12345) % 2147483648;
+      return seed / 2147483648;
+    };
+
+    for (let trial = 0; trial < 25; trial++) {
+      const waypoints = new Set<number>([50]); // force a split exactly on the emptying instant
+      const splitCount = 3 + Math.floor(rand() * 5);
+      for (let i = 0; i < splitCount; i++) waypoints.add(rand() * 55);
+      const sorted = [...waypoints].filter((t) => t > 0 && t < 55).sort((a, b) => a - b);
+      sorted.push(55);
+
+      const folded = fresh();
+      for (const t of sorted) resolve(folded, registry, t);
+
+      expect(folded.time).toBe(oneShot.time);
+      // Discrete outcomes must be bit-exact regardless of split.
+      expect(folded.inventory).toEqual(oneShot.inventory);
+      expect(folded.flags).toEqual(oneShot.flags);
+      expect(folded.xp).toEqual(oneShot.xp);
+      expect(folded.activeAction).toEqual(oneShot.activeAction);
+      // Continuous levels reconverge within float tolerance: the carried rollover
+      // remainder accrues bounded per-split error, which is accepted.
+      for (const id of Object.keys(oneShot.resources)) {
+        expect(folded.resources[id]).toBeCloseTo(oneShot.resources[id], 6);
+      }
+    }
+  });
+});

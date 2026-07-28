@@ -1,9 +1,9 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { createGameState } from '../src/game/contentDsl/runtime';
-import { loadModule } from '../src/game/contentDsl/registry';
-import { serializeSave } from '../src/game/contentDsl/save';
-import { beginAction, runTest, startSession, view } from '../src/game/contentDsl/session';
+import { createGameState } from '../src/runtime/runtime';
+import { loadModule } from '../src/content/registry';
+import { serializeSave } from '../src/runtime/save';
+import { beginAction, runTest, startSession, view } from '../src/runtime/session';
 import { handleCommand, liveTick, type Recorder } from './play-cli';
 
 const source = readFileSync('content/tutorial-island.dsl', 'utf8');

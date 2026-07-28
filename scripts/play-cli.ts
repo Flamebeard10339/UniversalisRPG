@@ -2,9 +2,9 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { createInterface } from 'node:readline/promises';
 import { pathToFileURL } from 'node:url';
-import { DslError } from '../src/game/contentDsl/parser';
-import { actionFirstUnit, craftFirstUnit, describeCondition, encounterView, PLAYER, RuntimeError, type ActiveAction, type GameState } from '../src/game/contentDsl/runtime';
-import { loadModule } from '../src/game/contentDsl/registry';
+import { DslError } from '../src/grammar/parser';
+import { actionFirstUnit, craftFirstUnit, describeCondition, encounterView, PLAYER, RuntimeError, type ActiveAction, type GameState } from '../src/runtime/runtime';
+import { loadModule } from '../src/content/registry';
 import {
   apply,
   applyDirective,
@@ -19,10 +19,10 @@ import {
   type PlayChoice,
   type PlaySession,
   type PlayView,
-} from '../src/game/contentDsl/session';
-import { serializeSave } from '../src/game/contentDsl/save';
-import { type ParsedSave } from '../src/game/contentDsl/saveSection';
-import { parseDirectiveLine, type Directive } from '../src/game/contentDsl/test';
+} from '../src/runtime/session';
+import { serializeSave } from '../src/runtime/save';
+import { type ParsedSave } from '../src/content/saveSection';
+import { parseDirectiveLine, type Directive } from '../src/content/test';
 
 const repoRoot = path.join(import.meta.dirname, '..');
 const defaultContent = 'content/tutorial-island.dsl';
