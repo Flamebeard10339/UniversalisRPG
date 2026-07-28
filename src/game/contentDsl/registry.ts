@@ -5,17 +5,17 @@ import { Entity, entitySchema } from './entity';
 import { Item, itemSchema } from './item';
 import { Location, locationSchema, recursivelyResolveRelativeCoordinates } from './location';
 import { parseModule } from './module';
+import { DslError } from './parser';
 import { Recipe, recipeSchema } from './recipe';
 import { Resource, resourceSchema } from './resource';
-import { SavedGame } from './save';
+import { ParsedSave } from './saveSection';
 import { scopeEntity, scopeLocation } from './scope';
 import { Authored, hydrateSection } from './section';
 import { Skill, skillSchema } from './skill';
 import { Stat, statSchema } from './stat';
-import { RuntimeError } from './state';
 import { TagClause } from './tagClause';
 import { Test } from './test';
-import { validateTuning } from './tuning';
+import { validateTuning } from './tuningVariables';
 import { humanize } from './values';
 import { Variable, variableSchema } from './variable';
 
@@ -32,7 +32,7 @@ export interface Registry {
   dialoguesByOwner: Map<string, Dialogue>;
   tests: Map<string, Test>;
   variables: Map<string, Variable>;
-  saves: Map<string, SavedGame>;
+  saves: Map<string, ParsedSave>;
 }
 
 // Compiled to an Action so a craft runs through the same resolve() machinery
@@ -83,7 +83,7 @@ function validateReferences(registry: Registry): void {
   };
   const check = (kind: ReferenceKind, id: string | undefined, where: string): void => {
     if (id === undefined || known[kind].has(id)) return;
-    throw new RuntimeError(`${where} names an unknown ${kind}: ${id}`);
+    throw new DslError(`${where} names an unknown ${kind}: ${id}`);
   };
 
   const checkResults = (where: string, ...groups: (ActionResult[] | undefined)[]): void => {
@@ -191,7 +191,7 @@ export function loadModule(source: string): Registry {
           // Without a pool to drain, a retaliation falls through to the fight's
           // own hit counter and wears down the target instead of the player.
           if (action.retaliates && !action.target) {
-            throw new RuntimeError(`# entity ${entity.id}: retaliating action ${JSON.stringify(action.label)} requires a target: pool`);
+            throw new DslError(`# entity ${entity.id}: retaliating action ${JSON.stringify(action.label)} requires a target: pool`);
           }
         }
         registry.entities.set(entity.id, entity);
@@ -225,7 +225,7 @@ export function loadModule(source: string): Registry {
       }
       case 'resource': {
         const resource = hydrateSection(section.value as Authored<Resource>, resourceSchema);
-        if (!resource.max) throw new RuntimeError(`# resource ${resource.id} requires a max: stat`);
+        if (!resource.max) throw new DslError(`# resource ${resource.id} requires a max: stat`);
         registry.resources.set(resource.id, resource);
         break;
       }
@@ -246,7 +246,7 @@ export function loadModule(source: string): Registry {
         break;
       }
       case 'save': {
-        const { id, saved } = section.value as { id: string; saved: SavedGame };
+        const { id, saved } = section.value as { id: string; saved: ParsedSave };
         registry.saves.set(id, saved);
         break;
       }

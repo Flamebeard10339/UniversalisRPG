@@ -5,7 +5,7 @@ import { locationSchema } from './location';
 import { DslError } from './parser';
 import { recipeSchema } from './recipe';
 import { resourceSchema } from './resource';
-import { parseSaveSection } from './save';
+import { parseSaveSection } from './saveSection';
 import { parseSection } from './section';
 import { skillSchema } from './skill';
 import { statSchema } from './stat';

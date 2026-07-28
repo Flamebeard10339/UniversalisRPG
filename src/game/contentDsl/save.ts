@@ -1,18 +1,12 @@
-import { DslError } from './parser';
 import { createGameState, GameState, initResources, RuntimeError } from './runtime';
 import { Registry } from './registry';
-import { RawSection } from './structure';
+import { ParsedSave } from './saveSection';
 
 // Bumped on any shape change; with no migration path, a stale save is rejected.
 export const SAVE_VERSION = 4;
 
 // A sparse diff against initialState: a new game saves as `{}`, and `log` is not state.
 export type SaveDiff = Partial<Omit<GameState, 'log'>>;
-
-export interface SavedGame {
-  version: number;
-  diff: SaveDiff;
-}
 
 // A Record over the exhaustive key type, so adding a GameState field is a type
 // error here until it is classified as diffed key-by-key or carried whole.
@@ -83,17 +77,17 @@ export function serializeSave(state: GameState, registry: Registry): string {
   return JSON.stringify({ version: SAVE_VERSION, ...diff });
 }
 
-function checkVersion(saved: SavedGame): void {
+function checkVersion(saved: ParsedSave): void {
   if (saved.version !== SAVE_VERSION) {
     throw new RuntimeError(`save version mismatch: expected ${SAVE_VERSION}, got ${saved.version}`);
   }
 }
 
 // Mutates `state` in place: resets every field to initialState, then applies
-export function loadSave(state: GameState, saved: SavedGame, registry: Registry): void {
+export function loadSave(state: GameState, saved: ParsedSave, registry: Registry): void {
   checkVersion(saved);
   const base = initialState(registry);
-  const diff = saved.diff as Record<string, unknown>;
+  const diff = saved.diff;
   const target = state as unknown as Record<string, unknown>;
   const baseline = base as unknown as Record<string, unknown>;
 
@@ -111,7 +105,7 @@ function describeValue(value: unknown): string {
   return value === undefined ? '(absent)' : JSON.stringify(value);
 }
 
-export function compareSave(state: GameState, saved: SavedGame, registry: Registry): string[] {
+export function compareSave(state: GameState, saved: ParsedSave, registry: Registry): string[] {
   checkVersion(saved);
   const current = diffState(state, initialState(registry));
   const expected = saved.diff;
@@ -130,25 +124,4 @@ export function compareSave(state: GameState, saved: SavedGame, registry: Regist
   }
 
   return diffs;
-}
-
-// The body is one line of JSON; the grammar has no multi-line support.
-export function parseSaveSection(section: RawSection): { id: string; saved: SavedGame } {
-  if (!section.id) throw new DslError('# save requires an id', section.span);
-
-  const raw = section.body.map((line) => line.text).join('');
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(raw);
-  } catch {
-    throw new DslError(`# save ${section.id}: invalid JSON: ${raw}`, section.span);
-  }
-  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
-    throw new DslError(`# save ${section.id}: must be a JSON object`, section.span);
-  }
-
-  const { version, ...diff } = parsed as { version?: unknown } & Record<string, unknown>;
-  if (typeof version !== 'number') throw new DslError(`# save ${section.id}: requires a numeric version`, section.span);
-
-  return { id: section.id, saved: { version, diff: diff as SaveDiff } };
 }

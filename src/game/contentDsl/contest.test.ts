@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
+import { DslError } from './parser';
 import { point } from './range';
 import { nextRandom } from './rng';
-import { armAction, createGameState, GameState, hitChance, initResources, resolve, RuntimeError } from './runtime';
+import { armAction, createGameState, GameState, hitChance, initResources, resolve } from './runtime';
 import { loadModule, Registry } from './registry';
 
 // Three entities differing only in what they oppose the player with: `dummy`
@@ -148,7 +149,7 @@ describe('the opposed roll', () => {
   });
 
   it('rejects a spread that cannot divide a gap', () => {
-    expect(() => loaded('# variable contest-spread\nvalue: 0\n')).toThrow(RuntimeError);
+    expect(() => loaded('# variable contest-spread\nvalue: 0\n')).toThrow(DslError);
     expect(() => loaded('# variable contest-spread\nvalue: -5\n')).toThrow(/must be positive/);
   });
 });

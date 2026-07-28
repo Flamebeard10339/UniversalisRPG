@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { DslError } from './parser';
 import { loadModule } from './registry';
-import { RuntimeError } from './runtime';
 
 const VALID = `
 # stat attack
@@ -140,7 +140,7 @@ describe('load-time reference resolution', () => {
     expect(() => loadModule('# entity ogre\nstats: rage 3\nroar:\n  time: 1\n  ability: rage\n\n# stat rage\n')).not.toThrow();
   });
 
-  it('raises a RuntimeError, the same failure kind the rest of load uses', () => {
-    expect(loading('target: health', 'target: helth')).toThrow(RuntimeError);
+  it('raises a DslError, the same failure kind the rest of load uses', () => {
+    expect(loading('target: health', 'target: helth')).toThrow(DslError);
   });
 });

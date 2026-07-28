@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { restorePools } from './effects';
 import { createGameState } from './runtime';
 import { loadModule } from './registry';
-import { compareSave, diffState, initialState, loadSave, parseSaveSection, SAVE_VERSION, serializeSave } from './save';
+import { compareSave, diffState, initialState, loadSave, SAVE_VERSION, serializeSave } from './save';
+import { parseSaveSection } from './saveSection';
 import { runTest } from './session';
 
 const MODULE = `

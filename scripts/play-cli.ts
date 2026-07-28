@@ -20,7 +20,8 @@ import {
   type PlaySession,
   type PlayView,
 } from '../src/game/contentDsl/session';
-import { serializeSave, type SaveDiff, type SavedGame } from '../src/game/contentDsl/save';
+import { serializeSave } from '../src/game/contentDsl/save';
+import { type ParsedSave } from '../src/game/contentDsl/saveSection';
 import { parseDirectiveLine, type Directive } from '../src/game/contentDsl/test';
 
 const repoRoot = path.join(import.meta.dirname, '..');
@@ -199,9 +200,9 @@ export interface Recorder {
   startSave: string;
 }
 
-function savedGameFromSerialized(serialized: string): SavedGame {
+function savedGameFromSerialized(serialized: string): ParsedSave {
   const { version, ...diff } = JSON.parse(serialized) as { version: number } & Record<string, unknown>;
-  return { version, diff: diff as SaveDiff };
+  return { version, diff };
 }
 
 function saveBlock(id: string, serialized: string): string[] {
