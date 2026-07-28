@@ -22,11 +22,13 @@ Do not bloat CLAUDE.md with over 200 lines of instructions.
 
 `.planning/.scratch.md` contains open thoughts, `backlog.md` for vetted work, `completed-tasks.md` contains the archive. 
 
-A feature large enough to span sessions gets a tracked deliverable log at `docs/<feature>/deliverable-log.md` (spec, chunk status, open decisions); `backlog.md` keeps only a pointer to it. Read the log before touching that feature's code. On merge, archive the log and lift anything unfinished back into `backlog.md`. Currently live: `docs/combat/deliverable-log.md`, `docs/readability-gate/deliverable-log.md`. 
+A feature large enough to span sessions gets a tracked deliverable log at `docs/<feature>/deliverable-log.md` (spec, chunk status, open decisions); `backlog.md` keeps only a pointer to it. Read the log before touching that feature's code. On merge, archive the log and lift anything unfinished back into `backlog.md`. Currently live: `docs/combat/deliverable-log.md`. 
 
 # Repository systems
 
-A system owns a set of paths, declared in `docs/audits/systems.json` — the one place membership is defined, so a commit's system follows from the files it touches. `npm run audit-status` reads it and reports commits since each system's last audit; record a completed audit by setting that system's `lastAudit` to the reviewed SHA.
+A system owns a set of paths, declared in `docs/audits/systems.json` — the one place membership is defined, so a commit's system follows from the files it touches. `npm run audit-status` reads it and reports commits since each system's last audit, counting only those that changed code: a comment strip or a pure rename does not spend a system's budget. It exits non-zero when an audit is due, and CI runs it, so the repo stays red until the audit lands.
+
+Record a completed audit by setting that system's `lastAudit` to the reviewed SHA **and** `lastAuditDoc` to the audit under `docs/audits/`. The doc is required — a counter reset with nothing to show for it fails the same check. Findings go to `backlog.md` as the next item; the audit doc is the evidence, not the todo list.
 
 1. **DSL load path** — `src/grammar` (text to syntax) and `src/content` (syntax to registry, incl. load-time reference resolution)
 2. **Runtime** — `src/runtime`: state, travel, actions, encounters, resources, stats, skills, flags, dialogue, saves; `session.ts` is the entry point everything above plays through

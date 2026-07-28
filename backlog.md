@@ -6,8 +6,13 @@ Check `scratch.md` for open architectural notes touching an area before starting
 
 # Tasks
 
-## Readability gate
-Tracked in `docs/readability-gate/deliverable-log.md`. Deterministic half is built and green; the model half needs a 3-file pilot, then a 68-file baseline, then wiring into CI.
+## Outstanding audits
+`npm run audit-status` is now enforced in CI, and four items are outstanding. Each needs a fresh subagent run against the audit prompt in `CLAUDE.md`, an audit doc under `docs/audits/`, and findings lifted back here.
+
+1. **DSL load path** — never audited, and owed since the restructure: the old "content pipeline" system stood at 11 commits when the split happened.
+2. **Testing procedure**, **Build & deployment**, **User interface** — each has `lastAudit: 83d81d2` recorded with no `lastAuditDoc`. Either the audit happened and the doc was never written, or the counter was reset without one. Resolve each explicitly: produce the doc, or set `lastAudit` back to null and audit it properly.
+
+The retired readability gate is written up in `docs/readability-gate/deliverable-log.md`; nothing there is outstanding.
 
 ## E2E Authoring
 Progress was made on this task in commits dcc74f6e1bcde83b1a798e7838008af856a8b33a and c1ea38675f13691519670c6f2d277beb6ccb9df4, but paused before task completion. 

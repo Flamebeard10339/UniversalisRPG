@@ -1,173 +1,85 @@
-# Readability gate — deliverable log
+# Readability gate — retired
 
-Branch: `dsl-pass2-resources`. Read this before touching `scripts/readability-*.ts`,
-`docs/audits/readability.json`, or `.claude/agents/readability-auditor.md`.
+**Status: closed, not shipped.** The machinery is deleted; this log is the record of
+what it was, what the pilot proved, and what moved into `audit-status`.
 
-## Spec
+## What it was
 
-Every source file must pass a readability audit within N=5 code-changing commits
-that touch it. The audit is performed by a cold Haiku agent that sees only that
-file's text. A file that goes stale, or that is recorded as failed, turns CI red.
+Every source file would pass a readability audit within N=5 code-changing commits
+touching it, performed by a cold Haiku agent that saw only that file's text. Split
+so CI stayed deterministic: `readability-check` was a pure function of the repo and
+its ledger, `readability-audit` generated prompts and recorded verdicts through a
+subagent. Grading happened in the orchestrating session.
 
-The gate is split so CI stays deterministic:
+Built over `2905b41`…`5e6eceb`, piloted in `da1c8d0`, retired here.
 
-- **`npm run readability-check`** is a pure function of the repo. It reads
-  `docs/audits/readability.json` and fails when a file is missing from the ledger,
-  recorded as failed, or has accumulated 5+ code-changing commits since its last
-  audit. No model runs here. This is what CI executes.
-- **`npm run readability-audit`** generates prompts and records verdicts. The model
-  calls happen through a subagent; grading happens in the orchestrating session.
-  Never wired into CI.
+## Why it was retired
 
-"Code-changing" reuses `codeOnly` from `scripts/lib/stripComments.ts`, so comment
-strips and pure renames do not spend a file's budget. Renames are followed, so
-moving a file cannot reset its counter.
+It was a second audit ledger. `docs/audits/readability.json` plus
+`readability-check.ts` reimplemented "count commits since a recorded SHA, compare to
+a threshold" — which `audit-status.ts` and `systems.json` already do, at system
+granularity. Two ledgers, two thresholds, two counting implementations, kept in sync
+by hand. That is the duplication CLAUDE.md exists to prevent.
 
-The comment budget and this gate are adversarial by design: the natural way to make
-a file explain itself is a header comment, which `npm run comment-budget` rejects.
-The remaining moves are renaming, tightening types, splitting the file, or deleting
-the confusing thing. That pressure is the point, not a contradiction.
+It also answered the wrong question. Independent audit earned its place because a
+fresh Opus reading a *system* found real defects. This asked whether each *file* was
+legible to a cold reader — a proxy, at 68× the granularity, whose gating half the
+pilot showed to be near-tautological. "Comments that restate self-documenting code"
+is already a line in the audit prompt.
 
-## Built and committed
+## What the pilot proved
 
-| Commit | What |
-|---|---|
-| `b126d9f` | Split the two files straddling the load/play boundary |
-| `262a637` | Move DSL sources into `grammar/content/runtime` |
-| `83d81d2` | `layer-check` gating the boundary in CI |
-| `2e05502` | Audit counters derived from git |
-| `2905b41` | `readability-check` — the deterministic half |
-| `ee8c06e` | `readability-audit` — first version, API-key based |
-| `542f994` | Delete `playtest-cli` in favour of `# test` |
-| `5e6eceb` | Rework the audit to run from a subagent, no API key |
+Ran on `src/grammar/values.ts`, `src/content/tuningVariables.ts`,
+`src/runtime/save.ts`, each against three same-folder distractors minted first. All
+three passed both halves.
 
-## Environment findings (tested, not assumed)
+**The leak test came back clean.** No description asserted anything absent from the
+text it was given. Words that looked like project knowledge — `DSL`, `game state`,
+`balance` — were all present as `DslError`, `GameState`, `MIN_DAMAGE`. `CLAUDE.md`
+reaching subagent context did not matter at this granularity.
 
-Probed by spawning `readability-auditor` and asking it directly:
+**Discrimination is a floor test, not a quality measure.** Almost every file
+contains a token naming its own subject, so the reader matches that token to an
+option without reading the logic. Two controls confirmed it: scrubbing the file path
+from the prompt changed nothing, and `src/content/variable.ts` — 14 lines, against
+three sibling schema files including the near-identically-shaped `stat.ts` — was
+identified immediately off `kind: 'variable'`. It catches a file so vague it could
+be any sibling. Nothing subtler.
 
-- **`tools: []` in the agent frontmatter does restrict the agent.** Two probes,
-  `tool_uses: 0` on both, including one that explicitly ordered it to attempt a
-  file read. It reports no mechanism to call a tool exists.
+**The prose audit had the signal, concentrated in NON-OBVIOUS BEHAVIOUR and
+UNCLEAR.** The verdict was the least useful thing it produced; the findings were
+real (`save.ts`: why is each field record vs scalar; `values.ts`: is `text`
+returning `''` deliberate). INPUTS AND OUTPUTS restated EXPORTS in all three audits.
+Its cost was the blocker: grading needs the orchestrator to read the file and check
+every claim, which is affordable once and unaffordable every five commits.
+
+## What was salvaged
+
+`readability-check.ts` counted commits better than `audit-status.ts` did — it
+followed renames and compared `codeOnly`, so comment strips and pure renames did not
+spend a budget. That logic moved into `audit-status.ts`, where it fixes a live
+miscount: a strip pass was pushing systems toward a spurious audit.
+
+## Environment findings (tested, still true, reusable)
+
+Probed by spawning a `tools: []` subagent and asking it directly:
+
+- **`tools: []` in agent frontmatter does restrict the agent.** Two probes,
+  `tool_uses: 0` on both, including one explicitly ordered to attempt a file read.
 - **The agent listing reports `(Tools: All tools)` for it anyway.** The listing and
   the behaviour disagree; the behaviour is what held.
 - **Project instructions DO reach subagent context.** It quoted `CLAUDE.md` verbatim
   when asked. This cannot be closed by agent configuration.
-- It does not have file contents preloaded — asked about `src/runtime/session.ts`
-  without a tool, it answered UNKNOWN.
+- It does not have file contents preloaded — asked about a file without a tool, it
+  answered UNKNOWN.
 
-### Mitigating the CLAUDE.md leak
+These matter for any future cold-reader work. They do not constrain system audits,
+where independence means a fresh session rather than an absence of tools.
 
-Two defences, both already in the design:
+## Not carried forward
 
-1. Distractors are drawn from **siblings in the same folder**, so knowing the layer
-   scheme cannot separate the candidates.
-2. When grading the prose audit, check each claim against the file text. A claim
-   that is *correct but unsupported by the file* is evidence of leakage, not of
-   readability — discount it rather than crediting it.
-
-## Remaining work
-
-### 1. Pilot — done
-
-Ran on `src/grammar/values.ts`, `src/content/tuningVariables.ts`,
-`src/runtime/save.ts`, each against three same-folder distractors minted first
-(`range`/`list`/`tagClause`, `variable`/`resource`/`stat`, `state`/`tuning`/`stats`).
-All three passed discrimination and prose; notes are in the ledger.
-
-**Leak test: clean.** No description asserted anything absent from the text it was
-given. Every claim traced to an identifier, an import path, or an in-file comment.
-The genre words that looked like leakage on first read (`DSL`, `game state`,
-`balance`) are all present in the given text as `DslError`, `GameState`,
-`MIN_DAMAGE`. `CLAUDE.md` reaching subagent context did not turn out to matter at
-this granularity.
-
-**Discrimination is valid but wide-margin.** The prompt names the file path, and
-these three filenames nearly answer their own question. A control run with the path
-scrubbed still passed both files tested, so the code carries the test, not the
-name — but the path is an unearned hint that should come out of
-`discriminationPrompt`, since the point is to measure the file.
-
-**Prose rubric is not over-failing.** It is currently under-gating, if anything: it
-is advisory, and the three verdicts turned on whether claims were supported, which
-all were. The useful output was not the verdict but the UNCLEAR section, which
-named real file-owned ambiguities (`values.ts`: does `text` return `''` by design;
-`save.ts`: why is each field record vs scalar). The one wrong claim in the pilot —
-`values.ts` error messages read as identical when `id` differs — came from three
-near-identical parser blocks, which is a readability signal the pass/fail verdict
-throws away.
-
-### Follow-ups the pilot surfaced
-
-- **Done.** `discriminationPrompt` no longer names the path, in the question or the
-  `<file>` tag. The audit and summary prompts still do.
-- **Rejected: a third ledger state.** `--set-summary` writes `discrimination: 'fail'`,
-  so minting 68 summaries before any audit marks the whole repo failed. That only
-  happens during bootstrapping, and a red repo is the honest reading of "no file has
-  been audited yet". Two states stay.
-
-### What the pilot says about the design
-
-The two halves came out inverted from the intent. Discrimination gates but barely
-discriminates; prose is advisory but is where every real finding came from.
-
-Discrimination is close to a tautology. Almost every file contains a token naming
-its own subject — `kind: 'variable'`, `SAVE_VERSION`, `hitDamage` — so the reader
-matches that token to an option without the logic mattering. Probed on the hardest
-realistic case, `src/content/variable.ts`: 14 lines, three sibling schema files as
-distractors, correct. It is a floor test for a file so vague it could be any
-sibling, not a measure of whether the file explains itself.
-
-Its virtue is that it is the only half gradeable without a model — one letter
-against `--answer` — so it is what a CI gate can key off. Keep it as the floor,
-expect it green, and do not read a pass as evidence a file is well written.
-
-The prose audit is the half with the signal, and it is concentrated in NON-OBVIOUS
-BEHAVIOUR and UNCLEAR. PURPOSE and EXPORTS earn their place as the check that the
-reader understood the file at all — an UNCLEAR from a confused reader means nothing,
-and the one false claim in the pilot surfaced in EXPORTS. INPUTS AND OUTPUTS
-restated EXPORTS in all three audits and should come out of `AUDIT_PROMPT`.
-
-Its cost is the constraint: grading needs the orchestrator to read the file and
-check every claim. That is affordable once at baseline and unaffordable every five
-commits, so the prose audit should be a one-shot baseline pass, with only
-discrimination recurring on staleness.
-
-### 2. Baseline — 68 files
-
-`npx tsx scripts/readability-audit.ts --needs-summary` lists what is outstanding.
-Summaries must all be minted **before** any discrimination test runs, or the first
-files audited get an empty distractor pool and an unearned pass.
-
-### 3. Calibrate, then wire CI
-
-Review the failure rate. Only once it is defensible, add to
-`.github/workflows/test.yml` after `layer-check`:
-
-```yaml
-      - run: npm run readability-check
-```
-
-## Commands
-
-```bash
-npx tsx scripts/readability-audit.ts --needs-summary
-npx tsx scripts/readability-audit.ts --prompt-summary <path>
-npx tsx scripts/readability-audit.ts --prompt-audit <path>
-npx tsx scripts/readability-audit.ts --prompt-discriminate <path>   # expected letter -> stderr
-npx tsx scripts/readability-audit.ts --set-summary <path> "<sentence>"
-npx tsx scripts/readability-audit.ts --record <path> --discrimination pass|fail --prose pass|fail --note "…"
-npx tsx scripts/readability-check.ts --explain <path> [<since-sha>]
-```
-
-Spawn the reader with `subagent_type: readability-auditor`, passing the generated
-prompt as the whole message. Grade in the orchestrating session; do not spawn an
-Opus grader, since the orchestrating session is already Opus and that would add
-~68 calls to the baseline for nothing.
-
-## Open decisions
-
-- Prose verdicts are recorded but **advisory**; only discrimination gates. Revisit
-  once the baseline shows whether prose verdicts are stable enough to gate on.
-- `scripts/` is not covered by `tsc --noEmit` (`tsconfig.json` has
-  `"include": ["src"]`). Unrelated to this gate, but it means a broken import in
-  `scripts/` ships silently. Worth fixing separately.
+A one-time prose sweep over all 68 files would still produce a real list of
+file-owned ambiguities. It was considered and dropped: it is a task, not a gate, and
+nothing about it needs the ledger, the summaries, or the discrimination test to
+happen. If it is ever wanted, it is one pass with the audit prompt and no
+infrastructure at all.
