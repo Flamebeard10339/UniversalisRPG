@@ -6,10 +6,8 @@ import { newCadence } from './encounter';
 import { loadModule, Registry } from './registry';
 import { tagClause } from './tagClause';
 
-// A stat's base and its flat bonuses may each be an interval; a use of the stat
-// samples the summed interval once. `dummy.strike` carries both a ranged flat
-// bonus and a percent bonus so the action-tag half of statRange is exercised
-// alongside the buff half.
+// `dummy.strike` carries both a ranged flat bonus and a percent one, so the
+// action-tag half of statRange is exercised alongside the buff half.
 const MODULE = `
 # stat attack
 base: 4-7
@@ -122,8 +120,7 @@ describe('sampleStat', () => {
 
   it('consumes exactly one draw however many ranged sources contribute', () => {
     const registry = loaded();
-    // One ranged source (a bare `spread` base) versus three stacked on `attack`;
-    // both must leave the RNG cursor one step along from the same seed.
+    // One ranged source versus three stacked: both must cost one RNG step.
     const one = createGameState('nowhere');
     sampleStat('spread', one, registry);
 
@@ -141,8 +138,7 @@ describe('sampleStat', () => {
 
     expect(Math.min(...rolls)).toBeGreaterThanOrEqual(4);
     expect(Math.max(...rolls)).toBeLessThanOrEqual(7);
-    // Uniform over 4-7 has mean 5.5; loose bounds keep this a distribution
-    // check rather than a restatement of the LCG's exact output.
+    // Loose bounds, so this stays a distribution check and not an LCG restatement.
     expect(rolls.reduce((sum, roll) => sum + roll, 0) / rolls.length).toBeCloseTo(5.5, 1);
     expect(Math.min(...rolls)).toBeLessThan(4.2);
     expect(Math.max(...rolls)).toBeGreaterThan(6.8);

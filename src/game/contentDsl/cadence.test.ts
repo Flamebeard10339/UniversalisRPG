@@ -4,17 +4,9 @@ import { armAction, createGameState, GameState, initResources, PLAYER, resolve }
 import { loadModule, Registry } from './registry';
 import { startSession, view } from './session';
 
-// The deliverable's acceptance case: a rat swinging 16x/min against a player
-// swinging 25x/min, plus a weapon that raises the player's rate 25% mid-fight.
-//
-// Attack rate needs no new duration axis — `time: 60` with `speed:` on a
-// per-minute rate stat already means "this many attempts per minute":
-//   player  60 / 25   = 2.4s   per swing
-//   rat     60 / 16   = 3.75s  per swing
-//   hasted  60 / 31.25 = 1.92s per swing
-//
-// giant-rat carries a deep pool so the interleaving can be watched without the
-// fight ending; punchbag has no `retaliates` action and so keeps no clock.
+// `time: 60` with `speed:` on a per-minute rate stat means attempts per minute:
+//   player 60/25 = 2.4s, rat 60/16 = 3.75s, hasted 60/31.25 = 1.92s.
+// giant-rat carries a deep pool; punchbag has no `retaliates` and keeps no clock.
 const MODULE = `
 # stat attack
 base: 10
@@ -139,8 +131,7 @@ describe('independent cadences', () => {
   });
 });
 
-// The open decision the log asked to make explicit: `progress` is elapsed
-// seconds, so raising a rate mid-swing shortens the swing already under way.
+// `progress` is elapsed seconds, so raising a rate shortens the swing under way.
 describe('a rate raised mid-swing (absolute carry)', () => {
   function hasted(at: number): { registry: Registry; state: GameState } {
     const registry = loaded();
@@ -151,15 +142,12 @@ describe('a rate raised mid-swing (absolute carry)', () => {
   }
 
   it('lands the in-flight swing 0.72s later, not 0.96s or 1.2s', () => {
-    // 1.2s into a 2.4s swing; +25% rate makes a swing 1.92s, and 1.2s is
-    // already banked, so 0.72s remain and the swing lands at 1.92.
+    // 1.2s banked into a 2.4s swing; at 1.92s per swing, 0.72s remain.
     const { registry, state } = hasted(1.2);
     expect(playerClock(state).progress).toBeCloseTo(1.2, 9);
 
     resolve(state, registry, 1.95);
     expect(playerClock(state).attemptsMade).toBe(1);
-    // Preserving the completed fraction would put it at 2.16 and a fixed
-    // deadline at 2.4; both would still read 0 here.
   });
 
   it('leaves the unhasted swing until 2.4, so the assertion above is about the buff', () => {
@@ -190,8 +178,7 @@ describe('two cadences stay associative', () => {
     };
 
     for (let trial = 0; trial < 25; trial++) {
-      // 60 and 120 are where 2.4 and 3.75 land on the same instant — the one
-      // place roster order, not float noise, has to decide who swings first.
+      // 60 and 120 are where 2.4 and 3.75 collide, so roster order must decide.
       const waypoints = new Set<number>([60, 120]);
       for (let i = 0; i < 3 + Math.floor(rand() * 6); i++) waypoints.add(rand() * 300);
       const sorted = [...waypoints].filter((t) => t > 0 && t < 300).sort((a, b) => a - b);
@@ -215,7 +202,6 @@ describe('two cadences stay associative', () => {
   it('resolves both swings at a collision instant, in roster order', () => {
     const registry = loaded();
     const state = fighting(registry);
-    // t=60 is the 25th player swing and the 16th rat swing.
     resolve(state, registry, 60);
     expect(playerClock(state).attemptsMade).toBe(25);
     expect(ratClock(state)!.attemptsMade).toBe(16);

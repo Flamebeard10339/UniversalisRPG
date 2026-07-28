@@ -4,16 +4,8 @@ import { nextRandom } from './rng';
 import { armAction, createGameState, GameState, hitChance, initResources, resolve, RuntimeError } from './runtime';
 import { loadModule, Registry } from './registry';
 
-// Every contested outcome in the game runs through one roll — a sword landing,
-// a dish coming out cooked, a lock giving — so the shape of the curve is tested
-// here on its own, and then that the resolver actually reads each side of it off
-// the right actor.
-//
 // Three entities differing only in what they oppose the player with: `dummy`
-// doesn't dodge at all, `phantom` matches the player's skill exactly, and
-// `biter` swings back so the roll can be watched in the other direction. All
-// three carry a pool deep enough that the fight never ends inside the horizon,
-// and a 60/min cadence so an attempt lands on every whole second.
+// does not dodge, `phantom` matches the player exactly, `biter` swings back.
 const MODULE = `
 # stat attack
 base: 10
@@ -105,8 +97,7 @@ function fighting(registry: Registry, entityId: string): GameState {
   return state;
 }
 
-// Hits are the only thing that moves the target's pool, and each lands for a
-// flat 10, so the pool level counts them.
+// Hits are the only thing that moves the pool and each lands for a flat 10.
 function hitsLanded(state: GameState, entityId: string): number {
   const pool = state.activeAction!.actors![entityId].resources.health;
   return (1000000 - pool) / DAMAGE;
@@ -144,17 +135,14 @@ describe('the opposed roll', () => {
     // 15 spreads of advantage is already one loss in 10^15.
     expect(hitChance(1500, 0, registry)).toBeLessThan(1);
     expect(hitChance(0, 1500, registry)).toBeGreaterThan(0);
-    // The curve is asymptotic in exact arithmetic; the double it is computed in
-    // is not. Past ~16 spreads the near side rounds to exactly 1. Pinned rather
-    // than guarded against: the resolver's uniform is drawn from [0, 1), so
-    // "always hits" is the right reading of a 1-in-10^16 gap anyway.
+    // Asymptotic in exact arithmetic but not in a double: past ~16 spreads the
+    // near side rounds to 1, which the [0, 1) uniform reads as "always hits".
     expect(hitChance(1700, 0, registry)).toBe(1);
   });
 
   it('sharpens or flattens with contest-spread', () => {
     const sharp = loaded('# variable contest-spread\nvalue: 10\n');
     const flat = loaded('# variable contest-spread\nvalue: 1000\n');
-    // The same +40 gap: decisive at a spread of 10, nearly nothing at 1000.
     expect(hitChance(140, 100, sharp)).toBeCloseTo(0.9999, 4);
     expect(hitChance(140, 100, flat)).toBeCloseTo(0.523, 3);
   });
@@ -165,9 +153,6 @@ describe('the opposed roll', () => {
   });
 });
 
-// The structural claim: `accuracy:` is read off whoever is swinging and
-// `evasion:` off whoever is being hit, so one action shape covers both
-// directions and difficulty lives on the target rather than in the verb.
 describe('a contest inside a fight', () => {
   it('lands more often against a target that opposes nothing', () => {
     const registry = loaded();
@@ -177,8 +162,7 @@ describe('a contest inside a fight', () => {
     const evasive = fighting(registry, 'phantom');
     resolve(evasive, registry, ATTEMPTS);
 
-    // Identical action, identical player: only the target's `dodge` differs, so
-    // this is the assertion that `evasion:` is the TARGET's stat.
+    // Only the target's `dodge` differs, so this pins `evasion:` to the TARGET.
     expect(hitsLanded(open, 'dummy') / ATTEMPTS).toBeCloseTo(0.909, 1);
     expect(hitsLanded(evasive, 'phantom') / ATTEMPTS).toBeCloseTo(0.5, 1);
     expect(hitsLanded(open, 'dummy')).toBeGreaterThan(hitsLanded(evasive, 'phantom'));
@@ -206,8 +190,7 @@ describe('a contest inside a fight', () => {
     nimble.activeBuffs['ring:dodge'] = { statId: 'dodge', kind: 'added', amount: point(100), expiresAt: 1e9 };
     resolve(nimble, registry, ATTEMPTS);
 
-    // The player's own `evasion: dodge` reads the BITER's dodge (0), so the
-    // player's buff must not leak into their own accuracy.
+    // The player's own `evasion: dodge` reads the BITER's dodge, not their buff.
     expect(hitsLanded(nimble, 'biter') / ATTEMPTS).toBeCloseTo(0.909, 1);
   });
 
@@ -216,12 +199,8 @@ describe('a contest inside a fight', () => {
     const state = fighting(registry, 'phantom');
     resolve(state, registry, ATTEMPTS);
 
-    // The whole point of deriving the threshold rather than sampling it: both
-    // sides are read with statValue, so the draw count per attempt is unchanged
-    // and resolve() stays associative. The reference cursor is stepped through
-    // nextRandom itself — restating the LCG's arithmetic here would only pin
-    // this test to whatever the implementation happens to compute (rng.test.ts
-    // is where that arithmetic is checked against an exact reference).
+    // The reference cursor steps through nextRandom itself: restating the LCG
+    // here would pin this test to the implementation (rng.test.ts checks that).
     const reference = createGameState();
     for (let i = 0; i < ATTEMPTS; i++) nextRandom(reference);
     expect(state.rng).toBe(reference.rng);

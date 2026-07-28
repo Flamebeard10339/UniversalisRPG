@@ -4,13 +4,9 @@ import { armAction, createGameState, GameState, initResources, PLAYER, resolve, 
 import { loadModule, Registry } from './registry';
 import { diffState, initialState, loadSave, SAVE_VERSION } from './save';
 
-// A `target:` action fights the entity it belongs to: that entity joins the
-// encounter with its own stat sheet and its own pools, and each hit drains the
-// named pool by (sampled damage - sampled dr), floored at min-damage.
-//
 // training-dummy: point damage, for exact arithmetic.
 // straw-man: ranged damage, for sampling and the associativity gate.
-// iron-golem: dr above the attacker's entire range, for the min-damage floor.
+// iron-golem: dr above the attacker's whole range, for the min-damage floor.
 const MODULE = `
 # stat attack
 base: 10
@@ -120,10 +116,8 @@ describe('encounter state', () => {
     expect(state.resources['health']).toBe(30);
   });
 
-  // `start:` is where a pool begins on a fresh game — a player-lifecycle
-  // concept. An actor stands up mid-fight and has no fresh game to begin, so
-  // honouring it spawned every enemy at the player's starting level however much
-  // max-health its own sheet claimed.
+  // An actor stands up mid-fight and has no fresh game to begin, so honouring
+  // `start:` spawned every enemy at the player's starting level.
   it('fills an actor from its own max even when the resource declares a start:', () => {
     const registry = loadModule(MODULE.replace('max: max-health\n', 'max: max-health\nstart: 5\n'));
     const state = started(registry);
@@ -179,8 +173,7 @@ describe('damage against a target pool', () => {
     useAction('entity', 'training-dummy', 'strike', registry, state);
     resolve(state, registry, 10);
 
-    // "You black out." belongs to the player's health; a felled dummy must not
-    // borrow the player's words.
+    // "You black out." belongs to the player's health, not a felled dummy's.
     expect(state.log).not.toContain('You black out.');
     expect(state.resources['health']).toBe(30);
   });

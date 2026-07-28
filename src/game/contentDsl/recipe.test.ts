@@ -80,9 +80,7 @@ describe('craft', () => {
     expect(state.inventory.bread).toBe(1);
     expect(state.xp.cooking).toBe(4);
     expect(state.log).toContain('The oven bakes your dough into a golden loaf.');
-    // bread has no time:, so it compiles to an instant, non-repeating craft
-    // (B1's duration<=0 boundary fires synchronously inside craft()'s
-    // resolve() call) — byte-identical to the old direct-apply craft().
+    // bread has no time:, so it compiles to an instant, non-repeating craft.
     expect(state.time).toBe(0);
     expect(state.activeAction).toBeNull();
   });
@@ -147,11 +145,8 @@ describe('session craft choices', () => {
   });
 });
 
-// Gate: a recipe requiring a capability is craftable only at a location
-// containing an entity that offers it, and NOT at a location without one —
-// independent of the "bread"/"oven" fixture above, using a differently-named
-// capability ("stove") to prove the match is on the capability id, not a
-// coincidence of reusing the word "oven" on both sides.
+// A differently-named capability ("stove"), so the match is proved to be on the
+// capability id rather than a coincidence of reusing the word "oven".
 const STATION_MODULE = `
 # item water
 examine: A splash of water.
@@ -201,11 +196,7 @@ describe('recipe station capability', () => {
   });
 });
 
-// Gate: a time>0 recipe compiles to a repeating, spannable craft — craft()
-// produces exactly one completion and leaves a `recipe.<id>` activeAction
-// that a later resolve()/wait continues, exactly like a repeating entity
-// action (the time:0 instant-craft path is covered above, in the `craft`
-// describe block, which also asserts no lingering activeAction).
+// A time>0 recipe leaves a `recipe.<id>` activeAction for a later resolve().
 const SPANNABLE_MODULE = `
 # item raw-clay
 examine: A lump of raw clay.
@@ -242,10 +233,7 @@ describe('spannable repeating craft', () => {
   });
 });
 
-// Gate: a repeating, accuracy-gated recipe with a `burnt` output produces
-// both outcomes over many crafts, each consuming exactly one input, success
-// + burnt totaling the craft count — the same distribution shape as a
-// stochastic entity fight (see resolve.test.ts), reached through craft().
+// Success + burnt must total the craft count, each consuming exactly one input.
 const BURN_MODULE = `
 # stat firing
 base: 80

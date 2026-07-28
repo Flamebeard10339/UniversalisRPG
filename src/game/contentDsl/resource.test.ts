@@ -4,9 +4,6 @@ import { applyResultsNow, createGameState, initResources } from './runtime';
 import { loadModule, Registry } from './registry';
 import { initialState } from './save';
 
-// Chunk 1 (data plumbing): a `# resource` section parses, hydrates with the
-// right defaults, drives initial pool levels, and validates its required max.
-// Rate integration itself is covered by the resolver gates in resolve.test.ts.
 const MODULE = `
 # stat max-health
 base: 20
@@ -89,10 +86,6 @@ describe('# resource: parsing and defaults', () => {
   });
 });
 
-// The discrete counterpart to rate integration: a 4-7 damage hit is not a rate,
-// so combat needs a level change that applies at an instant. Both verbs land on
-// one signed result kind, mirroring how a pool's rate is already one signed stat
-// rather than separate regen and drain.
 describe('drain: / restore: — the direct pool write', () => {
   function started(): { registry: Registry; state: ReturnType<typeof createGameState> } {
     const registry = loadModule(MODULE);
