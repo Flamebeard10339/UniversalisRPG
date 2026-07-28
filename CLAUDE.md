@@ -8,7 +8,7 @@ Make commits after each logical chunk.
 
 # Comments
 
-Comments are capped at 5% of a file's lines, gated by `npm run comment-budget` in CI. This is a hard budget, not an aspiration: spend it on the few facts that earn it.
+Comments are scarce by principle, not by quota. The 5% budget and its `comment-only` companion were retired 2026-07-28: the lesson had been extracted (they are what exposed `runtime.ts` hiding structure behind 521 comments), and the audit then showed `comment-only` certifying commits that deleted CI steps. A gate that generates strip commits and cannot prove what it claims costs more than it prevents.
 
 Keep a comment only if the fact is **owned by this file**, **not derivable from reading it**, and expressible as neither a name, a type, nor a test. Otherwise it has a destination — rename it, type it, test it, or leave it in the commit message and the audit log. Deleting it loses nothing; git holds every word.
 
@@ -16,7 +16,7 @@ Never describe another module's contract. That comment drifts the moment its own
 
 Never close an audit finding by writing its rationale into the source. The finding lives in `docs/audits/`, its fix lives in the code, and every behavioural claim it makes lives in a test. A comment restating a finding is a third copy that cannot be executed and will rot.
 
-Strip passes must pass `npm run comment-only -- <base>`, which proves no code changed. Renames go in their own commit so that proof stays honest.
+A file drifting toward heavy commenting is a design signal — read it as "this needs a seam", not "this needs a strip pass". Audits are where that gets caught now.
 
 Do not bloat CLAUDE.md with over 200 lines of instructions. 
 
@@ -28,7 +28,9 @@ A feature large enough to span sessions gets a tracked deliverable log at `docs/
 
 A system owns a set of paths, declared in `docs/audits/systems.json` — the one place membership is defined, so a commit's system follows from the files it touches. `npm run audit-status` reads it and reports commits since each system's last audit, counting only those that changed code: a comment strip or a pure rename does not spend a system's budget. It exits non-zero when an audit is due, and CI runs it, so the repo stays red until the audit lands.
 
-Record a completed audit by setting that system's `lastAudit` to the reviewed SHA **and** `lastAuditDoc` to the audit under `docs/audits/`. The doc is required — a counter reset with nothing to show for it fails the same check. Findings go to `backlog.md` as the next item; the audit doc is the evidence, not the todo list.
+Record a completed audit by setting that system's `lastAudit` to the reviewed SHA **and** `lastAuditDoc` to the audit under `docs/audits/`. The doc is required, and must be a real file there with real content — a counter reset with nothing to show for it fails the same check. Findings go to `backlog.md` as the next item; the audit doc is the evidence, not the todo list.
+
+Audits are the one gate that has repeatedly caught real defects, so they stay. Resist adding new automated gates: a gate earns its place by preventing something that actually happened, not by sounding rigorous.
 
 1. **DSL load path** — `src/grammar` (text to syntax) and `src/content` (syntax to registry, incl. load-time reference resolution)
 2. **Runtime** — `src/runtime`: state, travel, actions, encounters, resources, stats, skills, flags, dialogue, saves; `session.ts` is the entry point everything above plays through
@@ -37,7 +39,7 @@ Record a completed audit by setting that system's `lastAudit` to the reviewed SH
 5. **Testing procedure**
   1. `scripts/play-cli.ts` interactive REPL over `startSession`/`view`/`apply` (live `--live` real-time + instant piped/agent mode), named `# test` scripts run via `/test`
   2. `# test` sections in the DSL are the regression format: authored from a live session with `/create-test`, replayed with assertions by `runTest`, and run over the shipped content by `integration.test.ts`
-  3. CI: `.github/workflows/test.yml` runs `tsc --noEmit`, `npm test`, `npm run comment-budget`, `npm run layer-check` on push and PR
+  3. CI: `.github/workflows/test.yml` runs `tsc --noEmit`, `npm test`, `npm run layer-check`, `npm run audit-status` on push and PR
 6. **Build & deployment**
   1. Web: Vite build, tag-triggered publish to itch.io (`.github/workflows/publish.yml`)
   2. Android: Capacitor sync + Gradle release build, APK signing, attached to the GitHub release

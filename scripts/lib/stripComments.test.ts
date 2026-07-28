@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { codeOnly, isCommentLine, stripComments } from './stripComments';
+import { codeOnly, stripComments } from './stripComments';
 
 function commentLines(source: string): number {
   const original = source.split('\n');
-  return stripComments(source).filter((line, index) => isCommentLine(original[index] ?? '', line)).length;
+  return stripComments(source).filter((line, index) => (original[index] ?? '').trim() !== '' && line.trim() === '').length;
 }
 
 describe('stripComments', () => {

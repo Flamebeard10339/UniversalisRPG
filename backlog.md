@@ -15,25 +15,21 @@ verified against a fixture or a measurement; the doc names the fixture so it can
 Work them in tier order — tier 1 is what makes the rest of CI trustworthy.
 
 ### Tier 1 — the gates do not enforce what they claim
-- **TP-H1 `comment-only` certifies commits that gut CI.** `comment-only-diff.ts:38` skips every
-  non-`.ts` path, so one commit stripped comments *and* deleted `npm test` + `npm run
-  audit-status` from `test.yml`, disabled a shipped `# test`, and replaced `comment-budget`
-  with `echo skip` — and still reported "is comment-only". A workflow-only change reports
-  "0 files changed". `--worktree` mode cannot see untracked new source files. CLAUDE.md:19
-  says it "proves no code changed"; fix the tool or the claim.
-- **TP-M1 the audit-doc gate is satisfiable by `touch`.** `audit-status.ts:83` is bare
-  `existsSync` — a directory, `package.json`, or a zero-byte file all pass.
-- **TP-M2 the commit hook fires on the wrong things.** Triggers on `echo "git commit"` and
-  `--dry-run`, silent on `merge`/`rebase`, reports the main HEAD when you commit from a
-  worktree, and asserts "ran normally" without checking the exit code.
+**Mostly CLOSED 2026-07-28 by retiring the gates rather than repairing them.** The comment
+budget and `comment-only` are deleted; TP-H1, TP-M4, TP-L5 and UI-L1 died with them. TP-M1 is
+fixed: `audit-status` now requires a real file under `docs/audits/` with real content. What
+remains:
+
 - **DSL-L2 + TP-M7 `layer-check` is a string match.** Catches 1 of 7 upward-import syntaxes
   (single quotes only — nothing pins quote style, there is no ESLint/Prettier), false-positives
-  on imports inside comments and strings, and misses directory imports. `codeOnly` sits unused
-  in the same folder.
-- **TP-M4 + TP-L5 + UI-L1 the comment budget under-measures by construction.** Blind to trailing
-  comments (85 in repo, 3.2% measured vs 4.1% actual), blind to comment *length* (400 words on
-  one line passes), and hardcoded to `.ts`/`.tsx` so `.yml`/`.css`/`.md` are ungoverned — this
-  system's own workflow file is 24% comment.
+  on imports inside comments and strings, and misses directory imports. `codeOnly` is right
+  there in `scripts/lib/` and would fix the comment/string half in one line. Kept because
+  layering is a real architectural claim and the script is cheap — but it is currently
+  decorative, so either fix it or drop it too.
+- **TP-M2 the commit hook fires on the wrong things.** Triggers on `echo "git commit"` and
+  `--dry-run`, silent on `merge`/`rebase`, reports the main HEAD when you commit from a
+  worktree, and asserts "ran normally" without checking the exit code. It also dumps the whole
+  ledger after every commit; it should fire on the OK→DUE transition only.
 
 ### Tier 2 — DSL load path correctness
 - **DSL-H1 a second definition of an id replaces the first wholesale.** There are no merge
@@ -120,7 +116,7 @@ Work them in tier order — tier 1 is what makes the rest of CI trustworthy.
 DSL: redefinition/merge semantics (blocks DSL-H1); should flags be declarable; should `stations:`
 be a registered kind; are ids globally or kind-scoped unique. Build: should publish gate on the
 test suite; is a tag imminent given BD-H2; should the web and android jobs be independent.
-Testing: whether `comment-only` should grow to non-`.ts` files or shrink its claim.
+Testing: settled — the comment gates were cut rather than repaired.
 
 The retired readability gate is written up in `docs/readability-gate/deliverable-log.md`; the
 Testing-procedure audit re-verified that retirement is genuinely complete (second ledger deleted

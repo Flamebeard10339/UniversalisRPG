@@ -166,10 +166,6 @@ export function stripComments(source: string): string[] {
   return lines;
 }
 
-export function isCommentLine(original: string, stripped: string): boolean {
-  return original.trim() !== '' && stripped.trim() === '';
-}
-
 export function codeOnly(source: string): string[] {
   return stripComments(source)
     .map((line) => line.trim())

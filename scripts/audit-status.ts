@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, statSync } from 'node:fs';
 import { codeOnly } from './lib/stripComments';
 
 const MANIFEST = 'docs/audits/systems.json';
@@ -79,8 +79,15 @@ function touchesSince(system: System): Touch[] {
   });
 }
 
+const AUDIT_DOC_DIRECTORY = 'docs/audits/';
+const MINIMUM_AUDIT_DOC_BYTES = 500;
+
 function documented(system: System): boolean {
-  return system.lastAudit === null || (system.lastAuditDoc !== null && existsSync(system.lastAuditDoc));
+  if (system.lastAudit === null) return true;
+  const doc = system.lastAuditDoc;
+  if (doc === null || !doc.startsWith(AUDIT_DOC_DIRECTORY) || !existsSync(doc)) return false;
+  const stats = statSync(doc);
+  return stats.isFile() && stats.size >= MINIMUM_AUDIT_DOC_BYTES;
 }
 
 const manifest = JSON.parse(readFileSync(MANIFEST, 'utf8')) as Manifest;
@@ -110,7 +117,7 @@ for (const system of manifest.systems) {
 
 console.log(`\nThreshold ${manifest.threshold}. Systems and their paths are declared in ${MANIFEST}.`);
 
-for (const name of undocumented) console.error(`no audit doc:  ${name} records a lastAudit but no readable lastAuditDoc`);
+for (const name of undocumented) console.error(`no audit doc:  ${name} records a lastAudit, but its lastAuditDoc is missing, empty, or not a file under ${AUDIT_DOC_DIRECTORY}`);
 if (due.length > 0) console.error(`audit due:     ${due.join(', ')}`);
 
 if (due.length + undocumented.length > 0) {
