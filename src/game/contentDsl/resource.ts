@@ -4,32 +4,18 @@ import { DslError, Parser } from './parser';
 import { SectionSchema } from './section';
 import { humanize, id, decimal, text } from './values';
 
-// A pool (health, energy, a rage meter...) whose `current` level the resolver
-// integrates over time. Its rate is a single stat's NET value **per minute**:
-// positive regenerates, negative drains — regen and drain are the same stat with
-// opposite sign, and an action drains/boosts a pool only by carrying stat-bonus
-// tag clauses (`-5 regeneration`) that shift that stat while it runs, exactly
-// like a food buff or a piece of equipment. Effects never touch a pool directly.
 export type ResourceDisplay = 'full' | 'minimal';
 
 export interface Resource {
   id: string;
   title: string;
-  // Stat id whose live value (statValue) is the per-minute rate. Absent = a
-  // static pool that never changes on its own.
+  // One NET signed rate: regeneration and drain are the same stat.
   rate?: string;
-  // Stat id whose live value is the pool's maximum (so a +max buff raises the
-  // cap). Required — validated at load.
   max: string;
-  // Where `current` begins on a fresh game; absent means start full (= max).
   start?: number;
-  // How a driver renders the pool (see the play-cli readout): a full bar, or a
-  // single character stepping through ~8 stages.
   display: ResourceDisplay;
-  // Fires once when `current` transitions from >0 to 0 (see resolve()).
   onEmpty: ActionResult[];
-  // Presence turns the pool into a rollover meter: on reaching max it resets to
-  // 0 and fires these effects (batched per rollover). Empty = a plain capped pool.
+  // Presence makes the pool a rollover meter rather than a plain capped one.
   onFull: ActionResult[];
 }
 
