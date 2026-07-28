@@ -16,7 +16,6 @@
     "audit-status": "tsx scripts/audit-status.ts",
     "readability-check": "tsx scripts/readability-check.ts",
     "readability-audit": "tsx scripts/readability-audit.ts",
-    "playtest": "tsx scripts/playtest-cli.ts",
     "play": "tsx scripts/play-cli.ts"
   },
   "dependencies": {

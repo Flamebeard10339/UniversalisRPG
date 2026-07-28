@@ -34,7 +34,7 @@ A system owns a set of paths, declared in `docs/audits/systems.json` — the one
 4. **User interface** — `src/ui`, pending the GUI rebuild. Main tabs: Map, Home, Character, Settings, Edit. Modals: dialogue, skills, stats. Experience: floating text
 5. **Testing procedure**
   1. `scripts/play-cli.ts` interactive REPL over `startSession`/`view`/`apply` (live `--live` real-time + instant piped/agent mode), named `# test` scripts run via `/test`
-  2. `scripts/playtest-cli.ts` headless replay of a saved choiceId script through `startSession`/`apply`, writing a transcript (zero browser, zero real wait)
+  2. `# test` sections in the DSL are the regression format: authored from a live session with `/create-test`, replayed with assertions by `runTest`, and run over the shipped content by `integration.test.ts`
   3. CI: `.github/workflows/test.yml` runs `tsc --noEmit`, `npm test`, `npm run comment-budget`, `npm run layer-check` on push and PR
 6. **Build & deployment**
   1. Web: Vite build, tag-triggered publish to itch.io (`.github/workflows/publish.yml`)
@@ -74,7 +74,7 @@ Report findings by severity with file references and evidence.
 - travel actions without cost or reward are treated as pathfinding edges for multi step map navigation
 - all skill-XP-granting moments must produce floating text
 - progress signals get lightweight UI acknowledgement (e.g. map tab flashing on location discovery)
-- prefer expanding `scripts/playtest-cli.ts` over writing ad-hoc preview_eval scripts
+- record a regression as a `# test` section via `/create-test` rather than writing an ad-hoc script
 - the dev-only `window.__test` browser harness (batched checks via `window.__test.batch([...])`) was removed with the legacy GUI; pending the GUI rebuild, reintroduce it rather than reaching for ad-hoc `page.evaluate`/screenshot loops
 - manually clearing browser storage does not reliably give you a fresh state. Use `/cheat reset`
 
