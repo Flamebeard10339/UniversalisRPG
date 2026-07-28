@@ -4,6 +4,15 @@ import type { ActiveAction } from './runtime';
 
 export class RuntimeError extends Error {}
 
+// Current level of each `# resource` pool, keyed by resource id. The pool's max
+// is not stored — it's always derived live via statValue(resource.max), so a
+// +max buff raises the ceiling without rewriting saved state.
+//
+// Readonly on purpose: effects.ts owns every write, and a level that moved any
+// other way skipped the rollover and on-empty rules. That was a rule held by
+// vigilance and it had already drifted once; here it is a type error.
+export type PoolLevels = { readonly [resourceId: string]: number };
+
 // Who a stat or a pool belongs to. Actors are addressed by entity id; the player
 // is this reserved id and simply has no `# entity`, so every base it reads falls
 // through to the global `# stat` defaults.
@@ -30,12 +39,7 @@ export interface GameState extends RngCursor {
   time: number;
   activeAction: ActiveAction | null;
   activeBuffs: Record<string, ActiveBuff>;
-  // Current level of each `# resource` pool, keyed by resource id. The pool's
-  // max is not stored — it's always derived live via statValue(resource.max),
-  // so a +max buff raises the ceiling without rewriting saved state. Populated
-  // from each resource's start value by initResources (createGameState leaves it
-  // empty because it has no registry).
-  resources: Record<string, number>;
+  resources: PoolLevels;
   player: { name: string; race: string };
   // Set by `open-modal`, cleared once the driver (session/play-cli) collects
   // whatever the modal needed and calls back in (e.g. submitModal).

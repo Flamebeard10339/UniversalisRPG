@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { restorePools } from './effects';
 import { createGameState } from './runtime';
 import { loadModule } from './registry';
 import { compareSave, diffState, initialState, loadSave, parseSaveSection, SAVE_VERSION, serializeSave } from './save';
@@ -78,7 +79,7 @@ describe('loadSave', () => {
     const state = initialState(registry);
     state.inventory.bread = 3;
     state.flags['tutorial.done'] = true;
-    state.resources.health = 4; // a damaged pool must survive the round trip, not reset to full
+    restorePools(state, { health: 4 }); // a damaged pool must survive the round trip, not reset to full
     const serialized = serializeSave(state, registry);
     expect(JSON.parse(serialized).resources).toEqual({ health: 4 });
 

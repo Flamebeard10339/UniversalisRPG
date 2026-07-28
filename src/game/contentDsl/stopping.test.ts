@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { restorePools } from './effects';
 import { point } from './range';
 import { armAction, createGameState, GameState, initResources, resolve } from './runtime';
 import { loadModule, Registry } from './registry';
@@ -225,7 +226,7 @@ describe('a pool running out stops the fight', () => {
     const { registry, state } = started();
     armAction('entity', 'beacon', 'tend', registry, state);
     state.activeBuffs['elixir:max-vigor'] = { statId: 'max-vigor', amount: point(20), kind: 'added', expiresAt: 10 };
-    state.resources['vigor'] = 20;
+    restorePools(state, { vigor: 20 });
 
     resolve(state, registry, 20);
 

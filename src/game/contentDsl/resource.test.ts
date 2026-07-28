@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { restorePools } from './effects';
 import { applyResultsNow, createGameState, initResources } from './runtime';
 import { loadModule, Registry } from './registry';
 import { initialState } from './save';
@@ -66,7 +67,7 @@ describe('# resource: parsing and defaults', () => {
   it('initResources only fills missing pools, so a loaded/mid-game level survives', () => {
     const registry = loadModule(MODULE);
     const state = createGameState();
-    state.resources['health'] = 7; // pretend a save restored a damaged pool
+    restorePools(state, { health: 7 }); // pretend a save restored a damaged pool
     initResources(state, registry);
 
     expect(state.resources['health']).toBe(7); // untouched
