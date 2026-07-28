@@ -377,7 +377,19 @@ scripts pass, and the audit's own associativity fuzz reruns 400/400 against the 
   explicit leading `/load`.
 - **Character-creation-modal-in-recordings** — the modal isn't a directive, so a recording
   can't capture name/race (replay starts from `<id>-start`, which predates the modal).
-  Known limitation, unsolved. (see `recordings of /test ignore modals.` backlog item)- **Default action duration** (`TODO(default-duration)` in `action.ts`) — the playtest
+  Known limitation, unsolved. (see `recordings of /test ignore modals.` backlog item)
+  Proposed fix (`TODO(modal-recording)` in `play-cli.ts`): make modal submission a
+  first-class directive (`modal: {"name":"Kira","race":"Elf"}` or
+  `submit-modal: name=Kira race=Elf`), parsed by `parseDirectiveLine`, executed by
+  `applyDirective` calling `submitModal`, and recorded like any other directive — so the
+  recorder, `runTest` and the CLI stay on one vocabulary. Also unblocks any future
+  modal-gated branch being reproducible by a recorded test.
+- **Quest journal** (`TODO(quest-journal)` in `play-cli.ts`) — there is no `/quests`
+  command because quests are not a first-class DSL concept: progress is emergent from
+  flags (`tutorial.quest-given`, `tutorial.made-bread`, …) set by dialogue nodes. The
+  playtest wanted a discoverable journal. Doing it properly means a `# quest` section kind
+  (objectives + completion conditions over flags) plus a `/quests` renderer. Deferred as
+  out of MVP scope.- **Default action duration** (`TODO(default-duration)` in `action.ts`) — the playtest
   suggested a small nonzero default (~0.5s) so every action feels weighty. Blocked on a
   design call, not effort: an absent `time:` is currently the seam distinguishing an
   INSTANT action (mirror/stairs/eat — a deliberate design tool per CLAUDE.md) from a
