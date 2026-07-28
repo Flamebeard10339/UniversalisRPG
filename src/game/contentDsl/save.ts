@@ -3,40 +3,19 @@ import { createGameState, GameState, initResources, RuntimeError } from './runti
 import { Registry } from './registry';
 import { RawSection } from './structure';
 
-// Versioned so a future format change fails loudly instead of silently
-// misapplying a stale diff — see the postmortem for why this rewrite has no
-// migration path.
-// 2: a flat stat buff's `amount` became a range ({min, max}) rather than a
-//    number, so a v1 save with food active would otherwise poison every stat
-//    reading it with NaN.
-// 3: activeAction carries the encounter's non-player actors and their pools.
-// 4: activeAction's clocks became a `cadences` map keyed by actor id with the
-//    player as an ordinary key, rather than the player's being inlined on the
-//    encounter and every other actor's living on its ActorState.
+// Bumped on any shape change; with no migration path, a stale save is rejected.
 export const SAVE_VERSION = 4;
 
-// A save is a sparse diff against initialState(registry): a brand-new game
-// saves as `{}`. `log` is transcript, not state, and is never part of a save.
+// A sparse diff against initialState: a new game saves as `{}`, and `log` is not state.
 export type SaveDiff = Partial<Omit<GameState, 'log'>>;
 
-// In-memory shape; the on-disk/DSL JSON form is the flat `{version, ...diff}`
-// object (see serializeSave/parseSaveSection).
 export interface SavedGame {
   version: number;
   diff: SaveDiff;
 }
 
-// Every field of GameState a save carries, and how it is carried: `record`
-// fields are diffed key-by-key so a save holds only the entries that changed,
-// `scalar` fields whole. `log` is transcript, not state, and is the one
-// deliberate omission.
-//
-// This is a Record over the exhaustive key type on purpose. diffing, loading and
-// comparing each used to keep their own hand-written list of fields, and three
-// passes in a row had to thread a new field through all of them by hand — the
-// "systems required to be manually kept in sync" CLAUDE.md prohibits. A field
-// missed that way is worse than lost: compareSave reports no difference for it.
-// Adding one to GameState is now a type error here until it is classified.
+// A Record over the exhaustive key type, so adding a GameState field is a type
+// error here until it is classified as diffed key-by-key or carried whole.
 type SaveField = Exclude<keyof GameState, 'log'>;
 
 const SAVE_FIELDS: Record<SaveField, 'record' | 'scalar'> = {
@@ -73,15 +52,10 @@ function diffRecord(state: Record<string, unknown>, baseline: Record<string, unk
   return Object.keys(out).length > 0 ? out : undefined;
 }
 
-// The single source of truth for "which location does a fresh game start in":
-// shared by initialState (the save baseline) and startSession (session.ts),
-// so the two can't drift.
 export function startingLocationId(registry: Registry): string | undefined {
   return [...registry.locations.values()].find((location) => location.starting)?.id;
 }
 
-// The save-diff baseline: a brand-new game, placed at the registry's starting
-// location exactly as startSession does it.
 export function initialState(registry: Registry): GameState {
   const state = createGameState();
   const starting = startingLocationId(registry);
@@ -90,7 +64,6 @@ export function initialState(registry: Registry): GameState {
   return state;
 }
 
-// Only the fields of `state` that differ from `baseline`, excluding `log`.
 export function diffState(state: GameState, baseline: GameState): SaveDiff {
   const diff: Record<string, unknown> = {};
 
@@ -105,7 +78,6 @@ export function diffState(state: GameState, baseline: GameState): SaveDiff {
   return diff as SaveDiff;
 }
 
-// Single-line JSON, matching the `# save` DSL body (see parseSaveSection).
 export function serializeSave(state: GameState, registry: Registry): string {
   const diff = diffState(state, initialState(registry));
   return JSON.stringify({ version: SAVE_VERSION, ...diff });
@@ -117,9 +89,7 @@ function checkVersion(saved: SavedGame): void {
   }
 }
 
-// Mutates `state` in place (callers hold the reference): resets every field to
-// initialState(registry)'s values, clearing anything stale, then applies the
-// saved diff on top.
+// Mutates `state` in place: resets every field to initialState, then applies
 export function loadSave(state: GameState, saved: SavedGame, registry: Registry): void {
   checkVersion(saved);
   const base = initialState(registry);
@@ -131,8 +101,7 @@ export function loadSave(state: GameState, saved: SavedGame, registry: Registry)
     target[field] = { ...(baseline[field] as object), ...(diff[field] as object) };
   }
   for (const field of SCALAR_FIELDS) {
-    // `in` rather than `!== undefined`: a diff can legitimately carry an
-    // explicit undefined (pendingModal cleared against a baseline that had one).
+    // `in`, not `!== undefined`: a diff can carry an explicit undefined.
     target[field] = field in diff ? diff[field] : baseline[field];
   }
   state.log = base.log;
@@ -142,8 +111,6 @@ function describeValue(value: unknown): string {
   return value === undefined ? '(absent)' : JSON.stringify(value);
 }
 
-// Human-readable differences between `state`'s current save-diff and the
-// stored one; [] means match. `log` is already excluded by diffState.
 export function compareSave(state: GameState, saved: SavedGame, registry: Registry): string[] {
   checkVersion(saved);
   const current = diffState(state, initialState(registry));
@@ -165,8 +132,7 @@ export function compareSave(state: GameState, saved: SavedGame, registry: Regist
   return diffs;
 }
 
-// Parses a `# save <id>` section: the body is a single line of JSON in the
-// flat `{version, ...diff}` form (no multi-line JSON support — see grammar).
+// The body is one line of JSON; the grammar has no multi-line support.
 export function parseSaveSection(section: RawSection): { id: string; saved: SavedGame } {
   if (!section.id) throw new DslError('# save requires an id', section.span);
 

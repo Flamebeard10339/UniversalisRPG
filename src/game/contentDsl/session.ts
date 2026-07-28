@@ -25,9 +25,6 @@ export interface PlayView {
   choices: PlayChoice[];
   time: number;
   resources: Array<{ id: string; title: string; current: number; max: number; display: ResourceDisplay }>;
-  // The fight in flight, or null. Separate from `resources` because those are
-  // the player's own persistent pools while this is scoped to an encounter and
-  // vanishes with it.
   encounter: EncounterView | null;
   pendingModal?: string;
 }
@@ -41,10 +38,6 @@ export interface PlaySession {
 
 type Actable = { actions?: Action[] };
 
-// Offering an action is armAction's gate plus one more: a retaliation is the
-// owner's own move in a fight, run by the resolver on that owner's cadence and
-// never something the player picks off a list. The two shared conditions come
-// from the runtime rather than being restated here.
 function actionAvailable(action: Action, state: GameState): boolean {
   if (action.retaliates) return false;
   return requiresMet(action, state) && actionVisible(action, state);
@@ -54,10 +47,7 @@ function availableActions(owner: Actable, state: GameState): Action[] {
   return (owner.actions ?? []).filter((action) => actionAvailable(action, state));
 }
 
-// A "free travel action" is pure movement: its results only relocate (plus
-// optional flavor `say`), with no rewards, costs, or branching outcomes — the
-// stairs' ascend/descend are the canonical case. Such an action is an alias for
-// a travel edge to the same destination.
+// Pure movement — results only relocate — so it aliases a travel edge.
 function isFreeTravelAction(action: Action, target: string): boolean {
   const relocatesToTarget = action.results.some((r) => r.kind === 'relocate' && r.location === target);
   if (!relocatesToTarget) return false;
@@ -66,8 +56,6 @@ function isFreeTravelAction(action: Action, target: string): boolean {
   return onlyMovement && noBranches;
 }
 
-// True when an entity present here already offers a free relocate to `target`,
-// so the travel edge to it would just duplicate that entity's action.
 function entityAliasesTravelTo(location: Location, target: string, registry: Registry, state: GameState): boolean {
   return location.entities.some((entityId) => {
     const entity = registry.entities.get(entityId);
@@ -112,17 +100,9 @@ function locationChoices(session: PlaySession): PlayChoice[] {
     }
   }
 
-  // TODO(inventory-crafting): every craftable recipe surfaces here as a
-  // location action, so a stationless recipe (e.g. mixing dough) clutters the
-  // room's action list. The playtest wanted stationless crafts to live on the
-  // inventory/items involved instead — surfaced when you act on an ingredient,
-  // not on the location. Deferred: it needs an item-scoped craft affordance
-  // (which held item exposes which recipes) rather than the flat location scan.
+    // TODO(inventory-crafting): stationless recipes clutter the room list. See backlog.
   for (const recipe of registry.recipes.values()) {
     if (!recipeCraftable(recipe, registry, state)) continue;
-    // Label the craft with the title of a present entity providing the
-    // capability, falling back to its humanized id (unreachable once
-    // recipeCraftable has confirmed one is present).
     const detail = recipe.requiresCapability
       ? (location.entities.map((entityId) => registry.entities.get(entityId)).find((entity) => entity?.capabilities.includes(recipe.requiresCapability!))?.title ?? humanize(recipe.requiresCapability))
       : undefined;
@@ -131,9 +111,7 @@ function locationChoices(session: PlaySession): PlayChoice[] {
 
   for (const edge of location.adjacent) {
     if (edge.condition && !evaluateCondition(edge.condition, state)) continue;
-    // Suppress a travel edge that an entity here already exposes as a free
-    // relocate (e.g. the stairs' ascend/descend) — they're aliases for the same
-    // move, so showing both duplicates the option (playtest feedback #2).
+    // Both are the same move, so showing the edge as well duplicates the option.
     if (entityAliasesTravelTo(location, edge.target, registry, state)) continue;
     const target = registry.locations.get(edge.target);
     choices.push({ id: `travel:${edge.target}`, kind: 'travel', label: `Travel to ${target?.title ?? edge.target}` });
@@ -156,12 +134,7 @@ function computeChoices(session: PlaySession): PlayChoice[] {
   return locationChoices(session);
 }
 
-// The single converter from a PlayChoice to the structured Directive that
-// applyDirective executes. Every gameplay choice maps to exactly one directive,
-// so apply()/beginAction and the test/CLI directive path share one executor and
-// one command vocabulary — there is no second switch over choice kinds. A
-// dialogue choice carries its already-rendered label as the `choose:` text;
-// choose() re-matches by rendered text, so the label round-trips.
+// The single converter, so there is no second switch over choice kinds.
 export function choiceToDirective(choice: PlayChoice): Directive {
   switch (choice.kind) {
     case 'talk':
@@ -217,9 +190,7 @@ export function view(session: PlaySession): PlayView {
   };
 }
 
-// Every declared pool with its live max derived from stats (so a +max buff
-// widens the bar). Split out from view() with no side effects, so a driver can
-// re-read the pools (e.g. play-cli's /state) without consuming the log cursor.
+// Side-effect-free, so a driver can re-read pools without consuming the log cursor.
 export function sessionResources(session: PlaySession): PlayView['resources'] {
   const { registry, state } = session;
   return [...registry.resources.values()].map((resource) => ({
@@ -238,37 +209,20 @@ export function apply(session: PlaySession, choiceId: string): PlayView {
   return view(session);
 }
 
-// Like apply(), but for a spannable action/craft/travel it only ARMS the fight
-// (state.activeAction set) instead of resolving its first unit instantly — a
-// live driver then drives it forward over real time via wait(). A journey
-// (travel) is spannable when its distance is positive; talk/dialogue choices,
-// and any action/craft/travel whose first unit resolves in zero simulated time
-// (an instant item action, a zero-time craft, a zero-distance journey), still
-// go through the ordinary instant dispatch()/apply() path unchanged. After
-// beginAction, session.state.activeAction is non-null IFF a spannable action is
-// now in flight.
-//
-// Nothing that completing an action does may live in useAction, because this
-// path never returns through it. Eating's food buff did, and so a stew with a
-// `time:` buffed in instant mode and not at all here; it now hangs off the
-// action's completion inside resolve(), which both paths reach.
+// ARMS a spannable action instead of resolving its first unit; everything else
+// takes the instant path. Nothing done on completion may live in useAction.
 export function beginAction(session: PlaySession, choiceId: string): PlayView {
   const choice = computeChoices(session).find((c) => c.id === choiceId);
   if (!choice) throw new RuntimeError(`unavailable choice: ${JSON.stringify(choiceId)}`);
   const directive = choiceToDirective(choice);
   const { registry, state } = session;
 
-  // A spannable verb whose first unit takes positive sim-time is ARMED for a
-  // live driver to advance over real time. Everything else — talk/dialogue, or
-  // a zero-time craft/action or zero-distance journey — falls through to
-  // applyDirective, the same instant executor apply() uses.
   if (directive.kind === 'craft' && craftFirstUnit(directive.recipe, registry, state) > 0) {
     armCraft(directive.recipe, registry, state);
     return view(session);
   }
   if (directive.kind === 'use' && actionFirstUnit(directive.obj, directive.objId, directive.actionId, registry, state) > 0) {
-    // If the take-gate fails, armAction logs the failure and leaves
-    // activeAction unset; either way there's nothing left to resolve here.
+    // armAction has already logged a take-gate failure and left activeAction unset.
     armAction(directive.obj, directive.objId, directive.actionId, registry, state);
     return view(session);
   }
@@ -281,37 +235,27 @@ export function beginAction(session: PlaySession, choiceId: string): PlayView {
   return view(session);
 }
 
-// Both wait() and cancelAction() are the view-returning face of the same
-// mutation applyDirective performs for a `wait:`/`cancel` test directive —
-// they route through it so the semantics live in exactly one place (a driver
-// callable, unlike the directive path, always has a resolvable location, so
-// building a PlayView here is safe).
+// The view-returning face of the mutation applyDirective performs, so the
+// semantics live in one place.
 export function wait(session: PlaySession, seconds: number): PlayView {
   applyDirective(session, { kind: 'wait', seconds });
   return view(session);
 }
 
-// First-class cancellation: abandon the action in flight, mid-progress. Any
-// units it already completed on earlier resolve() ticks stay applied; the
-// partly-done current attempt is discarded (no partial credit). Sim-time is not
-// rewound — the player spent the time they spent. A no-op when nothing is
-// active, so a driver can call it unconditionally.
+// Completed units stay applied, the current attempt is discarded with no partial
+// credit, and sim-time is not rewound.
 export function cancelAction(session: PlaySession): PlayView {
   applyDirective(session, { kind: 'cancel' });
   return view(session);
 }
 
-// Called by a driver (session/play-cli) once it has collected whatever the
-// pending modal needed from the player. Currently the only modal is
-// character-creation, so this is the one place `state.player` is set.
+// The one place `state.player` is set; character-creation is the only modal.
 export function submitModal(session: PlaySession, data: { name: string; race: string }): PlayView {
   session.state.player = { name: data.name, race: data.race };
   session.state.pendingModal = undefined;
   return view(session);
 }
 
-// The choice id beginAction's live path expects, for the same use/travel/craft
-// payload a `begin:` test directive carries.
 function choiceIdFor(inner: Extract<Directive, { kind: 'use' | 'travel' | 'craft' }>): string {
   switch (inner.kind) {
     case 'use':
@@ -323,12 +267,8 @@ function choiceIdFor(inner: Extract<Directive, { kind: 'use' | 'travel' | 'craft
   }
 }
 
-// Executes one test directive against a live session — the single seam shared
-// by runTest (headless) and, later, the interactive CLI, so there is one
-// command vocabulary and one place gameplay/assertion semantics live. `run:`
-// is excluded: it recurses into another test, which only runTest knows how to
-// do (cyclic-run detection, stack tracking), so applyDirective throws if asked
-// to execute one.
+// `run:` is excluded: it recurses into another test, which only runTest can do
+// with its cyclic-run detection.
 export function applyDirective(session: PlaySession, directive: Directive): { failure?: string } {
   const { registry, state } = session;
 
@@ -378,15 +318,10 @@ export function applyDirective(session: PlaySession, directive: Directive): { fa
       return {};
     }
     case 'cancel':
-      // The single home of cancellation's mutation: cancelAction() wraps this
-      // with a view(). Kept view-free here because a test's state (built
-      // without startSession, see runTest) may have no resolvable location.
+      // View-free because a test's state may have no resolvable location.
       endAction(state);
       return {};
     case 'wait':
-      // The single home of time advancement's mutation: wait() wraps this with
-      // a view(). View-free here for the same reason as cancel above (e.g.
-      // runtime.test.ts asserts on state.time with no location ever set).
       resolve(state, registry, state.time + directive.seconds);
       return {};
   }
@@ -397,12 +332,7 @@ export interface TestResult {
   failure?: string;
 }
 
-// Runs a `# test` script directive-by-directive through applyDirective, the
-// same executor a live driver uses — so a headless test and an interactive
-// session can never drift onto two different command vocabularies. Builds its
-// own PlaySession directly (not via startSession) because startSession sets a
-// fresh state's location to the registry's starting location, which would
-// break a test that begins with its own `travel:` from an unset location.
+// Its own PlaySession: startSession would set a location, breaking a test's `travel:`.
 export function runTest(testId: string, registry: Registry, state: GameState, stack: readonly string[] = []): TestResult {
   if (stack.includes(testId)) throw new RuntimeError(`cyclic test run: ${[...stack, testId].join(' -> ')}`);
   const test = registry.tests.get(testId);

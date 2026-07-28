@@ -4,9 +4,7 @@ import { applyResultsNow } from './effects';
 import { Registry } from './registry';
 import { GameState, RuntimeError } from './state';
 
-// Walking a `# dialogue` node's beats, one menu at a time. A session is a
-// resumable cursor rather than a loop, because a menu hands control back to the
-// driver and the node has to pick up at the step after it.
+// A resumable cursor, not a loop: a menu hands control back to the driver.
 
 export interface DialogueSession {
   dialogue: Dialogue;
@@ -22,16 +20,8 @@ function findNode(dialogue: Dialogue, name: string): DialogueNode {
   return node;
 }
 
-// A `menu` step hands control back for a choice; the node then resumes at the
-// step after it, so a choice with no goto falls through to the rest of the node.
-//
-// TODO(dialogue-pacing): consecutive `say` beats between menus are all pushed to
-// the log in one turn, so a multi-line node dumps everything at once with no
-// "continue" beat (the playtest praised the first, gated dialogue but found the
-// rest a wall of text). Two options the playtest raised: (a) treat each say beat
-// as an implicit single-choice "continue" menu so the player advances line by
-// line; (b) model dialogue as a first-class modal (pendingModal) so a GUI need
-// not reverse-engineer pacing. Deferred as an out-of-MVP dialogue-engine change.
+// A choice with no goto falls through to the rest of the node.
+// TODO(dialogue-pacing): say beats between menus arrive all at once. See backlog.
 function runSteps(dialogue: Dialogue, node: DialogueNode, registry: Registry, state: GameState, start: number, replay: boolean): DialogueSession {
   for (let i = start; i < node.steps.length; i++) {
     const step = node.steps[i];
@@ -51,8 +41,6 @@ function runSteps(dialogue: Dialogue, node: DialogueNode, registry: Registry, st
   return { dialogue, node, resumeIndex: node.steps.length, replay, choices: null };
 }
 
-// On a revisit, only a `sticky` node replays its beats and effects; otherwise
-// they fire once and later visits show `again` instead.
 function enterNode(dialogue: Dialogue, node: DialogueNode, registry: Registry, state: GameState): DialogueSession {
   const visit = (state.visits[node.name] = (state.visits[node.name] ?? 0) + 1);
   const replay = visit === 1 || node.sticky === true;

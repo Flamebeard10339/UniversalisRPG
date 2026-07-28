@@ -396,3 +396,16 @@ scripts pass, and the audit's own associativity fuzz reruns 400/400 against the 
   spannable one, and `beginAction` routes on `firstUnit > 0`. Defaulting to 0.5 turns
   every instant action spannable and shifts every timing assertion (session.test's ~19s
   Miki route, resolve.test). Decide which actions stay instant first.
+- **Stationless crafts on items, not locations** (`TODO(inventory-crafting)` in
+  `session.ts`) — every craftable recipe currently surfaces as a location action, so a
+  stationless recipe (mixing dough) clutters the room's list. The playtest wanted these on
+  the inventory/items involved, surfaced when you act on an ingredient. Needs an
+  item-scoped craft affordance (which held item exposes which recipes) rather than the
+  flat location scan.
+- **Dialogue pacing** (`TODO(dialogue-pacing)` in `dialogue-runtime.ts`) — consecutive
+  `say` beats between menus all push to the log in one turn, so a multi-line node dumps at
+  once with no "continue" beat. The playtest praised the first, gated dialogue but found
+  the rest a wall of text. Two options it raised: (a) treat each say beat as an implicit
+  single-choice "continue" menu so the player advances line by line; (b) model dialogue as
+  a first-class modal (`pendingModal`) so a GUI need not reverse-engineer pacing. Deferred
+  as an out-of-MVP dialogue-engine change.
