@@ -6,6 +6,9 @@ Check `scratch.md` for open architectural notes touching an area before starting
 
 # Tasks
 
+## Readability gate
+Tracked in `docs/readability-gate/deliverable-log.md`. Deterministic half is built and green; the model half needs a 3-file pilot, then a 68-file baseline, then wiring into CI.
+
 ## E2E Authoring
 Progress was made on this task in commits dcc74f6e1bcde83b1a798e7838008af856a8b33a and c1ea38675f13691519670c6f2d277beb6ccb9df4, but paused before task completion. 
 
