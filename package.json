@@ -13,6 +13,7 @@
     "comment-budget": "tsx scripts/comment-ratio.ts",
     "comment-only": "tsx scripts/comment-only-diff.ts",
     "layer-check": "tsx scripts/layer-check.ts",
+    "audit-status": "tsx scripts/audit-status.ts",
     "playtest": "tsx scripts/playtest-cli.ts",
     "play": "tsx scripts/play-cli.ts"
   },

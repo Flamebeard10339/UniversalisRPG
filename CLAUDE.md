@@ -2,7 +2,7 @@
 
 Optimize for correctness, bounded scope, reuse, architectural coherence, strong evidence, and clean review—not patch volume. Passing tests is necessary. Avoid patches that accrue technical debt. Prefer self documenting code over comments or updating repository context. 
 
-Track which systems commits impact and prompt an independent system audit when un-audited commits > 10. Keep independent systems independent. Do not create systems that are required to be manually kept in sync. 
+Prompt an independent system audit when a system's un-audited commits exceed the threshold; `npm run audit-status` derives the counts from git, so nothing needs incrementing by hand. Keep independent systems independent. Do not create systems that are required to be manually kept in sync. 
 
 Make commits after each logical chunk.
 
@@ -25,23 +25,24 @@ Do not bloat CLAUDE.md with over 200 lines of instructions.
 A feature large enough to span sessions gets a tracked deliverable log at `docs/<feature>/deliverable-log.md` (spec, chunk status, open decisions); `backlog.md` keeps only a pointer to it. Read the log before touching that feature's code. On merge, archive the log and lift anything unfinished back into `backlog.md`. Currently live: `docs/combat/deliverable-log.md`. 
 
 # Repository systems
-1. Content pipeline through DSL markdown files (commits since audit: 11 — AUDIT DUE)
-  1. Contribution system: editor, validation/merge engine
-  2. DSL system: grammar, parser, compiler, loader (incl. load-time reference resolution)
-2. User interface (commits since audit: 0)
-  1. Main tabs: Map, Home, Character, Settings, Edit 
-  2. Modals: dialogue, skills, stats
-  3. Experience: floating text
-3. Game Engine (commits since audit: 8 — `docs/audits/game-engine-2026-07-27-pass2.md`; H1/M1/S1–S6 closed, L1 open)
-  1. Core: State-driven UI, travel and locations
-  2. Data structures: locations, dialogue, quests, actions, resources, stats, skills, flags 
-4. Build & deployment (commits since audit: 1)
+
+A system owns a set of paths, declared in `docs/audits/systems.json` — the one place membership is defined, so a commit's system follows from the files it touches. `npm run audit-status` reads it and reports commits since each system's last audit; record a completed audit by setting that system's `lastAudit` to the reviewed SHA.
+
+1. **DSL load path** — `src/grammar` (text to syntax) and `src/content` (syntax to registry, incl. load-time reference resolution)
+2. **Runtime** — `src/runtime`: state, travel, actions, encounters, resources, stats, skills, flags, dialogue, saves; `session.ts` is the entry point everything above plays through
+3. **Contribution system** — unbuilt: editor, validation/merge engine
+4. **User interface** — `src/ui`, pending the GUI rebuild. Main tabs: Map, Home, Character, Settings, Edit. Modals: dialogue, skills, stats. Experience: floating text
+5. **Testing procedure**
+  1. `scripts/play-cli.ts` interactive REPL over `startSession`/`view`/`apply` (live `--live` real-time + instant piped/agent mode), named `# test` scripts run via `/test`
+  2. `scripts/playtest-cli.ts` headless replay of a saved choiceId script through `startSession`/`apply`, writing a transcript (zero browser, zero real wait)
+  3. CI: `.github/workflows/test.yml` runs `tsc --noEmit`, `npm test`, `npm run comment-budget`, `npm run layer-check` on push and PR
+6. **Build & deployment**
   1. Web: Vite build, tag-triggered publish to itch.io (`.github/workflows/publish.yml`)
   2. Android: Capacitor sync + Gradle release build, APK signing, attached to the GitHub release
-5. Testing procedure (commits since audit: 6)
-  1. Human/agent testing: `scripts/play-cli.ts` interactive REPL over `startSession`/`view`/`apply` (live `--live` real-time + instant piped/agent mode), named `# test` scripts run via `/test`
-  2. `scripts/playtest-cli.ts` headless replay of a saved choiceId script through `startSession`/`apply`, writing a transcript (zero browser, zero real wait)
-  3. CI: `.github/workflows/test.yml` runs `tsc --noEmit` + `npm test` on push and PR
+
+# Layers
+
+`grammar < content < runtime < ui`. Imports point downward only, gated by `npm run layer-check`. Cycles within a layer are allowed; reaching up is not. A file that needs something from the layer above is usually two files — that is how `tuning.ts` and `save.ts` split. Tests live in the folder of the layer they drive, not the one their name suggests.
 
 # Audit prompt
 Audit the {repository-system} for correctness in the context of the last {N} commits impacting the system and global repository architecture. 

@@ -1,0 +1,54 @@
+{
+  "threshold": 10,
+  "systems": [
+    {
+      "name": "DSL load path",
+      "paths": ["src/grammar", "src/content"],
+      "lastAudit": null,
+      "lastAuditDoc": null,
+      "note": "Owed at the restructure: the old 'content pipeline' system stood at 11 commits, AUDIT DUE. Pre-move history cannot be split between this system and the runtime, because both lived in src/game/contentDsl."
+    },
+    {
+      "name": "Runtime",
+      "paths": ["src/runtime"],
+      "lastAudit": "83d81d2",
+      "lastAuditDoc": "docs/audits/game-engine-2026-07-27-pass2.md",
+      "note": "L1 open from pass2. Counter restarts at the restructure; pre-move commits are not attributable per layer."
+    },
+    {
+      "name": "Contribution system",
+      "paths": [],
+      "lastAudit": null,
+      "lastAuditDoc": null,
+      "note": "Unbuilt: editor, validation/merge engine."
+    },
+    {
+      "name": "User interface",
+      "paths": ["src/ui", "src/main.tsx", "src/index.css", "index.html"],
+      "lastAudit": "83d81d2",
+      "lastAuditDoc": null,
+      "note": "Awaiting the GUI rebuild; src/ui does not exist yet."
+    },
+    {
+      "name": "Testing procedure",
+      "paths": ["scripts", ".github/workflows/test.yml"],
+      "lastAudit": "83d81d2",
+      "lastAuditDoc": null,
+      "note": null
+    },
+    {
+      "name": "Build & deployment",
+      "paths": [
+        ".github/workflows/publish.yml",
+        "android",
+        "capacitor.config.ts",
+        "vite.config.mjs",
+        "package.json",
+        "tsconfig.json"
+      ],
+      "lastAudit": "83d81d2",
+      "lastAuditDoc": null,
+      "note": null
+    }
+  ]
+}
