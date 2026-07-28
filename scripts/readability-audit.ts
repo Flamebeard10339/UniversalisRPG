@@ -62,6 +62,12 @@ function withFile(prompt: string, path: string): string {
   return `${prompt.replace('<path>', path)}\n\n<file path="${path}">\n${readFileSync(path, 'utf8')}\n</file>`;
 }
 
+// A filename is half an answer — `save.ts` picks its own option out of a lineup
+// without the body being read at all.
+function withUnnamedFile(prompt: string, path: string): string {
+  return `${prompt}\n\n<file>\n${readFileSync(path, 'utf8')}\n</file>`;
+}
+
 // Siblings make the hardest distractors, and they also blunt any project-level
 // context the auditor carries: knowing the layer scheme cannot separate two
 // files from the same folder. Taking the next three cyclically keeps the set
@@ -86,7 +92,7 @@ function discriminationPrompt(path: string, ledger: Ledger): { prompt: string; a
   const options = [real, ...distractorsFor(path, ledger)].sort();
   const answer = 'ABCD'[options.indexOf(real)];
   const lettered = options.map((option, index) => `${'ABCD'[index]}. ${option}`).join('\n');
-  return { prompt: withFile(`Which one of these sentences describes file <path>? Reply with a single letter.\n\n${lettered}`, path), answer };
+  return { prompt: withUnnamedFile(`Which one of these sentences describes the file below? Reply with a single letter.\n\n${lettered}`, path), answer };
 }
 
 const args = process.argv.slice(2);

@@ -98,11 +98,39 @@ throws away.
 
 ### Follow-ups the pilot surfaced
 
-- Drop the path from `discriminationPrompt`; keep it in the audit and summary prompts.
-- `--set-summary` writes `discrimination: 'fail'`, so a summarized-but-unaudited file
-  reads as a recorded failure. Minting 68 summaries before any audit — which the
-  baseline requires — puts the whole repo in that state. Needs a third value, or
-  `readability-check` keying off an empty `lastAuditedSha`.
+- **Done.** `discriminationPrompt` no longer names the path, in the question or the
+  `<file>` tag. The audit and summary prompts still do.
+- **Rejected: a third ledger state.** `--set-summary` writes `discrimination: 'fail'`,
+  so minting 68 summaries before any audit marks the whole repo failed. That only
+  happens during bootstrapping, and a red repo is the honest reading of "no file has
+  been audited yet". Two states stay.
+
+### What the pilot says about the design
+
+The two halves came out inverted from the intent. Discrimination gates but barely
+discriminates; prose is advisory but is where every real finding came from.
+
+Discrimination is close to a tautology. Almost every file contains a token naming
+its own subject — `kind: 'variable'`, `SAVE_VERSION`, `hitDamage` — so the reader
+matches that token to an option without the logic mattering. Probed on the hardest
+realistic case, `src/content/variable.ts`: 14 lines, three sibling schema files as
+distractors, correct. It is a floor test for a file so vague it could be any
+sibling, not a measure of whether the file explains itself.
+
+Its virtue is that it is the only half gradeable without a model — one letter
+against `--answer` — so it is what a CI gate can key off. Keep it as the floor,
+expect it green, and do not read a pass as evidence a file is well written.
+
+The prose audit is the half with the signal, and it is concentrated in NON-OBVIOUS
+BEHAVIOUR and UNCLEAR. PURPOSE and EXPORTS earn their place as the check that the
+reader understood the file at all — an UNCLEAR from a confused reader means nothing,
+and the one false claim in the pilot surfaced in EXPORTS. INPUTS AND OUTPUTS
+restated EXPORTS in all three audits and should come out of `AUDIT_PROMPT`.
+
+Its cost is the constraint: grading needs the orchestrator to read the file and
+check every claim. That is affordable once at baseline and unaffordable every five
+commits, so the prose audit should be a one-shot baseline pass, with only
+discrimination recurring on staleness.
 
 ### 2. Baseline — 68 files
 
