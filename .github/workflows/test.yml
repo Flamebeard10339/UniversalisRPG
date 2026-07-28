@@ -23,3 +23,4 @@ jobs:
       - run: npx tsc --noEmit
       - run: npm test
       - run: npm run comment-budget
+      - run: npm run layer-check
