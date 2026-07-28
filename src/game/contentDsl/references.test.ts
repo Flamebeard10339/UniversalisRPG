@@ -2,12 +2,6 @@ import { describe, expect, it } from 'vitest';
 import { loadModule } from './registry';
 import { RuntimeError } from './runtime';
 
-// Content ids resolved against the registry at load, so a typo is a content
-// error at the moment it is written rather than a failure much later somewhere
-// else. Before this ran there were two failure modes and neither named the
-// mistake: an unknown RESOURCE surfaced as `unknown resource: helth` from deep
-// inside a live fight, and an unknown STAT never failed at all — it silently
-// read 0, which is how a typo'd `speed:` came to divide by zero (see C1).
 const VALID = `
 # stat attack
 base: 10
@@ -75,9 +69,8 @@ describe('load-time reference resolution', () => {
     );
   });
 
-  // Each of the six is a separate field on Action and each fell through to a
-  // different silent default, so they are pinned individually rather than as one
-  // representative case.
+  // Each fell through to a different silent default, so they are pinned
+  // individually rather than as one representative case.
   it.each([
     ['speed: attack-rate', 'speed: nope', /unknown stat: nope/],
     ['ability: attack', 'ability: nope', /unknown stat: nope/],
@@ -99,9 +92,8 @@ describe('load-time reference resolution', () => {
     expect(loading('starting', 'starting\nadjacent: beach')).toThrow(/# location den adjacent: names an unknown location: beach/);
   });
 
-  // A sheet entry naming no # stat is never read: the action asking for that
-  // stat asks for the correctly-spelled one and falls through to its global
-  // default, so the override silently does nothing.
+  // Never read: the action asks for the correctly-spelled stat, so the override
+  // silently does nothing.
   it('rejects an actor sheet assigning a stat nobody declared', () => {
     expect(loading('stats: max-health 12, dr 2', 'stats: max-health 12, drr 2')).toThrow(/# entity training-dummy stats: names an unknown stat: drr/);
   });
@@ -113,12 +105,7 @@ describe('load-time reference resolution', () => {
     expect(() => loadModule(`${VALID}\n# recipe weave\ntime: 1\nspeed: nope\nout: 1 straw\n`)).toThrow(/# recipe weave speed: names an unknown stat: nope/);
   });
 
-  // The six Action fields above are only the ids an action holds directly. An
-  // action's RESULTS name ids too, and each of these used to load clean and
-  // fail — or silently not fail — somewhere else entirely: `drain:` threw from
-  // inside a live fight, a stat-bonus tag read 0 forever, `xp:` accrued under a
-  // skill with no floating text to show, `relocate:` threw from view(), and
-  // `discover:` set a flag for a place that does not exist.
+  // An action's RESULTS name ids too, each with its own silent failure mode.
   it.each([
     ['  ability: attack', '  ability: attack\n  drain: 5 bogus', /drain: names an unknown resource: bogus/],
     ['  ability: attack', '  ability: attack\n  restore: 5 bogus', /restore: names an unknown resource: bogus/],
@@ -139,8 +126,6 @@ describe('load-time reference resolution', () => {
     expect(loading('owner = training-dummy', 'owner = training-dumy')).toThrow(/# dialogue caretaker owner names an unknown entity: training-dumy/);
   });
 
-  // Recipes are validated through their compiled Action, so in:/out:/burnt: and
-  // skill: are covered by the same walk rather than a second hand-written list.
   it('checks a recipe through the action it compiles to', () => {
     expect(() => loadModule(`${VALID}\n# recipe weave\nin: 1 bogus\nout: 1 straw\n`)).toThrow(/# recipe weave take: names an unknown item: bogus/);
     expect(() => loadModule(`${VALID}\n# recipe weave\nout: 1 straw\nskill: bogus 1\n`)).toThrow(/# recipe weave xp: names an unknown skill: bogus/);

@@ -21,10 +21,7 @@ export interface Test {
   directives: Directive[];
 }
 
-// Payload grammars for use:/travel:/craft:, factored out so `begin:` (which
-// takes the same payload but with the verb inline instead of as the leading
-// keyword, e.g. `begin: use entity.x.y`) can parse it without duplicating the
-// sub-patterns.
+// Factored out so `begin:` can take the same payload with the verb inline.
 const USE_PAYLOAD = '(?<obj>[a-z][a-z0-9-]*)\\.(?<objId>[a-z][a-z0-9-]*)\\.(?<actionId>.+)';
 const TRAVEL_PAYLOAD = '(?<id>[a-z][a-z0-9-]*)';
 const CRAFT_PAYLOAD = '(?<id>[a-z][a-z0-9-]*)';
@@ -64,9 +61,7 @@ function parseBegin(text: string, verb: string, rest: string): Directive {
   throw new DslError(`unknown begin: verb (expected use, travel, or craft): ${text}`);
 }
 
-// Parses a single directive line, or returns null when the line matches no
-// known directive. The sole parser for test-directive lines, shared by
-// parseTest (headless test runner) and, later, the interactive CLI.
+// The sole parser for directive lines, shared by parseTest and the CLI.
 export function parseDirectiveLine(text: string): Directive | null {
   const run = RUN.exec(text)?.groups;
   if (run) return { kind: 'run', test: run.id };

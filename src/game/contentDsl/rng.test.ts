@@ -1,16 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_RNG_SEED, nextRandom, RngCursor } from './rng';
 
-// The draw sequence is a save field, so a fight's whole hit/miss/damage pattern
-// is whatever this produces. It was for a long time NOT what its constants
-// describe: `state * 1103515245` reaches 2^61, and a float multiply rounds the
-// low bits away before the modulus can take them, collapsing a nominal 2^31
-// period to a measured 10,466 states. Roughly eleven in-game hours of combat
-// then replayed identically, forever.
-//
-// These check the two halves of that separately: the arithmetic against an
-// exact reference, and the period against the collapse. Neither restates the
-// implementation — the reference is BigInt, which cannot lose a bit.
 const MULTIPLIER = 1103515245n;
 const INCREMENT = 12345n;
 const MODULUS = 4294967296n; // 2^32
@@ -54,8 +44,7 @@ describe('nextRandom', () => {
       expect(value).toBeLessThan(1);
       buckets[Math.floor(value * 10)]++;
     }
-    // A uniform draw puts 10,000 in each bucket; the band is wide enough to be
-    // a uniformity check rather than a restatement of the exact sequence.
+    // A band wide enough to check uniformity without restating the sequence.
     for (const count of buckets) expect(count).toBeGreaterThan(9_000);
   });
 });

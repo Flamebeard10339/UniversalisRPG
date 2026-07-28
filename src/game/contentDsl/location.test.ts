@@ -69,10 +69,8 @@ describe('recursivelyResolveRelativeCoordinates', () => {
   });
 });
 
-// The runtime carried `use:location.<id>.<action>` all along — session emitted
-// the choice id and findActionOwner resolved it — but locationSchema declared no
-// entries, so authoring one was a parse error and the whole path was dead. An
-// `as unknown as Actable` cast in session.ts is what kept tsc from noticing.
+// The runtime resolved `use:location.<id>.<action>` all along, but locationSchema
+// declared no entries, so authoring one was a parse error and the path was dead.
 const WITH_ACTIONS = `
 # location shore
 x: 0, y: 0
@@ -97,8 +95,7 @@ describe('a location’s own actions', () => {
     const session = startSession(registry);
     const ids = view(session).choices.map((c) => c.id);
     expect(ids).toContain('use:location.shore.search tideline');
-    // `requires:` gates a location action off the list exactly as it does an
-    // entity's, and its bare reference is scoped to the location.
+    // Its bare reference is scoped to the location, as an entity action's is.
     expect(ids).not.toContain('use:location.shore.light beacon');
   });
 
