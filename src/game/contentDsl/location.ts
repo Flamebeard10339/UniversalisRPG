@@ -28,9 +28,7 @@ export interface Location {
   adjacent: Edge[];
   starting: boolean;
   relative?: Relative;
-  // Things the place itself can do, as opposed to something standing in it —
-  // the same `<obj>.<objId>.<actionId>` shape entities and items carry, and
-  // location-scoped like an entity's rather than travelling with the player.
+  // Actions the location itself can do, as opposed to something standing in it.
   actions: Action[];
 }
 
@@ -64,13 +62,6 @@ const DIRECTION_VECTORS: Record<Direction, [number, number, number]> = {
   down: [0, 0, -1],
 };
 
-// Resolves every location authored as `<direction> of <other>` into absolute
-// x/y/z, walking one unit step from its origin's coordinates. Origins may
-// themselves be relative, so this recurses to place an origin before the
-// location that depends on it (insertion order alone isn't enough). Hydrated
-// fields are read-only getters, so each resolved location is replaced in the
-// map with a plain-valued copy rather than mutated. Throws on an unknown origin
-// or a relative cycle.
 export function resolveCoordinates(locations: Map<string, Location>): void {
   const placing = new Set<string>();
   const coords = new Map<string, [number, number, number]>();
