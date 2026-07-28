@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { Condition } from './condition';
 import {
-  actionFirstUnit, applyResult, armAction, armCraft, craft, craftFirstUnit, createGameState, evaluateCondition, renderSegments, travelSecondsPerUnit, useAction } from './runtime';
+  actionFirstUnit, applyResultsNow, armAction, armCraft, craft, craftFirstUnit, createGameState, evaluateCondition, renderSegments, travelSecondsPerUnit, useAction } from './runtime';
 import { loadModule } from './registry';
 import { runTest } from './session';
 
@@ -130,35 +130,35 @@ describe('applyResult', () => {
 
   it('sets and unsets flags', () => {
     const state = createGameState();
-    applyResult({ kind: 'set', variable: 'unlocked' }, state, registry);
+    applyResultsNow(state, registry, [{ kind: 'set', variable: 'unlocked' }]);
     expect(state.flags.unlocked).toBe(true);
-    applyResult({ kind: 'unset', variable: 'unlocked' }, state, registry);
+    applyResultsNow(state, registry, [{ kind: 'unset', variable: 'unlocked' }]);
     expect(state.flags.unlocked).toBeUndefined();
   });
 
   it('gives and takes inventory counts', () => {
     const state = createGameState();
-    applyResult({ kind: 'give', item: 'cooked-shrimp', amount: 5 }, state, registry);
-    applyResult({ kind: 'take', item: 'cooked-shrimp', amount: 2 }, state, registry);
+    applyResultsNow(state, registry, [{ kind: 'give', item: 'cooked-shrimp', amount: 5 }]);
+    applyResultsNow(state, registry, [{ kind: 'take', item: 'cooked-shrimp', amount: 2 }]);
     expect(state.inventory['cooked-shrimp']).toBe(3);
   });
 
   it('floors take at 0, never driving inventory negative', () => {
     const state = createGameState();
-    applyResult({ kind: 'give', item: 'cooked-shrimp', amount: 2 }, state, registry);
-    applyResult({ kind: 'take', item: 'cooked-shrimp', amount: 5 }, state, registry);
+    applyResultsNow(state, registry, [{ kind: 'give', item: 'cooked-shrimp', amount: 2 }]);
+    applyResultsNow(state, registry, [{ kind: 'take', item: 'cooked-shrimp', amount: 5 }]);
     expect(state.inventory['cooked-shrimp']).toBe(0);
   });
 
   it('adds to a numeric flag, treating an absent or boolean-true base as 0', () => {
     const state = createGameState();
-    applyResult({ kind: 'add', variable: 'rats-killed', amount: 1 }, state, registry);
+    applyResultsNow(state, registry, [{ kind: 'add', variable: 'rats-killed', amount: 1 }]);
     expect(state.flags['rats-killed']).toBe(1);
-    applyResult({ kind: 'add', variable: 'rats-killed', amount: 1 }, state, registry);
+    applyResultsNow(state, registry, [{ kind: 'add', variable: 'rats-killed', amount: 1 }]);
     expect(state.flags['rats-killed']).toBe(2);
 
     state.flags.snubbed = true;
-    applyResult({ kind: 'add', variable: 'snubbed', amount: 3 }, state, registry);
+    applyResultsNow(state, registry, [{ kind: 'add', variable: 'snubbed', amount: 3 }]);
     expect(state.flags.snubbed).toBe(3);
   });
 
@@ -166,18 +166,18 @@ describe('applyResult', () => {
     const state = createGameState();
     const condition: Condition = { kind: 'comparison', left: { path: ['rats-killed'] }, operator: '>=', right: 3 };
     expect(evaluateCondition(condition, state)).toBe(false);
-    applyResult({ kind: 'add', variable: 'rats-killed', amount: 1 }, state, registry);
-    applyResult({ kind: 'add', variable: 'rats-killed', amount: 1 }, state, registry);
+    applyResultsNow(state, registry, [{ kind: 'add', variable: 'rats-killed', amount: 1 }]);
+    applyResultsNow(state, registry, [{ kind: 'add', variable: 'rats-killed', amount: 1 }]);
     expect(evaluateCondition(condition, state)).toBe(false);
-    applyResult({ kind: 'add', variable: 'rats-killed', amount: 1 }, state, registry);
+    applyResultsNow(state, registry, [{ kind: 'add', variable: 'rats-killed', amount: 1 }]);
     expect(evaluateCondition(condition, state)).toBe(true);
   });
 
   it('accumulates xp and moves location on relocate/discover', () => {
     const state = createGameState();
-    applyResult({ kind: 'xp', skill: 'thieving', amount: 4 }, state, registry);
-    applyResult({ kind: 'relocate', location: 'beach' }, state, registry);
-    applyResult({ kind: 'discover', location: 'bank' }, state, registry);
+    applyResultsNow(state, registry, [{ kind: 'xp', skill: 'thieving', amount: 4 }]);
+    applyResultsNow(state, registry, [{ kind: 'relocate', location: 'beach' }]);
+    applyResultsNow(state, registry, [{ kind: 'discover', location: 'bank' }]);
     expect(state.xp.thieving).toBe(4);
     expect(state.location).toBe('beach');
     expect(state.flags['bank.discovered']).toBe(true);
@@ -185,7 +185,7 @@ describe('applyResult', () => {
 
   it('logs and sets pendingModal on open-modal', () => {
     const state = createGameState();
-    applyResult({ kind: 'open-modal', modal: 'character-creation' }, state, registry);
+    applyResultsNow(state, registry, [{ kind: 'open-modal', modal: 'character-creation' }]);
     expect(state.log).toContain('modal:character-creation');
     expect(state.pendingModal).toBe('character-creation');
   });
