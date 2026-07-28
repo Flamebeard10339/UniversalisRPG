@@ -4,16 +4,10 @@ import { point } from './range';
 import { armAction, createGameState, GameState, initResources, resolve } from './runtime';
 import { loadModule, Registry } from './registry';
 
-// An action outliving the circumstances that let it start is the bug this
-// covers: a player swinging on at 0 health, a ritual continuing after its
-// blessing lapses. Two independent mechanisms answer it and they are tested
-// separately — `requires:`/inputs are re-checked by the resolver, while a pool
-// running out is content's call via `stop` in that pool's `on empty:` block.
-//
-// The rat: 16 bites/min (3.75s) for 10 each against 30 health, so the player
-// dies on the third bite at t=11.25 exactly. The player swings 25/min (2.4s)
-// for 10 against 1000, needing 100 hits — 240s — so the rat always outlives the
-// player and the fight would otherwise run the whole span.
+// Two independent mechanisms: `requires:`/inputs are re-checked by the resolver,
+// while a pool running out is content's call via `stop` in its `on empty:`.
+// The rat bites 16/min for 10 against 30 health, so the player dies at t=11.25;
+// the player needs 100 hits at 25/min, so the rat always outlives them.
 const MODULE = `
 # stat attack
 base: 10
@@ -141,8 +135,7 @@ spar:
   stop
 `;
 
-// The same world with nothing declaring health fatal — the control that shows
-// stopping is authored rather than something the engine imposes.
+// The control: nothing declares health fatal, so nothing stops.
 const WITHOUT_STOP = MODULE.replace('\n  stop\n', '\n');
 
 function started(source = MODULE): { registry: Registry; state: GameState } {
@@ -166,9 +159,8 @@ describe('a pool running out stops the fight', () => {
     expect(state.resources['health']).toBe(0);
     expect(state.activeAction).toBeNull();
     expect(state.log).toContain('You black out.');
-    // Under a settle-at-span-end reading the player would have kept swinging
-    // through the whole 300s and felled the rat at 240s. No tail means the
-    // fight really stopped at 11.25.
+    // No tail: under a settle-at-span-end reading the player would have swung
+    // through the whole 300s and felled the rat at 240s.
     expect(state.inventory['rat-tail'] ?? 0).toBe(0);
     expect(state.time).toBe(300); // time still passes; the player just isn't fighting
   });
@@ -189,8 +181,7 @@ describe('a pool running out stops the fight', () => {
     const { registry, state } = fighting(WITHOUT_STOP);
     resolve(state, registry, 300);
 
-    // Still at 0 health and still fighting: the engine has no opinion about a
-    // pool named `health`, so the fight runs to the rat's death at 240s.
+    // The engine has no opinion about a pool named `health`.
     expect(state.resources['health']).toBe(0);
     expect(state.activeAction).not.toBeNull();
     expect(state.inventory['rat-tail']).toBe(1);
@@ -210,18 +201,14 @@ describe('a pool running out stops the fight', () => {
     armAction('entity', 'treadmill', 'run', registry, state);
     resolve(state, registry, 100);
 
-    // -60/min against 30 health empties at t=30, and a completion lands on each
-    // whole second up to it. nextBoundary already lands the segment there, so
-    // this path is exact rather than segment-granular.
+    // -60/min against 30 empties at t=30, and nextBoundary lands the segment
+    // there, so this path is exact rather than segment-granular.
     expect(state.inventory['blessing']).toBe(30);
     expect(state.resources['health']).toBe(0);
     expect(state.activeAction).toBeNull();
   });
 
-  // A pool can also empty because its CEILING fell, not because anything drained
-  // it. clampResources used to write state.resources directly, which made it a
-  // third way a pool could move past setPoolLevel — the seam that owns the
-  // on-empty rule — so a max shrinking to 0 zeroed the pool in silence.
+  // A pool can also empty because its CEILING fell, with nothing draining it.
   it('fires on empty: when a shrinking max squeezes a pool to nothing', () => {
     const { registry, state } = started();
     armAction('entity', 'beacon', 'tend', registry, state);
@@ -254,12 +241,6 @@ describe('a pool running out stops the fight', () => {
   });
 });
 
-// `stop` in a pool's `on empty:` block fires from settlePools, after whichever
-// resolver has already returned. In an ACTION's own results it fires from inside
-// the resolver instead, which is a different problem twice over: the batched
-// path had already applied the whole span's completions before the one-shot verb
-// ran, and the per-attempt path went on using a local ActiveAction that
-// state.activeAction no longer held.
 describe('`stop` among an action’s own results', () => {
   function stopping(entity: string, action: string): { registry: Registry; state: GameState } {
     const s = started();
@@ -354,9 +335,6 @@ describe('a start condition that stops holding', () => {
     resolve(state, registry, 3);
     expect(state.inventory['blessing']).toBe(3);
 
-    // `hidden if:` decides whether an action is OFFERED. One already under way
-    // is a different question — a rat fight shouldn't abort mid-swing because
-    // the kill-count made the option disappear from the list.
     state.flags['beacon.dawn'] = true;
     resolve(state, registry, 6);
     expect(state.inventory['blessing']).toBe(6);

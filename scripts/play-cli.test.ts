@@ -8,11 +8,7 @@ import { handleCommand, liveTick, type Recorder } from './play-cli';
 
 const source = readFileSync('content/tutorial-island.dsl', 'utf8');
 
-// tutorial-island.dsl has no `# save` section (checked: it's all locations/
-// entities/dialogue/items for the hand-authored tutorial content), so /load
-// and /expect need their own tiny fixture module with one `# save` — mirrors
-// the inline-module pattern already used below for LIVE_MODULE and in
-// src/game/contentDsl/save.test.ts's SAVE_TEST_MODULE.
+// tutorial-island.dsl has no `# save` section, so /load and /expect need their own.
 const SAVE_MODULE = `
 # location camp
 x: 0, y: 0
@@ -35,10 +31,8 @@ assert: time >= 0
 assert: time < 0
 `;
 
-// A plain, unaliased two-location fixture: no entity here offers a free
-// relocate to `ruins`, so the camp -> ruins edge surfaces as a genuine kind:
-// 'travel' PlayChoice (unlike every edge in tutorial-island.dsl, which is
-// aliased by a stairs entity — see the comment at its use site below).
+// Unaliased on purpose: no entity offers a free relocate to `ruins`, so the edge
+// surfaces as a genuine kind: 'travel' choice, which tutorial-island never has.
 const TRAVEL_MODULE = `
 # location camp
 x: 0, y: 0
@@ -146,11 +140,6 @@ describe('play-cli handleCommand', () => {
     expect(result.recorded).toBe('travel: basement');
   });
 
-  // tutorial-island's only travel edges (guide-house <-> upstairs/basement)
-  // are all aliased by a stairs entity's free relocate action (see
-  // entityAliasesTravelTo in session.ts), so a genuine kind: 'travel' choice
-  // never appears there — a plain unaliased two-location fixture is used
-  // instead to exercise the numbered-choice 'travel' recording path.
   it('a numbered choice records the correct canonical directive for a travel option', () => {
     const registry = loadModule(TRAVEL_MODULE);
     const session = startSession(registry);
@@ -167,10 +156,6 @@ describe('play-cli handleCommand', () => {
 });
 
 describe('play-cli handleCommand: /test, /load, /expect, /assert, /cancel', () => {
-  // tutorial-island.dsl has no `# save` section, so /load and /expect are
-  // exercised against a tiny inline fixture module instead (SAVE_MODULE
-  // above), mirroring the pattern already used for LIVE_MODULE below and for
-  // save.test.ts's SAVE_TEST_MODULE.
   it('/load <id> loads a save by id, erroring cleanly (not throwing) on an unknown one', () => {
     const registry = loadModule(SAVE_MODULE);
     const session = startSession(registry);
@@ -236,11 +221,8 @@ describe('play-cli handleCommand: /test, /load, /expect, /assert, /cancel', () =
   });
 });
 
-// A small live-mode fixture: `oven.roast` is a REPEATING spannable action
-// (never self-completes — a live driver only stops it on Enter/EOF), and
-// `anvil.strike` is a NON-repeating spannable action (self-completes once
-// its single attempt resolves) — the two shapes runLiveAction's real-time
-// loop has to end for (see runLiveAction's doc comment in play-cli.ts).
+// `oven.roast` repeats and never self-completes; `anvil.strike` completes after
+// its single attempt. Both shapes runLiveAction's loop has to end for.
 const LIVE_MODULE = `
 # location camp
 x: 0, y: 0
@@ -284,8 +266,7 @@ describe('liveTick: pure per-tick core of live mode', () => {
     const session = startSession(registry);
     beginAction(session, 'use:entity.oven.roast');
 
-    // 25 ticks of 200ms at 1x = 5 simulated seconds, comfortably clearing the
-    // 4s cycle (time: 4) with margin against float-accumulation error.
+    // 25 ticks of 200ms at 1x = 5 simulated seconds, clearing the 4s cycle.
     for (let i = 0; i < 25; i++) {
       const result = liveTick(session, 200, 1);
       expect(result.active).toBe(true); // repeating: never self-completes
@@ -327,10 +308,8 @@ describe('liveTick: pure per-tick core of live mode', () => {
   });
 });
 
-// TRAVEL_MODULE (above) rather than tutorial-island.dsl: it's small and
-// deterministic (one real travel edge, no dialogue/inventory noise), which
-// keeps the recorded-history assertions and the round-trip test's expected
-// save diff ({location: 'ruins'}) simple and unambiguous.
+// TRAVEL_MODULE rather than tutorial-island: one edge, no dialogue or inventory
+// noise, so the expected save diff stays unambiguous.
 describe('play-cli recorder: /create-test and /create-valid-test', () => {
   function recordedFixture() {
     const registry = loadModule(TRAVEL_MODULE);
@@ -340,9 +319,7 @@ describe('play-cli recorder: /create-test and /create-valid-test', () => {
     return { registry, session, current, recorder };
   }
 
-  // Drives one numbered choice (travel) and one typed directive (wait),
-  // exercising both of handleCommand's recording paths against the same
-  // recorder.
+  // One numbered choice and one typed directive: both of handleCommand's paths.
   function recordATravelAndAWait(session: ReturnType<typeof recordedFixture>['session'], current: ReturnType<typeof recordedFixture>['current'], recorder: Recorder) {
     const travelIndex = current.choices.findIndex((choice) => choice.id === 'travel:ruins');
     expect(travelIndex).toBeGreaterThanOrEqual(0);
@@ -388,11 +365,8 @@ describe('play-cli recorder: /create-test and /create-valid-test', () => {
     expect(result.output).toContain('expect: bar-end');
     expect(session.registry.tests.has('bar')).toBe(true);
 
-    // The key correctness gate: paste the emitted blocks (everything from the
-    // first `# ...` line on — the confirmation line above it is a CLI status
-    // message, not part of the pasteable DSL) into a brand-new module (fresh
-    // registry, zero shared state with the recording session) and confirm
-    // replaying the test reproduces the recorded end state.
+    // The correctness gate: paste the emitted blocks into a brand-new module,
+    // sharing no state with the recording session, and replay them.
     const blocks = result.output.slice(result.output.findIndex((line) => line.startsWith('# ')));
     const pasted = `${TRAVEL_MODULE}\n${blocks.join('\n')}\n`;
     const freshRegistry = loadModule(pasted);
