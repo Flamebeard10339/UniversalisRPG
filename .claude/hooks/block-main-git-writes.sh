@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 
-command=$(jq -r '.tool_input.command // ""')
+command=$(node .claude/hooks/lib/tool-command.js)
 
 case "$command" in
-  git\ add*|git\ commit\ -m*)
+  *git\ add*|*git\ commit*)
     branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || true)
 
     if [ "$branch" = "main" ]; then

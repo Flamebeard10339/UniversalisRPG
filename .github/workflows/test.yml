@@ -14,7 +14,11 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
+      # Full history: audit-status walks back to each system's lastAudit SHA,
+      # which a shallow clone does not contain.
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: 20
@@ -24,3 +28,4 @@ jobs:
       - run: npm test
       - run: npm run comment-budget
       - run: npm run layer-check
+      - run: npm run audit-status
