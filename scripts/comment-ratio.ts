@@ -1,12 +1,11 @@
-import { readdirSync, readFileSync, statSync } from 'node:fs';
-import { join, relative } from 'node:path';
+import { readFileSync } from 'node:fs';
+import { relative } from 'node:path';
+import { sourceFiles } from './lib/sourceFiles';
 import { isCommentLine, stripComments } from './lib/stripComments';
 
 const MAX_COMMENT_RATIO = 0.05;
 const ALWAYS_ALLOWED_COMMENT_LINES = 2;
 const ROOTS = ['src', 'scripts'];
-const SOURCE_EXTENSIONS = ['.ts', '.tsx'];
-const SKIPPED_DIRECTORIES = new Set(['node_modules', 'dist', 'android', '.git']);
 
 interface FileReport {
   path: string;
@@ -14,17 +13,6 @@ interface FileReport {
   totalLines: number;
   ratio: number;
   budget: number;
-}
-
-function sourceFiles(directory: string): string[] {
-  const found: string[] = [];
-  for (const entry of readdirSync(directory)) {
-    if (SKIPPED_DIRECTORIES.has(entry)) continue;
-    const path = join(directory, entry);
-    if (statSync(path).isDirectory()) found.push(...sourceFiles(path));
-    else if (SOURCE_EXTENSIONS.some((extension) => entry.endsWith(extension))) found.push(path);
-  }
-  return found;
 }
 
 function report(path: string): FileReport {

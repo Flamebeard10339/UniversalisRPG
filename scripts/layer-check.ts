@@ -1,5 +1,6 @@
-import { readdirSync, readFileSync, statSync } from 'node:fs';
-import { join, normalize, relative } from 'node:path';
+import { readFileSync } from 'node:fs';
+import { join, relative } from 'node:path';
+import { posix, sourceFiles } from './lib/sourceFiles';
 
 const LAYERS = ['grammar', 'content', 'runtime', 'ui', 'scripts'] as const;
 type Layer = (typeof LAYERS)[number];
@@ -20,32 +21,11 @@ const ROOTS: Record<Layer, string> = {
   scripts: 'scripts',
 };
 
-const SOURCE_EXTENSIONS = ['.ts', '.tsx'];
 const IMPORT_PATTERN = /(?:from|import)\s*\(?\s*'(\.[^']*)'/g;
 
 interface Violation {
   from: string;
   to: string;
-}
-
-function sourceFiles(directory: string): string[] {
-  let entries: string[];
-  try {
-    entries = readdirSync(directory);
-  } catch {
-    return [];
-  }
-  const found: string[] = [];
-  for (const entry of entries) {
-    const path = join(directory, entry);
-    if (statSync(path).isDirectory()) found.push(...sourceFiles(path));
-    else if (SOURCE_EXTENSIONS.some((extension) => entry.endsWith(extension))) found.push(path);
-  }
-  return found;
-}
-
-function posix(path: string): string {
-  return normalize(path).replace(/\\/g, '/');
 }
 
 function layerOf(path: string): Layer | null {
