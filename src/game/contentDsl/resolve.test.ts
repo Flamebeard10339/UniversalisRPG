@@ -3,20 +3,12 @@ import { ActiveAction, armAction, craft, createGameState, GameState, initResourc
 import { newCadence } from './encounter';
 import { loadModule, Registry } from './registry';
 
-// Fixture for the resolver tests: a speed stat, a food item that doubles it
-// for a fixed window, an unbounded repeating cook recipe (campfire-cook — no
-// in:, so its input limit is infinite), a finite repeating cook recipe
-// (smokehouse-cook — in: raw-shrimp bounds it), a non-repeating action with a
-// real time: cost (torch), a repeating action with no time: at all to
-// exercise the "must have a positive duration" guard (broken-oven), a
-// stochastic repeating cook recipe (grill-cook — accuracy-gated, burns
-// instead of retrying on a miss), and a deterministic multi-hit fight (tree).
-//
-// campfire/smokehouse/grill are RECIPES, not entity actions: a "craft" (turn
-// inputs into outputs) is exactly what recipes model now (see recipeAction in
-// registry.ts), and driving these gates through the recipe path is the point
-// of this rewrite. `tree` stays a plain entity action — see the comment above
-// its definition below for why a multi-hit fight isn't a recipe.
+// Fixtures: campfire-cook (no in:, so an infinite input limit), smokehouse-cook
+// (in: raw-shrimp bounds it), grill-cook (accuracy-gated, burns on a miss),
+// torch (non-repeating with a real time:), broken-oven (repeating with no time:,
+// for the positive-duration guard), and tree (a deterministic multi-hit fight).
+// The three cooks are recipes because turning inputs into outputs is what a
+// recipe models; tree stays an entity action, for the reason given at its use.
 const MODULE = `
 # stat cooking-speed
 base: 1
@@ -183,10 +175,8 @@ function loaded(): Registry {
   return loadModule(MODULE);
 }
 
-// Builds the activeAction for a fresh (0-progress, fully-armed) fight against
-// a recipe's compiled Action, looked up from the registry rather than
-// hardcoded — the recipe path re-driving these gates should not depend on
-// guessing the compiled action's internal label text.
+// Looked up from the registry rather than hardcoded, so these gates do not
+// depend on guessing the compiled action's label text.
 function recipeActive(registry: Registry, recipeId: string): ActiveAction {
   const action = registry.recipeActions.get(recipeId)!;
   return { ownerRef: `recipe.${recipeId}`, actionLabel: action.label, repeating: action.repeating === true, healthRemaining: action.health ?? 1, cadences: { [PLAYER]: newCadence() } };
@@ -209,8 +199,7 @@ describe('resolve: associativity (the core invariant)', () => {
     const oneShot = withCampfireCooking(registry, true);
     resolve(oneShot, registry, 1000);
 
-    // Deterministic LCG so a failure is reproducible without depending on
-    // the platform's Math.random implementation.
+    // Seeded so a failure reproduces without depending on Math.random.
     let seed = 42;
     const rand = () => {
       seed = (seed * 1103515245 + 12345) % 2147483648;
@@ -231,13 +220,8 @@ describe('resolve: associativity (the core invariant)', () => {
       expect(folded.inventory).toEqual(oneShot.inventory);
       expect(folded.activeAction).toEqual(oneShot.activeAction);
       expect(folded.activeBuffs).toEqual(oneShot.activeBuffs);
-      // The recipe's xp result must batch per completion, not per segment —
-      // this is what catches a non-associative batch where the live driver
-      // would over-fire relative to the REPL. (Recipes have no analogue of
-      // the old fixture's `on success: add:` flag effect — a recipe's
-      // results are a fixed take/give/xp/say shape — so `flags` is asserted
-      // here only as a trivial "stays empty on both sides" regression net,
-      // not as a batching gate; xp is what actually exercises batching.)
+      // xp must batch per completion, not per segment: this is what catches a
+      // non-associative batch where a live driver over-fires against the REPL.
       expect(folded.flags).toEqual(oneShot.flags);
       expect(folded.xp).toEqual(oneShot.xp);
       expect(folded.resources).toEqual(oneShot.resources);
@@ -280,11 +264,8 @@ describe('resolve: associativity (the core invariant)', () => {
   });
 });
 
-// A pool being drained per completion while it also regenerates is the one
-// shape where clamping is not associative: writing each drain immediately floors
-// the pool at 0 and then lets the rate refill it, so where a caller split the
-// span changes the level. The resolver settles a segment's discrete writes and
-// its integrated rate together, once, for exactly this reason.
+// The one shape where clamping is not associative: writing each drain immediately
+// floors the pool at 0 and lets the rate refill it, so the split changes the level.
 describe('resolve: direct pool writes stay associative alongside a rate', () => {
   function draining(registry: Registry, entityId: string, label: string): GameState {
     const state = createGameState('nowhere');
@@ -293,17 +274,15 @@ describe('resolve: direct pool writes stay associative alongside a rate', () => 
     return state;
   }
 
-  // vigor: starts 30, regenerates +60/min (+1/s), drained 2 per completion at
-  // one completion per second — net -1/s, so 25s leaves it mid-range at 5
-  // rather than saturated at either end, where any two answers would agree.
+  // Starts 30, +60/min, drained 2 per completion at one a second — net -1/s, so
+  // 25s leaves it mid-range rather than saturated where any two answers agree.
   const HORIZON = 25;
 
   it('holds for a deterministic repeating drain across random split points', () => {
     const registry = loaded();
     const oneShot = draining(registry, 'grindstone', 'sharpen');
     resolve(oneShot, registry, HORIZON);
-    // 30 - (2 x 25 completions) + 25s of regen. Pinning the value rules out the
-    // clamp-per-write reading, which floors at 0 mid-span and refills to 25.
+    // Pinning the value rules out the clamp-per-write reading, which refills to 25.
     expect(oneShot.resources['vigor']).toBeCloseTo(5, 6);
     expect(oneShot.inventory['edge']).toBe(25);
 
@@ -392,11 +371,8 @@ describe('resolve: input-limited repeating action ends in O(1) segments (test 4)
     expect(state.inventory['cooked-shrimp']).toBe(28);
     expect(state.inventory['raw-shrimp']).toBe(0);
     expect(state.activeAction).toBeNull();
-    // A per-completion loop over 1,000,000 (or even just 28) ticks would still
-    // be fast in absolute terms, but the point of the closed-form segment math
-    // is that cost is independent of both the target time and the completion
-    // count — a couple of segments, not a million. A generous ceiling here
-    // just guards against an accidental fixed-dt regression.
+    // The point of the closed-form segment math is that cost is independent of the
+    // target time and the completion count. A generous ceiling catches a fixed-dt.
     expect(elapsedMs).toBeLessThan(50);
   });
 
@@ -458,10 +434,8 @@ describe('useAction/craft integration: repeating actions, eating grants a live b
     expect(statValue('cooking-speed', state, registry)).toBe(2);
   });
 
-  // The buff hangs off the action COMPLETING, not off the verb that started it.
-  // While it lived in useAction, a food whose eat action carried a `time:` was
-  // buffed in instant mode and not at all once a live driver armed it and waited
-  // — and every food in the tutorial happens to be instant, so nothing showed it.
+  // While this hung off useAction, a food with a `time:` buffed in instant mode
+  // and not at all once a live driver armed it.
   it('grants a slow meal’s buff on the armed path as well as the instant one, with the clock starting when the bowl is empty', () => {
     const registry = loaded();
 
@@ -477,8 +451,7 @@ describe('useAction/craft integration: repeating actions, eating grants a live b
     for (const state of [instant, armed]) {
       expect(state.inventory['stew']).toBe(0);
       expect(statValue('cooking-speed', state, registry)).toBe(2);
-      // 3s to eat, then a 60s window — the clock starts at the last spoonful,
-      // not when the bowl was picked up.
+      // The 60s window starts at the last spoonful, not when the bowl was picked up.
       expect(state.activeBuffs['stew:cooking-speed'].expiresAt).toBe(63);
     }
   });
@@ -498,11 +471,8 @@ describe('useAction/craft integration: repeating actions, eating grants a live b
     expect(() => useAction('entity', 'broken-oven', 'cook', registry, state)).toThrow(RuntimeError);
   });
 
-  // A speed stat that reads 0 — a typo, or a declared `# stat` with no base: —
-  // makes the attempt duration Infinity, which slips through every `<= 0` guard
-  // and drives state.time to Infinity while NaN-ing the whole activeAction. NaN
-  // serializes to null, so the wreckage would survive a save round-trip instead
-  // of failing loudly.
+  // A speed stat reading 0 makes the duration Infinity, which slips through every
+  // `<= 0` guard; the resulting NaN serializes to null and survives a save.
   it('an action whose speed stat reads 0 refuses to start rather than resolving an infinite attempt duration', () => {
     const registry = loaded();
     const state = createGameState('nowhere');
@@ -513,12 +483,9 @@ describe('useAction/craft integration: repeating actions, eating grants a live b
   });
 });
 
-// Fixtures for the fight-model gates: `grill-cook` is a STOCHASTIC repeating
-// craft (cooking 100 vs shrimp-complexity 60 ⇒ ~0.72 — a miss on the one attempt a craft
-// gets immediately fails to `burnt` instead of cooking it, since recipeAction
-// always compiles accuracy => escape after 1); `tree` is a DETERMINISTIC
-// multi-hit repeating fight (health: 3, ability: chop-power @ 1/hit, no
-// accuracy — always takes exactly 3 attempts).
+// grill-cook is STOCHASTIC (cooking 100 vs complexity 60 => ~0.72, and a miss on
+// the one attempt a craft gets fails to `burnt`, since accuracy compiles to
+// escape after 1). tree is DETERMINISTIC: health 3 at 1/hit is always 3 attempts.
 function withGrillCooking(registry: Registry, rawShrimp: number): GameState {
   const state = createGameState('nowhere');
   state.inventory['raw-shrimp'] = rawShrimp;
@@ -539,8 +506,7 @@ describe('resolve: stochastic associativity — the accuracy/RNG core gate', () 
     const oneShot = withGrillCooking(registry, 100_000);
     resolve(oneShot, registry, 200);
 
-    // A separate seeded LCG, only used here to pick split points — distinct
-    // from the resolver's own state.rng, which is exactly what's under test.
+    // A separate seeded LCG for split points, distinct from the state.rng under test.
     let seed = 99;
     const rand = () => {
       seed = (seed * 1103515245 + 12345) % 2147483648;
@@ -564,10 +530,8 @@ describe('resolve: stochastic associativity — the accuracy/RNG core gate', () 
       expect(folded.log.length).toBe(oneShot.log.length);
       expect(folded.activeAction).toEqual(oneShot.activeAction);
       expect(folded.activeBuffs).toEqual(oneShot.activeBuffs);
-      // The draw that decides attempt N must be the SAME draw regardless of
-      // how the calls to resolve() are split — this is what a non-associative
-      // RNG (e.g. one keyed by segment count or by wall-clock split points
-      // instead of by attempt order) would break.
+      // The draw deciding attempt N must be the SAME draw however the calls split.
+      // An RNG keyed by segment count instead of attempt order would break here.
       expect(folded.rng).toBe(oneShot.rng);
     }
   });
@@ -648,23 +612,15 @@ describe('resolve: onSuccess batches per completion, not per segment (Pass-1 reg
       expect(folded.flags).toEqual(oneShot.flags); // add: (onSuccess) — would over-fire if batched per segment
       expect(folded.xp).toEqual(oneShot.xp); // xp: (onSuccess) — same
     }
-    // Sanity: onSuccess actually ran the expected number of times (1 per
-    // completion). `add: bricks-fired` is entity-scoped to `kiln.bricks-fired`
-    // (bare set/unset/add inside an entity action scope to the owner); xp's
-    // skill id stays global.
+    // `add: bricks-fired` is entity-scoped to `kiln.bricks-fired`; xp stays global.
     expect(oneShot.flags['kiln.bricks-fired']).toBe(1000);
     expect(oneShot.xp['smithing']).toBe(2000);
   });
 });
 
-// ── Pass 2: resource pools + effects(rate) ─────────────────────────────────
-// Rates are per MINUTE (Δ = statValue(rate)·dt/60). A pool changes only through
-// its rate stat; an action drains/boosts one purely by carrying a stat-bonus
-// tag on that stat (same buff machinery as food). `engine.run` fills a rollover
-// meter (`spark`, +240/min into a cap-3 pool) and drains a plain pool (`hp`,
-// -120/min from 100 => empties at t=50) while it runs, and gives a cog per
-// completion — so one fixture exercises rollover batching, on-empty, action
-// modifiers, and fight-completion batching together.
+// Rates are per MINUTE. `engine.run` fills a rollover meter (spark, +240/min into
+// a cap-3 pool) and drains a plain one (hp, -120/min from 100, empty at t=50)
+// while it runs, so one fixture covers rollover, on-empty and completion batching.
 const RESOURCE_MODULE = `
 # stat regen-rate
 base: 0
@@ -793,15 +749,13 @@ describe('resolve: resource associativity (the invariant, extended to pools)', (
       for (const t of sorted) resolve(folded, registry, t);
 
       expect(folded.time).toBe(oneShot.time);
-      // Discrete outcomes must be bit-exact regardless of split: rollover fire
-      // count (ember), completion count (cog), and the single on-empty flag.
+      // Discrete outcomes must be bit-exact regardless of split.
       expect(folded.inventory).toEqual(oneShot.inventory);
       expect(folded.flags).toEqual(oneShot.flags);
       expect(folded.xp).toEqual(oneShot.xp);
       expect(folded.activeAction).toEqual(oneShot.activeAction);
-      // Continuous pool levels reconverge within float tolerance (the carried
-      // rollover remainder accrues tiny per-split float error — an accepted,
-      // bounded limitation, not a divergence).
+      // Continuous levels reconverge within float tolerance: the carried rollover
+      // remainder accrues bounded per-split error, which is accepted.
       for (const id of Object.keys(oneShot.resources)) {
         expect(folded.resources[id]).toBeCloseTo(oneShot.resources[id], 6);
       }
