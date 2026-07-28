@@ -4,7 +4,7 @@ Optimize for correctness, bounded scope, reuse, architectural coherence, strong 
 
 Track which systems commits impact and prompt an independent system audit when un-audited commits > 10. Keep independent systems independent. Do not create systems that are required to be manually kept in sync. 
 
-Make commits after each logical chunk. 
+Make commits after each logical chunk. Only write comments that record a *decision*, not a *mechanism*. If a mechanistic comment is required, then the code is not self-documenting and must be rethought. 
 
 Do not bloat CLAUDE.md with over 200 lines of instructions. 
 
