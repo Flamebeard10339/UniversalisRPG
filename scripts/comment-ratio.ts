@@ -53,6 +53,20 @@ function format(file: FileReport): string {
   return `${percentage} ${String(file.commentLines).padStart(4)}/${String(file.totalLines).padEnd(5)} ${file.path}`;
 }
 
+// grep cannot tell a comment from a `//` inside a DSL fixture string, and a strip
+// built from grep deletes the fixture. This is the same scanner the budget uses.
+const linesFlag = process.argv.indexOf('--lines');
+if (linesFlag !== -1) {
+  const target = process.argv[linesFlag + 1];
+  const source = readFileSync(target, 'utf8');
+  const stripped = stripComments(source);
+  const original = source.split('\n');
+  for (let index = 0; index < stripped.length; index++) {
+    if (isCommentLine(original[index] ?? '', stripped[index])) console.log(`${index + 1}:${original[index]}`);
+  }
+  process.exit(0);
+}
+
 const listEverything = process.argv.includes('--all');
 const reports = ROOTS.flatMap((root) => sourceFiles(root))
   .map(report)
