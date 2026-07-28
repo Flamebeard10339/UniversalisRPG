@@ -1,5 +1,12 @@
 # Game Engine audit (pass 2) — 2026-07-27
 
+> **Resolved 2026-07-27** by the staged restructure in commits `1c30ea7`..`243e59d`.
+> H1, M1 and every structural finding S1–S6 are closed; **L1 remains open**, recorded in
+> `runtime.ts` as `TODO(L1)` rather than left as a comment the audit proved false.
+> `runtime.ts` went from 1781 lines to 643 across eleven modules. Re-verified after:
+> `tsc --noEmit` clean, 303 tests green, both tutorial-island `# test` scripts pass, and
+> this audit's own associativity fuzz reruns 400/400 against the real content.
+
 Independent audit of repository system 3 (**Game Engine**) at `28f07e0`, covering the 8
 commits since the previous audit — the remediation series `593318c`…`48fba00` — plus the
 structural state of `runtime.ts` that series left behind.

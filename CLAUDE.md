@@ -13,20 +13,20 @@ Do not bloat CLAUDE.md with over 200 lines of instructions.
 A feature large enough to span sessions gets a tracked deliverable log at `docs/<feature>/deliverable-log.md` (spec, chunk status, open decisions); `backlog.md` keeps only a pointer to it. Read the log before touching that feature's code. On merge, archive the log and lift anything unfinished back into `backlog.md`. Currently live: `docs/combat/deliverable-log.md`. 
 
 # Repository systems
-1. Content pipeline through DSL markdown files (commits since audit: 10)
+1. Content pipeline through DSL markdown files (commits since audit: 11 — AUDIT DUE)
   1. Contribution system: editor, validation/merge engine
   2. DSL system: grammar, parser, compiler, loader (incl. load-time reference resolution)
 2. User interface (commits since audit: 0)
   1. Main tabs: Map, Home, Character, Settings, Edit 
   2. Modals: dialogue, skills, stats
   3. Experience: floating text
-3. Game Engine (commits since audit: 0 — `docs/audits/game-engine-2026-07-27-pass2.md`, open H1/M1/L1 + structural S1–S6)
+3. Game Engine (commits since audit: 8 — `docs/audits/game-engine-2026-07-27-pass2.md`; H1/M1/S1–S6 closed, L1 open)
   1. Core: State-driven UI, travel and locations
   2. Data structures: locations, dialogue, quests, actions, resources, stats, skills, flags 
 4. Build & deployment (commits since audit: 1)
   1. Web: Vite build, tag-triggered publish to itch.io (`.github/workflows/publish.yml`)
   2. Android: Capacitor sync + Gradle release build, APK signing, attached to the GitHub release
-5. Testing procedure (commits since audit: 4)
+5. Testing procedure (commits since audit: 6)
   1. Human/agent testing: `scripts/play-cli.ts` interactive REPL over `startSession`/`view`/`apply` (live `--live` real-time + instant piped/agent mode), named `# test` scripts run via `/test`
   2. `scripts/playtest-cli.ts` headless replay of a saved choiceId script through `startSession`/`apply`, writing a transcript (zero browser, zero real wait)
   3. CI: `.github/workflows/test.yml` runs `tsc --noEmit` + `npm test` on push and PR

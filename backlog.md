@@ -333,31 +333,29 @@ landed. These are the genuinely-open forward items at merge time:
   PlayView/PlayChoice and measure simulated time per run.
 
 ### Game engine audit findings (pass 2, `docs/audits/game-engine-2026-07-27-pass2.md`)
-- **H1 — the PRNG's period is 10,466, not 2³¹.** `state.rng * RNG_MULTIPLIER` overflows 2⁵³,
-  so the low bits are rounded away before the modulus. Saturates its whole reachable state
-  space in ~40,000 s of a repeating fight, then repeats exactly. One-line `Math.imul` fix,
-  but it changes every existing sequence — the `# save` combat fixtures need regenerating,
-  so give it its own commit.
-- **M1 — reference validation misses `ActionResult`s, tag clauses and recipe quantities.**
-  `drain:`/`restore:` on an unknown pool still throws mid-fight and an unknown stat in a
-  `+N stat` tag still silently reads 0 — the two failure modes L3's own rationale says it
-  closed. Also `give`/`take`/`xp`/`relocate`/`discover` and recipe `in`/`out`/`burnt`/`skill`.
-- **L1 — `actionFirstUnit` probes before arming, `armAction` computes after.** They disagree
-  for any action that modifies its own `speed:` stat (measured 8 vs 4). Same bug class as M1's
-  food buffs: a quantity computed at two moments relative to arming.
+Closed 2026-07-27 by the staged restructure (commits `1c30ea7`..`243e59d`): H1, M1, and the
+structural findings S1–S6. Re-verified after: 303 tests green, both tutorial-island `# test`
+scripts pass, and the audit's own associativity fuzz reruns 400/400 against the real content.
+
+- **L1 — `actionFirstUnit` probes before arming, `armAction` computes after.** STILL OPEN,
+  now documented rather than silently false: the probe is only safe to read as a sign, which
+  is all `beginAction` asks of it, so this is a latent hazard rather than a live defect. The
+  fix is to arm first and route on `armAction`'s own return value (TODO(L1) in `runtime.ts`)
+  — which needs a call on what `beginAction` does when arming succeeds but the first unit is
+  instant. Same bug class as M1's food buffs: a quantity computed at two moments relative to
+  arming.
+- Pass-1 findings **L2, L4, L6** were re-confirmed open by the pass-2 audit and are untouched
+  by this work.
 
 ### Docs / cleanup
 - **grammar.md update (STALE).** Document the action combat axes (`accuracy`/`ability`/
   `health`/`escape after`/`on escape`), the `speed:` rename, recipe fields (`time`/
   `speed`/`accuracy`/`burnt`), and entity `stations:`. (User owns grammar.md commits.)
-- **`runtime.ts` decomposition** (supersedes the old "remove comments" framing, which the
-  2026-07-27 pass-2 audit found to be the wrong diagnosis). `runtime.ts` is 29.3% comment
-  lines against 13.3% for every other engine file, because three invariants have no home in
-  the code and live in prose instead: associativity (10 comments, 8 functions, 0 seams),
-  which of five apply-functions to call, and "all pool movement goes through `setPoolLevel`".
-  Three of three load-bearing comments the audit fact-checked were already false. Staged plan
-  and per-stage rationale in `docs/audits/game-engine-2026-07-27-pass2.md`. Do NOT do this by
-  deleting comments — the comments are a symptom.
+- ~~**`runtime.ts` decomposition**~~ DONE 2026-07-27. 1781 lines to 643, split into
+  `registry`/`rng`/`state`/`tuning`/`conditions`/`actions`/`stats`/`effects`/`encounter`/
+  `dialogue-runtime`. Each of the three homeless invariants got a home: associativity and the
+  apply-function quadrant became the `Segment` type, and "all pool movement goes through
+  `setPoolLevel`" became a readonly `PoolLevels` index signature.
 - `tsconfig include:["src"]` means `scripts/**` (play-cli.ts) is never type-checked by
   `tsc --noEmit` (a task chip was spawned for this).
 
