@@ -10,7 +10,10 @@ import { RawSection } from './structure';
 //    number, so a v1 save with food active would otherwise poison every stat
 //    reading it with NaN.
 // 3: activeAction carries the encounter's non-player actors and their pools.
-export const SAVE_VERSION = 3;
+// 4: activeAction's clocks became a `cadences` map keyed by actor id with the
+//    player as an ordinary key, rather than the player's being inlined on the
+//    encounter and every other actor's living on its ActorState.
+export const SAVE_VERSION = 4;
 
 // A save is a sparse diff against initialState(registry): a brand-new game
 // saves as `{}`. `log` is transcript, not state, and is never part of a save.

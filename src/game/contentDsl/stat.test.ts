@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { Cursor, DslError } from './parser';
 import { point, range } from './range';
-import { ActiveAction, createGameState, GameState, hitDamage, minDamage, sampleStat, statRange, statValue } from './runtime';
+import { ActiveAction, createGameState, GameState, hitDamage, minDamage, PLAYER, sampleStat, statRange, statValue } from './runtime';
+import { newCadence } from './encounter';
 import { loadModule, Registry } from './registry';
 import { tagClause } from './tagClause';
 
@@ -31,7 +32,7 @@ function loaded(): Registry {
   return loadModule(MODULE);
 }
 
-const striking = (): ActiveAction => ({ ownerRef: 'entity.dummy', actionLabel: 'strike', progress: 0, repeating: false, healthRemaining: 1, attemptsMade: 0 });
+const striking = (): ActiveAction => ({ ownerRef: 'entity.dummy', actionLabel: 'strike', repeating: false, healthRemaining: 1, cadences: { [PLAYER]: newCadence() } });
 
 function withStrike(): GameState {
   const state = createGameState('nowhere');

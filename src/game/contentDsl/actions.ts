@@ -3,7 +3,7 @@ import { evaluateCondition } from './conditions';
 import { Action } from './entity';
 import { Location } from './location';
 import { Registry } from './registry';
-import type { ActiveAction } from './runtime';
+import type { ActiveAction } from './encounter';
 import { GameState, RuntimeError } from './state';
 import { travelSecondsPerUnit } from './tuning';
 

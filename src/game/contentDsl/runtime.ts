@@ -15,6 +15,17 @@ import {
 } from './actions';
 import { evaluateCondition, renderSegments } from './conditions';
 import {
+  ActiveAction,
+  damagePool,
+  enterEncounter,
+  logSwing,
+  newCadence,
+  Participant,
+  participants,
+  playerCadence,
+  poolLevel,
+} from './encounter';
+import {
   applyResults,
   applyResultsNow,
   captureResourceRates,
@@ -51,46 +62,9 @@ export { describeCondition, evaluateCondition, renderSegments } from './conditio
 export { actionVisible, requiresMet } from './actions';
 export { hitChance, hitDamage, sampleStat, statRange, statValue } from './stats';
 export { applyResultsNow, initResources } from './effects';
+export { encounterView } from './encounter';
+export type { ActiveAction, ActorState, Cadence, EncounterFoe, EncounterView } from './encounter';
 
-// A repeating/spannable action in flight: a sequence of attempts against one
-// target with `healthRemaining` (a "fight"). `progress` is seconds elapsed
-// toward the *next attempt*, not an absolute deadline, so a mid-flight speed
-// change re-maps the remaining progress instead of rewriting a deadline.
-// `attemptsMade`/`healthRemaining` let a split mid-fight resume exactly.
-// `progress`/`attemptsMade` are the PLAYER's cadence, kept here rather than
-// alongside the other actors' so the closed-form path — which has exactly one
-// swinger and no encounter — is untouched by any of this. The resolver builds a
-// uniform participant list over both, so the storage asymmetry never reaches the
-// scheduling logic.
-export interface ActiveAction extends Cadence {
-  ownerRef: string; // "<obj>.<objId>", e.g. "entity.oven"
-  actionLabel: string;
-  repeating: boolean;
-  healthRemaining: number;
-  // Non-player actors taking part, keyed by entity id. Absent for a solo action
-  // (cooking, travel, chopping); a `target:` action puts the entity it fights in
-  // here. Their pools live with the encounter and not in state.resources because
-  // they are scoped to the fight — they vanish with it, the player's persist.
-  actors?: Record<string, ActorState>;
-}
-
-// One swinger's independent attack clock. `progress` is seconds elapsed toward
-// the next attempt, not an absolute deadline, so a mid-flight rate change
-// re-maps what remains rather than rewriting a deadline: a 2.4s swing 1.2s in
-// that speeds up to 1.92s has 0.72s left, not 0.96s or 1.2s.
-export interface Cadence {
-  progress: number;
-  attemptsMade: number;
-}
-
-// A non-player participant's sheet. Only pool levels and its clock are stored:
-// its stats come from its `# entity` block and its maxima are derived live from
-// those stats, exactly as the player's are. `cadence` is present only when the
-// entity has a `retaliates` action to run — an inert target keeps no clock.
-export interface ActorState {
-  resources: Record<string, number>;
-  cadence?: Cadence;
-}
 
 
 
@@ -208,163 +182,6 @@ function fightPlan(action: Action, state: GameState, registry: Registry): Determ
 }
 
 
-
-// An encounter actor's pools, each filled to that ACTOR's own max. Deliberately
-// not initResources' rule: `start` is where a pool begins on a fresh game, a
-// player-lifecycle concept with no meaning for something that stands up
-// mid-fight. Honouring it made a `# resource health` with `start: 5` spawn every
-// rat at 5 however much max-health its own sheet claimed.
-// The actor keeps a clock only if it has a `retaliates` action to swing on it.
-function freshActor(actorId: string, state: GameState, registry: Registry): ActorState {
-  const resources: Record<string, number> = {};
-  for (const resource of registry.resources.values()) {
-    resources[resource.id] = statValue(resource.max, state, registry, actorId);
-  }
-  const swings = retaliationOf(actorId, registry) !== undefined;
-  return swings ? { resources, cadence: { progress: 0, attemptsMade: 0 } } : { resources };
-}
-
-function actorInEncounter(state: GameState, actorId: string): ActorState {
-  const actor = state.activeAction?.actors?.[actorId];
-  if (!actor) throw new RuntimeError(`actor is not in the encounter: ${actorId}`);
-  return actor;
-}
-
-// One swinger in the encounter: `self` runs `action` against `other`, on its own
-// clock. `speed`/`ability`/`accuracy` read `self`; `target`/`dr` read `other`, so
-// the identical action shape serves both directions and only the perspective
-// flips between the player's attack and the entity's `retaliates` answer.
-interface Participant {
-  self: string;
-  other: string;
-  action: Action;
-  cadence: Cadence;
-}
-
-// The player always swings; each encounter actor with a `retaliates` action
-// swings alongside on its own clock. The order is fixed — player first, then
-// actors in the order the encounter armed them — and it is what breaks ties when
-// two cadences land on the same instant, so who goes first can never depend on
-// where a caller split the span.
-function participants(state: GameState, registry: Registry, action: Action): Participant[] {
-  const active = state.activeAction!;
-  const list: Participant[] = [{ self: PLAYER, other: parseOwnerRef(active.ownerRef).objId, action, cadence: active }];
-  for (const [actorId, actor] of Object.entries(active.actors ?? {})) {
-    if (!actor.cadence) continue;
-    const retaliation = retaliationOf(actorId, registry);
-    if (retaliation) list.push({ self: actorId, other: PLAYER, action: retaliation, cadence: actor.cadence });
-  }
-  return list;
-}
-
-function retaliationOf(actorId: string, registry: Registry): Action | undefined {
-  return registry.entities.get(actorId)?.actions.find((candidate) => candidate.retaliates);
-}
-
-function actorTitle(actorId: string, registry: Registry): string {
-  return registry.entities.get(actorId)?.title ?? humanize(actorId);
-}
-
-// One combatant as a driver needs to draw it. `cadence` is the fraction of the
-// way to its next swing, which is the meter the CLI's 8-stage glyph renderer was
-// built for and never had a source; it is null for a target that doesn't swing
-// back and so keeps no clock.
-export interface EncounterFoe {
-  id: string;
-  title: string;
-  resource: string;
-  current: number;
-  max: number;
-  cadence: number | null;
-}
-
-export interface EncounterView {
-  cadence: number;
-  foes: EncounterFoe[];
-}
-
-// The fight in flight, for display only — the read-only twin of participants().
-// Everything here is derived on the spot from the encounter and the actors'
-// sheets; nothing is stored for the sake of being shown, so a driver that never
-// calls this costs nothing. Null unless a real fight (a `target:` action) is
-// running.
-export function encounterView(state: GameState, registry: Registry): EncounterView | null {
-  const active = state.activeAction;
-  if (!active) return null;
-  const action = findActiveAction(active, registry);
-  if (!action.target) return null;
-
-  const fractionOf = (cadence: Cadence, actorId: string, swing: Action): number => {
-    const duration = attemptDuration(swing, state, registry, actorId);
-    return duration > 0 ? Math.min(1, cadence.progress / duration) : 1;
-  };
-  const resource = requireResource(registry, action.target);
-
-  const foes: EncounterFoe[] = [];
-  for (const [actorId, actor] of Object.entries(active.actors ?? {})) {
-    const retaliation = retaliationOf(actorId, registry);
-    foes.push({
-      id: actorId,
-      title: actorTitle(actorId, registry),
-      resource: resource.id,
-      current: actor.resources[resource.id] ?? 0,
-      max: statValue(resource.max, state, registry, actorId),
-      cadence: actor.cadence && retaliation ? fractionOf(actor.cadence, actorId, retaliation) : null,
-    });
-  }
-  return { cadence: fractionOf(active, PLAYER, action), foes };
-}
-
-// Blow-by-blow narration, engine-side: a fight is the one place the player has
-// to see every attempt as it lands, and there is nothing content could usefully
-// say about a number the resolver has just rolled. Only a `target:` action
-// narrates — a craft attempt is not a swing at anything.
-//
-// The player is always one side of a fight, so the two directions are two
-// sentences rather than a general combat-log grammar.
-function logSwing(state: GameState, registry: Registry, self: string, other: string, damage: number | null): void {
-  if (self === PLAYER) {
-    const title = actorTitle(other, registry);
-    state.log.push(damage === null ? `You miss the ${title}.` : `You hit the ${title} for ${damage}.`);
-  } else {
-    const title = actorTitle(self, registry);
-    state.log.push(damage === null ? `The ${title} misses you.` : `The ${title} hits you for ${damage}.`);
-  }
-}
-
-function poolLevel(state: GameState, registry: Registry, actorId: string, resourceId: string): number {
-  requireResource(registry, resourceId);
-  if (actorId === PLAYER) return state.resources[resourceId] ?? 0;
-  return actorInEncounter(state, actorId).resources[resourceId] ?? 0;
-}
-
-// A hit landing on an actor's pool; returns the level it leaves behind.
-//
-// The player's damage joins the segment's deltas like any other pool write (see
-// Segment). An enemy's is written on the spot instead: it has no rate
-// integration to net against, and the fight's completion check has to read it
-// back immediately.
-//
-// Neither path runs the resource's `on empty`/`on full` blocks for a non-player
-// actor: those are authored in the player's voice ("You slump to the floor"), and
-// a felled enemy must not borrow them. Its death is the fight completing.
-function damagePool(state: GameState, registry: Registry, actorId: string, resourceId: string, amount: number, deltas: PoolDeltas): number {
-  const resource = requireResource(registry, resourceId);
-  if (actorId === PLAYER) {
-    const pending = (deltas.get(resourceId) ?? 0) - amount;
-    deltas.set(resourceId, pending);
-    // Where the segment is heading, so a caller sees the damage before it
-    // settles; the clamped write itself happens once, at segment end.
-    return Math.max(0, (state.resources[resourceId] ?? 0) + pending);
-  }
-  const pools = actorInEncounter(state, actorId).resources;
-  const max = statValue(resource.max, state, registry, actorId);
-  const level = Math.min(max, Math.max(0, (pools[resource.id] ?? 0) - amount));
-  pools[resource.id] = level;
-  return level;
-}
-
-
 // The earliest instant in [state.time, toTime] at which something discrete
 // must happen (a buff expiring, a repeating action running out of input, a
 // non-repeating action completing, a draining pool with `on empty` hitting 0),
@@ -382,7 +199,8 @@ function nextBoundary(state: GameState, registry: Registry, toTime: number): num
     // bounded only by whatever buff-expiry/toTime already gives.
     if (!resolvesPerAttempt(action)) {
       const { duration, attemptsToResolve, outcome } = fightPlan(action, state, registry);
-      const remainingAttempts = attemptsToResolve - state.activeAction.attemptsMade;
+      const player = playerCadence(state.activeAction);
+      const remainingAttempts = attemptsToResolve - player.attemptsMade;
       // An action that stops on its own outcome is, for boundary purposes, not
       // repeating: it ends at its first completion, so the segment must land
       // there. Otherwise the span would batch straight past the stop with the
@@ -393,12 +211,12 @@ function nextBoundary(state: GameState, registry: Registry, toTime: number): num
           // Time to finish the fight already in flight, plus (limit - 1)
           // more full fights after it — generalizes the old
           // `limit * duration - progress` to attempt-scoped progress.
-          const runway = remainingAttempts * duration - state.activeAction.progress + Math.max(0, limit - 1) * attemptsToResolve * duration;
+          const runway = remainingAttempts * duration - player.progress + Math.max(0, limit - 1) * attemptsToResolve * duration;
           const limitInstant = state.time + Math.max(0, runway);
           if (limitInstant < boundary) boundary = limitInstant;
         }
       } else {
-        const completionInstant = state.time + Math.max(0, remainingAttempts * duration - state.activeAction.progress);
+        const completionInstant = state.time + Math.max(0, remainingAttempts * duration - player.progress);
         if (completionInstant < boundary) boundary = completionInstant;
       }
     }
@@ -435,12 +253,13 @@ function resolveDeterministicSegment(segment: Segment, action: Action, segEnd: n
     throw new RuntimeError(`repeating action ${active.ownerRef}.${active.actionLabel} resolved a non-positive duration (${duration}) — give it a positive time: or a positive speed stat`);
   }
 
-  const totalAttemptTime = active.progress + segLen;
+  const player = playerCadence(active);
+  const totalAttemptTime = player.progress + segLen;
   const attemptsThisSegment = duration > 0 ? Math.floor(totalAttemptTime / duration) : 0;
   const newProgress = totalAttemptTime - attemptsThisSegment * duration;
 
   if (active.repeating) {
-    const totalAttempts = active.attemptsMade + attemptsThisSegment;
+    const totalAttempts = player.attemptsMade + attemptsThisSegment;
     const fights = Math.floor(totalAttempts / attemptsToResolve);
     const remainder = totalAttempts - fights * attemptsToResolve;
     const batch = fightBatch(action, fights, outcome);
@@ -452,16 +271,16 @@ function resolveDeterministicSegment(segment: Segment, action: Action, segEnd: n
       endAction(state);
       return;
     }
-    active.attemptsMade = remainder;
+    player.attemptsMade = remainder;
     active.healthRemaining = health - remainder * abilityAmount;
-    active.progress = newProgress;
+    player.progress = newProgress;
   } else {
     // A non-repeating fight fires its single outcome as a boundary event
     // (applyDueBoundaries) once attemptsMade reaches attemptsToResolve —
     // clamped here, never wrapped, so that check can still see it.
-    active.attemptsMade = Math.min(active.attemptsMade + attemptsThisSegment, attemptsToResolve);
-    active.healthRemaining = health - active.attemptsMade * abilityAmount;
-    active.progress = newProgress;
+    player.attemptsMade = Math.min(player.attemptsMade + attemptsThisSegment, attemptsToResolve);
+    active.healthRemaining = health - player.attemptsMade * abilityAmount;
+    player.progress = newProgress;
   }
 }
 
@@ -578,7 +397,7 @@ function resolveStochasticSegment(segment: Segment, action: Action, segEnd: numb
 
     let fightOutcome: FightOutcome | null = null;
     if (depleted) fightOutcome = 'completion';
-    else if (active.attemptsMade >= (action.escapeAfter ?? Infinity)) fightOutcome = 'escape';
+    else if (playerCadence(active).attemptsMade >= (action.escapeAfter ?? Infinity)) fightOutcome = 'escape';
 
     if (fightOutcome) {
       const batch = fightBatch(action, 1, fightOutcome);
@@ -594,9 +413,9 @@ function resolveStochasticSegment(segment: Segment, action: Action, segEnd: numb
       if (active.repeating) {
         // A fresh target steps up: pools refilled from its own stats, clock
         // restarted, so it does not inherit the dead one's half-finished swing.
-        if (action.target) active.actors![next.other] = freshActor(next.other, state, registry);
+        if (action.target) enterEncounter(active, next.other, state, registry);
         else active.healthRemaining = action.health ?? 1;
-        active.attemptsMade = 0;
+        playerCadence(active).attemptsMade = 0;
       } else {
         grantActionFoodBuff(state, registry);
         endAction(state);
@@ -664,7 +483,7 @@ function applyDueBoundaries(state: GameState, registry: Registry, at: number): v
           // immediately regardless of attemptsMade. This is the only place a
           // zero-`time:` action fires: its toTime === state.time in useAction,
           // so resolveSegment's closed form never runs to advance attemptsMade.
-          if (state.activeAction.attemptsMade >= attemptsToResolve || duration <= 0) {
+          if (playerCadence(state.activeAction).attemptsMade >= attemptsToResolve || duration <= 0) {
             const batch = fightBatch(action, 1, outcome);
             applyResultsNow(state, registry, batch.results, batch.count);
             grantActionFoodBuff(state, registry);
@@ -799,10 +618,13 @@ export function armAction(obj: string, objId: string, actionId: string, registry
     throw new RuntimeError(`repeating action ${obj}.${objId}.${actionId} needs a positive time: after speed scaling`);
   }
 
-  state.activeAction = { ownerRef: `${obj}.${objId}`, actionLabel: actionId, progress: 0, repeating, healthRemaining: action.health ?? 1, attemptsMade: 0 };
+  // The player's clock goes in first, which fixes it as the tie-break winner
+  // when two cadences come due at the same instant (see participants).
+  const active: ActiveAction = { ownerRef: `${obj}.${objId}`, actionLabel: actionId, repeating, healthRemaining: action.health ?? 1, cadences: { [PLAYER]: newCadence() } };
+  state.activeAction = active;
   // A `target:` action opens an encounter: the thing being fought joins with its
-  // own pools, filled from its own stats.
-  if (action.target) state.activeAction.actors = { [objId]: freshActor(objId, state, registry) };
+  // own pools, filled from its own stats, and its own clock if it swings back.
+  if (action.target) enterEncounter(active, objId, state, registry);
   return { armed: true, firstUnit: firstUnitSpan(action, state, registry) };
 }
 

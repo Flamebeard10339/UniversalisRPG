@@ -26,7 +26,7 @@ open:
   give: 1 gold
 
 # save empty
-{"version":3}
+{"version":4}
 
 # test always-passes
 assert: time >= 0

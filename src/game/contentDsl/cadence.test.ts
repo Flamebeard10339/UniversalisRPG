@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { point } from './range';
-import { armAction, createGameState, GameState, initResources, resolve } from './runtime';
+import { armAction, createGameState, GameState, initResources, PLAYER, resolve } from './runtime';
 import { loadModule, Registry } from './registry';
 import { startSession, view } from './session';
 
@@ -84,6 +84,8 @@ function fighting(registry: Registry, entityId = 'giant-rat', label = 'fight'): 
 }
 
 const ratOf = (state: GameState) => state.activeAction!.actors!['giant-rat'];
+const ratClock = (state: GameState) => state.activeAction!.cadences['giant-rat'];
+const playerClock = (state: GameState) => state.activeAction!.cadences[PLAYER];
 
 describe('independent cadences', () => {
   it('interleaves two clocks with no shared tick', () => {
@@ -92,8 +94,8 @@ describe('independent cadences', () => {
     resolve(state, registry, 12);
 
     // player at 2.4 / 4.8 / 7.2 / 9.6 / 12.0; rat at 3.75 / 7.5 / 11.25
-    expect(state.activeAction!.attemptsMade).toBe(5);
-    expect(ratOf(state).cadence!.attemptsMade).toBe(3);
+    expect(playerClock(state).attemptsMade).toBe(5);
+    expect(ratClock(state)!.attemptsMade).toBe(3);
   });
 
   it('reads each side damage off its own sheet', () => {
@@ -110,7 +112,7 @@ describe('independent cadences', () => {
   it('gives an inert target no clock at all', () => {
     const registry = loaded();
     const state = fighting(registry, 'punchbag', 'hit');
-    expect(state.activeAction!.actors!['punchbag'].cadence).toBeUndefined();
+    expect(state.activeAction!.cadences['punchbag']).toBeUndefined();
 
     resolve(state, registry, 12);
     expect(state.resources['health']).toBe(100); // nothing swings back
@@ -124,7 +126,7 @@ describe('independent cadences', () => {
 
     expect(state.inventory['rat-tail']).toBeUndefined();
     expect(state.activeAction!.actors!['punchbag'].resources.health).toBe(24); // refilled
-    expect(state.activeAction!.attemptsMade).toBe(0);
+    expect(playerClock(state).attemptsMade).toBe(0);
   });
 
   it('keeps a retaliation out of the player choice list', () => {
@@ -152,10 +154,10 @@ describe('a rate raised mid-swing (absolute carry)', () => {
     // 1.2s into a 2.4s swing; +25% rate makes a swing 1.92s, and 1.2s is
     // already banked, so 0.72s remain and the swing lands at 1.92.
     const { registry, state } = hasted(1.2);
-    expect(state.activeAction!.progress).toBeCloseTo(1.2, 9);
+    expect(playerClock(state).progress).toBeCloseTo(1.2, 9);
 
     resolve(state, registry, 1.95);
-    expect(state.activeAction!.attemptsMade).toBe(1);
+    expect(playerClock(state).attemptsMade).toBe(1);
     // Preserving the completed fraction would put it at 2.16 and a fixed
     // deadline at 2.4; both would still read 0 here.
   });
@@ -164,14 +166,14 @@ describe('a rate raised mid-swing (absolute carry)', () => {
     const registry = loaded();
     const state = fighting(registry);
     resolve(state, registry, 1.95);
-    expect(state.activeAction!.attemptsMade).toBe(0);
+    expect(playerClock(state).attemptsMade).toBe(0);
   });
 
   it('quickens every later swing too', () => {
     const { registry, state } = hasted(1.2);
     resolve(state, registry, 12);
     // 1.92, 3.84, 5.76, 7.68, 9.6, 11.52 — six swings where 25/min gave five.
-    expect(state.activeAction!.attemptsMade).toBe(6);
+    expect(playerClock(state).attemptsMade).toBe(6);
   });
 });
 
@@ -201,12 +203,12 @@ describe('two cadences stay associative', () => {
       expect(folded.time).toBe(oneShot.time);
       expect(folded.rng).toBe(oneShot.rng);
       expect(folded.inventory).toEqual(oneShot.inventory);
-      expect(folded.activeAction!.attemptsMade).toBe(oneShot.activeAction!.attemptsMade);
-      expect(ratOf(folded).cadence!.attemptsMade).toBe(ratOf(oneShot).cadence!.attemptsMade);
+      expect(playerClock(folded).attemptsMade).toBe(playerClock(oneShot).attemptsMade);
+      expect(ratClock(folded)!.attemptsMade).toBe(ratClock(oneShot)!.attemptsMade);
       expect(ratOf(folded).resources.health).toBeCloseTo(ratOf(oneShot).resources.health, 6);
       expect(folded.resources['health']).toBeCloseTo(oneShot.resources['health'], 6);
-      expect(folded.activeAction!.progress).toBeCloseTo(oneShot.activeAction!.progress, 6);
-      expect(ratOf(folded).cadence!.progress).toBeCloseTo(ratOf(oneShot).cadence!.progress, 6);
+      expect(playerClock(folded).progress).toBeCloseTo(playerClock(oneShot).progress, 6);
+      expect(ratClock(folded)!.progress).toBeCloseTo(ratClock(oneShot)!.progress, 6);
     }
   });
 
@@ -215,10 +217,10 @@ describe('two cadences stay associative', () => {
     const state = fighting(registry);
     // t=60 is the 25th player swing and the 16th rat swing.
     resolve(state, registry, 60);
-    expect(state.activeAction!.attemptsMade).toBe(25);
-    expect(ratOf(state).cadence!.attemptsMade).toBe(16);
-    expect(state.activeAction!.progress).toBeCloseTo(0, 9);
-    expect(ratOf(state).cadence!.progress).toBeCloseTo(0, 9);
+    expect(playerClock(state).attemptsMade).toBe(25);
+    expect(ratClock(state)!.attemptsMade).toBe(16);
+    expect(playerClock(state).progress).toBeCloseTo(0, 9);
+    expect(ratClock(state)!.progress).toBeCloseTo(0, 9);
   });
 });
 

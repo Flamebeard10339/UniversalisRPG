@@ -3,7 +3,7 @@ import path from 'node:path';
 import { createInterface } from 'node:readline/promises';
 import { pathToFileURL } from 'node:url';
 import { DslError } from '../src/game/contentDsl/parser';
-import { actionFirstUnit, craftFirstUnit, describeCondition, encounterView, RuntimeError, type ActiveAction, type GameState } from '../src/game/contentDsl/runtime';
+import { actionFirstUnit, craftFirstUnit, describeCondition, encounterView, PLAYER, RuntimeError, type ActiveAction, type GameState } from '../src/game/contentDsl/runtime';
 import { loadModule } from '../src/game/contentDsl/registry';
 import {
   apply,
@@ -541,7 +541,8 @@ export function liveTick(session: PlaySession, elapsedMs: number, multiplier: nu
     return { active: false, line: `${label}: done.  [time: ${session.state.time.toFixed(1)}s]` };
   }
   const duration = cycleDuration(session, after);
-  const bar = duration > 0 ? progressBar(after.progress / duration) : progressBar(1);
+  const clock = after.cadences[PLAYER];
+  const bar = duration > 0 ? progressBar(clock.progress / duration) : progressBar(1);
   // In a real fight the combatants' own pools are the detail worth showing (the
   // playtest asked for exactly this), and `healthRemaining` means nothing there
   // — it belongs to the older single-target hit counter. Otherwise fall back to
@@ -549,8 +550,8 @@ export function liveTick(session: PlaySession, elapsedMs: number, multiplier: nu
   // with more than one hitpoint being worn down. A plain single-hit action
   // (roast, craft) would read "hits:0 target-hp:1.0" forever, which looks stuck
   // — the moving bar already carries its progress.
-  const showCombat = after.attemptsMade > 0 || after.healthRemaining < 1;
-  const detail = liveCombatDetail(session) || (showCombat ? ` hits:${after.attemptsMade} target-hp:${after.healthRemaining.toFixed(1)}` : '');
+  const showCombat = clock.attemptsMade > 0 || after.healthRemaining < 1;
+  const detail = liveCombatDetail(session) || (showCombat ? ` hits:${clock.attemptsMade} target-hp:${after.healthRemaining.toFixed(1)}` : '');
   const line = `${label}... ${bar}${detail}  [time: ${session.state.time.toFixed(1)}s]`;
   return { active: true, line };
 }

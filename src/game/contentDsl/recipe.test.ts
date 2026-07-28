@@ -233,7 +233,7 @@ describe('spannable repeating craft', () => {
     expect(state.inventory['clay-brick']).toBe(1);
     expect(state.inventory['raw-clay']).toBe(2);
     expect(state.time).toBe(2);
-    expect(state.activeAction).toEqual({ ownerRef: 'recipe.brick', actionLabel: 'Craft Brick', progress: 0, repeating: true, healthRemaining: 1, attemptsMade: 0 });
+    expect(state.activeAction).toEqual({ ownerRef: 'recipe.brick', actionLabel: 'Craft Brick', repeating: true, healthRemaining: 1, cadences: { player: { progress: 0, attemptsMade: 0 } } });
 
     resolve(state, registry, 6); // two more completions' worth of time
     expect(state.inventory['clay-brick']).toBe(3);

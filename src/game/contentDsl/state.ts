@@ -1,6 +1,6 @@
 import type { Range } from './range';
 import { DEFAULT_RNG_SEED, RngCursor } from './rng';
-import type { ActiveAction } from './runtime';
+import type { ActiveAction } from './encounter';
 
 export class RuntimeError extends Error {}
 

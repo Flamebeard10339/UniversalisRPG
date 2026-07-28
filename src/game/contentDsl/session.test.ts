@@ -1,6 +1,6 @@
 import { readFileSync } from 'fs';
 import { describe, expect, it } from 'vitest';
-import { createGameState, travelSecondsPerUnit } from './runtime';
+import { createGameState, PLAYER, travelSecondsPerUnit } from './runtime';
 import { loadModule } from './registry';
 import { apply, beginAction, cancelAction, PlayView, runTest, startSession, submitModal, view, wait } from './session';
 
@@ -223,7 +223,7 @@ out: 1 mix
 
     const v = beginAction(session, 'use:entity.oven.roast');
     expect(session.state.activeAction).not.toBeNull();
-    expect(session.state.activeAction?.progress).toBe(0);
+    expect(session.state.activeAction?.cadences[PLAYER].progress).toBe(0);
     expect(session.state.time).toBe(0);
     expect(session.state.inventory['roasted-chestnut'] ?? 0).toBe(0);
     expect(v.time).toBe(0);
