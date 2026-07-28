@@ -12,15 +12,12 @@ export interface Entity {
   title: string;
   examine?: string;
   capabilities: string[];
-  // This actor's own base for each named stat, replacing the global `# stat`
-  // default. Anything it doesn't name falls back to that default — which is how
-  // the player, naming nothing, goes on working unchanged.
+  // Replaces the global `# stat` default per name; the player names nothing.
   stats: Record<string, Range>;
   actions: Action[];
 }
 
-// `attack 4-7` — an assignment, not the `+4-7 attack` bonus tag clauses carry.
-// An actor states what its stat IS; a bonus states how much something shifts it.
+// An assignment, not the `+4-7 attack` shift a bonus tag clause carries.
 const statAssignment: Parser<[string, Range]> = {
   parse(cursor) {
     const statId = id.parse(cursor);

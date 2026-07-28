@@ -2,12 +2,10 @@ import { Condition, Reference } from './condition';
 import { TextSegment } from './dialogue';
 import { GameState } from './state';
 
-// Reading and rendering authored expressions against live state. Conditions are
-// the engine's only question about the world; text rendering asks the same
-// questions inline, which is why the two live together.
+// Rendering asks the same questions of state that conditions do, which is why
+// the two live together.
 
-// References are flat dotted keys, not nested lookups (grammar.md "References");
-// the one exception the engine maintains is `<node-name>.visits`.
+// Flat dotted keys, not nested lookups; `<node-name>.visits` is the exception.
 export function resolveReference(reference: Reference, state: GameState): boolean | number | string | undefined {
   const { path } = reference;
   if (path.length === 1 && path[0] === 'time') return state.time;

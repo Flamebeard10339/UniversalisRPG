@@ -26,8 +26,6 @@ export interface Registry {
   stats: Map<string, Stat>;
   skills: Map<string, Skill>;
   recipes: Map<string, Recipe>;
-  // Each recipe's compiled Action form (see recipeAction), built once at load
-  // and looked up by findActionOwner('recipe', ...).
   recipeActions: Map<string, Action>;
   resources: Map<string, Resource>;
   dialogues: Map<string, Dialogue>;
@@ -37,9 +35,8 @@ export interface Registry {
   saves: Map<string, SavedGame>;
 }
 
-// Compiles a recipe into an Action so a craft runs through the same
-// resolve()/fight machinery as a repeating entity action: a single-attempt
-// (health: 1) fight whose "target" is the input stack.
+// Compiled to an Action so a craft runs through the same resolve() machinery
+// as any other single-attempt fight.
 function recipeAction(recipe: Recipe): Action {
   const takes: ActionResult[] = recipe.in.map((q) => ({ kind: 'take', item: q.item, amount: q.amount }));
   const gives: ActionResult[] = recipe.out.map((q) => ({ kind: 'give', item: q.item, amount: q.amount }));
@@ -60,10 +57,8 @@ function recipeAction(recipe: Recipe): Action {
   };
 
   if (recipe.accuracy) {
-    // A craft is a single-attempt fight: a miss fails the whole craft to
-    // `burnt` instead of retrying. The fail path consumes the SAME inputs as
-    // success, so inputLimit (which reads only `results`) still bounds a
-    // repeating burn-capable craft.
+    // The fail path consumes the SAME inputs as success, so inputLimit still
+    // bounds a repeating burn-capable craft.
     action.escapeAfter = 1;
     const burnt: ActionResult[] = recipe.burnt.map((q) => ({ kind: 'give', item: q.item, amount: q.amount }));
     action.onEscape = [...takes, ...burnt];
@@ -74,16 +69,9 @@ function recipeAction(recipe: Recipe): Action {
 
 type ReferenceKind = 'stat' | 'resource' | 'entity' | 'location' | 'item' | 'skill';
 
-// Every id one section uses to name another, resolved against the registry once,
-// after everything has parsed (so forward references are fine).
-//
-// A typo that reaches the engine fails in one of two ways and neither names the
-// author's mistake: an unknown RESOURCE surfaces from deep inside a live fight,
-// many actions after the module loaded clean, and an unknown STAT never fails at
-// all — statRange falls through entity.stats → # stat → point(0), so it reads 0
-// forever and the resolver divides by it. Every id an authored node can hold is
-// walked here so neither is reachable, rather than only the ids that happened to
-// cause a past incident.
+// Walked after everything parses, so forward references are fine. Every id is
+// checked, not just the ones a past incident named: an unknown stat never fails
+// at all — statRange falls through to point(0) and the resolver divides by it.
 function validateReferences(registry: Registry): void {
   const known: Record<ReferenceKind, ReadonlyMap<string, unknown>> = {
     stat: registry.stats,
@@ -144,9 +132,8 @@ function validateReferences(registry: Registry): void {
   };
 
   for (const entity of registry.entities.values()) {
-    // A sheet entry naming no # stat is not an error the runtime would ever
-    // reach — it just never gets read, because the action asking for that stat
-    // asks for the correctly-spelled one and falls through to its global default.
+    // Never reached at runtime: the action asks for the correctly-spelled stat
+    // and falls through to its global default.
     for (const statId of Object.keys(entity.stats)) check('stat', statId, `# entity ${entity.id} stats:`);
     actionsOf(`# entity ${entity.id}`, entity.actions);
   }
@@ -154,9 +141,7 @@ function validateReferences(registry: Registry): void {
     checkTags(`# item ${item.id}`, item.tags);
     actionsOf(`# item ${item.id}`, item.actions);
   }
-  // Recipes are checked through their compiled Action rather than their authored
-  // fields, so recipeAction's forwarding — in:/out:/burnt: into give/take, skill:
-  // into xp — is covered by the same walk.
+    // Through the compiled Action, so recipeAction's forwarding is covered too.
   for (const [recipeId, action] of registry.recipeActions) checkAction(action, `# recipe ${recipeId}`);
   for (const resource of registry.resources.values()) {
     check('stat', resource.max, `# resource ${resource.id} max:`);
@@ -203,9 +188,8 @@ export function loadModule(source: string): Registry {
       case 'entity': {
         const entity = scopeEntity(hydrateSection(section.value as Authored<Entity>, entitySchema));
         for (const action of entity.actions) {
-          // A retaliation exists to hit the player. Without a pool to drain it
-          // would fall through to the fight's own hit counter and quietly wear
-          // down the player's target instead of the player.
+          // Without a pool to drain, a retaliation falls through to the fight's
+          // own hit counter and wears down the target instead of the player.
           if (action.retaliates && !action.target) {
             throw new RuntimeError(`# entity ${entity.id}: retaliating action ${JSON.stringify(action.label)} requires a target: pool`);
           }
@@ -268,8 +252,6 @@ export function loadModule(source: string): Registry {
       }
     }
   }
-  // Locations placed with `<direction> of <other>` may reference an origin that
-  // parsed later, so absolute coordinates are resolved once all locations exist.
   recursivelyResolveRelativeCoordinates(registry.locations);
   validateTuning(registry.variables);
   validateReferences(registry);

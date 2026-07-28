@@ -1,8 +1,7 @@
 import { DslError, Parser, Span } from './parser';
 import { Range } from './range';
 
-// A flat stat bonus takes a range (`+3-6 attack`); a percent bonus never does,
-// so the two are separate members rather than one shape with a maybe-range.
+// A percent bonus never takes a range, so the two are separate members.
 export type TagClause =
   | { kind: 'keyword'; value: string }
   | { kind: 'stat-bonus'; statId: string; percent: false; amount: Range }
@@ -17,8 +16,7 @@ const KEYWORD = /^[a-z][a-z0-9-]*$/;
 
 function parseStatBonus(groups: Record<string, string | undefined>, raw: string, span: Span): TagClause {
   const statId = groups.stat!;
-  // The sign leads the whole clause, so it applies to both bounds: `-3-6 dr`
-  // is "between -6 and -3", written with ascending magnitudes.
+  // The sign leads the whole clause: `-3-6 dr` is between -6 and -3.
   const sign = groups.sign === '-' ? -1 : 1;
   const lo = Number(groups.lo);
 

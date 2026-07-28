@@ -12,9 +12,7 @@ export const number: Parser<number> = {
   },
 };
 
-// Like `number` but accepts a fractional part, for values that are inherently
-// non-integer (e.g. a stat base doubling as a probability). Item/xp/flag counts
-// stay on the integer-only `number` above.
+// Item, xp and flag counts stay on the integer-only `number` above.
 export const decimal: Parser<number> = {
   parse: (cursor) => {
     const raw = cursor.take(/-?\d+(?:\.\d+)?/);
@@ -31,7 +29,6 @@ export const id: Parser<string> = {
   },
 };
 
-// A dotted state path: `bridge-open`, `front-door.unlocked`, `quest.x.accepted`.
 export const REFERENCE = /[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9-]*)*/;
 
 export const humanize = (id: string): string =>

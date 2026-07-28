@@ -49,7 +49,6 @@ export function hitDamage(attack: number, dr: number, registry: Registry): numbe
 export function attemptDuration(action: Action, state: GameState, registry: Registry, actorId: string = PLAYER): number {
   const speed = action.speed ? statValue(action.speed, state, registry, actorId) : 1;
   const duration = (action.time ?? 0) / speed;
-  // Zero stays legal: an action with no time: is instant.
   if (!Number.isFinite(duration) || duration < 0) {
     throw new RuntimeError(
       `action ${action.label} resolved an impossible attempt duration (${duration}) from time: ${action.time ?? 0} and speed stat ${action.speed ?? '1'} = ${speed}`,

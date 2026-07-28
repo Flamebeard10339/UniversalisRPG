@@ -10,18 +10,12 @@ export interface Recipe {
   out: Quantified[];
   skill?: { skill: string; amount: number };
   say?: string;
-  // Seconds per attempt (mirrors Action.time). Absent/0 compiles to an
-  // instant, non-repeating craft (today's behavior); >0 compiles to a
-  // repeating, spannable craft — see recipeAction in registry.ts.
+  // Absent or 0 compiles to an instant craft, positive to a spannable one.
   time?: number;
   speed?: string;
   accuracy?: string;
-  // The dish's difficulty in the opposed roll, contested against `accuracy:`
-  // (Action.evasion — the same field a rat's dodge uses). Absent means the
-  // craft opposes nothing and the cook's skill decides alone.
+  // Contested against `accuracy:`, the same field a rat's dodge uses.
   evasion?: string;
-  // Escape-path output when accuracy is set — a missed attempt fails to this
-  // instead of retrying (recipeAction compiles accuracy => escapeAfter: 1).
   burnt: Quantified[];
 }
 

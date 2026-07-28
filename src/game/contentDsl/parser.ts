@@ -1,6 +1,4 @@
-// The content DSL is one-directional: text is the canonical form. We parse it to
-// objects and never regenerate it, so a parser only reads. (A future structured
-// editor will emit DSL for the specific shapes it edits, not via a general printer.)
+// Text is the canonical form and is never regenerated, so a parser only reads.
 export interface Parser<T> {
   parse(cursor: Cursor): T;
 }
