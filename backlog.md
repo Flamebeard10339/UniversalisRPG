@@ -377,4 +377,10 @@ scripts pass, and the audit's own associativity fuzz reruns 400/400 against the 
   explicit leading `/load`.
 - **Character-creation-modal-in-recordings** — the modal isn't a directive, so a recording
   can't capture name/race (replay starts from `<id>-start`, which predates the modal).
-  Known limitation, unsolved. (see `recordings of /test ignore modals.` backlog item)
+  Known limitation, unsolved. (see `recordings of /test ignore modals.` backlog item)- **Default action duration** (`TODO(default-duration)` in `action.ts`) — the playtest
+  suggested a small nonzero default (~0.5s) so every action feels weighty. Blocked on a
+  design call, not effort: an absent `time:` is currently the seam distinguishing an
+  INSTANT action (mirror/stairs/eat — a deliberate design tool per CLAUDE.md) from a
+  spannable one, and `beginAction` routes on `firstUnit > 0`. Defaulting to 0.5 turns
+  every instant action spannable and shifts every timing assertion (session.test's ~19s
+  Miki route, resolve.test). Decide which actions stay instant first.

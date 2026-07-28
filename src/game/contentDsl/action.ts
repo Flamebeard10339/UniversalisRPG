@@ -15,77 +15,29 @@ export interface Action {
   results: ActionResult[];
   onSuccess?: ActionResult[];
   onFailure?: ActionResult[];
-  // Applies instead of results/onSuccess when a fight ends by running out of
-  // attempts (escape after:) rather than by exhausting the target's health.
   onEscape?: ActionResult[];
-  // Seconds the action occupies (0 / absent = instant). TODO(default-duration):
-  // the playtest suggested a small nonzero default (~0.5s) so every action feels
-  // weighty. Not done here on purpose: an absent `time:` is currently the seam
-  // that distinguishes an INSTANT action (mirror/stairs/eat — a deliberate
-  // design tool per CLAUDE.md) from a spannable one, and beginAction routes on
-  // `firstUnit > 0`. Flipping the default to 0.5 turns every instant action
-  // spannable and shifts every timing assertion (session.test's ~19s Miki
-  // route, resolve.test). Needs a design call on which actions stay instant
-  // before changing the default.
+  // TODO(default-duration): absent means instant, which is load-bearing — see backlog.
   time?: number;
-  // The stat whose value scales this action's per-attempt duration (time: /
-  // statValue) — attempts per second, e.g. a cooking-speed stat. Absent
-  // means a fixed multiplier of 1.
+  // Stat ids, read live, each absent meaning the neutral default.
   speed?: string;
-  // The attacker's skill in the opposed roll that decides whether each attempt
-  // lands (see hitChance in stats.ts). Absent means every attempt is a
-  // certain, deterministic hit — no randomness is drawn for this action at all
-  // (see runtime.ts's resolve()/RNG contract). A stat is never read as a raw
-  // probability: the chance always comes out of this stat against `evasion:`,
-  // so the difficulty of a task lives in the thing being attempted.
   accuracy?: string;
-  // The stat ON THE TARGET opposed to `accuracy:` — a rat's dodge, a dish's
-  // complexity, a lock's resistance. Absent means the target opposes nothing,
-  // so the attempt is decided by the attacker's skill against zero.
   evasion?: string;
-  // The stat whose value is subtracted from the target's remaining health
-  // per successful attempt. Absent defaults to a magnitude of 1.
   ability?: string;
-  // The pool ON THE TARGET ACTOR that a successful attempt drains — `health` on
-  // a rat, `integrity` on a lock. The target actor is the entity this action
-  // belongs to. Naming a pool is what makes an action a real fight: it ends when
-  // that pool reaches 0 rather than when `health:` attempts are spent, damage is
-  // sampled per hit (ability minus dr, see hitDamage), and it always resolves
-  // attempt-by-attempt because a sampled sum has no closed form to batch.
+  // Naming a pool is what makes an action a fight rather than a fixed count of hits.
   target?: string;
-  // The stat ON THE TARGET whose value is subtracted from each incoming hit.
-  // Absent means no reduction. Only meaningful alongside `target:`.
   dr?: string;
-  // The target's hitpoints for one fight. Absent defaults to 1 — combined
-  // with the accuracy/ability defaults above, this makes an action with none
-  // of these fields a fight that always completes in exactly one hit (i.e.
-  // today's action shape).
+  // Absent is 1, so an action with none of these fields completes in one hit.
   health?: number;
-  // After this many attempts against one target without completing, the
-  // fight ends unsuccessfully instead (the target "escapes") and onEscape
-  // applies instead of results/onSuccess. Absent means never (Infinity).
   escapeAfter?: number;
-  // A `repeating` bare tag (see below) makes this a spannable, looping
-  // action instead of a one-shot: resolve() re-arms a fresh fight after each
-  // completion or escape instead of clearing it.
   repeating?: boolean;
-  // A `retaliates` bare tag marks this as the OWNER's own move in an encounter
-  // rather than something the player invokes: it is kept out of the player's
-  // choice list, and while its owner is in a fight it runs on that owner's
-  // cadence against the player. The fields read the same way either direction —
-  // `speed`/`ability` off whoever is swinging, `target`/`dr` off whoever is
-  // being hit — so only the perspective flips.
+  // The owner's own move in an encounter, never offered to the player.
   retaliates?: boolean;
 }
 
 const results = list(actionResult);
 const tagClauses = list(tagClause);
 
-// Bare keyword tags that also name a boolean field on Action get lifted onto
-// that field directly (see the loop in parseBlock below) instead of staying
-// inert like an ordinary tag (e.g. `once`). `repeating` is the only one
-// today, but the lift itself isn't hardcoded to it — extending this list is
-// what adds a new one.
+// Bare tags lifted onto the field they name; extending this list adds another.
 const BOOLEAN_ACTION_FLAGS = ['repeating', 'retaliates'] as const;
 type BooleanActionField = (typeof BOOLEAN_ACTION_FLAGS)[number];
 const BOOLEAN_ACTION_FLAG_SET: ReadonlySet<string> = new Set<string>(BOOLEAN_ACTION_FLAGS);
