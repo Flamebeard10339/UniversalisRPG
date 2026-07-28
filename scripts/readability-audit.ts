@@ -1,4 +1,3 @@
-import Anthropic from '@anthropic-ai/sdk';
 import { execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
@@ -6,8 +5,7 @@ import { sourceFiles } from './lib/sourceFiles';
 
 const LEDGER = 'docs/audits/readability.json';
 const ROOTS = ['src', 'scripts'];
-const COLD_MODEL = 'claude-haiku-4-5';
-const GRADER_MODEL = 'claude-opus-5';
+const MODEL = 'haiku';
 const DISTRACTORS = 3;
 
 const AUDIT_PROMPT =
@@ -20,15 +18,10 @@ const AUDIT_PROMPT =
   'NON-OBVIOUS BEHAVIOUR — anything a reader could not predict from the names alone.\n' +
   'UNCLEAR — anything you could not determine from this file alone.';
 
-const GRADER_PROMPT =
-  'A reader saw one source file, with no other context, and wrote the description below. ' +
-  'You can see the same file. Decide whether the description would let a competent engineer ' +
-  'work with this file correctly.\n\n' +
-  'Fail it if the description misses an export, misstates what something does, or leaves a ' +
-  'caller-visible behaviour undescribed. Do not fail it for brevity, for style, or for anything ' +
-  'listed under UNCLEAR that genuinely cannot be determined from this file alone — that is the ' +
-  "file's shortcoming to record, not the description's.\n\n" +
-  'Reply with a single line: PASS or FAIL, then a tab, then one sentence of justification.';
+const SUMMARY_PROMPT =
+  'Write one sentence describing what file <path> does, for use as an answer in a multiple-choice test. ' +
+  'Do not name the file, its path, or any of its exported identifiers — describe the role, do not label it. ' +
+  'Reply with the sentence and nothing else.';
 
 type Verdict = 'pass' | 'fail';
 
@@ -47,36 +40,37 @@ interface Ledger {
   files: Record<string, Entry>;
 }
 
-const client = new Anthropic();
-
 function git(...args: string[]): string {
   return execFileSync('git', args, { encoding: 'utf8' }).trim();
 }
 
-async function ask(model: string, prompt: string, deterministic: boolean): Promise<string> {
-  // Only Haiku accepts temperature; Opus 5 rejects any sampling parameter with a 400.
-  const response = await client.messages.create({
-    model,
-    max_tokens: 4096,
-    ...(deterministic ? { temperature: 0 } : {}),
-    messages: [{ role: 'user', content: prompt }],
-  });
-  return response.content
-    .filter((block): block is Anthropic.TextBlock => block.type === 'text')
-    .map((block) => block.text)
-    .join('\n');
+function load(): Ledger {
+  return JSON.parse(readFileSync(LEDGER, 'utf8')) as Ledger;
 }
 
-function withFile(prompt: string, path: string, source: string): string {
-  return `${prompt.replace('<path>', path)}\n\n<file path="${path}">\n${source}\n</file>`;
+function save(ledger: Ledger): void {
+  writeFileSync(LEDGER, `${JSON.stringify(ledger, null, 2)}\n`);
 }
 
-// Siblings make the hardest distractors, and taking the next three cyclically keeps
-// the choice stable across runs.
-function distractorsFor(path: string, ledger: Ledger, tracked: string[]): string[] {
-  const siblings = tracked.filter((other) => dirname(other) === dirname(path) && ledger.files[other]?.summary);
-  const pool = siblings.length > DISTRACTORS ? siblings : tracked.filter((other) => other !== path && ledger.files[other]?.summary);
-  const ordered = [...pool].sort();
+function tracked(): string[] {
+  return ROOTS.flatMap((root) => sourceFiles(root))
+    .filter((path) => !path.endsWith('.d.ts'))
+    .sort();
+}
+
+function withFile(prompt: string, path: string): string {
+  return `${prompt.replace('<path>', path)}\n\n<file path="${path}">\n${readFileSync(path, 'utf8')}\n</file>`;
+}
+
+// Siblings make the hardest distractors, and they also blunt any project-level
+// context the auditor carries: knowing the layer scheme cannot separate two
+// files from the same folder. Taking the next three cyclically keeps the set
+// stable across runs.
+function distractorsFor(path: string, ledger: Ledger): string[] {
+  const summarized = tracked().filter((other) => other !== path && ledger.files[other]?.summary);
+  const siblings = summarized.filter((other) => dirname(other) === dirname(path));
+  const pool = siblings.length >= DISTRACTORS ? siblings : summarized;
+  const ordered = [...pool, path].sort();
   const start = ordered.indexOf(path);
   const picked: string[] = [];
   for (let step = 1; picked.length < DISTRACTORS && step <= ordered.length; step++) {
@@ -86,99 +80,73 @@ function distractorsFor(path: string, ledger: Ledger, tracked: string[]): string
   return picked;
 }
 
-async function summarize(path: string, source: string): Promise<string> {
-  const answer = await ask(
-    GRADER_MODEL,
-    withFile(
-      'Write one sentence describing what this file does, for use in a multiple-choice test. ' +
-        'Do not name the file, its path, or any of its exported identifiers — the sentence must ' +
-        'describe the role, not label it. Reply with the sentence and nothing else.',
-      path,
-      source,
-    ),
-    false,
-  );
-  return answer.trim().split('\n')[0];
-}
-
-async function discriminate(path: string, source: string, real: string, distractors: string[]): Promise<Verdict> {
-  const options = [real, ...distractors];
-  const correct = options.findIndex((option) => option === real);
+function discriminationPrompt(path: string, ledger: Ledger): { prompt: string; answer: string } {
+  const real = ledger.files[path]?.summary;
+  if (!real) throw new Error(`${path} has no summary yet; run --needs-summary first.`);
+  const options = [real, ...distractorsFor(path, ledger)].sort();
+  const answer = 'ABCD'[options.indexOf(real)];
   const lettered = options.map((option, index) => `${'ABCD'[index]}. ${option}`).join('\n');
-  const answer = await ask(
-    COLD_MODEL,
-    withFile(
-      `Which one of these sentences describes the file below? Reply with a single letter.\n\n${lettered}`,
-      path,
-      source,
-    ),
-    true,
-  );
-  return answer.trim().toUpperCase().startsWith('ABCD'[correct]) ? 'pass' : 'fail';
+  return { prompt: withFile(`Which one of these sentences describes file <path>? Reply with a single letter.\n\n${lettered}`, path), answer };
 }
 
-async function auditProse(path: string, source: string): Promise<{ verdict: Verdict; note: string }> {
-  const description = await ask(COLD_MODEL, withFile(AUDIT_PROMPT, path, source), true);
-  const judgement = await ask(
-    GRADER_MODEL,
-    `${withFile(GRADER_PROMPT, path, source)}\n\n<description>\n${description}\n</description>`,
-    false,
-  );
-  const [verdict, ...rest] = judgement.trim().split(/\s+/);
-  return { verdict: verdict.toUpperCase().startsWith('PASS') ? 'pass' : 'fail', note: rest.join(' ') };
-}
+const args = process.argv.slice(2);
+const flag = (name: string): string | undefined => {
+  const index = args.indexOf(name);
+  return index === -1 ? undefined : args[index + 1];
+};
 
-const args = process.argv.slice(2).filter((arg) => !arg.startsWith('--'));
-const dryRun = process.argv.includes('--dry-run');
-const ledger = JSON.parse(readFileSync(LEDGER, 'utf8')) as Ledger;
-const tracked = ROOTS.flatMap((root) => sourceFiles(root))
-  .filter((path) => !path.endsWith('.d.ts'))
-  .sort();
-const targets = args.length > 0 ? args.map((arg) => arg.replace(/\\/g, '/')) : tracked;
-const sha = git('rev-parse', '--short', 'HEAD');
-const today = git('log', '-1', '--format=%cs');
+const ledger = load();
 
-// Every summary is minted before any test runs. Interleaving the two would give the
-// first files audited an empty distractor pool and an unearned pass.
-if (!dryRun) {
-  for (const path of targets) {
-    if (ledger.files[path]?.summary) continue;
-    ledger.files[path] = {
-      ...(ledger.files[path] ?? { lastAuditedSha: '', discrimination: 'fail', prose: 'fail', proseNote: '', model: COLD_MODEL, date: today }),
-      summary: await summarize(path, readFileSync(path, 'utf8')),
-    };
-    writeFileSync(LEDGER, `${JSON.stringify(ledger, null, 2)}\n`);
-  }
-}
-
-for (const path of targets) {
-  const source = readFileSync(path, 'utf8');
-
-  if (dryRun) {
-    const distractors = distractorsFor(path, ledger, tracked);
-    console.log(`=== ${path} ===`);
-    console.log(`cold model: ${COLD_MODEL} (temperature 0), grader: ${GRADER_MODEL} (no sampling params)`);
-    console.log(`distractors available: ${distractors.length}`);
-    console.log(`prompt bytes: ${withFile(AUDIT_PROMPT, path, source).length}`);
-    continue;
-  }
-
-  const summary = ledger.files[path].summary;
-  const distractors = distractorsFor(path, ledger, tracked);
-  const discrimination = distractors.length === DISTRACTORS ? await discriminate(path, source, summary, distractors) : 'pass';
-  const prose = await auditProse(path, source);
-
+if (args.includes('--needs-summary')) {
+  for (const path of tracked()) if (!ledger.files[path]?.summary) console.log(path);
+} else if (flag('--prompt-summary')) {
+  console.log(withFile(SUMMARY_PROMPT, flag('--prompt-summary')!));
+} else if (flag('--prompt-audit')) {
+  console.log(withFile(AUDIT_PROMPT, flag('--prompt-audit')!));
+} else if (flag('--prompt-discriminate')) {
+  const { prompt, answer } = discriminationPrompt(flag('--prompt-discriminate')!, ledger);
+  console.log(prompt);
+  console.error(`expected answer: ${answer}`);
+} else if (flag('--answer')) {
+  const path = flag('--answer')!;
+  console.log(discriminationPrompt(path, ledger).answer);
+} else if (flag('--set-summary')) {
+  const path = flag('--set-summary')!;
+  const existing = ledger.files[path];
   ledger.files[path] = {
-    lastAuditedSha: sha,
-    discrimination,
-    prose: prose.verdict,
-    summary,
-    proseNote: prose.note,
-    model: COLD_MODEL,
-    date: today,
+    lastAuditedSha: existing?.lastAuditedSha ?? '',
+    discrimination: existing?.discrimination ?? 'fail',
+    prose: existing?.prose ?? 'fail',
+    proseNote: existing?.proseNote ?? '',
+    model: MODEL,
+    date: existing?.date ?? '',
+    summary: args[args.indexOf('--set-summary') + 2],
   };
-  console.log(`${discrimination === 'pass' ? '  ' : 'D!'}${prose.verdict === 'pass' ? '  ' : ' P!'} ${path}`);
-  writeFileSync(LEDGER, `${JSON.stringify(ledger, null, 2)}\n`);
+  save(ledger);
+} else if (flag('--record')) {
+  const path = flag('--record')!;
+  const existing = ledger.files[path];
+  if (!existing?.summary) throw new Error(`${path} has no summary; set one before recording a verdict.`);
+  ledger.files[path] = {
+    ...existing,
+    lastAuditedSha: git('rev-parse', '--short', 'HEAD'),
+    discrimination: flag('--discrimination') === 'pass' ? 'pass' : 'fail',
+    prose: flag('--prose') === 'pass' ? 'pass' : 'fail',
+    proseNote: flag('--note') ?? '',
+    model: MODEL,
+    date: git('log', '-1', '--format=%cs'),
+  };
+  save(ledger);
+  console.log(`${path}: discrimination=${ledger.files[path].discrimination} prose=${ledger.files[path].prose}`);
+} else {
+  console.log(
+    'Usage:\n' +
+      '  --needs-summary                    list files with no summary yet\n' +
+      '  --prompt-summary <path>            prompt to mint a one-line summary\n' +
+      '  --prompt-audit <path>              the readability audit prompt\n' +
+      '  --prompt-discriminate <path>       four-way test; expected letter goes to stderr\n' +
+      '  --answer <path>                    expected letter alone\n' +
+      '  --set-summary <path> <sentence>    store a summary\n' +
+      '  --record <path> --discrimination pass|fail --prose pass|fail [--note "…"]',
+  );
 }
-
-if (!dryRun) console.log(`\nLedger written to ${LEDGER} at ${sha}.`);
