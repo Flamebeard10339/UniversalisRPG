@@ -42,11 +42,6 @@ import { advanceTime, endAction, GameState, PLAYER, RuntimeError } from './state
 import { attemptDuration, hitChance, hitDamage, sampleStat, statValue } from './stats';
 import { TagClause } from './tagClause';
 
-// The engine's public surface is this module: the resolver and the verbs live
-// here, and everything the drivers also need is re-exported from wherever it
-// actually lives. The one deliberate omission is the loader — loadModule and
-// Registry belong to the content pipeline, and consumers import them from
-// registry.ts.
 export { advanceTime, createGameState, endAction, PLAYER, RuntimeError } from './state';
 export type { ActiveBuff, GameState } from './state';
 export { contestSpread, minDamage, travelSecondsPerUnit } from './tuning';
@@ -66,11 +61,6 @@ interface FightParams {
   escapeAfter: number; // raw escape-after threshold (Infinity if absent)
 }
 
-// A deterministic (no-accuracy) fight has a closed-form length and end,
-// computed assuming every attempt hits. These two fields are meaningless once
-// an attempt can miss, so only the deterministic path takes a DeterministicFightPlan
-// — the stochastic path decides completion vs escape per attempt at runtime
-// (resolveStochasticSegment) off the plain FightParams.
 interface DeterministicFightPlan extends FightParams {
   attemptsToResolve: number; // attempts to end one fight
   outcome: FightOutcome; // which end the fight reaches first
@@ -95,11 +85,6 @@ function fightPlan(action: Action, state: GameState, registry: Registry): Determ
 }
 
 
-// The earliest instant in [state.time, toTime] at which something discrete
-// must happen (a buff expiring, a repeating action running out of input, a
-// non-repeating action completing, a draining pool with `on empty` hitting 0),
-// or toTime if nothing does — what lets resolve() cross a huge idle span in one
-// step.
 function nextBoundary(state: GameState, registry: Registry, toTime: number): number {
   let boundary = toTime;
   for (const buff of Object.values(state.activeBuffs)) {
@@ -107,22 +92,15 @@ function nextBoundary(state: GameState, registry: Registry, toTime: number): num
   }
   if (state.activeAction) {
     const action = findActiveAction(state.activeAction, registry);
-    // A stochastic action (accuracy) has no closed-form boundary — fight length
-    // is random. resolveStochasticSegment simulates it attempt-by-attempt,
-    // bounded only by whatever buff-expiry/toTime already gives.
     if (!resolvesPerAttempt(action)) {
       const { duration, attemptsToResolve, outcome } = fightPlan(action, state, registry);
       const player = playerCadence(state.activeAction);
       const remainingAttempts = attemptsToResolve - player.attemptsMade;
-      // An action that stops on its own outcome is, for boundary purposes, not
-      // repeating: it ends at its first completion, so the segment must land
-      // there. Otherwise the span would batch straight past the stop with the
-      // action's stat modifiers snapshotted for the whole of it.
+      // One that stops on its outcome must land the segment on its completion.
       if (state.activeAction.repeating && !stopsOnOutcome(action, outcome)) {
         const limit = inputLimit(action, state).completions;
         if (Number.isFinite(limit)) {
-          // Time to finish the fight already in flight, plus (limit - 1)
-          // more full fights after it.
+          // The fight in flight, plus (limit - 1) whole fights after it.
           const runway = remainingAttempts * duration - player.progress + Math.max(0, limit - 1) * attemptsToResolve * duration;
           const limitInstant = state.time + Math.max(0, runway);
           if (limitInstant < boundary) boundary = limitInstant;
@@ -133,10 +111,6 @@ function nextBoundary(state: GameState, registry: Registry, toTime: number): num
       }
     }
   }
-  // A draining pool with an `on empty` handler must break the segment exactly
-  // when it hits 0, so onEmpty fires once at the right instant. A pool without
-  // an on-empty handler just clamps silently and needs no boundary; nor does a
-  // filling pool (its rollover is closed-form and associative in-segment).
   for (const resource of registry.resources.values()) {
     if (resource.onEmpty.length === 0 || !resource.rate) continue;
     const ratePerMinute = statValue(resource.rate, state, registry);
@@ -150,9 +124,6 @@ function nextBoundary(state: GameState, registry: Registry, toTime: number): num
   return boundary;
 }
 
-// Advances state.time to segEnd for a deterministic action (no accuracy —
-// outcome and fight length known in closed form), applying whole fights as one
-// batch however many the span covers.
 function resolveDeterministicSegment(segment: Segment, action: Action, segEnd: number): void {
   const { state, registry } = segment;
   const active = state.activeAction!;
@@ -175,9 +146,6 @@ function resolveDeterministicSegment(segment: Segment, action: Action, segEnd: n
     const remainder = totalAttempts - fights * attemptsToResolve;
     const batch = fightBatch(action, fights, outcome);
     applyResults(segment, batch.results, batch.count);
-    // The batch capped itself at one completion and that completion asked to
-    // stop: the action ends here rather than carrying a remainder it will never
-    // swing. nextBoundary put segEnd on this instant, so time is already right.
     if (segment.stopped) {
       endAction(state);
       return;
@@ -186,26 +154,14 @@ function resolveDeterministicSegment(segment: Segment, action: Action, segEnd: n
     active.healthRemaining = health - remainder * abilityAmount;
     player.progress = newProgress;
   } else {
-    // A non-repeating fight fires its single outcome as a boundary event
-    // (applyDueBoundaries) once attemptsMade reaches attemptsToResolve —
-    // clamped here, never wrapped, so that check can still see it.
+    // Clamped, never wrapped, so applyDueBoundaries can still see the completion.
     player.attemptsMade = Math.min(player.attemptsMade + attemptsThisSegment, attemptsToResolve);
     active.healthRemaining = health - player.attemptsMade * abilityAmount;
     player.progress = newProgress;
   }
 }
 
-// Resolves one participant's attempt: the hit roll, then damage against
-// whatever pool it targets. Returns whether that pool is now empty.
-//
-// Draws happen in a fixed order — hit roll, damage roll, reduction roll — and an
-// action with no accuracy stat cannot miss and draws nothing for the first. The
-// count per attempt is therefore a function of state alone, which is what lets
-// per-attempt randomness live under resolve()'s associativity invariant. The
-// opposed roll costs nothing extra here: both sides of the contest are read
-// with statValue (no draw), so it only changes what the one uniform is compared
-// against. Sampling them instead would put the range roll and the contest roll
-// in the same decision, which is two sources of variance for one outcome.
+// Both sides read with statValue, not sampled: one uniform decides the hit.
 function resolveAttempt(participant: Participant, segment: Segment): boolean {
   const { state, registry } = segment;
   const { self, other, action, cadence } = participant;
@@ -239,14 +195,7 @@ function resolveAttempt(participant: Participant, segment: Segment): boolean {
   return poolLevel(state, registry, other, action.target) <= EPSILON;
 }
 
-// Advances state.time to segEnd attempt-by-attempt, which is what an action with
-// a miss chance or with sampled damage requires (neither has a closed form to
-// batch). Every participant swings on its own clock, so the loop is an event
-// queue: jump to whichever attempt lands soonest, credit that span to EVERY
-// participant's progress, and resolve just the one that came due. A 2.4s player
-// and a 3.75s rat interleave naturally out of that, with no shared tick.
-//
-// O(attempts) is bounded by segment length and input affordability.
+// An event queue, not a tick: each participant swings on its own clock.
 function resolveStochasticSegment(segment: Segment, action: Action, segEnd: number): void {
   const { state, registry } = segment;
   const active = state.activeAction!;
@@ -265,14 +214,9 @@ function resolveStochasticSegment(segment: Segment, action: Action, segEnd: numb
       if (duration <= 0) {
         throw new RuntimeError(`action ${active.ownerRef}.${participant.action.label} resolved a non-positive attempt duration (${duration}) — give it a positive time: or a positive speed stat`);
       }
-      // Elapsed progress carries in absolute seconds, so a rate raised mid-swing
-      // shortens what remains of the swing already under way. Progress accrues
-      // across arbitrarily many segments and can land a hair past its duration,
-      // so an overdue swing is floored at "now" rather than allowed to compute
-      // an instant in the past.
+      // Progress can land past its duration, so an overdue swing floors at now.
       const at = state.time + Math.max(0, duration - participant.cadence.progress);
-      // Strictly-sooner-by-EPSILON: a genuine tie (2.4s and 3.75s cadences do
-      // collide, at t=60) falls to roster order rather than to float noise.
+      // Strictly sooner by EPSILON, so a genuine tie falls to roster order.
       if (at < nextAt - EPSILON) {
         next = participant;
         nextAt = at;
@@ -280,8 +224,6 @@ function resolveStochasticSegment(segment: Segment, action: Action, segEnd: numb
     }
 
     if (!next || nextAt > segEnd) {
-      // Nothing comes due inside this segment: credit the whole span and stop.
-      // A later resolve() picks up exactly here.
       const elapsed = segEnd - state.time;
       for (const participant of roster) participant.cadence.progress += elapsed;
       advanceTime(state, elapsed);
@@ -294,14 +236,9 @@ function resolveStochasticSegment(segment: Segment, action: Action, segEnd: numb
 
     const depleted = resolveAttempt(next, segment);
 
-    // Only the player's swing decides the fight: its action owns the results,
-    // the escape counter and the repeat. A retaliation is only a damage source.
+    // Only the player's swing decides the fight; a retaliation is a damage source.
     if (next.self !== PLAYER) {
-      // Except when it empties the pool it drains: the segment ends right here
-      // so that pool settles at the instant it ran out rather than at whatever
-      // distant instant the caller's span happens to end. That is what lets its
-      // `on empty:` block fire on time — and whether running out is fatal to the
-      // fight is the block's call, via `stop`, not the resolver's.
+      // Unless it empties a pool, which must settle at the instant it ran out.
       if (depleted || state.time >= segEnd) return;
       continue;
     }
@@ -313,17 +250,11 @@ function resolveStochasticSegment(segment: Segment, action: Action, segEnd: numb
     if (fightOutcome) {
       const batch = fightBatch(action, 1, fightOutcome);
       applyResults(segment, batch.results, batch.count);
-      // The outcome asked to stop, so nothing rearms and this local `active`
-      // goes out of scope still holding the fight it just ended. Reading the
-      // flag here is what keeps it and state.activeAction from disagreeing —
-      // the next participants() would dereference the null.
       if (segment.stopped) {
         endAction(state);
         return;
       }
       if (active.repeating) {
-        // A fresh target steps up: pools refilled from its own stats, clock
-        // restarted, so it does not inherit the dead one's half-finished swing.
         if (action.target) enterEncounter(active, next.other, state, registry);
         else active.healthRemaining = action.health ?? 1;
         playerCadence(active).attemptsMade = 0;
@@ -340,8 +271,7 @@ function resolveStochasticSegment(segment: Segment, action: Action, segEnd: numb
 
 function resolveSegment(state: GameState, registry: Registry, segEnd: number): void {
   const start = state.time;
-  // Snapshot resource rates now, while the active action's modifiers are still
-  // in force — the stochastic path can clear the action before we integrate.
+  // While the action's modifiers still hold; the stochastic path can clear it.
   const snapshots = captureResourceRates(state, registry);
   const segment: Segment = { state, registry, deltas: new Map(), stopped: false };
 
@@ -357,18 +287,11 @@ function resolveSegment(state: GameState, registry: Registry, segEnd: number): v
     }
   }
 
-  // Settle over the time the segment actually consumed: a stochastic action
-  // that exhausts its input mid-segment stops early, and its untouched tail
-  // resolves as a later action-less segment where rates are re-snapshotted (so
-  // an action's drain stops the instant the action does).
+  // Over the time actually consumed: a segment can stop short of segEnd.
   const elapsed = state.time - start;
   if (elapsed > 0 || segment.deltas.size > 0) settlePools(state, registry, snapshots, Math.max(0, elapsed), segment.deltas);
 }
 
-// Fires whatever is due exactly at `at` and keeps re-checking until nothing
-// more is due at that same instant (e.g. a buff expiring the moment an
-// action also completes). Also what lets a zero-duration action fire its
-// completion immediately, before resolve() has consumed any segment at all.
 function applyDueBoundaries(state: GameState, registry: Registry, at: number): void {
   for (;;) {
     let changed = false;
@@ -386,14 +309,9 @@ function applyDueBoundaries(state: GameState, registry: Registry, at: number): v
         endAction(state);
         changed = true;
       } else if (!resolvesPerAttempt(action)) {
-        // A per-attempt action fires and rearms itself inside
-        // resolveStochasticSegment — nothing else is due here for it.
         if (!state.activeAction.repeating) {
           const { duration, attemptsToResolve, outcome } = fightPlan(action, state, registry);
-          // duration <= 0 means every attempt is instantaneous — fire
-          // immediately regardless of attemptsMade. This is the only place a
-          // zero-`time:` action fires: its toTime === state.time in useAction,
-          // so resolveSegment's closed form never runs to advance attemptsMade.
+          // The only place a zero-`time:` action fires; no segment advances it.
           if (playerCadence(state.activeAction).attemptsMade >= attemptsToResolve || duration <= 0) {
             const batch = fightBatch(action, 1, outcome);
             applyResultsNow(state, registry, batch.results, batch.count);
@@ -406,46 +324,26 @@ function applyDueBoundaries(state: GameState, registry: Registry, at: number): v
     }
 
     if (!changed) {
-      // Once the boundary has settled, re-clamp pools so a max shrunk by an
-      // expired buff can't leave one above its new ceiling.
       clampResources(state, registry);
       return;
     }
   }
 }
 
-// THE single seam every driver (REPL, session, a future live loop) calls to
-// advance simulated time. Core invariant (proved in resolve.test.ts):
-// resolve(resolve(s, t1), t2) === resolve(s, t2) for t1 <= t2 — one big jump
-// equals any sequence of smaller steps to the same target. It walks forward in
-// segments bounded by the next discrete event, never fixed dt steps, so a
-// deterministic segment resolves in closed form. Randomness (accuracy actions)
-// is drawn only from state.rng at attempt boundaries, in strict attempt order,
-// so splitting the call can't change which draw powers which attempt. Resource
-// pools (Pass 2) integrate per segment at a constant per-minute rate and stay
-// associative the same way — with two accepted, bounded limitations: an `on
-// full` handler is assumed segment-preserving (inventory/counter/say; one that
-// mutated a rate-referenced stat would be non-associative), and a stochastic
-// (accuracy) action whose modifier empties a pool mid-fight fires `on empty` at
-// segment granularity, not the exact fractional attempt instant (deterministic
-// paths are exact — nextBoundary lands the segment on the emptying instant).
+// Associative, as resolve.test.ts proves. Two accepted limitations: an `on full`
+// handler mutating a rate-referenced stat is not, and a stochastic action
+// emptying a pool fires `on empty` at segment granularity, not the exact instant.
 export function resolve(state: GameState, registry: Registry, toTime: number): void {
   if (toTime < state.time) throw new RuntimeError(`resolve: toTime (${toTime}) must be >= state.time (${state.time})`);
   applyDueBoundaries(state, registry, state.time);
   while (state.time < toTime) {
     const segEnd = nextBoundary(state, registry, toTime);
     resolveSegment(state, registry, segEnd);
-    // Boundaries are settled at the instant the segment actually reached, not
-    // at the one it was aimed at: a segment can stop short (input exhausted, a
-    // pool emptied), and firing at segEnd would expire buffs that still had
-    // time left on them.
+    // At the instant reached, not segEnd: buffs may still have time left.
     applyDueBoundaries(state, registry, state.time);
   }
 }
 
-// Turns the inert `food, +N <stat>, <duration>` item tags into live buffs:
-// eating (an item action that take:s the item it's defined on) grants each
-// stat-bonus tag as a timed buff whose clock starts when eating completes.
 function grantFoodBuff(item: Item, state: GameState): void {
   if (!item.tags.some((tag) => tag.kind === 'keyword' && tag.value === 'food')) return;
 
@@ -461,14 +359,7 @@ function grantFoodBuff(item: Item, state: GameState): void {
   }
 }
 
-// The action in flight, if it is an item eating itself, grants that item's food
-// tags — called as the action COMPLETES, which is where the buff's clock has to
-// start and, more to the point, the one moment both ways of starting an action
-// pass through. Hanging it off useAction instead meant a food whose eat action
-// carried a `time:` buffed correctly in instant mode and not at all in --live,
-// because beginAction arms directly and never returns through useAction. Every
-// food in the tutorial happens to be instant, which is the only reason that
-// never showed.
+// On COMPLETION: the one moment both ways of starting an action pass through.
 function grantActionFoodBuff(state: GameState, registry: Registry): void {
   const active = state.activeAction;
   if (!active) return;
@@ -482,22 +373,9 @@ function grantActionFoodBuff(state: GameState, registry: Registry): void {
   grantFoodBuff(item, state);
 }
 
-// Result of arming a spannable action/craft: `armed: false` means a take-gate
-// failure already logged its onFailure/shortfall message (nothing to resolve);
-// `armed: true` means state.activeAction is now set and `firstUnit` is the
-// span (from state.time) the *first* natural unit of play covers — a caller
-// that wants the instant behavior of today calls resolve() with it right
-// away, a live driver instead drives `wait()` toward it over real time.
+// `armed: false` has already logged its failure; `firstUnit` spans from state.time.
 type ArmResult = { armed: true; firstUnit: number } | { armed: false };
 
-// Everything useAction did before its resolve() call: gating (requires/
-// hiddenIf throw, take-affordability failure logs and returns un-armed) and
-// arming state.activeAction. Extracted so a live driver can arm a spannable
-// action WITHOUT resolving its first unit instantly (see actionFirstUnit for
-// the side-effect-free duration probe that decides whether to do so).
-// The first natural unit of play from state.time: one full fight when it's
-// closed-form (deterministic), or just the first attempt when it isn't
-// (stochastic — fight length is random, so there's no fixed span to jump to).
 function firstUnitSpan(action: Action, state: GameState, registry: Registry): number {
   const duration = attemptDuration(action, state, registry);
   return resolvesPerAttempt(action) ? duration : fightPlan(action, state, registry).attemptsToResolve * duration;
@@ -512,10 +390,7 @@ export function armAction(obj: string, objId: string, actionId: string, registry
   if (!requiresMet(action, state)) throw new RuntimeError(`action requires unmet: ${obj}.${objId}.${actionId}`);
   if (!actionVisible(action, state)) throw new RuntimeError(`action hidden: ${obj}.${objId}.${actionId}`);
 
-  // take: implies affordability — checked once up front for one completion's
-  // worth; this only gates whether the action may START. A repeating action
-  // running out of input mid-flight is handled in resolve()'s limiting math,
-  // not here, and ends quietly without firing onFailure.
+  // Gates only the START; running dry mid-flight is resolve()'s limiting math.
   const { short: shortfall } = inputLimit(action, state);
   if (shortfall !== undefined) {
     if (action.onFailure) applyResultsNow(state, registry, action.onFailure);
@@ -529,29 +404,14 @@ export function armAction(obj: string, objId: string, actionId: string, registry
     throw new RuntimeError(`repeating action ${obj}.${objId}.${actionId} needs a positive time: after speed scaling`);
   }
 
-  // The player's clock goes in first, which fixes it as the tie-break winner
-  // when two cadences come due at the same instant (see participants).
+  // First in, so the player wins a tie between cadences due at the same instant.
   const active: ActiveAction = { ownerRef: `${obj}.${objId}`, actionLabel: actionId, repeating, healthRemaining: action.health ?? 1, cadences: { [PLAYER]: newCadence() } };
   state.activeAction = active;
-  // A `target:` action opens an encounter: the thing being fought joins with its
-  // own pools, filled from its own stats, and its own clock if it swings back.
   if (action.target) enterEncounter(active, objId, state, registry);
   return { armed: true, firstUnit: firstUnitSpan(action, state, registry) };
 }
 
-// Side-effect-free probe of an action's first unit, for a driver deciding
-// instant-vs-spannable before committing to arm. Returns 0 if the action can't
-// be found — a caller then falls back to the instant path, which reproduces
-// whatever error looking it up for real would have produced.
-//
-// This is NOT the number armAction will return. statRange folds the ACTIVE
-// action's own stat-bonus tags into every stat it reads, so an action that
-// modifies its own `speed:` reads differently through the two paths: a `time: 8`
-// action with a `+100% cooking-speed` tag probes 8 here and runs at 4 once
-// armed. Only the sign is safe to route on, which is all beginAction asks —
-// `time:` is a fixed field, so zero here means zero armed and vice versa.
-// TODO(L1): arm first and route on armAction's own return value, so nothing
-// depends on a quantity computed before the action it depends on exists.
+// NOT the number armAction returns; only its sign is safe to route on. TODO(L1).
 export function actionFirstUnit(obj: string, objId: string, actionId: string, registry: Registry, state: GameState): number {
   const target = findActionOwner(obj, objId, registry) as { actions?: Action[] } | undefined;
   const action = target?.actions?.find((a) => a.label === actionId);
@@ -559,40 +419,24 @@ export function actionFirstUnit(obj: string, objId: string, actionId: string, re
   return firstUnitSpan(action, state, registry);
 }
 
-// Arms and resolves the first unit in one call — the instant/agent path. The
-// food-buff-on-eating side effect used to live here; it now hangs off the
-// action's completion inside resolve() (grantActionFoodBuff), which is the one
-// moment this path and beginAction's armed path both reach.
 export function useAction(obj: string, objId: string, actionId: string, registry: Registry, state: GameState): void {
   const armed = armAction(obj, objId, actionId, registry, state);
   if (!armed.armed) return;
   resolve(state, registry, state.time + armed.firstUnit);
 }
 
-// Travel wrappers: adapt an (origin, dest) pair to the generic action machinery
-// through the synthetic `travel` owner (travelAction / findActionOwner), so
-// travel gains spannable/real-time behavior with no bespoke resolver. A journey
-// from an unset origin (a fresh state that has never been anywhere, e.g. a test
-// that travels before startSession) is a plain placement, not a journey.
-
-// Side-effect-free probe of a journey's span; 0 for an unset origin so callers
-// route it through the instant path (which just places the player).
+// A journey from an unset origin is a plain placement, not a journey.
 export function travelFirstUnit(origin: string, dest: string, registry: Registry, state: GameState): number {
   if (!origin) return 0;
   const { label } = travelAction(origin, dest, registry);
   return actionFirstUnit('travel', `${origin}.${dest}`, label, registry, state);
 }
 
-// Arms the journey without resolving it, for a live driver to advance over real
-// time. Only called with a real origin (a distance-0 or unset journey takes the
-// instant path instead, see beginAction).
 export function armTravel(origin: string, dest: string, registry: Registry, state: GameState): void {
   const { label } = travelAction(origin, dest, registry);
   armAction('travel', `${origin}.${dest}`, label, registry, state);
 }
 
-// Arms and resolves the journey in one call (instant in real time, sim-time
-// accrues) — the agent-CLI / test path, mirroring useAction/craft.
 export function useTravel(origin: string, dest: string, registry: Registry, state: GameState): void {
   if (!origin) {
     state.location = dest;
@@ -603,9 +447,7 @@ export function useTravel(origin: string, dest: string, registry: Registry, stat
 }
 
 export function recipeCraftable(recipe: Recipe, registry: Registry, state: GameState): boolean {
-  // Through the compiled action, not `recipe.in`: recipeAction turns those
-  // inputs into the take: results the rest of the engine bounds a craft by, so
-  // reading them here again would be the same list under two owners.
+  // Through the compiled action, not `recipe.in`: the same list under two owners.
   const action = registry.recipeActions.get(recipe.id);
   if (!action) throw new RuntimeError(`unknown recipe: ${recipe.id}`);
   if (inputLimit(action, state).short !== undefined) return false;
@@ -618,13 +460,6 @@ export function recipeCraftable(recipe: Recipe, registry: Registry, state: GameS
   return true;
 }
 
-// A craft is a spannable action on the synthetic `recipe` owner (see
-// findActionOwner), so it arms through the generic armAction — exactly like
-// travel delegates through armTravel. The only craft-specific step is the
-// recipeCraftable gate (inputs + station capability), which armAction's
-// take-gate doesn't cover; once that passes the compiled recipe Action already
-// carries `in:`→take, so armAction's own affordability check never trips
-// (this ArmResult never comes back armed: false today).
 export function armCraft(recipeId: string, registry: Registry, state: GameState): ArmResult {
   const recipe = registry.recipes.get(recipeId);
   if (!recipe) throw new RuntimeError(`unknown recipe: ${recipeId}`);
@@ -633,8 +468,6 @@ export function armCraft(recipeId: string, registry: Registry, state: GameState)
   return armAction('recipe', recipeId, action.label, registry, state);
 }
 
-// Side-effect-free probe delegating to actionFirstUnit through the `recipe`
-// owner. Returns 0 if the recipe (or its compiled action) isn't found.
 export function craftFirstUnit(recipeId: string, registry: Registry, state: GameState): number {
   const action = registry.recipeActions.get(recipeId);
   if (!action) return 0;
