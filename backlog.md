@@ -14,6 +14,152 @@ Check `scratch.md` for open architectural notes touching an area before starting
 
 The retired readability gate is written up in `docs/readability-gate/deliverable-log.md`; nothing there is outstanding.
 
+## dsl-rewrite-carryover (lifted from the archived branch deliverable on merge, 2026-07-26)
+Full design context/rationale for these lives in `docs/dsl-rewrite/deliverable-log.md`.
+The branch merged with the contentDsl engine, spannable actions, action/combat
+unification (B1+B2), travel-by-distance, timed buffs, and the named-test system all
+landed. These are the genuinely-open forward items at merge time:
+
+### Engine
+- ~~**Pass 2 — resource pools + effects(rate).**~~ DONE (b70b64f): `# resource` pools with
+  max derived live from a stat, per-minute rate integration + clamp, rollover batching
+  (`on full`/`on empty`), all under the associativity invariant. An action drains or feeds
+  a pool by carrying a stat-bonus tag on the pool's rate stat — the same modifier math as
+  food/equipment. Still deferred from that slice: combat numerics (below), pause/resume
+  across different actions.
+- **Combat that mimics an aRPG** (+ its two separable companions, **droptables** and
+  **skill levels + XP events**). Spec is complete and lives in
+  `docs/combat/deliverable-log.md` — deliverable, settled decisions, engine gaps, open
+  questions, chunk status and implementation order. Read that file, not this line, before
+  touching combat code. Deliverable: the rat encounter becomes a real fight (rat 16×/min vs
+  player 25×/min, +25%-attack-rate weapon) instead of the Pass-2 health-drain placeholder.
+- **Offline progression.** Never written, and CLAUDE.md listed it under Game Engine → Core as
+  though it were (found by the 2026-07-27 audit's inventory check; the line has been
+  corrected). There is no wall-clock reconciliation anywhere in `src/game` — the only
+  `Date.now()` in the repo is `play-cli`'s `--live` render loop. `resolve()` is the seam that
+  would carry it: reconciling means calling it with the elapsed wall-clock span on load, which
+  the associativity invariant already makes safe. Open questions are policy, not mechanism —
+  whether a fight keeps swinging while the game is closed, and whether a span is capped.
+- **Exploratory play-bot (`playbot.ts`).** Standalone Node loop holding a live session,
+  calling the LLM API each turn to play and report bugs/softlocks/immersion. Design
+  decided, not implemented. Related: port the old agentSession GM shape onto
+  PlayView/PlayChoice and measure simulated time per run.
+
+### Game engine audit findings (pass 2, `docs/audits/game-engine-2026-07-27-pass2.md`)
+Closed 2026-07-27 by the staged restructure (commits `1c30ea7`..`243e59d`): H1, M1, and the
+structural findings S1–S6. Re-verified after: 303 tests green, both tutorial-island `# test`
+scripts pass, and the audit's own associativity fuzz reruns 400/400 against the real content.
+
+- **L1 — `actionFirstUnit` probes before arming, `armAction` computes after.** STILL OPEN,
+  now documented rather than silently false: the probe is only safe to read as a sign, which
+  is all `beginAction` asks of it, so this is a latent hazard rather than a live defect. The
+  fix is to arm first and route on `armAction`'s own return value (TODO(L1) in `runtime.ts`)
+  — which needs a call on what `beginAction` does when arming succeeds but the first unit is
+  instant. Same bug class as M1's food buffs: a quantity computed at two moments relative to
+  arming.
+- Pass-1 findings **L2, L4, L6** were re-confirmed open by the pass-2 audit and are untouched
+  by this work.
+
+### Docs / cleanup
+- **grammar.md update (STALE).** Document the action combat axes (`accuracy`/`ability`/
+  `health`/`escape after`/`on escape`), the `speed:` rename, recipe fields (`time`/
+  `speed`/`accuracy`/`burnt`), and entity `stations:`. (User owns grammar.md commits.)
+- ~~**`runtime.ts` decomposition**~~ DONE 2026-07-27. 1781 lines to 643, split into
+  `registry`/`rng`/`state`/`tuning`/`conditions`/`actions`/`stats`/`effects`/`encounter`/
+  `dialogue-runtime`. Each of the three homeless invariants got a home: associativity and the
+  apply-function quadrant became the `Segment` type, and "all pool movement goes through
+  `setPoolLevel`" became a readonly `PoolLevels` index signature.
+- ~~`tsconfig include:["src"]` means `scripts/**` (play-cli.ts) is never type-checked by
+  `tsc --noEmit`~~ DONE (see commit below): `include` is now `["src", "scripts"]`. All nine
+  script files were already clean, so it was a one-line change with no cleanup behind it.
+
+### Content
+- **Miki questline Paths 2/3 (thieving/fishing)** are still only stubbed — content authoring.
+
+### Design decisions to settle with user (before hardening)
+- **Integer/fixed-point numbers vs floats** — eliminate EPSILON and float error across
+  durations/rates/resource levels/stat values/progress. Weigh scale factor, percent
+  stat-bonuses, rate integration, grammar impact (`time:` accepts decimals today).
+- ~~**Full combat formula**~~ SETTLED — see the combat item above: Elo-style opposed
+  accuracy-vs-evasion, and defense as a multiplicative percent factor plus a flat
+  subtraction outside the attacker's multiplier. The attack-vs-defense truncated-Normal
+  model (`.planning/old/balancing-resolution.md`) stays scrapped. Still true and still the
+  reason this was cheap to defer: adding derived combat stats needs ZERO resolver rework,
+  because the resolver only ever reads stat *values*.
+- **Test recorder auto-`load:`** — `/create-*` prepends `load: <id>-start` for
+  reproducibility when history doesn't lead with a load; user may prefer requiring an
+  explicit leading `/load`.
+- **Character-creation-modal-in-recordings** — the modal isn't a directive, so a recording
+  can't capture name/race (replay starts from `<id>-start`, which predates the modal).
+  Known limitation, unsolved. (see `recordings of /test ignore modals.` backlog item)
+  Proposed fix (`TODO(modal-recording)` in `play-cli.ts`): make modal submission a
+  first-class directive (`modal: {"name":"Kira","race":"Elf"}` or
+  `submit-modal: name=Kira race=Elf`), parsed by `parseDirectiveLine`, executed by
+  `applyDirective` calling `submitModal`, and recorded like any other directive — so the
+  recorder, `runTest` and the CLI stay on one vocabulary. Also unblocks any future
+  modal-gated branch being reproducible by a recorded test.
+- **Quest journal** (`TODO(quest-journal)` in `play-cli.ts`) — there is no `/quests`
+  command because quests are not a first-class DSL concept: progress is emergent from
+  flags (`tutorial.quest-given`, `tutorial.made-bread`, …) set by dialogue nodes. The
+  playtest wanted a discoverable journal. Doing it properly means a `# quest` section kind
+  (objectives + completion conditions over flags) plus a `/quests` renderer. Deferred as
+  out of MVP scope.- **Default action duration** (`TODO(default-duration)` in `action.ts`) — the playtest
+  suggested a small nonzero default (~0.5s) so every action feels weighty. Blocked on a
+  design call, not effort: an absent `time:` is currently the seam distinguishing an
+  INSTANT action (mirror/stairs/eat — a deliberate design tool per CLAUDE.md) from a
+  spannable one, and `beginAction` routes on `firstUnit > 0`. Defaulting to 0.5 turns
+  every instant action spannable and shifts every timing assertion (session.test's ~19s
+  Miki route, resolve.test). Decide which actions stay instant first.
+- **Stationless crafts on items, not locations** (`TODO(inventory-crafting)` in
+  `session.ts`) — every craftable recipe currently surfaces as a location action, so a
+  stationless recipe (mixing dough) clutters the room's list. The playtest wanted these on
+  the inventory/items involved, surfaced when you act on an ingredient. Needs an
+  item-scoped craft affordance (which held item exposes which recipes) rather than the
+  flat location scan.
+- **Dialogue pacing** (`TODO(dialogue-pacing)` in `dialogue-runtime.ts`) — consecutive
+  `say` beats between menus all push to the log in one turn, so a multi-line node dumps at
+  once with no "continue" beat. The playtest praised the first, gated dialogue but found
+  the rest a wall of text. Two options it raised: (a) treat each say beat as an implicit
+  single-choice "continue" menu so the player advances line by line; (b) model dialogue as
+  a first-class modal (`pendingModal`) so a GUI need not reverse-engineer pacing. Deferred
+  as an out-of-MVP dialogue-engine change.
+
+## Implement CLI commands for editing the DSL
+There should be a way to create new entities/locations/actions/etc in game that are stored in a local DSL file. 
+We should also be able to edit existing data. 
+There should be a command to export the local DSL changes
+There should be a way to view/delete all/specific local changes if the author isn't happy with them. 
+
+The vision is that I (or an agent) should be able to explore the world in game and create/balance things without having to exit the program. For example, the user can start a fight with a monster, and if it is too hard, they can edit the monster and try again, repeating until they are happy with how it feels with the current gear set. This should lead naturally into the GUI version that will come later which will show the full local changes and allow authoring. 
+
+### DSL pipeline audit
+Investigate the current DSL data pipeline. Investigate the full pipeline from authoring in editor, to reading patches and merging said patches into the game. 
+Identify any innefficiencies and technical debt to answer whether it needs a refactor or hardening in key areas. 
+The criteria are that the whole DSL system will eventually become ground truth, forsaking any raw JSON. The DSL system has to be robust with the ability to go to and from objects easily so that working with the DSL is straightforward
+The motivation is that the most recent feature of adding diff support for contributors has felt difficult to implement and hacky. Additionally, the grammar document has grown excessively with rules that undercut the point of using a DSL (it's simplicity and near english authoring flow).
+
+Please don't consider CLAUDE.md or any of the other standards/assumptions in the project as this is intentionally a rethink of the methods. Investigate with an open mind and come up with a solution that is the final solution rather than a patch job on the existing codebase. 
+
+## Make the thin RPG GUI work again. 
+Should be a thin wrapper that only calls CLI commands. 
+Should be designed from the ground up for mobile
+
+## Create the CLI modportal to enable disable mods. 
+There should be options in game to enable/disable certain modules. 
+Need to think about how mods are connected to each other. 
+
+
+## recordings of /test ignore modals. 
+See: `TODO(modal-recording)` in line 199 of `play-cli.ts`
+Investigate the validity of unifying dialogue and the character creation modal into a single system that handles all popup style interactions through a new window. Ideally, the designed system is extensible and capable of supporting every other type of modal we wish to add in the future like: shops, minigames, potentially the inventory, quest journal, etc. Essentially every popup in game. 
+That's the global goal. The main local goal is to complete the modal-recording todo. 
+See also `TODO(dialogue-pacing)` in case it is relevant here. 
+
+## Implement a migration system for saves
+Saves stored inside of the DSL should probably be migrated once, instead of running through the migration engine every time. There should be a command for this we can run in the project whenever we bump the version. 
+
+---
+
 ## E2E Authoring
 Progress was made on this task in commits dcc74f6e1bcde83b1a798e7838008af856a8b33a and c1ea38675f13691519670c6f2d277beb6ccb9df4, but paused before task completion. 
 
@@ -205,215 +351,3 @@ Close github issue.
 Create any necessary unit tests. 
 Only create an integration test for the issue if several similar issues have cropped up in the past. (potentially tag all bug reports with the class of bug?)
 
-## Supercharge CLI with DSL supported integration tests
-Create DSL native integration tests which run known repeatable CLI commands and dump debug info to the console. 
-- Add the ability to load profiles which take in save data acquired from the serialized export feature and loads the save. 
-- There should be an `expect` section which can compare the current state to a known save and print a "test passed"/"test failed" dialogue.
-- There should be a clean up section, which returns the save back to the way it was before the test was initiated. 
-- All tests should enable debug mode, set the seed, and set-speed at the start. If a test explicitly wants to test a different seed, it can do so manually inside of the test.
-
-```md
-# test finish-tutorial
-/change-setting debug-mode true
-/cheat set-seed 12345
-/cheat set-speed {speed-multiplier}
-
-/load-save bribed-gommi
-/look
-/do 1
-/cheat expect bribed-gommi-2
-
-# save bribed-gommi
-eyJ1bml2ZXJzZUlkIjoiY29udHJpYnV0aW9uOmJhc2UiL ... (truncated for brevity)
-
-# save bribed-gommi-2
-eyJ1bml2ZXJzZUlkIjoiY29udHJpYnV0aW9uOmJhc2UiL ... (truncated for brevity)
-```
-
-The CLI should support
-/cheat test <test-id> <speed-multiplier=1> <reset-state=true>
-/load-save <save-id> 
-/cheat set-speed <value=1>
-	(set-speed skip, skips timers completely so tests can run instantly)
-	(set-speed 60 is a 60x speed boost)
-	(set-speed 1 is a 1x speed boost = normal play)
-/cheat set-seed <seed=12345>
-	Sets the randomization seed so that tests are repeatable. 
-/change-setting debug-mode true 
-	(currently change-setting is a glorified toggle for show-gui)
-/export-save 
-	(exports the save so agents can create save profiles themselves)
-/cheat expect <save-id> <compare-transcript=false>
-	general function to compare current state to target save, and print out the result. 
-	(? optionally compare against run-transcript ?)
-
-Changes to run-transcript and debug-log:
-	Both currently show a rendered json. Raw json with a copy json button is more useful. 
-	They should probably be merged in some way since they serve the same purpose of figuring out the sequence of events that occurred that resulted in the change in state. 
-
-### Things to consider before starting this task
-1. Saves should be shortened. (save data should be a diff compared to the default) in other words: exporting an empty save should be empty.
-2. If a test fails, what debug features are necessary to actually fix things? I believe a diff on all the different keys that are different should be sufficient. 
-3. Need to make the game deterministic off of a seed. Is this even possible? Do we need to 'fake' randomness to ensure reliability?
-4. How does export-save work? It should print it to the chat, but should there be more allowances to make it easier for agents to access the chat log?
-5. There is the question of test drift. We don't want to maintain multiple testing paradigms that can drift apart. 
-	Pros of this system:
-		1. I can test a single test in a way that is repeatable. 
-		2. It allows humans to author tests very easily
-		3. It works in the GUI.
-		4. Ideally, agents should also be able to use it by creating saves and hard coding tests with expected results.
-		5. Tests for a module can live inside of that module
-		6. The proposed solution places all tests and saves inside of modules which hard codes them at run time. This can be good or bad. Good because it allows mod authors to create their own tests when proposing new content (or in the built in editor). Bad because I would have to close and reopen the server if I use vscode to edit one of the tests (not such a big con really).
-		7. If we want to implement compound actions (an action that triggers 2+ other actions in a sequence) in the future, it is free since we can reuse this system. 
-	Cons:
-		1. Can this system run all tests sequentially? Is it fast? Should there be a command to run all tests for a specific location? 
-		2. If a test fails, is it easy to figure out what went wrong? Do we need tooling to step through the test command by command? How does this interact with the semi-continuous nature of the game with progress bars?
-		3. New content can irreparably break many tests at a time. (ex: if lots of tests use an iron-dagger for testing combat, and the dagger gets rebalanced, then the resulting state will be different) (or if the order of entities changes, /do 1 means something different). I think this is just the cost of doing business, and I don't know if there is a fix necessarily.  
-		4. Since this system uses real save games, how do we handle version compatibility? Bumping versions could deprecate tests unless manually reviewed. Or should the load-save command automatically migrate the output?
-6. Should the run-transcript be adapted to this system? If a bug is found, and an issue is posted with their run transcript. Should this system natively support pasting their transcript into the game, the game runs it, and bam we reproduced the bug? Essentially, what I am proposing is a `Submit Bug Report` button. 
-7. Should /expect also compare against the run transcript? Do we need to have a /export-save and an /export-verbose-save. The latter of which contains debugging information?
-8. Should this system be able to measure animations? At least their existence. More broadly, should it natively support GUI tab switching? 
-9. Do we need /expect to be able to check which UI components are visible or that out of scope?
-
-
-## Implement a migration system for saves
-Saves stored inside of the DSL should probably be migrated once, instead of running through the migration engine every time. There should be a command for this we can run in the project whenever we bump the version. 
-
-## Make the thin RPG GUI work again. 
-Should be a thin wrapper that only calls CLI commands. 
-Should be designed from the ground up for mobile
-
-## Create the CLI modportal to enable disable mods. 
-There should be options in game to enable/disable certain modules. 
-Need to think about how mods are connected to each other. 
-
-## Implement CLI commands for editing the DSL
-There should be a way to create new entities/locations/actions/etc in game that are stored in a local DSL file. 
-We should also be able to edit existing data. 
-There should be a command to export the local DSL changes
-There should be a way to view/delete all/specific local changes if the author isn't happy with them. 
-
-The vision is that I (or an agent) should be able to explore the world in game and create/balance things without having to exit the program. For example, the user can start a fight with a monster, and if it is too hard, they can edit the monster and try again, repeating until they are happy with how it feels with the current gear set. This should lead naturally into the GUI version that will come later which will show the full local changes and allow authoring. 
-
-### DSL pipeline audit
-Investigate the current DSL data pipeline. Investigate the full pipeline from authoring in editor, to reading patches and merging said patches into the game. 
-Identify any innefficiencies and technical debt to answer whether it needs a refactor or hardening in key areas. 
-The criteria are that the whole DSL system will eventually become ground truth, forsaking any raw JSON. The DSL system has to be robust with the ability to go to and from objects easily so that working with the DSL is straightforward
-The motivation is that the most recent feature of adding diff support for contributors has felt difficult to implement and hacky. Additionally, the grammar document has grown excessively with rules that undercut the point of using a DSL (it's simplicity and near english authoring flow).
-
-Please don't consider CLAUDE.md or any of the other standards/assumptions in the project as this is intentionally a rethink of the methods. Investigate with an open mind and come up with a solution that is the final solution rather than a patch job on the existing codebase. 
-
-## recordings of /test ignore modals. 
-See: `TODO(modal-recording)` in line 199 of `play-cli.ts`
-Investigate the validity of unifying dialogue and the character creation modal into a single system that handles all popup style interactions through a new window. Ideally, the designed system is extensible and capable of supporting every other type of modal we wish to add in the future like: shops, minigames, potentially the inventory, quest journal, etc. Essentially every popup in game. 
-That's the global goal. The main local goal is to complete the modal-recording todo. 
-See also `TODO(dialogue-pacing)` in case it is relevant here. 
-
-## dsl-rewrite-carryover (lifted from the archived branch deliverable on merge, 2026-07-26)
-Full design context/rationale for these lives in `docs/dsl-rewrite/deliverable-log.md`.
-The branch merged with the contentDsl engine, spannable actions, action/combat
-unification (B1+B2), travel-by-distance, timed buffs, and the named-test system all
-landed. These are the genuinely-open forward items at merge time:
-
-### Engine
-- ~~**Pass 2 — resource pools + effects(rate).**~~ DONE (b70b64f): `# resource` pools with
-  max derived live from a stat, per-minute rate integration + clamp, rollover batching
-  (`on full`/`on empty`), all under the associativity invariant. An action drains or feeds
-  a pool by carrying a stat-bonus tag on the pool's rate stat — the same modifier math as
-  food/equipment. Still deferred from that slice: combat numerics (below), pause/resume
-  across different actions.
-- **Combat that mimics an aRPG** (+ its two separable companions, **droptables** and
-  **skill levels + XP events**). Spec is complete and lives in
-  `docs/combat/deliverable-log.md` — deliverable, settled decisions, engine gaps, open
-  questions, chunk status and implementation order. Read that file, not this line, before
-  touching combat code. Deliverable: the rat encounter becomes a real fight (rat 16×/min vs
-  player 25×/min, +25%-attack-rate weapon) instead of the Pass-2 health-drain placeholder.
-- **Offline progression.** Never written, and CLAUDE.md listed it under Game Engine → Core as
-  though it were (found by the 2026-07-27 audit's inventory check; the line has been
-  corrected). There is no wall-clock reconciliation anywhere in `src/game` — the only
-  `Date.now()` in the repo is `play-cli`'s `--live` render loop. `resolve()` is the seam that
-  would carry it: reconciling means calling it with the elapsed wall-clock span on load, which
-  the associativity invariant already makes safe. Open questions are policy, not mechanism —
-  whether a fight keeps swinging while the game is closed, and whether a span is capped.
-- **Exploratory play-bot (`playbot.ts`).** Standalone Node loop holding a live session,
-  calling the LLM API each turn to play and report bugs/softlocks/immersion. Design
-  decided, not implemented. Related: port the old agentSession GM shape onto
-  PlayView/PlayChoice and measure simulated time per run.
-
-### Game engine audit findings (pass 2, `docs/audits/game-engine-2026-07-27-pass2.md`)
-Closed 2026-07-27 by the staged restructure (commits `1c30ea7`..`243e59d`): H1, M1, and the
-structural findings S1–S6. Re-verified after: 303 tests green, both tutorial-island `# test`
-scripts pass, and the audit's own associativity fuzz reruns 400/400 against the real content.
-
-- **L1 — `actionFirstUnit` probes before arming, `armAction` computes after.** STILL OPEN,
-  now documented rather than silently false: the probe is only safe to read as a sign, which
-  is all `beginAction` asks of it, so this is a latent hazard rather than a live defect. The
-  fix is to arm first and route on `armAction`'s own return value (TODO(L1) in `runtime.ts`)
-  — which needs a call on what `beginAction` does when arming succeeds but the first unit is
-  instant. Same bug class as M1's food buffs: a quantity computed at two moments relative to
-  arming.
-- Pass-1 findings **L2, L4, L6** were re-confirmed open by the pass-2 audit and are untouched
-  by this work.
-
-### Docs / cleanup
-- **grammar.md update (STALE).** Document the action combat axes (`accuracy`/`ability`/
-  `health`/`escape after`/`on escape`), the `speed:` rename, recipe fields (`time`/
-  `speed`/`accuracy`/`burnt`), and entity `stations:`. (User owns grammar.md commits.)
-- ~~**`runtime.ts` decomposition**~~ DONE 2026-07-27. 1781 lines to 643, split into
-  `registry`/`rng`/`state`/`tuning`/`conditions`/`actions`/`stats`/`effects`/`encounter`/
-  `dialogue-runtime`. Each of the three homeless invariants got a home: associativity and the
-  apply-function quadrant became the `Segment` type, and "all pool movement goes through
-  `setPoolLevel`" became a readonly `PoolLevels` index signature.
-- `tsconfig include:["src"]` means `scripts/**` (play-cli.ts) is never type-checked by
-  `tsc --noEmit` (a task chip was spawned for this).
-
-### Content
-- **Miki questline Paths 2/3 (thieving/fishing)** are still only stubbed — content authoring.
-
-### Design decisions to settle with user (before hardening)
-- **Integer/fixed-point numbers vs floats** — eliminate EPSILON and float error across
-  durations/rates/resource levels/stat values/progress. Weigh scale factor, percent
-  stat-bonuses, rate integration, grammar impact (`time:` accepts decimals today).
-- ~~**Full combat formula**~~ SETTLED — see the combat item above: Elo-style opposed
-  accuracy-vs-evasion, and defense as a multiplicative percent factor plus a flat
-  subtraction outside the attacker's multiplier. The attack-vs-defense truncated-Normal
-  model (`.planning/old/balancing-resolution.md`) stays scrapped. Still true and still the
-  reason this was cheap to defer: adding derived combat stats needs ZERO resolver rework,
-  because the resolver only ever reads stat *values*.
-- **Test recorder auto-`load:`** — `/create-*` prepends `load: <id>-start` for
-  reproducibility when history doesn't lead with a load; user may prefer requiring an
-  explicit leading `/load`.
-- **Character-creation-modal-in-recordings** — the modal isn't a directive, so a recording
-  can't capture name/race (replay starts from `<id>-start`, which predates the modal).
-  Known limitation, unsolved. (see `recordings of /test ignore modals.` backlog item)
-  Proposed fix (`TODO(modal-recording)` in `play-cli.ts`): make modal submission a
-  first-class directive (`modal: {"name":"Kira","race":"Elf"}` or
-  `submit-modal: name=Kira race=Elf`), parsed by `parseDirectiveLine`, executed by
-  `applyDirective` calling `submitModal`, and recorded like any other directive — so the
-  recorder, `runTest` and the CLI stay on one vocabulary. Also unblocks any future
-  modal-gated branch being reproducible by a recorded test.
-- **Quest journal** (`TODO(quest-journal)` in `play-cli.ts`) — there is no `/quests`
-  command because quests are not a first-class DSL concept: progress is emergent from
-  flags (`tutorial.quest-given`, `tutorial.made-bread`, …) set by dialogue nodes. The
-  playtest wanted a discoverable journal. Doing it properly means a `# quest` section kind
-  (objectives + completion conditions over flags) plus a `/quests` renderer. Deferred as
-  out of MVP scope.- **Default action duration** (`TODO(default-duration)` in `action.ts`) — the playtest
-  suggested a small nonzero default (~0.5s) so every action feels weighty. Blocked on a
-  design call, not effort: an absent `time:` is currently the seam distinguishing an
-  INSTANT action (mirror/stairs/eat — a deliberate design tool per CLAUDE.md) from a
-  spannable one, and `beginAction` routes on `firstUnit > 0`. Defaulting to 0.5 turns
-  every instant action spannable and shifts every timing assertion (session.test's ~19s
-  Miki route, resolve.test). Decide which actions stay instant first.
-- **Stationless crafts on items, not locations** (`TODO(inventory-crafting)` in
-  `session.ts`) — every craftable recipe currently surfaces as a location action, so a
-  stationless recipe (mixing dough) clutters the room's list. The playtest wanted these on
-  the inventory/items involved, surfaced when you act on an ingredient. Needs an
-  item-scoped craft affordance (which held item exposes which recipes) rather than the
-  flat location scan.
-- **Dialogue pacing** (`TODO(dialogue-pacing)` in `dialogue-runtime.ts`) — consecutive
-  `say` beats between menus all push to the log in one turn, so a multi-line node dumps at
-  once with no "continue" beat. The playtest praised the first, gated dialogue but found
-  the rest a wall of text. Two options it raised: (a) treat each say beat as an implicit
-  single-choice "continue" menu so the player advances line by line; (b) model dialogue as
-  a first-class modal (`pendingModal`) so a GUI need not reverse-engineer pacing. Deferred
-  as an out-of-MVP dialogue-engine change.
