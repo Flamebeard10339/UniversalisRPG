@@ -52,3 +52,12 @@ export function advanceTime(state: GameState, seconds: number): void {
   if (seconds < 0) throw new RuntimeError(`advanceTime: seconds must be non-negative, got ${seconds}`);
   state.time += seconds;
 }
+
+// THE one way an action ends, so what "ending" means has a single definition
+// rather than nine copies of one assignment. Ending is rarely the resolver's own
+// decision — a `stop` result, an input running out, a boundary firing, a max
+// shrinking to nothing, a player cancel all reach it — and each of those used to
+// write the field itself.
+export function endAction(state: GameState): void {
+  state.activeAction = null;
+}

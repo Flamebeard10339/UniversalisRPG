@@ -1,22 +1,42 @@
 import { ActionResult } from './actionResult';
-import { Condition, Reference } from './condition';
-import { Choice, Dialogue, DialogueNode, TextSegment } from './dialogue';
+import {
+  actionStillValid,
+  fightBatch,
+  findActionOwner,
+  findActiveAction,
+  FightOutcome,
+  inputLimit,
+  parseOwnerRef,
+  resolvesPerAttempt,
+  requiresMet,
+  actionVisible,
+  stopsOnOutcome,
+  travelAction,
+} from './actions';
+import { evaluateCondition, renderSegments } from './conditions';
+import { nextRandom } from './rng';
+import { Choice, Dialogue, DialogueNode } from './dialogue';
 import { Action } from './entity';
 import { Item } from './item';
-import { Location } from './location';
-import { addRanges, isPoint, midpoint, point, Range, sampleRange, scaleRange } from './range';
 import { Registry } from './registry';
 import { Recipe } from './recipe';
 import { Resource } from './resource';
-import { nextRandom } from './rng';
-import { advanceTime, GameState, PLAYER, RuntimeError } from './state';
+import { advanceTime, endAction, GameState, PLAYER, RuntimeError } from './state';
+import { attemptDuration, hitChance, hitDamage, sampleStat, statValue } from './stats';
 import { TagClause } from './tagClause';
-import { contestSpread, minDamage, travelSecondsPerUnit } from './tuning';
 import { humanize } from './values';
 
-export { advanceTime, createGameState, PLAYER, RuntimeError } from './state';
+// The engine's public surface is this module: the resolver and the verbs live
+// here, and everything the drivers also need is re-exported from wherever it
+// actually lives. The one deliberate omission is the loader — loadModule and
+// Registry belong to the content pipeline, and consumers import them from
+// registry.ts.
+export { advanceTime, createGameState, endAction, PLAYER, RuntimeError } from './state';
 export type { ActiveBuff, GameState } from './state';
 export { contestSpread, minDamage, travelSecondsPerUnit } from './tuning';
+export { describeCondition, evaluateCondition, renderSegments } from './conditions';
+export { actionVisible, requiresMet } from './actions';
+export { hitChance, hitDamage, sampleStat, statRange, statValue } from './stats';
 
 // A repeating/spannable action in flight: a sequence of attempts against one
 // target with `healthRemaining` (a "fight"). `progress` is seconds elapsed
@@ -58,77 +78,6 @@ export interface ActorState {
   cadence?: Cadence;
 }
 
-// THE one way an action ends, so what "ending" means has a single definition
-// rather than nine copies of one assignment. Ending is rarely the resolver's own
-// decision — a `stop` result, an input running out, a boundary firing, a max
-// shrinking to nothing, a player cancel all reach it — and each of those used to
-// write the field itself.
-export function endAction(state: GameState): void {
-  state.activeAction = null;
-}
-
-// References are flat dotted keys, not nested lookups (grammar.md "References");
-// the one exception the engine maintains is `<node-name>.visits`.
-function resolveReference(reference: Reference, state: GameState): boolean | number | string | undefined {
-  const { path } = reference;
-  if (path.length === 1 && path[0] === 'time') return state.time;
-  if (path.length === 2 && path[1] === 'visits') return state.visits[path[0]] ?? 0;
-  if (path.length === 2 && path[0] === 'player') return state.player[path[1] as 'name' | 'race'];
-  return state.flags[path.join('.')];
-}
-
-function truthy(value: boolean | number | string | undefined): boolean {
-  return value !== undefined && value !== false && value !== 0 && value !== '';
-}
-
-export function evaluateCondition(condition: Condition, state: GameState): boolean {
-  switch (condition.kind) {
-    case 'reference':
-      return truthy(resolveReference(condition.reference, state));
-    case 'comparison': {
-      const left = resolveReference(condition.left, state);
-      const value = typeof left === 'number' ? left : Number(left ?? 0);
-      switch (condition.operator) {
-        case '>':
-          return value > condition.right;
-        case '<':
-          return value < condition.right;
-        case '>=':
-          return value >= condition.right;
-        case '<=':
-          return value <= condition.right;
-        case '=':
-          return value === condition.right;
-      }
-      break;
-    }
-    case 'not':
-      return !evaluateCondition(condition.condition, state);
-    case 'and':
-      return condition.conditions.every((c) => evaluateCondition(c, state));
-    case 'or':
-      return condition.conditions.some((c) => evaluateCondition(c, state));
-    case 'has':
-      return (state.inventory[condition.item] ?? 0) >= condition.count;
-  }
-}
-
-export function describeCondition(condition: Condition): string {
-  switch (condition.kind) {
-    case 'reference':
-      return condition.reference.path.join('.');
-    case 'comparison':
-      return `${condition.left.path.join('.')} ${condition.operator} ${condition.right}`;
-    case 'not':
-      return `not ${describeCondition(condition.condition)}`;
-    case 'and':
-      return condition.conditions.map(describeCondition).join(' and ');
-    case 'or':
-      return condition.conditions.map(describeCondition).join(' or ');
-    case 'has':
-      return condition.count === 1 ? `has ${condition.item}` : `has ${condition.count} ${condition.item}`;
-  }
-}
 
 // The span of simulated time results are applied into, and the two things a
 // result can ask for that only the span's end can honour.
@@ -229,20 +178,6 @@ export function applyResultsNow(state: GameState, registry: Registry, results: r
   if (segment.stopped) endAction(state);
 }
 
-export function renderSegments(segments: TextSegment[], state: GameState): string {
-  return segments
-    .map((segment) => {
-      switch (segment.kind) {
-        case 'literal':
-          return segment.text;
-        case 'interpolate':
-          return String(resolveReference(segment.reference, state) ?? '');
-        case 'conditional':
-          return evaluateCondition(segment.condition, state) ? segment.text : '';
-      }
-    })
-    .join('');
-}
 
 export interface DialogueSession {
   dialogue: Dialogue;
@@ -318,152 +253,9 @@ export function choose(text: string, session: DialogueSession, registry: Registr
   return runSteps(session.dialogue, session.node, registry, state, session.resumeIndex, session.replay);
 }
 
-function findActionOwner(obj: string, objId: string, registry: Registry): unknown {
-  switch (obj) {
-    case 'entity':
-      return registry.entities.get(objId);
-    case 'item':
-      return registry.items.get(objId);
-    case 'location':
-      return registry.locations.get(objId);
-    case 'recipe': {
-      const action = registry.recipeActions.get(objId);
-      return action ? { actions: [action] } : undefined;
-    }
-    case 'travel': {
-      // objId encodes `<origin>.<dest>` (the origin travelled from — see
-      // travelAction on why it's needed); split on the first dot, since ids
-      // themselves never contain one.
-      const dot = objId.indexOf('.');
-      return { actions: [travelAction(objId.slice(0, dot), objId.slice(dot + 1), registry)] };
-    }
-    default:
-      return undefined;
-  }
-}
 
-// THE opposed roll — every contested outcome in the game runs through it: a
-// sword landing, a dish coming out cooked rather than burnt, a lock giving.
-// A logistic curve on the gap between the two stats, so equal stats are a coin
-// flip, +spread wins ~91%, +2×spread ~99%, and no gap ever reaches certainty in
-// either direction.
-//
-// A stat is deliberately never readable as a raw probability. The chance of
-// succeeding at something is always derived from that thing's difficulty
-// against the actor's skill, which puts difficulty in a stat where gear, buffs
-// and levels can move it — an authored 0.7 would be inert.
-export function hitChance(accuracy: number, evasion: number, registry: Registry): number {
-  return 1 / (1 + 10 ** ((evasion - accuracy) / contestSpread(registry)));
-}
 
-function locationDistance(a: Location, b: Location): number {
-  return Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z);
-}
 
-// A journey along a travel edge, modelled as a one-attempt deterministic fight
-// (health 1, no accuracy) whose single result relocates the player on
-// completion. This lets travel reuse the whole resolve()/fight machinery for
-// free: it becomes a spannable action like any other, so `--live` renders it as
-// a real-time transition and the instant driver (agent CLI / tests) accrues its
-// sim-time. The origin is encoded in the ownerRef rather than read from
-// state.location because state.location stays the origin until the relocate
-// fires; the distance comes from the registry's resolved coordinates, so the
-// action can be rebuilt from the ownerRef alone with no state.
-function travelAction(originId: string, destId: string, registry: Registry): Action {
-  const origin = registry.locations.get(originId);
-  const dest = registry.locations.get(destId);
-  if (!origin) throw new RuntimeError(`unknown travel origin: ${originId}`);
-  if (!dest) throw new RuntimeError(`unknown travel destination: ${destId}`);
-  return {
-    label: `Travel to ${dest.title}`,
-    results: [{ kind: 'relocate', location: destId }],
-    time: locationDistance(origin, dest) * travelSecondsPerUnit(registry),
-    health: 1,
-  };
-}
-
-function parseOwnerRef(ownerRef: string): { obj: string; objId: string } {
-  const dot = ownerRef.indexOf('.');
-  return { obj: ownerRef.slice(0, dot), objId: ownerRef.slice(dot + 1) };
-}
-
-function findActiveAction(active: ActiveAction, registry: Registry): Action {
-  const { obj, objId } = parseOwnerRef(active.ownerRef);
-  const owner = findActionOwner(obj, objId, registry) as { actions?: Action[] } | undefined;
-  if (!owner) throw new RuntimeError(`unknown ${obj}: ${objId}`);
-  const action = owner.actions?.find((a) => a.label === active.actionLabel);
-  if (!action) throw new RuntimeError(`unknown action ${JSON.stringify(active.actionLabel)} on ${active.ownerRef}`);
-  return action;
-}
-
-// (base + Σ(added)) × (1 + Σ(increased)), as an interval: base and the flat
-// bonuses may each be a range, and they are summed endpoint-wise into a single
-// interval that is sampled ONCE. Scaling the interval by the increased factor
-// before sampling is the same distribution as scaling a sample of it, so this
-// is exactly the authored rule `sample(base + Σadded) × (1 + Σincreased)`.
-//
-// Modifiers come from two sources, both flowing through the same math: timed
-// buffs (eaten food / future equipment), and the currently-active action's own
-// stat-bonus tags — which act as modifiers ONLY while that action runs (they
-// vanish the instant activeAction clears, with no add/remove bookkeeping). This
-// is how an action drains or boosts a resource: e.g. an attack tagged
-// `-5 regeneration` pushes the health pool's rate stat negative for the fight's
-// duration and nothing more.
-//
-// Note a percent bonus multiplies whatever flat bonuses are present, so `+10%
-// dr` with no added dr is deliberately nothing at all (0 × 1.1 = 0).
-export function statRange(statId: string, state: GameState, registry: Registry, actorId: string = PLAYER): Range {
-  // An actor's own `stats:` block replaces the global default; the player names
-  // nothing and so reads the default for everything.
-  let added = registry.entities.get(actorId)?.stats[statId] ?? registry.stats.get(statId)?.base ?? point(0);
-  let increased = 0;
-  // Buffs and the active action's tags are the PLAYER's: food the player ate,
-  // and the action the player is performing. A non-player actor carries neither
-  // in this pass, so it reads its declared sheet and nothing else.
-  if (actorId === PLAYER) {
-    for (const buff of Object.values(state.activeBuffs)) {
-      if (buff.statId !== statId) continue;
-      if (buff.kind === 'added') added = addRanges(added, buff.amount);
-      else increased += buff.amount;
-    }
-    if (state.activeAction) {
-      const action = findActiveAction(state.activeAction, registry);
-      for (const tag of action.tags ?? []) {
-        if (tag.kind !== 'stat-bonus' || tag.statId !== statId) continue;
-        if (tag.percent) increased += tag.amount / 100;
-        else added = addRanges(added, tag.amount);
-      }
-    }
-  }
-  return scaleRange(added, 1 + increased);
-}
-
-// The stat's deterministic value: its expected value, identical to the stat
-// itself whenever nothing about it is ranged. Everything that needs a number
-// without consuming randomness reads this — pool maxima, rates, attempt
-// durations — so a ranged stat can never make a duration or a ceiling jitter.
-export function statValue(statId: string, state: GameState, registry: Registry, actorId: string = PLAYER): number {
-  return midpoint(statRange(statId, state, registry, actorId));
-}
-
-// One roll of the stat, for the per-attempt uses where the range is the point
-// (damage, damage reduction). RNG contract: this consumes exactly one draw when
-// the stat's interval is non-degenerate and none at all when it isn't — a count
-// that is a deterministic function of state, which is what keeps resolve()
-// associative (see the invariant on resolve()).
-export function sampleStat(statId: string, state: GameState, registry: Registry, actorId: string = PLAYER): number {
-  const range = statRange(statId, state, registry, actorId);
-  return isPoint(range) ? range.min : sampleRange(range, nextRandom(state));
-}
-
-// Flat damage reduction: `dr` is an ordinary stat, subtracted from the incoming
-// hit, and the result truncates to an int. The floor is not balance tuning —
-// `escapeAfter` defaults to Infinity, so a fight whose damage reaches 0 would
-// never deplete the target and never end, locking the player in the action with
-// time advancing and nothing to show for it.
-export function hitDamage(attack: number, dr: number, registry: Registry): number {
-  return Math.max(minDamage(registry), Math.trunc(attack - dr));
-}
 
 // Fills any pool the state doesn't already carry with its starting level: the
 // authored `start` if given, else full (the live max). Called wherever a fresh
@@ -480,36 +272,7 @@ export function initResources(state: GameState, registry: Registry): void {
   }
 }
 
-// The one place a duration is divided by a speed stat, and therefore the one
-// place that division can go wrong. A speed of 0 is an ordinary authoring
-// accident — a typo'd stat id reads 0 (statRange falls through to point(0)), and
-// so does a declared `# stat` with no `base:` — and it yields Infinity, which
-// every downstream `<= 0` guard happily passes. That poisons state.time and NaNs
-// the whole activeAction, and NaN serializes to null, so the wreck survives a
-// save round-trip instead of failing loudly. It fails loudly here instead.
-//
-// Zero stays legal: an action with no `time:` is instant, which is a real thing.
-function attemptDuration(action: Action, state: GameState, registry: Registry, actorId: string = PLAYER): number {
-  const speed = action.speed ? statValue(action.speed, state, registry, actorId) : 1;
-  const duration = (action.time ?? 0) / speed;
-  if (!Number.isFinite(duration) || duration < 0) {
-    throw new RuntimeError(
-      `action ${action.label} resolved an impossible attempt duration (${duration}) from time: ${action.time ?? 0} and speed stat ${action.speed ?? '1'} = ${speed}`,
-    );
-  }
-  return duration;
-}
 
-type FightOutcome = 'completion' | 'escape';
-
-// An action resolves attempt-by-attempt instead of in closed form when what an
-// attempt does isn't knowable ahead of it: a miss chance, or damage sampled
-// against a target's pool. Both are authored fields, never derived from live
-// state, so this can't flip partway through a fight and strand a batch that was
-// planned under the other reading.
-function resolvesPerAttempt(action: Action): boolean {
-  return action.accuracy !== undefined || action.target !== undefined;
-}
 
 interface FightParams {
   duration: number; // seconds per attempt
@@ -545,98 +308,6 @@ function fightPlan(action: Action, state: GameState, registry: Registry): Determ
   };
 }
 
-// Whether an action in flight may keep running — the same gate that let it
-// start, re-checked rather than trusted for the action's whole life. The
-// circumstances that made it legal can stop holding while it runs: the bait runs
-// out, a quest flag flips, the forge goes cold.
-//
-// `hidden if:` is deliberately NOT part of this. It decides whether an action is
-// OFFERED, which is why armAction refuses to start a hidden one; an action
-// already under way is a different question, and a rat fight shouldn't abort
-// mid-swing because the third rat's kill-count made the option disappear.
-//
-// Running out of a POOL is not here either, and cannot be: `health` is a name
-// content chose, not something the engine knows. Content declares which pool is
-// fatal by putting `stop` in that resource's `on empty:` block.
-function actionStillValid(action: Action, active: ActiveAction, state: GameState): boolean {
-  if (!requiresMet(action, state)) return false;
-  // Inputs only bound a REPEATING action — a single completion's worth was
-  // already checked when it armed, and isn't consumed until it completes.
-  return !active.repeating || inputLimit(action, state).completions > 0;
-}
-
-// The two conditions every "may this action run" question is built from. The
-// three sites that ask compose them differently on purpose — armAction refuses
-// to START a hidden action, one already under way ignores visibility (a rat
-// fight must not abort mid-swing because the kill count removed it from the
-// list), and the choice list additionally hides retaliations — so they stay
-// separate predicates rather than collapsing into one with flags. What they must
-// not do is each restate what an absent clause means, which is what this fixes.
-export function requiresMet(action: Action, state: GameState): boolean {
-  return !action.requires || evaluateCondition(action.requires, state);
-}
-
-export function actionVisible(action: Action, state: GameState): boolean {
-  return !action.hiddenIf || !evaluateCondition(action.hiddenIf, state);
-}
-
-// One completion's worth of `take:` cost, as item → amount. Only the take side
-// can bound anything — items have no stack cap in this schema (Pass 1), so the
-// output side is unbounded.
-function perCompletionCost(action: Action): Map<string, number> {
-  const cost = new Map<string, number>();
-  for (const result of action.results) {
-    if (result.kind === 'take') cost.set(result.item, (cost.get(result.item) ?? 0) + (result.amount ?? 1));
-  }
-  return cost;
-}
-
-// How many completions the current inventory affords, and — when that is under
-// one — which item fell short, so armAction can tell the player what they need.
-// Both are the same reduction over the same map, and asking for the count or the
-// name used to mean writing it out again.
-interface InputLimit {
-  completions: number;
-  short?: string;
-}
-
-function inputLimit(action: Action, state: GameState): InputLimit {
-  let completions = Infinity;
-  let short: string | undefined;
-  for (const [item, need] of perCompletionCost(action)) {
-    if (need <= 0) continue;
-    const affords = Math.floor((state.inventory[item] ?? 0) / need);
-    if (affords < 1 && short === undefined) short = item;
-    completions = Math.min(completions, affords);
-  }
-  return { completions, short };
-}
-
-// Which of an action's result lists one fight outcome fires. `results`/
-// `onSuccess` on completion, `onEscape` on escape — mutually exclusive per fight.
-function outcomeResults(action: Action, outcome: FightOutcome): ActionResult[] {
-  return outcome === 'completion' ? [...action.results, ...(action.onSuccess ?? [])] : (action.onEscape ?? []);
-}
-
-// Whether the results this outcome fires ask the action to stop.
-function stopsOnOutcome(action: Action, outcome: FightOutcome): boolean {
-  return outcomeResults(action, outcome).some((result) => result.kind === 'stop');
-}
-
-// `count` fights' worth of one outcome, as a single batch (count can be
-// enormous) rather than one application per fight. Firing per *fight*, not per
-// segment, is what keeps resolve() associative.
-//
-// A `stop` among the results caps the batch at one completion. Without the cap a
-// batched path could not stop anything — the whole span had already happened by
-// the time the one-shot verb ran, so resolve(s, 100) applied 100 completions
-// where 100 stepped calls applied 1. nextBoundary independently lands the segment
-// on that first completion, so time stops there too; this cap is what holds if
-// the two ever disagree.
-function fightBatch(action: Action, count: number, outcome: FightOutcome): { results: ActionResult[]; count: number } {
-  const results = outcomeResults(action, outcome);
-  return { results, count: stopsOnOutcome(action, outcome) ? Math.min(count, 1) : count };
-}
 
 const EPSILON = 1e-9;
 const SECONDS_PER_MINUTE = 60;
