@@ -58,6 +58,15 @@ export interface ActorState {
   cadence?: Cadence;
 }
 
+// THE one way an action ends, so what "ending" means has a single definition
+// rather than nine copies of one assignment. Ending is rarely the resolver's own
+// decision — a `stop` result, an input running out, a boundary firing, a max
+// shrinking to nothing, a player cancel all reach it — and each of those used to
+// write the field itself.
+export function endAction(state: GameState): void {
+  state.activeAction = null;
+}
+
 // References are flat dotted keys, not nested lookups (grammar.md "References");
 // the one exception the engine maintains is `<node-name>.visits`.
 function resolveReference(reference: Reference, state: GameState): boolean | number | string | undefined {
@@ -170,7 +179,7 @@ export function applyResult(result: ActionResult, state: GameState, registry: Re
       // dialogue step. Inside one, applyResultBatch intercepts `stop` and
       // records it on the segment instead, because the resolver holds the
       // ActiveAction as a local and this write would go behind its back.
-      state.activeAction = null;
+      endAction(state);
       break;
   }
 }
@@ -894,14 +903,14 @@ function applyResultNow(result: ActionResult, count: number, state: GameState, r
   const effects = newSegmentEffects();
   applyResultBatch(result, count, state, registry, effects);
   settlePools(state, registry, [], 0, effects.deltas);
-  if (effects.stopped) state.activeAction = null;
+  if (effects.stopped) endAction(state);
 }
 
 function applyFightBatchNow(action: Action, count: number, outcome: FightOutcome, state: GameState, registry: Registry): void {
   const effects = newSegmentEffects();
   applyFightBatch(action, count, outcome, state, registry, effects);
   settlePools(state, registry, [], 0, effects.deltas);
-  if (effects.stopped) state.activeAction = null;
+  if (effects.stopped) endAction(state);
 }
 
 // Re-seats every pool under its live max; called once a boundary settles, so a
@@ -1007,7 +1016,7 @@ function resolveDeterministicSegment(state: GameState, registry: Registry, actio
     // stop: the action ends here rather than carrying a remainder it will never
     // swing. nextBoundary put segEnd on this instant, so time is already right.
     if (effects.stopped) {
-      state.activeAction = null;
+      endAction(state);
       return;
     }
     active.attemptsMade = remainder;
@@ -1079,7 +1088,7 @@ function resolveStochasticSegment(state: GameState, registry: Registry, action: 
 
   for (;;) {
     if (!actionStillValid(action, active, state)) {
-      state.activeAction = null;
+      endAction(state);
       return;
     }
 
@@ -1143,7 +1152,7 @@ function resolveStochasticSegment(state: GameState, registry: Registry, action: 
       // flag here is what keeps it and state.activeAction from disagreeing —
       // the next participants() would dereference the null.
       if (effects.stopped) {
-        state.activeAction = null;
+        endAction(state);
         return;
       }
       if (active.repeating) {
@@ -1154,7 +1163,7 @@ function resolveStochasticSegment(state: GameState, registry: Registry, action: 
         active.attemptsMade = 0;
       } else {
         grantActionFoodBuff(state, registry);
-        state.activeAction = null;
+        endAction(state);
         return;
       }
     }
@@ -1211,7 +1220,7 @@ function applyDueBoundaries(state: GameState, registry: Registry, at: number): v
     if (state.activeAction) {
       const action = findActiveAction(state.activeAction, registry);
       if (!actionStillValid(action, state.activeAction, state)) {
-        state.activeAction = null;
+        endAction(state);
         changed = true;
       } else if (!resolvesPerAttempt(action)) {
         // A per-attempt action fires and rearms itself inside
@@ -1225,7 +1234,7 @@ function applyDueBoundaries(state: GameState, registry: Registry, at: number): v
           if (state.activeAction.attemptsMade >= attemptsToResolve || duration <= 0) {
             applyFightBatchNow(action, 1, outcome, state, registry);
             grantActionFoodBuff(state, registry);
-            state.activeAction = null;
+            endAction(state);
             changed = true;
           }
         }

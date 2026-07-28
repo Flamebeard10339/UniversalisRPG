@@ -1,7 +1,7 @@
 import { Action } from './entity';
 import { Location } from './location';
 import {
-  actionFirstUnit, actionVisible, armAction, armCraft, armTravel, craft, craftFirstUnit, describeCondition, DialogueSession, encounterView, EncounterView, evaluateCondition, GameState, RuntimeError, choose, createGameState, initResources, recipeCraftable, renderSegments, requiresMet, resolve, statValue, talk, travelFirstUnit, useAction, useTravel } from './runtime';
+  actionFirstUnit, actionVisible, armAction, armCraft, armTravel, craft, craftFirstUnit, describeCondition, DialogueSession, encounterView, EncounterView, endAction, evaluateCondition, GameState, RuntimeError, choose, createGameState, initResources, recipeCraftable, renderSegments, requiresMet, resolve, statValue, talk, travelFirstUnit, useAction, useTravel } from './runtime';
 import { Registry } from './registry';
 import { ResourceDisplay } from './resource';
 import { compareSave, loadSave, startingLocationId } from './save';
@@ -381,7 +381,7 @@ export function applyDirective(session: PlaySession, directive: Directive): { fa
       // The single home of cancellation's mutation: cancelAction() wraps this
       // with a view(). Kept view-free here because a test's state (built
       // without startSession, see runTest) may have no resolvable location.
-      state.activeAction = null;
+      endAction(state);
       return {};
     case 'wait':
       // The single home of time advancement's mutation: wait() wraps this with
