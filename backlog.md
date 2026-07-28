@@ -6,13 +6,125 @@ Check `scratch.md` for open architectural notes touching an area before starting
 
 # Tasks
 
-## Outstanding audits
-`npm run audit-status` is now enforced in CI, and four items are outstanding. Each needs a fresh subagent run against the audit prompt in `CLAUDE.md`, an audit doc under `docs/audits/`, and findings lifted back here.
+## Audit findings (2026-07-28)
+The four outstanding audits ran. Evidence lives in the docs, not here:
+`docs/audits/dsl-load-path-2026-07-28.md`, `testing-procedure-2026-07-28.md`,
+`build-deployment-2026-07-28.md`, `user-interface-2026-07-28.md`. Every finding below was
+verified against a fixture or a measurement; the doc names the fixture so it can be re-run.
 
-1. **DSL load path** — never audited, and owed since the restructure: the old "content pipeline" system stood at 11 commits when the split happened.
-2. **Testing procedure**, **Build & deployment**, **User interface** — each has `lastAudit: 83d81d2` recorded with no `lastAuditDoc`. Either the audit happened and the doc was never written, or the counter was reset without one. Resolve each explicitly: produce the doc, or set `lastAudit` back to null and audit it properly.
+Work them in tier order — tier 1 is what makes the rest of CI trustworthy.
 
-The retired readability gate is written up in `docs/readability-gate/deliverable-log.md`; nothing there is outstanding.
+### Tier 1 — the gates do not enforce what they claim
+- **TP-H1 `comment-only` certifies commits that gut CI.** `comment-only-diff.ts:38` skips every
+  non-`.ts` path, so one commit stripped comments *and* deleted `npm test` + `npm run
+  audit-status` from `test.yml`, disabled a shipped `# test`, and replaced `comment-budget`
+  with `echo skip` — and still reported "is comment-only". A workflow-only change reports
+  "0 files changed". `--worktree` mode cannot see untracked new source files. CLAUDE.md:19
+  says it "proves no code changed"; fix the tool or the claim.
+- **TP-M1 the audit-doc gate is satisfiable by `touch`.** `audit-status.ts:83` is bare
+  `existsSync` — a directory, `package.json`, or a zero-byte file all pass.
+- **TP-M2 the commit hook fires on the wrong things.** Triggers on `echo "git commit"` and
+  `--dry-run`, silent on `merge`/`rebase`, reports the main HEAD when you commit from a
+  worktree, and asserts "ran normally" without checking the exit code.
+- **DSL-L2 + TP-M7 `layer-check` is a string match.** Catches 1 of 7 upward-import syntaxes
+  (single quotes only — nothing pins quote style, there is no ESLint/Prettier), false-positives
+  on imports inside comments and strings, and misses directory imports. `codeOnly` sits unused
+  in the same folder.
+- **TP-M4 + TP-L5 + UI-L1 the comment budget under-measures by construction.** Blind to trailing
+  comments (85 in repo, 3.2% measured vs 4.1% actual), blind to comment *length* (400 words on
+  one line passes), and hardcoded to `.ts`/`.tsx` so `.yml`/`.css`/`.md` are ungoverned — this
+  system's own workflow file is 24% comment.
+
+### Tier 2 — DSL load path correctness
+- **DSL-H1 a second definition of an id replaces the first wholesale.** There are no merge
+  semantics; "patching" is `Map.set`. A 2-line mod concatenated onto real content — exactly what
+  `play-cli.ts:551` does and exactly the worked example under *E2E Authoring* below — strips
+  `guide-house` of 5 entities, 3 edges and `starting`, and the game then cannot start. This is
+  the crux of the *DSL pipeline audit* item below; settle redefinition semantics before building
+  the editor on top of it.
+- **DSL-H2 reference validation covers 20 of 44 reference-bearing fields.** `registry.ts:72`
+  claims "Every id is checked". Sharpest miss: `requires: has <typo>` loads clean and is false
+  forever — the exact silent-typed-reference class the pass-2 M1 fix claimed to close (that fix
+  *did* land completely; this is the remaining surface). Also `goto`, `open modal:`, `station:`,
+  `stat-id:`, and every `# test` directive. 15 of the 24 misses name an already-registered kind.
+  Third consecutive audit to find a false universal claim in this validator's comment.
+- **DSL-M1 + TP-M6 CRLF breaks the shipped content, and CI cannot see it.** One stray `\r`
+  reattributes a section to the previous one; a CRLF checkout fails `loadModule` outright
+  (13 tests red). There is no `.gitattributes`, CI is ubuntu-only, and pasting DSL through a
+  GitHub issue is the planned authoring path. One-line fix plus a CI matrix entry.
+- **DSL-M2 `action.ts` is a second, laxer copy of the section field engine.** 89 of its 147
+  lines, with 14 duplicated "defined more than once" guards; `time: 1e3` → `1`,
+  `speed: s garbage`, `escape after 3 times` and `stop now` all load clean where the section
+  engine rejects the equivalents. `section.ts:1` records the hand-written-per-kind parser as the
+  *rejected* alternative. Likely partly causal for the **grammar.md update (STALE)** item:
+  the document grew rules because actions parse by a different rulebook than sections do.
+- **DSL-M3** a mistyped section field becomes a player-facing action (`examin:` →
+  `use:location.den.examin` in `view().choices`).
+- **DSL-M4** `# save` bodies are unchecked past `version`: `"time":"potato"` survives a
+  `resolve()`; `flags`/`inventory` as strings become index maps.
+- **DSL-M5** zero `starting` locations crashes at first `view()`; two picks silently by source order.
+- **DSL-L1** `DslError.span` is built at 37 sites and read by zero live code — and every
+  post-parse error carries no span at all, while `play-cli` concatenates files before parsing so
+  offsets are not file-attributable anyway. Decide whether spans earn their keep or get deleted.
+- **DSL-L4** `Skill['stat-id']` is parsed, unvalidated, read by nothing; `parse.test.ts:79` pins
+  its emptiness. **DSL-L5** `add: x -3` silently means `+1` (`/\d+/` cannot match a sign);
+  `give: 0 straw` accepted. **DSL-L6** default examine is `"This is an Hay."` and
+  `parse.test.ts:378` locks the bug in. **DSL-L7** `burnt:` without `accuracy:` is dropped.
+
+### Tier 3 — the publish pipeline would ship a placeholder
+- **BD-H2 no gate stops a non-functional publish, and today's build is one.** `src/main.tsx`
+  renders a bare "GUI pending" div; any tag push sends that to itch.io *and* attaches a signed
+  APK of it to a GitHub Release. Gate the release on something, or accept it knowingly.
+- **BD-H1 the web build ships absolute asset paths.** `base` is never set in `vite.config.mjs`;
+  `dist/index.html` emits `/assets/...`, which 404s under itch.io's subdirectory hosting.
+- **BD-M2** three publish actions handling secrets (itch credentials, APK signing key) are pinned
+  to floating tags, not SHAs. **BD-M3** `publish.yml` has no `permissions:` block.
+- **BD-L1** `android/app/build.gradle` hardcodes `versionCode 1`/`versionName "1.0"` with no
+  relationship to `package.json` — a hand-synced pair, which CLAUDE.md forbids.
+- **BD-L5** the Android CI job re-implements the `sync` npm script inline.
+
+### Tier 4 — teardown residue that ships today
+- **UI-H1** `vite.config.mjs:20-22` excludes `attic/**` and cites `attic/README.md`; `attic/` was
+  deleted in `843d8b8` and nothing can ever catch a stale config comment.
+- **UI-M1** `src/index.css` is ~90% dead (270 lines, zero live consumers for its four animation
+  classes; its one substantive comment describes two deleted files) and compiles into the shipped
+  16.57 kB CSS bundle. **UI-M2** `public/content/` ships 49 KB of legacy locale/universe data no
+  live code reads. **UI-M3** eight `dependencies` (zustand, 6 codemirror/lezer, diff) have zero
+  imports; `reactflow` is imported for CSS only from the placeholder `main.tsx` and its 9.2 kB
+  stylesheet is fully compiled into the production bundle.
+- **BD-L2** `playwright-core` unused. **BD-L3** `tsconfig.node.tsbuildinfo` is tracked.
+  **BD-L4** `vite.config.mjs` is outside both tsconfig projects.
+
+### Tier 5 — `systems.json` membership is not a partition
+- **TP-M5** 37 of 164 tracked files are owned by no system, so they can never trigger an audit —
+  including `.claude/hooks/*` (which gate commits) and `content/tutorial-island.dsl` (the shipped
+  game). **UI-L3** adds `public/`, `postcss.config.js`, `tailwind.config.js`, `src/vite-env.d.ts`.
+- **BD-M1** the converse: all 7 commits that charged **Build & deployment**'s budget touched it
+  only through `package.json`/`tsconfig.json`. Its real pipeline files have not changed once
+  since before the previous baseline — the trigger fires on neighbours' noise.
+- **DSL-L3** `references.test.ts` sits in `src/runtime/` but drives `src/content/registry.ts`, so
+  changes to this system's key test spend the *Runtime's* budget. **TP-M5** also found `runTest` /
+  `# test` parsing / `integration.test.ts` are double-covered rather than orphaned.
+- **TP-L4** code has five layers; CLAUDE.md documents four.
+
+### Tier 6 — test corpus
+- **TP-L2** the shipped `# test` corpus is two happy paths, catches 4 of 6 injected mutants, and
+  never uses `expect: <save-id>` — its strongest assertion — over shipped content.
+  `integration.test.ts` holds the ad-hoc script CLAUDE.md tells you not to write.
+- **TP-M3** `runTest` returns `passed: true` while holding an unhandled `pendingModal`, and
+  `/test` then eats the next two piped commands as name/race. Merge this into the
+  **recordings of `/test` ignore modals** item below rather than filing it separately.
+- **TP-L3** `session.test.ts` walks the Miki route a second time in TypeScript.
+
+### Design questions raised for the user, not defects
+DSL: redefinition/merge semantics (blocks DSL-H1); should flags be declarable; should `stations:`
+be a registered kind; are ids globally or kind-scoped unique. Build: should publish gate on the
+test suite; is a tag imminent given BD-H2; should the web and android jobs be independent.
+Testing: whether `comment-only` should grow to non-`.ts` files or shrink its claim.
+
+The retired readability gate is written up in `docs/readability-gate/deliverable-log.md`; the
+Testing-procedure audit re-verified that retirement is genuinely complete (second ledger deleted
+too), so nothing there is outstanding.
 
 ## dsl-rewrite-carryover (lifted from the archived branch deliverable on merge, 2026-07-26)
 Full design context/rationale for these lives in `docs/dsl-rewrite/deliverable-log.md`.

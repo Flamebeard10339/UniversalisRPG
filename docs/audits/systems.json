@@ -4,9 +4,9 @@
     {
       "name": "DSL load path",
       "paths": ["src/grammar", "src/content"],
-      "lastAudit": null,
-      "lastAuditDoc": null,
-      "note": "Owed at the restructure: the old 'content pipeline' system stood at 11 commits, AUDIT DUE. Pre-move history cannot be split between this system and the runtime, because both lived in src/game/contentDsl."
+      "lastAudit": "50a4f41",
+      "lastAuditDoc": "docs/audits/dsl-load-path-2026-07-28.md",
+      "note": "H1 (redefinition has no merge semantics) and H2 (20 of 44 reference fields validated) open. Pre-move history cannot be split between this system and the runtime, because both lived in src/game/contentDsl."
     },
     {
       "name": "Runtime",
@@ -25,16 +25,16 @@
     {
       "name": "User interface",
       "paths": ["src/ui", "src/main.tsx", "src/index.css", "index.html"],
-      "lastAudit": null,
-      "lastAuditDoc": null,
-      "note": "Awaiting the GUI rebuild; src/ui does not exist yet. The 83d81d2 marker was reset to null on 2026-07-28: it recorded a counter reset with no audit behind it."
+      "lastAudit": "50a4f41",
+      "lastAuditDoc": "docs/audits/user-interface-2026-07-28.md",
+      "note": "src/ui does not exist; the 2026-07-28 audit covers teardown residue only, and its coverage is structurally limited until the GUI rebuild."
     },
     {
       "name": "Testing procedure",
       "paths": ["scripts", ".github/workflows/test.yml"],
-      "lastAudit": null,
-      "lastAuditDoc": null,
-      "note": "The 83d81d2 marker was reset to null on 2026-07-28: it recorded a counter reset with no audit behind it."
+      "lastAudit": "50a4f41",
+      "lastAuditDoc": "docs/audits/testing-procedure-2026-07-28.md",
+      "note": "H1 open: comment-only certifies commits that gut CI. These paths are not the whole system — runTest and # test parsing live under src/, and .claude/hooks is owned by nobody (M5)."
     },
     {
       "name": "Build & deployment",
@@ -46,9 +46,9 @@
         "package.json",
         "tsconfig.json"
       ],
-      "lastAudit": null,
-      "lastAuditDoc": null,
-      "note": "The 83d81d2 marker was reset to null on 2026-07-28: it recorded a counter reset with no audit behind it."
+      "lastAudit": "50a4f41",
+      "lastAuditDoc": "docs/audits/build-deployment-2026-07-28.md",
+      "note": "H2 open: a tag push would publish the placeholder build. M1: package.json/tsconfig.json membership makes neighbouring systems' commits spend this budget."
     }
   ]
 }
