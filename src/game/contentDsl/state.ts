@@ -1,4 +1,5 @@
 import type { Range } from './range';
+import { DEFAULT_RNG_SEED, RngCursor } from './rng';
 import type { ActiveAction } from './runtime';
 
 export class RuntimeError extends Error {}
@@ -19,7 +20,7 @@ export type ActiveBuff =
   | (TimedModifier & { kind: 'added'; amount: Range })
   | (TimedModifier & { kind: 'increased'; amount: number });
 
-export interface GameState {
+export interface GameState extends RngCursor {
   flags: Record<string, boolean | number>;
   inventory: Record<string, number>;
   location: string;
@@ -35,18 +36,11 @@ export interface GameState {
   // from each resource's start value by initResources (createGameState leaves it
   // empty because it has no registry).
   resources: Record<string, number>;
-  // Deterministic PRNG cursor, advanced only when resolving an attempt of an
-  // `accuracy` action — deterministic actions never draw. Living in state (not a
-  // parameter) counts draws in attempt order regardless of how a caller splits a
-  // resolve() span; see the associativity invariant on resolve().
-  rng: number;
   player: { name: string; race: string };
   // Set by `open-modal`, cleared once the driver (session/play-cli) collects
   // whatever the modal needed and calls back in (e.g. submitModal).
   pendingModal?: string;
 }
-
-const DEFAULT_RNG_SEED = 20260718;
 
 export function createGameState(location = ''): GameState {
   return { flags: {}, inventory: {}, location, visits: {}, xp: {}, log: [], time: 0, activeAction: null, activeBuffs: {}, resources: {}, rng: DEFAULT_RNG_SEED, player: { name: '', race: '' } };

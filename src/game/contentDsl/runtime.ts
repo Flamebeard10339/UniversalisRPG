@@ -8,6 +8,7 @@ import { addRanges, isPoint, midpoint, point, Range, sampleRange, scaleRange } f
 import { Registry } from './registry';
 import { Recipe } from './recipe';
 import { Resource } from './resource';
+import { nextRandom } from './rng';
 import { advanceTime, GameState, PLAYER, RuntimeError } from './state';
 import { TagClause } from './tagClause';
 import { contestSpread, minDamage, travelSecondsPerUnit } from './tuning';
@@ -55,17 +56,6 @@ export interface Cadence {
 export interface ActorState {
   resources: Record<string, number>;
   cadence?: Cadence;
-}
-
-// A small LCG (same shape as glibc's rand()): advances state.rng and returns a
-// value in [0, 1).
-const RNG_MULTIPLIER = 1103515245;
-const RNG_INCREMENT = 12345;
-const RNG_MODULUS = 2147483648; // 2^31
-
-function nextRandom(state: GameState): number {
-  state.rng = (state.rng * RNG_MULTIPLIER + RNG_INCREMENT) % RNG_MODULUS;
-  return state.rng / RNG_MODULUS;
 }
 
 // References are flat dotted keys, not nested lookups (grammar.md "References");

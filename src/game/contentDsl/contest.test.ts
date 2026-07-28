@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { point } from './range';
+import { nextRandom } from './rng';
 import { armAction, createGameState, GameState, hitChance, initResources, resolve, RuntimeError } from './runtime';
 import { loadModule, Registry } from './registry';
 
@@ -217,10 +218,13 @@ describe('a contest inside a fight', () => {
 
     // The whole point of deriving the threshold rather than sampling it: both
     // sides are read with statValue, so the draw count per attempt is unchanged
-    // and resolve() stays associative.
-    let expected = createGameState().rng;
-    for (let i = 0; i < ATTEMPTS; i++) expected = (expected * 1103515245 + 12345) % 2147483648;
-    expect(state.rng).toBe(expected);
+    // and resolve() stays associative. The reference cursor is stepped through
+    // nextRandom itself — restating the LCG's arithmetic here would only pin
+    // this test to whatever the implementation happens to compute (rng.test.ts
+    // is where that arithmetic is checked against an exact reference).
+    const reference = createGameState();
+    for (let i = 0; i < ATTEMPTS; i++) nextRandom(reference);
+    expect(state.rng).toBe(reference.rng);
   });
 
   it('stays associative across arbitrary splits', () => {
