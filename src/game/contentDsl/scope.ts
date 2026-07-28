@@ -4,11 +4,6 @@ import { Condition, Reference } from './condition';
 import { Entity } from './entity';
 import { Location } from './location';
 
-// Inside an entity's own action block a bare (single-segment) reference names
-// that entity's state: `unlocked` inside `front-door` means `front-door.unlocked`.
-// A qualified (dotted) reference is left alone, and so is `has` — which names an
-// item, not the entity's state. This is the one rule an editor enforces to make
-// bare references inside a block unambiguous.
 function scopeReference(reference: Reference, owner: string): Reference {
   return reference.path.length === 1 ? { path: [owner, reference.path[0]] } : reference;
 }
@@ -37,10 +32,8 @@ function scopeResult(result: ActionResult, owner: string): ActionResult {
   return result;
 }
 
-// Both kinds of location-scoped owner — an entity and the place itself — bind
-// their actions' bare references the same way, so the rule lives once here.
-// Items are deliberately not scoped: an item travels with the player and its
-// bare references are global.
+// Items are deliberately absent: one travels with the player, so its bare
+// references are global rather than owner-bound.
 function scopeActions(actions: Action[], owner: string): void {
   for (const action of actions) {
     if (action.requires) action.requires = scopeCondition(action.requires, owner);

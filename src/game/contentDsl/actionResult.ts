@@ -12,15 +12,9 @@ export type ActionResult =
   | { kind: 'relocate'; location: string }
   | { kind: 'discover'; location: string }
   | { kind: 'open-modal'; modal: string }
-  // An instantaneous level change on a `# resource` pool, from `drain:` or
-  // `restore:`. One signed kind rather than two, matching how a pool's rate is
-  // already a single signed stat instead of separate regen and drain.
+  // One signed kind rather than two, as a pool's rate is one signed stat.
   | { kind: 'pool'; resource: string; delta: number }
-  // Abandons whatever action is in flight, mid-progress — the same abandonment
-  // a player-initiated cancel performs. It is how content declares that a
-  // circumstance is fatal to an encounter: `stop` in a pool's `on empty:` block
-  // is what makes running out of health end a fight, and running out of bait
-  // end a fishing trip. The engine has no privileged pool of its own.
+  // Abandons the action in flight, exactly as a player-initiated cancel does.
   | { kind: 'stop' };
 
 function parseGiveTake(kind: 'give' | 'take', cursor: Cursor): ActionResult {
@@ -40,10 +34,7 @@ function parseAdd(cursor: Cursor): ActionResult {
   return { kind: 'add', variable, amount: amount !== null ? Number(amount) : 1 };
 }
 
-// `drain: 5 health` / `restore: 2.5 focus`. The amount is written unsigned and
-// the verb carries the direction, so a pool can never be drained by a negative
-// restore; it is a decimal because pools are float (an int pool would round a
-// slow regeneration rate to zero every tick and never recover).
+// Decimal because pools are float: an int pool rounds slow regeneration to zero.
 function parsePool(sign: 1 | -1, cursor: Cursor): ActionResult {
   const raw = cursor.take(/\d+(?:\.\d+)?/);
   if (raw === null) throw new DslError('expected an amount and a resource, as in `drain: 5 health`', { start: cursor.abs(cursor.pos), end: cursor.abs(cursor.pos) });
