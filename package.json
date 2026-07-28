@@ -10,6 +10,8 @@
     "preview": "vite preview --configLoader runner",
     "sync": "npm run build && cap sync",
     "test": "vitest run --configLoader runner",
+    "comment-budget": "tsx scripts/comment-ratio.ts",
+    "comment-only": "tsx scripts/comment-only-diff.ts",
     "playtest": "tsx scripts/playtest-cli.ts",
     "play": "tsx scripts/play-cli.ts"
   },
