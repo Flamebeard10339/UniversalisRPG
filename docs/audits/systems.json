@@ -25,16 +25,16 @@
     {
       "name": "User interface",
       "paths": ["src/ui", "src/main.tsx", "src/index.css", "index.html"],
-      "lastAudit": "83d81d2",
+      "lastAudit": null,
       "lastAuditDoc": null,
-      "note": "Awaiting the GUI rebuild; src/ui does not exist yet."
+      "note": "Awaiting the GUI rebuild; src/ui does not exist yet. The 83d81d2 marker was reset to null on 2026-07-28: it recorded a counter reset with no audit behind it."
     },
     {
       "name": "Testing procedure",
       "paths": ["scripts", ".github/workflows/test.yml"],
-      "lastAudit": "83d81d2",
+      "lastAudit": null,
       "lastAuditDoc": null,
-      "note": null
+      "note": "The 83d81d2 marker was reset to null on 2026-07-28: it recorded a counter reset with no audit behind it."
     },
     {
       "name": "Build & deployment",
@@ -46,9 +46,9 @@
         "package.json",
         "tsconfig.json"
       ],
-      "lastAudit": "83d81d2",
+      "lastAudit": null,
       "lastAuditDoc": null,
-      "note": null
+      "note": "The 83d81d2 marker was reset to null on 2026-07-28: it recorded a counter reset with no audit behind it."
     }
   ]
 }
