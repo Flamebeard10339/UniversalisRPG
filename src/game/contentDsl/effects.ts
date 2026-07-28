@@ -1,7 +1,7 @@
 import { ActionResult } from './actionResult';
 import { Registry } from './registry';
 import { Resource } from './resource';
-import { endAction, GameState, PoolLevels, RuntimeError } from './state';
+import { endAction, GameState, RuntimeError } from './state';
 import { statValue } from './stats';
 
 // Everything that changes game state, and the pool mechanics those changes move.

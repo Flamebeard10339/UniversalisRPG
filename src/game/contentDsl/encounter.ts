@@ -6,8 +6,6 @@ import { findActiveAction, parseOwnerRef } from './actions';
 import { GameState, PLAYER, RuntimeError } from './state';
 import { humanize } from './values';
 
-const EPSILON = 1e-9;
-
 // A repeating/spannable action in flight: a sequence of attempts against one
 // target with `healthRemaining` (a "fight").
 export interface ActiveAction {
