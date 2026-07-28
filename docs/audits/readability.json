@@ -1,4 +1,113 @@
 {
   "threshold": 5,
-  "files": {}
+  "files": {
+    "src/grammar/values.ts": {
+      "lastAuditedSha": "d60b984",
+      "discrimination": "pass",
+      "prose": "pass",
+      "proseNote": "Read correctly. One misread: claimed number/decimal/id share the message 'expected a number' when id says 'expected an id' - three near-identical blocks invite skimming. Flagged text's empty-string-on-no-match as possibly a latent bug; that ambiguity is owned by this file.",
+      "model": "haiku",
+      "date": "2026-07-28",
+      "summary": "Provides parser implementations that extract and convert raw input into typed primitive values like text, numbers, and identifiers."
+    },
+    "src/grammar/range.ts": {
+      "lastAuditedSha": "",
+      "discrimination": "fail",
+      "prose": "fail",
+      "proseNote": "",
+      "model": "haiku",
+      "date": "",
+      "summary": "It parses numerical intervals from the DSL and provides utilities for sampling, scaling, and combining them."
+    },
+    "src/grammar/list.ts": {
+      "lastAuditedSha": "",
+      "discrimination": "fail",
+      "prose": "fail",
+      "proseNote": "",
+      "model": "haiku",
+      "date": "",
+      "summary": "Enables parsing of comma-separated element sequences in both inline and multi-line formats."
+    },
+    "src/grammar/tagClause.ts": {
+      "lastAuditedSha": "",
+      "discrimination": "fail",
+      "prose": "fail",
+      "proseNote": "",
+      "model": "haiku",
+      "date": "",
+      "summary": "Parses individual DSL tag clauses, converting raw text into keywords, stat bonuses with optional ranges or percentages, or duration values."
+    },
+    "src/content/tuningVariables.ts": {
+      "lastAuditedSha": "d60b984",
+      "discrimination": "pass",
+      "prose": "pass",
+      "proseNote": "Read correctly, no unsupported claims. Flagged that MIN_DAMAGE and TRAVEL_SECONDS_PER_UNIT are exported but never used here, so the file's purpose reads as two things - a key registry and one validator.",
+      "model": "haiku",
+      "date": "2026-07-28",
+      "summary": "This module defines the constant names for numeric balance tuning values and validates that they satisfy required constraints during initialization."
+    },
+    "src/content/variable.ts": {
+      "lastAuditedSha": "",
+      "discrimination": "fail",
+      "prose": "fail",
+      "proseNote": "",
+      "model": "haiku",
+      "date": "",
+      "summary": "It specifies how to parse and structure named numeric state variables from DSL content sections."
+    },
+    "src/content/resource.ts": {
+      "lastAuditedSha": "",
+      "discrimination": "fail",
+      "prose": "fail",
+      "proseNote": "",
+      "model": "haiku",
+      "date": "",
+      "summary": "Parses DSL declarations of pooled numeric values with regeneration rates and conditional actions that fire when pools empty or fill completely."
+    },
+    "src/content/stat.ts": {
+      "lastAuditedSha": "",
+      "discrimination": "fail",
+      "prose": "fail",
+      "proseNote": "",
+      "model": "haiku",
+      "date": "",
+      "summary": "Provides the schema for parsing character statistics from DSL, with support for base values that can be fixed numbers or ranges sampled at runtime."
+    },
+    "src/runtime/save.ts": {
+      "lastAuditedSha": "d60b984",
+      "discrimination": "pass",
+      "prose": "pass",
+      "proseNote": "Every claim traced to the file, including the JSON.stringify equality caveat and the unconditional log reset. Two file-owned unclears: why each field is record vs scalar, and why the double cast through Record<string, unknown> is needed.",
+      "model": "haiku",
+      "date": "2026-07-28",
+      "summary": "Persists game state as a sparse differential against the initialized baseline, capturing only changes to minimize serialized size and rejecting saves from incompatible versions."
+    },
+    "src/runtime/state.ts": {
+      "lastAuditedSha": "",
+      "discrimination": "fail",
+      "prose": "fail",
+      "proseNote": "",
+      "model": "haiku",
+      "date": "",
+      "summary": "Defines the mutable game state structure and provides operations to advance simulated time and manage active actions."
+    },
+    "src/runtime/tuning.ts": {
+      "lastAuditedSha": "",
+      "discrimination": "fail",
+      "prose": "fail",
+      "proseNote": "",
+      "model": "haiku",
+      "date": "",
+      "summary": "Retrieves game balance parameters from the content registry at runtime, with hardcoded defaults for missing values."
+    },
+    "src/runtime/stats.ts": {
+      "lastAuditedSha": "",
+      "discrimination": "fail",
+      "prose": "fail",
+      "proseNote": "",
+      "model": "haiku",
+      "date": "",
+      "summary": "Computes combat-relevant metrics by combining base statistics with active buffs and action effects."
+    }
+  }
 }

@@ -67,23 +67,42 @@ Two defences, both already in the design:
 
 ## Remaining work
 
-### 1. Pilot — 3 files, before anything else
+### 1. Pilot — done
 
-Run the full loop by hand on three files spanning the layers, e.g.
-`src/grammar/values.ts`, `src/content/tuningVariables.ts`, `src/runtime/save.ts`.
+Ran on `src/grammar/values.ts`, `src/content/tuningVariables.ts`,
+`src/runtime/save.ts`, each against three same-folder distractors minted first
+(`range`/`list`/`tagClause`, `variable`/`resource`/`stat`, `state`/`tuning`/`stats`).
+All three passed discrimination and prose; notes are in the ledger.
 
-For each: mint a summary, run the audit prompt, grade it, run the discrimination
-test, record. Then read the three descriptions and ask:
+**Leak test: clean.** No description asserted anything absent from the text it was
+given. Every claim traced to an identifier, an import path, or an in-file comment.
+The genre words that looked like leakage on first read (`DSL`, `game state`,
+`balance`) are all present in the given text as `DslError`, `GameState`,
+`MIN_DAMAGE`. `CLAUDE.md` reaching subagent context did not turn out to matter at
+this granularity.
 
-- Does any description assert something not present in the file it was given?
-  That is the leak test, and it is the reason the pilot exists.
-- Is the discrimination test too easy or impossible? Sibling summaries are meant to
-  be hard but fair.
-- Does the prose rubric produce verdicts that feel right, or is it failing files
-  that are genuinely fine?
+**Discrimination is valid but wide-margin.** The prompt names the file path, and
+these three filenames nearly answer their own question. A control run with the path
+scrubbed still passed both files tested, so the code carries the test, not the
+name — but the path is an unearned hint that should come out of
+`discriminationPrompt`, since the point is to measure the file.
 
-Do not proceed to the baseline until these read sensibly. If the failure rate is
-very high, the gate is miscalibrated, not the code.
+**Prose rubric is not over-failing.** It is currently under-gating, if anything: it
+is advisory, and the three verdicts turned on whether claims were supported, which
+all were. The useful output was not the verdict but the UNCLEAR section, which
+named real file-owned ambiguities (`values.ts`: does `text` return `''` by design;
+`save.ts`: why is each field record vs scalar). The one wrong claim in the pilot —
+`values.ts` error messages read as identical when `id` differs — came from three
+near-identical parser blocks, which is a readability signal the pass/fail verdict
+throws away.
+
+### Follow-ups the pilot surfaced
+
+- Drop the path from `discriminationPrompt`; keep it in the audit and summary prompts.
+- `--set-summary` writes `discrimination: 'fail'`, so a summarized-but-unaudited file
+  reads as a recorded failure. Minting 68 summaries before any audit — which the
+  baseline requires — puts the whole repo in that state. Needs a third value, or
+  `readability-check` keying off an empty `lastAuditedSha`.
 
 ### 2. Baseline — 68 files
 
