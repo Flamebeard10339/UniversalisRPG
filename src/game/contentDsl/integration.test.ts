@@ -1,7 +1,8 @@
 import { readFileSync } from 'fs';
 import { describe, expect, it } from 'vitest';
 import { point } from './range';
-import { createGameState, loadModule, resolve, useAction } from './runtime';
+import { createGameState, resolve, useAction } from './runtime';
+import { loadModule } from './registry';
 import { runTest, startSession } from './session';
 
 // End-to-end: authored content (content/tutorial-island.dsl) loaded and its

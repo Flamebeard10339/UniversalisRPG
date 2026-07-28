@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { point } from './range';
-import { armAction, createGameState, GameState, initResources, loadModule, Registry, resolve } from './runtime';
+import { armAction, createGameState, GameState, initResources, resolve } from './runtime';
+import { loadModule, Registry } from './registry';
 import { startSession, view } from './session';
 
 // The deliverable's acceptance case: a rat swinging 16x/min against a player

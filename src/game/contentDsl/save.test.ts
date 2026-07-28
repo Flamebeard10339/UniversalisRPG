@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { createGameState, loadModule } from './runtime';
+import { createGameState } from './runtime';
+import { loadModule } from './registry';
 import { compareSave, diffState, initialState, loadSave, parseSaveSection, SAVE_VERSION, serializeSave } from './save';
 import { runTest } from './session';
 

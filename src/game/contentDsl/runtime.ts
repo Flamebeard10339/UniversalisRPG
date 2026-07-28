@@ -1,24 +1,21 @@
 import { ActionResult } from './actionResult';
 import { Condition, Reference } from './condition';
 import { Choice, Dialogue, DialogueNode, TextSegment } from './dialogue';
-import { Action, Entity, entitySchema } from './entity';
-import { Item, itemSchema } from './item';
-import { Location, locationSchema, resolveCoordinates } from './location';
-import { parseModule } from './module';
+import { Action } from './entity';
+import { Item } from './item';
+import { Location } from './location';
 import { addRanges, isPoint, midpoint, point, Range, sampleRange, scaleRange } from './range';
-import { Recipe, recipeSchema } from './recipe';
-import { Resource, resourceSchema } from './resource';
-import { SavedGame } from './save';
-import { scopeEntity, scopeLocation } from './scope';
-import { Authored, hydrateSection } from './section';
-import { Skill, skillSchema } from './skill';
-import { Stat, statSchema } from './stat';
+import { Registry } from './registry';
+import { Recipe } from './recipe';
+import { Resource } from './resource';
+import { advanceTime, GameState, PLAYER, RuntimeError } from './state';
 import { TagClause } from './tagClause';
-import { Test } from './test';
+import { contestSpread, minDamage, travelSecondsPerUnit } from './tuning';
 import { humanize } from './values';
-import { Variable, variableSchema } from './variable';
 
-export class RuntimeError extends Error {}
+export { advanceTime, createGameState, PLAYER, RuntimeError } from './state';
+export type { ActiveBuff, GameState } from './state';
+export { contestSpread, minDamage, travelSecondsPerUnit } from './tuning';
 
 // A repeating/spannable action in flight: a sequence of attempts against one
 // target with `healthRemaining` (a "fight"). `progress` is seconds elapsed
@@ -60,58 +57,6 @@ export interface ActorState {
   cadence?: Cadence;
 }
 
-// Who a stat or a pool belongs to. Actors are addressed by entity id; the player
-// is this reserved id and simply has no `# entity`, so every base it reads falls
-// through to the global `# stat` defaults.
-export const PLAYER = 'player';
-
-// A timed stat modifier (from eating food, etc). `added` sums flat onto the
-// stat's base and may be a range (`+3-6 attack`); `increased` sums as a
-// fraction applied multiplicatively and never is (see statRange).
-interface TimedModifier {
-  statId: string;
-  expiresAt: number;
-}
-export type ActiveBuff =
-  | (TimedModifier & { kind: 'added'; amount: Range })
-  | (TimedModifier & { kind: 'increased'; amount: number });
-
-export interface GameState {
-  flags: Record<string, boolean | number>;
-  inventory: Record<string, number>;
-  location: string;
-  visits: Record<string, number>;
-  xp: Record<string, number>;
-  log: string[];
-  time: number;
-  activeAction: ActiveAction | null;
-  activeBuffs: Record<string, ActiveBuff>;
-  // Current level of each `# resource` pool, keyed by resource id. The pool's
-  // max is not stored — it's always derived live via statValue(resource.max),
-  // so a +max buff raises the ceiling without rewriting saved state. Populated
-  // from each resource's start value by initResources (createGameState leaves it
-  // empty because it has no registry).
-  resources: Record<string, number>;
-  // Deterministic PRNG cursor (LCG state), advanced only when resolving an
-  // attempt of an `accuracy` action — deterministic actions never draw. Living
-  // in state (not a parameter) counts draws in attempt order regardless of how
-  // a caller splits a resolve() span; see the associativity invariant on
-  // resolve().
-  rng: number;
-  player: { name: string; race: string };
-  // Set by `open-modal`, cleared once the driver (session/play-cli) collects
-  // whatever the modal needed and calls back in (e.g. submitModal).
-  pendingModal?: string;
-}
-
-// Nonzero seed: an LCG degenerates only at a genuine fixed point, which this
-// seed/multiplier/increment combination avoids.
-const DEFAULT_RNG_SEED = 20260718;
-
-export function createGameState(location = ''): GameState {
-  return { flags: {}, inventory: {}, location, visits: {}, xp: {}, log: [], time: 0, activeAction: null, activeBuffs: {}, resources: {}, rng: DEFAULT_RNG_SEED, player: { name: '', race: '' } };
-}
-
 // A small LCG (same shape as glibc's rand()): advances state.rng and returns a
 // value in [0, 1).
 const RNG_MULTIPLIER = 1103515245;
@@ -121,188 +66,6 @@ const RNG_MODULUS = 2147483648; // 2^31
 function nextRandom(state: GameState): number {
   state.rng = (state.rng * RNG_MULTIPLIER + RNG_INCREMENT) % RNG_MODULUS;
   return state.rng / RNG_MODULUS;
-}
-
-// The single seam through which simulated time advances: the pure runtime
-// never reads a real clock, it only moves forward when something calls this.
-export function advanceTime(state: GameState, seconds: number): void {
-  if (seconds < 0) throw new RuntimeError(`advanceTime: seconds must be non-negative, got ${seconds}`);
-  state.time += seconds;
-}
-
-export interface Registry {
-  entities: Map<string, Entity>;
-  locations: Map<string, Location>;
-  items: Map<string, Item>;
-  stats: Map<string, Stat>;
-  skills: Map<string, Skill>;
-  recipes: Map<string, Recipe>;
-  // Each recipe's compiled Action form (see recipeAction), built once at load
-  // and looked up by findActionOwner('recipe', ...).
-  recipeActions: Map<string, Action>;
-  resources: Map<string, Resource>;
-  dialogues: Map<string, Dialogue>;
-  dialoguesByOwner: Map<string, Dialogue>;
-  tests: Map<string, Test>;
-  // Authored numeric constants (see travelSecondsPerUnit and friends).
-  variables: Map<string, Variable>;
-  saves: Map<string, SavedGame>;
-}
-
-type ReferenceKind = 'stat' | 'resource' | 'entity' | 'location';
-
-// Every id one section uses to name another, resolved against the registry once,
-// after everything has parsed (so forward references are fine).
-//
-// Until this ran, a typo failed in one of two ways and neither named the
-// author's mistake. An unknown RESOURCE surfaced as `unknown resource: helth`
-// from deep inside a live fight, many actions after the module loaded clean. An
-// unknown STAT never failed at all: statRange falls through entity.stats →
-// # stat → point(0), so `speed: attack-rat` silently read 0 and the resolver
-// divided by it. That is C1's whole cause class, closed at the source here while
-// attemptDuration keeps the guard for the stat that is declared but has no base:.
-function validateReferences(registry: Registry): void {
-  const known: Record<ReferenceKind, ReadonlyMap<string, unknown>> = {
-    stat: registry.stats,
-    resource: registry.resources,
-    entity: registry.entities,
-    location: registry.locations,
-  };
-  const check = (kind: ReferenceKind, id: string | undefined, where: string): void => {
-    if (id === undefined || known[kind].has(id)) return;
-    throw new RuntimeError(`${where} names an unknown ${kind}: ${id}`);
-  };
-  const checkAction = (action: Action, where: string): void => {
-    check('stat', action.speed, `${where} speed:`);
-    check('stat', action.accuracy, `${where} accuracy:`);
-    check('stat', action.evasion, `${where} evasion:`);
-    check('stat', action.ability, `${where} ability:`);
-    check('stat', action.dr, `${where} dr:`);
-    check('resource', action.target, `${where} target:`);
-  };
-  const actionsOf = (where: string, actions: Action[]): void => {
-    for (const action of actions) checkAction(action, `${where} action ${JSON.stringify(action.label)}`);
-  };
-
-  for (const entity of registry.entities.values()) {
-    // A sheet entry naming no # stat is not an error the runtime would ever
-    // reach — it just never gets read, because the action asking for that stat
-    // asks for the correctly-spelled one and falls through to its global default.
-    for (const statId of Object.keys(entity.stats)) check('stat', statId, `# entity ${entity.id} stats:`);
-    actionsOf(`# entity ${entity.id}`, entity.actions);
-  }
-  for (const item of registry.items.values()) actionsOf(`# item ${item.id}`, item.actions);
-  // Recipes are checked through their compiled Action rather than their authored
-  // fields, so recipeAction's forwarding is covered by the same six checks.
-  for (const [recipeId, action] of registry.recipeActions) checkAction(action, `# recipe ${recipeId}`);
-  for (const resource of registry.resources.values()) {
-    check('stat', resource.max, `# resource ${resource.id} max:`);
-    check('stat', resource.rate, `# resource ${resource.id} rate:`);
-  }
-  for (const location of registry.locations.values()) {
-    for (const entityId of location.entities) check('entity', entityId, `# location ${location.id} entities:`);
-    for (const edge of location.adjacent) check('location', edge.target, `# location ${location.id} adjacent:`);
-    actionsOf(`# location ${location.id}`, location.actions);
-  }
-}
-
-export function loadModule(source: string): Registry {
-  const registry: Registry = {
-    entities: new Map(),
-    locations: new Map(),
-    items: new Map(),
-    stats: new Map(),
-    skills: new Map(),
-    recipes: new Map(),
-    recipeActions: new Map(),
-    resources: new Map(),
-    dialogues: new Map(),
-    dialoguesByOwner: new Map(),
-    tests: new Map(),
-    variables: new Map(),
-    saves: new Map(),
-  };
-
-  for (const section of parseModule(source)) {
-    switch (section.kind) {
-      case 'entity': {
-        const entity = scopeEntity(hydrateSection(section.value as Authored<Entity>, entitySchema));
-        for (const action of entity.actions) {
-          // A retaliation exists to hit the player. Without a pool to drain it
-          // would fall through to the fight's own hit counter and quietly wear
-          // down the player's target instead of the player.
-          if (action.retaliates && !action.target) {
-            throw new RuntimeError(`# entity ${entity.id}: retaliating action ${JSON.stringify(action.label)} requires a target: pool`);
-          }
-        }
-        registry.entities.set(entity.id, entity);
-        break;
-      }
-      case 'location': {
-        const location = scopeLocation(hydrateSection(section.value as Authored<Location>, locationSchema));
-        registry.locations.set(location.id, location);
-        break;
-      }
-      case 'item': {
-        const item = hydrateSection(section.value as Authored<Item>, itemSchema);
-        registry.items.set(item.id, item);
-        break;
-      }
-      case 'stat': {
-        const stat = hydrateSection(section.value as Authored<Stat>, statSchema);
-        registry.stats.set(stat.id, stat);
-        break;
-      }
-      case 'skill': {
-        const skill = hydrateSection(section.value as Authored<Skill>, skillSchema);
-        registry.skills.set(skill.id, skill);
-        break;
-      }
-      case 'recipe': {
-        const recipe = hydrateSection(section.value as Authored<Recipe>, recipeSchema);
-        registry.recipes.set(recipe.id, recipe);
-        registry.recipeActions.set(recipe.id, recipeAction(recipe));
-        break;
-      }
-      case 'resource': {
-        const resource = hydrateSection(section.value as Authored<Resource>, resourceSchema);
-        if (!resource.max) throw new RuntimeError(`# resource ${resource.id} requires a max: stat`);
-        registry.resources.set(resource.id, resource);
-        break;
-      }
-      case 'dialogue': {
-        const dialogue = section.value as Dialogue;
-        registry.dialogues.set(dialogue.id, dialogue);
-        if (dialogue.owner) registry.dialoguesByOwner.set(dialogue.owner, dialogue);
-        break;
-      }
-      case 'test': {
-        const test = section.value as Test;
-        registry.tests.set(test.id, test);
-        break;
-      }
-      case 'variable': {
-        const variable = hydrateSection(section.value as Authored<Variable>, variableSchema);
-        // An absent value means "leave it at the engine default" (the DSL's
-        // empty==absent rule), so only an authored one is worth rejecting.
-        if (variable.id === CONTEST_SPREAD && variable.value !== undefined && variable.value <= 0) {
-          throw new RuntimeError(`# variable ${CONTEST_SPREAD} must be positive, got ${variable.value} — it divides the stat gap in every opposed roll`);
-        }
-        registry.variables.set(variable.id, variable);
-        break;
-      }
-      case 'save': {
-        const { id, saved } = section.value as { id: string; saved: SavedGame };
-        registry.saves.set(id, saved);
-        break;
-      }
-    }
-  }
-  // Locations placed with `<direction> of <other>` may reference an origin that
-  // parsed later, so absolute coordinates are resolved once all locations exist.
-  resolveCoordinates(registry.locations);
-  validateReferences(registry);
-  return registry;
 }
 
 // References are flat dotted keys, not nested lookups (grammar.md "References");
@@ -533,39 +296,6 @@ function findActionOwner(obj: string, objId: string, registry: Registry): unknow
     default:
       return undefined;
   }
-}
-
-// Seconds of travel per unit of straight-line coordinate distance. A travel
-// edge's journey lasts distance × this factor (see travelAction). Authored as
-// `# variable travel-seconds-per-unit`; content that omits it falls back to this
-// default so a bare module still paces travel sensibly.
-const TRAVEL_SECONDS_PER_UNIT = 'travel-seconds-per-unit';
-const DEFAULT_TRAVEL_SECONDS_PER_UNIT = 5;
-
-export function travelSecondsPerUnit(registry: Registry): number {
-  return registry.variables.get(TRAVEL_SECONDS_PER_UNIT)?.value ?? DEFAULT_TRAVEL_SECONDS_PER_UNIT;
-}
-
-// The least damage a landed hit can deal, however much damage reduction the
-// target has (see hitDamage). Authored as `# variable min-damage`; it is held
-// at 1 or above because a floor of 0 makes a fight unwinnable and unendable.
-const MIN_DAMAGE = 'min-damage';
-const DEFAULT_MIN_DAMAGE = 1;
-
-export function minDamage(registry: Registry): number {
-  return Math.max(1, registry.variables.get(MIN_DAMAGE)?.value ?? DEFAULT_MIN_DAMAGE);
-}
-
-// The stat gap that buys roughly a 91% chance in the opposed roll below, and so
-// the dial for how sharply skill converts to success: smaller makes a small
-// edge decisive, larger flattens the curve. Authored as `# variable
-// contest-spread`, and rejected at load if it isn't positive (see loadModule) —
-// it divides the gap, so zero has no meaning to fall back on.
-const CONTEST_SPREAD = 'contest-spread';
-const DEFAULT_CONTEST_SPREAD = 100;
-
-export function contestSpread(registry: Registry): number {
-  return registry.variables.get(CONTEST_SPREAD)?.value ?? DEFAULT_CONTEST_SPREAD;
 }
 
 // THE opposed roll — every contested outcome in the game runs through it: a
@@ -1696,42 +1426,6 @@ export function useTravel(origin: string, dest: string, registry: Registry, stat
   }
   const { label } = travelAction(origin, dest, registry);
   useAction('travel', `${origin}.${dest}`, label, registry, state);
-}
-
-// Compiles a recipe into an Action so a craft runs through the same
-// resolve()/fight machinery as a repeating entity action: a single-attempt
-// (health: 1) fight whose "target" is the input stack. Called once per recipe
-// at load (see the `recipe` case above).
-function recipeAction(recipe: Recipe): Action {
-  const takes: ActionResult[] = recipe.in.map((q) => ({ kind: 'take', item: q.item, amount: q.amount }));
-  const gives: ActionResult[] = recipe.out.map((q) => ({ kind: 'give', item: q.item, amount: q.amount }));
-  const results: ActionResult[] = [...takes, ...gives];
-  if (recipe.skill) results.push({ kind: 'xp', skill: recipe.skill.skill, amount: recipe.skill.amount });
-  if (recipe.say) results.push({ kind: 'say', text: recipe.say });
-
-  const time = recipe.time ?? 0;
-  const action: Action = {
-    label: `Craft ${humanize(recipe.id)}`,
-    results,
-    time,
-    speed: recipe.speed,
-    accuracy: recipe.accuracy,
-    evasion: recipe.evasion,
-    health: 1,
-    repeating: time > 0,
-  };
-
-  if (recipe.accuracy) {
-    // A craft is a single-attempt fight: a miss fails the whole craft to
-    // `burnt` instead of retrying. The fail path consumes the SAME inputs as
-    // success, so inputLimit (which reads only `results`) still bounds a
-    // repeating burn-capable craft.
-    action.escapeAfter = 1;
-    const burnt: ActionResult[] = recipe.burnt.map((q) => ({ kind: 'give', item: q.item, amount: q.amount }));
-    action.onEscape = [...takes, ...burnt];
-  }
-
-  return action;
 }
 
 export function recipeCraftable(recipe: Recipe, registry: Registry, state: GameState): boolean {

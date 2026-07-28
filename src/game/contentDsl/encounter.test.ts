@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { point } from './range';
-import { armAction, createGameState, GameState, initResources, loadModule, PLAYER, Registry, resolve, statRange, statValue, useAction } from './runtime';
+import { armAction, createGameState, GameState, initResources, PLAYER, resolve, statRange, statValue, useAction } from './runtime';
+import { loadModule, Registry } from './registry';
 import { diffState, initialState, loadSave, SAVE_VERSION } from './save';
 
 // A `target:` action fights the entity it belongs to: that entity joins the

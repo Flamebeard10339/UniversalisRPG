@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { createGameState, loadModule } from '../src/game/contentDsl/runtime';
+import { createGameState } from '../src/game/contentDsl/runtime';
+import { loadModule } from '../src/game/contentDsl/registry';
 import { serializeSave } from '../src/game/contentDsl/save';
 import { beginAction, runTest, startSession, view } from '../src/game/contentDsl/session';
 import { handleCommand, liveTick, type Recorder } from './play-cli';
@@ -247,6 +248,12 @@ starting
 entities:
   oven
   anvil
+
+# item roasted-chestnut
+examine: Split and steaming.
+
+# item ingot
+examine: A dull grey bar.
 
 # entity oven
 roast:

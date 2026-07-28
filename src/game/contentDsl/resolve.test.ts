@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { ActiveAction, armAction, craft, createGameState, GameState, initResources, loadModule, Registry, resolve, RuntimeError, statValue, useAction } from './runtime';
+import { ActiveAction, armAction, craft, createGameState, GameState, initResources, resolve, RuntimeError, statValue, useAction } from './runtime';
+import { loadModule, Registry } from './registry';
 
 // Fixture for the resolver tests: a speed stat, a food item that doubles it
 // for a fixed window, an unbounded repeating cook recipe (campfire-cook — no
@@ -37,6 +38,25 @@ eat:
 
 # item raw-shrimp
 examine: Fresh-caught shrimp, raw.
+
+# item cooked-shrimp
+examine: Hot and pink.
+
+# item blessing
+examine: A warm certainty.
+
+# item wood
+examine: A split log.
+
+# item edge
+examine: A keen edge, ground in.
+
+# item brick
+examine: Fired clay.
+
+# skill smithing
+
+# skill cooking
 
 # recipe campfire-cook
 speed: cooking-speed

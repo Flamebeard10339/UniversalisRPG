@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { Cursor, DslError } from './parser';
 import { point, range } from './range';
-import { ActiveAction, createGameState, GameState, hitDamage, loadModule, minDamage, Registry, sampleStat, statRange, statValue } from './runtime';
+import { ActiveAction, createGameState, GameState, hitDamage, minDamage, sampleStat, statRange, statValue } from './runtime';
+import { loadModule, Registry } from './registry';
 import { tagClause } from './tagClause';
 
 // A stat's base and its flat bonuses may each be an interval; a use of the stat

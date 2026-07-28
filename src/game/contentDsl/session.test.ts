@@ -1,6 +1,7 @@
 import { readFileSync } from 'fs';
 import { describe, expect, it } from 'vitest';
-import { createGameState, loadModule, travelSecondsPerUnit } from './runtime';
+import { createGameState, travelSecondsPerUnit } from './runtime';
+import { loadModule } from './registry';
 import { apply, beginAction, cancelAction, PlayView, runTest, startSession, submitModal, view, wait } from './session';
 
 const source = readFileSync('content/tutorial-island.dsl', 'utf8');
@@ -190,6 +191,9 @@ starting
 entities:
   oven
 
+# item roasted-chestnut
+examine: Split and steaming.
+
 # entity oven
 roast:
   repeating
@@ -198,6 +202,12 @@ roast:
 
 # item bread
 eat: take: 1 bread, say: You eat the bread.
+
+# item dough
+examine: Springy and pale.
+
+# item mix
+examine: Dry flour and salt.
 
 # recipe dough
 time: 2
@@ -338,6 +348,9 @@ x: 1, y: 0
 # location summit
 x: 0, y: 1
 
+# item coin
+examine: A worn copper coin.
+
 # entity gate
 enter:
   take: 1 coin
@@ -389,6 +402,9 @@ x: 0, y: 0
 starting
 entities:
   oven
+
+# item roasted-chestnut
+examine: Split and steaming.
 
 # entity oven
 roast:

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { point } from './range';
-import { armAction, createGameState, GameState, hitChance, initResources, loadModule, Registry, resolve, RuntimeError } from './runtime';
+import { armAction, createGameState, GameState, hitChance, initResources, resolve, RuntimeError } from './runtime';
+import { loadModule, Registry } from './registry';
 
 // Every contested outcome in the game runs through one roll — a sword landing,
 // a dish coming out cooked, a lock giving — so the shape of the curve is tested

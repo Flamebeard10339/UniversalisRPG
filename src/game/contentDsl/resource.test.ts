@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { applyResult, createGameState, initResources, loadModule, Registry } from './runtime';
+import { applyResult, createGameState, initResources } from './runtime';
+import { loadModule, Registry } from './registry';
 import { initialState } from './save';
 
 // Chunk 1 (data plumbing): a `# resource` section parses, hydrates with the

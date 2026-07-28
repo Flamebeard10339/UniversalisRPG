@@ -1,19 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { Condition } from './condition';
 import {
-  actionFirstUnit,
-  applyResult,
-  armAction,
-  armCraft,
-  craft,
-  craftFirstUnit,
-  createGameState,
-  evaluateCondition,
-  loadModule,
-  renderSegments,
-  travelSecondsPerUnit,
-  useAction,
-} from './runtime';
+  actionFirstUnit, applyResult, armAction, armCraft, craft, craftFirstUnit, createGameState, evaluateCondition, renderSegments, travelSecondsPerUnit, useAction } from './runtime';
+import { loadModule } from './registry';
 import { runTest } from './session';
 
 const MODULE = `
@@ -23,6 +12,8 @@ starting
 
 # entity front-door
 open: relocate: guide-house, say: The door swings open.
+
+# entity miki
 
 # dialogue miki
 owner = miki
@@ -228,6 +219,9 @@ prepare:
   on success:
     say: A feast is laid out.
 
+# location hallway
+x: 5, y: 0
+
 # entity door
 open:
   relocate: hallway
@@ -337,6 +331,9 @@ describe('renderSegments', () => {
 
 describe('armAction / actionFirstUnit: arming a spannable action without resolving it (live-mode support)', () => {
   const MODULE = `
+# item roasted-chestnut
+examine: Split and steaming.
+
 # entity oven
 roast:
   repeating
@@ -396,6 +393,9 @@ describe('armCraft / craftFirstUnit', () => {
   const MODULE = `
 # item raw-shrimp
 examine: Fresh-caught shrimp, raw.
+
+# item cooked-shrimp
+examine: Hot and pink.
 
 # recipe cook
 time: 2

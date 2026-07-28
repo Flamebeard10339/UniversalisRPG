@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { loadModule, RuntimeError } from './runtime';
+import { loadModule } from './registry';
+import { RuntimeError } from './runtime';
 
 // Content ids resolved against the registry at load, so a typo is a content
 // error at the moment it is written rather than a failure much later somewhere
@@ -24,6 +25,9 @@ base: 25
 # resource health
 rate: regeneration
 max: max-health
+on empty: stop
+
+# skill brawling
 
 # item straw
 examine: A fistful of straw.
@@ -32,6 +36,9 @@ examine: A fistful of straw.
 x: 0, y: 0
 starting
 entities: training-dummy
+
+# location shed
+x: 1, y: 0
 
 # entity training-dummy
 stats: max-health 12, dr 2
@@ -42,6 +49,15 @@ strike:
   target: health
   ability: attack
   dr: dr
+  xp: brawling 2
+
+# dialogue caretaker
+owner = training-dummy
+
+node hello:
+  when: time >= 0
+  Nothing to say.
+  give: 1 straw
 `;
 
 function loading(replace: string, withText: string): () => void {
@@ -95,6 +111,44 @@ describe('load-time reference resolution', () => {
       /# item straw action "eat" speed: names an unknown stat: nope/,
     );
     expect(() => loadModule(`${VALID}\n# recipe weave\ntime: 1\nspeed: nope\nout: 1 straw\n`)).toThrow(/# recipe weave speed: names an unknown stat: nope/);
+  });
+
+  // The six Action fields above are only the ids an action holds directly. An
+  // action's RESULTS name ids too, and each of these used to load clean and
+  // fail — or silently not fail — somewhere else entirely: `drain:` threw from
+  // inside a live fight, a stat-bonus tag read 0 forever, `xp:` accrued under a
+  // skill with no floating text to show, `relocate:` threw from view(), and
+  // `discover:` set a flag for a place that does not exist.
+  it.each([
+    ['  ability: attack', '  ability: attack\n  drain: 5 bogus', /drain: names an unknown resource: bogus/],
+    ['  ability: attack', '  ability: attack\n  restore: 5 bogus', /restore: names an unknown resource: bogus/],
+    ['  ability: attack', '  ability: attack\n  give: 1 bogus', /give: names an unknown item: bogus/],
+    ['  ability: attack', '  ability: attack\n  take: 1 bogus', /take: names an unknown item: bogus/],
+    ['  ability: attack', '  ability: attack\n  relocate: bogus', /relocate: names an unknown location: bogus/],
+    ['  ability: attack', '  ability: attack\n  discover: bogus', /discover: names an unknown location: bogus/],
+    ['  xp: brawling 2', '  xp: bogus 2', /xp: names an unknown skill: bogus/],
+    ['  repeating', '  repeating\n  +100% bogus', /tag names an unknown stat: bogus/],
+  ])('rejects a result or tag naming nothing: %s → %s', (from, to, message) => {
+    expect(loading(from, to)).toThrow(message);
+  });
+
+  it('rejects an unreachable handler: a pool block, a dialogue effect, a choice effect', () => {
+    expect(loading('on empty: stop', 'on empty: give: 1 bogus')).toThrow(/# resource health on empty: give: names an unknown item: bogus/);
+    expect(loading('  give: 1 straw', '  give: 1 bogus')).toThrow(/# dialogue caretaker node hello give: names an unknown item: bogus/);
+    expect(loading('  give: 1 straw', '  -> Take it.\n    give: 1 bogus')).toThrow(/# dialogue caretaker node hello choice give: names an unknown item: bogus/);
+    expect(loading('owner = training-dummy', 'owner = training-dumy')).toThrow(/# dialogue caretaker owner names an unknown entity: training-dumy/);
+  });
+
+  // Recipes are validated through their compiled Action, so in:/out:/burnt: and
+  // skill: are covered by the same walk rather than a second hand-written list.
+  it('checks a recipe through the action it compiles to', () => {
+    expect(() => loadModule(`${VALID}\n# recipe weave\nin: 1 bogus\nout: 1 straw\n`)).toThrow(/# recipe weave take: names an unknown item: bogus/);
+    expect(() => loadModule(`${VALID}\n# recipe weave\nout: 1 straw\nskill: bogus 1\n`)).toThrow(/# recipe weave xp: names an unknown skill: bogus/);
+    expect(() => loadModule(`${VALID}\n# recipe weave\naccuracy: attack\nout: 1 straw\nburnt: 1 bogus\n`)).toThrow(/# recipe weave give: names an unknown item: bogus/);
+  });
+
+  it('checks a food item tag, the other way a stat id reaches statRange', () => {
+    expect(loading('examine: A fistful of straw.', 'examine: A fistful of straw.\nfood, +3 bogus, 60s')).toThrow(/# item straw tag names an unknown stat: bogus/);
   });
 
   it('resolves forward references, since the pass runs once everything has parsed', () => {

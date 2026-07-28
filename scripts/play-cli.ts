@@ -3,7 +3,8 @@ import path from 'node:path';
 import { createInterface } from 'node:readline/promises';
 import { pathToFileURL } from 'node:url';
 import { DslError } from '../src/game/contentDsl/parser';
-import { actionFirstUnit, craftFirstUnit, describeCondition, encounterView, loadModule, RuntimeError, type ActiveAction, type GameState } from '../src/game/contentDsl/runtime';
+import { actionFirstUnit, craftFirstUnit, describeCondition, encounterView, RuntimeError, type ActiveAction, type GameState } from '../src/game/contentDsl/runtime';
+import { loadModule } from '../src/game/contentDsl/registry';
 import {
   apply,
   applyDirective,

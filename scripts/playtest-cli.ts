@@ -1,6 +1,7 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
-import { createGameState, loadModule, type GameState } from '../src/game/contentDsl/runtime';
+import { createGameState, type GameState } from '../src/game/contentDsl/runtime';
+import { loadModule } from '../src/game/contentDsl/registry';
 import { apply, startSession, view, type PlayView } from '../src/game/contentDsl/session';
 
 const repoRoot = path.join(import.meta.dirname, '..');

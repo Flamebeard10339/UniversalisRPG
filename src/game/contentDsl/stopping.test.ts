@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { point } from './range';
-import { armAction, createGameState, GameState, initResources, loadModule, Registry, resolve } from './runtime';
+import { armAction, createGameState, GameState, initResources, resolve } from './runtime';
+import { loadModule, Registry } from './registry';
 
 // An action outliving the circumstances that let it start is the bug this
 // covers: a player swinging on at 0 health, a ritual continuing after its

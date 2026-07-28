@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { craft, createGameState, loadModule, Registry, RuntimeError, recipeCraftable, resolve } from './runtime';
+import { craft, createGameState, RuntimeError, recipeCraftable, resolve } from './runtime';
+import { loadModule, Registry } from './registry';
 import { startSession, view } from './session';
 
 const MODULE = `

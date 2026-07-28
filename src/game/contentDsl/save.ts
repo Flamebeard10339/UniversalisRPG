@@ -1,5 +1,6 @@
 import { DslError } from './parser';
-import { createGameState, GameState, initResources, Registry, RuntimeError } from './runtime';
+import { createGameState, GameState, initResources, RuntimeError } from './runtime';
+import { Registry } from './registry';
 import { RawSection } from './structure';
 
 // Versioned so a future format change fails loudly instead of silently

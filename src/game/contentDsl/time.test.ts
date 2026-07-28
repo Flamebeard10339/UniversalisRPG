@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { advanceTime, createGameState, evaluateCondition, loadModule, renderSegments, RuntimeError, useAction } from './runtime';
+import { advanceTime, createGameState, evaluateCondition, renderSegments, RuntimeError, useAction } from './runtime';
+import { loadModule } from './registry';
 import { runTest, startSession, view, wait } from './session';
 
 describe('advanceTime', () => {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { Direction, Location, resolveCoordinates } from './location';
-import { loadModule } from './runtime';
+import { loadModule } from './registry';
 import { apply, startSession, view } from './session';
 
 function loc(id: string, over: Partial<Location> = {}): Location {
