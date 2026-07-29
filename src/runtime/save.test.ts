@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { restorePools } from './effects';
-import { createGameState } from './runtime';
+import { createGameState, PLAYER } from './runtime';
 import { loadModule } from '../content/registry';
-import { compareSave, diffState, initialState, loadSave, SAVE_VERSION, serializeSave } from './save';
+import { compareSave, diffState, initialState, loadSave, pruneStateForRegistry, SAVE_VERSION, serializeSave } from './save';
 import { parseSaveSection } from '../content/saveSection';
 import { runTest } from './session';
 
@@ -13,6 +13,8 @@ starting
 
 # item gold
 title: Gold
+
+# flag done
 
 # stat max-health
 base: 10
@@ -78,8 +80,8 @@ describe('loadSave', () => {
   it('round-trips through serialize -> parseSaveSection -> loadSave', () => {
     const registry = loadModule(MODULE);
     const state = initialState(registry);
-    state.inventory.bread = 3;
-    state.flags['tutorial.done'] = true;
+    state.inventory.gold = 3;
+    state.flags.done = true;
     restorePools(state, { health: 4 }); // a damaged pool must survive the round trip, not reset to full
     const serialized = serializeSave(state, registry);
     expect(JSON.parse(serialized).resources).toEqual({ health: 4 });
@@ -117,6 +119,93 @@ describe('loadSave', () => {
     const registry = loadModule(MODULE);
     const state = createGameState();
     expect(() => loadSave(state, { version: SAVE_VERSION + 1, diff: {} }, registry)).toThrow(/version/);
+  });
+});
+
+const PRUNE_MODULE = `
+# location camp
+x: 0, y: 0
+starting
+
+# item bread
+
+# flag known
+
+# skill cooking
+
+# stat max-health
+base: 10
+
+# stat strength
+base: 1
+
+# resource health
+max: max-health
+
+# dialogue miki
+node hello:
+  Hi.
+`;
+
+describe('pruneStateForRegistry', () => {
+  it('removes state entries whose content ids are not loaded', () => {
+    const registry = loadModule(PRUNE_MODULE);
+    const state = initialState(registry);
+    state.location = 'missing-camp';
+    state.inventory.bread = 1;
+    state.inventory['mod.gem'] = 2;
+    state.flags.known = true;
+    state.flags['mod.flag'] = true;
+    state.visits['miki.hello'] = 1;
+    state.visits['mod.dialogue.hello'] = 3;
+    state.xp.cooking = 4;
+    state.xp.mining = 5;
+    restorePools(state, { health: 6, mana: 7 });
+    state.activeBuffs['bread:strength'] = { kind: 'added', statId: 'strength', amount: { min: 1, max: 1 }, expiresAt: 10 };
+    state.activeBuffs['mod.meal:strength'] = { kind: 'added', statId: 'strength', amount: { min: 1, max: 1 }, expiresAt: 10 };
+    state.activeBuffs['bread:agility'] = { kind: 'added', statId: 'agility', amount: { min: 1, max: 1 }, expiresAt: 10 };
+    state.activeAction = {
+      ownerRef: 'item.mod.gem',
+      actionLabel: 'eat',
+      repeating: false,
+      healthRemaining: 1,
+      cadences: { [PLAYER]: { progress: 0, attemptsMade: 0 } },
+    };
+
+    const warnings = pruneStateForRegistry(state, registry);
+
+    expect(state.location).toBe('camp');
+    expect(state.inventory).toEqual({ bread: 1 });
+    expect(state.flags).toEqual({ known: true });
+    expect(state.visits).toEqual({ 'miki.hello': 1 });
+    expect(state.xp).toEqual({ cooking: 4 });
+    expect(state.resources).toEqual({ health: 6 });
+    expect(Object.keys(state.activeBuffs)).toEqual(['bread:strength']);
+    expect(state.activeAction).toBeNull();
+    expect(warnings.map((warning) => warning.path)).toEqual(
+      expect.arrayContaining([
+        'location',
+        'inventory.mod.gem',
+        'flags.mod.flag',
+        'visits.mod.dialogue.hello',
+        'xp.mining',
+        'resources.mana',
+        'activeBuffs.mod.meal:strength',
+        'activeBuffs.bread:agility',
+        'activeAction',
+      ]),
+    );
+  });
+
+  it('loadSave prunes restored stale ids and records quiet warnings in the transient log', () => {
+    const registry = loadModule(PRUNE_MODULE);
+    const state = createGameState();
+    const warnings = loadSave(state, { version: SAVE_VERSION, diff: { inventory: { 'mod.gem': 2 }, flags: { 'mod.flag': true } } }, registry);
+
+    expect(state.inventory).toEqual({});
+    expect(state.flags).toEqual({});
+    expect(warnings.map((warning) => warning.path)).toEqual(['inventory.mod.gem', 'flags.mod.flag']);
+    expect(state.log).toEqual(warnings.map((warning) => warning.message));
   });
 });
 

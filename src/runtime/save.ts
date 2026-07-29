@@ -1,6 +1,8 @@
 import { createGameState, GameState, initResources, RuntimeError } from './runtime';
 import { Registry } from '../content/registry';
 import { ParsedSave } from '../content/saveSection';
+import { findActionOwner, parseOwnerRef } from './actions';
+import { PLAYER } from './state';
 
 // Bumped on any shape change; with no migration path, a stale save is rejected.
 export const SAVE_VERSION = 4;
@@ -58,6 +60,87 @@ export function initialState(registry: Registry): GameState {
   return state;
 }
 
+export interface PruneWarning {
+  path: string;
+  id: string;
+  message: string;
+}
+
+function addWarning(warnings: PruneWarning[], path: string, id: string, message: string): void {
+  warnings.push({ path, id, message });
+}
+
+function pruneRecord<T>(
+  record: Record<string, T>,
+  path: string,
+  has: (id: string) => boolean,
+  kind: string,
+  warnings: PruneWarning[],
+): void {
+  for (const id of Object.keys(record)) {
+    if (has(id)) continue;
+    delete record[id];
+    addWarning(warnings, `${path}.${id}`, id, `Removed ${path} ${id} because its ${kind} is not loaded.`);
+  }
+}
+
+function activeActionProblem(state: GameState, registry: Registry): string | null {
+  const active = state.activeAction;
+  if (!active) return null;
+  const { obj, objId } = parseOwnerRef(active.ownerRef);
+  let owner: { actions?: { label: string }[] } | undefined;
+  try {
+    owner = findActionOwner(obj, objId, registry) as { actions?: { label: string }[] } | undefined;
+  } catch (error) {
+    if (error instanceof RuntimeError) return error.message;
+    throw error;
+  }
+  if (!owner) return `unknown ${obj}: ${objId}`;
+  if (!owner.actions?.some((action) => action.label === active.actionLabel)) return `unknown action ${JSON.stringify(active.actionLabel)} on ${active.ownerRef}`;
+
+  for (const actorId of Object.keys(active.actors ?? {})) if (!registry.entities.has(actorId)) return `unknown encounter actor: ${actorId}`;
+  for (const actorId of Object.keys(active.cadences)) if (actorId !== PLAYER && !registry.entities.has(actorId)) return `unknown encounter cadence actor: ${actorId}`;
+  for (const actor of Object.values(active.actors ?? {})) {
+    for (const resourceId of Object.keys(actor.resources)) if (!registry.resources.has(resourceId)) return `unknown encounter resource: ${resourceId}`;
+  }
+  return null;
+}
+
+export function pruneStateForRegistry(state: GameState, registry: Registry): PruneWarning[] {
+  const warnings: PruneWarning[] = [];
+
+  if (state.location && !registry.locations.has(state.location)) {
+    const old = state.location;
+    const replacement = startingLocationId(registry) ?? '';
+    state.location = replacement;
+    addWarning(warnings, 'location', old, `Moved from unavailable location ${old} to ${replacement || '(nowhere)'}.`);
+  }
+
+  pruneRecord(state.inventory, 'inventory', (id) => registry.items.has(id), 'item', warnings);
+  pruneRecord(state.flags, 'flags', (id) => registry.flags.has(id), 'flag', warnings);
+  pruneRecord(state.visits, 'visits', (id) => registry.namespace.has('node', id), 'dialogue node', warnings);
+  pruneRecord(state.xp, 'xp', (id) => registry.skills.has(id), 'skill', warnings);
+  pruneRecord(state.resources as Record<string, number>, 'resources', (id) => registry.resources.has(id), 'resource', warnings);
+
+  for (const [key, buff] of Object.entries(state.activeBuffs)) {
+    const itemId = key.includes(':') ? key.slice(0, key.indexOf(':')) : undefined;
+    const missing = !registry.stats.has(buff.statId) ? `stat ${buff.statId}` : itemId && !registry.items.has(itemId) ? `item ${itemId}` : undefined;
+    if (!missing) continue;
+    delete state.activeBuffs[key];
+    addWarning(warnings, `activeBuffs.${key}`, key, `Removed active buff ${key} because its ${missing} is not loaded.`);
+  }
+
+  const activeProblem = activeActionProblem(state, registry);
+  if (activeProblem) {
+    const active = state.activeAction!;
+    const id = `${active.ownerRef}.${active.actionLabel}`;
+    state.activeAction = null;
+    addWarning(warnings, 'activeAction', id, `Stopped unavailable action ${id}: ${activeProblem}.`);
+  }
+
+  return warnings;
+}
+
 export function diffState(state: GameState, baseline: GameState): SaveDiff {
   const diff: Record<string, unknown> = {};
 
@@ -84,7 +167,7 @@ function checkVersion(saved: ParsedSave): void {
 }
 
 // Mutates `state` in place: resets every field to initialState, then applies
-export function loadSave(state: GameState, saved: ParsedSave, registry: Registry): void {
+export function loadSave(state: GameState, saved: ParsedSave, registry: Registry): PruneWarning[] {
   checkVersion(saved);
   const base = initialState(registry);
   const diff = saved.diff;
@@ -96,9 +179,14 @@ export function loadSave(state: GameState, saved: ParsedSave, registry: Registry
   }
   for (const field of SCALAR_FIELDS) {
     // `in`, not `!== undefined`: a diff can carry an explicit undefined.
-    target[field] = field in diff ? diff[field] : baseline[field];
+    if (field in diff) target[field] = diff[field];
+    else if (field in baseline) target[field] = baseline[field];
+    else delete target[field];
   }
   state.log = base.log;
+  const warnings = pruneStateForRegistry(state, registry);
+  for (const warning of warnings) state.log.push(warning.message);
+  return warnings;
 }
 
 function describeValue(value: unknown): string {

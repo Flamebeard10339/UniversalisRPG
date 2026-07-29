@@ -19,6 +19,20 @@ function visibleTo(module: ParsedModule, loaded: ReadonlySet<string>): Set<strin
 
 const isNamespaced = (kind: string): boolean => NAMESPACED_KINDS.includes(kind);
 
+function missingOptionalDependencies(module: ParsedModule, loaded: ReadonlySet<string>): Set<string> {
+  const missing = new Set<string>();
+  for (const dependency of module.info.dependencies) {
+    if ((dependency.prefix === 'optional' || dependency.prefix === 'recommended') && !loaded.has(dependency.module)) missing.add(dependency.module);
+  }
+  return missing;
+}
+
+function namesMissingOptional(kind: string, raw: string, missing: ReadonlySet<string>): boolean {
+  const segments = raw.split('.');
+  if (segments[0] === kind && segments.length > 1) segments.shift();
+  return segments.length > 1 && missing.has(segments[0]);
+}
+
 // A bare heading names something inside this module; a dotted one edits something
 // that already exists. You cannot create outside your own namespace, so adding a
 // dependency can never quietly turn a module's creation into an edit of another
@@ -38,7 +52,13 @@ function declareMembers(namespace: Namespace, kind: string, value: { id: string;
 
 export function resolveModule(module: ParsedModule, namespace: Namespace, loaded: ReadonlySet<string>): void {
   const visible = visibleTo(module, loaded);
+  const missingOptional = missingOptionalDependencies(module, loaded);
   const self = module.namespace;
+  module.sections = module.sections.filter((section) => {
+    if (section.kind === 'remove') return !namesMissingOptional((section.value as Removal).kind, (section.value as Removal).target, missingOptional);
+    const { id } = section.value as { id?: string };
+    return id === undefined || !isNamespaced(section.kind) || !id.includes('.') || !namesMissingOptional(section.kind, id, missingOptional);
+  });
   const created = module.sections.filter((section) => section.kind !== 'remove') as { kind: string; value: { id: string; flags?: unknown; nodes?: { name: string }[] } }[];
 
   // Declared before anything is resolved, so a section may reference one that
@@ -65,7 +85,8 @@ export function resolveModule(module: ParsedModule, namespace: Namespace, loaded
     const { id } = section.value as { id: string };
     // The section is the innermost context its own references are read from, so
     // a bare flag name means this object's before it means anyone else's.
-    const visit = (kind: ReferenceKind, raw: string, where: string): string => (isNamespaced(kind) ? namespace.resolve(kind, raw, self, visible, where, id) : raw);
+    const visit = (kind: ReferenceKind, raw: string, where: string): string =>
+      isNamespaced(kind) && !namesMissingOptional(kind, raw, missingOptional) ? namespace.resolve(kind, raw, self, visible, where, id) : raw;
     visitSection(section.kind, section.value, `# ${section.kind} ${id}`, visit);
   }
 }

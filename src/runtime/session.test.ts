@@ -2,7 +2,7 @@ import { readFileSync } from 'fs';
 import { describe, expect, it } from 'vitest';
 import { createGameState, PLAYER, travelSecondsPerUnit } from './runtime';
 import { loadModule } from '../content/registry';
-import { apply, beginAction, cancelAction, PlayView, runTest, startSession, submitModal, view, wait } from './session';
+import { apply, applyDirective, beginAction, cancelAction, PlayView, runTest, startSession, submitModal, view, wait } from './session';
 
 const source = readFileSync('content/tutorial-island.dsl', 'utf8');
 
@@ -182,6 +182,24 @@ node greeting:
 
     v = apply(session, 'talk:mirror');
     expect(v.said).toContain('There you are, Rowan, Elf.');
+  });
+
+  it('shows content-pruning warnings after loading a save with stale ids', () => {
+    const registry = loadModule(`
+# location camp
+x: 0, y: 0
+starting
+
+# save stale
+{"version":4,"inventory":{"mod.gem":1}}
+`);
+    const session = startSession(registry);
+
+    applyDirective(session, { kind: 'load', save: 'stale' });
+    const v = view(session);
+
+    expect(v.said).toEqual(['Removed inventory mod.gem because its item is not loaded.']);
+    expect(session.state.inventory).toEqual({});
   });
 });
 

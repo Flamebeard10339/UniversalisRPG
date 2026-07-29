@@ -12,6 +12,7 @@ import { DslError, Span } from '../grammar/parser';
 import { Namespace } from './namespace';
 import { Recipe, recipeSchema } from './recipe';
 import { registryCapabilities, validateDialogueReferences, validateRecipeReferences, validateTestReferences } from './references';
+import { ReferenceKind, Visit, visitAction, visitSection } from './referenceSites';
 import { Removal } from './removal';
 import { resolveModule } from './resolve';
 import { Resource, resourceSchema } from './resource';
@@ -54,9 +55,18 @@ export interface ModuleDiagnostic {
   column?: number;
 }
 
+export interface ModuleStatus {
+  sourceName: string;
+  moduleId: string;
+  pack?: string;
+  enabled: boolean;
+  loaded: boolean;
+}
+
 export interface UniverseLoadResult {
   registry: Registry;
   diagnostics: ModuleDiagnostic[];
+  modules: ModuleStatus[];
   loadedModules: string[];
   disabledModules: string[];
 }
@@ -131,6 +141,20 @@ function lineColumn(source: string, span: Span | undefined): { line: number; col
 function diagnostic(source: ModuleSource, moduleId: string, stage: ModuleLoadStage, error: DslError): ModuleDiagnostic {
   const position = lineColumn(source.text, error.span);
   return { sourceName: source.name, moduleId, stage, message: error.message, span: error.span, ...(position ?? {}) };
+}
+
+const sourceEnabled = (source: ModuleSource): boolean => source.enabled !== false;
+
+function moduleStatus(source: ModuleSource, moduleId: string, pack: string | undefined, loaded: boolean): ModuleStatus {
+  return { sourceName: source.name, moduleId, pack, enabled: sourceEnabled(source), loaded };
+}
+
+function parsedModuleStatus(module: ParsedModule, loaded: boolean): ModuleStatus {
+  return moduleStatus(module.source, module.info.id, module.info.pack, loaded);
+}
+
+function summarizeDisabled(statuses: readonly ModuleStatus[]): string[] {
+  return statuses.filter((module) => !module.loaded).map((module) => module.moduleId);
 }
 
 export function formatModuleDiagnostic(value: ModuleDiagnostic): string {
@@ -225,6 +249,8 @@ interface BuildFailure {
   error: DslError;
 }
 
+class DanglingReference extends Error {}
+
 const ownerKey = (kind: string, id: string): string => `${kind}\0${id}`;
 
 function sectionOwner(owners: ReadonlyMap<string, ParsedModule>, kind: string, id: string): ParsedModule | undefined {
@@ -235,7 +261,121 @@ function locationIdFromMessage(message: string): string | undefined {
   return /^location '([^']+)'/.exec(message)?.[1] ?? /^location coordinates form a cycle at '([^']+)'/.exec(message)?.[1];
 }
 
-function validateBuiltRegistry(registry: Registry, owners: ReadonlyMap<string, ParsedModule>): BuildFailure | null {
+function namesDanglingRoot(kind: ReferenceKind, id: string, danglingRoots: ReadonlySet<string>): boolean {
+  const segments = id.split('.');
+  if (segments[0] === kind && segments.length > 1) segments.shift();
+  return segments.length > 1 && danglingRoots.has(segments[0]);
+}
+
+function referencePruned(kind: ReferenceKind, id: string, pruned: ReadonlySet<string>): boolean {
+  return pruned.has(ownerKey(kind, id));
+}
+
+function danglingVisit(danglingRoots: ReadonlySet<string>, pruned: ReadonlySet<string>): Visit {
+  return (kind, id) => {
+    if (namesDanglingRoot(kind, id, danglingRoots) || referencePruned(kind, id, pruned)) throw new DanglingReference();
+    return id;
+  };
+}
+
+function referencesLoaded(check: () => void): boolean {
+  try {
+    check();
+    return true;
+  } catch (error) {
+    if (error instanceof DanglingReference) return false;
+    throw error;
+  }
+}
+
+function pruneActions(actions: Action[], where: string, visit: Visit): Action[] {
+  return actions.filter((action) => referencesLoaded(() => visitAction(action, `${where} action ${JSON.stringify(action.label)}`, visit)));
+}
+
+function pruneRegistryDanglingReferences(registry: Registry, danglingRoots: ReadonlySet<string>): void {
+  const pruned = new Set<string>();
+  for (;;) {
+    let changed = false;
+    const visit = danglingVisit(danglingRoots, pruned);
+
+    for (const [id, entity] of registry.entities) {
+      const stats = Object.fromEntries(Object.entries(entity.stats).filter(([statId]) => registry.stats.has(statId)));
+      const actions = pruneActions(entity.actions, `# entity ${id}`, visit);
+      if (Object.keys(stats).length !== Object.keys(entity.stats).length || actions.length !== entity.actions.length) {
+        registry.entities.set(id, { ...entity, stats, actions });
+        changed = true;
+      }
+    }
+
+    for (const [id, item] of registry.items) {
+      const tags = item.tags.filter((tag) => tag.kind !== 'stat-bonus' || registry.stats.has(tag.statId));
+      const actions = pruneActions(item.actions, `# item ${id}`, visit);
+      if (tags.length !== item.tags.length || actions.length !== item.actions.length) {
+        registry.items.set(id, { ...item, tags, actions });
+        changed = true;
+      }
+    }
+
+    for (const [id, location] of registry.locations) {
+      if (location.relative && (namesDanglingRoot('location', location.relative.of, danglingRoots) || referencePruned('location', location.relative.of, pruned))) {
+        registry.locations.delete(id);
+        pruned.add(ownerKey('location', id));
+        changed = true;
+        continue;
+      }
+      const entities = location.entities.filter((entityId) => !namesDanglingRoot('entity', entityId, danglingRoots) && !referencePruned('entity', entityId, pruned));
+      const adjacent = location.adjacent.filter((edge) =>
+        !namesDanglingRoot('location', edge.target, danglingRoots) &&
+        !referencePruned('location', edge.target, pruned) &&
+        referencesLoaded(() => visitSection('location', { ...location, entities: [], adjacent: [{ ...edge }], relative: undefined, actions: [] }, `# location ${id}`, visit)),
+      );
+      const actions = pruneActions(location.actions, `# location ${id}`, visit);
+      if (entities.length !== location.entities.length || adjacent.length !== location.adjacent.length || actions.length !== location.actions.length) {
+        registry.locations.set(id, { ...location, entities, adjacent, actions });
+        changed = true;
+      }
+    }
+
+    for (const [id, recipe] of registry.recipes) {
+      if (referencesLoaded(() => visitSection('recipe', { ...recipe }, `# recipe ${id}`, visit))) continue;
+      registry.recipes.delete(id);
+      registry.recipeActions.delete(id);
+      pruned.add(ownerKey('recipe', id));
+      changed = true;
+    }
+
+    for (const [id, resource] of registry.resources) {
+      if (referencesLoaded(() => visitSection('resource', { ...resource }, `# resource ${id}`, visit))) continue;
+      registry.resources.delete(id);
+      pruned.add(ownerKey('resource', id));
+      changed = true;
+    }
+
+    for (const [id, dialogue] of registry.dialogues) {
+      if (referencesLoaded(() => visitSection('dialogue', { ...dialogue, nodes: dialogue.nodes.map((node) => ({ ...node })) }, `# dialogue ${id}`, visit))) continue;
+      registry.dialogues.delete(id);
+      pruned.add(ownerKey('dialogue', id));
+      changed = true;
+    }
+
+    for (const [id, test] of registry.tests) {
+      if (referencesLoaded(() => visitSection('test', { ...test }, `# test ${id}`, visit))) continue;
+      registry.tests.delete(id);
+      pruned.add(ownerKey('test', id));
+      changed = true;
+    }
+
+    if (!changed) {
+      registry.dialoguesByOwner.clear();
+      for (const dialogue of registry.dialogues.values()) if (dialogue.owner) registry.dialoguesByOwner.set(dialogue.owner, dialogue);
+      return;
+    }
+  }
+}
+
+function validateBuiltRegistry(registry: Registry, owners: ReadonlyMap<string, ParsedModule>, danglingRoots: ReadonlySet<string>): BuildFailure | null {
+  pruneRegistryDanglingReferences(registry, danglingRoots);
+
   try {
     recursivelyResolveRelativeCoordinates(registry.locations);
   } catch (error) {
@@ -293,6 +433,12 @@ function compileModules(modules: readonly ParsedModule[]): { registry: Registry 
   const owners = new Map<string, ParsedModule>();
   const namespace = registry.namespace;
   const loaded = new Set(modules.map((module) => module.info.id));
+  const danglingRoots = new Set<string>();
+  for (const module of modules) {
+    for (const dependency of module.info.dependencies) {
+      if ((dependency.prefix === 'optional' || dependency.prefix === 'recommended') && !loaded.has(dependency.module)) danglingRoots.add(dependency.module);
+    }
+  }
   namespace.declareModules(loaded);
   for (const module of modules) {
     // Per module, before merging: a shortened reference resolves against its own
@@ -336,18 +482,23 @@ function compileModules(modules: readonly ParsedModule[]): { registry: Registry 
       }
     }
   }
-  const validationFailure = validateBuiltRegistry(registry, owners);
+  const validationFailure = validateBuiltRegistry(registry, owners, danglingRoots);
   if (validationFailure) return { failure: validationFailure };
   return { registry };
 }
 
 export function loadUniverse(sources: readonly ModuleSource[]): Registry {
-  const compiled = compileModules(parseUniverse(sources));
+  const compiled = compileModules(parseUniverse(sources.filter(sourceEnabled)));
   if ('failure' in compiled) throw compiled.failure.error;
   return compiled.registry;
 }
 
-function parseActiveSources(sources: readonly ModuleSource[], diagnostics: ModuleDiagnostic[], disabled: Set<ModuleSource>): ParsedModule[] | null {
+function parseActiveSources(
+  sources: readonly ModuleSource[],
+  diagnostics: ModuleDiagnostic[],
+  disabled: Set<ModuleSource>,
+  statuses: Map<ModuleSource, ModuleStatus>,
+): ParsedModule[] | null {
   const modules: ParsedModule[] = [];
   let failed = false;
   for (const source of sources) {
@@ -357,6 +508,7 @@ function parseActiveSources(sources: readonly ModuleSource[], diagnostics: Modul
       if (!(error instanceof DslError)) throw error;
       diagnostics.push(diagnostic(source, source.name, 'parse', error));
       disabled.add(source);
+      statuses.set(source, moduleStatus(source, source.name, undefined, false));
       failed = true;
     }
   }
@@ -366,27 +518,31 @@ function parseActiveSources(sources: readonly ModuleSource[], diagnostics: Modul
 export function loadUniverseWithDiagnostics(sources: readonly ModuleSource[]): UniverseLoadResult {
   const diagnostics: ModuleDiagnostic[] = [];
   const disabled = new Set<ModuleSource>();
-  let active = sources.filter((source) => {
+  const statuses = new Map<ModuleSource, ModuleStatus>();
+
+  for (const source of sources.filter((source) => !sourceEnabled(source))) {
     try {
-      parseModuleSource(source);
-      return true;
+      statuses.set(source, parsedModuleStatus(parseModuleSource(source), false));
     } catch (error) {
       if (!(error instanceof DslError)) throw error;
       diagnostics.push(diagnostic(source, source.name, 'parse', error));
-      disabled.add(source);
-      return false;
+      statuses.set(source, moduleStatus(source, source.name, undefined, false));
     }
-  });
+    disabled.add(source);
+  }
+
+  let active = sources.filter(sourceEnabled);
 
   for (;;) {
-    const modules = parseActiveSources(active, diagnostics, disabled);
+    const modules = parseActiveSources(active, diagnostics, disabled, statuses);
     if (modules === null) {
       active = active.filter((source) => !disabled.has(source));
       continue;
     }
 
     if (modules.length === 0) {
-      return { registry: emptyRegistry(), diagnostics, loadedModules: [], disabledModules: [...new Set(diagnostics.map((d) => d.moduleId))] };
+      const modules = sources.map((source) => statuses.get(source) ?? moduleStatus(source, source.name, undefined, false));
+      return { registry: emptyRegistry(), diagnostics, modules, loadedModules: [], disabledModules: summarizeDisabled(modules) };
     }
 
     const orderProblems = moduleOrderProblems(modules);
@@ -394,6 +550,7 @@ export function loadUniverseWithDiagnostics(sources: readonly ModuleSource[]): U
       for (const problem of orderProblems) {
         diagnostics.push(diagnostic(problem.module.source, problem.module.info.id, 'order', problem.error));
         disabled.add(problem.module.source);
+        statuses.set(problem.module.source, parsedModuleStatus(problem.module, false));
       }
       active = active.filter((source) => !disabled.has(source));
       continue;
@@ -402,16 +559,20 @@ export function loadUniverseWithDiagnostics(sources: readonly ModuleSource[]): U
     const ordered = orderModules(modules);
     const compiled = compileModules(ordered);
     if (!('failure' in compiled)) {
+      for (const module of ordered) statuses.set(module.source, parsedModuleStatus(module, true));
+      const modules = sources.map((source) => statuses.get(source) ?? moduleStatus(source, source.name, undefined, false));
       return {
         registry: compiled.registry,
         diagnostics,
+        modules,
         loadedModules: ordered.map((module) => module.info.id),
-        disabledModules: [...new Set(diagnostics.map((d) => d.moduleId))],
+        disabledModules: summarizeDisabled(modules),
       };
     }
 
     diagnostics.push(diagnostic(compiled.failure.module.source, compiled.failure.module.info.id, compiled.failure.stage, compiled.failure.error));
     disabled.add(compiled.failure.module.source);
+    statuses.set(compiled.failure.module.source, parsedModuleStatus(compiled.failure.module, false));
     active = active.filter((source) => !disabled.has(source));
   }
 }

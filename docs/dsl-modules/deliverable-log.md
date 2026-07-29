@@ -1,7 +1,7 @@
 # DSL modules — deliverable log
 
-**Status:** D1-D8 settled. **Chunks 1, 2, 3a, 3b, 3c and 4 landed** — the namespace work is done
-bar action labels, deferred with a reason in the 3c entry. Chunk 5 is next.
+**Status:** D1-D8 settled. **Chunks 1, 2, 3a, 3b, 3c, 4 and 5 landed** — the namespace work is
+done except bare action labels, deferred with a reason in the 3c entry. Chunk 6 is next.
 
 ---
 
@@ -277,7 +277,7 @@ Engine first; nothing in tooling is safe until a bad module can fail alone.
 | 3b | ~~One namespace tree for objects; resolution subsumes validation~~ **done** | D3, D6, D8 |
 | 3c | ~~Members: declarable flags and dialogue nodes; folds `scope.ts` in; the `tutorial.` migration~~ **done**; action labels deferred | D7, rest of D6; unlocks req 6 |
 | 4 | ~~Per-module error isolation + diagnostics~~ **done** | engine req 3, 4 |
-| 5 | Enable/disable, packs, dangling-ref pruning | engine req 1, 6; module req 4 |
+| 5 | ~~Enable/disable, packs, dangling-ref pruning~~ **done** | engine req 1, 6; module req 4 |
 | 6 | CLI authoring of every DSL type | engine req 2 |
 | 7 | Publish to GitHub issue; squash tooling | engine req 5 |
 | 8 | Modportal over `approved-mod` issues | stretch |
@@ -573,6 +573,50 @@ if it needs to become broader.
 
 Verified: 387 tests green, `npm run build`, `npm run layer-check`, `npm run audit-status`, and a
 CLI smoke run of `content/tutorial-island.dsl` through the tolerant loader.
+
+---
+
+### Chunk 5 — enable/disable, packs and dangling-reference pruning (done)
+
+Enablement is now user state on `ModuleSource.enabled`, not authored `# info` data. The strict
+loader filters disabled sources before parsing, so a switched-off broken module cannot poison the
+universe. The diagnostic loader reports every source through `modules: ModuleStatus[]`, including
+`sourceName`, module id, authored `pack:`, `enabled` and `loaded`, while preserving the existing
+`loadedModules`/`disabledModules` summaries for simple callers.
+
+`pack:` remains authored metadata, and filesystem folders stay a source-discovery concern rather
+than a content-layer concern. That keeps the engine operating on `ModuleSource[]` from any future
+picker, folder walker, local-changes store or modportal without baking one storage layout into the
+DSL loader.
+
+Absent optional/recommended dependencies now degrade instead of failing. During resolution, an
+explicit reference into a missing optional module root is left as a dangling path; a section that
+only edits/removes that missing module's object is skipped. After merge, the registry prunes those
+dangling paths before final validation: list members are filtered, actions that name missing
+optional content are removed, and whole recipes/resources/dialogues/tests are removed when their
+own reference set no longer makes sense. Ordinary unknown ids still fail loudly; the prune pass is
+driven by absent optional module roots, not by "anything the registry lacks", so typos and unknown
+capabilities keep producing diagnostics.
+
+Save/runtime pruning landed as `pruneStateForRegistry(state, registry)`. It mutates the existing
+state and returns warnings while removing stale inventory items, flags, dialogue visits, skill XP,
+resources, active buffs and unavailable in-flight actions. A stale location moves to the registry's
+starting location, or to nowhere if none exists. `loadSave` runs that same prune after applying the
+save diff and appends the warnings to the transient log; `/load` now leaves those warning lines
+visible in the next view instead of advancing the cursor past them.
+
+Accepted boundaries:
+- Optional dangling refs must name the missing module root explicitly (`addon.gem`). A bare
+  shortcut into an absent optional dependency is unknowable and still errors.
+- Dialogue/resource/test pruning is conservative at the owning object level. If that becomes too
+  coarse for real authored mods, the shared visitor now gives the hook for a finer node/effect
+  policy without weakening validation.
+- Unknown station capabilities still fail. Capabilities are deliberately global contracts, not
+  namespaced objects, so there is no module root to prove that `station: kiln` meant a disabled
+  optional dependency rather than a typo.
+
+Verified: 392 tests green, `npm run build`, `npm run layer-check`, `npm run audit-status`, and a
+CLI smoke run of `content/tutorial-island.dsl` after the prune pass.
 
 ---
 

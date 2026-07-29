@@ -134,6 +134,55 @@ describe('loadUniverse', () => {
 });
 
 describe('loadUniverseWithDiagnostics', () => {
+  it('skips disabled modules before parsing the strict load set, while reporting their pack status', () => {
+    const base = module('base', '# info base', '# item rope');
+    const extra: ModuleSource = { ...module('extra', '# info extra', 'pack: side-content', '# item gem'), enabled: false };
+
+    expect([...loadUniverse([base, extra]).items.keys()]).toEqual(['base.rope']);
+
+    const result = loadUniverseWithDiagnostics([extra, base]);
+    expect(result.loadedModules).toEqual(['base']);
+    expect(result.disabledModules).toEqual(['extra']);
+    expect(result.diagnostics).toEqual([]);
+    expect(result.modules).toEqual([
+      { sourceName: 'extra', moduleId: 'extra', pack: 'side-content', enabled: false, loaded: false },
+      { sourceName: 'base', moduleId: 'base', enabled: true, loaded: true },
+    ]);
+  });
+
+  it('prunes references into absent optional modules instead of disabling the referring module', () => {
+    const addon: ModuleSource = {
+      ...module('addon', '# info addon', '# item gem', '# entity fairy', '# location garden', 'x: 1, y: 0'),
+      enabled: false,
+    };
+    const base = module(
+      'base',
+      '# info base',
+      'dependencies: ? addon',
+      '# item charm',
+      '# entity chest',
+      'open:',
+      '  give: addon.gem',
+      '# recipe charm',
+      'in: addon.gem',
+      'out: charm',
+      '# location camp',
+      'x: 0, y: 0',
+      'starting',
+      'entities: chest, addon.fairy',
+      'adjacent: addon.garden',
+    );
+
+    const result = loadUniverseWithDiagnostics([base, addon]);
+
+    expect(result.loadedModules).toEqual(['base']);
+    expect(result.diagnostics).toEqual([]);
+    expect(result.registry.entities.get('base.chest')!.actions).toEqual([]);
+    expect(result.registry.recipes.has('base.charm')).toBe(false);
+    expect(result.registry.locations.get('base.camp')!.entities).toEqual(['base.chest']);
+    expect(result.registry.locations.get('base.camp')!.adjacent).toEqual([]);
+  });
+
   it('disables only the module whose source does not parse', () => {
     const result = loadUniverseWithDiagnostics([module('base', '# info base', '# item rope'), { name: 'broken', text: '# item' }]);
 
@@ -159,7 +208,7 @@ describe('loadUniverseWithDiagnostics', () => {
     const result = loadUniverseWithDiagnostics([child, bad, base]);
 
     expect(result.loadedModules).toEqual(['base']);
-    expect(result.disabledModules).toEqual(['bad', 'child']);
+    expect([...result.disabledModules].sort()).toEqual(['bad', 'child']);
     expect(result.diagnostics.map((d) => [d.moduleId, d.stage, d.message])).toEqual([
       ['bad', 'resolve', '# entity bad.gull action "peck" give: names an unknown item: missing'],
       ['child', 'order', '# info child dependencies: names a module that is not loaded: bad'],

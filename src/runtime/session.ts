@@ -314,9 +314,9 @@ export function applyDirective(session: PlaySession, directive: Directive): { fa
     case 'load': {
       const saved = registry.saves.get(directive.save);
       if (!saved) throw new RuntimeError(`unknown save: ${directive.save}`);
-      loadSave(state, saved, registry);
+      const warnings = loadSave(state, saved, registry);
       session.dialogue = null;
-      session.logCursor = state.log.length;
+      session.logCursor = Math.max(0, state.log.length - warnings.length);
       return {};
     }
     case 'cancel':

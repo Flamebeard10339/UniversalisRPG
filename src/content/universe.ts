@@ -7,6 +7,7 @@ import { Authored, hydrateSection } from '../grammar/section';
 export interface ModuleSource {
   name: string;
   text: string;
+  enabled?: boolean;
 }
 
 export interface ParsedModule {
