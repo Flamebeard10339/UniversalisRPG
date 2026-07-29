@@ -205,6 +205,8 @@ See also `TODO(dialogue-pacing)` in case it is relevant here.
 ## Implement a migration system for saves
 Saves stored inside of the DSL should probably be migrated once, instead of running through the migration engine every time. There should be a command for this we can run in the project whenever we bump the version. 
 
+## Balancing of the tutorial
+
 ---
 
 ## E2E Authoring
