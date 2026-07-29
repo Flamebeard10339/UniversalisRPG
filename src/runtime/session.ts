@@ -1,7 +1,7 @@
 import { Action } from '../content/entity';
 import { Location } from '../content/location';
 import {
-  actionFirstUnit, actionVisible, armAction, armCraft, armTravel, craft, craftFirstUnit, describeCondition, DialogueSession, encounterView, EncounterView, endAction, evaluateCondition, GameState, RuntimeError, choose, createGameState, initResources, recipeCraftable, renderSegments, requiresMet, resolve, statValue, talk, travelFirstUnit, useAction, useTravel } from './runtime';
+  actionVisible, ArmResult, armAction, armCraft, armTravel, craft, describeCondition, DialogueSession, encounterView, EncounterView, endAction, evaluateCondition, GameState, RuntimeError, choose, createGameState, initResources, recipeCraftable, renderSegments, requiresMet, resolve, statValue, talk, useAction, useTravel } from './runtime';
 import { Registry } from '../content/registry';
 import { ResourceDisplay } from '../content/resource';
 import { compareSave, loadSave, startingLocationId } from './save';
@@ -216,27 +216,39 @@ export function apply(session: PlaySession, choiceId: string): PlayView {
 
 // ARMS a spannable action instead of resolving its first unit; everything else
 // takes the instant path. Nothing done on completion may live in useAction.
+// Null for a directive there is nothing to arm: a journey from an unset origin
+// is a placement, and everything else here is applied rather than begun.
+function arm(directive: Directive, registry: Registry, state: GameState): ArmResult | null {
+  switch (directive.kind) {
+    case 'craft':
+      return armCraft(directive.recipe, registry, state);
+    case 'use':
+      return armAction(directive.obj, directive.objId, directive.actionId, registry, state);
+    case 'travel':
+      return state.location ? armTravel(state.location, directive.location, registry, state) : null;
+    default:
+      return null;
+  }
+}
+
 export function beginAction(session: PlaySession, choiceId: string): PlayView {
   const choice = computeChoices(session).find((c) => c.id === choiceId);
   if (!choice) throw new RuntimeError(`unavailable choice: ${JSON.stringify(choiceId)}`);
   const directive = choiceToDirective(choice);
   const { registry, state } = session;
 
-  if (directive.kind === 'craft' && craftFirstUnit(directive.recipe, registry, state) > 0) {
-    armCraft(directive.recipe, registry, state);
+  // Arm, then route on what arming returned. Probing first asked for a quantity
+  // computed against the state before arming, and arming can move what it
+  // measures — the same bug class as a food buff read on either side of it.
+  const armed = arm(directive, registry, state);
+  if (armed === null) {
+    applyDirective(session, directive);
     return view(session);
   }
-  if (directive.kind === 'use' && actionFirstUnit(directive.obj, directive.objId, directive.actionId, registry, state) > 0) {
-    // armAction has already logged a take-gate failure and left activeAction unset.
-    armAction(directive.obj, directive.objId, directive.actionId, registry, state);
-    return view(session);
-  }
-  if (directive.kind === 'travel' && travelFirstUnit(state.location, directive.location, registry, state) > 0) {
-    armTravel(state.location, directive.location, registry, state);
-    return view(session);
-  }
-
-  applyDirective(session, directive);
+  // armAction has already logged a take-gate failure and left activeAction
+  // unset; an instant action has nothing to wait for, so beginning it is doing
+  // it, which is what useAction does with a zero first unit.
+  if (armed.armed && armed.firstUnit === 0) resolve(state, registry, state.time);
   return view(session);
 }
 

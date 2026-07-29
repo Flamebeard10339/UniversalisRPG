@@ -11,6 +11,10 @@ function ids(v: PlayView): string[] {
 }
 
 describe('session', () => {
+  // Not a second copy of the `# test` that walks the same route: that one
+  // asserts flags and an end-state save, this one asserts the choice-list API
+  // around them — which ids are offered and withdrawn, `inDialogue`, the
+  // encounter readout, `said` — none of which a `# test` directive can reach.
   it('drives the tutorial-island miki route through the choice-list API', () => {
     const registry = loadModule(source);
     const session = startSession(registry);

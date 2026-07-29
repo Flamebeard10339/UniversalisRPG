@@ -375,7 +375,7 @@ function grantActionFoodBuff(state: GameState, registry: Registry): void {
 }
 
 // `armed: false` has already logged its failure; `firstUnit` spans from state.time.
-type ArmResult = { armed: true; firstUnit: number } | { armed: false };
+export type ArmResult = { armed: true; firstUnit: number } | { armed: false };
 
 function firstUnitSpan(action: Action, state: GameState, registry: Registry): number {
   const duration = attemptDuration(action, state, registry);
@@ -412,7 +412,10 @@ export function armAction(obj: string, objId: string, actionId: string, registry
   return { armed: true, firstUnit: firstUnitSpan(action, state, registry) };
 }
 
-// NOT the number armAction returns; only its sign is safe to route on. TODO(L1).
+// A probe: it computes the first unit WITHOUT arming, and arming can move what
+// it measures. Callers that are about to arm should arm and read `ArmResult`
+// instead; this is for a caller with nothing to arm, like the CLI's readout of
+// an action already in flight.
 export function actionFirstUnit(obj: string, objId: string, actionId: string, registry: Registry, state: GameState): number {
   const target = findActionOwner(obj, objId, registry) as { actions?: Action[] } | undefined;
   const action = target?.actions?.find((a) => a.label === actionId);
@@ -433,9 +436,9 @@ export function travelFirstUnit(origin: string, dest: string, registry: Registry
   return actionFirstUnit('travel', travelPair(origin, dest), label, registry, state);
 }
 
-export function armTravel(origin: string, dest: string, registry: Registry, state: GameState): void {
+export function armTravel(origin: string, dest: string, registry: Registry, state: GameState): ArmResult {
   const { label } = travelAction(origin, dest, registry);
-  armAction('travel', travelPair(origin, dest), label, registry, state);
+  return armAction('travel', travelPair(origin, dest), label, registry, state);
 }
 
 export function useTravel(origin: string, dest: string, registry: Registry, state: GameState): void {
