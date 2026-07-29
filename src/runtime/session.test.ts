@@ -473,3 +473,9 @@ cancel
     expect(state.time).toBe(2);
   });
 });
+
+describe('starting a session with nowhere to begin', () => {
+  it('says so instead of failing later with an empty location id', () => {
+    expect(() => startSession(loadModule('# location camp\nx: 0, y: 0'))).toThrow(/no # location is marked starting/);
+  });
+});

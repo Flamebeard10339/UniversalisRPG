@@ -382,8 +382,23 @@ function pruneRegistryDanglingReferences(registry: Registry, danglingRoots: Read
   }
 }
 
+// Two `starting` locations used to resolve by source order, which is a coin
+// toss an author cannot see. Zero is not checked here — a module set is allowed
+// to hold locations without holding the one a new game begins in, and the
+// session says so when a game is actually started.
+function startingLocationFailure(registry: Registry, owners: ReadonlyMap<string, ParsedModule>): BuildFailure | null {
+  const starting = [...registry.locations.values()].filter((location) => location.starting);
+  if (starting.length < 2) return null;
+  const module = sectionOwner(owners, 'location', starting[1].id);
+  const error = new DslError(`# location ${starting[1].id} is marked starting, and so is ${starting[0].id}; a new game begins in exactly one place`);
+  return module ? { module, stage: 'validate', error } : null;
+}
+
 function validateBuiltRegistry(registry: Registry, owners: ReadonlyMap<string, ParsedModule>, danglingRoots: ReadonlySet<string>): BuildFailure | null {
   pruneRegistryDanglingReferences(registry, danglingRoots);
+
+  const starting = startingLocationFailure(registry, owners);
+  if (starting) return starting;
 
   try {
     recursivelyResolveRelativeCoordinates(registry.locations);

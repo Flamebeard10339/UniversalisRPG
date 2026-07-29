@@ -159,7 +159,10 @@ export function choiceToDirective(choice: PlayChoice): Directive {
 export function startSession(registry: Registry, state: GameState = createGameState()): PlaySession {
   if (!state.location) {
     const starting = startingLocationId(registry);
-    if (starting) state.location = starting;
+    // Said here rather than at the first `view()`, where it surfaced as
+    // "unknown location: " and named nothing an author could act on.
+    if (!starting) throw new RuntimeError('no # location is marked starting, so a new game has nowhere to begin');
+    state.location = starting;
   }
   initResources(state, registry);
   return { registry, state, dialogue: null, logCursor: state.log.length };

@@ -128,3 +128,11 @@ describe('what a namespace does not reach', () => {
     expect(loadUniverse([kitchen, cook]).recipes.get('cook.bake')!.requiresCapability).toBe('oven');
   });
 });
+
+describe('a new game begins in exactly one place', () => {
+  it('refuses two starting locations rather than picking by source order', () => {
+    expect(() => loadUniverse([module('base', '# location a', 'x: 0, y: 0', 'starting', '# location b', 'x: 1, y: 0', 'starting')])).toThrow(
+      /is marked starting, and so is/,
+    );
+  });
+});
