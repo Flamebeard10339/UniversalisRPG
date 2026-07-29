@@ -11,6 +11,7 @@ import {
   resolvesPerAttempt,
   stopsOnOutcome,
   travelAction,
+  travelPair,
 } from './actions';
 import {
   applyResults,
@@ -429,12 +430,12 @@ export function useAction(obj: string, objId: string, actionId: string, registry
 export function travelFirstUnit(origin: string, dest: string, registry: Registry, state: GameState): number {
   if (!origin) return 0;
   const { label } = travelAction(origin, dest, registry);
-  return actionFirstUnit('travel', `${origin}.${dest}`, label, registry, state);
+  return actionFirstUnit('travel', travelPair(origin, dest), label, registry, state);
 }
 
 export function armTravel(origin: string, dest: string, registry: Registry, state: GameState): void {
   const { label } = travelAction(origin, dest, registry);
-  armAction('travel', `${origin}.${dest}`, label, registry, state);
+  armAction('travel', travelPair(origin, dest), label, registry, state);
 }
 
 export function useTravel(origin: string, dest: string, registry: Registry, state: GameState): void {
@@ -443,7 +444,7 @@ export function useTravel(origin: string, dest: string, registry: Registry, stat
     return;
   }
   const { label } = travelAction(origin, dest, registry);
-  useAction('travel', `${origin}.${dest}`, label, registry, state);
+  useAction('travel', travelPair(origin, dest), label, registry, state);
 }
 
 export function recipeCraftable(recipe: Recipe, registry: Registry, state: GameState): boolean {

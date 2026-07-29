@@ -1,7 +1,7 @@
 # DSL modules — deliverable log
 
-**Status:** design ratified 2026-07-28, D1–D7 settled. **Chunks 1 and 2 landed.** Chunk 1b has
-merged into chunk 3 — see the chunk log.
+**Status:** D1-D8 settled. **Chunks 1, 2, 3a and 3b landed.** Chunk 3c (members: flags,
+action labels, dialogue nodes) is what remains of the namespace work.
 
 ---
 
@@ -71,7 +71,7 @@ title: Miki
 examine: A guide, mid-yawn.
 dialogue: miki-intro
 
-# entity miki                     ← in a module that depends on the above: edits it
+# entity base.miki                ← in a module that depends on the above: edits it
 examine: A guide, wide awake.     ← title and dialogue are untouched
 ```
 
@@ -154,8 +154,9 @@ read from the current context outward. One mechanism, no exceptions.
 **`self.`** is reserved for "explicitly my own module", for when local content is shadowed or when
 a generator wants to be unambiguous.
 
-Creation is always namespace-local: a section names a bare id and the owning module's prefix is
-applied at load. You cannot collide, because you cannot create outside your own namespace.
+Creation is always namespace-local: a bare heading names something inside this module and the
+owning module's prefix is applied at load; a dotted heading edits a path that already exists
+(D8). You cannot collide, because you cannot create outside your own namespace.
 
 #### Consequences that fall out of making this rigorous
 
@@ -177,10 +178,10 @@ applied at load. You cannot collide, because you cannot create outside your own 
 #### Accepted costs
 
 - **Adding a dependency can break existing shortenings**, because the namespace it resolves
-  against grew. Accepted as the cost of doing business; a "expand all references" command is the
-  fix if it ever stings. Note the same thing happens *within* a module — adding `entity.rope` to
-  a module that already has `item.rope` breaks bare `rope` — which is more frequent during
-  authoring than the dependency case, and lands on the same fix.
+  against grew. Accepted as the cost of doing business; an "expand all references" command is the
+  fix if it ever stings. The same-module version of this turned out **not** to happen: resolution
+  is directed by the kind each site wants, so adding an `entity` named `rope` alongside an `item`
+  named `rope` leaves `give: rope` resolving to the item.
 - **`tutorial.made-bread` must become `tutorial-made-bread`.** Verified blast radius: 19
   references in `content/tutorial-island.dsl`, 20 in `src`/`scripts`. Mechanical, but note the
   hope that no tests change is *nearly* right rather than right — no test needs restructuring,
@@ -272,7 +273,9 @@ Engine first; nothing in tooling is safe until a bad module can fail alone.
 | --- | --- | --- |
 | 1 | ~~`# info`, module identity, `loadUniverse`, topological order~~ **done** | spec basis |
 | 2 | ~~Field-granular merge + `remove` + list operators~~ **done** | DSL-H1, module req 1–3 |
-| 3 | One traversal that resolves and validates every reference — absorbs the old chunk 1b | DSL-H2, D6, D7; unlocks req 6 |
+| 3a | ~~Walk every reference the grammar carries~~ **done** | DSL-H2 (checkable half) |
+| 3b | ~~One namespace tree for objects; resolution subsumes validation~~ **done** | D3, D6, D8 |
+| 3c | Members: declarable flags, action labels, dialogue nodes; folds `scope.ts` in; the `tutorial.` migration | D7, rest of D6; unlocks req 6 |
 | 4 | Per-module error isolation + diagnostics | engine req 3, 4 |
 | 5 | Enable/disable, packs, dangling-ref pruning | engine req 1, 6; module req 4 |
 | 6 | CLI authoring of every DSL type | engine req 2 |
@@ -434,9 +437,51 @@ Nothing catches this today because flags are the one thing the walk cannot check
 
 ---
 
+### Chunk 3b — one namespace tree for objects (done)
+
+Every id a module declares hangs under its module id, and every reference resolves against the
+module that wrote it plus that module's **direct** dependencies. A bare heading creates inside
+this module; a dotted one edits a path that already exists (D8, option B).
+
+Resolution is **directed by the kind the site wants**, which is a refinement of D6 rather than a
+departure: `give: rope` asks for an item, so an `entity` named `rope` cannot shadow it. That also
+retires the accepted cost about `entity.rope` breaking bare `rope` — it does not.
+
+Resolution runs per module before merge, and it **subsumes validation**: a reference that resolves
+to nothing cannot be rewritten into a key, so it throws there. `references.ts` shrank from a full
+second traversal to the three checks resolution cannot make — capability, `goto` node, `use:`
+action label. One shared visitor (`referenceSites.ts`) now serves resolution, the remaining
+validation, and typed CLI input, which is what merging the old chunks 1b and 3 bought.
+
+Decisions taken while building, each measured rather than assumed:
+
+- **A module with no `# info` declares at the root, and that is only legal alone.** The prefix is
+  a list of segments; no identity contributes none. This is the empty case of the rule, not an
+  exception — and `orderModules` rejects an unnamed module in company, so root ids cannot collide.
+  Measured: always-qualifying broke 192 tests, almost all runtime tests whose fixtures are
+  anonymous snippets; this rule cut it to 49 and left exactly the meaningful churn.
+- **`variable` and `capability` are not namespaced.** A tuning variable is a knob the engine reads
+  by name (`registry.variables.get('min-damage')`), and a station is a contract between modules
+  that never met. Namespacing either would break the thing it exists for.
+- **Ids carry dots now, which broke two packed-string encodings.** A travel `ownerRef` packed
+  `origin.dest` and split on the first dot; it now joins on a character an id cannot contain. The
+  choice-id regex `use:<kind>.<objId>.<label>` had `[a-z0-9-]+` for the objId. Both were found by
+  the tutorial route failing, not by inspection.
+- **A typed name at the CLI resolves the same way an authored one does.** Namespacing otherwise
+  breaks `travel: basement`, which is a product regression, not test churn. `registry.namespace`
+  is exposed and resolves runtime input against every namespace loaded.
+- **`humanize` reads the name off the end of the path**, or every title in the game would have
+  read "Tutorial Island.miki".
+
+Still open, and now the whole of what is left of D6/D7: **members**. Flags, action labels and
+dialogue nodes are not yet paths in the tree, so `scope.ts` still auto-scopes and `tutorial.`
+still lies. That is chunk 3c.
+
+---
+
 ## Open decisions
 
-### D8 — does a bare section heading create, or edit whatever it finds? (blocking chunk 3b)
+### D8 — does a bare section heading create, or edit whatever it finds? (settled: option B)
 
 The design says both, in different places, and they cannot both hold:
 
@@ -460,7 +505,7 @@ module's, name its path: `# entity tutorial-island.miki`. Costs: the merge examp
 wrong as written and need fixing, and a patch module is more verbose — though a patch *is* an
 edit, and D6's consequence 3 already says the editor emits full paths.
 
-Recommendation: **B**. It makes "you cannot collide because you cannot create outside your own
+Chosen: **B**. It makes "you cannot collide because you cannot create outside your own
 namespace" literally true, it lets a reader tell a module's creations from its edits at a glance,
 and it matches `# remove entity.mirror`, which already addresses by path.
 

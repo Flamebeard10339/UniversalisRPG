@@ -74,7 +74,6 @@ function parseBlock(parser: Parser<unknown>, children: RawLine[], span: Span): u
 export function parseSection<H extends { id: string }, F extends keyof H = never, E extends keyof H = never>(section: RawSection, schema: SectionSchema<H, F, E>): Authored<H> {
   if (section.kind !== schema.kind) throw new DslError(`expected # ${schema.kind}, got # ${section.kind}`, section.span);
   if (!section.id) throw new DslError(`# ${schema.kind} requires an id`, section.span);
-  if (section.id.includes('.')) throw new DslError(`# ${schema.kind} ${section.id}: a section creates an id inside its own module, so the id is a name and not a path`, section.span);
 
   const fields = schema.fields as unknown as AnyFields;
   const byKeyword: Record<string, string> = {};

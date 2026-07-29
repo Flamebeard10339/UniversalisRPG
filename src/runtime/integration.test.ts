@@ -25,22 +25,22 @@ describe('tutorial-island content', () => {
 describe('tutorial-island health resource (Pass 2 end-to-end)', () => {
   it('starts full, drains as the rat bites back, then regenerates from a meal as time passes', () => {
     const { state } = startSession(registry);
-    expect(state.resources['health']).toBe(30); // full = statValue(max-health) at start
+    expect(state.resources['tutorial-island.health']).toBe(30); // full = statValue(max-health) at start
 
     // One `use:` is one swing at 25/min; the rat answers on its own 16/min clock.
-    useAction('entity', 'giant-rat', 'fight', registry, state);
+    useAction('entity', 'tutorial-island.giant-rat', 'fight', registry, state);
     expect(state.time).toBeCloseTo(2.4, 6);
 
     resolve(state, registry, 120); // far longer than the ~6s the rat lasts
-    const afterFighting = state.resources['health'];
+    const afterFighting = state.resources['tutorial-island.health'];
     expect(state.flags['tutorial.rats-killed']).toBe(1);
     expect(afterFighting).toBeLessThan(30); // it got its bites in
     expect(state.log.some((line) => line.startsWith('The Giant Rat hits you for '))).toBe(true);
     expect(state.log.some((line) => line.startsWith('You hit the Giant Rat for '))).toBe(true);
 
     // A standing buff needs no active action to tick.
-    state.activeBuffs['cooked-shrimp:regeneration'] = { statId: 'regeneration', amount: point(3), kind: 'added', expiresAt: state.time + 60 };
+    state.activeBuffs['tutorial-island.cooked-shrimp:regeneration'] = { statId: 'tutorial-island.regeneration', amount: point(3), kind: 'added', expiresAt: state.time + 60 };
     resolve(state, registry, state.time + 60);
-    expect(state.resources['health']).toBeCloseTo(Math.min(30, afterFighting + 3), 6);
+    expect(state.resources['tutorial-island.health']).toBeCloseTo(Math.min(30, afterFighting + 3), 6);
   });
 });

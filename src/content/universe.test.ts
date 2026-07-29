@@ -30,7 +30,7 @@ describe('module identity', () => {
     expect(() => parseModuleSource(module('m', '# info a', '# info b'))).toThrow(/declares # info more than once/);
     expect(() => parseModuleSource(module('m', '# info entity'))).toThrow(/entity is a reserved module id/);
     expect(() => parseModuleSource(module('m', '# info player'))).toThrow(/player is a reserved module id/);
-    expect(() => orderModules([parseModuleSource(module('a')), parseModuleSource(module('a'))])).toThrow(/two modules declare the id a/);
+    expect(() => orderModules([parseModuleSource(module('a', '# info a')), parseModuleSource(module('a', '# info a'))])).toThrow(/two modules declare the id a/);
   });
 });
 
@@ -40,29 +40,29 @@ describe('load order', () => {
   });
 
   it('breaks ties by module id, whatever order the sources arrive in', () => {
-    const sources = [module('c'), module('a'), module('b')];
+    const sources = [module('c', '# info c'), module('a', '# info a'), module('b', '# info b')];
     expect(ids(sources)).toEqual(['a', 'b', 'c']);
     expect(ids([...sources].reverse())).toEqual(['a', 'b', 'c']);
   });
 
   it('places a module immediately after the dependency that unblocks it', () => {
-    const sources = [module('b'), module('a-late', '# info a-late', 'dependencies: b'), module('c')];
+    const sources = [module('b', '# info b'), module('a-late', '# info a-late', 'dependencies: b'), module('c', '# info c')];
     expect(ids(sources)).toEqual(['b', 'a-late', 'c']);
   });
 
   it('makes the later module win a conflict, so the order is visible in the registry', () => {
     const first = module('alpha', '# info alpha', '# stat attack', 'base: 3');
-    const second = module('zebra', '# info zebra', 'dependencies: alpha', '# stat attack', 'base: 9');
-    expect(loadUniverse([second, first]).stats.get('attack')!.base).toEqual({ min: 9, max: 9 });
+    const second = module('zebra', '# info zebra', 'dependencies: alpha', '# stat alpha.attack', 'base: 9');
+    expect(loadUniverse([second, first]).stats.get('alpha.attack')!.base).toEqual({ min: 9, max: 9 });
   });
 
   it('builds the same universe from the same modules in any source order', () => {
     const base = module('base', '# info base', '# stat attack', 'base: 3');
-    const addon = module('addon', '# info addon', 'dependencies: base', '# stat attack', 'base: 7');
-    const bestiary = module('bestiary', '# info bestiary', 'dependencies: addon', '# entity ogre', 'stats: attack 4-7');
+    const addon = module('addon', '# info addon', 'dependencies: base', '# stat base.attack', 'base: 7');
+    const bestiary = module('bestiary', '# info bestiary', 'dependencies: addon, base', '# entity ogre', 'stats: attack 4-7');
     const flavor = module('flavor', '# info flavor');
 
-    const expected = { order: ['base', 'addon', 'bestiary', 'flavor'], attack: { min: 7, max: 7 }, ogre: { attack: { min: 4, max: 7 } } };
+    const expected = { order: ['base', 'addon', 'bestiary', 'flavor'], attack: { min: 7, max: 7 }, ogre: { 'base.attack': { min: 4, max: 7 } } };
     const sourceOrders = [
       [base, addon, bestiary, flavor],
       [flavor, bestiary, addon, base],
@@ -72,8 +72,8 @@ describe('load order', () => {
     for (const sources of sourceOrders) {
       const universe = loadUniverse(sources);
       expect(ids(sources)).toEqual(expected.order);
-      expect(universe.stats.get('attack')!.base).toEqual(expected.attack);
-      expect(universe.entities.get('ogre')!.stats).toEqual(expected.ogre);
+      expect(universe.stats.get('base.attack')!.base).toEqual(expected.attack);
+      expect(universe.entities.get('bestiary.ogre')!.stats).toEqual(expected.ogre);
     }
   });
 });
@@ -88,11 +88,11 @@ describe('dependency declarations', () => {
   });
 
   it('orders against an optional dependency that is present', () => {
-    expect(ids([module('a-late', '# info a-late', 'dependencies: ? zebra'), module('zebra')])).toEqual(['zebra', 'a-late']);
+    expect(ids([module('a-late', '# info a-late', 'dependencies: ? zebra'), module('zebra', '# info zebra')])).toEqual(['zebra', 'a-late']);
   });
 
   it('rejects a loaded incompatible module', () => {
-    expect(() => ids([module('m', '# info m', 'dependencies: ! other'), module('other')])).toThrow(/m is incompatible with other/);
+    expect(() => ids([module('m', '# info m', 'dependencies: ! other'), module('other', '# info other')])).toThrow(/m is incompatible with other/);
   });
 
   it('checks the version of a dependency that is present', () => {
@@ -129,6 +129,6 @@ describe('loadUniverse', () => {
   it('resolves references across module boundaries in either direction', () => {
     const stats = module('stats', '# info stats', '# stat attack');
     const uses = module('uses', '# info uses', 'dependencies: stats', '# entity ogre', 'stats: attack 4-7');
-    expect(loadUniverse([uses, stats]).entities.get('ogre')!.stats).toEqual({ attack: { min: 4, max: 7 } });
+    expect(loadUniverse([uses, stats]).entities.get('uses.ogre')!.stats).toEqual({ 'stats.attack': { min: 4, max: 7 } });
   });
 });

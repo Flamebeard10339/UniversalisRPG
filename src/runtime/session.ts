@@ -140,7 +140,9 @@ export function choiceToDirective(choice: PlayChoice): Directive {
     case 'talk':
       return { kind: 'talk', entity: choice.id.slice('talk:'.length) };
     case 'action': {
-      const match = /^use:([a-z]+)\.([a-z0-9-]+)\.(.+)$/.exec(choice.id);
+      // The objId is namespaced, so it carries dots of its own; the greedy match
+      // hands the last one to the action label.
+      const match = /^use:([a-z]+)\.([a-z0-9.-]+)\.(.+)$/.exec(choice.id);
       if (!match) throw new RuntimeError(`malformed action choice id: ${choice.id}`);
       const [, obj, objId, actionId] = match;
       return { kind: 'use', obj, objId, actionId };

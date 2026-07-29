@@ -127,9 +127,9 @@ describe('load-time reference resolution', () => {
   });
 
   it('checks a recipe through the action it compiles to', () => {
-    expect(() => loadModule(`${VALID}\n# recipe weave\nin: 1 bogus\nout: 1 straw\n`)).toThrow(/# recipe weave take: names an unknown item: bogus/);
-    expect(() => loadModule(`${VALID}\n# recipe weave\nout: 1 straw\nskill: bogus 1\n`)).toThrow(/# recipe weave xp: names an unknown skill: bogus/);
-    expect(() => loadModule(`${VALID}\n# recipe weave\naccuracy: attack\nout: 1 straw\nburnt: 1 bogus\n`)).toThrow(/# recipe weave give: names an unknown item: bogus/);
+    expect(() => loadModule(`${VALID}\n# recipe weave\nin: 1 bogus\nout: 1 straw\n`)).toThrow(/# recipe weave in: names an unknown item: bogus/);
+    expect(() => loadModule(`${VALID}\n# recipe weave\nout: 1 straw\nskill: bogus 1\n`)).toThrow(/# recipe weave skill: names an unknown skill: bogus/);
+    expect(() => loadModule(`${VALID}\n# recipe weave\naccuracy: attack\nout: 1 straw\nburnt: 1 bogus\n`)).toThrow(/# recipe weave burnt: names an unknown item: bogus/);
   });
 
   it('checks a food item tag, the other way a stat id reaches statRange', () => {

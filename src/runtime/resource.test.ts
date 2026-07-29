@@ -78,7 +78,7 @@ describe('# resource: parsing and defaults', () => {
   });
 
   it('rejects a resource with no max: stat', () => {
-    expect(() => loadModule('# resource broken\nrate: regeneration\n')).toThrow(/requires a max/);
+    expect(() => loadModule('# stat regeneration\n# resource broken\nrate: regeneration\n')).toThrow(/requires a max/);
   });
 
   it('rejects an unknown display mode', () => {

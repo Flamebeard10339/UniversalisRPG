@@ -50,7 +50,7 @@ describe('play-cli handleCommand', () => {
     const session = startSession(registry);
     const current = view(session);
 
-    const talkIndex = current.choices.findIndex((choice) => choice.id === 'talk:miki');
+    const talkIndex = current.choices.findIndex((choice) => choice.id === 'talk:tutorial-island.miki');
     expect(talkIndex).toBeGreaterThanOrEqual(0);
 
     const result = handleCommand(session, current, String(talkIndex + 1));
@@ -135,9 +135,9 @@ describe('play-cli handleCommand', () => {
 
     const result = handleCommand(session, current, 'travel: basement');
     expect(result.quit).toBe(false);
-    expect(session.state.location).toBe('basement');
-    expect(result.view?.location.id).toBe('basement');
-    expect(result.recorded).toBe('travel: basement');
+    expect(session.state.location).toBe('tutorial-island.basement');
+    expect(result.view?.location.id).toBe('tutorial-island.basement');
+    expect(result.recorded).toBe('travel: tutorial-island.basement');
   });
 
   it('a numbered choice records the correct canonical directive for a travel option', () => {

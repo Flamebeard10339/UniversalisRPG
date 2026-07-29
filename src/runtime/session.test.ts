@@ -16,12 +16,12 @@ describe('session', () => {
     const session = startSession(registry);
 
     let v = view(session);
-    expect(v.location.id).toBe('guide-house');
+    expect(v.location.id).toBe('tutorial-island.guide-house');
     expect(v.said).toEqual([]);
-    expect(ids(v)).toContain('talk:miki');
-    expect(ids(v)).not.toContain('use:entity.front-door.pick lock');
+    expect(ids(v)).toContain('talk:tutorial-island.miki');
+    expect(ids(v)).not.toContain('use:entity.tutorial-island.front-door.pick lock');
 
-    v = apply(session, 'talk:miki');
+    v = apply(session, 'talk:tutorial-island.miki');
     expect(v.inDialogue).toBe(true);
     expect(ids(v)).toEqual(expect.arrayContaining(['dialogue:0', 'dialogue:1']));
 
@@ -29,52 +29,52 @@ describe('session', () => {
     expect(v.inDialogue).toBe(false);
     expect(session.state.flags['tutorial.quest-given']).toBe(true);
 
-    v = apply(session, 'use:entity.mirror.look in');
+    v = apply(session, 'use:entity.tutorial-island.mirror.look in');
     expect(v.said).toContain('modal:character-creation');
     expect(session.state.flags['tutorial.mirror-done']).toBe(true);
-    expect(ids(v)).not.toContain('use:entity.mirror.look in');
+    expect(ids(v)).not.toContain('use:entity.tutorial-island.mirror.look in');
 
-    v = apply(session, 'talk:miki');
+    v = apply(session, 'talk:tutorial-island.miki');
     expect(v.inDialogue).toBe(false);
-    expect(session.state.inventory['jug-of-water']).toBe(1);
-    expect(session.state.inventory['pot-of-flour']).toBe(1);
+    expect(session.state.inventory['tutorial-island.jug-of-water']).toBe(1);
+    expect(session.state.inventory['tutorial-island.pot-of-flour']).toBe(1);
 
-    expect(ids(v)).toContain('craft:dough');
-    v = apply(session, 'craft:dough');
-    expect(session.state.inventory.dough).toBe(1);
+    expect(ids(v)).toContain('craft:tutorial-island.dough');
+    v = apply(session, 'craft:tutorial-island.dough');
+    expect(session.state.inventory['tutorial-island.dough']).toBe(1);
 
-    expect(ids(v)).toContain('craft:bread');
-    v = apply(session, 'craft:bread');
-    expect(session.state.inventory.bread).toBe(1);
+    expect(ids(v)).toContain('craft:tutorial-island.bread');
+    v = apply(session, 'craft:tutorial-island.bread');
+    expect(session.state.inventory['tutorial-island.bread']).toBe(1);
 
-    v = apply(session, 'use:entity.stairs.ascend');
-    expect(v.location.id).toBe('guide-house-upstairs');
-    expect(ids(v)).toContain('use:entity.dresser.search drawer');
+    v = apply(session, 'use:entity.tutorial-island.stairs.ascend');
+    expect(v.location.id).toBe('tutorial-island.guide-house-upstairs');
+    expect(ids(v)).toContain('use:entity.tutorial-island.dresser.search drawer');
 
-    v = apply(session, 'use:entity.dresser.search drawer');
-    expect(session.state.inventory.lockpick).toBe(1);
+    v = apply(session, 'use:entity.tutorial-island.dresser.search drawer');
+    expect(session.state.inventory['tutorial-island.lockpick']).toBe(1);
 
-    v = apply(session, 'use:entity.stairs-down.descend');
-    expect(v.location.id).toBe('guide-house');
-    expect(ids(v)).toContain('use:entity.front-door.pick lock');
+    v = apply(session, 'use:entity.tutorial-island.stairs-down.descend');
+    expect(v.location.id).toBe('tutorial-island.guide-house');
+    expect(ids(v)).toContain('use:entity.tutorial-island.front-door.pick lock');
 
-    v = apply(session, 'talk:miki');
+    v = apply(session, 'talk:tutorial-island.miki');
     expect(v.inDialogue).toBe(false);
     expect(session.state.flags['tutorial.made-bread']).toBe(true);
 
-    v = apply(session, 'talk:miki');
+    v = apply(session, 'talk:tutorial-island.miki');
     expect(v.inDialogue).toBe(false);
-    expect(session.state.inventory['iron-sword']).toBe(1);
-    expect(session.state.inventory['wooden-shield']).toBe(1);
+    expect(session.state.inventory['tutorial-island.iron-sword']).toBe(1);
+    expect(session.state.inventory['tutorial-island.wooden-shield']).toBe(1);
 
-    v = apply(session, 'use:entity.stairs.descend');
-    expect(v.location.id).toBe('basement');
-    expect(ids(v)).toContain('use:entity.giant-rat.fight');
+    v = apply(session, 'use:entity.tutorial-island.stairs.descend');
+    expect(v.location.id).toBe('tutorial-island.basement');
+    expect(ids(v)).toContain('use:entity.tutorial-island.giant-rat.fight');
 
     // A real fight: one `use:` is one swing, so each rat needs the clock to run
     // on. 30s is far longer than the ~6s one actually lasts.
     for (let killed = 1; killed <= 3; killed++) {
-      v = apply(session, 'use:entity.giant-rat.fight');
+      v = apply(session, 'use:entity.tutorial-island.giant-rat.fight');
       expect(v.encounter).not.toBeNull();
       expect(v.encounter!.foes.map((foe) => foe.title)).toEqual(['Giant Rat']);
 
@@ -82,26 +82,26 @@ describe('session', () => {
       expect(session.state.flags['tutorial.rats-killed']).toBe(killed);
       expect(v.encounter).toBeNull(); // the fight is over, so is the readout
     }
-    expect(ids(v)).not.toContain('use:entity.giant-rat.fight');
+    expect(ids(v)).not.toContain('use:entity.tutorial-island.giant-rat.fight');
 
-    v = apply(session, 'use:entity.stairs-up.ascend');
-    expect(v.location.id).toBe('guide-house');
-    expect(ids(v)).not.toContain('travel:beach');
+    v = apply(session, 'use:entity.tutorial-island.stairs-up.ascend');
+    expect(v.location.id).toBe('tutorial-island.guide-house');
+    expect(ids(v)).not.toContain('travel:tutorial-island.beach');
 
-    v = apply(session, 'talk:miki');
+    v = apply(session, 'talk:tutorial-island.miki');
     expect(v.inDialogue).toBe(false);
     expect(session.state.flags['tutorial.miki-complete']).toBe(true);
     expect(session.state.flags['front-door.unlocked']).toBe(true);
 
     v = view(session);
-    expect(ids(v)).toContain('travel:beach');
+    expect(ids(v)).toContain('travel:tutorial-island.beach');
 
-    v = apply(session, 'talk:miki');
+    v = apply(session, 'talk:tutorial-island.miki');
     expect(v.inDialogue).toBe(false);
     expect(v.said).toContain("Still here? The boat to the mainland won't wait forever.");
 
-    v = apply(session, 'travel:beach');
-    expect(v.location.id).toBe('beach');
+    v = apply(session, 'travel:tutorial-island.beach');
+    expect(v.location.id).toBe('tutorial-island.beach');
 
     // The route's mechanical sim-time: dough (2s) + bread (3s) + three rat
     // fights + the beach journey (1 unit east × the authored
@@ -121,8 +121,8 @@ describe('session', () => {
   it('throws a clear error on an unavailable or unknown choice id', () => {
     const registry = loadModule(source);
     const session = startSession(registry);
-    expect(() => apply(session, 'use:entity.front-door.pick lock')).toThrow();
-    expect(() => apply(session, 'travel:beach')).toThrow();
+    expect(() => apply(session, 'use:entity.tutorial-island.front-door.pick lock')).toThrow();
+    expect(() => apply(session, 'travel:tutorial-island.beach')).toThrow();
     expect(() => apply(session, 'nonsense')).toThrow();
   });
 
@@ -320,15 +320,15 @@ describe('travel edges aliased by a free entity relocate are hidden', () => {
   it('hides a travel edge that a stairs-like entity already offers as a free relocate', () => {
     const registry = loadModule(source);
     const session = startSession(registry);
-    session.state.location = 'guide-house';
+    session.state.location = 'tutorial-island.guide-house';
 
     const choiceIds = ids(view(session));
     // The stairs entity relocates to both floors, so the duplicate vertical
     // travel edges are suppressed in favor of ascend/descend.
-    expect(choiceIds).toContain('use:entity.stairs.ascend');
-    expect(choiceIds).toContain('use:entity.stairs.descend');
-    expect(choiceIds).not.toContain('travel:basement');
-    expect(choiceIds).not.toContain('travel:guide-house-upstairs');
+    expect(choiceIds).toContain('use:entity.tutorial-island.stairs.ascend');
+    expect(choiceIds).toContain('use:entity.tutorial-island.stairs.descend');
+    expect(choiceIds).not.toContain('travel:tutorial-island.basement');
+    expect(choiceIds).not.toContain('travel:tutorial-island.guide-house-upstairs');
   });
 
   it('keeps an unaliased edge, and one whose relocate is not free (has a cost)', () => {
@@ -372,18 +372,18 @@ describe('cancelAction', () => {
   it('drops the action in flight, keeping units already completed and un-consumed inputs', () => {
     const registry = loadModule(source);
     const session = startSession(registry);
-    session.state.location = 'guide-house';
-    session.state.inventory.dough = 2; // two loaves' worth
+    session.state.location = 'tutorial-island.guide-house';
+    session.state.inventory['tutorial-island.dough'] = 2; // two loaves' worth
 
-    beginAction(session, 'craft:bread');
+    beginAction(session, 'craft:tutorial-island.bread');
     wait(session, 4); // one full 3s bake done, a second one 1s in
-    expect(session.state.inventory.bread).toBe(1);
+    expect(session.state.inventory['tutorial-island.bread']).toBe(1);
     expect(session.state.activeAction).not.toBeNull();
 
     const v = cancelAction(session);
     expect(session.state.activeAction).toBeNull();
-    expect(session.state.inventory.bread).toBe(1); // no partial credit for the aborted bake
-    expect(session.state.inventory.dough).toBe(1); // its input was not consumed
+    expect(session.state.inventory['tutorial-island.bread']).toBe(1); // no partial credit for the aborted bake
+    expect(session.state.inventory['tutorial-island.dough']).toBe(1); // its input was not consumed
     expect(v.choices.length).toBeGreaterThan(0); // back to ordinary choices
   });
 

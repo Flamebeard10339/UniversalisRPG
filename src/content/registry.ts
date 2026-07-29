@@ -8,9 +8,11 @@ import { mergeSection } from './merge';
 import { ModuleSection } from './module';
 import { ModuleSource, parseUniverse } from './universe';
 import { DslError } from '../grammar/parser';
+import { Namespace } from './namespace';
 import { Recipe, recipeSchema } from './recipe';
 import { validateReferences } from './references';
 import { Removal } from './removal';
+import { resolveModule } from './resolve';
 import { Resource, resourceSchema } from './resource';
 import { ParsedSave } from './saveSection';
 import { scopeEntity, scopeLocation } from './scope';
@@ -36,6 +38,7 @@ export interface Registry {
   tests: Map<string, Test>;
   variables: Map<string, Variable>;
   saves: Map<string, ParsedSave>;
+  namespace: Namespace;
 }
 
 // Compiled to an Action so a craft runs through the same resolve() machinery
@@ -155,13 +158,21 @@ export function loadUniverse(sources: readonly ModuleSource[]): Registry {
     tests: new Map(),
     variables: new Map(),
     saves: new Map(),
+    namespace: new Namespace(),
   };
 
   // Two phases, because merging must happen on the authored form: a hydrated
   // object has every field filled in with defaults, so overlaying one would
   // silently reset everything the patch did not mention.
   const merged = new Map<string, Map<string, object>>();
-  for (const module of parseUniverse(sources)) {
+  const namespace = registry.namespace;
+  const modules = parseUniverse(sources);
+  const loaded = new Set(modules.map((module) => module.info.id));
+  for (const module of modules) {
+    // Per module, before merging: a shortened reference resolves against its own
+    // module and that module's dependencies, and once sections are merged there
+    // is no longer a module to resolve it against.
+    resolveModule(module, namespace, loaded);
     for (const section of module.sections) {
       // Removal is applied where it stands, so a later module can name the id
       // again and get a fresh one rather than a hole.

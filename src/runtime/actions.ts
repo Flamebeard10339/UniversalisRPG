@@ -20,8 +20,8 @@ export function findActionOwner(obj: string, objId: string, registry: Registry):
       return action ? { actions: [action] } : undefined;
     }
     case 'travel': {
-      const dot = objId.indexOf('.');
-      return { actions: [travelAction(objId.slice(0, dot), objId.slice(dot + 1), registry)] };
+      const [origin, dest] = objId.split(TRAVEL_PAIR);
+      return { actions: [travelAction(origin, dest, registry)] };
     }
     default:
       return undefined;
@@ -31,6 +31,13 @@ export function findActionOwner(obj: string, objId: string, registry: Registry):
 function locationDistance(a: Location, b: Location): number {
   return Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z);
 }
+
+// A travel ownerRef packs both ends of the journey into one objId, and a module
+// namespaces its ids with dots, so the pair is joined by a character an id
+// cannot contain.
+const TRAVEL_PAIR = '>';
+
+export const travelPair = (origin: string, dest: string): string => `${origin}${TRAVEL_PAIR}${dest}`;
 
 // Shaped as a one-attempt fight so a journey spans like any other action. The
 // origin comes from the ownerRef: state.location holds it until relocate fires.

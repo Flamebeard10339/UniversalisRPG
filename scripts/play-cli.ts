@@ -24,6 +24,7 @@ import {
 import { serializeSave } from '../src/runtime/save';
 import { type ParsedSave } from '../src/content/saveSection';
 import { parseDirectiveLine, type Directive } from '../src/content/test';
+import { resolveDirective } from '../src/content/typed';
 
 const repoRoot = path.join(import.meta.dirname, '..');
 const defaultContent = 'content/tutorial-island.dsl';
@@ -315,7 +316,8 @@ function handleGameplayCommand(session: PlaySession, currentView: PlayView, line
 
   let directive: Directive | null;
   try {
-    directive = parseDirectiveLine(toParse);
+    const typed = parseDirectiveLine(toParse);
+    directive = typed && resolveDirective(typed, session.registry);
   } catch (err) {
     if (err instanceof RuntimeError || err instanceof DslError) return { output: [`Error: ${err.message}`], quit: false };
     throw err;

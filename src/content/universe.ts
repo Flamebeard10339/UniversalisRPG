@@ -11,6 +11,10 @@ export interface ModuleSource {
 
 export interface ParsedModule {
   info: ModuleInfo;
+  // The prefix every id this module declares hangs under. A module that declares
+  // no `# info` has no identity to namespace with, so its ids are root ids —
+  // which is only safe alone, and `orderModules` is where that is enforced.
+  namespace: string | null;
   sections: ModuleSection[];
 }
 
@@ -28,7 +32,7 @@ export function parseModuleSource(source: ModuleSource): ParsedModule {
   if (!MODULE_ID.test(info.id)) throw new DslError(`${info.id} is not a usable module id`);
   if (RESERVED_IDS.includes(info.id)) throw new DslError(`${info.id} is a reserved module id`);
 
-  return { info, sections: parsed.filter((section) => section.kind !== 'info') };
+  return { info, namespace: infos.length > 0 ? info.id : null, sections: parsed.filter((section) => section.kind !== 'info') };
 }
 
 function loadsAfter(module: ParsedModule, loaded: ReadonlyMap<string, ParsedModule>): Set<string> {
@@ -59,6 +63,9 @@ export function orderModules(modules: readonly ParsedModule[]): ParsedModule[] {
   const byId = new Map<string, ParsedModule>();
   for (const module of modules) {
     if (byId.has(module.info.id)) throw new DslError(`two modules declare the id ${module.info.id}`);
+    if (module.namespace === null && modules.length > 1) {
+      throw new DslError(`${module.info.id} declares no # info, so its ids have no namespace to keep them apart from the other ${modules.length - 1} module(s) loaded`);
+    }
     byId.set(module.info.id, module);
   }
 
