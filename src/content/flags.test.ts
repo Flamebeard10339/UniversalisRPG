@@ -56,15 +56,50 @@ describe('what the engine answers itself', () => {
     return (requires.reference ?? requires.left)!.path;
   };
 
-  it('leaves the clock, the player sheet and a visit counter as written', () => {
+  it('leaves the clock and the player sheet as written, because nobody declares them', () => {
     expect(asks('time > 10')).toEqual(['time']);
     expect(asks('player.race')).toEqual(['player', 'race']);
-    expect(asks('greeting.visits >= 2')).toEqual(['greeting', 'visits']);
   });
 
   it('declares discovered on every location, because the engine sets it', () => {
     const registry = loadModule(['# location beach', 'x: 0, y: 0', '# entity gull', 'squawk:', '  requires: beach.discovered'].join('\n'));
     expect(registry.entities.get('gull')!.actions[0].requires).toEqual({ kind: 'reference', reference: { path: ['beach', 'discovered'] } });
+  });
+});
+
+describe('a dialogue node is a member too, and its visits are counted against its path', () => {
+  const TWO_GREETINGS = [
+    '# entity miki',
+    '# dialogue miki',
+    'owner = miki',
+    'node greeting:',
+    '  Hello.',
+    '# entity gull',
+    '# dialogue gull',
+    'owner = gull',
+    'node greeting:',
+    '  Squawk.',
+  ].join('\n');
+
+  const asked = (source: string, dialogue = 'miki'): string[] => {
+    const node = loadModule(source).dialogues.get(dialogue)!.nodes.find((each) => each.when)!;
+    return ((node.when as { left: { path: string[] } }).left ?? (node.when as unknown as { reference: { path: string[] } }).reference).path;
+  };
+
+  it('counts two dialogues that each have a greeting apart, where one bare key used to conflate them', () => {
+    const source = [TWO_GREETINGS, 'node annoyed:', '  when: greeting.visits >= 2', '  Still you.'].join('\n');
+    expect(asked(source, 'gull')).toEqual(['gull', 'greeting', 'visits']);
+  });
+
+  it(`reads its own dialogue's node before any other, and another dialogue's by naming it`, () => {
+    const own = [TWO_GREETINGS.replace('  Squawk.', '  Squawk.\nnode annoyed:\n  when: greeting.visits >= 2\n  Still you.'), ''].join('\n');
+    expect(asked(own, 'gull')).toEqual(['gull', 'greeting', 'visits']);
+    const other = [TWO_GREETINGS, 'node annoyed:', '  when: miki.greeting.visits >= 2', '  Still you.'].join('\n');
+    expect(asked(other, 'gull')).toEqual(['miki', 'greeting', 'visits']);
+  });
+
+  it('refuses a node nobody declared', () => {
+    expect(() => loadModule([TWO_GREETINGS, 'node annoyed:', '  when: grating.visits >= 2', '  Still you.'].join('\n'))).toThrow(/names an unknown node: grating/);
   });
 });
 

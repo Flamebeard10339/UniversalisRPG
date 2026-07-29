@@ -42,7 +42,10 @@ function runSteps(dialogue: Dialogue, node: DialogueNode, registry: Registry, st
 }
 
 function enterNode(dialogue: Dialogue, node: DialogueNode, registry: Registry, state: GameState): DialogueSession {
-  const visit = (state.visits[node.name] = (state.visits[node.name] ?? 0) + 1);
+  // Keyed by the node's path, not its bare name: two dialogues may each have a
+  // node called greeting, and they are not the same counter.
+  const counter = `${dialogue.id}.${node.name}`;
+  const visit = (state.visits[counter] = (state.visits[counter] ?? 0) + 1);
   const replay = visit === 1 || node.sticky === true;
   if (!replay && node.again) state.log.push(renderSegments(node.again, state));
   return runSteps(dialogue, node, registry, state, 0, replay);

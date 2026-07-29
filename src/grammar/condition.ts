@@ -5,17 +5,20 @@ export interface Reference {
   path: string[];
 }
 
-// State the engine keeps rather than any module: the clock, the player sheet,
-// and the per-node visit counters. No module declares one, so nothing resolves
-// one either, and the runtime reads them off state instead of off flags.
+// State the engine keeps rather than any module: the clock and the player sheet,
+// which no module declares and nothing resolves.
 export const TIME = 'time';
 export const PLAYER = 'player';
-export const VISITS = 'visits';
 
 const ENGINE_ROOTS: readonly string[] = [TIME, PLAYER];
-const ENGINE_MEMBERS: readonly string[] = [VISITS];
 
-export const isEngineReference = (path: readonly string[]): boolean => ENGINE_ROOTS.includes(path[0]) || ENGINE_MEMBERS.includes(path[path.length - 1]);
+export const isEngineRoot = (path: readonly string[]): boolean => ENGINE_ROOTS.includes(path[0]);
+
+// A counter the engine keeps against a node the module does declare, so the
+// owner resolves like any other path and only the last segment is the engine's.
+export const VISITS = 'visits';
+
+export const visitedNode = (path: readonly string[]): readonly string[] | null => (path.length > 1 && path[path.length - 1] === VISITS ? path.slice(0, -1) : null);
 
 export type ComparisonOperator = '>' | '<' | '>=' | '<=' | '=';
 

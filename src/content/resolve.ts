@@ -28,15 +28,18 @@ function targetKey(module: ParsedModule, kind: string, id: string, namespace: Na
   return namespace.resolve(kind, id, module.namespace, visible, `# ${kind} ${id}`);
 }
 
-function declareFlags(namespace: Namespace, kind: string, value: { id: string; flags?: unknown }): void {
+// What hangs under an object rather than beside it: the flags it owns, and the
+// nodes of a dialogue, whose visits the engine counts against the node's path.
+function declareMembers(namespace: Namespace, kind: string, value: { id: string; flags?: unknown; nodes?: { name: string }[] }): void {
   if (kind === 'location') namespace.declareMember('flag', kind, value.id, DISCOVERED);
   for (const flag of listMembers<string>(value.flags)) namespace.declareMember('flag', kind, value.id, flag);
+  if (kind === 'dialogue') for (const node of value.nodes ?? []) namespace.declareMember('node', kind, value.id, node.name);
 }
 
 export function resolveModule(module: ParsedModule, namespace: Namespace, loaded: ReadonlySet<string>): void {
   const visible = visibleTo(module, loaded);
   const self = module.namespace;
-  const created = module.sections.filter((section) => section.kind !== 'remove') as { kind: string; value: { id: string; flags?: unknown } }[];
+  const created = module.sections.filter((section) => section.kind !== 'remove') as { kind: string; value: { id: string; flags?: unknown; nodes?: { name: string }[] } }[];
 
   // Declared before anything is resolved, so a section may reference one that
   // appears further down its own file.
@@ -48,7 +51,7 @@ export function resolveModule(module: ParsedModule, namespace: Namespace, loaded
   // its object ended up with — and an edit's heading names another module's.
   for (const section of created) {
     section.value.id = targetKey(module, section.kind, section.value.id, namespace, visible);
-    declareFlags(namespace, section.kind, section.value);
+    declareMembers(namespace, section.kind, section.value);
   }
 
   for (const section of module.sections) {

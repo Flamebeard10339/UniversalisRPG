@@ -1,19 +1,20 @@
-import { Condition, isEngineReference, PLAYER, Reference, TIME } from '../grammar/condition';
+import { Condition, PLAYER, Reference, TIME, visitedNode } from '../grammar/condition';
 import { TextSegment } from '../content/dialogue';
 import { GameState } from './state';
 
 // Rendering asks the same questions of state that conditions do, which is why
 // the two live together.
 
-// Flat dotted keys, not nested lookups. Which paths the engine answers itself is
-// the same question load-time resolution asks when it decides what to leave
-// alone, so both ask it of `isEngineReference`.
+// Flat dotted keys, not nested lookups. Which paths the engine answers rather
+// than the flag table is the same question load-time resolution asks when it
+// decides what to rewrite, so both read it off `grammar/condition`.
 export function resolveReference(reference: Reference, state: GameState): boolean | number | string | undefined {
   const { path } = reference;
-  if (!isEngineReference(path)) return state.flags[path.join('.')];
   if (path[0] === TIME) return state.time;
   if (path[0] === PLAYER) return state.player[path[1] as 'name' | 'race'];
-  return state.visits[path.slice(0, -1).join('.')] ?? 0;
+  const node = visitedNode(path);
+  if (node) return state.visits[node.join('.')] ?? 0;
+  return state.flags[path.join('.')];
 }
 
 export function truthy(value: boolean | number | string | undefined): boolean {

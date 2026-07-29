@@ -1,6 +1,6 @@
 import { Action } from '../grammar/action';
 import { ActionResult } from '../grammar/actionResult';
-import { Condition, isEngineReference, Reference } from '../grammar/condition';
+import { Condition, isEngineRoot, Reference, VISITS, visitedNode } from '../grammar/condition';
 import { Dialogue, TextSegment } from './dialogue';
 import { Directive } from './test';
 import { Edge, Relative } from './location';
@@ -8,7 +8,7 @@ import { isFieldEdits, listMembers } from '../grammar/section';
 import { Quantified } from '../grammar/values';
 import { TagClause } from '../grammar/tagClause';
 
-export type ReferenceKind = 'stat' | 'resource' | 'entity' | 'location' | 'item' | 'skill' | 'recipe' | 'save' | 'test' | 'capability' | 'flag';
+export type ReferenceKind = 'stat' | 'resource' | 'entity' | 'location' | 'item' | 'skill' | 'recipe' | 'save' | 'test' | 'capability' | 'flag' | 'node';
 
 // Returns what the id should become. Resolution rewrites it into a namespaced
 // key; validation hands it back and throws if it names nothing.
@@ -36,13 +36,15 @@ function strings(holder: Loose, key: string, kind: ReferenceKind, where: string,
   else if (Array.isArray(list)) rewrite(list);
 }
 
-// A flag reference is a path like any other, but the engine answers some of them
-// off state instead of off a declaration, and those are nobody's to resolve.
+// A reference in a condition names a flag, or a node whose visits the engine
+// counts. Either way the owner is a path and resolves like one; only the clock
+// and the player sheet belong to nobody and are left as written.
 function reference(value: Reference | undefined, where: string, visit: Visit): void {
-  if (!value || isEngineReference(value.path)) return;
-  const raw = value.path.join('.');
-  const resolved = visit('flag', raw, where);
-  if (resolved !== raw) value.path = resolved.split('.');
+  if (!value || isEngineRoot(value.path)) return;
+  const node = visitedNode(value.path);
+  const raw = (node ?? value.path).join('.');
+  const resolved = visit(node ? 'node' : 'flag', raw, where);
+  value.path = node ? [...resolved.split('.'), VISITS] : resolved.split('.');
 }
 
 function segments(list: TextSegment[] | undefined, where: string, visit: Visit): void {
