@@ -89,9 +89,12 @@ export class Namespace {
 
     if (inner !== null && this.has(kind, `${inner}.${suffix}`)) return `${inner}.${suffix}`;
 
-    const matches = [...this.keys(kind)].filter(([key, namespace]) => visible.has(namespace) && (key === suffix || key.endsWith(`.${suffix}`)));
-    if (matches.length === 1) return matches[0][0];
+    const matches: string[] = [];
+    for (const [key, namespace] of this.keys(kind)) {
+      if (visible.has(namespace) && (key === suffix || key.endsWith(`.${suffix}`))) matches.push(key);
+    }
+    if (matches.length === 1) return matches[0];
     if (matches.length === 0) throw new DslError(`${where} names an unknown ${kind}: ${raw}`);
-    throw new DslError(`${where} names ${raw}, which is ambiguous between ${matches.map(([key]) => key).sort().join(' and ')}. Name the module, or use self.`);
+    throw new DslError(`${where} names ${raw}, which is ambiguous between ${matches.sort().join(' and ')}. Name the module, or use self.`);
   }
 }
