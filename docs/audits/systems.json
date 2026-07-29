@@ -42,7 +42,7 @@
         ".github/workflows/publish.yml",
         "android",
         "capacitor.config.ts",
-        "vite.config.mjs",
+        "vite.config.ts",
         "package.json",
         "tsconfig.json"
       ],

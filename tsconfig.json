@@ -16,6 +16,8 @@
     "noEmit": true,
     "jsx": "react-jsx"
   },
-  "include": ["src", "scripts"],
-  "references": [{ "path": "./tsconfig.node.json" }]
+  // The build configs are code too, and sat outside every project, so nothing
+  // type-checked them. One project now: the separate node one only ever held
+  // the same settings, and being composite it emitted .d.ts into the root.
+  "include": ["src", "scripts", "vite.config.ts", "capacitor.config.ts"]
 }

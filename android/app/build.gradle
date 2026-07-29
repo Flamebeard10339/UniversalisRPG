@@ -1,5 +1,12 @@
 apply plugin: 'com.android.application'
 
+// package.json is the one place the app's version is written. A hand-synced
+// second copy here is exactly the pair CLAUDE.md forbids, and it read 1.0
+// against a package at 0.1.0. versionCode has to be a rising integer, so it is
+// derived rather than authored: 0.1.0 -> 100.
+def appVersion = new groovy.json.JsonSlurper().parseText(file("$rootDir/../package.json").text).version
+def (appMajor, appMinor, appPatch) = appVersion.tokenize('.').collect { it.toInteger() }
+
 android {
     namespace "org.universalis.rpg"
     compileSdk rootProject.ext.compileSdkVersion
@@ -7,8 +14,8 @@ android {
         applicationId "org.universalis.rpg"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
+        versionCode appMajor * 10000 + appMinor * 100 + appPatch
+        versionName appVersion
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.

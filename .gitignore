@@ -17,3 +17,6 @@ completed-tasks.md
 
 .planning/*
 
+
+# Emitted by tsc --build for the tsconfig.node project.
+tsconfig.node.tsbuildinfo
