@@ -183,6 +183,34 @@ describe('loadUniverseWithDiagnostics', () => {
     expect(result.registry.locations.get('base.camp')!.adjacent).toEqual([]);
   });
 
+  it('undeclares what it prunes, so the namespace and the registry survive as one universe', () => {
+    const addon: ModuleSource = { ...module('addon', '# info addon', '# item gem'), enabled: false };
+    const base = module(
+      'base',
+      '# info base',
+      'dependencies: ? addon',
+      '# entity miki',
+      '# dialogue chat',
+      'owner = miki',
+      'node greet:',
+      '  Hi.',
+      '  give: addon.gem',
+      '# location camp',
+      'north of addon.garden',
+    );
+
+    const { registry, loadedModules, diagnostics } = loadUniverseWithDiagnostics([base, addon]);
+
+    expect({ loadedModules, diagnostics }).toEqual({ loadedModules: ['base'], diagnostics: [] });
+    expect(registry.entities.has('base.miki')).toBe(true);
+    expect(registry.dialogues.has('base.chat')).toBe(false);
+    expect(registry.namespace.has('dialogue', 'base.chat')).toBe(false);
+    expect(registry.namespace.has('node', 'base.chat.greet')).toBe(false);
+    expect(registry.locations.has('base.camp')).toBe(false);
+    expect(registry.namespace.has('location', 'base.camp')).toBe(false);
+    expect(registry.namespace.has('flag', 'base.camp.discovered')).toBe(false);
+  });
+
   it('disables only the module whose source does not parse', () => {
     const result = loadUniverseWithDiagnostics([module('base', '# info base', '# item rope'), { name: 'broken', text: '# item' }]);
 

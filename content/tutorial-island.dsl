@@ -372,3 +372,13 @@ talk: miki
 assert: miki-complete
 assert: front-door.unlocked
 travel: beach
+
+// --- saves ---
+
+# save explored-and-unlocked
+{"version":4,"flags":{"tutorial-island.front-door.unlocked":true,"tutorial-island.beach.discovered":true}}
+
+# test save-restores-object-owned-flags
+load: explored-and-unlocked
+assert: front-door.unlocked
+assert: beach.discovered

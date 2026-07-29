@@ -117,7 +117,7 @@ export function pruneStateForRegistry(state: GameState, registry: Registry): Pru
   }
 
   pruneRecord(state.inventory, 'inventory', (id) => registry.items.has(id), 'item', warnings);
-  pruneRecord(state.flags, 'flags', (id) => registry.flags.has(id), 'flag', warnings);
+  pruneRecord(state.flags, 'flags', (id) => registry.namespace.has('flag', id), 'flag', warnings);
   pruneRecord(state.visits, 'visits', (id) => registry.namespace.has('node', id), 'dialogue node', warnings);
   pruneRecord(state.xp, 'xp', (id) => registry.skills.has(id), 'skill', warnings);
   pruneRecord(state.resources as Record<string, number>, 'resources', (id) => registry.resources.has(id), 'resource', warnings);

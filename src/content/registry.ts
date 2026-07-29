@@ -293,6 +293,15 @@ function pruneActions(actions: Action[], where: string, visit: Visit): Action[] 
   return actions.filter((action) => referencesLoaded(() => visitAction(action, `${where} action ${JSON.stringify(action.label)}`, visit)));
 }
 
+// The registry and the namespace must describe the same surviving universe:
+// drop one without the other and a save is pruned against content that is
+// present, or a reference resolves to content that is gone.
+function dropContent(registry: Registry, kind: string, id: string, pruned: Set<string>, maps: readonly { delete(id: string): boolean }[]): void {
+  for (const map of maps) map.delete(id);
+  registry.namespace.undeclare(kind, id);
+  pruned.add(ownerKey(kind, id));
+}
+
 function pruneRegistryDanglingReferences(registry: Registry, danglingRoots: ReadonlySet<string>): void {
   const pruned = new Set<string>();
   for (;;) {
@@ -319,8 +328,7 @@ function pruneRegistryDanglingReferences(registry: Registry, danglingRoots: Read
 
     for (const [id, location] of registry.locations) {
       if (location.relative && (namesDanglingRoot('location', location.relative.of, danglingRoots) || referencePruned('location', location.relative.of, pruned))) {
-        registry.locations.delete(id);
-        pruned.add(ownerKey('location', id));
+        dropContent(registry, 'location', id, pruned, [registry.locations]);
         changed = true;
         continue;
       }
@@ -339,30 +347,25 @@ function pruneRegistryDanglingReferences(registry: Registry, danglingRoots: Read
 
     for (const [id, recipe] of registry.recipes) {
       if (referencesLoaded(() => visitSection('recipe', { ...recipe }, `# recipe ${id}`, visit))) continue;
-      registry.recipes.delete(id);
-      registry.recipeActions.delete(id);
-      pruned.add(ownerKey('recipe', id));
+      dropContent(registry, 'recipe', id, pruned, [registry.recipes, registry.recipeActions]);
       changed = true;
     }
 
     for (const [id, resource] of registry.resources) {
       if (referencesLoaded(() => visitSection('resource', { ...resource }, `# resource ${id}`, visit))) continue;
-      registry.resources.delete(id);
-      pruned.add(ownerKey('resource', id));
+      dropContent(registry, 'resource', id, pruned, [registry.resources]);
       changed = true;
     }
 
     for (const [id, dialogue] of registry.dialogues) {
       if (referencesLoaded(() => visitSection('dialogue', { ...dialogue, nodes: dialogue.nodes.map((node) => ({ ...node })) }, `# dialogue ${id}`, visit))) continue;
-      registry.dialogues.delete(id);
-      pruned.add(ownerKey('dialogue', id));
+      dropContent(registry, 'dialogue', id, pruned, [registry.dialogues]);
       changed = true;
     }
 
     for (const [id, test] of registry.tests) {
       if (referencesLoaded(() => visitSection('test', { ...test }, `# test ${id}`, visit))) continue;
-      registry.tests.delete(id);
-      pruned.add(ownerKey('test', id));
+      dropContent(registry, 'test', id, pruned, [registry.tests]);
       changed = true;
     }
 

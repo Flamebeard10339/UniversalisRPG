@@ -126,6 +126,10 @@ const PRUNE_MODULE = `
 # location camp
 x: 0, y: 0
 starting
+flags: lit
+
+# location cave
+x: 1, y: 0
 
 # item bread
 
@@ -155,6 +159,8 @@ describe('pruneStateForRegistry', () => {
     state.inventory.bread = 1;
     state.inventory['mod.gem'] = 2;
     state.flags.known = true;
+    state.flags['camp.lit'] = true;
+    state.flags['cave.discovered'] = true;
     state.flags['mod.flag'] = true;
     state.visits['miki.hello'] = 1;
     state.visits['mod.dialogue.hello'] = 3;
@@ -176,7 +182,7 @@ describe('pruneStateForRegistry', () => {
 
     expect(state.location).toBe('camp');
     expect(state.inventory).toEqual({ bread: 1 });
-    expect(state.flags).toEqual({ known: true });
+    expect(state.flags).toEqual({ known: true, 'camp.lit': true, 'cave.discovered': true });
     expect(state.visits).toEqual({ 'miki.hello': 1 });
     expect(state.xp).toEqual({ cooking: 4 });
     expect(state.resources).toEqual({ health: 6 });
@@ -195,6 +201,20 @@ describe('pruneStateForRegistry', () => {
         'activeAction',
       ]),
     );
+  });
+
+  it('keeps object-owned flags and map discovery, which live only in the namespace', () => {
+    const registry = loadModule(PRUNE_MODULE);
+    const state = initialState(registry);
+    state.flags['camp.lit'] = true;
+    state.flags['cave.discovered'] = true;
+    const saved = { version: SAVE_VERSION, diff: diffState(state, initialState(registry)) };
+
+    const target = createGameState();
+    const warnings = loadSave(target, saved, registry);
+
+    expect(warnings).toEqual([]);
+    expect(target.flags).toEqual({ 'camp.lit': true, 'cave.discovered': true });
   });
 
   it('loadSave prunes restored stale ids and records quiet warnings in the transient log', () => {
