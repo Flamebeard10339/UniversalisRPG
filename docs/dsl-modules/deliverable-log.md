@@ -1,7 +1,7 @@
 # DSL modules — deliverable log
 
-**Status:** D1-D8 settled. **Chunks 1, 2, 3a and 3b landed.** Chunk 3c (members: flags,
-action labels, dialogue nodes) is what remains of the namespace work.
+**Status:** D1-D8 settled. **Chunks 1, 2, 3a, 3b and 3c landed** — the namespace work is done bar
+action labels, deferred with a reason in the 3c entry. Chunk 4 is next.
 
 ---
 
@@ -275,7 +275,7 @@ Engine first; nothing in tooling is safe until a bad module can fail alone.
 | 2 | ~~Field-granular merge + `remove` + list operators~~ **done** | DSL-H1, module req 1–3 |
 | 3a | ~~Walk every reference the grammar carries~~ **done** | DSL-H2 (checkable half) |
 | 3b | ~~One namespace tree for objects; resolution subsumes validation~~ **done** | D3, D6, D8 |
-| 3c | Members: declarable flags, action labels, dialogue nodes; folds `scope.ts` in; the `tutorial.` migration | D7, rest of D6; unlocks req 6 |
+| 3c | ~~Members: declarable flags and dialogue nodes; folds `scope.ts` in; the `tutorial.` migration~~ **done**; action labels deferred | D7, rest of D6; unlocks req 6 |
 | 4 | Per-module error isolation + diagnostics | engine req 3, 4 |
 | 5 | Enable/disable, packs, dangling-ref pruning | engine req 1, 6; module req 4 |
 | 6 | CLI authoring of every DSL type | engine req 2 |
@@ -476,6 +476,64 @@ Decisions taken while building, each measured rather than assumed:
 Still open, and now the whole of what is left of D6/D7: **members**. Flags, action labels and
 dialogue nodes are not yet paths in the tree, so `scope.ts` still auto-scopes and `tutorial.`
 still lies. That is chunk 3c.
+
+---
+
+### Chunk 3c — members (done, bar action labels)
+
+Flags were the one thing in the DSL nobody declared, which made them the single exception to
+"everything is a path". Two declaration forms, one per level of the tree D6 already ratified:
+`# flag <id>` for state the module owns, and a `flags:` field on an entity or location for state
+that prop owns. `# item` has none, keeping the line `scope.ts` already drew — one travels with the
+player, so its references were never owner-bound.
+
+**`scope.ts` is folded in rather than kept.** Auto-scoping *guessed*: inside `# entity mirror` a
+bare name became `mirror.<name>` whether or not the mirror had anything by that name. That is the
+whole reason `tutorial.` existed, and why the standalone rename failed. Now the enclosing object is
+tried as the innermost context and wins only if it actually declares the flag; otherwise the same
+suffix rule every other reference uses applies, and an undeclared name is an error naming the site.
+
+**D7 closed with no rename.** The module's own namespace supplies the prefix, so
+`tutorial.made-bread` is now written `made-bread` and stored as `tutorial-island.made-bread`. The
+migration this log costed at 19 + 20 string literals came to a prefix deletion and seven `# flag`
+lines. `front-door.unlocked` now reads the same from inside the door and from a `# test assert:`
+outside it, which is precisely what the old scoping could not do.
+
+Dialogue nodes went the same way, and fixed a live defect: the engine keyed `state.visits` by the
+bare node name, so two dialogues that each have a `node greeting` — which the fixtures already did
+— shared one counter. A node is a member of its dialogue; its owner segments resolve like any
+other path and only the trailing `visits` stays the engine's.
+
+Falling out of making the tree literal:
+
+- `Namespace.resolve` matches a suffix of **any** depth, because a member key is three deep. The
+  two-segment cap in 3b was a simplification, not a rule.
+- **"This module cannot see that one" is decided against the modules in play**, not against what
+  has been declared so far. Caught by a test: `stranger` sorts after `mod` in the load order, so
+  the old check silently degraded to "unknown item" depending on module id.
+- Undeclaring an object takes its members with it.
+- **`# remove entity.tutorial-island.mirror` was rejected.** `parseRemoval` demanded exactly two
+  segments, so the fully-qualified form D6's consequence 3 says the editor will emit could not be
+  removed at all. A gap 3b opened and nothing caught until a member test needed the full path.
+- `discovered` is declared on every location: the engine writes it, and an author had no way to
+  read it back.
+- The schema's boolean-keyword list is `keywords` now, freeing `flags` for the DSL field.
+- Which references the engine answers itself is **one** predicate in `grammar/condition.ts`, read
+  by load-time resolution to decide what to leave alone and by the runtime to decide what to read
+  off state. They cannot disagree about the set; a form added to one and not the other fails
+  loudly at load rather than quietly at runtime.
+
+**Action labels are deferred, and this is the one piece of 3c not done.** They are D6's third
+member kind, but unlike flags and nodes nothing about them is broken: they are validated already
+in `references.ts`, and their objId is namespaced, so there is no addressing gap. Making them path
+segments needs a slug/display split that rewrites the `use:<kind>.<objId>.<label>` choice-id
+contract — a string the CLI keys on and the GUI rebuild will redefine. Doing it now would churn
+that contract twice to prevent nothing that has happened. Lifted to `backlog.md`.
+
+What the flag work does **not** do: a `-flags:` edit still declares what it removes, because
+resolution runs before merge and cannot know what survives it. The over-approximation is the safe
+direction — a reference to a removed flag resolves rather than erroring — but it is not free, and
+chunk 5's dangling-ref pruning is where it should be settled.
 
 ---
 

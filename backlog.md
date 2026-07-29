@@ -240,6 +240,14 @@ semantics) and DSL-H2 (the reference walker, which turns out to be a prerequisit
 mod-disable, not cleanup). The worked examples under *E2E Authoring* below describe the legacy
 `upsert`/`replace`/`remove` system, which no longer exists.
 
+**Action labels as members** (the one piece of chunk 3c deferred). Flags and dialogue nodes are
+paths in the namespace tree; action labels are not. Nothing is broken by that — labels are
+validated in `src/content/references.ts` and their objId is already namespaced — so it buys
+uniformity, not a fix. It needs a slug/display split (labels carry spaces: `pick lock`,
+`roast chestnuts`) and rewrites the `use:<kind>.<objId>.<label>` choice-id contract in
+`src/runtime/session.ts` and `src/content/test.ts`. Do it with the GUI rebuild, which redefines
+that contract anyway, rather than churning it twice.
+
 ## Implement CLI commands for editing the DSL
 There should be a way to create new entities/locations/actions/etc in game that are stored in a local DSL file. 
 We should also be able to edit existing data. 
