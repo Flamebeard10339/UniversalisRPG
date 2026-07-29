@@ -35,7 +35,7 @@ that reads GitHub issues labelled `approved-mod` so user mods need not be commit
 
 ---
 
-## Where the code actually is (verified 2026-07-28 at `8da9b95`)
+## Where the code actually is (verified 2026-07-28 at `1301729`)
 
 **There is no module system to fix — there is one to build.** Measured, not assumed:
 

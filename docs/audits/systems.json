@@ -4,9 +4,9 @@
     {
       "name": "DSL load path",
       "paths": ["src/grammar", "src/content"],
-      "lastAudit": "680d912",
+      "lastAudit": "65d764a",
       "lastAuditDoc": "docs/audits/dsl-load-path-2026-07-29.md",
-      "note": "The 2026-07-29 audit covered DSL module chunks 1-7. Its serializer, squash, BOM/CRLF, unordered-dependency and local-module-id findings were fixed in 680d912."
+      "note": "The 2026-07-29 audit covered DSL module chunks 1-7. Its serializer, squash, BOM/CRLF, unordered-dependency and local-module-id findings were fixed in 65d764a."
     },
     {
       "name": "Runtime",
