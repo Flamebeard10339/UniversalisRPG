@@ -1,7 +1,7 @@
 # DSL modules — deliverable log
 
-**Status:** D1-D8 settled. **Chunks 1, 2, 3a, 3b, 3c, 4, 5 and 6 landed** — the namespace work is
-done except bare action labels, deferred with a reason in the 3c entry. Chunk 7 is next.
+**Status:** D1-D8 settled. **Chunks 1, 2, 3a, 3b, 3c, 4, 5, 6 and 7 landed** — the namespace work is
+done except bare action labels, deferred with a reason in the 3c entry. Chunk 8 is next.
 
 ---
 
@@ -279,7 +279,7 @@ Engine first; nothing in tooling is safe until a bad module can fail alone.
 | 4 | ~~Per-module error isolation + diagnostics~~ **done** | engine req 3, 4 |
 | 5 | ~~Enable/disable, packs, dangling-ref pruning~~ **done** | engine req 1, 6; module req 4 |
 | 6 | ~~CLI authoring of every DSL type~~ **done** | engine req 2 |
-| 7 | Publish to GitHub issue; squash tooling | engine req 5 |
+| 7 | ~~Publish to GitHub issue; squash tooling~~ **done** | engine req 5 |
 | 8 | Modportal over `approved-mod` issues | stretch |
 
 Chunk 4 is the one to not skip.
@@ -664,6 +664,39 @@ Accepted boundaries:
 Verified: 403 tests green, `npm run build`, `npm run layer-check`, `npm run audit-status`, and a
 file-backed CLI smoke that staged `/dsl item smoke-token`, exported the generated `local-changes`
 module, and quit through `npm run play -- local=<temp-file> content/tutorial-island.dsl`.
+
+---
+
+### Chunk 7 — GitHub issue publishing and squash tooling (done)
+
+Local authoring now has a packaging path. `npm run contribution:issue` validates a file-backed
+`local-changes` module against the selected content files and prints a pasteable GitHub issue body
+by default; `--create` hands that body to `gh issue create`. The GitHub content-contribution
+template now asks for the full local-changes DSL block rather than generated JSON, so the issue is
+the same plug-and-play module the author tested locally.
+
+`npm run contribution:squash` applies local changes and emits one canonical DSL module for review
+or integration. It validates the emitted source, then reloads the remaining sources plus that
+emitted module and compares the loaded content maps against the original base+local universe. If a
+local-created object would disappear while squashing into a different module, the command fails and
+tells the integrator to squash the touched module separately or keep `local-changes` as its own
+module.
+
+`serializeRegistryModule` is deliberately a canonical printer, not a source-preserving formatter.
+It does not keep comments or author shorthand, it may expand defaults, and relative locations are
+printed as absolute coordinates because validation resolves them in the registry. That is accepted
+for squash tooling: the contract is "load-equivalent content", not "same prose and layout." The
+round-trip tests cover multi-result actions, branch results, dialogues, tests, resources, saves,
+tags and dotted references.
+
+Four load-path hardening fixes landed because the independent audit caught them on the new surface:
+UTF-8 BOMs no longer shift section spans used by local-change slicing, CRLF DSL files parse,
+stat-bonus tags accept dotted stat ids that the serializer emits, and `~` dependencies can be read
+for cyclic references but cannot be used as patch targets because they do not promise load order.
+
+Verified: 413 tests green, `npm run build`, `npm run layer-check`, `git diff --check`, and a
+script smoke that packaged a BOM-bearing `local-changes` file with `Diagnostics: none` and squashed
+a `tutorial-island.bread` title patch back into the `tutorial-island` module.
 
 ---
 

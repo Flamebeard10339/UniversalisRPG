@@ -128,6 +128,7 @@ function lineColumn(source: string, span: Span | undefined): { line: number; col
   let line = 1;
   let column = 1;
   for (let i = 0; i < span.start; i++) {
+    if (i === 0 && source[i] === '\uFEFF') continue;
     if (source[i] === '\n') {
       line++;
       column = 1;

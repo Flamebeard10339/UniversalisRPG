@@ -65,6 +65,17 @@ describe('comments', () => {
     const [section] = parseModule(source);
     expect(section.value).toEqual({ id: 'gold', examine: 'Small bright coins.', tags: [{ kind: 'keyword', value: 'currency' }] });
   });
+
+  it('accepts a UTF-8 BOM before the first section', () => {
+    const [section] = parseModule('\uFEFF# item gold\nexamine: Small bright coins.');
+    expect(section.value).toMatchObject({ id: 'gold', examine: 'Small bright coins.' });
+  });
+
+  it('accepts CRLF line endings', () => {
+    const sections = parseModule('# item gold\r\nexamine: Small bright coins.\r\n# stat vigor\r\nbase: 3');
+    expect(sections.map((section) => section.kind)).toEqual(['item', 'stat']);
+    expect(sections[0].value).toMatchObject({ id: 'gold', examine: 'Small bright coins.' });
+  });
 });
 
 describe('stat and skill', () => {

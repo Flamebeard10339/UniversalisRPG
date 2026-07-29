@@ -76,6 +76,12 @@ describe('a heading creates or edits by its shape alone', () => {
   it('refuses to edit a path that names nothing', () => {
     expect(() => loadUniverse([BASE, module('mod', 'dependencies: base', '# item base.cable', 'title: Cable')])).toThrow(/names an unknown item: base.cable/);
   });
+
+  it('refuses to edit a dependency declared with ~ because it does not load first', () => {
+    const dependency = module('aaa', '# item coin');
+    const patch = module('zzz', 'dependencies: ~ aaa', '# item aaa.coin', 'title: Gold Coin');
+    expect(() => loadUniverse([patch, dependency])).toThrow(/~ dependencies do not load before this module/);
+  });
 });
 
 describe('what a namespace does not reach', () => {

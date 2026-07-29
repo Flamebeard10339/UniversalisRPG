@@ -66,6 +66,10 @@ export class Namespace {
     return this.declared.get(kind)?.has(key) === true;
   }
 
+  ownerOf(kind: string, key: string): string | null | undefined {
+    return this.declared.get(kind)?.get(key);
+  }
+
   // A reference may drop leading segments — `orc-pack.entity.goblin`, `entity.goblin`
   // and `goblin` are the same path — and resolves when exactly one visible module
   // answers to what is left. Resolution is directed by the kind the site wants, so

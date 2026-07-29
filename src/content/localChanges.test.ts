@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { clearLocalSections, deleteLocalSection, initialLocalChangesModule, localSectionHeadings, upsertLocalSection } from './localChanges';
+import { clearLocalSections, deleteLocalSection, initialLocalChangesModule, listLocalSections, localSectionHeadings, upsertLocalSection } from './localChanges';
 
 describe('local-changes module text helpers', () => {
   it('renders a managed header with sorted dependencies', () => {
@@ -36,5 +36,10 @@ describe('local-changes module text helpers', () => {
     const cleared = clearLocalSections(['base']);
     expect(localSectionHeadings(cleared)).toEqual([]);
     expect(cleared).toContain('# info local-changes');
+  });
+
+  it('preserves section text when a file starts with a UTF-8 BOM', () => {
+    const source = `\uFEFF${initialLocalChangesModule(['base'])}\n# item gem\ntitle: Gem\n`;
+    expect(listLocalSections(source)[0]).toEqual({ kind: 'item', id: 'gem', text: '# item gem\ntitle: Gem' });
   });
 });

@@ -11,7 +11,7 @@ export type TagClause =
 const SECONDS_PER_MINUTE = 60;
 
 const DURATION = /^(?:(?<minutes>\d+)m)?(?:(?<seconds>\d+)s)?$/;
-const STAT_BONUS = /^(?<sign>[+-])(?<lo>\d+)(?:-(?<hi>\d+))?(?<percent>%?)[ \t]+(?<stat>[a-z][a-z0-9-]*)$/;
+const STAT_BONUS = /^(?<sign>[+-])(?<lo>\d+)(?:-(?<hi>\d+))?(?<percent>%?)[ \t]+(?<stat>[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9-]*)*)$/;
 const KEYWORD = /^[a-z][a-z0-9-]*$/;
 
 function parseStatBonus(groups: Record<string, string | undefined>, raw: string, span: Span): TagClause {

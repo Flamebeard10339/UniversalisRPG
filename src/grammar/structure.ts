@@ -24,20 +24,24 @@ export function splitSections(source: string): RawSection[] {
   for (const raw of source.split('\n')) {
     const lineStart = offset;
     offset += raw.length + 1;
+    const withoutCarriageReturn = raw.endsWith('\r') ? raw.slice(0, -1) : raw;
+    const bom = lineStart === 0 && withoutCarriageReturn.startsWith('\uFEFF') ? 1 : 0;
+    const textLine = bom === 0 ? withoutCarriageReturn : withoutCarriageReturn.slice(bom);
+    const textLineStart = lineStart + bom;
 
-    const heading = HEADING.exec(raw)?.groups;
+    const heading = HEADING.exec(textLine)?.groups;
     if (heading) {
-      current = { kind: heading.kind, id: heading.id, body: [], span: { start: lineStart, end: lineStart + raw.length } };
+      current = { kind: heading.kind, id: heading.id, body: [], span: { start: textLineStart, end: textLineStart + textLine.length } };
       sections.push(current);
       stack = [];
       continue;
     }
-    if (raw.trim() === '' || raw.trim().startsWith('//')) continue;
-    if (!current) throw new DslError(`content before first section: ${raw}`, { start: lineStart, end: lineStart + raw.length });
+    if (textLine.trim() === '' || textLine.trim().startsWith('//')) continue;
+    if (!current) throw new DslError(`content before first section: ${textLine}`, { start: textLineStart, end: textLineStart + textLine.length });
 
-    const indent = raw.length - raw.trimStart().length;
-    const text = raw.trim();
-    const start = lineStart + indent;
+    const indent = textLine.length - textLine.trimStart().length;
+    const text = textLine.trim();
+    const start = textLineStart + indent;
     const line: RawLine = { text, span: { start, end: start + text.length }, children: [] };
 
     while (stack.length > 0 && stack[stack.length - 1].indent >= indent) stack.pop();

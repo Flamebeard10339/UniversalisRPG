@@ -33,13 +33,22 @@ function namesMissingOptional(kind: string, raw: string, missing: ReadonlySet<st
   return segments.length > 1 && missing.has(segments[0]);
 }
 
+function unorderedDependencies(module: ParsedModule): ReadonlySet<string> {
+  return new Set(module.info.dependencies.filter((dependency) => dependency.prefix === 'unordered').map((dependency) => dependency.module));
+}
+
 // A bare heading names something inside this module; a dotted one edits something
 // that already exists. You cannot create outside your own namespace, so adding a
 // dependency can never quietly turn a module's creation into an edit of another
 // module's object.
 function targetKey(module: ParsedModule, kind: string, id: string, namespace: Namespace, visible: ReadonlySet<string | null>): string {
   if (!isNamespaced(kind) || !id.includes('.')) return isNamespaced(kind) ? qualify(module.namespace, id) : id;
-  return namespace.resolve(kind, id, module.namespace, visible, `# ${kind} ${id}`);
+  const resolved = namespace.resolve(kind, id, module.namespace, visible, `# ${kind} ${id}`);
+  const owner = namespace.ownerOf(kind, resolved);
+  if (owner !== null && owner !== undefined && unorderedDependencies(module).has(owner)) {
+    throw new DslError(`# ${kind} ${id} edits ${owner}, but ~ dependencies do not load before this module. Use a load-order dependency for patches.`);
+  }
+  return resolved;
 }
 
 // What hangs under an object rather than beside it: the flags it owns, and the
@@ -79,6 +88,10 @@ export function resolveModule(module: ParsedModule, namespace: Namespace, loaded
       const removal = section.value as Removal;
       if (!isNamespaced(removal.kind)) throw new DslError(`# remove ${removal.id}: ${removal.kind} is not a kind a module owns`);
       removal.target = namespace.resolve(removal.kind, removal.target, self, visible, `# remove ${removal.id}`);
+      const owner = namespace.ownerOf(removal.kind, removal.target);
+      if (owner !== null && owner !== undefined && unorderedDependencies(module).has(owner)) {
+        throw new DslError(`# remove ${removal.id} edits ${owner}, but ~ dependencies do not load before this module. Use a load-order dependency for patches.`);
+      }
       namespace.undeclare(removal.kind, removal.target);
       continue;
     }
