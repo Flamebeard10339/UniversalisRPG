@@ -1,8 +1,7 @@
 # DSL modules — deliverable log
 
-**Status:** design drafted 2026-07-28. D1–D5 settled by the user the same day and folded in below;
-**D6 (namespace separator) blocks chunk 1** because `.` is already overloaded three ways in the
-reference grammar.
+**Status:** design drafted and ratified 2026-07-28. D1–D7 all settled and folded in below.
+Nothing blocks chunk 1.
 
 ---
 
@@ -128,28 +127,64 @@ Settled sub-rules:
   (chunk 3) catches a typo'd id anyway; a typo in a non-reference list like `tags:` will pass
   silently. Accepted.
 
-### Namespaces (D3, settled — separator still open)
+### Namespaces are paths, and `.` is the only separator (D3 + D6, settled)
 
-Every id a module creates is prefixed with that module's id. Inside its own module a section
-writes the bare id; the namespace is applied at load:
+There is **one** namespace tree and every reference is a path into it. Each `.` narrows:
 
 ```
-# entity goblin        ← authored in module `orc-pack`, becomes `orc-pack<sep>goblin`
+<module-id> . <kind> . <objId> . <member>
+orc-pack    . entity . goblin  . attack
 ```
 
-Another module edits it by naming it in full. This makes "is this id free?" a question a
-contributor never has to ask — **you cannot collide, because you can only create in your own
-namespace** — and it gives the in-game editor a clean autocomplete axis.
+A reference may drop any number of **leading** segments, and resolves iff the remaining suffix is
+unique across the module and its dependencies:
 
-**Creation and reference are separable, and should be separated.** Requiring full qualification
-everywhere would tax the most common case: a new module referencing core stats would write
-`base<sep>cooking-speed` on every line. Since the collision problem is entirely about *creation*,
-resolve references local-first, then across declared dependencies in declaration order, and raise
-an **ambiguity error** if two dependencies both define the name. Cheap local refs, cheap core
-refs, no silent ambiguity — and the error message tells the author to qualify.
+```
+orc-pack.entity.goblin.attack   ≡   entity.goblin.attack   ≡   goblin.attack
+```
 
-Migrating `content/tutorial-island.dsl` is free: it is one module and every reference in it is
-already local.
+Ambiguity is an error naming both candidates, not a silent pick.
+
+**This collapses existing special cases rather than adding one.** `<obj>.<objId>.<actionId>` and
+`<entityId>.<flag>` stop being distinct grammatical forms — they are just paths of different
+depth. Today's entity auto-scoping (`set: fainted` inside an entity meaning
+`front-door.fainted`) stops being a scoping pass and becomes the same relative-resolution rule
+read from the current context outward. One mechanism, no exceptions.
+
+**`self.`** is reserved for "explicitly my own module", for when local content is shadowed or when
+a generator wants to be unambiguous.
+
+Creation is always namespace-local: a section names a bare id and the owning module's prefix is
+applied at load. You cannot collide, because you cannot create outside your own namespace.
+
+#### Consequences that fall out of making this rigorous
+
+1. **Flags must become declarable.** This is the load-bearing consequence. Flags are currently
+   invented by `set:`, so the resolver cannot enumerate them, cannot check a shortened flag
+   reference for ambiguity, and cannot catch a typo. Keeping them undeclared would leave flags as
+   the single exception to "everything is a path" — the exact thing this design is trying to
+   remove. Declaring them also closes the sharpest half of audit finding DSL-H2, where
+   `requires: has <typo>` loads clean and reads false forever. The old `## upsert flags` block in
+   the *E2E Authoring* notes already assumed this.
+2. **Kind names and builtin roots become reserved module ids.** Otherwise `entity.goblin.attack`
+   is ambiguous between kind-`entity` and a module named `entity`. Reserved: every section kind,
+   plus `player`, `skills`, `self`.
+3. **The in-game editor should always emit fully-qualified paths.** Shortening is a human
+   authoring affordance; generated content has no reason to be terse. This substantially defuses
+   the "adding a dependency breaks my shortcuts" problem below, because `local-changes` and
+   published contributions are machine-written and already expanded.
+
+#### Accepted costs
+
+- **Adding a dependency can break existing shortenings**, because the namespace it resolves
+  against grew. Accepted as the cost of doing business; a "expand all references" command is the
+  fix if it ever stings. Note the same thing happens *within* a module — adding `entity.rope` to
+  a module that already has `item.rope` breaks bare `rope` — which is more frequent during
+  authoring than the dependency case, and lands on the same fix.
+- **`tutorial.made-bread` must become `tutorial-made-bread`.** Verified blast radius: 19
+  references in `content/tutorial-island.dsl`, 20 in `src`/`scripts`. Mechanical, but note the
+  hope that no tests change is *nearly* right rather than right — no test needs restructuring,
+  and about twenty string literals need renaming.
 
 ### Load order comes from dependencies, and is deterministic
 
@@ -235,8 +270,9 @@ Engine first; nothing in tooling is safe until a bad module can fail alone.
 
 | # | Chunk | Closes |
 | --- | --- | --- |
-| 1 | `# info`, module identity, namespaces, `loadUniverse`, topological order | spec basis; **needs D6** |
-| 2 | Field-granular merge + `remove` | DSL-H1, module req 1–3 |
+| 1 | `# info`, module identity, `loadUniverse`, topological order | spec basis |
+| 1b | Path resolution: one namespace tree, suffix shortening, declarable flags, the `tutorial.` migration | D6, D7; collapses today's scoping pass |
+| 2 | Field-granular merge + `remove` + list operators | DSL-H1, module req 1–3 |
 | 3 | Complete the reference walker | DSL-H2, unlocks req 6 |
 | 4 | Per-module error isolation + diagnostics | engine req 3, 4 |
 | 5 | Enable/disable, packs, dangling-ref pruning | engine req 1, 6; module req 4 |
@@ -265,8 +301,12 @@ scope:
 | *(none)* | hard requirement; loads before this module |
 | `!` | incompatible; version is ignored |
 | `~` | required, but **does not affect load order** — for breaking dependency cycles |
+| `?` | optional; if present, loads first — if absent, this module still loads |
+| `+` | recommended; same load-order effect as `?`, surfaced differently in the UI |
 
-Version operators (`<`, `<=`, `=`, `>=`, `>`) are supported and optional.
+Version operators (`<`, `<=`, `=`, `>=`, `>`) are supported and optional. An optional dependency
+that is present but fails its version requirement makes this module incompatible, and it is
+disabled.
 
 Two consequences worth stating before they surprise someone:
 
@@ -274,39 +314,15 @@ Two consequences worth stating before they surprise someone:
   already exist, which is a load-order requirement by definition. `~` is for mutual references
   that are cyclic, not for patches. The loader should reject a merge into a `~` dependency's id
   with exactly that message.
-- **Dropping `?` (optional) means compatibility patches cost a hard dependency.** A module that
-  reconciles mod A with mod B must hard-depend on both, so it cannot ship for players who have
-  only one. `?` is the same grammar shape and can be added whenever that case appears; noted so
-  it is a deferral rather than an omission.
+- **`?` and `+` are the primary consumers of graceful degradation.** A reference into an absent
+  optional dependency dangles by design, which is precisely engine requirement 6 — so the
+  chunk-5 pruning path is not an edge case, it is the normal operating mode for optional deps.
 
 ---
 
 ## Open decisions
 
-**D6 — the namespace separator, and it blocks chunk 1.** `.` is already overloaded three ways in
-the reference grammar, verified against the shipped content:
-
-| Form in `tutorial-island.dsl` | Meaning |
-| --- | --- |
-| `entity.giant-rat.fight` | object action path, `<obj>.<objId>.<actionId>` |
-| `front-door.unlocked` | entity-scoped flag, `<entityId>.<flag>` |
-| `tutorial.made-bread` | a flag using `tutorial.` as a naming *convention*, not a namespace |
-
-`REFERENCE = /[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9-]*)*/` (`values.ts:32`) is an arbitrary-depth path
-split positionally (`condition.ts:23`). Adding module namespaces on `.` makes
-`orc-pack.goblin.attack` ambiguous with both existing forms, and a module named `entity` would
-break the grammar outright.
-
-Options: **(a) `/`** — `orc-pack/goblin`. Unused anywhere in the value grammar, reads as a path,
-and visually matches the packs/folders organization of module requirement 4. **(b) `:`** —
-`orc-pack:goblin`; also unused in value position, but `:` is already the key/value separator so it
-carries a different meaning one token to the left. **(c) keep `.`** and resolve by
-longest-known-module-prefix — rejected: fragile, and it makes valid module ids depend on the
-reference grammar. *Recommending (a).*
-
-**D7 — does `tutorial.` on flags become a real namespace or stay a convention?** Once modules own
-namespaces, flags like `tutorial.made-bread` are the odd form out. Cheap either way, but it should
-be decided with D6 rather than drifting.
+None blocking. Chunk 1 can start.
 
 ---
 
@@ -319,4 +335,9 @@ be decided with D6 rather than drifting.
 - **D3** — ids are unique per kind, namespaced by owning module; creation is namespace-local so
   collisions are structurally impossible.
 - **D4** — a reference creates the dependency; no reference means no declaration.
-- **D5** — Factorio dependency grammar, prefixes `(none)`, `!`, `~`.
+- **D5** — Factorio dependency grammar, prefixes `(none)`, `!`, `~`, `?`, `+`.
+- **D6** — `.` is the only separator; every reference is a path into one namespace tree, and any
+  unique leading-truncated suffix resolves. `<obj>.<objId>.<actionId>` and `<entityId>.<flag>`
+  collapse into it rather than coexisting with it.
+- **D7** — `tutorial.` on flags is neither a namespace nor a convention to keep; it is an error
+  (`no such object: tutorial`). Those flags become `tutorial-made-bread` and friends.
