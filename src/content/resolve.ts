@@ -59,29 +59,39 @@ function declareMembers(namespace: Namespace, kind: string, value: { id: string;
   if (kind === 'dialogue') for (const node of value.nodes ?? []) namespace.declareMember('node', kind, value.id, node.name);
 }
 
-export function resolveModule(module: ParsedModule, namespace: Namespace, loaded: ReadonlySet<string>): void {
-  const visible = visibleTo(module, loaded);
+type Created = { kind: string; value: { id: string; flags?: unknown; nodes?: { name: string }[] } };
+
+const createdSections = (module: ParsedModule): Created[] => module.sections.filter((section) => section.kind !== 'remove') as Created[];
+
+// A section naming an absent optional dependency is dropped rather than failing
+// the module, which is what makes an optional dependency optional.
+function declareIds(module: ParsedModule, namespace: Namespace, loaded: ReadonlySet<string>): void {
   const missingOptional = missingOptionalDependencies(module, loaded);
-  const self = module.namespace;
   module.sections = module.sections.filter((section) => {
     if (section.kind === 'remove') return !namesMissingOptional((section.value as Removal).kind, (section.value as Removal).target, missingOptional);
     const { id } = section.value as { id?: string };
     return id === undefined || !isNamespaced(section.kind) || !id.includes('.') || !namesMissingOptional(section.kind, id, missingOptional);
   });
-  const created = module.sections.filter((section) => section.kind !== 'remove') as { kind: string; value: { id: string; flags?: unknown; nodes?: { name: string }[] } }[];
 
-  // Declared before anything is resolved, so a section may reference one that
-  // appears further down its own file.
-  for (const { kind, value } of created) {
-    if (isNamespaced(kind) && value.id !== undefined && !value.id.includes('.')) namespace.declare(kind, self, value.id);
+  for (const { kind, value } of createdSections(module)) {
+    if (isNamespaced(kind) && value.id !== undefined && !value.id.includes('.')) namespace.declare(kind, module.namespace, value.id);
   }
+}
 
-  // Ids settle before members are declared, because a member hangs under the key
-  // its object ended up with — and an edit's heading names another module's.
-  for (const section of created) {
+// Ids settle before members are declared, because a member hangs under the key
+// its object ended up with — and an edit's heading names another module's.
+function settleIds(module: ParsedModule, namespace: Namespace, loaded: ReadonlySet<string>): void {
+  const visible = visibleTo(module, loaded);
+  for (const section of createdSections(module)) {
     section.value.id = targetKey(module, section.kind, section.value.id, namespace, visible);
     declareMembers(namespace, section.kind, section.value);
   }
+}
+
+function resolveReferences(module: ParsedModule, namespace: Namespace, loaded: ReadonlySet<string>): void {
+  const visible = visibleTo(module, loaded);
+  const missingOptional = missingOptionalDependencies(module, loaded);
+  const self = module.namespace;
 
   for (const section of module.sections) {
     if (section.kind === 'remove') {
@@ -103,3 +113,9 @@ export function resolveModule(module: ParsedModule, namespace: Namespace, loaded
     visitSection(section.kind, section.value, `# ${section.kind} ${id}`, visit);
   }
 }
+
+// Each pass runs over every module before the next begins, so what a name
+// resolves to follows from what is loaded rather than from where the naming
+// module sits in the load order — which is what `~` promises and what a
+// module-at-a-time resolution could not deliver.
+export const RESOLUTION_PASSES: readonly ((module: ParsedModule, namespace: Namespace, loaded: ReadonlySet<string>) => void)[] = [declareIds, settleIds, resolveReferences];

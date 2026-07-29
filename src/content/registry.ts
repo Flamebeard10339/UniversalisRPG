@@ -14,7 +14,7 @@ import { Recipe, recipeSchema } from './recipe';
 import { registryCapabilities, validateDialogueReferences, validateRecipeReferences, validateTestReferences } from './references';
 import { ReferenceKind, Visit, visitAction, visitSection } from './referenceSites';
 import { Removal } from './removal';
-import { resolveModule } from './resolve';
+import { RESOLUTION_PASSES } from './resolve';
 import { Resource, resourceSchema } from './resource';
 import { ParsedSave } from './saveSection';
 import { Authored, hydrateSection } from '../grammar/section';
@@ -444,16 +444,20 @@ function compileModules(modules: readonly ParsedModule[]): { registry: Registry 
     }
   }
   namespace.declareModules(loaded);
-  for (const module of modules) {
-    // Per module, before merging: a shortened reference resolves against its own
-    // module and that module's dependencies, and once sections are merged there
-    // is no longer a module to resolve it against.
-    try {
-      resolveModule(module, namespace, loaded);
-    } catch (error) {
-      if (!(error instanceof DslError)) throw error;
-      return { failure: { module, stage: 'resolve', error } };
+  // Before merging: a shortened reference resolves against its own module and
+  // that module's dependencies, and once sections are merged there is no longer
+  // a module to resolve it against.
+  for (const pass of RESOLUTION_PASSES) {
+    for (const module of modules) {
+      try {
+        pass(module, namespace, loaded);
+      } catch (error) {
+        if (!(error instanceof DslError)) throw error;
+        return { failure: { module, stage: 'resolve', error } };
+      }
     }
+  }
+  for (const module of modules) {
     try {
       for (const section of module.sections) {
         // Removal is applied where it stands, so a later module can name the id

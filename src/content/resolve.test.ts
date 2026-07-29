@@ -84,6 +84,25 @@ describe('a heading creates or edits by its shape alone', () => {
   });
 });
 
+describe('a ~ dependency is visible whichever way the module names sort', () => {
+  const target = module('target', '# item gem');
+  const referrer = (id: string, ...lines: string[]) => module(id, 'dependencies: ~ target', ...lines);
+
+  it('resolves a reference into it, which is the whole point of ~', () => {
+    for (const id of ['aref', 'zref']) {
+      const registry = loadUniverse([referrer(id, '# entity npc', 'use:', '  give: target.gem'), target]);
+      expect(registry.entities.get(`${id}.npc`)!.actions[0].results[0]).toEqual({ kind: 'give', item: 'target.gem' });
+    }
+  });
+
+  it('still refuses an edit or a removal, and says why rather than that the id is unknown', () => {
+    for (const id of ['aaa', 'zzz']) {
+      expect(() => loadUniverse([referrer(id, '# item target.gem', 'title: Gem'), target])).toThrow(/~ dependencies do not load before this module/);
+      expect(() => loadUniverse([referrer(id, '# remove item.target.gem'), target])).toThrow(/~ dependencies do not load before this module/);
+    }
+  });
+});
+
 describe('what a namespace does not reach', () => {
   it('leaves a tuning variable global, because the engine reads it by name', () => {
     expect([...loadUniverse([module('base', '# variable min-damage', 'value: 3')]).variables.keys()]).toEqual(['min-damage']);
