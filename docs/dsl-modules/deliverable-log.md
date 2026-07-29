@@ -1,7 +1,7 @@
 # DSL modules — deliverable log
 
-**Status:** D1-D8 settled. **Chunks 1, 2, 3a, 3b, 3c, 4, 5, 6 and 7 landed** — the namespace work is
-done except bare action labels, deferred with a reason in the 3c entry. Chunk 8 is next.
+**Status:** D1-D8 settled. **Chunks 1, 2, 3a, 3b, 3c, 4, 5, 6, 7 and 8 landed** — the namespace
+work is done except bare action labels, deferred with a reason in the 3c entry.
 
 ---
 
@@ -280,7 +280,7 @@ Engine first; nothing in tooling is safe until a bad module can fail alone.
 | 5 | ~~Enable/disable, packs, dangling-ref pruning~~ **done** | engine req 1, 6; module req 4 |
 | 6 | ~~CLI authoring of every DSL type~~ **done** | engine req 2 |
 | 7 | ~~Publish to GitHub issue; squash tooling~~ **done** | engine req 5 |
-| 8 | Modportal over `approved-mod` issues | stretch |
+| 8 | ~~Modportal over `approved-mod` issues~~ **done** | stretch |
 
 Chunk 4 is the one to not skip.
 
@@ -697,6 +697,41 @@ for cyclic references but cannot be used as patch targets because they do not pr
 Verified: 413 tests green, `npm run build`, `npm run layer-check`, `git diff --check`, and a
 script smoke that packaged a BOM-bearing `local-changes` file with `Diagnostics: none` and squashed
 a `tutorial-island.bread` title patch back into the `tutorial-island` module.
+
+---
+
+### Chunk 8 — approved-mod modportal (done)
+
+Approved issue mods now have a local-first play path. `npm run modportal -- sync` reads GitHub
+issues labelled `approved-mod` through `gh issue list` and extracts the fenced DSL block that Chunk 7
+publishes; `--from <issues.json>` runs the same materialization path from a local fixture for tests
+or manual offline smoke runs. Synced files live under the ignored default cache
+`content/modportal.local`, so approved mods can be played without being committed.
+
+The cache has a small manifest with `enabled` state. `npm run modportal -- list`, `enable`, `disable`,
+`sources` and `show` operate on that manifest. Enablement is local user state, not authored DSL, and
+resync preserves it by issue number.
+
+Generated `local-changes` issue modules are re-identified as `approved-mod-<issue-number>` before
+they are cached. The re-id also rewrites qualified `local-changes.` self references, because the CLI
+authoring path emits fully-qualified paths for generated content. Custom modules that already declare
+their own module id are preserved.
+
+The play CLI loads enabled modportal entries automatically from `content/modportal.local` when the
+manifest exists, or from `modportal=<dir>` when a cache is named explicitly. `modportal=off` and
+`--no-modportal` disable that startup loading. The entries are ordinary `ModuleSource`s with the
+Chunk 5 `enabled` flag, so the tolerant loader, module diagnostics, dependency handling and state
+pruning remain the only content-loading path.
+
+Accepted boundary: the real networked sync is delegated to the user's authenticated `gh` CLI and was
+not exercised against GitHub in automation. The tested contract is extraction, materialization,
+cache/manifest behavior, enablement, and play loading; the smoke used local issue JSON with the same
+shape as `gh issue list --json number,title,body,url,updatedAt`.
+
+Verified: 419 tests green, `npm run build`, `npm run layer-check`, `npm run audit-status`,
+`git diff --check`, and a temp-cache smoke that synced an approved issue patch, listed it, and loaded
+`content/tutorial-island.dsl` through `npm run play -- modportal=<cache>` with the modded starting
+location title visible.
 
 ---
 

@@ -1,12 +1,14 @@
-import { readFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { createGameState } from '../src/runtime/runtime';
 import { loadModule } from '../src/content/registry';
 import { initialLocalChangesModule } from '../src/content/localChanges';
-import { ModuleSource } from '../src/content/universe';
+import type { ModuleSource } from '../src/content/universe';
 import { serializeSave } from '../src/runtime/save';
 import { beginAction, runTest, startSession, view } from '../src/runtime/session';
-import { handleCommand, liveTick, type AuthoringContext, type Recorder } from './play-cli';
+import { handleCommand, liveTick, loadModportalSources, type AuthoringContext, type Recorder } from './play-cli';
 
 const source = readFileSync('content/tutorial-island.dsl', 'utf8');
 
@@ -549,5 +551,55 @@ describe('play-cli local DSL authoring', () => {
     const session = startSession(registry);
     const result = handleCommand(session, view(session), '/dsl item gem');
     expect(result.output).toEqual(['Error: local authoring is unavailable.']);
+  });
+});
+
+describe('play-cli modportal cache loading', () => {
+  it('loads synced approved mods with their manifest enablement', () => {
+    const dir = mkdtempSync(path.join(os.tmpdir(), 'universalis-modportal-'));
+    try {
+      writeFileSync(path.join(dir, '1-approved-mod-1.dsl'), '# info approved-mod-1\nversion: 0.0.0\n', 'utf8');
+      writeFileSync(path.join(dir, '2-approved-mod-2.dsl'), '# info approved-mod-2\nversion: 0.0.0\n', 'utf8');
+      writeFileSync(
+        path.join(dir, 'manifest.json'),
+        JSON.stringify({
+          version: 1,
+          label: 'approved-mod',
+          entries: [
+            { issue: 1, title: 'One', moduleId: 'approved-mod-1', file: '1-approved-mod-1.dsl', enabled: true },
+            { issue: 2, title: 'Two', moduleId: 'approved-mod-2', file: '2-approved-mod-2.dsl', enabled: false },
+          ],
+        }),
+        'utf8',
+      );
+
+      const loaded = loadModportalSources(dir);
+
+      expect(loaded.warnings).toEqual([]);
+      expect(loaded.sources.map((source) => ({ name: source.name, enabled: source.enabled }))).toEqual([
+        { name: 'approved-mod-1', enabled: true },
+        { name: 'approved-mod-2', enabled: false },
+      ]);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('warns instead of reading manifest files outside the cache directory', () => {
+    const dir = mkdtempSync(path.join(os.tmpdir(), 'universalis-modportal-'));
+    try {
+      writeFileSync(
+        path.join(dir, 'manifest.json'),
+        JSON.stringify({ version: 1, label: 'approved-mod', entries: [{ issue: 1, title: 'One', moduleId: 'approved-mod-1', file: '../outside.dsl', enabled: true }] }),
+        'utf8',
+      );
+
+      const loaded = loadModportalSources(dir);
+
+      expect(loaded.sources).toEqual([]);
+      expect(loaded.warnings).toEqual(['Modportal skipped approved-mod-1: file escapes cache directory']);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

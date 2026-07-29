@@ -14,6 +14,7 @@ import {
   localSectionHeadings,
   upsertLocalSection,
 } from '../src/content/localChanges';
+import { DEFAULT_MODPORTAL_CACHE, type ModportalManifest } from '../src/content/modportal';
 import {
   apply,
   applyDirective,
@@ -66,6 +67,7 @@ const HELP_LINES = [
   '  /local delete <kind> <id> delete one staged section',
   '  /local clear delete all staged sections',
   '  local=<file> at startup chooses the local DSL file',
+  '  modportal=<dir> at startup loads enabled approved-mod DSL from a synced cache',
   '  /create-test <id>       emit a # test from what you just did in this session',
   '  /create-valid-test <id> same, plus a # save + expect: regression assertion',
   '  /help        show this help',
@@ -657,6 +659,7 @@ interface CliArgs {
   files: string[];
   liveRequested: boolean;
   localFile: string;
+  modportalDir?: string;
 }
 
 function splitContentArg(arg: string | undefined): string[] {
@@ -666,6 +669,7 @@ function splitContentArg(arg: string | undefined): string[] {
 function parseCliArgs(rawArgs: string[]): CliArgs {
   const positional: string[] = [];
   let localFile = defaultLocalChanges;
+  let modportalDir: string | undefined = DEFAULT_MODPORTAL_CACHE;
   let liveRequested = false;
 
   for (let i = 0; i < rawArgs.length; i++) {
@@ -690,11 +694,29 @@ function parseCliArgs(rawArgs: string[]): CliArgs {
       localFile = arg.slice('local='.length);
       continue;
     }
+    if (arg === '--no-modportal' || arg === 'modportal=off') {
+      modportalDir = undefined;
+      continue;
+    }
+    if (arg === '--modportal') {
+      modportalDir = rawArgs[++i] ?? DEFAULT_MODPORTAL_CACHE;
+      continue;
+    }
+    if (arg.startsWith('--modportal=')) {
+      const value = arg.slice('--modportal='.length);
+      modportalDir = value === 'off' ? undefined : value;
+      continue;
+    }
+    if (arg.startsWith('modportal=')) {
+      const value = arg.slice('modportal='.length);
+      modportalDir = value === 'off' ? undefined : value;
+      continue;
+    }
     positional.push(arg);
   }
 
   if (positional.length > 1 && localFile === defaultLocalChanges) localFile = positional[0];
-  return { files: splitContentArg(positional.length > 1 ? positional[1] : positional[0]), liveRequested, localFile };
+  return { files: splitContentArg(positional.length > 1 ? positional[1] : positional[0]), liveRequested, localFile, modportalDir };
 }
 
 function repoPath(file: string): string {
@@ -718,6 +740,39 @@ function writeLocalChanges(file: string, text: string): void {
   const target = repoPath(file);
   mkdirSync(path.dirname(target), { recursive: true });
   writeFileSync(target, text, 'utf8');
+}
+
+export interface ModportalLoadResult {
+  sources: ModuleSource[];
+  warnings: string[];
+}
+
+function inside(base: string, target: string): boolean {
+  const relative = path.relative(base, target);
+  return relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative));
+}
+
+export function loadModportalSources(dir: string): ModportalLoadResult {
+  const root = repoPath(dir);
+  const manifestFile = path.join(root, 'manifest.json');
+  if (!existsSync(manifestFile)) return { sources: [], warnings: [] };
+
+  const manifest = JSON.parse(readFileSync(manifestFile, 'utf8').replace(/^\uFEFF/, '')) as ModportalManifest;
+  const sources: ModuleSource[] = [];
+  const warnings: string[] = [];
+  for (const entry of manifest.entries) {
+    const file = path.resolve(root, entry.file);
+    if (!inside(root, file)) {
+      warnings.push(`Modportal skipped ${entry.moduleId}: file escapes cache directory`);
+      continue;
+    }
+    if (!existsSync(file)) {
+      warnings.push(`Modportal skipped ${entry.moduleId}: missing ${entry.file}`);
+      continue;
+    }
+    sources.push({ name: entry.moduleId, text: readFileSync(file, 'utf8'), enabled: entry.enabled });
+  }
+  return { sources, warnings };
 }
 
 const RACES = ['Human', 'Elf', 'Dwarf', 'Orc'];
@@ -750,7 +805,9 @@ async function main(): Promise<void> {
   const liveMode = args.liveRequested && Boolean(process.stdin.isTTY);
   const localPath = repoPath(args.localFile);
   const files = args.files.filter((file) => repoPath(file) !== localPath);
-  const baseSources = loadContent(files);
+  const modportal = args.modportalDir ? loadModportalSources(args.modportalDir) : { sources: [], warnings: [] };
+  for (const warning of modportal.warnings) console.error(warning);
+  const baseSources = [...loadContent(files), ...modportal.sources];
   const baseLoaded = loadUniverseWithDiagnostics(baseSources);
   const dependencies = baseLoaded.loadedModules;
   const localText = existsSync(localPath) ? readFileSync(localPath, 'utf8') : initialLocalChangesModule(dependencies);
