@@ -41,6 +41,10 @@ export const humanize = (id: string): string =>
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
     .join(' ');
 
+// Approximate: the written vowel, not the spoken one, so "a unicorn" comes out
+// wrong and "an Hay" — which is what a blanket "an" produced — does not.
+export const article = (word: string): string => (/^[aeiou]/i.test(word) ? 'an' : 'a');
+
 export interface Quantified {
   item: string;
   amount?: number;
@@ -51,6 +55,9 @@ export const quantified: Parser<Quantified> = {
     const amount = cursor.take(/\d+/);
     if (amount !== null) cursor.take(/[ \t]+/);
     const item = id.parse(cursor);
-    return amount !== null ? { item, amount: Number(amount) } : { item };
+    if (amount === null) return { item };
+    // An absent count means one; a written zero is a line that does nothing.
+    if (Number(amount) === 0) throw new DslError(`a count of 0 does nothing: ${item}`, { start: cursor.abs(cursor.pos - item.length), end: cursor.abs(cursor.pos) });
+    return { item, amount: Number(amount) };
   },
 };

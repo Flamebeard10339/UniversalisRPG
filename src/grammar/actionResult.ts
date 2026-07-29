@@ -30,7 +30,9 @@ function parseVariable(cursor: Cursor): string {
 function parseAdd(cursor: Cursor): ActionResult {
   const variable = parseVariable(cursor);
   cursor.take(/[ \t]+/);
-  const amount = cursor.take(/\d+/);
+  // Signed, so `add: counter -3` subtracts rather than silently meaning +1.
+  // Signed, so `add: counter -3` subtracts instead of silently meaning +1.
+  const amount = cursor.take(/-?\d+/);
   return { kind: 'add', variable, amount: amount !== null ? Number(amount) : 1 };
 }
 

@@ -199,6 +199,11 @@ function applySection(registry: Registry, section: ModuleSection): void {
     }
     case 'recipe': {
       const recipe = hydrateSection(section.value as Authored<Recipe>, recipeSchema);
+      // `burnt:` is what a failed attempt yields, and only `accuracy:` gives an
+      // attempt a way to fail; without it the outputs are silently unreachable.
+      if (recipe.burnt.length > 0 && !recipe.accuracy) {
+        throw new DslError(`# recipe ${recipe.id}: burnt: needs an accuracy: stat, or nothing can ever burn`);
+      }
       registry.recipes.set(recipe.id, recipe);
       registry.recipeActions.set(recipe.id, recipeAction(recipe));
       break;

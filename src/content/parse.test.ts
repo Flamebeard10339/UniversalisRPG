@@ -387,7 +387,8 @@ describe('the authored / derived boundary', () => {
     expect(mystery.examine).toBeUndefined();
     const hydrated = hydrateSection(mystery, itemSchema);
     expect(hydrated.title).toBe('Mystery Box');
-    expect(hydrated.examine).toBe('This is an Mystery Box.');
+    expect(hydrated.examine).toBe('This is a Mystery Box.');
+    expect(hydrateSection(parseOne('# item apple', itemSchema), itemSchema).examine).toBe('This is an Apple.');
   });
 
   it('lets an authored field win over its default', () => {
@@ -455,5 +456,23 @@ describe('a sub-parser must consume the whole line, like the section engine does
 
   it('still accepts every field written correctly', () => {
     expect(load('# flag a', '# flag b', '# item coin', '# stat attack', '# entity gull', 'peck:', '  requires: a and not b', '  time: 1.5', '  accuracy: attack', '  escape after 3', '  give: 1 coin, say: Hi')).not.toThrow();
+  });
+});
+
+describe('a value that reads as a mistake is refused rather than reinterpreted', () => {
+  const load = (...lines: string[]) => () => loadModule(lines.join('\n'));
+
+  it('takes a sign on add:, which used to fall through to +1', () => {
+    const results = loadModule('# flag counter\n# entity gull\npeck:\n  add: counter -3').entities.get('gull')!.actions[0].results;
+    expect(results).toEqual([{ kind: 'add', variable: 'counter', amount: -3 }]);
+  });
+
+  it('refuses a count of zero, which is a line that does nothing', () => {
+    expect(load('# item straw', '# entity gull', 'peck:', '  give: 0 straw')).toThrow(/a count of 0 does nothing: straw/);
+    expect(load('# item straw', '# item hay', '# recipe bale', 'in: 0 straw', 'out: hay')).toThrow(/a count of 0 does nothing/);
+  });
+
+  it('refuses burnt: outputs that nothing can ever reach', () => {
+    expect(load('# item dough', '# item bread', '# item ash', '# recipe bake', 'in: dough', 'out: bread', 'burnt: ash')).toThrow(/burnt: needs an accuracy: stat/);
   });
 });
