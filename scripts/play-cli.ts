@@ -67,6 +67,7 @@ const HELP_LINES = [
   '  /local show  print the local-changes DSL module',
   '  /local delete <kind> <id> delete one staged section',
   '  /local clear delete all staged sections',
+  '  <a.dsl,b.dsl> at startup loads content files, comma-separated in one argument',
   '  local=<file> at startup chooses the local DSL file',
   '  modportal=<dir> at startup loads enabled approved-mod DSL from a synced cache',
   '  /create-test <id>       emit a # test from what you just did in this session',
@@ -716,8 +717,13 @@ function parseCliArgs(rawArgs: string[]): CliArgs {
     positional.push(arg);
   }
 
-  if (positional.length > 1 && localFile === defaultLocalChanges) localFile = positional[0];
-  return { files: splitContentArg(positional.length > 1 ? positional[1] : positional[0]), liveRequested, localFile, modportalDir };
+  // One positional, comma-separated. A second one used to become the local file,
+  // which `/dsl` then rewrote as `local-changes` — silently, over real content.
+  if (positional.length > 1) {
+    console.error(`Load several content files as one comma-separated argument, not ${positional.length} separate ones. Use local=<file> to choose where local changes are written.`);
+    process.exit(1);
+  }
+  return { files: splitContentArg(positional[0]), liveRequested, localFile, modportalDir };
 }
 
 function repoPath(file: string): string {
