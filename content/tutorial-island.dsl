@@ -3,6 +3,9 @@
 // Paths 2/3 (thieving, fishing) are only stubbed where Path 1 shares their props
 // (front door, dresser, lockpick) so the world stays internally consistent.
 
+# info tutorial-island
+version: 1.0.0
+
 // --- variables ---
 
 // Seconds of real-time travel per unit of straight-line distance between

@@ -4,7 +4,8 @@ import { Dialogue } from './dialogue';
 import { Entity, entitySchema } from './entity';
 import { Item, itemSchema } from './item';
 import { Location, locationSchema, recursivelyResolveRelativeCoordinates } from './location';
-import { parseModule } from './module';
+import { ModuleSection } from './module';
+import { ModuleSource, parseUniverse } from './universe';
 import { DslError } from '../grammar/parser';
 import { Recipe, recipeSchema } from './recipe';
 import { Resource, resourceSchema } from './resource';
@@ -166,7 +167,77 @@ function validateReferences(registry: Registry): void {
   }
 }
 
-export function loadModule(source: string): Registry {
+function applySection(registry: Registry, section: ModuleSection): void {
+  switch (section.kind) {
+    case 'entity': {
+      const entity = scopeEntity(hydrateSection(section.value as Authored<Entity>, entitySchema));
+      for (const action of entity.actions) {
+        // Without a pool to drain, a retaliation falls through to the fight's
+        // own hit counter and wears down the target instead of the player.
+        if (action.retaliates && !action.target) {
+          throw new DslError(`# entity ${entity.id}: retaliating action ${JSON.stringify(action.label)} requires a target: pool`);
+        }
+      }
+      registry.entities.set(entity.id, entity);
+      break;
+    }
+    case 'location': {
+      const location = scopeLocation(hydrateSection(section.value as Authored<Location>, locationSchema));
+      registry.locations.set(location.id, location);
+      break;
+    }
+    case 'item': {
+      const item = hydrateSection(section.value as Authored<Item>, itemSchema);
+      registry.items.set(item.id, item);
+      break;
+    }
+    case 'stat': {
+      const stat = hydrateSection(section.value as Authored<Stat>, statSchema);
+      registry.stats.set(stat.id, stat);
+      break;
+    }
+    case 'skill': {
+      const skill = hydrateSection(section.value as Authored<Skill>, skillSchema);
+      registry.skills.set(skill.id, skill);
+      break;
+    }
+    case 'recipe': {
+      const recipe = hydrateSection(section.value as Authored<Recipe>, recipeSchema);
+      registry.recipes.set(recipe.id, recipe);
+      registry.recipeActions.set(recipe.id, recipeAction(recipe));
+      break;
+    }
+    case 'resource': {
+      const resource = hydrateSection(section.value as Authored<Resource>, resourceSchema);
+      if (!resource.max) throw new DslError(`# resource ${resource.id} requires a max: stat`);
+      registry.resources.set(resource.id, resource);
+      break;
+    }
+    case 'dialogue': {
+      const dialogue = section.value as Dialogue;
+      registry.dialogues.set(dialogue.id, dialogue);
+      if (dialogue.owner) registry.dialoguesByOwner.set(dialogue.owner, dialogue);
+      break;
+    }
+    case 'test': {
+      const test = section.value as Test;
+      registry.tests.set(test.id, test);
+      break;
+    }
+    case 'variable': {
+      const variable = hydrateSection(section.value as Authored<Variable>, variableSchema);
+      registry.variables.set(variable.id, variable);
+      break;
+    }
+    case 'save': {
+      const { id, saved } = section.value as { id: string; saved: ParsedSave };
+      registry.saves.set(id, saved);
+      break;
+    }
+  }
+}
+
+export function loadUniverse(sources: readonly ModuleSource[]): Registry {
   const registry: Registry = {
     entities: new Map(),
     locations: new Map(),
@@ -183,77 +254,13 @@ export function loadModule(source: string): Registry {
     saves: new Map(),
   };
 
-  for (const section of parseModule(source)) {
-    switch (section.kind) {
-      case 'entity': {
-        const entity = scopeEntity(hydrateSection(section.value as Authored<Entity>, entitySchema));
-        for (const action of entity.actions) {
-          // Without a pool to drain, a retaliation falls through to the fight's
-          // own hit counter and wears down the target instead of the player.
-          if (action.retaliates && !action.target) {
-            throw new DslError(`# entity ${entity.id}: retaliating action ${JSON.stringify(action.label)} requires a target: pool`);
-          }
-        }
-        registry.entities.set(entity.id, entity);
-        break;
-      }
-      case 'location': {
-        const location = scopeLocation(hydrateSection(section.value as Authored<Location>, locationSchema));
-        registry.locations.set(location.id, location);
-        break;
-      }
-      case 'item': {
-        const item = hydrateSection(section.value as Authored<Item>, itemSchema);
-        registry.items.set(item.id, item);
-        break;
-      }
-      case 'stat': {
-        const stat = hydrateSection(section.value as Authored<Stat>, statSchema);
-        registry.stats.set(stat.id, stat);
-        break;
-      }
-      case 'skill': {
-        const skill = hydrateSection(section.value as Authored<Skill>, skillSchema);
-        registry.skills.set(skill.id, skill);
-        break;
-      }
-      case 'recipe': {
-        const recipe = hydrateSection(section.value as Authored<Recipe>, recipeSchema);
-        registry.recipes.set(recipe.id, recipe);
-        registry.recipeActions.set(recipe.id, recipeAction(recipe));
-        break;
-      }
-      case 'resource': {
-        const resource = hydrateSection(section.value as Authored<Resource>, resourceSchema);
-        if (!resource.max) throw new DslError(`# resource ${resource.id} requires a max: stat`);
-        registry.resources.set(resource.id, resource);
-        break;
-      }
-      case 'dialogue': {
-        const dialogue = section.value as Dialogue;
-        registry.dialogues.set(dialogue.id, dialogue);
-        if (dialogue.owner) registry.dialoguesByOwner.set(dialogue.owner, dialogue);
-        break;
-      }
-      case 'test': {
-        const test = section.value as Test;
-        registry.tests.set(test.id, test);
-        break;
-      }
-      case 'variable': {
-        const variable = hydrateSection(section.value as Authored<Variable>, variableSchema);
-        registry.variables.set(variable.id, variable);
-        break;
-      }
-      case 'save': {
-        const { id, saved } = section.value as { id: string; saved: ParsedSave };
-        registry.saves.set(id, saved);
-        break;
-      }
-    }
+  for (const module of parseUniverse(sources)) {
+    for (const section of module.sections) applySection(registry, section);
   }
   recursivelyResolveRelativeCoordinates(registry.locations);
   validateTuning(registry.variables);
   validateReferences(registry);
   return registry;
 }
+
+export const loadModule = (source: string): Registry => loadUniverse([{ name: 'anonymous', text: source }]);

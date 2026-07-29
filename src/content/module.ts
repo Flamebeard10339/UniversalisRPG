@@ -1,5 +1,6 @@
 import { parseDialogue } from './dialogue';
 import { entitySchema } from './entity';
+import { infoSchema } from './info';
 import { itemSchema } from './item';
 import { locationSchema } from './location';
 import { DslError } from '../grammar/parser';
@@ -16,6 +17,7 @@ import { variableSchema } from './variable';
 // Most kinds are a SectionSchema walked by the generic engine; a few (dialogue)
 // have a grammar too far from key/value to fit it and bring their own parser.
 const PARSERS: Record<string, (section: RawSection) => object> = {
+  info: (section) => parseSection(section, infoSchema),
   item: (section) => parseSection(section, itemSchema),
   stat: (section) => parseSection(section, statSchema),
   skill: (section) => parseSection(section, skillSchema),
@@ -28,6 +30,8 @@ const PARSERS: Record<string, (section: RawSection) => object> = {
   test: parseTest,
   save: parseSaveSection,
 };
+
+export const SECTION_KINDS: readonly string[] = Object.keys(PARSERS);
 
 export interface ModuleSection {
   kind: string;

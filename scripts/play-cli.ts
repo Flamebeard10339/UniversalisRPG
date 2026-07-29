@@ -4,7 +4,8 @@ import { createInterface } from 'node:readline/promises';
 import { pathToFileURL } from 'node:url';
 import { DslError } from '../src/grammar/parser';
 import { actionFirstUnit, craftFirstUnit, describeCondition, encounterView, PLAYER, RuntimeError, type ActiveAction, type GameState } from '../src/runtime/runtime';
-import { loadModule } from '../src/content/registry';
+import { loadUniverse } from '../src/content/registry';
+import { type ModuleSource } from '../src/content/universe';
 import {
   apply,
   applyDirective,
@@ -514,8 +515,13 @@ function runLiveAction(session: PlaySession, rl: ReturnType<typeof createInterfa
   });
 }
 
-function loadContent(files: string[]): string {
-  return files.map((file) => readFileSync(path.resolve(repoRoot, file), 'utf8')).join('\n');
+// One file is one module: its `# info` names it, and its filename is the
+// fallback id for a file that declares none.
+function loadContent(files: string[]): ModuleSource[] {
+  return files.map((file) => ({
+    name: path.basename(file).replace(/\.[^.]*$/, ''),
+    text: readFileSync(path.resolve(repoRoot, file), 'utf8'),
+  }));
 }
 
 const RACES = ['Human', 'Elf', 'Dwarf', 'Orc'];
@@ -548,7 +554,7 @@ async function main(): Promise<void> {
   const liveMode = rawArgs.includes('--live') && Boolean(process.stdin.isTTY);
   const arg = rawArgs.find((a) => !a.startsWith('--'));
   const files = (arg ?? defaultContent).split(',').map((file) => file.trim()).filter(Boolean);
-  const registry = loadModule(loadContent(files));
+  const registry = loadUniverse(loadContent(files));
   const session = startSession(registry);
   const recorder: Recorder = { history: [], startSave: serializeSave(session.state, registry) };
 

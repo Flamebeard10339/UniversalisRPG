@@ -1,7 +1,6 @@
 # DSL modules — deliverable log
 
-**Status:** design drafted and ratified 2026-07-28. D1–D7 all settled and folded in below.
-Nothing blocks chunk 1.
+**Status:** design ratified 2026-07-28, D1–D7 settled. **Chunk 1 landed.** Chunk 1b is next.
 
 ---
 
@@ -270,7 +269,7 @@ Engine first; nothing in tooling is safe until a bad module can fail alone.
 
 | # | Chunk | Closes |
 | --- | --- | --- |
-| 1 | `# info`, module identity, `loadUniverse`, topological order | spec basis |
+| 1 | ~~`# info`, module identity, `loadUniverse`, topological order~~ **done** | spec basis |
 | 1b | Path resolution: one namespace tree, suffix shortening, declarable flags, the `tutorial.` migration | D6, D7; collapses today's scoping pass |
 | 2 | Field-granular merge + `remove` + list operators | DSL-H1, module req 1–3 |
 | 3 | Complete the reference walker | DSL-H2, unlocks req 6 |
@@ -320,9 +319,39 @@ Two consequences worth stating before they surprise someone:
 
 ---
 
+## Chunk log
+
+### Chunk 1 — module identity and load order (done)
+
+`# info <module-id>` with `version:`, `dependencies:`, `pack:`. `loadUniverse(ModuleSource[])`
+parses every module, validates its declarations against what is loaded, orders the set, and
+applies the sections in that order. `loadModule(source)` survives as a one-module wrapper — and
+is no longer misnamed, now that a universe has its own entry point.
+
+Order is the **lexicographically smallest topological order**: of everything whose dependencies
+are placed, the alphabetically first goes next. Same modules in, same universe out, whatever
+order the sources arrive in.
+
+Three decisions taken during the build, none of them reversals:
+
+- **`enabled` is not a `# info` field.** Enablement is user state, not an author declaration —
+  Factorio keeps it in `mod-list.json`, not `info.json`, for the same reason. A module cannot
+  meaningfully ship "I am switched off". It belongs on the universe input in chunk 5. `pack:`
+  *is* author-declared, so it landed here.
+- **An optional dependency present at the wrong version is an error, not a disable.** The design
+  says disable; disabling requires the isolation machinery from chunk 4, so until that exists a
+  loud error is the honest behaviour and a silent wrong universe is not.
+- **Reserved module ids are enforced now**, ahead of the namespace tree that needs them, so no
+  content is authored against an id that 1b will have to take away.
+
+Verified: 332 tests green (17 new), the CLI plays the tutorial unchanged, and a second file
+loaded alongside it resolves cross-module references in both directions.
+
+---
+
 ## Open decisions
 
-None blocking. Chunk 1 can start.
+None blocking. Chunk 1b can start.
 
 ---
 
