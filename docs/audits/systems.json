@@ -4,9 +4,9 @@
     {
       "name": "DSL load path",
       "paths": ["src/grammar", "src/content"],
-      "lastAudit": "65d764a",
-      "lastAuditDoc": "docs/audits/dsl-load-path-2026-07-29.md",
-      "note": "The 2026-07-29 audit covered DSL module chunks 1-7. Its serializer, squash, BOM/CRLF, unordered-dependency and local-module-id findings were fixed in 65d764a."
+      "lastAudit": "731c3a6",
+      "lastAuditDoc": "docs/audits/dsl-modules-2026-07-29-full.md",
+      "note": "Full deliverable audit over chunks 1-8. Findings are open in backlog.md, H1/H2 first. The audit deliberately crossed into src/runtime/save.ts and scripts/, because engine requirement 6 is implemented outside this system's paths; that does not certify the Runtime system, whose own counter is untouched."
     },
     {
       "name": "Runtime",

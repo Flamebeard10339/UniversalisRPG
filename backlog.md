@@ -6,6 +6,73 @@ Check `scratch.md` for open architectural notes touching an area before starting
 
 # Tasks
 
+## Audit findings — DSL modules, full deliverable (2026-07-29)
+Evidence: `docs/audits/dsl-modules-2026-07-29-full.md`. Covers chunks 1-8 and the cross-system
+surfaces the deliverable grew (`src/runtime/save.ts`, `scripts/play-cli.ts`, `scripts/modportal.ts`).
+Every item below was reproduced at `731c3a6`. Work them in order; H1 and H2 are player-visible data
+loss.
+
+- **H1 a loaded save deletes every object-owned flag.** `src/runtime/save.ts:120` checks
+  `registry.flags`, which holds only `# flag` sections; flags declared by `flags:` on an entity or
+  location, and `discovered` on every location, live in `registry.namespace` alone. Round-tripping a
+  save against the shipped tutorial loses `front-door.unlocked` and `basement.discovered`. Fires on
+  `/load` and on every `/dsl` edit. The fix is the shape the `visits` line one row below already
+  uses: `registry.namespace.has('flag', id)` — applied, 419/419 green. **Land the fix with a `# test`
+  that saves, loads and asserts a member flag survived**, or M7 stays open.
+- **H2 patching one stat on another module's entity deletes the rest of the sheet.** `stats` is a
+  `Record` whose parser (`src/content/entity.ts:30`) is not a `ListParser`, so
+  `merge.ts:61` replaces wholesale instead of merging. Silent. Fails module requirement 2 of the
+  deliverable and the design's own "fields it does not list are untouched".
+- **M1 `stats:` is the only collection field that rejects block form and `+`/`-`.** Same root cause as
+  H2: `statBlock` wraps `list()` and drops the `parseBlock`/`element` it supplies. Every other
+  multi-valued field in the grammar takes a block. Making `statBlock` a real `ListParser` over
+  `[statId, Range]` pairs closes H2 and M1 together — do them as one change.
+- **M2 a corrupt modportal manifest crashes the game.** Unguarded `JSON.parse` + `manifest.entries`
+  iteration at `scripts/play-cli.ts:760` and `scripts/modportal.ts:97`. Takes down `npm run play`
+  before the tolerant loader is reached, and takes down `modportal list/enable/disable` so the cache
+  cannot be repaired through the tool.
+- **M3 disabling a broken module neither silences it nor unblocks `sync`.** `registry.ts:524` records
+  parse diagnostics for switched-off sources; `play-cli` prints them every launch and
+  `scripts/modportal.ts:165` exits 1 on them.
+- **M4 two positional args make the first the local-changes file, and `/dsl` overwrites it.**
+  `play-cli.ts:718`. `npm run play -- content/a.dsl content/b.dsl` rewrites `a.dsl`'s `# info` header
+  as `local-changes`. Multi-file loading is comma-separated; drop the positional rule or refuse a
+  local file that already declares another module id.
+- **M5 the prune map has no exhaustiveness guard.** `SAVE_FIELDS` in the same file forces a new
+  `GameState` field to be classified for diffing; `pruneStateForRegistry` is hand-written and says
+  nothing. Drive the record prunes off a `SaveField`-keyed table so one exhaustive key type covers
+  both halves. (The prune is otherwise *not* over-complex — see the audit doc's M5 for the
+  justification.)
+- **M6 approved-mod re-identification is a global text substitution.** `modportal.ts:60` rewrites
+  every `local-changes.` in the source, prose and `# save` JSON included. Route it through the
+  namespace/`referenceSites` machinery that exists for this.
+- **M7 the prune tests restate the implementation.** The H1 fix leaves the suite green.
+  `PRUNE_MODULE` declares only module-level flags, and no `# save` section exists in `content/`, so
+  `integration.test.ts` never loads a real save.
+- **L1** `extractContributionDsl` takes the *first* ```dsl fence, which contributor notes precede.
+- **L2** `serialize.ts:25` `n()` has two identical branches.
+- **L3** `pruneRegistryDanglingReferences` uses dangling-roots for most kinds but
+  `registry.stats.has` for entity stats and stat-bonus tags — two rules, one function, and the log
+  disclaims the second.
+- **L4** `visits` is not reserved, so a flag named `visits` misparses as a dialogue-node counter;
+  `skills` is reserved but is not an engine root.
+- **L5** `Namespace.resolve` materializes every key of a kind per reference; `/dsl` reloads the whole
+  universe per accepted edit.
+
+### Decision wanted, not a defect
+- **`/dsl <kind>` should print the kind's fields instead of requiring memorization.** `SCHEMAS`
+  (`src/content/module.ts:19`) already enumerates every field of every generic kind, so the help can
+  be generated rather than written and cannot drift. Two things make it real work rather than a
+  one-liner: `AnySchema` (`grammar/section.ts:34`) currently carries only field *names*, so it would
+  need widening to expose `keyword`, `keywords`, `clauses` and `bare` — otherwise the help says
+  `capabilities` where the DSL wants `stations`, and `hiddenIf` where it wants `hidden if` — and the
+  four bespoke kinds (`dialogue`, `test`, `save`, `remove`) have no schema and need a hand-written
+  line each. Recommended: `/dsl <kind>` with no id prints the generated field list and returns; the
+  existing `/dsl <kind> <id> [body]` is unchanged.
+- **Modportal `sync` enables new approved mods by default** and `play-cli` auto-loads the cache, so
+  approved third-party content goes live without a prompt. Defensible (DSL-only, maintainer-labelled)
+  but currently unstated. Decide and record it.
+
 ## Audit findings (2026-07-29)
 Evidence: `docs/audits/dsl-load-path-2026-07-29.md`.
 
