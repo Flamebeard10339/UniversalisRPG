@@ -107,6 +107,68 @@ describe('dialogue merges one node at a time', () => {
   });
 });
 
+describe('a list key takes + and -', () => {
+  const adjacency = (sources: ModuleSource[]): string[] => loadUniverse(sources).locations.get('beach')!.adjacent.map((edge) => edge.target);
+
+  it('appends and removes independently, leaving the rest of the list alone', () => {
+    expect(adjacency([BASE, module('reef', 'dependencies: base', '# location reef', 'x: 0, y: 1', '# location beach', '+adjacent: reef')])).toEqual(['dunes', 'reef']);
+    expect(adjacency([BASE, patch('# location beach', '-adjacent: dunes')])).toEqual([]);
+  });
+
+  it('applies several operators on one key in source order', () => {
+    const both = module('reef', 'dependencies: base', '# location reef', 'x: 0, y: 1', '# location beach', '+adjacent: reef', '-adjacent: dunes');
+    expect(adjacency([BASE, both])).toEqual(['reef']);
+
+    const undone = module('reef', 'dependencies: base', '# location reef', 'x: 0, y: 1', '# location beach', '+adjacent: reef', '-adjacent: reef');
+    expect(adjacency([BASE, undone])).toEqual(['dunes']);
+  });
+
+  it('does not append a member the list already holds, and ignores removing one it does not', () => {
+    expect(adjacency([BASE, patch('# location beach', '+adjacent: dunes')])).toEqual(['dunes']);
+    expect(adjacency([BASE, patch('# location beach', '-adjacent: reef')])).toEqual(['dunes']);
+  });
+
+  it('removes a member named by only as much of it as identifies it', () => {
+    const conditional = module('base2', '# location beach', 'x: 0, y: 0', 'adjacent: dunes while tide-out', '# location dunes', 'x: 1, y: 0');
+    expect(adjacency([conditional, module('cut', 'dependencies: base2', '# location beach', '-adjacent: dunes')])).toEqual([]);
+  });
+
+  it('rejects replacing and modifying the same key in one section', () => {
+    expect(() => adjacency([BASE, patch('# location beach', '+adjacent: dunes', 'adjacent: dunes')])).toThrow(/cannot be both replaced and modified/);
+    expect(() => adjacency([BASE, patch('# location beach', 'adjacent: dunes', '-adjacent: dunes')])).toThrow(/cannot be both replaced and modified/);
+  });
+
+  it('rejects an operator on a key that is not a list', () => {
+    expect(() => loadUniverse([BASE, patch('# item rope', '+title: Rope')])).toThrow(/title is not a list, so it cannot take \+/);
+  });
+
+  it('removes one action by label, and refuses a + that would mean nothing', () => {
+    const entity = loadUniverse([BASE, patch('# entity crab', '-pinch:')]).entities.get('crab')!;
+    expect(entity.actions.map((action) => action.label)).toEqual(['flee']);
+    expect(() => loadUniverse([BASE, patch('# entity crab', '+wave:', '  say: Hi.')])).toThrow(/\+ means nothing here/);
+  });
+});
+
+describe('# remove takes out what omission cannot', () => {
+  it('removes a section, and complains when it names nothing', () => {
+    const registry = loadUniverse([BASE, patch('# location beach', '-adjacent: dunes'), module('cut', 'dependencies: patch', '# remove location.dunes')]);
+    expect(registry.locations.has('dunes')).toBe(false);
+    expect(() => loadUniverse([BASE, patch('# remove location.atlantis')])).toThrow(/# remove location.atlantis names nothing that is loaded/);
+  });
+
+  it('lets a later module name the removed id again and get a fresh one', () => {
+    const cut = module('cut', 'dependencies: base', '# remove item.rope');
+    const again = module('zzz-again', 'dependencies: cut', '# item rope', 'title: New Rope');
+    const item = loadUniverse([BASE, cut, again]).items.get('rope')!;
+    expect(item.title).toBe('New Rope');
+    expect(item.examine).not.toBe('Coarse and long.');
+  });
+
+  it('rejects a dotted id on a section that creates', () => {
+    expect(() => loadUniverse([BASE, patch('# item base.rope', 'title: Nope')])).toThrow(/the id is a name and not a path/);
+  });
+});
+
 describe('merging follows load order, not source order', () => {
   it('lets the module that loads last decide a field both modules write', () => {
     const first = patch('# item rope', 'title: Old Rope');

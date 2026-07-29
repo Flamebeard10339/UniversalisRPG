@@ -37,17 +37,33 @@ export interface AnySchema {
   entries?: { into: string };
 }
 
-export const isListField = (schema: AnySchema, name: string): boolean => {
-  const parser = schema.fields[name]?.parser;
-  return typeof parser === 'object' && parser !== null && 'element' in parser;
-};
+const isListParser = (parser: unknown): boolean => typeof parser === 'object' && parser !== null && 'element' in parser;
+
+export const isListField = (schema: AnySchema, name: string): boolean => isListParser(schema.fields[name]?.parser);
+
+// What a `+key:`/`-key:` line contributes, kept apart from a bare assignment so
+// that merging can tell "add these" from "this is now the whole list".
+export interface FieldEdits {
+  ops: { op: '+' | '-'; values: unknown[] }[];
+}
+
+export const isFieldEdits = (value: unknown): value is FieldEdits => typeof value === 'object' && value !== null && 'ops' in value;
+
+// A `-label:` line inside an entries field, carried in the entries array itself
+// so that removals and additions in one section stay in source order.
+export interface EntryRemoval {
+  label: string;
+  removed: true;
+}
+
+export const isEntryRemoval = (entry: { label: string }): entry is EntryRemoval => (entry as EntryRemoval).removed === true;
 
 export const parseAnySection = (section: RawSection, schema: AnySchema): { id: string } => parseSection(section, schema as unknown as SectionSchema<{ id: string }>);
 
 type AnyFields = Record<string, { parser: Parser<unknown>; default?: (self: unknown) => unknown; keyword?: string }>;
 type EntryConfig = { into: string; body: EntryBody };
 
-const KEY = /(?<key>[a-z][a-z0-9 -]*?):/;
+const KEY = /(?<op>[+-][ \t]*)?(?<key>[a-z][a-z0-9 -]*?):/;
 const WORD = /[a-z][a-z0-9-]*/;
 
 function parseBlock(parser: Parser<unknown>, children: RawLine[], span: Span): unknown {
@@ -58,6 +74,7 @@ function parseBlock(parser: Parser<unknown>, children: RawLine[], span: Span): u
 export function parseSection<H extends { id: string }, F extends keyof H = never, E extends keyof H = never>(section: RawSection, schema: SectionSchema<H, F, E>): Authored<H> {
   if (section.kind !== schema.kind) throw new DslError(`expected # ${schema.kind}, got # ${section.kind}`, section.span);
   if (!section.id) throw new DslError(`# ${schema.kind} requires an id`, section.span);
+  if (section.id.includes('.')) throw new DslError(`# ${schema.kind} ${section.id}: a section creates an id inside its own module, so the id is a name and not a path`, section.span);
 
   const fields = schema.fields as unknown as AnyFields;
   const byKeyword: Record<string, string> = {};
@@ -86,18 +103,31 @@ function parseLine(line: RawLine, fields: AnyFields, byKeyword: Record<string, s
     cursor.take(/[ \t]*/);
     if (cursor.done) break;
 
-    const key = cursor.peek(KEY)?.groups?.key;
+    const heading = cursor.peek(KEY)?.groups;
+    const key = heading?.key;
+    const op = heading?.op?.trim() as '+' | '-' | undefined;
     const name = key !== undefined ? byKeyword[key] : undefined;
     const labelsBareField = name !== undefined && (name === clauses || name === bare);
     if (key !== undefined && !labelsBareField && (name !== undefined || entries !== undefined)) {
-      const keySpan = { start: cursor.abs(cursor.pos), end: cursor.abs(cursor.pos + key.length) };
+      const keySpan = { start: cursor.abs(cursor.pos), end: cursor.abs(cursor.pos + (heading!.op?.length ?? 0) + key.length) };
       cursor.take(KEY);
       cursor.take(/[ \t]*/);
       if (name !== undefined) {
-        if (authored[name] !== undefined) throw new DslError(`${kind} field ${key} is defined more than once`, keySpan);
-        if (!cursor.done) authored[name] = fields[name].parser.parse(cursor);
-        else if (line.children.length > 0) authored[name] = parseBlock(fields[name].parser, line.children, line.span);
+        const held = authored[name];
+        if (held !== undefined && (op === undefined || !isFieldEdits(held))) {
+          throw new DslError(op === undefined && !isFieldEdits(held) ? `${kind} field ${key} is defined more than once` : `${kind} field ${key} cannot be both replaced and modified in one section`, keySpan);
+        }
+        if (op !== undefined && !isListParser(fields[name].parser)) throw new DslError(`${kind} field ${key} is not a list, so it cannot take ${op}`, keySpan);
+
+        const value = !cursor.done ? fields[name].parser.parse(cursor) : line.children.length > 0 ? parseBlock(fields[name].parser, line.children, line.span) : undefined;
         // an empty value with no block is unspecified: leave the field absent
+        if (value === undefined) continue;
+        if (op === undefined) authored[name] = value;
+        else ((authored[name] ??= { ops: [] }) as FieldEdits).ops.push({ op, values: value as unknown[] });
+      } else if (op === '+') {
+        throw new DslError(`a bare ${key}: already adds ${key} when it is not there, so + means nothing here`, keySpan);
+      } else if (op === '-') {
+        ((authored[entries!.into] ??= []) as object[]).push({ label: key, removed: true });
       } else {
         const body = cursor.done ? entries!.body.parseBlock(line.children) : entries!.body.parse(cursor);
         ((authored[entries!.into] ??= []) as object[]).push({ label: key, ...body });

@@ -1,6 +1,7 @@
 # DSL modules — deliverable log
 
-**Status:** design ratified 2026-07-28, D1–D7 settled. **Chunk 1 landed.** Chunk 1b is next.
+**Status:** design ratified 2026-07-28, D1–D7 settled. **Chunks 1 and 2 landed.** Chunk 1b has
+merged into chunk 3 — see the chunk log.
 
 ---
 
@@ -270,16 +271,15 @@ Engine first; nothing in tooling is safe until a bad module can fail alone.
 | # | Chunk | Closes |
 | --- | --- | --- |
 | 1 | ~~`# info`, module identity, `loadUniverse`, topological order~~ **done** | spec basis |
-| 1b | Path resolution: one namespace tree, suffix shortening, declarable flags, the `tutorial.` migration | D6, D7; collapses today's scoping pass |
-| 2 | Field-granular merge + `remove` + list operators | DSL-H1, module req 1–3 |
-| 3 | Complete the reference walker | DSL-H2, unlocks req 6 |
+| 2 | ~~Field-granular merge + `remove` + list operators~~ **done** | DSL-H1, module req 1–3 |
+| 3 | One traversal that resolves and validates every reference — absorbs the old chunk 1b | DSL-H2, D6, D7; unlocks req 6 |
 | 4 | Per-module error isolation + diagnostics | engine req 3, 4 |
 | 5 | Enable/disable, packs, dangling-ref pruning | engine req 1, 6; module req 4 |
 | 6 | CLI authoring of every DSL type | engine req 2 |
 | 7 | Publish to GitHub issue; squash tooling | engine req 5 |
 | 8 | Modportal over `approved-mod` issues | stretch |
 
-Chunks 1–2 are one sitting and kill the highest audit finding. Chunk 4 is the one to not skip.
+Chunk 4 is the one to not skip.
 
 ---
 
@@ -347,11 +347,63 @@ Three decisions taken during the build, none of them reversals:
 Verified: 332 tests green (17 new), the CLI plays the tutorial unchanged, and a second file
 loaded alongside it resolves cross-module references in both directions.
 
+### Chunk 1b merged into chunk 3 (measured, not preferred)
+
+The old chunk 1b (namespace resolution) and chunk 3 (complete the reference walker) are the same
+traversal. `validateReferences` visits every reference-bearing field and asks `has(id)`;
+resolution visits the same fields and asks `resolve(path) → key`. Same visitor, different leaf —
+and resolution *subsumes* validation, since "resolves to nothing" is exactly "names an unknown
+entity". Doing 1b first meant writing the visitor against 20 of 44 fields and then writing it
+again in chunk 3, so the two are now one chunk.
+
+Two consequences to build against, both recorded before they can surprise anyone:
+
+- **Resolution runs per module, before merge.** A shortened reference resolves against *its own
+  module and that module's dependencies*, so once sections are merged there is no longer a module
+  to resolve against. Chunk 2's merge is untouched by this — it merges whatever keys resolution
+  produced — but the pass must be inserted between parse and collect, not after.
+- **`time`, `visits` and `player` are engine-owned roots** with hardcoded cases in
+  `resolveReference`. `player` and `skills` are already reserved module ids; `time` and `visits`
+  are not, and must be before the tree is real.
+
+The `tutorial.` migration (D7) depends on none of this and can be lifted out whenever.
+
+### Chunk 2 — field-granular merge, list operators, `# remove` (done)
+
+Closes DSL-H1. Merging happens on the **authored** form, before hydration, because a hydrated
+object has every field filled in with defaults — overlaying one would reset everything the patch
+did not mention. That split the load into collect-then-build.
+
+Actions merge by label; dialogues merge by node name. Steps inside a node carry no ids to address
+them by, so a respecified node replaces them wholesale — the node is the unit of a dialogue fix,
+which is what the requirement actually asks for.
+
+Operators land on the key, per D1: `+adjacent:` / `-adjacent:`, several per key, applied in source
+order. `-` names as much of a member as identifies it, so `-adjacent: dunes` also removes the
+`dunes` edge that carries a `while` condition. `-label:` removes one entry; `+label:` is rejected
+because a bare `label:` already adds it.
+
+`# remove entity.mirror` uses a path rather than the design's `# remove entity mirror`, because
+the heading grammar carries one id and a path is what D6 already ratified — and it extends to
+`# remove entity.mirror.look-in` later without new syntax. Removal is applied where it stands, so
+a later module can name the id again and get a fresh object rather than a hole.
+
+Three holes, all accepted and all narrow:
+
+- **An action cannot be emptied by patching it.** A body parser reports a list it was given no
+  lines for as empty rather than absent, so an empty one in a patch means "not respecified".
+  Remove the action or respecify it.
+- **Operators do not reach inside an action body.** `+on success:` is not a thing, because action
+  bodies are parsed by a bespoke parser rather than the generic engine. This is the same seam
+  audit finding DSL-M2 named.
+- **Removing an id that is not loaded is an error, not a no-op.** Softens in chunk 5, where
+  optional dependencies make "not there" a legitimate state.
+
 ---
 
 ## Open decisions
 
-None blocking. Chunk 1b can start.
+None blocking. Chunk 3 can start.
 
 ---
 

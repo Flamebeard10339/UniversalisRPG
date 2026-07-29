@@ -1,6 +1,6 @@
 import { Dialogue, DialogueNode } from './dialogue';
 import { SCHEMAS } from './module';
-import { AnySchema } from '../grammar/section';
+import { AnySchema, FieldEdits, isEntryRemoval, isFieldEdits, isListField } from '../grammar/section';
 
 type Fields = Record<string, unknown>;
 
@@ -19,9 +19,33 @@ const overlay = (into: Fields, from: Fields): Fields => {
   return merged;
 };
 
+// A `-` names as much of a member as it takes to identify it, so an edge written
+// `-adjacent: dunes` also removes the `dunes` edge that carries a condition.
+function identifies(pattern: unknown, candidate: unknown): boolean {
+  if (typeof pattern !== 'object' || pattern === null || typeof candidate !== 'object' || candidate === null) return pattern === candidate;
+  return Object.entries(pattern).every(([key, value]) => identifies(value, (candidate as Fields)[key]));
+}
+
+// Operators apply in source order, so `+a: x` then `-a: x` leaves it absent and
+// the reverse leaves it present. No reordering, no set algebra.
+function applyEdits(held: unknown, edits: FieldEdits): unknown[] {
+  let values = Array.isArray(held) ? [...held] : [];
+  for (const { op, values: operands } of edits.ops) {
+    for (const operand of operands) {
+      if (op === '-') values = values.filter((value) => !identifies(operand, value));
+      else if (!values.some((value) => identifies(operand, value))) values.push(operand);
+    }
+  }
+  return values;
+}
+
 function mergeEntries(into: Labelled[], from: Labelled[]): Labelled[] {
-  const merged = [...into];
+  let merged = [...into];
   for (const entry of from) {
+    if (isEntryRemoval(entry)) {
+      merged = merged.filter((existing) => existing.label !== entry.label);
+      continue;
+    }
     const at = merged.findIndex((existing) => existing.label === entry.label);
     if (at === -1) merged.push(entry);
     else merged[at] = overlay(merged[at], entry) as Labelled;
@@ -30,10 +54,12 @@ function mergeEntries(into: Labelled[], from: Labelled[]): Labelled[] {
 }
 
 function mergeAuthored(into: Fields, from: Fields, schema: AnySchema): Fields {
-  const entries = schema.entries?.into as string | undefined;
+  const entries = schema.entries?.into;
   const merged = { ...into };
   for (const [key, value] of Object.entries(from)) {
-    merged[key] = key === entries && into[key] !== undefined ? mergeEntries(into[key] as Labelled[], value as Labelled[]) : value;
+    if (key === entries) merged[key] = mergeEntries((into[key] as Labelled[]) ?? [], value as Labelled[]);
+    else if (isListField(schema, key) && isFieldEdits(value)) merged[key] = applyEdits(into[key], value);
+    else merged[key] = value;
   }
   return merged;
 }
@@ -56,9 +82,8 @@ function mergeDialogue(into: Dialogue, from: Dialogue): Dialogue {
 // Whether the section creates or edits is not declared — it follows from whether
 // the id was already there when this module loaded.
 export function mergeSection(kind: string, into: object | undefined, from: object): object {
-  if (into === undefined) return from;
-  if (kind === 'dialogue') return mergeDialogue(into as Dialogue, from as Dialogue);
-
   const schema = SCHEMAS[kind];
-  return schema ? mergeAuthored(into as Fields, from as Fields, schema) : from;
+  if (schema) return mergeAuthored((into as Fields) ?? { id: (from as { id: string }).id }, from as Fields, schema);
+  if (into === undefined) return from;
+  return kind === 'dialogue' ? mergeDialogue(into as Dialogue, from as Dialogue) : from;
 }

@@ -9,6 +9,7 @@ import { ModuleSection } from './module';
 import { ModuleSource, parseUniverse } from './universe';
 import { DslError } from '../grammar/parser';
 import { Recipe, recipeSchema } from './recipe';
+import { Removal } from './removal';
 import { Resource, resourceSchema } from './resource';
 import { ParsedSave } from './saveSection';
 import { scopeEntity, scopeLocation } from './scope';
@@ -261,6 +262,13 @@ export function loadUniverse(sources: readonly ModuleSource[]): Registry {
   const merged = new Map<string, Map<string, object>>();
   for (const module of parseUniverse(sources)) {
     for (const section of module.sections) {
+      // Removal is applied where it stands, so a later module can name the id
+      // again and get a fresh one rather than a hole.
+      if (section.kind === 'remove') {
+        const { kind, target, id } = section.value as Removal;
+        if (!merged.get(kind)?.delete(target)) throw new DslError(`# remove ${id} names nothing that is loaded`);
+        continue;
+      }
       const byId = merged.get(section.kind) ?? new Map<string, object>();
       const id = (section.value as { id: string }).id;
       byId.set(id, mergeSection(section.kind, byId.get(id), section.value));

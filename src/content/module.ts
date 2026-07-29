@@ -5,6 +5,7 @@ import { itemSchema } from './item';
 import { locationSchema } from './location';
 import { DslError } from '../grammar/parser';
 import { recipeSchema } from './recipe';
+import { parseRemoval } from './removal';
 import { resourceSchema } from './resource';
 import { parseSaveSection } from './saveSection';
 import { AnySchema, parseAnySection } from '../grammar/section';
@@ -32,6 +33,7 @@ const BESPOKE: Record<string, (section: RawSection) => object> = {
   dialogue: parseDialogue,
   test: parseTest,
   save: parseSaveSection,
+  remove: parseRemoval,
 };
 
 const PARSERS: Record<string, (section: RawSection) => object> = {

@@ -13,7 +13,7 @@ export interface RawSection {
   span: Span;
 }
 
-const HEADING = /^#[ \t]+(?<kind>[a-z][a-z0-9-]*)(?:[ \t]+(?<id>[a-z][a-z0-9-]*))?[ \t]*$/;
+const HEADING = /^#[ \t]+(?<kind>[a-z][a-z0-9-]*)(?:[ \t]+(?<id>[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9-]*)*))?[ \t]*$/;
 
 export function splitSections(source: string): RawSection[] {
   const sections: RawSection[] = [];
