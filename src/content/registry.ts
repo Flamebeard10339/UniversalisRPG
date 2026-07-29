@@ -309,7 +309,7 @@ function pruneRegistryDanglingReferences(registry: Registry, danglingRoots: Read
     const visit = danglingVisit(danglingRoots, pruned);
 
     for (const [id, entity] of registry.entities) {
-      const stats = Object.fromEntries(Object.entries(entity.stats).filter(([statId]) => registry.stats.has(statId)));
+      const stats = Object.fromEntries(Object.entries(entity.stats).filter(([statId]) => referencesLoaded(() => visit('stat', statId, `# entity ${id} stats:`))));
       const actions = pruneActions(entity.actions, `# entity ${id}`, visit);
       if (Object.keys(stats).length !== Object.keys(entity.stats).length || actions.length !== entity.actions.length) {
         registry.entities.set(id, { ...entity, stats, actions });
@@ -318,7 +318,7 @@ function pruneRegistryDanglingReferences(registry: Registry, danglingRoots: Read
     }
 
     for (const [id, item] of registry.items) {
-      const tags = item.tags.filter((tag) => tag.kind !== 'stat-bonus' || registry.stats.has(tag.statId));
+      const tags = item.tags.filter((tag) => tag.kind !== 'stat-bonus' || referencesLoaded(() => visit('stat', tag.statId, `# item ${id} tag`)));
       const actions = pruneActions(item.actions, `# item ${id}`, visit);
       if (tags.length !== item.tags.length || actions.length !== item.actions.length) {
         registry.items.set(id, { ...item, tags, actions });
