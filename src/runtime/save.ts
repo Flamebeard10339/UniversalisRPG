@@ -84,6 +84,35 @@ function pruneRecord<T>(
   }
 }
 
+interface RecordPrune {
+  of: string;
+  loaded(registry: Registry, id: string): boolean;
+}
+
+// How each saved field survives a registry it no longer matches, over the same
+// exhaustive key type as SAVE_FIELDS: adding a GameState field is a type error
+// here until it says whether it can hold an id the registry might have lost.
+type FieldPrune = RecordPrune | 'pruned by a rule of its own' | 'holds no registry id';
+
+const PRUNE_FIELDS: Record<SaveField, FieldPrune> = {
+  location: 'pruned by a rule of its own',
+  inventory: { of: 'item', loaded: (registry, id) => registry.items.has(id) },
+  flags: { of: 'flag', loaded: (registry, id) => registry.namespace.has('flag', id) },
+  visits: { of: 'dialogue node', loaded: (registry, id) => registry.namespace.has('node', id) },
+  xp: { of: 'skill', loaded: (registry, id) => registry.skills.has(id) },
+  resources: { of: 'resource', loaded: (registry, id) => registry.resources.has(id) },
+  activeBuffs: 'pruned by a rule of its own',
+  activeAction: 'pruned by a rule of its own',
+  time: 'holds no registry id',
+  rng: 'holds no registry id',
+  player: 'holds no registry id',
+  pendingModal: 'holds no registry id',
+};
+
+const RECORD_PRUNES = (Object.keys(PRUNE_FIELDS) as SaveField[])
+  .map((field) => [field, PRUNE_FIELDS[field]] as const)
+  .filter((entry): entry is [SaveField, RecordPrune] => typeof entry[1] !== 'string');
+
 function activeActionProblem(state: GameState, registry: Registry): string | null {
   const active = state.activeAction;
   if (!active) return null;
@@ -116,11 +145,9 @@ export function pruneStateForRegistry(state: GameState, registry: Registry): Pru
     addWarning(warnings, 'location', old, `Moved from unavailable location ${old} to ${replacement || '(nowhere)'}.`);
   }
 
-  pruneRecord(state.inventory, 'inventory', (id) => registry.items.has(id), 'item', warnings);
-  pruneRecord(state.flags, 'flags', (id) => registry.namespace.has('flag', id), 'flag', warnings);
-  pruneRecord(state.visits, 'visits', (id) => registry.namespace.has('node', id), 'dialogue node', warnings);
-  pruneRecord(state.xp, 'xp', (id) => registry.skills.has(id), 'skill', warnings);
-  pruneRecord(state.resources as Record<string, number>, 'resources', (id) => registry.resources.has(id), 'resource', warnings);
+  for (const [field, rule] of RECORD_PRUNES) {
+    pruneRecord(state[field] as unknown as Record<string, unknown>, field, (id) => rule.loaded(registry, id), rule.of, warnings);
+  }
 
   for (const [key, buff] of Object.entries(state.activeBuffs)) {
     const itemId = key.includes(':') ? key.slice(0, key.indexOf(':')) : undefined;
