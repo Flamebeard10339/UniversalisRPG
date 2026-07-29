@@ -243,7 +243,9 @@ An encounter is a set of actors, each carrying its own stats, resources and atta
   soonest, credits that span to *every* participant's progress, and resolves only the one
   that came due. Ties fall to a fixed roster order (player first, then actors in arm order),
   compared with an EPSILON margin — 2.4 and 3.75 genuinely collide at t=60, and float noise
-  must not be what decides who swings first.
+  must not be what decides who swings first. (Under the integer conversion the collision at
+  t=60000ms is exact and the margin goes away with `EPSILON`; the roster-order tie-break stays,
+  because a genuine tie still needs a deterministic winner.)
 - **Storage stays asymmetric on purpose.** The player's cadence remains
   `ActiveAction.progress`/`attemptsMade`; an actor's lives in `ActorState.cadence`. The
   resolver builds a uniform `Participant[]` over both, so the asymmetry never reaches the
@@ -360,8 +362,13 @@ Pass 2's stated invariant is that pools move *only* via their rate stat (`gramma
 `-120 regeneration` tag. A discrete 4-7 damage hit is not a rate. Combat needs a result kind
 applying an instantaneous pool delta — the one real architectural change in this feature.
 
-**Pools stay float and only damage truncates**: an int pool would round a low regeneration
-rate to zero every tick and never recover at all.
+~~**Pools stay float and only damage truncates**: an int pool would round a low regeneration
+rate to zero every tick and never recover at all.~~ **SUPERSEDED 2026-07-29** — pools become
+milli-scale integers along with everything else. The objection was correct about
+truncate-and-discard and does not survive a carried remainder: `acc = rate * dtMs + remainder`,
+add `floor(acc / 60000)`, keep `acc % 60000`, so a rate below one unit per segment accumulates
+instead of vanishing. That form is also *exactly* associative, where the float version holds only
+to `toBeCloseTo(..., 6)`. See the integer task in `backlog.md`.
 
 **Built in chunk 2** as the `drain:` / `restore:` results (`actionResult.ts`), parsed into
 one signed `{ kind: 'pool', resource, delta }` — mirroring how a pool's rate is already one
@@ -709,7 +716,8 @@ belong under the existing "grammar.md update (STALE)" backlog item.
   rangeless, and a descending range is an error.
 - `# variable min-damage` — the floor on a landed hit (default 1, never below 1).
 - Action results — `drain: <n> <resource-id>` and `restore: <n> <resource-id>`, valid
-  anywhere a result fires. The amount is an unsigned decimal (pools are float).
+  anywhere a result fires. The amount is an unsigned decimal (authored as a decimal; stored at
+  milli-scale after the integer conversion).
 - The `# resource` prose stating that nothing writes a pool level directly is now wrong.
 - `# entity` — `stats: <stat-id> <range>, ...`, this actor's own bases.
 - Actions — `target: <resource-id>` (the pool on the fought entity a hit drains) and
@@ -739,8 +747,9 @@ All three are now closed. Kept for the reasoning; the work they unblock is in `b
 
 - ~~**In-flight swing when the rate changes.**~~ SETTLED in chunk 4: absolute carry, chosen
   deliberately and pinned by tests against both alternatives.
-- ~~**`rate:` sugar** for `time: 60` + `speed: <stat>`.~~ SETTLED 2026-07-29: `rate: <stat>`
-  desugars to `time: 60` + `speed: <stat>`, landing with the F2 taxonomy below.
+- ~~**`rate:` sugar** for `time: 60` + `speed: <stat>`.~~ SETTLED 2026-07-29, and promoted from
+  sugar to the required cadence field of a continuous action. `rate:` takes attempts per minute,
+  as a literal or a stat id, and cannot coexist with `time:` or `speed:`. See the F2 table below.
 - ~~**Whether `action.health` survives as sugar** for trivial one-hit targets, or is removed
   outright.~~ SETTLED 2026-07-29: **removed outright.** Every action gets an implicit pool
   addressed by `target:`. Keeping it as sugar would preserve the two code paths the
@@ -765,17 +774,31 @@ a continuous action still needs a finite per-attempt duration — the rat's `60 
 `floor(t / Infinity)` is 0, so the action would never attempt anything while
 `state.time + Infinity` poisons the clock at `firstUnitSpan`.
 
-| kind | spelling | `time:` |
+Each kind carries **exactly one** cadence field, so the `time: 60` folklore this section named as
+the defect disappears from content rather than being documented:
+
+| kind | tag | cadence |
 | --- | --- | --- |
-| instant | `instant` bare tag | rejected at load |
-| duration | untagged (the default) | optional; absent means `default-action-duration` |
-| continuous | `continuous` bare tag, renaming `repeating` | required, positive after `speed:` scaling |
+| instant | `instant` bare tag | none; `time:`, `rate:` and `speed:` all rejected |
+| duration | untagged (the default) | `time:`, absent means `default-action-duration`; `speed:` optional |
+| continuous | `continuous` bare tag, renaming `repeating` | `rate:` required; `time:` and `speed:` rejected |
+
+`rate:` accepts a literal (per minute) or a stat id. Four load errors enforce the table: `time:`
+with `rate:`, `rate:` with `speed:`, any cadence field on `instant`, and `continuous` without
+`rate:`. The mutual exclusion is the point — `time: 60` + `speed:` is opaque to a contributor who
+has not read this log, and a rule that only warns about the confusion is weaker than a grammar in
+which it cannot be written.
 
 `# variable default-action-duration` defaults to `0`, so an untagged action with no `time:`
 reproduces today's instant behaviour exactly and no timing assertion moves. Raising it — which
 is the playtest's "every action feels weighty" ask — first requires the genuinely-instant
 actions (mirror, stairs, eat) to carry the `instant` tag, or raising it silently turns each of
 them spannable. Shipped content has 5 `time:` lines and 1 `repeating`, so the migration is small.
+
+Accepted cost: a continuous action with a non-60 base scaled by a speed stat (`time: 30` +
+`speed: X`) is no longer directly expressible; content scales the stat instead. The
++25%-attack-rate weapon already works that way — a stat bonus on the rate channel rather than a
+second multiplier field — so this is the shape the spec assumed.
 
 ## Implementation order
 

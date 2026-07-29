@@ -8,35 +8,63 @@ A decision line marked **SETTLED (2026-07-29)** is an answer the user gave in th
 session; it is the contract for the item, not a suggestion. Full rationale lives in the linked
 deliverable log, not here.
 
-# Open question
-
-## Number representation — floats vs milli-unit integers
-The only question left unanswered by the 2026-07-29 triage. Evidence gathered, decision owed.
-
-Every associativity gate in the repo is `toBeCloseTo(..., 6)` (`resolve.test.ts:306`,
-`cadence.test.ts:195`, `contest.test.ts:233`) — the core invariant holds to ~5e-7, not exactly.
-`EPSILON` is `1e-9` (`effects.ts:85`) and decides whether a pool is empty, which fires `on empty:`,
-which is death. The demonstrated drift is ~500x the threshold that decides the outcome. Unreachable
-today only because damage and health are integers and float64 is exact on integers; it becomes
-reachable when a continuous drain empties a pool, which offline progression makes routine.
-
-Float error is unbiased and relative; milli-unit truncation is biased toward zero and absolute, so
-over a long span truncation grows as n where float grows as sqrt(n). That argues against int pools
-and says nothing about int time.
-
-Proposed next step (bounded experiment, not a commitment): convert **time only** — `state.time`,
-cadence `progress`, durations — to integer milliseconds; leave pools and stats float. Exact split
-points make attempt counts, RNG draw counts, flags and XP exactly split-independent, which is where
-a divergence is visible; a 1e-7 pool difference is not, unless it crosses `EPSILON`. It also makes
-the forward-progress guard below trivially checkable. Watch `time / speed` when it is not clean
-(`60/7 = 8571.43ms`) and decide whether the cadence carries a remainder.
-
-Pools stay open as a second, cheaper-afterwards experiment. Milli-units dissolve the original
-objection to int pools ("an int pool never recovers from a low regen rate").
-
 # Tasks
 
-## Action-time taxonomy: name the three kinds
+## Go full integer: milli-units and integer milliseconds
+**SETTLED (2026-07-29).** Every number the simulation stores becomes an integer: pools and stats at
+milli-scale (`10.0` health is stored as `10000`), and `state.time`, cadence `progress` and every
+duration in integer milliseconds. Chosen for the correctness properties — fewer edge cases, no
+`EPSILON` equality, an invariant that can be asserted with `toBe` instead of `toBeCloseTo`.
+
+What it fixes: every associativity gate today is `toBeCloseTo(..., 6)` (`resolve.test.ts:306`,
+`cadence.test.ts:195`, `contest.test.ts:233`), so the core invariant holds to ~5e-7 while `EPSILON`
+(`1e-9`, `effects.ts:85`) decides whether a pool is empty — and an empty pool fires `on empty:`,
+which is death. The drift is ~500x the threshold that decides the outcome. It is unreachable today
+only because damage and health are integers and float64 is exact on integers; it becomes reachable
+the moment a continuous drain empties a pool, which offline progression makes routine.
+
+**The accumulation must carry a remainder. It must not truncate per segment.** This is the one thing
+that makes the conversion correct rather than a much worse regression, and it is not optional.
+`effects.ts:144` accumulates `raw = current + delta + ratePerMinute * dtMinutes` into the stored
+level once per segment, and the resolver has no tick rate — it advances to content-determined
+boundaries, so the same span may be resolved in one segment or a thousand. Truncating per segment
+makes the result depend on where the caller split. Worked example, 5 health/min at milli-scale over
+one second: one segment gives `trunc(5000 x 1/60)` = **83** milli; sixty segments give
+`60 x trunc(5000 x 1/3600)` = **60** milli. A 28% divergence from a pure split choice, against
+~1e-13 for floats. Because the resolver splits at each swing in a fight, how much a player
+regenerates would depend on how many times they were hit — an observable bug, not a rounding
+artifact.
+
+The remainder shape: accumulate `acc = rate * dtMs + remainder`, add `floor(acc / 60000)` to the
+pool, keep `acc % 60000`. Exactly associative by
+`floor(a/n) + floor((b + a mod n)/n) = floor((a+b)/n)`, provided `dt` is an integer — which the
+integer-time half supplies, so the two halves depend on each other and land together. Cost: one
+integer per rated pool, in state and in every save.
+
+Consequences and things to settle during the work:
+
+- **With remainders there are no dead rates.** A 0.001 health/min regen still accumulates and
+  eventually ticks. The dead-rate breakpoints in the original milli-unit sketch were an artifact of
+  truncate-and-discard, not a property of integers.
+- **Breakpoints are still available, on derived rates rather than on the integration** — which is
+  what Diablo 2 actually does (IAS to frames-per-attack, floored once; it never truncates
+  accumulation per frame and never makes a stat do nothing forever). Two places:
+  `attemptDuration = floor(timeMs / speed)` gets them for free and exactly, because it is a pure
+  function of stats and stats only change at boundaries (`runtime.ts:615`) — `60000/16 = 3750`ms.
+  And regen breakpoints, if wanted, belong in `captureResourceRates`, quantizing `ratePerMinute` at
+  capture, which already runs once per boundary. Both are split-independent by construction.
+- **Define the remainder's behaviour when a pool clamps at max** (discard, presumably — the pool is
+  already at the ceiling). `resolve.test.ts:268` already documents one clamping shape that is not
+  associative; integers do not make it worse, but the interaction needs a decision rather than a
+  default.
+- **State the overflow bound.** JS integers are integer-valued float64, exact to 2^53. `rate * dtMs`
+  across the 4-hour offline cap is ~5e10, well inside it, but the plan should say so rather than
+  assume it.
+- `EPSILON` and its six call sites (`effects.ts:85,123`; `runtime.ts:120,183,193,196,221`) are
+  deleted, not retuned.
+- Display divides by the scale; the DSL keeps authoring decimals (`time:` already accepts them).
+
+## Action-time taxonomy: name the three kinds, one cadence field each
 **SETTLED (2026-07-29).** Closes `TODO(default-duration)` (`src/grammar/action.ts:19`), the `rate:`
 sugar open decision, and F2 in `docs/combat/deliverable-log.md`.
 
@@ -46,18 +74,27 @@ continuous action still needs a finite per-attempt duration (the rat's 60/attack
 `floor(t / Infinity)` is 0, so such an action would never attempt anything while
 `state.time + Infinity` poisons the clock on first use.
 
-| kind | spelling | `time:` |
-| --- | --- | --- |
-| instant | `instant` bare tag | rejected at load |
-| duration | untagged (the default) | optional; absent means `default-action-duration` |
-| continuous | `continuous` bare tag, renaming `repeating` | required, positive after `speed:` scaling |
+Each kind carries **exactly one** cadence field, so `time: 60` — authoring folklore that is opaque
+to any contributor who has not read this file — never appears in content again.
 
+| kind | tag | cadence |
+| --- | --- | --- |
+| instant | `instant` bare tag | none; `time:`, `rate:` and `speed:` all rejected |
+| duration | untagged (the default) | `time:`, absent means `default-action-duration`; `speed:` optional |
+| continuous | `continuous` bare tag, renaming `repeating` | `rate:` required; `time:` and `speed:` rejected |
+
+- `rate:` accepts a literal (`rate: 12` is twelve per minute) or a stat id (`rate: attack-rate`).
+- Four load errors, each naming its fix: `time:` with `rate:`, `rate:` with `speed:`, any cadence
+  field on `instant`, and `continuous` without `rate:`.
 - `# variable default-action-duration`, default `0`. Absent `time:` on an untagged action resolves
   to it, so the shipped default reproduces today's behaviour exactly and no timing assertion moves.
-- `rate: <stat>` is sugar for `time: 60` + `speed: <stat>`.
 - Prerequisite for the variable ever being nonzero: tag the genuinely-instant actions (mirror,
   stairs, eat) `instant` in content first, otherwise raising it turns every one of them spannable.
   Surface is small — shipped content has 5 `time:` lines and 1 `repeating`.
+- Accepted cost: a continuous action with a non-60 base scaled by a speed stat (`time: 30` +
+  `speed: X`) is no longer directly expressible; content scales the stat instead. The
+  +25%-attack-rate weapon in the spec already works that way — as a stat bonus on the rate channel,
+  not a second multiplier field — so this is the shape the spec assumed.
 
 ## Unify `action.health` into `target:`, then drop `healthRemaining`
 **SETTLED (2026-07-29).** Closes game-engine finding **L6** and the combat log's "whether
@@ -149,8 +186,9 @@ rebuild.
 If a drain rate is large enough that `current / drainPerSecond` falls below the ULP of `state.time`,
 `nextBoundary` returns `state.time` and the loop spins. It needs a rate above ~600k/min so it is not
 reachable from plausible content, but it is the one place the resolver has no forward-progress
-guard. Integer milliseconds would eliminate the class outright; the guard is worth having either
-way.
+guard. The integer conversion eliminates the ULP class outright — a boundary is then either strictly
+after now or equal to it — but the guard is worth having either way, and asserting it is what proves
+the conversion did what it claims.
 
 ## Entity action templates (F1)
 **SETTLED (2026-07-29)** — the override-scope question is answered; the rest is implementation.
@@ -190,8 +228,11 @@ bespoke kinds (`dialogue`, `test`, `save`, `remove`), which have no schema.
   sleep; the player is expected to explicitly stop acting to prevent it.
 - **`# variable offline-span-cap`, default `14400`** (4 hours).
 - `resolve()` is the seam: reconciling is calling it with the elapsed wall-clock span on load, which
-  the associativity invariant already makes safe. Note the interaction with the number-representation
-  question above — a 4-hour span integrates rates thousands of times.
+  the associativity invariant already makes safe.
+- **Sequence this after the integer conversion.** A 4-hour span integrates rates thousands of times,
+  which is both the case where per-segment truncation would diverge most and the case that makes the
+  `EPSILON` exposure reachable. Doing offline progression first means building it on the arithmetic
+  that is being replaced.
 
 ## Single dev mode
 **SETTLED (2026-07-29).** Contribution mode and debug mode are the same setting; you always want
@@ -372,8 +413,10 @@ earlier settled decision. Recorded here rather than silently deleted.
 - **"No validation that `max:`/`rate:` name real stats"** (`.scratch.md`) — fixed.
   `src/content/referenceSites.ts:212` resolves both as stat references, and unresolved references
   throw at load.
-- **Integer/fixed-point vs floats, as previously framed** — replaced by the sharper open question at
-  the top of this file, which separates time from pools.
+- **Integer/fixed-point vs floats** — settled as full integer; see the task at the top of this file.
+  The combat log's earlier "pools stay float (an int pool never recovers from a low regen rate)" is
+  superseded: milli-scale plus a carried remainder removes the objection, since a rate below one
+  unit per segment accumulates rather than vanishing.
 - **Test recorder auto-`load:`** — keep the auto-prepend of `load: <id>-start`. It is what makes a
   recording reproducible, and an explicit `/load` already overrides it. No change.
 - **"Implement CLI commands for editing the DSL"** — chunk 6, done. `/dsl <kind> <id> [body]`,
