@@ -232,6 +232,14 @@ scripts pass, and the audit's own associativity fuzz reruns 400/400 against the 
   a first-class modal (`pendingModal`) so a GUI need not reverse-engineer pacing. Deferred
   as an out-of-MVP dialogue-engine change.
 
+## DSL modules (spec + design: `docs/dsl-modules/deliverable-log.md`)
+Read that log before touching the load path. It carries the spec, the merge design, the chunk
+order, and five open decisions — two of which change the grammar surface. It supersedes the
+merge-semantics half of *DSL pipeline audit* below, and absorbs audit findings DSL-H1 (no merge
+semantics) and DSL-H2 (the reference walker, which turns out to be a prerequisite for graceful
+mod-disable, not cleanup). The worked examples under *E2E Authoring* below describe the legacy
+`upsert`/`replace`/`remove` system, which no longer exists.
+
 ## Implement CLI commands for editing the DSL
 There should be a way to create new entities/locations/actions/etc in game that are stored in a local DSL file. 
 We should also be able to edit existing data. 

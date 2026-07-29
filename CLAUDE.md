@@ -22,7 +22,7 @@ Do not bloat CLAUDE.md with over 200 lines of instructions.
 
 `.planning/.scratch.md` contains open thoughts, `backlog.md` for vetted work, `completed-tasks.md` contains the archive. 
 
-A feature large enough to span sessions gets a tracked deliverable log at `docs/<feature>/deliverable-log.md` (spec, chunk status, open decisions); `backlog.md` keeps only a pointer to it. Read the log before touching that feature's code. On merge, archive the log and lift anything unfinished back into `backlog.md`. Currently live: `docs/combat/deliverable-log.md`. 
+A feature large enough to span sessions gets a tracked deliverable log at `docs/<feature>/deliverable-log.md` (spec, chunk status, open decisions); `backlog.md` keeps only a pointer to it. Read the log before touching that feature's code. On merge, archive the log and lift anything unfinished back into `backlog.md`. Currently live: `docs/combat/deliverable-log.md`, `docs/dsl-modules/deliverable-log.md`. 
 
 # Repository systems
 
