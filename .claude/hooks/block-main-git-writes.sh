@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
-command=$(node .claude/hooks/lib/tool-command.js)
+here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+command=$(node "$here/lib/hook-field.js" tool_input.command)
 
 case "$command" in
   *git\ add*|*git\ commit*)
