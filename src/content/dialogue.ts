@@ -1,6 +1,6 @@
 import { ActionResult, actionResult, startsResult } from '../grammar/actionResult';
 import { Condition, condition, Reference } from '../grammar/condition';
-import { Cursor, DslError } from '../grammar/parser';
+import { Cursor, DslError, parseWhole } from '../grammar/parser';
 import { RawLine, RawSection } from '../grammar/structure';
 import { REFERENCE } from '../grammar/values';
 
@@ -52,7 +52,7 @@ function parseFragment(raw: string, base: number): TextSegment {
     if (!match || match[0] !== raw) throw new DslError(`malformed interpolation: {${raw}}`, { start: base, end: base + raw.length });
     return { kind: 'interpolate', reference: { path: raw.split('.') } };
   }
-  const parsedCondition = condition.parse(new Cursor(raw.slice(0, colon), 0, base));
+  const parsedCondition = parseWhole(condition, raw.slice(0, colon), base, 'a conditional fragment');
   return { kind: 'conditional', condition: parsedCondition, text: raw.slice(colon + 1).replace(/^[ \t]/, '') };
 }
 
@@ -80,11 +80,11 @@ function parseChoice(source: RawLine): Choice {
   const match = CHOICE.exec(source.text)?.groups;
   if (!match?.text) throw new DslError(`malformed choice: ${source.text}`, source.span);
   const choice: Choice = { segments: parseSegments(match.text, source.span.start), effects: [] };
-  if (match.cond) choice.when = condition.parse(new Cursor(match.cond));
+  if (match.cond) choice.when = parseWhole(condition, match.cond, source.span.start, 'a choice when');
   for (const line of source.children) {
     const goto = GOTO.exec(line.text)?.groups;
     if (goto) choice.goto = goto.target;
-    else choice.effects.push(actionResult.parse(new Cursor(line.text, 0, line.span.start)));
+    else choice.effects.push(parseWhole(actionResult, line.text, line.span.start, 'a choice effect'));
   }
   return choice;
 }
@@ -107,12 +107,12 @@ function parseNode(name: string, source: RawLine): DialogueNode {
     const when = WHEN.exec(line.text)?.groups;
     const again = AGAIN.exec(line.text)?.groups;
     const goto = GOTO.exec(line.text)?.groups;
-    if (when) node.when = condition.parse(new Cursor(when.cond));
+    if (when) node.when = parseWhole(condition, when.cond, line.span.start, 'a node when');
     else if (again) node.again = parseSegments(again.text, line.span.start);
     else if (line.text === 'once') node.once = true;
     else if (line.text === 'sticky') node.sticky = true;
     else if (goto) node.steps.push({ kind: 'goto', target: goto.target });
-    else if (startsResult(new Cursor(line.text))) node.steps.push({ kind: 'effect', result: actionResult.parse(new Cursor(line.text, 0, line.span.start)) });
+    else if (startsResult(new Cursor(line.text))) node.steps.push({ kind: 'effect', result: parseWhole(actionResult, line.text, line.span.start, 'a node effect') });
     else node.steps.push({ kind: 'say', segments: parseSegments(line.text, line.span.start) });
   }
   flush();

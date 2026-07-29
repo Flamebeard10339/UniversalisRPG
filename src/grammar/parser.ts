@@ -49,3 +49,20 @@ export class Cursor {
     return match ? match[0] : null;
   }
 }
+
+// A sub-parser stops at the first thing it does not understand and hands back
+// what it did read, so a caller that does not demand the rest of the line drops
+// the author's typo instead of reporting it.
+export function requireEnd(cursor: Cursor, what: string): void {
+  cursor.take(/[ \t]*/);
+  if (cursor.done) return;
+  const leftover = cursor.rest();
+  throw new DslError(`unexpected content after ${what}: ${JSON.stringify(leftover)}`, { start: cursor.abs(cursor.pos), end: cursor.abs(cursor.pos + leftover.length) });
+}
+
+export function parseWhole<T>(parser: Parser<T>, text: string, base: number, what: string): T {
+  const cursor = new Cursor(text, 0, base);
+  const value = parser.parse(cursor);
+  requireEnd(cursor, what);
+  return value;
+}

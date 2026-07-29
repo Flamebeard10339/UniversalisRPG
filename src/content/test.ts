@@ -1,5 +1,5 @@
 import { Condition, condition } from '../grammar/condition';
-import { Cursor, DslError } from '../grammar/parser';
+import { DslError, parseWhole } from '../grammar/parser';
 import { RawSection } from '../grammar/structure';
 
 export type Directive =
@@ -86,7 +86,7 @@ export function parseDirectiveLine(text: string): Directive | null {
   if (begin) return parseBegin(text, begin.verb, begin.rest);
 
   const assert = ASSERT.exec(text)?.groups;
-  if (assert) return { kind: 'assert', condition: condition.parse(new Cursor(assert.cond)) };
+  if (assert) return { kind: 'assert', condition: parseWhole(condition, assert.cond, 0, 'an assert condition') };
 
   const expect = EXPECT.exec(text)?.groups;
   if (expect) return { kind: 'expect', save: expect.id };

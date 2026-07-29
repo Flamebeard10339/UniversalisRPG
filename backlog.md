@@ -51,21 +51,8 @@ verified against a fixture or a measurement; the doc names the fixture so it can
 Work them in tier order — tier 1 is what makes the rest of CI trustworthy.
 
 ### Tier 1 — the gates do not enforce what they claim
-**Mostly CLOSED 2026-07-28 by retiring the gates rather than repairing them.** The comment
-budget and `comment-only` are deleted; TP-H1, TP-M4, TP-L5 and UI-L1 died with them. TP-M1 is
-fixed: `audit-status` now requires a real file under `docs/audits/` with real content. What
-remains:
-
-- **DSL-L2 + TP-M7 `layer-check` is a string match.** Catches 1 of 7 upward-import syntaxes
-  (single quotes only — nothing pins quote style, there is no ESLint/Prettier), false-positives
-  on imports inside comments and strings, and misses directory imports. `codeOnly` is right
-  there in `scripts/lib/` and would fix the comment/string half in one line. Kept because
-  layering is a real architectural claim and the script is cheap — but it is currently
-  decorative, so either fix it or drop it too.
-- **TP-M2 the commit hook fires on the wrong things.** Triggers on `echo "git commit"` and
-  `--dry-run`, silent on `merge`/`rebase`, reports the main HEAD when you commit from a
-  worktree, and asserts "ran normally" without checking the exit code. It also dumps the whole
-  ledger after every commit; it should fire on the OK→DUE transition only.
+**CLOSED.** The comment budget and `comment-only` were retired 2026-07-28, taking TP-H1, TP-M4,
+TP-L5 and UI-L1 with them; TP-M1, DSL-L2 + TP-M7 and TP-M2 are fixed. See `completed-tasks.md`.
 
 ### Tier 2 — DSL load path correctness
 - **DSL-H1 a second definition of an id replaces the first wholesale.** There are no merge

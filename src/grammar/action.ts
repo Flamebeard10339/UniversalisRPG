@@ -1,7 +1,7 @@
 import { ActionResult, actionResult, startsResult } from './actionResult';
 import { Condition, condition } from './condition';
 import { list } from './list';
-import { Cursor, DslError } from './parser';
+import { Cursor, DslError, requireEnd } from './parser';
 import { EntryBody } from './section';
 import { RawLine } from './structure';
 import { TagClause, tagClause } from './tagClause';
@@ -42,9 +42,16 @@ const BOOLEAN_ACTION_FLAGS = ['repeating', 'retaliates'] as const;
 type BooleanActionField = (typeof BOOLEAN_ACTION_FLAGS)[number];
 const BOOLEAN_ACTION_FLAG_SET: ReadonlySet<string> = new Set<string>(BOOLEAN_ACTION_FLAGS);
 
+// One field per line, and the whole line: `requireEnd` is what the generic
+// section engine does by looping to the end of the line, and without it a typo
+// after a value — `time: 1 typo`, `escape after 3 times` — is silently dropped.
 function parseActionLine(line: RawLine, action: Omit<Action, 'label'>): void {
   const cursor = new Cursor(line.text, 0, line.span.start);
+  parseActionField(line, cursor, action);
+  requireEnd(cursor, 'an action field');
+}
 
+function parseActionField(line: RawLine, cursor: Cursor, action: Omit<Action, 'label'>): void {
   if (cursor.take(/(?:requires|require):[ \t]*/) !== null) {
     if (action.requires !== undefined) throw new DslError('action requires is defined more than once', line.span);
     if (!cursor.done) action.requires = condition.parse(cursor);

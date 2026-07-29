@@ -3,6 +3,7 @@ import { condition } from '../grammar/condition';
 import { entitySchema } from './entity';
 import { itemSchema } from './item';
 import { locationSchema } from './location';
+import { loadModule } from './registry';
 import { parseModule } from './module';
 import { Cursor, DslError } from '../grammar/parser';
 import { point } from '../grammar/range';
@@ -426,5 +427,33 @@ describe('tag-clause micro-grammar', () => {
     }
     expect(error).toBeInstanceOf(DslError);
     expect((error as DslError).span?.start).toBe(source.indexOf('+ bad'));
+  });
+});
+
+describe('a sub-parser must consume the whole line, like the section engine does', () => {
+  const load = (...lines: string[]) => () => loadModule(lines.join('\n'));
+
+  it('refuses trailing garbage after an action field', () => {
+    expect(load('# item coin', '# entity gull', 'peck:', '  requires: has coin typo', '  say: hi')).toThrow(/unexpected content after an action field: "typo"/);
+    expect(load('# item coin', '# entity gull', 'peck:', '  give: coin typo')).toThrow(/unexpected content after an action field/);
+    expect(load('# stat attack', '# entity gull', 'peck:', '  accuracy: attack typo', '  say: hi')).toThrow(/unexpected content after an action field/);
+    // The number parsers stop where they stop; what follows used to be dropped.
+    expect(load('# entity gull', 'peck:', '  time: 1e3', '  say: hi')).toThrow(/unexpected content after an action field: "e3"/);
+    expect(load('# entity gull', 'peck:', '  escape after 3 times', '  say: hi')).toThrow(/unexpected content after an action field: "times"/);
+  });
+
+  it('refuses trailing garbage in a dialogue condition or effect', () => {
+    const dialogue = (...body: string[]) => load('# flag lit', '# item coin', '# entity miki', '# dialogue chat', 'owner = miki', 'node a:', ...body);
+    expect(dialogue('  when: lit typo', '  Hi.')).toThrow(/unexpected content after a node when/);
+    expect(dialogue('  Hi.', '  -> go (when lit typo)')).toThrow(/unexpected content after a choice when/);
+    expect(dialogue('  give: 1 coin typo', '  Hi.')).toThrow(/unexpected content after a node effect/);
+  });
+
+  it('refuses trailing garbage in a test assertion', () => {
+    expect(load('# flag lit', '# test t', 'assert: lit typo')).toThrow(/unexpected content after an assert condition/);
+  });
+
+  it('still accepts every field written correctly', () => {
+    expect(load('# flag a', '# flag b', '# item coin', '# stat attack', '# entity gull', 'peck:', '  requires: a and not b', '  time: 1.5', '  accuracy: attack', '  escape after 3', '  give: 1 coin, say: Hi')).not.toThrow();
   });
 });
