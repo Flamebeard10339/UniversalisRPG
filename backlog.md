@@ -6,6 +6,16 @@ Check `scratch.md` for open architectural notes touching an area before starting
 
 # Tasks
 
+## Audit findings (2026-07-29)
+Evidence: `docs/audits/dsl-load-path-2026-07-29.md`.
+
+The independent DSL load-path audit for chunks 1-7 found serializer, squash, BOM/CRLF,
+unordered-dependency and local-module-id defects. All were fixed in `680d912` as part of Chunk 7,
+with regression tests. No open follow-up was added from this audit. Residual boundary: the squash
+serializer is canonical rather than source-preserving, and the networked `gh issue create` path still
+needs a real authenticated GitHub run when contribution publishing gets its first end-to-end manual
+test.
+
 ## Audit findings (2026-07-28)
 The four outstanding audits ran. Evidence lives in the docs, not here:
 `docs/audits/dsl-load-path-2026-07-28.md`, `testing-procedure-2026-07-28.md`,
@@ -474,4 +484,3 @@ Once more, run the transcript/save and validate that the new logs don't have the
 Close github issue.
 Create any necessary unit tests. 
 Only create an integration test for the issue if several similar issues have cropped up in the past. (potentially tag all bug reports with the class of bug?)
-

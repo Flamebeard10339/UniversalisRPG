@@ -4,9 +4,9 @@
     {
       "name": "DSL load path",
       "paths": ["src/grammar", "src/content"],
-      "lastAudit": "50a4f41",
-      "lastAuditDoc": "docs/audits/dsl-load-path-2026-07-28.md",
-      "note": "H1 (redefinition has no merge semantics) and H2 (20 of 44 reference fields validated) open. Pre-move history cannot be split between this system and the runtime, because both lived in src/game/contentDsl."
+      "lastAudit": "680d912",
+      "lastAuditDoc": "docs/audits/dsl-load-path-2026-07-29.md",
+      "note": "The 2026-07-29 audit covered DSL module chunks 1-7. Its serializer, squash, BOM/CRLF, unordered-dependency and local-module-id findings were fixed in 680d912."
     },
     {
       "name": "Runtime",
