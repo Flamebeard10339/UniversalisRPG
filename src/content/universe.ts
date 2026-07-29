@@ -14,7 +14,7 @@ export interface ParsedModule {
   sections: ModuleSection[];
 }
 
-const RESERVED_IDS: readonly string[] = [...SECTION_KINDS, 'player', 'skills', 'self'];
+const RESERVED_IDS: readonly string[] = [...SECTION_KINDS, 'player', 'skills', 'self', 'time'];
 
 const MODULE_ID = /^[a-z][a-z0-9-]*$/;
 

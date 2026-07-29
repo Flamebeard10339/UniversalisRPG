@@ -9,6 +9,7 @@ import { ModuleSection } from './module';
 import { ModuleSource, parseUniverse } from './universe';
 import { DslError } from '../grammar/parser';
 import { Recipe, recipeSchema } from './recipe';
+import { validateReferences } from './references';
 import { Removal } from './removal';
 import { Resource, resourceSchema } from './resource';
 import { ParsedSave } from './saveSection';
@@ -16,7 +17,6 @@ import { scopeEntity, scopeLocation } from './scope';
 import { Authored, hydrateSection } from '../grammar/section';
 import { Skill, skillSchema } from './skill';
 import { Stat, statSchema } from './stat';
-import { TagClause } from '../grammar/tagClause';
 import { Test } from './test';
 import { validateTuning } from './tuningVariables';
 import { humanize } from '../grammar/values';
@@ -68,105 +68,6 @@ function recipeAction(recipe: Recipe): Action {
   }
 
   return action;
-}
-
-type ReferenceKind = 'stat' | 'resource' | 'entity' | 'location' | 'item' | 'skill';
-
-// Walked after everything parses, so forward references are fine. Every id is
-// checked, not just the ones a past incident named: an unknown stat never fails
-// at all — statRange falls through to point(0) and the resolver divides by it.
-function validateReferences(registry: Registry): void {
-  const known: Record<ReferenceKind, ReadonlyMap<string, unknown>> = {
-    stat: registry.stats,
-    resource: registry.resources,
-    entity: registry.entities,
-    location: registry.locations,
-    item: registry.items,
-    skill: registry.skills,
-  };
-  const check = (kind: ReferenceKind, id: string | undefined, where: string): void => {
-    if (id === undefined || known[kind].has(id)) return;
-    throw new DslError(`${where} names an unknown ${kind}: ${id}`);
-  };
-
-  const checkResults = (where: string, ...groups: (ActionResult[] | undefined)[]): void => {
-    for (const results of groups) {
-      for (const result of results ?? []) {
-        switch (result.kind) {
-          case 'give':
-          case 'take':
-            check('item', result.item, `${where} ${result.kind}:`);
-            break;
-          case 'xp':
-            check('skill', result.skill, `${where} xp:`);
-            break;
-          case 'relocate':
-            check('location', result.location, `${where} relocate:`);
-            break;
-          case 'discover':
-            check('location', result.location, `${where} discover:`);
-            break;
-          case 'pool':
-            check('resource', result.resource, `${where} ${result.delta < 0 ? 'drain' : 'restore'}:`);
-            break;
-        }
-      }
-    }
-  };
-
-  const checkTags = (where: string, tags: TagClause[] | undefined): void => {
-    for (const tag of tags ?? []) {
-      if (tag.kind === 'stat-bonus') check('stat', tag.statId, `${where} tag`);
-    }
-  };
-
-  const checkAction = (action: Action, where: string): void => {
-    check('stat', action.speed, `${where} speed:`);
-    check('stat', action.accuracy, `${where} accuracy:`);
-    check('stat', action.evasion, `${where} evasion:`);
-    check('stat', action.ability, `${where} ability:`);
-    check('stat', action.dr, `${where} dr:`);
-    check('resource', action.target, `${where} target:`);
-    checkTags(where, action.tags);
-    checkResults(where, action.results, action.onSuccess, action.onFailure, action.onEscape);
-  };
-  const actionsOf = (where: string, actions: Action[]): void => {
-    for (const action of actions) checkAction(action, `${where} action ${JSON.stringify(action.label)}`);
-  };
-
-  for (const entity of registry.entities.values()) {
-    // Never reached at runtime: the action asks for the correctly-spelled stat
-    // and falls through to its global default.
-    for (const statId of Object.keys(entity.stats)) check('stat', statId, `# entity ${entity.id} stats:`);
-    actionsOf(`# entity ${entity.id}`, entity.actions);
-  }
-  for (const item of registry.items.values()) {
-    checkTags(`# item ${item.id}`, item.tags);
-    actionsOf(`# item ${item.id}`, item.actions);
-  }
-    // Through the compiled Action, so recipeAction's forwarding is covered too.
-  for (const [recipeId, action] of registry.recipeActions) checkAction(action, `# recipe ${recipeId}`);
-  for (const resource of registry.resources.values()) {
-    check('stat', resource.max, `# resource ${resource.id} max:`);
-    check('stat', resource.rate, `# resource ${resource.id} rate:`);
-    checkResults(`# resource ${resource.id} on empty:`, resource.onEmpty);
-    checkResults(`# resource ${resource.id} on full:`, resource.onFull);
-  }
-  for (const location of registry.locations.values()) {
-    for (const entityId of location.entities) check('entity', entityId, `# location ${location.id} entities:`);
-    for (const edge of location.adjacent) check('location', edge.target, `# location ${location.id} adjacent:`);
-    actionsOf(`# location ${location.id}`, location.actions);
-  }
-  for (const dialogue of registry.dialogues.values()) {
-    if (dialogue.owner) check('entity', dialogue.owner, `# dialogue ${dialogue.id} owner`);
-    for (const node of dialogue.nodes) {
-      const where = `# dialogue ${dialogue.id} node ${node.name}`;
-      for (const step of node.steps) {
-        if (step.kind === 'effect') checkResults(where, [step.result]);
-        if (step.kind === 'menu') for (const choice of step.choices) checkResults(`${where} choice`, choice.effects);
-      }
-    }
-  }
 }
 
 function applySection(registry: Registry, section: ModuleSection): void {

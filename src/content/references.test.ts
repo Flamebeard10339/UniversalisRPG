@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DslError } from '../grammar/parser';
-import { loadModule } from '../content/registry';
+import { loadModule } from './registry';
 
 const VALID = `
 # stat attack
@@ -142,5 +142,58 @@ describe('load-time reference resolution', () => {
 
   it('raises a DslError, the same failure kind the rest of load uses', () => {
     expect(loading('target: health', 'target: helth')).toThrow(DslError);
+  });
+});
+
+// Every case below loaded clean before the walk was completed, and failed later
+// or not at all: a gate that reads false forever, a mid-conversation crash, a
+// recipe craftable nowhere, a test that only breaks when it runs.
+describe('references the walk used to step over', () => {
+  it('rejects a `has` naming no item, wherever the condition sits', () => {
+    expect(loading('  repeating', '  repeating\n  requires: has strawe')).toThrow(/# entity training-dummy action "strike" requires: has names an unknown item: strawe/);
+    expect(loading('  repeating', '  repeating\n  hidden if: has strawe')).toThrow(/hidden if: has names an unknown item: strawe/);
+    expect(loading('starting', 'starting\nadjacent: shed while has strawe')).toThrow(/# location den adjacent: shed while has names an unknown item: strawe/);
+    expect(loading('  when: time >= 0', '  when: has strawe')).toThrow(/# dialogue caretaker node hello when: has names an unknown item: strawe/);
+  });
+
+  it('reaches inside not/and/or rather than stopping at the operator', () => {
+    expect(loading('  repeating', '  repeating\n  requires: not has strawe')).toThrow(/has names an unknown item: strawe/);
+    expect(loading('  repeating', '  repeating\n  requires: has straw and has strawe')).toThrow(/has names an unknown item: strawe/);
+    expect(loading('  repeating', '  repeating\n  requires: has strawe or has straw')).toThrow(/has names an unknown item: strawe/);
+  });
+
+  it('rejects a `has` inside a choice condition and inside interpolated text', () => {
+    expect(loading('  give: 1 straw', '  -> Take it. (when has strawe)\n    give: 1 straw')).toThrow(/# dialogue caretaker node hello choice when has names an unknown item: strawe/);
+    expect(loading('  Nothing to say.', '  {has strawe: You have straw.}')).toThrow(/# dialogue caretaker node hello has names an unknown item: strawe/);
+  });
+
+  it('rejects a goto naming no node in its own dialogue', () => {
+    expect(loading('  give: 1 straw', '  goto elsewhere')).toThrow(/# dialogue caretaker node hello goto names an unknown node in # dialogue caretaker: elsewhere/);
+    expect(loading('  give: 1 straw', '  -> Take it.\n    goto elsewhere')).toThrow(/choice goto names an unknown node in # dialogue caretaker: elsewhere/);
+  });
+
+  it('rejects a recipe whose station nothing provides, and accepts one an entity does', () => {
+    expect(() => loadModule(`${VALID}\n# recipe weave\nstation: loom\nout: 1 straw\n`)).toThrow(/# recipe weave station: names an unknown capability: loom/);
+    expect(() => loadModule(`${VALID.replace('stats: max-health 12, dr 2', 'stations: loom\nstats: max-health 12, dr 2')}\n# recipe weave\nstation: loom\nout: 1 straw\n`)).not.toThrow();
+  });
+
+  it('rejects every id a # test directive names', () => {
+    const test = (...lines: string[]) => () => loadModule(`${VALID}\n# test walk\n${lines.join('\n')}\n`);
+    expect(test('travel: shedd')).toThrow(/# test walk travel: names an unknown location: shedd/);
+    expect(test('talk: training-dumy')).toThrow(/# test walk talk: names an unknown entity: training-dumy/);
+    expect(test('craft: weave')).toThrow(/# test walk craft: names an unknown recipe: weave/);
+    expect(test('run: other')).toThrow(/# test walk run: names an unknown test: other/);
+    expect(test('load: start')).toThrow(/# test walk load: names an unknown save: start/);
+    expect(test('expect: start')).toThrow(/# test walk expect: names an unknown save: start/);
+    expect(test('assert: has strawe')).toThrow(/# test walk assert: has names an unknown item: strawe/);
+    expect(test('begin: travel shedd')).toThrow(/# test walk begin: travel: names an unknown location: shedd/);
+  });
+
+  it('rejects a `use:` naming an unknown kind, object, or action', () => {
+    const test = (line: string) => () => loadModule(`${VALID}\n# test walk\n${line}\n`);
+    expect(test('use: creature.training-dummy.strike')).toThrow(/# test walk use: names an unknown kind: creature/);
+    expect(test('use: entity.training-dumy.strike')).toThrow(/# test walk use: names an unknown entity: training-dumy/);
+    expect(test('use: entity.training-dummy.strke')).toThrow(/# test walk use: names an unknown entity action: strke/);
+    expect(test('use: entity.training-dummy.strike')).not.toThrow();
   });
 });
