@@ -180,12 +180,9 @@ export function visitSection(kind: string, value: object, where: string, visit: 
   const section = value as Loose;
   switch (kind) {
     case 'entity': {
-      // A stat sheet is keyed by stat id, so resolving one rebuilds the record.
-      const stats = section.stats as Record<string, unknown> | undefined;
-      if (stats) {
-        const resolved = Object.fromEntries(Object.entries(stats).map(([statId, value]) => [visit('stat', statId, `${where} stats:`), value]));
-        if (Object.keys(resolved).some((key, index) => key !== Object.keys(stats)[index])) section.stats = resolved;
-      }
+      // A stat sheet is authored as a list of assignments; the stat id leading
+      // each one is the reference.
+      for (const assignment of listMembers<[string, unknown]>(section.stats)) assignment[0] = visit('stat', assignment[0], `${where} stats:`);
       actions(section.actions, where, visit);
       return;
     }

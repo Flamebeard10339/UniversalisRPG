@@ -9,6 +9,17 @@ export interface Field<T, Self> {
   keyword?: string; // DSL surface keyword, when it differs from the field name
 }
 
+// A field whose authored form is not its held form. A stat sheet is authored as
+// a list, so `+stats:` can address one assignment, and held as a map keyed by
+// stat id, so a later assignment to the same stat wins. `hydrate` runs after
+// merging, on whatever the `+`/`-` operations left.
+export interface MappedField<T, Self> {
+  parser: Parser<unknown>;
+  hydrate(parsed: unknown): NonNullable<T>;
+  default?: (self: Self) => T;
+  keyword?: string;
+}
+
 // An open-ended, dynamically-labelled collection (e.g. an entity's actions):
 // each `<label>:` that is not a fixed field becomes one entry `{ label, ...body }`.
 export interface EntryBody {
@@ -18,7 +29,7 @@ export interface EntryBody {
 
 export interface SectionSchema<H extends { id: string }, Flags extends keyof H = never, Entries extends keyof H = never> {
   kind: string;
-  fields: { [K in Exclude<keyof H, 'id' | Flags | Entries>]: Field<H[K], H> };
+  fields: { [K in Exclude<keyof H, 'id' | Flags | Entries>]: Field<H[K], H> | MappedField<H[K], H> };
   clauses?: Exclude<keyof H, 'id' | Flags | Entries>;
   bare?: Exclude<keyof H, 'id' | Flags | Entries>;
   keywords?: readonly Flags[];
@@ -67,7 +78,7 @@ export const isEntryRemoval = (entry: { label: string }): entry is EntryRemoval 
 
 export const parseAnySection = (section: RawSection, schema: AnySchema): { id: string } => parseSection(section, schema as unknown as SectionSchema<{ id: string }>);
 
-type AnyFields = Record<string, { parser: Parser<unknown>; default?: (self: unknown) => unknown; keyword?: string }>;
+type AnyFields = Record<string, { parser: Parser<unknown>; hydrate?: (parsed: unknown) => unknown; default?: (self: unknown) => unknown; keyword?: string }>;
 type EntryConfig = { into: string; body: EntryBody };
 
 const KEY = /(?<op>[+-][ \t]*)?(?<key>[a-z][a-z0-9 -]*?):/;
@@ -176,7 +187,9 @@ export function hydrateSection<H extends { id: string }, F extends keyof H = nev
         if (state === 'resolving') throw new DslError(`circular default among ${schema.kind} fields, reached via ${key}`);
         if (state === 'unresolved') {
           state = 'resolving';
-          cached = read[key] ?? fields[key].default?.(view);
+          const authoredValue = read[key];
+          const hydrate = fields[key].hydrate;
+          cached = authoredValue === undefined ? fields[key].default?.(view) : hydrate ? hydrate(authoredValue) : authoredValue;
           state = 'resolved';
         }
         return cached;

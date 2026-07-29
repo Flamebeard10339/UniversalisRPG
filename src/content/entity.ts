@@ -27,17 +27,17 @@ const statAssignment: Parser<[string, Range]> = {
   },
 };
 
-const statBlock: Parser<Record<string, Range>> = {
-  parse: (cursor) => Object.fromEntries(list(statAssignment).parse(cursor)),
-};
-
 export const entitySchema: SectionSchema<Entity, never, 'actions'> = {
   kind: 'entity',
   fields: {
     title: { parser: text, default: (self) => humanize(self.id) },
     examine: { parser: text },
     capabilities: { parser: list(id), keyword: 'stations', default: () => [] },
-    stats: { parser: statBlock, default: () => ({}) },
+    stats: {
+      parser: list(statAssignment),
+      hydrate: (parsed) => Object.fromEntries(parsed as [string, Range][]),
+      default: () => ({}),
+    },
     flags: { parser: list(id), default: () => [] },
   },
   entries: { into: 'actions', body: actionBody },
