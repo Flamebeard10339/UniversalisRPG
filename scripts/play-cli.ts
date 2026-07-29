@@ -1,11 +1,19 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { createInterface } from 'node:readline/promises';
 import { pathToFileURL } from 'node:url';
 import { DslError } from '../src/grammar/parser';
-import { actionFirstUnit, craftFirstUnit, describeCondition, encounterView, PLAYER, RuntimeError, type ActiveAction, type GameState } from '../src/runtime/runtime';
+import { actionFirstUnit, craftFirstUnit, describeCondition, encounterView, initResources, PLAYER, RuntimeError, type ActiveAction, type GameState } from '../src/runtime/runtime';
 import { formatModuleDiagnostic, loadUniverseWithDiagnostics } from '../src/content/registry';
 import { type ModuleSource } from '../src/content/universe';
+import {
+  clearLocalSections,
+  deleteLocalSection,
+  initialLocalChangesModule,
+  LOCAL_CHANGES_MODULE_ID,
+  localSectionHeadings,
+  upsertLocalSection,
+} from '../src/content/localChanges';
 import {
   apply,
   applyDirective,
@@ -21,13 +29,14 @@ import {
   type PlaySession,
   type PlayView,
 } from '../src/runtime/session';
-import { serializeSave } from '../src/runtime/save';
+import { pruneStateForRegistry, serializeSave } from '../src/runtime/save';
 import { type ParsedSave } from '../src/content/saveSection';
 import { parseDirectiveLine, type Directive } from '../src/content/test';
 import { resolveDirective } from '../src/content/typed';
 
 const repoRoot = path.join(import.meta.dirname, '..');
 const defaultContent = 'content/tutorial-island.dsl';
+const defaultLocalChanges = 'content/local-changes.dsl';
 
 export interface CommandResult {
   view?: PlayView;
@@ -51,6 +60,12 @@ const HELP_LINES = [
   '  /assert <c>  assert a condition against current state',
   '  /cancel      cancel the in-flight spannable action, if any',
   '  <directive>  any raw directive line (talk:/use:/travel:/craft:/begin:/…)',
+  '  /dsl <kind> <id> [body] stage or replace one local DSL section; use | for new lines',
+  '  /local       list local changes',
+  '  /local show  print the local-changes DSL module',
+  '  /local delete <kind> <id> delete one staged section',
+  '  /local clear delete all staged sections',
+  '  local=<file> at startup chooses the local DSL file',
   '  /create-test <id>       emit a # test from what you just did in this session',
   '  /create-valid-test <id> same, plus a # save + expect: regression assertion',
   '  /help        show this help',
@@ -202,6 +217,13 @@ export interface Recorder {
   startSave: string;
 }
 
+export interface AuthoringContext {
+  baseSources: ModuleSource[];
+  dependencies: string[];
+  localSource: ModuleSource;
+  writeLocalChanges?: (text: string) => void;
+}
+
 function savedGameFromSerialized(serialized: string): ParsedSave {
   const { version, ...diff } = JSON.parse(serialized) as { version: number } & Record<string, unknown>;
   return { version, diff };
@@ -252,6 +274,111 @@ function buildCreateTest(session: PlaySession, recorder: Recorder, id: string, o
   if (endSaveSerialized !== undefined) output.push(...saveBlock(endSaveId, endSaveSerialized), '');
   output.push(`# test ${id}`, ...lines);
   return { output };
+}
+
+function commandBodyLines(body: string): string[] {
+  if (body.trim() === '') return [];
+  return body
+    .split('|')
+    .map((line) => line.replace(/^[ \t]/, '').trimEnd())
+    .filter((line) => line.trim() !== '');
+}
+
+function localSectionSource(kind: string, id: string, body: string): string {
+  return [`# ${kind} ${id}`, ...commandBodyLines(body)].join('\n') + '\n';
+}
+
+function localDiagnosticsFor(authoring: AuthoringContext, diagnostics: ReturnType<typeof loadUniverseWithDiagnostics>['diagnostics']): string[] {
+  return diagnostics
+    .filter((diagnostic) => diagnostic.sourceName === authoring.localSource.name || diagnostic.moduleId === LOCAL_CHANGES_MODULE_ID)
+    .map((diagnostic) => formatModuleDiagnostic(diagnostic));
+}
+
+function commitLocalChanges(session: PlaySession, authoring: AuthoringContext, text: string, message: string): CommandResult {
+  const loaded = loadUniverseWithDiagnostics([...authoring.baseSources, { ...authoring.localSource, text }]);
+  const localStatus = loaded.modules.find((module) => module.sourceName === authoring.localSource.name || module.moduleId === LOCAL_CHANGES_MODULE_ID);
+  const diagnostics = localDiagnosticsFor(authoring, loaded.diagnostics);
+  if (diagnostics.length > 0 || localStatus?.loaded !== true) {
+    return { output: ['Error: local changes did not load.', ...diagnostics.map((diagnostic) => `  ${diagnostic}`)], quit: false };
+  }
+
+  try {
+    authoring.writeLocalChanges?.(text);
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
+    return { output: [`Error: could not write local changes: ${detail}`], quit: false };
+  }
+
+  authoring.localSource.text = text;
+  session.registry = loaded.registry;
+  session.dialogue = null;
+  const warnings = pruneStateForRegistry(session.state, session.registry);
+  for (const warning of warnings) session.state.log.push(warning.message);
+  session.logCursor = Math.max(0, session.state.log.length - warnings.length);
+  initResources(session.state, session.registry);
+
+  try {
+    const next = view(session);
+    return { view: next, output: [message, ...formatView(next)], quit: false };
+  } catch (error) {
+    if (error instanceof RuntimeError) return { output: [message, `Error: ${error.message}`], quit: false };
+    throw error;
+  }
+}
+
+function handleDslCommand(session: PlaySession, trimmed: string, authoring: AuthoringContext | undefined): CommandResult {
+  if (!authoring) return { output: ['Error: local authoring is unavailable.'], quit: false };
+  const rest = trimmed.slice('/dsl'.length).trim();
+  const match = /^(?<kind>[a-z][a-z0-9-]*)(?:[ \t]+(?<id>[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9-]*)*))?(?:[ \t]+(?<body>.*))?$/.exec(rest)?.groups;
+  if (!match?.kind || !match.id) return { output: ['Error: /dsl requires <kind> <id> [body]'], quit: false };
+
+  try {
+    const edit = upsertLocalSection(authoring.localSource.text, authoring.dependencies, localSectionSource(match.kind, match.id, match.body ?? ''));
+    const verb = edit.replaced ? 'Replaced' : 'Staged';
+    return commitLocalChanges(session, authoring, edit.text, `${verb} # ${edit.section.kind} ${edit.section.id} in ${LOCAL_CHANGES_MODULE_ID}.`);
+  } catch (error) {
+    if (error instanceof DslError) return { output: [`Error: ${error.message}`], quit: false };
+    throw error;
+  }
+}
+
+function localModuleLines(authoring: AuthoringContext): string[] {
+  return authoring.localSource.text.trimEnd().split('\n');
+}
+
+function handleLocalCommand(session: PlaySession, trimmed: string, authoring: AuthoringContext | undefined): CommandResult {
+  if (!authoring) return { output: ['Error: local authoring is unavailable.'], quit: false };
+  const rest = trimmed.slice('/local'.length).trim();
+
+  if (rest === '' || rest === 'list') {
+    try {
+      const headings = localSectionHeadings(authoring.localSource.text);
+      return { output: headings.length > 0 ? headings : ['No local changes staged.'], quit: false };
+    } catch (error) {
+      if (error instanceof DslError) return { output: [`Error: ${error.message}`], quit: false };
+      throw error;
+    }
+  }
+
+  if (rest === 'show' || rest === 'export') return { output: localModuleLines(authoring), quit: false };
+
+  if (rest === 'clear') {
+    return commitLocalChanges(session, authoring, clearLocalSections(authoring.dependencies), `Cleared ${LOCAL_CHANGES_MODULE_ID}.`);
+  }
+
+  const remove = /^delete[ \t]+(?<kind>[a-z][a-z0-9-]*)[ \t]+(?<id>[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9-]*)*)$/.exec(rest)?.groups;
+  if (remove) {
+    try {
+      const next = deleteLocalSection(authoring.localSource.text, authoring.dependencies, remove.kind, remove.id);
+      if (!next.deleted) return { output: [`Error: no local # ${remove.kind} ${remove.id} is staged.`], quit: false };
+      return commitLocalChanges(session, authoring, next.text, `Deleted local # ${remove.kind} ${remove.id}.`);
+    } catch (error) {
+      if (error instanceof DslError) return { output: [`Error: ${error.message}`], quit: false };
+      throw error;
+    }
+  }
+
+  return { output: [`Error: unknown /local command: ${rest}`], quit: false };
 }
 
 function beginInnerForChoice(choice: PlayChoice): string {
@@ -374,8 +501,17 @@ export function handleCommand(
   currentView: PlayView,
   line: string,
   recorder: Recorder = { history: [], startSave: '' },
+  authoring?: AuthoringContext,
 ): CommandResult {
   const trimmed = line.trim();
+
+  if (trimmed === '/dsl' || trimmed.startsWith('/dsl ')) {
+    return handleDslCommand(session, trimmed, authoring);
+  }
+
+  if (trimmed === '/local' || trimmed.startsWith('/local ')) {
+    return handleLocalCommand(session, trimmed, authoring);
+  }
 
   if (trimmed.startsWith('/create-valid-test')) {
     const id = trimmed.slice('/create-valid-test'.length).trim();
@@ -517,13 +653,71 @@ function runLiveAction(session: PlaySession, rl: ReturnType<typeof createInterfa
   });
 }
 
+interface CliArgs {
+  files: string[];
+  liveRequested: boolean;
+  localFile: string;
+}
+
+function splitContentArg(arg: string | undefined): string[] {
+  return (arg ?? defaultContent).split(',').map((file) => file.trim()).filter(Boolean);
+}
+
+function parseCliArgs(rawArgs: string[]): CliArgs {
+  const positional: string[] = [];
+  let localFile = defaultLocalChanges;
+  let liveRequested = false;
+
+  for (let i = 0; i < rawArgs.length; i++) {
+    const arg = rawArgs[i];
+    if (arg === '--live') {
+      liveRequested = true;
+      continue;
+    }
+    if (arg === '--local' || arg === '--changes') {
+      localFile = rawArgs[++i] ?? defaultLocalChanges;
+      continue;
+    }
+    if (arg.startsWith('--local=')) {
+      localFile = arg.slice('--local='.length);
+      continue;
+    }
+    if (arg.startsWith('--changes=')) {
+      localFile = arg.slice('--changes='.length);
+      continue;
+    }
+    if (arg.startsWith('local=')) {
+      localFile = arg.slice('local='.length);
+      continue;
+    }
+    positional.push(arg);
+  }
+
+  if (positional.length > 1 && localFile === defaultLocalChanges) localFile = positional[0];
+  return { files: splitContentArg(positional.length > 1 ? positional[1] : positional[0]), liveRequested, localFile };
+}
+
+function repoPath(file: string): string {
+  return path.resolve(repoRoot, file);
+}
+
+function sourceName(file: string): string {
+  return path.basename(file).replace(/\.[^.]*$/, '');
+}
+
 // One file is one module: its `# info` names it, and its filename is the
 // fallback id for a file that declares none.
 function loadContent(files: string[]): ModuleSource[] {
   return files.map((file) => ({
-    name: path.basename(file).replace(/\.[^.]*$/, ''),
-    text: readFileSync(path.resolve(repoRoot, file), 'utf8'),
+    name: sourceName(file),
+    text: readFileSync(repoPath(file), 'utf8'),
   }));
+}
+
+function writeLocalChanges(file: string, text: string): void {
+  const target = repoPath(file);
+  mkdirSync(path.dirname(target), { recursive: true });
+  writeFileSync(target, text, 'utf8');
 }
 
 const RACES = ['Human', 'Elf', 'Dwarf', 'Orc'];
@@ -550,17 +744,29 @@ async function promptCharacterCreation(it: AsyncIterator<string>): Promise<{ nam
 }
 
 async function main(): Promise<void> {
-  const rawArgs = process.argv.slice(2);
+  const args = parseCliArgs(process.argv.slice(2));
   // Nobody to press a key on a non-TTY run, and a repeating action would tick
   // forever, so --live falls back to the instant path.
-  const liveMode = rawArgs.includes('--live') && Boolean(process.stdin.isTTY);
-  const arg = rawArgs.find((a) => !a.startsWith('--'));
-  const files = (arg ?? defaultContent).split(',').map((file) => file.trim()).filter(Boolean);
-  const loaded = loadUniverseWithDiagnostics(loadContent(files));
+  const liveMode = args.liveRequested && Boolean(process.stdin.isTTY);
+  const localPath = repoPath(args.localFile);
+  const files = args.files.filter((file) => repoPath(file) !== localPath);
+  const baseSources = loadContent(files);
+  const baseLoaded = loadUniverseWithDiagnostics(baseSources);
+  const dependencies = baseLoaded.loadedModules;
+  const localText = existsSync(localPath) ? readFileSync(localPath, 'utf8') : initialLocalChangesModule(dependencies);
+  const localSource: ModuleSource = { name: sourceName(args.localFile), text: localText };
+  const sources = existsSync(localPath) ? [...baseSources, localSource] : baseSources;
+  const loaded = loadUniverseWithDiagnostics(sources);
   for (const each of loaded.diagnostics) console.error(`Disabled module: ${formatModuleDiagnostic(each)}`);
   const registry = loaded.registry;
   const session = startSession(registry);
   const recorder: Recorder = { history: [], startSave: serializeSave(session.state, registry) };
+  const authoring: AuthoringContext = {
+    baseSources,
+    dependencies,
+    localSource,
+    writeLocalChanges: (text) => writeLocalChanges(args.localFile, text),
+  };
 
   let current: PlayView;
   try {
@@ -615,7 +821,7 @@ async function main(): Promise<void> {
           else throw err;
         }
       } else {
-        const result = handleCommand(session, current, line, recorder);
+        const result = handleCommand(session, current, line, recorder, authoring);
         if (result.output.length > 0) console.log(result.output.join('\n'));
         if (result.view) current = result.view;
         quit = result.quit;

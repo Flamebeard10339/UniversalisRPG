@@ -1,7 +1,7 @@
 # DSL modules — deliverable log
 
-**Status:** D1-D8 settled. **Chunks 1, 2, 3a, 3b, 3c, 4 and 5 landed** — the namespace work is
-done except bare action labels, deferred with a reason in the 3c entry. Chunk 6 is next.
+**Status:** D1-D8 settled. **Chunks 1, 2, 3a, 3b, 3c, 4, 5 and 6 landed** — the namespace work is
+done except bare action labels, deferred with a reason in the 3c entry. Chunk 7 is next.
 
 ---
 
@@ -278,7 +278,7 @@ Engine first; nothing in tooling is safe until a bad module can fail alone.
 | 3c | ~~Members: declarable flags and dialogue nodes; folds `scope.ts` in; the `tutorial.` migration~~ **done**; action labels deferred | D7, rest of D6; unlocks req 6 |
 | 4 | ~~Per-module error isolation + diagnostics~~ **done** | engine req 3, 4 |
 | 5 | ~~Enable/disable, packs, dangling-ref pruning~~ **done** | engine req 1, 6; module req 4 |
-| 6 | CLI authoring of every DSL type | engine req 2 |
+| 6 | ~~CLI authoring of every DSL type~~ **done** | engine req 2 |
 | 7 | Publish to GitHub issue; squash tooling | engine req 5 |
 | 8 | Modportal over `approved-mod` issues | stretch |
 
@@ -617,6 +617,53 @@ Accepted boundaries:
 
 Verified: 392 tests green, `npm run build`, `npm run layer-check`, `npm run audit-status`, and a
 CLI smoke run of `content/tutorial-island.dsl` after the prune pass.
+
+---
+
+### Chunk 6 — CLI authoring of every DSL type (done)
+
+The play CLI now has a local authoring lane backed by a managed `local-changes` DSL module.
+`/dsl <kind> <id> [body]` stages or replaces one section in that module, with `|` as the
+single-line REPL spelling for a new DSL line. The command is intentionally section-level rather
+than prompt-by-field: it accepts the grammar's own text for items, stats, skills, variables,
+resources, locations, entities/actions, recipes, dialogues, saves, tests and `# remove`, so new
+DSL kinds do not require another CLI form before they are authorable.
+
+`/local` lists staged sections, `/local show` and `/local export` print the whole pasteable module,
+`/local delete <kind> <id>` removes one staged section, and `/local clear` removes all staged
+sections. The file defaults to `content/local-changes.dsl` and can be chosen at startup with
+`local=<file>`; the older `--local`/`--changes` spellings are accepted by direct `tsx` runs, but
+`npm run` treats unknown `--` flags as npm config, so the no-warning documented form is
+`local=<file>`.
+
+The local file's `# info local-changes` header is generated with `pack: local` plus dependencies on
+the currently loaded base modules, which makes dotted edits like `# entity tutorial-island.oven`
+load after the content they patch. Startup only auto-loads the local module if the file already
+exists; a one-file scratch DSL without `# info` still plays as a single unnamed module until the
+author actually asks to stage local changes.
+
+Every accepted edit reloads the universe through the diagnostic loader before writing the file. If
+the local module fails parsing, ordering, resolution, merge/build or validation, the command prints
+the module diagnostic and leaves both the live registry and the local file untouched. If it succeeds,
+the existing session keeps its state, runs the Chunk 5 prune path against the new registry, fills any
+new resources with `initResources`, clears an in-progress dialogue, and prints the refreshed view.
+
+Two parser fixes fell out of the generated-authoring contract: `# test` directives now accept
+fully-qualified ids for run/talk/use/travel/craft/load/expect/begin, and `# dialogue owner =` accepts
+a dotted entity path. Without those, the CLI could emit namespaced content that its own replay parser
+or dialogue parser rejected.
+
+Accepted boundaries:
+- `# info` is managed metadata for the local module, not a user-staged section.
+- The CLI does not synthesize per-field forms. Full structured GUI controls belong with the GUI
+  rebuild; this chunk's durable contract is "paste one valid DSL section and validate it before it
+  becomes live."
+- `|` cannot appear literally in a one-line `/dsl` body. A hand-edited local DSL file can still hold
+  prose containing that character.
+
+Verified: 403 tests green, `npm run build`, `npm run layer-check`, `npm run audit-status`, and a
+file-backed CLI smoke that staged `/dsl item smoke-token`, exported the generated `local-changes`
+module, and quit through `npm run play -- local=<temp-file> content/tutorial-island.dsl`.
 
 ---
 

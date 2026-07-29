@@ -22,12 +22,13 @@ export interface Test {
 }
 
 // Factored out so `begin:` can take the same payload with the verb inline.
-const USE_PAYLOAD = '(?<obj>[a-z][a-z0-9-]*)\\.(?<objId>[a-z][a-z0-9-]*)\\.(?<actionId>.+)';
-const TRAVEL_PAYLOAD = '(?<id>[a-z][a-z0-9-]*)';
-const CRAFT_PAYLOAD = '(?<id>[a-z][a-z0-9-]*)';
+const PATH = '[a-z][a-z0-9-]*(?:\\.[a-z][a-z0-9-]*)*';
+const USE_PAYLOAD = `(?<obj>[a-z][a-z0-9-]*)\\.(?<objId>${PATH})\\.(?<actionId>.+)`;
+const TRAVEL_PAYLOAD = `(?<id>${PATH})`;
+const CRAFT_PAYLOAD = `(?<id>${PATH})`;
 
-const RUN = /^run:[ \t]*(?<id>[a-z][a-z0-9-]*)$/;
-const TALK = /^talk:[ \t]*(?<id>[a-z][a-z0-9-]*)$/;
+const RUN = new RegExp(`^run:[ \\t]*(?<id>${PATH})$`);
+const TALK = new RegExp(`^talk:[ \\t]*(?<id>${PATH})$`);
 const CHOOSE = /^choose:[ \t]*(?<text>.*)$/;
 const USE = new RegExp(`^use:[ \\t]*${USE_PAYLOAD}$`);
 const TRAVEL = new RegExp(`^travel:[ \\t]*${TRAVEL_PAYLOAD}$`);
@@ -37,8 +38,8 @@ const BEGIN_USE = new RegExp(`^${USE_PAYLOAD}$`);
 const BEGIN_TRAVEL = new RegExp(`^${TRAVEL_PAYLOAD}$`);
 const BEGIN_CRAFT = new RegExp(`^${CRAFT_PAYLOAD}$`);
 const ASSERT = /^assert:[ \t]*(?<cond>.+)$/;
-const EXPECT = /^expect:[ \t]*(?<id>[a-z][a-z0-9-]*)$/;
-const LOAD = /^load:[ \t]*(?<id>[a-z][a-z0-9-]*)$/;
+const EXPECT = new RegExp(`^expect:[ \\t]*(?<id>${PATH})$`);
+const LOAD = new RegExp(`^load:[ \\t]*(?<id>${PATH})$`);
 const CANCEL = /^cancel$/;
 const WAIT = /^wait:[ \t]*(?<seconds>\d+(?:\.\d+)?)$/;
 

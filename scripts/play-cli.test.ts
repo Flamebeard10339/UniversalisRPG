@@ -2,9 +2,11 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { createGameState } from '../src/runtime/runtime';
 import { loadModule } from '../src/content/registry';
+import { initialLocalChangesModule } from '../src/content/localChanges';
+import { ModuleSource } from '../src/content/universe';
 import { serializeSave } from '../src/runtime/save';
 import { beginAction, runTest, startSession, view } from '../src/runtime/session';
-import { handleCommand, liveTick, type Recorder } from './play-cli';
+import { handleCommand, liveTick, type AuthoringContext, type Recorder } from './play-cli';
 
 const source = readFileSync('content/tutorial-island.dsl', 'utf8');
 
@@ -390,5 +392,162 @@ describe('play-cli recorder: /create-test and /create-valid-test', () => {
     const result = handleCommand(session, current, '/create-test empty', recorder);
     expect(result.output.some((line) => line.includes('nothing recorded'))).toBe(true);
     expect(session.registry.tests.has('empty')).toBe(false);
+  });
+});
+
+const AUTHORING_MODULE = `
+# info base
+version: 1.0.0
+
+# location camp
+x: 0, y: 0
+starting
+entities:
+  chest
+
+# entity chest
+title: Chest
+open:
+  say: Empty.
+
+# item coin
+title: Coin
+`;
+
+describe('play-cli local DSL authoring', () => {
+  function authoringFixture() {
+    const baseSources: ModuleSource[] = [{ name: 'base', text: AUTHORING_MODULE }];
+    const registry = loadModule(AUTHORING_MODULE);
+    const session = startSession(registry);
+    const current = view(session);
+    const writes: string[] = [];
+    const recorder: Recorder = { history: [], startSave: serializeSave(session.state, registry) };
+    const authoring: AuthoringContext = {
+      baseSources,
+      dependencies: ['base'],
+      localSource: { name: 'local-changes', text: initialLocalChangesModule(['base']) },
+      writeLocalChanges: (text) => writes.push(text),
+    };
+    return { session, current, recorder, authoring, writes };
+  }
+
+  function runLocal(
+    fixture: ReturnType<typeof authoringFixture>,
+    command: string,
+    current: { value: ReturnType<typeof view> },
+  ) {
+    const result = handleCommand(fixture.session, current.value, command, fixture.recorder, fixture.authoring);
+    if (result.view) current.value = result.view;
+    return result;
+  }
+
+  it('/dsl stages a section, persists it, reloads it, and /local can show/delete it', () => {
+    const fixture = authoringFixture();
+    const current = { value: fixture.current };
+
+    const created = runLocal(fixture, '/dsl item gem title: Gem | examine: Cut bright.', current);
+    expect(created.output[0]).toBe('Staged # item gem in local-changes.');
+    expect(fixture.writes).toHaveLength(1);
+    expect(fixture.authoring.localSource.text).toContain('# item gem');
+    expect(fixture.authoring.localSource.text).toContain('dependencies:');
+    expect(fixture.session.registry.items.get('local-changes.gem')?.title).toBe('Gem');
+
+    const listed = runLocal(fixture, '/local', current);
+    expect(listed.output).toContain('# item gem');
+
+    const shown = runLocal(fixture, '/local show', current);
+    expect(shown.output).toContain('# info local-changes');
+    expect(shown.output).toContain('# item gem');
+
+    const removed = runLocal(fixture, '/local delete item gem', current);
+    expect(removed.output[0]).toBe('Deleted local # item gem.');
+    expect(fixture.session.registry.items.has('local-changes.gem')).toBe(false);
+    expect(runLocal(fixture, '/local', current).output).toEqual(['No local changes staged.']);
+  });
+
+  it('/dsl edits existing content by staging a field-granular patch', () => {
+    const fixture = authoringFixture();
+    const current = { value: fixture.current };
+
+    const edited = runLocal(fixture, '/dsl entity base.chest title: Treasure Chest', current);
+    expect(edited.output[0]).toBe('Staged # entity base.chest in local-changes.');
+    const chest = fixture.session.registry.entities.get('base.chest')!;
+    expect(chest.title).toBe('Treasure Chest');
+    expect(chest.actions.map((action) => action.label)).toEqual(['open']);
+  });
+
+  it('/dsl rejects invalid local changes without writing or mutating the live registry', () => {
+    const fixture = authoringFixture();
+    const current = { value: fixture.current };
+    const before = fixture.authoring.localSource.text;
+
+    const rejected = runLocal(fixture, '/dsl entity base.chest open: |   give: missing-item', current);
+    expect(rejected.output[0]).toBe('Error: local changes did not load.');
+    expect(rejected.output.some((line) => line.includes('missing-item'))).toBe(true);
+    expect(fixture.writes).toEqual([]);
+    expect(fixture.authoring.localSource.text).toBe(before);
+    expect(fixture.session.registry.entities.get('base.chest')?.actions[0].results).toEqual([{ kind: 'say', text: 'Empty.' }]);
+  });
+
+  it('/local clear reloads and prunes stale state from removed local content', () => {
+    const fixture = authoringFixture();
+    const current = { value: fixture.current };
+
+    runLocal(fixture, '/dsl item gem title: Gem', current);
+    fixture.session.state.inventory['local-changes.gem'] = 1;
+    const cleared = runLocal(fixture, '/local clear', current);
+
+    expect(cleared.output[0]).toBe('Cleared local-changes.');
+    expect(cleared.output.some((line) => line.includes('Removed inventory local-changes.gem'))).toBe(true);
+    expect(fixture.session.state.inventory['local-changes.gem']).toBeUndefined();
+  });
+
+  it('/dsl can author every DSL section kind that local-changes is allowed to own', () => {
+    const fixture = authoringFixture();
+    const current = { value: fixture.current };
+    const commands = [
+      '/dsl stat vigor base: 10',
+      '/dsl skill focus stat-id: local-changes.vigor',
+      '/dsl item token title: Token',
+      '/dsl item ore title: Ore',
+      '/dsl item ingot title: Ingot',
+      '/dsl item temporary title: Temporary',
+      '/dsl entity npc title: NPC | cheer: say: Hello.',
+      '/dsl location grove x: 1, y: 0 | entities: local-changes.npc',
+      '/dsl flag levered',
+      '/dsl variable local-knob value: 2',
+      '/dsl resource stamina max: local-changes.vigor',
+      '/dsl recipe smelt in: local-changes.ore | out: local-changes.ingot',
+      '/dsl dialogue npc-chat owner = local-changes.npc | node greet: |   Hello there.',
+      '/dsl save blank {"version":4}',
+      '/dsl test smoke assert: time >= 0',
+      '/dsl remove item.local-changes.temporary',
+    ];
+
+    for (const command of commands) {
+      const result = runLocal(fixture, command, current);
+      expect(result.output[0], command).not.toMatch(/^Error:/);
+    }
+
+    expect(fixture.session.registry.stats.has('local-changes.vigor')).toBe(true);
+    expect(fixture.session.registry.skills.has('local-changes.focus')).toBe(true);
+    expect(fixture.session.registry.items.has('local-changes.token')).toBe(true);
+    expect(fixture.session.registry.entities.has('local-changes.npc')).toBe(true);
+    expect(fixture.session.registry.locations.has('local-changes.grove')).toBe(true);
+    expect(fixture.session.registry.flags.has('local-changes.levered')).toBe(true);
+    expect(fixture.session.registry.variables.has('local-knob')).toBe(true);
+    expect(fixture.session.registry.resources.has('local-changes.stamina')).toBe(true);
+    expect(fixture.session.registry.recipes.has('local-changes.smelt')).toBe(true);
+    expect(fixture.session.registry.dialogues.has('local-changes.npc-chat')).toBe(true);
+    expect(fixture.session.registry.saves.has('local-changes.blank')).toBe(true);
+    expect(fixture.session.registry.tests.has('local-changes.smoke')).toBe(true);
+    expect(fixture.session.registry.items.has('local-changes.temporary')).toBe(false);
+  });
+
+  it('reports local authoring commands as unavailable when no authoring context is provided', () => {
+    const registry = loadModule(AUTHORING_MODULE);
+    const session = startSession(registry);
+    const result = handleCommand(session, view(session), '/dsl item gem');
+    expect(result.output).toEqual(['Error: local authoring is unavailable.']);
   });
 });

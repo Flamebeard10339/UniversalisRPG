@@ -37,7 +37,8 @@ export interface Dialogue {
   nodes: DialogueNode[];
 }
 
-const OWNER = /^owner[ \t]*=[ \t]*(?<id>[a-z][a-z0-9-]*)$/;
+const PATH = '[a-z][a-z0-9-]*(?:\\.[a-z][a-z0-9-]*)*';
+const OWNER = new RegExp(`^owner[ \\t]*=[ \\t]*(?<id>${PATH})$`);
 const NODE = /^node[ \t]+(?<name>[a-z][a-z0-9-]*):$/;
 const WHEN = /^when:[ \t]*(?<cond>.+)$/;
 const AGAIN = /^again:[ \t]?(?<text>.*)$/;
