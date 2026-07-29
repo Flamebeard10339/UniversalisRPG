@@ -399,11 +399,73 @@ Three holes, all accepted and all narrow:
 - **Removing an id that is not loaded is an error, not a no-op.** Softens in chunk 5, where
   optional dependencies make "not there" a legitimate state.
 
+### Chunk 3a — the complete reference walk (done)
+
+Closes the checkable half of DSL-H2. Newly checked: `has <item>` in every condition position
+(action `requires`/`hidden if`, edge `while`, dialogue `when`, choice `(when …)`, `{cond: text}`,
+`# test assert:`), `goto` against its own dialogue's nodes, `station:` against the capabilities
+entities declare, and every id a `# test` directive names down to the action label in
+`use: <kind>.<id>.<action>`. The walk moved out of `registry.ts` into `references.ts`, and its
+test moved to the layer it drives. The false "every id is checked" comment is gone; what it
+claimed is now a `describe` block that runs.
+
+Three named references stay unchecked deliberately: `open modal:` has no registry until the GUI
+is rebuilt, `# skill stat-id:` is the dead field L4 says to delete, and `# save` diff contents are
+shaped by the runtime's save codec rather than this layer.
+
+**The audit's cheap flag check does not work.** It suggested treating "written by some `set:`/
+`add:` in the module set" as the declaration. Implemented, it failed sixteen existing tests that
+write flags from TypeScript — and it would also reject any flag written by a save or by an absent
+optional dependency. A writer is not a declaration. Flags need declaring outright.
+
+### D7 cannot be lifted out of the namespace work (measured)
+
+The `tutorial.` → `tutorial-` rename was attempted standalone and reverted. The dot is
+**load-bearing today**: `scope.ts` scopes a bare reference inside an entity to that entity, and
+keys that decision on the absence of a dot. Rename `tutorial.mirror-done` to
+`tutorial-mirror-done` and `set:` inside `# entity mirror` silently becomes
+`mirror.tutorial-mirror-done`, which a `# test assert:` outside the entity cannot see. Verified by
+loading the renamed content and printing the result: `{"kind":"set","variable":
+"mirror.tutorial-mirror-done"}`.
+
+So `tutorial.` is not merely an ugly convention — it is the current escape hatch from
+auto-scoping. It can only go when relative resolution replaces auto-scoping, in the same change.
+Nothing catches this today because flags are the one thing the walk cannot check.
+
 ---
 
 ## Open decisions
 
-None blocking. Chunk 3 can start.
+### D8 — does a bare section heading create, or edit whatever it finds? (blocking chunk 3b)
+
+The design says both, in different places, and they cannot both hold:
+
+- D3/D6: *"Creation is always namespace-local: a section names a bare id and the owning module's
+  prefix is applied at load. You cannot collide, because you cannot create outside your own
+  namespace."*
+- The merge rule, as written and as now implemented: *"`# entity miki` in a module that depends on
+  the one that first named `miki` **edits** it."*
+
+Under namespace-local creation the second is impossible — `# entity miki` in module B is
+`B.miki`, a different object.
+
+**Option A — a heading resolves like a reference.** Bare `miki` edits whatever `miki` uniquely
+resolves to across this module and its dependencies; otherwise it creates. Matches the merge
+examples. Costs: adding a dependency that happens to define `miki` silently converts your creation
+into an edit of someone else's object. That is a silent semantic change, strictly worse than the
+broken-shortcut cost D6 already accepted.
+
+**Option B — bare creates, dotted edits.** `# entity miki` is always `self.miki`. To edit another
+module's, name its path: `# entity tutorial-island.miki`. Costs: the merge examples in this log are
+wrong as written and need fixing, and a patch module is more verbose — though a patch *is* an
+edit, and D6's consequence 3 already says the editor emits full paths.
+
+Recommendation: **B**. It makes "you cannot collide because you cannot create outside your own
+namespace" literally true, it lets a reader tell a module's creations from its edits at a glance,
+and it matches `# remove entity.mirror`, which already addresses by path.
+
+Chunk 3b is: qualified storage keys, suffix resolution, declarable flags, folding `scope.ts` into
+relative resolution, and the `tutorial.` migration — all of which hang off this answer.
 
 ---
 
