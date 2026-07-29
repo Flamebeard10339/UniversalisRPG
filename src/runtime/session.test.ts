@@ -2,7 +2,7 @@ import { readFileSync } from 'fs';
 import { describe, expect, it } from 'vitest';
 import { createGameState, PLAYER, travelSecondsPerUnit } from './runtime';
 import { loadModule } from '../content/registry';
-import { apply, applyDirective, beginAction, cancelAction, PlayView, runTest, startSession, submitModal, view, wait } from './session';
+import { apply, applyDirective, beginAction, cancelAction, PlayView, runTest, SAID_HEAD_KEPT, SAID_TAIL_KEPT, startSession, submitModal, view, wait } from './session';
 
 const source = readFileSync('content/tutorial-island.dsl', 'utf8');
 
@@ -481,5 +481,83 @@ cancel
 describe('starting a session with nowhere to begin', () => {
   it('says so instead of failing later with an empty location id', () => {
     expect(() => startSession(loadModule('# location camp\nx: 0, y: 0'))).toThrow(/no # location is marked starting/);
+  });
+});
+
+describe('view: what a long span hands back', () => {
+  // An unkillable dummy at one swing a second: the big-jump path resolve() exists
+  // for, logging one line per swing for as long as the span lasts.
+  const arena = `
+# stat attack
+base: 1
+
+# stat accuracy
+base: 100
+
+# stat evasion
+base: 0
+
+# stat swings-per-minute
+base: 60
+
+# stat max-health
+base: 1000000
+
+# resource health
+max: max-health
+start: 1000000
+
+# location arena
+starting
+entities: dummy
+
+# entity dummy
+title: Dummy
+stats: attack 0, max-health 1000000, accuracy 100, evasion 0, swings-per-minute 60
+hit:
+  repeating
+  time: 60
+  speed: swings-per-minute
+  accuracy: accuracy
+  evasion: evasion
+  ability: attack
+  target: health
+`;
+
+  function swinging(): ReturnType<typeof startSession> {
+    const session = startSession(loadModule(arena));
+    view(session);
+    apply(session, 'use:entity.dummy.hit');
+    return session;
+  }
+
+  it('elides the middle of a span too long to read instead of handing back every line', () => {
+    const session = swinging();
+
+    const said = wait(session, 3600).said;
+
+    expect(said).toHaveLength(SAID_HEAD_KEPT + 1 + SAID_TAIL_KEPT);
+    expect(said[SAID_HEAD_KEPT]).toMatch(/^… \d+ more lines$/);
+    expect(said[0]).toMatch(/^You hit the Dummy/);
+    expect(said[said.length - 1]).toMatch(/^You hit the Dummy/);
+  });
+
+  it('keeps nothing it has already handed back, so a session that idles forever does not grow', () => {
+    const session = swinging();
+
+    wait(session, 3600);
+    expect(session.state.log).toEqual([]);
+
+    wait(session, 3600);
+    expect(session.state.log).toEqual([]);
+  });
+
+  it('hands back a short span whole', () => {
+    const session = swinging();
+
+    const said = wait(session, 5).said;
+
+    expect(said).toHaveLength(5);
+    expect(said.every((line) => line.startsWith('You hit the Dummy'))).toBe(true);
   });
 });

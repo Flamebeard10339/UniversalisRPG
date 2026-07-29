@@ -168,6 +168,15 @@ export function startSession(registry: Registry, state: GameState = createGameSt
   return { registry, state, dialogue: null, logCursor: state.log.length };
 }
 
+export const SAID_HEAD_KEPT = 40;
+export const SAID_TAIL_KEPT = 40;
+
+function elideMiddle(said: string[]): string[] {
+  const dropped = said.length - SAID_HEAD_KEPT - SAID_TAIL_KEPT;
+  if (dropped <= 0) return said;
+  return [...said.slice(0, SAID_HEAD_KEPT), `… ${dropped} more lines`, ...said.slice(said.length - SAID_TAIL_KEPT)];
+}
+
 export function view(session: PlaySession): PlayView {
   const { registry, state } = session;
   const location = registry.locations.get(state.location);
@@ -179,8 +188,9 @@ export function view(session: PlaySession): PlayView {
     if (entity) entities.push({ id: entity.id, title: entity.title, examine: entity.examine });
   }
 
-  const said = state.log.slice(session.logCursor);
-  session.logCursor = state.log.length;
+  const said = elideMiddle(state.log.slice(session.logCursor));
+  state.log.length = 0;
+  session.logCursor = 0;
 
   return {
     location: { id: location.id, title: location.title, description: location.examine ?? '' },
