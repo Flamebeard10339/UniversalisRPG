@@ -14,9 +14,6 @@ export interface ParsedModule {
   sections: ModuleSection[];
 }
 
-// A module id is the root of the namespace every id it declares hangs under, so
-// it may not collide with a segment the resolver already spends: the section
-// kinds, or a root the engine owns.
 const RESERVED_IDS: readonly string[] = [...SECTION_KINDS, 'player', 'skills', 'self'];
 
 const MODULE_ID = /^[a-z][a-z0-9-]*$/;
@@ -34,9 +31,6 @@ export function parseModuleSource(source: ModuleSource): ParsedModule {
   return { info, sections: parsed.filter((section) => section.kind !== 'info') };
 }
 
-// The ids that must already be loaded when `module` loads. `~` is deliberately
-// absent: it requires the module without ordering against it, which is what
-// makes it the only way to express a cycle.
 function loadsAfter(module: ParsedModule, loaded: ReadonlyMap<string, ParsedModule>): Set<string> {
   const where = `# info ${module.info.id} dependencies:`;
   const before = new Set<string>();
@@ -55,15 +49,12 @@ function loadsAfter(module: ParsedModule, loaded: ReadonlyMap<string, ParsedModu
       throw new DslError(`${where} needs ${formatDependency(declared)}, but ${declared.module} ${formatVersion(present.info.version)} is loaded`);
     }
     if (declared.prefix !== 'unordered') before.add(declared.module);
+    // `~` is deliberately absent: it requires the module without ordering against it
   }
   return before;
 }
 
-// Lexicographically smallest topological order: of everything whose dependencies
-// are already placed, the alphabetically first goes next. The same set of
-// modules therefore always produces the same universe, so a conflict between two
-// modules that do not depend on each other is a reproducible result rather than
-// a heisenbug.
+// Lexicographically smallest topological order
 export function orderModules(modules: readonly ParsedModule[]): ParsedModule[] {
   const byId = new Map<string, ParsedModule>();
   for (const module of modules) {

@@ -7,28 +7,36 @@ import { DslError } from '../grammar/parser';
 import { recipeSchema } from './recipe';
 import { resourceSchema } from './resource';
 import { parseSaveSection } from './saveSection';
-import { parseSection } from '../grammar/section';
+import { AnySchema, parseAnySection } from '../grammar/section';
 import { skillSchema } from './skill';
 import { statSchema } from './stat';
 import { RawSection, splitSections } from '../grammar/structure';
 import { parseTest } from './test';
 import { variableSchema } from './variable';
 
-// Most kinds are a SectionSchema walked by the generic engine; a few (dialogue)
-// have a grammar too far from key/value to fit it and bring their own parser.
-const PARSERS: Record<string, (section: RawSection) => object> = {
-  info: (section) => parseSection(section, infoSchema),
-  item: (section) => parseSection(section, itemSchema),
-  stat: (section) => parseSection(section, statSchema),
-  skill: (section) => parseSection(section, skillSchema),
-  location: (section) => parseSection(section, locationSchema),
-  entity: (section) => parseSection(section, entitySchema),
-  recipe: (section) => parseSection(section, recipeSchema),
-  resource: (section) => parseSection(section, resourceSchema),
-  variable: (section) => parseSection(section, variableSchema),
+export const SCHEMAS: Record<string, AnySchema> = {
+  info: infoSchema,
+  item: itemSchema,
+  stat: statSchema,
+  skill: skillSchema,
+  location: locationSchema,
+  entity: entitySchema,
+  recipe: recipeSchema,
+  resource: resourceSchema,
+  variable: variableSchema,
+};
+
+// A few kinds have a grammar too far from key/value to fit the generic engine
+// and bring their own parser. They merge on their own terms too — see mergeSection.
+const BESPOKE: Record<string, (section: RawSection) => object> = {
   dialogue: parseDialogue,
   test: parseTest,
   save: parseSaveSection,
+};
+
+const PARSERS: Record<string, (section: RawSection) => object> = {
+  ...Object.fromEntries(Object.entries(SCHEMAS).map(([kind, schema]) => [kind, (section: RawSection) => parseAnySection(section, schema)])),
+  ...BESPOKE,
 };
 
 export const SECTION_KINDS: readonly string[] = Object.keys(PARSERS);

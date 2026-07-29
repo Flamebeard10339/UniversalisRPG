@@ -55,6 +55,27 @@ describe('load order', () => {
     const second = module('zebra', '# info zebra', 'dependencies: alpha', '# stat attack', 'base: 9');
     expect(loadUniverse([second, first]).stats.get('attack')!.base).toEqual({ min: 9, max: 9 });
   });
+
+  it('builds the same universe from the same modules in any source order', () => {
+    const base = module('base', '# info base', '# stat attack', 'base: 3');
+    const addon = module('addon', '# info addon', 'dependencies: base', '# stat attack', 'base: 7');
+    const bestiary = module('bestiary', '# info bestiary', 'dependencies: addon', '# entity ogre', 'stats: attack 4-7');
+    const flavor = module('flavor', '# info flavor');
+
+    const expected = { order: ['base', 'addon', 'bestiary', 'flavor'], attack: { min: 7, max: 7 }, ogre: { attack: { min: 4, max: 7 } } };
+    const sourceOrders = [
+      [base, addon, bestiary, flavor],
+      [flavor, bestiary, addon, base],
+      [bestiary, flavor, base, addon],
+    ];
+
+    for (const sources of sourceOrders) {
+      const universe = loadUniverse(sources);
+      expect(ids(sources)).toEqual(expected.order);
+      expect(universe.stats.get('attack')!.base).toEqual(expected.attack);
+      expect(universe.entities.get('ogre')!.stats).toEqual(expected.ogre);
+    }
+  });
 });
 
 describe('dependency declarations', () => {

@@ -28,6 +28,22 @@ export interface SectionSchema<H extends { id: string }, Flags extends keyof H =
 
 export type Authored<H extends { id: string }> = { id: string } & Partial<Omit<H, 'id'>>;
 
+// A schema's generics describe one kind's authoring type, so a table holding
+// every kind sees them through this shape instead. It carries exactly what a
+// caller that does not know the kind can act on.
+export interface AnySchema {
+  kind: string;
+  fields: Record<string, { parser: unknown }>;
+  entries?: { into: string };
+}
+
+export const isListField = (schema: AnySchema, name: string): boolean => {
+  const parser = schema.fields[name]?.parser;
+  return typeof parser === 'object' && parser !== null && 'element' in parser;
+};
+
+export const parseAnySection = (section: RawSection, schema: AnySchema): { id: string } => parseSection(section, schema as unknown as SectionSchema<{ id: string }>);
+
 type AnyFields = Record<string, { parser: Parser<unknown>; default?: (self: unknown) => unknown; keyword?: string }>;
 type EntryConfig = { into: string; body: EntryBody };
 

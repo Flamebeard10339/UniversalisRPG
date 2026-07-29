@@ -4,6 +4,7 @@ import { Dialogue } from './dialogue';
 import { Entity, entitySchema } from './entity';
 import { Item, itemSchema } from './item';
 import { Location, locationSchema, recursivelyResolveRelativeCoordinates } from './location';
+import { mergeSection } from './merge';
 import { ModuleSection } from './module';
 import { ModuleSource, parseUniverse } from './universe';
 import { DslError } from '../grammar/parser';
@@ -254,8 +255,20 @@ export function loadUniverse(sources: readonly ModuleSource[]): Registry {
     saves: new Map(),
   };
 
+  // Two phases, because merging must happen on the authored form: a hydrated
+  // object has every field filled in with defaults, so overlaying one would
+  // silently reset everything the patch did not mention.
+  const merged = new Map<string, Map<string, object>>();
   for (const module of parseUniverse(sources)) {
-    for (const section of module.sections) applySection(registry, section);
+    for (const section of module.sections) {
+      const byId = merged.get(section.kind) ?? new Map<string, object>();
+      const id = (section.value as { id: string }).id;
+      byId.set(id, mergeSection(section.kind, byId.get(id), section.value));
+      merged.set(section.kind, byId);
+    }
+  }
+  for (const [kind, byId] of merged) {
+    for (const value of byId.values()) applySection(registry, { kind, value });
   }
   recursivelyResolveRelativeCoordinates(registry.locations);
   validateTuning(registry.variables);
