@@ -3,6 +3,12 @@
 **Status:** D1-D8 settled. **Chunks 1, 2, 3a, 3b, 3c, 4, 5, 6, 7 and 8 landed** — the namespace
 work is done except bare action labels, deferred with a reason in the 3c entry.
 
+**Engine requirement 2 is half-met, and this deliverable will not close it.** "Create new content
+of every DSL type, from both CLI and GUI" is met from the CLI by chunk 6; `src/main.tsx` renders a
+"GUI pending" placeholder, so the GUI half is unmet by construction and waits on the GUI rebuild
+(`backlog.md`, BD-H2). Recorded here rather than left implied, because the alternative is a
+deliverable archived as complete against a criterion it never met.
+
 ---
 
 ## The deliverable
@@ -620,7 +626,7 @@ CLI smoke run of `content/tutorial-island.dsl` after the prune pass.
 
 ---
 
-### Chunk 6 — CLI authoring of every DSL type (done)
+### Chunk 6 — CLI authoring of every DSL type (done — the CLI half of engine requirement 2)
 
 The play CLI now has a local authoring lane backed by a managed `local-changes` DSL module.
 `/dsl <kind> <id> [body]` stages or replaces one section in that module, with `|` as the
