@@ -14,27 +14,50 @@ export type SaveDiff = Partial<Omit<GameState, 'log'>>;
 // error here until it is classified as diffed key-by-key or carried whole.
 type SaveField = Exclude<keyof GameState, 'log'>;
 
-const SAVE_FIELDS: Record<SaveField, 'record' | 'scalar'> = {
-  flags: 'record',
-  inventory: 'record',
-  xp: 'record',
-  visits: 'record',
-  activeBuffs: 'record',
-  resources: 'record',
-  location: 'scalar',
-  time: 'scalar',
-  rng: 'scalar',
-  player: 'scalar',
-  activeAction: 'scalar',
-  pendingModal: 'scalar',
-};
-
-function fieldsOfKind(kind: 'record' | 'scalar'): SaveField[] {
-  return (Object.keys(SAVE_FIELDS) as SaveField[]).filter((field) => SAVE_FIELDS[field] === kind);
+interface RecordPrune {
+  of: string;
+  loaded(registry: Registry, id: string): boolean;
 }
 
-const RECORD_FIELDS = fieldsOfKind('record');
-const SCALAR_FIELDS = fieldsOfKind('scalar');
+// How a field survives a registry that no longer matches it.
+type Prune = RecordPrune | 'pruned by a rule of its own' | 'holds no registry id';
+
+interface SaveFieldRule {
+  // Whether a save diff carries this field key-by-key or whole.
+  shape: 'record' | 'scalar';
+  // What the field will accept. A `# save` body is hand-written JSON that
+  // nothing else checks, so this is where a `"time":"potato"` is caught.
+  holds(value: unknown): boolean;
+  prune: Prune;
+}
+
+const isNumber = (value: unknown): boolean => typeof value === 'number' && Number.isFinite(value);
+const isObject = (value: unknown): boolean => typeof value === 'object' && value !== null && !Array.isArray(value);
+
+const SAVE_FIELDS: Record<SaveField, SaveFieldRule> = {
+  location: { shape: 'scalar', holds: (value) => typeof value === 'string', prune: 'pruned by a rule of its own' },
+  inventory: { shape: 'record', holds: isNumber, prune: { of: 'item', loaded: (registry, id) => registry.items.has(id) } },
+  flags: { shape: 'record', holds: (value) => typeof value === 'boolean' || isNumber(value), prune: { of: 'flag', loaded: (registry, id) => registry.namespace.has('flag', id) } },
+  visits: { shape: 'record', holds: isNumber, prune: { of: 'dialogue node', loaded: (registry, id) => registry.namespace.has('node', id) } },
+  xp: { shape: 'record', holds: isNumber, prune: { of: 'skill', loaded: (registry, id) => registry.skills.has(id) } },
+  resources: { shape: 'record', holds: isNumber, prune: { of: 'resource', loaded: (registry, id) => registry.resources.has(id) } },
+  activeBuffs: { shape: 'record', holds: isObject, prune: 'pruned by a rule of its own' },
+  activeAction: { shape: 'scalar', holds: (value) => value === null || isObject(value), prune: 'pruned by a rule of its own' },
+  time: { shape: 'scalar', holds: isNumber, prune: 'holds no registry id' },
+  rng: { shape: 'scalar', holds: isNumber, prune: 'holds no registry id' },
+  player: { shape: 'scalar', holds: isObject, prune: 'holds no registry id' },
+  pendingModal: { shape: 'scalar', holds: (value) => value === undefined || typeof value === 'string', prune: 'holds no registry id' },
+};
+
+const SAVE_FIELD_NAMES = Object.keys(SAVE_FIELDS) as SaveField[];
+
+function fieldsOfShape(shape: 'record' | 'scalar'): SaveField[] {
+  return SAVE_FIELD_NAMES.filter((field) => SAVE_FIELDS[field].shape === shape);
+}
+
+const RECORD_FIELDS = fieldsOfShape('record');
+const SCALAR_FIELDS = fieldsOfShape('scalar');
+const RECORD_PRUNES = SAVE_FIELD_NAMES.map((field) => [field, SAVE_FIELDS[field].prune] as const).filter((entry): entry is [SaveField, RecordPrune] => typeof entry[1] !== 'string');
 
 function deepEqual(a: unknown, b: unknown): boolean {
   return JSON.stringify(a) === JSON.stringify(b);
@@ -83,35 +106,6 @@ function pruneRecord<T>(
     addWarning(warnings, `${path}.${id}`, id, `Removed ${path} ${id} because its ${kind} is not loaded.`);
   }
 }
-
-interface RecordPrune {
-  of: string;
-  loaded(registry: Registry, id: string): boolean;
-}
-
-// How each saved field survives a registry it no longer matches, over the same
-// exhaustive key type as SAVE_FIELDS: adding a GameState field is a type error
-// here until it says whether it can hold an id the registry might have lost.
-type FieldPrune = RecordPrune | 'pruned by a rule of its own' | 'holds no registry id';
-
-const PRUNE_FIELDS: Record<SaveField, FieldPrune> = {
-  location: 'pruned by a rule of its own',
-  inventory: { of: 'item', loaded: (registry, id) => registry.items.has(id) },
-  flags: { of: 'flag', loaded: (registry, id) => registry.namespace.has('flag', id) },
-  visits: { of: 'dialogue node', loaded: (registry, id) => registry.namespace.has('node', id) },
-  xp: { of: 'skill', loaded: (registry, id) => registry.skills.has(id) },
-  resources: { of: 'resource', loaded: (registry, id) => registry.resources.has(id) },
-  activeBuffs: 'pruned by a rule of its own',
-  activeAction: 'pruned by a rule of its own',
-  time: 'holds no registry id',
-  rng: 'holds no registry id',
-  player: 'holds no registry id',
-  pendingModal: 'holds no registry id',
-};
-
-const RECORD_PRUNES = (Object.keys(PRUNE_FIELDS) as SaveField[])
-  .map((field) => [field, PRUNE_FIELDS[field]] as const)
-  .filter((entry): entry is [SaveField, RecordPrune] => typeof entry[1] !== 'string');
 
 function activeActionProblem(state: GameState, registry: Registry): string | null {
   const active = state.activeAction;
@@ -187,15 +181,27 @@ export function serializeSave(state: GameState, registry: Registry): string {
   return JSON.stringify({ version: SAVE_VERSION, ...diff });
 }
 
-function checkVersion(saved: ParsedSave): void {
+function checkSave(saved: ParsedSave): void {
   if (saved.version !== SAVE_VERSION) {
     throw new RuntimeError(`save version mismatch: expected ${SAVE_VERSION}, got ${saved.version}`);
+  }
+  for (const [field, value] of Object.entries(saved.diff)) {
+    const rule = SAVE_FIELDS[field as SaveField];
+    if (!rule) throw new RuntimeError(`save holds an unknown field: ${field}`);
+    if (rule.shape === 'scalar') {
+      if (!rule.holds(value)) throw new RuntimeError(`save field ${field} holds ${JSON.stringify(value)}, which is not what ${field} keeps`);
+      continue;
+    }
+    if (!isObject(value)) throw new RuntimeError(`save field ${field} must be an object of ids, not ${JSON.stringify(value)}`);
+    for (const [id, held] of Object.entries(value as Record<string, unknown>)) {
+      if (!rule.holds(held)) throw new RuntimeError(`save field ${field}.${id} holds ${JSON.stringify(held)}, which is not what ${field} keeps`);
+    }
   }
 }
 
 // Mutates `state` in place: resets every field to initialState, then applies
 export function loadSave(state: GameState, saved: ParsedSave, registry: Registry): PruneWarning[] {
-  checkVersion(saved);
+  checkSave(saved);
   const base = initialState(registry);
   const diff = saved.diff;
   const target = state as unknown as Record<string, unknown>;
@@ -221,7 +227,7 @@ function describeValue(value: unknown): string {
 }
 
 export function compareSave(state: GameState, saved: ParsedSave, registry: Registry): string[] {
-  checkVersion(saved);
+  checkSave(saved);
   const current = diffState(state, initialState(registry));
   const expected = saved.diff;
   const diffs: string[] = [];

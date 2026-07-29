@@ -301,3 +301,30 @@ describe('# save section wired through load: / expect: test directives', () => {
     expect(result.failure).toMatch(/inventory\.gold/);
   });
 });
+
+describe('a # save body is checked past its version', () => {
+  const registry = loadModule(PRUNE_MODULE);
+  const load = (diff: Record<string, unknown>) => () => loadSave(createGameState(), { version: SAVE_VERSION, diff }, registry);
+
+  it('refuses a scalar of the wrong type', () => {
+    expect(load({ time: 'potato' })).toThrow(/save field time holds "potato"/);
+    expect(load({ location: 3 })).toThrow(/save field location holds 3/);
+  });
+
+  it('refuses a record written as anything but an object of ids', () => {
+    expect(load({ flags: 'known' })).toThrow(/save field flags must be an object of ids/);
+    expect(load({ inventory: ['bread'] })).toThrow(/save field inventory must be an object of ids/);
+  });
+
+  it('refuses a record member of the wrong type', () => {
+    expect(load({ inventory: { bread: 'lots' } })).toThrow(/save field inventory\.bread holds "lots"/);
+  });
+
+  it('refuses a field the engine does not keep', () => {
+    expect(load({ inventroy: {} })).toThrow(/save holds an unknown field: inventroy/);
+  });
+
+  it('still accepts every field written correctly', () => {
+    expect(load({ time: 3, location: 'camp', flags: { known: true }, inventory: { bread: 2 } })).not.toThrow();
+  });
+});
