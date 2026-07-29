@@ -9,6 +9,17 @@ const source = readFileSync('content/tutorial-island.dsl', 'utf8');
 const registry = loadModule(source);
 
 describe('tutorial-island content', () => {
+  // A CRLF checkout is a real configuration — .gitattributes pins LF in the
+  // index, and the CI matrix runs Windows, but the loader is what has to hold.
+  it('loads identically from a CRLF checkout, with or without a BOM', () => {
+    const crlf = source.replace(/\n/g, '\r\n');
+    for (const text of [crlf, `\uFEFF${crlf}`]) {
+      const loaded = loadModule(text);
+      expect([...loaded.locations.keys()]).toEqual([...registry.locations.keys()]);
+      expect([...loaded.tests.keys()]).toEqual([...registry.tests.keys()]);
+    }
+  });
+
   it('loads the expected kinds', () => {
     expect(registry.entities.size).toBeGreaterThan(0);
     expect(registry.dialogues.size).toBeGreaterThan(0);

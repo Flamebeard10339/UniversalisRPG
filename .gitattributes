@@ -1,0 +1,13 @@
+# The index keeps LF for every text file, so a checkout on any platform parses
+# the same bytes. The DSL is the reason this matters: a stray CR reattributes a
+# section to the one above it, and content is authored by pasting through GitHub.
+* text=auto eol=lf
+
+# Windows tooling that needs its own line endings whatever the repo says.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+*.png binary
+*.jpg binary
+*.jar binary
+*.keystore binary

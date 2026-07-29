@@ -12,7 +12,14 @@ on:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    # Both platforms, because the DSL is line-ending sensitive and the authoring
+    # path is pasting through a GitHub issue: a Windows checkout is a real
+    # configuration this content has to parse in, and ubuntu alone cannot see it.
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
     steps:
       # Full history: audit-status walks back to each system's lastAudit SHA,
       # which a shallow clone does not contain.
@@ -28,3 +35,4 @@ jobs:
       - run: npm test
       - run: npm run layer-check
       - run: npm run audit-status
+        if: matrix.os == 'ubuntu-latest'
