@@ -528,12 +528,14 @@ export function loadUniverseWithDiagnostics(sources: readonly ModuleSource[]): U
   const disabled = new Set<ModuleSource>();
   const statuses = new Map<ModuleSource, ModuleStatus>();
 
+  // A switched-off source is parsed only to recover the id and pack its status
+  // reports. It contributes no diagnostic: nothing it says is loaded, so
+  // switching a broken module off is an exit from its problems, not a rename.
   for (const source of sources.filter((source) => !sourceEnabled(source))) {
     try {
       statuses.set(source, parsedModuleStatus(parseModuleSource(source), false));
     } catch (error) {
       if (!(error instanceof DslError)) throw error;
-      diagnostics.push(diagnostic(source, source.name, 'parse', error));
       statuses.set(source, moduleStatus(source, source.name, undefined, false));
     }
     disabled.add(source);

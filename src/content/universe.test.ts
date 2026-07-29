@@ -228,6 +228,14 @@ describe('loadUniverseWithDiagnostics', () => {
     expect(formatModuleDiagnostic(result.diagnostics[0])).toContain('broken:1:1 [broken] parse: # item requires an id');
   });
 
+  it('does not diagnose a switched-off source that does not parse, so switching one off is an exit from its problems', () => {
+    const result = loadUniverseWithDiagnostics([module('base', '# info base', '# item rope'), { name: 'broken', text: '# item', enabled: false }]);
+
+    expect(result.loadedModules).toEqual(['base']);
+    expect(result.disabledModules).toEqual(['broken']);
+    expect(result.diagnostics).toEqual([]);
+  });
+
   it('disables a module that fails resolution, then disables dependents against the recomputed active set', () => {
     const base = module('base', '# info base', '# item rope');
     const bad = module('bad', '# info bad', 'dependencies: base', '# entity gull', 'peck:', '  give: missing');

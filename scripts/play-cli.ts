@@ -14,7 +14,8 @@ import {
   localSectionHeadings,
   upsertLocalSection,
 } from '../src/content/localChanges';
-import { DEFAULT_MODPORTAL_CACHE, type ModportalManifest } from '../src/content/modportal';
+import { DEFAULT_MODPORTAL_CACHE } from '../src/content/modportal';
+import { modportalEntryPath, readModportalCache } from './lib/modportalCache';
 import {
   apply,
   applyDirective,
@@ -747,25 +748,12 @@ export interface ModportalLoadResult {
   warnings: string[];
 }
 
-function inside(base: string, target: string): boolean {
-  const relative = path.relative(base, target);
-  return relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative));
-}
-
 export function loadModportalSources(dir: string): ModportalLoadResult {
   const root = repoPath(dir);
-  const manifestFile = path.join(root, 'manifest.json');
-  if (!existsSync(manifestFile)) return { sources: [], warnings: [] };
-
-  const manifest = JSON.parse(readFileSync(manifestFile, 'utf8').replace(/^\uFEFF/, '')) as ModportalManifest;
+  const { manifest, warnings } = readModportalCache(root);
   const sources: ModuleSource[] = [];
-  const warnings: string[] = [];
   for (const entry of manifest.entries) {
-    const file = path.resolve(root, entry.file);
-    if (!inside(root, file)) {
-      warnings.push(`Modportal skipped ${entry.moduleId}: file escapes cache directory`);
-      continue;
-    }
+    const file = modportalEntryPath(root, entry);
     if (!existsSync(file)) {
       warnings.push(`Modportal skipped ${entry.moduleId}: missing ${entry.file}`);
       continue;

@@ -1,10 +1,11 @@
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
-import { APPROVED_MOD_LABEL, DEFAULT_MODPORTAL_CACHE, emptyModportalManifest, materializeApprovedModIssue, upsertModportalEntries } from '../src/content/modportal';
+import { APPROVED_MOD_LABEL, DEFAULT_MODPORTAL_CACHE, materializeApprovedModIssue, upsertModportalEntries } from '../src/content/modportal';
 import type { ApprovedModIssue, MaterializedMod, ModportalEntry, ModportalManifest } from '../src/content/modportal';
 import { formatModuleDiagnostic, loadUniverseWithDiagnostics } from '../src/content/registry';
 import type { ModuleSource } from '../src/content/universe';
+import { MODPORTAL_MANIFEST_FILE, modportalEntryPath, readModportalCache } from './lib/modportalCache';
 
 const repoRoot = path.join(import.meta.dirname, '..');
 const defaultContent = 'content/tutorial-island.dsl';
@@ -88,13 +89,13 @@ function cachePath(args: Args, file = ''): string {
 }
 
 function manifestPath(args: Args): string {
-  return cachePath(args, 'manifest.json');
+  return cachePath(args, MODPORTAL_MANIFEST_FILE);
 }
 
 function readManifest(args: Args): ModportalManifest {
-  const file = manifestPath(args);
-  if (!existsSync(file)) return emptyModportalManifest(args.label);
-  return JSON.parse(readFileSync(file, 'utf8').replace(/^\uFEFF/, '')) as ModportalManifest;
+  const { manifest, warnings } = readModportalCache(cachePath(args), args.label);
+  for (const warning of warnings) console.error(warning);
+  return manifest;
 }
 
 function writeManifest(args: Args, manifest: ModportalManifest): void {
@@ -131,14 +132,17 @@ function contentSource(file: string): ModuleSource {
   return { name: sourceName(file), text: readFileSync(repoPath(file), 'utf8') };
 }
 
-function entrySource(args: Args, entry: ModportalEntry): ModuleSource {
-  return { name: entry.moduleId, text: readFileSync(cachePath(args, entry.file), 'utf8'), enabled: entry.enabled };
-}
-
-function validateEnabled(args: Args, entries: readonly ModportalEntry[]): string[] {
-  const sources = [...args.contentFiles.map(contentSource), ...entries.map((entry) => entrySource(args, entry))];
-  const loaded = loadUniverseWithDiagnostics(sources);
-  return loaded.diagnostics.map(formatModuleDiagnostic);
+// Named for what it checks: a switched-off mod is not loaded, so whether it
+// parses is not this run's problem. `pending` carries the text of a mod that
+// has been materialized but not yet written, so `sync` can validate a candidate
+// cache without first committing it.
+function validateEnabled(args: Args, entries: readonly ModportalEntry[], pending: ReadonlyMap<string, string> = new Map()): string[] {
+  const entrySource = (entry: ModportalEntry): ModuleSource => ({
+    name: entry.moduleId,
+    text: pending.get(entry.moduleId) ?? readFileSync(modportalEntryPath(cachePath(args), entry), 'utf8'),
+  });
+  const sources = [...args.contentFiles.map(contentSource), ...entries.filter((entry) => entry.enabled).map(entrySource)];
+  return loadUniverseWithDiagnostics(sources).diagnostics.map(formatModuleDiagnostic);
 }
 
 function findEntry(manifest: ModportalManifest, target: string): ModportalEntry | undefined {
@@ -155,14 +159,21 @@ function sync(args: Args): void {
     process.exit(1);
   }
   const manifest = upsertModportalEntries(readManifest(args), materialized, new Date().toISOString());
+
+  // Validated before anything is written. Enabling a new approved mod by default
+  // is only defensible for one that loads, and a cache that already holds a
+  // broken enabled mod needs repairing rather than switching off.
+  const diagnostics = validateEnabled(args, manifest.entries, new Map(materialized.map((mod) => [mod.moduleId, mod.text])));
+  if (diagnostics.length > 0) {
+    for (const diagnostic of diagnostics) console.error(diagnostic);
+    console.error(`Synced nothing: the approved mods do not load together, so ${args.cacheDir} is unchanged.`);
+    process.exit(1);
+  }
+
   mkdirSync(cachePath(args), { recursive: true });
   for (const mod of materialized) writeFileSync(cachePath(args, mod.file), mod.text, 'utf8');
   writeManifest(args, manifest);
-
-  const diagnostics = validateEnabled(args, manifest.entries);
-  for (const diagnostic of diagnostics) console.error(`Disabled module: ${diagnostic}`);
   console.log(`Synced ${manifest.entries.length} approved mod(s) to ${args.cacheDir}.`);
-  if (diagnostics.length > 0) process.exit(1);
 }
 
 function list(args: Args): void {
@@ -192,7 +203,7 @@ function toggle(args: Args, enabled: boolean): void {
 
 function sources(args: Args): void {
   const manifest = readManifest(args);
-  for (const entry of manifest.entries.filter((entry) => entry.enabled)) console.log(path.relative(repoRoot, cachePath(args, entry.file)));
+  for (const entry of manifest.entries.filter((entry) => entry.enabled)) console.log(path.relative(repoRoot, modportalEntryPath(cachePath(args), entry)));
 }
 
 function show(args: Args): void {
@@ -202,7 +213,7 @@ function show(args: Args): void {
     console.error(`No approved mod matches ${args.target}`);
     process.exit(1);
   }
-  console.log(readFileSync(cachePath(args, entry.file), 'utf8').trimEnd());
+  console.log(readFileSync(modportalEntryPath(cachePath(args), entry), 'utf8').trimEnd());
 }
 
 const args = parseArgs(process.argv.slice(2));

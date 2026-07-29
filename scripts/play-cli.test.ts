@@ -585,6 +585,20 @@ describe('play-cli modportal cache loading', () => {
     }
   });
 
+  it('warns instead of crashing on a manifest a truncated write left unreadable', () => {
+    const dir = mkdtempSync(path.join(os.tmpdir(), 'universalis-modportal-'));
+    try {
+      writeFileSync(path.join(dir, 'manifest.json'), '{"version": 1, "entries": [{"issue": 1,', 'utf8');
+      expect(loadModportalSources(dir).sources).toEqual([]);
+      expect(loadModportalSources(dir).warnings[0]).toMatch(/^Modportal ignored manifest\.json:/);
+
+      writeFileSync(path.join(dir, 'manifest.json'), JSON.stringify({ version: 1, label: 'approved-mod' }), 'utf8');
+      expect(loadModportalSources(dir).warnings).toEqual(['Modportal ignored manifest.json: it holds no entries array']);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   it('warns instead of reading manifest files outside the cache directory', () => {
     const dir = mkdtempSync(path.join(os.tmpdir(), 'universalis-modportal-'));
     try {
