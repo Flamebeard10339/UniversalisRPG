@@ -22,9 +22,7 @@ export interface SerializeModuleOptions {
   globalVariables?: readonly string[];
 }
 
-function n(value: number): string {
-  return Number.isInteger(value) ? String(value) : String(value);
-}
+const n = (value: number): string => String(value);
 
 function range(value: Range): string {
   return isPoint(value) ? n(value.min) : `${n(value.min)}-${n(value.max)}`;

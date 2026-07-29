@@ -42,6 +42,22 @@ describe('contribution issue packaging', () => {
     expect(extractContributionDsl(body)).toBe(LOCAL.trimEnd() + '\n');
   });
 
+  it('takes the DSL under its own heading, not a fence a contributor put in their notes', () => {
+    const validation = loadUniverseWithDiagnostics([
+      { name: 'base', text: BASE },
+      { name: 'local-changes', text: LOCAL },
+    ]);
+    const body = buildContributionIssueBody({
+      title: '[Content]: gem',
+      notes: ['Replaces what used to read:', '```dsl', '# item gem', 'title: Rock', '```'].join('\n'),
+      localModule: LOCAL,
+      validation,
+      contentFiles: ['content/base.dsl'],
+    });
+
+    expect(extractContributionDsl(body)).toBe(LOCAL.trimEnd() + '\n');
+  });
+
   it('reports a local module as not loaded when diagnostics disabled it', () => {
     const validation = loadUniverseWithDiagnostics([
       { name: 'base', text: BASE },

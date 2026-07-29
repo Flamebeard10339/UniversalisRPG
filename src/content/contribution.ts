@@ -10,6 +10,7 @@ export interface ContributionIssueInput {
 }
 
 const DSL_FENCE = '```dsl';
+const DSL_HEADING = '## Local Changes DSL';
 
 function validationLines(validation: UniverseLoadResult): string[] {
   const lines = [`Loaded modules: ${validation.loadedModules.join(', ') || '(none)'}`];
@@ -41,7 +42,7 @@ export function buildContributionIssueBody(input: ContributionIssueInput): strin
     '## Validation',
     ...validationLines(input.validation),
     '',
-    '## Local Changes DSL',
+    DSL_HEADING,
     DSL_FENCE,
     localModule,
     '```',
@@ -51,7 +52,10 @@ export function buildContributionIssueBody(input: ContributionIssueInput): strin
 }
 
 export function extractContributionDsl(issueBody: string): string {
-  const start = issueBody.indexOf(DSL_FENCE);
+  // Anchored on the heading the builder writes, because contributor notes come
+  // first in the body and a contributor may fence DSL of their own in them.
+  const heading = issueBody.indexOf(DSL_HEADING);
+  const start = issueBody.indexOf(DSL_FENCE, heading === -1 ? 0 : heading);
   if (start === -1) throw new Error('issue body does not contain a ```dsl block');
   const bodyStart = issueBody.indexOf('\n', start);
   if (bodyStart === -1) throw new Error('issue body has an unterminated ```dsl block');
