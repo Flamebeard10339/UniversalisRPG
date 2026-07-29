@@ -1,5 +1,5 @@
 import { SectionSchema } from '../grammar/section';
-import { humanize, text } from '../grammar/values';
+import { humanize, id, text } from '../grammar/values';
 
 export interface Skill {
   id: string;
@@ -11,6 +11,8 @@ export const skillSchema: SectionSchema<Skill> = {
   kind: 'skill',
   fields: {
     title: { parser: text, default: (self) => humanize(self.id) },
-    'stat-id': { parser: text },
+    // Nothing reads it yet — skill levels are designed in docs/combat — but it
+    // names a stat, so it resolves and is checked like every other reference.
+    'stat-id': { parser: id },
   },
 };

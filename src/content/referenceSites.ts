@@ -199,6 +199,9 @@ export function visitSection(kind: string, value: object, where: string, visit: 
       if (section.relative) put(section.relative as Relative, 'of', 'location', `${where} relative`, visit);
       actions(section.actions, where, visit);
       return;
+    case 'skill':
+      put(section, 'stat-id', 'stat', `${where} stat-id:`, visit);
+      return;
     case 'recipe':
       for (const field of ['in', 'out', 'burnt'] as const) quantified(section[field], 'item', `${where} ${field}:`, visit);
       for (const field of ['speed', 'accuracy', 'evasion'] as const) put(section, field, 'stat', `${where} ${field}:`, visit);

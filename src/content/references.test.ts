@@ -22,6 +22,7 @@ max: max-health
 on empty: stop
 
 # skill brawling
+stat-id: attack
 
 # item straw
 examine: A fistful of straw.
@@ -195,5 +196,11 @@ describe('references the walk used to step over', () => {
     expect(test('use: entity.training-dumy.strike')).toThrow(/# test walk use: names an unknown entity: training-dumy/);
     expect(test('use: entity.training-dummy.strke')).toThrow(/# test walk use: names an unknown entity action: strke/);
     expect(test('use: entity.training-dummy.strike')).not.toThrow();
+  });
+});
+
+describe('a skill names the stat it raises', () => {
+  it('checks stat-id like any other reference, though nothing reads it yet', () => {
+    expect(loading('stat-id: attack', 'stat-id: attak')).toThrow(/# skill brawling stat-id: names an unknown stat: attak/);
   });
 });
