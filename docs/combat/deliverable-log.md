@@ -735,12 +735,47 @@ belong under the existing "grammar.md update (STALE)" backlog item.
 
 ## Open decisions (not blocking chunk 1)
 
+All three are now closed. Kept for the reasoning; the work they unblock is in `backlog.md`.
+
 - ~~**In-flight swing when the rate changes.**~~ SETTLED in chunk 4: absolute carry, chosen
   deliberately and pinned by tests against both alternatives.
-- **`rate:` sugar** for `time: 60` + `speed: <stat>` — worth it, but not required to ship.
-  Still opaque without it: `time: 60` meaning "per minute" is authoring folklore.
-- **Whether `action.health` survives as sugar** for trivial one-hit targets, or is removed
-  outright.
+- ~~**`rate:` sugar** for `time: 60` + `speed: <stat>`.~~ SETTLED 2026-07-29: `rate: <stat>`
+  desugars to `time: 60` + `speed: <stat>`, landing with the F2 taxonomy below.
+- ~~**Whether `action.health` survives as sugar** for trivial one-hit targets, or is removed
+  outright.~~ SETTLED 2026-07-29: **removed outright.** Every action gets an implicit pool
+  addressed by `target:`. Keeping it as sugar would preserve the two code paths the
+  consolidation section says should not exist, and `ActiveAction.healthRemaining` — game-engine
+  finding L6 — drops with it.
+
+### F1 override scope — SETTLED 2026-07-29
+
+The open question was what an override attaches to, given that `stats:` belongs to the entity
+while `give: 1 rat-tail` is a result on `fight`. Answer: **the entity-level body sets stats only,
+and per-action overrides go in a named block matching the template's action label.** The two
+scopes stay separate rather than being addressed by one body. The template's declaring keyword
+and its reference keyword must also agree on one name; the sketch above writes
+`# entitytype basic-enemy` and then `type enemy:`.
+
+### F2 taxonomy — SETTLED 2026-07-29
+
+The kind becomes its own authored token, because `time:` (seconds per attempt) and the exit
+condition are orthogonal axes. Encoding continuity into `time:` was considered and rejected:
+a continuous action still needs a finite per-attempt duration — the rat's `60 / attack-rate` is
+3.75s — so `time: inf` leaves the swing cadence unexpressible, and mechanically
+`floor(t / Infinity)` is 0, so the action would never attempt anything while
+`state.time + Infinity` poisons the clock at `firstUnitSpan`.
+
+| kind | spelling | `time:` |
+| --- | --- | --- |
+| instant | `instant` bare tag | rejected at load |
+| duration | untagged (the default) | optional; absent means `default-action-duration` |
+| continuous | `continuous` bare tag, renaming `repeating` | required, positive after `speed:` scaling |
+
+`# variable default-action-duration` defaults to `0`, so an untagged action with no `time:`
+reproduces today's instant behaviour exactly and no timing assertion moves. Raising it — which
+is the playtest's "every action feels weighty" ask — first requires the genuinely-instant
+actions (mirror, stairs, eat) to carry the `instant` tag, or raising it silently turns each of
+them spannable. Shipped content has 5 `time:` lines and 1 `repeating`, so the migration is small.
 
 ## Implementation order
 

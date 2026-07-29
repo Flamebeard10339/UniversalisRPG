@@ -743,6 +743,23 @@ location title visible.
 
 ## Open decisions
 
+None. D8 below is settled, and the three questions the 2026-07-29 audits raised against this
+system were answered in the backlog triage that day:
+
+- **D9 — is an approved mod stored source-preserving or canonical?** (audit finding M6) Settled:
+  **canonical.** `modportal.ts:60`'s global `local-changes.` text substitution is replaced by
+  re-serialization through `serializeRegistryModule`. Losing comments and formatting costs nothing
+  because the cache is a build artifact — the maintainer reads the issue body, which stays the
+  author's original source.
+- **D10 — should an approved mod prompt before going live?** Settled: **no.** The official workflow
+  is `pending-mod` -> `approved-mod`, and the `approved-mod` label is the human gate. R3 already
+  narrowed the sync default to mods that validate, so nothing unvalidated auto-enables.
+- **D11 — how does the mod portal place a mod with multiple dependencies?** Settled by dissolving
+  it: **the tree is built from `pack:`, not from the dependency graph.** `# info` already carries
+  `pack:`, a mod belongs to exactly one, and packs are what the expansion story wants — "enable a
+  folder of mods together". Dependency edges keep doing what they already do (load order and
+  recursive enablement) and stop being asked to also express hierarchy.
+
 ### D8 — does a bare section heading create, or edit whatever it finds? (settled: option B)
 
 The design says both, in different places, and they cannot both hold:
