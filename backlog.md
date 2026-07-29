@@ -71,12 +71,6 @@ unification (B1+B2), travel-by-distance, timed buffs, and the named-test system 
 landed. These are the genuinely-open forward items at merge time:
 
 ### Engine
-- ~~**Pass 2 — resource pools + effects(rate).**~~ DONE (b70b64f): `# resource` pools with
-  max derived live from a stat, per-minute rate integration + clamp, rollover batching
-  (`on full`/`on empty`), all under the associativity invariant. An action drains or feeds
-  a pool by carrying a stat-bonus tag on the pool's rate stat — the same modifier math as
-  food/equipment. Still deferred from that slice: combat numerics (below), pause/resume
-  across different actions.
 - **Combat that mimics an aRPG** (+ its two separable companions, **droptables** and
   **skill levels + XP events**). Spec is complete and lives in
   `docs/combat/deliverable-log.md` — deliverable, settled decisions, engine gaps, open
@@ -116,14 +110,6 @@ H1, M1 and the structural findings S1–S6 closed 2026-07-27; L1 and L2 closed 2
 - **grammar.md update (STALE).** Document the action combat axes (`accuracy`/`ability`/
   `health`/`escape after`/`on escape`), the `speed:` rename, recipe fields (`time`/
   `speed`/`accuracy`/`burnt`), and entity `stations:`. (User owns grammar.md commits.)
-- ~~**`runtime.ts` decomposition**~~ DONE 2026-07-27. 1781 lines to 643, split into
-  `registry`/`rng`/`state`/`tuning`/`conditions`/`actions`/`stats`/`effects`/`encounter`/
-  `dialogue-runtime`. Each of the three homeless invariants got a home: associativity and the
-  apply-function quadrant became the `Segment` type, and "all pool movement goes through
-  `setPoolLevel`" became a readonly `PoolLevels` index signature.
-- ~~`tsconfig include:["src"]` means `scripts/**` (play-cli.ts) is never type-checked by
-  `tsc --noEmit`~~ DONE (see commit below): `include` is now `["src", "scripts"]`. All nine
-  script files were already clean, so it was a one-line change with no cleanup behind it.
 
 ### Content
 - **Miki questline Paths 2/3 (thieving/fishing)** are still only stubbed — content authoring.
@@ -132,12 +118,6 @@ H1, M1 and the structural findings S1–S6 closed 2026-07-27; L1 and L2 closed 2
 - **Integer/fixed-point numbers vs floats** — eliminate EPSILON and float error across
   durations/rates/resource levels/stat values/progress. Weigh scale factor, percent
   stat-bonuses, rate integration, grammar impact (`time:` accepts decimals today).
-- ~~**Full combat formula**~~ SETTLED — see the combat item above: Elo-style opposed
-  accuracy-vs-evasion, and defense as a multiplicative percent factor plus a flat
-  subtraction outside the attacker's multiplier. The attack-vs-defense truncated-Normal
-  model (`.planning/old/balancing-resolution.md`) stays scrapped. Still true and still the
-  reason this was cheap to defer: adding derived combat stats needs ZERO resolver rework,
-  because the resolver only ever reads stat *values*.
 - **Test recorder auto-`load:`** — `/create-*` prepends `load: <id>-start` for
   reproducibility when history doesn't lead with a load; user may prefer requiring an
   explicit leading `/load`.
@@ -179,9 +159,8 @@ H1, M1 and the structural findings S1–S6 closed 2026-07-27; L1 and L2 closed 2
 ## DSL modules (spec + design: `docs/dsl-modules/deliverable-log.md`)
 Read that log before touching the load path. It carries the spec, the merge design, the chunk
 order, and five open decisions — two of which change the grammar surface. It supersedes the
-merge-semantics half of *DSL pipeline audit* below, and absorbs audit findings DSL-H1 (no merge
-semantics) and DSL-H2 (the reference walker, which turns out to be a prerequisite for graceful
-mod-disable, not cleanup). The worked examples under *E2E Authoring* below describe the legacy
+merge-semantics half of *DSL pipeline audit* below; it also absorbed audit findings DSL-H1 and
+DSL-H2, both of which it closed. The worked examples under *E2E Authoring* below describe the legacy
 `upsert`/`replace`/`remove` system, which no longer exists.
 
 **Action labels as members** (the one piece of chunk 3c deferred). Flags and dialogue nodes are
