@@ -4,7 +4,7 @@ import { createInterface } from 'node:readline/promises';
 import { pathToFileURL } from 'node:url';
 import { DslError } from '../src/grammar/parser';
 import { actionFirstUnit, craftFirstUnit, describeCondition, encounterView, PLAYER, RuntimeError, type ActiveAction, type GameState } from '../src/runtime/runtime';
-import { loadUniverse } from '../src/content/registry';
+import { formatModuleDiagnostic, loadUniverseWithDiagnostics } from '../src/content/registry';
 import { type ModuleSource } from '../src/content/universe';
 import {
   apply,
@@ -556,11 +556,22 @@ async function main(): Promise<void> {
   const liveMode = rawArgs.includes('--live') && Boolean(process.stdin.isTTY);
   const arg = rawArgs.find((a) => !a.startsWith('--'));
   const files = (arg ?? defaultContent).split(',').map((file) => file.trim()).filter(Boolean);
-  const registry = loadUniverse(loadContent(files));
+  const loaded = loadUniverseWithDiagnostics(loadContent(files));
+  for (const each of loaded.diagnostics) console.error(`Disabled module: ${formatModuleDiagnostic(each)}`);
+  const registry = loaded.registry;
   const session = startSession(registry);
   const recorder: Recorder = { history: [], startSave: serializeSave(session.state, registry) };
 
-  let current = view(session);
+  let current: PlayView;
+  try {
+    current = view(session);
+  } catch (err) {
+    if (err instanceof RuntimeError) {
+      console.error(`Error: ${err.message}`);
+      return;
+    }
+    throw err;
+  }
   console.log(formatView(current).join('\n'));
   console.log('\nType /help for commands (/state and /inventory show your progress).');
 

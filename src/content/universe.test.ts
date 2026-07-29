@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { loadUniverse } from './registry';
+import { formatModuleDiagnostic, loadUniverse, loadUniverseWithDiagnostics } from './registry';
 import { ModuleSource, orderModules, parseModuleSource, parseUniverse } from './universe';
 
 const module = (name: string, ...lines: string[]): ModuleSource => ({ name, text: lines.join('\n') });
@@ -130,5 +130,55 @@ describe('loadUniverse', () => {
     const stats = module('stats', '# info stats', '# stat attack');
     const uses = module('uses', '# info uses', 'dependencies: stats', '# entity ogre', 'stats: attack 4-7');
     expect(loadUniverse([uses, stats]).entities.get('uses.ogre')!.stats).toEqual({ 'stats.attack': { min: 4, max: 7 } });
+  });
+});
+
+describe('loadUniverseWithDiagnostics', () => {
+  it('disables only the module whose source does not parse', () => {
+    const result = loadUniverseWithDiagnostics([module('base', '# info base', '# item rope'), { name: 'broken', text: '# item' }]);
+
+    expect(result.loadedModules).toEqual(['base']);
+    expect(result.disabledModules).toEqual(['broken']);
+    expect([...result.registry.items.keys()]).toEqual(['base.rope']);
+    expect(result.diagnostics[0]).toMatchObject({
+      sourceName: 'broken',
+      moduleId: 'broken',
+      stage: 'parse',
+      message: '# item requires an id',
+      line: 1,
+      column: 1,
+    });
+    expect(formatModuleDiagnostic(result.diagnostics[0])).toContain('broken:1:1 [broken] parse: # item requires an id');
+  });
+
+  it('disables a module that fails resolution, then disables dependents against the recomputed active set', () => {
+    const base = module('base', '# info base', '# item rope');
+    const bad = module('bad', '# info bad', 'dependencies: base', '# entity gull', 'peck:', '  give: missing');
+    const child = module('child', '# info child', 'dependencies: bad', '# item bead');
+
+    const result = loadUniverseWithDiagnostics([child, bad, base]);
+
+    expect(result.loadedModules).toEqual(['base']);
+    expect(result.disabledModules).toEqual(['bad', 'child']);
+    expect(result.diagnostics.map((d) => [d.moduleId, d.stage, d.message])).toEqual([
+      ['bad', 'resolve', '# entity bad.gull action "peck" give: names an unknown item: missing'],
+      ['child', 'order', '# info child dependencies: names a module that is not loaded: bad'],
+    ]);
+  });
+
+  it('attributes post-merge validation errors to the module that owns the section', () => {
+    const base = module('base', '# info base', '# entity oven', 'stations: oven');
+    const bad = module('bad', '# info bad', '# item bread', '# recipe bake', 'station: kiln', 'out: bread');
+
+    const result = loadUniverseWithDiagnostics([base, bad]);
+
+    expect(result.loadedModules).toEqual(['base']);
+    expect(result.registry.recipes.size).toBe(0);
+    expect(result.diagnostics).toHaveLength(1);
+    expect(result.diagnostics[0]).toMatchObject({
+      moduleId: 'bad',
+      stage: 'validate',
+      message: '# recipe bad.bake station: names an unknown capability: kiln',
+    });
   });
 });

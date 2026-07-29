@@ -1,7 +1,7 @@
 # DSL modules — deliverable log
 
-**Status:** D1-D8 settled. **Chunks 1, 2, 3a, 3b and 3c landed** — the namespace work is done bar
-action labels, deferred with a reason in the 3c entry. Chunk 4 is next.
+**Status:** D1-D8 settled. **Chunks 1, 2, 3a, 3b, 3c and 4 landed** — the namespace work is done
+bar action labels, deferred with a reason in the 3c entry. Chunk 5 is next.
 
 ---
 
@@ -276,7 +276,7 @@ Engine first; nothing in tooling is safe until a bad module can fail alone.
 | 3a | ~~Walk every reference the grammar carries~~ **done** | DSL-H2 (checkable half) |
 | 3b | ~~One namespace tree for objects; resolution subsumes validation~~ **done** | D3, D6, D8 |
 | 3c | ~~Members: declarable flags and dialogue nodes; folds `scope.ts` in; the `tutorial.` migration~~ **done**; action labels deferred | D7, rest of D6; unlocks req 6 |
-| 4 | Per-module error isolation + diagnostics | engine req 3, 4 |
+| 4 | ~~Per-module error isolation + diagnostics~~ **done** | engine req 3, 4 |
 | 5 | Enable/disable, packs, dangling-ref pruning | engine req 1, 6; module req 4 |
 | 6 | CLI authoring of every DSL type | engine req 2 |
 | 7 | Publish to GitHub issue; squash tooling | engine req 5 |
@@ -534,6 +534,45 @@ What the flag work does **not** do: a `-flags:` edit still declares what it remo
 resolution runs before merge and cannot know what survives it. The over-approximation is the safe
 direction — a reference to a removed flag resolves rather than erroring — but it is not free, and
 chunk 5's dangling-ref pruning is where it should be settled.
+
+---
+
+### Chunk 4 — per-module error isolation and diagnostics (done)
+
+The loader now has two faces. `loadUniverse` stays strict and throwy for tests and internal
+invariants; `loadUniverseWithDiagnostics` is the safe entry point for player/contributor content.
+It returns `{ registry, diagnostics, loadedModules, disabledModules }`, so a caller can keep
+playing with the registry that survived and still tell the author exactly what was disabled.
+
+The safe loader disables one module at a time and rebuilds from source after every disable. That
+reparse is intentional: `resolveModule` rewrites ids and references in place, so retrying with
+half-resolved parsed objects would make the result depend on the failed attempt's staging state.
+Fresh parse/order/resolve/merge per retry keeps the tolerant path as deterministic as the strict
+path.
+
+Order failures are now data, not only thrown control flow. `moduleOrderProblems` reports duplicate
+ids, anonymous modules loaded in company, missing required deps, incompatibilities, version
+mismatches and dependency cycles against the module(s) that must be disabled. After a module fails
+later in the build, dependency order is recomputed, so a dependent module reports "dependency not
+loaded" instead of failing later with a more mysterious unknown reference.
+
+Merge/build/validation attribution is section-owned. The merge staging remembers the module that
+last wrote each section id; hydration/build errors are blamed on that writer, and the remaining
+post-merge validators were split so recipes, dialogues, tests and tuning variables can be checked
+one section at a time. Parser spans finally have a live renderer through `formatModuleDiagnostic`,
+which gives source name plus 1-based line/column when the error carries a span.
+
+The CLI uses the tolerant loader now. A broken mod prints `Disabled module: ...` diagnostics to
+stderr and the REPL starts with the surviving universe; if no playable starting view remains, it
+prints a normal `Error:` line instead of a stack trace.
+
+Accepted boundary: a relative-location coordinate cycle is blamed on the location where the cycle
+is detected, not every module participating in the cycle. That is still recoverable and
+actionable, and chunk 5's pruning work is the right place to revisit multi-owner graph diagnostics
+if it needs to become broader.
+
+Verified: 387 tests green, `npm run build`, `npm run layer-check`, `npm run audit-status`, and a
+CLI smoke run of `content/tutorial-island.dsl` through the tolerant loader.
 
 ---
 

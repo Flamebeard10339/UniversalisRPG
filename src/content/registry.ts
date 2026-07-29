@@ -7,11 +7,11 @@ import { Item, itemSchema } from './item';
 import { Location, locationSchema, recursivelyResolveRelativeCoordinates } from './location';
 import { mergeSection } from './merge';
 import { ModuleSection } from './module';
-import { ModuleSource, parseUniverse } from './universe';
-import { DslError } from '../grammar/parser';
+import { ModuleSource, ParsedModule, moduleOrderProblems, orderModules, parseModuleSource, parseUniverse } from './universe';
+import { DslError, Span } from '../grammar/parser';
 import { Namespace } from './namespace';
 import { Recipe, recipeSchema } from './recipe';
-import { validateReferences } from './references';
+import { registryCapabilities, validateDialogueReferences, validateRecipeReferences, validateTestReferences } from './references';
 import { Removal } from './removal';
 import { resolveModule } from './resolve';
 import { Resource, resourceSchema } from './resource';
@@ -20,7 +20,7 @@ import { Authored, hydrateSection } from '../grammar/section';
 import { Skill, skillSchema } from './skill';
 import { Stat, statSchema } from './stat';
 import { Test } from './test';
-import { validateTuning } from './tuningVariables';
+import { validateTuningVariable } from './tuningVariables';
 import { humanize } from '../grammar/values';
 import { Variable, variableSchema } from './variable';
 
@@ -40,6 +40,25 @@ export interface Registry {
   variables: Map<string, Variable>;
   saves: Map<string, ParsedSave>;
   namespace: Namespace;
+}
+
+export type ModuleLoadStage = 'parse' | 'order' | 'resolve' | 'merge' | 'build' | 'validate';
+
+export interface ModuleDiagnostic {
+  sourceName: string;
+  moduleId: string;
+  stage: ModuleLoadStage;
+  message: string;
+  span?: Span;
+  line?: number;
+  column?: number;
+}
+
+export interface UniverseLoadResult {
+  registry: Registry;
+  diagnostics: ModuleDiagnostic[];
+  loadedModules: string[];
+  disabledModules: string[];
 }
 
 // Compiled to an Action so a craft runs through the same resolve() machinery
@@ -72,6 +91,51 @@ function recipeAction(recipe: Recipe): Action {
   }
 
   return action;
+}
+
+function emptyRegistry(): Registry {
+  return {
+    entities: new Map(),
+    locations: new Map(),
+    items: new Map(),
+    stats: new Map(),
+    skills: new Map(),
+    recipes: new Map(),
+    recipeActions: new Map(),
+    resources: new Map(),
+    dialogues: new Map(),
+    dialoguesByOwner: new Map(),
+    tests: new Map(),
+    flags: new Map(),
+    variables: new Map(),
+    saves: new Map(),
+    namespace: new Namespace(),
+  };
+}
+
+function lineColumn(source: string, span: Span | undefined): { line: number; column: number } | undefined {
+  if (!span) return undefined;
+  let line = 1;
+  let column = 1;
+  for (let i = 0; i < span.start; i++) {
+    if (source[i] === '\n') {
+      line++;
+      column = 1;
+    } else {
+      column++;
+    }
+  }
+  return { line, column };
+}
+
+function diagnostic(source: ModuleSource, moduleId: string, stage: ModuleLoadStage, error: DslError): ModuleDiagnostic {
+  const position = lineColumn(source.text, error.span);
+  return { sourceName: source.name, moduleId, stage, message: error.message, span: error.span, ...(position ?? {}) };
+}
+
+export function formatModuleDiagnostic(value: ModuleDiagnostic): string {
+  const at = value.line === undefined ? value.sourceName : `${value.sourceName}:${value.line}:${value.column}`;
+  return `${at} [${value.moduleId}] ${value.stage}: ${value.message}`;
 }
 
 function applySection(registry: Registry, section: ModuleSection): void {
@@ -149,59 +213,207 @@ function applySection(registry: Registry, section: ModuleSection): void {
   }
 }
 
-export function loadUniverse(sources: readonly ModuleSource[]): Registry {
-  const registry: Registry = {
-    entities: new Map(),
-    locations: new Map(),
-    items: new Map(),
-    stats: new Map(),
-    skills: new Map(),
-    recipes: new Map(),
-    recipeActions: new Map(),
-    resources: new Map(),
-    dialogues: new Map(),
-    dialoguesByOwner: new Map(),
-    tests: new Map(),
-    flags: new Map(),
-    variables: new Map(),
-    saves: new Map(),
-    namespace: new Namespace(),
-  };
+interface OwnedSection {
+  kind: string;
+  value: object;
+  module: ParsedModule;
+}
+
+interface BuildFailure {
+  module: ParsedModule;
+  stage: ModuleLoadStage;
+  error: DslError;
+}
+
+const ownerKey = (kind: string, id: string): string => `${kind}\0${id}`;
+
+function sectionOwner(owners: ReadonlyMap<string, ParsedModule>, kind: string, id: string): ParsedModule | undefined {
+  return owners.get(ownerKey(kind, id));
+}
+
+function locationIdFromMessage(message: string): string | undefined {
+  return /^location '([^']+)'/.exec(message)?.[1] ?? /^location coordinates form a cycle at '([^']+)'/.exec(message)?.[1];
+}
+
+function validateBuiltRegistry(registry: Registry, owners: ReadonlyMap<string, ParsedModule>): BuildFailure | null {
+  try {
+    recursivelyResolveRelativeCoordinates(registry.locations);
+  } catch (error) {
+    if (!(error instanceof DslError)) throw error;
+    const id = locationIdFromMessage(error.message);
+    const module = id ? sectionOwner(owners, 'location', id) : undefined;
+    if (!module) throw error;
+    return { module, stage: 'validate', error };
+  }
+
+  for (const variable of registry.variables.values()) {
+    try {
+      validateTuningVariable(variable);
+    } catch (error) {
+      if (!(error instanceof DslError)) throw error;
+      return { module: sectionOwner(owners, 'variable', variable.id)!, stage: 'validate', error };
+    }
+  }
+
+  const capabilities = registryCapabilities(registry);
+  for (const recipe of registry.recipes.values()) {
+    try {
+      validateRecipeReferences(recipe, capabilities);
+    } catch (error) {
+      if (!(error instanceof DslError)) throw error;
+      return { module: sectionOwner(owners, 'recipe', recipe.id)!, stage: 'validate', error };
+    }
+  }
+  for (const dialogue of registry.dialogues.values()) {
+    try {
+      validateDialogueReferences(dialogue);
+    } catch (error) {
+      if (!(error instanceof DslError)) throw error;
+      return { module: sectionOwner(owners, 'dialogue', dialogue.id)!, stage: 'validate', error };
+    }
+  }
+  for (const test of registry.tests.values()) {
+    try {
+      validateTestReferences(test, registry);
+    } catch (error) {
+      if (!(error instanceof DslError)) throw error;
+      return { module: sectionOwner(owners, 'test', test.id)!, stage: 'validate', error };
+    }
+  }
+  return null;
+}
+
+function compileModules(modules: readonly ParsedModule[]): { registry: Registry } | { failure: BuildFailure } {
+  const registry = emptyRegistry();
 
   // Two phases, because merging must happen on the authored form: a hydrated
   // object has every field filled in with defaults, so overlaying one would
   // silently reset everything the patch did not mention.
-  const merged = new Map<string, Map<string, object>>();
+  const merged = new Map<string, Map<string, OwnedSection>>();
+  const owners = new Map<string, ParsedModule>();
   const namespace = registry.namespace;
-  const modules = parseUniverse(sources);
   const loaded = new Set(modules.map((module) => module.info.id));
   namespace.declareModules(loaded);
   for (const module of modules) {
     // Per module, before merging: a shortened reference resolves against its own
     // module and that module's dependencies, and once sections are merged there
     // is no longer a module to resolve it against.
-    resolveModule(module, namespace, loaded);
-    for (const section of module.sections) {
-      // Removal is applied where it stands, so a later module can name the id
-      // again and get a fresh one rather than a hole.
-      if (section.kind === 'remove') {
-        const { kind, target, id } = section.value as Removal;
-        if (!merged.get(kind)?.delete(target)) throw new DslError(`# remove ${id} names nothing that is loaded`);
-        continue;
+    try {
+      resolveModule(module, namespace, loaded);
+    } catch (error) {
+      if (!(error instanceof DslError)) throw error;
+      return { failure: { module, stage: 'resolve', error } };
+    }
+    try {
+      for (const section of module.sections) {
+        // Removal is applied where it stands, so a later module can name the id
+        // again and get a fresh one rather than a hole.
+        if (section.kind === 'remove') {
+          const { kind, target, id } = section.value as Removal;
+          if (!merged.get(kind)?.delete(target)) throw new DslError(`# remove ${id} names nothing that is loaded`);
+          owners.delete(ownerKey(kind, target));
+          continue;
+        }
+        const byId = merged.get(section.kind) ?? new Map<string, OwnedSection>();
+        const id = (section.value as { id: string }).id;
+        const existing = byId.get(id);
+        byId.set(id, { kind: section.kind, value: mergeSection(section.kind, existing?.value, section.value), module });
+        owners.set(ownerKey(section.kind, id), module);
+        merged.set(section.kind, byId);
       }
-      const byId = merged.get(section.kind) ?? new Map<string, object>();
-      const id = (section.value as { id: string }).id;
-      byId.set(id, mergeSection(section.kind, byId.get(id), section.value));
-      merged.set(section.kind, byId);
+    } catch (error) {
+      if (!(error instanceof DslError)) throw error;
+      return { failure: { module, stage: 'merge', error } };
     }
   }
   for (const [kind, byId] of merged) {
-    for (const value of byId.values()) applySection(registry, { kind, value });
+    for (const section of byId.values()) {
+      try {
+        applySection(registry, { kind, value: section.value });
+      } catch (error) {
+        if (!(error instanceof DslError)) throw error;
+        return { failure: { module: section.module, stage: 'build', error } };
+      }
+    }
   }
-  recursivelyResolveRelativeCoordinates(registry.locations);
-  validateTuning(registry.variables);
-  validateReferences(registry);
-  return registry;
+  const validationFailure = validateBuiltRegistry(registry, owners);
+  if (validationFailure) return { failure: validationFailure };
+  return { registry };
+}
+
+export function loadUniverse(sources: readonly ModuleSource[]): Registry {
+  const compiled = compileModules(parseUniverse(sources));
+  if ('failure' in compiled) throw compiled.failure.error;
+  return compiled.registry;
+}
+
+function parseActiveSources(sources: readonly ModuleSource[], diagnostics: ModuleDiagnostic[], disabled: Set<ModuleSource>): ParsedModule[] | null {
+  const modules: ParsedModule[] = [];
+  let failed = false;
+  for (const source of sources) {
+    try {
+      modules.push(parseModuleSource(source));
+    } catch (error) {
+      if (!(error instanceof DslError)) throw error;
+      diagnostics.push(diagnostic(source, source.name, 'parse', error));
+      disabled.add(source);
+      failed = true;
+    }
+  }
+  return failed ? null : modules;
+}
+
+export function loadUniverseWithDiagnostics(sources: readonly ModuleSource[]): UniverseLoadResult {
+  const diagnostics: ModuleDiagnostic[] = [];
+  const disabled = new Set<ModuleSource>();
+  let active = sources.filter((source) => {
+    try {
+      parseModuleSource(source);
+      return true;
+    } catch (error) {
+      if (!(error instanceof DslError)) throw error;
+      diagnostics.push(diagnostic(source, source.name, 'parse', error));
+      disabled.add(source);
+      return false;
+    }
+  });
+
+  for (;;) {
+    const modules = parseActiveSources(active, diagnostics, disabled);
+    if (modules === null) {
+      active = active.filter((source) => !disabled.has(source));
+      continue;
+    }
+
+    if (modules.length === 0) {
+      return { registry: emptyRegistry(), diagnostics, loadedModules: [], disabledModules: [...new Set(diagnostics.map((d) => d.moduleId))] };
+    }
+
+    const orderProblems = moduleOrderProblems(modules);
+    if (orderProblems.length > 0) {
+      for (const problem of orderProblems) {
+        diagnostics.push(diagnostic(problem.module.source, problem.module.info.id, 'order', problem.error));
+        disabled.add(problem.module.source);
+      }
+      active = active.filter((source) => !disabled.has(source));
+      continue;
+    }
+
+    const ordered = orderModules(modules);
+    const compiled = compileModules(ordered);
+    if (!('failure' in compiled)) {
+      return {
+        registry: compiled.registry,
+        diagnostics,
+        loadedModules: ordered.map((module) => module.info.id),
+        disabledModules: [...new Set(diagnostics.map((d) => d.moduleId))],
+      };
+    }
+
+    diagnostics.push(diagnostic(compiled.failure.module.source, compiled.failure.module.info.id, compiled.failure.stage, compiled.failure.error));
+    disabled.add(compiled.failure.module.source);
+    active = active.filter((source) => !disabled.has(source));
+  }
 }
 
 export const loadModule = (source: string): Registry => loadUniverse([{ name: 'anonymous', text: source }]);

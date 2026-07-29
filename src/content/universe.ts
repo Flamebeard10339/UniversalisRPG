@@ -10,12 +10,18 @@ export interface ModuleSource {
 }
 
 export interface ParsedModule {
+  source: ModuleSource;
   info: ModuleInfo;
   // The prefix every id this module declares hangs under. A module that declares
   // no `# info` has no identity to namespace with, so its ids are root ids —
   // which is only safe alone, and `orderModules` is where that is enforced.
   namespace: string | null;
   sections: ModuleSection[];
+}
+
+export interface ModuleOrderProblem {
+  module: ParsedModule;
+  error: DslError;
 }
 
 const RESERVED_IDS: readonly string[] = [...SECTION_KINDS, 'player', 'skills', 'self', 'time'];
@@ -32,42 +38,123 @@ export function parseModuleSource(source: ModuleSource): ParsedModule {
   if (!MODULE_ID.test(info.id)) throw new DslError(`${info.id} is not a usable module id`);
   if (RESERVED_IDS.includes(info.id)) throw new DslError(`${info.id} is a reserved module id`);
 
-  return { info, namespace: infos.length > 0 ? info.id : null, sections: parsed.filter((section) => section.kind !== 'info') };
+  return { source, info, namespace: infos.length > 0 ? info.id : null, sections: parsed.filter((section) => section.kind !== 'info') };
 }
 
-function loadsAfter(module: ParsedModule, loaded: ReadonlyMap<string, ParsedModule>): Set<string> {
+function dependencyError(module: ParsedModule, loaded: ReadonlyMap<string, ParsedModule>): DslError | null {
   const where = `# info ${module.info.id} dependencies:`;
-  const before = new Set<string>();
-
   for (const declared of module.info.dependencies) {
     const present = loaded.get(declared.module);
     if (declared.prefix === 'incompatible') {
-      if (present) throw new DslError(`${where} ${module.info.id} is incompatible with ${declared.module}, which is loaded`);
+      if (present) return new DslError(`${where} ${module.info.id} is incompatible with ${declared.module}, which is loaded`);
       continue;
     }
     if (!present) {
       if (declared.prefix === 'optional' || declared.prefix === 'recommended') continue;
-      throw new DslError(`${where} names a module that is not loaded: ${formatDependency(declared)}`);
+      return new DslError(`${where} names a module that is not loaded: ${formatDependency(declared)}`);
     }
     if (declared.operator && !satisfies(present.info.version, declared.operator, declared.version!)) {
-      throw new DslError(`${where} needs ${formatDependency(declared)}, but ${declared.module} ${formatVersion(present.info.version)} is loaded`);
+      return new DslError(`${where} needs ${formatDependency(declared)}, but ${declared.module} ${formatVersion(present.info.version)} is loaded`);
     }
+  }
+  return null;
+}
+
+function loadsAfter(module: ParsedModule, loaded: ReadonlyMap<string, ParsedModule>): Set<string> {
+  const before = new Set<string>();
+  for (const declared of module.info.dependencies) {
+    if (declared.prefix === 'incompatible') continue;
+    const present = loaded.get(declared.module);
+    if (!present) continue;
+    if (declared.operator && !satisfies(present.info.version, declared.operator, declared.version!)) continue;
     if (declared.prefix !== 'unordered') before.add(declared.module);
-    // `~` is deliberately absent: it requires the module without ordering against it
   }
   return before;
 }
 
-// Lexicographically smallest topological order
-export function orderModules(modules: readonly ParsedModule[]): ParsedModule[] {
-  const byId = new Map<string, ParsedModule>();
-  for (const module of modules) {
-    if (byId.has(module.info.id)) throw new DslError(`two modules declare the id ${module.info.id}`);
-    if (module.namespace === null && modules.length > 1) {
-      throw new DslError(`${module.info.id} declares no # info, so its ids have no namespace to keep them apart from the other ${modules.length - 1} module(s) loaded`);
+function cyclicModuleIds(after: ReadonlyMap<string, ReadonlySet<string>>): string[] {
+  let nextIndex = 0;
+  const index = new Map<string, number>();
+  const low = new Map<string, number>();
+  const stack: string[] = [];
+  const stacked = new Set<string>();
+  const cyclic = new Set<string>();
+
+  const visit = (id: string): void => {
+    index.set(id, nextIndex);
+    low.set(id, nextIndex);
+    nextIndex++;
+    stack.push(id);
+    stacked.add(id);
+
+    for (const dependency of after.get(id) ?? []) {
+      if (!after.has(dependency)) continue;
+      if (!index.has(dependency)) {
+        visit(dependency);
+        low.set(id, Math.min(low.get(id)!, low.get(dependency)!));
+      } else if (stacked.has(dependency)) {
+        low.set(id, Math.min(low.get(id)!, index.get(dependency)!));
+      }
     }
+
+    if (low.get(id) !== index.get(id)) return;
+    const component: string[] = [];
+    for (;;) {
+      const popped = stack.pop()!;
+      stacked.delete(popped);
+      component.push(popped);
+      if (popped === id) break;
+    }
+    if (component.length > 1 || (after.get(id)?.has(id) ?? false)) for (const each of component) cyclic.add(each);
+  };
+
+  for (const id of [...after.keys()].sort()) if (!index.has(id)) visit(id);
+  return [...cyclic].sort();
+}
+
+export function moduleOrderProblems(modules: readonly ParsedModule[]): ModuleOrderProblem[] {
+  const byId = new Map<string, ParsedModule>();
+  const duplicateIds = new Set<string>();
+  for (const module of modules) {
+    if (byId.has(module.info.id)) duplicateIds.add(module.info.id);
     byId.set(module.info.id, module);
   }
+  if (duplicateIds.size > 0) {
+    return modules
+      .filter((module) => duplicateIds.has(module.info.id))
+      .map((module) => ({ module, error: new DslError(`two modules declare the id ${module.info.id}`) }));
+  }
+
+  const unnamed = modules.filter((module) => module.namespace === null);
+  if (modules.length > 1 && unnamed.length > 0) {
+    return unnamed.map((module) => ({
+      module,
+      error: new DslError(`${module.info.id} declares no # info, so its ids have no namespace to keep them apart from the other ${modules.length - 1} module(s) loaded`),
+    }));
+  }
+
+  const dependencyProblems = modules.flatMap((module) => {
+    const error = dependencyError(module, byId);
+    return error ? [{ module, error }] : [];
+  });
+  if (dependencyProblems.length > 0) return dependencyProblems;
+
+  const after = new Map<string, Set<string>>();
+  for (const module of modules) after.set(module.info.id, loadsAfter(module, byId));
+  const cyclic = new Set(cyclicModuleIds(after));
+  if (cyclic.size === 0) return [];
+
+  const message = `modules depend on each other in a cycle: ${[...cyclic].sort().join(', ')}. Use ~ for a dependency that need not load first.`;
+  return modules.filter((module) => cyclic.has(module.info.id)).map((module) => ({ module, error: new DslError(message) }));
+}
+
+// Lexicographically smallest topological order
+export function orderModules(modules: readonly ParsedModule[]): ParsedModule[] {
+  const problems = moduleOrderProblems(modules);
+  if (problems.length > 0) throw problems[0].error;
+
+  const byId = new Map<string, ParsedModule>();
+  for (const module of modules) byId.set(module.info.id, module);
 
   const after = new Map<string, Set<string>>();
   for (const module of modules) after.set(module.info.id, loadsAfter(module, byId));
