@@ -43,124 +43,26 @@ needs a real authenticated GitHub run when contribution publishing gets its firs
 test.
 
 ## Audit findings (2026-07-28)
-The four outstanding audits ran. Evidence lives in the docs, not here:
-`docs/audits/dsl-load-path-2026-07-28.md`, `testing-procedure-2026-07-28.md`,
-`build-deployment-2026-07-28.md`, `user-interface-2026-07-28.md`. Every finding below was
-verified against a fixture or a measurement; the doc names the fixture so it can be re-run.
+Evidence: `docs/audits/dsl-load-path-2026-07-28.md`, `testing-procedure-2026-07-28.md`,
+`build-deployment-2026-07-28.md`, `user-interface-2026-07-28.md`. All six tiers are closed except
+the two below; see `completed-tasks.md` for the commit per finding.
 
-Work them in tier order — tier 1 is what makes the rest of CI trustworthy.
+- **BD-H2 no gate stops a non-functional publish, and today's build is one.** BLOCKED — design
+  question. `src/main.tsx` renders a bare "GUI pending" div; any tag push sends that to itch.io
+  *and* attaches a signed APK of it to a GitHub Release. The audit's own wording is the decision
+  that is owed: **gate the release on something, or accept it knowingly.** Neither is safe to
+  pick unasked — a test-suite gate changes what a tag means, and accepting it changes what a
+  published build promises. Related unanswered questions from the same audit: should the web and
+  android jobs be independent, and is a tag imminent.
+- **TP-M3 `runTest` returns `passed: true` while holding an unhandled `pendingModal`.** BLOCKED —
+  folded into **recordings of `/test` ignore modals** below, on the audit's own instruction, and
+  blocked on the same call: modal submission is not a directive, so there is no spelling for it
+  in a recording. Deciding `modal: {"name":"Kira","race":"Elf"}` versus `submit-modal: name=Kira
+  race=Elf` is what unblocks both. A guard added to `runTest` without it fails the shipped
+  `miki-route-full`, which ends on an open modal.
 
-### Tier 1 — the gates do not enforce what they claim
-**CLOSED.** The comment budget and `comment-only` were retired 2026-07-28, taking TP-H1, TP-M4,
-TP-L5 and UI-L1 with them; TP-M1, DSL-L2 + TP-M7 and TP-M2 are fixed. See `completed-tasks.md`.
-
-### Tier 2 — DSL load path correctness
-- **DSL-H1 a second definition of an id replaces the first wholesale.** There are no merge
-  semantics; "patching" is `Map.set`. A 2-line mod concatenated onto real content — exactly what
-  `play-cli.ts:551` does and exactly the worked example under *E2E Authoring* below — strips
-  `guide-house` of 5 entities, 3 edges and `starting`, and the game then cannot start. This is
-  the crux of the *DSL pipeline audit* item below; settle redefinition semantics before building
-  the editor on top of it.
-- **DSL-H2 reference validation covers 20 of 44 reference-bearing fields.** `registry.ts:72`
-  claims "Every id is checked". Sharpest miss: `requires: has <typo>` loads clean and is false
-  forever — the exact silent-typed-reference class the pass-2 M1 fix claimed to close (that fix
-  *did* land completely; this is the remaining surface). Also `goto`, `open modal:`, `station:`,
-  `stat-id:`, and every `# test` directive. 15 of the 24 misses name an already-registered kind.
-  Third consecutive audit to find a false universal claim in this validator's comment.
-- **DSL-M1 + TP-M6 CRLF breaks the shipped content, and CI cannot see it.** One stray `\r`
-  reattributes a section to the previous one; a CRLF checkout fails `loadModule` outright
-  (13 tests red). There is no `.gitattributes`, CI is ubuntu-only, and pasting DSL through a
-  GitHub issue is the planned authoring path. One-line fix plus a CI matrix entry.
-- **DSL-M2 `action.ts` is a second, laxer copy of the section field engine.** 89 of its 147
-  lines, with 14 duplicated "defined more than once" guards; `time: 1e3` → `1`,
-  `speed: s garbage`, `escape after 3 times` and `stop now` all load clean where the section
-  engine rejects the equivalents. `section.ts:1` records the hand-written-per-kind parser as the
-  *rejected* alternative. Likely partly causal for the **grammar.md update (STALE)** item:
-  the document grew rules because actions parse by a different rulebook than sections do.
-  **Rediscovered independently 2026-07-29 (audit B, M1) — still open, and scope now wider.** The
-  root cause is that sub-parsers return without requiring end-of-line consumption, so trailing
-  garbage is silently dropped: `requires: has coin typo`, `time: 1 typo`, `accuracy: attack typo`
-  and `give: coin typo` all load clean (verified 4/4; the generic section engine rejects the
-  control). Beyond `action.ts:45,50`, the same gap is in `src/content/dialogue.ts:83,87,110,115`
-  (conditions and effects parse with fresh cursors) and `src/content/test.ts:40,88,89` (`assert:`).
-  Fold those two files into this item's scope. A second independent audit finding it raises its
-  priority: author typos are accepted as valid DSL and then vanish.
-- **DSL-M3** a mistyped section field becomes a player-facing action (`examin:` →
-  `use:location.den.examin` in `view().choices`).
-- **DSL-M4** `# save` bodies are unchecked past `version`: `"time":"potato"` survives a
-  `resolve()`; `flags`/`inventory` as strings become index maps.
-- **DSL-M5** zero `starting` locations crashes at first `view()`; two picks silently by source order.
-- **DSL-L1** `DslError.span` is built at 37 sites and read by zero live code — and every
-  post-parse error carries no span at all, while `play-cli` concatenates files before parsing so
-  offsets are not file-attributable anyway. Decide whether spans earn their keep or get deleted.
-- **DSL-L4** `Skill['stat-id']` is parsed, unvalidated, read by nothing; `parse.test.ts:79` pins
-  its emptiness. **DSL-L5** `add: x -3` silently means `+1` (`/\d+/` cannot match a sign);
-  `give: 0 straw` accepted. **DSL-L6** default examine is `"This is an Hay."` and
-  `parse.test.ts:378` locks the bug in. **DSL-L7** `burnt:` without `accuracy:` is dropped.
-
-### Tier 3 — the publish pipeline would ship a placeholder
-- **BD-H2 no gate stops a non-functional publish, and today's build is one.** `src/main.tsx`
-  renders a bare "GUI pending" div; any tag push sends that to itch.io *and* attaches a signed
-  APK of it to a GitHub Release. Gate the release on something, or accept it knowingly.
-- **BD-H1 the web build ships absolute asset paths.** `base` is never set in `vite.config.mjs`;
-  `dist/index.html` emits `/assets/...`, which 404s under itch.io's subdirectory hosting.
-- **BD-M2** three publish actions handling secrets (itch credentials, APK signing key) are pinned
-  to floating tags, not SHAs. **BD-M3** `publish.yml` has no `permissions:` block.
-- **BD-L1** `android/app/build.gradle` hardcodes `versionCode 1`/`versionName "1.0"` with no
-  relationship to `package.json` — a hand-synced pair, which CLAUDE.md forbids.
-- **BD-L5** the Android CI job re-implements the `sync` npm script inline.
-
-### Tier 4 — teardown residue that ships today
-- **UI-H1** `vite.config.mjs:20-22` excludes `attic/**` and cites `attic/README.md`; `attic/` was
-  deleted in `843d8b8` and nothing can ever catch a stale config comment.
-- **UI-M1** `src/index.css` is ~90% dead (270 lines, zero live consumers for its four animation
-  classes; its one substantive comment describes two deleted files) and compiles into the shipped
-  16.57 kB CSS bundle. **UI-M2** `public/content/` ships 49 KB of legacy locale/universe data no
-  live code reads. **UI-M3** eight `dependencies` (zustand, 6 codemirror/lezer, diff) have zero
-  imports; `reactflow` is imported for CSS only from the placeholder `main.tsx` and its 9.2 kB
-  stylesheet is fully compiled into the production bundle.
-- **BD-L2** `playwright-core` unused. **BD-L3** `tsconfig.node.tsbuildinfo` is tracked.
-  **BD-L4** `vite.config.mjs` is outside both tsconfig projects.
-
-### Tier 5 — `systems.json` membership is not a partition
-- **TP-M5** 37 of 164 tracked files are owned by no system, so they can never trigger an audit —
-  including `.claude/hooks/*` (which gate commits) and `content/tutorial-island.dsl` (the shipped
-  game). **UI-L3** adds `public/`, `postcss.config.js`, `tailwind.config.js`, `src/vite-env.d.ts`.
-  - **Contribution system has code but no paths** (audit B, M5 — a specific instance TP-M5 stated
-    only in aggregate). `docs/audits/systems.json:19-23` still reads `paths: []` / "Unbuilt: editor,
-    validation/merge engine", while the system's code exists at `scripts/publish-local-changes.ts`,
-    `scripts/squash-local-changes.ts`, `scripts/modportal.ts` and `src/content/contribution.ts`. Its
-    commits are therefore charged to Testing Procedure's broad `scripts` coverage instead of the
-    system they implement. **Sequencing warning:** giving it real paths while `lastAudit` is `null`
-    turns `audit-status` (and CI) red immediately. Defensible — the code is genuinely unaudited — but
-    that is a deliberate call, so land it with either a first contribution-system audit or an
-    explicit baseline SHA.
-- **BD-M1** the converse: all 7 commits that charged **Build & deployment**'s budget touched it
-  only through `package.json`/`tsconfig.json`. Its real pipeline files have not changed once
-  since before the previous baseline — the trigger fires on neighbours' noise.
-- **DSL-L3** `references.test.ts` sits in `src/runtime/` but drives `src/content/registry.ts`, so
-  changes to this system's key test spend the *Runtime's* budget. **TP-M5** also found `runTest` /
-  `# test` parsing / `integration.test.ts` are double-covered rather than orphaned.
-- **TP-L4** code has five layers; CLAUDE.md documents four.
-
-### Tier 6 — test corpus
-- **TP-L2** the shipped `# test` corpus is two happy paths, catches 4 of 6 injected mutants, and
-  never uses `expect: <save-id>` — its strongest assertion — over shipped content.
-  `integration.test.ts` holds the ad-hoc script CLAUDE.md tells you not to write.
-- **TP-M3** `runTest` returns `passed: true` while holding an unhandled `pendingModal`, and
-  `/test` then eats the next two piped commands as name/race. Merge this into the
-  **recordings of `/test` ignore modals** item below rather than filing it separately.
-- **TP-L3** `session.test.ts` walks the Miki route a second time in TypeScript.
-
-### Design questions raised for the user, not defects
-DSL: redefinition/merge semantics (blocks DSL-H1); should flags be declarable; should `stations:`
-be a registered kind; are ids globally or kind-scoped unique. Build: should publish gate on the
-test suite; is a tag imminent given BD-H2; should the web and android jobs be independent.
-Testing: settled — the comment gates were cut rather than repaired.
-
-The retired readability gate is written up in `docs/readability-gate/deliverable-log.md`; the
-Testing-procedure audit re-verified that retirement is genuinely complete (second ledger deleted
-too), so nothing there is outstanding.
+Still-open design questions this audit raised that are not defects: should flags be declarable;
+should `stations:` be a registered kind; are ids globally or kind-scoped unique.
 
 ## dsl-rewrite-carryover (lifted from the archived branch deliverable on merge, 2026-07-26)
 Full design context/rationale for these lives in `docs/dsl-rewrite/deliverable-log.md`.
@@ -193,20 +95,22 @@ landed. These are the genuinely-open forward items at merge time:
   decided, not implemented. Related: port the old agentSession GM shape onto
   PlayView/PlayChoice and measure simulated time per run.
 
-### Game engine audit findings (pass 2, `docs/audits/game-engine-2026-07-27-pass2.md`)
-Closed 2026-07-27 by the staged restructure (commits `1c30ea7`..`243e59d`): H1, M1, and the
-structural findings S1–S6. Re-verified after: 303 tests green, both tutorial-island `# test`
-scripts pass, and the audit's own associativity fuzz reruns 400/400 against the real content.
+### Game engine audit findings (`docs/audits/game-engine-2026-07-27.md` and `-pass2.md`)
+H1, M1 and the structural findings S1–S6 closed 2026-07-27; L1 and L2 closed 2026-07-29. See
+`completed-tasks.md`. What is left:
 
-- **L1 — `actionFirstUnit` probes before arming, `armAction` computes after.** STILL OPEN,
-  now documented rather than silently false: the probe is only safe to read as a sign, which
-  is all `beginAction` asks of it, so this is a latent hazard rather than a live defect. The
-  fix is to arm first and route on `armAction`'s own return value (TODO(L1) in `runtime.ts`)
-  — which needs a call on what `beginAction` does when arming succeeds but the first unit is
-  instant. Same bug class as M1's food buffs: a quantity computed at two moments relative to
-  arming.
-- Pass-1 findings **L2, L4, L6** were re-confirmed open by the pass-2 audit and are untouched
-  by this work.
+- **L4 a `target:` action on a non-entity owner fights a phantom built from the player's sheet.**
+  BLOCKED — design question, and the audit deliberately left it as one. `armAction` puts `objId`
+  into `actors` unconditionally and `freshActor` falls through to the global `# stat` defaults,
+  so an item action with `target: health` fights a "Lockpick" with **the player's** 30
+  max-health, narrated as `You hit the Lockpick for 10.` The generality may well be wanted — the
+  spec's lockpicking shape is a non-entity with a pool — but inheriting the player's maximum is
+  not. Deciding it means deciding **whether a non-entity can carry a sheet.**
+- **L6 `ActiveAction.healthRemaining` is written by both paths and read by one.** BLOCKED on the
+  same decision. It is carried in state and in every save while meaning nothing on a `target:`
+  fight, and is cheap to drop — but only once the `action.health`/`target:` unification tracked
+  in `docs/combat/deliverable-log.md` settles what the two fields mean. The audit filed them to
+  be resolved together.
 
 ### Docs / cleanup
 - **grammar.md update (STALE).** Document the action combat axes (`accuracy`/`ability`/

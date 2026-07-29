@@ -17,7 +17,7 @@
       "paths": ["src/runtime"],
       "lastAudit": "83d81d2",
       "lastAuditDoc": "docs/audits/game-engine-2026-07-27-pass2.md",
-      "note": "L1 open from pass2. Counter restarts at the restructure; pre-move commits are not attributable per layer."
+      "note": "Pass-1 L4 and L6 open, both BLOCKED on the action.health/target: unification; pass-2 L1 and pass-1 L2 closed 2026-07-29. Counter restarts at the restructure; pre-move commits are not attributable per layer."
     },
     {
       "name": "Contribution system",
