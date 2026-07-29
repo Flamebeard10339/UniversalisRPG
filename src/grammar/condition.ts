@@ -10,7 +10,7 @@ export interface Reference {
 export const TIME = 'time';
 export const PLAYER = 'player';
 
-const ENGINE_ROOTS: readonly string[] = [TIME, PLAYER];
+export const ENGINE_ROOTS: readonly string[] = [TIME, PLAYER];
 
 export const isEngineRoot = (path: readonly string[]): boolean => ENGINE_ROOTS.includes(path[0]);
 

@@ -103,6 +103,20 @@ describe('a ~ dependency is visible whichever way the module names sort', () => 
   });
 });
 
+describe('names the engine keeps for itself', () => {
+  it('refuses a flag called visits, which a condition reads as a node counter', () => {
+    expect(() => loadUniverse([module('base', '# flag visits')])).toThrow(/# flag visits is reserved/);
+    expect(() => loadUniverse([module('base', '# location camp', 'x: 0, y: 0', 'flags: visits')])).toThrow(/declares a flag named visits/);
+  });
+
+  it('reserves the module ids the engine actually owns', () => {
+    for (const reserved of ['time', 'player', 'item', 'self']) {
+      expect(() => loadUniverse([module(reserved, '# item rope')])).toThrow(/is a reserved module id/);
+    }
+    expect(() => loadUniverse([module('skills', '# item rope')])).not.toThrow();
+  });
+});
+
 describe('what a namespace does not reach', () => {
   it('leaves a tuning variable global, because the engine reads it by name', () => {
     expect([...loadUniverse([module('base', '# variable min-damage', 'value: 3')]).variables.keys()]).toEqual(['min-damage']);

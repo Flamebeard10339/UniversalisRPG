@@ -1,3 +1,4 @@
+import { ENGINE_ROOTS } from '../grammar/condition';
 import { formatDependency, formatVersion, satisfies } from '../grammar/dependency';
 import { ModuleInfo, infoSchema } from './info';
 import { ModuleSection, SECTION_KINDS, parseModule } from './module';
@@ -25,7 +26,10 @@ export interface ModuleOrderProblem {
   error: DslError;
 }
 
-const RESERVED_IDS: readonly string[] = [...SECTION_KINDS, 'player', 'skills', 'self', 'time'];
+// A module id may not shadow a section kind, a root the engine owns, or `self`.
+// Taken from the engine's own list rather than restated, so the two cannot drift
+// — `skills` sat here for a while and is not a root at all.
+const RESERVED_IDS: readonly string[] = [...SECTION_KINDS, ...ENGINE_ROOTS, 'self'];
 
 const MODULE_ID = /^[a-z][a-z0-9-]*$/;
 

@@ -1,5 +1,6 @@
 import { DISCOVERED } from './location';
 import { DslError } from '../grammar/parser';
+import { VISITS } from '../grammar/condition';
 import { listMembers } from '../grammar/section';
 import { NAMESPACED_KINDS, Namespace, qualify } from './namespace';
 import { ParsedModule } from './universe';
@@ -51,11 +52,19 @@ function targetKey(module: ParsedModule, kind: string, id: string, namespace: Na
   return resolved;
 }
 
+// `<node>.visits` is how a condition asks how often a dialogue node has been
+// reached, so a flag by that name would be read as a node counter and resolve
+// against a node that does not exist.
+function declareFlag(namespace: Namespace, kind: string, id: string, name: string, where: string): void {
+  if (name === VISITS) throw new DslError(`${where} declares a flag named ${VISITS}, which the engine reads as a dialogue node's visit counter`);
+  namespace.declareMember('flag', kind, id, name);
+}
+
 // What hangs under an object rather than beside it: the flags it owns, and the
 // nodes of a dialogue, whose visits the engine counts against the node's path.
 function declareMembers(namespace: Namespace, kind: string, value: { id: string; flags?: unknown; nodes?: { name: string }[] }): void {
   if (kind === 'location') namespace.declareMember('flag', kind, value.id, DISCOVERED);
-  for (const flag of listMembers<string>(value.flags)) namespace.declareMember('flag', kind, value.id, flag);
+  for (const flag of listMembers<string>(value.flags)) declareFlag(namespace, kind, value.id, flag, `# ${kind} ${value.id}`);
   if (kind === 'dialogue') for (const node of value.nodes ?? []) namespace.declareMember('node', kind, value.id, node.name);
 }
 
@@ -74,7 +83,9 @@ function declareIds(module: ParsedModule, namespace: Namespace, loaded: Readonly
   });
 
   for (const { kind, value } of createdSections(module)) {
-    if (isNamespaced(kind) && value.id !== undefined && !value.id.includes('.')) namespace.declare(kind, module.namespace, value.id);
+    if (!isNamespaced(kind) || value.id === undefined || value.id.includes('.')) continue;
+    if (kind === 'flag' && value.id === VISITS) throw new DslError(`# flag ${VISITS} is reserved: the engine reads <node>.${VISITS} as a dialogue node's visit counter`);
+    namespace.declare(kind, module.namespace, value.id);
   }
 }
 
