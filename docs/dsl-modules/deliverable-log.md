@@ -1,7 +1,8 @@
 # DSL modules — deliverable log
 
-**Status:** design drafted 2026-07-28, **not ratified**. Open decisions at the bottom; two of
-them change the grammar surface, so they want an answer before chunk 2 starts.
+**Status:** design drafted 2026-07-28. D1–D5 settled by the user the same day and folded in below;
+**D6 (namespace separator) blocks chunk 1** because `.` is already overloaded three ways in the
+reference grammar.
 
 ---
 
@@ -96,6 +97,60 @@ title: Creaking Stairs            ← its actions, examine, etc. survive
 Dialogue nodes are addressed by node id, which is what makes "change this one line" a two-line
 module rather than a repaste.
 
+### List fields: the operator is on the key, not the value (D1, settled)
+
+A bare key replaces. A `+` prefix appends if absent; a `-` prefix removes if present.
+
+```
++adjacent: tutorial-birdhouse
+-adjacent: tutorial-river
+```
+
+The operator sits on the **key** because putting it on values is unparseable —
+`adjacent: +a b` cannot say whether `b` is appended or replacing. Multiple `+`/`-` lines for the
+same key are allowed, so additions and removals are expressed independently.
+
+Mixing a bare assignment with an operator **for the same key in the same section** is an error:
+
+```
++adjacent: tutorial-birdhouse
+-adjacent: tutorial-river
+adjacent: tutorial-house          ← invalid: replace and modify in one breath
+```
+
+Settled sub-rules:
+- The restriction is **per section**, not per module. A module assigning `adjacent:` and a later
+  module doing `+adjacent:` is the entire point.
+- Multiple operators apply **in source order**, so `+a: x` then `-a: x` leaves it absent and the
+  reverse leaves it present. No reordering, no set algebra.
+- `+`/`-` on a non-list field is an error, not a silent coercion.
+- `-` naming an absent member is a no-op. Safe for reference-bearing lists because the walker
+  (chunk 3) catches a typo'd id anyway; a typo in a non-reference list like `tags:` will pass
+  silently. Accepted.
+
+### Namespaces (D3, settled — separator still open)
+
+Every id a module creates is prefixed with that module's id. Inside its own module a section
+writes the bare id; the namespace is applied at load:
+
+```
+# entity goblin        ← authored in module `orc-pack`, becomes `orc-pack<sep>goblin`
+```
+
+Another module edits it by naming it in full. This makes "is this id free?" a question a
+contributor never has to ask — **you cannot collide, because you can only create in your own
+namespace** — and it gives the in-game editor a clean autocomplete axis.
+
+**Creation and reference are separable, and should be separated.** Requiring full qualification
+everywhere would tax the most common case: a new module referencing core stats would write
+`base<sep>cooking-speed` on every line. Since the collision problem is entirely about *creation*,
+resolve references local-first, then across declared dependencies in declaration order, and raise
+an **ambiguity error** if two dependencies both define the name. Cheap local refs, cheap core
+refs, no silent ambiguity — and the error message tells the author to qualify.
+
+Migrating `content/tutorial-island.dsl` is free: it is one module and every reference in it is
+already local.
+
 ### Load order comes from dependencies, and is deterministic
 
 `# info` gains `dependencies:`. Load order is a topological sort of the dependency DAG, **with
@@ -180,7 +235,7 @@ Engine first; nothing in tooling is safe until a bad module can fail alone.
 
 | # | Chunk | Closes |
 | --- | --- | --- |
-| 1 | `# info`, module identity, `loadUniverse`, topological order | spec basis |
+| 1 | `# info`, module identity, namespaces, `loadUniverse`, topological order | spec basis; **needs D6** |
 | 2 | Field-granular merge + `remove` | DSL-H1, module req 1–3 |
 | 3 | Complete the reference walker | DSL-H2, unlocks req 6 |
 | 4 | Per-module error isolation + diagnostics | engine req 3, 4 |
@@ -193,26 +248,75 @@ Chunks 1–2 are one sitting and kill the highest audit finding. Chunk 4 is the 
 
 ---
 
+## Dependencies (D4 + D5, settled)
+
+**A reference is what creates a dependency.** A module that names no other module's id is
+genuinely dependency-free and declares nothing. Any cross-module reference must have a declared
+dependency — which the chunk-3 reference walker can verify mechanically, since it already
+enumerates every reference. The in-game editor gets an `import` affordance over active modules.
+
+Dependency syntax follows Factorio's, which is a solved problem
+(`https://lua-api.factorio.com/latest/auxiliary/mod-structure.html`) — a string of
+`<prefix> module-id <operator> <version>`, e.g. `? some-mod >= 4.2.0`. Three prefixes are in
+scope:
+
+| Prefix | Meaning |
+| --- | --- |
+| *(none)* | hard requirement; loads before this module |
+| `!` | incompatible; version is ignored |
+| `~` | required, but **does not affect load order** — for breaking dependency cycles |
+
+Version operators (`<`, `<=`, `=`, `>=`, `>`) are supported and optional.
+
+Two consequences worth stating before they surprise someone:
+
+- **`~` cannot be used for a dependency you edit.** Editing means merging over an id that must
+  already exist, which is a load-order requirement by definition. `~` is for mutual references
+  that are cyclic, not for patches. The loader should reject a merge into a `~` dependency's id
+  with exactly that message.
+- **Dropping `?` (optional) means compatibility patches cost a hard dependency.** A module that
+  reconciles mod A with mod B must hard-depend on both, so it cannot ship for players who have
+  only one. `?` is the same grammar shape and can be added whenever that case appears; noted so
+  it is a deferral rather than an omission.
+
+---
+
 ## Open decisions
 
-**D1 — do lists replace or append?** The rule says a field assignment replaces that field's value
-entirely, lists included. That keeps one rule for everything, but it bites on `adjacent:`: a module
-adding a two-way connection to an existing location must repaste that location's whole adjacency
-list. Options: (a) keep the single rule, accept the repaste; (b) add a `+` prefix for additive list
-fields — `adjacent: +tutorial.birdhouse` — one character, opt-in, default stays simple.
-*Leaning (b), only because connectivity is directional so this case is common.*
+**D6 — the namespace separator, and it blocks chunk 1.** `.` is already overloaded three ways in
+the reference grammar, verified against the shipped content:
 
-**D2 — can a module reset a field to its default?** Merge has no way to say "put `examine` back to
-the generated default". Probably YAGNI; flagging so it is a decision rather than an oversight.
+| Form in `tutorial-island.dsl` | Meaning |
+| --- | --- |
+| `entity.giant-rat.fight` | object action path, `<obj>.<objId>.<actionId>` |
+| `front-door.unlocked` | entity-scoped flag, `<entityId>.<flag>` |
+| `tutorial.made-bread` | a flag using `tutorial.` as a naming *convention*, not a namespace |
 
-**D3 — are ids globally unique or unique per kind?** Raised by the audit and unanswered. Merge
-semantics make it sharper: `# entity mirror` and `# item mirror` either are or are not the same id.
+`REFERENCE = /[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9-]*)*/` (`values.ts:32`) is an arbitrary-depth path
+split positionally (`condition.ts:23`). Adding module namespaces on `.` makes
+`orc-pack.goblin.attack` ambiguous with both existing forms, and a module named `entity` would
+break the grammar outright.
 
-**D4 — does a module have to declare a dependency to edit, or is it just recommended?** Strict
-(refuse to merge into an id you do not depend on) gives better diagnostics and makes conflicts rare;
-lax is friendlier for a quick local tweak. *Leaning strict for published mods, lax for
-`local-changes`.*
+Options: **(a) `/`** — `orc-pack/goblin`. Unused anywhere in the value grammar, reads as a path,
+and visually matches the packs/folders organization of module requirement 4. **(b) `:`** —
+`orc-pack:goblin`; also unused in value position, but `:` is already the key/value separator so it
+carries a different meaning one token to the left. **(c) keep `.`** and resolve by
+longest-known-module-prefix — rejected: fragile, and it makes valid module ids depend on the
+reference grammar. *Recommending (a).*
 
-**D5 — versioning.** `# info` carries `version:`. Does a dependency pin one, and what happens when
-a dependency's content changes underneath a patch that targets it? Deferrable until modules are
-distributed rather than committed, but it is the thing that decides whether chunk 8 is possible.
+**D7 — does `tutorial.` on flags become a real namespace or stay a convention?** Once modules own
+namespaces, flags like `tutorial.made-bread` are the odd form out. Cheap either way, but it should
+be decided with D6 rather than drifting.
+
+---
+
+## Closed decisions
+
+- **D1** — list operators prefix the key (`+adjacent:` / `-adjacent:`), bare key replaces, mixing
+  the two for one key in one section is an error. See the design section above.
+- **D2** — no way to reset a field to its default. A default that is wanted can be written
+  directly.
+- **D3** — ids are unique per kind, namespaced by owning module; creation is namespace-local so
+  collisions are structurally impossible.
+- **D4** — a reference creates the dependency; no reference means no declaration.
+- **D5** — Factorio dependency grammar, prefixes `(none)`, `!`, `~`.
