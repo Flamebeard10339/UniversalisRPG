@@ -476,3 +476,18 @@ describe('a value that reads as a mistake is refused rather than reinterpreted',
     expect(load('# item dough', '# item bread', '# item ash', '# recipe bake', 'in: dough', 'out: bread', 'burnt: ash')).toThrow(/burnt: needs an accuracy: stat/);
   });
 });
+
+describe('a field name that is one letter off is a typo, not an action label', () => {
+  it('refuses the near-miss and names the field it read as intended', () => {
+    expect(() => parseOne('# location den\nflag: say: oops', locationSchema)).toThrow(/unknown location field: flag, one letter from flags/);
+    expect(() => parseOne('# location den\nexamin: say: oops', locationSchema)).toThrow(/one letter from examine/);
+    expect(() => parseOne('# location den\nentites: shrine', locationSchema)).toThrow(/one letter from entities/);
+    expect(() => parseOne('# location den\nstartin: say: oops', locationSchema)).toThrow(/one letter from starting/);
+    expect(() => parseOne('# location den\n-flag: ', locationSchema)).toThrow(/one letter from flags/);
+  });
+
+  it('leaves an action label that is merely short or unfamiliar alone', () => {
+    const den = parseOne('# location den\neat: say: You eat.\npick lock: say: Click.\nrest: say: You rest.', locationSchema);
+    expect(den.actions?.map((action) => action.label)).toEqual(['eat', 'pick lock', 'rest']);
+  });
+});

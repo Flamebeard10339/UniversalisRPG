@@ -113,6 +113,29 @@ export function parseSection<H extends { id: string }, F extends keyof H = never
   return authored as Authored<H>;
 }
 
+function withinOneEdit(a: string, b: string): boolean {
+  if (Math.abs(a.length - b.length) > 1) return false;
+  const [shorter, longer] = a.length <= b.length ? [a, b] : [b, a];
+  let i = 0;
+  let edits = 0;
+  for (let j = 0; j < longer.length; j++) {
+    if (shorter[i] === longer[j]) i++;
+    else if (++edits > 1) return false;
+    else if (shorter.length === longer.length) i++;
+  }
+  return edits + (shorter.length - i) <= 1;
+}
+
+const SHORTEST_TYPO = 3;
+
+// An entries field takes any unclaimed key as a label, which is what lets an
+// author name an action freely — and what lets `tag:` become a playable action
+// instead of the `tags:` they meant.
+function typoOf(key: string, known: readonly string[]): string | undefined {
+  if (key.length < SHORTEST_TYPO) return undefined;
+  return known.find((field) => withinOneEdit(field, key));
+}
+
 function parseLine(line: RawLine, fields: AnyFields, byKeyword: Record<string, string>, keywords: readonly string[], clauses: string | undefined, bare: string | undefined, entries: EntryConfig | undefined, kind: string, authored: Record<string, unknown>): void {
   const cursor = new Cursor(line.text, 0, line.span.start);
 
@@ -127,6 +150,7 @@ function parseLine(line: RawLine, fields: AnyFields, byKeyword: Record<string, s
     const labelsBareField = name !== undefined && (name === clauses || name === bare);
     if (key !== undefined && !labelsBareField && (name !== undefined || entries !== undefined)) {
       const keySpan = { start: cursor.abs(cursor.pos), end: cursor.abs(cursor.pos + (heading!.op?.length ?? 0) + key.length) };
+      const meantField = name !== undefined ? undefined : typoOf(key, [...Object.keys(byKeyword), ...keywords]);
       cursor.take(KEY);
       cursor.take(/[ \t]*/);
       if (name !== undefined) {
@@ -141,6 +165,8 @@ function parseLine(line: RawLine, fields: AnyFields, byKeyword: Record<string, s
         if (value === undefined) continue;
         if (op === undefined) authored[name] = value;
         else ((authored[name] ??= { ops: [] }) as FieldEdits).ops.push({ op, values: value as unknown[] });
+      } else if (meantField !== undefined) {
+        throw new DslError(`unknown ${kind} field: ${key}, one letter from ${meantField}`, keySpan);
       } else if (op === '+') {
         throw new DslError(`a bare ${key}: already adds ${key} when it is not there, so + means nothing here`, keySpan);
       } else if (op === '-') {
