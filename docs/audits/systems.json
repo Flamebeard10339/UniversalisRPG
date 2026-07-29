@@ -5,8 +5,8 @@
       "name": "DSL load path",
       "paths": ["src/grammar", "src/content"],
       "lastAudit": "731c3a6",
-      "lastAuditDoc": "docs/audits/dsl-modules-2026-07-29-full.md",
-      "note": "Full deliverable audit over chunks 1-8. Findings are open in backlog.md, H1/H2 first. The audit deliberately crossed into src/runtime/save.ts and scripts/, because engine requirement 6 is implemented outside this system's paths; that does not certify the Runtime system, whose own counter is untouched."
+      "lastAuditDoc": "docs/audits/dsl-modules-2026-07-29-reconciled.md",
+      "note": "Two independent audits of chunks 1-8 (dsl-modules-2026-07-29-full.md and dsl-modules-2026-07-29-codex-independent.md), reconciled in the doc above — read that one; it carries the agreement ranking and the reproductions. Findings are open in backlog.md, R2/R1/R7 first. Each pass found a HIGH the other missed, so neither source doc is sufficient alone. The full-system pass deliberately crossed into src/runtime/save.ts and scripts/, because engine requirement 6 is implemented outside this system's paths; that does not certify the Runtime system, whose own counter is untouched."
     },
     {
       "name": "Runtime",

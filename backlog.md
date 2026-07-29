@@ -7,33 +7,66 @@ Check `scratch.md` for open architectural notes touching an area before starting
 # Tasks
 
 ## Audit findings — DSL modules, full deliverable (2026-07-29)
-Evidence: `docs/audits/dsl-modules-2026-07-29-full.md`. Covers chunks 1-8 and the cross-system
-surfaces the deliverable grew (`src/runtime/save.ts`, `scripts/play-cli.ts`, `scripts/modportal.ts`).
-Every item below was reproduced at `731c3a6`. Work them in order; H1 and H2 are player-visible data
-loss.
+Evidence: `docs/audits/dsl-modules-2026-07-29-reconciled.md`, which reconciles two independent audits
+of the same push (`e56b25d`..`731c3a6`): `dsl-modules-2026-07-29-full.md` (**A**, full-system,
+crossed into `src/runtime` + `scripts`) and `dsl-modules-2026-07-29-codex-independent.md` (**B**,
+independent, isolated worktree). Read the reconciliation, not the two sources — it carries the
+agreement ranking, the reproductions, and the two places the audits disagreed.
 
-- **H1 a loaded save deletes every object-owned flag.** `src/runtime/save.ts:120` checks
-  `registry.flags`, which holds only `# flag` sections; flags declared by `flags:` on an entity or
-  location, and `discovered` on every location, live in `registry.namespace` alone. Round-tripping a
-  save against the shipped tutorial loses `front-door.unlocked` and `basement.discovered`. Fires on
-  `/load` and on every `/dsl` edit. The fix is the shape the `visits` line one row below already
-  uses: `registry.namespace.has('flag', id)` — applied, 419/419 green. **Land the fix with a `# test`
-  that saves, loads and asserts a member flag survived**, or M7 stays open.
-- **H2 patching one stat on another module's entity deletes the rest of the sheet.** `stats` is a
-  `Record` whose parser (`src/content/entity.ts:30`) is not a `ListParser`, so
-  `merge.ts:61` replaces wholesale instead of merging. Silent. Fails module requirement 2 of the
-  deliverable and the design's own "fields it does not list are untouched".
-- **M1 `stats:` is the only collection field that rejects block form and `+`/`-`.** Same root cause as
-  H2: `statBlock` wraps `list()` and drops the `parseBlock`/`element` it supplies. Every other
-  multi-valued field in the grammar takes a block. Making `statBlock` a real `ListParser` over
-  `[statId, Range]` pairs closes H2 and M1 together — do them as one change.
-- **M2 a corrupt modportal manifest crashes the game.** Unguarded `JSON.parse` + `manifest.entries`
-  iteration at `scripts/play-cli.ts:760` and `scripts/modportal.ts:97`. Takes down `npm run play`
-  before the tolerant loader is reached, and takes down `modportal list/enable/disable` so the cache
-  cannot be repaired through the tool.
-- **M3 disabling a broken module neither silences it nor unblocks `sync`.** `registry.ts:524` records
-  parse diagnostics for switched-off sources; `play-cli` prints them every launch and
-  `scripts/modportal.ts:165` exits 1 on them.
+**R1-R6 were found by both audits independently and are ordered first.** Every item was re-reproduced
+against the working tree at `1d13661`.
+
+- **R2 the registry and the namespace describe different universes.** (A-H1 + B-M3 — *both, from
+  opposite directions*.) Player-visible data loss, and the reason it is first.
+  - A-H1: `src/runtime/save.ts:120` prunes flags against `registry.flags`, which holds only `# flag`
+    sections. Flags declared by `flags:` on an object, and `discovered` on *every* location
+    (`resolve.ts:57`), live in `registry.namespace` alone — so a loaded save loses them all,
+    including **all map discovery**. Fires on `/load` and on every accepted `/dsl` edit.
+  - B-M3: the converse. Optional-dependency pruning deletes registry entries
+    (`registry.ts:342,350,357,364`) without ever calling `namespace.undeclare`, so pruned dialogue
+    nodes stay declared and their stale visits survive.
+  - **Do not just flip the predicate.** A's one-line fix to `registry.namespace.has('flag', id)` is
+    tested green but uncommitted, and it makes the prune trust a structure B proves is not
+    maintained. Establish the invariant that both structures describe the same surviving universe,
+    then pick the predicate. **Land it with the `# test` M7 asks for** (save, load, assert a member
+    flag survived), or M7 stays open.
+- **R1 `stats:` is a broken collection field.** (A-H2 + A-M1, B-M2 — *both*.) One root cause at
+  `src/content/entity.ts:30`: `statBlock` calls `list(statAssignment).parse` and discards the
+  `ListParser` around it, dropping both the `parseBlock` block form needs and the `element`
+  `isListField` needs for granular merge. Three symptoms, one change:
+  - patching one stat on another module's entity **deletes the rest of the sheet**, silently
+    (verified: `attack 4, defence 9` + patch `attack 7` → attack only). Fails module requirement 2
+    and the design's own "fields it does not list are untouched";
+  - `stats:` is the only multi-valued field in the grammar that rejects block form;
+  - `+stats` / `-stats` are rejected.
+  Both audits proposed the same fix: make `statBlock` a real `ListParser` over `[statId, Range]`.
+- **R7 `~` dependencies do not work at all.** (B-H1 only — **verified during reconciliation and
+  promoted**.) `~` is documented as "required, but does not affect load order — for breaking
+  dependency cycles" (`deliverable-log.md:305`). Section ids are declared inside `resolveModule` as
+  each module is reached, so a `~` reference resolves only when name order happens to put the target
+  first. Reproduced with two runs differing **only in module name**: `aref` fails, `zref` loads.
+  Corroborating: `resolve.ts:92` already throws a bespoke `~`-aware error for `# remove`, so the
+  hazard is known and was fixed in exactly one place. Fix: a pre-resolution declaration pass over all
+  loaded modules, which also makes that special case redundant.
+- **R3 modportal `sync` writes before it validates, and disabling is not an escape hatch.**
+  (A-M2 + A-M3, B-M4 — *both*.) `sync` materializes issues, writes DSL and writes the manifest before
+  validating (`scripts/modportal.ts:157-165`), and new entries default to enabled
+  (`src/content/modportal.ts:87-100`) — so a bad approved issue exits non-zero having already left a
+  broken **enabled** mod in the cache. Disabling does not help: `registry.ts:524` records parse
+  diagnostics for switched-off sources, `play-cli` prints them every launch, and `validateEnabled`
+  (despite the name) is called with all entries and exits 1 on any diagnostic. Fix in that order.
+- **R4 the modportal manifest read path lacks the guard `play-cli` already applies.** (A-M2, B-L2 —
+  *both*.) `scripts/modportal.ts:134,135,198-205` reads manifest-supplied paths directly;
+  `play-cli.ts:750-773` guards the same data with `inside()`. Two consequences, one fix: unguarded
+  `JSON.parse` + `manifest.entries` iteration crashes `npm run play` *before* the tolerant loader
+  (routing around chunk 4's guarantee) and takes `modportal list/enable/disable` down with it, so the
+  cache cannot be repaired through the tool; and a corrupt manifest can read outside the cache. Give
+  both call sites one guarded reader.
+- **R5 the GUI half of engine requirement 2 is unmet and being recorded as done.** (B-H2, A residual
+  risk — *both*.) `src/main.tsx` is a placeholder, so "create content of every DSL type, from both
+  CLI and GUI" is half-met by construction. Reconciled as a **bookkeeping** defect, not code: correct
+  `docs/dsl-modules/deliverable-log.md` to say requirement 2 is half-met rather than marking chunk 6
+  as closing it. Same placeholder as **BD-H2** below — do not file twice.
 - **M4 two positional args make the first the local-changes file, and `/dsl` overwrites it.**
   `play-cli.ts:718`. `npm run play -- content/a.dsl content/b.dsl` rewrites `a.dsl`'s `# info` header
   as `local-changes`. Multi-file loading is comma-separated; drop the positional rule or refuse a
@@ -41,16 +74,17 @@ loss.
 - **M5 the prune map has no exhaustiveness guard.** `SAVE_FIELDS` in the same file forces a new
   `GameState` field to be classified for diffing; `pruneStateForRegistry` is hand-written and says
   nothing. Drive the record prunes off a `SaveField`-keyed table so one exhaustive key type covers
-  both halves. (The prune is otherwise *not* over-complex — see the audit doc's M5 for the
-  justification.)
+  both halves. (The prune's *shape* is right — **both audits independently answered "is the pruning
+  more complicated than it needs to be?" with no**. Fix the predicates and the type discipline; do
+  not rewrite the pass.)
 - **M6 approved-mod re-identification is a global text substitution.** `modportal.ts:60` rewrites
   every `local-changes.` in the source, prose and `# save` JSON included. Route it through the
   namespace/`referenceSites` machinery that exists for this.
-- **M7 the prune tests restate the implementation.** The H1 fix leaves the suite green.
+- **M7 the prune tests restate the implementation.** The R2 one-liner leaves the suite green.
   `PRUNE_MODULE` declares only module-level flags, and no `# save` section exists in `content/`, so
   `integration.test.ts` never loads a real save.
 - **L1** `extractContributionDsl` takes the *first* ```dsl fence, which contributor notes precede.
-- **L2** `serialize.ts:25` `n()` has two identical branches.
+- **L2** `serialize.ts:25` `n()` has two identical branches. (Confirmed still present.)
 - **L3** `pruneRegistryDanglingReferences` uses dangling-roots for most kinds but
   `registry.stats.has` for entity stats and stat-bonus tags — two rules, one function, and the log
   disclaims the second.
@@ -58,6 +92,9 @@ loss.
   `skills` is reserved but is not an engine root.
 - **L5** `Namespace.resolve` materializes every key of a kind per reference; `/dsl` reloads the whole
   universe per accepted edit.
+
+Two of B's findings are **re-discoveries of already-open items** and were folded in rather than filed
+again — see DSL-M2 and TP-M5 in the 2026-07-28 section below.
 
 ### Decision wanted, not a defect
 - **`/dsl <kind>` should print the kind's fields instead of requiring memorization.** `SCHEMAS`
@@ -131,6 +168,14 @@ remains:
   engine rejects the equivalents. `section.ts:1` records the hand-written-per-kind parser as the
   *rejected* alternative. Likely partly causal for the **grammar.md update (STALE)** item:
   the document grew rules because actions parse by a different rulebook than sections do.
+  **Rediscovered independently 2026-07-29 (audit B, M1) — still open, and scope now wider.** The
+  root cause is that sub-parsers return without requiring end-of-line consumption, so trailing
+  garbage is silently dropped: `requires: has coin typo`, `time: 1 typo`, `accuracy: attack typo`
+  and `give: coin typo` all load clean (verified 4/4; the generic section engine rejects the
+  control). Beyond `action.ts:45,50`, the same gap is in `src/content/dialogue.ts:83,87,110,115`
+  (conditions and effects parse with fresh cursors) and `src/content/test.ts:40,88,89` (`assert:`).
+  Fold those two files into this item's scope. A second independent audit finding it raises its
+  priority: author typos are accepted as valid DSL and then vanish.
 - **DSL-M3** a mistyped section field becomes a player-facing action (`examin:` →
   `use:location.den.examin` in `view().choices`).
 - **DSL-M4** `# save` bodies are unchecked past `version`: `"time":"potato"` survives a
@@ -172,6 +217,15 @@ remains:
 - **TP-M5** 37 of 164 tracked files are owned by no system, so they can never trigger an audit —
   including `.claude/hooks/*` (which gate commits) and `content/tutorial-island.dsl` (the shipped
   game). **UI-L3** adds `public/`, `postcss.config.js`, `tailwind.config.js`, `src/vite-env.d.ts`.
+  - **Contribution system has code but no paths** (audit B, M5 — a specific instance TP-M5 stated
+    only in aggregate). `docs/audits/systems.json:19-23` still reads `paths: []` / "Unbuilt: editor,
+    validation/merge engine", while the system's code exists at `scripts/publish-local-changes.ts`,
+    `scripts/squash-local-changes.ts`, `scripts/modportal.ts` and `src/content/contribution.ts`. Its
+    commits are therefore charged to Testing Procedure's broad `scripts` coverage instead of the
+    system they implement. **Sequencing warning:** giving it real paths while `lastAudit` is `null`
+    turns `audit-status` (and CI) red immediately. Defensible — the code is genuinely unaudited — but
+    that is a deliberate call, so land it with either a first contribution-system audit or an
+    explicit baseline SHA.
 - **BD-M1** the converse: all 7 commits that charged **Build & deployment**'s budget touched it
   only through `package.json`/`tsconfig.json`. Its real pipeline files have not changed once
   since before the previous baseline — the trigger fires on neighbours' noise.
