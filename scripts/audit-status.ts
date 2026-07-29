@@ -14,7 +14,20 @@ interface System {
 
 interface Manifest {
   threshold: number;
+  unowned: { note: string; paths: string[] };
   systems: System[];
+}
+
+const covers = (path: string, file: string): boolean => (path.startsWith('*.') ? file.endsWith(path.slice(1)) && !file.includes('/') : file === path || file.startsWith(`${path}/`));
+
+// Membership only means something if it is a partition. A file owned by no
+// system can never trigger an audit, and nothing used to notice one appearing.
+function orphanedFiles(manifest: Manifest): string[] {
+  const declared = [...manifest.systems.flatMap((system) => system.paths), ...manifest.unowned.paths];
+  return git('ls-files')
+    .trim()
+    .split('\n')
+    .filter((file) => file !== '' && !declared.some((path) => covers(path, file)));
 }
 
 function git(...args: string[]): string {
@@ -115,12 +128,18 @@ for (const system of manifest.systems) {
   if (verbose) for (const touch of touches) console.log(`      ${touch.code ? 'code ' : 'no-op'} ${touch.sha} ${touch.subject}`);
 }
 
+const orphans = orphanedFiles(manifest);
+
 console.log(`\nThreshold ${manifest.threshold}. Systems and their paths are declared in ${MANIFEST}.`);
 
 for (const name of undocumented) console.error(`no audit doc:  ${name} records a lastAudit, but its lastAuditDoc is missing, empty, or not a file under ${AUDIT_DOC_DIRECTORY}`);
+if (orphans.length > 0) {
+  console.error(`unowned:       ${orphans.length} tracked file(s) belong to no system and are not declared unowned in ${MANIFEST}:`);
+  for (const file of orphans) console.error(`               ${file}`);
+}
 if (due.length > 0) console.error(`audit due:     ${due.join(', ')}`);
 
-if (due.length + undocumented.length > 0) {
+if (due.length + undocumented.length + orphans.length > 0) {
   console.error('\nSpawn an independent auditor with the audit prompt in CLAUDE.md, write the audit under docs/audits/, lift its findings into backlog.md, then set lastAudit and lastAuditDoc.');
   process.exit(1);
 }

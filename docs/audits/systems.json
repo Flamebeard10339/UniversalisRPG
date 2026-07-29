@@ -1,12 +1,16 @@
 {
   "threshold": 10,
+  "unowned": {
+    "note": "Deliberately chargeable to no system: prose, audit records, and the repo-wide manifests that change for every system's reasons and none of their own. Everything else must be owned, and audit-status fails when a tracked file is neither.",
+    "paths": ["docs", ".claude/launch.json", ".gitignore", "package.json", "package-lock.json", "tsconfig.json", "*.md"]
+  },
   "systems": [
     {
       "name": "DSL load path",
-      "paths": ["src/grammar", "src/content"],
+      "paths": ["src/grammar", "src/content", "content"],
       "lastAudit": "731c3a6",
       "lastAuditDoc": "docs/audits/dsl-modules-2026-07-29-reconciled.md",
-      "note": "Two independent audits of chunks 1-8 (dsl-modules-2026-07-29-full.md and dsl-modules-2026-07-29-codex-independent.md), reconciled in the doc above — read that one; it carries the agreement ranking and the reproductions. Findings are open in backlog.md, R2/R1/R7 first. Each pass found a HIGH the other missed, so neither source doc is sufficient alone. The full-system pass deliberately crossed into src/runtime/save.ts and scripts/, because engine requirement 6 is implemented outside this system's paths; that does not certify the Runtime system, whose own counter is untouched."
+      "note": "Two independent audits of chunks 1-8 (dsl-modules-2026-07-29-full.md and dsl-modules-2026-07-29-codex-independent.md), reconciled in the doc above — read that one; it carries the agreement ranking and the reproductions. Each pass found a HIGH the other missed, so neither source doc is sufficient alone. The full-system pass deliberately crossed into src/runtime/save.ts and scripts/, because engine requirement 6 is implemented outside this system's paths; that does not certify the Runtime system, whose own counter is untouched. Now also owns content/, the shipped DSL this path exists to load; the contribution system's files under src/content are owned by both, which is double coverage rather than a gap."
     },
     {
       "name": "Runtime",
@@ -17,38 +21,56 @@
     },
     {
       "name": "Contribution system",
-      "paths": [],
+      "paths": [
+        "src/content/contribution.ts",
+        "src/content/contribution.test.ts",
+        "src/content/localChanges.ts",
+        "src/content/localChanges.test.ts",
+        "src/content/modportal.ts",
+        "src/content/modportal.test.ts",
+        "src/content/serialize.ts",
+        "src/content/serialize.test.ts",
+        "scripts/modportal.ts",
+        "scripts/modportal.test.ts",
+        "scripts/publish-local-changes.ts",
+        "scripts/squash-local-changes.ts",
+        "scripts/squash-local-changes.test.ts",
+        "scripts/lib/modportalCache.ts",
+        ".github/ISSUE_TEMPLATE/content-contribution.yml"
+      ],
       "lastAudit": null,
       "lastAuditDoc": null,
-      "note": "Unbuilt: editor, validation/merge engine."
+      "note": "Was recorded as unbuilt with no paths while its code demonstrably existed, so its commits were charged to Testing Procedure's broad scripts coverage. Given real paths 2026-07-29 with lastAudit still null, which makes it DUE immediately: the code is genuinely unaudited, and saying so is the point of the ledger. The editor and the validation/merge engine are still unbuilt."
     },
     {
       "name": "User interface",
-      "paths": ["src/ui", "src/main.tsx", "src/index.css", "index.html"],
+      "paths": ["src/ui", "src/main.tsx", "src/index.css", "src/vite-env.d.ts", "index.html", "public", "postcss.config.js", "tailwind.config.js"],
       "lastAudit": "50a4f41",
       "lastAuditDoc": "docs/audits/user-interface-2026-07-28.md",
       "note": "src/ui does not exist; the 2026-07-28 audit covers teardown residue only, and its coverage is structurally limited until the GUI rebuild."
     },
     {
       "name": "Testing procedure",
-      "paths": ["scripts", ".github/workflows/test.yml"],
+      "paths": [
+        "scripts/play-cli.ts",
+        "scripts/play-cli.test.ts",
+        "scripts/audit-status.ts",
+        "scripts/layer-check.ts",
+        "scripts/lib",
+        ".claude/hooks",
+        ".claude/settings.json",
+        ".github/workflows/test.yml"
+      ],
       "lastAudit": "50a4f41",
       "lastAuditDoc": "docs/audits/testing-procedure-2026-07-28.md",
-      "note": "H1 open: comment-only certifies commits that gut CI. These paths are not the whole system — runTest and # test parsing live under src/, and .claude/hooks is owned by nobody (M5)."
+      "note": "Now owns .claude/hooks, which gate commits and were owned by nobody (M5). Its scripts coverage is narrowed to the files it actually implements, with the contribution scripts charged to their own system; the orphan check below is what makes that narrowing safe. runTest and # test parsing still live under src/ and are covered by the DSL load path and Runtime as well."
     },
     {
       "name": "Build & deployment",
-      "paths": [
-        ".github/workflows/publish.yml",
-        "android",
-        "capacitor.config.ts",
-        "vite.config.ts",
-        "package.json",
-        "tsconfig.json"
-      ],
+      "paths": [".github/workflows/publish.yml", "android", "capacitor.config.ts", "vite.config.ts", ".gitattributes", "run-web.cmd"],
       "lastAudit": "50a4f41",
       "lastAuditDoc": "docs/audits/build-deployment-2026-07-28.md",
-      "note": "H2 open: a tag push would publish the placeholder build. M1: package.json/tsconfig.json membership makes neighbouring systems' commits spend this budget."
+      "note": "H2 open: a tag push would publish the placeholder build. M1 fixed: package.json and tsconfig.json are no longer members, because every commit that had ever spent this budget did so through them while the pipeline files themselves never changed."
     }
   ]
 }

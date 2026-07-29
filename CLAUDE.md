@@ -26,7 +26,7 @@ A feature large enough to span sessions gets a tracked deliverable log at `docs/
 
 # Repository systems
 
-A system owns a set of paths, declared in `docs/audits/systems.json` — the one place membership is defined, so a commit's system follows from the files it touches. `npm run audit-status` reads it and reports commits since each system's last audit, counting only those that changed code: a comment strip or a pure rename does not spend a system's budget. It exits non-zero when an audit is due, and CI runs it, so the repo stays red until the audit lands.
+A system owns a set of paths, declared in `docs/audits/systems.json` — the one place membership is defined, so a commit's system follows from the files it touches. Membership is a partition: every tracked file is owned by a system or listed under `unowned` (prose, audit records, repo-wide manifests), and `audit-status` fails on a file that is neither. `npm run audit-status` reads it and reports commits since each system's last audit, counting only those that changed code: a comment strip or a pure rename does not spend a system's budget. It exits non-zero when an audit is due, and CI runs it, so the repo stays red until the audit lands.
 
 Record a completed audit by setting that system's `lastAudit` to the reviewed SHA **and** `lastAuditDoc` to the audit under `docs/audits/`. The doc is required, and must be a real file there with real content — a counter reset with nothing to show for it fails the same check. Findings go to `backlog.md` as the next item; the audit doc is the evidence, not the todo list.
 
@@ -46,7 +46,7 @@ Audits are the one gate that has repeatedly caught real defects, so they stay. R
 
 # Layers
 
-`grammar < content < runtime < ui`. Imports point downward only, gated by `npm run layer-check`. Cycles within a layer are allowed; reaching up is not. A file that needs something from the layer above is usually two files — that is how `tuning.ts` and `save.ts` split. Tests live in the folder of the layer they drive, not the one their name suggests.
+`grammar < content < runtime < ui < scripts`. Imports point downward only, gated by `npm run layer-check`. Cycles within a layer are allowed; reaching up is not. A file that needs something from the layer above is usually two files — that is how `tuning.ts` and `save.ts` split. Tests live in the folder of the layer they drive, not the one their name suggests.
 
 # Audit prompt
 Audit the {repository-system} for correctness in the context of the last {N} commits impacting the system and global repository architecture. 
