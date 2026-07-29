@@ -243,6 +243,28 @@ describe('entity action modifiers', () => {
     expect(() => parseOne('# entity chest\nopen:\n  on success:\n    say: a\n  on success:\n    say: b', entitySchema)).toThrow(/on success is defined more than once/);
   });
 
+  // Every action field, not the handful that happened to have a test: the guard
+  // is one shared rule, and a field added without it is what this catches.
+  it.each([
+    ['requires: a', 'requires'],
+    ['hidden if: a', 'hidden if'],
+    ['on success: say: a', 'on success'],
+    ['on failure: say: a', 'on failure'],
+    ['on escape: say: a', 'on escape'],
+    ['time: 1', 'time'],
+    ['speed: quickness', 'speed'],
+    ['accuracy: aim', 'accuracy'],
+    ['evasion: dodge', 'evasion'],
+    ['ability: might', 'ability'],
+    ['target: health', 'target'],
+    ['dr: armour', 'dr'],
+    ['health: 3', 'health'],
+    ['escape after 3', 'escape after'],
+  ])('rejects %s written twice', (line, written) => {
+    expect(parseOne(`# entity chest\nopen:\n  ${line}\n  say: hi`, entitySchema).actions).toHaveLength(1);
+    expect(() => parseOne(`# entity chest\nopen:\n  ${line}\n  ${line}\n  say: hi`, entitySchema)).toThrow(`action ${written} is defined more than once`);
+  });
+
   it('parses on failure inline and as a block, and rejects it defined more than once', () => {
     const inline = parseOne('# entity chest\nopen:\n  take: 5 cooked-shrimp\n  on failure: say: Not enough shrimp.', entitySchema);
     expect(inline.actions).toEqual([

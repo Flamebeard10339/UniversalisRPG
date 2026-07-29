@@ -42,6 +42,48 @@ const BOOLEAN_ACTION_FLAGS = ['repeating', 'retaliates'] as const;
 type BooleanActionField = (typeof BOOLEAN_ACTION_FLAGS)[number];
 const BOOLEAN_ACTION_FLAG_SET: ReadonlySet<string> = new Set<string>(BOOLEAN_ACTION_FLAGS);
 
+type ActionValue = (cursor: Cursor, line: RawLine) => unknown;
+
+const conditionValue: ActionValue = (cursor) => (cursor.done ? undefined : condition.parse(cursor));
+const statValue: ActionValue = (cursor) => id.parse(cursor);
+const resultsValue: ActionValue = (cursor, line) => (!cursor.done ? results.parse(cursor) : line.children.length > 0 ? results.parseBlock(line.children) : undefined);
+
+const nonNegative =
+  (written: string): ActionValue =>
+  (cursor, line) => {
+    const raw = cursor.take(/\d+(?:\.\d+)?/);
+    if (raw === null) throw new DslError(`action ${written} requires a non-negative number`, line.span);
+    return Number(raw);
+  };
+
+const positiveCount =
+  (written: string): ActionValue =>
+  (cursor, line) => {
+    const raw = cursor.take(/\d+/);
+    if (raw === null || Number(raw) <= 0) throw new DslError(`action ${written} requires a positive integer`, line.span);
+    return Number(raw);
+  };
+
+// Field name as written, the label that introduces it, and how its value reads.
+// One row per field is the whole shape: the once-guard and the end-of-line
+// demand below are what keep a new row from inventing its own laxity.
+const ACTION_FIELDS: readonly { written: string; label: RegExp; name: keyof Omit<Action, 'label' | 'results'>; value: ActionValue }[] = [
+  { written: 'requires', label: /(?:requires|require):[ \t]*/, name: 'requires', value: conditionValue },
+  { written: 'hidden if', label: /hidden if:[ \t]*/, name: 'hiddenIf', value: conditionValue },
+  { written: 'on success', label: /on success:[ \t]*/, name: 'onSuccess', value: resultsValue },
+  { written: 'on failure', label: /on failure:[ \t]*/, name: 'onFailure', value: resultsValue },
+  { written: 'on escape', label: /on escape:[ \t]*/, name: 'onEscape', value: resultsValue },
+  { written: 'time', label: /time:[ \t]*/, name: 'time', value: nonNegative('time') },
+  { written: 'speed', label: /speed:[ \t]*/, name: 'speed', value: statValue },
+  { written: 'accuracy', label: /accuracy:[ \t]*/, name: 'accuracy', value: statValue },
+  { written: 'evasion', label: /evasion:[ \t]*/, name: 'evasion', value: statValue },
+  { written: 'ability', label: /ability:[ \t]*/, name: 'ability', value: statValue },
+  { written: 'target', label: /target:[ \t]*/, name: 'target', value: statValue },
+  { written: 'dr', label: /dr:[ \t]*/, name: 'dr', value: statValue },
+  { written: 'health', label: /health:[ \t]*/, name: 'health', value: nonNegative('health') },
+  { written: 'escape after', label: /escape after[ \t]+/, name: 'escapeAfter', value: positiveCount('escape after') },
+];
+
 // One field per line, and the whole line: `requireEnd` is what the generic
 // section engine does by looping to the end of the line, and without it a typo
 // after a value — `time: 1 typo`, `escape after 3 times` — is silently dropped.
@@ -52,83 +94,12 @@ function parseActionLine(line: RawLine, action: Omit<Action, 'label'>): void {
 }
 
 function parseActionField(line: RawLine, cursor: Cursor, action: Omit<Action, 'label'>): void {
-  if (cursor.take(/(?:requires|require):[ \t]*/) !== null) {
-    if (action.requires !== undefined) throw new DslError('action requires is defined more than once', line.span);
-    if (!cursor.done) action.requires = condition.parse(cursor);
-    return;
-  }
-  if (cursor.take(/hidden if:[ \t]*/) !== null) {
-    if (action.hiddenIf !== undefined) throw new DslError('action hidden if is defined more than once', line.span);
-    if (!cursor.done) action.hiddenIf = condition.parse(cursor);
-    return;
-  }
-  if (cursor.take(/on success:[ \t]*/) !== null) {
-    if (action.onSuccess !== undefined) throw new DslError('action on success is defined more than once', line.span);
-    if (!cursor.done) action.onSuccess = results.parse(cursor);
-    else if (line.children.length > 0) action.onSuccess = results.parseBlock(line.children);
-    return;
-  }
-  if (cursor.take(/on failure:[ \t]*/) !== null) {
-    if (action.onFailure !== undefined) throw new DslError('action on failure is defined more than once', line.span);
-    if (!cursor.done) action.onFailure = results.parse(cursor);
-    else if (line.children.length > 0) action.onFailure = results.parseBlock(line.children);
-    return;
-  }
-  if (cursor.take(/on escape:[ \t]*/) !== null) {
-    if (action.onEscape !== undefined) throw new DslError('action on escape is defined more than once', line.span);
-    if (!cursor.done) action.onEscape = results.parse(cursor);
-    else if (line.children.length > 0) action.onEscape = results.parseBlock(line.children);
-    return;
-  }
-  if (cursor.take(/time:[ \t]*/) !== null) {
-    if (action.time !== undefined) throw new DslError('action time is defined more than once', line.span);
-    const raw = cursor.take(/\d+(?:\.\d+)?/);
-    if (raw === null) throw new DslError('action time requires a non-negative number', line.span);
-    action.time = Number(raw);
-    return;
-  }
-  if (cursor.take(/speed:[ \t]*/) !== null) {
-    if (action.speed !== undefined) throw new DslError('action speed is defined more than once', line.span);
-    action.speed = id.parse(cursor);
-    return;
-  }
-  if (cursor.take(/accuracy:[ \t]*/) !== null) {
-    if (action.accuracy !== undefined) throw new DslError('action accuracy is defined more than once', line.span);
-    action.accuracy = id.parse(cursor);
-    return;
-  }
-  if (cursor.take(/evasion:[ \t]*/) !== null) {
-    if (action.evasion !== undefined) throw new DslError('action evasion is defined more than once', line.span);
-    action.evasion = id.parse(cursor);
-    return;
-  }
-  if (cursor.take(/ability:[ \t]*/) !== null) {
-    if (action.ability !== undefined) throw new DslError('action ability is defined more than once', line.span);
-    action.ability = id.parse(cursor);
-    return;
-  }
-  if (cursor.take(/target:[ \t]*/) !== null) {
-    if (action.target !== undefined) throw new DslError('action target is defined more than once', line.span);
-    action.target = id.parse(cursor);
-    return;
-  }
-  if (cursor.take(/dr:[ \t]*/) !== null) {
-    if (action.dr !== undefined) throw new DslError('action dr is defined more than once', line.span);
-    action.dr = id.parse(cursor);
-    return;
-  }
-  if (cursor.take(/health:[ \t]*/) !== null) {
-    if (action.health !== undefined) throw new DslError('action health is defined more than once', line.span);
-    const raw = cursor.take(/\d+(?:\.\d+)?/);
-    if (raw === null) throw new DslError('action health requires a non-negative number', line.span);
-    action.health = Number(raw);
-    return;
-  }
-  if (cursor.take(/escape after[ \t]+/) !== null) {
-    if (action.escapeAfter !== undefined) throw new DslError('action escape after is defined more than once', line.span);
-    const raw = cursor.take(/\d+/);
-    if (raw === null || Number(raw) <= 0) throw new DslError('action escape after requires a positive integer', line.span);
-    action.escapeAfter = Number(raw);
+  const held = action as Record<string, unknown>;
+  for (const field of ACTION_FIELDS) {
+    if (cursor.take(field.label) === null) continue;
+    if (held[field.name] !== undefined) throw new DslError(`action ${field.written} is defined more than once`, line.span);
+    const value = field.value(cursor, line);
+    if (value !== undefined) held[field.name] = value;
     return;
   }
 
