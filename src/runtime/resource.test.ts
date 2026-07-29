@@ -13,6 +13,8 @@ base: 20
 # stat max-focus
 base: 4
 
+# flag fainted
+
 # resource health
 rate: regeneration
 max: max-health

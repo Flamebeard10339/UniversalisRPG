@@ -155,6 +155,7 @@ grind:
   give: 1 edge
 
 # entity kiln
+flags: bricks-fired
 // A repeating ENTITY action that carries an on-success block — the one action
 // shape a recipe can't express (recipe results are a fixed take/give/xp/say
 // list, no onSuccess block). Kept as a standing regression guard for the
@@ -632,6 +633,8 @@ base: 100
 
 # item cog
 
+# flag fainted
+
 # resource hp
 rate: regen-rate
 max: max-hp
@@ -693,6 +696,7 @@ describe('resolve: net-zero / idle drain falls out (test 3 — O(1) over a huge 
 base: 0
 # stat still-cap
 base: 5
+# flag dry
 # resource pond
 rate: still-rate
 max: still-cap

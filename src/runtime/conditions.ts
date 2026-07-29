@@ -1,17 +1,19 @@
-import { Condition, Reference } from '../grammar/condition';
+import { Condition, isEngineReference, PLAYER, Reference, TIME } from '../grammar/condition';
 import { TextSegment } from '../content/dialogue';
 import { GameState } from './state';
 
 // Rendering asks the same questions of state that conditions do, which is why
 // the two live together.
 
-// Flat dotted keys, not nested lookups; `<node-name>.visits` is the exception.
+// Flat dotted keys, not nested lookups. Which paths the engine answers itself is
+// the same question load-time resolution asks when it decides what to leave
+// alone, so both ask it of `isEngineReference`.
 export function resolveReference(reference: Reference, state: GameState): boolean | number | string | undefined {
   const { path } = reference;
-  if (path.length === 1 && path[0] === 'time') return state.time;
-  if (path.length === 2 && path[1] === 'visits') return state.visits[path[0]] ?? 0;
-  if (path.length === 2 && path[0] === 'player') return state.player[path[1] as 'name' | 'race'];
-  return state.flags[path.join('.')];
+  if (!isEngineReference(path)) return state.flags[path.join('.')];
+  if (path[0] === TIME) return state.time;
+  if (path[0] === PLAYER) return state.player[path[1] as 'name' | 'race'];
+  return state.visits[path.slice(0, -1).join('.')] ?? 0;
 }
 
 export function truthy(value: boolean | number | string | undefined): boolean {

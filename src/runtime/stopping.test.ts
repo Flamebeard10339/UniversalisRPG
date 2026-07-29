@@ -70,6 +70,7 @@ bite:
   dr: dr
 
 # entity shrine
+flags: moon-up
 chant:
   repeating
   requires: moon-up
@@ -77,6 +78,7 @@ chant:
   give: 1 blessing
 
 # entity beacon
+flags: dawn
 tend:
   repeating
   hidden if: dawn
@@ -84,6 +86,7 @@ tend:
   give: 1 blessing
 
 # entity training-post
+flags: permitted
 stats: max-health 30, dr 0
 drill:
   repeating

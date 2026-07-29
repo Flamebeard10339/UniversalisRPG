@@ -21,7 +21,7 @@ export interface SectionSchema<H extends { id: string }, Flags extends keyof H =
   fields: { [K in Exclude<keyof H, 'id' | Flags | Entries>]: Field<H[K], H> };
   clauses?: Exclude<keyof H, 'id' | Flags | Entries>;
   bare?: Exclude<keyof H, 'id' | Flags | Entries>;
-  flags?: readonly Flags[];
+  keywords?: readonly Flags[];
   entries?: { into: Entries; body: EntryBody };
   exclusive?: readonly (readonly Exclude<keyof H, 'id' | Flags | Entries>[])[];
 }
@@ -48,6 +48,13 @@ export interface FieldEdits {
 }
 
 export const isFieldEdits = (value: unknown): value is FieldEdits => typeof value === 'object' && value !== null && 'ops' in value;
+
+// A list field holds either its members or the `+`/`-` operations that will
+// produce them, and a caller reading what it names wants both.
+export function listMembers<T>(value: unknown): T[] {
+  if (isFieldEdits(value)) return value.ops.flatMap((op) => op.values as T[]);
+  return Array.isArray(value) ? (value as T[]) : [];
+}
 
 // A `-label:` line inside an entries field, carried in the entries array itself
 // so that removals and additions in one section stay in source order.
@@ -78,12 +85,12 @@ export function parseSection<H extends { id: string }, F extends keyof H = never
   const fields = schema.fields as unknown as AnyFields;
   const byKeyword: Record<string, string> = {};
   for (const name of Object.keys(fields)) byKeyword[fields[name].keyword ?? name] = name;
-  const flags = (schema.flags ?? []) as readonly string[];
+  const keywords = (schema.keywords ?? []) as readonly string[];
   const clauses = schema.clauses as string | undefined;
   const bare = schema.bare as string | undefined;
   const entries = schema.entries as EntryConfig | undefined;
   const authored: Record<string, unknown> = { id: section.id };
-  for (const line of section.body) parseLine(line, fields, byKeyword, flags, clauses, bare, entries, schema.kind, authored);
+  for (const line of section.body) parseLine(line, fields, byKeyword, keywords, clauses, bare, entries, schema.kind, authored);
 
   if (schema.exclusive) {
     const active = schema.exclusive.filter((group) => (group as readonly string[]).some((key) => authored[key] !== undefined));
@@ -95,7 +102,7 @@ export function parseSection<H extends { id: string }, F extends keyof H = never
   return authored as Authored<H>;
 }
 
-function parseLine(line: RawLine, fields: AnyFields, byKeyword: Record<string, string>, flags: readonly string[], clauses: string | undefined, bare: string | undefined, entries: EntryConfig | undefined, kind: string, authored: Record<string, unknown>): void {
+function parseLine(line: RawLine, fields: AnyFields, byKeyword: Record<string, string>, keywords: readonly string[], clauses: string | undefined, bare: string | undefined, entries: EntryConfig | undefined, kind: string, authored: Record<string, unknown>): void {
   const cursor = new Cursor(line.text, 0, line.span.start);
 
   while (!cursor.done) {
@@ -137,7 +144,7 @@ function parseLine(line: RawLine, fields: AnyFields, byKeyword: Record<string, s
       throw new DslError(`unknown ${kind} field: ${key}`, { start: cursor.abs(cursor.pos), end: cursor.abs(cursor.pos + key.length) });
     } else {
       const word = cursor.peek(WORD)?.[0];
-      if (word !== undefined && flags.includes(word)) {
+      if (word !== undefined && keywords.includes(word)) {
         cursor.take(WORD);
         authored[word] = true;
       } else if (clauses !== undefined) {
@@ -176,8 +183,8 @@ export function hydrateSection<H extends { id: string }, F extends keyof H = nev
       },
     });
   }
-  for (const flag of (schema.flags ?? []) as readonly string[]) {
-    Object.defineProperty(view, flag, { enumerable: true, value: read[flag] ?? false });
+  for (const keyword of (schema.keywords ?? []) as readonly string[]) {
+    Object.defineProperty(view, keyword, { enumerable: true, value: read[keyword] ?? false });
   }
   if (schema.entries) {
     const into = (schema.entries as EntryConfig).into;

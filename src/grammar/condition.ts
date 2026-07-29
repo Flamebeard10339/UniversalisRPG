@@ -5,6 +5,18 @@ export interface Reference {
   path: string[];
 }
 
+// State the engine keeps rather than any module: the clock, the player sheet,
+// and the per-node visit counters. No module declares one, so nothing resolves
+// one either, and the runtime reads them off state instead of off flags.
+export const TIME = 'time';
+export const PLAYER = 'player';
+export const VISITS = 'visits';
+
+const ENGINE_ROOTS: readonly string[] = [TIME, PLAYER];
+const ENGINE_MEMBERS: readonly string[] = [VISITS];
+
+export const isEngineReference = (path: readonly string[]): boolean => ENGINE_ROOTS.includes(path[0]) || ENGINE_MEMBERS.includes(path[path.length - 1]);
+
 export type ComparisonOperator = '>' | '<' | '>=' | '<=' | '=';
 
 export type Condition =

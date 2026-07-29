@@ -5,7 +5,7 @@ import { loadModule } from '../content/registry';
 import { apply, startSession, view } from './session';
 
 function loc(id: string, over: Partial<Location> = {}): Location {
-  return { id, x: 0, y: 0, z: 0, title: id, entities: [], adjacent: [], actions: [], starting: false, ...over };
+  return { id, x: 0, y: 0, z: 0, title: id, entities: [], adjacent: [], flags: [], actions: [], starting: false, ...over };
 }
 
 function relative(id: string, direction: Direction, of: string): Location {
@@ -75,6 +75,7 @@ const WITH_ACTIONS = `
 # location shore
 x: 0, y: 0
 starting
+flags: searched
 search tideline:
   time: 2
   give: 1 driftwood

@@ -27,11 +27,11 @@ describe('session', () => {
 
     v = apply(session, 'dialogue:0');
     expect(v.inDialogue).toBe(false);
-    expect(session.state.flags['tutorial.quest-given']).toBe(true);
+    expect(session.state.flags['tutorial-island.quest-given']).toBe(true);
 
     v = apply(session, 'use:entity.tutorial-island.mirror.look in');
     expect(v.said).toContain('modal:character-creation');
-    expect(session.state.flags['tutorial.mirror-done']).toBe(true);
+    expect(session.state.flags['tutorial-island.mirror-done']).toBe(true);
     expect(ids(v)).not.toContain('use:entity.tutorial-island.mirror.look in');
 
     v = apply(session, 'talk:tutorial-island.miki');
@@ -60,7 +60,7 @@ describe('session', () => {
 
     v = apply(session, 'talk:tutorial-island.miki');
     expect(v.inDialogue).toBe(false);
-    expect(session.state.flags['tutorial.made-bread']).toBe(true);
+    expect(session.state.flags['tutorial-island.made-bread']).toBe(true);
 
     v = apply(session, 'talk:tutorial-island.miki');
     expect(v.inDialogue).toBe(false);
@@ -79,7 +79,7 @@ describe('session', () => {
       expect(v.encounter!.foes.map((foe) => foe.title)).toEqual(['Giant Rat']);
 
       v = wait(session, 30);
-      expect(session.state.flags['tutorial.rats-killed']).toBe(killed);
+      expect(session.state.flags['tutorial-island.rats-killed']).toBe(killed);
       expect(v.encounter).toBeNull(); // the fight is over, so is the readout
     }
     expect(ids(v)).not.toContain('use:entity.tutorial-island.giant-rat.fight');
@@ -90,8 +90,8 @@ describe('session', () => {
 
     v = apply(session, 'talk:tutorial-island.miki');
     expect(v.inDialogue).toBe(false);
-    expect(session.state.flags['tutorial.miki-complete']).toBe(true);
-    expect(session.state.flags['front-door.unlocked']).toBe(true);
+    expect(session.state.flags['tutorial-island.miki-complete']).toBe(true);
+    expect(session.state.flags['tutorial-island.front-door.unlocked']).toBe(true);
 
     v = view(session);
     expect(ids(v)).toContain('travel:tutorial-island.beach');
@@ -155,6 +155,8 @@ x: 0, y: 0
 starting
 entities:
   mirror
+
+# flag greeted
 
 # entity mirror
 look in: open modal: character-creation

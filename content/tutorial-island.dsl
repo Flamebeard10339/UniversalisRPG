@@ -63,6 +63,24 @@ on empty:
   set: fainted
   stop
 
+// --- flags ---
+
+// Quest and world state the module owns. An entity or location declares the
+// flags that are its own; these belong to no one prop.
+# flag fainted
+
+# flag mirror-done
+
+# flag made-bread
+
+# flag rats-killed
+
+# flag quest-given
+
+# flag snubbed-miki
+
+# flag miki-complete
+
 // --- skills ---
 
 # skill thieving
@@ -151,6 +169,7 @@ examine: A weathered man in patched leather, quick to smile.
 
 # entity front-door
 examine: A heavy wooden door, bound in iron.
+flags: unlocked
 pick lock:
   requires: has lockpick
   hidden if: unlocked
@@ -163,9 +182,9 @@ pick lock:
 # entity mirror
 examine: A tall mirror in a gilt frame. Your reflection waits, nameless.
 look in:
-  hidden if: tutorial.mirror-done
+  hidden if: mirror-done
   open modal: character-creation
-  set: tutorial.mirror-done
+  set: mirror-done
 
 # entity oven
 examine: A stone oven, its coals still glowing.
@@ -211,7 +230,7 @@ title: Giant Rat
 examine: A hunched rat claws at an overturned crate, eyes red in the dark.
 stats: attack 8, defense 0, max-health 20, attack-rate 16, accuracy 60, evasion 40
 fight:
-  hidden if: tutorial.rats-killed >= 3
+  hidden if: rats-killed >= 3
   time: 60
   speed: attack-rate
   accuracy: accuracy
@@ -221,7 +240,7 @@ fight:
   target: health
   xp: melee 5
   on success:
-    add: tutorial.rats-killed 1
+    add: rats-killed 1
     say: You put down another rat.
 bite:
   retaliates
@@ -256,26 +275,26 @@ say: The oven bakes your dough into a golden loaf.
 owner = miki
 
 node greeting:
-  when: not tutorial.quest-given
+  when: not quest-given
   Greetings, adventurer! Welcome to UniversalisRPG.
   The name's Miki, your tutorial guide, here to walk you through your first steps.
   What do you say I show you the ropes?
   -> Sounds good. Teach me.
   -> I'd rather find my own way.
-    set: tutorial.snubbed-miki
+    set: snubbed-miki
     goto snub
   Splendid! We start with what gives an adventurer purpose: quests.
   Your first task: find the mirror in this house and decide who you are, your name and your people.
-  set: tutorial.quest-given
+  set: quest-given
 
 node remind-mirror:
-  when: tutorial.quest-given
+  when: quest-given
   sticky
   again: The mirror's still waiting. Name yourself first, then we'll talk.
   The mirror's still waiting. Name yourself first, then we'll talk.
 
 node buffs:
-  when: tutorial.mirror-done
+  when: mirror-done
   once
   again: Knead that dough and get it in the oven, {player.name} - water and flour won't bake themselves.
   There you are, {player.name}. A fine name.
@@ -285,14 +304,14 @@ node buffs:
   Give it a go. I'll wait.
 
 node baked:
-  when: tutorial.mirror-done and has bread and not tutorial.made-bread
+  when: mirror-done and has bread and not made-bread
   once
   A warm loaf! Well done, {player.name}.
   Keep it in your pack - eat it whenever you're hungry.
-  set: tutorial.made-bread
+  set: made-bread
 
 node skills:
-  when: tutorial.made-bread
+  when: made-bread
   once
   again: Still those rats, {player.name}? Downstairs, in the basement.
   Every swing and catch builds a skill, and skills raise your stats.
@@ -307,13 +326,13 @@ node skills-annoyed:
   Are you deaf, {player.name}? Rats. Basement. Now.
 
 node sendoff:
-  when: tutorial.rats-killed >= 3
+  when: rats-killed >= 3
   once
   again: Still here? The boat to the mainland won't wait forever.
   Ha! Barely a scratch on you. You're a natural.
   Truth be told, there's little left I can teach you.
   So here's the last of it: get off this island. There's a boat to the mainland, and a whole world of skills waiting past it.
-  set: tutorial.miki-complete
+  set: miki-complete
   set: front-door.unlocked
   Go on. Make some trouble worth telling stories about.
 
@@ -325,13 +344,13 @@ node snub:
 # test tutorial-quest-given
 talk: miki
 choose: Sounds good. Teach me.
-assert: tutorial.quest-given
+assert: quest-given
 
 # test miki-route-full
 travel: guide-house
 run: tutorial-quest-given
 use: entity.mirror.look in
-assert: tutorial.mirror-done
+assert: mirror-done
 talk: miki
 assert: has jug-of-water
 craft: dough
@@ -339,7 +358,7 @@ assert: has dough
 craft: bread
 assert: has bread
 talk: miki
-assert: tutorial.made-bread
+assert: made-bread
 // A rat takes a few swings to put down, so each `use:` starts the fight and the
 // `wait:` lets it play out — 30s is far longer than the ~6s it actually needs.
 use: entity.giant-rat.fight
@@ -348,8 +367,8 @@ use: entity.giant-rat.fight
 wait: 30
 use: entity.giant-rat.fight
 wait: 30
-assert: tutorial.rats-killed >= 3
+assert: rats-killed >= 3
 talk: miki
-assert: tutorial.miki-complete
+assert: miki-complete
 assert: front-door.unlocked
 travel: beach

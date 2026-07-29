@@ -10,8 +10,10 @@ export interface Removal {
 // Merge-by-omission cannot express removal — there is no partial section that
 // means "this is gone" — so exactly one keyword survives inference.
 export function parseRemoval(section: RawSection): Removal {
-  const path = section.id?.split('.') ?? [];
-  if (path.length !== 2) throw new DslError('# remove names a kind and an id, as in `# remove entity.mirror`', section.span);
+  // The kind leads and the rest is a path, as long as the author cared to make
+  // it: `entity.mirror` and `entity.tutorial-island.mirror` both name one thing.
+  const [kind, ...path] = section.id?.split('.') ?? [];
+  if (path.length === 0) throw new DslError('# remove names a kind and an id, as in `# remove entity.mirror`', section.span);
   if (section.body.length > 0) throw new DslError('# remove takes no body', section.span);
-  return { id: section.id!, kind: path[0], target: path[1] };
+  return { id: section.id!, kind, target: path.join('.') };
 }

@@ -1,4 +1,5 @@
 import { ActionResult } from '../grammar/actionResult';
+import { DISCOVERED } from '../content/location';
 import { Registry } from '../content/registry';
 import { Resource } from '../content/resource';
 import { endAction, GameState, RuntimeError } from './state';
@@ -48,7 +49,7 @@ export function applyResults(segment: Segment, results: readonly ActionResult[],
         state.location = result.location;
         break;
       case 'discover':
-        state.flags[`${result.location}.discovered`] = true;
+        state.flags[`${result.location}.${DISCOVERED}`] = true;
         break;
       case 'open-modal':
         state.log.push(`modal:${result.modal}`);

@@ -1,14 +1,14 @@
 import { Action } from '../grammar/action';
 import { ActionResult } from '../grammar/actionResult';
-import { Condition } from '../grammar/condition';
-import { Dialogue } from './dialogue';
+import { Condition, isEngineReference, Reference } from '../grammar/condition';
+import { Dialogue, TextSegment } from './dialogue';
 import { Directive } from './test';
 import { Edge, Relative } from './location';
-import { isFieldEdits } from '../grammar/section';
+import { isFieldEdits, listMembers } from '../grammar/section';
 import { Quantified } from '../grammar/values';
 import { TagClause } from '../grammar/tagClause';
 
-export type ReferenceKind = 'stat' | 'resource' | 'entity' | 'location' | 'item' | 'skill' | 'recipe' | 'save' | 'test' | 'capability';
+export type ReferenceKind = 'stat' | 'resource' | 'entity' | 'location' | 'item' | 'skill' | 'recipe' | 'save' | 'test' | 'capability' | 'flag';
 
 // Returns what the id should become. Resolution rewrites it into a namespaced
 // key; validation hands it back and throws if it names nothing.
@@ -25,13 +25,6 @@ function put<T extends object>(holder: T, key: keyof T & string, kind: Reference
   if (next !== current) (holder as Loose)[key] = next;
 }
 
-// A list field holds either its members or the `+`/`-` operations that will
-// produce them, and both carry references.
-function members<T>(value: unknown): T[] {
-  if (isFieldEdits(value)) return value.ops.flatMap((op) => op.values as T[]);
-  return Array.isArray(value) ? (value as T[]) : [];
-}
-
 function strings(holder: Loose, key: string, kind: ReferenceKind, where: string, visit: Visit): void {
   const list = holder[key];
   const rewrite = (values: unknown[]): void => {
@@ -43,8 +36,24 @@ function strings(holder: Loose, key: string, kind: ReferenceKind, where: string,
   else if (Array.isArray(list)) rewrite(list);
 }
 
+// A flag reference is a path like any other, but the engine answers some of them
+// off state instead of off a declaration, and those are nobody's to resolve.
+function reference(value: Reference | undefined, where: string, visit: Visit): void {
+  if (!value || isEngineReference(value.path)) return;
+  const raw = value.path.join('.');
+  const resolved = visit('flag', raw, where);
+  if (resolved !== raw) value.path = resolved.split('.');
+}
+
+function segments(list: TextSegment[] | undefined, where: string, visit: Visit): void {
+  for (const segment of list ?? []) {
+    if (segment.kind === 'conditional') condition(segment.condition, where, visit);
+    if (segment.kind === 'interpolate') reference(segment.reference, where, visit);
+  }
+}
+
 function quantified(list: unknown, kind: ReferenceKind, where: string, visit: Visit): void {
-  for (const entry of members<Quantified>(list)) put(entry, 'item', kind, where, visit);
+  for (const entry of listMembers<Quantified>(list)) put(entry, 'item', kind, where, visit);
 }
 
 function condition(value: Condition | undefined, where: string, visit: Visit): void {
@@ -52,6 +61,12 @@ function condition(value: Condition | undefined, where: string, visit: Visit): v
   switch (value.kind) {
     case 'has':
       put(value, 'item', 'item', `${where} has`, visit);
+      return;
+    case 'reference':
+      reference(value.reference, where, visit);
+      return;
+    case 'comparison':
+      reference(value.left, where, visit);
       return;
     case 'not':
       condition(value.condition, where, visit);
@@ -79,12 +94,17 @@ function results(list: ActionResult[] | undefined, where: string, visit: Visit):
       case 'pool':
         put(result, 'resource', 'resource', `${where} ${result.delta < 0 ? 'drain' : 'restore'}:`, visit);
         break;
+      case 'set':
+      case 'unset':
+      case 'add':
+        put(result, 'variable', 'flag', `${where} ${result.kind}:`, visit);
+        break;
     }
   }
 }
 
 function tags(list: unknown, where: string, visit: Visit): void {
-  for (const tag of members<TagClause>(list)) if (tag.kind === 'stat-bonus') put(tag, 'statId', 'stat', `${where} tag`, visit);
+  for (const tag of listMembers<TagClause>(list)) if (tag.kind === 'stat-bonus') put(tag, 'statId', 'stat', `${where} tag`, visit);
 }
 
 export function visitAction(action: Action, where: string, visit: Visit): void {
@@ -97,7 +117,7 @@ export function visitAction(action: Action, where: string, visit: Visit): void {
 }
 
 function actions(list: unknown, where: string, visit: Visit): void {
-  for (const action of members<Action>(list)) visitAction(action, `${where} action ${JSON.stringify(action.label)}`, visit);
+  for (const action of listMembers<Action>(list)) visitAction(action, `${where} action ${JSON.stringify(action.label)}`, visit);
 }
 
 // Exported because a directive also arrives typed at the CLI, where the names
@@ -137,13 +157,13 @@ function dialogue(value: Dialogue, where: string, visit: Visit): void {
   for (const node of value.nodes ?? []) {
     const at = `${where} node ${node.name}`;
     condition(node.when, `${at} when:`, visit);
-    for (const segment of node.again ?? []) if (segment.kind === 'conditional') condition(segment.condition, at, visit);
+    segments(node.again, at, visit);
     for (const step of node.steps ?? []) {
       if (step.kind === 'effect') results([step.result], at, visit);
-      if (step.kind === 'say') for (const segment of step.segments) if (segment.kind === 'conditional') condition(segment.condition, at, visit);
+      if (step.kind === 'say') segments(step.segments, at, visit);
       if (step.kind === 'menu') {
         for (const choice of step.choices) {
-          for (const segment of choice.segments) if (segment.kind === 'conditional') condition(segment.condition, `${at} choice`, visit);
+          segments(choice.segments, `${at} choice`, visit);
           condition(choice.when, `${at} choice when`, visit);
           results(choice.effects, `${at} choice`, visit);
         }
@@ -173,7 +193,7 @@ export function visitSection(kind: string, value: object, where: string, visit: 
       return;
     case 'location':
       strings(section, 'entities', 'entity', `${where} entities:`, visit);
-      for (const edge of members<Edge>(section.adjacent)) {
+      for (const edge of listMembers<Edge>(section.adjacent)) {
         put(edge, 'target', 'location', `${where} adjacent:`, visit);
         condition(edge.condition, `${where} adjacent: ${edge.target} while`, visit);
       }

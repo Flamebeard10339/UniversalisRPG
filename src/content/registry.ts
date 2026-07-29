@@ -2,6 +2,7 @@ import { ActionResult } from '../grammar/actionResult';
 import { Action } from '../grammar/action';
 import { Dialogue } from './dialogue';
 import { Entity, entitySchema } from './entity';
+import { Flag, flagSchema } from './flag';
 import { Item, itemSchema } from './item';
 import { Location, locationSchema, recursivelyResolveRelativeCoordinates } from './location';
 import { mergeSection } from './merge';
@@ -15,7 +16,6 @@ import { Removal } from './removal';
 import { resolveModule } from './resolve';
 import { Resource, resourceSchema } from './resource';
 import { ParsedSave } from './saveSection';
-import { scopeEntity, scopeLocation } from './scope';
 import { Authored, hydrateSection } from '../grammar/section';
 import { Skill, skillSchema } from './skill';
 import { Stat, statSchema } from './stat';
@@ -36,6 +36,7 @@ export interface Registry {
   dialogues: Map<string, Dialogue>;
   dialoguesByOwner: Map<string, Dialogue>;
   tests: Map<string, Test>;
+  flags: Map<string, Flag>;
   variables: Map<string, Variable>;
   saves: Map<string, ParsedSave>;
   namespace: Namespace;
@@ -76,7 +77,7 @@ function recipeAction(recipe: Recipe): Action {
 function applySection(registry: Registry, section: ModuleSection): void {
   switch (section.kind) {
     case 'entity': {
-      const entity = scopeEntity(hydrateSection(section.value as Authored<Entity>, entitySchema));
+      const entity = hydrateSection(section.value as Authored<Entity>, entitySchema);
       for (const action of entity.actions) {
         // Without a pool to drain, a retaliation falls through to the fight's
         // own hit counter and wears down the target instead of the player.
@@ -88,7 +89,7 @@ function applySection(registry: Registry, section: ModuleSection): void {
       break;
     }
     case 'location': {
-      const location = scopeLocation(hydrateSection(section.value as Authored<Location>, locationSchema));
+      const location = hydrateSection(section.value as Authored<Location>, locationSchema);
       registry.locations.set(location.id, location);
       break;
     }
@@ -130,6 +131,11 @@ function applySection(registry: Registry, section: ModuleSection): void {
       registry.tests.set(test.id, test);
       break;
     }
+    case 'flag': {
+      const flag = hydrateSection(section.value as Authored<Flag>, flagSchema);
+      registry.flags.set(flag.id, flag);
+      break;
+    }
     case 'variable': {
       const variable = hydrateSection(section.value as Authored<Variable>, variableSchema);
       registry.variables.set(variable.id, variable);
@@ -156,6 +162,7 @@ export function loadUniverse(sources: readonly ModuleSource[]): Registry {
     dialogues: new Map(),
     dialoguesByOwner: new Map(),
     tests: new Map(),
+    flags: new Map(),
     variables: new Map(),
     saves: new Map(),
     namespace: new Namespace(),
@@ -168,6 +175,7 @@ export function loadUniverse(sources: readonly ModuleSource[]): Registry {
   const namespace = registry.namespace;
   const modules = parseUniverse(sources);
   const loaded = new Set(modules.map((module) => module.info.id));
+  namespace.declareModules(loaded);
   for (const module of modules) {
     // Per module, before merging: a shortened reference resolves against its own
     // module and that module's dependencies, and once sections are merged there

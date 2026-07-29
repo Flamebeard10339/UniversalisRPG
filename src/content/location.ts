@@ -5,6 +5,10 @@ import { DslError, Parser } from '../grammar/parser';
 import { SectionSchema } from '../grammar/section';
 import { humanize, id, number, text } from '../grammar/values';
 
+// The one flag every location owns without declaring it, because the engine
+// sets it the first time the player arrives.
+export const DISCOVERED = 'discovered';
+
 export type Direction = 'north' | 'south' | 'east' | 'west' | 'up' | 'down';
 
 export interface Relative {
@@ -26,6 +30,7 @@ export interface Location {
   examine?: string;
   entities: string[];
   adjacent: Edge[];
+  flags: string[];
   starting: boolean;
   relative?: Relative;
   // Actions the location itself can do, as opposed to something standing in it.
@@ -106,9 +111,10 @@ export const locationSchema: SectionSchema<Location, 'starting', 'actions'> = {
     examine: { parser: text },
     entities: { parser: list(id), default: () => [] },
     adjacent: { parser: list(edge), default: () => [] },
+    flags: { parser: list(id), default: () => [] },
     relative: { parser: relative },
   },
-  flags: ['starting'],
+  keywords: ['starting'],
   bare: 'relative',
   exclusive: [
     ['x', 'y', 'z'],

@@ -1,4 +1,6 @@
+import { DISCOVERED } from './location';
 import { DslError } from '../grammar/parser';
+import { listMembers } from '../grammar/section';
 import { NAMESPACED_KINDS, Namespace, qualify } from './namespace';
 import { ParsedModule } from './universe';
 import { ReferenceKind, visitSection } from './referenceSites';
@@ -26,18 +28,28 @@ function targetKey(module: ParsedModule, kind: string, id: string, namespace: Na
   return namespace.resolve(kind, id, module.namespace, visible, `# ${kind} ${id}`);
 }
 
+function declareFlags(namespace: Namespace, kind: string, value: { id: string; flags?: unknown }): void {
+  if (kind === 'location') namespace.declareMember('flag', kind, value.id, DISCOVERED);
+  for (const flag of listMembers<string>(value.flags)) namespace.declareMember('flag', kind, value.id, flag);
+}
+
 export function resolveModule(module: ParsedModule, namespace: Namespace, loaded: ReadonlySet<string>): void {
   const visible = visibleTo(module, loaded);
   const self = module.namespace;
+  const created = module.sections.filter((section) => section.kind !== 'remove') as { kind: string; value: { id: string; flags?: unknown } }[];
 
   // Declared before anything is resolved, so a section may reference one that
   // appears further down its own file.
-  for (const section of module.sections) {
-    const id = (section.value as { id?: string }).id;
-    if (section.kind !== 'remove' && isNamespaced(section.kind) && id !== undefined && !id.includes('.')) namespace.declare(section.kind, self, id);
+  for (const { kind, value } of created) {
+    if (isNamespaced(kind) && value.id !== undefined && !value.id.includes('.')) namespace.declare(kind, self, value.id);
   }
 
-  const visit = (kind: ReferenceKind, id: string, where: string): string => (isNamespaced(kind) ? namespace.resolve(kind, id, self, visible, where) : id);
+  // Ids settle before members are declared, because a member hangs under the key
+  // its object ended up with — and an edit's heading names another module's.
+  for (const section of created) {
+    section.value.id = targetKey(module, section.kind, section.value.id, namespace, visible);
+    declareFlags(namespace, section.kind, section.value);
+  }
 
   for (const section of module.sections) {
     if (section.kind === 'remove') {
@@ -47,8 +59,10 @@ export function resolveModule(module: ParsedModule, namespace: Namespace, loaded
       namespace.undeclare(removal.kind, removal.target);
       continue;
     }
-    const value = section.value as { id: string };
-    value.id = targetKey(module, section.kind, value.id, namespace, visible);
-    visitSection(section.kind, value, `# ${section.kind} ${value.id}`, visit);
+    const { id } = section.value as { id: string };
+    // The section is the innermost context its own references are read from, so
+    // a bare flag name means this object's before it means anyone else's.
+    const visit = (kind: ReferenceKind, raw: string, where: string): string => (isNamespaced(kind) ? namespace.resolve(kind, raw, self, visible, where, id) : raw);
+    visitSection(section.kind, section.value, `# ${section.kind} ${id}`, visit);
   }
 }

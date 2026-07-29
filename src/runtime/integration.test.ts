@@ -33,7 +33,7 @@ describe('tutorial-island health resource (Pass 2 end-to-end)', () => {
 
     resolve(state, registry, 120); // far longer than the ~6s the rat lasts
     const afterFighting = state.resources['tutorial-island.health'];
-    expect(state.flags['tutorial.rats-killed']).toBe(1);
+    expect(state.flags['tutorial-island.rats-killed']).toBe(1);
     expect(afterFighting).toBeLessThan(30); // it got its bites in
     expect(state.log.some((line) => line.startsWith('The Giant Rat hits you for '))).toBe(true);
     expect(state.log.some((line) => line.startsWith('You hit the Giant Rat for '))).toBe(true);

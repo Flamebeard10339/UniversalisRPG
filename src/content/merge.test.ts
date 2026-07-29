@@ -131,7 +131,7 @@ describe('a list key takes + and -', () => {
   });
 
   it('removes a member named by only as much of it as identifies it', () => {
-    const conditional = module('base', '# location beach', 'x: 0, y: 0', 'adjacent: dunes while tide-out', '# location dunes', 'x: 1, y: 0');
+    const conditional = module('base', '# flag tide-out', '# location beach', 'x: 0, y: 0', 'adjacent: dunes while tide-out', '# location dunes', 'x: 1, y: 0');
     expect(adjacency([conditional, patch('# location base.beach', '-adjacent: dunes')])).toEqual([]);
   });
 

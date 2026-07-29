@@ -13,6 +13,8 @@ starting
 # entity front-door
 open: relocate: guide-house, say: The door swings open.
 
+# flag quest-given
+
 # entity miki
 
 # dialogue miki
@@ -35,6 +37,8 @@ node snub:
 
 # test enter
 travel: guide-house
+
+# flag unlocked
 
 # test main
 run: enter
@@ -197,6 +201,7 @@ describe('useAction: take affordability and graceful failure', () => {
 title: Cooked Shrimp
 
 # entity brazier
+flags: brazier-lit
 light:
   take: 2 cooked-shrimp
   set: brazier-lit
@@ -204,6 +209,7 @@ light:
     say: The brazier roars to life.
 
 # entity shrine
+flags: shrine-offered
 offer:
   take: 2 cooked-shrimp
   set: shrine-offered

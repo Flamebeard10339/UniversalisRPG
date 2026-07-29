@@ -14,6 +14,7 @@ export interface Entity {
   capabilities: string[];
   // Replaces the global `# stat` default per name; the player names nothing.
   stats: Record<string, Range>;
+  flags: string[];
   actions: Action[];
 }
 
@@ -37,6 +38,7 @@ export const entitySchema: SectionSchema<Entity, never, 'actions'> = {
     examine: { parser: text },
     capabilities: { parser: list(id), keyword: 'stations', default: () => [] },
     stats: { parser: statBlock, default: () => ({}) },
+    flags: { parser: list(id), default: () => [] },
   },
   entries: { into: 'actions', body: actionBody },
 };

@@ -31,6 +31,7 @@ on empty:
 examine: A fistful of straw.
 
 # entity training-dummy
+flags: dummies-felled
 stats: max-health 12, dr 2
 strike:
   repeating
