@@ -608,9 +608,14 @@ A named kind per row — which is what "interaction kinds are named by the conte
 argues for elsewhere in this log — would make the taxonomy the authored thing and `time:`
 unambiguous within each.
 
-### F3 — a second `retaliates` action is silently dead content
+### F3 — a second `retaliates` action is rejected at load
 
-**Answered, and it is the unhelpful answer.** `retaliationOf` (`runtime.ts:907`) is
+**Cleared 2026-07-29.** `loadModule` rejects a second `retaliates` action on the same
+entity, next to the existing "retaliation requires a `target:`" guard. Multiple cadences
+per actor remain reserved for a later deliberate design instead of being silently dead
+content.
+
+Previous behavior: `retaliationOf` (`runtime.ts:907`) was
 `entity.actions.find(a => a.retaliates)` — first in authoring order wins. `freshActor`
 allocates exactly one `cadence`, and `participants()` pushes exactly one entry per actor, so
 every later `retaliates` action is unreachable. Load raises nothing.

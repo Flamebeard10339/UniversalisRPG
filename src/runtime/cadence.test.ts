@@ -225,4 +225,10 @@ describe('the rat sheet', () => {
   it('rejects a retaliation with nothing to hit', () => {
     expect(() => loadModule('# entity ghost\nwail:\n  retaliates\n  time: 60\n')).toThrow(/requires a target: pool/);
   });
+
+  it('rejects a second retaliation instead of leaving it dead', () => {
+    expect(() => loadModule(`${MODULE}\n# entity giant-rat\nclaw:\n  retaliates\n  time: 60\n  target: health\n`)).toThrow(
+      /retaliating action "claw" conflicts with "bite"; only one retaliates action is supported/,
+    );
+  });
 });

@@ -167,11 +167,18 @@ function applySection(registry: Registry, section: ModuleSection): void {
   switch (section.kind) {
     case 'entity': {
       const entity = hydrateSection(section.value as Authored<Entity>, entitySchema);
+      let retaliation: Action | undefined;
       for (const action of entity.actions) {
         // Without a pool to drain, a retaliation falls through to the fight's
         // own hit counter and wears down the target instead of the player.
         if (action.retaliates && !action.target) {
           throw new DslError(`# entity ${entity.id}: retaliating action ${JSON.stringify(action.label)} requires a target: pool`);
+        }
+        if (action.retaliates) {
+          if (retaliation) {
+            throw new DslError(`# entity ${entity.id}: retaliating action ${JSON.stringify(action.label)} conflicts with ${JSON.stringify(retaliation.label)}; only one retaliates action is supported`);
+          }
+          retaliation = action;
         }
       }
       registry.entities.set(entity.id, entity);
