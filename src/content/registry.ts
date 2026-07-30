@@ -11,7 +11,7 @@ import { ModuleSource, ParsedModule, moduleOrderProblems, orderModules, parseMod
 import { DslError, Span } from '../grammar/parser';
 import { Namespace } from './namespace';
 import { Recipe, recipeSchema } from './recipe';
-import { registryCapabilities, validateDialogueReferences, validateRecipeReferences, validateTestReferences } from './references';
+import { registryCapabilities, validateDialogueReferences, validateRecipeReferences, validateSectionReferences, validateTestReferences } from './references';
 import { ReferenceKind, Visit, visitAction, visitSection } from './referenceSites';
 import { Removal } from './removal';
 import { RESOLUTION_PASSES } from './resolve';
@@ -42,6 +42,22 @@ export interface Registry {
   saves: Map<string, ParsedSave>;
   namespace: Namespace;
 }
+
+// Each DSL section kind beside the registry map that holds it. `recipeActions`
+// and `dialoguesByOwner` are indexes over maps already listed, and `flag`,
+// `variable` and `save` carry no references to anything, so the pairs here are
+// every section a reference can be authored inside.
+export const CONTENT_SECTION_MAPS: readonly (readonly [string, keyof Registry])[] = [
+  ['entity', 'entities'],
+  ['location', 'locations'],
+  ['item', 'items'],
+  ['stat', 'stats'],
+  ['skill', 'skills'],
+  ['recipe', 'recipes'],
+  ['resource', 'resources'],
+  ['dialogue', 'dialogues'],
+  ['test', 'tests'],
+];
 
 export type ModuleLoadStage = 'parse' | 'order' | 'resolve' | 'merge' | 'build' | 'validate';
 
@@ -426,6 +442,17 @@ function validateBuiltRegistry(registry: Registry, owners: ReadonlyMap<string, P
     }
   }
 
+  for (const [kind, map] of CONTENT_SECTION_MAPS) {
+    for (const [id, value] of registry[map] as ReadonlyMap<string, object>) {
+      try {
+        validateSectionReferences(kind, id, value, registry);
+      } catch (error) {
+        if (!(error instanceof DslError)) throw error;
+        return { module: sectionOwner(owners, kind, id)!, stage: 'validate', error };
+      }
+    }
+  }
+
   const capabilities = registryCapabilities(registry);
   for (const recipe of registry.recipes.values()) {
     try {
@@ -493,6 +520,11 @@ function compileModules(modules: readonly ParsedModule[]): { registry: Registry 
           const { kind, target, id } = section.value as Removal;
           if (!merged.get(kind)?.delete(target)) throw new DslError(`# remove ${id} names nothing that is loaded`);
           owners.delete(ownerKey(kind, target));
+          // Undeclared here rather than during resolution, so that what a name
+          // resolves to stays independent of load order while the namespace and
+          // the surviving universe still agree — which is what lets the
+          // post-build reference check see a member go with its owner.
+          namespace.undeclare(kind, target);
           continue;
         }
         const byId = merged.get(section.kind) ?? new Map<string, OwnedSection>();

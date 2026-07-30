@@ -178,6 +178,25 @@ describe('# remove takes out what omission cannot', () => {
     expect(() => loadUniverse([BASE, patch('# remove location.atlantis')])).toThrow(/names an unknown location: atlantis/);
   });
 
+  // The defect this pins: removal used to undeclare mid-resolution, so a module
+  // that named the removed item failed only when it happened to sort after the
+  // remover. Sorting first, it resolved and left a reference to nothing, and the
+  // universe loaded clean with the item gone.
+  it('rejects a reference to a removed item whichever module names it first', () => {
+    const cut = (id: string): ModuleSource => module(id, 'dependencies: base', '# remove item.rope');
+    const wants = (id: string): ModuleSource => module(id, 'dependencies: base', '# entity gull', 'fetch:', '  give: base.rope');
+    const dangles = /names an unknown item: base.rope/;
+
+    expect(() => loadUniverse([BASE, cut('aaa-cut'), wants('zzz-wants')])).toThrow(dangles);
+    expect(() => loadUniverse([BASE, wants('aaa-wants'), cut('zzz-cut')])).toThrow(dangles);
+  });
+
+  it('still lets one module unwire a reference and remove its target together', () => {
+    const registry = loadUniverse([BASE, patch('# location base.beach', '-adjacent: dunes', '# remove location.dunes')]);
+    expect(registry.locations.has('base.dunes')).toBe(false);
+    expect(registry.locations.get('base.beach')!.adjacent).toEqual([]);
+  });
+
   it('lets a later module name the removed id again and get a fresh one', () => {
     const cut = module('cut', 'dependencies: base', '# remove item.rope');
     const again = module('zzz-again', 'dependencies: cut', '# item rope', 'title: New Rope');

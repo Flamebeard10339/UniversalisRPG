@@ -130,6 +130,6 @@ describe('a flag across module boundaries', () => {
   it('goes away with the object it belonged to', () => {
     const doomed = module('doomed', '# entity door', 'flags: unlocked');
     const wrecker = module('wrecker', 'dependencies: doomed', '# remove entity.doomed.door', '# entity gull', 'squawk:', '  requires: door.unlocked');
-    expect(() => loadUniverse([doomed, wrecker])).toThrow(/names an unknown flag: door.unlocked/);
+    expect(() => loadUniverse([doomed, wrecker])).toThrow(/names an unknown flag: doomed.door.unlocked/);
   });
 });

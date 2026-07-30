@@ -134,9 +134,68 @@ Two consequences to carry into the work:
    list. New mods default by tier — `mod-approved` available but off, `mod-auto-enabled` on after
    validation.
 
-## `# remove` validates by load order, so a dangling reference can pass silently
-Found while building the R1 admission fixtures, not by an audit of the DSL load path — so it is
-unproven whether this is one bug or the visible edge of a wider ordering assumption.
+## `/dsl <kind> <id>` reads like a query and is a write (grammar evidence, 2026-07-29)
+Kept as evidence for the grammar work, not as a bug to patch in isolation. **What to fix is a
+question for the `/dsl` redesign**; what follows is the observation that should inform it.
+
+**What happened.** Verifying that R1's modportal-synced mods reached a live session, I wanted to see
+the DSL of the `gem` item that `approved-mod-11` had contributed, and typed `/dsl item gem`. It
+printed `Staged # item gem in local-changes.` — `handleDslCommand` (`scripts/play-cli.ts:333`) treats
+an absent body as an empty body, so the command created `content/local-changes.dsl` holding a
+heading with no fields, **and added `approved-mod-11` and `approved-mod-12` to that module's
+`dependencies:`**. A read-shaped invocation wrote a file and edited a dependency list. Nothing was
+lost — the file was untracked and deleted — but nothing warned either.
+
+**Why the mistake happened**, which is the part worth keeping:
+
+- **The read/write axis is carried by nothing in the syntax.** `/dsl item gem` and
+  `/dsl item gem title: Gem` are both writes; they differ only in whether a body follows. Every
+  other verb in the CLI announces itself — `/local delete`, `/local clear`, `/create-test`. `/dsl`
+  does not, and `<kind> <id>` is the universal shape of *addressing* a thing in this repo
+  (`use:<kind>.<objId>.<label>`, `# remove item.rock`, `/local delete <kind> <id>`), which everywhere
+  else means "the one I mean", not "make one".
+- **Arity is about to become the read/write discriminator**, which is the actual trap. The settled
+  item "`/dsl <kind>` prints the kind's fields" makes `/dsl item` a **read**. So the grammar becomes:
+  one argument reads, two arguments write, three arguments write. Adding specificity flips the verb,
+  then adding more does not. That reads as a narrowing query right up to the point it mutates.
+- **An empty body is accepted as content.** Staging `# item gem` with no fields is almost never what
+  anyone means; it is the exact keystroke of someone who expected output.
+- **There is no read path for loaded content at all.** `/local show` prints the staged local module;
+  nothing prints a registry object. So the thing I wanted did not exist, and the nearest-looking
+  command was a write. Sessions cannot inspect what mods contributed without editing something.
+
+**What it says about intuitiveness.** The wrong guess came from an agent holding the whole repo, the
+grammar, and the help text — the help line does say "stage or replace". If that is not enough to
+overcome the shape of the command, a contributor reading a wiki page has no chance. It is weak
+evidence about humans and strong evidence that the shape itself is misleading; the write verb should
+be visible in the syntax rather than inferable from argument count.
+
+## A field edit can strip a member and leave references to it dangling
+The remaining half of the `# remove` ordering defect below, which is **fixed**. That half was found
+while building the R1 admission fixtures; this half was found while proving the fix, and it is the
+same defect class reached through a different door — with no ordering component, just no coverage.
+
+```
+# entity base.door        <- base declares flags: unlocked, and open: requires: unlocked
+-flags: unlocked          <- a later module strips the flag
+```
+loads **clean**, leaving `open:` requiring `base.door.unlocked`, a key nothing can ever set. The
+action is permanently unavailable and nothing says so.
+
+`# remove` now undeclares from the namespace at merge, which is what lets the post-build check see a
+member go with its owner. A `-field:` edit does not: it filters the object's `flags` array without
+telling the namespace, so the member stays declared and the reference still resolves. Fixing it means
+member-level field edits reconciling with the namespace the way `# remove` now does. Same for any
+other member list a `-` edit can shorten.
+
+## ~~`# remove` validates by load order, so a dangling reference can pass silently~~ FIXED
+Fixed on this branch. Resolution no longer undeclares; it only qualifies names. `# remove` undeclares
+at **merge**, where removal is actually a fact and all resolution has finished, and existence is
+proved after the universe is built by `validateSectionReferences`, walking the same reference sites
+resolution walks and asking the namespace — which already knows a member goes away with its owner.
+Both orders now produce the same diagnostic, attributed to the module holding the dangling reference.
+`referenceSites.ts` had promised this pass all along ("validation hands it back and throws if it names
+nothing"); the dead `validateReferences` export it should have been was deleted. The original finding:
 
 Two modules over the same base: A does `# remove item.rock`, B has an entity whose action does
 `give: base.rock`. Each loads clean alone. Together, **whether it errors depends on module order**:
@@ -153,6 +212,30 @@ loads with no diagnostic while the entity's `give:` names an item that no longer
 Reachable from ordinary content the moment two modules disagree, and load order follows module id, so
 it is decided by a name. Fix direction: validate references after all modules are merged, or make
 `# remove` reject a target that something still references. Wants a `# test` covering both orders.
+
+## Go full integer: milli-units and integer milliseconds
+See and Audit the following before marking this task resolved:
+---
+Branch: `backlog/full-integer-milli-ms`  
+Worktree: `C:\Users\yonat\Projects\UniversalisRPG-full-integer`
+
+The current checkout was left alone; all code changes are in the new worktree. I also linked `node_modules` in that worktree to the existing install so I could verify without reinstalling dependencies.
+
+Implemented:
+- Raw simulation time is integer milliseconds.
+- Raw pools/resources are milli-units.
+- Cadence progress and action spans are integer milliseconds.
+- Resource rate integration carries integer remainders in state.
+- Save version bumped to `5`, with stored time/resource fixtures updated.
+- Float `EPSILON` usage removed from runtime resolution.
+- Tests updated to assert exact integer storage where appropriate.
+
+Verification passed:
+- `npm test` → 31 files, 476 tests passed
+- `npm run build` → passed
+
+No commit was made.
+---
 **SETTLED (2026-07-29).** Every number the simulation stores becomes an integer: pools and stats at
 milli-scale (`10.0` health is stored as `10000`), and `state.time`, cadence `progress` and every
 duration in integer milliseconds. Chosen for the correctness properties — fewer edge cases, no

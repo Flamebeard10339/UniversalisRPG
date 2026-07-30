@@ -113,7 +113,10 @@ function resolveReferences(module: ParsedModule, namespace: Namespace, loaded: R
       if (owner !== null && owner !== undefined && unorderedDependencies(module).has(owner)) {
         throw new DslError(`# remove ${removal.id} edits ${owner}, but ~ dependencies do not load before this module. Use a load-order dependency for patches.`);
       }
-      namespace.undeclare(removal.kind, removal.target);
+      // Deliberately does not undeclare: a removal is a merge-time fact, and
+      // taking the id out of the namespace here made every later module's
+      // reference to it fail while every earlier module's silently survived.
+      // What survives is proved against the built registry instead.
       continue;
     }
     const { id } = section.value as { id: string };

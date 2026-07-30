@@ -3,11 +3,31 @@ import { Recipe } from './recipe';
 import { Registry } from './registry';
 import { Dialogue } from './dialogue';
 import { Directive, Test } from './test';
+import { NAMESPACED_KINDS } from './namespace';
+import { Visit, visitSection } from './referenceSites';
 
-// Resolution already threw for anything naming an unknown object: a reference
-// that resolves to nothing cannot be rewritten into a key. What is left are the
-// references that point at something other than a namespaced object — a
-// capability, a node inside one dialogue, an action's own label.
+// Resolution qualifies a name; it cannot prove the name still points at
+// something. Both `# remove` and a `-field:` edit decide what survives at merge,
+// after every reference was authored, so this is the check `referenceSites.ts`
+// promises: walk the same sites once the universe is built and throw if one names
+// nothing. Doing it during resolution instead made the answer depend on module
+// order — the removing module's peers failed, its predecessors dangled silently.
+//
+// The namespace answers rather than the registry maps, because it is the one
+// place that already knows a member goes away with the object that owned it.
+export function validateSectionReferences(kind: string, id: string, value: object, registry: Registry): void {
+  const visit: Visit = (referenced, target, where) => {
+    if (NAMESPACED_KINDS.includes(referenced) && !registry.namespace.has(referenced, target)) {
+      throw new DslError(`${where} names an unknown ${referenced}: ${target}`);
+    }
+    return target;
+  };
+  visitSection(kind, { ...value }, `# ${kind} ${id}`, visit);
+}
+
+// What is left for the per-section checks below are the references that point at
+// something other than a namespaced object — a capability, a node inside one
+// dialogue, an action's own label.
 export function registryCapabilities(registry: Registry): Set<string> {
   const capabilities = new Set<string>();
   for (const entity of registry.entities.values()) for (const capability of entity.capabilities) capabilities.add(capability);
@@ -51,9 +71,3 @@ export function validateTestReferences(test: Test, registry: Registry): void {
   for (const each of test.directives) directive(each, `# test ${test.id}`);
 }
 
-export function validateReferences(registry: Registry): void {
-  const capabilities = registryCapabilities(registry);
-  for (const recipe of registry.recipes.values()) validateRecipeReferences(recipe, capabilities);
-  for (const dialogue of registry.dialogues.values()) validateDialogueReferences(dialogue);
-  for (const test of registry.tests.values()) validateTestReferences(test, registry);
-}
