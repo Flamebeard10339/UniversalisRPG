@@ -751,9 +751,13 @@ system were answered in the backlog triage that day:
   re-serialization through `serializeRegistryModule`. Losing comments and formatting costs nothing
   because the cache is a build artifact — the maintainer reads the issue body, which stays the
   author's original source.
-- **D10 — should an approved mod prompt before going live?** Settled: **no.** The official workflow
-  is `pending-mod` -> `approved-mod`, and the `approved-mod` label is the human gate. R3 already
-  narrowed the sync default to mods that validate, so nothing unvalidated auto-enables.
+- **D10 — should an approved mod prompt before going live?** Settled: **no** — the label is the human
+  gate, and R3 narrowed the sync default to mods that validate, so nothing unvalidated auto-enables.
+  **Superseded in part (2026-07-29):** this was settled against one flat `approved-mod` label, where
+  approval and activation were the same event. They are now separate labels — `mod-approved` is
+  listable but off until the user opts in, `mod-auto-enabled` defaults on. Contract in `backlog.md`
+  under "Contribution system audit follow-ups"; evidence in
+  `docs/audits/contribution-system-2026-07-29-reconciled.md`.
 - **D11 — how does the mod portal place a mod with multiple dependencies?** Settled by dissolving
   it: **the tree is built from `pack:`, not from the dependency graph.** `# info` already carries
   `pack:`, a mod belongs to exactly one, and packs are what the expansion story wants — "enable a

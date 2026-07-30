@@ -16,8 +16,10 @@ Two independent audits, reconciled in `docs/audits/contribution-system-2026-07-2
 Read that doc, not the two source passes — it carries the agreement ranking and the reproductions.
 Ordered by agreement: R1 and R3 first, because two passes (or two audit sessions) found them.
 
-**BLOCKED on the seven decisions listed at the end of this item.** R1 and R3 both have two live fix
-directions that produce different systems; R6 is a policy question with no default.
+**Unblocked 2026-07-29:** all seven decisions are settled at the end of this item, under the label-tier
+model stated there. That model is the contract the fixes are written against, and it adds work beyond
+the audit findings — the label rename plus a third tier, a multi-label `sync`, `Target universe`
+becoming live, and the base-modlist capture the web form cannot supply today.
 
 - **R1: the modportal enablement model is unsound in both directions.** One change, two halves that
   must land together (`scripts/modportal.ts`). `enable` writes `entry.enabled = true` and saves the
@@ -47,11 +49,11 @@ directions that produce different systems; R6 is a policy question with no defau
   test file; only its library is covered. `parseArgs` notes handling, the `localModuleLoaded` gate,
   `--notes-file`, and `--create`'s process handling are unexercised — and R3's notes half plus L1 and
   L2 all live there.
-- **R6: "approved" is a label, and it grants full module powers, on by default.** A labelled issue may
-  declare `starting` on its own location, redeclare a global `# variable`, carry `# remove entity.x`,
-  or register `# save`/`# test` into the shared registry, and `enabled: previous?.enabled ?? true`
-  switches it on. *"Approved mods are stored canonical"* below settles that the label is the human
-  gate; it does not settle what a third-party module may declare.
+- **R6: "approved" is a label, and it grants full module powers, on by default.** Half of this is
+  intended and half is the bug. Full module powers are intended (decision 4). What is wrong is
+  `enabled: previous?.enabled ?? true` (`src/content/modportal.ts:99`): under the tier model a
+  `mod-approved` entry defaults **off** and only `mod-auto-enabled` defaults on, so the default is a
+  function of tier rather than a constant.
 - **LOW, no decision needed:** L1 `createIssue`'s `finally` is dead (`process.exit` inside the `try`,
   so every `--create` leaks a temp dir holding the issue body). L2 a missing `gh` gives
   `publish-local-changes` a bare exit 1 with no output (`result.error` ignored). L3
@@ -60,34 +62,66 @@ directions that produce different systems; R6 is a policy question with no defau
   `DEFAULT_MODPORTAL_CACHE` and `MODPORTAL_MANIFEST_FILE` are split across layers though only scripts
   read either. L8 `serialize.ts:227` types its item parameter structurally instead of importing `Item`.
 
-Open decisions, all blocking:
+### The model these decisions assume
 
-1. **Is the web issue form authoritative, or is it removed?** Either the extractor matches the form's
-   rendered heading (case-insensitive, `##`/`###` tolerant) and the form gets a fixture, or the form
-   is reduced to a pointer at `npm run contribution:issue` and stops being a second, unvalidated
-   ingestion path. Bearing on it: the form cannot supply `Content Files`, so a web contribution is
-   ingested with no record of the base it was validated against, and its required `Target universe`
-   field is read by nothing.
-2. **Delimiter discipline: last occurrence, or refuse a duplicated heading?** Closes the notes-capture
-   half of R3 in one line either way.
-3. **Sync failure policy: per-issue, or all-or-nothing with a reachable escape hatch?** Either
-   materialize and validate per issue, writing the ones that load and recording the rest as
-   `enabled: false` with their diagnostic, or keep the all-or-nothing write and let
-   `enable`/`disable` target an issue number that is not yet in the manifest.
-4. **May a third-party approved mod declare every section kind?** (R6.) If not, the allowlist is the
-   deliverable and it wants stating before the editor and merge engine widen the surface.
-5. **Is `squash` absorbing local-created variables intended?** A new `# variable` squashes into
-   `# info base` cleanly while a new `# item` fails with *"publish local-changes as its own module
-   when it creates new content"* (`squash-local-changes.ts:137`). Variables being global rather than
-   module-owned makes it defensible — but then say so and test it, or make it fail like every other
-   kind.
-6. **Should `registryDiff` become the serializer's CI property?** It lives in
-   `squash-local-changes.ts:108-120` and *is* the round-trip property; `serialize.test.ts:102-114`
-   instead asserts nine cherry-picked fields on a synthetic module. Ran clean by hand over shipped
-   content during the audit, but a 356-line printer silently drops any field added to a domain type.
-   Decision is where the utility lives (it is shared, and the test would cross into the DSL load path).
-7. **Orphan cache files and resurrected enablement** (L9): prune the `.dsl` of an unlabelled issue and
-   remember its `enabled: false`, or accept that re-labelling returns it switched on?
+**SETTLED (2026-07-29).** The shipped game has a **canonical default modlist** — curated core mods,
+mostly project-owned — and that is what a first-time player sees. The modportal is an explicit
+settings/discovery surface for browsing, enabling, disabling and experimenting with community content.
+
+**Labels are workflow states, not one flat trust bit.** Three tiers, renamed from today's single
+`approved-mod`:
+
+| label | means | portal | default activation |
+| --- | --- | --- | --- |
+| `mod-pending` | submitted, not ready | not listed | — |
+| `mod-approved` | reviewed, listable | visible/installable | **off**; user opts in |
+| `mod-auto-enabled` | reviewed for default activation | visible/installable | on, after validation |
+
+`mod-auto-enabled` is a narrower, stronger channel than `mod-approved` — the curated trust surface,
+alongside the canonical default modlist. The general portal is user choice.
+
+Two consequences to carry into the work:
+
+- **The generated module id keeps its `approved-mod-<issue>` prefix.** It is content identity, not a
+  workflow state: if it tracked the label, promoting an issue from `mod-approved` to
+  `mod-auto-enabled` would rename its module and break every reference and save that names it. Only
+  the label strings and `--label` handling rename.
+- **`sync` fetches more than one label now.** `issueListFromGitHub` takes a single `--label`; it needs
+  the two listable tiers and must carry each entry's tier into the manifest, because tier is what
+  decides the default in decision 7.
+
+### Settled decisions (2026-07-29)
+
+1. **The web issue form stays authoritative.** It is the lowest-friction community path and becomes a
+   first-class ingestion format, not a stale parallel one. The CLI stays the *preferred* authoring
+   path, not the only valid submission path. Four parts: the extractor matches GitHub-rendered
+   headings case-insensitively and tolerates `##`/`###`; the form gets a fixture; `Target universe` is
+   actually read; and the form captures or derives the content files / base modlist the contribution
+   claims to validate against.
+2. **Refuse duplicated machine headings.** A body holds exactly one `Local Changes DSL` section.
+   Contributor notes may carry fenced DSL examples but must not be able to create a second parse
+   target. Extraction stays deterministic and fails closed.
+3. **Sync per issue, then validate the enabled set.** Materialize every fetched issue independently;
+   write the valid/listable entries; record broken ones as disabled carrying their diagnostic; and
+   make `enable` stage-then-validate before persisting. One bad mod must never block the rest from
+   reaching the portal, and enabling must never write a load-failing state.
+4. **No section allowlist for portal mods.** Real mods need `# variable`, `# remove`, an alternate
+   `starting`, saves, tests — total-conversion powers. The distinction that matters is the activation
+   tier above, not a restricted grammar.
+5. **`squash` absorbing local-created variables is intended.** Variables are global tuning knobs, not
+   module-owned content. State it explicitly and cover it. The asymmetry with `# item`/`# entity` is
+   correct: those create namespaced content that would disappear when squashed into another module
+   unless kept as its own module — which is exactly what the failure message already says.
+6. **`registryDiff` becomes the serializer's CI property.** The serializer's real contract is registry
+   round-trip equivalence, not nine cherry-picked fields. Move `registryDiff` into shared content
+   test tooling and drive serializer tests from it over shipped content plus a broad fixture. The
+   DSL-load-path crossing is accepted: the serializer exists to preserve loaded content semantics.
+7. **Prune orphan cache files; preserve enablement intent by issue number.** When an issue leaves the
+   fetched labelled set its `.dsl` is pruned, but a user's decision survives: disabling `#123`, then
+   unlabelling and re-labelling it, must not resurrect it as enabled. Intent therefore outlives the
+   entry and is keyed by issue number, so it needs a home in the manifest separate from the entry
+   list. New mods default by tier — `mod-approved` available but off, `mod-auto-enabled` on after
+   validation.
 
 ## Go full integer: milli-units and integer milliseconds
 **SETTLED (2026-07-29).** Every number the simulation stores becomes an integer: pools and stats at
@@ -240,9 +274,14 @@ comments included, by global text substitution. Replace it with canonical re-ser
 `serializeRegistryModule`. Comment loss costs nothing: the cache is a build artifact and the issue
 body remains the human-readable original.
 
-Also settled: **no additional prompt before an approved mod goes live.** The official workflow is
-`pending-mod` -> `approved-mod`, and the `approved-mod` label is the human gate. R3 already narrowed
-the default to mods that validate.
+Also settled: **no additional prompt before a reviewed mod goes live** — the label is the human gate,
+and validation narrows it further to mods that load.
+
+**Superseded in part (2026-07-29):** that decision was taken against one flat `approved-mod` label,
+where "goes live" meant "auto-enables". Under the tier model in the contribution follow-up item above,
+approval and activation are different labels: `mod-approved` is listable but off until the user opts
+in, and only `mod-auto-enabled` defaults on. No prompt still holds — the *label* is still the gate.
+What no longer holds is that reviewing a mod activates it.
 
 ## Mod portal organized by pack
 **SETTLED (2026-07-29).** Supersedes "how do you handle multiple dependencies / where do you place

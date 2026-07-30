@@ -205,9 +205,11 @@ B's ledger, carried forward so the next pass does not re-spend budget. Re-spot-c
 ## Disposition
 
 `backlog.md` carries the reconciled set as one item, ordered R1 → R3 → R4… , with the duplicate of
-R2 removed in favour of the already-settled *"Approved mods are stored canonical"*. Seven decisions
-are open and blocking (see that item): they are recorded there rather than here, because the audit is
-the evidence and the backlog is the todo list.
+R2 removed in favour of the already-settled *"Approved mods are stored canonical"*. The seven
+decisions the reconciliation surfaced were settled the same day and are recorded there, not here,
+because the audit is the evidence and the backlog is the contract. Two of them supersede earlier
+settled text: approval and activation became separate labels, so reviewing a mod no longer activates
+it (D10 in `docs/dsl-modules/deliverable-log.md`).
 
 `docs/audits/systems.json` points the Contribution system's `lastAuditDoc` at this file; the two
 source docs stay in the tree as the provenance for the agreement ranking.
