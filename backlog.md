@@ -15,6 +15,12 @@ Tracked in `docs/contribution-system/deliverable-log.md` — spec, the settled l
 is done and what is left. **Read that log before touching contribution code.** Evidence for every
 finding it carries is `docs/audits/contribution-system-2026-07-29-reconciled.md`.
 
+**DONE pending user confirmation.** Closeout commits: `6299045` covered
+`publish-local-changes` plus LOW L1/L2/L3/L5/L7/L8, `edba422` pinned the squash variable
+asymmetry, `c9c88e1` made `registryDiff` the serializer CI property, and `bd77f26` stored approved
+mods canonically. Open decision closed 2026-07-30: core mods ship with the game, so vanilla is
+playable offline and the mod portal is not required for the base state.
+
 ## `/dsl <kind> <id>` reads like a query and is a write (grammar evidence, 2026-07-29)
 Kept as evidence for the grammar work, not as a bug to patch in isolation. **What to fix is a
 question for the `/dsl` redesign**; what follows is the observation that should inform it.
@@ -275,6 +281,12 @@ where "goes live" meant "auto-enables". Under the tier model in the contribution
 approval and activation are different labels: `mod-approved` is listable but off until the user opts
 in, and only `mod-auto-enabled` defaults on. No prompt still holds — the *label* is still the gate.
 What no longer holds is that reviewing a mod activates it.
+
+**DONE pending user confirmation (`bd77f26`).** `materializeApprovedModIssue` now canonicalizes
+loadable `local-changes` submissions through `serializeRegistryModule` using the same base sources
+that `sync` validates against. The old global namespace text rewrite is gone for loadable mods; a
+test pins that prose containing `local-changes.*` is not rewritten. Broken submissions still
+materialize as blocked entries so one bad issue cannot disappear from the repair surface.
 
 ## Mod portal organized by pack
 **SETTLED (2026-07-29).** Supersedes "how do you handle multiple dependencies / where do you place

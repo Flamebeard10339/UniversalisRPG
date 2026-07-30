@@ -20,13 +20,15 @@ second reproduced a HIGH in it, while the second missed the raw-regex namespace 
 | R4. Missing-entry-file tolerance | **done** `8cde0dc` — closed with R1, same seam |
 | R3. Web form as an ingestion format | **done** `efa64cd` — extraction, `Target universe`, fixture |
 | R6. Enable-by-default | **done** `8cde0dc` — `intent[issue] ?? tierDefaultsEnabled(tier)`, covered |
-| R2. Approved mods stored canonical | not started — tracked in `backlog.md` as its own settled item |
-| R5. `publish-local-changes.ts` has no test | not started — **suggested next** |
-| Decision 5. `squash` variable asymmetry | not started — state it and cover it |
-| Decision 6. `registryDiff` as the serializer's CI property | not started |
-| LOW L1, L2, L3, L5, L7, L8 | not started |
+| R2. Approved mods stored canonical | **done** `bd77f26` — local-changes issues serialize canonically when loadable |
+| R5. `publish-local-changes.ts` has no test | **done** `6299045` — CLI coverage for notes, validation gate, `--create` |
+| Decision 5. `squash` variable asymmetry | **done** `edba422` — stated and covered |
+| Decision 6. `registryDiff` as the serializer's CI property | **done** `c9c88e1` — shared helper over fixture + shipped content |
+| LOW L1, L2, L3, L5, L7, L8 | **done** `6299045` — bundled LOW cleanup |
 
-Gates green at `efa64cd`: `tsc --noEmit`, 498 tests, `layer-check`, `audit-status`.
+Closeout verification on 2026-07-30: `npm test` 505 tests, `npm run build`, and `npm run
+layer-check` pass. `npm run audit-status` has no unowned files after this closeout, but still reports
+the broader DSL load path audit due at 22 commits over a threshold of 20.
 
 ## Deliverable
 
@@ -40,8 +42,9 @@ ingestion and enablement path that does exist.
 ## The model — SETTLED 2026-07-29
 
 The shipped game has a **canonical default modlist**: curated core mods, mostly project-owned, and
-that is what a first-time player sees. The modportal is an explicit settings/discovery surface for
-browsing, enabling, disabling and experimenting with community content.
+that is what a first-time player sees. Core mods ship with the game, so vanilla is playable without an
+internet connection and never depends on the mod portal. The modportal is an explicit
+settings/discovery surface for browsing, enabling, disabling and experimenting with community content.
 
 **Labels are workflow states, not one flat trust bit.**
 
@@ -133,22 +136,27 @@ author named was validated against something other than what the maintainer is a
 refused at ingestion. What each contribution claims as its base is recorded on the manifest entry:
 `Content Files` on the CLI path, `Target universe` on the form path.
 
-## What is left
+## What was left
 
-### R5 — `scripts/publish-local-changes.ts` has no test (suggested next)
+### R5 — `scripts/publish-local-changes.ts` has no test — DONE `6299045`
 
 146 lines, no test file; only its library is covered. Unexercised: `parseArgs` notes handling, the
 `localModuleLoaded` gate, `--notes-file`, and `--create`'s process handling. L1 and L2 below both live
 in that script, so they want doing in the same pass as the test that would catch them.
 
-### Decision 5 — state and cover the `squash` variable asymmetry
+Closed by `scripts/publish-local-changes.test.ts`, which covers `--notes-file`, local validation
+failure, missing `gh` reporting and temp cleanup.
+
+### Decision 5 — state and cover the `squash` variable asymmetry — DONE `edba422`
 
 `scripts/squash-local-changes.ts:137` folds the local module's `variable` ids into the target's
 globals, so a new `# variable` squashes cleanly while a new `# item` trips `registryDiff` and fails
 with *"publish local-changes as its own module when it creates new content."* Intended; untested and
 unstated. The only existing tests are the item case both ways.
 
-### Decision 6 — `registryDiff` as the serializer's CI property
+Now stated at the code seam and covered by `scripts/squash-local-changes.test.ts`.
+
+### Decision 6 — `registryDiff` as the serializer's CI property — DONE `c9c88e1`
 
 Lives in `scripts/squash-local-changes.ts:108-120` and *is* the round-trip property;
 `serialize.test.ts` instead asserts nine cherry-picked fields on a synthetic module. Verified clean by
@@ -158,14 +166,22 @@ the printer is 356 lines that silently drop any field added to a domain type. No
 needs; `registryDiff`'s own `CONTENT_MAPS` is a third expression of the same knowledge and should
 collapse into it.
 
-### R2 — approved mods stored canonical
+`src/content/registryDiff.ts` is the shared helper; `serialize.test.ts` asserts loaded registry
+equivalence for a broad fixture and shipped `content/tutorial-island.dsl`.
+
+### R2 — approved mods stored canonical — DONE `bd77f26`
 
 Tracked in `backlog.md` as its own settled item, *Approved mods are stored canonical*: replace
 `replaceLocalChangesNamespace`'s global text substitution with re-serialization through
 `serializeRegistryModule`. Sequence it **after** decision 6 — it makes the serializer the ingestion
 path, so the round-trip property should be held by CI first.
 
-### LOW
+Loadable local-changes issue modules are now canonicalized through `serializeRegistryModule` with
+structural reference renaming, so prose such as `say: local-changes.foo` is preserved. Broken modules
+still materialize with only `# info` renamed so they remain visible as blocked cache entries instead
+of becoming unreachable unusable submissions.
+
+### LOW — DONE `6299045`
 
 - **L1** `createIssue`'s `finally` is dead (`process.exit` inside the `try`), so every `--create` leaks
   a temp dir holding the issue body.
@@ -179,14 +195,18 @@ path, so the round-trip property should be held by CI first.
   scripts read either.
 - **L8** `serialize.ts:227` types its item parameter structurally instead of importing `Item`.
 
-## Open decisions
+## Open decisions — CLOSED 2026-07-30
 
-**One, and it is not blocking.** Decision 1 said the form must "capture **or derive**" the base
+**Closed.** Decision 1 said the form must "capture **or derive**" the base
 modlist. The derive route was taken: `Target universe` is the form's base declaration at module
 granularity, checked against the module's `dependencies:`, and no file-paths field was added to the
 form — asking a web contributor for `content/tutorial-island.dsl` is friction they cannot satisfy
 without a checkout. If the stronger reading is wanted (the form literally listing content files), it is
 one `input` in the `.yml` plus a branch in `contributionBase`.
+
+The stronger reading is not wanted for core content. Vanilla must be playable offline, so curated core
+mods ship with the game as the canonical default modlist. The web form continues to derive the base
+from `Target universe`; community portal sync is not the delivery path for base vanilla content.
 
 ## How to exercise it without GitHub
 
