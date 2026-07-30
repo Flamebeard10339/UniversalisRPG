@@ -147,9 +147,10 @@ function tierLabel(tier: ModTier): string {
 function sync(args: Args): void {
   const materialized: MaterializedMod[] = [];
   const unusable: string[] = [];
+  const base = args.contentFiles.map(contentSource);
   for (const issue of issueList(args)) {
     try {
-      materialized.push(materializeApprovedModIssue(issue));
+      materialized.push(materializeApprovedModIssue(issue, base));
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error);
       unusable.push(`Skipped #${issue?.number ?? '?'}: ${detail}`);
@@ -159,7 +160,7 @@ function sync(args: Args): void {
   const manifest = planModportalSync({
     existing: readManifest(args),
     materialized,
-    base: args.contentFiles.map(contentSource),
+    base,
     syncedAt: new Date().toISOString(),
   });
 

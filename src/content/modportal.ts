@@ -4,6 +4,8 @@ import type { ContributionBase } from './contribution';
 import { parseModuleSource } from './universe';
 import { formatModuleDiagnostic, loadUniverseWithDiagnostics } from './registry';
 import type { ModuleSource } from './universe';
+import { serializeRegistryModule } from './serialize';
+import { visitSection } from './referenceSites';
 
 export const MOD_PENDING_LABEL = 'mod-pending';
 export const MOD_APPROVED_LABEL = 'mod-approved';
@@ -81,37 +83,92 @@ function generatedModuleId(issue: number): string {
   return `approved-mod-${issue}`;
 }
 
-function escapeRegex(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+function renamedId(id: string, from: string, to: string): string {
+  return id.startsWith(`${from}.`) ? `${to}${id.slice(from.length)}` : id;
 }
 
 function replaceInfoId(source: string, from: string, to: string): string {
-  const pattern = new RegExp(`^(\\uFEFF?# info[ \\t]+)${escapeRegex(from)}(?=[ \\t]*(?:\\r?\\n|$))`, 'm');
+  const pattern = new RegExp(`^(\\uFEFF?# info[ \\t]+)${from}(?=[ \\t]*(?:\\r?\\n|$))`, 'm');
   const replaced = source.replace(pattern, `$1${to}`);
   if (replaced === source) throw new Error(`approved mod issue did not declare # info ${from}`);
   return replaced;
 }
 
-function replaceLocalChangesNamespace(source: string, moduleId: string): string {
-  return replaceInfoId(source, LOCAL_CHANGES_MODULE_ID, moduleId).replace(/(^|[^a-z0-9-])local-changes\./g, `$1${moduleId}.`);
+function cloned<T>(value: T): T {
+  return JSON.parse(JSON.stringify(value)) as T;
 }
 
-export function materializeApprovedModIssue(issue: ApprovedModIssue): MaterializedMod {
+function rewriteHydratedSection(kind: string, value: { id: string }, from: string, to: string): { id: string } {
+  const next = cloned(value);
+  next.id = renamedId(next.id, from, to);
+  if (kind === 'entity') {
+    const entity = next as typeof next & { stats?: Record<string, unknown> };
+    if (entity.stats) entity.stats = Object.fromEntries(Object.entries(entity.stats).map(([statId, range]) => [renamedId(statId, from, to), range]));
+  }
+  visitSection(kind, next, `# ${kind} ${value.id}`, (_kind, id) => renamedId(id, from, to));
+  return next;
+}
+
+function localVariableIds(parsed: ReturnType<typeof parseModuleSource>, moduleId: string): string[] {
+  return parsed.sections
+    .filter((section) => section.kind === 'variable')
+    .map((section) => renamedId((section.value as { id: string }).id, LOCAL_CHANGES_MODULE_ID, moduleId));
+}
+
+function canonicalLocalChangesModule(source: string, moduleId: string, base: readonly ModuleSource[]): string {
+  const checked = loadUniverseWithDiagnostics([...base, { name: LOCAL_CHANGES_MODULE_ID, text: source }]);
+  if (checked.diagnostics.length > 0) return replaceInfoId(source, LOCAL_CHANGES_MODULE_ID, moduleId);
+  const parsed = parseModuleSource({ name: LOCAL_CHANGES_MODULE_ID, text: source });
+  const registry = { ...checked.registry };
+  for (const [kind, mapName] of [
+    ['stat', 'stats'],
+    ['skill', 'skills'],
+    ['item', 'items'],
+    ['entity', 'entities'],
+    ['location', 'locations'],
+    ['recipe', 'recipes'],
+    ['resource', 'resources'],
+    ['dialogue', 'dialogues'],
+    ['flag', 'flags'],
+    ['variable', 'variables'],
+    ['test', 'tests'],
+  ] as const) {
+    const sourceMap = checked.registry[mapName] as ReadonlyMap<string, { id: string }>;
+    const next = new Map(sourceMap);
+    for (const [id, value] of sourceMap) {
+      if (!id.startsWith(`${LOCAL_CHANGES_MODULE_ID}.`)) continue;
+      next.delete(id);
+      const rewritten = rewriteHydratedSection(kind, value, LOCAL_CHANGES_MODULE_ID, moduleId);
+      next.set(rewritten.id, rewritten);
+    }
+    (registry[mapName] as Map<string, { id: string }>) = next;
+  }
+  const saves = new Map(checked.registry.saves);
+  for (const [id, save] of checked.registry.saves) {
+    if (!id.startsWith(`${LOCAL_CHANGES_MODULE_ID}.`)) continue;
+    saves.delete(id);
+    saves.set(renamedId(id, LOCAL_CHANGES_MODULE_ID, moduleId), cloned(save));
+  }
+  registry.saves = saves;
+  return serializeRegistryModule(registry, { info: { ...parsed.info, id: moduleId }, globalVariables: localVariableIds(parsed, moduleId) });
+}
+
+export function materializeApprovedModIssue(issue: ApprovedModIssue, baseSources: readonly ModuleSource[] = []): MaterializedMod {
   if (!Number.isInteger(issue.number) || issue.number <= 0) throw new Error('approved mod issue requires a positive issue number');
   if (!issue.title) throw new Error(`approved mod issue #${issue.number} requires a title`);
   if (!issue.body) throw new Error(`approved mod issue #${issue.number} has no body`);
   const extracted = extractContributionDsl(issue.body);
   const parsed = parseModuleSource({ name: `issue-${issue.number}`, text: extracted });
-  const base = contributionBase(issue.body);
+  const contribution = contributionBase(issue.body);
   // The universe a web contributor names is read rather than filed: a module
   // that does not depend on what its author says it targets was validated
   // against something other than what the maintainer is about to load.
   const declared = parsed.info.dependencies.map((dependency) => dependency.module);
-  if (base.universe !== undefined && !declared.includes(base.universe)) {
-    throw new Error(`approved mod issue #${issue.number} targets universe ${base.universe}, which its module does not declare a dependency on (it declares ${declared.join(', ') || 'none'})`);
+  if (contribution.universe !== undefined && !declared.includes(contribution.universe)) {
+    throw new Error(`approved mod issue #${issue.number} targets universe ${contribution.universe}, which its module does not declare a dependency on (it declares ${declared.join(', ') || 'none'})`);
   }
   const moduleId = parsed.info.id === LOCAL_CHANGES_MODULE_ID ? generatedModuleId(issue.number) : parsed.info.id;
-  const text = moduleId === parsed.info.id ? extracted : replaceLocalChangesNamespace(extracted, moduleId);
+  const text = moduleId === parsed.info.id ? extracted : canonicalLocalChangesModule(extracted, moduleId, baseSources);
   parseModuleSource({ name: moduleId, text });
   return {
     issue: issue.number,
@@ -119,7 +176,7 @@ export function materializeApprovedModIssue(issue: ApprovedModIssue): Materializ
     url: issue.url,
     updatedAt: issue.updatedAt,
     tier: issueTier(issue),
-    base,
+    base: contribution,
     moduleId,
     file: `${issue.number}-${moduleId}.dsl`,
     text,

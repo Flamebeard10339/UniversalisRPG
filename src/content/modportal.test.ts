@@ -41,6 +41,10 @@ function issueBody(localModule: string): string {
   return buildContributionIssueBody({ notes: 'Adds a gem.', localModule, validation, contentFiles: ['content/base.dsl'] });
 }
 
+function materialize(issue: Parameters<typeof materializeApprovedModIssue>[0]): ReturnType<typeof materializeApprovedModIssue> {
+  return materializeApprovedModIssue(issue, base);
+}
+
 function mod(issue: number, tier: ModTier, body: string): MaterializedMod {
   const moduleId = `approved-mod-${issue}`;
   return {
@@ -68,7 +72,7 @@ function enablement(manifest: ModportalManifest): Record<number, boolean> {
 
 describe('approved mod issues', () => {
   it('turns a local-changes contribution into a unique issue module', () => {
-    const materialized = materializeApprovedModIssue({ number: 42, title: 'Gem mod', body: issueBody(LOCAL), url: 'https://example.test/42' });
+    const materialized = materialize({ number: 42, title: 'Gem mod', body: issueBody(LOCAL), url: 'https://example.test/42' });
 
     expect(materialized.moduleId).toBe('approved-mod-42');
     expect(materialized.file).toBe('42-approved-mod-42.dsl');
@@ -76,6 +80,15 @@ describe('approved mod issues', () => {
     expect(materialized.text).toContain('+2 approved-mod-42.vigor');
     expect(materialized.text).not.toContain('# info local-changes');
     expect(materialized.text).not.toContain('local-changes.vigor');
+  });
+
+  it('canonicalizes approved local-changes modules without rewriting prose', () => {
+    const local = `${LOCAL}\n# entity teller\nrepeat:\n  say: local-changes.vigor is prose here\n`;
+    const materialized = materialize({ number: 43, title: 'Prose', body: issueBody(local) });
+
+    expect(materialized.text).toContain('# info approved-mod-43');
+    expect(materialized.text).toContain('+2 approved-mod-43.vigor');
+    expect(materialized.text).toContain('say: local-changes.vigor is prose here');
   });
 
   it('preserves a custom module id from an approved issue', () => {
@@ -90,8 +103,8 @@ describe('approved mod issues', () => {
   it('refuses an issue whose declared target universe its module does not depend on', () => {
     const targeting = (universe: string): string => `### Target universe\n\n${universe}\n\n### Local changes DSL\n\n\`\`\`dsl\n${LOCAL.trim()}\n\`\`\`\n`;
 
-    expect(materializeApprovedModIssue({ number: 8, title: 'Gem', body: targeting('base') }).base.universe).toBe('base');
-    expect(() => materializeApprovedModIssue({ number: 8, title: 'Gem', body: targeting('some-other-universe') })).toThrow(
+    expect(materialize({ number: 8, title: 'Gem', body: targeting('base') }).base.universe).toBe('base');
+    expect(() => materialize({ number: 8, title: 'Gem', body: targeting('some-other-universe') })).toThrow(
       /targets universe some-other-universe, which its module does not declare a dependency on \(it declares base\)/,
     );
   });
@@ -106,8 +119,8 @@ describe('approved mod issues', () => {
 
   it('keeps the generated module id off the label, so promoting a mod does not rename it', () => {
     const body = issueBody(LOCAL);
-    const approved = materializeApprovedModIssue({ number: 42, title: 'Gem mod', body, labels: [{ name: 'mod-approved' }] });
-    const promoted = materializeApprovedModIssue({ number: 42, title: 'Gem mod', body, labels: [{ name: 'mod-auto-enabled' }] });
+    const approved = materialize({ number: 42, title: 'Gem mod', body, labels: [{ name: 'mod-approved' }] });
+    const promoted = materialize({ number: 42, title: 'Gem mod', body, labels: [{ name: 'mod-auto-enabled' }] });
 
     expect(promoted.tier).toBe('auto-enabled');
     expect(promoted.moduleId).toBe(approved.moduleId);
