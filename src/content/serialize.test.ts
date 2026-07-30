@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { loadModule } from './registry';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
+import { loadModule, loadUniverse } from './registry';
+import { registryDiff } from './registryDiff';
 import { serializeRegistryModule } from './serialize';
+import { ModuleSource, parseModuleSource, ParsedModule } from './universe';
 
 const FULL_MODULE = `
 # info base
@@ -91,7 +95,32 @@ expect: blank
 `;
 
 describe('serializeRegistryModule', () => {
-  it('prints a canonical module that the loader accepts again', () => {
+  function variableIds(module: ParsedModule): string[] {
+    return module.sections.filter((section) => section.kind === 'variable').map((section) => (section.value as { id: string }).id);
+  }
+
+  function expectSemanticRoundTrip(source: ModuleSource): void {
+    const parsed = parseModuleSource(source);
+    const registry = loadUniverse([source]);
+    const printed = serializeRegistryModule(registry, {
+      info: parsed.info,
+      globalVariables: variableIds(parsed),
+    });
+    const roundTrip = loadUniverse([{ ...source, text: printed }]);
+
+    expect(registryDiff(registry, roundTrip)).toEqual([]);
+  }
+
+  it('preserves the loaded semantics of a broad fixture', () => {
+    expectSemanticRoundTrip({ name: 'base', text: FULL_MODULE });
+  });
+
+  it('preserves the loaded semantics of shipped content', () => {
+    const file = path.join(import.meta.dirname, '../../content/tutorial-island.dsl');
+    expectSemanticRoundTrip({ name: 'tutorial-island', text: readFileSync(file, 'utf8') });
+  });
+
+  it('prints readable canonical sections for the broad fixture', () => {
     const registry = loadModule(FULL_MODULE);
     const printed = serializeRegistryModule(registry, {
       info: { id: 'base', version: [1, 2, 3], pack: 'core' },

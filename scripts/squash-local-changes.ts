@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { formatModuleDiagnostic, loadUniverseWithDiagnostics } from '../src/content/registry';
-import type { Registry } from '../src/content/registry';
+import { registryDiff } from '../src/content/registryDiff';
 import { serializeRegistryModule } from '../src/content/serialize';
 import { ModuleSource, parseModuleSource, ParsedModule } from '../src/content/universe';
 
@@ -91,32 +91,6 @@ function writeOutput(file: string, text: string): void {
   const target = repoPath(file);
   mkdirSync(path.dirname(target), { recursive: true });
   writeFileSync(target, text, 'utf8');
-}
-
-const CONTENT_MAPS = ['entities', 'locations', 'items', 'stats', 'skills', 'recipes', 'resources', 'dialogues', 'tests', 'flags', 'variables', 'saves'] as const;
-
-function stable(value: unknown): unknown {
-  if (Array.isArray(value)) return value.map(stable);
-  if (value && typeof value === 'object') {
-    const out: Record<string, unknown> = {};
-    for (const key of Object.keys(value).sort()) out[key] = stable((value as Record<string, unknown>)[key]);
-    return out;
-  }
-  return value;
-}
-
-function registryDiff(before: Registry, after: Registry): string[] {
-  const lines: string[] = [];
-  for (const name of CONTENT_MAPS) {
-    const left = before[name] as Map<string, unknown>;
-    const right = after[name] as Map<string, unknown>;
-    for (const key of [...left.keys()].sort()) {
-      if (!right.has(key)) lines.push(`  ${name}: missing ${key}`);
-      else if (JSON.stringify(stable(left.get(key))) !== JSON.stringify(stable(right.get(key)))) lines.push(`  ${name}: changed ${key}`);
-    }
-    for (const key of [...right.keys()].sort()) if (!left.has(key)) lines.push(`  ${name}: added ${key}`);
-  }
-  return lines;
 }
 
 const args = parseArgs(process.argv.slice(2));
