@@ -10,6 +10,76 @@ deliverable log, not here.
 
 # Tasks
 
+## A block-form list line silently drops what it does not understand (DSL audit 2026-07-30, H1)
+`list.parseBlock` (`src/grammar/list.ts:22`) hands each child line a fresh cursor and never demands
+the rest of it. `4f1b648` swept `action.ts`, `dialogue.ts` and `test.ts` onto `parseWhole`/
+`requireEnd`; this is the one site it missed, and it is the site every block-form list field of every
+section kind goes through. On the shipped file, one letter changed in `while` at
+`content/tutorial-island.dsl:139`:
+
+```
+shipped as authored : [{"target":"…beach","condition":{…"front-door","unlocked"}}]
+one letter changed  : [{"target":"…beach"}]
+```
+
+The front-door gate disappears, the beach is adjacent from turn one, no diagnostic. Also silent:
+`entities:` / `  miki oven` holds one entity; `xp: brawling 2.5` in an `on success:` block holds `2`.
+The same text inline is rejected, so whether a typo is caught follows from whether the author used
+block form — and block form is what shipped content uses. Fix is `requireEnd` per line in the one
+place; wants a test that walks the list fields rather than one per field. Evidence:
+`docs/audits/dsl-load-path-2026-07-30.md`.
+
+## A removal that removes nothing says nothing (DSL audit 2026-07-30, M2 + M3)
+Two doors into one rule the repo already applies at section granularity — `registry.ts:521` throws
+`# remove ... names nothing that is loaded` — and does not apply to field edits.
+
+**M3, the worse half.** `declareMembers` (`src/content/resolve.ts:67`) walks
+`listMembers(value.flags)`, which flattens **every** op including `-`, so a patch that strips a flag
+*declares* it. `-flags: ghost` on another module's entity leaves `namespace.has('flag',
+'base.rat.ghost')` true, and an action `requires: base.rat.ghost` in the same patch then loads clean —
+permanently unavailable, no diagnostic. This is the same defect class as the `-field:` item below;
+that item names the missing undeclare, this names an active wrong declare, which is the simpler half
+and probably the first line of the fix.
+
+**M2.** `applyEdits` (`src/content/merge.ts:31`) never reports a `-` operand that identified nothing.
+For `stats:` that is the common case rather than the corner: `statAssignment` (`entity.ts:22`)
+requires a range, so `-stats: attack` is a parse error and `-stats: attack 5` against a base of
+`attack 4` is a silent no-op — a correct patch becomes a no-op the moment the base retunes the value.
+`merge.ts:22` claims "a `-` names as much of a member as it takes to identify it", which holds for
+`-adjacent: dunes` and not for the field the R1 work just made a list. The test added with that work
+pins only the restated-value case, so the suite stays green through the no-op.
+
+## Hydrate breaks the single-traversal invariant over reference sites (DSL audit 2026-07-30, M1)
+`referenceSites.ts:177` promises every reference site in one traversal "so that resolving one and
+validating one cannot drift apart". They have. `visitSection('entity')` reads the stat sheet through
+`listMembers` (`:185`), i.e. the authored `[statId, Range]` list; `validateSectionReferences` runs
+over the hydrated value where `stats` is a `Record`, so `listMembers` returns `[]` and the sheet is
+never walked. `# remove stat.base.attack` against an entity with `stats: attack 4` loads clean with
+the sheet still naming it, while the identical reference in `accuracy:` errors.
+
+The seam is already known: `registry.ts:340` hand-rolls `Object.entries(entity.stats)` for the
+dangling-dependency prune, doing `visitSection`'s job a second time because `visitSection` cannot see
+the hydrated sheet. **The duplication is the item**; the missed validation is its symptom. Deleting
+that loop is the proof the fix worked. Consequence today is bounded — `runtime/stats.ts:15` reads the
+sheet by stat id and nothing asks for a stat that is gone, so the stale entry is inert.
+
+## DSL audit 2026-07-30 lows
+- **L1** Action fields have no typo detection: `accuracey: attack` reports `unrecognized tag clause`.
+  `03d4f4b` gave `action.ts` the field table that would make the section engine's `one letter from
+  accuracy` message nearly free. Folds into **DSL-M2** below, whose *duplication* half is still open
+  (two field tables, two once-guards, one typo table) even though its laxity half is now closed but
+  for H1 above.
+- **L2** `registryDiff.ts:3` builds its map list from `CONTENT_SECTION_MAPS` plus three literals, so a
+  new registry map is silently outside the round-trip assertion that `bd77f26`'s canonicalization of
+  approved mods leans on. `SAVE_FIELDS` (`runtime/save.ts:37`) is the same-window pattern that gets
+  this right by type.
+- **L3** `grammar/actionResult.ts:33-34` says the same thing twice in different words.
+- **L4** `registry.ts:363` filters on whether an entity was pruned; nothing ever prunes an entity, so
+  the check reads as coverage that does not exist.
+- **L5** `validateBuiltRegistry` asserts a section's owner away five times (`registry.ts:441,451,462,
+  470,478`) and the caller dereferences it, while `startingLocationFailure` in the same file handles a
+  missing owner defensively. No input reaches it; the file disagrees with itself.
+
 ## `/dsl <kind> <id>` reads like a query and is a write (grammar evidence, 2026-07-29)
 Kept as evidence for the grammar work, not as a bug to patch in isolation. **What to fix is a
 question for the `/dsl` redesign**; what follows is the observation that should inform it.
@@ -63,6 +133,11 @@ member go with its owner. A `-field:` edit does not: it filters the object's `fl
 telling the namespace, so the member stays declared and the reference still resolves. Fixing it means
 member-level field edits reconciling with the namespace the way `# remove` now does. Same for any
 other member list a `-` edit can shorten.
+
+**Second door found (DSL audit 2026-07-30, M3).** The namespace is not merely un-told — it is told
+wrong. `declareMembers` (`resolve.ts:67`) walks `listMembers(value.flags)`, which flattens `-` ops
+too, so `-flags: ghost` *declares* `base.rat.ghost` for a flag that never existed. See the "A removal
+that removes nothing says nothing" item above; fix the two together.
 
 ## ~~`# remove` validates by load order, so a dangling reference can pass silently~~ FIXED
 Fixed on this branch. Resolution no longer undeclares; it only qualifies names. `# remove` undeclares

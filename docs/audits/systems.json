@@ -8,9 +8,9 @@
     {
       "name": "DSL load path",
       "paths": ["src/grammar", "src/content", "content"],
-      "lastAudit": "731c3a6",
-      "lastAuditDoc": "docs/audits/dsl-modules-2026-07-29-reconciled.md",
-      "note": "Two independent audits of chunks 1-8 (dsl-modules-2026-07-29-full.md and dsl-modules-2026-07-29-codex-independent.md), reconciled in the doc above — read that one; it carries the agreement ranking and the reproductions. Each pass found a HIGH the other missed, so neither source doc is sufficient alone. The full-system pass deliberately crossed into src/runtime/save.ts and scripts/, because engine requirement 6 is implemented outside this system's paths; that does not certify the Runtime system, whose own counter is untouched. Now also owns content/, the shipped DSL this path exists to load; the contribution system's files under src/content are owned by both, which is double coverage rather than a gap."
+      "lastAudit": "49b7ca6",
+      "lastAuditDoc": "docs/audits/dsl-load-path-2026-07-30.md",
+      "note": "The 2026-07-30 pass verified the previous reconciliation's R1, R2 (both halves), R7 and R8 closed, and found H1: list.parseBlock is the one fresh-cursor sub-parse 4f1b648 missed, so a block-form list line silently drops a typo — reproduced on the shipped file, where one letter turns the front-door gate into an unconditional edge. Its three mediums are all one theme, that a removal removing nothing says nothing, plus hydrate breaking the referenceSites single-traversal invariant. The earlier baseline is dsl-modules-2026-07-29-reconciled.md, which reconciles two independent passes that each found a HIGH the other missed; read it for the history rather than the source docs. Owns content/, the shipped DSL this path exists to load; the contribution system's files under src/content are owned by both, which is double coverage rather than a gap — five commits in the 2026-07-30 window are charged to both counters and were not re-audited here."
     },
     {
       "name": "Runtime",
