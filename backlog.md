@@ -10,6 +10,38 @@ deliverable log, not here.
 
 # Tasks
 
+## `checkSave` crashes on the save bodies it exists to reject (Runtime audit 2026-07-30, H1)
+Evidence: `docs/audits/runtime-2026-07-30.md`, H1. `SAVE_FIELDS.holds` (`src/runtime/save.ts:38-52`)
+is a real predicate for the ten scalar fields and bare `isObject` for the three that have an
+inside — `activeAction`, `player`, `activeBuffs`. A version-5 body whose ids are *all real* but
+whose `cadences` is absent reaches `Object.keys(active.cadences)` at `save.ts:127` and throws
+`TypeError: Cannot convert undefined or null to object` from inside `activeActionProblem` — the
+validator that wraps `findActionOwner` in a `try/catch` two lines earlier specifically to turn bad
+state into a warning. `{"activeAction":{}}` throws from `parseOwnerRef` the same way. This is the
+only gate between hand-written JSON and the resolver for `# save` sections, browser saves and disk
+saves alike (`06c2e47` routed all three through it).
+
+Fix: give the three object-shaped fields structural predicates. For `activeAction` that is a
+string `ownerRef`, a string `actionLabel` and a `cadences` object carrying `PLAYER` — the shape
+`activeActionProblem` already assumes, asserted before it is used. While there: `rng` is
+`isNumber` where `time` and both pool records are `isInteger` (M3), and `Math.imul` truncates, so
+every fractional cursor lands on one fixed stream. Same root, one-word fix.
+
+Also from that audit, each small and independent: a `# save` fixture that pins a pool mid-range,
+since all three shipped `# test` sections pass with every pool off by 1000x (M1, mutation-verified
+— `miki-route-end` pins `health` at `0`, the one value a scale change fixes); and
+`resourceRateRemainders` is never cleared when a resource stops having a rate (L2), so a stale
+sub-milli-unit remainder is serialised into saves.
+
+## `ability:` deals different damage on the two fight paths (Runtime audit 2026-07-30, M2)
+Measured evidence for the `action.health`/`target:` unification that pass-1 L4 and L6 are both
+BLOCKED on, so read it there rather than as a separate item. One stat `blow` at `2.5`, two actions
+differing only in `health:` vs `target: health`, four attempts each: the healthless path runs
+`100000 -> 90000` (exact, via `toMilliUnits(statValue(action.ability))` at `runtime.ts:72`) and
+the `target:` path runs `100000 -> 92000` (quantised, via `Math.trunc` in `hitDamage`,
+`stats.ts:47`). The `Math.trunc` predates the integer conversion, but the conversion made one path
+exact and left the other whole-unit, so the gap is wider now than when L4 was written.
+
 ## `/test` rewinds the live session and corrupts the test it records (TP audit 2026-07-30, H1)
 `runTestCommand` (`scripts/play-cli.ts:172`) passes `session.state` straight to `runTest`, so a
 `# test` beginning `load:` — the shape `/create-test` itself emits — overwrites the player's

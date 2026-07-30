@@ -15,9 +15,9 @@
     {
       "name": "Runtime",
       "paths": ["src/runtime"],
-      "lastAudit": "83d81d2",
-      "lastAuditDoc": "docs/audits/game-engine-2026-07-27-pass2.md",
-      "note": "Pass-1 L4 and L6 open, both BLOCKED on the action.health/target: unification; pass-2 L1 and pass-1 L2 closed 2026-07-29. Counter restarts at the restructure; pre-move commits are not attributable per layer."
+      "lastAudit": "d7c6493",
+      "lastAuditDoc": "docs/audits/runtime-2026-07-30.md",
+      "note": "The 2026-07-30 pass verified the integer conversion's core claim — 875 split points across a sign-changing rate all agree with the one-shot resolve, and every write into state.resources/time/progress is closed under the integer scale — and found H1: checkSave gives the three object-shaped save fields (activeAction, player, activeBuffs) no check past isObject, so a body whose ids are all real but whose cadences is absent crashes loadSave with a raw TypeError from inside the validator that exists to prevent it. Its mediums are all about what the window did not measure: the shipped # test regressions pass with every pool off by 1000x (mutation-verified, because the one save fixture pins health at 0, the value a scale change fixes), ability: 2.5 deals 2.5 down the healthless path and 2.0 down the target: path, and rng is the one GameState number left as isNumber so a fractional cursor collapses onto a fixed stream. Pass-1 L4 and L6 stay open and BLOCKED on the action.health/target: unification; M2 is fresh measured evidence for it. Pass-2 L1 and pass-1 L2 closed 2026-07-29. Counter restarts at the restructure; pre-move commits are not attributable per layer."
     },
     {
       "name": "Contribution system",
