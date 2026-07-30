@@ -2,7 +2,6 @@ import { formatModuleDiagnostic, ModuleDiagnostic, UniverseLoadResult } from './
 import { LOCAL_CHANGES_MODULE_ID } from './localChanges';
 
 export interface ContributionIssueInput {
-  title: string;
   notes?: string;
   localModule: string;
   validation: UniverseLoadResult;

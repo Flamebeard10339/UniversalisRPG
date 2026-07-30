@@ -14,8 +14,7 @@ import {
   localSectionHeadings,
   upsertLocalSection,
 } from '../src/content/localChanges';
-import { DEFAULT_MODPORTAL_CACHE } from '../src/content/modportal';
-import { readEntryText, readModportalCache } from './lib/modportalCache';
+import { DEFAULT_MODPORTAL_CACHE, readEntryText, readModportalCache } from './lib/modportalCache';
 import {
   apply,
   applyDirective,

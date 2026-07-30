@@ -38,7 +38,7 @@ function issueBody(localModule: string): string {
     { name: 'base', text: BASE },
     { name: 'local-changes', text: localModule },
   ]);
-  return buildContributionIssueBody({ title: '[Content]: gem', notes: 'Adds a gem.', localModule, validation, contentFiles: ['content/base.dsl'] });
+  return buildContributionIssueBody({ notes: 'Adds a gem.', localModule, validation, contentFiles: ['content/base.dsl'] });
 }
 
 function mod(issue: number, tier: ModTier, body: string): MaterializedMod {

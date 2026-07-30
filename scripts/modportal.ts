@@ -1,11 +1,11 @@
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
-import { DEFAULT_MODPORTAL_CACHE, LISTABLE_MOD_LABELS, materializeApprovedModIssue, planModportalSync } from '../src/content/modportal';
+import { LISTABLE_MOD_LABELS, materializeApprovedModIssue, planModportalSync } from '../src/content/modportal';
 import type { ApprovedModIssue, MaterializedMod, ModportalEntry, ModportalManifest, ModTier } from '../src/content/modportal';
 import { formatModuleDiagnostic, loadUniverseWithDiagnostics } from '../src/content/registry';
 import type { ModuleSource } from '../src/content/universe';
-import { MODPORTAL_MANIFEST_FILE, modportalEntryPath, orphanEntryFiles, readEntryText, readModportalCache } from './lib/modportalCache';
+import { DEFAULT_MODPORTAL_CACHE, MODPORTAL_MANIFEST_FILE, modportalEntryPath, orphanEntryFiles, readEntryText, readModportalCache } from './lib/modportalCache';
 
 const repoRoot = path.join(import.meta.dirname, '..');
 const defaultContent = 'content/tutorial-island.dsl';

@@ -7,6 +7,7 @@ import { TagClause } from '../grammar/tagClause';
 import { Quantified } from '../grammar/values';
 import { Dialogue, TextSegment } from './dialogue';
 import { Entity } from './entity';
+import { Item } from './item';
 import { Location } from './location';
 import { Recipe } from './recipe';
 import { Registry } from './registry';
@@ -224,7 +225,7 @@ function titled(lines: Lines, value: { title?: string; examine?: string }): void
   if (value.examine !== undefined) lines.push(`examine: ${value.examine}`);
 }
 
-function itemSection(moduleId: string, item: { id: string; title?: string; examine?: string; tags?: TagClause[]; actions?: Action[] }): string {
+function itemSection(moduleId: string, item: Item): string {
   const lines = [`# item ${moduleLocalId(moduleId, item.id)}`];
   titled(lines, item);
   if (item.tags && item.tags.length > 0) lines.push(item.tags.map(tag).join(', '));

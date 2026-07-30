@@ -81,12 +81,12 @@ function parseLocalSection(sectionSource: string): LocalSection {
 export function upsertLocalSection(source: string, dependencies: readonly string[], sectionSource: string): LocalSectionEdit {
   const section = parseLocalSection(sectionSource);
   const sections = bodySections(source);
-  const kept = sections.filter((existing) => existing.kind !== section.kind || existing.id !== section.id);
-  const replaced = kept.length !== sections.length;
+  const found = sections.findIndex((existing) => existing.kind === section.kind && existing.id === section.id);
+  const next = found === -1 ? [...sections, section] : sections.map((existing, index) => (index === found ? section : existing));
   return {
-    text: renderLocalChangesModule(dependencies, [...kept.map((existing) => existing.text), section.text]),
+    text: renderLocalChangesModule(dependencies, next.map((existing) => existing.text)),
     section,
-    replaced,
+    replaced: found !== -1,
   };
 }
 

@@ -8,7 +8,6 @@ import type { ModuleSource } from './universe';
 export const MOD_PENDING_LABEL = 'mod-pending';
 export const MOD_APPROVED_LABEL = 'mod-approved';
 export const MOD_AUTO_ENABLED_LABEL = 'mod-auto-enabled';
-export const DEFAULT_MODPORTAL_CACHE = 'content/modportal.local';
 export const MODPORTAL_MANIFEST_VERSION = 2;
 
 export type ModTier = 'approved' | 'auto-enabled';

@@ -10,13 +10,13 @@ describe('local-changes module text helpers', () => {
   it('upserts one section by kind and id while preserving the other staged sections', () => {
     let text = initialLocalChangesModule(['base']);
     text = upsertLocalSection(text, ['base'], '# item gem\ntitle: Gem\n').text;
+    text = upsertLocalSection(text, ['base'], '# entity sprite\ntitle: Sprite\n').text;
     const edited = upsertLocalSection(text, ['base'], '# item gem\ntitle: Ruby\n');
-    text = upsertLocalSection(edited.text, ['base'], '# entity sprite\ntitle: Sprite\n').text;
 
     expect(edited.replaced).toBe(true);
-    expect(localSectionHeadings(text)).toEqual(['# item gem', '# entity sprite']);
-    expect(text).toContain('title: Ruby');
-    expect(text).not.toContain('title: Gem');
+    expect(localSectionHeadings(edited.text)).toEqual(['# item gem', '# entity sprite']);
+    expect(edited.text).toContain('title: Ruby');
+    expect(edited.text).not.toContain('title: Gem');
   });
 
   it('deletes one staged section and reports misses without changing the module', () => {

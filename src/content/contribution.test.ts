@@ -30,7 +30,6 @@ describe('contribution issue packaging', () => {
 
     expect(localModuleLoaded('local-changes', validation)).toBe(true);
     const body = buildContributionIssueBody({
-      title: '[Content]: gem',
       notes: 'Adds a gem.',
       localModule: `\uFEFF${LOCAL}`,
       validation,
@@ -48,7 +47,6 @@ describe('contribution issue packaging', () => {
       { name: 'local-changes', text: LOCAL },
     ]);
     const body = buildContributionIssueBody({
-      title: '[Content]: gem',
       notes: ['Replaces what used to read:', '```dsl', '# item gem', 'title: Rock', '```'].join('\n'),
       localModule: LOCAL,
       validation,
@@ -64,7 +62,7 @@ describe('contribution issue packaging', () => {
       { name: 'local-changes', text: LOCAL },
     ]);
     const build = (notes: string): string =>
-      buildContributionIssueBody({ title: '[Content]: gem', notes, localModule: LOCAL, validation, contentFiles: ['content/base.dsl'] });
+      buildContributionIssueBody({ notes, localModule: LOCAL, validation, contentFiles: ['content/base.dsl'] });
 
     expect(() => build(['## Local Changes DSL', '```dsl', '# item gem', 'title: NOT WHAT WAS VALIDATED', '```'].join('\n'))).toThrow(/notes cannot contain a Local Changes DSL heading/);
     expect(() => build('### local changes dsl')).toThrow(/notes cannot contain a Local Changes DSL heading/);
@@ -76,7 +74,7 @@ describe('contribution issue packaging', () => {
       { name: 'base', text: BASE },
       { name: 'local-changes', text: LOCAL },
     ]);
-    const body = buildContributionIssueBody({ title: '[Content]: gem', localModule: LOCAL, validation, contentFiles: ['content/base.dsl', 'content/extra.dsl'] });
+    const body = buildContributionIssueBody({ localModule: LOCAL, validation, contentFiles: ['content/base.dsl', 'content/extra.dsl'] });
 
     expect(contributionBase(body).contentFiles).toEqual(['content/base.dsl', 'content/extra.dsl']);
     expect(contributionBase(body).universe).toBeUndefined();

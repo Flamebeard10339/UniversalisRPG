@@ -1,6 +1,7 @@
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import { buildContributionIssueBody, localDiagnostics, localModuleLoaded } from '../src/content/contribution';
 import { formatModuleDiagnostic, loadUniverseWithDiagnostics } from '../src/content/registry';
@@ -37,7 +38,7 @@ function splitFiles(value: string): string[] {
   return value.split(',').map((file) => file.trim()).filter(Boolean);
 }
 
-function parseArgs(raw: string[]): Args {
+export function parseArgs(raw: string[]): Args {
   const args: Args = {
     contentFiles: splitFiles(defaultContent),
     localFile: defaultLocal,
@@ -104,7 +105,7 @@ function fail(lines: string[]): never {
   process.exit(1);
 }
 
-function createIssue(args: Args, body: string): void {
+export function createIssue(args: Args, body: string): number {
   const dir = mkdtempSync(path.join(os.tmpdir(), 'universalis-issue-'));
   const bodyFile = path.join(dir, 'body.md');
   try {
@@ -113,35 +114,36 @@ function createIssue(args: Args, body: string): void {
     for (const label of args.labels) ghArgs.push('--label', label);
     if (args.repo) ghArgs.push('--repo', args.repo);
     const result = spawnSync('gh', ghArgs, { stdio: 'inherit' });
-    process.exit(result.status ?? 1);
+    if (result.error) console.error(`Could not create GitHub issue with gh: ${result.error.message}`);
+    return result.status ?? 1;
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
 }
 
-const args = parseArgs(process.argv.slice(2));
-if (!existsSync(repoPath(args.localFile))) fail([`Local changes file not found: ${args.localFile}`]);
+export function main(raw: string[] = process.argv.slice(2)): void {
+  const args = parseArgs(raw);
+  if (!existsSync(repoPath(args.localFile))) fail([`Local changes file not found: ${args.localFile}`]);
 
-const baseSources = args.contentFiles.map(source);
-const localSource = source(args.localFile);
-const validation = loadUniverseWithDiagnostics([...baseSources, localSource]);
-if (!localModuleLoaded(localSource.name, validation)) {
-  fail([
-    `${LOCAL_CHANGES_MODULE_ID} did not validate:`,
-    ...localDiagnostics(localSource.name, validation.diagnostics).map((diagnostic) => `  ${formatModuleDiagnostic(diagnostic)}`),
-  ]);
+  const baseSources = args.contentFiles.map(source);
+  const localSource = source(args.localFile);
+  const validation = loadUniverseWithDiagnostics([...baseSources, localSource]);
+  if (!localModuleLoaded(localSource.name, validation)) {
+    fail([
+      `${LOCAL_CHANGES_MODULE_ID} did not validate:`,
+      ...localDiagnostics(localSource.name, validation.diagnostics).map((diagnostic) => `  ${formatModuleDiagnostic(diagnostic)}`),
+    ]);
+  }
+
+  const body = buildContributionIssueBody({
+    notes: args.notes,
+    localModule: localSource.text,
+    validation,
+    contentFiles: args.contentFiles,
+  });
+
+  if (!args.create) console.log(body);
+  else process.exit(createIssue(args, body));
 }
 
-const body = buildContributionIssueBody({
-  title: args.title,
-  notes: args.notes,
-  localModule: localSource.text,
-  validation,
-  contentFiles: args.contentFiles,
-});
-
-if (!args.create) {
-  console.log(body);
-} else {
-  createIssue(args, body);
-}
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) main();

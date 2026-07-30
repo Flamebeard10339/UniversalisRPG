@@ -3,6 +3,7 @@ import path from 'node:path';
 import { emptyModportalManifest, MODPORTAL_MANIFEST_VERSION } from '../../src/content/modportal';
 import type { ModportalEntry, ModportalManifest, ModTier } from '../../src/content/modportal';
 
+export const DEFAULT_MODPORTAL_CACHE = 'content/modportal.local';
 export const MODPORTAL_MANIFEST_FILE = 'manifest.json';
 
 // Every filename `sync` writes: an issue number, the module id, `.dsl`. Pruning
