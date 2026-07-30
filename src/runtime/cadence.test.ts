@@ -84,7 +84,7 @@ describe('independent cadences', () => {
   it('interleaves two clocks with no shared tick', () => {
     const registry = loaded();
     const state = fighting(registry);
-    resolve(state, registry, 12);
+    resolve(state, registry, secondsToMs(12));
 
     // player at 2.4 / 4.8 / 7.2 / 9.6 / 12.0; rat at 3.75 / 7.5 / 11.25
     expect(playerClock(state).attemptsMade).toBe(5);
@@ -94,7 +94,7 @@ describe('independent cadences', () => {
   it('reads each side damage off its own sheet', () => {
     const registry = loaded();
     const state = fighting(registry);
-    resolve(state, registry, 12);
+    resolve(state, registry, secondsToMs(12));
 
     // player attack 10 - rat dr 2 = 8, five times
     expect(ratOf(state).resources.health).toBe(toMilliUnits(1000 - 5 * 8));
@@ -107,7 +107,7 @@ describe('independent cadences', () => {
     const state = fighting(registry, 'punchbag', 'hit');
     expect(state.activeAction!.cadences['punchbag']).toBeUndefined();
 
-    resolve(state, registry, 12);
+    resolve(state, registry, secondsToMs(12));
     expect(state.resources['health']).toBe(toMilliUnits(100)); // nothing swings back
   });
 
@@ -115,7 +115,7 @@ describe('independent cadences', () => {
     const registry = loaded();
     const state = fighting(registry, 'punchbag', 'hit');
     // 24 hp at 10 a hit: three swings, so the fight turns over at t=7.2.
-    resolve(state, registry, 8);
+    resolve(state, registry, secondsToMs(8));
 
     expect(state.inventory['rat-tail']).toBeUndefined();
     expect(state.activeAction!.actors!['punchbag'].resources.health).toBe(toMilliUnits(24)); // refilled
@@ -137,7 +137,7 @@ describe('a rate raised mid-swing (absolute carry)', () => {
   function hasted(at: number): { registry: Registry; state: GameState } {
     const registry = loaded();
     const state = fighting(registry);
-    resolve(state, registry, at);
+    resolve(state, registry, secondsToMs(at));
     state.activeBuffs['sword:attack-rate'] = { statId: 'attack-rate', kind: 'increased', amount: 0.25, expiresAt: secondsToMs(10_000) };
     return { registry, state };
   }
@@ -147,20 +147,20 @@ describe('a rate raised mid-swing (absolute carry)', () => {
     const { registry, state } = hasted(1.2);
     expect(playerClock(state).progress).toBe(secondsToMs(1.2));
 
-    resolve(state, registry, 1.95);
+    resolve(state, registry, secondsToMs(1.95));
     expect(playerClock(state).attemptsMade).toBe(1);
   });
 
   it('leaves the unhasted swing until 2.4, so the assertion above is about the buff', () => {
     const registry = loaded();
     const state = fighting(registry);
-    resolve(state, registry, 1.95);
+    resolve(state, registry, secondsToMs(1.95));
     expect(playerClock(state).attemptsMade).toBe(0);
   });
 
   it('quickens every later swing too', () => {
     const { registry, state } = hasted(1.2);
-    resolve(state, registry, 12);
+    resolve(state, registry, secondsToMs(12));
     // 1.92, 3.84, 5.76, 7.68, 9.6, 11.52 — six swings where 25/min gave five.
     expect(playerClock(state).attemptsMade).toBe(6);
   });
@@ -170,7 +170,7 @@ describe('two cadences stay associative', () => {
   it('matches one jump against random split points, including the instant both clocks collide', () => {
     const registry = loaded();
     const oneShot = fighting(registry);
-    resolve(oneShot, registry, 300);
+    resolve(oneShot, registry, secondsToMs(300));
 
     let seed = 17;
     const rand = () => {
@@ -186,7 +186,7 @@ describe('two cadences stay associative', () => {
       sorted.push(300);
 
       const folded = fighting(registry);
-      for (const t of sorted) resolve(folded, registry, t);
+      for (const t of sorted) resolve(folded, registry, secondsToMs(t));
 
       expect(folded.time).toBe(oneShot.time);
       expect(folded.rng).toBe(oneShot.rng);
@@ -203,7 +203,7 @@ describe('two cadences stay associative', () => {
   it('resolves both swings at a collision instant, in roster order', () => {
     const registry = loaded();
     const state = fighting(registry);
-    resolve(state, registry, 60);
+    resolve(state, registry, secondsToMs(60));
     expect(playerClock(state).attemptsMade).toBe(25);
     expect(ratClock(state)!.attemptsMade).toBe(16);
     expect(playerClock(state).progress).toBe(0);

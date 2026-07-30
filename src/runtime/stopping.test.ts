@@ -158,7 +158,7 @@ function fighting(source = MODULE): { registry: Registry; state: GameState } {
 describe('a pool running out stops the fight', () => {
   it('ends at the instant health empties, not at the end of whatever span was asked for', () => {
     const { registry, state } = fighting();
-    resolve(state, registry, 300);
+    resolve(state, registry, secondsToMs(300));
 
     expect(state.resources['health']).toBe(0);
     expect(state.activeAction).toBeNull();
@@ -172,18 +172,18 @@ describe('a pool running out stops the fight', () => {
   it('pins that instant to the third bite', () => {
     const { registry, state } = fighting();
 
-    resolve(state, registry, 11.2);
+    resolve(state, registry, secondsToMs(11.2));
     expect(state.resources['health']).toBe(toMilliUnits(10));
     expect(state.activeAction).not.toBeNull();
 
-    resolve(state, registry, 11.3);
+    resolve(state, registry, secondsToMs(11.3));
     expect(state.resources['health']).toBe(0);
     expect(state.activeAction).toBeNull();
   });
 
   it('keeps swinging when no one authored it as fatal', () => {
     const { registry, state } = fighting(WITHOUT_STOP);
-    resolve(state, registry, 300);
+    resolve(state, registry, secondsToMs(300));
 
     // The engine has no opinion about a pool named `health`.
     expect(state.resources['health']).toBe(0);
@@ -194,7 +194,7 @@ describe('a pool running out stops the fight', () => {
   it('runs the rest of the on-empty block, which is where losing your things lives', () => {
     const { registry, state } = fighting();
     state.inventory['rat-tail'] = 3;
-    resolve(state, registry, 300);
+    resolve(state, registry, secondsToMs(300));
 
     expect(state.inventory['rat-tail']).toBe(2); // `take: 1 rat-tail` on blacking out
     expect(state.log.filter((line) => line === 'You black out.')).toHaveLength(1);
@@ -203,7 +203,7 @@ describe('a pool running out stops the fight', () => {
   it('stops a deterministic drain on its exact second too', () => {
     const { registry, state } = started();
     armAction('entity', 'treadmill', 'run', registry, state);
-    resolve(state, registry, 100);
+    resolve(state, registry, secondsToMs(100));
 
     // -60/min against 30 empties at t=30, and nextBoundary lands the segment
     // there, so this path is exact rather than segment-granular.
@@ -219,7 +219,7 @@ describe('a pool running out stops the fight', () => {
     state.activeBuffs['elixir:max-vigor'] = { statId: 'max-vigor', amount: point(20), kind: 'added', expiresAt: secondsToMs(10) };
     restorePools(state, { vigor: toMilliUnits(20) });
 
-    resolve(state, registry, 20);
+    resolve(state, registry, secondsToMs(20));
 
     expect(state.resources['vigor']).toBe(0);
     expect(state.log).toContain('Your vigor gutters out.');
@@ -230,11 +230,11 @@ describe('a pool running out stops the fight', () => {
 
   it('lands death at the same instant however the span is split', () => {
     const { registry: oneRegistry, state: oneShot } = fighting();
-    resolve(oneShot, oneRegistry, 300);
+    resolve(oneShot, oneRegistry, secondsToMs(300));
 
     for (const splits of [[5, 300], [11.25, 300], [1, 2, 3, 11, 11.5, 60, 300], [0.5, 11.2, 11.3, 300]]) {
       const { registry, state } = fighting();
-      for (const t of splits) resolve(state, registry, t);
+      for (const t of splits) resolve(state, registry, secondsToMs(t));
 
       expect(state.rng).toBe(oneShot.rng);
       expect(state.resources['health']).toBe(oneShot.resources['health']);
@@ -254,7 +254,7 @@ describe('`stop` among an action’s own results', () => {
 
   it('ends a batched deterministic action at its first completion, not after the span’s worth', () => {
     const { registry, state } = stopping('altar', 'chant');
-    resolve(state, registry, 100);
+    resolve(state, registry, secondsToMs(100));
 
     expect(state.inventory['blessing']).toBe(1);
     expect(state.log.filter((line) => line === 'You have had enough.')).toHaveLength(1);
@@ -264,10 +264,10 @@ describe('`stop` among an action’s own results', () => {
 
   it('gives the same answer jumped as stepped, which is the invariant it used to break', () => {
     const jumped = stopping('altar', 'chant');
-    resolve(jumped.state, jumped.registry, 100);
+    resolve(jumped.state, jumped.registry, secondsToMs(100));
 
     const stepped = stopping('altar', 'chant');
-    for (let t = 1; t <= 100; t++) resolve(stepped.state, stepped.registry, t);
+    for (let t = 1; t <= 100; t++) resolve(stepped.state, stepped.registry, secondsToMs(t));
 
     expect(stepped.state.inventory).toEqual(jumped.state.inventory);
     expect(stepped.state.log).toEqual(jumped.state.log);
@@ -277,7 +277,7 @@ describe('`stop` among an action’s own results', () => {
 
   it('ends a per-attempt fight without leaving the resolver holding a felled one', () => {
     const { registry, state } = stopping('straw-man', 'spar');
-    resolve(state, registry, 300);
+    resolve(state, registry, secondsToMs(300));
 
     expect(state.inventory['rat-tail']).toBe(1);
     expect(state.activeAction).toBeNull();
@@ -287,11 +287,11 @@ describe('`stop` among an action’s own results', () => {
 
   it('lands the per-attempt stop at the same instant however the span is split', () => {
     const jumped = stopping('straw-man', 'spar');
-    resolve(jumped.state, jumped.registry, 300);
+    resolve(jumped.state, jumped.registry, secondsToMs(300));
 
     for (const splits of [[4.8, 300], [2.4, 5, 300], [1, 2, 3, 4, 5, 60, 300], [0.5, 4.7, 4.9, 300]]) {
       const { registry, state } = stopping('straw-man', 'spar');
-      for (const t of splits) resolve(state, registry, t);
+      for (const t of splits) resolve(state, registry, secondsToMs(t));
 
       expect(state.rng).toBe(jumped.state.rng);
       expect(state.inventory).toEqual(jumped.state.inventory);
@@ -308,11 +308,11 @@ describe('a start condition that stops holding', () => {
     state.flags['shrine.moon-up'] = true;
     armAction('entity', 'shrine', 'chant', registry, state);
 
-    resolve(state, registry, 3);
+    resolve(state, registry, secondsToMs(3));
     expect(state.inventory['blessing']).toBe(3);
 
     delete state.flags['shrine.moon-up'];
-    resolve(state, registry, 10);
+    resolve(state, registry, secondsToMs(10));
     expect(state.inventory['blessing']).toBe(3); // nothing since the moon set
     expect(state.activeAction).toBeNull();
   });
@@ -323,11 +323,11 @@ describe('a start condition that stops holding', () => {
     armAction('entity', 'training-post', 'drill', registry, state);
 
     // 30 health at 10 a hit is 3 swings, so a fight turns over every 7.2s.
-    resolve(state, registry, 15);
+    resolve(state, registry, secondsToMs(15));
     expect(state.inventory['blessing']).toBe(2);
 
     delete state.flags['training-post.permitted'];
-    resolve(state, registry, 100);
+    resolve(state, registry, secondsToMs(100));
     expect(state.inventory['blessing']).toBe(2);
     expect(state.activeAction).toBeNull();
   });
@@ -336,11 +336,11 @@ describe('a start condition that stops holding', () => {
     const { registry, state } = started();
     armAction('entity', 'beacon', 'tend', registry, state);
 
-    resolve(state, registry, 3);
+    resolve(state, registry, secondsToMs(3));
     expect(state.inventory['blessing']).toBe(3);
 
     state.flags['beacon.dawn'] = true;
-    resolve(state, registry, 6);
+    resolve(state, registry, secondsToMs(6));
     expect(state.inventory['blessing']).toBe(6);
     expect(state.activeAction).not.toBeNull();
   });

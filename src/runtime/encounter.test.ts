@@ -162,7 +162,7 @@ describe('damage against a target pool', () => {
     const registry = loaded();
     const state = started(registry);
     useAction('entity', 'training-dummy', 'strike', registry, state);
-    resolve(state, registry, 2); // second hit takes 4 -> 0
+    resolve(state, registry, secondsToMs(2)); // second hit takes 4 -> 0
 
     expect(state.flags['training-dummy.dummies-felled']).toBe(1); // entity-scoped, as any bare counter is
     expect(state.activeAction!.actors!['training-dummy'].resources.health).toBe(toMilliUnits(12)); // refilled
@@ -173,7 +173,7 @@ describe('damage against a target pool', () => {
     const registry = loaded();
     const state = started(registry);
     useAction('entity', 'training-dummy', 'strike', registry, state);
-    resolve(state, registry, 10);
+    resolve(state, registry, secondsToMs(10));
 
     // "You black out." belongs to the player's health, not a felled dummy's.
     expect(state.log).not.toContain('You black out.');
@@ -187,7 +187,7 @@ describe('damage against a target pool', () => {
     useAction('entity', 'iron-golem', 'chip', registry, state);
     expect(state.activeAction!.actors!['iron-golem'].resources.health).toBe(toMilliUnits(2));
 
-    resolve(state, registry, 3);
+    resolve(state, registry, secondsToMs(3));
     expect(state.activeAction).toBeNull(); // 3 hp, 3 hits, fight over
   });
 
@@ -198,7 +198,7 @@ describe('damage against a target pool', () => {
 
     const levels: number[] = [];
     for (let t = 1; t <= 8; t++) {
-      resolve(state, registry, t);
+      resolve(state, registry, secondsToMs(t));
       levels.push(state.activeAction!.actors!['straw-man'].resources.health);
     }
     // wild-attack is 4-7 and the straw man's dr is 1, so each hit is 3, 4 or 5.
@@ -219,7 +219,7 @@ describe('a target: action resolves per attempt, and stays associative doing it'
     }
 
     const oneShot = fighting();
-    resolve(oneShot, registry, 200);
+    resolve(oneShot, registry, secondsToMs(200));
     expect(oneShot.inventory['straw']).toBeGreaterThan(0); // fights really complete
 
     let seed = 5;
@@ -235,7 +235,7 @@ describe('a target: action resolves per attempt, and stays associative doing it'
       sorted.push(200);
 
       const folded = fighting();
-      for (const t of sorted) resolve(folded, registry, t);
+      for (const t of sorted) resolve(folded, registry, secondsToMs(t));
 
       expect(folded.time).toBe(oneShot.time);
       expect(folded.rng).toBe(oneShot.rng);

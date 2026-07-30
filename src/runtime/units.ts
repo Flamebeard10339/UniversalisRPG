@@ -18,7 +18,15 @@ export function msToSeconds(ms: number): number {
   return ms / MS_PER_SECOND;
 }
 
+// Floor, not truncate: it is what keeps the remainder in [0, MS_PER_MINUTE) and
+// so makes the split of a span unobservable even where the rate changes sign.
 export function divideRateRemainder(acc: number): { units: number; remainder: number } {
-  const units = Math.trunc(acc / MS_PER_MINUTE);
+  const units = Math.floor(acc / MS_PER_MINUTE);
   return { units, remainder: acc - units * MS_PER_MINUTE };
+}
+
+// The instant a pool draining at `rateMilliPerMinute` reaches zero, as the
+// smallest dt for which divideRateRemainder takes `current` to 0 or below.
+export function msUntilEmpty(current: number, rateMilliPerMinute: number, remainder: number): number {
+  return Math.ceil((MS_PER_MINUTE * (1 - current) - 1 - remainder) / rateMilliPerMinute);
 }

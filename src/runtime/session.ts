@@ -7,7 +7,7 @@ import { ResourceDisplay } from '../content/resource';
 import { compareSave, loadSave, startingLocationId } from './save';
 import { Directive } from '../content/test';
 import { humanize } from '../grammar/values';
-import { fromMilliUnits, msToSeconds } from './units';
+import { fromMilliUnits, msToSeconds, secondsToMs } from './units';
 
 export type PlayChoiceKind = 'talk' | 'action' | 'travel' | 'dialogue' | 'craft';
 
@@ -259,7 +259,7 @@ export function beginAction(session: PlaySession, choiceId: string): PlayView {
   // armAction has already logged a take-gate failure and left activeAction
   // unset; an instant action has nothing to wait for, so beginning it is doing
   // it, which is what useAction does with a zero first unit.
-  if (armed.armed && armed.firstUnit === 0) resolve(state, registry, msToSeconds(state.time));
+  if (armed.armed && armed.firstUnit === 0) resolve(state, registry, state.time);
   return view(session);
 }
 
@@ -350,7 +350,7 @@ export function applyDirective(session: PlaySession, directive: Directive): { fa
       endAction(state);
       return {};
     case 'wait':
-      resolve(state, registry, msToSeconds(state.time) + directive.seconds);
+      resolve(state, registry, state.time + secondsToMs(directive.seconds));
       return {};
   }
 }

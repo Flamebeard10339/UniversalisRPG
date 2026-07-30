@@ -4,7 +4,7 @@ import { Registry } from '../content/registry';
 import { Resource } from '../content/resource';
 import { endAction, GameState, RuntimeError } from './state';
 import { statValue } from './stats';
-import { divideRateRemainder, fromMilliUnits, toMilliUnits } from './units';
+import { divideRateRemainder, toMilliUnits } from './units';
 
 export interface Segment {
   state: GameState;
@@ -102,10 +102,6 @@ export function captureResourceRates(state: GameState, registry: Registry): Reso
 // The one cast that opens PoolLevels for writing.
 function levels(state: GameState): Record<string, number> {
   return state.resources as Record<string, number>;
-}
-
-export function poolDisplayValue(level: number): number {
-  return fromMilliUnits(level);
 }
 
 // Loading a save constructs a state rather than moving pools: no rollover, no clamp.

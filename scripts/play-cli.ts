@@ -34,7 +34,7 @@ import { pruneStateForRegistry, serializeSave } from '../src/runtime/save';
 import { type ParsedSave } from '../src/content/saveSection';
 import { parseDirectiveLine, type Directive } from '../src/content/test';
 import { resolveDirective } from '../src/content/typed';
-import { fromMilliUnits, msToSeconds } from '../src/runtime/units';
+import { fromMilliUnits, msToSeconds, toMilliUnits } from '../src/runtime/units';
 
 const repoRoot = path.join(import.meta.dirname, '..');
 const defaultContent = 'content/tutorial-island.dsl';
@@ -579,7 +579,7 @@ export function liveTick(session: PlaySession, elapsedMs: number, multiplier: nu
   const clock = after.cadences[PLAYER];
   const bar = duration > 0 ? progressBar(clock.progress / duration) : progressBar(1);
   // `healthRemaining` is the older single-target counter, meaningless in a fight.
-  const showCombat = clock.attemptsMade > 0 || after.healthRemaining < 1000;
+  const showCombat = clock.attemptsMade > 0 || after.healthRemaining < toMilliUnits(1);
   const detail = liveCombatDetail(session) || (showCombat ? ` hits:${clock.attemptsMade} target-hp:${fromMilliUnits(after.healthRemaining).toFixed(1)}` : '');
   const line = `${label}... ${bar}${detail}  [time: ${msToSeconds(session.state.time).toFixed(1)}s]`;
   return { active: true, line };

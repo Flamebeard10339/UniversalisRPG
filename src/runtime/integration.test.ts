@@ -4,7 +4,7 @@ import { point } from '../grammar/range';
 import { createGameState, resolve, useAction } from './runtime';
 import { loadModule } from '../content/registry';
 import { runTest, startSession } from './session';
-import { msToSeconds, secondsToMs, toMilliUnits } from './units';
+import { secondsToMs, toMilliUnits } from './units';
 
 const source = readFileSync('content/tutorial-island.dsl', 'utf8');
 const registry = loadModule(source);
@@ -43,7 +43,7 @@ describe('tutorial-island health resource (Pass 2 end-to-end)', () => {
     useAction('entity', 'tutorial-island.giant-rat', 'fight', registry, state);
     expect(state.time).toBe(secondsToMs(2.4));
 
-    resolve(state, registry, 120); // far longer than the ~6s the rat lasts
+    resolve(state, registry, secondsToMs(120)); // far longer than the ~6s the rat lasts
     const afterFighting = state.resources['tutorial-island.health'];
     expect(state.flags['tutorial-island.rats-killed']).toBe(1);
     expect(afterFighting).toBeLessThan(toMilliUnits(30)); // it got its bites in
@@ -52,7 +52,7 @@ describe('tutorial-island health resource (Pass 2 end-to-end)', () => {
 
     // A standing buff needs no active action to tick.
     state.activeBuffs['tutorial-island.cooked-shrimp:regeneration'] = { statId: 'tutorial-island.regeneration', amount: point(3), kind: 'added', expiresAt: state.time + secondsToMs(60) };
-    resolve(state, registry, msToSeconds(state.time) + 60);
+    resolve(state, registry, state.time + secondsToMs(60));
     expect(state.resources['tutorial-island.health']).toBe(Math.min(toMilliUnits(30), afterFighting + toMilliUnits(3)));
   });
 });

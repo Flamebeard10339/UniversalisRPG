@@ -162,9 +162,9 @@ describe('a contest inside a fight', () => {
     const registry = loaded();
 
     const open = fighting(registry, 'dummy');
-    resolve(open, registry, ATTEMPTS);
+    resolve(open, registry, secondsToMs(ATTEMPTS));
     const evasive = fighting(registry, 'phantom');
-    resolve(evasive, registry, ATTEMPTS);
+    resolve(evasive, registry, secondsToMs(ATTEMPTS));
 
     // Only the target's `dodge` differs, so this pins `evasion:` to the TARGET.
     expect(hitsLanded(open, 'dummy') / ATTEMPTS).toBeCloseTo(0.909, 1);
@@ -176,12 +176,12 @@ describe('a contest inside a fight', () => {
     const registry = loaded();
 
     const bare = fighting(registry, 'biter');
-    resolve(bare, registry, ATTEMPTS);
+    resolve(bare, registry, secondsToMs(ATTEMPTS));
 
     const nimble = fighting(registry, 'biter');
     // A ring of dodging: +100 closes the rat's 100-point skill advantage to nil.
     nimble.activeBuffs['ring:dodge'] = { statId: 'dodge', kind: 'added', amount: point(100), expiresAt: secondsToMs(1e9) };
-    resolve(nimble, registry, ATTEMPTS);
+    resolve(nimble, registry, secondsToMs(ATTEMPTS));
 
     expect(hitsTaken(bare) / ATTEMPTS).toBeCloseTo(0.909, 1);
     expect(hitsTaken(nimble) / ATTEMPTS).toBeCloseTo(0.5, 1);
@@ -192,7 +192,7 @@ describe('a contest inside a fight', () => {
 
     const nimble = fighting(registry, 'biter');
     nimble.activeBuffs['ring:dodge'] = { statId: 'dodge', kind: 'added', amount: point(100), expiresAt: secondsToMs(1e9) };
-    resolve(nimble, registry, ATTEMPTS);
+    resolve(nimble, registry, secondsToMs(ATTEMPTS));
 
     // The player's own `evasion: dodge` reads the BITER's dodge, not their buff.
     expect(hitsLanded(nimble, 'biter') / ATTEMPTS).toBeCloseTo(0.909, 1);
@@ -201,7 +201,7 @@ describe('a contest inside a fight', () => {
   it('still costs exactly one draw per attempt, contested or not', () => {
     const registry = loaded();
     const state = fighting(registry, 'phantom');
-    resolve(state, registry, ATTEMPTS);
+    resolve(state, registry, secondsToMs(ATTEMPTS));
 
     // The reference cursor steps through nextRandom itself: restating the LCG
     // here would pin this test to the implementation (rng.test.ts checks that).
@@ -213,7 +213,7 @@ describe('a contest inside a fight', () => {
   it('stays associative across arbitrary splits', () => {
     const registry = loaded();
     const oneShot = fighting(registry, 'biter');
-    resolve(oneShot, registry, 600);
+    resolve(oneShot, registry, secondsToMs(600));
 
     let seed = 31;
     const rand = () => {
@@ -228,7 +228,7 @@ describe('a contest inside a fight', () => {
       sorted.push(600);
 
       const folded = fighting(registry, 'biter');
-      for (const t of sorted) resolve(folded, registry, t);
+      for (const t of sorted) resolve(folded, registry, secondsToMs(t));
 
       expect(folded.rng).toBe(oneShot.rng);
       expect(folded.time).toBe(oneShot.time);

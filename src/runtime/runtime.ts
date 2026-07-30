@@ -40,7 +40,7 @@ import { nextRandom } from './rng';
 import { advanceTime, endAction, GameState, PLAYER, RuntimeError } from './state';
 import { attemptDuration, hitChance, hitDamage, sampleStat, statValue } from './stats';
 import { TagClause } from '../grammar/tagClause';
-import { MS_PER_MINUTE, secondsToMs, toMilliUnits } from './units';
+import { msUntilEmpty, secondsToMs, toMilliUnits } from './units';
 
 export { advanceTime, createGameState, endAction, PLAYER, RuntimeError } from './state';
 export type { ActiveBuff, GameState } from './state';
@@ -115,12 +115,10 @@ function nextBoundary(state: GameState, registry: Registry, toTime: number): num
     if (resource.onEmpty.length === 0 || !resource.rate) continue;
     const ratePerMinute = statValue(resource.rate, state, registry);
     if (ratePerMinute >= 0) continue;
-    const rateMilliPerMinute = toMilliUnits(ratePerMinute);
     const current = state.resources[resource.id] ?? 0;
     if (current <= 0) continue;
-    const target = -current * MS_PER_MINUTE;
-    const emptyIn = Math.ceil((target - (state.resourceRateRemainders[resource.id] ?? 0)) / rateMilliPerMinute);
-    const emptyInstant = state.time + Math.max(0, emptyIn);
+    const emptyIn = msUntilEmpty(current, toMilliUnits(ratePerMinute), state.resourceRateRemainders[resource.id] ?? 0);
+    const emptyInstant = state.time + emptyIn;
     if (emptyInstant < boundary) boundary = emptyInstant;
   }
   return boundary;
@@ -332,23 +330,19 @@ function applyDueBoundaries(state: GameState, registry: Registry, at: number): v
   }
 }
 
-function resolveAtMs(state: GameState, registry: Registry, toTime: number): void {
-  if (toTime < state.time) throw new RuntimeError(`resolve: toTime (${toTime}) must be >= state.time (${state.time})`);
-  if (!Number.isInteger(toTime)) throw new RuntimeError(`resolve: toTime must be an integer millisecond value, got ${toTime}`);
+// Associative, as resolve.test.ts proves. Two accepted limitations: an `on full`
+// handler mutating a rate-referenced stat is not, and a stochastic action
+// emptying a pool fires `on empty` at segment granularity, not the exact instant.
+export function resolve(state: GameState, registry: Registry, toTimeMs: number): void {
+  if (toTimeMs < state.time) throw new RuntimeError(`resolve: toTime (${toTimeMs}) must be >= state.time (${state.time})`);
+  if (!Number.isInteger(toTimeMs)) throw new RuntimeError(`resolve: toTime must be an integer millisecond value, got ${toTimeMs}`);
   applyDueBoundaries(state, registry, state.time);
-  while (state.time < toTime) {
-    const segEnd = nextBoundary(state, registry, toTime);
+  while (state.time < toTimeMs) {
+    const segEnd = nextBoundary(state, registry, toTimeMs);
     resolveSegment(state, registry, segEnd);
     // At the instant reached, not segEnd: buffs may still have time left.
     applyDueBoundaries(state, registry, state.time);
   }
-}
-
-// Associative, as resolve.test.ts proves. Two accepted limitations: an `on full`
-// handler mutating a rate-referenced stat is not, and a stochastic action
-// emptying a pool fires `on empty` at segment granularity, not the exact instant.
-export function resolve(state: GameState, registry: Registry, toTimeSeconds: number): void {
-  resolveAtMs(state, registry, secondsToMs(toTimeSeconds));
 }
 
 function grantFoodBuff(item: Item, state: GameState): void {
@@ -432,7 +426,7 @@ export function actionFirstUnit(obj: string, objId: string, actionId: string, re
 export function useAction(obj: string, objId: string, actionId: string, registry: Registry, state: GameState): void {
   const armed = armAction(obj, objId, actionId, registry, state);
   if (!armed.armed) return;
-  resolveAtMs(state, registry, state.time + armed.firstUnit);
+  resolve(state, registry, state.time + armed.firstUnit);
 }
 
 // A journey from an unset origin is a plain placement, not a journey.
@@ -487,5 +481,5 @@ export function craftFirstUnit(recipeId: string, registry: Registry, state: Game
 export function craft(recipeId: string, registry: Registry, state: GameState): void {
   const armed = armCraft(recipeId, registry, state);
   if (!armed.armed) return;
-  resolveAtMs(state, registry, state.time + armed.firstUnit);
+  resolve(state, registry, state.time + armed.firstUnit);
 }

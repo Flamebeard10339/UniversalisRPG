@@ -227,7 +227,7 @@ describe('spannable repeating craft', () => {
     expect(state.time).toBe(secondsToMs(2));
     expect(state.activeAction).toEqual({ ownerRef: 'recipe.brick', actionLabel: 'Craft Brick', repeating: true, healthRemaining: toMilliUnits(1), cadences: { player: { progress: 0, attemptsMade: 0 } } });
 
-    resolve(state, registry, 6); // two more completions' worth of time
+    resolve(state, registry, secondsToMs(6)); // two more completions' worth of time
     expect(state.inventory['clay-brick']).toBe(3);
     expect(state.inventory['raw-clay']).toBe(0);
     expect(state.activeAction).toBeNull(); // input exhausted mid-way through the span
@@ -272,7 +272,7 @@ describe('burn: accuracy < 1 with a burnt output', () => {
     state.inventory['raw-clay'] = attempts;
 
     craft('tile', registry, state);
-    resolve(state, registry, attempts * 10); // generous horizon; input exhausts well before this
+    resolve(state, registry, secondsToMs(attempts * 10)); // generous horizon; input exhausts well before this
 
     const fired = state.inventory['clay-tile'] ?? 0;
     const burnt = state.inventory['slag'] ?? 0;
