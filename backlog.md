@@ -165,28 +165,14 @@ it is decided by a name. Fix direction: validate references after all modules ar
 `# remove` reject a target that something still references. Wants a `# test` covering both orders.
 
 ## Go full integer: milli-units and integer milliseconds
-See and Audit the following before marking this task resolved:
----
-Branch: `backlog/full-integer-milli-ms`  
-Worktree: `C:\Users\yonat\Projects\UniversalisRPG-full-integer`
+**DONE — `2c2ccee` (conversion) and `f9dfd72` (audit fixes), on `dsl-pass2-resources`.** Awaiting
+your confirmation to move to `completed-tasks.md`. The `backlog/full-integer-milli-ms` worktree at
+`C:\Users\yonat\Projects\UniversalisRPG-full-integer` held the conversion uncommitted against a base
+12 commits stale; it applied cleanly here and is now superseded, so that worktree and branch can be
+deleted. Audit notes are in `f9dfd72`'s message: the seconds-taking `resolve()` wrapper and the
+truncating remainder were the two findings, and the four properties the spec settled in prose below
+now have tests in `resolve.test.ts`.
 
-The current checkout was left alone; all code changes are in the new worktree. I also linked `node_modules` in that worktree to the existing install so I could verify without reinstalling dependencies.
-
-Implemented:
-- Raw simulation time is integer milliseconds.
-- Raw pools/resources are milli-units.
-- Cadence progress and action spans are integer milliseconds.
-- Resource rate integration carries integer remainders in state.
-- Save version bumped to `5`, with stored time/resource fixtures updated.
-- Float `EPSILON` usage removed from runtime resolution.
-- Tests updated to assert exact integer storage where appropriate.
-
-Verification passed:
-- `npm test` → 31 files, 476 tests passed
-- `npm run build` → passed
-
-No commit was made.
----
 **SETTLED (2026-07-29).** Every number the simulation stores becomes an integer: pools and stats at
 milli-scale (`10.0` health is stored as `10000`), and `state.time`, cadence `progress` and every
 duration in integer milliseconds. Chosen for the correctness properties — fewer edge cases, no
