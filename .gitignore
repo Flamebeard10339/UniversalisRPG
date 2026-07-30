@@ -15,7 +15,8 @@ vite.*.log
 
 completed-tasks.md
 
-.planning/*
+.planning/.scratch.md
+.planning/old/*
 
 
 # Emitted by tsc --build for the tsconfig.node project.
