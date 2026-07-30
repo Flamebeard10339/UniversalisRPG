@@ -134,6 +134,9 @@ if (loaded.diagnostics.length > 0) fail(['Cannot squash while diagnostics are pr
 
 const globals = new Set<string>(variableIds(target));
 const localParsed = parsedModules.find((module) => module.source === localSource);
+// Variables are global tuning knobs rather than module-owned content, so a
+// local-created variable can become part of the squashed module's globals. A
+// local-created item/entity/etc. is still refused by registryDiff below.
 if (localParsed && localParsed.info.id !== targetId) for (const id of variableIds(localParsed)) globals.add(id);
 
 const squashed = serializeRegistryModule(loaded.registry, { info: target.info, globalVariables: [...globals].sort() });

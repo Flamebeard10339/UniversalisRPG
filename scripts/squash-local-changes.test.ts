@@ -98,4 +98,40 @@ describe('squash-local-changes', () => {
       rmSync(dir, { recursive: true, force: true });
     }
   });
+
+  it('absorbs local-created variables as target globals when squashing', () => {
+    const dir = mkdtempSync(path.join(os.tmpdir(), 'universalis-squash-'));
+    try {
+      const base = write(
+        path.join(dir, 'base.dsl'),
+        `
+        # info base
+        version: 1.0.0
+
+        # location camp
+        x: 0, y: 0
+        starting
+        `,
+      );
+      const local = write(
+        path.join(dir, 'local-changes.dsl'),
+        `
+        # info local-changes
+        version: 0.0.0
+        dependencies:
+          base
+
+        # variable tutorial-speed
+        value: 7
+        `,
+      );
+
+      const output = runSquash([`local=${local}`, `content=${base}`]);
+
+      expect(output).toContain('# variable tutorial-speed');
+      expect(output).toContain('value: 7');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
 });
