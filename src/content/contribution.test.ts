@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildContributionIssueBody, extractContributionDsl, localModuleLoaded } from './contribution';
+import { buildContributionIssueBody, contributionBase, extractContributionDsl, localModuleLoaded } from './contribution';
 import { loadUniverseWithDiagnostics } from './registry';
 
 const BASE = `
@@ -56,6 +56,36 @@ describe('contribution issue packaging', () => {
     });
 
     expect(extractContributionDsl(body)).toBe(LOCAL.trimEnd() + '\n');
+  });
+
+  it('refuses to build a body whose notes carry the delimiter, before it is submitted', () => {
+    const validation = loadUniverseWithDiagnostics([
+      { name: 'base', text: BASE },
+      { name: 'local-changes', text: LOCAL },
+    ]);
+    const build = (notes: string): string =>
+      buildContributionIssueBody({ title: '[Content]: gem', notes, localModule: LOCAL, validation, contentFiles: ['content/base.dsl'] });
+
+    expect(() => build(['## Local Changes DSL', '```dsl', '# item gem', 'title: NOT WHAT WAS VALIDATED', '```'].join('\n'))).toThrow(/notes cannot contain a Local Changes DSL heading/);
+    expect(() => build('### local changes dsl')).toThrow(/notes cannot contain a Local Changes DSL heading/);
+    expect(() => build(['Quoting the shape of it:', '```md', '## Local Changes DSL', '```'].join('\n'))).not.toThrow();
+  });
+
+  it('reads back the content files it recorded, so a maintainer knows the base', () => {
+    const validation = loadUniverseWithDiagnostics([
+      { name: 'base', text: BASE },
+      { name: 'local-changes', text: LOCAL },
+    ]);
+    const body = buildContributionIssueBody({ title: '[Content]: gem', localModule: LOCAL, validation, contentFiles: ['content/base.dsl', 'content/extra.dsl'] });
+
+    expect(contributionBase(body).contentFiles).toEqual(['content/base.dsl', 'content/extra.dsl']);
+    expect(contributionBase(body).universe).toBeUndefined();
+  });
+
+  it('refuses a body with no delimiter rather than taking the first fence it finds', () => {
+    const body = ['## Summary', 'Here is my module:', '```dsl', '# info local-changes', 'version: 0.0.0', '```'].join('\n');
+
+    expect(() => extractContributionDsl(body)).toThrow(/no Local Changes DSL heading/);
   });
 
   it('reports a local module as not loaded when diagnostics disabled it', () => {

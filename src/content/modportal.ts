@@ -1,5 +1,6 @@
 import { LOCAL_CHANGES_MODULE_ID } from './localChanges';
-import { extractContributionDsl } from './contribution';
+import { contributionBase, extractContributionDsl } from './contribution';
+import type { ContributionBase } from './contribution';
 import { parseModuleSource } from './universe';
 import { formatModuleDiagnostic, loadUniverseWithDiagnostics } from './registry';
 import type { ModuleSource } from './universe';
@@ -33,6 +34,7 @@ export interface MaterializedMod {
   url?: string;
   updatedAt?: string;
   tier: ModTier;
+  base: ContributionBase;
   moduleId: string;
   file: string;
   text: string;
@@ -44,6 +46,10 @@ export interface ModportalEntry {
   url?: string;
   updatedAt?: string;
   tier: ModTier;
+  // What the contribution claimed it was validated against, carried so a
+  // maintainer reading the cache can tell a mod checked against this content set
+  // from one checked against something else.
+  base?: ContributionBase;
   moduleId: string;
   file: string;
   enabled: boolean;
@@ -97,6 +103,14 @@ export function materializeApprovedModIssue(issue: ApprovedModIssue): Materializ
   if (!issue.body) throw new Error(`approved mod issue #${issue.number} has no body`);
   const extracted = extractContributionDsl(issue.body);
   const parsed = parseModuleSource({ name: `issue-${issue.number}`, text: extracted });
+  const base = contributionBase(issue.body);
+  // The universe a web contributor names is read rather than filed: a module
+  // that does not depend on what its author says it targets was validated
+  // against something other than what the maintainer is about to load.
+  const declared = parsed.info.dependencies.map((dependency) => dependency.module);
+  if (base.universe !== undefined && !declared.includes(base.universe)) {
+    throw new Error(`approved mod issue #${issue.number} targets universe ${base.universe}, which its module does not declare a dependency on (it declares ${declared.join(', ') || 'none'})`);
+  }
   const moduleId = parsed.info.id === LOCAL_CHANGES_MODULE_ID ? generatedModuleId(issue.number) : parsed.info.id;
   const text = moduleId === parsed.info.id ? extracted : replaceLocalChangesNamespace(extracted, moduleId);
   parseModuleSource({ name: moduleId, text });
@@ -106,6 +120,7 @@ export function materializeApprovedModIssue(issue: ApprovedModIssue): Materializ
     url: issue.url,
     updatedAt: issue.updatedAt,
     tier: issueTier(issue),
+    base,
     moduleId,
     file: `${issue.number}-${moduleId}.dsl`,
     text,
@@ -143,6 +158,7 @@ export function planModportalSync(plan: SyncPlan): ModportalManifest {
       url: mod.url,
       updatedAt: mod.updatedAt,
       tier: mod.tier,
+      base: mod.base,
       moduleId: mod.moduleId,
       file: mod.file,
       enabled: false,

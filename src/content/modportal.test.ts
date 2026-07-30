@@ -43,7 +43,15 @@ function issueBody(localModule: string): string {
 
 function mod(issue: number, tier: ModTier, body: string): MaterializedMod {
   const moduleId = `approved-mod-${issue}`;
-  return { issue, title: `Mod ${issue}`, tier, moduleId, file: `${issue}-${moduleId}.dsl`, text: `# info ${moduleId}\nversion: 0.0.0\ndependencies:\n  base\n\n${body}` };
+  return {
+    issue,
+    title: `Mod ${issue}`,
+    tier,
+    base: { universe: 'base', contentFiles: [] },
+    moduleId,
+    file: `${issue}-${moduleId}.dsl`,
+    text: `# info ${moduleId}\nversion: 0.0.0\ndependencies:\n  base\n\n${body}`,
+  };
 }
 
 const gem = (issue: number, tier: ModTier): MaterializedMod => mod(issue, tier, '# item gem\ntitle: Gem\n');
@@ -77,6 +85,15 @@ describe('approved mod issues', () => {
     expect(materialized.moduleId).toBe('gem-pack');
     expect(materialized.file).toBe('7-gem-pack.dsl');
     expect(materialized.text).toContain('# info gem-pack');
+  });
+
+  it('refuses an issue whose declared target universe its module does not depend on', () => {
+    const targeting = (universe: string): string => `### Target universe\n\n${universe}\n\n### Local changes DSL\n\n\`\`\`dsl\n${LOCAL.trim()}\n\`\`\`\n`;
+
+    expect(materializeApprovedModIssue({ number: 8, title: 'Gem', body: targeting('base') }).base.universe).toBe('base');
+    expect(() => materializeApprovedModIssue({ number: 8, title: 'Gem', body: targeting('some-other-universe') })).toThrow(
+      /targets universe some-other-universe, which its module does not declare a dependency on \(it declares base\)/,
+    );
   });
 
   it('reads the activation tier from the issue labels, taking the stronger channel', () => {

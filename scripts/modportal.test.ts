@@ -163,7 +163,7 @@ describe('modportal CLI', () => {
       const synced = runModportal(['sync', '--from', from, '--cache', dir, `content=${base}`]);
 
       expect(synced.status).toBe(0);
-      expect(synced.stderr).toContain('Skipped #5: issue body does not contain a ```dsl block');
+      expect(synced.stderr).toContain('Skipped #5: issue body has no Local Changes DSL heading');
       expect(synced.stdout).toContain('Synced 1 mod(s)');
       expect(synced.stdout).toContain('1 unusable');
       expect(runModportal(['sources', '--cache', dir]).stdout).toContain('9-approved-mod-9.dsl');

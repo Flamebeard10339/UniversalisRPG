@@ -24,6 +24,7 @@
       "paths": [
         "src/content/contribution.ts",
         "src/content/contribution.test.ts",
+        "src/content/issueForm.test.ts",
         "src/content/localChanges.ts",
         "src/content/localChanges.test.ts",
         "src/content/modportal.ts",

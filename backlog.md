@@ -40,8 +40,21 @@ becoming live, and the base-modlist capture the web form cannot supply today.
   approved mod for every operator with no in-tool recovery, and the comment at `:163-165` assumes an
   escape hatch that does not exist. Also fix the test that certifies the recovered state rather than
   the path to it: `scripts/modportal.test.ts:111` pre-seeds the broken issue as already disabled.
-- **R3: the shipped issue form and the extractor disagree, so the heading anchor is inert on every
-  web contribution.** `.github/ISSUE_TEMPLATE/content-contribution.yml:31` labels the field
+- **R3 — DONE (this branch).** The web form is authoritative, per decision 1. Extraction is now a
+  fence-aware section scan (`src/content/contribution.ts`) that finds the delimiter by **what it says**
+  rather than how it was typed, so `##`/`###` and any casing match; a body carrying two of them is
+  refused rather than resolved by position, and `buildContributionIssueBody` refuses notes containing
+  the heading so a contributor learns before submitting. The "first fence anywhere" fallback is gone —
+  a body with no delimiter is an error, which is what makes the outcome deterministic. `Target universe`
+  is read and load-bearing: a module that does not declare a dependency on the universe its author
+  named is refused at ingestion, since it was validated against something else. The base each
+  contribution claims is recorded on the manifest entry, so a web contribution is no longer ingested
+  with no record of it — `Content Files` supplies it on the CLI path, `Target universe` on the form
+  path. The fixture (`src/content/issueForm.test.ts`) **renders the shipped yml** rather than restating
+  it: renaming the form's label fails three tests instead of silently breaking ingestion, which was
+  verified by doing it. The original finding:
+- ~~**R3: the shipped issue form and the extractor disagree, so the heading anchor is inert on every
+  web contribution.**~~ `.github/ISSUE_TEMPLATE/content-contribution.yml:31` labels the field
   `Local changes DSL`, which GitHub renders as `### Local changes DSL`;
   `src/content/contribution.ts:13` anchors on `'## Local Changes DSL'`. `indexOf` returns `-1` and
   `:58` falls back to offset 0 — **the first ```dsl fence anywhere in the body wins**, which is the
