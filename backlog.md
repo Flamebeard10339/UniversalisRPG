@@ -10,17 +10,6 @@ deliverable log, not here.
 
 # Tasks
 
-## Contribution system
-Tracked in `docs/contribution-system/deliverable-log.md` — spec, the settled label-tier model, what
-is done and what is left. **Read that log before touching contribution code.** Evidence for every
-finding it carries is `docs/audits/contribution-system-2026-07-29-reconciled.md`.
-
-**DONE pending user confirmation.** Closeout commits: `6299045` covered
-`publish-local-changes` plus LOW L1/L2/L3/L5/L7/L8, `edba422` pinned the squash variable
-asymmetry, `c9c88e1` made `registryDiff` the serializer CI property, and `bd77f26` stored approved
-mods canonically. Open decision closed 2026-07-30: core mods ship with the game, so vanilla is
-playable offline and the mod portal is not required for the base state.
-
 ## `/dsl <kind> <id>` reads like a query and is a write (grammar evidence, 2026-07-29)
 Kept as evidence for the grammar work, not as a bug to patch in isolation. **What to fix is a
 question for the `/dsl` redesign**; what follows is the observation that should inform it.
