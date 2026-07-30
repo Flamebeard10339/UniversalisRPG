@@ -10,6 +10,17 @@ deliverable log, not here.
 
 # Tasks
 
+## Contribution system audit follow-ups (2026-07-29)
+
+From `docs/audits/contribution-system-2026-07-29.md`.
+
+- **H1: validate before enabling an approved mod.** `scripts/modportal.ts` validates enabled entries during
+  `sync`, but `enable` writes `entry.enabled = true` without running the same check. Stage the toggle,
+  run `validateEnabled`, and leave the manifest untouched when the newly enabled cache would not load.
+- **M1: stop rewriting approved local-changes modules with a raw regex.** `src/content/modportal.ts`
+  replaces every `local-changes.` substring when generating `approved-mod-N`, including player-facing
+  prose. Move this to a parsed/reference-aware transform or require the final module id before approval.
+
 ## Go full integer: milli-units and integer milliseconds
 **SETTLED (2026-07-29).** Every number the simulation stores becomes an integer: pools and stats at
 milli-scale (`10.0` health is stored as `10000`), and `state.time`, cadence `progress` and every

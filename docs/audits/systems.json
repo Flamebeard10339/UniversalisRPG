@@ -38,8 +38,8 @@
         "scripts/lib/modportalCache.ts",
         ".github/ISSUE_TEMPLATE/content-contribution.yml"
       ],
-      "lastAudit": null,
-      "lastAuditDoc": null,
+      "lastAudit": "e45067b",
+      "lastAuditDoc": "docs/audits/contribution-system-2026-07-29.md",
       "note": "Was recorded as unbuilt with no paths while its code demonstrably existed, so its commits were charged to Testing Procedure's broad scripts coverage. Given real paths 2026-07-29 with lastAudit still null, which makes it DUE immediately: the code is genuinely unaudited, and saying so is the point of the ledger. The editor and the validation/merge engine are still unbuilt."
     },
     {
