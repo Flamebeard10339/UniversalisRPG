@@ -10,6 +10,149 @@ deliverable log, not here.
 
 # Tasks
 
+## An approved mod loses every edit and removal it makes (Contribution audit 2026-07-30, H1)
+Evidence: `docs/audits/contribution-system-2026-07-30.md`, H1. `canonicalLocalChangesModule`
+(`src/content/modportal.ts:118`) serialises the merged registry, and `serializeRegistryModule`
+(`src/content/serialize.ts:339`) guards every loop with `inModule(moduleId, id)`. A contribution's
+edits merge into the **base** module's sections and a `# remove` is not a registry entry at all, so
+neither survives the filter. `# location base.home` / `+adjacent: base.shed` and
+`# remove item.base.lamp` both store as a bare `# info approved-mod-7`; the re-parse at `:172`
+accepts it, `planModportalSync:226` loads it without diagnostics, and `scripts/modportal.ts` reports
+it under "enabled". Editing existing content is what a mod *is* — `merge.ts` and `removal.ts` exist
+for it.
+
+Fix: reload the canonical text against the base and refuse unless the universe is unchanged. The code
+is already written one file over — `scripts/squash-local-changes.ts:125` does exactly this and its
+error text names this failure mode. `c9c88e1` promoted `registryDiff` into `src/content/` one commit
+before `bd77f26` built a second serialize-and-reload path without it. Do it with the test (L1): every
+`materializeApprovedModIssue` test today builds an additive contribution and asserts substrings, which
+is why this is green in CI.
+
+## The signed release APK is built in dev configuration (Build audit 2026-07-30, H1)
+Evidence: `docs/audits/build-deployment-2026-07-30.md`, H1. `capacitor.config.ts:3` branches on
+`NODE_ENV`; `npm run build` sets it inside the Vite process only, and `cap sync` is the next process
+in the `&&` chain, so `publish.yml`'s android job reads `undefined` and takes the dev branch.
+Reproduced under the workflow's exact environment: the synced config carries
+`"server": {"url": "http://10.0.2.2:5173", "cleartext": true}`. `10.0.2.2` is the emulator's alias for
+the host loopback, so the APK that is assembled, signed with the release key and attached to the
+GitHub Release ignores its bundled `dist` and loads nothing on a real device.
+
+Fix: set `NODE_ENV: production` on the android job and assert `server` is absent from the synced
+`capacitor.config.json` before `assembleRelease` — an ambient default that produces a broken release
+when unset is failing in the wrong direction. Same gate wants **BD-H2** (a tag push publishes the
+placeholder build), still open from 2026-07-28, and the M2 half below.
+
+## The shipped end-to-end test plays the tutorial with no health pool (DSL audit 2026-07-30 pass 2, H1)
+Evidence: `docs/audits/dsl-load-path-2026-07-30-pass2.md`, H1. `integration.test.ts:32` runs every
+shipped `# test` from a bare `createGameState()`, which leaves `resources: {}` — `initResources` is
+only called by `initialState`/`startSession`. `setPoolLevel` (`src/runtime/effects.ts:118`) fires
+`on empty:` only when `current > 0`, so with the pool at 0 the guard can never be met: the player
+takes three rat bites at zero health, never faints, and `# save miki-route-end` pins
+`"resources":{"tutorial-island.health":0}` as the correct end state. Against a live session — what
+`/test` passes — the same test fails `resources.tutorial-island.health: 21000 vs 0`.
+
+So `health`, the only resource carrying `on empty:` and the one the tutorial is built around, has no
+end-to-end coverage; the fixture asserts a state no player can reach; and `/test` and CI disagree
+about the same test. This is the root cause of Runtime M1 above, which measured the symptom.
+
+Fix: decide `runTest`'s starting-state contract and make both callers use it — `initialState(registry)`
+is the honest one, and `runTest`'s comment about `startSession` concerns the *location*, not the pools.
+Then regenerate the fixture. Blocked-adjacent on the `/test` rewind (TP H1): fix that first or
+`/create-valid-test` regenerates against a rewound session. Do M1 in the same pass — the route also
+skips `node skills`, so 4 of 8 dialogue nodes and both equipment items are never reached and the
+stat-bonus system has no shipped coverage; one `talk: miki` before the fights fixes it, and it needs
+the same fixture regenerated.
+
+## `public/changelog.txt` ships and advertises the deleted GUI (UI audit 2026-07-30, M1)
+Evidence: `docs/audits/user-interface-2026-07-30.md`, M1. No reader by the same grep that condemned
+`public/content/` in `060dd3e`, and Vite copies it to `dist/` on every build, so it goes to itch.io
+and into the APK. Its text promises "JSON-first community contribution mode", an editable map,
+multiple universes, localization and a settings screen — all torn out across
+`c5d5da4`/`bda44e5`/`843d8b8` — under version `0.1.0`. Delete it, or make it a generated artefact of
+whatever closes BD-H2; do not hand-maintain it beside `package.json`.
+
+## The contribution delimiter contract is enforced one granularity too coarse (Contribution audit 2026-07-30, M2 + M3)
+Evidence: `docs/audits/contribution-system-2026-07-30.md`, M2 and M3. Two halves of one theme, and
+`efa64cd` stated the rule for both.
+
+**M2** — `buildContributionIssueBody` (`src/content/contribution.ts:90`) refuses notes containing the
+`Local Changes DSL` heading so a contributor "learns before they submit rather than after a maintainer
+approves", but section boundaries also depend on fence state (`issueSections:45`) and that half is
+unguarded. Notes carrying an unbalanced code fence build clean and then cannot be extracted at all
+(`issue body has no Local Changes DSL heading`) — and notes describing a DSL problem are the likeliest
+place for a fence. Fix by reusing what exists: build the body, run `extractContributionDsl` over it,
+refuse if it does not round-trip. That replaces a guard enumerating one hazard with one checking the
+property.
+
+**M3** — `fencedDsl` (`:60`) takes the first ```` ```dsl ```` block in a section, so two under one
+heading resolve by position, which is exactly what `:113`'s comment says the code refuses. The web
+form reaches it: `content-contribution.yml:29` sets `render: dsl`, so a contributor who pastes a module
+that already carries its own fence produces nested fences and extraction returns an empty module —
+caught today only by the optional `Target universe` check, which does not run on the CLI path.
+
+## A tag push publishes without running the tests, and can half-publish (Build audit 2026-07-30, M2)
+Evidence: `docs/audits/build-deployment-2026-07-30.md`, M2. `test.yml` fires on
+`push: branches: ['**']` and `pull_request`; a tag push matches neither, so the one workflow running
+`tsc`, `npm test`, `layer-check` and `audit-status` does not gate a release. Separately the `web` and
+`android` jobs have no `needs:` between them and no shared gate, so one can succeed while the other
+fails: itch.io carries a build with no matching APK, or the release carries an APK for a web build
+that never went out. The itch side is idempotent on re-run; the release asset is not. Cheapest real
+gate in the repo — do the test dependency first.
+
+## The modportal cache does not record what it was proved against (Contribution audit 2026-07-30, M1)
+Evidence: `docs/audits/contribution-system-2026-07-30.md`, M1. `ModportalManifest`
+(`src/content/modportal.ts:65-70`) records `version`, `syncedAt`, `entries` and `intent` — not the
+content files the sync was planned against — and every command falls back to
+`defaultContent = 'content/tutorial-island.dsl'` (`scripts/modportal.ts:11`). So `sync content=a.dsl,b.dsl`
+admits mods against `a+b` while a later `enable` proves against `tutorial-island`, and `sources` — the
+output the game consumes — carries no record of which. `efa64cd` closed this gap one level down for
+what each *contribution* claimed as its base; the portal has none of its own, and it is the one that
+was actually proved. Fix: write `contentFiles` onto the manifest at sync and warn when an explicit
+`content=` disagrees.
+
+## Lows from the 2026-07-30 four-system pass
+Each small and independent. Evidence is the audit named in brackets.
+
+**Contribution system** [`contribution-system-2026-07-30.md`]
+- **L2** — `modportal.ts:120`: when a contribution does not load cleanly, canonicalisation still falls
+  back to the raw-regex `replaceInfoId`. It is the *safer* branch given H1 (it keeps the authored text
+  verbatim), which means the stored form of a mod depends on whether it loaded and only the failing
+  branch preserves what the author wrote. State the decision once H1 is fixed.
+- **L3** — `scripts/lib/modportalCache.ts:96`: `isEntry` (`:33`) validates `moduleId` and `file` only,
+  so a pre-tier entry missing `issue` writes `intent["undefined"]`, a key that can never match a real
+  issue or be pruned.
+
+**Build & deployment** [`build-deployment-2026-07-30.md`]
+- **M1/L-adjacent** — pinning stops at the actions. `setup-java` takes a moving `temurin`/`21`, the
+  Gradle wrapper resolves its own distribution, and `assembleRelease` pulls plugin/AndroidX versions
+  the lockfile does not cover — in the job that holds `SIGNING_KEY`. Same threat model `060dd3e` wrote
+  down for the action tags.
+- **L1** — `.gitattributes:1-3` and `test.yml:15` justify each other with a claim `4b6e383` made false
+  in the same commit: with `* text=auto eol=lf` both runners check out identical bytes, so the Windows
+  leg never sees CRLF. The real guard is `integration.test.ts:15`. Keep the leg for what it does cover
+  (`posix()`, tsx and vitest on the development platform) and say that. Same as TP-L2, other side.
+- **L2** — `run-web.cmd` is a user-facing entry point for a tree whose only page is `PlaceholderRoot`;
+  fold into whatever closes BD-H2. **L3** — `capacitor.config.ts:9` hardcodes the emulator host, which
+  helps the one workflow that supplies its own URL and breaks the one that must not have it.
+
+**User interface** [`user-interface-2026-07-30.md`]
+- **L1** — `src/index.css` kept the inherited remainder: 14 of 16 `--color-*` properties have no
+  consumer, and the five `data-font-size` and two `data-theme` rules are the deleted Settings screen
+  waiting for an attribute nothing sets. Either call it a deliberate palette seed in the GUI rebuild's
+  deliverable log or cut it; the 2026-07-28 pass asked for a rewrite from the declared shape, not an
+  inheritance.
+- **L2** — `tailwind.config.js:3` scans `./src/**/*.{ts,tsx}`, sweeping three layers below this one for
+  class-name-shaped strings. Narrow to `./src/ui/**` when `src/ui` exists. **L3** — `index.html:7`'s
+  `theme-color` is `--color-surface` hand-copied.
+
+**DSL load path** [`dsl-load-path-2026-07-30-pass2.md`]
+- **L1** — `src/content/saveSection.ts:11` says "The body is one line of JSON; the grammar has no
+  multi-line support", but `join('')` means a two-line body parses fine. Either the tolerance is
+  intended and the comment is false, or a split body should be refused.
+- **L2** — shipped content carries members nothing can reach: `# item cooked-shrimp` (`:96`) has no
+  `give:`, recipe or drop; `# flag fainted` (`:70`) and `# flag snubbed-miki` (`:80`) are set and never
+  read.
+
 ## `checkSave` crashes on the save bodies it exists to reject (Runtime audit 2026-07-30, H1)
 Evidence: `docs/audits/runtime-2026-07-30.md`, H1. `SAVE_FIELDS.holds` (`src/runtime/save.ts:38-52`)
 is a real predicate for the ten scalar fields and bare `isObject` for the three that have an
@@ -141,6 +284,14 @@ The same text inline is rejected, so whether a typo is caught follows from wheth
 block form — and block form is what shipped content uses. Fix is `requireEnd` per line in the one
 place; wants a test that walks the list fields rather than one per field. Evidence:
 `docs/audits/dsl-load-path-2026-07-30.md`.
+
+Fourth reproduction, from the 2026-07-30 pass-2 audit (M2), on the field that decides load order and
+compatibility: `dependencies:` / `  base 1.0.0` parses as `{"prefix":"required","module":"base"}` —
+the version is dropped. `dependency.parse` (`src/grammar/dependency.ts:66`) requires an operator
+before a version and returns early without one, and `parseBlock` discards the rest. `base >= 1.0.0`
+is the correct form; `base 1.0.0` is what the issue template's `placeholder: base` invites, and inline
+rejects it with `unexpected content: "1.0.0"`. This also silently erases the version half of what the
+contribution system records a mod as "validated against".
 
 ## A removal that removes nothing says nothing (DSL audit 2026-07-30, M2 + M3)
 Two doors into one rule the repo already applies at section granularity — `registry.ts:521` throws

@@ -8,9 +8,9 @@
     {
       "name": "DSL load path",
       "paths": ["src/grammar", "src/content", "content"],
-      "lastAudit": "49b7ca6",
-      "lastAuditDoc": "docs/audits/dsl-load-path-2026-07-30.md",
-      "note": "The 2026-07-30 pass verified the previous reconciliation's R1, R2 (both halves), R7 and R8 closed, and found H1: list.parseBlock is the one fresh-cursor sub-parse 4f1b648 missed, so a block-form list line silently drops a typo — reproduced on the shipped file, where one letter turns the front-door gate into an unconditional edge. Its three mediums are all one theme, that a removal removing nothing says nothing, plus hydrate breaking the referenceSites single-traversal invariant. The earlier baseline is dsl-modules-2026-07-29-reconciled.md, which reconciles two independent passes that each found a HIGH the other missed; read it for the history rather than the source docs. Owns content/, the shipped DSL this path exists to load; the contribution system's files under src/content are owned by both, which is double coverage rather than a gap — five commits in the 2026-07-30 window are charged to both counters and were not re-audited here."
+      "lastAudit": "f8c8c8d",
+      "lastAuditDoc": "docs/audits/dsl-load-path-2026-07-30-pass2.md",
+      "note": "Pass 2 (2026-07-30) audited the half no previous pass had: content/, the shipped DSL. Its one in-window commit changed two lines of a # save fixture, and that fixture is H1 — integration.test.ts runs every shipped # test from a bare createGameState(), so the whole tutorial route plays with the health pool never initialised, on empty: can never fire (setPoolLevel needs current > 0), and miki-route-end pins health at 0. The same test against a live session fails 21000 vs 0, so /test and CI disagree about it; this is also the root cause of Runtime M1, which measured the symptom. M1: the route skips node skills, so 4 of 8 dialogue nodes and both equipment items are unreached and the stat-bonus system has no shipped coverage. M2 is a fourth reproduction of pass 1's open H1, on dependencies: — block form silently drops the version constraint. Pass 1 (dsl-load-path-2026-07-30.md) is the loader audit and every one of its findings is still open; read it for the loader, this one for the content. Earlier history is in dsl-modules-2026-07-29-reconciled.md. The contribution system's files under src/content are owned by both, which is double coverage rather than a gap."
     },
     {
       "name": "Runtime",
@@ -41,16 +41,16 @@
         "scripts/lib/modportalCache.ts",
         ".github/ISSUE_TEMPLATE/content-contribution.yml"
       ],
-      "lastAudit": "745659a",
-      "lastAuditDoc": "docs/audits/contribution-system-2026-07-29-reconciled.md",
-      "note": "Was recorded as unbuilt with no paths while its code demonstrably existed, so its commits were charged to Testing Procedure's broad scripts coverage. Given real paths 2026-07-29, then baselined by two independent audits (contribution-system-2026-07-29.md and -independent.md) reconciled in the doc above — read that one; it carries the agreement ranking and the reproductions. Neither source doc is sufficient alone: the first pass certified the issue-body extraction as closed and the second reproduced a HIGH in it, while the second missed the raw-regex namespace rewrite the first found. The seven decisions the reconciliation surfaced are settled in backlog.md under a three-tier label model (mod-pending / mod-approved / mod-auto-enabled), which supersedes the flat approved-mod label the audits were written against; R1 and R4 are fixed against it and the manifest is now v2. The editor and the validation/merge engine are still unbuilt."
+      "lastAudit": "f8c8c8d",
+      "lastAuditDoc": "docs/audits/contribution-system-2026-07-30.md",
+      "note": "The 2026-07-30 pass verified R1, R3 and R4 closed — enable stages and proves before writing, sync admits incrementally so one bad mod cannot withhold the portal, extraction finds the shipped form's label by what it says — and found H1: bd77f26's canonicalisation serialises a module, and serializeRegistryModule filters by inModule, so every edit to base content and every # remove is silently dropped. A contribution that adds a path between two base locations is stored as a bare # info, loads clean, and is reported enabled. The fix is written in a sibling file: squash-local-changes.ts:125 does the same serialize-then-reload and refuses on registryDiff, and c9c88e1 promoted registryDiff into the content layer one commit before bd77f26 declined to use it. Its mediums are all 'the rule is enforced at one granularity and not the next one down': the publisher refuses a DSL heading in the notes but not an unbalanced fence (M2), two dsl fences under one heading resolve by position although the comment says two delimiters are refused (M3), and the manifest records what each contribution claimed as its base but not what the portal itself was proved against, so enable/sources can answer against a different universe than sync (M1). L1 is why H1 is green: every materialize test builds an additive contribution and asserts substrings. Earlier baseline is contribution-system-2026-07-29-reconciled.md. The editor and the validation/merge engine are still unbuilt."
     },
     {
       "name": "User interface",
       "paths": ["src/ui", "src/main.tsx", "src/index.css", "src/vite-env.d.ts", "index.html", "public", "postcss.config.js", "tailwind.config.js"],
-      "lastAudit": "50a4f41",
-      "lastAuditDoc": "docs/audits/user-interface-2026-07-28.md",
-      "note": "src/ui does not exist; the 2026-07-28 audit covers teardown residue only, and its coverage is structurally limited until the GUI rebuild."
+      "lastAudit": "f8c8c8d",
+      "lastAuditDoc": "docs/audits/user-interface-2026-07-30.md",
+      "note": "src/ui still does not exist, so coverage stays structurally limited until the GUI rebuild. The 2026-07-30 pass verified 060dd3e closed UI-H1 (the attic exclude), UI-M1 (270 to 70 lines of CSS, 16.57 to 6.98 kB), UI-M2 (public/content/) and UI-M3 (twelve unimported dependencies, reactflow included), and that 73a73f3's partition closed the 2026-07-28 orphan list — public/, postcss.config.js, tailwind.config.js and src/vite-env.d.ts are members now, which is why this system had a window at all. M1 is the one file of that sweep left standing: public/changelog.txt has no reader by the same grep that condemned public/content/, ships to itch.io and into the APK, and advertises the deleted legacy GUI's features under version 0.1.0. Its lows are the inherited remainder — 14 unused colour properties and seven data-theme/data-font-size rules nothing sets, a Tailwind glob sweeping three layers below this one, and a theme-color hand-copied from the stylesheet."
     },
     {
       "name": "Testing procedure",
@@ -71,9 +71,9 @@
     {
       "name": "Build & deployment",
       "paths": [".github/workflows/publish.yml", "android", "capacitor.config.ts", "vite.config.ts", ".gitattributes", "run-web.cmd"],
-      "lastAudit": "50a4f41",
-      "lastAuditDoc": "docs/audits/build-deployment-2026-07-28.md",
-      "note": "H2 open: a tag push would publish the placeholder build. M1 fixed: package.json and tsconfig.json are no longer members, because every commit that had ever spent this budget did so through them while the pipeline files themselves never changed."
+      "lastAudit": "f8c8c8d",
+      "lastAuditDoc": "docs/audits/build-deployment-2026-07-30.md",
+      "note": "The 2026-07-30 pass verified BD-H1 (base is './' and the built HTML proves it), BD-M2/M3 (every action pinned by commit, least-privilege permissions), BD-L1 (versionCode/versionName derived from package.json) and BD-L3/L4 closed, and found H1: capacitor.config.ts reads NODE_ENV, npm run build sets it inside the Vite process only, and cap sync is the next process in the chain — so the signed release APK is built in dev configuration, pointing its WebView at http://10.0.2.2:5173 with cleartext on. Reproduced under the exact environment publish.yml provides. BD-H2 stays open and wants the same release-readiness gate. Mediums: the two publish jobs have no needs: between them so a tag can half-publish, and neither runs the test suite, because test.yml fires on branches and pull_request and a tag push matches neither; and pinning stops at the actions, not at what Gradle resolves in the job holding SIGNING_KEY. L1 records that .gitattributes and test.yml justify each other with a claim the same commit made false — with eol=lf in the index both runners check out identical bytes, and the real CRLF guard is integration.test.ts. M1 of 2026-07-28 stays fixed: package.json and tsconfig.json are not members, which is why this window is two commits rather than twelve."
     }
   ]
 }
