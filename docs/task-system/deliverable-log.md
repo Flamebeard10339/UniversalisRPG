@@ -15,7 +15,7 @@ it into `docs/tasks/` alongside everything else.
 | 2. `tasks check` + systems.json ownership | not started |
 | 3. The writer verbs | not started |
 | 4. `.claude/commands/` and the handoff hook | not started |
-| 5. Audit trigger: chunk budget at task completion, plus `--brief` | not started |
+| 5. Audit trigger: chunk budget at task completion, per-system warn/block, plus `--brief` | not started |
 | 6. Migrate `backlog.md` (58 items) and the deliverable logs → `docs/tasks/` | not started |
 | 7. Audit back-reference pass over the six `lastAuditDoc`s | not started |
 | 8. CLAUDE.md, AGENTS.md, `completed-tasks.md`, CI wiring | not started |
@@ -341,9 +341,28 @@ firing. Testing procedure — which owns `scripts/` and `.claude/`, everything c
   else, so nothing mid-task can make a system overdue and CI cannot go red while work is in
   flight. This is the part that fixes the observed failure; the counter's precision is
   secondary.
-- **The audit gates confirmation, not the fix.** When completing a task tips a system past its
-  budget, the audit runs and its findings become tasks before the user confirms. Closing does
-  not wait on *fixing* what the audit found, or nothing would ever close.
+- **It blocks, and it blocks at `tasks done`.** A system past its hard budget refuses `tasks
+  done` for any task naming it. Evaluation and refusal are the same point, so there is one
+  place to reason about and one place to test. The audit does not gate *fixing* what it finds —
+  its findings become tasks and queue like anything else, or nothing would ever close.
+  An earlier draft gated `tasks confirm` instead. That is too weak to be the forcing function:
+  confirmation is a user status flip already nagged on every `tasks next`, so the only
+  consequence of exceeding the budget would have been one more line in a list of nags, which is
+  the ignorable signal this design exists to replace.
+- **The refusal is per-system.** Only a task naming an over-budget system is refused; a task
+  naming two is refused if either is over. `audit-status` today exits 1 when *any* system is
+  due, so a DSL load path debt reddens CI for combat work. That is incidental to the counter,
+  and it is most of why blocking currently feels heavier than what it actually protects.
+- **Slack is one task, and it falls out of the mechanism rather than being configured.** Task A
+  closes and tips the budget; task B is then worked and committed in full; `tasks done` on B is
+  refused. Nothing is stranded — B's chunks are ticked, its handoff written, its commits landed
+  — and the audit lands in the gap between two features rather than inside one. This is the
+  "feature push, then audit push" rhythm, obtained without a second number.
+- **CI keeps one exit code, and that is not a contradiction.** `audit-status` still exits
+  non-zero when any system is past `block`, repo-wide as today. Under the old rule that state
+  was reachable mid-task, which is the failure being fixed; under this one it is only reachable
+  if someone bypassed `tasks done`, so it asserts the tool was used rather than gating work. A
+  system at `warn` exits 0.
 - **A task may demand one: `audit: on-completion`.** Escalation, not a threshold, and it
   matches what already happens by hand — `1d13661` and `745659a` were deliberate audits
   commissioned at the end of a deliverable rather than triggered by a counter.
@@ -402,9 +421,27 @@ This is the second half of the audit integration: gate 8 pushes findings out int
 
 ### Threshold
 
-**The starting value is a guess and should be labelled one.** Recent audits fired at 11, 20
-and 22 commits, which at two to three commits per chunk suggests something near 8. Start at 8
-chunks and tune against observation.
+**Two numbers, warn below block.** `systems.json`'s `threshold: 20` becomes
+`chunkBudget: { "warn": 5, "block": 8 }` — a rename, because the field's unit changes from
+commits to chunks and a silent unit change is worse than an edit.
+
+**The starting values are guesses and should be labelled ones.** Recent audits fired at 11, 20
+and 22 commits, which at two to three commits per chunk suggests something near 8. `block: 8`
+is therefore calibrated against the largest audit anyone has actually completed here, and that
+is the constraint it must keep answering to.
+
+**`warn: 5` exists to make the block rarely the thing that stops you.** From 5 chunks
+`audit-status` and `tasks next` report the system as auditable; nothing is refused. That window
+is where the audit is *chosen* into a convenient gap between features, which is the whole point
+— by the time the block fires, it should mostly be catching the case where the window was
+ignored.
+
+**If the block fires too often, raise `block`. Do not add a count of pending audits.** How many
+audits may be outstanding and how many chunks may be unreviewed control the same quantity — how
+much change one auditor is handed — so a second number means tuning two knobs against one
+observation, in two units, against this design's own one-vocabulary rule. The soft edge is
+added *below* the hard one for the same reason: buying slack by raising `block` makes every
+audit bigger than one has ever been, and `warn` buys it without touching audit size.
 
 **Counters reset at the switch.** Every system's chunk count starts at zero when chunk 5
 lands, and whatever is DUE under the old rule at that moment is resolved first. Nothing is
@@ -475,9 +512,10 @@ these land in the same commit as the files:
 `npm run tasks check` under the same `if: matrix.os == 'ubuntu-latest'` guard as
 `audit-status`.
 
-Chunk 5 additionally modifies `scripts/audit-status.ts` and the `systems.json` schema, both
-owned by Testing procedure — the system the budget change most affects, and the reason chunk 5
-is sequenced before that budget can be spent.
+Chunk 5 additionally modifies `scripts/audit-status.ts`, `scripts/tasks.ts` and the
+`systems.json` schema (`threshold` → `chunkBudget`), all owned by Testing procedure — the
+system the budget change most affects, and the reason chunk 5 is sequenced before that budget
+can be spent.
 
 ## Migration
 
@@ -512,6 +550,29 @@ same commit as the move; seeding Deliverable and compacting archives are the onl
 Chunk 6 is large enough to be its own task under the new system by the time it runs. Split it:
 backlog first, logs second, archive third.
 
+## Decisions
+
+- **2026-07-30** — the audit stays blocking; it is not downgraded to a warning. The alternative
+  considered was to let a due audit remain pending indefinitely and merely nag. Rejected on this
+  repo's own evidence: `docs/dsl-rewrite/backlog-process-review.md` found that every major DSL
+  failure was identified correctly, in writing, in advance, and lost anyway — "a forcing-function
+  problem, not a knowledge problem". A warning is knowledge, and this project has demonstrated it
+  already has the knowledge and loses it. Deliverable failure #4 is the same finding, and
+  CLAUDE.md's rule that a gate earns its place by preventing something that actually happened is
+  satisfied here and by almost nothing else.
+- **2026-07-30** — the discomfort that prompted the question (feature/audit/feature/audit
+  alternation) is caused by the *fire point*, not by blocking. `e65f784` audited the DSL load path
+  mid-branch because a commit boundary is mid-task by construction. Moving evaluation to task
+  completion already means a system can only become due at a task boundary, so it is already
+  "feature push, then audit push". No second mechanism is spent on it.
+- **2026-07-30** — the refusal moves from `tasks confirm` to `tasks done`, and is scoped
+  per-system. See "The change". Gating confirmation left the budget with no teeth; gating all
+  work repo-wide, which is what `audit-status`'s single exit code does today, punishes systems
+  that owe nothing.
+- **2026-07-30** — a "how many audits may be pending" counter is rejected, and a soft `warn`
+  threshold is added below the hard `block` instead. See "Threshold" for why these are the same
+  lever and why the soft edge belongs below rather than above.
+
 ## Open questions
 
 - [blocking] none.
@@ -540,7 +601,10 @@ backlog first, logs second, archive third.
 3. **Chunk 3** — the writer verbs. **Chunk 4** — slash commands and the handoff hook.
 4. **Chunk 5** — the audit trigger and `--brief`. Every system is at 0 commits as of
    `72a40f0`, so the counters have nothing to carry across; do it before chunks 1–4 spend
-   Testing procedure's budget back up.
+   Testing procedure's budget back up. It lands after chunk 3 because the refusal lives inside
+   the `tasks done` verb, so chunk 5 touches `scripts/tasks.ts` as well as
+   `scripts/audit-status.ts` — the budget calculation is shared and belongs in one of them,
+   imported by the other.
 5. **Chunk 6** — the migration, split three ways. `backlog.md` is deleted here, not before.
 6. **Chunk 7** — walk the six `lastAuditDoc` values, confirm each is referenced by a migrated
    task, declare `noFindings` where an audit produced none.
