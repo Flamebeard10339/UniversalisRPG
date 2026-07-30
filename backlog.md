@@ -10,6 +10,87 @@ deliverable log, not here.
 
 # Tasks
 
+## `/test` rewinds the live session and corrupts the test it records (TP audit 2026-07-30, H1)
+`runTestCommand` (`scripts/play-cli.ts:172`) passes `session.state` straight to `runTest`, so a
+`# test` beginning `load:` — the shape `/create-test` itself emits — overwrites the player's
+inventory, location, flags and clock. Nothing is recorded, so `recorder.history` and
+`session.state` describe different timelines and `/create-valid-test` pairs one's directives with
+the other's `-end` save:
+
+```
+played:  travel: ruins   -> location = ruins  inventory = {}
+ran:     /test unrelated-regression -> PASSED
+         live state is now location = camp   inventory = {"gold":3}
+```
+
+The emitted test fails on its own first replay (`save mismatch derived-end: inventory.gold:
+(absent) vs 3; location: "ruins" vs (absent)`), and where the divergence is small enough for
+`expect:` to still pass it pins a state the directives never produce. Reached by `/test <id>` and
+by a raw `run:` directive; the suite missed it because `play-cli.test.ts:204` only ever runs
+`assert:`-only tests. The state sharing is correct for `runTest`'s other two callers, so the fix
+belongs in `runTestCommand` — snapshot and restore through `serializeSave`/`loadSave`, which
+`/create-test` already round-trips through. Evidence:
+`docs/audits/testing-procedure-2026-07-30.md`.
+
+## One bad SHA silences the audit ledger, permanently and without a word (TP audit 2026-07-30, M1)
+`touchesSince` (`scripts/audit-status.ts:83`) runs `git log <lastAudit>..HEAD` unguarded, so an
+unresolvable `lastAudit` — a rebased or gc'd branch SHA — throws out of the per-system loop before
+any verdict prints, before the `audit due:` summary, and before `orphanedFiles` runs at line 131.
+`7676c09` then reads that crash as "the ledger could not run", exits 0, and **does not write the
+state file**, so it reaches the same conclusion on every later commit:
+
+| Ledger state | Hook exit | State written | Reported |
+| --- | --- | --- | --- |
+| genuinely DUE | 2 | `<head> due` | yes |
+| `deadbeef` + another system genuinely DUE | **0** | **none** | **no** |
+
+Commit counting, the doc gate and the partition check all go dark together; only CI still notices.
+Same class: a malformed `systems.json` throws at line 106. Two fixes — resolve `lastAudit` in a
+`try` and report it as a verdict line the way `undocumented` already does, and let the hook say one
+line on an unrecognised non-zero rather than nothing. This is 2026-07-28's TP-L1, never fixed and
+never tracked; `7676c09` turned it from a stack trace into a silent disable.
+
+## `layer-check` never reads `src/` itself (TP audit 2026-07-30, M2)
+`ROOTS` (`scripts/lib/layers.ts:8`) names five directories, so a file directly under `src/` is
+neither swept nor resolvable as a target: `src/probe-root.ts` importing `../scripts/play-cli`
+passes, and `src/grammar/probe-c.ts` importing `../probe-root` reaches runtime and scripts through
+it unreported. `src/main.tsx` sits there today — latent only until the GUI rebuild gives it real
+imports. The fix mirrors what `audit-status` already does for `systems.json`: assert every source
+file under `src/` and `scripts/` is inside a declared root, failing and naming any that is not.
+That check would have caught this hole and the six `fe74472` closed.
+
+## `/create-test` ignores the authoring machinery `/dsl` gave it (TP audit 2026-07-30, M3)
+`buildCreateTest` (`scripts/play-cli.ts:241`) hand-assembles its blocks, `console.log`s them and
+mutates `session.registry` in place, while `/dsl test <id>` and `/dsl save <id>` have staged,
+validated and persisted the same kinds since `11d9335` (`play-cli.test.ts:508` demonstrates all
+sixteen). A recorded regression therefore lives in terminal scrollback until a human copies three
+blocks into a content file — the step CLAUDE.md's "record a regression via `/create-test`" exists
+to make cheap. It is also the only writer that never re-loads, so it is the only one that cannot
+refuse a bad emission. Routing it through `commitLocalChanges` deletes the duplicated registry
+mutation and removes the mechanism behind H1's worst outcome.
+
+## Testing-procedure lows (TP audit 2026-07-30)
+- **L1** `documented()` (`audit-status.ts:98`) accepts `docs/audits/../../package-lock.json`, 600
+  bytes of `x`, and an uncommitted file. `resolve()`-and-contain plus `git ls-files
+  --error-unmatch` close the two mechanical holes; content it can never judge.
+- **L2** `test.yml:15` justifies the Windows leg as the only place a CRLF checkout is seen, but
+  `.gitattributes`' `* text=auto eol=lf` — added in the same commit — makes both runners check out
+  identical bytes. The real CRLF guard is `integration.test.ts`'s in-memory synthesis. Keep the
+  leg for what it does cover (`posix()`, tsx and vitest on the development platform) and say that.
+- **L3** `parseCliArgs` (`play-cli.ts:671`) is unexported and untested, including `8a54d1b`'s fix
+  for a second positional silently becoming the local-changes file. `handleCommand`, `liveTick`
+  and `loadModportalSources` are all exported for testability; this is the one decision function
+  that is not.
+- **L4** `systems.json`'s Testing note claims contribution scripts are charged elsewhere, but
+  `scripts/lib` covers `scripts/lib/modportalCache.ts` too, double-charging `339f106`, `8cde0dc`
+  and `6299045`. Either intend it and say so, or name the three files this system implements.
+- **L5** `play-cli.ts:502` claims "the one place a result reaches the recorder", but live mode
+  pushes at `855, 860, 861, 865`, none under test. The divergence is deliberate; the comment is
+  not.
+- **L6** `shownLocations` and `speedMultiplier` (`play-cli.ts:82,85`) are module-level mutable
+  state, so `formatView` output depends on process history across the many sessions
+  `play-cli.test.ts` builds per run.
+
 ## A block-form list line silently drops what it does not understand (DSL audit 2026-07-30, H1)
 `list.parseBlock` (`src/grammar/list.ts:22`) hands each child line a fresh cursor and never demands
 the rest of it. `4f1b648` swept `action.ts`, `dialogue.ts` and `test.ts` onto `parseWhole`/

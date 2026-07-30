@@ -64,9 +64,9 @@
         ".claude/settings.json",
         ".github/workflows/test.yml"
       ],
-      "lastAudit": "50a4f41",
-      "lastAuditDoc": "docs/audits/testing-procedure-2026-07-28.md",
-      "note": "Now owns .claude/hooks, which gate commits and were owned by nobody (M5). Its scripts coverage is narrowed to the files it actually implements, with the contribution scripts charged to their own system; the orphan check below is what makes that narrowing safe. runTest and # test parsing still live under src/ and are covered by the DSL load path and Runtime as well."
+      "lastAudit": "4631baa",
+      "lastAuditDoc": "docs/audits/testing-procedure-2026-07-30.md",
+      "note": "The 2026-07-30 pass verified the 2026-07-28 closures and found H1: /test runs a # test against the LIVE session state, so it rewinds the player and makes /create-valid-test emit a test that fails on its own first replay — reproduced end to end. Its mediums are one theme, gates claiming more than they check: an unresolvable lastAudit aborts the whole ledger before any verdict, the doc gate or the partition check, and 7676c09's hook reads that crash as silence (M1); layer-check never reads any file directly under src/, in either direction (M2); /create-test is the one authoring command that bypasses the /dsl machinery that would validate and persist it (M3). Owns .claude/hooks (2026-07-28 M5). Its scripts coverage names the files it implements, except that scripts/lib is declared whole and so double-charges the contribution system's modportalCache.ts — L4, open. Eleven of this window's sixteen commits reached it only through scripts/play-cli.ts, which is a downstream consumer of every layer beneath it; the coverage is still earned, since nobody else audits that file and H1 and M3 are both in it. runTest and # test parsing live under src/ and are covered by the DSL load path and Runtime as well."
     },
     {
       "name": "Build & deployment",
