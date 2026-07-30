@@ -38,9 +38,9 @@
         "scripts/lib/modportalCache.ts",
         ".github/ISSUE_TEMPLATE/content-contribution.yml"
       ],
-      "lastAudit": "e45067b",
-      "lastAuditDoc": "docs/audits/contribution-system-2026-07-29.md",
-      "note": "Was recorded as unbuilt with no paths while its code demonstrably existed, so its commits were charged to Testing Procedure's broad scripts coverage. Given real paths 2026-07-29 with lastAudit still null, which makes it DUE immediately: the code is genuinely unaudited, and saying so is the point of the ledger. The editor and the validation/merge engine are still unbuilt."
+      "lastAudit": "745659a",
+      "lastAuditDoc": "docs/audits/contribution-system-2026-07-29-reconciled.md",
+      "note": "Was recorded as unbuilt with no paths while its code demonstrably existed, so its commits were charged to Testing Procedure's broad scripts coverage. Given real paths 2026-07-29, then baselined by two independent audits (contribution-system-2026-07-29.md and -independent.md) reconciled in the doc above — read that one; it carries the agreement ranking and the reproductions. Neither source doc is sufficient alone: the first pass certified the issue-body extraction as closed and the second reproduced a HIGH in it, while the second missed the raw-regex namespace rewrite the first found. Seven decisions are open and block the follow-up work; they live in backlog.md. The editor and the validation/merge engine are still unbuilt."
     },
     {
       "name": "User interface",

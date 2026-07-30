@@ -12,14 +12,82 @@ deliverable log, not here.
 
 ## Contribution system audit follow-ups (2026-07-29)
 
-From `docs/audits/contribution-system-2026-07-29.md`.
+Two independent audits, reconciled in `docs/audits/contribution-system-2026-07-29-reconciled.md`.
+Read that doc, not the two source passes — it carries the agreement ranking and the reproductions.
+Ordered by agreement: R1 and R3 first, because two passes (or two audit sessions) found them.
 
-- **H1: validate before enabling an approved mod.** `scripts/modportal.ts` validates enabled entries during
-  `sync`, but `enable` writes `entry.enabled = true` without running the same check. Stage the toggle,
-  run `validateEnabled`, and leave the manifest untouched when the newly enabled cache would not load.
-- **M1: stop rewriting approved local-changes modules with a raw regex.** `src/content/modportal.ts`
-  replaces every `local-changes.` substring when generating `approved-mod-N`, including player-facing
-  prose. Move this to a parsed/reference-aware transform or require the final module id before approval.
+**BLOCKED on the seven decisions listed at the end of this item.** R1 and R3 both have two live fix
+directions that produce different systems; R6 is a policy question with no default.
+
+- **R1: the modportal enablement model is unsound in both directions.** One change, two halves that
+  must land together (`scripts/modportal.ts`). `enable` writes `entry.enabled = true` and saves the
+  manifest with no `validateEnabled` (`:199-200`), so an ordinary repair command can put the cache
+  into a load-failing state `sync` would have refused. And `sync` writes *nothing* when any diagnostic
+  appears (`:166-171`) while `findEntry` resolves `enable`/`disable`/`show` against manifest entries
+  that a refused first sync never created (`:148-149`) — so one bad approved issue blocks every other
+  approved mod for every operator with no in-tool recovery, and the comment at `:163-165` assumes an
+  escape hatch that does not exist. Also fix the test that certifies the recovered state rather than
+  the path to it: `scripts/modportal.test.ts:111` pre-seeds the broken issue as already disabled.
+- **R3: the shipped issue form and the extractor disagree, so the heading anchor is inert on every
+  web contribution.** `.github/ISSUE_TEMPLATE/content-contribution.yml:31` labels the field
+  `Local changes DSL`, which GitHub renders as `### Local changes DSL`;
+  `src/content/contribution.ts:13` anchors on `'## Local Changes DSL'`. `indexOf` returns `-1` and
+  `:58` falls back to offset 0 — **the first ```dsl fence anywhere in the body wins**, which is the
+  defect `400ff94` set out to fix. The web form is the only path a contributor without the CLI has,
+  and the only input format in the system with no fixture. Same root cause on the CLI path: `--notes`
+  is copied verbatim *ahead* of the heading and the extractor takes the first occurrence, so notes
+  carrying the heading capture the extraction while the `## Validation` block describes another
+  module. The first audit pass certified this as closed; that non-finding is withdrawn.
+- **R4: `scripts/modportal.ts` crashes where the shared cache reader promises tolerance.**
+  `scripts/lib/modportalCache.ts:27-30` promises that an interrupted sync takes down neither caller,
+  and delivers parse tolerance and path containment but not *missing entry file*. That half lives in
+  one caller only — `play-cli.ts:762-765` warns; `modportal.ts:142` and `:216` throw a raw `ENOENT`
+  out of the tool whose job is repairing that cache. Move the concept into the library that owns it.
+- **R5: the contributor-facing entry point has no test.** `scripts/publish-local-changes.ts` has no
+  test file; only its library is covered. `parseArgs` notes handling, the `localModuleLoaded` gate,
+  `--notes-file`, and `--create`'s process handling are unexercised — and R3's notes half plus L1 and
+  L2 all live there.
+- **R6: "approved" is a label, and it grants full module powers, on by default.** A labelled issue may
+  declare `starting` on its own location, redeclare a global `# variable`, carry `# remove entity.x`,
+  or register `# save`/`# test` into the shared registry, and `enabled: previous?.enabled ?? true`
+  switches it on. *"Approved mods are stored canonical"* below settles that the label is the human
+  gate; it does not settle what a third-party module may declare.
+- **LOW, no decision needed:** L1 `createIssue`'s `finally` is dead (`process.exit` inside the `try`,
+  so every `--create` leaks a temp dir holding the issue body). L2 a missing `gh` gives
+  `publish-local-changes` a bare exit 1 with no output (`result.error` ignored). L3
+  `ContributionIssueInput.title` is declared, passed, never read. L5 `upsertLocalSection` appends, so
+  re-editing a staged section moves it to the bottom of a file the contributor reads. L7
+  `DEFAULT_MODPORTAL_CACHE` and `MODPORTAL_MANIFEST_FILE` are split across layers though only scripts
+  read either. L8 `serialize.ts:227` types its item parameter structurally instead of importing `Item`.
+
+Open decisions, all blocking:
+
+1. **Is the web issue form authoritative, or is it removed?** Either the extractor matches the form's
+   rendered heading (case-insensitive, `##`/`###` tolerant) and the form gets a fixture, or the form
+   is reduced to a pointer at `npm run contribution:issue` and stops being a second, unvalidated
+   ingestion path. Bearing on it: the form cannot supply `Content Files`, so a web contribution is
+   ingested with no record of the base it was validated against, and its required `Target universe`
+   field is read by nothing.
+2. **Delimiter discipline: last occurrence, or refuse a duplicated heading?** Closes the notes-capture
+   half of R3 in one line either way.
+3. **Sync failure policy: per-issue, or all-or-nothing with a reachable escape hatch?** Either
+   materialize and validate per issue, writing the ones that load and recording the rest as
+   `enabled: false` with their diagnostic, or keep the all-or-nothing write and let
+   `enable`/`disable` target an issue number that is not yet in the manifest.
+4. **May a third-party approved mod declare every section kind?** (R6.) If not, the allowlist is the
+   deliverable and it wants stating before the editor and merge engine widen the surface.
+5. **Is `squash` absorbing local-created variables intended?** A new `# variable` squashes into
+   `# info base` cleanly while a new `# item` fails with *"publish local-changes as its own module
+   when it creates new content"* (`squash-local-changes.ts:137`). Variables being global rather than
+   module-owned makes it defensible — but then say so and test it, or make it fail like every other
+   kind.
+6. **Should `registryDiff` become the serializer's CI property?** It lives in
+   `squash-local-changes.ts:108-120` and *is* the round-trip property; `serialize.test.ts:102-114`
+   instead asserts nine cherry-picked fields on a synthetic module. Ran clean by hand over shipped
+   content during the audit, but a 356-line printer silently drops any field added to a domain type.
+   Decision is where the utility lives (it is shared, and the test would cross into the DSL load path).
+7. **Orphan cache files and resurrected enablement** (L9): prune the `.dsl` of an unlabelled issue and
+   remember its `enabled: false`, or accept that re-labelling returns it switched on?
 
 ## Go full integer: milli-units and integer milliseconds
 **SETTLED (2026-07-29).** Every number the simulation stores becomes an integer: pools and stats at
@@ -163,7 +231,9 @@ renders", it is **MVP complete**. No tag publishes before then. Keep the web and
 independent so one failing does not block the other. No tag is imminent.
 
 ## Approved mods are stored canonical
-**SETTLED (2026-07-29).** Closes **M6**.
+**SETTLED (2026-07-29).** Closes **M6**, and **R2** of the contribution reconciliation — the first
+contribution pass found the same defect independently, which is why it ranks Tier 1 there. The
+duplicate copy that pass added to the follow-up list above has been removed in favour of this item.
 
 `src/content/modportal.ts:60` rewrites every `local-changes.` in an approved issue's DSL, prose and
 comments included, by global text substitution. Replace it with canonical re-serialization through
