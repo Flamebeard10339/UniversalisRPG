@@ -5,6 +5,7 @@ import { spawnSync } from 'node:child_process';
 import { buildContributionIssueBody, localDiagnostics, localModuleLoaded } from '../src/content/contribution';
 import { formatModuleDiagnostic, loadUniverseWithDiagnostics } from '../src/content/registry';
 import { LOCAL_CHANGES_MODULE_ID } from '../src/content/localChanges';
+import { MOD_PENDING_LABEL } from '../src/content/modportal';
 import { ModuleSource } from '../src/content/universe';
 
 const repoRoot = path.join(import.meta.dirname, '..');
@@ -41,7 +42,7 @@ function parseArgs(raw: string[]): Args {
     contentFiles: splitFiles(defaultContent),
     localFile: defaultLocal,
     title: '[Content]: local changes',
-    labels: ['content', 'community'],
+    labels: ['content', 'community', MOD_PENDING_LABEL],
     create: false,
   };
 

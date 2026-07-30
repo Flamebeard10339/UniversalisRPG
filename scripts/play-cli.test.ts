@@ -563,11 +563,10 @@ describe('play-cli modportal cache loading', () => {
       writeFileSync(
         path.join(dir, 'manifest.json'),
         JSON.stringify({
-          version: 1,
-          label: 'approved-mod',
+          version: 2,
           entries: [
-            { issue: 1, title: 'One', moduleId: 'approved-mod-1', file: '1-approved-mod-1.dsl', enabled: true },
-            { issue: 2, title: 'Two', moduleId: 'approved-mod-2', file: '2-approved-mod-2.dsl', enabled: false },
+            { issue: 1, title: 'One', tier: 'auto-enabled', moduleId: 'approved-mod-1', file: '1-approved-mod-1.dsl', enabled: true },
+            { issue: 2, title: 'Two', tier: 'approved', moduleId: 'approved-mod-2', file: '2-approved-mod-2.dsl', enabled: false },
           ],
         }),
         'utf8',
@@ -592,7 +591,7 @@ describe('play-cli modportal cache loading', () => {
       expect(loadModportalSources(dir).sources).toEqual([]);
       expect(loadModportalSources(dir).warnings[0]).toMatch(/^Modportal ignored manifest\.json:/);
 
-      writeFileSync(path.join(dir, 'manifest.json'), JSON.stringify({ version: 1, label: 'approved-mod' }), 'utf8');
+      writeFileSync(path.join(dir, 'manifest.json'), JSON.stringify({ version: 2 }), 'utf8');
       expect(loadModportalSources(dir).warnings).toEqual(['Modportal ignored manifest.json: it holds no entries array']);
     } finally {
       rmSync(dir, { recursive: true, force: true });
@@ -604,7 +603,7 @@ describe('play-cli modportal cache loading', () => {
     try {
       writeFileSync(
         path.join(dir, 'manifest.json'),
-        JSON.stringify({ version: 1, label: 'approved-mod', entries: [{ issue: 1, title: 'One', moduleId: 'approved-mod-1', file: '../outside.dsl', enabled: true }] }),
+        JSON.stringify({ version: 2, entries: [{ issue: 1, title: 'One', tier: 'approved', moduleId: 'approved-mod-1', file: '../outside.dsl', enabled: true }] }),
         'utf8',
       );
 

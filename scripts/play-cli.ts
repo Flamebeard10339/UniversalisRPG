@@ -15,7 +15,7 @@ import {
   upsertLocalSection,
 } from '../src/content/localChanges';
 import { DEFAULT_MODPORTAL_CACHE } from '../src/content/modportal';
-import { modportalEntryPath, readModportalCache } from './lib/modportalCache';
+import { readEntryText, readModportalCache } from './lib/modportalCache';
 import {
   apply,
   applyDirective,
@@ -69,7 +69,7 @@ const HELP_LINES = [
   '  /local clear delete all staged sections',
   '  <a.dsl,b.dsl> at startup loads content files, comma-separated in one argument',
   '  local=<file> at startup chooses the local DSL file',
-  '  modportal=<dir> at startup loads enabled approved-mod DSL from a synced cache',
+  '  modportal=<dir> at startup loads enabled portal mod DSL from a synced cache',
   '  /create-test <id>       emit a # test from what you just did in this session',
   '  /create-valid-test <id> same, plus a # save + expect: regression assertion',
   '  /help        show this help',
@@ -759,12 +759,9 @@ export function loadModportalSources(dir: string): ModportalLoadResult {
   const { manifest, warnings } = readModportalCache(root);
   const sources: ModuleSource[] = [];
   for (const entry of manifest.entries) {
-    const file = modportalEntryPath(root, entry);
-    if (!existsSync(file)) {
-      warnings.push(`Modportal skipped ${entry.moduleId}: missing ${entry.file}`);
-      continue;
-    }
-    sources.push({ name: entry.moduleId, text: readFileSync(file, 'utf8'), enabled: entry.enabled });
+    const { text, warning } = readEntryText(root, entry);
+    if (text === undefined) warnings.push(warning!);
+    else sources.push({ name: entry.moduleId, text, enabled: entry.enabled });
   }
   return { sources, warnings };
 }

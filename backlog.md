@@ -21,7 +21,17 @@ model stated there. That model is the contract the fixes are written against, an
 the audit findings — the label rename plus a third tier, a multi-label `sync`, `Target universe`
 becoming live, and the base-modlist capture the web form cannot supply today.
 
-- **R1: the modportal enablement model is unsound in both directions.** One change, two halves that
+- **R1 — DONE (this branch).** Rebuilt on the tier model: `planModportalSync` (`src/content/modportal.ts`)
+  owns the policy as a pure function, `scripts/modportal.ts` owns the IO. Admission is incremental, so a
+  mod joins the enabled set only if the set still loads with it and is otherwise recorded switched off
+  carrying the diagnostic that rejected it; explicit intent is admitted ahead of tier defaults, so a mod
+  the user asked for wins a conflict against one merely on by default. `enable` stages and proves before
+  writing; `disable` needs no proof. Intent is keyed by issue number and outlives the entry, orphan cache
+  files are pruned, and a pre-tier manifest surrenders its enable/disable choices rather than its whole
+  self. **R4 closed with it** — `readEntryText` in `scripts/lib/modportalCache.ts` now owns the
+  missing-entry-file half of the tolerance contract, and both callers use it. Manifest is v2. The
+  original finding, for the record:
+- ~~**R1: the modportal enablement model is unsound in both directions.**~~ One change, two halves that
   must land together (`scripts/modportal.ts`). `enable` writes `entry.enabled = true` and saves the
   manifest with no `validateEnabled` (`:199-200`), so an ordinary repair command can put the cache
   into a load-failing state `sync` would have refused. And `sync` writes *nothing* when any diagnostic
@@ -40,7 +50,8 @@ becoming live, and the base-modlist capture the web form cannot supply today.
   is copied verbatim *ahead* of the heading and the extractor takes the first occurrence, so notes
   carrying the heading capture the extraction while the `## Validation` block describes another
   module. The first audit pass certified this as closed; that non-finding is withdrawn.
-- **R4: `scripts/modportal.ts` crashes where the shared cache reader promises tolerance.**
+- ~~**R4: `scripts/modportal.ts` crashes where the shared cache reader promises tolerance.**~~ **DONE
+  with R1** — see above; regression covers `show` and `enable` against a manifest entry whose file is gone.
   `scripts/lib/modportalCache.ts:27-30` promises that an interrupted sync takes down neither caller,
   and delivers parse tolerance and path containment but not *missing entry file*. That half lives in
   one caller only — `play-cli.ts:762-765` warns; `modportal.ts:142` and `:216` throw a raw `ENOENT`
@@ -123,7 +134,25 @@ Two consequences to carry into the work:
    list. New mods default by tier — `mod-approved` available but off, `mod-auto-enabled` on after
    validation.
 
-## Go full integer: milli-units and integer milliseconds
+## `# remove` validates by load order, so a dangling reference can pass silently
+Found while building the R1 admission fixtures, not by an audit of the DSL load path — so it is
+unproven whether this is one bug or the visible edge of a wider ordering assumption.
+
+Two modules over the same base: A does `# remove item.rock`, B has an entity whose action does
+`give: base.rock`. Each loads clean alone. Together, **whether it errors depends on module order**:
+
+| load order | result |
+| --- | --- |
+| remover first (`mod-a`, `mod-b`) | `resolve: … give: names an unknown item: base.rock` |
+| referencer first (`approved-mod-2`, `approved-mod-8`) | **clean**, and `registry.items` is empty |
+
+So a reference is resolved against the registry as it stands at that module's turn, and a later
+`# remove` does not re-check what pointed at what. The second row is the dangerous one: the universe
+loads with no diagnostic while the entity's `give:` names an item that no longer exists.
+
+Reachable from ordinary content the moment two modules disagree, and load order follows module id, so
+it is decided by a name. Fix direction: validate references after all modules are merged, or make
+`# remove` reject a target that something still references. Wants a `# test` covering both orders.
 **SETTLED (2026-07-29).** Every number the simulation stores becomes an integer: pools and stats at
 milli-scale (`10.0` health is stored as `10000`), and `state.time`, cadence `progress` and every
 duration in integer milliseconds. Chosen for the correctness properties — fewer edge cases, no

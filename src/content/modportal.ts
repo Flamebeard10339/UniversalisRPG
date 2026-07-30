@@ -1,10 +1,21 @@
 import { LOCAL_CHANGES_MODULE_ID } from './localChanges';
 import { extractContributionDsl } from './contribution';
 import { parseModuleSource } from './universe';
+import { formatModuleDiagnostic, loadUniverseWithDiagnostics } from './registry';
+import type { ModuleSource } from './universe';
 
-export const APPROVED_MOD_LABEL = 'approved-mod';
+export const MOD_PENDING_LABEL = 'mod-pending';
+export const MOD_APPROVED_LABEL = 'mod-approved';
+export const MOD_AUTO_ENABLED_LABEL = 'mod-auto-enabled';
 export const DEFAULT_MODPORTAL_CACHE = 'content/modportal.local';
-export const MODPORTAL_MANIFEST_VERSION = 1;
+export const MODPORTAL_MANIFEST_VERSION = 2;
+
+export type ModTier = 'approved' | 'auto-enabled';
+
+export const LISTABLE_MOD_LABELS: readonly { label: string; tier: ModTier }[] = [
+  { label: MOD_APPROVED_LABEL, tier: 'approved' },
+  { label: MOD_AUTO_ENABLED_LABEL, tier: 'auto-enabled' },
+];
 
 export interface ApprovedModIssue {
   number: number;
@@ -12,6 +23,8 @@ export interface ApprovedModIssue {
   body?: string | null;
   url?: string;
   updatedAt?: string;
+  labels?: readonly { name?: string }[];
+  tier?: ModTier;
 }
 
 export interface MaterializedMod {
@@ -19,6 +32,7 @@ export interface MaterializedMod {
   title: string;
   url?: string;
   updatedAt?: string;
+  tier: ModTier;
   moduleId: string;
   file: string;
   text: string;
@@ -29,16 +43,33 @@ export interface ModportalEntry {
   title: string;
   url?: string;
   updatedAt?: string;
+  tier: ModTier;
   moduleId: string;
   file: string;
   enabled: boolean;
+  diagnostics?: string[];
 }
 
+// `intent` is what the user chose, keyed by issue number, and it deliberately
+// outlives the entry: an issue that loses its label is pruned from `entries`
+// while the decision to switch it off survives a later re-label. A tier default
+// is not a choice and never lands here, so promoting a mod to
+// `mod-auto-enabled` can still enable it.
 export interface ModportalManifest {
   version: typeof MODPORTAL_MANIFEST_VERSION;
-  label: string;
   syncedAt?: string;
   entries: ModportalEntry[];
+  intent: Record<string, boolean>;
+}
+
+export function tierDefaultsEnabled(tier: ModTier): boolean {
+  return tier === 'auto-enabled';
+}
+
+export function issueTier(issue: ApprovedModIssue): ModTier {
+  if (issue.tier) return issue.tier;
+  const labels = issue.labels?.map((label) => label.name) ?? [];
+  return labels.includes(MOD_AUTO_ENABLED_LABEL) ? 'auto-enabled' : 'approved';
 }
 
 function generatedModuleId(issue: number): string {
@@ -74,31 +105,65 @@ export function materializeApprovedModIssue(issue: ApprovedModIssue): Materializ
     title: issue.title,
     url: issue.url,
     updatedAt: issue.updatedAt,
+    tier: issueTier(issue),
     moduleId,
     file: `${issue.number}-${moduleId}.dsl`,
     text,
   };
 }
 
-export function emptyModportalManifest(label = APPROVED_MOD_LABEL): ModportalManifest {
-  return { version: MODPORTAL_MANIFEST_VERSION, label, entries: [] };
+export function emptyModportalManifest(): ModportalManifest {
+  return { version: MODPORTAL_MANIFEST_VERSION, entries: [], intent: {} };
 }
 
-export function upsertModportalEntries(existing: ModportalManifest, incoming: readonly MaterializedMod[], syncedAt: string): ModportalManifest {
-  const previousByIssue = new Map(existing.entries.map((entry) => [entry.issue, entry]));
-  const entries = incoming
-    .map((mod) => {
-      const previous = previousByIssue.get(mod.issue);
-      return {
-        issue: mod.issue,
-        title: mod.title,
-        url: mod.url,
-        updatedAt: mod.updatedAt,
-        moduleId: mod.moduleId,
-        file: mod.file,
-        enabled: previous?.enabled ?? true,
-      };
-    })
-    .sort((a, b) => a.issue - b.issue);
-  return { version: MODPORTAL_MANIFEST_VERSION, label: existing.label, syncedAt, entries };
+export interface SyncPlan {
+  existing: ModportalManifest;
+  materialized: readonly MaterializedMod[];
+  base: readonly ModuleSource[];
+  syncedAt: string;
+}
+
+// Admission is incremental so that one mod which does not load cannot withhold
+// the rest of the portal: a candidate joins the set only if the set still loads
+// with it, and otherwise is recorded switched off carrying the diagnostic that
+// rejected it. Explicit intent is admitted ahead of tier defaults, so a mod the
+// user asked for wins a conflict against one merely on by default.
+export function planModportalSync(plan: SyncPlan): ModportalManifest {
+  const intent = plan.existing.intent;
+  const wanted = (mod: MaterializedMod): boolean => intent[String(mod.issue)] ?? tierDefaultsEnabled(mod.tier);
+  const chosen = (mod: MaterializedMod): boolean => intent[String(mod.issue)] === true;
+  const ordered = [...plan.materialized].sort((a, b) => Number(chosen(b)) - Number(chosen(a)) || a.issue - b.issue);
+
+  const admitted: ModuleSource[] = [];
+  const entries: ModportalEntry[] = [];
+  for (const mod of ordered) {
+    const entry: ModportalEntry = {
+      issue: mod.issue,
+      title: mod.title,
+      url: mod.url,
+      updatedAt: mod.updatedAt,
+      tier: mod.tier,
+      moduleId: mod.moduleId,
+      file: mod.file,
+      enabled: false,
+    };
+    entries.push(entry);
+    if (!wanted(mod)) continue;
+
+    const source: ModuleSource = { name: mod.moduleId, text: mod.text };
+    const diagnostics = loadUniverseWithDiagnostics([...plan.base, ...admitted, source]).diagnostics.map(formatModuleDiagnostic);
+    if (diagnostics.length > 0) {
+      entry.diagnostics = diagnostics;
+      continue;
+    }
+    admitted.push(source);
+    entry.enabled = true;
+  }
+
+  return {
+    version: MODPORTAL_MANIFEST_VERSION,
+    syncedAt: plan.syncedAt,
+    entries: entries.sort((a, b) => a.issue - b.issue),
+    intent,
+  };
 }

@@ -1,7 +1,7 @@
 name: Content contribution
 description: Submit a UniversalisRPG local-changes DSL module.
 title: "[Content]: "
-labels: ["content", "community"]
+labels: ["content", "community", "mod-pending"]
 body:
   - type: input
     id: universe
