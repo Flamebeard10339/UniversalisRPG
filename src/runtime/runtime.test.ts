@@ -3,6 +3,7 @@ import { Condition } from '../grammar/condition';
 import {
   actionFirstUnit, applyResultsNow, armAction, armCraft, craft, craftFirstUnit, createGameState, evaluateCondition, renderSegments, travelSecondsPerUnit, useAction } from './runtime';
 import { loadModule } from '../content/registry';
+import { secondsToMs, toMilliUnits } from './units';
 import { runTest } from './session';
 
 const MODULE = `
@@ -355,7 +356,7 @@ open:
     const registry = loadModule(MODULE);
     const state = createGameState();
     const duration = actionFirstUnit('entity', 'oven', 'roast', registry, state);
-    expect(duration).toBe(4);
+    expect(duration).toBe(secondsToMs(4));
     expect(state.activeAction).toBeNull();
     expect(state.time).toBe(0);
   });
@@ -378,8 +379,8 @@ open:
     const registry = loadModule(MODULE);
     const state = createGameState();
     const result = armAction('entity', 'oven', 'roast', registry, state);
-    expect(result).toEqual({ armed: true, firstUnit: 4 });
-    expect(state.activeAction).toEqual({ ownerRef: 'entity.oven', actionLabel: 'roast', repeating: true, healthRemaining: 1, cadences: { player: { progress: 0, attemptsMade: 0 } } });
+    expect(result).toEqual({ armed: true, firstUnit: secondsToMs(4) });
+    expect(state.activeAction).toEqual({ ownerRef: 'entity.oven', actionLabel: 'roast', repeating: true, healthRemaining: toMilliUnits(1), cadences: { player: { progress: 0, attemptsMade: 0 } } });
     expect(state.time).toBe(0);
     expect(state.inventory['roasted-chestnut'] ?? 0).toBe(0);
   });
@@ -388,7 +389,7 @@ open:
     const registry = loadModule(MODULE);
     const state = createGameState();
     useAction('entity', 'oven', 'roast', registry, state);
-    expect(state.time).toBe(4);
+    expect(state.time).toBe(secondsToMs(4));
     expect(state.inventory['roasted-chestnut']).toBe(1);
     // repeating: stays armed for a live driver (or another wait()) to continue.
     expect(state.activeAction).not.toBeNull();
@@ -413,7 +414,7 @@ out: 1 cooked-shrimp
     const registry = loadModule(MODULE);
     const state = createGameState();
     state.inventory['raw-shrimp'] = 1;
-    expect(craftFirstUnit('cook', registry, state)).toBe(2);
+    expect(craftFirstUnit('cook', registry, state)).toBe(secondsToMs(2));
     expect(state.activeAction).toBeNull();
   });
 
@@ -429,13 +430,13 @@ out: 1 cooked-shrimp
     state.inventory['raw-shrimp'] = 1;
 
     const armed = armCraft('cook', registry, state);
-    expect(armed).toEqual({ armed: true, firstUnit: 2 });
+    expect(armed).toEqual({ armed: true, firstUnit: secondsToMs(2) });
     expect(state.time).toBe(0);
     expect(state.inventory['cooked-shrimp'] ?? 0).toBe(0);
     expect(state.inventory['raw-shrimp']).toBe(1); // not consumed until resolve()
 
     craft('cook', registry, state);
-    expect(state.time).toBe(2);
+    expect(state.time).toBe(secondsToMs(2));
     expect(state.inventory['cooked-shrimp']).toBe(1);
   });
 });

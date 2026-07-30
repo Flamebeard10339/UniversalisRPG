@@ -18,8 +18,6 @@ import {
   applyResultsNow,
   captureResourceRates,
   clampResources,
-  EPSILON,
-  SECONDS_PER_MINUTE,
   Segment,
   settlePools,
 } from './effects';
@@ -42,6 +40,7 @@ import { nextRandom } from './rng';
 import { advanceTime, endAction, GameState, PLAYER, RuntimeError } from './state';
 import { attemptDuration, hitChance, hitDamage, sampleStat, statValue } from './stats';
 import { TagClause } from '../grammar/tagClause';
+import { MS_PER_MINUTE, secondsToMs, toMilliUnits } from './units';
 
 export { advanceTime, createGameState, endAction, PLAYER, RuntimeError } from './state';
 export type { ActiveBuff, GameState } from './state';
@@ -57,8 +56,8 @@ export type { DialogueSession } from './dialogue-runtime';
 
 
 interface FightParams {
-  duration: number; // seconds per attempt
-  abilityAmount: number; // health subtracted per successful attempt
+  duration: number; // milliseconds per attempt
+  abilityAmount: number; // milli-health subtracted per successful attempt
   escapeAfter: number; // raw escape-after threshold (Infinity if absent)
 }
 
@@ -70,14 +69,14 @@ interface DeterministicFightPlan extends FightParams {
 function fightParams(action: Action, state: GameState, registry: Registry): FightParams {
   return {
     duration: attemptDuration(action, state, registry),
-    abilityAmount: action.ability ? statValue(action.ability, state, registry) : 1,
+    abilityAmount: toMilliUnits(action.ability ? statValue(action.ability, state, registry) : 1),
     escapeAfter: action.escapeAfter ?? Infinity,
   };
 }
 
 function fightPlan(action: Action, state: GameState, registry: Registry): DeterministicFightPlan {
   const params = fightParams(action, state, registry);
-  const neededForCompletion = Math.ceil((action.health ?? 1) / params.abilityAmount);
+  const neededForCompletion = Math.ceil(toMilliUnits(action.health ?? 1) / params.abilityAmount);
   return {
     ...params,
     attemptsToResolve: Math.min(neededForCompletion, params.escapeAfter),
@@ -116,10 +115,12 @@ function nextBoundary(state: GameState, registry: Registry, toTime: number): num
     if (resource.onEmpty.length === 0 || !resource.rate) continue;
     const ratePerMinute = statValue(resource.rate, state, registry);
     if (ratePerMinute >= 0) continue;
+    const rateMilliPerMinute = toMilliUnits(ratePerMinute);
     const current = state.resources[resource.id] ?? 0;
-    if (current <= EPSILON) continue;
-    const drainPerSecond = -ratePerMinute / SECONDS_PER_MINUTE;
-    const emptyInstant = state.time + current / drainPerSecond;
+    if (current <= 0) continue;
+    const target = -current * MS_PER_MINUTE;
+    const emptyIn = Math.ceil((target - (state.resourceRateRemainders[resource.id] ?? 0)) / rateMilliPerMinute);
+    const emptyInstant = state.time + Math.max(0, emptyIn);
     if (emptyInstant < boundary) boundary = emptyInstant;
   }
   return boundary;
@@ -130,7 +131,7 @@ function resolveDeterministicSegment(segment: Segment, action: Action, segEnd: n
   const active = state.activeAction!;
   const segLen = segEnd - state.time;
   const { duration, abilityAmount, attemptsToResolve, outcome } = fightPlan(action, state, registry);
-  const health = action.health ?? 1;
+  const health = toMilliUnits(action.health ?? 1);
 
   if (active.repeating && duration <= 0) {
     throw new RuntimeError(`repeating action ${active.ownerRef}.${active.actionLabel} resolved a non-positive duration (${duration}) — give it a positive time: or a positive speed stat`);
@@ -180,7 +181,7 @@ function resolveAttempt(participant: Participant, segment: Segment): boolean {
 
   if (!action.target) {
     if (hit) state.activeAction!.healthRemaining -= fightParams(action, state, registry).abilityAmount;
-    return state.activeAction!.healthRemaining <= EPSILON;
+    return state.activeAction!.healthRemaining <= 0;
   }
 
   if (hit) {
@@ -190,10 +191,10 @@ function resolveAttempt(participant: Participant, segment: Segment): boolean {
       registry,
     );
     logSwing(state, registry, self, other, dealt);
-    return damagePool(state, registry, other, action.target, dealt, segment.deltas) <= EPSILON;
+    return damagePool(state, registry, other, action.target, dealt, segment.deltas) <= 0;
   }
   logSwing(state, registry, self, other, null);
-  return poolLevel(state, registry, other, action.target) <= EPSILON;
+  return poolLevel(state, registry, other, action.target) <= 0;
 }
 
 // An event queue, not a tick: each participant swings on its own clock.
@@ -217,8 +218,8 @@ function resolveStochasticSegment(segment: Segment, action: Action, segEnd: numb
       }
       // Progress can land past its duration, so an overdue swing floors at now.
       const at = state.time + Math.max(0, duration - participant.cadence.progress);
-      // Strictly sooner by EPSILON, so a genuine tie falls to roster order.
-      if (at < nextAt - EPSILON) {
+      // Strictly sooner, so a genuine integer-millisecond tie falls to roster order.
+      if (at < nextAt) {
         next = participant;
         nextAt = at;
       }
@@ -240,7 +241,7 @@ function resolveStochasticSegment(segment: Segment, action: Action, segEnd: numb
     // Only the player's swing decides the fight; a retaliation is a damage source.
     if (next.self !== PLAYER) {
       // Unless it empties a pool, which must settle at the instant it ran out.
-      if (depleted || state.time >= segEnd) return;
+      if (depleted || state.time > segEnd) return;
       continue;
     }
 
@@ -257,7 +258,7 @@ function resolveStochasticSegment(segment: Segment, action: Action, segEnd: numb
       }
       if (active.repeating) {
         if (action.target) enterEncounter(active, next.other, state, registry);
-        else active.healthRemaining = action.health ?? 1;
+        else active.healthRemaining = toMilliUnits(action.health ?? 1);
         playerCadence(active).attemptsMade = 0;
       } else {
         grantActionFoodBuff(state, registry);
@@ -266,7 +267,7 @@ function resolveStochasticSegment(segment: Segment, action: Action, segEnd: numb
       }
     }
 
-    if (state.time >= segEnd) return;
+    if (state.time > segEnd) return;
   }
 }
 
@@ -331,11 +332,9 @@ function applyDueBoundaries(state: GameState, registry: Registry, at: number): v
   }
 }
 
-// Associative, as resolve.test.ts proves. Two accepted limitations: an `on full`
-// handler mutating a rate-referenced stat is not, and a stochastic action
-// emptying a pool fires `on empty` at segment granularity, not the exact instant.
-export function resolve(state: GameState, registry: Registry, toTime: number): void {
+function resolveAtMs(state: GameState, registry: Registry, toTime: number): void {
   if (toTime < state.time) throw new RuntimeError(`resolve: toTime (${toTime}) must be >= state.time (${state.time})`);
+  if (!Number.isInteger(toTime)) throw new RuntimeError(`resolve: toTime must be an integer millisecond value, got ${toTime}`);
   applyDueBoundaries(state, registry, state.time);
   while (state.time < toTime) {
     const segEnd = nextBoundary(state, registry, toTime);
@@ -343,6 +342,13 @@ export function resolve(state: GameState, registry: Registry, toTime: number): v
     // At the instant reached, not segEnd: buffs may still have time left.
     applyDueBoundaries(state, registry, state.time);
   }
+}
+
+// Associative, as resolve.test.ts proves. Two accepted limitations: an `on full`
+// handler mutating a rate-referenced stat is not, and a stochastic action
+// emptying a pool fires `on empty` at segment granularity, not the exact instant.
+export function resolve(state: GameState, registry: Registry, toTimeSeconds: number): void {
+  resolveAtMs(state, registry, secondsToMs(toTimeSeconds));
 }
 
 function grantFoodBuff(item: Item, state: GameState): void {
@@ -353,7 +359,7 @@ function grantFoodBuff(item: Item, state: GameState): void {
 
   for (const tag of item.tags) {
     if (tag.kind !== 'stat-bonus') continue;
-    const expiresAt = state.time + duration;
+    const expiresAt = state.time + secondsToMs(duration);
     state.activeBuffs[`${item.id}:${tag.statId}`] = tag.percent
       ? { statId: tag.statId, kind: 'increased', amount: tag.amount / 100, expiresAt }
       : { statId: tag.statId, kind: 'added', amount: tag.amount, expiresAt };
@@ -406,7 +412,7 @@ export function armAction(obj: string, objId: string, actionId: string, registry
   }
 
   // First in, so the player wins a tie between cadences due at the same instant.
-  const active: ActiveAction = { ownerRef: `${obj}.${objId}`, actionLabel: actionId, repeating, healthRemaining: action.health ?? 1, cadences: { [PLAYER]: newCadence() } };
+  const active: ActiveAction = { ownerRef: `${obj}.${objId}`, actionLabel: actionId, repeating, healthRemaining: toMilliUnits(action.health ?? 1), cadences: { [PLAYER]: newCadence() } };
   state.activeAction = active;
   if (action.target) enterEncounter(active, objId, state, registry);
   return { armed: true, firstUnit: firstUnitSpan(action, state, registry) };
@@ -426,7 +432,7 @@ export function actionFirstUnit(obj: string, objId: string, actionId: string, re
 export function useAction(obj: string, objId: string, actionId: string, registry: Registry, state: GameState): void {
   const armed = armAction(obj, objId, actionId, registry, state);
   if (!armed.armed) return;
-  resolve(state, registry, state.time + armed.firstUnit);
+  resolveAtMs(state, registry, state.time + armed.firstUnit);
 }
 
 // A journey from an unset origin is a plain placement, not a journey.
@@ -481,5 +487,5 @@ export function craftFirstUnit(recipeId: string, registry: Registry, state: Game
 export function craft(recipeId: string, registry: Registry, state: GameState): void {
   const armed = armCraft(recipeId, registry, state);
   if (!armed.armed) return;
-  resolve(state, registry, state.time + armed.firstUnit);
+  resolveAtMs(state, registry, state.time + armed.firstUnit);
 }

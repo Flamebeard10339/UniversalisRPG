@@ -4,6 +4,7 @@ import { point } from '../grammar/range';
 import { nextRandom } from './rng';
 import { armAction, createGameState, GameState, hitChance, initResources, resolve } from './runtime';
 import { loadModule, Registry } from '../content/registry';
+import { secondsToMs, toMilliUnits } from './units';
 
 // Three entities differing only in what they oppose the player with: `dummy`
 // does not dodge, `phantom` matches the player exactly, `biter` swings back.
@@ -86,6 +87,8 @@ bite:
 
 const ATTEMPTS = 2000; // one per second at 60/min
 const DAMAGE = 10; // attack 10 - dr 0, both unranged
+const MAX_HEALTH = toMilliUnits(1000000);
+const DAMAGE_MILLI = toMilliUnits(DAMAGE);
 
 function loaded(source = MODULE): Registry {
   return loadModule(source);
@@ -101,11 +104,11 @@ function fighting(registry: Registry, entityId: string): GameState {
 // Hits are the only thing that moves the pool and each lands for a flat 10.
 function hitsLanded(state: GameState, entityId: string): number {
   const pool = state.activeAction!.actors![entityId].resources.health;
-  return (1000000 - pool) / DAMAGE;
+  return (MAX_HEALTH - pool) / DAMAGE_MILLI;
 }
 
 function hitsTaken(state: GameState): number {
-  return (1000000 - state.resources['health']) / DAMAGE;
+  return (MAX_HEALTH - state.resources['health']) / DAMAGE_MILLI;
 }
 
 describe('the opposed roll', () => {
@@ -177,7 +180,7 @@ describe('a contest inside a fight', () => {
 
     const nimble = fighting(registry, 'biter');
     // A ring of dodging: +100 closes the rat's 100-point skill advantage to nil.
-    nimble.activeBuffs['ring:dodge'] = { statId: 'dodge', kind: 'added', amount: point(100), expiresAt: 1e9 };
+    nimble.activeBuffs['ring:dodge'] = { statId: 'dodge', kind: 'added', amount: point(100), expiresAt: secondsToMs(1e9) };
     resolve(nimble, registry, ATTEMPTS);
 
     expect(hitsTaken(bare) / ATTEMPTS).toBeCloseTo(0.909, 1);
@@ -188,7 +191,7 @@ describe('a contest inside a fight', () => {
     const registry = loaded();
 
     const nimble = fighting(registry, 'biter');
-    nimble.activeBuffs['ring:dodge'] = { statId: 'dodge', kind: 'added', amount: point(100), expiresAt: 1e9 };
+    nimble.activeBuffs['ring:dodge'] = { statId: 'dodge', kind: 'added', amount: point(100), expiresAt: secondsToMs(1e9) };
     resolve(nimble, registry, ATTEMPTS);
 
     // The player's own `evasion: dodge` reads the BITER's dodge, not their buff.
@@ -230,7 +233,7 @@ describe('a contest inside a fight', () => {
       expect(folded.rng).toBe(oneShot.rng);
       expect(folded.time).toBe(oneShot.time);
       expect(hitsLanded(folded, 'biter')).toBe(hitsLanded(oneShot, 'biter'));
-      expect(folded.resources['health']).toBeCloseTo(oneShot.resources['health'], 6);
+      expect(folded.resources['health']).toBe(oneShot.resources['health']);
     }
   });
 });

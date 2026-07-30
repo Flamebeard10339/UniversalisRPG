@@ -7,6 +7,7 @@ import { ResourceDisplay } from '../content/resource';
 import { compareSave, loadSave, startingLocationId } from './save';
 import { Directive } from '../content/test';
 import { humanize } from '../grammar/values';
+import { fromMilliUnits, msToSeconds } from './units';
 
 export type PlayChoiceKind = 'talk' | 'action' | 'travel' | 'dialogue' | 'craft';
 
@@ -198,7 +199,7 @@ export function view(session: PlaySession): PlayView {
     inDialogue: session.dialogue !== null && session.dialogue.choices !== null,
     said,
     choices: computeChoices(session),
-    time: state.time,
+    time: msToSeconds(state.time),
     resources: sessionResources(session),
     encounter: encounterView(state, registry),
     pendingModal: state.pendingModal,
@@ -211,7 +212,7 @@ export function sessionResources(session: PlaySession): PlayView['resources'] {
   return [...registry.resources.values()].map((resource) => ({
     id: resource.id,
     title: resource.title,
-    current: state.resources[resource.id] ?? 0,
+    current: fromMilliUnits(state.resources[resource.id] ?? 0),
     max: statValue(resource.max, state, registry),
     display: resource.display,
   }));
@@ -258,7 +259,7 @@ export function beginAction(session: PlaySession, choiceId: string): PlayView {
   // armAction has already logged a take-gate failure and left activeAction
   // unset; an instant action has nothing to wait for, so beginning it is doing
   // it, which is what useAction does with a zero first unit.
-  if (armed.armed && armed.firstUnit === 0) resolve(state, registry, state.time);
+  if (armed.armed && armed.firstUnit === 0) resolve(state, registry, msToSeconds(state.time));
   return view(session);
 }
 
@@ -349,7 +350,7 @@ export function applyDirective(session: PlaySession, directive: Directive): { fa
       endAction(state);
       return {};
     case 'wait':
-      resolve(state, registry, state.time + directive.seconds);
+      resolve(state, registry, msToSeconds(state.time) + directive.seconds);
       return {};
   }
 }

@@ -4,6 +4,7 @@ import { point } from '../grammar/range';
 import { createGameState, resolve, useAction } from './runtime';
 import { loadModule } from '../content/registry';
 import { runTest, startSession } from './session';
+import { msToSeconds, secondsToMs, toMilliUnits } from './units';
 
 const source = readFileSync('content/tutorial-island.dsl', 'utf8');
 const registry = loadModule(source);
@@ -36,22 +37,22 @@ describe('tutorial-island content', () => {
 describe('tutorial-island health resource (Pass 2 end-to-end)', () => {
   it('starts full, drains as the rat bites back, then regenerates from a meal as time passes', () => {
     const { state } = startSession(registry);
-    expect(state.resources['tutorial-island.health']).toBe(30); // full = statValue(max-health) at start
+    expect(state.resources['tutorial-island.health']).toBe(toMilliUnits(30)); // full = statValue(max-health) at start
 
     // One `use:` is one swing at 25/min; the rat answers on its own 16/min clock.
     useAction('entity', 'tutorial-island.giant-rat', 'fight', registry, state);
-    expect(state.time).toBeCloseTo(2.4, 6);
+    expect(state.time).toBe(secondsToMs(2.4));
 
     resolve(state, registry, 120); // far longer than the ~6s the rat lasts
     const afterFighting = state.resources['tutorial-island.health'];
     expect(state.flags['tutorial-island.rats-killed']).toBe(1);
-    expect(afterFighting).toBeLessThan(30); // it got its bites in
+    expect(afterFighting).toBeLessThan(toMilliUnits(30)); // it got its bites in
     expect(state.log.some((line) => line.startsWith('The Giant Rat hits you for '))).toBe(true);
     expect(state.log.some((line) => line.startsWith('You hit the Giant Rat for '))).toBe(true);
 
     // A standing buff needs no active action to tick.
-    state.activeBuffs['tutorial-island.cooked-shrimp:regeneration'] = { statId: 'tutorial-island.regeneration', amount: point(3), kind: 'added', expiresAt: state.time + 60 };
-    resolve(state, registry, state.time + 60);
-    expect(state.resources['tutorial-island.health']).toBeCloseTo(Math.min(30, afterFighting + 3), 6);
+    state.activeBuffs['tutorial-island.cooked-shrimp:regeneration'] = { statId: 'tutorial-island.regeneration', amount: point(3), kind: 'added', expiresAt: state.time + secondsToMs(60) };
+    resolve(state, registry, msToSeconds(state.time) + 60);
+    expect(state.resources['tutorial-island.health']).toBe(Math.min(toMilliUnits(30), afterFighting + toMilliUnits(3)));
   });
 });

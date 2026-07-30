@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { createGameState, PLAYER, travelSecondsPerUnit } from './runtime';
 import { loadModule } from '../content/registry';
 import { apply, applyDirective, beginAction, cancelAction, PlayView, runTest, SAID_HEAD_KEPT, SAID_TAIL_KEPT, startSession, submitModal, view, wait } from './session';
+import { secondsToMs } from './units';
 
 const source = readFileSync('content/tutorial-island.dsl', 'utf8');
 
@@ -195,7 +196,7 @@ x: 0, y: 0
 starting
 
 # save stale
-{"version":4,"inventory":{"mod.gem":1}}
+{"version":5,"inventory":{"mod.gem":1}}
 `);
     const session = startSession(registry);
 
@@ -336,7 +337,7 @@ adjacent:
     const arrived = wait(session, journey);
     expect(arrived.location.id).toBe('beach');
     expect(session.state.activeAction).toBeNull();
-    expect(session.state.time).toBe(journey);
+    expect(session.state.time).toBe(secondsToMs(journey));
   });
 });
 
@@ -474,7 +475,7 @@ cancel
 
     expect(state.activeAction).toBeNull();
     expect(state.inventory['roasted-chestnut'] ?? 0).toBe(0);
-    expect(state.time).toBe(2);
+    expect(state.time).toBe(secondsToMs(2));
   });
 });
 

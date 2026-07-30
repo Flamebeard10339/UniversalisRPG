@@ -9,6 +9,7 @@ import type { ModuleSource } from '../src/content/universe';
 import { serializeSave } from '../src/runtime/save';
 import { beginAction, runTest, startSession, view } from '../src/runtime/session';
 import { handleCommand, liveTick, loadModportalSources, type AuthoringContext, type Recorder } from './play-cli';
+import { secondsToMs } from '../src/runtime/units';
 
 const source = readFileSync('content/tutorial-island.dsl', 'utf8');
 
@@ -26,7 +27,7 @@ open:
   give: 1 gold
 
 # save empty
-{"version":4}
+{"version":5}
 
 # test always-passes
 assert: time >= 0
@@ -77,13 +78,13 @@ describe('play-cli handleCommand', () => {
     const registry = loadModule(source);
     const session = startSession(registry);
     const current = view(session);
-    session.state.time = 42;
+    session.state.time = secondsToMs(42);
 
     const result = handleCommand(session, current, '/state');
     expect(result.quit).toBe(false);
     expect(result.view).toBeUndefined();
     expect(result.output.some((line) => line.includes('42'))).toBe(true);
-    expect(session.state.time).toBe(42);
+    expect(session.state.time).toBe(secondsToMs(42));
   });
 
   it('reports a friendly error for an out-of-range choice number, without throwing or quitting', () => {
@@ -165,7 +166,7 @@ describe('play-cli handleCommand: /test, /load, /expect, /assert, /cancel', () =
     const session = startSession(registry);
     const current = view(session);
 
-    session.state.time = 99; // diverge, so we can observe /load resetting it
+    session.state.time = secondsToMs(99); // diverge, so we can observe /load resetting it
     const ok = handleCommand(session, current, '/load empty');
     expect(ok.recorded).toBe('load: empty');
     expect(session.state.time).toBe(0);
@@ -261,7 +262,7 @@ describe('liveTick: pure per-tick core of live mode', () => {
     expect(session.state.time).toBe(0); // armed, not yet resolved
 
     const result = liveTick(session, 500, 2); // 0.5s real * 2x = 1 sim-second
-    expect(session.state.time).toBe(1);
+    expect(session.state.time).toBe(secondsToMs(1));
     expect(result.active).toBe(true);
   });
 
@@ -275,7 +276,7 @@ describe('liveTick: pure per-tick core of live mode', () => {
       const result = liveTick(session, 200, 1);
       expect(result.active).toBe(true); // repeating: never self-completes
     }
-    expect(session.state.time).toBeCloseTo(5, 5);
+    expect(session.state.time).toBe(secondsToMs(5));
     expect(session.state.inventory['roasted-chestnut']).toBe(1);
     expect(session.state.activeAction).not.toBeNull();
   });
@@ -287,7 +288,7 @@ describe('liveTick: pure per-tick core of live mode', () => {
 
     // 1 real second at 4x => 4 simulated seconds, exactly one cycle.
     const result = liveTick(session, 1000, 4);
-    expect(session.state.time).toBe(4);
+    expect(session.state.time).toBe(secondsToMs(4));
     expect(result.active).toBe(true);
     expect(session.state.inventory['roasted-chestnut']).toBe(1);
   });
@@ -521,7 +522,7 @@ describe('play-cli local DSL authoring', () => {
       '/dsl resource stamina max: local-changes.vigor',
       '/dsl recipe smelt in: local-changes.ore | out: local-changes.ingot',
       '/dsl dialogue npc-chat owner = local-changes.npc | node greet: |   Hello there.',
-      '/dsl save blank {"version":4}',
+      '/dsl save blank {"version":5}',
       '/dsl test smoke assert: time >= 0',
       '/dsl remove item.local-changes.temporary',
     ];

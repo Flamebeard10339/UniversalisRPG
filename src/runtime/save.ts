@@ -5,7 +5,7 @@ import { findActionOwner, parseOwnerRef } from './actions';
 import { PLAYER } from './state';
 
 // Bumped on any shape change; with no migration path, a stale save is rejected.
-export const SAVE_VERSION = 4;
+export const SAVE_VERSION = 5;
 
 // A sparse diff against initialState: a new game saves as `{}`, and `log` is not state.
 export type SaveDiff = Partial<Omit<GameState, 'log'>>;
@@ -32,6 +32,7 @@ interface SaveFieldRule {
 }
 
 const isNumber = (value: unknown): boolean => typeof value === 'number' && Number.isFinite(value);
+const isInteger = (value: unknown): boolean => isNumber(value) && Number.isInteger(value);
 const isObject = (value: unknown): boolean => typeof value === 'object' && value !== null && !Array.isArray(value);
 
 const SAVE_FIELDS: Record<SaveField, SaveFieldRule> = {
@@ -40,10 +41,11 @@ const SAVE_FIELDS: Record<SaveField, SaveFieldRule> = {
   flags: { shape: 'record', holds: (value) => typeof value === 'boolean' || isNumber(value), prune: { of: 'flag', loaded: (registry, id) => registry.namespace.has('flag', id) } },
   visits: { shape: 'record', holds: isNumber, prune: { of: 'dialogue node', loaded: (registry, id) => registry.namespace.has('node', id) } },
   xp: { shape: 'record', holds: isNumber, prune: { of: 'skill', loaded: (registry, id) => registry.skills.has(id) } },
-  resources: { shape: 'record', holds: isNumber, prune: { of: 'resource', loaded: (registry, id) => registry.resources.has(id) } },
+  resources: { shape: 'record', holds: isInteger, prune: { of: 'resource', loaded: (registry, id) => registry.resources.has(id) } },
+  resourceRateRemainders: { shape: 'record', holds: isInteger, prune: { of: 'resource', loaded: (registry, id) => registry.resources.has(id) } },
   activeBuffs: { shape: 'record', holds: isObject, prune: 'pruned by a rule of its own' },
   activeAction: { shape: 'scalar', holds: (value) => value === null || isObject(value), prune: 'pruned by a rule of its own' },
-  time: { shape: 'scalar', holds: isNumber, prune: 'holds no registry id' },
+  time: { shape: 'scalar', holds: isInteger, prune: 'holds no registry id' },
   rng: { shape: 'scalar', holds: isNumber, prune: 'holds no registry id' },
   player: { shape: 'scalar', holds: isObject, prune: 'holds no registry id' },
   pendingModal: { shape: 'scalar', holds: (value) => value === undefined || typeof value === 'string', prune: 'holds no registry id' },

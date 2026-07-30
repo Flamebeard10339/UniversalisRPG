@@ -3,6 +3,7 @@ import { restorePools } from './effects';
 import { applyResultsNow, createGameState, initResources } from './runtime';
 import { loadModule, Registry } from '../content/registry';
 import { initialState } from './save';
+import { toMilliUnits } from './units';
 
 const MODULE = `
 # stat max-health
@@ -59,7 +60,7 @@ describe('# resource: parsing and defaults', () => {
     const state = createGameState();
     initResources(state, registry);
 
-    expect(state.resources['health']).toBe(20); // full = statValue(max-health) base
+    expect(state.resources['health']).toBe(toMilliUnits(20)); // full = statValue(max-health) base
     expect(state.resources['focus']).toBe(0); // explicit start
   });
 
@@ -69,14 +70,14 @@ describe('# resource: parsing and defaults', () => {
     restorePools(state, { health: 7 }); // pretend a save restored a damaged pool
     initResources(state, registry);
 
-    expect(state.resources['health']).toBe(7); // untouched
+    expect(state.resources['health']).toBe(7); // restorePools writes the stored save value verbatim
     expect(state.resources['focus']).toBe(0); // still filled
   });
 
   it('a fresh baseline game carries full pools, so the save diff stays empty', () => {
     const registry = loadModule(MODULE);
     const base = initialState(registry);
-    expect(base.resources).toEqual({ health: 20, focus: 0 });
+    expect(base.resources).toEqual({ health: toMilliUnits(20), focus: 0 });
   });
 
   it('rejects a resource with no max: stat', () => {
@@ -107,9 +108,9 @@ describe('drain: / restore: — the direct pool write', () => {
   it('moves the level in both directions', () => {
     const { registry, state } = started();
     applyResultsNow(state, registry, [{ kind: 'pool', resource: 'health', delta: -7 }]);
-    expect(state.resources['health']).toBe(13);
+    expect(state.resources['health']).toBe(toMilliUnits(13));
     applyResultsNow(state, registry, [{ kind: 'pool', resource: 'health', delta: 4 }]);
-    expect(state.resources['health']).toBe(17);
+    expect(state.resources['health']).toBe(toMilliUnits(17));
   });
 
   it('clamps at 0 and at the live max rather than overshooting', () => {
@@ -117,7 +118,7 @@ describe('drain: / restore: — the direct pool write', () => {
     applyResultsNow(state, registry, [{ kind: 'pool', resource: 'health', delta: -500 }]);
     expect(state.resources['health']).toBe(0);
     applyResultsNow(state, registry, [{ kind: 'pool', resource: 'health', delta: 500 }]);
-    expect(state.resources['health']).toBe(20);
+    expect(state.resources['health']).toBe(toMilliUnits(20));
   });
 
   it('fires on empty once as the pool crosses to 0, and not again while it sits there', () => {
@@ -137,7 +138,7 @@ describe('drain: / restore: — the direct pool write', () => {
     const { registry, state } = started();
     // focus caps at 4 and starts at 0; +10 is two full meters with 2 left over.
     applyResultsNow(state, registry, [{ kind: 'pool', resource: 'focus', delta: 10 }]);
-    expect(state.resources['focus']).toBe(2);
+    expect(state.resources['focus']).toBe(toMilliUnits(2));
     expect(state.inventory['focus-charge']).toBe(2);
   });
 

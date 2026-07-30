@@ -28,18 +28,20 @@ export interface GameState extends RngCursor {
   activeAction: ActiveAction | null;
   activeBuffs: Record<string, ActiveBuff>;
   resources: PoolLevels;
+  resourceRateRemainders: Record<string, number>;
   player: { name: string; race: string };
   pendingModal?: string;
 }
 
 export function createGameState(location = ''): GameState {
-  return { flags: {}, inventory: {}, location, visits: {}, xp: {}, log: [], time: 0, activeAction: null, activeBuffs: {}, resources: {}, rng: DEFAULT_RNG_SEED, player: { name: '', race: '' } };
+  return { flags: {}, inventory: {}, location, visits: {}, xp: {}, log: [], time: 0, activeAction: null, activeBuffs: {}, resources: {}, resourceRateRemainders: {}, rng: DEFAULT_RNG_SEED, player: { name: '', race: '' } };
 }
 
 // The one seam through which simulated time advances; nothing reads a real clock.
-export function advanceTime(state: GameState, seconds: number): void {
-  if (seconds < 0) throw new RuntimeError(`advanceTime: seconds must be non-negative, got ${seconds}`);
-  state.time += seconds;
+export function advanceTime(state: GameState, milliseconds: number): void {
+  if (milliseconds < 0) throw new RuntimeError(`advanceTime: milliseconds must be non-negative, got ${milliseconds}`);
+  if (!Number.isInteger(milliseconds)) throw new RuntimeError(`advanceTime: milliseconds must be an integer, got ${milliseconds}`);
+  state.time += milliseconds;
 }
 
 export function endAction(state: GameState): void {

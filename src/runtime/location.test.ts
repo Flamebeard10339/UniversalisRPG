@@ -3,6 +3,7 @@ import { Direction, Location, locationSchema, recursivelyResolveRelativeCoordina
 import { Authored, hydrateSection } from '../grammar/section';
 import { loadModule } from '../content/registry';
 import { apply, startSession, view } from './session';
+import { secondsToMs } from './units';
 
 function loc(id: string, over: Partial<Location> = {}): Location {
   return { id, x: 0, y: 0, z: 0, title: id, entities: [], adjacent: [], flags: [], actions: [], starting: false, ...over };
@@ -106,7 +107,7 @@ describe('a location’s own actions', () => {
     const v = apply(session, 'use:location.shore.search tideline');
     expect(session.state.inventory['driftwood']).toBe(1);
     expect(session.state.flags['shore.searched']).toBe(true);
-    expect(session.state.time).toBe(2);
+    expect(session.state.time).toBe(secondsToMs(2));
     expect(v.choices.map((c) => c.id)).toContain('use:location.shore.light beacon');
   });
 });

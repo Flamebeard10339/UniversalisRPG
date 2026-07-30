@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { ActiveAction, armAction, craft, createGameState, GameState, initResources, PLAYER, resolve, RuntimeError, statValue, useAction } from './runtime';
 import { newCadence } from './encounter';
 import { loadModule, Registry } from '../content/registry';
+import { secondsToMs, toMilliUnits } from './units';
 
 // Fixtures: campfire-cook (no in:, so an infinite input limit), smokehouse-cook
 // (in: raw-shrimp bounds it), grill-cook (accuracy-gated, burns on a miss),
@@ -180,13 +181,13 @@ function loaded(): Registry {
 // depend on guessing the compiled action's label text.
 function recipeActive(registry: Registry, recipeId: string): ActiveAction {
   const action = registry.recipeActions.get(recipeId)!;
-  return { ownerRef: `recipe.${recipeId}`, actionLabel: action.label, repeating: action.repeating === true, healthRemaining: action.health ?? 1, cadences: { [PLAYER]: newCadence() } };
+  return { ownerRef: `recipe.${recipeId}`, actionLabel: action.label, repeating: action.repeating === true, healthRemaining: toMilliUnits(action.health ?? 1), cadences: { [PLAYER]: newCadence() } };
 }
 
 function withCampfireCooking(registry: Registry, buffed: boolean): GameState {
   const state = createGameState('nowhere');
   if (buffed) {
-    state.activeBuffs['quickroot:cooking-speed'] = { statId: 'cooking-speed', amount: 1, kind: 'increased', expiresAt: 500 };
+    state.activeBuffs['quickroot:cooking-speed'] = { statId: 'cooking-speed', amount: 1, kind: 'increased', expiresAt: secondsToMs(500) };
   }
   state.activeAction = recipeActive(registry, 'campfire-cook');
   return state;
@@ -271,7 +272,7 @@ describe('resolve: direct pool writes stay associative alongside a rate', () => 
   function draining(registry: Registry, entityId: string, label: string): GameState {
     const state = createGameState('nowhere');
     initResources(state, registry);
-    state.activeAction = { ownerRef: `entity.${entityId}`, actionLabel: label, repeating: true, healthRemaining: 1, cadences: { [PLAYER]: newCadence() } };
+    state.activeAction = { ownerRef: `entity.${entityId}`, actionLabel: label, repeating: true, healthRemaining: toMilliUnits(1), cadences: { [PLAYER]: newCadence() } };
     return state;
   }
 
@@ -284,7 +285,7 @@ describe('resolve: direct pool writes stay associative alongside a rate', () => 
     const oneShot = draining(registry, 'grindstone', 'sharpen');
     resolve(oneShot, registry, HORIZON);
     // Pinning the value rules out the clamp-per-write reading, which refills to 25.
-    expect(oneShot.resources['vigor']).toBeCloseTo(5, 6);
+    expect(oneShot.resources['vigor']).toBe(toMilliUnits(5));
     expect(oneShot.inventory['edge']).toBe(25);
 
     let seed = 11;
@@ -303,7 +304,7 @@ describe('resolve: direct pool writes stay associative alongside a rate', () => 
       for (const t of sorted) resolve(folded, registry, t);
 
       expect(folded.inventory).toEqual(oneShot.inventory);
-      expect(folded.resources['vigor']).toBeCloseTo(oneShot.resources['vigor'], 6);
+      expect(folded.resources['vigor']).toBe(oneShot.resources['vigor']);
     }
   });
 
@@ -330,7 +331,7 @@ describe('resolve: direct pool writes stay associative alongside a rate', () => 
 
       expect(folded.rng).toBe(oneShot.rng);
       expect(folded.inventory).toEqual(oneShot.inventory);
-      expect(folded.resources['vigor']).toBeCloseTo(oneShot.resources['vigor'], 6);
+      expect(folded.resources['vigor']).toBe(oneShot.resources['vigor']);
     }
   });
 });
@@ -343,7 +344,7 @@ describe('resolve: repeating action, speed stat, and timed buff (test 1 from the
     resolve(state, registry, 1000);
 
     expect(state.inventory['cooked-shrimp']).toBe(1500);
-    expect(state.time).toBe(1000);
+    expect(state.time).toBe(secondsToMs(1000));
     expect(state.activeAction).toEqual(recipeActive(registry, 'campfire-cook'));
     expect(state.activeBuffs).toEqual({});
   });
@@ -387,7 +388,7 @@ describe('resolve: input-limited repeating action ends in O(1) segments (test 4)
 
     expect(state.inventory['cooked-shrimp'] ?? 0).toBe(0);
     expect(state.activeAction).toBeNull();
-    expect(state.time).toBe(100);
+    expect(state.time).toBe(secondsToMs(100));
   });
 });
 
@@ -395,7 +396,7 @@ describe('resolve: buff expiry', () => {
   it('the buff is present and boosts the stat right up until expiresAt, then is gone', () => {
     const registry = loaded();
     const state = createGameState('nowhere');
-    state.activeBuffs['quickroot:cooking-speed'] = { statId: 'cooking-speed', amount: 1, kind: 'increased', expiresAt: 500 };
+    state.activeBuffs['quickroot:cooking-speed'] = { statId: 'cooking-speed', amount: 1, kind: 'increased', expiresAt: secondsToMs(500) };
 
     resolve(state, registry, 499);
     expect(statValue('cooking-speed', state, registry)).toBe(2);
@@ -419,7 +420,7 @@ describe('useAction/craft integration: repeating actions, eating grants a live b
     expect(state.activeAction).toEqual(recipeActive(registry, 'smokehouse-cook'));
     expect(state.inventory['cooked-shrimp']).toBe(1);
     expect(state.inventory['raw-shrimp']).toBe(9);
-    expect(state.time).toBe(1);
+    expect(state.time).toBe(secondsToMs(1));
   });
 
   it('eating a food item grants its tags as a live timed buff via the ordinary self-consuming eat action', () => {
@@ -431,7 +432,7 @@ describe('useAction/craft integration: repeating actions, eating grants a live b
 
     expect(state.inventory['quickroot']).toBe(0);
     expect(state.log).toContain('You chew the root. Your hands feel quick.');
-    expect(state.activeBuffs['quickroot:cooking-speed']).toEqual({ statId: 'cooking-speed', amount: 1, kind: 'increased', expiresAt: 500 });
+    expect(state.activeBuffs['quickroot:cooking-speed']).toEqual({ statId: 'cooking-speed', amount: 1, kind: 'increased', expiresAt: secondsToMs(500) });
     expect(statValue('cooking-speed', state, registry)).toBe(2);
   });
 
@@ -453,7 +454,7 @@ describe('useAction/craft integration: repeating actions, eating grants a live b
       expect(state.inventory['stew']).toBe(0);
       expect(statValue('cooking-speed', state, registry)).toBe(2);
       // The 60s window starts at the last spoonful, not when the bowl was picked up.
-      expect(state.activeBuffs['stew:cooking-speed'].expiresAt).toBe(63);
+      expect(state.activeBuffs['stew:cooking-speed'].expiresAt).toBe(secondsToMs(63));
     }
   });
 
@@ -461,7 +462,7 @@ describe('useAction/craft integration: repeating actions, eating grants a live b
     const registry = loaded();
     const state = createGameState('nowhere');
     useAction('entity', 'torch', 'light', registry, state);
-    expect(state.time).toBe(5);
+    expect(state.time).toBe(secondsToMs(5));
     expect(state.activeAction).toBeNull();
     expect(state.log).toEqual(['The torch flares to life.']);
   });
@@ -496,7 +497,7 @@ function withGrillCooking(registry: Registry, rawShrimp: number): GameState {
 
 function withTreeChopping(): GameState {
   const state = createGameState('nowhere');
-  state.activeAction = { ownerRef: 'entity.tree', actionLabel: 'chop', repeating: true, healthRemaining: 3, cadences: { [PLAYER]: newCadence() } };
+  state.activeAction = { ownerRef: 'entity.tree', actionLabel: 'chop', repeating: true, healthRemaining: toMilliUnits(3), cadences: { [PLAYER]: newCadence() } };
   return state;
 }
 
@@ -563,15 +564,15 @@ describe('resolve: deterministic multi-hit fights (health > 1, no accuracy)', ()
     const oneShot = withTreeChopping();
     resolve(oneShot, registry, 3); // exactly one full fight (3 attempts * 1s)
     expect(oneShot.inventory['wood']).toBe(1);
-    expect(oneShot.activeAction).toEqual({ ownerRef: 'entity.tree', actionLabel: 'chop', repeating: true, healthRemaining: 3, cadences: { [PLAYER]: newCadence() } }); // rearmed fresh
+    expect(oneShot.activeAction).toEqual({ ownerRef: 'entity.tree', actionLabel: 'chop', repeating: true, healthRemaining: toMilliUnits(3), cadences: { [PLAYER]: newCadence() } }); // rearmed fresh
 
     const midFight = withTreeChopping();
     resolve(midFight, registry, 1); // 1 of 3 attempts
-    expect(midFight.activeAction).toEqual({ ownerRef: 'entity.tree', actionLabel: 'chop', repeating: true, healthRemaining: 2, cadences: { player: { progress: 0, attemptsMade: 1 } } });
+    expect(midFight.activeAction).toEqual({ ownerRef: 'entity.tree', actionLabel: 'chop', repeating: true, healthRemaining: toMilliUnits(2), cadences: { player: { progress: 0, attemptsMade: 1 } } });
     expect(midFight.inventory['wood'] ?? 0).toBe(0);
 
     resolve(midFight, registry, 2); // 2 of 3 attempts
-    expect(midFight.activeAction).toEqual({ ownerRef: 'entity.tree', actionLabel: 'chop', repeating: true, healthRemaining: 1, cadences: { player: { progress: 0, attemptsMade: 2 } } });
+    expect(midFight.activeAction).toEqual({ ownerRef: 'entity.tree', actionLabel: 'chop', repeating: true, healthRemaining: toMilliUnits(1), cadences: { player: { progress: 0, attemptsMade: 2 } } });
 
     resolve(midFight, registry, 3); // completes the fight
     expect(midFight.inventory['wood']).toBe(1);
@@ -586,7 +587,7 @@ describe('resolve: onSuccess batches per completion, not per segment (Pass-1 reg
 
     function withKilnFiring(): GameState {
       const state = createGameState('nowhere');
-      state.activeAction = { ownerRef: 'entity.kiln', actionLabel: 'fire', repeating: true, healthRemaining: 1, cadences: { [PLAYER]: newCadence() } };
+      state.activeAction = { ownerRef: 'entity.kiln', actionLabel: 'fire', repeating: true, healthRemaining: toMilliUnits(1), cadences: { [PLAYER]: newCadence() } };
       return state;
     }
 
@@ -684,8 +685,8 @@ on full:
     resolve(state, registry, 60); // one minute
 
     expect(state.inventory['spark']).toBe(2);
-    expect(state.resources['charge']).toBeCloseTo(0.5, 9);
-    expect(state.time).toBe(60);
+    expect(state.resources['charge']).toBe(toMilliUnits(0.5));
+    expect(state.time).toBe(secondsToMs(60));
   });
 });
 
@@ -710,9 +711,9 @@ on empty:
     resolve(state, registry, 1_000_000_000);
     const elapsedMs = performance.now() - started;
 
-    expect(state.resources['pond']).toBe(5); // never moved: net rate 0 => no boundary
+    expect(state.resources['pond']).toBe(toMilliUnits(5)); // never moved: net rate 0 => no boundary
     expect(state.flags['dry']).toBeUndefined();
-    expect(state.time).toBe(1_000_000_000);
+    expect(state.time).toBe(secondsToMs(1_000_000_000));
     expect(elapsedMs).toBeLessThan(50); // a couple of segments, not a fixed-dt march
   });
 });
@@ -724,7 +725,7 @@ describe('resolve: resource associativity (the invariant, extended to pools)', (
     function fresh(): GameState {
       const state = createGameState();
       initResources(state, registry); // hp = 100 (full), spark = 0
-      state.activeAction = { ownerRef: 'entity.engine', actionLabel: 'run', repeating: true, healthRemaining: 1, cadences: { [PLAYER]: newCadence() } };
+      state.activeAction = { ownerRef: 'entity.engine', actionLabel: 'run', repeating: true, healthRemaining: toMilliUnits(1), cadences: { [PLAYER]: newCadence() } };
       return state;
     }
 
@@ -761,7 +762,7 @@ describe('resolve: resource associativity (the invariant, extended to pools)', (
       // Continuous levels reconverge within float tolerance: the carried rollover
       // remainder accrues bounded per-split error, which is accepted.
       for (const id of Object.keys(oneShot.resources)) {
-        expect(folded.resources[id]).toBeCloseTo(oneShot.resources[id], 6);
+        expect(folded.resources[id]).toBe(oneShot.resources[id]);
       }
     }
   });

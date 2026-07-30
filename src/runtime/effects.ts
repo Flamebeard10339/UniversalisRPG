@@ -4,6 +4,7 @@ import { Registry } from '../content/registry';
 import { Resource } from '../content/resource';
 import { endAction, GameState, RuntimeError } from './state';
 import { statValue } from './stats';
+import { divideRateRemainder, fromMilliUnits, toMilliUnits } from './units';
 
 export interface Segment {
   state: GameState;
@@ -57,7 +58,7 @@ export function applyResults(segment: Segment, results: readonly ActionResult[],
         break;
       case 'pool':
         requireResource(registry, result.resource);
-        segment.deltas.set(result.resource, (segment.deltas.get(result.resource) ?? 0) + result.delta * count);
+        segment.deltas.set(result.resource, (segment.deltas.get(result.resource) ?? 0) + toMilliUnits(result.delta) * count);
         break;
       case 'stop':
         segment.stopped = true;
@@ -77,13 +78,10 @@ export function applyResultsNow(state: GameState, registry: Registry, results: r
 export function initResources(state: GameState, registry: Registry): void {
   for (const resource of registry.resources.values()) {
     if (state.resources[resource.id] === undefined) {
-      levels(state)[resource.id] = resource.start ?? statValue(resource.max, state, registry);
+      levels(state)[resource.id] = toMilliUnits(resource.start ?? statValue(resource.max, state, registry));
     }
   }
 }
-
-export const EPSILON = 1e-9;
-export const SECONDS_PER_MINUTE = 60;
 
 export interface ResourceSnapshot {
   resource: Resource;
@@ -94,9 +92,9 @@ export interface ResourceSnapshot {
 export function captureResourceRates(state: GameState, registry: Registry): ResourceSnapshot[] {
   const snapshots: ResourceSnapshot[] = [];
   for (const resource of registry.resources.values()) {
-    const ratePerMinute = resource.rate ? statValue(resource.rate, state, registry) : 0;
+    const ratePerMinute = resource.rate ? toMilliUnits(statValue(resource.rate, state, registry)) : 0;
     if (ratePerMinute === 0) continue;
-    snapshots.push({ resource, ratePerMinute, max: statValue(resource.max, state, registry) });
+    snapshots.push({ resource, ratePerMinute, max: toMilliUnits(statValue(resource.max, state, registry)) });
   }
   return snapshots;
 }
@@ -106,23 +104,28 @@ function levels(state: GameState): Record<string, number> {
   return state.resources as Record<string, number>;
 }
 
+export function poolDisplayValue(level: number): number {
+  return fromMilliUnits(level);
+}
+
 // Loading a save constructs a state rather than moving pools: no rollover, no clamp.
 export function restorePools(state: GameState, restored: Record<string, number>): void {
   for (const [id, level] of Object.entries(restored)) levels(state)[id] = level;
 }
 
-function setPoolLevel(state: GameState, registry: Registry, resource: Resource, current: number, raw: number, max: number): void {
+function setPoolLevel(state: GameState, registry: Registry, resource: Resource, current: number, raw: number, max: number): 'stored' | 'clamped' {
   if (raw > current && resource.onFull.length > 0 && max > 0) {
     const fires = Math.floor(raw / max);
     levels(state)[resource.id] = raw - fires * max;
     if (fires > 0) applyResultsNow(state, registry, resource.onFull, fires);
-    return;
+    return 'stored';
   }
   const clamped = Math.min(max, Math.max(0, raw));
   levels(state)[resource.id] = clamped;
-  if (raw < current && current > EPSILON && clamped <= EPSILON && resource.onEmpty.length > 0) {
+  if (raw < current && current > 0 && clamped <= 0 && resource.onEmpty.length > 0) {
     applyResultsNow(state, registry, resource.onEmpty);
   }
+  return clamped === raw ? 'stored' : 'clamped';
 }
 
 export function requireResource(registry: Registry, resourceId: string): Resource {
@@ -133,7 +136,6 @@ export function requireResource(registry: Registry, resourceId: string): Resourc
 
 // Iterates the registry, not the deltas, so settle order is split-independent.
 export function settlePools(state: GameState, registry: Registry, snapshots: ResourceSnapshot[], dt: number, deltas: PoolDeltas): void {
-  const dtMinutes = dt / SECONDS_PER_MINUTE;
   const rated = new Map(snapshots.map((snapshot) => [snapshot.resource.id, snapshot]));
 
   for (const resource of registry.resources.values()) {
@@ -141,8 +143,11 @@ export function settlePools(state: GameState, registry: Registry, snapshots: Res
     const delta = deltas.get(resource.id) ?? 0;
     if (!snapshot && delta === 0) continue;
     const current = state.resources[resource.id] ?? 0;
-    const raw = current + delta + (snapshot ? snapshot.ratePerMinute * dtMinutes : 0);
-    setPoolLevel(state, registry, resource, current, raw, snapshot?.max ?? statValue(resource.max, state, registry));
+    const rateAcc = snapshot ? snapshot.ratePerMinute * dt + (state.resourceRateRemainders[resource.id] ?? 0) : 0;
+    const rate = snapshot ? divideRateRemainder(rateAcc) : { units: 0, remainder: 0 };
+    const raw = current + delta + rate.units;
+    const result = setPoolLevel(state, registry, resource, current, raw, snapshot?.max ?? toMilliUnits(statValue(resource.max, state, registry)));
+    if (snapshot) state.resourceRateRemainders[resource.id] = result === 'clamped' ? 0 : rate.remainder;
   }
 }
 
@@ -150,7 +155,7 @@ export function clampResources(state: GameState, registry: Registry): void {
   for (const resource of registry.resources.values()) {
     const level = state.resources[resource.id];
     if (level === undefined) continue;
-    const max = statValue(resource.max, state, registry);
+    const max = toMilliUnits(statValue(resource.max, state, registry));
     // The ceiling-limited destination is what lets setPoolLevel fire `on empty`.
     setPoolLevel(state, registry, resource, level, Math.min(max, level), max);
   }

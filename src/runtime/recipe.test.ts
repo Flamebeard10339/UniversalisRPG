@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { craft, createGameState, RuntimeError, recipeCraftable, resolve } from './runtime';
 import { loadModule, Registry } from '../content/registry';
 import { startSession, view } from './session';
+import { secondsToMs, toMilliUnits } from './units';
 
 const MODULE = `
 # item jug-of-water
@@ -223,8 +224,8 @@ describe('spannable repeating craft', () => {
     craft('brick', registry, state);
     expect(state.inventory['clay-brick']).toBe(1);
     expect(state.inventory['raw-clay']).toBe(2);
-    expect(state.time).toBe(2);
-    expect(state.activeAction).toEqual({ ownerRef: 'recipe.brick', actionLabel: 'Craft Brick', repeating: true, healthRemaining: 1, cadences: { player: { progress: 0, attemptsMade: 0 } } });
+    expect(state.time).toBe(secondsToMs(2));
+    expect(state.activeAction).toEqual({ ownerRef: 'recipe.brick', actionLabel: 'Craft Brick', repeating: true, healthRemaining: toMilliUnits(1), cadences: { player: { progress: 0, attemptsMade: 0 } } });
 
     resolve(state, registry, 6); // two more completions' worth of time
     expect(state.inventory['clay-brick']).toBe(3);

@@ -2,15 +2,16 @@ import { describe, expect, it } from 'vitest';
 import { advanceTime, createGameState, evaluateCondition, renderSegments, RuntimeError, useAction } from './runtime';
 import { loadModule } from '../content/registry';
 import { runTest, startSession, view, wait } from './session';
+import { secondsToMs } from './units';
 
 describe('advanceTime', () => {
-  it('accrues seconds onto state.time', () => {
+  it('accrues integer milliseconds onto state.time', () => {
     const state = createGameState();
     expect(state.time).toBe(0);
-    advanceTime(state, 10);
-    expect(state.time).toBe(10);
-    advanceTime(state, 2.5);
-    expect(state.time).toBe(12.5);
+    advanceTime(state, 10_000);
+    expect(state.time).toBe(10_000);
+    advanceTime(state, 2500);
+    expect(state.time).toBe(12_500);
   });
 
   it('throws a RuntimeError on a negative delta', () => {
@@ -23,14 +24,14 @@ describe('advanceTime', () => {
 describe('time reference', () => {
   it('is readable via an ordinary comparison condition', () => {
     const state = createGameState();
-    advanceTime(state, 100);
+    advanceTime(state, secondsToMs(100));
     expect(evaluateCondition({ kind: 'comparison', left: { path: ['time'] }, operator: '>=', right: 100 }, state)).toBe(true);
     expect(evaluateCondition({ kind: 'comparison', left: { path: ['time'] }, operator: '>', right: 100 }, state)).toBe(false);
   });
 
   it('interpolates into rendered text', () => {
     const state = createGameState();
-    advanceTime(state, 42);
+    advanceTime(state, secondsToMs(42));
     const rendered = renderSegments([{ kind: 'interpolate', reference: { path: ['time'] } }], state);
     expect(rendered).toBe('42');
   });
@@ -63,7 +64,7 @@ tick:
     const state = createGameState();
     state.inventory['cooked-shrimp'] = 1;
     useAction('entity', 'campfire', 'cook', registry, state);
-    expect(state.time).toBe(30);
+    expect(state.time).toBe(secondsToMs(30));
   });
 
   it('does not advance time when the action is unaffordable (shortfall branch)', () => {
@@ -102,7 +103,7 @@ starting
     expect(view(session).time).toBe(0);
 
     const v = wait(session, 15);
-    expect(session.state.time).toBe(15);
+    expect(session.state.time).toBe(secondsToMs(15));
     expect(v.time).toBe(15);
   });
 });
@@ -127,7 +128,7 @@ assert: time > 60
     const state = createGameState();
     const result = runTest('wait-enough', registry, state);
     expect(result).toEqual({ passed: true });
-    expect(state.time).toBe(61);
+    expect(state.time).toBe(secondsToMs(61));
   });
 
   it('fails and reports the unmet condition when the wait is too short', () => {

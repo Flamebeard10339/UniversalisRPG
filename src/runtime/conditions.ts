@@ -1,6 +1,7 @@
 import { Condition, PLAYER, Reference, TIME, visitedNode } from '../grammar/condition';
 import { TextSegment } from '../content/dialogue';
 import { GameState } from './state';
+import { msToSeconds } from './units';
 
 // Rendering asks the same questions of state that conditions do, which is why
 // the two live together.
@@ -10,7 +11,7 @@ import { GameState } from './state';
 // decides what to rewrite, so both read it off `grammar/condition`.
 export function resolveReference(reference: Reference, state: GameState): boolean | number | string | undefined {
   const { path } = reference;
-  if (path[0] === TIME) return state.time;
+  if (path[0] === TIME) return msToSeconds(state.time);
   if (path[0] === PLAYER) return state.player[path[1] as 'name' | 'race'];
   const node = visitedNode(path);
   if (node) return state.visits[node.join('.')] ?? 0;

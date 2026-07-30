@@ -3,6 +3,7 @@ import { restorePools } from './effects';
 import { point } from '../grammar/range';
 import { armAction, createGameState, GameState, initResources, resolve } from './runtime';
 import { loadModule, Registry } from '../content/registry';
+import { secondsToMs, toMilliUnits } from './units';
 
 // Two independent mechanisms: `requires:`/inputs are re-checked by the resolver,
 // while a pool running out is content's call via `stop` in its `on empty:`.
@@ -165,14 +166,14 @@ describe('a pool running out stops the fight', () => {
     // No tail: under a settle-at-span-end reading the player would have swung
     // through the whole 300s and felled the rat at 240s.
     expect(state.inventory['rat-tail'] ?? 0).toBe(0);
-    expect(state.time).toBe(300); // time still passes; the player just isn't fighting
+    expect(state.time).toBe(secondsToMs(300)); // time still passes; the player just isn't fighting
   });
 
   it('pins that instant to the third bite', () => {
     const { registry, state } = fighting();
 
     resolve(state, registry, 11.2);
-    expect(state.resources['health']).toBe(10);
+    expect(state.resources['health']).toBe(toMilliUnits(10));
     expect(state.activeAction).not.toBeNull();
 
     resolve(state, registry, 11.3);
@@ -215,8 +216,8 @@ describe('a pool running out stops the fight', () => {
   it('fires on empty: when a shrinking max squeezes a pool to nothing', () => {
     const { registry, state } = started();
     armAction('entity', 'beacon', 'tend', registry, state);
-    state.activeBuffs['elixir:max-vigor'] = { statId: 'max-vigor', amount: point(20), kind: 'added', expiresAt: 10 };
-    restorePools(state, { vigor: 20 });
+    state.activeBuffs['elixir:max-vigor'] = { statId: 'max-vigor', amount: point(20), kind: 'added', expiresAt: secondsToMs(10) };
+    restorePools(state, { vigor: toMilliUnits(20) });
 
     resolve(state, registry, 20);
 
@@ -258,7 +259,7 @@ describe('`stop` among an action’s own results', () => {
     expect(state.inventory['blessing']).toBe(1);
     expect(state.log.filter((line) => line === 'You have had enough.')).toHaveLength(1);
     expect(state.activeAction).toBeNull();
-    expect(state.time).toBe(100);
+    expect(state.time).toBe(secondsToMs(100));
   });
 
   it('gives the same answer jumped as stepped, which is the invariant it used to break', () => {
@@ -280,7 +281,7 @@ describe('`stop` among an action’s own results', () => {
 
     expect(state.inventory['rat-tail']).toBe(1);
     expect(state.activeAction).toBeNull();
-    expect(state.time).toBe(300);
+    expect(state.time).toBe(secondsToMs(300));
     expect(state.log.filter((line) => line.startsWith('You hit the Straw Man'))).toHaveLength(2);
   });
 

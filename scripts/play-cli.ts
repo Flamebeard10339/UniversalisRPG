@@ -34,6 +34,7 @@ import { pruneStateForRegistry, serializeSave } from '../src/runtime/save';
 import { type ParsedSave } from '../src/content/saveSection';
 import { parseDirectiveLine, type Directive } from '../src/content/test';
 import { resolveDirective } from '../src/content/typed';
+import { fromMilliUnits, msToSeconds } from '../src/runtime/units';
 
 const repoRoot = path.join(import.meta.dirname, '..');
 const defaultContent = 'content/tutorial-island.dsl';
@@ -157,7 +158,7 @@ function formatState(session: PlaySession): string[] {
   const { state } = session;
   return [
     `Location: ${state.location}`,
-    `Elapsed simulated time: ${state.time}s`,
+    `Elapsed simulated time: ${msToSeconds(state.time)}s`,
     `Flags: ${JSON.stringify(state.flags)}`,
     ...formatInventory(state),
     ...formatResources(sessionResources(session)),
@@ -572,15 +573,15 @@ export function liveTick(session: PlaySession, elapsedMs: number, multiplier: nu
 
   const after = session.state.activeAction;
   if (!after) {
-    return { active: false, line: `${label}: done.  [time: ${session.state.time.toFixed(1)}s]` };
+    return { active: false, line: `${label}: done.  [time: ${msToSeconds(session.state.time).toFixed(1)}s]` };
   }
   const duration = cycleDuration(session, after);
   const clock = after.cadences[PLAYER];
   const bar = duration > 0 ? progressBar(clock.progress / duration) : progressBar(1);
   // `healthRemaining` is the older single-target counter, meaningless in a fight.
-  const showCombat = clock.attemptsMade > 0 || after.healthRemaining < 1;
-  const detail = liveCombatDetail(session) || (showCombat ? ` hits:${clock.attemptsMade} target-hp:${after.healthRemaining.toFixed(1)}` : '');
-  const line = `${label}... ${bar}${detail}  [time: ${session.state.time.toFixed(1)}s]`;
+  const showCombat = clock.attemptsMade > 0 || after.healthRemaining < 1000;
+  const detail = liveCombatDetail(session) || (showCombat ? ` hits:${clock.attemptsMade} target-hp:${fromMilliUnits(after.healthRemaining).toFixed(1)}` : '');
+  const line = `${label}... ${bar}${detail}  [time: ${msToSeconds(session.state.time).toFixed(1)}s]`;
   return { active: true, line };
 }
 
@@ -856,7 +857,7 @@ async function main(): Promise<void> {
             const { cancelled } = await runLiveAction(session, rl);
             current = view(session);
             const elapsed = session.state.time - t0;
-            if (elapsed > 0) recorder.history.push(`wait: ${formatElapsed(elapsed)}`);
+            if (elapsed > 0) recorder.history.push(`wait: ${formatElapsed(msToSeconds(elapsed))}`);
             if (cancelled) recorder.history.push('cancel');
           } else {
             console.log(formatView(next).join('\n'));

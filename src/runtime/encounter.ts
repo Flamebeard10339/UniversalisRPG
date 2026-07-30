@@ -5,6 +5,7 @@ import { Registry } from '../content/registry';
 import { findActiveAction, parseOwnerRef } from './actions';
 import { GameState, PLAYER, RuntimeError } from './state';
 import { humanize } from '../grammar/values';
+import { fromMilliUnits, toMilliUnits } from './units';
 
 export interface ActiveAction {
   ownerRef: string; // "<obj>.<objId>", e.g. "entity.oven"
@@ -38,7 +39,7 @@ export function playerCadence(active: ActiveAction): Cadence {
 export function enterEncounter(active: ActiveAction, actorId: string, state: GameState, registry: Registry): void {
   const resources: Record<string, number> = {};
   for (const resource of registry.resources.values()) {
-    resources[resource.id] = statValue(resource.max, state, registry, actorId);
+    resources[resource.id] = toMilliUnits(statValue(resource.max, state, registry, actorId));
   }
   (active.actors ??= {})[actorId] = { resources };
   if (retaliationOf(actorId, registry)) active.cadences[actorId] = newCadence();
@@ -115,7 +116,7 @@ export function encounterView(state: GameState, registry: Registry): EncounterVi
       id: actorId,
       title: actorTitle(actorId, registry),
       resource: resource.id,
-      current: actor.resources[resource.id] ?? 0,
+      current: fromMilliUnits(actor.resources[resource.id] ?? 0),
       max: statValue(resource.max, state, registry, actorId),
       cadence: cadence && retaliation ? fractionOf(cadence, actorId, retaliation) : null,
     });
@@ -143,15 +144,16 @@ export function poolLevel(state: GameState, registry: Registry, actorId: string,
 // runs a non-player's `on empty`/`on full`, authored in the player's voice.
 export function damagePool(state: GameState, registry: Registry, actorId: string, resourceId: string, amount: number, deltas: PoolDeltas): number {
   const resource = requireResource(registry, resourceId);
+  const milliAmount = toMilliUnits(amount);
   if (actorId === PLAYER) {
-    const pending = (deltas.get(resourceId) ?? 0) - amount;
+    const pending = (deltas.get(resourceId) ?? 0) - milliAmount;
     deltas.set(resourceId, pending);
     // Where the segment is heading; the clamped write happens at segment end.
     return Math.max(0, (state.resources[resourceId] ?? 0) + pending);
   }
   const pools = actorInEncounter(state, actorId).resources;
-  const max = statValue(resource.max, state, registry, actorId);
-  const level = Math.min(max, Math.max(0, (pools[resource.id] ?? 0) - amount));
+  const max = toMilliUnits(statValue(resource.max, state, registry, actorId));
+  const level = Math.min(max, Math.max(0, (pools[resource.id] ?? 0) - milliAmount));
   pools[resource.id] = level;
   return level;
 }

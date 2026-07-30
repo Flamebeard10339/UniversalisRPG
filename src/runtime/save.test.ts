@@ -5,6 +5,7 @@ import { loadModule } from '../content/registry';
 import { compareSave, diffState, initialState, loadSave, pruneStateForRegistry, SAVE_VERSION, serializeSave } from './save';
 import { parseSaveSection } from '../content/saveSection';
 import { runTest } from './session';
+import { toMilliUnits } from './units';
 
 const MODULE = `
 # location camp
@@ -82,9 +83,9 @@ describe('loadSave', () => {
     const state = initialState(registry);
     state.inventory.gold = 3;
     state.flags.done = true;
-    restorePools(state, { health: 4 }); // a damaged pool must survive the round trip, not reset to full
+    restorePools(state, { health: toMilliUnits(4) }); // a damaged pool must survive the round trip, not reset to full
     const serialized = serializeSave(state, registry);
-    expect(JSON.parse(serialized).resources).toEqual({ health: 4 });
+    expect(JSON.parse(serialized).resources).toEqual({ health: toMilliUnits(4) });
 
     const { saved } = parseSaveSection({
       kind: 'save',
@@ -166,7 +167,7 @@ describe('pruneStateForRegistry', () => {
     state.visits['mod.dialogue.hello'] = 3;
     state.xp.cooking = 4;
     state.xp.mining = 5;
-    restorePools(state, { health: 6, mana: 7 });
+    restorePools(state, { health: toMilliUnits(6), mana: toMilliUnits(7) });
     state.activeBuffs['bread:strength'] = { kind: 'added', statId: 'strength', amount: { min: 1, max: 1 }, expiresAt: 10 };
     state.activeBuffs['mod.meal:strength'] = { kind: 'added', statId: 'strength', amount: { min: 1, max: 1 }, expiresAt: 10 };
     state.activeBuffs['bread:agility'] = { kind: 'added', statId: 'agility', amount: { min: 1, max: 1 }, expiresAt: 10 };
@@ -185,7 +186,7 @@ describe('pruneStateForRegistry', () => {
     expect(state.flags).toEqual({ known: true, 'camp.lit': true, 'cave.discovered': true });
     expect(state.visits).toEqual({ 'miki.hello': 1 });
     expect(state.xp).toEqual({ cooking: 4 });
-    expect(state.resources).toEqual({ health: 6 });
+    expect(state.resources).toEqual({ health: toMilliUnits(6) });
     expect(Object.keys(state.activeBuffs)).toEqual(['bread:strength']);
     expect(state.activeAction).toBeNull();
     expect(warnings.map((warning) => warning.path)).toEqual(
@@ -273,7 +274,7 @@ open:
   give: 1 gold
 
 # save empty
-{"version":4}
+{"version":5}
 
 # test load-and-match
 load: empty

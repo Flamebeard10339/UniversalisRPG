@@ -3,6 +3,7 @@ import { point } from '../grammar/range';
 import { armAction, createGameState, GameState, initResources, PLAYER, resolve } from './runtime';
 import { loadModule, Registry } from '../content/registry';
 import { startSession, view } from './session';
+import { secondsToMs, toMilliUnits } from './units';
 
 // `time: 60` with `speed:` on a per-minute rate stat means attempts per minute:
 //   player 60/25 = 2.4s, rat 60/16 = 3.75s, hasted 60/31.25 = 1.92s.
@@ -96,9 +97,9 @@ describe('independent cadences', () => {
     resolve(state, registry, 12);
 
     // player attack 10 - rat dr 2 = 8, five times
-    expect(ratOf(state).resources.health).toBe(1000 - 5 * 8);
+    expect(ratOf(state).resources.health).toBe(toMilliUnits(1000 - 5 * 8));
     // rat attack 4 - player dr 0 = 4, three times
-    expect(state.resources['health']).toBe(100 - 3 * 4);
+    expect(state.resources['health']).toBe(toMilliUnits(100 - 3 * 4));
   });
 
   it('gives an inert target no clock at all', () => {
@@ -107,7 +108,7 @@ describe('independent cadences', () => {
     expect(state.activeAction!.cadences['punchbag']).toBeUndefined();
 
     resolve(state, registry, 12);
-    expect(state.resources['health']).toBe(100); // nothing swings back
+    expect(state.resources['health']).toBe(toMilliUnits(100)); // nothing swings back
   });
 
   it('stands a fresh target up with a restarted clock, not the dead one half-swing', () => {
@@ -117,7 +118,7 @@ describe('independent cadences', () => {
     resolve(state, registry, 8);
 
     expect(state.inventory['rat-tail']).toBeUndefined();
-    expect(state.activeAction!.actors!['punchbag'].resources.health).toBe(24); // refilled
+    expect(state.activeAction!.actors!['punchbag'].resources.health).toBe(toMilliUnits(24)); // refilled
     expect(playerClock(state).attemptsMade).toBe(0);
   });
 
@@ -137,14 +138,14 @@ describe('a rate raised mid-swing (absolute carry)', () => {
     const registry = loaded();
     const state = fighting(registry);
     resolve(state, registry, at);
-    state.activeBuffs['sword:attack-rate'] = { statId: 'attack-rate', kind: 'increased', amount: 0.25, expiresAt: 10_000 };
+    state.activeBuffs['sword:attack-rate'] = { statId: 'attack-rate', kind: 'increased', amount: 0.25, expiresAt: secondsToMs(10_000) };
     return { registry, state };
   }
 
   it('lands the in-flight swing 0.72s later, not 0.96s or 1.2s', () => {
     // 1.2s banked into a 2.4s swing; at 1.92s per swing, 0.72s remain.
     const { registry, state } = hasted(1.2);
-    expect(playerClock(state).progress).toBeCloseTo(1.2, 9);
+    expect(playerClock(state).progress).toBe(secondsToMs(1.2));
 
     resolve(state, registry, 1.95);
     expect(playerClock(state).attemptsMade).toBe(1);
@@ -192,10 +193,10 @@ describe('two cadences stay associative', () => {
       expect(folded.inventory).toEqual(oneShot.inventory);
       expect(playerClock(folded).attemptsMade).toBe(playerClock(oneShot).attemptsMade);
       expect(ratClock(folded)!.attemptsMade).toBe(ratClock(oneShot)!.attemptsMade);
-      expect(ratOf(folded).resources.health).toBeCloseTo(ratOf(oneShot).resources.health, 6);
-      expect(folded.resources['health']).toBeCloseTo(oneShot.resources['health'], 6);
-      expect(playerClock(folded).progress).toBeCloseTo(playerClock(oneShot).progress, 6);
-      expect(ratClock(folded)!.progress).toBeCloseTo(ratClock(oneShot)!.progress, 6);
+      expect(ratOf(folded).resources.health).toBe(ratOf(oneShot).resources.health);
+      expect(folded.resources['health']).toBe(oneShot.resources['health']);
+      expect(playerClock(folded).progress).toBe(playerClock(oneShot).progress);
+      expect(ratClock(folded)!.progress).toBe(ratClock(oneShot)!.progress);
     }
   });
 
@@ -205,8 +206,8 @@ describe('two cadences stay associative', () => {
     resolve(state, registry, 60);
     expect(playerClock(state).attemptsMade).toBe(25);
     expect(ratClock(state)!.attemptsMade).toBe(16);
-    expect(playerClock(state).progress).toBeCloseTo(0, 9);
-    expect(ratClock(state)!.progress).toBeCloseTo(0, 9);
+    expect(playerClock(state).progress).toBe(0);
+    expect(ratClock(state)!.progress).toBe(0);
   });
 });
 
