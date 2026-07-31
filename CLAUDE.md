@@ -28,7 +28,7 @@ A feature large enough to span sessions gets a tracked deliverable log at `docs/
 
 A system owns a set of paths, declared in `docs/audits/systems.json` — the one place membership is defined, so a diff's system follows from the files it touches. Membership is a partition: every tracked file is owned by a system or listed under `unowned` (prose, audit records, repo-wide manifests). That partition is the one condition `npm run audit-status` fails on, because attributing a diff to a system depends on it.
 
-`npm run audit-status` otherwise only reports: per system, how much has changed since its last whole-system sweep. Those counts trigger nothing. A sweep is a calendar decision — before a release — and is recorded by setting that system's `lastAudit` to the reviewed SHA and `lastAuditDoc` to the audit under `docs/audits/`. The audit doc is the evidence, not the todo list.
+`npm run audit-status` otherwise only reports: per system, how much has changed since its last whole-system sweep. Those counts trigger nothing, and a sweep has no cadence — it is requested by hand and logged, so that a cadence can eventually be derived from how often that happens rather than guessed. Record one by setting that system's `lastAudit` to the reviewed SHA.
 
 Audits are the one gate that has repeatedly caught real defects, so they stay. Resist adding new automated gates: a gate earns its place by preventing something that actually happened, not by sounding rigorous.
 
