@@ -4,6 +4,7 @@ import path from 'node:path';
 import { createInterface } from 'node:readline';
 import { pathToFileURL } from 'node:url';
 import { harvestFiles, parseAuditDoc, systemForDoc } from './lib/auditImport';
+import { loadManifest, systemNames as manifestSystemNames } from './lib/systems';
 import {
   checkStore,
   DEFAULT_STORE_PATH,
@@ -17,10 +18,6 @@ import {
   type State,
   type Task,
 } from './lib/taskStore';
-
-interface Manifest {
-  systems: { name: string }[];
-}
 
 interface Flags {
   positional: string[];
@@ -65,8 +62,7 @@ function resolveConfig(flags: Record<string, string>): Config {
 }
 
 function systemNames(config: Config): string[] {
-  const manifest = JSON.parse(readFileSync(config.systemsPath, 'utf8')) as Manifest;
-  return manifest.systems.map((system) => system.name);
+  return manifestSystemNames(loadManifest(config.systemsPath));
 }
 
 function specFile(config: Config, spec: string): string {

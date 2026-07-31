@@ -1,23 +1,8 @@
 import { execFileSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { covers, loadManifest, type Manifest, type System } from './lib/systems';
 import { codeOnly } from './lib/stripComments';
 
 const MANIFEST = 'docs/audits/systems.json';
-
-interface System {
-  name: string;
-  paths: string[];
-  lastAudit: string | null;
-  lastAuditDoc: string | null;
-  note: string | null;
-}
-
-interface Manifest {
-  unowned: { note: string; paths: string[] };
-  systems: System[];
-}
-
-const covers = (path: string, file: string): boolean => (path.startsWith('*.') ? file.endsWith(path.slice(1)) && !file.includes('/') : file === path || file.startsWith(`${path}/`));
 
 // Membership only means something if it is a partition. A file owned by no
 // system can never trigger an audit, and nothing used to notice one appearing.
@@ -91,7 +76,7 @@ function touchesSince(system: System): Touch[] {
   });
 }
 
-const manifest = JSON.parse(readFileSync(MANIFEST, 'utf8')) as Manifest;
+const manifest = loadManifest(MANIFEST);
 const verbose = process.argv.includes('--verbose');
 
 for (const system of manifest.systems) {
