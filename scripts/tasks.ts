@@ -615,6 +615,20 @@ function cmdSpecAdd(args: Flags): void {
     process.exitCode = 1;
     return;
   }
+  // Rule 6: pass 2+ findings may defer or decline, never promote. `spec add`
+  // is the other door into a spec besides triage's [1], so it has to refuse
+  // the same thing. Refuse the whole invocation rather than skip the
+  // offending ids — this verb is non-interactive and takes a list, so
+  // partial application would be worse than a refusal naming the problem.
+  const unpromotable = ids.filter((id) => {
+    const source = byId.get(id)!.source;
+    return source !== null && source.pass >= 2;
+  });
+  if (unpromotable.length > 0) {
+    console.error(`error: pass 2+ findings cannot be promoted — defer or decline: ${unpromotable.join(', ')}`);
+    process.exitCode = 1;
+    return;
+  }
   for (const id of ids) byId.get(id)!.spec = slug;
   saveStore(tasks, config.storePath);
   console.log(`added ${ids.length} task(s) to ${slug}`);

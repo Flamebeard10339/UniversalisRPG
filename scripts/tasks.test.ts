@@ -482,12 +482,16 @@ describe('tasks CLI', () => {
     });
   });
 
-  it('spec add joins named tasks to a spec regardless of their state', () => {
+  it('spec add joins named tasks to a spec regardless of their state, as long as they are not a pass 2+ finding', () => {
     fixture(({ tasks }) => {
       tasks('add', 'a task', '--id', 'a-task');
-      const added = tasks('spec', 'add', 'demo-spec', 'a-task');
+      tasks('add', 'a finding', '--id', 'a-finding', '--kind', 'finding', '--severity', 'low', '--deliverable', 'fix it');
+      tasks('audit', 'demo-spec', '--proof', '1=met', '--proof', '2=met', '--finding', 'pass one finding', '--severity', 'low', '--deliverable', 'fix it');
+      const added = tasks('spec', 'add', 'demo-spec', 'a-task', 'a-finding', 'demo-spec-pass1-pass-one-finding');
       expect(added.status).toBe(0);
       expect(tasks('show', 'a-task').stdout).toContain('spec: demo-spec');
+      expect(tasks('show', 'a-finding').stdout).toContain('spec: demo-spec');
+      expect(tasks('show', 'demo-spec-pass1-pass-one-finding').stdout).toContain('spec: demo-spec');
     });
   });
 
@@ -496,6 +500,20 @@ describe('tasks CLI', () => {
       tasks('add', 'a task', '--id', 'a-task');
       expect(tasks('spec', 'add', 'no-such-spec', 'a-task').status).toBe(1);
       expect(tasks('spec', 'add', 'demo-spec', 'no-such-task').status).toBe(1);
+    });
+  });
+
+  it('spec add refuses a pass 2+ finding, naming it and leaving it out of the spec', () => {
+    fixture(({ tasks }) => {
+      tasks('add', 'a task', '--id', 'a-task');
+      tasks('audit', 'demo-spec', '--proof', '1=met', '--proof', '2=met');
+      tasks('audit', 'demo-spec', '--proof', '1=met', '--proof', '2=met', '--finding', 'late finding', '--severity', 'low', '--deliverable', 'fix it');
+      const result = tasks('spec', 'add', 'demo-spec', 'a-task', 'demo-spec-pass2-late-finding');
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain('cannot be promoted');
+      expect(result.stderr).toContain('demo-spec-pass2-late-finding');
+      expect(tasks('show', 'a-task').stdout).toContain('spec: (deferred)');
+      expect(tasks('show', 'demo-spec-pass2-late-finding').stdout).toContain('spec: (deferred)');
     });
   });
 
