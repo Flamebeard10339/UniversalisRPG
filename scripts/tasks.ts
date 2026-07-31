@@ -6,7 +6,7 @@ import { pathToFileURL } from 'node:url';
 import { harvestFiles, parseAuditDoc, systemForDoc } from './lib/auditImport';
 import { checkCommitMessage, extractNextTrailer, isExempt } from './lib/commitContract';
 import { checkMergeGate } from './lib/mergeGate';
-import { appendAuditPass, parseSpecDoc, type AuditVerdict, type Verdict } from './lib/specDoc';
+import { appendAmendment, appendAuditPass, parseSpecDoc, type AuditVerdict, type Verdict } from './lib/specDoc';
 import { loadManifest, systemNames as manifestSystemNames } from './lib/systems';
 import {
   checkStore,
@@ -160,11 +160,19 @@ function cmdCheck(flags: Record<string, string>): void {
     return;
   }
 
+  // An amendment's archived text wins when one exists — it is the freeze's
+  // only sanctioned edit path. Merge-base is the fallback for a spec that
+  // has never been amended, and is a known no-op for the common case: rule
+  // 1 opens one spec per branch on that branch, so it never existed at the
+  // merge-base either.
+  const latestAmendment = doc ? doc.amendments[doc.amendments.length - 1] : undefined;
+  const deliverableBaseline = latestAmendment ? latestAmendment.deliverableText : deliverableAtMergeBase(config, spec, baseBranch);
+
   const mergeIssues = checkMergeGate({
     spec,
     specExists,
     doc,
-    deliverableAtMergeBase: deliverableAtMergeBase(config, spec, baseBranch),
+    deliverableBaseline,
     members: tasks.filter((task) => task.spec === spec),
   });
   for (const issue of mergeIssues) console.error(`merge gate: ${issue}`);
@@ -636,6 +644,34 @@ function cmdSpecDone(args: Flags): void {
   console.log(`${slug} is done: every member is done or declined`);
 }
 
+// The only sanctioned way to change a frozen ## Deliverable mid-branch:
+// archive the current text under ## Amendments, dated and reasoned, then
+// leave the live section for a human to edit. checkMergeGate compares
+// against the latest archived copy from here on, so drift is still caught
+// — it is just no longer required to close the spec and open another.
+function cmdSpecAmend(args: Flags): void {
+  const config = resolveConfig(args.flags);
+  const slug = args.positional[0];
+  const reason = args.flags.reason;
+  if (!slug || !reason) {
+    console.error('usage: tasks spec amend <slug> --reason "..."');
+    process.exitCode = 1;
+    return;
+  }
+  const path_ = specFile(config, slug);
+  if (!existsSync(path_)) {
+    console.error(`error: no such spec: ${slug}`);
+    process.exitCode = 1;
+    return;
+  }
+  const text = readFileSync(path_, 'utf8');
+  const doc = parseSpecDoc(text);
+  const date = today();
+  writeFileSync(path_, appendAmendment(text, { date, reason, deliverableText: doc.deliverableSection }), 'utf8');
+  console.log(`amended ${slug}: archived the current ## Deliverable under ## Amendments (${date} — ${reason})`);
+  console.log(`next: edit ## Deliverable in ${path_}, then run \`tasks audit ${slug}\` once the new text is ready to verify`);
+}
+
 function cmdSpec(args: Flags): void {
   const [sub, ...rest] = args.positional;
   const subArgs: Flags = { positional: rest, flags: args.flags };
@@ -648,8 +684,10 @@ function cmdSpec(args: Flags): void {
       return cmdSpecShow(subArgs);
     case 'done':
       return cmdSpecDone(subArgs);
+    case 'amend':
+      return cmdSpecAmend(subArgs);
     default:
-      console.error(`usage: tasks spec <new|add|show|done> ...`);
+      console.error(`usage: tasks spec <new|add|show|done|amend> ...`);
       process.exitCode = 1;
   }
 }

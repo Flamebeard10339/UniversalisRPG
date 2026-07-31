@@ -28,6 +28,7 @@ const cleanDoc: SpecDoc = {
     { index: 1, text: 'clause one' },
     { index: 2, text: 'clause two' },
   ],
+  amendments: [],
   auditPasses: [
     {
       pass: 1,
@@ -47,7 +48,7 @@ function baseInput(overrides: Partial<MergeGateInput> = {}): MergeGateInput {
     spec: 'demo',
     specExists: true,
     doc: cleanDoc,
-    deliverableAtMergeBase: cleanDoc.deliverableSection,
+    deliverableBaseline: cleanDoc.deliverableSection,
     members: [task({ id: 'a', state: 'done' }), task({ id: 'b', state: 'declined', reason: 'x' })],
     ...overrides,
   };
@@ -112,12 +113,12 @@ describe('checkMergeGate', () => {
     expect(checkMergeGate(baseInput({ doc }))).toContain('proof clause 2 is unmet as of pass 2');
   });
 
-  it('refuses when the deliverable text differs from the merge-base state', () => {
-    expect(checkMergeGate(baseInput({ deliverableAtMergeBase: '## Deliverable\n\nA different promise entirely.' }))).toContain("demo's ## Deliverable text differs from its state at the branch's merge-base");
+  it('refuses when the deliverable text differs from its baseline', () => {
+    expect(checkMergeGate(baseInput({ deliverableBaseline: '## Deliverable\n\nA different promise entirely.' }))).toContain("demo's ## Deliverable text differs from its most recent amendment (or its state at the branch's merge-base, if never amended)");
   });
 
-  it('does not refuse on deliverable drift when there is nothing to compare against (a new spec)', () => {
-    expect(checkMergeGate(baseInput({ deliverableAtMergeBase: null }))).toEqual([]);
+  it('does not refuse on deliverable drift when there is nothing to compare against (a new, un-amended spec)', () => {
+    expect(checkMergeGate(baseInput({ deliverableBaseline: null }))).toEqual([]);
   });
 
   it('refuses when a finding on the spec is still unreviewed', () => {

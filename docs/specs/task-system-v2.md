@@ -72,9 +72,13 @@ status table, no chunk list, no handoff — all three live in git.
 **The `## Deliverable` and its proof clauses freeze when the branch opens.** They are the only
 machine-read part of a spec, because rule 7 answers against them one clause at a time. Editing them
 mid-branch is how that rule becomes theatre: the cheapest way to make an `unmet` verdict disappear is
-to weaken the sentence it was measured against. Changing a deliverable means closing the spec and
-opening another, which is loud and appears in git. `tasks check` compares the clauses against their
-state at the branch's merge-base and fails on a difference.
+to weaken the sentence it was measured against. `tasks spec amend <slug> --reason "..."` is the
+sanctioned way to change one: it archives the current text under `## Amendments`, dated and reasoned,
+then leaves `## Deliverable` for a human to edit — loud, dated, and appears in git, without forcing
+the team to close the spec and open another for the common case of understanding the requirement
+better mid-branch. `tasks check` compares the live clauses against the most recent amendment's
+archived text, or against their state at the branch's merge-base when the spec has never been
+amended, and fails on a difference.
 
 **`docs/tasks.jsonl`** — one task per line, machine-owned, never hand-edited. One read loads the
 store. Line-oriented so a diff shows exactly which task changed and so concurrent branches usually
@@ -194,7 +198,9 @@ tool that loses work is a triage tool nobody opens twice.
 `decline <id> --reason "..."`.
 
 **Spec** — `spec new <slug>`, `spec add <slug> <id>...`, `spec show <slug>` (members with their
-states), `spec done <slug>` (refuses while a member is neither done nor declined, and names it).
+states), `spec done <slug>` (refuses while a member is neither done nor declined, and names it),
+`spec amend <slug> --reason "..."` (archives the current `## Deliverable` under `## Amendments`,
+leaving the live section open to edit — the sanctioned way to change a frozen deliverable mid-branch).
 
 **Handoff** — `handoff` prints the last commit's `Next:` line, the current spec's deliverable, the
 open fix-now tasks and their files. This is the first command of a cold session.
@@ -230,7 +236,8 @@ audit recorded that as `M7`, and a gate that cries wolf is bypassed within a wee
 
 - the spec has no recorded audit pass;
 - a frozen proof clause has no verdict, or has an `unmet` one;
-- the spec's deliverable text differs from its state at the branch's merge-base;
+- the spec's deliverable text differs from its most recent amendment, or — if it has never been
+  amended — from its state at the branch's merge-base;
 - a finding on the spec is still `unreviewed`;
 - a member is neither `done` nor `declined`.
 

@@ -5,10 +5,14 @@ export interface MergeGateInput {
   spec: string | null;
   specExists: boolean;
   doc: SpecDoc | null;
-  // null means "no prior text to compare" — either the merge-base lookup
-  // could not run, or the spec file did not exist there (a spec opened on
-  // this branch has nothing to have drifted from).
-  deliverableAtMergeBase: string | null;
+  // The text the live ## Deliverable is checked against: the most recent
+  // amendment's archived text when the spec has been amended, else its
+  // text at the branch's merge-base. null means "no prior text to compare"
+  // — no amendment recorded, and either the merge-base lookup could not
+  // run or the spec file did not exist there. That second case is the
+  // common one, since rule 1 opens one spec per branch on that branch, so
+  // an un-amended spec's drift check is a no-op until its first amendment.
+  deliverableBaseline: string | null;
   members: Task[];
 }
 
@@ -41,8 +45,8 @@ export function checkMergeGate(input: MergeGateInput): string[] {
     }
   }
 
-  if (input.deliverableAtMergeBase !== null && input.deliverableAtMergeBase.trim() !== doc.deliverableSection.trim()) {
-    issues.push(`${input.spec}'s ## Deliverable text differs from its state at the branch's merge-base`);
+  if (input.deliverableBaseline !== null && input.deliverableBaseline.trim() !== doc.deliverableSection.trim()) {
+    issues.push(`${input.spec}'s ## Deliverable text differs from its most recent amendment (or its state at the branch's merge-base, if never amended)`);
   }
 
   const unreviewed = input.members.filter((task) => task.state === 'unreviewed');

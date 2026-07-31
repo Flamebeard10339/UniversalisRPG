@@ -498,6 +498,56 @@ describe('tasks CLI', () => {
     });
   });
 
+  it('spec amend refuses without --reason', () => {
+    fixture(({ tasks }) => {
+      const result = tasks('spec', 'amend', 'demo-spec');
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain('usage: tasks spec amend');
+    });
+  });
+
+  it('spec amend refuses an unknown spec', () => {
+    fixture(({ tasks }) => {
+      const result = tasks('spec', 'amend', 'no-such-spec', '--reason', 'x');
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain('no such spec');
+    });
+  });
+
+  it('spec amend archives the current deliverable under ## Amendments and leaves ## Deliverable live for editing', () => {
+    fixture(({ tasks, dir }) => {
+      const result = tasks('spec', 'amend', 'demo-spec', '--reason', 'understood the requirement better after implementing it');
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('amended demo-spec');
+      expect(result.stdout).toContain('next: edit ## Deliverable');
+
+      const specText = readFileSync(path.join(dir, 'specs', 'demo-spec.md'), 'utf8');
+      expect(specText).toContain('## Amendments');
+      expect(specText).toContain('understood the requirement better after implementing it');
+      expect(specText).toContain('#### Deliverable');
+      // The live section is untouched: still exactly one real heading.
+      expect((specText.match(/^## Deliverable$/gm) ?? []).length).toBe(1);
+    });
+  });
+
+  it('check --merge compares the live deliverable against the most recent amendment once one exists, refusing on a later unrecorded edit', () => {
+    fixture(({ tasks, dir }) => {
+      tasks('audit', 'demo-spec', '--proof', '1=met', '--proof', '2=met');
+      tasks('spec', 'amend', 'demo-spec', '--reason', 'clarified after implementation');
+
+      const clean = tasks('check', '--merge');
+      expect(clean.status).toBe(0);
+
+      const specPath = path.join(dir, 'specs', 'demo-spec.md');
+      const original = readFileSync(specPath, 'utf8');
+      writeFileSync(specPath, original.replace('Something this branch promises.', 'Something this branch promises, revised.'), 'utf8');
+
+      const drifted = tasks('check', '--merge');
+      expect(drifted.status).toBe(1);
+      expect(drifted.stderr).toContain("differs from its most recent amendment");
+    });
+  });
+
   it('done on an undelivered task closes once the spec\'s latest audit pass grades its clause met', () => {
     fixture(({ tasks }) => {
       tasks('audit', 'demo-spec', '--proof', '1=unmet', '--evidence', '1=not yet', '--proof', '2=met');

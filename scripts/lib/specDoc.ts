@@ -19,10 +19,19 @@ export interface AuditPass {
   verdicts: AuditVerdict[];
 }
 
+export interface Amendment {
+  date: string;
+  reason: string;
+  // The archived `## Deliverable` section, in the same shape as
+  // SpecDoc.deliverableSection — directly comparable to it.
+  deliverableText: string;
+}
+
 export interface SpecDoc {
   deliverableSection: string;
   proofClauses: ProofClause[];
   auditPasses: AuditPass[];
+  amendments: Amendment[];
 }
 
 function sectionText(lines: string[], heading: string): { text: string; startIndex: number; endIndex: number } | null {
@@ -90,6 +99,31 @@ function parseAuditPasses(text: string): AuditPass[] {
   });
 }
 
+const AMENDMENT_HEADING = /^### (\d{4}-\d{2}-\d{2}) — (.+)$/;
+
+// Mirrors parseAuditPasses' shape, but each entry's body is the archived
+// `## Deliverable` text — stored with its heading demoted to `#### ` so it
+// cannot be mistaken for a real section boundary by sectionText's `^## `
+// scan, then promoted back here for the caller.
+function parseAmendments(text: string): Amendment[] {
+  const section = sectionText(text.split('\n'), '## Amendments');
+  if (!section) return [];
+  const lines = section.text.split('\n');
+  const starts: { index: number; date: string; reason: string }[] = [];
+  for (let i = 0; i < lines.length; i++) {
+    const match = AMENDMENT_HEADING.exec(lines[i]);
+    if (match) starts.push({ index: i, date: match[1], reason: match[2].trim() });
+  }
+  return starts.map((start, i) => {
+    const end = i + 1 < starts.length ? starts[i + 1].index : lines.length;
+    const body = lines
+      .slice(start.index + 1, end)
+      .join('\n')
+      .trim();
+    return { date: start.date, reason: start.reason, deliverableText: body.replace(/^#### Deliverable/, '## Deliverable') };
+  });
+}
+
 export function parseSpecDoc(text: string): SpecDoc {
   const deliverable = sectionText(text.split('\n'), '## Deliverable');
   const deliverableSection = deliverable ? deliverable.text : '';
@@ -97,6 +131,7 @@ export function parseSpecDoc(text: string): SpecDoc {
     deliverableSection,
     proofClauses: parseProofClauses(deliverableSection),
     auditPasses: parseAuditPasses(text),
+    amendments: parseAmendments(text),
   };
 }
 
@@ -122,6 +157,29 @@ export function appendAuditPass(text: string, pass: AuditPass): string {
   const headingIndex = lines.findIndex((line) => line.trim() === '## Audit passes');
   if (headingIndex === -1) {
     return `${lines.join('\n')}\n\n## Audit passes\n\n${rendered}\n`;
+  }
+  const nextHeading = lines.findIndex((line, index) => index > headingIndex && /^## /.test(line));
+  const insertAt = nextHeading === -1 ? lines.length : nextHeading;
+  const before = lines.slice(0, insertAt);
+  const after = lines.slice(insertAt);
+  const needsBlank = before[before.length - 1]?.trim() !== '';
+  return [...before, ...(needsBlank ? [''] : []), rendered, '', ...after].join('\n').trimEnd() + '\n';
+}
+
+export function renderAmendment(amendment: Amendment): string {
+  const demoted = amendment.deliverableText.replace(/^## Deliverable/, '#### Deliverable');
+  return [`### ${amendment.date} — ${amendment.reason}`, '', demoted].join('\n');
+}
+
+// Same append-or-create shape as appendAuditPass, targeting `## Amendments`
+// instead. Never touches ## Deliverable itself — the live section stays
+// exactly where and what it was, this only archives a copy of it.
+export function appendAmendment(text: string, amendment: Amendment): string {
+  const rendered = renderAmendment(amendment);
+  const lines = text.trimEnd().split('\n');
+  const headingIndex = lines.findIndex((line) => line.trim() === '## Amendments');
+  if (headingIndex === -1) {
+    return `${lines.join('\n')}\n\n## Amendments\n\n${rendered}\n`;
   }
   const nextHeading = lines.findIndex((line, index) => index > headingIndex && /^## /.test(line));
   const insertAt = nextHeading === -1 ? lines.length : nextHeading;

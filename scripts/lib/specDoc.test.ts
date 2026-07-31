@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { appendAuditPass, parseSpecDoc, renderAuditPass } from './specDoc';
+import { appendAmendment, appendAuditPass, parseSpecDoc, renderAuditPass } from './specDoc';
 
 const DOC = `# Demo spec
 
@@ -48,6 +48,10 @@ describe('parseSpecDoc', () => {
 
   it('returns no audit passes when none are recorded', () => {
     expect(parseSpecDoc(DOC).auditPasses).toEqual([]);
+  });
+
+  it('returns no amendments when none are recorded', () => {
+    expect(parseSpecDoc(DOC).amendments).toEqual([]);
   });
 
   it('parses the real docs/specs/task-system-v2.md deliverable into six proof clauses', () => {
@@ -143,5 +147,50 @@ describe('appendAuditPass / renderAuditPass round trip', () => {
     });
     const { auditPasses } = parseSpecDoc(withPass);
     expect(auditPasses[0].verdicts).toEqual([{ clause: 1, status: 'met', evidence: 'measured 70ms' }]);
+  });
+});
+
+describe('appendAmendment / parseSpecDoc amendments round trip', () => {
+  it('creates the ## Amendments section when absent, archiving the current deliverable text', () => {
+    const before = parseSpecDoc(DOC);
+    const amended = appendAmendment(DOC, { date: '2026-08-01', reason: 'understood the requirement better after implementing it', deliverableText: before.deliverableSection });
+    expect(amended).toContain('## Amendments');
+    const { amendments } = parseSpecDoc(amended);
+    expect(amendments).toEqual([{ date: '2026-08-01', reason: 'understood the requirement better after implementing it', deliverableText: before.deliverableSection }]);
+  });
+
+  it('never touches the live ## Deliverable when archiving a copy of it', () => {
+    const before = parseSpecDoc(DOC);
+    const amended = appendAmendment(DOC, { date: '2026-08-01', reason: 'x', deliverableText: before.deliverableSection });
+    expect(parseSpecDoc(amended).deliverableSection).toBe(before.deliverableSection);
+  });
+
+  it('appends a second amendment after the first rather than replacing it', () => {
+    const before = parseSpecDoc(DOC);
+    const afterOne = appendAmendment(DOC, { date: '2026-08-01', reason: 'first amendment', deliverableText: before.deliverableSection });
+    const afterTwo = appendAmendment(afterOne, { date: '2026-08-02', reason: 'second amendment', deliverableText: '## Deliverable\n\nA revised promise.' });
+    const { amendments } = parseSpecDoc(afterTwo);
+    expect(amendments.map((a) => a.reason)).toEqual(['first amendment', 'second amendment']);
+    expect(amendments[1].deliverableText).toBe('## Deliverable\n\nA revised promise.');
+  });
+
+  it('demotes the archived heading so it cannot be mistaken for a real ## section boundary', () => {
+    const before = parseSpecDoc(DOC);
+    const amended = appendAmendment(DOC, { date: '2026-08-01', reason: 'x', deliverableText: before.deliverableSection });
+    // Only the live section's own heading may appear at "## " depth — the
+    // archived copy's must not, or a second amendment's insertion point
+    // (and any later ## Decisions / ## Open questions lookup) would misparse.
+    expect(amended.match(/^## Deliverable$/gm)).toHaveLength(1);
+    expect(amended).toContain('#### Deliverable');
+  });
+
+  it('coexists with ## Audit passes without either section corrupting the other', () => {
+    const withPass = appendAuditPass(DOC, { pass: 1, date: '2026-07-31', base: 'a', head: 'b', verdicts: [] });
+    const before = parseSpecDoc(withPass);
+    const withBoth = appendAmendment(withPass, { date: '2026-08-01', reason: 'x', deliverableText: before.deliverableSection });
+    const doc = parseSpecDoc(withBoth);
+    expect(doc.auditPasses).toHaveLength(1);
+    expect(doc.amendments).toHaveLength(1);
+    expect(doc.deliverableSection).toBe(before.deliverableSection);
   });
 });
