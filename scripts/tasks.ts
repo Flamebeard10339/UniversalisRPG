@@ -271,6 +271,27 @@ function cmdNext(args: Flags): void {
   printTask(queue[0], tasks);
 }
 
+// Rule 7 requires an unmet deliverable to be able to reach `done` — a
+// blanket refusal on kind:undelivered would make the merge gate
+// permanently unclosable — so this earns the close rather than blocking
+// it: refuse unless the spec's LATEST recorded audit pass grades this
+// task's clause `met`. `task.deliverable` carries the clause text verbatim
+// (see cmdAudit), so the clause is recovered by matching it against the
+// spec's current proof clauses rather than storing a second pointer.
+function undeliveredDoneRefusal(config: Config, task: Task): string | null {
+  if (!task.spec) return 'is undelivered but has no spec to verify a pass against';
+  const path_ = specFile(config, task.spec);
+  if (!existsSync(path_)) return `is undelivered but its spec file is missing: ${path_}`;
+  const doc = parseSpecDoc(readFileSync(path_, 'utf8'));
+  const clause = doc.proofClauses.find((candidate) => candidate.text === task.deliverable);
+  if (!clause) return `is undelivered but its clause text no longer matches any proof clause in ${path_}`;
+  const latest = doc.auditPasses[doc.auditPasses.length - 1];
+  if (!latest) return `is undelivered and ${task.spec} has no recorded audit pass`;
+  const verdict = latest.verdicts.find((v) => v.clause === clause.index);
+  if (!verdict || verdict.status !== 'met') return `is undelivered and proof clause ${clause.index} is not met in the latest audit pass (pass ${latest.pass})`;
+  return null;
+}
+
 function cmdDone(args: Flags): void {
   const config = resolveConfig(args.flags);
   const id = args.positional[0];
@@ -290,6 +311,14 @@ function cmdDone(args: Flags): void {
     console.error(`error: ${id} is ${task.state}, not open`);
     process.exitCode = 1;
     return;
+  }
+  if (task.kind === 'undelivered') {
+    const refusal = undeliveredDoneRefusal(config, task);
+    if (refusal) {
+      console.error(`error: ${id} ${refusal}`);
+      process.exitCode = 1;
+      return;
+    }
   }
   const byId = new Map(tasks.map((t) => [t.id, t]));
   if (isBlocked(task, byId)) {

@@ -274,6 +274,65 @@ describe('tasks CLI', () => {
     });
   });
 
+  it('done on an undelivered task closes once the spec\'s latest audit pass grades its clause met', () => {
+    fixture(({ tasks }) => {
+      tasks('audit', 'demo-spec', '--proof', '1=unmet', '--evidence', '1=not yet', '--proof', '2=met');
+      expect(tasks('show', 'demo-spec-clause-1').stdout).toContain('[undelivered/open/high]');
+
+      tasks('audit', 'demo-spec', '--proof', '1=met', '--proof', '2=met');
+      const result = tasks('done', 'demo-spec-clause-1');
+      expect(result.status).toBe(0);
+      expect(tasks('show', 'demo-spec-clause-1').stdout).toContain('closed: ');
+    });
+  });
+
+  it('done on an undelivered task refuses while the latest audit pass still grades its clause unmet', () => {
+    fixture(({ tasks }) => {
+      tasks('audit', 'demo-spec', '--proof', '1=unmet', '--evidence', '1=nope', '--proof', '2=met');
+      const result = tasks('done', 'demo-spec-clause-1');
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain('not met');
+    });
+  });
+
+  it('done on an undelivered task refuses when no audit pass is recorded at all', () => {
+    fixture(({ tasks, dir }) => {
+      const storePath = path.join(dir, 'tasks.jsonl');
+      writeFileSync(
+        storePath,
+        `${JSON.stringify({ id: 'demo-spec-clause-1', title: 'Unmet deliverable clause 1', kind: 'undelivered', state: 'open', severity: 'high', system: null, spec: 'demo-spec', requires: [], files: [], deliverable: 'The first clause holds.', evidence: null, source: { spec: 'demo-spec', pass: 1 }, reason: null, closed: null })}\n`,
+        'utf8',
+      );
+      const result = tasks('done', 'demo-spec-clause-1');
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain('no recorded audit pass');
+    });
+  });
+
+  it('done on an undelivered task refuses when its clause text no longer matches any proof clause', () => {
+    fixture(({ tasks, dir }) => {
+      tasks('audit', 'demo-spec', '--proof', '1=met', '--proof', '2=met');
+      const storePath = path.join(dir, 'tasks.jsonl');
+      writeFileSync(
+        storePath,
+        `${JSON.stringify({ id: 'stale-clause', title: 'Unmet deliverable clause 9', kind: 'undelivered', state: 'open', severity: 'high', system: null, spec: 'demo-spec', requires: [], files: [], deliverable: 'a clause that used to exist', evidence: null, source: { spec: 'demo-spec', pass: 1 }, reason: null, closed: null })}\n`,
+        'utf8',
+      );
+      const result = tasks('done', 'stale-clause');
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain('no longer matches');
+    });
+  });
+
+  it('done is unaffected for a normal kind:task, met/unmet verdicts do not apply to it', () => {
+    fixture(({ tasks }) => {
+      tasks('add', 'plain', '--id', 'plain');
+      const result = tasks('done', 'plain');
+      expect(result.status).toBe(0);
+      expect(tasks('show', 'plain').stdout).toContain('closed: ');
+    });
+  });
+
   it('audit refuses when a proof clause is missing a verdict', () => {
     fixture(({ tasks }) => {
       const result = tasks('audit', 'demo-spec', '--proof', '1=met');
