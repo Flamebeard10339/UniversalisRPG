@@ -73,12 +73,16 @@ status table, no chunk list, no handoff — all three live in git.
 machine-read part of a spec, because rule 7 answers against them one clause at a time. Editing them
 mid-branch is how that rule becomes theatre: the cheapest way to make an `unmet` verdict disappear is
 to weaken the sentence it was measured against. `tasks spec amend <slug> --reason "..."` is the
-sanctioned way to change one: it archives the current text under `## Amendments`, dated and reasoned,
-then leaves `## Deliverable` for a human to edit — loud, dated, and appears in git, without forcing
-the team to close the spec and open another for the common case of understanding the requirement
-better mid-branch. `tasks check` compares the live clauses against the most recent amendment's
-archived text, or against their state at the branch's merge-base when the spec has never been
-amended, and fails on a difference.
+sanctioned way to change one: edit `## Deliverable`, then run it to record the text the spec adopted
+under `## Amendments`, dated and reasoned — loud, dated, and appears in git, without forcing the team
+to close the spec and open another for the common case of understanding the requirement better
+mid-branch. `tasks check` compares the live clauses against the most recent amendment's recorded
+text, or against their state at the branch's merge-base when the spec has never been amended, and
+fails on a difference.
+
+The edit comes first because an amendment records what a deliverable *became*. Amending an unchanged
+deliverable is refused: it would set a baseline nobody meant to set, and leave the edit that follows
+failing the gate against it.
 
 **`docs/tasks.jsonl`** — one task per line, machine-owned, never hand-edited. One read loads the
 store. Line-oriented so a diff shows exactly which task changed and so concurrent branches usually

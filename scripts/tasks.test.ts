@@ -601,12 +601,12 @@ describe('tasks CLI', () => {
     });
   });
 
-  it('spec amend archives the current deliverable under ## Amendments and leaves ## Deliverable live for editing', () => {
+  it('spec amend records the adopted deliverable under ## Amendments and leaves the live section intact', () => {
     fixture(({ tasks, dir }) => {
       const result = tasks('spec', 'amend', 'demo-spec', '--reason', 'understood the requirement better after implementing it');
       expect(result.status).toBe(0);
       expect(result.stdout).toContain('amended demo-spec');
-      expect(result.stdout).toContain('next: edit ## Deliverable');
+      expect(result.stdout).toContain('recorded the current ## Deliverable as adopted');
 
       const specText = readFileSync(path.join(dir, 'specs', 'demo-spec.md'), 'utf8');
       expect(specText).toContain('## Amendments');
@@ -614,6 +614,17 @@ describe('tasks CLI', () => {
       expect(specText).toContain('#### Deliverable');
       // The live section is untouched: still exactly one real heading.
       expect((specText.match(/^## Deliverable$/gm) ?? []).length).toBe(1);
+    });
+  });
+
+  it('spec amend refuses when the deliverable is unchanged since the last amendment', () => {
+    fixture(({ tasks }) => {
+      expect(tasks('spec', 'amend', 'demo-spec', '--reason', 'first').status).toBe(0);
+
+      const second = tasks('spec', 'amend', 'demo-spec', '--reason', 'nothing actually changed');
+      expect(second.status).toBe(1);
+      expect(second.stderr).toContain('unchanged since the amendment of');
+      expect(second.stderr).toContain('edit it first');
     });
   });
 

@@ -754,10 +754,19 @@ function cmdSpecAmend(args: Flags): void {
   }
   const text = readFileSync(path_, 'utf8');
   const doc = parseSpecDoc(text);
+  // An amendment records the text a spec adopted, so the edit comes first.
+  // Recording an unchanged deliverable would leave the next edit failing the
+  // gate against a baseline nobody meant to set.
+  const previous = doc.amendments[doc.amendments.length - 1];
+  if (previous && previous.deliverableText.trim() === doc.deliverableSection.trim()) {
+    console.error(`error: ${slug}'s ## Deliverable is unchanged since the amendment of ${previous.date} — edit it first, then record what it became`);
+    process.exitCode = 1;
+    return;
+  }
   const date = today();
   writeFileSync(path_, appendAmendment(text, { date, reason, deliverableText: doc.deliverableSection }), 'utf8');
-  console.log(`amended ${slug}: archived the current ## Deliverable under ## Amendments (${date} — ${reason})`);
-  console.log(`next: edit ## Deliverable in ${path_}, then run \`tasks audit ${slug}\` once the new text is ready to verify`);
+  console.log(`amended ${slug}: recorded the current ## Deliverable as adopted (${date} — ${reason})`);
+  console.log(`next: run \`tasks audit ${slug}\` to verify the new clauses`);
 }
 
 function cmdSpec(args: Flags): void {
