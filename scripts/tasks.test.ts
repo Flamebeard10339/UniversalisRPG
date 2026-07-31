@@ -461,6 +461,55 @@ describe('tasks CLI', () => {
     });
   });
 
+  it('spec remove sets spec back to null for the named ids', () => {
+    fixture(({ tasks }) => {
+      tasks('add', 'a task', '--id', 'a-task', '--spec', 'demo-spec');
+      tasks('add', 'b task', '--id', 'b-task', '--spec', 'demo-spec');
+      const removed = tasks('spec', 'remove', 'demo-spec', 'a-task', 'b-task');
+      expect(removed.status).toBe(0);
+      expect(removed.stdout).toContain('removed 2 task(s) from demo-spec');
+      expect(tasks('show', 'a-task').stdout).toContain('spec: (deferred)');
+      expect(tasks('show', 'b-task').stdout).toContain('spec: (deferred)');
+    });
+  });
+
+  it('spec remove refuses an unknown spec', () => {
+    fixture(({ tasks }) => {
+      tasks('add', 'a task', '--id', 'a-task', '--spec', 'demo-spec');
+      const result = tasks('spec', 'remove', 'no-such-spec', 'a-task');
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain('no such spec');
+      expect(tasks('show', 'a-task').stdout).toContain('spec: demo-spec');
+    });
+  });
+
+  it('spec remove refuses an id that does not exist', () => {
+    fixture(({ tasks }) => {
+      const result = tasks('spec', 'remove', 'demo-spec', 'no-such-task');
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain('no such task(s): no-such-task');
+    });
+  });
+
+  it('spec remove refuses an id that is not a member of that spec', () => {
+    fixture(({ tasks }) => {
+      tasks('add', 'unrelated', '--id', 'unrelated');
+      const result = tasks('spec', 'remove', 'demo-spec', 'unrelated');
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain('not member(s) of demo-spec: unrelated');
+    });
+  });
+
+  it('spec remove refuses on an undelivered task, the same rule spec done --defer-open enforces', () => {
+    fixture(({ tasks }) => {
+      tasks('audit', 'demo-spec', '--proof', '1=unmet', '--evidence', '1=not yet', '--proof', '2=met');
+      const result = tasks('spec', 'remove', 'demo-spec', 'demo-spec-clause-1');
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain('undelivered task(s) cannot be removed');
+      expect(tasks('show', 'demo-spec-clause-1').stdout).toContain('spec: demo-spec');
+    });
+  });
+
   it('spec show lists the deliverable and every member with its state', () => {
     fixture(({ tasks }) => {
       tasks('add', 'a member', '--id', 'a-member', '--spec', 'demo-spec');

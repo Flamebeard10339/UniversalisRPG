@@ -197,10 +197,12 @@ tool that loses work is a triage tool nobody opens twice.
 **Work** — `next` (highest severity, unblocked, in the current spec), `show <id>`, `done <id>`,
 `decline <id> --reason "..."`.
 
-**Spec** — `spec new <slug>`, `spec add <slug> <id>...`, `spec show <slug>` (members with their
-states), `spec done <slug>` (refuses while a member is neither done nor declined, and names it),
-`spec amend <slug> --reason "..."` (archives the current `## Deliverable` under `## Amendments`,
-leaving the live section open to edit — the sanctioned way to change a frozen deliverable mid-branch).
+**Spec** — `spec new <slug>`, `spec add <slug> <id>...`, `spec remove <slug> <id>...` (the demotion
+counterpart to `add`; refuses on an undelivered task, which rule 7 does not let leave a spec by hand),
+`spec show <slug>` (members with their states), `spec done <slug>` (refuses while a member is
+neither done nor declined, and names it), `spec amend <slug> --reason "..."` (archives the current
+`## Deliverable` under `## Amendments`, leaving the live section open to edit — the sanctioned way to
+change a frozen deliverable mid-branch).
 
 **Handoff** — `handoff` prints the last commit's `Next:` line, the current spec's deliverable, the
 open fix-now tasks and their files. This is the first command of a cold session.

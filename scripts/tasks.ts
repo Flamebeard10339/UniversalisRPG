@@ -608,6 +608,11 @@ function cmdSpecShow(args: Flags): void {
   }
 }
 
+// Rule 7: an undelivered task is the branch's outstanding promise and
+// cannot leave its spec by hand — `spec done --defer-open` skips it during
+// a sweep, `spec remove` refuses on it outright.
+const isUndelivered = (task: Task): boolean => task.kind === 'undelivered';
+
 function cmdSpecDone(args: Flags): void {
   const config = resolveConfig(args.flags);
   const slug = args.positional[0];
@@ -626,10 +631,8 @@ function cmdSpecDone(args: Flags): void {
   const stragglers = members.filter((task) => task.state !== 'done' && task.state !== 'declined');
 
   if (stragglers.length > 0 && args.flags['defer-open'] === 'true') {
-    // Rule 7's undelivered members cannot be swept out this way — an unmet
-    // deliverable must reach done, never quietly leave the spec.
     for (const straggler of stragglers) {
-      if (straggler.kind === 'undelivered') continue;
+      if (isUndelivered(straggler)) continue;
       straggler.spec = null;
     }
     saveStore(tasks, config.storePath);
@@ -642,6 +645,48 @@ function cmdSpecDone(args: Flags): void {
     return;
   }
   console.log(`${slug} is done: every member is done or declined`);
+}
+
+// The demotion counterpart to `spec add`: nothing else sets `spec` back to
+// null for named ids. `spec done --defer-open` sweeps every open member at
+// once; this targets specific ones without waiting for the spec to close.
+function cmdSpecRemove(args: Flags): void {
+  const config = resolveConfig(args.flags);
+  const slug = args.positional[0];
+  const ids = args.positional.slice(1);
+  if (!slug || ids.length === 0) {
+    console.error('usage: tasks spec remove <slug> <id>...');
+    process.exitCode = 1;
+    return;
+  }
+  if (!existsSync(specFile(config, slug))) {
+    console.error(`error: no such spec: ${slug}`);
+    process.exitCode = 1;
+    return;
+  }
+  const tasks = loadStore(config.storePath);
+  const byId = new Map(tasks.map((task) => [task.id, task]));
+  const missing = ids.filter((id) => !byId.has(id));
+  if (missing.length > 0) {
+    console.error(`error: no such task(s): ${missing.join(', ')}`);
+    process.exitCode = 1;
+    return;
+  }
+  const notMembers = ids.filter((id) => byId.get(id)!.spec !== slug);
+  if (notMembers.length > 0) {
+    console.error(`error: not member(s) of ${slug}: ${notMembers.join(', ')}`);
+    process.exitCode = 1;
+    return;
+  }
+  const undelivered = ids.filter((id) => isUndelivered(byId.get(id)!));
+  if (undelivered.length > 0) {
+    console.error(`error: undelivered task(s) cannot be removed from a spec: ${undelivered.join(', ')}`);
+    process.exitCode = 1;
+    return;
+  }
+  for (const id of ids) byId.get(id)!.spec = null;
+  saveStore(tasks, config.storePath);
+  console.log(`removed ${ids.length} task(s) from ${slug}`);
 }
 
 // The only sanctioned way to change a frozen ## Deliverable mid-branch:
@@ -680,6 +725,8 @@ function cmdSpec(args: Flags): void {
       return cmdSpecNew(subArgs);
     case 'add':
       return cmdSpecAdd(subArgs);
+    case 'remove':
+      return cmdSpecRemove(subArgs);
     case 'show':
       return cmdSpecShow(subArgs);
     case 'done':
@@ -687,7 +734,7 @@ function cmdSpec(args: Flags): void {
     case 'amend':
       return cmdSpecAmend(subArgs);
     default:
-      console.error(`usage: tasks spec <new|add|show|done|amend> ...`);
+      console.error(`usage: tasks spec <new|add|remove|show|done|amend> ...`);
       process.exitCode = 1;
   }
 }
