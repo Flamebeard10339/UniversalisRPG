@@ -942,6 +942,37 @@ describe('tasks CLI', () => {
     });
   });
 
+  it(
+    'handoff stays under 40 lines with a queue well past the cap, each member naming files',
+    () => {
+      fixture(({ tasks }) => {
+        for (let i = 0; i < 25; i++) {
+          tasks('add', `open task ${i}`, '--id', `open-task-${i}`, '--spec', 'demo-spec', '--severity', 'high', '--files', `src/runtime/file-${i}.ts`);
+        }
+        const result = tasks('handoff');
+        expect(result.status).toBe(0);
+        const lineCount = result.stdout.split('\n').filter((line) => line.length > 0).length;
+        expect(lineCount).toBeLessThan(40);
+      });
+    },
+    20000,
+  );
+
+  it(
+    'handoff truncates the queue at the cap and names how many were omitted and where to see them',
+    () => {
+      fixture(({ tasks }) => {
+        for (let i = 0; i < 25; i++) {
+          tasks('add', `open task ${i}`, '--id', `open-task-${i}`, '--spec', 'demo-spec', '--severity', 'high', '--files', `src/runtime/file-${i}.ts`);
+        }
+        const result = tasks('handoff');
+        expect(result.stdout).toContain('25 open fix-now task(s):');
+        expect(result.stdout).toContain('… 17 more, see `tasks list --spec demo-spec`');
+      });
+    },
+    20000,
+  );
+
   it('handoff names the branch and explains why there is no active spec when none matches it', () => {
     fixture(({ dir }) => {
       const storePath = path.join(dir, 'tasks.jsonl');

@@ -1269,6 +1269,11 @@ function findLatestNextTrailer(maxCommits = 20): FoundTrailer | null {
   return null;
 }
 
+// Fixed header (branch, trailer, spec, proof clauses) plus 2 lines per
+// queue member is what proof clause 6's 40-line cap is measured against —
+// 8 keeps that total comfortably under it even at a full clause list.
+const HANDOFF_QUEUE_CAP = 8;
+
 // The first command of a cold session.
 function cmdHandoff(args: Flags): void {
   const config = resolveConfig(args.flags);
@@ -1307,9 +1312,16 @@ function cmdHandoff(args: Flags): void {
 
   const queue = fixNowQueue(tasks, spec);
   console.log(`${queue.length} open fix-now task(s):`);
-  for (const task of queue) {
+  const shown = queue.slice(0, HANDOFF_QUEUE_CAP);
+  for (const task of shown) {
     console.log(`- ${task.id} [${task.severity ?? '?'}] ${task.title}`);
     if (task.files.length > 0) console.log(`    ${task.files.join('   ')}`);
+  }
+  // fixNowQueue is already severity-ordered, so truncating here drops the
+  // least urgent — the queue can otherwise print 2 lines per member and
+  // blow proof clause 6's 40-line cap as the store grows.
+  if (queue.length > shown.length) {
+    console.log(`… ${queue.length - shown.length} more, see \`tasks list --spec ${spec}\``);
   }
 }
 
