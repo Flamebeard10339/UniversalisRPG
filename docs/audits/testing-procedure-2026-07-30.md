@@ -224,56 +224,63 @@ verb has, and makes the emitted test survive the session. It also removes the me
 
 ---
 
-## Lows
+## L1 — the audit-doc gate accepts a file outside `docs/audits/`, a file with no content, and a file that is not committed.
 
-- **L1 — the audit-doc gate accepts a file outside `docs/audits/`, a file with no content, and a
-  file that is not committed.** `documented()` (`audit-status.ts:98`) checks `startsWith`,
-  `existsSync`, `isFile` and `size >= 500`. Measured passes: `lastAuditDoc:
-  "docs/audits/../../package-lock.json"`; a `docs/audits/filler.md` holding 600 bytes of `x`; the
-  same file left untracked. The 500-byte floor `73a73f3` added is a real improvement over the
-  2026-07-28 `touch` case and the gate can never judge content, but `resolve()`-and-contain and a
-  `git ls-files --error-unmatch` are two lines that close the two mechanical holes. The untracked
-  case is caught by CI incidentally, and by nothing locally.
+`documented()` (`audit-status.ts:98`) checks `startsWith`,
+`existsSync`, `isFile` and `size >= 500`. Measured passes: `lastAuditDoc:
+"docs/audits/../../package-lock.json"`; a `docs/audits/filler.md` holding 600 bytes of `x`; the
+same file left untracked. The 500-byte floor `73a73f3` added is a real improvement over the
+2026-07-28 `touch` case and the gate can never judge content, but `resolve()`-and-contain and a
+`git ls-files --error-unmatch` are two lines that close the two mechanical holes. The untracked
+case is caught by CI incidentally, and by nothing locally.
 
-- **L2 — the Windows CI leg cannot see the thing its comment says only it can see.** `test.yml:15`
-  justifies the matrix as "a Windows checkout is a real configuration this content has to parse
-  in, and ubuntu alone cannot see it". `4b6e383` added `.gitattributes` in the same commit, and
-  `* text=auto eol=lf` forces LF into the working tree on every platform regardless of
-  `core.autocrlf`, so the Windows runner checks out byte-identical content. The real CRLF guard is
-  `integration.test.ts`'s in-memory `replace(/\n/g, '\r\n')`, which runs on ubuntu too. The leg is
-  still worth its minutes — it is the only place `posix()`, `tsx` and vitest are exercised on the
-  platform this repo is developed on — but the comment should say that, since it is the reason
-  anyone would keep paying for it.
+## L2 — the Windows CI leg cannot see the thing its comment says only it can see.
 
-- **L3 — the CLI's whole argument surface is unexported and untested.** `parseCliArgs`
-  (`play-cli.ts:671`) handles `--live`, `--local`/`--changes`/`local=`, `--modportal`/`modportal=`/
-  `--no-modportal` and positionals, and is reachable only from `main()`. `8a54d1b` fixed a real
-  data-loss bug there — a second positional became the local-changes file, which `/dsl` then
-  rewrote over real content — and shipped with no regression test, because there is no seam to
-  test through. `handleCommand`, `liveTick` and `loadModportalSources` are all exported for exactly
-  this reason; `parseCliArgs` is the one decision function that is not.
+`test.yml:15`
+justifies the matrix as "a Windows checkout is a real configuration this content has to parse
+in, and ubuntu alone cannot see it". `4b6e383` added `.gitattributes` in the same commit, and
+`* text=auto eol=lf` forces LF into the working tree on every platform regardless of
+`core.autocrlf`, so the Windows runner checks out byte-identical content. The real CRLF guard is
+`integration.test.ts`'s in-memory `replace(/\n/g, '\r\n')`, which runs on ubuntu too. The leg is
+still worth its minutes — it is the only place `posix()`, `tsx` and vitest are exercised on the
+platform this repo is developed on — but the comment should say that, since it is the reason
+anyone would keep paying for it.
 
-- **L4 — `systems.json`'s Testing note is factually wrong about `scripts/lib`.** It says its
-  "scripts coverage is narrowed to the files it actually implements, with the contribution scripts
-  charged to their own system", but `scripts/lib` is declared as a whole directory and therefore
-  still covers `scripts/lib/modportalCache.ts`, which the Contribution system also lists.
-  `339f106`, `8cde0dc` and `6299045` are double-charged. Either intend it and say so the way the
-  DSL note does, or name the three files Testing procedure actually implements
-  (`layers.ts`, `sourceFiles.ts`, `stripComments.ts`, plus their tests).
+## L3 — the CLI's whole argument surface is unexported and untested.
 
-- **L5 — `handleCommand`'s comment claims a single recorder seam that live mode does not honour.**
-  `play-cli.ts:502` says "The one place a result reaches the recorder, so the two paths cannot
-  drift." Live mode pushes to `recorder.history` at four other sites (`play-cli.ts:855, 860, 861,
-  865`) inside `main()`'s loop, entirely outside `handleCommand`. The divergence is deliberate — a
-  live numeric choice records `begin:`/`wait:`/`cancel` rather than the instant form — but the
-  comment describes a contract the file no longer has, and none of those four sites is under test
-  (`runLiveAction` is unexported and TTY-bound; only the pure `liveTick` is covered).
+`parseCliArgs`
+(`play-cli.ts:671`) handles `--live`, `--local`/`--changes`/`local=`, `--modportal`/`modportal=`/
+`--no-modportal` and positionals, and is reachable only from `main()`. `8a54d1b` fixed a real
+data-loss bug there — a second positional became the local-changes file, which `/dsl` then
+rewrote over real content — and shipped with no regression test, because there is no seam to
+test through. `handleCommand`, `liveTick` and `loadModportalSources` are all exported for exactly
+this reason; `parseCliArgs` is the one decision function that is not.
 
-- **L6 — `shownLocations` and `speedMultiplier` are module-level mutable state.**
-  `play-cli.ts:82,85`. A second `PlaySession` in the same process inherits the first one's
-  "already described" set, so `formatView` output depends on process history — harmless for a
-  one-session REPL, but it means any future assertion over CLI output is order-dependent, and
-  `play-cli.test.ts` already builds many sessions per run.
+## L4 — `systems.json`'s Testing note is factually wrong about `scripts/lib`.
+
+It says its
+"scripts coverage is narrowed to the files it actually implements, with the contribution scripts
+charged to their own system", but `scripts/lib` is declared as a whole directory and therefore
+still covers `scripts/lib/modportalCache.ts`, which the Contribution system also lists.
+`339f106`, `8cde0dc` and `6299045` are double-charged. Either intend it and say so the way the
+DSL note does, or name the three files Testing procedure actually implements
+(`layers.ts`, `sourceFiles.ts`, `stripComments.ts`, plus their tests).
+
+## L5 — `handleCommand`'s comment claims a single recorder seam that live mode does not honour.
+
+`play-cli.ts:502` says "The one place a result reaches the recorder, so the two paths cannot
+drift." Live mode pushes to `recorder.history` at four other sites (`play-cli.ts:855, 860, 861,
+865`) inside `main()`'s loop, entirely outside `handleCommand`. The divergence is deliberate — a
+live numeric choice records `begin:`/`wait:`/`cancel` rather than the instant form — but the
+comment describes a contract the file no longer has, and none of those four sites is under test
+(`runLiveAction` is unexported and TTY-bound; only the pure `liveTick` is covered).
+
+## L6 — `shownLocations` and `speedMultiplier` are module-level mutable state.
+
+`play-cli.ts:82,85`. A second `PlaySession` in the same process inherits the first one's
+"already described" set, so `formatView` output depends on process history — harmless for a
+one-session REPL, but it means any future assertion over CLI output is order-dependent, and
+`play-cli.test.ts` already builds many sessions per run.
 
 ---
 
