@@ -613,7 +613,12 @@ async function cmdTriage(args: Flags): Promise<void> {
     console.log(`[${i + 1}/${total}]  ${severityTag}  ${task.system ?? '(no system)'}   ${task.title}`);
     if (task.files.length > 0) console.log(`          ${task.files.join('   ')}`);
     console.log('');
+    console.log('evidence — what is broken:');
     printEvidence(task.evidence);
+    console.log('');
+    console.log('deliverable — the proposed fix:');
+    if (task.deliverable) printEvidence(task.deliverable);
+    else console.log('          no proposed fix recorded');
     console.log('');
     console.log('[1] promote   [2] defer   [3] decline   [s] skip   [q] save and quit');
 

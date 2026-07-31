@@ -233,6 +233,26 @@ describe('tasks CLI', () => {
     });
   });
 
+  it('triage displays evidence and deliverable labelled, saying so explicitly when there is no proposed fix', () => {
+    fixture(({ tasks, triage }) => {
+      tasks('add', 'no fix yet', '--id', 'no-fix-yet', '--kind', 'finding', '--severity', 'high', '--evidence', 'it breaks like this');
+      const result = triage('s\n');
+      expect(result.stdout).toContain('evidence — what is broken:');
+      expect(result.stdout).toContain('it breaks like this');
+      expect(result.stdout).toContain('deliverable — the proposed fix:');
+      expect(result.stdout).toContain('no proposed fix recorded');
+    });
+  });
+
+  it('triage shows a recorded deliverable next to its evidence', () => {
+    fixture(({ tasks, triage }) => {
+      tasks('add', 'has a fix', '--id', 'has-a-fix', '--kind', 'finding', '--severity', 'high', '--evidence', 'broken thing', '--deliverable', 'the proposed repair');
+      const result = triage('s\n');
+      expect(result.stdout).toContain('the proposed repair');
+      expect(result.stdout).not.toContain('no proposed fix recorded');
+    });
+  });
+
   it('triage quits early and leaves the rest unreviewed', () => {
     fixture(({ tasks, triage }) => {
       tasks('add', 'first', '--id', 'first', '--kind', 'finding', '--severity', 'high');
