@@ -278,6 +278,30 @@ describe('tasks CLI', () => {
     });
   });
 
+  it('search matches across a task and accepts the list filters', () => {
+    fixture(({ tasks }) => {
+      tasks('add', 'Close the remaining combat gaps', '--id', 'combat-gaps', '--severity', 'high');
+      tasks('add', 'Layered droptables', '--id', 'droptables', '--severity', 'low', '--deliverable', 'give: is sugar for a single-entry COMBAT table');
+      tasks('add', 'Rebuild the GUI', '--id', 'gui-rebuild', '--severity', 'low');
+
+      const hits = tasks('search', 'combat');
+      expect(hits.status).toBe(0);
+      expect(hits.stdout).toContain('combat-gaps');
+      expect(hits.stdout).toContain('droptables');
+      expect(hits.stdout).not.toContain('gui-rebuild');
+
+      expect(tasks('search', 'combat', '--severity', 'high').stdout).not.toContain('droptables');
+    });
+  });
+
+  it('search refuses without a term', () => {
+    fixture(({ tasks }) => {
+      const result = tasks('search');
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain('usage: tasks search <term>');
+    });
+  });
+
   it('list filters by severity, system, spec and kind', () => {
     fixture(({ tasks }) => {
       tasks('add', 'runtime high', '--id', 'runtime-high', '--severity', 'high', '--system', 'Runtime', '--spec', 'demo-spec');

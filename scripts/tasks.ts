@@ -393,7 +393,21 @@ const LIST_KINDS: Kind[] = ['task', 'finding', 'undelivered'];
 // The only verb that can read the whole store rather than one spec's
 // fix-now queue — `next` refuses outside an active spec, and `spec: null`
 // findings otherwise have no command that surfaces them.
+function cmdSearch(args: Flags): void {
+  const term = args.positional[0];
+  if (!term) {
+    console.error('usage: tasks search <term> [--state ...] [--severity ...] [--system ...] [--spec ...] [--deferred] [--kind ...]');
+    process.exitCode = 1;
+    return;
+  }
+  runList(args, term);
+}
+
 function cmdList(args: Flags): void {
+  runList(args, undefined);
+}
+
+function runList(args: Flags, text: string | undefined): void {
   const config = resolveConfig(args.flags);
   const flags = args.flags;
 
@@ -427,6 +441,7 @@ function cmdList(args: Flags): void {
     spec: flags.spec,
     deferred: flags.deferred === 'true',
     kind,
+    text,
   });
 
   for (const task of queue) {
@@ -1349,7 +1364,7 @@ function cmdCheckCommitMessage(args: Flags): void {
   }
 }
 
-const USAGE = 'usage: npm run tasks -- <check|add|edit|show|list|next|done|decline|import|triage|spec|audit|handoff> ...';
+const USAGE = 'usage: npm run tasks -- <check|add|edit|show|list|search|next|done|decline|import|triage|spec|audit|handoff> ...';
 
 export async function run(argv: string[]): Promise<void> {
   const [command, ...rest] = argv;
@@ -1365,6 +1380,8 @@ export async function run(argv: string[]): Promise<void> {
       return cmdShow(args);
     case 'list':
       return cmdList(args);
+    case 'search':
+      return cmdSearch(args);
     case 'next':
       return cmdNext(args);
     case 'done':

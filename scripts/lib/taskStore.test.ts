@@ -116,6 +116,31 @@ describe('unreviewedQueue', () => {
   });
 });
 
+describe('listQueue text search', () => {
+  const corpus = [
+    task({ id: 'combat-post-chunk7-gaps', state: 'open', title: 'Close the remaining combat gaps' }),
+    task({ id: 'droptables', state: 'open', title: 'Layered droptables', deliverable: 'give: becomes sugar for a single-entry combat table' }),
+    task({ id: 'smithing', state: 'open', title: 'Smithing skill', evidence: 'no COMBAT involvement at all, listed for contrast' }),
+    task({ id: 'gui-rebuild', state: 'open', title: 'Rebuild the GUI', system: 'User interface' }),
+  ];
+
+  it('matches id, title, deliverable and evidence, case-insensitively', () => {
+    expect(listQueue(corpus, { text: 'combat' }).map((t) => t.id)).toEqual(['combat-post-chunk7-gaps', 'droptables', 'smithing']);
+  });
+
+  it('matches the system name', () => {
+    expect(listQueue(corpus, { text: 'user interface' }).map((t) => t.id)).toEqual(['gui-rebuild']);
+  });
+
+  it('ANDs with the other filters rather than replacing them', () => {
+    expect(listQueue(corpus, { text: 'combat', spec: 'nothing-has-this-spec' })).toEqual([]);
+  });
+
+  it('returns nothing for a term no task carries', () => {
+    expect(listQueue(corpus, { text: 'zzzznotpresent' })).toEqual([]);
+  });
+});
+
 describe('listQueue', () => {
   it('defaults to not-closed (unreviewed + open), highest severity first', () => {
     const tasks = [

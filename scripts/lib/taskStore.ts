@@ -90,7 +90,13 @@ export interface ListFilter {
   spec?: string;
   deferred?: boolean;
   kind?: Kind;
+  text?: string;
 }
+
+// Topic search until the store has a topic: the words a task already
+// carries are the only thing to match on, so "combat" reaches everything
+// whose id, title, system or prose mentions it.
+const SEARCHABLE = (task: Task): string => [task.id, task.title, task.system, task.deliverable, task.evidence].filter(Boolean).join('\n').toLowerCase();
 
 // The one query with no built-in state filter: with no --state, "not
 // closed" (unreviewed + open) is the useful default, since done and
@@ -104,6 +110,7 @@ export function listQueue(tasks: Task[], filter: ListFilter = {}): Task[] {
     .filter(({ task }) => filter.spec === undefined || task.spec === filter.spec)
     .filter(({ task }) => !filter.deferred || (task.state === 'open' && task.spec === null))
     .filter(({ task }) => filter.kind === undefined || task.kind === filter.kind)
+    .filter(({ task }) => filter.text === undefined || SEARCHABLE(task).includes(filter.text.toLowerCase()))
     .sort((a, b) => severityRank(a.task.severity) - severityRank(b.task.severity) || a.index - b.index)
     .map(({ task }) => task);
 }
