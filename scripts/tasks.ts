@@ -171,6 +171,25 @@ function cmdCheck(flags: Record<string, string>): void {
   if (mergeIssues.length > 0) process.exitCode = 1;
 }
 
+// Shared by add and edit: the two places content fields (severity, system,
+// requires) are accepted from a human by hand rather than produced by a
+// state-transition verb or the auditor.
+function validateContentFields(config: Config, tasks: Task[], flags: Record<string, string>): string | null {
+  if (flags.severity !== undefined && !['high', 'medium', 'low'].includes(flags.severity)) {
+    return 'error: --severity must be high, medium or low';
+  }
+  if (flags.system !== undefined && !systemNames(config).includes(flags.system)) {
+    return `error: --system not in systems.json: ${flags.system}`;
+  }
+  const requires = splitList(flags.requires);
+  if (requires.length > 0) {
+    const known = new Set(tasks.map((task) => task.id));
+    const missing = requires.filter((id) => !known.has(id));
+    if (missing.length > 0) return `error: --requires references unknown id(s): ${missing.join(', ')}`;
+  }
+  return null;
+}
+
 const ADD_USAGE =
   'usage: tasks add "<title>" [--kind task|finding] [--severity high|medium|low] [--system "<name>"] [--spec <slug>] [--files a.ts:12,b.ts] [--requires id1,id2] [--deliverable "..."] [--evidence "..."] [--id <id>]';
 
@@ -189,14 +208,15 @@ function cmdAdd(args: Flags): void {
     process.exitCode = 1;
     return;
   }
-  const severity = args.flags.severity as Severity | undefined;
-  if (severity !== undefined && !['high', 'medium', 'low'].includes(severity)) {
-    console.error('error: --severity must be high, medium or low');
+
+  const tasks = loadStore(config.storePath);
+  const validationError = validateContentFields(config, tasks, args.flags);
+  if (validationError) {
+    console.error(validationError);
     process.exitCode = 1;
     return;
   }
 
-  const tasks = loadStore(config.storePath);
   const taken = new Set(tasks.map((task) => task.id));
   const id = args.flags.id ?? uniqueId(slugify(title), taken);
   if (taken.has(id)) {
@@ -216,7 +236,7 @@ function cmdAdd(args: Flags): void {
     title,
     kind,
     state,
-    severity: severity ?? null,
+    severity: (args.flags.severity as Severity | undefined) ?? null,
     system: args.flags.system ?? null,
     spec,
     requires: splitList(args.flags.requires),
@@ -230,6 +250,76 @@ function cmdAdd(args: Flags): void {
   tasks.push(task);
   saveStore(tasks, config.storePath);
   console.log(`added ${id} [${task.kind}/${task.state}]`);
+}
+
+const EDIT_USAGE =
+  'usage: tasks edit <id> ["<new title>"] [--title "..."] [--deliverable "..."] [--evidence "..."] [--severity high|medium|low] [--system "<name>"] [--files a.ts:12,b.ts] [--requires id1,id2]';
+
+// Content only: id, kind, state, spec, reason, closed and source are state
+// transitions owned by the other verbs, so this never touches them.
+function cmdEdit(args: Flags): void {
+  const config = resolveConfig(args.flags);
+  const id = args.positional[0];
+  if (!id) {
+    console.error(EDIT_USAGE);
+    process.exitCode = 1;
+    return;
+  }
+
+  const tasks = loadStore(config.storePath);
+  const task = tasks.find((candidate) => candidate.id === id);
+  if (!task) {
+    console.error(`error: no such task: ${id}`);
+    process.exitCode = 1;
+    return;
+  }
+
+  const validationError = validateContentFields(config, tasks, args.flags);
+  if (validationError) {
+    console.error(validationError);
+    process.exitCode = 1;
+    return;
+  }
+
+  const title = args.flags.title ?? args.positional[1];
+  const changes: string[] = [];
+
+  if (title !== undefined) {
+    task.title = title;
+    changes.push('title');
+  }
+  if (args.flags.deliverable !== undefined) {
+    task.deliverable = args.flags.deliverable;
+    changes.push('deliverable');
+  }
+  if (args.flags.evidence !== undefined) {
+    task.evidence = args.flags.evidence;
+    changes.push('evidence');
+  }
+  if (args.flags.severity !== undefined) {
+    task.severity = args.flags.severity as Severity;
+    changes.push('severity');
+  }
+  if (args.flags.system !== undefined) {
+    task.system = args.flags.system;
+    changes.push('system');
+  }
+  if (args.flags.files !== undefined) {
+    task.files = splitList(args.flags.files);
+    changes.push('files');
+  }
+  if (args.flags.requires !== undefined) {
+    task.requires = splitList(args.flags.requires);
+    changes.push('requires');
+  }
+
+  if (changes.length === 0) {
+    console.log(`${id}: nothing to change`);
+    return;
+  }
+
+  saveStore(tasks, config.storePath);
+  console.log(`edited ${id}: ${changes.join(', ')}`);
 }
 
 function cmdShow(args: Flags): void {
@@ -971,7 +1061,7 @@ function cmdCheckCommitMessage(args: Flags): void {
   }
 }
 
-const USAGE = 'usage: npm run tasks -- <check|add|show|next|done|decline|import|triage|spec|audit|handoff> ...';
+const USAGE = 'usage: npm run tasks -- <check|add|edit|show|next|done|decline|import|triage|spec|audit|handoff> ...';
 
 export async function run(argv: string[]): Promise<void> {
   const [command, ...rest] = argv;
@@ -981,6 +1071,8 @@ export async function run(argv: string[]): Promise<void> {
       return cmdCheck(args.flags);
     case 'add':
       return cmdAdd(args);
+    case 'edit':
+      return cmdEdit(args);
     case 'show':
       return cmdShow(args);
     case 'next':

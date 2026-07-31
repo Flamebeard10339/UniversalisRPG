@@ -120,6 +120,87 @@ describe('tasks CLI', () => {
     });
   });
 
+  it('edit changes only the fields given, leaving the rest untouched', () => {
+    fixture(({ tasks }) => {
+      tasks('add', 'Original title', '--id', 'editable', '--severity', 'low', '--system', 'Runtime', '--deliverable', 'old fix', '--evidence', 'old evidence');
+      const edited = tasks('edit', 'editable', '--deliverable', 'new fix');
+      expect(edited.status).toBe(0);
+      expect(edited.stdout).toContain('edited editable: deliverable');
+
+      const shown = tasks('show', 'editable').stdout;
+      expect(shown).toContain('deliverable: new fix');
+      expect(shown).toContain('evidence: old evidence');
+      expect(shown).toContain('Original title');
+      expect(shown).toContain('system: Runtime');
+      expect(shown).toContain('[task/open/low]');
+    });
+  });
+
+  it('edit accepts a new title positionally or via --title', () => {
+    fixture(({ tasks }) => {
+      tasks('add', 'Original title', '--id', 'editable');
+      const edited = tasks('edit', 'editable', 'Replacement title');
+      expect(edited.status).toBe(0);
+      expect(tasks('show', 'editable').stdout).toContain('Replacement title');
+    });
+  });
+
+  it('edit reports nothing to change when no content flags are given', () => {
+    fixture(({ tasks }) => {
+      tasks('add', 'a task', '--id', 'editable');
+      const result = tasks('edit', 'editable');
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('nothing to change');
+    });
+  });
+
+  it('edit refuses an unknown id', () => {
+    fixture(({ tasks }) => {
+      const result = tasks('edit', 'no-such-task', '--deliverable', 'x');
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain('no such task: no-such-task');
+    });
+  });
+
+  it('edit refuses an invalid severity, and the store is left unchanged', () => {
+    fixture(({ tasks }) => {
+      tasks('add', 'a task', '--id', 'editable', '--severity', 'low');
+      const result = tasks('edit', 'editable', '--severity', 'extreme');
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain('--severity must be high, medium or low');
+      expect(tasks('show', 'editable').stdout).toContain('[task/open/low]');
+    });
+  });
+
+  it('edit refuses a system not in systems.json', () => {
+    fixture(({ tasks }) => {
+      tasks('add', 'a task', '--id', 'editable');
+      const result = tasks('edit', 'editable', '--system', 'Nonexistent');
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain('not in systems.json');
+      expect(tasks('show', 'editable').stdout).not.toContain('system: Nonexistent');
+    });
+  });
+
+  it('edit refuses a --requires id that does not resolve', () => {
+    fixture(({ tasks }) => {
+      tasks('add', 'a task', '--id', 'editable');
+      const result = tasks('edit', 'editable', '--requires', 'ghost');
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain('unknown id(s): ghost');
+    });
+  });
+
+  it('edit never changes id, kind, state, spec, reason or closed — only the other verbs do', () => {
+    fixture(({ tasks }) => {
+      tasks('add', 'a member', '--id', 'a-member', '--spec', 'demo-spec');
+      tasks('edit', 'a-member', '--deliverable', 'a fix');
+      const shown = tasks('show', 'a-member').stdout;
+      expect(shown).toContain('a-member  [task/open]');
+      expect(shown).toContain('spec: demo-spec');
+    });
+  });
+
   it('next returns the highest-severity unblocked task in the active spec', () => {
     fixture(({ tasks }) => {
       tasks('add', 'low one', '--severity', 'low', '--spec', 'demo-spec');
