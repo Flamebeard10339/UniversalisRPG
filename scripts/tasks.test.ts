@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -19,7 +19,7 @@ function fixture(run: (context: { dir: string; args: (extra?: string[]) => strin
   try {
     const specsDir = path.join(dir, 'specs');
     mkdirSync(specsDir);
-    writeFileSync(path.join(specsDir, 'demo-spec.md'), '# Demo spec\n\n## Deliverable\nsomething.\n', 'utf8');
+    writeFileSync(path.join(specsDir, 'demo-spec.md'), '# Demo spec\n\n## Deliverable\n\nSomething this branch promises.\n\nProof:\n\n- The first clause holds.\n- The second clause holds.\n\n## Decisions\n\n## Open questions\n\nNone.\n', 'utf8');
     const systemsPath = path.join(dir, 'systems.json');
     writeFileSync(systemsPath, JSON.stringify({ systems: [{ name: 'Runtime' }, { name: 'UI' }] }), 'utf8');
     const storePath = path.join(dir, 'tasks.jsonl');
@@ -195,6 +195,187 @@ describe('tasks CLI', () => {
       const result = triage('q\n');
       expect(result.stdout).toContain('2 unreviewed finding(s) left');
       expect(tasks('show', 'first').stdout).toContain('unreviewed');
+    });
+  });
+
+  it('spec new scaffolds a spec file and refuses to overwrite an existing one', () => {
+    fixture(({ tasks, dir }) => {
+      const created = tasks('spec', 'new', 'fresh-spec');
+      expect(created.status).toBe(0);
+      expect(readFileSync(path.join(dir, 'specs', 'fresh-spec.md'), 'utf8')).toContain('## Deliverable');
+
+      const again = tasks('spec', 'new', 'fresh-spec');
+      expect(again.status).toBe(1);
+      expect(again.stderr).toContain('already exists');
+    });
+  });
+
+  it('spec add joins named tasks to a spec regardless of their state', () => {
+    fixture(({ tasks }) => {
+      tasks('add', 'a task', '--id', 'a-task');
+      const added = tasks('spec', 'add', 'demo-spec', 'a-task');
+      expect(added.status).toBe(0);
+      expect(tasks('show', 'a-task').stdout).toContain('spec: demo-spec');
+    });
+  });
+
+  it('spec add refuses an unknown spec or an unknown task', () => {
+    fixture(({ tasks }) => {
+      tasks('add', 'a task', '--id', 'a-task');
+      expect(tasks('spec', 'add', 'no-such-spec', 'a-task').status).toBe(1);
+      expect(tasks('spec', 'add', 'demo-spec', 'no-such-task').status).toBe(1);
+    });
+  });
+
+  it('spec show lists the deliverable and every member with its state', () => {
+    fixture(({ tasks }) => {
+      tasks('add', 'a member', '--id', 'a-member', '--spec', 'demo-spec');
+      const shown = tasks('spec', 'show', 'demo-spec');
+      expect(shown.stdout).toContain('The first clause holds.');
+      expect(shown.stdout).toContain('a-member');
+      expect(shown.stdout).toContain('0 audit pass(es) recorded');
+    });
+  });
+
+  it('spec done refuses while a member is neither done nor declined, and names it', () => {
+    fixture(({ tasks }) => {
+      tasks('add', 'a member', '--id', 'a-member', '--spec', 'demo-spec');
+      const result = tasks('spec', 'done', 'demo-spec');
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain('a-member');
+    });
+  });
+
+  it('spec done succeeds once every member is done or declined', () => {
+    fixture(({ tasks }) => {
+      tasks('add', 'a member', '--id', 'a-member', '--spec', 'demo-spec');
+      tasks('done', 'a-member');
+      const result = tasks('spec', 'done', 'demo-spec');
+      expect(result.status).toBe(0);
+    });
+  });
+
+  it('spec done --defer-open removes a straggler task from the spec instead of refusing', () => {
+    fixture(({ tasks }) => {
+      tasks('add', 'a member', '--id', 'a-member', '--spec', 'demo-spec');
+      const result = tasks('spec', 'done', 'demo-spec', '--defer-open');
+      expect(result.status).toBe(0);
+      expect(tasks('show', 'a-member').stdout).toContain('spec: (deferred)');
+    });
+  });
+
+  it('audit refuses when a proof clause is missing a verdict', () => {
+    fixture(({ tasks }) => {
+      const result = tasks('audit', 'demo-spec', '--proof', '1=met');
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain('missing');
+      expect(result.stderr).toContain('2');
+    });
+  });
+
+  it('audit records a pass, creates an undelivered task for an unmet clause, and records findings unreviewed', () => {
+    fixture(({ tasks, dir }) => {
+      const result = tasks(
+        'audit',
+        'demo-spec',
+        '--proof',
+        '1=met',
+        '--proof',
+        '2=unmet',
+        '--evidence',
+        '2=it does not actually hold',
+        '--finding',
+        'a fresh bug',
+        '--severity',
+        'medium',
+        '--system',
+        'Runtime',
+        '--file',
+        'src/runtime/save.ts:1',
+      );
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('recorded pass 1');
+      expect(result.stdout).toContain('1 undelivered task(s)');
+      expect(result.stdout).toContain('1 finding(s) recorded, unreviewed');
+
+      const specText = readFileSync(path.join(dir, 'specs', 'demo-spec.md'), 'utf8');
+      expect(specText).toContain('## Audit passes');
+      expect(specText).toContain('- proof 2: unmet — it does not actually hold');
+
+      const undelivered = tasks('show', 'demo-spec-clause-2');
+      expect(undelivered.stdout).toContain('[undelivered/open/high]');
+      expect(undelivered.stdout).toContain('spec: demo-spec');
+
+      const finding = tasks('spec', 'show', 'demo-spec');
+      expect(finding.stdout).not.toContain('a fresh bug'); // findings are not spec members until promoted
+    });
+  });
+
+  it("audit's undelivered task cannot be declined, matching every other undelivered task", () => {
+    fixture(({ tasks }) => {
+      tasks('audit', 'demo-spec', '--proof', '1=unmet', '--evidence', '1=nope', '--proof', '2=met');
+      const result = tasks('decline', 'demo-spec-clause-1', '--reason', 'trying anyway');
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain('undelivered');
+    });
+  });
+
+  it('a second unmet pass for the same clause reuses the open undelivered task rather than duplicating it', () => {
+    fixture(({ tasks }) => {
+      tasks('audit', 'demo-spec', '--proof', '1=unmet', '--evidence', '1=first', '--proof', '2=met');
+      tasks('audit', 'demo-spec', '--proof', '1=unmet', '--evidence', '1=still not', '--proof', '2=met');
+      const spec = tasks('spec', 'show', 'demo-spec');
+      const occurrences = (spec.stdout.match(/demo-spec-clause-1/g) ?? []).length;
+      expect(occurrences).toBe(1);
+    });
+  });
+
+  it('check --merge passes once every proof clause is met in the latest pass and no member is open', () => {
+    fixture(({ tasks }) => {
+      tasks('audit', 'demo-spec', '--proof', '1=met', '--proof', '2=met');
+      const result = tasks('check', '--merge');
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('0 issue(s)');
+    });
+  });
+
+  it('check --merge refuses when there is no recorded audit pass', () => {
+    fixture(({ tasks }) => {
+      const result = tasks('check', '--merge');
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain('no recorded audit pass');
+    });
+  });
+
+  it('check --merge refuses when a promoted finding is still unreviewed', () => {
+    fixture(({ tasks }) => {
+      tasks('audit', 'demo-spec', '--proof', '1=met', '--proof', '2=met');
+      tasks('add', 'a finding', '--id', 'a-finding', '--kind', 'finding', '--severity', 'low');
+      tasks('spec', 'add', 'demo-spec', 'a-finding');
+      const result = tasks('check', '--merge');
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain('still unreviewed');
+    });
+  });
+
+  it('handoff prints the last commit\'s Next: line, the spec deliverable, and open fix-now tasks', () => {
+    fixture(({ tasks }) => {
+      tasks('add', 'open task', '--id', 'open-task', '--spec', 'demo-spec', '--severity', 'high');
+      const result = tasks('handoff');
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('The first clause holds.');
+      expect(result.stdout).toContain('open-task');
+    });
+  });
+
+  it('triage refuses to promote a finding sourced from an audit pass 2 or later', () => {
+    fixture(({ tasks, triage }) => {
+      tasks('audit', 'demo-spec', '--proof', '1=met', '--proof', '2=met');
+      tasks('audit', 'demo-spec', '--proof', '1=met', '--proof', '2=met', '--finding', 'late finding', '--severity', 'low');
+      const result = triage('1\n');
+      expect(result.stdout).toContain('cannot be promoted');
+      const shown = tasks('show', 'demo-spec-pass2-late-finding');
+      expect(shown.stdout).toContain('spec: (deferred)');
     });
   });
 });
