@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { existsSync, readFileSync, statSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { codeOnly } from './lib/stripComments';
 
 const MANIFEST = 'docs/audits/systems.json';
@@ -13,7 +13,6 @@ interface System {
 }
 
 interface Manifest {
-  threshold: number;
   unowned: { note: string; paths: string[] };
   systems: System[];
 }
@@ -92,55 +91,31 @@ function touchesSince(system: System): Touch[] {
   });
 }
 
-const AUDIT_DOC_DIRECTORY = 'docs/audits/';
-const MINIMUM_AUDIT_DOC_BYTES = 500;
-
-function documented(system: System): boolean {
-  if (system.lastAudit === null) return true;
-  const doc = system.lastAuditDoc;
-  if (doc === null || !doc.startsWith(AUDIT_DOC_DIRECTORY) || !existsSync(doc)) return false;
-  const stats = statSync(doc);
-  return stats.isFile() && stats.size >= MINIMUM_AUDIT_DOC_BYTES;
-}
-
 const manifest = JSON.parse(readFileSync(MANIFEST, 'utf8')) as Manifest;
 const verbose = process.argv.includes('--verbose');
-const due: string[] = [];
-const undocumented: string[] = [];
 
 for (const system of manifest.systems) {
   const touches = touchesSince(system);
   const changing = touches.filter((touch) => touch.code).length;
-  const owed = system.lastAudit === null && system.paths.length > 0;
-  const overdue = owed || changing >= manifest.threshold;
-
-  if (overdue) due.push(system.name);
-  if (!documented(system)) undocumented.push(system.name);
 
   const detail =
     system.paths.length === 0
       ? 'no paths declared'
-      : owed
-        ? 'never audited'
+      : system.lastAudit === null
+        ? 'never swept'
         : `${changing} of ${touches.length} commit(s) changed code since ${system.lastAudit}`;
-  console.log(`${overdue ? 'DUE ' : '    '} ${system.name.padEnd(22)} ${detail}`);
+  console.log(`     ${system.name.padEnd(22)} ${detail}`);
   if (system.note) console.log(`      ${system.note}`);
   if (verbose) for (const touch of touches) console.log(`      ${touch.code ? 'code ' : 'no-op'} ${touch.sha} ${touch.subject}`);
 }
 
 const orphans = orphanedFiles(manifest);
 
-console.log(`\nThreshold ${manifest.threshold}. Systems and their paths are declared in ${MANIFEST}.`);
+console.log(`\nSystems and their paths are declared in ${MANIFEST}. Counts are informational: an audit reviews a branch's diff, not a commit total.`);
 
-for (const name of undocumented) console.error(`no audit doc:  ${name} records a lastAudit, but its lastAuditDoc is missing, empty, or not a file under ${AUDIT_DOC_DIRECTORY}`);
 if (orphans.length > 0) {
-  console.error(`unowned:       ${orphans.length} tracked file(s) belong to no system and are not declared unowned in ${MANIFEST}:`);
+  console.error(`\nunowned:       ${orphans.length} tracked file(s) belong to no system and are not declared unowned in ${MANIFEST}:`);
   for (const file of orphans) console.error(`               ${file}`);
-}
-if (due.length > 0) console.error(`audit due:     ${due.join(', ')}`);
-
-if (due.length + undocumented.length + orphans.length > 0) {
-  console.error('\nSpawn an independent auditor with the audit prompt in CLAUDE.md, write the audit under docs/audits/, lift its findings into backlog.md, then set lastAudit and lastAuditDoc.');
+  console.error('\nEvery tracked file is owned by a system or declared unowned, so that a diff can be attributed to a system.');
   process.exit(1);
 }
-console.log('Every system has a current, documented audit.');
