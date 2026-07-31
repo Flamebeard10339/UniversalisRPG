@@ -13,8 +13,6 @@ vite.*.log
 .claude/settings.local.json
 .claude/worktrees/
 
-completed-tasks.md
-
 .planning/.scratch.md
 .planning/old/*
 
