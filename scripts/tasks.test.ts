@@ -835,6 +835,85 @@ describe('tasks CLI', () => {
     });
   });
 
+  it('next resolves the sole spec with open members when the branch matches no spec file, and says it was inferred', () => {
+    fixture(({ tasks, dir }) => {
+      tasks('add', 'open task', '--id', 'open-task', '--spec', 'demo-spec', '--severity', 'high');
+      const storePath = path.join(dir, 'tasks.jsonl');
+      const systemsPath = path.join(dir, 'systems.json');
+      const specsDir = path.join(dir, 'specs');
+      const result = spawnSync(process.execPath, [tsx, script, 'next', '--store', storePath, '--systems', systemsPath, '--specs-dir', specsDir, '--branch', 'orphaned-branch'], { cwd: repoRoot, encoding: 'utf8' });
+      expect(result.stdout).toContain('spec inferred: demo-spec');
+      expect(result.stdout).toContain('open task');
+    });
+  });
+
+  it('next does not infer when two specs both have open members — as ambiguous as none', () => {
+    fixture(({ tasks, dir }) => {
+      const specsDir = path.join(dir, 'specs');
+      writeFileSync(path.join(specsDir, 'other-spec.md'), '# Other spec\n\n## Deliverable\n\nAnother promise.\n\nProof:\n\n- a clause.\n\n## Decisions\n\n## Open questions\n\nNone.\n', 'utf8');
+      tasks('add', 'a', '--id', 'a-task', '--spec', 'demo-spec');
+      tasks('add', 'b', '--id', 'b-task', '--spec', 'other-spec');
+      const storePath = path.join(dir, 'tasks.jsonl');
+      const systemsPath = path.join(dir, 'systems.json');
+      const result = spawnSync(process.execPath, [tsx, script, 'next', '--store', storePath, '--systems', systemsPath, '--specs-dir', specsDir, '--branch', 'orphaned-branch'], { cwd: repoRoot, encoding: 'utf8' });
+      expect(result.stdout).toContain('no active spec for this branch');
+    });
+  });
+
+  it('handoff infers the active spec the same way, printing why', () => {
+    fixture(({ tasks, dir }) => {
+      tasks('add', 'open task', '--id', 'open-task', '--spec', 'demo-spec', '--severity', 'high');
+      const storePath = path.join(dir, 'tasks.jsonl');
+      const systemsPath = path.join(dir, 'systems.json');
+      const specsDir = path.join(dir, 'specs');
+      const result = spawnSync(process.execPath, [tsx, script, 'handoff', '--store', storePath, '--systems', systemsPath, '--specs-dir', specsDir, '--branch', 'orphaned-branch'], { cwd: repoRoot, encoding: 'utf8' });
+      expect(result.stdout).toContain('spec inferred: demo-spec');
+      expect(result.stdout).toContain('spec: demo-spec');
+    });
+  });
+
+  it('list infers the active spec and announces it, without narrowing which tasks it lists', () => {
+    fixture(({ tasks, dir }) => {
+      tasks('add', 'a task', '--id', 'a-task', '--spec', 'demo-spec');
+      tasks('add', 'deferred task', '--id', 'deferred-task');
+      const storePath = path.join(dir, 'tasks.jsonl');
+      const systemsPath = path.join(dir, 'systems.json');
+      const specsDir = path.join(dir, 'specs');
+      const result = spawnSync(process.execPath, [tsx, script, 'list', '--store', storePath, '--systems', systemsPath, '--specs-dir', specsDir, '--branch', 'orphaned-branch'], { cwd: repoRoot, encoding: 'utf8' });
+      expect(result.stdout).toContain('spec inferred: demo-spec');
+      expect(result.stdout).toContain('a-task');
+      expect(result.stdout).toContain('deferred-task');
+    });
+  });
+
+  it("triage promotes into the inferred spec when the branch matches no spec file", () => {
+    fixture(({ tasks, dir }) => {
+      tasks('add', 'fix-now anchor', '--id', 'anchor', '--spec', 'demo-spec');
+      tasks('add', 'a finding', '--id', 'a-finding', '--kind', 'finding', '--severity', 'high', '--deliverable', 'fix it');
+      const storePath = path.join(dir, 'tasks.jsonl');
+      const systemsPath = path.join(dir, 'systems.json');
+      const specsDir = path.join(dir, 'specs');
+      const globals = ['--store', storePath, '--systems', systemsPath, '--specs-dir', specsDir, '--branch', 'orphaned-branch'];
+      const result = spawnSync(process.execPath, [tsx, script, 'triage', ...globals], { cwd: repoRoot, encoding: 'utf8', input: '1\n' });
+      expect(result.stdout).toContain('spec inferred: demo-spec');
+      const shown = spawnSync(process.execPath, [tsx, script, 'show', 'a-finding', ...globals], { cwd: repoRoot, encoding: 'utf8' });
+      expect(shown.stdout).toContain('spec: demo-spec');
+    });
+  });
+
+  it('check --merge never infers a spec — it stays "not applicable" even when exactly one spec has open members', () => {
+    fixture(({ tasks, dir }) => {
+      tasks('add', 'open task', '--id', 'open-task', '--spec', 'demo-spec', '--severity', 'high');
+      const storePath = path.join(dir, 'tasks.jsonl');
+      const systemsPath = path.join(dir, 'systems.json');
+      const specsDir = path.join(dir, 'specs');
+      const result = spawnSync(process.execPath, [tsx, script, 'check', '--merge', '--store', storePath, '--systems', systemsPath, '--specs-dir', specsDir, '--branch', 'orphaned-branch'], { cwd: repoRoot, encoding: 'utf8' });
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('not applicable');
+      expect(result.stdout).not.toContain('demo-spec');
+    });
+  });
+
   it('triage refuses to promote a finding sourced from an audit pass 2 or later', () => {
     fixture(({ tasks, triage }) => {
       tasks('audit', 'demo-spec', '--proof', '1=met', '--proof', '2=met');

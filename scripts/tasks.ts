@@ -75,8 +75,41 @@ function specFile(config: Config, spec: string): string {
 
 // "the spec whose branch is checked out" — a branch not named after any spec
 // file has no active spec, and `--spec` on a read command overrides this.
+// Strict on purpose: `check --merge` resolves through this and only this,
+// never through resolveActiveSpec below — the gate keying off a mutable
+// branch name is a known hole, and inferring through it would make that
+// hole easier to trip rather than harder.
 function currentSpec(config: Config): string | null {
   return existsSync(specFile(config, config.branch)) ? config.branch : null;
+}
+
+interface ActiveSpec {
+  spec: string | null;
+  // Non-null exactly when `spec` was guessed rather than resolved from the
+  // branch name — the caller must say so.
+  note: string | null;
+}
+
+// The resume half of the branch-name lookup: when the branch matches no
+// spec file — as happened on this branch for five commits while the spec
+// lived at a name the branch had since moved past — and exactly one spec
+// file has open members in the store, treat that as the active spec rather
+// than stranding a cold session with no queue and no signal anything is
+// wrong. Two or more candidates is exactly as ambiguous as zero, so both
+// fall back to today's "no active spec" behaviour.
+function resolveActiveSpec(config: Config, tasks: Task[], explicit: string | undefined): ActiveSpec {
+  if (explicit !== undefined) return { spec: explicit, note: null };
+  const strict = currentSpec(config);
+  if (strict !== null) return { spec: strict, note: null };
+
+  const candidates = new Set<string>();
+  for (const task of tasks) {
+    if (task.state !== 'open' || task.spec === null) continue;
+    if (existsSync(specFile(config, task.spec))) candidates.add(task.spec);
+  }
+  if (candidates.size !== 1) return { spec: null, note: null };
+  const [spec] = candidates;
+  return { spec, note: `spec inferred: ${spec} — no docs/specs/${config.branch}.md, and ${spec} is the only spec with open members in the store` };
 }
 
 function slugify(title: string): string {
@@ -379,6 +412,9 @@ function cmdList(args: Flags): void {
   }
 
   const tasks = loadStore(config.storePath);
+  const activeSpec = resolveActiveSpec(config, tasks, flags.spec);
+  if (activeSpec.note) console.log(activeSpec.note);
+
   const queue = listQueue(tasks, {
     state,
     severity,
@@ -401,13 +437,15 @@ function cmdList(args: Flags): void {
 function cmdNext(args: Flags): void {
   const config = resolveConfig(args.flags);
   const tasks = loadStore(config.storePath);
-  const spec = args.flags.spec ?? currentSpec(config);
+  const activeSpec = resolveActiveSpec(config, tasks, args.flags.spec);
+  const spec = activeSpec.spec;
   // A resolved spec of null means "no active spec", not "match deferred
   // tasks" — those two must not collapse into the same query.
   if (spec === null) {
     console.log('no active spec for this branch, and no --spec given');
     return;
   }
+  if (activeSpec.note) console.log(activeSpec.note);
   const queue = fixNowQueue(tasks, spec, {
     system: args.flags.system,
     severity: args.flags.severity as Severity | undefined,
@@ -810,8 +848,10 @@ function printEvidence(evidence: string | null, maxLines = 12): void {
 // so a queue this long survives an interrupted session.
 async function cmdTriage(args: Flags): Promise<void> {
   const config = resolveConfig(args.flags);
-  const spec = args.flags.spec ?? currentSpec(config);
   const tasks = loadStore(config.storePath);
+  const activeSpec = resolveActiveSpec(config, tasks, args.flags.spec);
+  const spec = activeSpec.spec;
+  if (activeSpec.note) console.log(activeSpec.note);
   const queue = unreviewedQueue(tasks);
   if (queue.length === 0) {
     console.log('no unreviewed findings');
@@ -1161,11 +1201,14 @@ function cmdHandoff(args: Flags): void {
   }
   console.log('');
 
-  const spec = args.flags.spec ?? currentSpec(config);
+  const tasks = loadStore(config.storePath);
+  const activeSpec = resolveActiveSpec(config, tasks, args.flags.spec);
+  const spec = activeSpec.spec;
   if (spec === null) {
     console.log(`spec: none — no docs/specs/${config.branch}.md, and no --spec given`);
     return;
   }
+  if (activeSpec.note) console.log(activeSpec.note);
   const path_ = specFile(config, spec);
   console.log(`spec: ${spec} (${path_})`);
   if (!existsSync(path_)) {
@@ -1177,7 +1220,6 @@ function cmdHandoff(args: Flags): void {
   console.log(doc.deliverableSection);
   console.log('');
 
-  const tasks = loadStore(config.storePath);
   const queue = fixNowQueue(tasks, spec);
   console.log(`${queue.length} open fix-now task(s):`);
   for (const task of queue) {

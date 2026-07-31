@@ -125,7 +125,7 @@ Never stored, always computed:
 | fix now | `state: open` and `spec` is the current spec |
 | deferred | `state: open` and `spec` is null |
 | blocked | some id in `requires` is not `done` |
-| active spec | the spec whose branch is checked out |
+| active spec | the spec whose branch is checked out, or — on `next`/`handoff`/`list`/triage's promote target only, never on `check --merge` — the sole spec with open members, when no spec matches the branch |
 
 Storing any of these would be a second record of a fact the store already holds, which is the defect
 that produced `H1` of the last testing-procedure audit and is forbidden by CLAUDE.md.
