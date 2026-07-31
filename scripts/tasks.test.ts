@@ -369,6 +369,25 @@ describe('tasks CLI', () => {
     });
   });
 
+  it('audit\'s interactive clause walk asks for evidence on a met verdict, not only unmet, and it survives to the spec file', () => {
+    fixture(({ dir }) => {
+      const storePath = path.join(dir, 'tasks.jsonl');
+      const systemsPath = path.join(dir, 'systems.json');
+      const specsDir = path.join(dir, 'specs');
+      const globals = ['--store', storePath, '--systems', systemsPath, '--specs-dir', specsDir, '--branch', 'demo-spec'];
+      const result = spawnSync(process.execPath, [tsx, script, 'audit', 'demo-spec', ...globals], {
+        cwd: repoRoot,
+        encoding: 'utf8',
+        input: 'met\nmeasured 70ms\nmet\n\n',
+      });
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('evidence (optional)');
+      const specText = readFileSync(path.join(specsDir, 'demo-spec.md'), 'utf8');
+      expect(specText).toContain('- proof 1: met — measured 70ms');
+      expect(specText).toContain('- proof 2: met\n');
+    });
+  });
+
   it('audit refuses when a proof clause is missing a verdict', () => {
     fixture(({ tasks }) => {
       const result = tasks('audit', 'demo-spec', '--proof', '1=met');

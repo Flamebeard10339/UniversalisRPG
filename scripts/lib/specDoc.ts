@@ -103,7 +103,11 @@ export function parseSpecDoc(text: string): SpecDoc {
 export function renderAuditPass(pass: AuditPass): string {
   const lines = [`### Pass ${pass.pass} — ${pass.date}`, '', `- base: \`${pass.base}\``, `- head: \`${pass.head}\``];
   for (const verdict of pass.verdicts) {
-    const evidence = verdict.status === 'unmet' && verdict.evidence ? ` — ${verdict.evidence}` : '';
+    // Evidence is rendered for any verdict that carries it, met or unmet:
+    // this gate exists to stop false completion claims, so a measurement
+    // backing a `met` verdict is exactly what should survive, not be
+    // thrown away while an `unmet` one is kept.
+    const evidence = verdict.evidence ? ` — ${verdict.evidence}` : '';
     lines.push(`- proof ${verdict.clause}: ${verdict.status}${evidence}`);
   }
   return lines.join('\n');

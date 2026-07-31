@@ -102,19 +102,46 @@ describe('appendAuditPass / renderAuditPass round trip', () => {
     expect(after.deliverableSection).toBe(before.deliverableSection);
   });
 
-  it('renders met without evidence and unmet with it', () => {
+  it('renders evidence for a met verdict just as it does for an unmet one', () => {
     const rendered = renderAuditPass({
       pass: 3,
       date: '2026-08-02',
       base: 'aaa',
       head: 'bbb',
       verdicts: [
-        { clause: 1, status: 'met', evidence: 'ignored for met' },
+        { clause: 1, status: 'met', evidence: 'measured 70ms' },
         { clause: 2, status: 'unmet', evidence: 'the reason' },
       ],
     });
-    expect(rendered).toContain('- proof 1: met');
-    expect(rendered).not.toContain('ignored for met');
+    expect(rendered).toContain('- proof 1: met — measured 70ms');
     expect(rendered).toContain('- proof 2: unmet — the reason');
+  });
+
+  it('renders a bare verdict, met or unmet, when there is no evidence to attach', () => {
+    const rendered = renderAuditPass({
+      pass: 3,
+      date: '2026-08-02',
+      base: 'aaa',
+      head: 'bbb',
+      verdicts: [
+        { clause: 1, status: 'met', evidence: null },
+        { clause: 2, status: 'unmet', evidence: null },
+      ],
+    });
+    const lines = rendered.split('\n');
+    expect(lines).toContain('- proof 1: met');
+    expect(lines).toContain('- proof 2: unmet');
+  });
+
+  it('round-trips a met-with-evidence line back into a verdict', () => {
+    const withPass = appendAuditPass(DOC, {
+      pass: 1,
+      date: '2026-07-31',
+      base: 'abc1234',
+      head: 'def5678',
+      verdicts: [{ clause: 1, status: 'met', evidence: 'measured 70ms' }],
+    });
+    const { auditPasses } = parseSpecDoc(withPass);
+    expect(auditPasses[0].verdicts).toEqual([{ clause: 1, status: 'met', evidence: 'measured 70ms' }]);
   });
 });

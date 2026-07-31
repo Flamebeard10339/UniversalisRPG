@@ -743,8 +743,10 @@ async function walkClausesInteractively(clauses: { index: number; text: string }
       if (answer === 'met' || answer === 'unmet') status = answer;
       else console.log('type "met" or "unmet"');
     }
-    let evidenceText: string | null = null;
-    if (status === 'unmet') evidenceText = (await ask('evidence: ')).trim() || null;
+    // Evidence is askable on met too, not only unmet — a measurement
+    // backing a completion claim is worth keeping, and staying optional
+    // (an empty answer records nothing) costs a human one keystroke.
+    const evidenceText = (await ask('evidence (optional): ')).trim() || null;
     verdicts.push({ clause: clause.index, status, evidence: evidenceText });
   }
   rl.close();
