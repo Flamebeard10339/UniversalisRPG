@@ -2,7 +2,7 @@
 
 Optimize for correctness, bounded scope, reuse, architectural coherence, strong evidence, and clean review—not patch volume. Passing tests is necessary. Avoid patches that accrue technical debt. Prefer self documenting code over comments or updating repository context. 
 
-An audit reviews the diff a branch proposes to merge, not a running commit count. The workflow and the tool that carries it are specified in `docs/specs/task-system.md` and are not built yet; until they are, `backlog.md` is still the store. Keep independent systems independent. Do not create systems that are required to be manually kept in sync. 
+An audit reviews the diff a branch proposes to merge, not a running commit count. The workflow and the tool that carries it are specified in `docs/specs/task-system.md`; `npm run tasks` and `docs/tasks.jsonl` are the store. Keep independent systems independent. Do not create systems that are required to be manually kept in sync. 
 
 Make commits after each logical chunk.
 
@@ -20,9 +20,7 @@ A file drifting toward heavy commenting is a design signal — read it as "this 
 
 Do not bloat CLAUDE.md with over 200 lines of instructions. 
 
-`.planning/.scratch.md` contains open thoughts, `backlog.md` for vetted work, `completed-tasks.md` contains the archive. 
-
-A feature large enough to span sessions gets a tracked deliverable log at `docs/<feature>/deliverable-log.md` (spec, chunk status, open decisions); `backlog.md` keeps only a pointer to it. Read the log before touching that feature's code. On merge, archive the log and lift anything unfinished back into `backlog.md`. Currently live: `docs/combat/deliverable-log.md`. 
+`.planning/.scratch.md` contains open thoughts. Vetted work, its state, and its archive all live in `docs/tasks.jsonl`, reached through `npm run tasks` — `tasks next` for what to work on, `tasks show <id>` for a task's full record. A branch's own spec lives at `docs/specs/<slug>.md`.
 
 # Repository systems
 
