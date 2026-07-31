@@ -13,6 +13,7 @@ import {
   DEFAULT_STORE_PATH,
   fixNowQueue,
   isBlocked,
+  listQueue,
   loadStore,
   saveStore,
   unreviewedQueue,
@@ -338,6 +339,55 @@ function cmdShow(args: Flags): void {
     return;
   }
   printTask(task, tasks);
+}
+
+const LIST_STATES: State[] = ['unreviewed', 'open', 'done', 'declined'];
+const LIST_KINDS: Kind[] = ['task', 'finding', 'undelivered'];
+
+// The only verb that can read the whole store rather than one spec's
+// fix-now queue — `next` refuses outside an active spec, and `spec: null`
+// findings otherwise have no command that surfaces them.
+function cmdList(args: Flags): void {
+  const config = resolveConfig(args.flags);
+  const flags = args.flags;
+
+  const state = flags.state as State | undefined;
+  if (state !== undefined && !LIST_STATES.includes(state)) {
+    console.error(`error: --state must be one of ${LIST_STATES.join(', ')}`);
+    process.exitCode = 1;
+    return;
+  }
+  const severity = flags.severity as Severity | undefined;
+  if (severity !== undefined && !['high', 'medium', 'low'].includes(severity)) {
+    console.error('error: --severity must be high, medium or low');
+    process.exitCode = 1;
+    return;
+  }
+  const kind = flags.kind as Kind | undefined;
+  if (kind !== undefined && !LIST_KINDS.includes(kind)) {
+    console.error(`error: --kind must be one of ${LIST_KINDS.join(', ')}`);
+    process.exitCode = 1;
+    return;
+  }
+
+  const tasks = loadStore(config.storePath);
+  const queue = listQueue(tasks, {
+    state,
+    severity,
+    system: flags.system,
+    spec: flags.spec,
+    deferred: flags.deferred === 'true',
+    kind,
+  });
+
+  for (const task of queue) {
+    const tag = [task.kind, task.state, task.severity].filter(Boolean).join('/');
+    console.log(`${task.id}  [${tag}]  ${task.system ?? '(no system)'}  ${task.title}`);
+  }
+
+  const counts: Record<State, number> = { unreviewed: 0, open: 0, done: 0, declined: 0 };
+  for (const task of queue) counts[task.state]++;
+  console.log(`${queue.length} task(s) — unreviewed: ${counts.unreviewed}, open: ${counts.open}, done: ${counts.done}, declined: ${counts.declined}`);
 }
 
 function cmdNext(args: Flags): void {
@@ -1075,7 +1125,7 @@ function cmdCheckCommitMessage(args: Flags): void {
   }
 }
 
-const USAGE = 'usage: npm run tasks -- <check|add|edit|show|next|done|decline|import|triage|spec|audit|handoff> ...';
+const USAGE = 'usage: npm run tasks -- <check|add|edit|show|list|next|done|decline|import|triage|spec|audit|handoff> ...';
 
 export async function run(argv: string[]): Promise<void> {
   const [command, ...rest] = argv;
@@ -1089,6 +1139,8 @@ export async function run(argv: string[]): Promise<void> {
       return cmdEdit(args);
     case 'show':
       return cmdShow(args);
+    case 'list':
+      return cmdList(args);
     case 'next':
       return cmdNext(args);
     case 'done':

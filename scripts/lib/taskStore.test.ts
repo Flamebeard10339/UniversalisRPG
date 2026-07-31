@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { checkStore, fixNowQueue, isBlocked, loadStore, saveStore, unreviewedQueue, type Task } from './taskStore';
+import { checkStore, fixNowQueue, isBlocked, listQueue, loadStore, saveStore, unreviewedQueue, type Task } from './taskStore';
 
 function task(overrides: Partial<Task> & { id: string }): Task {
   return {
@@ -113,6 +113,48 @@ describe('unreviewedQueue', () => {
   it('orders unreviewed findings by severity, ignoring everything else', () => {
     const tasks = [task({ id: 'a', state: 'unreviewed', severity: 'low' }), task({ id: 'b', state: 'open', severity: 'high' }), task({ id: 'c', state: 'unreviewed', severity: 'high' })];
     expect(unreviewedQueue(tasks).map((t) => t.id)).toEqual(['c', 'a']);
+  });
+});
+
+describe('listQueue', () => {
+  it('defaults to not-closed (unreviewed + open), highest severity first', () => {
+    const tasks = [
+      task({ id: 'declined', state: 'declined', reason: 'x', severity: 'high' }),
+      task({ id: 'done', state: 'done', severity: 'high' }),
+      task({ id: 'low-open', state: 'open', severity: 'low' }),
+      task({ id: 'high-unreviewed', state: 'unreviewed', severity: 'high' }),
+    ];
+    expect(listQueue(tasks).map((t) => t.id)).toEqual(['high-unreviewed', 'low-open']);
+  });
+
+  it('breaks ties by creation order (file position)', () => {
+    const tasks = [task({ id: 'first', state: 'open', severity: 'high' }), task({ id: 'second', state: 'open', severity: 'high' })];
+    expect(listQueue(tasks).map((t) => t.id)).toEqual(['first', 'second']);
+  });
+
+  it('an explicit --state overrides the not-closed default', () => {
+    const tasks = [task({ id: 'a', state: 'done' }), task({ id: 'b', state: 'open' })];
+    expect(listQueue(tasks, { state: 'done' }).map((t) => t.id)).toEqual(['a']);
+  });
+
+  it('filters by severity, system, spec and kind', () => {
+    const tasks = [
+      task({ id: 'a', state: 'open', severity: 'high', system: 'Runtime', spec: 's', kind: 'task' }),
+      task({ id: 'b', state: 'open', severity: 'low', system: 'UI', spec: 'other', kind: 'finding' }),
+    ];
+    expect(listQueue(tasks, { severity: 'high' }).map((t) => t.id)).toEqual(['a']);
+    expect(listQueue(tasks, { system: 'UI' }).map((t) => t.id)).toEqual(['b']);
+    expect(listQueue(tasks, { spec: 's' }).map((t) => t.id)).toEqual(['a']);
+    expect(listQueue(tasks, { kind: 'finding' }).map((t) => t.id)).toEqual(['b']);
+  });
+
+  it('--deferred keeps only state:open tasks with no spec', () => {
+    const tasks = [
+      task({ id: 'deferred', state: 'open', spec: null }),
+      task({ id: 'fix-now', state: 'open', spec: 's' }),
+      task({ id: 'unreviewed', state: 'unreviewed', spec: null }),
+    ];
+    expect(listQueue(tasks, { deferred: true }).map((t) => t.id)).toEqual(['deferred']);
   });
 });
 

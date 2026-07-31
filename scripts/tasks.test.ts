@@ -233,6 +233,71 @@ describe('tasks CLI', () => {
     });
   });
 
+  it('list defaults to not-closed (unreviewed + open), highest severity first, with a state summary', () => {
+    fixture(({ tasks }) => {
+      tasks('add', 'low task', '--id', 'low-task', '--severity', 'low');
+      tasks('add', 'high finding', '--id', 'high-finding', '--kind', 'finding', '--severity', 'high');
+      tasks('add', 'closed task', '--id', 'closed-task');
+      tasks('done', 'closed-task');
+
+      const result = tasks('list');
+      expect(result.status).toBe(0);
+      const highIndex = result.stdout.indexOf('high-finding');
+      const lowIndex = result.stdout.indexOf('low-task');
+      expect(highIndex).toBeGreaterThan(-1);
+      expect(lowIndex).toBeGreaterThan(highIndex);
+      expect(result.stdout).not.toContain('closed-task');
+      expect(result.stdout).toContain('2 task(s) — unreviewed: 1, open: 1, done: 0, declined: 0');
+    });
+  });
+
+  it('list --state filters to a single state and overrides the not-closed default', () => {
+    fixture(({ tasks }) => {
+      tasks('add', 'a task', '--id', 'a-task');
+      tasks('done', 'a-task');
+      const result = tasks('list', '--state', 'done');
+      expect(result.stdout).toContain('a-task');
+      expect(result.stdout).toContain('1 task(s) — unreviewed: 0, open: 0, done: 1, declined: 0');
+    });
+  });
+
+  it('list filters by severity, system, spec and kind', () => {
+    fixture(({ tasks }) => {
+      tasks('add', 'runtime high', '--id', 'runtime-high', '--severity', 'high', '--system', 'Runtime', '--spec', 'demo-spec');
+      tasks('add', 'ui low', '--id', 'ui-low', '--severity', 'low', '--system', 'UI', '--kind', 'finding');
+
+      expect(tasks('list', '--severity', 'high').stdout).toContain('runtime-high');
+      expect(tasks('list', '--severity', 'high').stdout).not.toContain('ui-low');
+
+      expect(tasks('list', '--system', 'UI').stdout).toContain('ui-low');
+      expect(tasks('list', '--system', 'UI').stdout).not.toContain('runtime-high');
+
+      expect(tasks('list', '--spec', 'demo-spec').stdout).toContain('runtime-high');
+      expect(tasks('list', '--spec', 'demo-spec').stdout).not.toContain('ui-low');
+
+      expect(tasks('list', '--kind', 'finding').stdout).toContain('ui-low');
+      expect(tasks('list', '--kind', 'finding').stdout).not.toContain('runtime-high');
+    });
+  });
+
+  it('list --deferred shows only open tasks with no spec, unreachable by any other verb', () => {
+    fixture(({ tasks }) => {
+      tasks('add', 'deferred task', '--id', 'deferred-task');
+      tasks('add', 'fix now task', '--id', 'fix-now-task', '--spec', 'demo-spec');
+      const result = tasks('list', '--deferred');
+      expect(result.stdout).toContain('deferred-task');
+      expect(result.stdout).not.toContain('fix-now-task');
+    });
+  });
+
+  it('list refuses an invalid --state, --severity or --kind', () => {
+    fixture(({ tasks }) => {
+      expect(tasks('list', '--state', 'bogus').status).toBe(1);
+      expect(tasks('list', '--severity', 'extreme').status).toBe(1);
+      expect(tasks('list', '--kind', 'bogus').status).toBe(1);
+    });
+  });
+
   it('done closes an open, unblocked task and refuses a blocked one', () => {
     fixture(({ tasks }) => {
       tasks('add', 'blocker', '--id', 'blocker', '--spec', 'demo-spec');

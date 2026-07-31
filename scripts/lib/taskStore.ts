@@ -46,6 +46,10 @@ export function saveStore(tasks: Task[], path: string = DEFAULT_STORE_PATH): voi
 
 const SEVERITY_RANK: Record<Severity, number> = { high: 0, medium: 1, low: 2 };
 
+// Unset ranks last: every queue below sorts high before medium before low
+// before null, so this is the one comparator they all share.
+const severityRank = (severity: Severity | null): number => (severity === null ? 3 : SEVERITY_RANK[severity]);
+
 export function isBlocked(task: Task, byId: Map<string, Task>): boolean {
   return task.requires.some((id) => byId.get(id)?.state !== 'done');
 }
@@ -59,25 +63,48 @@ export interface QueueFilter {
 // file position, which is creation order for an append-only store.
 export function fixNowQueue(tasks: Task[], spec: string | null, filter: QueueFilter = {}): Task[] {
   const byId = new Map(tasks.map((task) => [task.id, task]));
-  const rank = (severity: Severity | null): number => (severity === null ? 3 : SEVERITY_RANK[severity]);
   return tasks
     .map((task, index) => ({ task, index }))
     .filter(({ task }) => task.state === 'open' && task.spec === spec)
     .filter(({ task }) => !isBlocked(task, byId))
     .filter(({ task }) => filter.system === undefined || task.system === filter.system)
     .filter(({ task }) => filter.severity === undefined || task.severity === filter.severity)
-    .sort((a, b) => rank(a.task.severity) - rank(b.task.severity) || a.index - b.index)
+    .sort((a, b) => severityRank(a.task.severity) - severityRank(b.task.severity) || a.index - b.index)
     .map(({ task }) => task);
 }
 
 // Severity first, then creation order: the shape `triage` walks the
 // unreviewed queue in.
 export function unreviewedQueue(tasks: Task[]): Task[] {
-  const rank = (severity: Severity | null): number => (severity === null ? 3 : SEVERITY_RANK[severity]);
   return tasks
     .map((task, index) => ({ task, index }))
     .filter(({ task }) => task.state === 'unreviewed')
-    .sort((a, b) => rank(a.task.severity) - rank(b.task.severity) || a.index - b.index)
+    .sort((a, b) => severityRank(a.task.severity) - severityRank(b.task.severity) || a.index - b.index)
+    .map(({ task }) => task);
+}
+
+export interface ListFilter {
+  state?: State;
+  severity?: Severity;
+  system?: string;
+  spec?: string;
+  deferred?: boolean;
+  kind?: Kind;
+}
+
+// The one query with no built-in state filter: with no --state, "not
+// closed" (unreviewed + open) is the useful default, since done and
+// declined are already resolved. Every filter given is ANDed together.
+export function listQueue(tasks: Task[], filter: ListFilter = {}): Task[] {
+  return tasks
+    .map((task, index) => ({ task, index }))
+    .filter(({ task }) => (filter.state !== undefined ? task.state === filter.state : task.state === 'unreviewed' || task.state === 'open'))
+    .filter(({ task }) => filter.severity === undefined || task.severity === filter.severity)
+    .filter(({ task }) => filter.system === undefined || task.system === filter.system)
+    .filter(({ task }) => filter.spec === undefined || task.spec === filter.spec)
+    .filter(({ task }) => !filter.deferred || (task.state === 'open' && task.spec === null))
+    .filter(({ task }) => filter.kind === undefined || task.kind === filter.kind)
+    .sort((a, b) => severityRank(a.task.severity) - severityRank(b.task.severity) || a.index - b.index)
     .map(({ task }) => task);
 }
 
