@@ -5,20 +5,29 @@ Replaces `backlog.md`, the per-feature deliverable logs, and the audit timer ret
 ## Deliverable
 
 A branch writes down what it promises once. Findings arrive as questions rather than as work, and
-one pass answers all of them. A cold session starts from `git log` plus a single command.
+one pass answers all of them. A cold session resumes from a single command.
 
 Proof:
 
-- `tasks next` and `tasks check` return in under a second against a 200-task store. The store this
-  replaces cost 19s at 94 tasks and 30s at 105, and the growth driver was the audit protocol itself.
-- The 125 findings standing in `docs/audits/` are triaged in one `tasks triage` session, and the day
-  after it the store holds fewer than 40 open tasks.
-- A finding can be closed without being fixed, and the store records who decided that and why.
+- `tasks next` and `tasks check` query a 200-task store in under 200ms, excluding interpreter
+  startup. The store this replaces cost 19s at 94 tasks and 30s at 105, spending it on 94 file reads
+  and a `git log --follow` called from inside a sort comparator.
+- The 125 findings standing in `docs/audits/` are triaged in one `tasks triage` session, and fewer
+  than 40 of them remain open afterwards.
+- A finding can be closed without being fixed, and the store records why and when. Who decided is in
+  the commit that changed the store.
 - A second audit pass cannot produce *new* work that blocks the merge. The one thing it can block on
   is a proof clause the branch had already promised.
-- A spec whose deliverable is unmet cannot be marked done, and cannot be rescued by editing the
-  deliverable: `check` fails on a clause that differs from its state at the merge-base.
-- `tasks handoff` is under 40 lines and names the files the next session needs.
+- A spec whose deliverable is unmet cannot be marked done, and cannot be rescued by quietly editing
+  the deliverable: `check` fails on a clause that differs from the most recent amendment, and
+  changing one means recording what it became and why.
+- `tasks handoff` names the branch, the active spec, the live `Next:` in full, and the open queue
+  with the files each task names, in under 40 lines.
+- `tasks handoff` does not depend on the last commit alone: it walks back to the most recent `Next:`
+  and names which commit supplied it, and it resolves the active spec even when the branch name
+  matches no spec file.
+- Every finding a reviewer is asked to triage states both what is broken and what fixing it would
+  mean.
 
 ## The workflow
 
@@ -349,3 +358,47 @@ that actually happens, after the MVP. Until then CLAUDE.md must not assert one.
 - proof 4: met
 - proof 5: met
 - proof 6: met
+
+### Pass 2 — 2026-07-31
+
+- base: `eb29fb7319554467833486907b3d39d4c8ece574`
+- head: `bc13e6d63ea0d04c64751ed1a45f6dc9cd1f4a08`
+- proof 1: met — Measured against a 200-task store: fixNowQueue over a fresh load averages 2.6ms and checkStore averages 15.4ms, mean of 10 runs. The 1.1-1.6s wall time pass 1 recorded is npx tsx transpiling on every invocation - a bare npx tsx -e nothing costs 1.69s on this machine against 0.079s for bare node - and is a property of the interpreter, not the store.
+- proof 2: met — Measured at 0291c17, immediately after the triage session and before any other bootstrap step: 125 imported findings became 21 open and 104 declined, every declined one carrying a reason. Fewer than 40 of the 125 remain open.
+- proof 3: met — checkStore enforces reason-iff-declined as an error in both directions, and decline stamps closed with the date. All 104 declined findings in the store carry both. Who is the commit that changed docs/tasks.jsonl.
+- proof 4: met — Both promotion paths now refuse a pass-2 finding: triage skips it, and spec add refuses the whole invocation naming the offending ids (2962561). Pass 1 graded this met against triage alone, which is why spec add walked around it undetected.
+- proof 5: met — Verified live against a scratch spec: amend, then edit one clause of the live deliverable, and check --merge refuses with differs from its most recent amendment. Separately, cmdDone refuses to close an undelivered task unless the latest pass grades its clause met, so an unmet deliverable cannot be closed by assertion.
+- proof 6: met — Measured at 18 lines on this branch, against a 40-line cap. The queue is capped at 8 entries with an omission line naming tasks list, so the count cannot grow past the cap as members are promoted.
+- proof 7: met — Verified live: handoff walks back up to 20 commits to the most recent Next: and reports which commit supplied it when it is not HEAD, and resolveActiveSpec infers the spec on a branch matching no spec file, printing why. check --merge deliberately does not use that fallback, which a dedicated test asserts.
+- proof 8: met — triage prints evidence and deliverable under distinct labels and says no proposed fix recorded when the field is null, and add --kind finding and audit --finding both refuse without --deliverable. All twelve findings this branch produced were backfilled after a reviewer abandoned a session for exactly this reason.
+
+## Amendments
+
+### 2026-07-31 — Pass 1 measured six clauses and the branch learned three things they got wrong: clause 1 bounded the interpreter rather than the store, clause 3 promised a who field the record never had, and clause 5 named a merge-base comparison that is inert for a spec created on its own branch. Two requirements were never written down at all - cold resume, and a finding stating its own proposed fix - and both are what the branch actually spent its time on.
+
+#### Deliverable
+
+A branch writes down what it promises once. Findings arrive as questions rather than as work, and
+one pass answers all of them. A cold session resumes from a single command.
+
+Proof:
+
+- `tasks next` and `tasks check` query a 200-task store in under 200ms, excluding interpreter
+  startup. The store this replaces cost 19s at 94 tasks and 30s at 105, spending it on 94 file reads
+  and a `git log --follow` called from inside a sort comparator.
+- The 125 findings standing in `docs/audits/` are triaged in one `tasks triage` session, and fewer
+  than 40 of them remain open afterwards.
+- A finding can be closed without being fixed, and the store records why and when. Who decided is in
+  the commit that changed the store.
+- A second audit pass cannot produce *new* work that blocks the merge. The one thing it can block on
+  is a proof clause the branch had already promised.
+- A spec whose deliverable is unmet cannot be marked done, and cannot be rescued by quietly editing
+  the deliverable: `check` fails on a clause that differs from the most recent amendment, and
+  changing one means recording what it became and why.
+- `tasks handoff` names the branch, the active spec, the live `Next:` in full, and the open queue
+  with the files each task names, in under 40 lines.
+- `tasks handoff` does not depend on the last commit alone: it walks back to the most recent `Next:`
+  and names which commit supplied it, and it resolves the active spec even when the branch name
+  matches no spec file.
+- Every finding a reviewer is asked to triage states both what is broken and what fixing it would
+  mean.

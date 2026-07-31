@@ -54,12 +54,19 @@ describe('parseSpecDoc', () => {
     expect(parseSpecDoc(DOC).amendments).toEqual([]);
   });
 
-  it('parses the real docs/specs/task-system-v2.md deliverable into six proof clauses', () => {
+  // Structure, never content: a spec's clauses are amendable by design, and
+  // pinning their text here would be a second freeze enforced by a unit test
+  // failure rather than by the merge gate.
+  it('parses the real docs/specs/task-system-v2.md into well-formed, sequentially indexed clauses', () => {
     const text = readFileSync('docs/specs/task-system-v2.md', 'utf8');
     const { proofClauses } = parseSpecDoc(text);
-    expect(proofClauses).toHaveLength(6);
-    expect(proofClauses[0].text).toContain('under a second against a 200-task store');
-    expect(proofClauses[5].text).toContain('under 40 lines');
+    expect(proofClauses.length).toBeGreaterThan(0);
+    expect(proofClauses.map((clause) => clause.index)).toEqual(proofClauses.map((_, i) => i + 1));
+    for (const clause of proofClauses) {
+      expect(clause.text.trim()).not.toBe('');
+      // Wrapped continuation lines are joined, not left as their own clause.
+      expect(clause.text).not.toMatch(/^- /);
+    }
   });
 });
 
