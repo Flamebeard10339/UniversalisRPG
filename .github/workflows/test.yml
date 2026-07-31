@@ -36,3 +36,11 @@ jobs:
       - run: npm run layer-check
       - run: npm run audit-status
         if: matrix.os == 'ubuntu-latest'
+      - run: npm run tasks -- check
+      # The merge gate only runs on pull_request — nothing gates a push, and
+      # it cannot redden main or a branch mid-work. actions/checkout leaves a
+      # PR checkout in detached HEAD, so --branch supplies what
+      # `git rev-parse --abbrev-ref HEAD` cannot; --base-branch targets the
+      # fetched remote-tracking ref, since a bare local `main` need not exist.
+      - run: npm run tasks -- check --merge --branch "${{ github.head_ref }}" --base-branch origin/main
+        if: github.event_name == 'pull_request'

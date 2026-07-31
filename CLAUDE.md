@@ -2,7 +2,7 @@
 
 Optimize for correctness, bounded scope, reuse, architectural coherence, strong evidence, and clean review—not patch volume. Passing tests is necessary. Avoid patches that accrue technical debt. Prefer self documenting code over comments or updating repository context. 
 
-An audit reviews the diff a branch proposes to merge, not a running commit count. The workflow and the tool that carries it are specified in `docs/specs/task-system.md`; `npm run tasks` and `docs/tasks.jsonl` are the store. Keep independent systems independent. Do not create systems that are required to be manually kept in sync. 
+An audit reviews the diff a branch proposes to merge, not a running commit count. The workflow and the tool that carries it are specified under `docs/specs/`; `npm run tasks` and `docs/tasks.jsonl` are the store. Keep independent systems independent. Do not create systems that are required to be manually kept in sync. 
 
 Make commits after each logical chunk.
 

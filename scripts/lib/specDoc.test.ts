@@ -50,8 +50,8 @@ describe('parseSpecDoc', () => {
     expect(parseSpecDoc(DOC).auditPasses).toEqual([]);
   });
 
-  it('parses the real docs/specs/task-system.md deliverable into six proof clauses', () => {
-    const text = readFileSync('docs/specs/task-system.md', 'utf8');
+  it('parses the real docs/specs/task-system-v2.md deliverable into six proof clauses', () => {
+    const text = readFileSync('docs/specs/task-system-v2.md', 'utf8');
     const { proofClauses } = parseSpecDoc(text);
     expect(proofClauses).toHaveLength(6);
     expect(proofClauses[0].text).toContain('under a second against a 200-task store');

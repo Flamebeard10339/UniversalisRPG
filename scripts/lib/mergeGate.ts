@@ -12,7 +12,7 @@ export interface MergeGateInput {
   members: Task[];
 }
 
-// The five refusal conditions from docs/specs/task-system.md's Merge gate
+// The five refusal conditions from docs/specs/task-system-v2.md's Merge gate
 // section, as plain strings rather than an exit code — the caller decides
 // how loud to be.
 export function checkMergeGate(input: MergeGateInput): string[] {

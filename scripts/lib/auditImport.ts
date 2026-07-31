@@ -12,7 +12,7 @@ const FINDING_HEADING = /^## ([HML])(\d+)\s+(.+)$/;
 const SEVERITY_FOR_LETTER: Record<string, Severity> = { H: 'high', M: 'medium', L: 'low' };
 
 // Findings under `## H1` / `## M2` / `## L3` are the load-bearing convention
-// docs/specs/task-system.md names — every other heading shape (Tier 1,
+// docs/specs/task-system-v2.md names — every other heading shape (Tier 1,
 // HIGH/MEDIUM/LOW sections, Findings/Non-Findings) belongs to a superseded
 // or reconciliation document and is deliberately left unimported. A body
 // still ends at the next `##` of ANY shape, not just the next finding —
