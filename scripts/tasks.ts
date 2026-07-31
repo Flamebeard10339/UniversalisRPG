@@ -4,7 +4,7 @@ import path from 'node:path';
 import { createInterface } from 'node:readline';
 import { pathToFileURL } from 'node:url';
 import { harvestFiles, parseAuditDoc, systemForDoc } from './lib/auditImport';
-import { checkCommitMessage, isExempt } from './lib/commitContract';
+import { checkCommitMessage, extractNextTrailer, isExempt } from './lib/commitContract';
 import { checkMergeGate } from './lib/mergeGate';
 import { appendAuditPass, parseSpecDoc, type AuditVerdict, type Verdict } from './lib/specDoc';
 import { loadManifest, systemNames as manifestSystemNames } from './lib/systems';
@@ -870,36 +870,64 @@ async function cmdAudit(rawArgs: string[]): Promise<void> {
   if (findingsCreated > 0) console.log(`${findingsCreated} finding(s) recorded, unreviewed`);
 }
 
+const COMMIT_SEP = '\x1e';
+const FIELD_SEP = '\x1f';
+
+interface FoundTrailer {
+  trailer: string;
+  sha: string;
+  distance: number;
+}
+
+// Only the last commit's Next: is meant to be live, but a mechanical or
+// fixup commit can carry none at all — walk back through recent history
+// (capped, so a long-dead trailer can't turn this into an unbounded scan)
+// to the most recent commit that actually has one.
+function findLatestNextTrailer(maxCommits = 20): FoundTrailer | null {
+  let log: string;
+  try {
+    log = execFileSync('git', ['log', `-${maxCommits}`, `--format=%H${FIELD_SEP}%B${COMMIT_SEP}`], { encoding: 'utf8' });
+  } catch {
+    return null;
+  }
+  const commits = log.split(COMMIT_SEP).filter((entry) => entry.trim().length > 0);
+  for (let distance = 0; distance < commits.length; distance++) {
+    const sepIndex = commits[distance].indexOf(FIELD_SEP);
+    const sha = commits[distance].slice(0, sepIndex).trim();
+    const message = commits[distance].slice(sepIndex + 1);
+    const trailer = extractNextTrailer(message);
+    if (trailer !== null) return { trailer, sha, distance };
+  }
+  return null;
+}
+
 // The first command of a cold session.
 function cmdHandoff(args: Flags): void {
   const config = resolveConfig(args.flags);
+  console.log(`branch: ${config.branch}`);
 
-  let nextLine = '(no commits yet)';
-  try {
-    const lastMessage = execFileSync('git', ['log', '-1', '--format=%B'], { encoding: 'utf8' });
-    const found = lastMessage
-      .split('\n')
-      .map((line) => line.trim())
-      .reverse()
-      .find((line) => /^Next:/.test(line));
-    nextLine = found ?? '(last commit has no Next: trailer)';
-  } catch {
-    // no commits yet
+  const found = findLatestNextTrailer();
+  if (found === null) {
+    console.log('(no Next: trailer found in the last 20 commits)');
+  } else {
+    if (found.distance > 0) console.log(`(from ${found.sha.slice(0, 7)}, ${found.distance} commit${found.distance === 1 ? '' : 's'} back)`);
+    console.log(found.trailer);
   }
-  console.log(nextLine);
   console.log('');
 
   const spec = args.flags.spec ?? currentSpec(config);
   if (spec === null) {
-    console.log('no active spec for this branch, and no --spec given');
+    console.log(`spec: none — no docs/specs/${config.branch}.md, and no --spec given`);
     return;
   }
   const path_ = specFile(config, spec);
+  console.log(`spec: ${spec} (${path_})`);
   if (!existsSync(path_)) {
     console.log(`spec file missing: ${path_}`);
     return;
   }
   const doc = parseSpecDoc(readFileSync(path_, 'utf8'));
+  console.log('');
   console.log(doc.deliverableSection);
   console.log('');
 

@@ -41,3 +41,21 @@ export function checkCommitMessage(message: string): string | null {
 
   return null;
 }
+
+// A trailer-style line: a bare token immediately followed by `: `, matching
+// git's own trailer convention (Next:, Signed-off-by:, Co-Authored-By: ...).
+const TRAILER_LINE = /^[A-Za-z][\w-]*:\s+\S/;
+
+// The whole Next: trailer, from its opening line through to the end of the
+// message or the next trailer-style line — whichever comes first —
+// preserving the author's line breaks rather than collapsing wrapped prose
+// into one sentence the way proof-clause parsing does. Returns null when
+// the message carries no Next: line at all.
+export function extractNextTrailer(message: string): string | null {
+  const lines = contentLines(message);
+  const start = lines.findIndex((line) => NEXT_TRAILER.test(line.trim()));
+  if (start === -1) return null;
+  const stop = lines.findIndex((line, index) => index > start && TRAILER_LINE.test(line.trim()));
+  const end = stop === -1 ? lines.length : stop;
+  return lines.slice(start, end).join('\n').trim();
+}

@@ -52,6 +52,42 @@ function fixture(run: (context: { dir: string; args: (extra?: string[]) => strin
   }
 }
 
+// A dedicated git repo per test, distinct from `fixture`'s (which spawns
+// against this repo's own real checkout) — handoff's walk-back and
+// multi-line capture need commits with exact, controlled messages.
+function gitFixture(run: (context: { dir: string; commit: (message: string) => string; tasks: (...args: string[]) => Run }) => void): void {
+  const dir = mkdtempSync(path.join(os.tmpdir(), 'universalis-handoff-'));
+  try {
+    spawnSync('git', ['init', '-q'], { cwd: dir });
+    spawnSync('git', ['config', 'user.email', 'test@example.com'], { cwd: dir });
+    spawnSync('git', ['config', 'user.name', 'Test'], { cwd: dir });
+
+    const specsDir = path.join(dir, 'specs');
+    mkdirSync(specsDir);
+    writeFileSync(path.join(specsDir, 'demo-spec.md'), '# Demo spec\n\n## Deliverable\n\nSomething this branch promises.\n\nProof:\n\n- The first clause holds.\n\n## Decisions\n\n## Open questions\n\nNone.\n', 'utf8');
+    const systemsPath = path.join(dir, 'systems.json');
+    writeFileSync(systemsPath, JSON.stringify({ unowned: { note: '', paths: ['docs', '*.md'] }, systems: [] }), 'utf8');
+    const storePath = path.join(dir, 'tasks.jsonl');
+    const globals = ['--store', storePath, '--systems', systemsPath, '--specs-dir', specsDir, '--branch', 'demo-spec'];
+
+    run({
+      dir,
+      commit: (message: string) => {
+        writeFileSync(path.join(dir, `file-${Date.now()}-${Math.random().toString(36).slice(2)}.txt`), 'x', 'utf8');
+        spawnSync('git', ['add', '.'], { cwd: dir });
+        spawnSync('git', ['commit', '--no-verify', '-m', message], { cwd: dir, encoding: 'utf8' });
+        return spawnSync('git', ['rev-parse', 'HEAD'], { cwd: dir, encoding: 'utf8' }).stdout.trim();
+      },
+      tasks: (...args: string[]) => {
+        const result = spawnSync(process.execPath, [tsx, script, ...args, ...globals], { cwd: dir, encoding: 'utf8' });
+        return { status: result.status ?? 1, stdout: result.stdout, stderr: result.stderr };
+      },
+    });
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
 describe('tasks CLI', () => {
   it('adds a task and shows it back', () => {
     fixture(({ tasks }) => {
@@ -443,8 +479,53 @@ describe('tasks CLI', () => {
       tasks('add', 'open task', '--id', 'open-task', '--spec', 'demo-spec', '--severity', 'high');
       const result = tasks('handoff');
       expect(result.status).toBe(0);
+      expect(result.stdout).toContain('branch: demo-spec');
+      expect(result.stdout).toContain('spec: demo-spec');
       expect(result.stdout).toContain('The first clause holds.');
       expect(result.stdout).toContain('open-task');
+    });
+  });
+
+  it('handoff names the branch and explains why there is no active spec when none matches it', () => {
+    fixture(({ dir }) => {
+      const storePath = path.join(dir, 'tasks.jsonl');
+      const systemsPath = path.join(dir, 'systems.json');
+      const specsDir = path.join(dir, 'specs');
+      const result = spawnSync(process.execPath, [tsx, script, 'handoff', '--store', storePath, '--systems', systemsPath, '--specs-dir', specsDir, '--branch', 'no-such-spec-branch'], { cwd: repoRoot, encoding: 'utf8' });
+      expect(result.stdout).toContain('branch: no-such-spec-branch');
+      expect(result.stdout).toContain('no docs/specs/no-such-spec-branch.md');
+    });
+  });
+
+  it('handoff captures the whole multi-line Next: trailer of the last commit, not just its first line', () => {
+    gitFixture(({ commit, tasks }) => {
+      commit('Subject line\n\nA body explaining the change.\n\nNext: first line of the trailer\nsecond line of the trailer\nthird line of the trailer.');
+      const result = tasks('handoff');
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('first line of the trailer');
+      expect(result.stdout).toContain('second line of the trailer');
+      expect(result.stdout).toContain('third line of the trailer.');
+    });
+  });
+
+  it('handoff walks back past a commit with no Next: trailer and says how far back it found one', () => {
+    gitFixture(({ commit, tasks }) => {
+      const withTrailer = commit('First subject\n\nA body.\n\nNext: pick up the real work here.');
+      commit('Second subject\n\nA mechanical commit with no trailer at all.');
+      const result = tasks('handoff');
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('pick up the real work here');
+      expect(result.stdout).toContain(withTrailer.slice(0, 7));
+      expect(result.stdout).toContain('1 commit back');
+    });
+  });
+
+  it('handoff reports no Next: trailer found when none exists in recent history', () => {
+    gitFixture(({ commit, tasks }) => {
+      commit('Only subject, no body or trailer.');
+      const result = tasks('handoff');
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('no Next: trailer found');
     });
   });
 
