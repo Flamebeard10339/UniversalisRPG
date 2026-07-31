@@ -955,6 +955,9 @@ interface AuditArgs {
   baseBranch: string;
   proofs: Map<number, Verdict>;
   evidence: Map<number, string>;
+  // Files named for an unmet proof clause — where the undelivered task
+  // this pass creates for it should tell the next session to start.
+  clauseFiles: Map<number, string[]>;
   findings: AuditFinding[];
 }
 
@@ -964,11 +967,18 @@ const CONFIG_FLAG_NAMES = new Set(['store', 'systems', 'specs-dir', 'branch']);
 // generic parseArgs collapses a repeated flag to its last value, and a
 // --finding's --severity/--system/--file belong to whichever --finding
 // came most recently, which a flat key-value map cannot express.
+//
+// --file is overloaded by position: while no --finding has been seen yet
+// it is clause-scoped and takes the same `N=value` shape as --proof and
+// --evidence (`--file 2=src/save.ts:88`); once a --finding is open it
+// attaches to that finding instead and takes a bare path, matching the
+// pre-existing behaviour.
 function parseAuditArgs(args: string[]): AuditArgs {
   const configFlags: Record<string, string> = {};
   let baseBranch = 'main';
   const proofs = new Map<number, Verdict>();
   const evidence = new Map<number, string>();
+  const clauseFiles = new Map<number, string[]>();
   const findings: AuditFinding[] = [];
   let slug: string | null = null;
   let current: AuditFinding | null = null;
@@ -1001,13 +1011,21 @@ function parseAuditArgs(args: string[]): AuditArgs {
       current.system = value ?? null;
     } else if (key === 'file' && current) {
       current.files.push(value ?? '');
+    } else if (key === 'file') {
+      const eq = (value ?? '').indexOf('=');
+      if (eq === -1) continue;
+      const clause = Number((value ?? '').slice(0, eq));
+      const filePath = (value ?? '').slice(eq + 1);
+      const existing = clauseFiles.get(clause) ?? [];
+      existing.push(filePath);
+      clauseFiles.set(clause, existing);
     }
   }
-  return { slug, configFlags, baseBranch, proofs, evidence, findings };
+  return { slug, configFlags, baseBranch, proofs, evidence, clauseFiles, findings };
 }
 
 const AUDIT_USAGE =
-  'usage: tasks audit <spec> [--proof N=met|unmet ...] [--evidence N="..." ...] [--finding "..." --severity high|medium|low --system "<name>" [--file path:line ...]]...  (with no --proof flags, walks the clauses interactively)';
+  'usage: tasks audit <spec> [--proof N=met|unmet ...] [--evidence N="..." ...] [--file N=path:line ...] [--finding "..." --severity high|medium|low --system "<name>" [--file path:line ...]]...  (with no --proof flags, walks the clauses interactively)';
 
 async function walkClausesInteractively(clauses: { index: number; text: string }[]): Promise<AuditVerdict[]> {
   const rl = createInterface({ input: process.stdin, output: process.stdout });
@@ -1111,7 +1129,7 @@ async function cmdAudit(rawArgs: string[]): Promise<void> {
       system: null,
       spec: slug,
       requires: [],
-      files: [],
+      files: parsed.clauseFiles.get(verdict.clause) ?? [],
       deliverable: clauseText,
       evidence: verdict.evidence,
       source: { spec: slug, pass: passNumber },

@@ -143,7 +143,9 @@ worse work than one that reads too much.
 - **Named at the moment of finding, never maintained afterwards.** An auditor passes `--file` for
   what it actually read to reach the finding, and `import` harvests `path/to/file.ts:123` out of the
   22 legacy documents, which are already dense with them. Nobody revisits the list later: a
-  hand-maintained list rots, and a rotted list that agents trust is worse than no list at all.
+  hand-maintained list rots, and a rotted list that agents trust is worse than no list at all. An
+  `unmet` proof clause takes the same flag, `--file N=path`, naming where the `undelivered` task it
+  creates should tell the next session to start.
 - **Paths are the contract; line numbers are a decaying hint.** Never resolve an edit by line number.
 - **`tasks check` warns when a listed path no longer exists.** A task pointing at a deleted file has
   gone stale and should be re-read before it is worked.
@@ -160,6 +162,7 @@ non-interactive and one clause per flag:
 ```
 tasks audit task-system-v2 --proof 1=met --proof 2=unmet \
   --evidence 2="triage loses the queue on ^C; nothing is written until [q]" \
+  --file 2=scripts/tasks.ts:412 \
   --finding "..." --severity medium --system "Testing procedure" --file scripts/tasks.ts:412
 ```
 

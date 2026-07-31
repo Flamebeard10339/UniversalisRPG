@@ -695,12 +695,16 @@ describe('tasks CLI', () => {
         '2=unmet',
         '--evidence',
         '2=it does not actually hold',
+        '--file',
+        '2=src/runtime/save.ts:88',
         '--finding',
         'a fresh bug',
         '--severity',
         'medium',
         '--system',
         'Runtime',
+        '--deliverable',
+        'add a guard before dereferencing',
         '--file',
         'src/runtime/save.ts:1',
       );
@@ -716,9 +720,48 @@ describe('tasks CLI', () => {
       const undelivered = tasks('show', 'demo-spec-clause-2');
       expect(undelivered.stdout).toContain('[undelivered/open/high]');
       expect(undelivered.stdout).toContain('spec: demo-spec');
+      expect(undelivered.stdout).toContain('files: src/runtime/save.ts:88');
 
       const finding = tasks('spec', 'show', 'demo-spec');
       expect(finding.stdout).not.toContain('a fresh bug'); // findings are not spec members until promoted
+    });
+  });
+
+  it('--file on a proof clause carries multiple paths onto its undelivered task, and stays separate from a finding\'s own --file', () => {
+    fixture(({ tasks }) => {
+      tasks(
+        'audit',
+        'demo-spec',
+        '--proof',
+        '1=unmet',
+        '--evidence',
+        '1=nope',
+        '--file',
+        '1=src/runtime/save.ts:88',
+        '--file',
+        '1=src/runtime/save.test.ts',
+        '--proof',
+        '2=met',
+        '--finding',
+        'unrelated finding',
+        '--severity',
+        'low',
+        '--deliverable',
+        'unrelated fix',
+        '--file',
+        'src/ui/foo.ts:1',
+      );
+      const undelivered = tasks('show', 'demo-spec-clause-1');
+      expect(undelivered.stdout).toContain('files: src/runtime/save.ts:88, src/runtime/save.test.ts');
+      expect(undelivered.stdout).not.toContain('src/ui/foo.ts:1');
+    });
+  });
+
+  it('an unmet clause with no --file leaves the undelivered task with no files, unchanged', () => {
+    fixture(({ tasks }) => {
+      tasks('audit', 'demo-spec', '--proof', '1=unmet', '--evidence', '1=nope', '--proof', '2=met');
+      const undelivered = tasks('show', 'demo-spec-clause-1');
+      expect(undelivered.stdout).not.toContain('files:');
     });
   });
 
