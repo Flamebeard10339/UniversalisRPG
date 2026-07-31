@@ -290,6 +290,16 @@ triage, and the store will be the previous store with different file extensions.
   `git log --follow` spawned from inside a sort comparator.
 - **The spec's prose stays in markdown.** Escaped newlines in a JSON field are unreviewable, and the
   spec is the part a human actually reads.
+- **2026-07-31 — proof clause 2's "the store holds fewer than 40 open tasks" is a measurement of the
+  triage session's outcome, not a permanent cap on the store.** It is the proof that disposal
+  happened, for the specific population the whole document is about — the 125 imported findings —
+  not a ceiling on legitimate roadmap work added afterward by a different bootstrap step. Measured
+  at `0291c17` (immediately after triage, before the backlog migration): 21 open, 104 declined, from
+  125 total — met under either reading, since at that moment the store held nothing else. The
+  store's current total (`155` tasks, `51` open) includes 30 `kind:task` items migrated from
+  `backlog.md`'s settled feature specs and un-imported bugs, which are not findings and are not what
+  the audit-inflation problem this clause guards against is about. Recorded rather than resolved
+  silently, since the clause's wording alone does not disambiguate the two readings.
 
 ## Open questions
 
