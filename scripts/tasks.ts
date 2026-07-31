@@ -233,7 +233,7 @@ function validateContentFields(config: Config, tasks: Task[], flags: Record<stri
 }
 
 const ADD_USAGE =
-  'usage: tasks add "<title>" [--kind task|finding] [--severity high|medium|low] [--system "<name>"] [--spec <slug>] [--files a.ts:12,b.ts] [--requires id1,id2] [--deliverable "..."] [--evidence "..."] [--id <id>]';
+  'usage: tasks add "<title>" [--kind task|finding] [--severity high|medium|low] [--system "<name>"] [--spec <slug>] [--files a.ts:12,b.ts] [--requires id1,id2] [--deliverable "..." (required for --kind finding)] [--evidence "..."] [--id <id>]';
 
 function cmdAdd(args: Flags): void {
   const config = resolveConfig(args.flags);
@@ -247,6 +247,11 @@ function cmdAdd(args: Flags): void {
   const kind = (args.flags.kind as Kind | undefined) ?? 'task';
   if (kind !== 'task' && kind !== 'finding') {
     console.error(`error: --kind must be task or finding (undelivered tasks are only created by \`audit\`)`);
+    process.exitCode = 1;
+    return;
+  }
+  if (kind === 'finding' && !args.flags.deliverable) {
+    console.error('error: --deliverable is required for --kind finding — a finding must say what fixing it would mean');
     process.exitCode = 1;
     return;
   }
@@ -947,6 +952,7 @@ interface AuditFinding {
   severity: Severity | null;
   system: string | null;
   files: string[];
+  deliverable: string | null;
 }
 
 interface AuditArgs {
@@ -1003,12 +1009,14 @@ function parseAuditArgs(args: string[]): AuditArgs {
       const eq = (value ?? '').indexOf('=');
       evidence.set(Number((value ?? '').slice(0, eq)), (value ?? '').slice(eq + 1));
     } else if (key === 'finding') {
-      current = { title: value ?? '', severity: null, system: null, files: [] };
+      current = { title: value ?? '', severity: null, system: null, files: [], deliverable: null };
       findings.push(current);
     } else if (key === 'severity' && current) {
       current.severity = value as Severity;
     } else if (key === 'system' && current) {
       current.system = value ?? null;
+    } else if (key === 'deliverable' && current) {
+      current.deliverable = value ?? null;
     } else if (key === 'file' && current) {
       current.files.push(value ?? '');
     } else if (key === 'file') {
@@ -1025,7 +1033,7 @@ function parseAuditArgs(args: string[]): AuditArgs {
 }
 
 const AUDIT_USAGE =
-  'usage: tasks audit <spec> [--proof N=met|unmet ...] [--evidence N="..." ...] [--file N=path:line ...] [--finding "..." --severity high|medium|low --system "<name>" [--file path:line ...]]...  (with no --proof flags, walks the clauses interactively)';
+  'usage: tasks audit <spec> [--proof N=met|unmet ...] [--evidence N="..." ...] [--file N=path:line ...] [--finding "..." --severity high|medium|low --system "<name>" --deliverable "..." [--file path:line ...]]...  (with no --proof flags, walks the clauses interactively)';
 
 async function walkClausesInteractively(clauses: { index: number; text: string }[]): Promise<AuditVerdict[]> {
   const rl = createInterface({ input: process.stdin, output: process.stdout });
@@ -1104,6 +1112,11 @@ async function cmdAudit(rawArgs: string[]): Promise<void> {
       process.exitCode = 1;
       return;
     }
+    if (!finding.deliverable) {
+      console.error(`error: finding "${finding.title}" needs --deliverable "..." — a finding must say what fixing it would mean`);
+      process.exitCode = 1;
+      return;
+    }
   }
 
   const passNumber = doc.auditPasses.length + 1;
@@ -1154,7 +1167,7 @@ async function cmdAudit(rawArgs: string[]): Promise<void> {
       spec: null,
       requires: [],
       files: finding.files,
-      deliverable: null,
+      deliverable: finding.deliverable,
       evidence: null,
       source: { spec: slug, pass: passNumber },
       reason: null,

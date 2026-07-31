@@ -175,7 +175,9 @@ pass 2 onward triage will not offer promote for them.
 `audit <spec>` with no verdicts walks the clauses one at a time for a human doing it by hand.
 
 **Intake**
-- `add` — a task from nothing, for work that is not a finding.
+- `add` — a task from nothing, for work that is not a finding. `add --kind finding` and a
+  `--finding` passed to `audit` both require `--deliverable "..."` — a finding without a proposed
+  fix is a report, not something triage can act on.
 - `import <audit-doc>` — the migration path only, for the 22 legacy documents under `docs/audits/`.
   Findings under `## H1` / `## M2` / `## L3` become `unreviewed` tasks carrying their severity,
   system and `path:line` references. Nothing written under this model will need it.

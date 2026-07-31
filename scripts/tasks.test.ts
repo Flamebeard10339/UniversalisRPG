@@ -105,7 +105,7 @@ describe('tasks CLI', () => {
 
   it('a finding starts unreviewed and outside any spec, even with --spec passed', () => {
     fixture(({ tasks }) => {
-      tasks('add', 'checkSave crashes', '--kind', 'finding', '--severity', 'high', '--spec', 'demo-spec');
+      tasks('add', 'checkSave crashes', '--kind', 'finding', '--severity', 'high', '--spec', 'demo-spec', '--deliverable', 'loadSave refuses the malformed body instead of throwing');
       const shown = tasks('show', 'checksave-crashes');
       expect(shown.stdout).toContain('[finding/unreviewed/high]');
       expect(shown.stdout).toContain('spec: (deferred)');
@@ -117,6 +117,23 @@ describe('tasks CLI', () => {
       const result = tasks('add', 'sneaky', '--kind', 'undelivered');
       expect(result.status).toBe(1);
       expect(result.stderr).toContain('only created by `audit`');
+    });
+  });
+
+  it('refuses --kind finding without --deliverable, and the store is left unchanged', () => {
+    fixture(({ tasks }) => {
+      const result = tasks('add', 'a bug with no proposed fix', '--kind', 'finding', '--severity', 'high');
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain('--deliverable is required for --kind finding');
+      expect(tasks('list', '--kind', 'finding').stdout).toContain('0 task(s)');
+    });
+  });
+
+  it('--kind task (the default) does not require --deliverable', () => {
+    fixture(({ tasks }) => {
+      const result = tasks('add', 'a plain task', '--id', 'plain-task');
+      expect(result.status).toBe(0);
+      expect(tasks('show', 'plain-task').stdout).not.toContain('deliverable:');
     });
   });
 
@@ -236,7 +253,7 @@ describe('tasks CLI', () => {
   it('list defaults to not-closed (unreviewed + open), highest severity first, with a state summary', () => {
     fixture(({ tasks }) => {
       tasks('add', 'low task', '--id', 'low-task', '--severity', 'low');
-      tasks('add', 'high finding', '--id', 'high-finding', '--kind', 'finding', '--severity', 'high');
+      tasks('add', 'high finding', '--id', 'high-finding', '--kind', 'finding', '--severity', 'high', '--deliverable', 'fix it');
       tasks('add', 'closed task', '--id', 'closed-task');
       tasks('done', 'closed-task');
 
@@ -264,7 +281,7 @@ describe('tasks CLI', () => {
   it('list filters by severity, system, spec and kind', () => {
     fixture(({ tasks }) => {
       tasks('add', 'runtime high', '--id', 'runtime-high', '--severity', 'high', '--system', 'Runtime', '--spec', 'demo-spec');
-      tasks('add', 'ui low', '--id', 'ui-low', '--severity', 'low', '--system', 'UI', '--kind', 'finding');
+      tasks('add', 'ui low', '--id', 'ui-low', '--severity', 'low', '--system', 'UI', '--kind', 'finding', '--deliverable', 'fix it');
 
       expect(tasks('list', '--severity', 'high').stdout).toContain('runtime-high');
       expect(tasks('list', '--severity', 'high').stdout).not.toContain('ui-low');
@@ -318,7 +335,7 @@ describe('tasks CLI', () => {
 
   it('decline requires a reason and is refused for undelivered tasks', () => {
     fixture(({ tasks }) => {
-      tasks('add', 'stale finding', '--id', 'stale', '--kind', 'finding');
+      tasks('add', 'stale finding', '--id', 'stale', '--kind', 'finding', '--deliverable', 'fix it');
       const missingReason = tasks('decline', 'stale');
       expect(missingReason.status).toBe(1);
 
@@ -364,9 +381,9 @@ describe('tasks CLI', () => {
 
   it('triage promotes, defers and declines findings, saving after every decision', () => {
     fixture(({ tasks, triage }) => {
-      tasks('add', 'promote me', '--id', 'promote-me', '--kind', 'finding', '--severity', 'high', '--system', 'Runtime', '--evidence', 'evidence text');
-      tasks('add', 'defer me', '--id', 'defer-me', '--kind', 'finding', '--severity', 'medium');
-      tasks('add', 'decline me', '--id', 'decline-me', '--kind', 'finding', '--severity', 'low');
+      tasks('add', 'promote me', '--id', 'promote-me', '--kind', 'finding', '--severity', 'high', '--system', 'Runtime', '--evidence', 'evidence text', '--deliverable', 'fix it');
+      tasks('add', 'defer me', '--id', 'defer-me', '--kind', 'finding', '--severity', 'medium', '--deliverable', 'fix it');
+      tasks('add', 'decline me', '--id', 'decline-me', '--kind', 'finding', '--severity', 'low', '--deliverable', 'fix it');
 
       const result = triage('1\n2\n3\nstale, superseded by later work\n');
       expect(result.status).toBe(0);
@@ -380,8 +397,16 @@ describe('tasks CLI', () => {
   });
 
   it('triage displays evidence and deliverable labelled, saying so explicitly when there is no proposed fix', () => {
-    fixture(({ tasks, triage }) => {
-      tasks('add', 'no fix yet', '--id', 'no-fix-yet', '--kind', 'finding', '--severity', 'high', '--evidence', 'it breaks like this');
+    fixture(({ dir, triage }) => {
+      // A finding with no deliverable can no longer be created via `add`
+      // (the store predates that rule — 58 open tasks do exactly this, and
+      // triage still has to display them), so this one is written directly.
+      const storePath = path.join(dir, 'tasks.jsonl');
+      writeFileSync(
+        storePath,
+        `${JSON.stringify({ id: 'no-fix-yet', title: 'no fix yet', kind: 'finding', state: 'unreviewed', severity: 'high', system: null, spec: null, requires: [], files: [], deliverable: null, evidence: 'it breaks like this', source: null, reason: null, closed: null })}\n`,
+        'utf8',
+      );
       const result = triage('s\n');
       expect(result.stdout).toContain('evidence — what is broken:');
       expect(result.stdout).toContain('it breaks like this');
@@ -423,8 +448,8 @@ describe('tasks CLI', () => {
 
   it('triage quits early and leaves the rest unreviewed', () => {
     fixture(({ tasks, triage }) => {
-      tasks('add', 'first', '--id', 'first', '--kind', 'finding', '--severity', 'high');
-      tasks('add', 'second', '--id', 'second', '--kind', 'finding', '--severity', 'low');
+      tasks('add', 'first', '--id', 'first', '--kind', 'finding', '--severity', 'high', '--deliverable', 'fix it');
+      tasks('add', 'second', '--id', 'second', '--kind', 'finding', '--severity', 'low', '--deliverable', 'fix it');
 
       const result = triage('q\n');
       expect(result.stdout).toContain('2 unreviewed finding(s) left');
@@ -675,6 +700,24 @@ describe('tasks CLI', () => {
     });
   });
 
+  it('audit refuses a --finding with no --deliverable, recording nothing', () => {
+    fixture(({ tasks }) => {
+      const result = tasks('audit', 'demo-spec', '--proof', '1=met', '--proof', '2=met', '--finding', 'undeliverable bug', '--severity', 'high');
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain('needs --deliverable');
+      expect(tasks('list', '--kind', 'finding').stdout).toContain('0 task(s)');
+    });
+  });
+
+  it('audit carries a --finding\'s --deliverable onto the finding task it creates', () => {
+    fixture(({ tasks }) => {
+      tasks('audit', 'demo-spec', '--proof', '1=met', '--proof', '2=met', '--finding', 'a real bug', '--severity', 'high', '--deliverable', 'guard the null case');
+      const shown = tasks('list', '--kind', 'finding', '--state', 'unreviewed');
+      const id = shown.stdout.split('\n')[0].split(' ')[0];
+      expect(tasks('show', id).stdout).toContain('deliverable: guard the null case');
+    });
+  });
+
   it('audit refuses when a proof clause is missing a verdict', () => {
     fixture(({ tasks }) => {
       const result = tasks('audit', 'demo-spec', '--proof', '1=met');
@@ -815,7 +858,7 @@ describe('tasks CLI', () => {
   it('check --merge refuses when a promoted finding is still unreviewed', () => {
     fixture(({ tasks }) => {
       tasks('audit', 'demo-spec', '--proof', '1=met', '--proof', '2=met');
-      tasks('add', 'a finding', '--id', 'a-finding', '--kind', 'finding', '--severity', 'low');
+      tasks('add', 'a finding', '--id', 'a-finding', '--kind', 'finding', '--severity', 'low', '--deliverable', 'fix it');
       tasks('spec', 'add', 'demo-spec', 'a-finding');
       const result = tasks('check', '--merge');
       expect(result.status).toBe(1);
@@ -960,7 +1003,7 @@ describe('tasks CLI', () => {
   it('triage refuses to promote a finding sourced from an audit pass 2 or later', () => {
     fixture(({ tasks, triage }) => {
       tasks('audit', 'demo-spec', '--proof', '1=met', '--proof', '2=met');
-      tasks('audit', 'demo-spec', '--proof', '1=met', '--proof', '2=met', '--finding', 'late finding', '--severity', 'low');
+      tasks('audit', 'demo-spec', '--proof', '1=met', '--proof', '2=met', '--finding', 'late finding', '--severity', 'low', '--deliverable', 'fix it');
       const result = triage('1\n');
       expect(result.stdout).toContain('cannot be promoted');
       const shown = tasks('show', 'demo-spec-pass2-late-finding');
