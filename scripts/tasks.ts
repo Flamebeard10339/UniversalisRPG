@@ -696,56 +696,70 @@ async function cmdTriage(args: Flags): Promise<void> {
   };
 
   const total = queue.length;
-  for (let i = 0; i < queue.length; i++) {
+  outer: for (let i = 0; i < queue.length; i++) {
     const task = queue[i];
-    const severityTag = task.severity ? task.severity[0].toUpperCase() : '?';
-    console.log('');
-    console.log(`[${i + 1}/${total}]  ${severityTag}  ${task.system ?? '(no system)'}   ${task.title}`);
-    if (task.files.length > 0) console.log(`          ${task.files.join('   ')}`);
-    console.log('');
-    console.log('evidence — what is broken:');
-    printEvidence(task.evidence);
-    console.log('');
-    console.log('deliverable — the proposed fix:');
-    if (task.deliverable) printEvidence(task.deliverable);
-    else console.log('          no proposed fix recorded');
-    console.log('');
-    console.log('[1] promote   [2] defer   [3] decline   [s] skip   [q] save and quit');
+    // Redirect re-displays this same task and asks again rather than
+    // advancing, so displaying and deciding is a loop, not a single pass.
+    while (true) {
+      const severityTag = task.severity ? task.severity[0].toUpperCase() : '?';
+      console.log('');
+      console.log(`[${i + 1}/${total}]  ${severityTag}  ${task.system ?? '(no system)'}   ${task.title}`);
+      if (task.files.length > 0) console.log(`          ${task.files.join('   ')}`);
+      console.log('');
+      console.log('evidence — what is broken:');
+      printEvidence(task.evidence);
+      console.log('');
+      console.log('deliverable — the proposed fix:');
+      if (task.deliverable) printEvidence(task.deliverable);
+      else console.log('          no proposed fix recorded');
+      console.log('');
+      console.log('[1] promote   [2] defer   [3] decline   [4] redirect   [s] skip   [q] save and quit');
 
-    const answer = (await ask('> ')).trim().toLowerCase();
-    if (answer === 'q') break;
-    if (answer === '' || answer === 's') continue;
+      const answer = (await ask('> ')).trim().toLowerCase();
+      if (answer === 'q') break outer;
+      if (answer === '' || answer === 's') break;
 
-    if (answer === '1') {
-      if (spec === null) {
-        console.log('no active spec to promote into — pass --spec, skipping');
+      if (answer === '1') {
+        if (spec === null) {
+          console.log('no active spec to promote into — pass --spec, skipping');
+          break;
+        }
+        // Rule 6: pass 2 and later may defer or decline a finding, never
+        // promote — the only rule that terminates the audit-fix loop.
+        if (task.source !== null && task.source.pass >= 2) {
+          console.log(`pass ${task.source.pass} findings cannot be promoted — defer or decline, skipping`);
+          break;
+        }
+        task.state = 'open';
+        task.spec = spec;
+      } else if (answer === '2') {
+        task.state = 'open';
+        task.spec = null;
+      } else if (answer === '3') {
+        const reason = (await ask('reason: ')).trim();
+        if (reason === '') {
+          console.log('a reason is required to decline — skipping');
+          break;
+        }
+        task.state = 'declined';
+        task.reason = reason;
+        task.closed = today();
+      } else if (answer === '4') {
+        const replacement = (await ask('replacement deliverable: ')).trim();
+        if (replacement === '') {
+          console.log('empty — redirect cancelled');
+          continue;
+        }
+        task.deliverable = replacement;
+        saveStore(tasks, config.storePath);
         continue;
+      } else {
+        console.log('unrecognised input, skipping');
+        break;
       }
-      // Rule 6: pass 2 and later may defer or decline a finding, never
-      // promote — the only rule that terminates the audit-fix loop.
-      if (task.source !== null && task.source.pass >= 2) {
-        console.log(`pass ${task.source.pass} findings cannot be promoted — defer or decline, skipping`);
-        continue;
-      }
-      task.state = 'open';
-      task.spec = spec;
-    } else if (answer === '2') {
-      task.state = 'open';
-      task.spec = null;
-    } else if (answer === '3') {
-      const reason = (await ask('reason: ')).trim();
-      if (reason === '') {
-        console.log('a reason is required to decline — skipping');
-        continue;
-      }
-      task.state = 'declined';
-      task.reason = reason;
-      task.closed = today();
-    } else {
-      console.log('unrecognised input, skipping');
-      continue;
+      saveStore(tasks, config.storePath);
+      break;
     }
-    saveStore(tasks, config.storePath);
   }
   rl.close();
 

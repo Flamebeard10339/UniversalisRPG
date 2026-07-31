@@ -334,6 +334,28 @@ describe('tasks CLI', () => {
     });
   });
 
+  it('triage redirect replaces the deliverable, saves it, then re-asks for a decision on the same task', () => {
+    fixture(({ tasks, triage }) => {
+      tasks('add', 'wrong fix', '--id', 'wrong-fix', '--kind', 'finding', '--severity', 'high', '--deliverable', 'the wrong fix');
+      const result = triage('4\nthe right fix\n1\n');
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('0 unreviewed finding(s) left');
+      const shown = tasks('show', 'wrong-fix').stdout;
+      expect(shown).toContain('deliverable: the right fix');
+      expect(shown).toContain('spec: demo-spec');
+    });
+  });
+
+  it('triage redirect is cancelled by an empty response, leaving the deliverable and the queue unchanged', () => {
+    fixture(({ tasks, triage }) => {
+      tasks('add', 'wrong fix', '--id', 'wrong-fix', '--kind', 'finding', '--severity', 'high', '--deliverable', 'original fix');
+      const result = triage('4\n\ns\n');
+      expect(result.stdout).toContain('empty — redirect cancelled');
+      expect(result.stdout).toContain('1 unreviewed finding(s) left');
+      expect(tasks('show', 'wrong-fix').stdout).toContain('deliverable: original fix');
+    });
+  });
+
   it('triage quits early and leaves the rest unreviewed', () => {
     fixture(({ tasks, triage }) => {
       tasks('add', 'first', '--id', 'first', '--kind', 'finding', '--severity', 'high');
