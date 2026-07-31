@@ -58,6 +58,8 @@
         "scripts/play-cli.test.ts",
         "scripts/audit-status.ts",
         "scripts/layer-check.ts",
+        "scripts/tasks.ts",
+        "scripts/tasks.test.ts",
         "scripts/lib",
         ".claude/hooks",
         ".claude/settings.json",

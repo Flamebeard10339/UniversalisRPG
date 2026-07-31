@@ -15,6 +15,7 @@
     "play": "tsx scripts/play-cli.ts",
     "contribution:issue": "tsx scripts/publish-local-changes.ts",
     "contribution:squash": "tsx scripts/squash-local-changes.ts",
+    "tasks": "tsx scripts/tasks.ts",
     "modportal": "tsx scripts/modportal.ts"
   },
   "dependencies": {
