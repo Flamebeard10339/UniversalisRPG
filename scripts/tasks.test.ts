@@ -357,6 +357,17 @@ describe('tasks CLI', () => {
     });
   });
 
+  it('check --merge passes when the branch has no active spec at all — the gate is opt-in, not universal', () => {
+    fixture(({ dir }) => {
+      const storePath = path.join(dir, 'tasks.jsonl');
+      const systemsPath = path.join(dir, 'systems.json');
+      const specsDir = path.join(dir, 'specs');
+      const result = spawnSync(process.execPath, [tsx, script, 'check', '--merge', '--store', storePath, '--systems', systemsPath, '--specs-dir', specsDir, '--branch', 'no-such-spec-branch'], { cwd: repoRoot, encoding: 'utf8' });
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('not applicable');
+    });
+  });
+
   it('check --merge refuses when a promoted finding is still unreviewed', () => {
     fixture(({ tasks }) => {
       tasks('audit', 'demo-spec', '--proof', '1=met', '--proof', '2=met');

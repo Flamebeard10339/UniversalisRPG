@@ -15,8 +15,16 @@ export interface MergeGateInput {
 // The five refusal conditions from docs/specs/task-system-v2.md's Merge gate
 // section, as plain strings rather than an exit code — the caller decides
 // how loud to be.
+//
+// A branch with no active spec has made no promise this gate can check, so
+// it passes vacuously rather than refusing — this runs on every
+// pull_request (rule 9's "It cannot redden main"), and the workflow is
+// opt-in per branch: forcing every PR to open a spec first, on pain of a
+// red merge gate, is a far heavier requirement than the design describes
+// and would turn "the only gate being added" into one that blocks the team
+// far more broadly than the timer it replaces ever did.
 export function checkMergeGate(input: MergeGateInput): string[] {
-  if (input.spec === null) return ['no active spec for this branch, and no --spec given'];
+  if (input.spec === null) return [];
   if (!input.specExists || !input.doc) return [`spec file missing: docs/specs/${input.spec}.md`];
 
   const issues: string[] = [];

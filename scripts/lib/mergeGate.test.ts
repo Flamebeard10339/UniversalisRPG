@@ -58,8 +58,8 @@ describe('checkMergeGate', () => {
     expect(checkMergeGate(baseInput())).toEqual([]);
   });
 
-  it('refuses when there is no active spec', () => {
-    expect(checkMergeGate(baseInput({ spec: null }))).toEqual(['no active spec for this branch, and no --spec given']);
+  it('passes vacuously when there is no active spec — a branch that made no promise has nothing to check', () => {
+    expect(checkMergeGate(baseInput({ spec: null }))).toEqual([]);
   });
 
   it('refuses when the spec file is missing', () => {

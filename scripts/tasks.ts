@@ -154,12 +154,17 @@ function cmdCheck(flags: Record<string, string>): void {
   const doc = specExists ? parseSpecDoc(readFileSync(specPath!, 'utf8')) : null;
   const baseBranch = flags['base-branch'] ?? 'main';
 
+  if (spec === null) {
+    console.log('merge gate: not applicable — no active spec for this branch, and no --spec given');
+    return;
+  }
+
   const mergeIssues = checkMergeGate({
     spec,
     specExists,
     doc,
-    deliverableAtMergeBase: spec !== null ? deliverableAtMergeBase(config, spec, baseBranch) : null,
-    members: spec !== null ? tasks.filter((task) => task.spec === spec) : [],
+    deliverableAtMergeBase: deliverableAtMergeBase(config, spec, baseBranch),
+    members: tasks.filter((task) => task.spec === spec),
   });
   for (const issue of mergeIssues) console.error(`merge gate: ${issue}`);
   console.log(`merge gate: ${mergeIssues.length} issue(s)`);
