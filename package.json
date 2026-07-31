@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "prepare": "git config core.hooksPath .claude/hooks || true",
     "dev": "vite --open --configLoader runner",
     "dev:android": "concurrently \"vite --configLoader runner\" \"wait-on http://localhost:5173 && cap run android --livereload\"",
     "build": "tsc && vite build --configLoader runner",
