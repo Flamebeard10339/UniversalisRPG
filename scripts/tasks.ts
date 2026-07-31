@@ -4,6 +4,7 @@ import path from 'node:path';
 import { createInterface } from 'node:readline';
 import { pathToFileURL } from 'node:url';
 import { harvestFiles, parseAuditDoc, systemForDoc } from './lib/auditImport';
+import { checkCommitMessage, isExempt } from './lib/commitContract';
 import { checkMergeGate } from './lib/mergeGate';
 import { appendAuditPass, parseSpecDoc, type AuditVerdict, type Verdict } from './lib/specDoc';
 import { loadManifest, systemNames as manifestSystemNames } from './lib/systems';
@@ -877,6 +878,30 @@ function cmdHandoff(args: Flags): void {
   }
 }
 
+// Driven by .claude/hooks/commit-msg, which supplies what only git knows:
+// whether MERGE_HEAD/REVERT_HEAD exist, and the staged file list.
+function cmdCheckCommitMessage(args: Flags): void {
+  const config = resolveConfig(args.flags);
+  const msgFile = args.positional[0];
+  if (!msgFile) {
+    console.error('usage: tasks check-commit-msg <msg-file> [--merge-or-revert] [--files a,b,c]');
+    process.exitCode = 1;
+    return;
+  }
+  const message = readFileSync(msgFile, 'utf8');
+  const subject = message.split('\n')[0] ?? '';
+  const manifest = loadManifest(config.systemsPath);
+  const exempt = isExempt(subject, { isMergeOrRevert: args.flags['merge-or-revert'] === 'true', changedFiles: splitList(args.flags.files) }, manifest);
+  if (exempt) return;
+
+  const reason = checkCommitMessage(message);
+  if (reason) {
+    console.error(`commit-msg: ${reason}`);
+    console.error('every commit needs a body (what was done) and a Next: trailer (what the following session should pick up). --no-verify to bypass.');
+    process.exitCode = 1;
+  }
+}
+
 const USAGE = 'usage: npm run tasks -- <check|add|show|next|done|decline|import|triage|spec|audit|handoff> ...';
 
 export async function run(argv: string[]): Promise<void> {
@@ -905,6 +930,8 @@ export async function run(argv: string[]): Promise<void> {
       return cmdAudit(rest);
     case 'handoff':
       return cmdHandoff(args);
+    case 'check-commit-msg':
+      return cmdCheckCommitMessage(args);
     default:
       console.error(`unknown command: ${command ?? '(none)'}\n${USAGE}`);
       process.exitCode = 1;

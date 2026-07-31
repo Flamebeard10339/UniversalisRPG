@@ -21,7 +21,17 @@ function fixture(run: (context: { dir: string; args: (extra?: string[]) => strin
     mkdirSync(specsDir);
     writeFileSync(path.join(specsDir, 'demo-spec.md'), '# Demo spec\n\n## Deliverable\n\nSomething this branch promises.\n\nProof:\n\n- The first clause holds.\n- The second clause holds.\n\n## Decisions\n\n## Open questions\n\nNone.\n', 'utf8');
     const systemsPath = path.join(dir, 'systems.json');
-    writeFileSync(systemsPath, JSON.stringify({ systems: [{ name: 'Runtime' }, { name: 'UI' }] }), 'utf8');
+    writeFileSync(
+      systemsPath,
+      JSON.stringify({
+        unowned: { note: '', paths: ['docs', '*.md'] },
+        systems: [
+          { name: 'Runtime', paths: ['src/runtime'], lastAudit: null, lastAuditDoc: null, note: null },
+          { name: 'UI', paths: ['src/ui'], lastAudit: null, lastAuditDoc: null, note: null },
+        ],
+      }),
+      'utf8',
+    );
     const storePath = path.join(dir, 'tasks.jsonl');
     const globals = ['--store', storePath, '--systems', systemsPath, '--specs-dir', specsDir, '--branch', 'demo-spec'];
 
@@ -376,6 +386,52 @@ describe('tasks CLI', () => {
       expect(result.stdout).toContain('cannot be promoted');
       const shown = tasks('show', 'demo-spec-pass2-late-finding');
       expect(shown.stdout).toContain('spec: (deferred)');
+    });
+  });
+
+  it('check-commit-msg passes a subject, body, and Next: trailer', () => {
+    fixture(({ tasks, dir }) => {
+      const msgFile = path.join(dir, 'msg.txt');
+      writeFileSync(msgFile, 'Subject\n\nA body explaining the change.\n\nNext: pick up X.\n', 'utf8');
+      const result = tasks('check-commit-msg', msgFile);
+      expect(result.status).toBe(0);
+    });
+  });
+
+  it('check-commit-msg refuses a subject-only message', () => {
+    fixture(({ tasks, dir }) => {
+      const msgFile = path.join(dir, 'msg.txt');
+      writeFileSync(msgFile, 'Just a subject\n', 'utf8');
+      const result = tasks('check-commit-msg', msgFile);
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain('no body');
+    });
+  });
+
+  it('check-commit-msg is exempt for a merge or revert regardless of body', () => {
+    fixture(({ tasks, dir }) => {
+      const msgFile = path.join(dir, 'msg.txt');
+      writeFileSync(msgFile, 'Merge branch main\n', 'utf8');
+      const result = tasks('check-commit-msg', msgFile, '--merge-or-revert');
+      expect(result.status).toBe(0);
+    });
+  });
+
+  it('check-commit-msg is exempt when every changed file is unowned', () => {
+    fixture(({ tasks, dir }) => {
+      const msgFile = path.join(dir, 'msg.txt');
+      writeFileSync(msgFile, 'Update docs only\n', 'utf8');
+      const result = tasks('check-commit-msg', msgFile, '--files', 'docs/specs/demo-spec.md,README.md');
+      expect(result.status).toBe(0);
+    });
+  });
+
+  it('check-commit-msg is not exempt when even one changed file is owned', () => {
+    fixture(({ tasks, dir }) => {
+      const msgFile = path.join(dir, 'msg.txt');
+      writeFileSync(msgFile, 'Update docs and code\n', 'utf8');
+      const result = tasks('check-commit-msg', msgFile, '--files', 'docs/specs/demo-spec.md,src/runtime/save.ts');
+      expect(result.status).toBe(1);
     });
   });
 });
