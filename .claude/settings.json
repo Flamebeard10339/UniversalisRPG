@@ -10,19 +10,6 @@
           }
         ]
       }
-    ],
-    "PostToolUse": [
-      {
-        "matcher": "Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash .claude/hooks/audit-due.sh",
-            "timeout": 60,
-            "statusMessage": "Checking audit status"
-          }
-        ]
-      }
     ]
   }
 }

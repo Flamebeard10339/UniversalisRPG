@@ -1,5 +1,4 @@
 {
-  "threshold": 20,
   "unowned": {
     "note": "Deliberately chargeable to no system: prose, audit records, and the repo-wide manifests that change for every system's reasons and none of their own. Everything else must be owned, and audit-status fails when a tracked file is neither.",
     "paths": ["docs", ".claude/launch.json", ".gitignore", "package.json", "package-lock.json", "tsconfig.json", "*.md", ".planning"]
@@ -59,6 +58,8 @@
         "scripts/play-cli.test.ts",
         "scripts/audit-status.ts",
         "scripts/layer-check.ts",
+        "scripts/tasks.ts",
+        "scripts/tasks.test.ts",
         "scripts/lib",
         ".claude/hooks",
         ".claude/settings.json",
