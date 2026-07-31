@@ -317,3 +317,16 @@ whole once the MVP lands, to unblock the v0.2 push, and that is the natural mome
 guessing — that is the arbitrariness that killed the timer, and inventing a replacement number would
 repeat it exactly. Sweeps are requested by hand and logged; the cadence gets derived from how often
 that actually happens, after the MVP. Until then CLAUDE.md must not assert one.
+
+## Audit passes
+
+### Pass 1 — 2026-07-31
+
+- base: `eb29fb7319554467833486907b3d39d4c8ece574`
+- head: `297d847639cda94e82cb5ea6f4a4b25b894bd4e3`
+- proof 1: unmet — npm run tasks -- next/check measured 1.1-1.6s wall time against a 200-task store; a no-op invocation alone costs ~1.3s (tsx transpile-on-every-run), the query logic itself adds only ~100-200ms. node --experimental-strip-types cuts the same call to ~0.15s but needs Node 22.6+, and test.yml pins node-version: 20 - not a same-session fix.
+- proof 2: met
+- proof 3: met
+- proof 4: met
+- proof 5: met
+- proof 6: met
