@@ -14,7 +14,7 @@ interface Run {
   stderr: string;
 }
 
-function fixture(run: (context: { dir: string; args: (extra?: string[]) => string[]; tasks: (...args: string[]) => Run }) => void): void {
+function fixture(run: (context: { dir: string; args: (extra?: string[]) => string[]; tasks: (...args: string[]) => Run; triage: (input: string, extra?: string[]) => Run }) => void): void {
   const dir = mkdtempSync(path.join(os.tmpdir(), 'universalis-tasks-'));
   try {
     const specsDir = path.join(dir, 'specs');
@@ -30,6 +30,10 @@ function fixture(run: (context: { dir: string; args: (extra?: string[]) => strin
       args: (extra = []) => [...globals, ...extra],
       tasks: (...args: string[]) => {
         const result = spawnSync(process.execPath, [tsx, script, ...args, ...globals], { cwd: repoRoot, encoding: 'utf8' });
+        return { status: result.status ?? 1, stdout: result.stdout, stderr: result.stderr };
+      },
+      triage: (input: string, extra: string[] = []) => {
+        const result = spawnSync(process.execPath, [tsx, script, 'triage', ...extra, ...globals], { cwd: repoRoot, encoding: 'utf8', input });
         return { status: result.status ?? 1, stdout: result.stdout, stderr: result.stderr };
       },
     });
@@ -143,6 +147,54 @@ describe('tasks CLI', () => {
       const broken = tasks('check');
       expect(broken.status).toBe(1);
       expect(broken.stderr).toContain('system not in systems.json');
+    });
+  });
+
+  it('import parses H/M/L findings out of an audit doc into unreviewed tasks, and is idempotent on re-run', () => {
+    fixture(({ tasks, dir }) => {
+      const docPath = path.join(dir, 'runtime-2026-08-01.md');
+      writeFileSync(docPath, ['## H1 — a real bug', 'src/runtime/save.ts:88 is where it lives.', '', '## L1 — a minor thing', 'body.'].join('\n'), 'utf8');
+
+      const first = tasks('import', docPath);
+      expect(first.status).toBe(0);
+      expect(first.stdout).toContain('imported 2 finding(s)');
+
+      const shown = tasks('show', 'runtime-2026-08-01-h1');
+      expect(shown.stdout).toContain('[finding/unreviewed/high]');
+      expect(shown.stdout).toContain('system: Runtime');
+      expect(shown.stdout).toContain(`files: ${docPath}#H1`);
+
+      const second = tasks('import', docPath);
+      expect(second.stdout).toContain('imported 0 finding(s)');
+      expect(second.stdout).toContain('2 already present, skipped');
+    });
+  });
+
+  it('triage promotes, defers and declines findings, saving after every decision', () => {
+    fixture(({ tasks, triage }) => {
+      tasks('add', 'promote me', '--id', 'promote-me', '--kind', 'finding', '--severity', 'high', '--system', 'Runtime', '--evidence', 'evidence text');
+      tasks('add', 'defer me', '--id', 'defer-me', '--kind', 'finding', '--severity', 'medium');
+      tasks('add', 'decline me', '--id', 'decline-me', '--kind', 'finding', '--severity', 'low');
+
+      const result = triage('1\n2\n3\nstale, superseded by later work\n');
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('0 unreviewed finding(s) left');
+
+      expect(tasks('show', 'promote-me').stdout).toContain('spec: demo-spec');
+      expect(tasks('show', 'defer-me').stdout).toContain('spec: (deferred)');
+      const declined = tasks('show', 'decline-me').stdout;
+      expect(declined).toContain('reason: stale, superseded by later work');
+    });
+  });
+
+  it('triage quits early and leaves the rest unreviewed', () => {
+    fixture(({ tasks, triage }) => {
+      tasks('add', 'first', '--id', 'first', '--kind', 'finding', '--severity', 'high');
+      tasks('add', 'second', '--id', 'second', '--kind', 'finding', '--severity', 'low');
+
+      const result = triage('q\n');
+      expect(result.stdout).toContain('2 unreviewed finding(s) left');
+      expect(tasks('show', 'first').stdout).toContain('unreviewed');
     });
   });
 });

@@ -1,6 +1,9 @@
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
+import path from 'node:path';
+import { createInterface } from 'node:readline';
 import { pathToFileURL } from 'node:url';
+import { harvestFiles, parseAuditDoc, systemForDoc } from './lib/auditImport';
 import {
   checkStore,
   DEFAULT_STORE_PATH,
@@ -8,6 +11,7 @@ import {
   isBlocked,
   loadStore,
   saveStore,
+  unreviewedQueue,
   type Kind,
   type Severity,
   type State,
@@ -297,9 +301,147 @@ function cmdDecline(args: Flags): void {
   console.log(`declined ${id}`);
 }
 
-const USAGE = 'usage: npm run tasks -- <check|add|show|next|done|decline> ...';
+// The migration path only, for the 22 legacy documents under docs/audits/.
+// Findings under `## H1` / `## M2` / `## L3` become unreviewed tasks; every
+// other heading shape in those docs (Tier N, HIGH/MEDIUM/LOW, Findings) is a
+// superseded or reconciliation format and is silently left unimported.
+function cmdImport(args: Flags): void {
+  const config = resolveConfig(args.flags);
+  const docPath = args.positional[0];
+  if (!docPath) {
+    console.error('usage: tasks import <audit-doc>');
+    process.exitCode = 1;
+    return;
+  }
+  if (!existsSync(docPath)) {
+    console.error(`error: no such file: ${docPath}`);
+    process.exitCode = 1;
+    return;
+  }
 
-export function run(argv: string[]): void {
+  const basename = path.basename(docPath).replace(/\.md$/, '');
+  const system = systemForDoc(basename);
+  const findings = parseAuditDoc(readFileSync(docPath, 'utf8'));
+
+  const tasks = loadStore(config.storePath);
+  const taken = new Set(tasks.map((task) => task.id));
+  let imported = 0;
+  let skipped = 0;
+  for (const finding of findings) {
+    const id = `${basename}-${finding.code.toLowerCase()}`;
+    if (taken.has(id)) {
+      skipped++;
+      continue;
+    }
+    const task: Task = {
+      id,
+      title: finding.title,
+      kind: 'finding',
+      state: 'unreviewed',
+      severity: finding.severity,
+      system,
+      spec: null,
+      requires: [],
+      files: [`${docPath}#${finding.code}`, ...harvestFiles(finding.body, existsSync)],
+      deliverable: null,
+      evidence: finding.body,
+      source: null,
+      reason: null,
+      closed: null,
+    };
+    tasks.push(task);
+    taken.add(id);
+    imported++;
+  }
+  saveStore(tasks, config.storePath);
+
+  const skippedNote = skipped > 0 ? ` (${skipped} already present, skipped)` : '';
+  const systemNote = system === null && findings.length > 0 ? ' — no system mapping for this doc name, system left null' : '';
+  console.log(`imported ${imported} finding(s) from ${docPath}${skippedNote}${systemNote}`);
+}
+
+function printEvidence(evidence: string | null, maxLines = 12): void {
+  if (!evidence) return;
+  const lines = evidence.split('\n');
+  for (const line of lines.slice(0, maxLines)) console.log(`          ${line}`);
+  if (lines.length > maxLines) console.log(`          … (${lines.length - maxLines} more line(s), see \`tasks show\`)`);
+}
+
+// A human, not the auditor, assigns state — this is the only place that
+// happens. promote/defer/decline all persist immediately, not just on quit,
+// so a queue this long survives an interrupted session.
+async function cmdTriage(args: Flags): Promise<void> {
+  const config = resolveConfig(args.flags);
+  const spec = args.flags.spec ?? currentSpec(config);
+  const tasks = loadStore(config.storePath);
+  const queue = unreviewedQueue(tasks);
+  if (queue.length === 0) {
+    console.log('no unreviewed findings');
+    return;
+  }
+
+  const rl = createInterface({ input: process.stdin, output: process.stdout });
+  // rl.question()'s once('line') listener drops any line that arrives before
+  // the next question() call registers it — real under piped/batched input,
+  // where every answer can already be buffered before we ask for the first
+  // one. The async iterator's internal queue does not have that race.
+  const lines = rl[Symbol.asyncIterator]();
+  const ask = async (prompt: string): Promise<string> => {
+    process.stdout.write(prompt);
+    const next = await lines.next();
+    return next.done ? 'q' : next.value;
+  };
+
+  const total = queue.length;
+  for (let i = 0; i < queue.length; i++) {
+    const task = queue[i];
+    const severityTag = task.severity ? task.severity[0].toUpperCase() : '?';
+    console.log('');
+    console.log(`[${i + 1}/${total}]  ${severityTag}  ${task.system ?? '(no system)'}   ${task.title}`);
+    if (task.files.length > 0) console.log(`          ${task.files.join('   ')}`);
+    console.log('');
+    printEvidence(task.evidence);
+    console.log('');
+    console.log('[1] promote   [2] defer   [3] decline   [s] skip   [q] save and quit');
+
+    const answer = (await ask('> ')).trim().toLowerCase();
+    if (answer === 'q') break;
+    if (answer === '' || answer === 's') continue;
+
+    if (answer === '1') {
+      if (spec === null) {
+        console.log('no active spec to promote into — pass --spec, skipping');
+        continue;
+      }
+      task.state = 'open';
+      task.spec = spec;
+    } else if (answer === '2') {
+      task.state = 'open';
+      task.spec = null;
+    } else if (answer === '3') {
+      const reason = (await ask('reason: ')).trim();
+      if (reason === '') {
+        console.log('a reason is required to decline — skipping');
+        continue;
+      }
+      task.state = 'declined';
+      task.reason = reason;
+      task.closed = today();
+    } else {
+      console.log('unrecognised input, skipping');
+      continue;
+    }
+    saveStore(tasks, config.storePath);
+  }
+  rl.close();
+
+  const remaining = tasks.filter((task) => task.state === 'unreviewed').length;
+  console.log(`\n${remaining} unreviewed finding(s) left`);
+}
+
+const USAGE = 'usage: npm run tasks -- <check|add|show|next|done|decline|import|triage> ...';
+
+export async function run(argv: string[]): Promise<void> {
   const [command, ...rest] = argv;
   const args = parseArgs(rest);
   switch (command) {
@@ -315,6 +457,10 @@ export function run(argv: string[]): void {
       return cmdDone(args);
     case 'decline':
       return cmdDecline(args);
+    case 'import':
+      return cmdImport(args);
+    case 'triage':
+      return cmdTriage(args);
     default:
       console.error(`unknown command: ${command ?? '(none)'}\n${USAGE}`);
       process.exitCode = 1;
@@ -322,5 +468,5 @@ export function run(argv: string[]): void {
 }
 
 if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  run(process.argv.slice(2));
+  await run(process.argv.slice(2));
 }
