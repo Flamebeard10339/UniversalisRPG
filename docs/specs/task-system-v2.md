@@ -209,7 +209,8 @@ neither done nor declined, and names it), `spec amend <slug> --reason "..."` (ar
 `## Deliverable` under `## Amendments`, leaving the live section open to edit — the sanctioned way to
 change a frozen deliverable mid-branch).
 
-**Handoff** — `handoff` prints the last commit's `Next:` line, the current spec's deliverable, the
+**Handoff** — `handoff` prints the last commit's `Next:` line, the current spec's proof clauses
+(numbered, truncated, not the whole `## Deliverable` prose that never changes between runs), the
 open fix-now tasks and their files. This is the first command of a cold session.
 
 **Integrity** — `check`, fast enough for CI: every id unique, every `requires` resolvable, no cycle,

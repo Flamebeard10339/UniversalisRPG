@@ -841,11 +841,39 @@ function cmdImport(args: Flags): void {
   console.log(`imported ${imported} finding(s) from ${docPath}${skippedNote}${systemNote}`);
 }
 
+const EVIDENCE_INDENT = '          ';
+const EVIDENCE_WRAP_WIDTH = 78 - EVIDENCE_INDENT.length;
+
+// Greedy word wrap: text written through `add`/`edit` carries no line
+// breaks of its own, so without this every finding's evidence or
+// deliverable prints as one unbroken line — true of all twelve findings
+// currently in the store.
+function wrapText(text: string, width: number): string[] {
+  if (text.length <= width) return [text];
+  const wrapped: string[] = [];
+  let current = '';
+  for (const word of text.split(' ')) {
+    const candidate = current === '' ? word : `${current} ${word}`;
+    if (candidate.length > width && current !== '') {
+      wrapped.push(current);
+      current = word;
+    } else {
+      current = candidate;
+    }
+  }
+  wrapped.push(current);
+  return wrapped;
+}
+
+function truncateLine(text: string, max = 100): string {
+  return text.length > max ? `${text.slice(0, max - 1)}…` : text;
+}
+
 function printEvidence(evidence: string | null, maxLines = 12): void {
   if (!evidence) return;
-  const lines = evidence.split('\n');
-  for (const line of lines.slice(0, maxLines)) console.log(`          ${line}`);
-  if (lines.length > maxLines) console.log(`          … (${lines.length - maxLines} more line(s), see \`tasks show\`)`);
+  const lines = evidence.split('\n').flatMap((line) => wrapText(line, EVIDENCE_WRAP_WIDTH));
+  for (const line of lines.slice(0, maxLines)) console.log(`${EVIDENCE_INDENT}${line}`);
+  if (lines.length > maxLines) console.log(`${EVIDENCE_INDENT}… (${lines.length - maxLines} more line(s), see \`tasks show\`)`);
 }
 
 // A human, not the auditor, assigns state — this is the only place that
@@ -1248,7 +1276,10 @@ function cmdHandoff(args: Flags): void {
   }
   const doc = parseSpecDoc(readFileSync(path_, 'utf8'));
   console.log('');
-  console.log(doc.deliverableSection);
+  // The proof clauses, not the whole ## Deliverable section: the section's
+  // prose never changes between runs, and what a cold session needs from
+  // it — what the branch still owes — is exactly what the clauses are.
+  for (const clause of doc.proofClauses) console.log(`  ${clause.index}. ${truncateLine(clause.text)}`);
   console.log('');
 
   const queue = fixNowQueue(tasks, spec);

@@ -424,6 +424,19 @@ describe('tasks CLI', () => {
     });
   });
 
+  it('printEvidence wraps long text onto multiple indented lines, instead of one unbroken line, for both evidence and deliverable', () => {
+    fixture(({ tasks, triage }) => {
+      const longText = "loadSave gives activeAction, player and activeBuffs no check past isObject, so a body whose ids are all real but whose cadences is absent crashes the validator that exists to prevent it.";
+      tasks('add', 'checkSave crashes', '--id', 'checksave-crashes', '--kind', 'finding', '--severity', 'high', '--evidence', longText, '--deliverable', longText);
+      const result = triage('s\n');
+      expect(result.stdout).not.toContain(longText);
+
+      const indented = result.stdout.split('\n').filter((line) => line.startsWith('          ') && line.trim().length > 0);
+      expect(indented.length).toBeGreaterThan(2); // multiple wrapped lines each for evidence and deliverable
+      for (const line of indented) expect(line.length).toBeLessThanOrEqual(78);
+    });
+  });
+
   it('triage redirect replaces the deliverable, saves it, then re-asks for a decision on the same task', () => {
     fixture(({ tasks, triage }) => {
       tasks('add', 'wrong fix', '--id', 'wrong-fix', '--kind', 'finding', '--severity', 'high', '--deliverable', 'the wrong fix');
@@ -873,8 +886,30 @@ describe('tasks CLI', () => {
       expect(result.status).toBe(0);
       expect(result.stdout).toContain('branch: demo-spec');
       expect(result.stdout).toContain('spec: demo-spec');
-      expect(result.stdout).toContain('The first clause holds.');
+      expect(result.stdout).toContain('1. The first clause holds.');
+      expect(result.stdout).toContain('2. The second clause holds.');
       expect(result.stdout).toContain('open-task');
+    });
+  });
+
+  it('handoff prints proof clauses numbered and truncated, not the whole ## Deliverable prose', () => {
+    fixture(({ tasks, dir }) => {
+      const longClause = 'x'.repeat(150);
+      writeFileSync(path.join(dir, 'specs', 'demo-spec.md'), `# Demo spec\n\n## Deliverable\n\nProse that should not appear in handoff's output at all.\n\nProof:\n\n- ${longClause}\n\n## Decisions\n\n## Open questions\n\nNone.\n`, 'utf8');
+      const result = tasks('handoff');
+      expect(result.status).toBe(0);
+      expect(result.stdout).not.toContain('Prose that should not appear');
+      expect(result.stdout).toContain('1. ' + 'x'.repeat(99) + '…');
+      expect(result.stdout).not.toContain(longClause);
+    });
+  });
+
+  it('handoff stays well under the 40-line cap proof clause 6 sets', () => {
+    fixture(({ tasks }) => {
+      tasks('add', 'open task', '--id', 'open-task', '--spec', 'demo-spec', '--severity', 'high');
+      const result = tasks('handoff');
+      const lineCount = result.stdout.split('\n').filter((line) => line.length > 0).length;
+      expect(lineCount).toBeLessThan(40);
     });
   });
 
