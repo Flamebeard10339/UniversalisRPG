@@ -105,7 +105,9 @@ export function checkStore(tasks: Task[], systems: string[], specExists: (spec: 
     if (task.system !== null && !systems.includes(task.system)) issues.push({ level: 'error', message: `${task.id} has a system not in systems.json: ${task.system}` });
     if (task.spec !== null && !specExists(task.spec)) issues.push({ level: 'error', message: `${task.id} references a spec with no file: ${task.spec}` });
     for (const file of task.files) {
-      const path = file.split(':')[0];
+      // A doc backlink is `path#H1`, a code reference is `path:88` — strip
+      // whichever suffix is present before checking the path itself exists.
+      const path = file.split(/[:#]/)[0];
       if (!existsSync(path)) issues.push({ level: 'warning', message: `${task.id} lists a file that no longer exists: ${file}` });
     }
   }

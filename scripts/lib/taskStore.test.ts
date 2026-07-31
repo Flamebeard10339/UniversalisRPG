@@ -164,4 +164,15 @@ describe('checkStore', () => {
     const issues = checkStore([task({ id: 'a', files: ['no/such/file.ts:12'] })], systems);
     expect(issues).toEqual([{ level: 'warning', message: 'a lists a file that no longer exists: no/such/file.ts:12' }]);
   });
+
+  it('resolves the path out of a doc backlink (path#H1) rather than checking the anchored string itself', () => {
+    // docs/audits/systems.json is a real file in this repo's own checkout,
+    // so a #anchor suffix on it must not warn — only a code reference's
+    // `:line` suffix was being stripped before this fix.
+    const clean = checkStore([task({ id: 'a', files: ['docs/audits/systems.json#H1'] })], systems);
+    expect(clean).toEqual([]);
+
+    const missing = checkStore([task({ id: 'b', files: ['docs/audits/no-such-doc.md#H1'] })], systems);
+    expect(missing).toEqual([{ level: 'warning', message: 'b lists a file that no longer exists: docs/audits/no-such-doc.md#H1' }]);
+  });
 });
