@@ -1,8 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { armAction, createGameState, equip, GameState, initResources, resolve, statRange, statValue, unequip } from './runtime';
+import { armAction, createGameState, equip, GameState, initResources, resolve, unequip } from './runtime';
 import { loadModule, loadUniverse, Registry } from '../content/registry';
 import { secondsToMs, toMilliUnits } from './units';
-import { PLAYER } from './state';
 
 const MODULE = `
 # stat attack
@@ -31,6 +30,13 @@ entities: target
 stats: max-health 100000, dodge 0
 strike:
   repeating
+  time: 60
+  speed: attack-rate
+  target: health
+  ability: attack
+  dr: defense
+bite:
+  retaliates
   time: 60
   speed: attack-rate
   target: health
@@ -92,17 +98,31 @@ describe('equipment', () => {
     expect(equippedDamage).toBeGreaterThan(bareDamage);
   });
 
-  it('equipment-slots: an equipped +defense item raises the defense stat', () => {
+  // Through the foe's retaliation rather than through the stat: the deliverable
+  // asks whether the shield changes damage taken, and a stat that moves without
+  // reaching `dr` would satisfy a stat assertion while changing nothing.
+  it('equipment-slots: an equipped +defense item lowers incoming damage, a carried one does not', () => {
     const registry = loaded();
-    const state = createGameState('arena');
-    initResources(state, registry);
+    const ATTEMPTS = 100;
 
-    const bareDefense = statValue('defense', state, registry, PLAYER);
-    state.inventory['defense-bonus'] = 1;
-    equip(state, registry, 'defense-bonus');
-    const equippedDefense = statValue('defense', state, registry, PLAYER);
+    const bareState = fighting(registry, 'target');
+    resolve(bareState, registry, secondsToMs(ATTEMPTS));
+    const bareTaken = damageTaken(bareState);
 
-    expect(equippedDefense).toBeGreaterThan(bareDefense);
+    const carriedState = fighting(registry, 'target');
+    carriedState.inventory['defense-bonus'] = 1;
+    resolve(carriedState, registry, secondsToMs(ATTEMPTS));
+    const carriedTaken = damageTaken(carriedState);
+
+    const equippedState = fighting(registry, 'target');
+    equippedState.inventory['defense-bonus'] = 1;
+    equip(equippedState, registry, 'defense-bonus');
+    resolve(equippedState, registry, secondsToMs(ATTEMPTS));
+    const equippedTaken = damageTaken(equippedState);
+
+    expect(bareTaken).toBeGreaterThan(0);
+    expect(carriedTaken).toBe(bareTaken);
+    expect(equippedTaken).toBeLessThan(bareTaken);
   });
 
   it('equipment-slots: tutorial equipment is equippable and changes stats when equipped', () => {

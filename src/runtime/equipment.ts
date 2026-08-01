@@ -1,4 +1,4 @@
-import { GameState, PLAYER, RuntimeError } from './state';
+import { GameState, RuntimeError } from './state';
 import { Registry } from '../content/registry';
 
 export function equip(state: GameState, registry: Registry, itemId: string): void {

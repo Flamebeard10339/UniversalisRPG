@@ -156,13 +156,10 @@ export function pruneStateForRegistry(state: GameState, registry: Registry): Pru
 
   for (const [slot, itemId] of Object.entries(state.equipped)) {
     const item = registry.items.get(itemId);
-    if (!item) {
-      delete state.equipped[slot];
-      addWarning(warnings, `equipped.${slot}`, itemId, `Removed equipped item ${itemId} from slot ${slot} because the item is not loaded.`);
-    } else if (item.slot !== slot) {
-      delete state.equipped[slot];
-      addWarning(warnings, `equipped.${slot}`, itemId, `Removed equipped item ${itemId} from slot ${slot} because the item no longer declares that slot.`);
-    }
+    const missing = !item ? `item ${itemId} is not loaded` : item.slot !== slot ? `item ${itemId} no longer declares that slot` : undefined;
+    if (!missing) continue;
+    delete state.equipped[slot];
+    addWarning(warnings, `equipped.${slot}`, itemId, `Unequipped ${slot} because its ${missing}.`);
   }
 
   const activeProblem = activeActionProblem(state, registry);

@@ -13,41 +13,42 @@ export function hitChance(accuracy: number, evasion: number, registry: Registry)
   return 1 / (1 + 10 ** ((evasion - accuracy) / contestSpread(registry)));
 }
 
-function foldStatBonusTag(tag: TagClause, statId: string, added: Range, increased: number): { added: Range; increased: number } {
-  if (tag.kind !== 'stat-bonus' || tag.statId !== statId) return { added, increased };
-  if (tag.percent) return { added, increased: increased + tag.amount / 100 };
-  return { added: addRanges(added, tag.amount), increased };
+interface StatFold {
+  added: Range;
+  increased: number;
+}
+
+function foldStatBonuses(tags: readonly TagClause[], statId: string, fold: StatFold): void {
+  for (const tag of tags) {
+    if (tag.kind !== 'stat-bonus' || tag.statId !== statId) continue;
+    if (tag.percent) fold.increased += tag.amount / 100;
+    else fold.added = addRanges(fold.added, tag.amount);
+  }
 }
 
 export function statRange(statId: string, state: GameState, registry: Registry, actorId: string = PLAYER): Range {
-  let added = registry.entities.get(actorId)?.stats[statId] ?? registry.stats.get(statId)?.base ?? point(0);
-  let increased = 0;
+  const fold: StatFold = {
+    added: registry.entities.get(actorId)?.stats[statId] ?? registry.stats.get(statId)?.base ?? point(0),
+    increased: 0,
+  };
   if (actorId === PLAYER) {
     for (const buff of Object.values(state.activeBuffs)) {
       if (buff.statId !== statId) continue;
-      if (buff.kind === 'added') added = addRanges(added, buff.amount);
-      else increased += buff.amount;
+      if (buff.kind === 'added') fold.added = addRanges(fold.added, buff.amount);
+      else fold.increased += buff.amount;
     }
     if (state.activeAction) {
-      const action = findActiveAction(state.activeAction, registry);
-      for (const tag of action.tags ?? []) {
-        const result = foldStatBonusTag(tag, statId, added, increased);
-        added = result.added;
-        increased = result.increased;
-      }
+      foldStatBonuses(findActiveAction(state.activeAction, registry).tags ?? [], statId, fold);
     }
+    // Equipped but no longer carried contributes nothing, so a `take:` that
+    // removes the last copy needs no second write to keep the slot honest.
     for (const itemId of Object.values(state.equipped)) {
       if ((state.inventory[itemId] ?? 0) === 0) continue;
       const item = registry.items.get(itemId);
-      if (!item) continue;
-      for (const tag of item.tags ?? []) {
-        const result = foldStatBonusTag(tag, statId, added, increased);
-        added = result.added;
-        increased = result.increased;
-      }
+      if (item) foldStatBonuses(item.tags, statId, fold);
     }
   }
-  return scaleRange(added, 1 + increased);
+  return scaleRange(fold.added, 1 + fold.increased);
 }
 
 // Midpoint, not a sample: pool ceilings and durations must not jitter.
