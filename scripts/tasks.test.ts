@@ -1204,6 +1204,36 @@ describe('tasks CLI', () => {
     });
   });
 
+  it('handoff does not reach past the branch point for a trailer that belongs to other work', () => {
+    gitFixture(({ dir, commit, tasks }) => {
+      commit('Previous branch landed\n\nA body.\n\nNext: start the combat continuation, a different branch entirely.');
+      spawnSync('git', ['branch', '-M', 'main'], { cwd: dir });
+      spawnSync('git', ['checkout', '-q', '-b', 'demo-spec'], { cwd: dir });
+      commit('Created new task\n\nA body, but no trailer of its own yet.');
+
+      const result = tasks('handoff');
+      expect(result.status).toBe(0);
+      expect(result.stdout).not.toContain('combat continuation');
+      expect(result.stdout).toContain('no Next: trailer yet on this branch');
+    });
+  });
+
+  it('handoff still walks back within the branch, so a trailerless commit does not hide the branch\'s own plan', () => {
+    gitFixture(({ dir, commit, tasks }) => {
+      commit('Previous branch landed\n\nA body.\n\nNext: start the combat continuation, a different branch entirely.');
+      spawnSync('git', ['branch', '-M', 'main'], { cwd: dir });
+      spawnSync('git', ['checkout', '-q', '-b', 'demo-spec'], { cwd: dir });
+      const withTrailer = commit('Real work\n\nA body.\n\nNext: finish the thing this branch is for.');
+      commit('Fixup\n\nA mechanical commit with no trailer.');
+
+      const result = tasks('handoff');
+      expect(result.stdout).toContain('finish the thing this branch is for');
+      expect(result.stdout).toContain(withTrailer.slice(0, 7));
+      expect(result.stdout).toContain('1 commit back');
+      expect(result.stdout).not.toContain('combat continuation');
+    });
+  });
+
   it('next resolves the sole spec with open members when the branch matches no spec file, and says it was inferred', () => {
     fixture(({ tasks, dir }) => {
       tasks('add', 'open task', '--id', 'open-task', '--spec', 'demo-spec', '--severity', 'high');

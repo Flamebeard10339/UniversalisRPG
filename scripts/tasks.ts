@@ -1303,14 +1303,32 @@ interface FoundTrailer {
   distance: number;
 }
 
+// The branch's own commits, or null when that range can't be built or is
+// empty — the latter being the base branch itself, where "this branch's
+// work" is the whole history and the unscoped walk is the right one.
+function branchCommitRange(baseBranch: string): string | null {
+  try {
+    const mergeBase = execFileSync('git', ['merge-base', baseBranch, 'HEAD'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+    const count = execFileSync('git', ['rev-list', '--count', `${mergeBase}..HEAD`], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+    return count === '0' ? null : `${mergeBase}..HEAD`;
+  } catch {
+    return null;
+  }
+}
+
 // Only the last commit's Next: is meant to be live, but a mechanical or
-// fixup commit can carry none at all — walk back through recent history
-// (capped, so a long-dead trailer can't turn this into an unbounded scan)
-// to the most recent commit that actually has one.
-function findLatestNextTrailer(maxCommits = 20): FoundTrailer | null {
+// fixup commit can carry none at all — walk back to the most recent commit
+// that actually has one.
+//
+// Stopping at the merge-base is the difference between "nothing to resume
+// yet" and a confident pointer at another branch's plan: a branch whose
+// first commit carries no trailer has nothing of its own to find, and
+// walking past its base reaches whatever the previous branch was planning
+// next. The commit cap stays as a bound on the scan, not on the reach.
+function findLatestNextTrailer(range: string | null, maxCommits = 20): FoundTrailer | null {
   let log: string;
   try {
-    log = execFileSync('git', ['log', `-${maxCommits}`, `--format=%H${FIELD_SEP}%B${COMMIT_SEP}`], { encoding: 'utf8' });
+    log = execFileSync('git', ['log', `-${maxCommits}`, `--format=%H${FIELD_SEP}%B${COMMIT_SEP}`, ...(range === null ? [] : [range])], { encoding: 'utf8' });
   } catch {
     return null;
   }
@@ -1335,9 +1353,11 @@ function cmdHandoff(args: Flags): void {
   const config = resolveConfig(args.flags);
   console.log(`branch: ${config.branch}`);
 
-  const found = findLatestNextTrailer();
+  const baseBranch = args.flags['base-branch'] ?? 'main';
+  const range = branchCommitRange(baseBranch);
+  const found = findLatestNextTrailer(range);
   if (found === null) {
-    console.log('(no Next: trailer found in the last 20 commits)');
+    console.log(range === null ? '(no Next: trailer found in the last 20 commits)' : `(no Next: trailer yet on this branch — nothing recorded since it left ${baseBranch})`);
   } else {
     if (found.distance > 0) console.log(`(from ${found.sha.slice(0, 7)}, ${found.distance} commit${found.distance === 1 ? '' : 's'} back)`);
     console.log(found.trailer);
