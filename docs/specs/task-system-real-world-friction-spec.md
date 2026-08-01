@@ -409,3 +409,18 @@ Proof:
   `npm test`, `npx tsc --noEmit`, `npm run layer-check`, `npm run tasks --
   check`, and `npm run tasks -- check --merge --spec
   task-system-real-world-friction-spec` pass.
+
+## Audit passes
+
+### Pass 1 — 2026-08-01
+
+- base: `91cd1ed87c7a4c179e68a834a8bad0cc48052749`
+- head: `07463c8ee4e97e483245e8a3b832a07c1bc1b135`
+- proof 1: unmet — A vitest proof target can never pass for a real multi-test file — forcing the vitest branch to unconditionally return leaves 176/176 green — though the command-target half is genuinely mutation-proven.
+- proof 2: unmet — Reducing `closedCommit = args.flags.commit ?? currentHead()` to `?? null` leaves 165/165 green, and the `done` -> `git checkout -- docs/tasks.jsonl` -> `check` scenario the clause exists to catch still reports 0 errors/warnings.
+- proof 3: met — Six lifecycle mutations are caught and every named surface was hand-verified, but five mutations that treat in-progress as complete ship green, so the verdict rests on the auditor's reproduction rather than the suite.
+- proof 4: unmet — Three of four sub-properties are mutation-proven, but the freeze-baseline promise is false by default (3 of 4 shipped specs have no `## Baseline`) and dropping it entirely leaves the suite green, and clause-id retirement is enforced only against auto-assignment, not a hand-written `[cN]`.
+- proof 5: unmet — `required commands` appears nowhere in `cmdAuditPrompt`, the prompt prints `Member tasks: - none` and no relevant files for the very spec it serves, and replacing the diff-range value with an empty string leaves the named test green.
+- proof 6: met — All five named behaviours run correctly and die under targeted mutation; command-specific help is absent but c6's own wording does not require it.
+- proof 7: met — Verified with real commits across every body/`Next:` combination and both launcher branches, and `checkCommitMessage` dies under drop-the-body and require-`Next:` mutations; the one gap is that nothing automated reads `.claude/hooks/commit-msg`.
+- proof 8: unmet — `npm test` fails reproducibly on a clean checkout of HEAD (3/3 across plain, shuffled, and isolated runs), the "only subprocess/Git-history smoke cases stay out-of-process" description does not match the actual routing, and c8's own fifth command becomes unreachable once this audit pass is committed.
