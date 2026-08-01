@@ -47,6 +47,12 @@ the result was correct, and what the review caught.
 | 30 | Opus 5 (cold spawn, Opus orchestrator) | **Audit: Testing procedure** (`scripts`+`test.yml`+`# test`/`runTest`/CI). Read-only; brief mandated *adversarial* gate testing — for each gate, construct a violation it catches AND one of the same spirit it misses. | 200.2k | 84 | 1786s | n/a (read-only; adversarial method prescribed) | 12 findings; the adversarial framing is what produced H1 (a throwaway commit that stripped comments *and* deleted `npm test` from the workflow, certified "comment-only"). Also refuted its own prediction (`audit-status` merge-commit attribution is correct) and **retracted two measurement tables mid-audit** — one run in a worktree without `node_modules` where vitest exited non-zero and scored every mutant "caught". That accident surfaced M6 (CRLF). Documented both in a Corrections section. Orchestrator confirmed H1 at `comment-only-diff.ts:38` and M1 at `audit-status.ts:83`. |
 | 31 | Sonnet 5 (cold spawn, Opus orchestrator) | **Audit: Build & deployment.** Read-only; brief split verifiable-locally (build, deps, tsconfig) from reason-only (`publish.yml`, Gradle) and required each finding be labeled with which it was. | 101.3k | 47 | 449s | n/a (read-only; verify/reason split prescribed) | 11 findings, labels honoured. Ran the real Vite build and read `dist/index.html` for H1 rather than reading the config. Reported `npm audit`'s 3 high/3 critical as dev-only and informational instead of inflating them — the honesty instruction held under a tempting finding. Orchestrator verified H1/H2/L1/L3 directly. |
 | 32 | Sonnet 5 (cold spawn, Opus orchestrator) | **Audit: User interface** — a system whose main path (`src/ui`) does not exist. Brief said so explicitly and told it not to pad. | 103.6k | 39 | 416s | n/a (read-only; anti-padding instruction prescribed) | 6 findings, none padded, and the "was this worth running" self-assessment was the useful part: no code to audit, but two teardown passes left residue that ships today (dead CSS in the bundle, 49 KB orphaned `public/content/`, 8 unused deps) and a `vite.config.mjs` comment describing a directory deleted nine days earlier. Also corrected a *memory note* — `attic/` is gone, not quarantined. Orchestrator verified the attic and dependency claims. |
+| 33 | Opus 5 (cold spawn, Opus orchestrator) | **Clause audit: store + lifecycle** (c2/c3 of `task-system-real-world-friction-spec`). First use of *isolated git worktrees* — each auditor got its own worktree with a `node_modules` junction, so mutation edits could not corrupt a sibling's test run. | 173.8k | 85 | 2321s | n/a (read-only; mutation mandate prescribed) | c2 unmet, c3 met-but-weakly-proven. Reproduced the branch's originating failure end to end (`done` → `git checkout -- docs/tasks.jsonl` → `check` reports nothing). Proved the store migration lossless (188→188, 0 fields lost) rather than asserting it. |
+| 34 | Opus 5 (cold spawn, Opus orchestrator) | **Clause audit: spec identity + proof targets** (c1/c4). Brief seeded three orchestrator hypotheses explicitly framed as "verify, do not assume". | 148.2k | 72 | 1194s | n/a | c1/c4 unmet. **Refuted the orchestrator's own headline hypothesis** (the `## Baseline` duplication) by mutation — the parser was correctly scoped. Killed c1 with `return null` in the vitest branch leaving 176/176 green. |
+| 35 | Opus 5 (cold spawn, Opus orchestrator) | **Clause audit: CLI + hook + gates** (c5–c8). | 172.0k | 61 | 1580s | n/a | c5/c8 unmet, c6/c7 met. Turned a "flaky" test into a reproducible failure (3/3 plain, 3/3 shuffled, 3/3 isolated) — the distinction that mattered. Supplied the wall-clock measurement the spec required and the branch never recorded (105.3s → 39.3s). |
+| 36 | Opus 5 (cold spawn, Opus orchestrator) | **Whole-diff audit: architecture + scope**, no clause verdicts. Deliberately overlapped the other three to test convergence. | 170.0k | 46 | 921s | n/a | 20 findings. Found the unsatisfiable-gate defect that sat *inside another auditor's scope and was missed there*. Answered the bootstrap question (13 folded tasks closed, none attached) that none of the clause auditors owned. |
+| 37 | Opus 5 (cold spawn, Opus orchestrator) | **Reconciliation** of the four reports into one audit record. Not an audit — merge by root cause, preserve reproductions, flag disagreements. | 154.9k | 11 | 526s | high (dedup rules, severity rule, output skeleton prescribed) | 44 findings → 36 (7H/17M/12L); 14 merged by root cause, 9 with independent corroboration. 11 tool calls for 155k tokens — reading dominates, so this is cheap per unit of judgment and a good delegation shape. |
+| 38 | Sonnet 5 (cold spawn, Opus orchestrator) | **Mechanical transcription** of the audit record into the store via the repo's own CLI. Explicitly "do not exercise creative judgment". | 168.4k | 42 | 733s | high (exact command shape, safety constraints, 5 verification steps) | Recorded cleanly; diff was pure append, no serializer churn. Diagnosed a real defect en route: `npm run tasks --` with a >8191-char argv **fails silently** on Windows (exit 127, no output) because it routes through `npm.cmd`. Sonnet was the right tier — the task was quoting discipline, not judgment. |
 
 ## Session usage snapshots
 
@@ -275,6 +281,32 @@ tokens total. Early and directional:
   ~2 headline claims per audit at the line level cost far less than the audits
   and caught nothing wrong — which is itself the data point.
 
+## Clause audits with a mutation mandate (rows 33–38)
+
+Six delegations, ~987k subagent tokens, auditing a branch against its spec's
+eight proof clauses rather than auditing a system.
+
+- **Worktree isolation is the enabling infrastructure.** Mutation testing means
+  temporarily breaking source, so parallel auditors in one tree would poison
+  each other's runs. A git worktree per auditor plus a `node_modules` junction
+  (`mklink /J`) costs one setup call and makes the parallelism safe. Without it
+  this had to run sequentially.
+- **Deliberate scope overlap pays.** The whole-diff auditor (row 36) found the
+  unsatisfiable-gate defect *inside* the spec auditor's scope, where it had been
+  missed. Redundancy is not waste when the failure mode is a blind spot.
+- **Orchestrator review added a finding for the first time.** Previous rows
+  recorded spot-checks confirming what agents claimed. Here a two-minute code
+  read of the line two auditors had already condemned found a *second*,
+  independent defect on it (`'0 passed'` also matches `10 passed`). Review is
+  worth more than sampling when it lands on already-suspect code.
+- **Seed hypotheses, but frame them as "verify, do not assume".** Three were
+  seeded; one was refuted by mutation (row 34), one confirmed, one confirmed and
+  deepened. The refutation is the evidence the framing works — a brief that
+  asserted the hypothesis would have gotten agreement instead.
+- **"Flaky" is a hypothesis, not a finding.** Two auditors reported the same test
+  as intermittent; the one that ran it 9 times across three conditions (row 35)
+  established it was deterministic. Brief auditors to distinguish the two.
+
 ## Open experiments
 
 - [ ] Low-spec Haiku probe (intent-only small task) — find the reliability edge.
@@ -288,4 +320,5 @@ tokens total. Early and directional:
       2 doc-accuracy corrections, 2 runtime bugs, 1 content-balance edit — the
       runtime bugs only via integration against real content, not the agent's
       own tests. 1 agent-initiated adjacent-consistency fix, correct, needed no
-      planner rework).
+      planner rework. Rows 33–38: 0 sent back; 1 defect *added* by orchestrator
+      review on top of a finding two auditors had already made).
