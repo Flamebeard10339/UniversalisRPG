@@ -1,8 +1,5 @@
 export interface ProofClause {
-  // What a verdict, an undelivered task and a `<slug>-clause-N` id all name.
-  // Written into the spec as a `[cN]` tag by stampClauseIds; a clause with
-  // no tag yet takes the lowest id no tag has claimed, in document order,
-  // so an unstamped spec reads exactly as it did when identity was position.
+  // A name, not a position: ids need be neither sequential nor in order.
   id: number;
   text: string;
 }
@@ -49,8 +46,8 @@ function sectionText(lines: string[], heading: string): { text: string; startInd
 const CLAUSE_TAG = /^\[c(\d+)\] (.*)$/;
 
 interface ScannedClause {
-  // Offset within the deliverable section's lines — what stampClauseIds
-  // rewrites, and the only reason scanning is separate from parsing.
+  // Only stampClauseIds needs this, and needing it is why scanning is
+  // separate from parsing.
   line: number;
   tag: number | null;
   text: string;
@@ -102,10 +99,8 @@ function parseProofClauses(deliverableSection: string): ProofClause[] {
 }
 
 // Turns each clause's id from something derived — position in the list —
-// into something written down, so rewording and reordering both leave it
-// alone. `audit` calls this at the moment identity starts carrying weight:
-// a verdict recorded against the clause and an undelivered task named after
-// it. Already-tagged clauses are left exactly as they are.
+// into something written down, which is what rewording and reordering then
+// leave alone.
 export function stampClauseIds(text: string): string {
   const lines = text.split('\n');
   const section = sectionText(lines, '## Deliverable');
@@ -122,9 +117,8 @@ export function stampClauseIds(text: string): string {
   return stamped.join('\n');
 }
 
-// An id that names two clauses is worse than no id: the verdict, the
-// undelivered task and the gate all resolve through it, and each would pick
-// a different clause's prose while agreeing they had found one.
+// An id two clauses answer to is worse than no id: every lookup through it
+// finds one of them and reports success.
 export function duplicateClauseIds(clauses: ProofClause[]): number[] {
   const ids = clauses.map((clause) => clause.id);
   return [...new Set(ids.filter((id, i) => ids.indexOf(id) !== i))];

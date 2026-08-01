@@ -170,10 +170,8 @@ function deliverableAtMergeBase(config: Config, spec: string, baseBranch: string
   }
 }
 
-// A clause id is a reference the store resolves through, the same way
-// `requires` is, so a spec that has stopped naming its clauses uniquely is
-// a broken reference and belongs in the check that runs on every push —
-// not only in the merge gate, which sees one branch's spec on a PR.
+// Here rather than only in the merge gate because this runs on every push,
+// while the gate sees one branch's spec on a pull request.
 function specIssues(config: Config): CheckIssue[] {
   if (!existsSync(config.specsDir)) return [];
   return readdirSync(config.specsDir)
@@ -501,9 +499,7 @@ function cmdNext(args: Flags): void {
 // blanket refusal on kind:undelivered would make the merge gate
 // permanently unclosable — so this earns the close rather than blocking
 // it: refuse unless the spec's LATEST recorded audit pass grades this
-// task's clause `met`. The clause is named by `task.clause`, which the spec
-// file carries too, so an amendment that rewords or moves the clause leaves
-// the binding intact; only deleting the clause outright breaks it.
+// task's clause `met`.
 function undeliveredDoneRefusal(config: Config, task: Task): string | null {
   if (!task.spec) return 'is undelivered but has no spec to verify a pass against';
   if (task.clause === null) return 'is undelivered but names no proof clause';
@@ -807,8 +803,7 @@ function cmdSpecAmend(args: Flags): void {
   // Recording an unchanged deliverable would leave the next edit failing the
   // gate against a baseline nobody meant to set.
   const previous = doc.amendments[doc.amendments.length - 1];
-  // Gaining clause tags is not a change worth adopting, so it is refused
-  // here on the same terms the gate accepts it on.
+  // Gaining clause tags is not a change worth adopting.
   const unchanged = (before: string): boolean => doc.deliverableSection.trim() === before.trim() || doc.deliverableSection.trim() === stampClauseIds(before).trim();
   if (previous && unchanged(previous.deliverableText)) {
     console.error(`error: ${slug}'s ## Deliverable is unchanged since the amendment of ${previous.date} — edit it first, then record what it became`);
@@ -1171,9 +1166,8 @@ async function cmdAudit(rawArgs: string[]): Promise<void> {
     process.exitCode = 1;
     return;
   }
-  // Stamped before anything is recorded, so every verdict and every
-  // undelivered task this pass writes names an id the spec file now carries
-  // in the clause's own line rather than one derived from its position.
+  // Stamped before anything is recorded, so this pass names ids the spec
+  // file already carries rather than ids it is about to be given.
   const original = readFileSync(path_, 'utf8');
   const text = stampClauseIds(original);
   const doc = parseSpecDoc(text);

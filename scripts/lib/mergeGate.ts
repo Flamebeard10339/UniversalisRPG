@@ -47,9 +47,8 @@ export function checkMergeGate(input: MergeGateInput): string[] {
       if (!verdict) issues.push(`proof clause ${clause.id} has no verdict in the latest audit pass (pass ${latest.pass})`);
       else if (verdict.status === 'unmet') issues.push(`proof clause ${clause.id} is unmet as of pass ${latest.pass}`);
     }
-    // The other direction, which is what catches a tag edited after the
-    // pass was recorded: renumbering a clause leaves its verdict pointing
-    // at nothing, and walking only clauses to verdicts never reads it.
+    // Both directions, because the walk above never reads a verdict whose
+    // clause is gone — which is exactly what renumbering a tag produces.
     for (const verdict of latest.verdicts) {
       if (!doc.proofClauses.some((clause) => clause.id === verdict.clause)) {
         issues.push(`pass ${latest.pass} graded proof clause ${verdict.clause}, which is no longer in the deliverable`);
@@ -57,10 +56,9 @@ export function checkMergeGate(input: MergeGateInput): string[] {
     }
   }
 
-  // Stamping ids onto a baseline that predates them is the one edit a
-  // machine makes to a frozen deliverable, so it is the one difference
-  // accepted here. A tag altered by hand is the branch rewriting the
-  // mapping its own verdicts resolve through, and reads as drift.
+  // Stamping ids onto a baseline that predates them is the only edit a
+  // machine makes to a frozen deliverable, so it is the only difference
+  // accepted — a tag altered by hand is drift like any other.
   const baseline = input.deliverableBaseline;
   if (baseline !== null && doc.deliverableSection.trim() !== baseline.trim() && doc.deliverableSection.trim() !== stampClauseIds(baseline).trim()) {
     issues.push(`${input.spec}'s ## Deliverable text differs from its most recent amendment (or its state at the branch's merge-base, if never amended)`);

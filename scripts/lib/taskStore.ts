@@ -17,9 +17,6 @@ export interface Task {
   severity: Severity | null;
   system: string | null;
   spec: string | null;
-  // The proof clause id an undelivered task is bound to, and null for every
-  // other kind: the binding is a number the spec file also carries, so
-  // rewording the clause cannot break it.
   clause: number | null;
   requires: string[];
   files: string[];
