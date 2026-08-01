@@ -89,6 +89,20 @@ function gitFixture(run: (context: { dir: string; commit: (message: string) => s
 }
 
 describe('tasks CLI', () => {
+  it('prints help without treating --help or help as unknown commands', () => {
+    fixture(({ tasks }) => {
+      const flag = tasks('--help');
+      expect(flag.status).toBe(0);
+      expect(flag.stdout).toContain('usage: npm run tasks --');
+      expect(flag.stderr).toBe('');
+
+      const verb = tasks('help');
+      expect(verb.status).toBe(0);
+      expect(verb.stdout).toContain('usage: npm run tasks --');
+      expect(verb.stderr).toBe('');
+    });
+  });
+
   it('adds a task and shows it back', () => {
     fixture(({ tasks }) => {
       const added = tasks('add', 'Fix the thing', '--severity', 'high', '--system', 'Runtime', '--deliverable', 'the thing is fixed');
@@ -229,6 +243,23 @@ describe('tasks CLI', () => {
     });
   });
 
+  it('next is concise by default and prints full task detail only with --full', () => {
+    fixture(({ tasks }) => {
+      const longEvidence = 'first line of evidence\nsecond line of evidence\nthird line of evidence';
+      tasks('add', 'verbose task', '--id', 'verbose-task', '--severity', 'high', '--system', 'Runtime', '--spec', 'demo-spec', '--files', 'src/runtime/save.ts:1', '--deliverable', 'the fix exists', '--evidence', longEvidence);
+
+      const concise = tasks('next');
+      expect(concise.stdout).toContain('verbose-task  [task/open/high]');
+      expect(concise.stdout).toContain('files: src/runtime/save.ts:1');
+      expect(concise.stdout).toContain('evidence: first line of evidence');
+      expect(concise.stdout).not.toContain('second line of evidence');
+
+      const full = tasks('next', '--full');
+      expect(full.stdout).toContain('second line of evidence');
+      expect(full.stdout).toContain('deliverable: the fix exists');
+    });
+  });
+
   it('next reports no active spec rather than surfacing deferred tasks when the branch matches no spec', () => {
     fixture(({ dir }) => {
       const storePath = path.join(dir, 'tasks.jsonl');
@@ -286,8 +317,8 @@ describe('tasks CLI', () => {
 
       const hits = tasks('search', 'combat');
       expect(hits.status).toBe(0);
-      expect(hits.stdout).toContain('combat-gaps');
-      expect(hits.stdout).toContain('droptables');
+      expect(hits.stdout).toContain('combat-gaps  [task/open/high]  (no system)  Close the remaining combat gaps  (matches: id, title)');
+      expect(hits.stdout).toContain('droptables  [task/open/low]  (no system)  Layered droptables  (matches: deliverable)');
       expect(hits.stdout).not.toContain('gui-rebuild');
 
       expect(tasks('search', 'combat', '--severity', 'high').stdout).not.toContain('droptables');
@@ -618,6 +649,27 @@ describe('tasks CLI', () => {
       expect(shown.stdout).toContain('The first clause holds.');
       expect(shown.stdout).toContain('a-member');
       expect(shown.stdout).toContain('0 audit pass(es) recorded');
+    });
+  });
+
+  it('spec <slug> is an alias for spec show <slug>', () => {
+    fixture(({ tasks }) => {
+      tasks('add', 'a member', '--id', 'a-member', '--spec', 'demo-spec');
+      expect(tasks('spec', 'demo-spec').stdout).toBe(tasks('spec', 'show', 'demo-spec').stdout);
+    });
+  });
+
+  it('spec show --order lists dependencies before tasks that require them', () => {
+    fixture(({ tasks }) => {
+      tasks('add', 'dependent task', '--id', 'dependent', '--spec', 'demo-spec');
+      tasks('add', 'blocker task', '--id', 'blocker', '--spec', 'demo-spec');
+      tasks('edit', 'dependent', '--requires', 'blocker');
+
+      const unordered = tasks('spec', 'show', 'demo-spec');
+      expect(unordered.stdout.indexOf('dependent')).toBeLessThan(unordered.stdout.indexOf('blocker'));
+
+      const ordered = tasks('spec', 'show', 'demo-spec', '--order');
+      expect(ordered.stdout.indexOf('blocker')).toBeLessThan(ordered.stdout.indexOf('dependent'));
     });
   });
 

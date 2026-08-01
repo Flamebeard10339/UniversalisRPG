@@ -157,6 +157,24 @@ function printTask(task: Task, tasks: Task[]): void {
   if (task.closed) console.log(`closed: ${task.closed}`);
 }
 
+function preview(text: string): string {
+  return text.split('\n').map((line) => line.trim()).find((line) => line.length > 0) ?? '';
+}
+
+function printTaskConcise(task: Task, tasks: Task[]): void {
+  const byId = new Map(tasks.map((t) => [t.id, t]));
+  const blocked = isBlocked(task, byId);
+  const tag = [task.kind, task.state, task.severity].filter(Boolean).join('/');
+  console.log(`${task.id}  [${tag}]${blocked ? '  BLOCKED' : ''}`);
+  console.log(task.title);
+  if (task.system) console.log(`system: ${task.system}`);
+  console.log(`spec: ${task.spec ?? '(deferred)'}`);
+  if (task.requires.length > 0) console.log(`requires: ${task.requires.join(', ')}`);
+  if (task.files.length > 0) console.log(`files: ${task.files.join(', ')}`);
+  if (task.deliverable) console.log(`deliverable: ${preview(task.deliverable)}`);
+  if (task.evidence) console.log(`evidence: ${preview(task.evidence)}`);
+}
+
 // null means "nothing to compare against" — merge-base lookup failed, or
 // the spec file did not exist there (opened on this branch, so nothing has
 // drifted).
@@ -432,6 +450,19 @@ function cmdList(args: Flags): void {
   runList(args, undefined);
 }
 
+const SEARCH_FIELDS: Array<[label: string, read: (task: Task) => string | null]> = [
+  ['id', (task) => task.id],
+  ['title', (task) => task.title],
+  ['system', (task) => task.system],
+  ['deliverable', (task) => task.deliverable],
+  ['evidence', (task) => task.evidence],
+];
+
+function matchingFields(task: Task, text: string): string[] {
+  const term = text.toLowerCase();
+  return SEARCH_FIELDS.filter(([, read]) => (read(task) ?? '').toLowerCase().includes(term)).map(([label]) => label);
+}
+
 function runList(args: Flags, text: string | undefined): void {
   const config = resolveConfig(args.flags);
   const flags = args.flags;
@@ -471,7 +502,8 @@ function runList(args: Flags, text: string | undefined): void {
 
   for (const task of queue) {
     const tag = [task.kind, task.state, task.severity].filter(Boolean).join('/');
-    console.log(`${task.id}  [${tag}]  ${task.system ?? '(no system)'}  ${task.title}`);
+    const matches = text === undefined ? '' : `  (matches: ${matchingFields(task, text).join(', ')})`;
+    console.log(`${task.id}  [${tag}]  ${task.system ?? '(no system)'}  ${task.title}${matches}`);
   }
 
   const counts: Record<State, number> = { unreviewed: 0, open: 0, done: 0, declined: 0 };
@@ -499,7 +531,8 @@ function cmdNext(args: Flags): void {
     console.log(`no open, unblocked tasks in spec ${spec}`);
     return;
   }
-  printTask(queue[0], tasks);
+  if (args.flags.full === 'true') printTask(queue[0], tasks);
+  else printTaskConcise(queue[0], tasks);
 }
 
 // Rule 7 requires an unmet deliverable to be able to reach `done` — a
@@ -696,11 +729,34 @@ function cmdSpecShow(args: Flags): void {
   }
   console.log('');
 
-  const members = loadStore(config.storePath).filter((task) => task.spec === slug);
+  const members = specMembers(loadStore(config.storePath).filter((task) => task.spec === slug), args.flags.order === 'true');
   console.log(`${members.length} member(s):`);
   for (const member of members) {
     console.log(`  ${member.id}  [${member.kind}/${member.state}${member.severity ? '/' + member.severity : ''}]  ${member.title}`);
   }
+}
+
+function specMembers(members: Task[], ordered: boolean): Task[] {
+  if (!ordered) return members;
+  const byId = new Map(members.map((task) => [task.id, task]));
+  const visited = new Set<string>();
+  const visiting = new Set<string>();
+  const result: Task[] = [];
+
+  function visit(task: Task): void {
+    if (visited.has(task.id) || visiting.has(task.id)) return;
+    visiting.add(task.id);
+    for (const requirement of task.requires) {
+      const dep = byId.get(requirement);
+      if (dep) visit(dep);
+    }
+    visiting.delete(task.id);
+    visited.add(task.id);
+    result.push(task);
+  }
+
+  for (const task of members) visit(task);
+  return result;
 }
 
 // Rule 7: an undelivered task is the branch's outstanding promise and
@@ -826,6 +882,7 @@ function cmdSpecAmend(args: Flags): void {
 function cmdSpec(args: Flags): void {
   const [sub, ...rest] = args.positional;
   const subArgs: Flags = { positional: rest, flags: args.flags };
+  if (sub && !['new', 'add', 'remove', 'show', 'done', 'amend'].includes(sub)) return cmdSpecShow({ positional: [sub, ...rest], flags: args.flags });
   switch (sub) {
     case 'new':
       return cmdSpecNew(subArgs);
@@ -1438,6 +1495,12 @@ export async function run(argv: string[]): Promise<void> {
   const [command, ...rest] = argv;
   const args = parseArgs(rest);
   switch (command) {
+    case undefined:
+    case '--help':
+    case '-h':
+    case 'help':
+      console.log(USAGE);
+      return;
     case 'check':
       return cmdCheck(args.flags);
     case 'add':
