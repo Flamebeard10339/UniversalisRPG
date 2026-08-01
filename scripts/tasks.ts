@@ -74,6 +74,30 @@ function specFile(config: Config, spec: string): string {
   return `${config.specsDir}/${spec}.md`;
 }
 
+function usesDefaultStore(config: Config): boolean {
+  return path.resolve(config.storePath) === path.resolve(DEFAULT_STORE_PATH);
+}
+
+function dirtyStoreIssue(config: Config): CheckIssue | null {
+  if (!usesDefaultStore(config)) return null;
+  const result = spawnSync('git', ['status', '--porcelain', '--', config.storePath], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
+  if ((result.status ?? 1) !== 0 || result.stdout.trim() === '') return null;
+  return {
+    level: 'warning',
+    message: `${config.storePath} has uncommitted task-state changes; commit them before cleanup/reset, or another session may miss working-tree-only state`,
+  };
+}
+
+function warnIfStoreDirty(config: Config): void {
+  const issue = dirtyStoreIssue(config);
+  if (issue) console.warn(`warning: ${issue.message}`);
+}
+
+function saveStoreAndWarn(tasks: Task[], config: Config): void {
+  saveStore(tasks, config.storePath);
+  warnIfStoreDirty(config);
+}
+
 // "the spec whose branch is checked out" — a branch not named after any spec
 // file has no active spec, and `--spec` on a read command overrides this.
 // Strict on purpose: `check --merge` resolves through this and only this,
@@ -216,7 +240,8 @@ function cmdCheck(flags: Record<string, string>): void {
     tasks = [];
     loadIssues.push({ level: 'error', message: error instanceof Error ? error.message : String(error) });
   }
-  const issues = [...loadIssues, ...checkStore(tasks, systemNames(config), (spec) => existsSync(specFile(config, spec))), ...closedCommitIssues(tasks), ...specIssues(config)];
+  const dirtyIssue = dirtyStoreIssue(config);
+  const issues = [...loadIssues, ...checkStore(tasks, systemNames(config), (spec) => existsSync(specFile(config, spec))), ...closedCommitIssues(tasks), ...specIssues(config), ...(dirtyIssue ? [dirtyIssue] : [])];
   const errors = issues.filter((issue) => issue.level === 'error');
   const warnings = issues.filter((issue) => issue.level === 'warning');
   for (const warning of warnings) console.warn(`warning: ${warning.message}`);
@@ -405,7 +430,7 @@ function cmdAdd(args: Flags): void {
     closedCommit: null,
   };
   tasks.push(task);
-  saveStore(tasks, config.storePath);
+  saveStoreAndWarn(tasks, config);
   console.log(`added ${id} [${task.kind}/${task.state}]`);
 }
 
@@ -475,7 +500,7 @@ function cmdEdit(args: Flags): void {
     return;
   }
 
-  saveStore(tasks, config.storePath);
+  saveStoreAndWarn(tasks, config);
   console.log(`edited ${id}: ${changes.join(', ')}`);
 }
 
@@ -630,7 +655,7 @@ function cmdStart(args: Flags): void {
     return;
   }
   task.state = 'in-progress';
-  saveStore(tasks, config.storePath);
+  saveStoreAndWarn(tasks, config);
   console.log(`started ${id}`);
 }
 
@@ -655,7 +680,7 @@ function cmdStop(args: Flags): void {
     return;
   }
   task.state = 'open';
-  saveStore(tasks, config.storePath);
+  saveStoreAndWarn(tasks, config);
   console.log(`stopped ${id}`);
 }
 
@@ -716,7 +741,7 @@ function cmdDone(args: Flags): void {
   task.state = 'done';
   task.closed = today();
   task.closedCommit = args.flags.commit ?? currentHead();
-  saveStore(tasks, config.storePath);
+  saveStoreAndWarn(tasks, config);
   console.log(`done ${id}`);
 }
 
@@ -750,7 +775,7 @@ function cmdDecline(args: Flags): void {
   task.reason = reason;
   task.closed = today();
   task.closedCommit = null;
-  saveStore(tasks, config.storePath);
+  saveStoreAndWarn(tasks, config);
   console.log(`declined ${id}`);
 }
 
@@ -827,7 +852,7 @@ function cmdSpecAdd(args: Flags): void {
     return;
   }
   for (const id of ids) byId.get(id)!.spec = slug;
-  saveStore(tasks, config.storePath);
+  saveStoreAndWarn(tasks, config);
   console.log(`added ${ids.length} task(s) to ${slug}`);
 }
 
@@ -912,7 +937,7 @@ function cmdSpecDone(args: Flags): void {
       if (isUndelivered(straggler)) continue;
       straggler.spec = null;
     }
-    saveStore(tasks, config.storePath);
+    saveStoreAndWarn(tasks, config);
   }
 
   const stillOpen = loadStore(config.storePath).filter((task) => task.spec === slug && task.state !== 'done' && task.state !== 'declined');
@@ -962,7 +987,7 @@ function cmdSpecRemove(args: Flags): void {
     return;
   }
   for (const id of ids) byId.get(id)!.spec = null;
-  saveStore(tasks, config.storePath);
+  saveStoreAndWarn(tasks, config);
   console.log(`removed ${ids.length} task(s) from ${slug}`);
 }
 
@@ -1114,7 +1139,7 @@ function cmdImport(args: Flags): void {
     taken.add(id);
     imported++;
   }
-  saveStore(tasks, config.storePath);
+  saveStoreAndWarn(tasks, config);
 
   const skippedNote = skipped > 0 ? ` (${skipped} already present, skipped)` : '';
   const systemNote = system === null && findings.length > 0 ? ' — no system mapping for this doc name, system left null' : '';
@@ -1298,13 +1323,13 @@ async function cmdTriage(args: Flags): Promise<void> {
           continue;
         }
         task.deliverable = replacement;
-        saveStore(tasks, config.storePath);
+        saveStoreAndWarn(tasks, config);
         continue;
       } else {
         console.log('unrecognised input, skipping');
         break;
       }
-      saveStore(tasks, config.storePath);
+      saveStoreAndWarn(tasks, config);
       break;
     }
   }
@@ -1568,7 +1593,7 @@ async function cmdAudit(rawArgs: string[]): Promise<void> {
     findingsCreated++;
   }
 
-  saveStore(tasks, config.storePath);
+  saveStoreAndWarn(tasks, config);
   writeFileSync(path_, appendAuditPass(text, { pass: passNumber, date: today(), base, head, verdicts }), 'utf8');
 
   const met = verdicts.filter((verdict) => verdict.status === 'met').length;
@@ -1719,7 +1744,7 @@ function cmdCheckCommitMessage(args: Flags): void {
 
 const USAGE = 'usage: npm run tasks -- <check|add|edit|show|list|search|next|start|stop|done|decline|import|triage|spec|audit|audit-prompt|handoff> ...';
 
-export async function run(argv: string[]): Promise<void> {
+export function run(argv: string[]): void | Promise<void> {
   const [command, ...rest] = argv;
   const args = parseArgs(rest);
   switch (command) {

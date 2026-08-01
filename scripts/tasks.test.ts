@@ -3,6 +3,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 import os from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { run as runTasks } from './tasks';
 
 const repoRoot = path.join(import.meta.dirname, '..');
 const tsx = path.join(repoRoot, 'node_modules/tsx/dist/cli.mjs');
@@ -12,6 +13,36 @@ interface Run {
   status: number;
   stdout: string;
   stderr: string;
+}
+
+function runInProcess(args: string[]): Run {
+  const stdout: string[] = [];
+  const stderr: string[] = [];
+  const originalLog = console.log;
+  const originalWarn = console.warn;
+  const originalError = console.error;
+  const previousExitCode = process.exitCode;
+  process.exitCode = undefined;
+  try {
+    console.log = (...values: unknown[]) => {
+      stdout.push(`${values.map(String).join(' ')}\n`);
+    };
+    console.warn = (...values: unknown[]) => {
+      stderr.push(`${values.map(String).join(' ')}\n`);
+    };
+    console.error = (...values: unknown[]) => {
+      stderr.push(`${values.map(String).join(' ')}\n`);
+    };
+    const result = runTasks(args);
+    if (result instanceof Promise) throw new Error(`async command must run through the subprocess fixture: ${args[0] ?? '(none)'}`);
+    const status = process.exitCode === undefined ? 0 : Number(process.exitCode);
+    return { status, stdout: stdout.join(''), stderr: stderr.join('') };
+  } finally {
+    console.log = originalLog;
+    console.warn = originalWarn;
+    console.error = originalError;
+    process.exitCode = previousExitCode;
+  }
 }
 
 function fixture(run: (context: { dir: string; args: (extra?: string[]) => string[]; tasks: (...args: string[]) => Run; triage: (input: string, extra?: string[]) => Run }) => void): void {
@@ -39,6 +70,7 @@ function fixture(run: (context: { dir: string; args: (extra?: string[]) => strin
       dir,
       args: (extra = []) => [...globals, ...extra],
       tasks: (...args: string[]) => {
+        if (args[0] !== 'audit') return runInProcess([...args, ...globals]);
         const result = spawnSync(process.execPath, [tsx, script, ...args, ...globals], { cwd: repoRoot, encoding: 'utf8' });
         return { status: result.status ?? 1, stdout: result.stdout, stderr: result.stderr };
       },
@@ -80,6 +112,33 @@ function gitFixture(run: (context: { dir: string; commit: (message: string) => s
       },
       tasks: (...args: string[]) => {
         const result = spawnSync(process.execPath, [tsx, script, ...args, ...globals], { cwd: dir, encoding: 'utf8' });
+        return { status: result.status ?? 1, stdout: result.stdout, stderr: result.stderr };
+      },
+    });
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+function defaultStoreGitFixture(run: (context: { dir: string; tasks: (...args: string[]) => Run }) => void): void {
+  const dir = mkdtempSync(path.join(os.tmpdir(), 'universalis-default-store-'));
+  try {
+    spawnSync('git', ['init', '-q'], { cwd: dir });
+    spawnSync('git', ['config', 'user.email', 'test@example.com'], { cwd: dir });
+    spawnSync('git', ['config', 'user.name', 'Test'], { cwd: dir });
+
+    mkdirSync(path.join(dir, 'docs', 'specs'), { recursive: true });
+    mkdirSync(path.join(dir, 'docs', 'audits'), { recursive: true });
+    writeFileSync(path.join(dir, 'docs', 'specs', 'demo-spec.md'), '# Demo spec\n\n## Deliverable\n\nSomething this branch promises.\n\nProof:\n\n- The first clause holds.\n\n## Decisions\n\n## Open questions\n\nNone.\n', 'utf8');
+    writeFileSync(path.join(dir, 'docs', 'audits', 'systems.json'), JSON.stringify({ unowned: { note: '', paths: ['docs', '*.md'] }, systems: [] }), 'utf8');
+    writeFileSync(path.join(dir, 'docs', 'tasks.jsonl'), '', 'utf8');
+    spawnSync('git', ['add', '.'], { cwd: dir });
+    spawnSync('git', ['commit', '--no-verify', '-m', 'Initial fixture\n\nA tracked task store exists.'], { cwd: dir, encoding: 'utf8' });
+
+    run({
+      dir,
+      tasks: (...args: string[]) => {
+        const result = spawnSync(process.execPath, [tsx, script, ...args, '--branch', 'demo-spec'], { cwd: dir, encoding: 'utf8' });
         return { status: result.status ?? 1, stdout: result.stdout, stderr: result.stderr };
       },
     });
@@ -451,6 +510,27 @@ describe('tasks CLI', () => {
       const broken = tasks('check');
       expect(broken.status).toBe(1);
       expect(broken.stderr).toContain('system not in systems.json');
+    });
+  });
+
+  it('state-changing default-store writes warn when task state is only in the working tree', () => {
+    defaultStoreGitFixture(({ tasks }) => {
+      const result = tasks('add', 'Dirty tracked task', '--id', 'dirty-tracked');
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('added dirty-tracked [task/open]');
+      expect(result.stderr).toContain('warning: docs/tasks.jsonl has uncommitted task-state changes');
+    });
+  });
+
+  it('check warns when the default store has uncommitted working-tree-only task state', () => {
+    defaultStoreGitFixture(({ tasks }) => {
+      expect(tasks('check').stderr).not.toContain('docs/tasks.jsonl has uncommitted task-state changes');
+
+      tasks('add', 'Dirty tracked task', '--id', 'dirty-tracked');
+      const result = tasks('check');
+      expect(result.status).toBe(0);
+      expect(result.stderr).toContain('warning: docs/tasks.jsonl has uncommitted task-state changes');
+      expect(result.stdout).toContain('1 warning(s)');
     });
   });
 
@@ -922,6 +1002,20 @@ describe('tasks CLI', () => {
       // The insertion took a fresh id instead of displacing clause 1's.
       expect(readFileSync(specPath, 'utf8')).toContain('- [c3] A newly inserted clause.');
       expect(tasks('done', 'demo-spec-clause-1').status).toBe(0);
+    });
+  });
+
+  it('replacing an audited clause with an untagged new clause requires a fresh audit verdict', () => {
+    fixture(({ tasks, dir }) => {
+      const specPath = path.join(dir, 'specs', 'demo-spec.md');
+      tasks('audit', 'demo-spec', '--proof', '1=met', '--proof', '2=met');
+
+      writeFileSync(specPath, readFileSync(specPath, 'utf8').replace('- [c1] The first clause holds.', '- A replacement clause needs its own verdict.'), 'utf8');
+
+      const result = tasks('check', '--merge');
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain('proof clause 3 has no verdict in the latest audit pass');
+      expect(result.stderr).toContain('pass 1 graded proof clause 1, which is no longer in the deliverable');
     });
   });
 

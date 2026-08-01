@@ -76,6 +76,19 @@ describe('parseSpecDoc', () => {
     expect(parseSpecDoc(doc).proofClauses.map((clause) => clause.id)).toEqual([2, 1, 3]);
   });
 
+  it('does not reuse an audited clause id for a later untagged replacement clause', () => {
+    const audited = appendAuditPass('## Deliverable\n\nPromise.\n\nProof:\n\n- [c1] The original clause.\n', {
+      pass: 1,
+      date: '2026-08-01',
+      base: 'abc1234',
+      head: 'def5678',
+      verdicts: [{ clause: 1, status: 'met', evidence: null }],
+    });
+    const replaced = audited.replace('- [c1] The original clause.', '- A replacement clause.');
+    expect(parseSpecDoc(replaced).proofClauses).toEqual([{ id: 2, text: 'A replacement clause.' }]);
+    expect(stampClauseIds(replaced)).toContain('- [c2] A replacement clause.');
+  });
+
   it('returns no proof clauses when there is no Proof: line', () => {
     const doc = '## Deliverable\n\nJust prose, no proof list.\n\n## Decisions\n';
     expect(parseSpecDoc(doc).proofClauses).toEqual([]);

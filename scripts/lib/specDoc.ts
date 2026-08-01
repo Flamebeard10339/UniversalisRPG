@@ -89,8 +89,12 @@ function scanProofClauses(deliverableSection: string): ScannedClause[] {
   return clauses;
 }
 
-function resolveIds(clauses: ScannedClause[]): number[] {
-  const claimed = new Set(clauses.map((clause) => clause.tag).filter((tag): tag is number => tag !== null));
+function auditedClauseIds(text: string): number[] {
+  return parseAuditPasses(text).flatMap((pass) => pass.verdicts.map((verdict) => verdict.clause));
+}
+
+function resolveIds(clauses: ScannedClause[], reserved: number[] = []): number[] {
+  const claimed = new Set([...reserved, ...clauses.map((clause) => clause.tag).filter((tag): tag is number => tag !== null)]);
   let next = 1;
   return clauses.map((clause) => {
     if (clause.tag !== null) return clause.tag;
@@ -100,9 +104,9 @@ function resolveIds(clauses: ScannedClause[]): number[] {
   });
 }
 
-function parseProofClauses(deliverableSection: string): ProofClause[] {
+function parseProofClauses(deliverableSection: string, reserved: number[] = []): ProofClause[] {
   const scanned = scanProofClauses(deliverableSection);
-  const ids = resolveIds(scanned);
+  const ids = resolveIds(scanned, reserved);
   return scanned.map((clause, i) => ({
     id: ids[i],
     text: clause.text,
@@ -119,7 +123,7 @@ export function stampClauseIds(text: string): string {
   if (!section) return text;
 
   const scanned = scanProofClauses(section.text);
-  const ids = resolveIds(scanned);
+  const ids = resolveIds(scanned, auditedClauseIds(text));
   const stamped = [...lines];
   scanned.forEach((clause, i) => {
     if (clause.tag !== null) return;
@@ -209,10 +213,11 @@ function parseBaseline(text: string): string | null {
 export function parseSpecDoc(text: string): SpecDoc {
   const deliverable = sectionText(text.split('\n'), '## Deliverable');
   const deliverableSection = deliverable ? deliverable.text : '';
+  const auditPasses = parseAuditPasses(text);
   return {
     deliverableSection,
-    proofClauses: parseProofClauses(deliverableSection),
-    auditPasses: parseAuditPasses(text),
+    proofClauses: parseProofClauses(deliverableSection, auditPasses.flatMap((pass) => pass.verdicts.map((verdict) => verdict.clause))),
+    auditPasses,
     amendments: parseAmendments(text),
     baseline: parseBaseline(text),
   };
