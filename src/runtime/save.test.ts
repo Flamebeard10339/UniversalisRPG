@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { restorePools } from './effects';
 import { createGameState, PLAYER } from './runtime';
+import { IMPLICIT_TARGET_FULL } from './encounter';
 import { loadModule } from '../content/registry';
 import { compareSave, diffState, initialState, loadSave, pruneStateForRegistry, SAVE_VERSION, serializeSave } from './save';
 import { parseSaveSection } from '../content/saveSection';
@@ -175,7 +176,7 @@ describe('pruneStateForRegistry', () => {
       ownerRef: 'item.mod.gem',
       actionLabel: 'eat',
       repeating: false,
-      healthRemaining: 1,
+      implicitTarget: IMPLICIT_TARGET_FULL,
       cadences: { [PLAYER]: { progress: 0, attemptsMade: 0 } },
     };
 
@@ -274,7 +275,7 @@ open:
   give: 1 gold
 
 # save empty
-{"version":5}
+{"version":6}
 
 # test load-and-match
 load: empty

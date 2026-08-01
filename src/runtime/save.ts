@@ -5,7 +5,7 @@ import { findActionOwner, parseOwnerRef } from './actions';
 import { PLAYER } from './state';
 
 // Bumped on any shape change; with no migration path, a stale save is rejected.
-export const SAVE_VERSION = 5;
+export const SAVE_VERSION = 6;
 
 // A sparse diff against initialState: a new game saves as `{}`, and `log` is not state.
 export type SaveDiff = Partial<Omit<GameState, 'log'>>;

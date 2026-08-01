@@ -104,7 +104,6 @@ function recipeAction(recipe: Recipe): Action {
     speed: recipe.speed,
     accuracy: recipe.accuracy,
     evasion: recipe.evasion,
-    health: 1,
     repeating: time > 0,
   };
 

@@ -9,8 +9,9 @@ export function travelSecondsPerUnit(registry: Registry): number {
 
 const DEFAULT_MIN_DAMAGE = 1;
 
-// Clamped above zero because a fight that deals no damage never depletes its
-// target and never ends.
+// Clamped above zero so a fight that deals no damage still depletes its target.
+// In hitDamage, the floor is the minimum of minDamage and unreduced attack, so
+// the floor never exceeds what the attack would have been without reduction.
 export function minDamage(registry: Registry): number {
   return Math.max(1, registry.variables.get(MIN_DAMAGE)?.value ?? DEFAULT_MIN_DAMAGE);
 }

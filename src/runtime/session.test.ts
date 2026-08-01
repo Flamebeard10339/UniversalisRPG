@@ -196,7 +196,7 @@ x: 0, y: 0
 starting
 
 # save stale
-{"version":5,"inventory":{"mod.gem":1}}
+{"version":6,"inventory":{"mod.gem":1}}
 `);
     const session = startSession(registry);
 

@@ -258,7 +258,6 @@ describe('entity action modifiers', () => {
     ['ability: might', 'ability'],
     ['target: health', 'target'],
     ['dr: armour', 'dr'],
-    ['health: 3', 'health'],
     ['escape after 3', 'escape after'],
   ])('rejects %s written twice', (line, written) => {
     expect(parseOne(`# entity chest\nopen:\n  ${line}\n  say: hi`, entitySchema).actions).toHaveLength(1);

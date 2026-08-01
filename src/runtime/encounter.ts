@@ -5,13 +5,13 @@ import { Registry } from '../content/registry';
 import { findActiveAction, parseOwnerRef } from './actions';
 import { GameState, PLAYER, RuntimeError } from './state';
 import { humanize } from '../grammar/values';
-import { fromMilliUnits, toMilliUnits } from './units';
+import { fromMilliUnits, toMilliUnits, MILLI_UNITS } from './units';
 
 export interface ActiveAction {
   ownerRef: string; // "<obj>.<objId>", e.g. "entity.oven"
   actionLabel: string;
   repeating: boolean;
-  healthRemaining: number;
+  implicitTarget: number;
   // Insertion order breaks ties between clocks due at the same instant.
   cadences: Record<string, Cadence>;
   // Scoped to the fight and vanish with it, where the player's pools persist.
@@ -34,6 +34,8 @@ export interface ActorState {
 export function playerCadence(active: ActiveAction): Cadence {
   return active.cadences[PLAYER];
 }
+
+export const IMPLICIT_TARGET_FULL = MILLI_UNITS;
 
 // The actor's own max, not initResources' `start`, a player-lifecycle concept.
 export function enterEncounter(active: ActiveAction, actorId: string, state: GameState, registry: Registry): void {
@@ -122,6 +124,20 @@ export function encounterView(state: GameState, registry: Registry): EncounterVi
     });
   }
   return { cadence: fractionOf(playerCadence(active), PLAYER, action), foes };
+}
+
+export function targetLevel(state: GameState, registry: Registry, action: Action, actorId: string): number {
+  if (!action.target) return state.activeAction!.implicitTarget;
+  return poolLevel(state, registry, actorId, action.target);
+}
+
+export function damageTarget(state: GameState, registry: Registry, action: Action, actorId: string, milliAmount: number, deltas: PoolDeltas): number {
+  if (!action.target) {
+    const active = state.activeAction!;
+    active.implicitTarget -= milliAmount;
+    return active.implicitTarget;
+  }
+  return damagePool(state, registry, actorId, action.target, milliAmount, deltas);
 }
 
 export function logSwing(state: GameState, registry: Registry, self: string, other: string, damage: number | null): void {

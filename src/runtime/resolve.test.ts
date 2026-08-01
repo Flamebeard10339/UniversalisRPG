@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ActiveAction, armAction, craft, createGameState, GameState, initResources, PLAYER, resolve, RuntimeError, statValue, useAction } from './runtime';
-import { newCadence } from './encounter';
+import { IMPLICIT_TARGET_FULL, newCadence } from './encounter';
 import { point } from '../grammar/range';
 import { loadModule, Registry } from '../content/registry';
 import { secondsToMs, toMilliUnits } from './units';
@@ -109,17 +109,16 @@ out: 1 cooked-shrimp
 burnt: 1 burnt-shrimp
 
 # stat chop-power
-base: 1
+base: 0.34
 
 # entity tree
-// Deterministic multi-hit fight against a health pool (health: 3, always
-// exactly 3 attempts) is combat-shaped, not a craft: it wears down a
-// target's hitpoints rather than converting an input stack into an output
-// stack, so it stays a plain repeating entity action instead of becoming a
-// recipe (recipes always compile to health: 1 — see recipeAction).
+// Deterministic multi-hit fight through an implicit target (3 attempts to
+// complete, not 1) is combat-shaped, not a craft: it wears down completion
+// through repeated low-damage swings rather than converting an input stack
+// into an output stack, so it stays a plain repeating entity action instead
+// of becoming a recipe (recipes always compile to completion in one attempt).
 chop:
   repeating
-  health: 3
   ability: chop-power
   time: 1
   give: 1 wood
@@ -182,7 +181,7 @@ function loaded(): Registry {
 // depend on guessing the compiled action's label text.
 function recipeActive(registry: Registry, recipeId: string): ActiveAction {
   const action = registry.recipeActions.get(recipeId)!;
-  return { ownerRef: `recipe.${recipeId}`, actionLabel: action.label, repeating: action.repeating === true, healthRemaining: toMilliUnits(action.health ?? 1), cadences: { [PLAYER]: newCadence() } };
+  return { ownerRef: `recipe.${recipeId}`, actionLabel: action.label, repeating: action.repeating === true, implicitTarget: IMPLICIT_TARGET_FULL, cadences: { [PLAYER]: newCadence() } };
 }
 
 function withCampfireCooking(registry: Registry, buffed: boolean): GameState {
@@ -273,7 +272,7 @@ describe('resolve: direct pool writes stay associative alongside a rate', () => 
   function draining(registry: Registry, entityId: string, label: string): GameState {
     const state = createGameState('nowhere');
     initResources(state, registry);
-    state.activeAction = { ownerRef: `entity.${entityId}`, actionLabel: label, repeating: true, healthRemaining: toMilliUnits(1), cadences: { [PLAYER]: newCadence() } };
+    state.activeAction = { ownerRef: `entity.${entityId}`, actionLabel: label, repeating: true, implicitTarget: IMPLICIT_TARGET_FULL, cadences: { [PLAYER]: newCadence() } };
     return state;
   }
 
@@ -498,7 +497,7 @@ function withGrillCooking(registry: Registry, rawShrimp: number): GameState {
 
 function withTreeChopping(): GameState {
   const state = createGameState('nowhere');
-  state.activeAction = { ownerRef: 'entity.tree', actionLabel: 'chop', repeating: true, healthRemaining: toMilliUnits(3), cadences: { [PLAYER]: newCadence() } };
+  state.activeAction = { ownerRef: 'entity.tree', actionLabel: 'chop', repeating: true, implicitTarget: IMPLICIT_TARGET_FULL, cadences: { [PLAYER]: newCadence() } };
   return state;
 }
 
@@ -558,22 +557,22 @@ describe('resolve: raw-to-burnt outcome distribution (accuracy < 1, escape after
   });
 });
 
-describe('resolve: deterministic multi-hit fights (health > 1, no accuracy)', () => {
-  it('a health:3/ability:1 fight takes exactly ceil(3/1)=3 attempts; a mid-fight split carries healthRemaining/attemptsMade and reproduces the one-shot result', () => {
+describe('resolve: deterministic multi-hit fights (implicit target, no accuracy)', () => {
+  it('a ceil(1000/abilityAmount)=3 implicit target takes exactly 3 attempts; a mid-fight split carries implicitTarget/attemptsMade and reproduces the one-shot result', () => {
     const registry = loaded();
 
     const oneShot = withTreeChopping();
     resolve(oneShot, registry, secondsToMs(3)); // exactly one full fight (3 attempts * 1s)
     expect(oneShot.inventory['wood']).toBe(1);
-    expect(oneShot.activeAction).toEqual({ ownerRef: 'entity.tree', actionLabel: 'chop', repeating: true, healthRemaining: toMilliUnits(3), cadences: { [PLAYER]: newCadence() } }); // rearmed fresh
+    expect(oneShot.activeAction).toEqual({ ownerRef: 'entity.tree', actionLabel: 'chop', repeating: true, implicitTarget: toMilliUnits(1), cadences: { [PLAYER]: newCadence() } }); // rearmed fresh
 
     const midFight = withTreeChopping();
     resolve(midFight, registry, secondsToMs(1)); // 1 of 3 attempts
-    expect(midFight.activeAction).toEqual({ ownerRef: 'entity.tree', actionLabel: 'chop', repeating: true, healthRemaining: toMilliUnits(2), cadences: { player: { progress: 0, attemptsMade: 1 } } });
+    expect(midFight.activeAction).toEqual({ ownerRef: 'entity.tree', actionLabel: 'chop', repeating: true, implicitTarget: toMilliUnits(1) - toMilliUnits(0.34), cadences: { player: { progress: 0, attemptsMade: 1 } } });
     expect(midFight.inventory['wood'] ?? 0).toBe(0);
 
     resolve(midFight, registry, secondsToMs(2)); // 2 of 3 attempts
-    expect(midFight.activeAction).toEqual({ ownerRef: 'entity.tree', actionLabel: 'chop', repeating: true, healthRemaining: toMilliUnits(1), cadences: { player: { progress: 0, attemptsMade: 2 } } });
+    expect(midFight.activeAction).toEqual({ ownerRef: 'entity.tree', actionLabel: 'chop', repeating: true, implicitTarget: toMilliUnits(1) - 2 * toMilliUnits(0.34), cadences: { player: { progress: 0, attemptsMade: 2 } } });
 
     resolve(midFight, registry, secondsToMs(3)); // completes the fight
     expect(midFight.inventory['wood']).toBe(1);
@@ -588,7 +587,7 @@ describe('resolve: onSuccess batches per completion, not per segment (Pass-1 reg
 
     function withKilnFiring(): GameState {
       const state = createGameState('nowhere');
-      state.activeAction = { ownerRef: 'entity.kiln', actionLabel: 'fire', repeating: true, healthRemaining: toMilliUnits(1), cadences: { [PLAYER]: newCadence() } };
+      state.activeAction = { ownerRef: 'entity.kiln', actionLabel: 'fire', repeating: true, implicitTarget: IMPLICIT_TARGET_FULL, cadences: { [PLAYER]: newCadence() } };
       return state;
     }
 
@@ -726,7 +725,7 @@ describe('resolve: resource associativity (the invariant, extended to pools)', (
     function fresh(): GameState {
       const state = createGameState();
       initResources(state, registry); // hp = 100 (full), spark = 0
-      state.activeAction = { ownerRef: 'entity.engine', actionLabel: 'run', repeating: true, healthRemaining: toMilliUnits(1), cadences: { [PLAYER]: newCadence() } };
+      state.activeAction = { ownerRef: 'entity.engine', actionLabel: 'run', repeating: true, implicitTarget: IMPLICIT_TARGET_FULL, cadences: { [PLAYER]: newCadence() } };
       return state;
     }
 

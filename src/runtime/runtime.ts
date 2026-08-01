@@ -24,13 +24,16 @@ import {
 import {
   ActiveAction,
   damagePool,
+  damageTarget,
   enterEncounter,
+  IMPLICIT_TARGET_FULL,
   logSwing,
   newCadence,
   Participant,
   participants,
   playerCadence,
   poolLevel,
+  targetLevel,
 } from './encounter';
 import { Action } from '../content/entity';
 import { Item } from '../content/item';
@@ -69,14 +72,14 @@ interface DeterministicFightPlan extends FightParams {
 function fightParams(action: Action, state: GameState, registry: Registry): FightParams {
   return {
     duration: attemptDuration(action, state, registry),
-    abilityAmount: toMilliUnits(action.ability ? statValue(action.ability, state, registry) : 1),
+    abilityAmount: hitDamage(action.ability ? statValue(action.ability, state, registry) : 1, 0, registry),
     escapeAfter: action.escapeAfter ?? Infinity,
   };
 }
 
 function fightPlan(action: Action, state: GameState, registry: Registry): DeterministicFightPlan {
   const params = fightParams(action, state, registry);
-  const neededForCompletion = Math.ceil(toMilliUnits(action.health ?? 1) / params.abilityAmount);
+  const neededForCompletion = Math.ceil(IMPLICIT_TARGET_FULL / params.abilityAmount);
   return {
     ...params,
     attemptsToResolve: Math.min(neededForCompletion, params.escapeAfter),
@@ -129,7 +132,6 @@ function resolveDeterministicSegment(segment: Segment, action: Action, segEnd: n
   const active = state.activeAction!;
   const segLen = segEnd - state.time;
   const { duration, abilityAmount, attemptsToResolve, outcome } = fightPlan(action, state, registry);
-  const health = toMilliUnits(action.health ?? 1);
 
   if (active.repeating && duration <= 0) {
     throw new RuntimeError(`repeating action ${active.ownerRef}.${active.actionLabel} resolved a non-positive duration (${duration}) — give it a positive time: or a positive speed stat`);
@@ -151,12 +153,12 @@ function resolveDeterministicSegment(segment: Segment, action: Action, segEnd: n
       return;
     }
     player.attemptsMade = remainder;
-    active.healthRemaining = health - remainder * abilityAmount;
+    active.implicitTarget = IMPLICIT_TARGET_FULL - remainder * abilityAmount;
     player.progress = newProgress;
   } else {
     // Clamped, never wrapped, so applyDueBoundaries can still see the completion.
     player.attemptsMade = Math.min(player.attemptsMade + attemptsThisSegment, attemptsToResolve);
-    active.healthRemaining = health - player.attemptsMade * abilityAmount;
+    active.implicitTarget = IMPLICIT_TARGET_FULL - player.attemptsMade * abilityAmount;
     player.progress = newProgress;
   }
 }
@@ -177,22 +179,17 @@ function resolveAttempt(participant: Participant, segment: Segment): boolean {
         registry,
       );
 
-  if (!action.target) {
-    if (hit) state.activeAction!.healthRemaining -= fightParams(action, state, registry).abilityAmount;
-    return state.activeAction!.healthRemaining <= 0;
-  }
-
-  if (hit) {
-    const dealt = hitDamage(
-      action.ability ? sampleStat(action.ability, state, registry, self) : 1,
-      action.dr ? sampleStat(action.dr, state, registry, other) : 0,
-      registry,
-    );
-    logSwing(state, registry, self, other, dealt);
-    return damagePool(state, registry, other, action.target, dealt, segment.deltas) <= 0;
-  }
-  logSwing(state, registry, self, other, null);
-  return poolLevel(state, registry, other, action.target) <= 0;
+  const dealt = hit
+    ? hitDamage(
+        action.ability ? sampleStat(action.ability, state, registry, self) : 1,
+        action.dr ? sampleStat(action.dr, state, registry, other) : 0,
+        registry,
+      )
+    : null;
+  // A swing is narrated only in a fight: an implicit target is no one to hit.
+  if (action.target) logSwing(state, registry, self, other, dealt);
+  if (dealt === null) return targetLevel(state, registry, action, other) <= 0;
+  return damageTarget(state, registry, action, other, dealt, segment.deltas) <= 0;
 }
 
 // An event queue, not a tick: each participant swings on its own clock.
@@ -256,7 +253,7 @@ function resolveStochasticSegment(segment: Segment, action: Action, segEnd: numb
       }
       if (active.repeating) {
         if (action.target) enterEncounter(active, next.other, state, registry);
-        else active.healthRemaining = toMilliUnits(action.health ?? 1);
+        else active.implicitTarget = IMPLICIT_TARGET_FULL;
         playerCadence(active).attemptsMade = 0;
       } else {
         grantActionFoodBuff(state, registry);
@@ -310,9 +307,9 @@ function applyDueBoundaries(state: GameState, registry: Registry, at: number): v
         changed = true;
       } else if (!resolvesPerAttempt(action)) {
         if (!state.activeAction.repeating) {
-          const { duration, attemptsToResolve, outcome } = fightPlan(action, state, registry);
+          const { duration, outcome } = fightPlan(action, state, registry);
           // The only place a zero-`time:` action fires; no segment advances it.
-          if (playerCadence(state.activeAction).attemptsMade >= attemptsToResolve || duration <= 0) {
+          if (state.activeAction.implicitTarget <= 0 || duration <= 0) {
             const batch = fightBatch(action, 1, outcome);
             applyResultsNow(state, registry, batch.results, batch.count);
             grantActionFoodBuff(state, registry);
@@ -406,7 +403,7 @@ export function armAction(obj: string, objId: string, actionId: string, registry
   }
 
   // First in, so the player wins a tie between cadences due at the same instant.
-  const active: ActiveAction = { ownerRef: `${obj}.${objId}`, actionLabel: actionId, repeating, healthRemaining: toMilliUnits(action.health ?? 1), cadences: { [PLAYER]: newCadence() } };
+  const active: ActiveAction = { ownerRef: `${obj}.${objId}`, actionLabel: actionId, repeating, implicitTarget: IMPLICIT_TARGET_FULL, cadences: { [PLAYER]: newCadence() } };
   state.activeAction = active;
   if (action.target) enterEncounter(active, objId, state, registry);
   return { armed: true, firstUnit: firstUnitSpan(action, state, registry) };

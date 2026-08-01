@@ -44,7 +44,8 @@ export function sampleStat(statId: string, state: GameState, registry: Registry,
 }
 
 export function hitDamage(attack: number, dr: number, registry: Registry): number {
-  return Math.max(toMilliUnits(minDamage(registry)), toMilliUnits(attack - dr));
+  const floor = Math.min(toMilliUnits(minDamage(registry)), toMilliUnits(attack));
+  return Math.max(floor, toMilliUnits(attack - dr));
 }
 
 export function attemptDuration(action: Action, state: GameState, registry: Registry, actorId: string = PLAYER): number {

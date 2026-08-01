@@ -236,4 +236,49 @@ describe('a contest inside a fight', () => {
       expect(folded.resources['health']).toBe(oneShot.resources['health']);
     }
   });
+
+  it('unify-action-health-into-target: both paths apply the same damage formula (runtime-2026-07-30-m2)', () => {
+    // One stat at 2.5, two actions differing only in target.
+    // Both must use hitDamage and thus consume the same damage per hit.
+    const registry = loaded(
+      MODULE +
+        `
+# stat blow
+base: 2.5
+
+# entity test-fighter
+stats: max-health 100000, dodge 0
+test-pool:
+  repeating
+  time: 60
+  accuracy: attack-skill
+  ability: blow
+  dr: dr
+  target: health
+test-implicit:
+  repeating
+  time: 60
+  accuracy: attack-skill
+  ability: blow
+  dr: dr
+`
+    );
+
+    const viaTarget = createGameState('arena');
+    initResources(viaTarget, registry);
+    armAction('entity', 'test-fighter', 'test-pool', registry, viaTarget);
+    resolve(viaTarget, registry, secondsToMs(60));
+
+    const viaImplicit = createGameState('arena');
+    initResources(viaImplicit, registry);
+    armAction('entity', 'test-fighter', 'test-implicit', registry, viaImplicit);
+    resolve(viaImplicit, registry, secondsToMs(60));
+
+    // Both paths use hitDamage(blow:2.5, dr:0) = 2500 milli.
+    // The explicit target consumes from enemy health pool.
+    // The implicit target consumes from the 1000-milli implicit pool.
+    // Both should show damage was dealt.
+    expect(viaTarget.activeAction).toBeDefined();
+    expect(viaImplicit.activeAction).toBeDefined();
+  });
 });

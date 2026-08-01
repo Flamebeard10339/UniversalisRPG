@@ -50,7 +50,6 @@ export function travelAction(originId: string, destId: string, registry: Registr
     label: `Travel to ${dest.title}`,
     results: [{ kind: 'relocate', location: destId }],
     time: locationDistance(origin, dest) * travelSecondsPerUnit(registry),
-    health: 1,
   };
 }
 

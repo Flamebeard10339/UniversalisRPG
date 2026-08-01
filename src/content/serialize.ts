@@ -145,7 +145,6 @@ function actionLines(action: Action): Lines {
     action.ability ||
     action.target ||
     action.dr ||
-    action.health !== undefined ||
     action.escapeAfter !== undefined ||
     action.repeating ||
     action.retaliates;
@@ -166,7 +165,6 @@ function actionLines(action: Action): Lines {
   if (action.ability) lines.push(`  ability: ${action.ability}`);
   if (action.target) lines.push(`  target: ${action.target}`);
   if (action.dr) lines.push(`  dr: ${action.dr}`);
-  if (action.health !== undefined) lines.push(`  health: ${n(action.health)}`);
   if (action.escapeAfter !== undefined) lines.push(`  escape after ${n(action.escapeAfter)}`);
   lines.push(...indented(action.results.map(result)));
   resultBlock(lines, '  on success', action.onSuccess, 4);

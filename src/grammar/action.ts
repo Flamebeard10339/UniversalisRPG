@@ -26,8 +26,6 @@ export interface Action {
   // Naming a pool is what makes an action a fight rather than a fixed count of hits.
   target?: string;
   dr?: string;
-  // Absent is 1, so an action with none of these fields completes in one hit.
-  health?: number;
   escapeAfter?: number;
   repeating?: boolean;
   // The owner's own move in an encounter, never offered to the player.
@@ -80,7 +78,6 @@ const ACTION_FIELDS: readonly { written: string; label: RegExp; name: keyof Omit
   { written: 'ability', label: /ability:[ \t]*/, name: 'ability', value: statValue },
   { written: 'target', label: /target:[ \t]*/, name: 'target', value: statValue },
   { written: 'dr', label: /dr:[ \t]*/, name: 'dr', value: statValue },
-  { written: 'health', label: /health:[ \t]*/, name: 'health', value: nonNegative('health') },
   { written: 'escape after', label: /escape after[ \t]+/, name: 'escapeAfter', value: positiveCount('escape after') },
 ];
 
