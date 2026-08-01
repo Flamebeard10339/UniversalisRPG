@@ -101,6 +101,10 @@ function gitFixture(run: (context: { dir: string; commit: (message: string) => s
     writeFileSync(systemsPath, JSON.stringify({ unowned: { note: '', paths: ['docs', '*.md'] }, systems: [] }), 'utf8');
     const storePath = path.join(dir, 'tasks.jsonl');
     const globals = ['--store', storePath, '--systems', systemsPath, '--specs-dir', specsDir, '--branch', 'demo-spec'];
+    spawnSync('git', ['add', '.'], { cwd: dir });
+    spawnSync('git', ['commit', '--no-verify', '-m', 'Initial fixture\n\nA branch base exists.'], { cwd: dir, encoding: 'utf8' });
+    spawnSync('git', ['branch', '-M', 'main'], { cwd: dir });
+    spawnSync('git', ['checkout', '-q', '-b', 'demo-spec'], { cwd: dir });
 
     run({
       dir,
@@ -1175,6 +1179,25 @@ describe('tasks CLI', () => {
     });
   });
 
+  it('clause-shaped evidence after a finding still goes to the clause rather than overwriting the finding', () => {
+    fixture(({ tasks }) => {
+      const result = tasks('audit', 'demo-spec', '--proof', '1=met', '--proof', '2=unmet', '--finding', 'some bug', '--severity', 'low', '--deliverable', 'fix it', '--evidence', 'broken here', '--evidence', '2=the clause did not hold');
+      expect(result.status).toBe(0);
+      expect(tasks('show', 'demo-spec-clause-2').stdout).toContain('evidence: the clause did not hold');
+      const id = tasks('list', '--kind', 'finding', '--state', 'unreviewed').stdout.split('\n')[0].split(' ')[0];
+      expect(tasks('show', id).stdout).toContain('evidence: broken here');
+    });
+  });
+
+  it('audit refuses a second bare finding evidence instead of silently replacing the first', () => {
+    fixture(({ tasks }) => {
+      const result = tasks('audit', 'demo-spec', '--proof', '1=met', '--proof', '2=met', '--finding', 'some bug', '--severity', 'low', '--deliverable', 'fix it', '--evidence', 'first evidence', '--evidence', 'replacement evidence');
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain('already has evidence');
+      expect(tasks('list', '--kind', 'finding').stdout).toContain('0 task(s)');
+    });
+  });
+
   it('audit carries a --finding\'s --deliverable onto the finding task it creates', () => {
     fixture(({ tasks }) => {
       tasks('audit', 'demo-spec', '--proof', '1=met', '--proof', '2=met', '--finding', 'a real bug', '--severity', 'high', '--deliverable', 'guard the null case', '--evidence', 'null deref on an empty save');
@@ -1337,6 +1360,18 @@ describe('tasks CLI', () => {
       expect(result.stderr).toContain('proof clause 2 target failed');
       expect(result.stderr).toContain('command node --definitely-not-a-real-node-flag');
       expect(result.stderr).not.toContain('proof clause 1 target failed');
+    });
+  });
+
+  it('check --merge refuses when commits landed after the latest audit pass', () => {
+    gitFixture(({ commit, tasks }) => {
+      tasks('audit', 'demo-spec', '--proof', '1=met');
+      commit('Later implementation\n\nA body after the audit.');
+
+      const result = tasks('check', '--merge');
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain('latest audit pass');
+      expect(result.stderr).toContain('1 commit(s) after that audit');
     });
   });
 
@@ -1503,6 +1538,33 @@ describe('tasks CLI', () => {
       const result = tasks('handoff');
       expect(result.status).toBe(0);
       expect(result.stdout).toContain('no Next: trailer found');
+    });
+  });
+
+  it('handoff says the scan cap was reached instead of claiming the branch has no plan', () => {
+    gitFixture(({ dir, commit, tasks }) => {
+      commit('Previous branch landed\n\nA body.');
+      spawnSync('git', ['branch', '-M', 'main'], { cwd: dir });
+      spawnSync('git', ['checkout', '-q', '-b', 'demo-spec'], { cwd: dir });
+      commit('Branch plan\n\nA body.\n\nNext: the older branch-local plan.');
+      for (let i = 0; i < 21; i++) commit(`Fixup ${i}\n\nA mechanical commit with no trailer.`);
+
+      const result = tasks('handoff');
+      expect(result.status).toBe(0);
+      expect(result.stdout).not.toContain('the older branch-local plan');
+      expect(result.stdout).toContain('no Next: trailer found in the last 20 branch commits');
+      expect(result.stdout).not.toContain('nothing recorded since it left main');
+    });
+  });
+
+  it('handoff skips the Next scan when the base branch cannot be resolved', () => {
+    gitFixture(({ commit, tasks }) => {
+      commit('Previous branch landed\n\nA body.\n\nNext: other branch plan.');
+
+      const result = tasks('handoff', '--base-branch', 'missing-base');
+      expect(result.status).toBe(0);
+      expect(result.stdout).not.toContain('other branch plan');
+      expect(result.stdout).toContain('could not find the branch point for missing-base');
     });
   });
 

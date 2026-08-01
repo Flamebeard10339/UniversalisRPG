@@ -291,7 +291,8 @@ function cmdCheck(flags: Record<string, string>): void {
     members: tasks.filter((task) => task.spec === spec),
   });
   const proofIssues = doc ? runProofTargets(doc) : [];
-  const allMergeIssues = [...mergeIssues, ...proofIssues];
+  const auditIssues = doc ? [staleAuditIssue(spec, doc)].filter((issue): issue is string => issue !== null) : [];
+  const allMergeIssues = [...mergeIssues, ...proofIssues, ...auditIssues];
   for (const issue of allMergeIssues) console.error(`merge gate: ${issue}`);
   console.log(`merge gate: ${allMergeIssues.length} issue(s)`);
   if (allMergeIssues.length > 0) process.exitCode = 1;
@@ -343,6 +344,23 @@ function currentHead(): string | null {
     return execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
   } catch {
     return null;
+  }
+}
+
+function staleAuditIssue(spec: string, doc: ReturnType<typeof parseSpecDoc>): string | null {
+  const latest = doc.auditPasses[doc.auditPasses.length - 1];
+  if (!latest || latest.head === '') return null;
+  const head = currentHead();
+  if (head === null || head === latest.head) return null;
+
+  const ancestor = spawnSync('git', ['merge-base', '--is-ancestor', latest.head, 'HEAD'], { stdio: 'ignore' });
+  if (ancestor.status !== 0) return `${spec}'s latest audit pass reviewed ${latest.head}, which is not reachable from HEAD`;
+
+  try {
+    const count = execFileSync('git', ['rev-list', '--count', `${latest.head}..HEAD`], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+    return `${spec}'s latest audit pass reviewed ${latest.head}; HEAD has ${count} commit(s) after that audit`;
+  } catch {
+    return `${spec}'s latest audit pass reviewed ${latest.head}, but commits after it could not be counted`;
   }
 }
 
@@ -1354,6 +1372,7 @@ interface AuditArgs {
   baseBranch: string;
   proofs: Map<number, Verdict>;
   evidence: Map<number, string>;
+  errors: string[];
   // Files named for an unmet proof clause — where the undelivered task
   // this pass creates for it should tell the next session to start.
   clauseFiles: Map<number, string[]>;
@@ -1376,6 +1395,7 @@ function parseAuditArgs(args: string[]): AuditArgs {
   let baseBranch = 'main';
   const proofs = new Map<number, Verdict>();
   const evidence = new Map<number, string>();
+  const errors: string[] = [];
   const clauseFiles = new Map<number, string[]>();
   const findings: AuditFinding[] = [];
   let slug: string | null = null;
@@ -1398,7 +1418,15 @@ function parseAuditArgs(args: string[]): AuditArgs {
       const [clause, status] = (value ?? '').split('=');
       proofs.set(Number(clause), status as Verdict);
     } else if (key === 'evidence' && current) {
-      current.evidence = value ?? null;
+      const raw = value ?? '';
+      const eq = raw.indexOf('=');
+      if (eq > 0 && Number.isFinite(Number(raw.slice(0, eq)))) {
+        evidence.set(Number(raw.slice(0, eq)), raw.slice(eq + 1));
+      } else if (current.evidence !== null) {
+        errors.push(`finding "${current.title}" already has evidence`);
+      } else {
+        current.evidence = raw;
+      }
     } else if (key === 'evidence') {
       const eq = (value ?? '').indexOf('=');
       evidence.set(Number((value ?? '').slice(0, eq)), (value ?? '').slice(eq + 1));
@@ -1423,7 +1451,7 @@ function parseAuditArgs(args: string[]): AuditArgs {
       clauseFiles.set(clause, existing);
     }
   }
-  return { slug, configFlags, baseBranch, proofs, evidence, clauseFiles, findings };
+  return { slug, configFlags, baseBranch, proofs, evidence, errors, clauseFiles, findings };
 }
 
 const AUDIT_USAGE =
@@ -1464,6 +1492,11 @@ async function cmdAudit(rawArgs: string[]): Promise<void> {
   const parsed = parseAuditArgs(rawArgs);
   if (!parsed.slug) {
     console.error(AUDIT_USAGE);
+    process.exitCode = 1;
+    return;
+  }
+  if (parsed.errors.length > 0) {
+    console.error(`error: ${parsed.errors[0]}`);
     process.exitCode = 1;
     return;
   }
@@ -1612,16 +1645,21 @@ interface FoundTrailer {
   distance: number;
 }
 
+type BranchCommitRange =
+  | { kind: 'range'; range: string; count: number }
+  | { kind: 'empty'; range: null; count: 0 }
+  | { kind: 'unknown'; range: null; count: 0 };
+
 // The branch's own commits, or null when that range can't be built or is
 // empty — the latter being the base branch itself, where "this branch's
 // work" is the whole history and the unscoped walk is the right one.
-function branchCommitRange(baseBranch: string): string | null {
+function branchCommitRange(baseBranch: string): BranchCommitRange {
   try {
     const mergeBase = execFileSync('git', ['merge-base', baseBranch, 'HEAD'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
-    const count = execFileSync('git', ['rev-list', '--count', `${mergeBase}..HEAD`], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
-    return count === '0' ? null : `${mergeBase}..HEAD`;
+    const count = Number(execFileSync('git', ['rev-list', '--count', `${mergeBase}..HEAD`], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim());
+    return count === 0 ? { kind: 'empty', range: null, count } : { kind: 'range', range: `${mergeBase}..HEAD`, count };
   } catch {
-    return null;
+    return { kind: 'unknown', range: null, count: 0 };
   }
 }
 
@@ -1663,10 +1701,12 @@ function cmdHandoff(args: Flags): void {
   console.log(`branch: ${config.branch}`);
 
   const baseBranch = args.flags['base-branch'] ?? 'main';
-  const range = branchCommitRange(baseBranch);
-  const found = findLatestNextTrailer(range);
-  if (found === null) {
-    console.log(range === null ? '(no Next: trailer found in the last 20 commits)' : `(no Next: trailer yet on this branch — nothing recorded since it left ${baseBranch})`);
+  const branchRange = branchCommitRange(baseBranch);
+  const found = branchRange.kind === 'range' ? findLatestNextTrailer(branchRange.range) : null;
+  if (branchRange.kind === 'unknown') {
+    console.log(`(could not find the branch point for ${baseBranch}; Next trailer scan skipped)`);
+  } else if (found === null) {
+    console.log(branchRange.kind === 'empty' ? `(no Next: trailer yet on this branch — nothing recorded since it left ${baseBranch})` : branchRange.count > 20 ? '(no Next: trailer found in the last 20 branch commits)' : `(no Next: trailer yet on this branch; no Next: trailer found in ${branchRange.count} branch commit${branchRange.count === 1 ? '' : 's'} since it left ${baseBranch})`);
   } else {
     if (found.distance > 0) console.log(`(from ${found.sha.slice(0, 7)}, ${found.distance} commit${found.distance === 1 ? '' : 's'} back)`);
     console.log(found.trailer);
