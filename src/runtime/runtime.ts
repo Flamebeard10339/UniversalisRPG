@@ -18,6 +18,7 @@ import {
   applyResultsNow,
   captureResourceRates,
   clampResources,
+  getDelta,
   Segment,
   settlePools,
 } from './effects';
@@ -56,6 +57,13 @@ export type { ActiveAction, ActorState, Cadence, EncounterFoe, EncounterView } f
 export { choose, talk } from './dialogue-runtime';
 export type { DialogueSession } from './dialogue-runtime';
 
+
+function hasDeltas(deltas: Map<string, Map<string, number>>): boolean {
+  for (const actorDeltas of deltas.values()) {
+    if (actorDeltas.size > 0) return true;
+  }
+  return false;
+}
 
 interface FightParams {
   duration: number; // milliseconds per attempt
@@ -285,7 +293,7 @@ function resolveSegment(state: GameState, registry: Registry, segEnd: number): v
 
   // Over the time actually consumed: a segment can stop short of segEnd.
   const elapsed = state.time - start;
-  if (elapsed > 0 || segment.deltas.size > 0) settlePools(state, registry, snapshots, Math.max(0, elapsed), segment.deltas);
+  if (elapsed > 0 || hasDeltas(segment.deltas)) settlePools(state, registry, snapshots, Math.max(0, elapsed), segment.deltas);
 }
 
 function applyDueBoundaries(state: GameState, registry: Registry, at: number): void {

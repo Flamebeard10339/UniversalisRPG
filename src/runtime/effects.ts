@@ -2,7 +2,7 @@ import { ActionResult } from '../grammar/actionResult';
 import { DISCOVERED } from '../content/location';
 import { Registry } from '../content/registry';
 import { Resource } from '../content/resource';
-import { endAction, GameState, RuntimeError } from './state';
+import { endAction, GameState, PLAYER, RuntimeError } from './state';
 import { statValue } from './stats';
 import { divideRateRemainder, toMilliUnits } from './units';
 
@@ -14,7 +14,17 @@ export interface Segment {
   // Control flow, not a write: only the segment's owner may end the action.
   stopped: boolean;
 }
-export type PoolDeltas = Map<string, number>;
+export type PoolDeltas = Map<string, Map<string, number>>;
+
+export function addDelta(deltas: PoolDeltas, actorId: string, resourceId: string, milliAmount: number): void {
+  if (!deltas.has(actorId)) deltas.set(actorId, new Map());
+  const actorDeltas = deltas.get(actorId)!;
+  actorDeltas.set(resourceId, (actorDeltas.get(resourceId) ?? 0) + milliAmount);
+}
+
+export function getDelta(deltas: PoolDeltas, actorId: string, resourceId: string): number {
+  return deltas.get(actorId)?.get(resourceId) ?? 0;
+}
 
 export function applyResults(segment: Segment, results: readonly ActionResult[], count = 1): void {
   if (count <= 0) return;
@@ -58,7 +68,7 @@ export function applyResults(segment: Segment, results: readonly ActionResult[],
         break;
       case 'pool':
         requireResource(registry, result.resource);
-        segment.deltas.set(result.resource, (segment.deltas.get(result.resource) ?? 0) + toMilliUnits(result.delta) * count);
+        addDelta(segment.deltas, PLAYER, result.resource, toMilliUnits(result.delta) * count);
         break;
       case 'stop':
         segment.stopped = true;
@@ -85,16 +95,23 @@ export function initResources(state: GameState, registry: Registry): void {
 
 export interface ResourceSnapshot {
   resource: Resource;
+  actorId: string;
   ratePerMinute: number;
   max: number;
 }
 
 export function captureResourceRates(state: GameState, registry: Registry): ResourceSnapshot[] {
   const snapshots: ResourceSnapshot[] = [];
-  for (const resource of registry.resources.values()) {
-    const ratePerMinute = resource.rate ? toMilliUnits(statValue(resource.rate, state, registry)) : 0;
-    if (ratePerMinute === 0) continue;
-    snapshots.push({ resource, ratePerMinute, max: toMilliUnits(statValue(resource.max, state, registry)) });
+  const actors = [PLAYER];
+  if (state.activeAction?.actors) {
+    actors.push(...Object.keys(state.activeAction.actors));
+  }
+  for (const actorId of actors) {
+    for (const resource of registry.resources.values()) {
+      const ratePerMinute = resource.rate ? toMilliUnits(statValue(resource.rate, state, registry, actorId)) : 0;
+      if (ratePerMinute === 0) continue;
+      snapshots.push({ resource, actorId, ratePerMinute, max: toMilliUnits(statValue(resource.max, state, registry, actorId)) });
+    }
   }
   return snapshots;
 }
@@ -132,18 +149,45 @@ export function requireResource(registry: Registry, resourceId: string): Resourc
 
 // Iterates the registry, not the deltas, so settle order is split-independent.
 export function settlePools(state: GameState, registry: Registry, snapshots: ResourceSnapshot[], dt: number, deltas: PoolDeltas): void {
-  const rated = new Map(snapshots.map((snapshot) => [snapshot.resource.id, snapshot]));
+  const ratedByActor = new Map<string, Map<string, ResourceSnapshot>>();
+  for (const snapshot of snapshots) {
+    if (!ratedByActor.has(snapshot.actorId)) {
+      ratedByActor.set(snapshot.actorId, new Map());
+    }
+    ratedByActor.get(snapshot.actorId)!.set(snapshot.resource.id, snapshot);
+  }
 
   for (const resource of registry.resources.values()) {
-    const snapshot = rated.get(resource.id);
-    const delta = deltas.get(resource.id) ?? 0;
-    if (!snapshot && delta === 0) continue;
-    const current = state.resources[resource.id] ?? 0;
-    const rateAcc = snapshot ? snapshot.ratePerMinute * dt + (state.resourceRateRemainders[resource.id] ?? 0) : 0;
-    const rate = snapshot ? divideRateRemainder(rateAcc) : { units: 0, remainder: 0 };
-    const raw = current + delta + rate.units;
-    const result = setPoolLevel(state, registry, resource, current, raw, snapshot?.max ?? toMilliUnits(statValue(resource.max, state, registry)));
-    if (snapshot) state.resourceRateRemainders[resource.id] = result === 'clamped' ? 0 : rate.remainder;
+    // Settle player pools with full handlers
+    {
+      const snapshot = ratedByActor.get(PLAYER)?.get(resource.id);
+      const delta = getDelta(deltas, PLAYER, resource.id);
+      if (!snapshot && delta === 0) {
+        // Skip, but check other actors below
+      } else {
+        const current = state.resources[resource.id] ?? 0;
+        const rateAcc = snapshot ? snapshot.ratePerMinute * dt + (state.resourceRateRemainders[resource.id] ?? 0) : 0;
+        const rate = snapshot ? divideRateRemainder(rateAcc) : { units: 0, remainder: 0 };
+        const raw = current + delta + rate.units;
+        const result = setPoolLevel(state, registry, resource, current, raw, snapshot?.max ?? toMilliUnits(statValue(resource.max, state, registry)));
+        if (snapshot) state.resourceRateRemainders[resource.id] = result === 'clamped' ? 0 : rate.remainder;
+      }
+    }
+
+    // Settle enemy pools with clamping only
+    for (const [actorId, actor] of Object.entries(state.activeAction?.actors ?? {})) {
+      const snapshot = ratedByActor.get(actorId)?.get(resource.id);
+      const delta = getDelta(deltas, actorId, resource.id);
+      if (!snapshot && delta === 0) continue;
+      const current = actor.resources[resource.id] ?? 0;
+      const rateAcc = snapshot ? snapshot.ratePerMinute * dt + (actor.rateRemainders[resource.id] ?? 0) : 0;
+      const rate = snapshot ? divideRateRemainder(rateAcc) : { units: 0, remainder: 0 };
+      const raw = current + delta + rate.units;
+      const max = snapshot?.max ?? toMilliUnits(statValue(resource.max, state, registry, actorId));
+      const clamped = Math.min(max, Math.max(0, raw));
+      actor.resources[resource.id] = clamped;
+      if (snapshot) actor.rateRemainders[resource.id] = clamped === raw ? rate.remainder : 0;
+    }
   }
 }
 

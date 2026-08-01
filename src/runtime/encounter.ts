@@ -1,6 +1,6 @@
 import { Action } from '../content/entity';
 import { attemptDuration, statValue } from './stats';
-import { PoolDeltas, requireResource } from './effects';
+import { PoolDeltas, requireResource, addDelta } from './effects';
 import { Registry } from '../content/registry';
 import { findActiveAction, parseOwnerRef } from './actions';
 import { GameState, PLAYER, RuntimeError } from './state';
@@ -29,6 +29,7 @@ export function newCadence(): Cadence {
 
 export interface ActorState {
   resources: Record<string, number>;
+  rateRemainders: Record<string, number>;
 }
 
 export function playerCadence(active: ActiveAction): Cadence {
@@ -43,7 +44,7 @@ export function enterEncounter(active: ActiveAction, actorId: string, state: Gam
   for (const resource of registry.resources.values()) {
     resources[resource.id] = toMilliUnits(statValue(resource.max, state, registry, actorId));
   }
-  (active.actors ??= {})[actorId] = { resources };
+  (active.actors ??= {})[actorId] = { resources, rateRemainders: {} };
   if (retaliationOf(actorId, registry)) active.cadences[actorId] = newCadence();
   else delete active.cadences[actorId];
 }
@@ -156,19 +157,15 @@ export function poolLevel(state: GameState, registry: Registry, actorId: string,
   return actorInEncounter(state, actorId).resources[resourceId] ?? 0;
 }
 
-// An enemy's damage is written on the spot: no rate to net against. Neither path
-// runs a non-player's `on empty`/`on full`, authored in the player's voice.
+// Damage is accrued as a delta for all actors, settled at segment end. Neither
+// path runs a non-player's `on empty`/`on full`, authored in the player's voice.
 export function damagePool(state: GameState, registry: Registry, actorId: string, resourceId: string, milliAmount: number, deltas: PoolDeltas): number {
-  const resource = requireResource(registry, resourceId);
+  requireResource(registry, resourceId);
+  addDelta(deltas, actorId, resourceId, -milliAmount);
+  // Where the segment is heading; the clamped write happens at segment end.
   if (actorId === PLAYER) {
-    const pending = (deltas.get(resourceId) ?? 0) - milliAmount;
-    deltas.set(resourceId, pending);
-    // Where the segment is heading; the clamped write happens at segment end.
-    return Math.max(0, (state.resources[resourceId] ?? 0) + pending);
+    return Math.max(0, (state.resources[resourceId] ?? 0) + (deltas.get(actorId)?.get(resourceId) ?? 0));
   }
   const pools = actorInEncounter(state, actorId).resources;
-  const max = toMilliUnits(statValue(resource.max, state, registry, actorId));
-  const level = Math.min(max, Math.max(0, (pools[resource.id] ?? 0) - milliAmount));
-  pools[resource.id] = level;
-  return level;
+  return Math.max(0, (pools[resourceId] ?? 0) + (deltas.get(actorId)?.get(resourceId) ?? 0));
 }
