@@ -1,17 +1,17 @@
 import { Action } from '../content/entity';
 import { attemptDuration, statValue } from './stats';
-import { PoolDeltas, requireResource } from './effects';
+import { addDelta, getDelta, PoolDeltas, requireResource } from './effects';
 import { Registry } from '../content/registry';
 import { findActiveAction, parseOwnerRef } from './actions';
 import { GameState, PLAYER, RuntimeError } from './state';
 import { humanize } from '../grammar/values';
-import { fromMilliUnits, toMilliUnits } from './units';
+import { fromMilliUnits, toMilliUnits, MILLI_UNITS } from './units';
 
 export interface ActiveAction {
   ownerRef: string; // "<obj>.<objId>", e.g. "entity.oven"
   actionLabel: string;
   repeating: boolean;
-  healthRemaining: number;
+  implicitTarget: number;
   // Insertion order breaks ties between clocks due at the same instant.
   cadences: Record<string, Cadence>;
   // Scoped to the fight and vanish with it, where the player's pools persist.
@@ -29,11 +29,14 @@ export function newCadence(): Cadence {
 
 export interface ActorState {
   resources: Record<string, number>;
+  rateRemainders: Record<string, number>;
 }
 
 export function playerCadence(active: ActiveAction): Cadence {
   return active.cadences[PLAYER];
 }
+
+export const IMPLICIT_TARGET_FULL = MILLI_UNITS;
 
 // The actor's own max, not initResources' `start`, a player-lifecycle concept.
 export function enterEncounter(active: ActiveAction, actorId: string, state: GameState, registry: Registry): void {
@@ -41,7 +44,7 @@ export function enterEncounter(active: ActiveAction, actorId: string, state: Gam
   for (const resource of registry.resources.values()) {
     resources[resource.id] = toMilliUnits(statValue(resource.max, state, registry, actorId));
   }
-  (active.actors ??= {})[actorId] = { resources };
+  (active.actors ??= {})[actorId] = { resources, rateRemainders: {} };
   if (retaliationOf(actorId, registry)) active.cadences[actorId] = newCadence();
   else delete active.cadences[actorId];
 }
@@ -124,13 +127,33 @@ export function encounterView(state: GameState, registry: Registry): EncounterVi
   return { cadence: fractionOf(playerCadence(active), PLAYER, action), foes };
 }
 
+export function targetLevel(state: GameState, registry: Registry, action: Action, actorId: string): number {
+  if (!action.target) return state.activeAction!.implicitTarget;
+  return poolLevel(state, registry, actorId, action.target);
+}
+
+export function damageTarget(state: GameState, registry: Registry, action: Action, actorId: string, milliAmount: number, deltas: PoolDeltas): number {
+  if (!action.target) {
+    const active = state.activeAction!;
+    active.implicitTarget -= milliAmount;
+    return active.implicitTarget;
+  }
+  return damagePool(state, registry, actorId, action.target, milliAmount, deltas);
+}
+
+// Rounded, because the log is prose: sub-unit precision belongs in the pool,
+// not in a sentence reporting a hit for 4.873.
+function spoken(milliAmount: number): string {
+  return String(Math.round(fromMilliUnits(milliAmount) * 10) / 10);
+}
+
 export function logSwing(state: GameState, registry: Registry, self: string, other: string, damage: number | null): void {
   if (self === PLAYER) {
     const title = actorTitle(other, registry);
-    state.log.push(damage === null ? `You miss the ${title}.` : `You hit the ${title} for ${damage}.`);
+    state.log.push(damage === null ? `You miss the ${title}.` : `You hit the ${title} for ${spoken(damage)}.`);
   } else {
     const title = actorTitle(self, registry);
-    state.log.push(damage === null ? `The ${title} misses you.` : `The ${title} hits you for ${damage}.`);
+    state.log.push(damage === null ? `The ${title} misses you.` : `The ${title} hits you for ${spoken(damage)}.`);
   }
 }
 
@@ -140,20 +163,11 @@ export function poolLevel(state: GameState, registry: Registry, actorId: string,
   return actorInEncounter(state, actorId).resources[resourceId] ?? 0;
 }
 
-// An enemy's damage is written on the spot: no rate to net against. Neither path
-// runs a non-player's `on empty`/`on full`, authored in the player's voice.
-export function damagePool(state: GameState, registry: Registry, actorId: string, resourceId: string, amount: number, deltas: PoolDeltas): number {
-  const resource = requireResource(registry, resourceId);
-  const milliAmount = toMilliUnits(amount);
-  if (actorId === PLAYER) {
-    const pending = (deltas.get(resourceId) ?? 0) - milliAmount;
-    deltas.set(resourceId, pending);
-    // Where the segment is heading; the clamped write happens at segment end.
-    return Math.max(0, (state.resources[resourceId] ?? 0) + pending);
-  }
-  const pools = actorInEncounter(state, actorId).resources;
-  const max = toMilliUnits(statValue(resource.max, state, registry, actorId));
-  const level = Math.min(max, Math.max(0, (pools[resource.id] ?? 0) - milliAmount));
-  pools[resource.id] = level;
-  return level;
+// Accrued for every actor alike, so where a caller splits a span cannot change
+// the level reached. Neither path runs a non-player's `on empty`/`on full`,
+// authored in the player's voice.
+export function damagePool(state: GameState, registry: Registry, actorId: string, resourceId: string, milliAmount: number, deltas: PoolDeltas): number {
+  addDelta(deltas, actorId, resourceId, -milliAmount);
+  // Where the segment is heading; the clamped write happens at segment end.
+  return Math.max(0, poolLevel(state, registry, actorId, resourceId) + getDelta(deltas, actorId, resourceId));
 }

@@ -9,8 +9,8 @@ export function travelSecondsPerUnit(registry: Registry): number {
 
 const DEFAULT_MIN_DAMAGE = 1;
 
-// Clamped above zero because a fight that deals no damage never depletes its
-// target and never ends.
+// Clamped above zero because a fight whose hits are fully absorbed never
+// depletes its target and never ends.
 export function minDamage(registry: Registry): number {
   return Math.max(1, registry.variables.get(MIN_DAMAGE)?.value ?? DEFAULT_MIN_DAMAGE);
 }

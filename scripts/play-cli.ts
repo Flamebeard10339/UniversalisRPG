@@ -4,6 +4,7 @@ import { createInterface } from 'node:readline/promises';
 import { pathToFileURL } from 'node:url';
 import { DslError } from '../src/grammar/parser';
 import { actionFirstUnit, craftFirstUnit, describeCondition, encounterView, initResources, PLAYER, RuntimeError, type ActiveAction, type GameState } from '../src/runtime/runtime';
+import { findActiveAction } from '../src/runtime/actions';
 import { formatModuleDiagnostic, loadUniverseWithDiagnostics } from '../src/content/registry';
 import { type ModuleSource } from '../src/content/universe';
 import {
@@ -151,7 +152,11 @@ function formatView(v: PlayView): string[] {
 
 function formatInventory(state: GameState): string[] {
   const inventory = Object.fromEntries(Object.entries(state.inventory).filter(([, count]) => count > 0));
-  return [`Inventory: ${JSON.stringify(inventory)}`, `XP: ${JSON.stringify(state.xp)}`];
+  const lines = [`Inventory: ${JSON.stringify(inventory)}`, `XP: ${JSON.stringify(state.xp)}`];
+  if (Object.keys(state.equipped).length > 0) {
+    lines.push(`Equipped: ${JSON.stringify(state.equipped)}`);
+  }
+  return lines;
 }
 
 function formatState(session: PlaySession): string[] {
@@ -204,8 +209,17 @@ function canonicalDirective(directive: Directive): string {
       return 'cancel';
     case 'wait':
       return `wait: ${directive.seconds}`;
-    default:
-      throw new Error(`canonicalDirective: unexpected directive kind: ${(directive as Directive).kind}`);
+    case 'equip':
+      return `equip: ${directive.item}`;
+    case 'unequip':
+      return `unequip: ${directive.slot}`;
+    // Exhaustive, so widening Directive is a type error here rather than a
+    // throw at the moment a player picks the new kind. These three are
+    // authored, never recorded, so they never reach this.
+    case 'run':
+    case 'expect':
+    case 'assert':
+      throw new RuntimeError(`canonicalDirective: ${directive.kind}: is authored, not recorded`);
   }
 }
 
@@ -578,9 +592,10 @@ export function liveTick(session: PlaySession, elapsedMs: number, multiplier: nu
   const duration = cycleDuration(session, after);
   const clock = after.cadences[PLAYER];
   const bar = duration > 0 ? progressBar(clock.progress / duration) : progressBar(1);
-  // `healthRemaining` is the older single-target counter, meaningless in a fight.
-  const showCombat = clock.attemptsMade > 0 || after.healthRemaining < toMilliUnits(1);
-  const detail = liveCombatDetail(session) || (showCombat ? ` hits:${clock.attemptsMade} target-hp:${fromMilliUnits(after.healthRemaining).toFixed(1)}` : '');
+  // Show implicit target progress only when there's no real target to narrate.
+  const action = findActiveAction(after, session.registry);
+  const showImplicitTarget = clock.attemptsMade > 0 || after.implicitTarget < toMilliUnits(1);
+  const detail = liveCombatDetail(session) || (!action.target && showImplicitTarget ? ` hits:${clock.attemptsMade} completion:${fromMilliUnits(after.implicitTarget).toFixed(1)}` : '');
   const line = `${label}... ${bar}${detail}  [time: ${msToSeconds(session.state.time).toFixed(1)}s]`;
   return { active: true, line };
 }

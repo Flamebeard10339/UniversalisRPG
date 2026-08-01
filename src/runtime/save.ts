@@ -5,7 +5,7 @@ import { findActionOwner, parseOwnerRef } from './actions';
 import { PLAYER } from './state';
 
 // Bumped on any shape change; with no migration path, a stale save is rejected.
-export const SAVE_VERSION = 5;
+export const SAVE_VERSION = 6;
 
 // A sparse diff against initialState: a new game saves as `{}`, and `log` is not state.
 export type SaveDiff = Partial<Omit<GameState, 'log'>>;
@@ -43,10 +43,11 @@ const SAVE_FIELDS: Record<SaveField, SaveFieldRule> = {
   xp: { shape: 'record', holds: isNumber, prune: { of: 'skill', loaded: (registry, id) => registry.skills.has(id) } },
   resources: { shape: 'record', holds: isInteger, prune: { of: 'resource', loaded: (registry, id) => registry.resources.has(id) } },
   resourceRateRemainders: { shape: 'record', holds: isInteger, prune: { of: 'resource', loaded: (registry, id) => registry.resources.has(id) } },
+  equipped: { shape: 'record', holds: (value) => typeof value === 'string', prune: 'pruned by a rule of its own' },
   activeBuffs: { shape: 'record', holds: isObject, prune: 'pruned by a rule of its own' },
   activeAction: { shape: 'scalar', holds: (value) => value === null || isObject(value), prune: 'pruned by a rule of its own' },
   time: { shape: 'scalar', holds: isInteger, prune: 'holds no registry id' },
-  rng: { shape: 'scalar', holds: isNumber, prune: 'holds no registry id' },
+  rng: { shape: 'scalar', holds: isInteger, prune: 'holds no registry id' },
   player: { shape: 'scalar', holds: isObject, prune: 'holds no registry id' },
   pendingModal: { shape: 'scalar', holds: (value) => value === undefined || typeof value === 'string', prune: 'holds no registry id' },
 };
@@ -151,6 +152,14 @@ export function pruneStateForRegistry(state: GameState, registry: Registry): Pru
     if (!missing) continue;
     delete state.activeBuffs[key];
     addWarning(warnings, `activeBuffs.${key}`, key, `Removed active buff ${key} because its ${missing} is not loaded.`);
+  }
+
+  for (const [slot, itemId] of Object.entries(state.equipped)) {
+    const item = registry.items.get(itemId);
+    const missing = !item ? `item ${itemId} is not loaded` : item.slot !== slot ? `item ${itemId} no longer declares that slot` : undefined;
+    if (!missing) continue;
+    delete state.equipped[slot];
+    addWarning(warnings, `equipped.${slot}`, itemId, `Unequipped ${slot} because its ${missing}.`);
   }
 
   const activeProblem = activeActionProblem(state, registry);

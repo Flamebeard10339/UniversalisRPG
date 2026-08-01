@@ -1,7 +1,7 @@
 import { Action } from '../content/entity';
 import { Location } from '../content/location';
 import {
-  actionVisible, ArmResult, armAction, armCraft, armTravel, craft, describeCondition, DialogueSession, encounterView, EncounterView, endAction, evaluateCondition, GameState, RuntimeError, choose, createGameState, initResources, recipeCraftable, renderSegments, requiresMet, resolve, statValue, talk, useAction, useTravel } from './runtime';
+  actionVisible, ArmResult, armAction, armCraft, armTravel, craft, describeCondition, DialogueSession, encounterView, EncounterView, endAction, equip, evaluateCondition, GameState, RuntimeError, choose, createGameState, initResources, recipeCraftable, renderSegments, requiresMet, resolve, statValue, talk, unequip, useAction, useTravel } from './runtime';
 import { Registry } from '../content/registry';
 import { ResourceDisplay } from '../content/resource';
 import { compareSave, loadSave, startingLocationId } from './save';
@@ -9,7 +9,7 @@ import { Directive } from '../content/test';
 import { humanize } from '../grammar/values';
 import { fromMilliUnits, msToSeconds, secondsToMs } from './units';
 
-export type PlayChoiceKind = 'talk' | 'action' | 'travel' | 'dialogue' | 'craft';
+export type PlayChoiceKind = 'talk' | 'action' | 'travel' | 'dialogue' | 'craft' | 'equip' | 'unequip';
 
 export interface PlayChoice {
   id: string;
@@ -99,6 +99,14 @@ function locationChoices(session: PlaySession): PlayChoice[] {
     for (const action of availableActions(item, state)) {
       choices.push({ id: `use:item.${itemId}.${action.label}`, kind: 'action', label: action.label, detail: item.title });
     }
+    if (item.slot && state.equipped[item.slot] !== itemId) {
+      choices.push({ id: `equip:${itemId}`, kind: 'equip', label: `Equip ${item.title}`, detail: item.slot });
+    }
+  }
+
+  for (const [slot, itemId] of Object.entries(state.equipped)) {
+    const item = registry.items.get(itemId);
+    choices.push({ id: `unequip:${slot}`, kind: 'unequip', label: `Unequip ${item?.title ?? slot}`, detail: slot });
   }
 
     // TODO(inventory-crafting): stationless recipes clutter the room list. See backlog.
@@ -154,6 +162,10 @@ export function choiceToDirective(choice: PlayChoice): Directive {
       return { kind: 'craft', recipe: choice.id.slice('craft:'.length) };
     case 'dialogue':
       return { kind: 'choose', text: choice.label };
+    case 'equip':
+      return { kind: 'equip', item: choice.id.slice('equip:'.length) };
+    case 'unequip':
+      return { kind: 'unequip', slot: choice.id.slice('unequip:'.length) };
   }
 }
 
@@ -351,6 +363,12 @@ export function applyDirective(session: PlaySession, directive: Directive): { fa
       return {};
     case 'wait':
       resolve(state, registry, state.time + secondsToMs(directive.seconds));
+      return {};
+    case 'equip':
+      equip(state, registry, directive.item);
+      return {};
+    case 'unequip':
+      unequip(state, directive.slot);
       return {};
   }
 }

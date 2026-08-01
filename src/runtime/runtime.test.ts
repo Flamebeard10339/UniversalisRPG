@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { Condition } from '../grammar/condition';
 import {
   actionFirstUnit, applyResultsNow, armAction, armCraft, craft, craftFirstUnit, createGameState, evaluateCondition, renderSegments, travelSecondsPerUnit, useAction } from './runtime';
+import { IMPLICIT_TARGET_FULL } from './encounter';
 import { loadModule } from '../content/registry';
 import { secondsToMs, toMilliUnits } from './units';
 import { runTest } from './session';
@@ -380,7 +381,7 @@ open:
     const state = createGameState();
     const result = armAction('entity', 'oven', 'roast', registry, state);
     expect(result).toEqual({ armed: true, firstUnit: secondsToMs(4) });
-    expect(state.activeAction).toEqual({ ownerRef: 'entity.oven', actionLabel: 'roast', repeating: true, healthRemaining: toMilliUnits(1), cadences: { player: { progress: 0, attemptsMade: 0 } } });
+    expect(state.activeAction).toEqual({ ownerRef: 'entity.oven', actionLabel: 'roast', repeating: true, implicitTarget: IMPLICIT_TARGET_FULL, cadences: { player: { progress: 0, attemptsMade: 0 } } });
     expect(state.time).toBe(0);
     expect(state.inventory['roasted-chestnut'] ?? 0).toBe(0);
   });

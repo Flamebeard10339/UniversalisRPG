@@ -151,6 +151,13 @@ export function visitDirective(value: Directive, where: string, visit: Visit): v
     case 'use':
       // `obj` names the kind, so the object it addresses is resolved as one.
       if (value.obj === 'entity' || value.obj === 'location' || value.obj === 'item') put(value, 'objId', value.obj, `${where} use:`, visit);
+      return;
+    case 'equip':
+      put(value, 'item', 'item', `${where} equip:`, visit);
+      return;
+    // `unequip:` names a slot, which is no section's id, so it resolves nothing
+    // here; validateTestReferences checks it against what items declare.
+    case 'unequip':
   }
 }
 

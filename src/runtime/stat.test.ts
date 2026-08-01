@@ -2,9 +2,10 @@ import { describe, expect, it } from 'vitest';
 import { Cursor, DslError } from '../grammar/parser';
 import { point, range } from '../grammar/range';
 import { ActiveAction, createGameState, GameState, hitDamage, minDamage, PLAYER, sampleStat, statRange, statValue } from './runtime';
-import { newCadence } from './encounter';
+import { IMPLICIT_TARGET_FULL, newCadence } from './encounter';
 import { loadModule, Registry } from '../content/registry';
 import { tagClause } from '../grammar/tagClause';
+import { toMilliUnits } from './units';
 
 // `dummy.strike` carries both a ranged flat bonus and a percent one, so the
 // action-tag half of statRange is exercised alongside the buff half.
@@ -30,7 +31,7 @@ function loaded(): Registry {
   return loadModule(MODULE);
 }
 
-const striking = (): ActiveAction => ({ ownerRef: 'entity.dummy', actionLabel: 'strike', repeating: false, healthRemaining: 1, cadences: { [PLAYER]: newCadence() } });
+const striking = (): ActiveAction => ({ ownerRef: 'entity.dummy', actionLabel: 'strike', repeating: false, implicitTarget: IMPLICIT_TARGET_FULL, cadences: { [PLAYER]: newCadence() } });
 
 function withStrike(): GameState {
   const state = createGameState('nowhere');
@@ -155,20 +156,24 @@ describe('sampleStat', () => {
 describe('hitDamage', () => {
   const registry = loaded();
 
-  it('subtracts damage reduction flat and truncates to an int', () => {
-    expect(hitDamage(6.9, 2, registry)).toBe(4);
-    expect(hitDamage(7, 0, registry)).toBe(7);
+  it('subtracts damage reduction flat and converts to milli-units without truncating', () => {
+    expect(hitDamage(6.9, 2, registry)).toBe(toMilliUnits(4.9));
+    expect(hitDamage(7, 0, registry)).toBe(toMilliUnits(7));
   });
 
   it('floors at the minimum rather than reaching zero, which would make a fight unendable', () => {
-    expect(hitDamage(4, 10, registry)).toBe(1);
-    expect(hitDamage(4, 4, registry)).toBe(1);
+    expect(hitDamage(4, 10, registry)).toBe(toMilliUnits(1));
+    expect(hitDamage(4, 4, registry)).toBe(toMilliUnits(1));
   });
 
   it('reads an authored min-damage but never lets it fall below 1', () => {
     expect(minDamage(registry)).toBe(1);
     expect(minDamage(loadModule('# variable min-damage\nvalue: 3'))).toBe(3);
     expect(minDamage(loadModule('# variable min-damage\nvalue: 0'))).toBe(1);
-    expect(hitDamage(4, 10, loadModule('# variable min-damage\nvalue: 3'))).toBe(3);
+    expect(hitDamage(4, 10, loadModule('# variable min-damage\nvalue: 3'))).toBe(toMilliUnits(3));
+  });
+
+  it('when ability is below min-damage, deals the ability value not the floor', () => {
+    expect(hitDamage(0.5, 0, registry)).toBe(toMilliUnits(0.5));
   });
 });

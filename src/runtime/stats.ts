@@ -5,32 +5,48 @@ import { Registry } from '../content/registry';
 import { nextRandom } from './rng';
 import { GameState, PLAYER, RuntimeError } from './state';
 import { contestSpread, minDamage } from './tuning';
-import { secondsToMs } from './units';
+import { secondsToMs, toMilliUnits } from './units';
+import { TagClause } from '../grammar/tagClause';
 
 // Difficulty is a stat, never an authored probability, so gear and buffs move it.
 export function hitChance(accuracy: number, evasion: number, registry: Registry): number {
   return 1 / (1 + 10 ** ((evasion - accuracy) / contestSpread(registry)));
 }
 
+interface StatFold {
+  added: Range;
+  increased: number;
+}
+
+function foldStatBonuses(tags: readonly TagClause[], statId: string, fold: StatFold): void {
+  for (const tag of tags) {
+    if (tag.kind !== 'stat-bonus' || tag.statId !== statId) continue;
+    if (tag.percent) fold.increased += tag.amount / 100;
+    else fold.added = addRanges(fold.added, tag.amount);
+  }
+}
+
 export function statRange(statId: string, state: GameState, registry: Registry, actorId: string = PLAYER): Range {
-  let added = registry.entities.get(actorId)?.stats[statId] ?? registry.stats.get(statId)?.base ?? point(0);
-  let increased = 0;
+  const fold: StatFold = {
+    added: registry.entities.get(actorId)?.stats[statId] ?? registry.stats.get(statId)?.base ?? point(0),
+    increased: 0,
+  };
   if (actorId === PLAYER) {
     for (const buff of Object.values(state.activeBuffs)) {
       if (buff.statId !== statId) continue;
-      if (buff.kind === 'added') added = addRanges(added, buff.amount);
-      else increased += buff.amount;
+      if (buff.kind === 'added') fold.added = addRanges(fold.added, buff.amount);
+      else fold.increased += buff.amount;
     }
     if (state.activeAction) {
-      const action = findActiveAction(state.activeAction, registry);
-      for (const tag of action.tags ?? []) {
-        if (tag.kind !== 'stat-bonus' || tag.statId !== statId) continue;
-        if (tag.percent) increased += tag.amount / 100;
-        else added = addRanges(added, tag.amount);
-      }
+      foldStatBonuses(findActiveAction(state.activeAction, registry).tags ?? [], statId, fold);
+    }
+    for (const itemId of Object.values(state.equipped)) {
+      if ((state.inventory[itemId] ?? 0) === 0) continue;
+      const item = registry.items.get(itemId);
+      if (item) foldStatBonuses(item.tags, statId, fold);
     }
   }
-  return scaleRange(added, 1 + increased);
+  return scaleRange(fold.added, 1 + fold.increased);
 }
 
 // Midpoint, not a sample: pool ceilings and durations must not jitter.
@@ -44,7 +60,8 @@ export function sampleStat(statId: string, state: GameState, registry: Registry,
 }
 
 export function hitDamage(attack: number, dr: number, registry: Registry): number {
-  return Math.max(minDamage(registry), Math.trunc(attack - dr));
+  const floor = Math.max(1, Math.min(toMilliUnits(minDamage(registry)), toMilliUnits(attack)));
+  return Math.max(floor, toMilliUnits(attack - dr));
 }
 
 export function attemptDuration(action: Action, state: GameState, registry: Registry, actorId: string = PLAYER): number {

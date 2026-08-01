@@ -258,11 +258,14 @@ describe('entity action modifiers', () => {
     ['ability: might', 'ability'],
     ['target: health', 'target'],
     ['dr: armour', 'dr'],
-    ['health: 3', 'health'],
     ['escape after 3', 'escape after'],
   ])('rejects %s written twice', (line, written) => {
     expect(parseOne(`# entity chest\nopen:\n  ${line}\n  say: hi`, entitySchema).actions).toHaveLength(1);
     expect(() => parseOne(`# entity chest\nopen:\n  ${line}\n  ${line}\n  say: hi`, entitySchema)).toThrow(`action ${written} is defined more than once`);
+  });
+
+  it('no longer accepts a health: field, which the implicit target pool replaced', () => {
+    expect(() => parseOne('# entity chest\nopen:\n  health: 3\n  say: hi', entitySchema)).toThrow(/unrecognized tag clause/);
   });
 
   it('parses on failure inline and as a block, and rejects it defined more than once', () => {

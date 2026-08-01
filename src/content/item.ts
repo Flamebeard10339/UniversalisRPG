@@ -2,12 +2,13 @@ import { Action, actionBody } from '../grammar/action';
 import { list } from '../grammar/list';
 import { Authored, SectionSchema } from '../grammar/section';
 import { TagClause, tagClause } from '../grammar/tagClause';
-import { article, humanize, text } from '../grammar/values';
+import { article, humanize, id, text } from '../grammar/values';
 
 export interface Item {
   id: string;
   title: string;
   examine: string;
+  slot?: string;
   tags: TagClause[];
   actions: Action[];
 }
@@ -19,6 +20,7 @@ export const itemSchema: SectionSchema<Item, never, 'actions'> = {
   fields: {
     title: { parser: text, default: (self) => humanize(self.id) },
     examine: { parser: text, default: (self) => `This is ${article(self.title)} ${self.title}.` },
+    slot: { parser: id },
     tags: { parser: list(tagClause), default: () => [] },
   },
   clauses: 'tags',

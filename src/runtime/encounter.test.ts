@@ -113,8 +113,9 @@ describe('encounter state', () => {
     const state = started(registry);
     armAction('entity', 'training-dummy', 'strike', registry, state);
 
-    // 12, from the dummy's own max-health — not the player's 30.
-    expect(state.activeAction!.actors).toEqual({ 'training-dummy': { resources: { health: toMilliUnits(12) } } });
+    // 12, from the dummy's own max-health — not the player's 30, and its own
+    // rate remainders, which start empty because no span has settled yet.
+    expect(state.activeAction!.actors).toEqual({ 'training-dummy': { resources: { health: toMilliUnits(12) }, rateRemainders: {} } });
     expect(state.resources['health']).toBe(toMilliUnits(30));
   });
 
@@ -201,10 +202,10 @@ describe('damage against a target pool', () => {
       resolve(state, registry, secondsToMs(t));
       levels.push(state.activeAction!.actors!['straw-man'].resources.health);
     }
-    // wild-attack is 4-7 and the straw man's dr is 1, so each hit is 3, 4 or 5.
+    // wild-attack is 4-7 and the straw man's dr is 1, so each hit is in the range 3-6.
     const hits = levels.map((level, i) => (i === 0 ? toMilliUnits(40) : levels[i - 1]) - level);
     for (const hit of hits) expect(hit).toBeGreaterThanOrEqual(toMilliUnits(3));
-    for (const hit of hits) expect(hit).toBeLessThanOrEqual(toMilliUnits(5));
+    for (const hit of hits) expect(hit).toBeLessThanOrEqual(toMilliUnits(6));
     expect(new Set(hits).size).toBeGreaterThan(1); // genuinely varying, not a constant
   });
 });

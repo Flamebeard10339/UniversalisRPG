@@ -27,7 +27,7 @@ open:
   give: 1 gold
 
 # save empty
-{"version":5}
+{"version":6}
 
 # test always-passes
 assert: time >= 0
@@ -522,7 +522,7 @@ describe('play-cli local DSL authoring', () => {
       '/dsl resource stamina max: local-changes.vigor',
       '/dsl recipe smelt in: local-changes.ore | out: local-changes.ingot',
       '/dsl dialogue npc-chat owner = local-changes.npc | node greet: |   Hello there.',
-      '/dsl save blank {"version":5}',
+      '/dsl save blank {"version":6}',
       '/dsl test smoke assert: time >= 0',
       '/dsl remove item.local-changes.temporary',
     ];

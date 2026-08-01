@@ -34,6 +34,14 @@ export function registryCapabilities(registry: Registry): Set<string> {
   return capabilities;
 }
 
+// Items supply the slot vocabulary the way entities supply capabilities, so a
+// slot demanded by name is checked against what some item actually declares.
+export function registrySlots(registry: Registry): Set<string> {
+  const slots = new Set<string>();
+  for (const item of registry.items.values()) if (item.slot !== undefined) slots.add(item.slot);
+  return slots;
+}
+
 export function validateRecipeReferences(recipe: Recipe, capabilities: ReadonlySet<string>): void {
   if (recipe.requiresCapability !== undefined && !capabilities.has(recipe.requiresCapability)) {
     throw new DslError(`# recipe ${recipe.id} station: names an unknown capability: ${recipe.requiresCapability}`);
@@ -60,8 +68,13 @@ export function validateTestReferences(test: Test, registry: Registry): void {
     location: registry.locations,
     item: registry.items,
   };
+  const slots = registrySlots(registry);
   const directive = (value: Directive, where: string): void => {
     if (value.kind === 'begin') return directive(value.inner, `${where} begin:`);
+    if (value.kind === 'unequip') {
+      if (!slots.has(value.slot)) throw new DslError(`${where} unequip: names an unknown slot: ${value.slot}`);
+      return;
+    }
     if (value.kind !== 'use') return;
     const owner = owners[value.obj];
     if (!owner) throw new DslError(`${where} use: names an unknown kind: ${value.obj}`);

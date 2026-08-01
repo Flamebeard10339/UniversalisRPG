@@ -145,7 +145,6 @@ function actionLines(action: Action): Lines {
     action.ability ||
     action.target ||
     action.dr ||
-    action.health !== undefined ||
     action.escapeAfter !== undefined ||
     action.repeating ||
     action.retaliates;
@@ -166,7 +165,6 @@ function actionLines(action: Action): Lines {
   if (action.ability) lines.push(`  ability: ${action.ability}`);
   if (action.target) lines.push(`  target: ${action.target}`);
   if (action.dr) lines.push(`  dr: ${action.dr}`);
-  if (action.health !== undefined) lines.push(`  health: ${n(action.health)}`);
   if (action.escapeAfter !== undefined) lines.push(`  escape after ${n(action.escapeAfter)}`);
   lines.push(...indented(action.results.map(result)));
   resultBlock(lines, '  on success', action.onSuccess, 4);
@@ -213,6 +211,10 @@ function directive(value: Directive): string {
       return 'cancel';
     case 'wait':
       return `wait: ${n(value.seconds)}`;
+    case 'equip':
+      return `equip: ${value.item}`;
+    case 'unequip':
+      return `unequip: ${value.slot}`;
   }
 }
 
@@ -228,6 +230,7 @@ function titled(lines: Lines, value: { title?: string; examine?: string }): void
 function itemSection(moduleId: string, item: Item): string {
   const lines = [`# item ${moduleLocalId(moduleId, item.id)}`];
   titled(lines, item);
+  if (item.slot) lines.push(`slot: ${item.slot}`);
   if (item.tags && item.tags.length > 0) lines.push(item.tags.map(tag).join(', '));
   for (const action of item.actions ?? []) lines.push(...actionLines(action));
   return lines.join('\n');
