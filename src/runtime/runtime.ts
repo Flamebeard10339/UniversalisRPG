@@ -324,8 +324,6 @@ function applyDueBoundaries(state: GameState, registry: Registry, at: number): v
       } else if (!resolvesPerAttempt(action)) {
         if (!state.activeAction.repeating) {
           const { duration, attemptsToResolve, outcome } = fightPlan(action, state, registry);
-          // Attempts, not the pool: `escape after` ends a fight with the pool
-          // still full, so a pool read would wait for a boundary never reached.
           // The only place a zero-`time:` action fires; no segment advances it.
           if (playerCadence(state.activeAction).attemptsMade >= attemptsToResolve || duration <= 0) {
             const batch = fightBatch(action, 1, outcome);

@@ -153,8 +153,11 @@ export function visitDirective(value: Directive, where: string, visit: Visit): v
       if (value.obj === 'entity' || value.obj === 'location' || value.obj === 'item') put(value, 'objId', value.obj, `${where} use:`, visit);
       return;
     case 'equip':
-      // `unequip:` names a slot, which no section owns, so it resolves nothing.
       put(value, 'item', 'item', `${where} equip:`, visit);
+      return;
+    // `unequip:` names a slot, which is no section's id, so it resolves nothing
+    // here; validateTestReferences checks it against what items declare.
+    case 'unequip':
   }
 }
 

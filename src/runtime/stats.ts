@@ -40,8 +40,6 @@ export function statRange(statId: string, state: GameState, registry: Registry, 
     if (state.activeAction) {
       foldStatBonuses(findActiveAction(state.activeAction, registry).tags ?? [], statId, fold);
     }
-    // Equipped but no longer carried contributes nothing, so a `take:` that
-    // removes the last copy needs no second write to keep the slot honest.
     for (const itemId of Object.values(state.equipped)) {
       if ((state.inventory[itemId] ?? 0) === 0) continue;
       const item = registry.items.get(itemId);
@@ -61,10 +59,6 @@ export function sampleStat(statId: string, state: GameState, registry: Registry,
   return isPoint(range) ? range.min : sampleRange(range, nextRandom(state));
 }
 
-// The floor answers damage reduction, so it never exceeds what the unreduced
-// attack would have done — an `ability:` below `min-damage` is worth its own
-// value, not the floor. It stays above zero whatever the stats say, because a
-// hit worth nothing empties no pool and ends no fight.
 export function hitDamage(attack: number, dr: number, registry: Registry): number {
   const floor = Math.max(1, Math.min(toMilliUnits(minDamage(registry)), toMilliUnits(attack)));
   return Math.max(floor, toMilliUnits(attack - dr));

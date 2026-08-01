@@ -138,15 +138,15 @@ describe('equipment', () => {
 
     const state = createGameState('tutorial-island.beach');
     initResources(state, tutorial);
-    state.inventory[sword] = 1;
-    state.inventory[shield] = 1;
-
     const bareAttack = statValue('tutorial-island.attack', state, tutorial);
     const bareDefense = statValue('tutorial-island.defense', state, tutorial);
 
     // Carried, not equipped: the tutorial hands both over at node `skills`, and
     // holding them must not by itself move a stat.
+    state.inventory[sword] = 1;
+    state.inventory[shield] = 1;
     expect(statValue('tutorial-island.attack', state, tutorial)).toBe(bareAttack);
+    expect(statValue('tutorial-island.defense', state, tutorial)).toBe(bareDefense);
 
     equip(state, tutorial, sword);
     equip(state, tutorial, shield);
@@ -158,8 +158,6 @@ describe('equipment', () => {
     expect(statValue('tutorial-island.defense', state, tutorial)).toBe(bareDefense + 2);
   });
 
-  // The comment on statRange's equipment fold claims this trade, so it is a
-  // behavioural claim and belongs here rather than in the source.
   it('equipment-slots: a slot keeps its item across losing and re-acquiring it', () => {
     const registry = loaded();
     const state = createGameState('arena');

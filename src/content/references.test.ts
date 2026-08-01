@@ -27,6 +27,9 @@ stat-id: attack
 # item straw
 examine: A fistful of straw.
 
+# item hat
+slot: head
+
 # location den
 x: 0, y: 0
 starting
@@ -189,6 +192,17 @@ describe('references the walk used to step over', () => {
     expect(test('assert: has strawe')).toThrow(/# test walk assert: has names an unknown item: strawe/);
     expect(test('begin: travel shedd')).toThrow(/# test walk begin: travel: names an unknown location: shedd/);
     expect(test('equip: strawe')).toThrow(/# test walk equip: names an unknown item: strawe/);
+  });
+
+  // A slot is no section's id, so it is checked against what items declare —
+  // the same shape as a recipe's station against what entities supply.
+  it('rejects an unequip: naming a slot no item declares', () => {
+    const test = (line: string) => () => loadModule(`${VALID}
+# test walk
+${line}
+`);
+    expect(test('unequip: heaad')).toThrow(/# test walk unequip: names an unknown slot: heaad/);
+    expect(test('unequip: head')).not.toThrow();
   });
 
   it('rejects a `use:` naming an unknown kind, object, or action', () => {

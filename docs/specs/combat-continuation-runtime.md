@@ -19,7 +19,11 @@ Proof:
   `ability: 2.5` reproduction no longer has a 2.5-vs-2.0 damage split between runtime paths.
 - Enemy-owned pools participate in rate capture and settlement while a fight is active. A
   regenerating enemy health pool produces the same result for one-shot resolution and split
-  resolution, including the carried remainder.
+  resolution, including the carried remainder, once it is off its ceiling. A pool saturated in its
+  rate's direction is split-dependent — settling it clamps the rate away and drops the carried
+  remainder — and a foe enters an encounter at full, so the claim holds from the first hit rather
+  than from the first instant. The limitation is the player's too, it is recorded on `resolve`, and
+  closing it is `saturated-pool-rate-associativity`, not this branch.
 - Equipment is a real equipped state, not a property of carrying an item. An item declares the slot
   it occupies the way a recipe declares its station; the player's equipped items are one item per
   slot, held in game state, saved, and pruned when the item or its slot declaration goes away.

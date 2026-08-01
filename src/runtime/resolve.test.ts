@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ActiveAction, armAction, craft, createGameState, GameState, initResources, PLAYER, resolve, RuntimeError, statValue, useAction } from './runtime';
-import { IMPLICIT_TARGET_FULL, newCadence, enterEncounter } from './encounter';
+import { IMPLICIT_TARGET_FULL, newCadence } from './encounter';
 import { point } from '../grammar/range';
 import { loadModule, Registry } from '../content/registry';
 import { secondsToMs, toMilliUnits } from './units';
