@@ -11,6 +11,7 @@ function task(overrides: Partial<Task> & { id: string }): Task {
     severity: null,
     system: null,
     spec: 'demo',
+    clause: null,
     requires: [],
     files: [],
     deliverable: null,
@@ -25,8 +26,8 @@ function task(overrides: Partial<Task> & { id: string }): Task {
 const cleanDoc: SpecDoc = {
   deliverableSection: '## Deliverable\n\nSome promise.\n\nProof:\n\n- clause one\n- clause two',
   proofClauses: [
-    { index: 1, text: 'clause one' },
-    { index: 2, text: 'clause two' },
+    { id: 1, text: 'clause one' },
+    { id: 2, text: 'clause two' },
   ],
   amendments: [],
   auditPasses: [

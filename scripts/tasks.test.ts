@@ -714,7 +714,7 @@ describe('tasks CLI', () => {
       const storePath = path.join(dir, 'tasks.jsonl');
       writeFileSync(
         storePath,
-        `${JSON.stringify({ id: 'demo-spec-clause-1', title: 'Unmet deliverable clause 1', kind: 'undelivered', state: 'open', severity: 'high', system: null, spec: 'demo-spec', requires: [], files: [], deliverable: 'The first clause holds.', evidence: null, source: { spec: 'demo-spec', pass: 1 }, reason: null, closed: null })}\n`,
+        `${JSON.stringify({ id: 'demo-spec-clause-1', title: 'Unmet deliverable clause 1', kind: 'undelivered', state: 'open', severity: 'high', system: null, spec: 'demo-spec', clause: 1, requires: [], files: [], deliverable: 'The first clause holds.', evidence: null, source: { spec: 'demo-spec', pass: 1 }, reason: null, closed: null })}\n`,
         'utf8',
       );
       const result = tasks('done', 'demo-spec-clause-1');
@@ -723,18 +723,82 @@ describe('tasks CLI', () => {
     });
   });
 
-  it('done on an undelivered task refuses when its clause text no longer matches any proof clause', () => {
+  it('done on an undelivered task refuses when its clause has been deleted from the spec outright', () => {
     fixture(({ tasks, dir }) => {
       tasks('audit', 'demo-spec', '--proof', '1=met', '--proof', '2=met');
       const storePath = path.join(dir, 'tasks.jsonl');
       writeFileSync(
         storePath,
-        `${JSON.stringify({ id: 'stale-clause', title: 'Unmet deliverable clause 9', kind: 'undelivered', state: 'open', severity: 'high', system: null, spec: 'demo-spec', requires: [], files: [], deliverable: 'a clause that used to exist', evidence: null, source: { spec: 'demo-spec', pass: 1 }, reason: null, closed: null })}\n`,
+        `${JSON.stringify({ id: 'stale-clause', title: 'Unmet deliverable clause 9', kind: 'undelivered', state: 'open', severity: 'high', system: null, spec: 'demo-spec', clause: 9, requires: [], files: [], deliverable: 'a clause that used to exist', evidence: null, source: { spec: 'demo-spec', pass: 1 }, reason: null, closed: null })}\n`,
         'utf8',
       );
       const result = tasks('done', 'stale-clause');
       expect(result.status).toBe(1);
-      expect(result.stderr).toContain('no longer matches');
+      expect(result.stderr).toContain('proof clause 9 is no longer in');
+    });
+  });
+
+  it('an undelivered task survives its clause being reworded by an amendment, and closes on the next met verdict', () => {
+    fixture(({ tasks, dir }) => {
+      const specPath = path.join(dir, 'specs', 'demo-spec.md');
+      tasks('audit', 'demo-spec', '--proof', '1=unmet', '--evidence', '1=not yet', '--proof', '2=met');
+      expect(tasks('show', 'demo-spec-clause-1').stdout).toContain('[undelivered/open/high]');
+
+      // The first audit stamped the clause, so the tag is already sitting in
+      // the line a human rewords when they amend around it.
+      writeFileSync(specPath, readFileSync(specPath, 'utf8').replace('[c1] The first clause holds.', '[c1] The first clause holds, under a narrower reading.'), 'utf8');
+      expect(tasks('spec', 'amend', 'demo-spec', '--reason', 'narrowed after implementing it').status).toBe(0);
+
+      tasks('audit', 'demo-spec', '--proof', '1=met', '--proof', '2=met');
+      const result = tasks('done', 'demo-spec-clause-1');
+      expect(result.status).toBe(0);
+      expect(tasks('show', 'demo-spec-clause-1').stdout).toContain('closed: ');
+    });
+  });
+
+  it('a clause keeps its id when the Proof: list is reordered and a new clause is inserted above it', () => {
+    fixture(({ tasks, dir }) => {
+      const specPath = path.join(dir, 'specs', 'demo-spec.md');
+      tasks('audit', 'demo-spec', '--proof', '1=unmet', '--evidence', '1=not yet', '--proof', '2=met');
+
+      writeFileSync(
+        specPath,
+        readFileSync(specPath, 'utf8').replace(
+          '- [c1] The first clause holds.\n- [c2] The second clause holds.',
+          '- A newly inserted clause.\n- [c2] The second clause holds.\n- [c1] The first clause holds.',
+        ),
+        'utf8',
+      );
+
+      const audited = tasks('audit', 'demo-spec', '--proof', '1=met', '--proof', '2=met', '--proof', '3=met');
+      expect(audited.status).toBe(0);
+      expect(audited.stdout).toContain("keep it when you reword or reorder");
+      // The insertion took a fresh id instead of displacing clause 1's.
+      expect(readFileSync(specPath, 'utf8')).toContain('- [c3] A newly inserted clause.');
+      expect(tasks('done', 'demo-spec-clause-1').status).toBe(0);
+    });
+  });
+
+  it('stamping a clause id is not deliverable drift — the gate compares the promise, not its bookkeeping', () => {
+    fixture(({ tasks, dir }) => {
+      const specPath = path.join(dir, 'specs', 'demo-spec.md');
+      // Amend before any audit, so the archived baseline predates every tag.
+      writeFileSync(specPath, readFileSync(specPath, 'utf8').replace('Something this branch promises.', 'Something this branch promises, restated.'), 'utf8');
+      expect(tasks('spec', 'amend', 'demo-spec', '--reason', 'restated before the first audit').status).toBe(0);
+
+      tasks('audit', 'demo-spec', '--proof', '1=met', '--proof', '2=met');
+      expect(readFileSync(specPath, 'utf8')).toContain('- [c1] The first clause holds.');
+      expect(tasks('check', '--merge').status).toBe(0);
+    });
+  });
+
+  it('audit refuses a spec whose clauses carry the same tag twice', () => {
+    fixture(({ tasks, dir }) => {
+      const specPath = path.join(dir, 'specs', 'demo-spec.md');
+      writeFileSync(specPath, readFileSync(specPath, 'utf8').replace('- The first clause holds.\n- The second clause holds.', '- [c1] The first clause holds.\n- [c1] The second clause holds.'), 'utf8');
+      const result = tasks('audit', 'demo-spec', '--proof', '1=met');
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain('more than one proof clause tagged [c1]');
     });
   });
 

@@ -6,7 +6,7 @@ import { pathToFileURL } from 'node:url';
 import { harvestFiles, parseAuditDoc, systemForDoc } from './lib/auditImport';
 import { checkCommitMessage, extractNextTrailer, isExempt } from './lib/commitContract';
 import { checkMergeGate } from './lib/mergeGate';
-import { appendAmendment, appendAuditPass, parseSpecDoc, type AuditVerdict, type Verdict } from './lib/specDoc';
+import { appendAmendment, appendAuditPass, parseSpecDoc, stampClauseIds, stripClauseTags, type AuditVerdict, type ProofClause, type Verdict } from './lib/specDoc';
 import { loadManifest, systemNames as manifestSystemNames } from './lib/systems';
 import {
   checkStore,
@@ -286,6 +286,7 @@ function cmdAdd(args: Flags): void {
     severity: (args.flags.severity as Severity | undefined) ?? null,
     system: args.flags.system ?? null,
     spec,
+    clause: null,
     requires: splitList(args.flags.requires),
     files: splitList(args.flags.files),
     deliverable: args.flags.deliverable ?? null,
@@ -481,20 +482,20 @@ function cmdNext(args: Flags): void {
 // blanket refusal on kind:undelivered would make the merge gate
 // permanently unclosable — so this earns the close rather than blocking
 // it: refuse unless the spec's LATEST recorded audit pass grades this
-// task's clause `met`. `task.deliverable` carries the clause text verbatim
-// (see cmdAudit), so the clause is recovered by matching it against the
-// spec's current proof clauses rather than storing a second pointer.
+// task's clause `met`. The clause is named by `task.clause`, which the spec
+// file carries too, so an amendment that rewords or moves the clause leaves
+// the binding intact; only deleting the clause outright breaks it.
 function undeliveredDoneRefusal(config: Config, task: Task): string | null {
   if (!task.spec) return 'is undelivered but has no spec to verify a pass against';
+  if (task.clause === null) return 'is undelivered but names no proof clause';
   const path_ = specFile(config, task.spec);
   if (!existsSync(path_)) return `is undelivered but its spec file is missing: ${path_}`;
   const doc = parseSpecDoc(readFileSync(path_, 'utf8'));
-  const clause = doc.proofClauses.find((candidate) => candidate.text === task.deliverable);
-  if (!clause) return `is undelivered but its clause text no longer matches any proof clause in ${path_}`;
+  if (!doc.proofClauses.some((candidate) => candidate.id === task.clause)) return `is undelivered but proof clause ${task.clause} is no longer in ${path_}`;
   const latest = doc.auditPasses[doc.auditPasses.length - 1];
   if (!latest) return `is undelivered and ${task.spec} has no recorded audit pass`;
-  const verdict = latest.verdicts.find((v) => v.clause === clause.index);
-  if (!verdict || verdict.status !== 'met') return `is undelivered and proof clause ${clause.index} is not met in the latest audit pass (pass ${latest.pass})`;
+  const verdict = latest.verdicts.find((v) => v.clause === task.clause);
+  if (!verdict || verdict.status !== 'met') return `is undelivered and proof clause ${task.clause} is not met in the latest audit pass (pass ${latest.pass})`;
   return null;
 }
 
@@ -787,7 +788,7 @@ function cmdSpecAmend(args: Flags): void {
   // Recording an unchanged deliverable would leave the next edit failing the
   // gate against a baseline nobody meant to set.
   const previous = doc.amendments[doc.amendments.length - 1];
-  if (previous && previous.deliverableText.trim() === doc.deliverableSection.trim()) {
+  if (previous && stripClauseTags(previous.deliverableText).trim() === stripClauseTags(doc.deliverableSection).trim()) {
     console.error(`error: ${slug}'s ## Deliverable is unchanged since the amendment of ${previous.date} — edit it first, then record what it became`);
     process.exitCode = 1;
     return;
@@ -860,6 +861,7 @@ function cmdImport(args: Flags): void {
       severity: finding.severity,
       system,
       spec: null,
+      clause: null,
       requires: [],
       files: [`${docPath}#${finding.code}`, ...harvestFiles(finding.body, existsSync)],
       deliverable: null,
@@ -1101,7 +1103,7 @@ function parseAuditArgs(args: string[]): AuditArgs {
 const AUDIT_USAGE =
   'usage: tasks audit <spec> [--proof N=met|unmet ...] [--evidence N="..." ...] [--file N=path:line ...] [--finding "..." --severity high|medium|low --system "<name>" --deliverable "..." [--file path:line ...]]...  (with no --proof flags, walks the clauses interactively)';
 
-async function walkClausesInteractively(clauses: { index: number; text: string }[]): Promise<AuditVerdict[]> {
+async function walkClausesInteractively(clauses: ProofClause[]): Promise<AuditVerdict[]> {
   const rl = createInterface({ input: process.stdin, output: process.stdout });
   const lines = rl[Symbol.asyncIterator]();
   const ask = async (prompt: string): Promise<string> => {
@@ -1112,7 +1114,7 @@ async function walkClausesInteractively(clauses: { index: number; text: string }
 
   const verdicts: AuditVerdict[] = [];
   for (const clause of clauses) {
-    console.log(`\nclause ${clause.index}: ${clause.text}`);
+    console.log(`\nclause ${clause.id}: ${clause.text}`);
     let status: Verdict | null = null;
     while (status === null) {
       const answer = (await ask('met/unmet? ')).trim().toLowerCase();
@@ -1123,7 +1125,7 @@ async function walkClausesInteractively(clauses: { index: number; text: string }
     // backing a completion claim is worth keeping, and staying optional
     // (an empty answer records nothing) costs a human one keystroke.
     const evidenceText = (await ask('evidence (optional): ')).trim() || null;
-    verdicts.push({ clause: clause.index, status, evidence: evidenceText });
+    verdicts.push({ clause: clause.id, status, evidence: evidenceText });
   }
   rl.close();
   return verdicts;
@@ -1147,10 +1149,20 @@ async function cmdAudit(rawArgs: string[]): Promise<void> {
     process.exitCode = 1;
     return;
   }
-  const text = readFileSync(path_, 'utf8');
+  // Stamped before anything is recorded, so every verdict and every
+  // undelivered task this pass writes names an id the spec file now carries
+  // in the clause's own line rather than one derived from its position.
+  const original = readFileSync(path_, 'utf8');
+  const text = stampClauseIds(original);
   const doc = parseSpecDoc(text);
   if (doc.proofClauses.length === 0) {
     console.error(`error: ${slug}'s ## Deliverable has no Proof: clauses to verify`);
+    process.exitCode = 1;
+    return;
+  }
+  const duplicates = doc.proofClauses.map((clause) => clause.id).filter((id, i, ids) => ids.indexOf(id) !== i);
+  if (duplicates.length > 0) {
+    console.error(`error: ${slug} has more than one proof clause tagged [c${duplicates[0]}] — a clause id names exactly one clause`);
     process.exitCode = 1;
     return;
   }
@@ -1159,16 +1171,16 @@ async function cmdAudit(rawArgs: string[]): Promise<void> {
   if (parsed.proofs.size === 0 && parsed.findings.length === 0) {
     verdicts = await walkClausesInteractively(doc.proofClauses);
   } else {
-    const missing = doc.proofClauses.filter((clause) => !parsed.proofs.has(clause.index));
+    const missing = doc.proofClauses.filter((clause) => !parsed.proofs.has(clause.id));
     if (missing.length > 0) {
-      console.error(`error: every proof clause needs a verdict before findings are accepted; missing: ${missing.map((clause) => clause.index).join(', ')}`);
+      console.error(`error: every proof clause needs a verdict before findings are accepted; missing: ${missing.map((clause) => clause.id).join(', ')}`);
       process.exitCode = 1;
       return;
     }
     verdicts = doc.proofClauses.map((clause) => ({
-      clause: clause.index,
-      status: parsed.proofs.get(clause.index)!,
-      evidence: parsed.evidence.get(clause.index) ?? null,
+      clause: clause.id,
+      status: parsed.proofs.get(clause.id)!,
+      evidence: parsed.evidence.get(clause.id) ?? null,
     }));
   }
 
@@ -1198,7 +1210,7 @@ async function cmdAudit(rawArgs: string[]): Promise<void> {
     const baseId = `${slug}-clause-${verdict.clause}`;
     if (tasks.some((task) => task.id === baseId && task.state === 'open')) continue;
     const id = taken.has(baseId) ? `${baseId}-pass-${passNumber}` : baseId;
-    const clauseText = doc.proofClauses.find((clause) => clause.index === verdict.clause)?.text ?? '';
+    const clauseText = doc.proofClauses.find((clause) => clause.id === verdict.clause)?.text ?? '';
     const undelivered: Task = {
       id,
       title: `Unmet deliverable clause ${verdict.clause}: ${clauseText}`,
@@ -1207,6 +1219,7 @@ async function cmdAudit(rawArgs: string[]): Promise<void> {
       severity: 'high',
       system: null,
       spec: slug,
+      clause: verdict.clause,
       requires: [],
       files: parsed.clauseFiles.get(verdict.clause) ?? [],
       deliverable: clauseText,
@@ -1231,6 +1244,7 @@ async function cmdAudit(rawArgs: string[]): Promise<void> {
       severity: finding.severity,
       system: finding.system,
       spec: null,
+      clause: null,
       requires: [],
       files: finding.files,
       deliverable: finding.deliverable,
@@ -1249,6 +1263,7 @@ async function cmdAudit(rawArgs: string[]): Promise<void> {
 
   const met = verdicts.filter((verdict) => verdict.status === 'met').length;
   console.log(`recorded pass ${passNumber} for ${slug}: ${met}/${verdicts.length} clauses met`);
+  if (text !== original) console.log(`tagged ${slug}'s proof clauses [cN] — the tag is the clause's identity, so keep it when you reword or reorder`);
   if (undeliveredCreated > 0) console.log(`${undeliveredCreated} undelivered task(s) created for unmet clauses`);
   if (findingsCreated > 0) console.log(`${findingsCreated} finding(s) recorded, unreviewed`);
 }
@@ -1322,7 +1337,7 @@ function cmdHandoff(args: Flags): void {
   // The proof clauses, not the whole ## Deliverable section: the section's
   // prose never changes between runs, and what a cold session needs from
   // it — what the branch still owes — is exactly what the clauses are.
-  for (const clause of doc.proofClauses) console.log(`  ${clause.index}. ${truncateLine(clause.text)}`);
+  for (const clause of doc.proofClauses) console.log(`  ${clause.id}. ${truncateLine(clause.text)}`);
   console.log('');
 
   const queue = fixNowQueue(tasks, spec);

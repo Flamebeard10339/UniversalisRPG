@@ -1,5 +1,9 @@
 export interface ProofClause {
-  index: number;
+  // What a verdict, an undelivered task and a `<slug>-clause-N` id all name.
+  // Written into the spec as a `[cN]` tag by stampClauseIds; a clause with
+  // no tag yet takes the lowest id no tag has claimed, in document order,
+  // so an unstamped spec reads exactly as it did when identity was position.
+  id: number;
   text: string;
 }
 
@@ -42,27 +46,90 @@ function sectionText(lines: string[], heading: string): { text: string; startInd
   return { text: lines.slice(start, endIndex).join('\n').trimEnd(), startIndex: start, endIndex };
 }
 
+const CLAUSE_TAG = /^\[c(\d+)\] (.*)$/;
+
+interface ScannedClause {
+  // Offset within the deliverable section's lines — what stampClauseIds
+  // rewrites, and the only reason scanning is separate from parsing.
+  line: number;
+  tag: number | null;
+  text: string;
+}
+
 // "Proof:" introduces a bullet list within ## Deliverable; each top-level
 // `- ` line is one clause, and any following non-bullet lines are its
 // wrapped continuation, joined back into one sentence.
-function parseProofClauses(deliverableSection: string): ProofClause[] {
+function scanProofClauses(deliverableSection: string): ScannedClause[] {
   const lines = deliverableSection.split('\n');
   const proofIndex = lines.findIndex((line) => line.trim() === 'Proof:');
   if (proofIndex === -1) return [];
 
-  const clauses: ProofClause[] = [];
+  const clauses: ScannedClause[] = [];
   let current: string[] | null = null;
-  for (const line of lines.slice(proofIndex + 1)) {
-    const bullet = /^- (.*)$/.exec(line.trim());
+  const flush = (): void => {
+    if (current) clauses[clauses.length - 1].text = current.join(' ').trim();
+  };
+  for (let i = proofIndex + 1; i < lines.length; i++) {
+    const bullet = /^- (.*)$/.exec(lines[i].trim());
     if (bullet) {
-      if (current) clauses.push({ index: clauses.length + 1, text: current.join(' ').trim() });
-      current = [bullet[1]];
-    } else if (current && line.trim() !== '') {
-      current.push(line.trim());
+      flush();
+      const tagged = CLAUSE_TAG.exec(bullet[1]);
+      clauses.push({ line: i, tag: tagged ? Number(tagged[1]) : null, text: '' });
+      current = [tagged ? tagged[2] : bullet[1]];
+    } else if (current && lines[i].trim() !== '') {
+      current.push(lines[i].trim());
     }
   }
-  if (current) clauses.push({ index: clauses.length + 1, text: current.join(' ').trim() });
+  flush();
   return clauses;
+}
+
+function resolveIds(clauses: ScannedClause[]): number[] {
+  const claimed = new Set(clauses.map((clause) => clause.tag).filter((tag): tag is number => tag !== null));
+  let next = 1;
+  return clauses.map((clause) => {
+    if (clause.tag !== null) return clause.tag;
+    while (claimed.has(next)) next++;
+    claimed.add(next);
+    return next;
+  });
+}
+
+function parseProofClauses(deliverableSection: string): ProofClause[] {
+  const scanned = scanProofClauses(deliverableSection);
+  const ids = resolveIds(scanned);
+  return scanned.map((clause, i) => ({ id: ids[i], text: clause.text }));
+}
+
+// Turns each clause's id from something derived — position in the list —
+// into something written down, so rewording and reordering both leave it
+// alone. `audit` calls this at the moment identity starts carrying weight:
+// a verdict recorded against the clause and an undelivered task named after
+// it. Already-tagged clauses are left exactly as they are.
+export function stampClauseIds(text: string): string {
+  const lines = text.split('\n');
+  const section = sectionText(lines, '## Deliverable');
+  if (!section) return text;
+
+  const scanned = scanProofClauses(section.text);
+  const ids = resolveIds(scanned);
+  const stamped = [...lines];
+  scanned.forEach((clause, i) => {
+    if (clause.tag !== null) return;
+    const at = section.startIndex + clause.line;
+    stamped[at] = stamped[at].replace(/^(\s*)- /, `$1- [c${ids[i]}] `);
+  });
+  return stamped.join('\n');
+}
+
+// A `[cN]` tag is bookkeeping `audit` writes, never part of what the branch
+// promised, so the freeze compares clause prose with the tags taken back
+// off — a spec that has only gained tags has not drifted.
+export function stripClauseTags(deliverableSection: string): string {
+  return deliverableSection
+    .split('\n')
+    .map((line) => line.replace(/^(\s*)- \[c\d+\] /, '$1- '))
+    .join('\n');
 }
 
 const PASS_HEADING = /^### Pass (\d+) — (.+)$/;

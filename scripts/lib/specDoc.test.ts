@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { appendAmendment, appendAuditPass, parseSpecDoc, renderAuditPass } from './specDoc';
+import { appendAmendment, appendAuditPass, parseSpecDoc, renderAuditPass, stampClauseIds, stripClauseTags } from './specDoc';
 
 const DOC = `# Demo spec
 
@@ -32,13 +32,26 @@ describe('parseSpecDoc', () => {
     expect(deliverableSection).not.toContain('## Decisions');
   });
 
-  it('numbers proof clauses in document order and joins wrapped continuation lines', () => {
+  it('numbers untagged proof clauses in document order and joins wrapped continuation lines', () => {
     const { proofClauses } = parseSpecDoc(DOC);
     expect(proofClauses).toEqual([
-      { index: 1, text: 'The first clause, on one line.' },
-      { index: 2, text: 'The second clause wraps onto a continuation line that should join back into one sentence.' },
-      { index: 3, text: 'A third clause.' },
+      { id: 1, text: 'The first clause, on one line.' },
+      { id: 2, text: 'The second clause wraps onto a continuation line that should join back into one sentence.' },
+      { id: 3, text: 'A third clause.' },
     ]);
+  });
+
+  it('takes a clause id from its [cN] tag rather than its position, and keeps the tag out of the text', () => {
+    const doc = '## Deliverable\n\nPromise.\n\nProof:\n\n- [c3] The clause that was third.\n- [c1] The clause that was first.\n';
+    expect(parseSpecDoc(doc).proofClauses).toEqual([
+      { id: 3, text: 'The clause that was third.' },
+      { id: 1, text: 'The clause that was first.' },
+    ]);
+  });
+
+  it('gives an untagged clause the lowest id no tag has claimed, so a new clause never steals an existing one', () => {
+    const doc = '## Deliverable\n\nPromise.\n\nProof:\n\n- An inserted clause.\n- [c1] The original clause.\n- Another inserted clause.\n';
+    expect(parseSpecDoc(doc).proofClauses.map((clause) => clause.id)).toEqual([2, 1, 3]);
   });
 
   it('returns no proof clauses when there is no Proof: line', () => {
@@ -57,16 +70,61 @@ describe('parseSpecDoc', () => {
   // Structure, never content: a spec's clauses are amendable by design, and
   // pinning their text here would be a second freeze enforced by a unit test
   // failure rather than by the merge gate.
-  it('parses the real docs/specs/task-system-v2.md into well-formed, sequentially indexed clauses', () => {
+  it('parses the real docs/specs/task-system-v2.md into well-formed, distinctly identified clauses', () => {
     const text = readFileSync('docs/specs/task-system-v2.md', 'utf8');
     const { proofClauses } = parseSpecDoc(text);
     expect(proofClauses.length).toBeGreaterThan(0);
-    expect(proofClauses.map((clause) => clause.index)).toEqual(proofClauses.map((_, i) => i + 1));
+    expect(new Set(proofClauses.map((clause) => clause.id)).size).toBe(proofClauses.length);
     for (const clause of proofClauses) {
       expect(clause.text.trim()).not.toBe('');
       // Wrapped continuation lines are joined, not left as their own clause.
       expect(clause.text).not.toMatch(/^- /);
     }
+  });
+});
+
+describe('stampClauseIds', () => {
+  it('writes the resolved id into every untagged clause line and leaves everything else alone', () => {
+    const stamped = stampClauseIds(DOC);
+    expect(stamped).toContain('- [c1] The first clause, on one line.');
+    expect(stamped).toContain('- [c2] The second clause wraps onto');
+    expect(stamped).toContain('- [c3] A third clause.');
+    // The continuation line is not a clause of its own, so it stays bare.
+    expect(stamped).toContain('  a continuation line that should join back into one sentence.');
+    expect(stamped).toContain('## Open questions');
+  });
+
+  it('is idempotent: stamping an already-stamped document changes nothing', () => {
+    const once = stampClauseIds(DOC);
+    expect(stampClauseIds(once)).toBe(once);
+  });
+
+  it('preserves the ids parsed before stamping, so a stamp cannot silently rebind a recorded verdict', () => {
+    const before = parseSpecDoc(DOC).proofClauses;
+    expect(parseSpecDoc(stampClauseIds(DOC)).proofClauses).toEqual(before);
+  });
+
+  it('leaves a clause tagged out of order tagged as it was, and gives its untagged neighbours fresh ids', () => {
+    const doc = '## Deliverable\n\nPromise.\n\nProof:\n\n- An inserted clause.\n- [c1] The original clause.\n';
+    const stamped = stampClauseIds(doc);
+    expect(stamped).toContain('- [c2] An inserted clause.');
+    expect(stamped).toContain('- [c1] The original clause.');
+  });
+
+  it('does nothing to a deliverable with no Proof: list', () => {
+    const doc = '## Deliverable\n\nJust prose.\n\n## Decisions\n';
+    expect(stampClauseIds(doc)).toBe(doc);
+  });
+});
+
+describe('stripClauseTags', () => {
+  it('takes the tags back off so a stamped section compares equal to its unstamped baseline', () => {
+    expect(stripClauseTags(stampClauseIds(DOC))).toBe(DOC);
+  });
+
+  it('leaves a bracketed phrase that is not a clause tag untouched', () => {
+    const line = '- [see docs] a clause that opens with a link-shaped phrase';
+    expect(stripClauseTags(line)).toBe(line);
   });
 });
 

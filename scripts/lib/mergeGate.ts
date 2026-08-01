@@ -1,4 +1,4 @@
-import type { SpecDoc } from './specDoc';
+import { stripClauseTags, type SpecDoc } from './specDoc';
 import type { Task } from './taskStore';
 
 export interface MergeGateInput {
@@ -39,13 +39,13 @@ export function checkMergeGate(input: MergeGateInput): string[] {
   } else {
     const latest = doc.auditPasses[doc.auditPasses.length - 1];
     for (const clause of doc.proofClauses) {
-      const verdict = latest.verdicts.find((v) => v.clause === clause.index);
-      if (!verdict) issues.push(`proof clause ${clause.index} has no verdict in the latest audit pass (pass ${latest.pass})`);
-      else if (verdict.status === 'unmet') issues.push(`proof clause ${clause.index} is unmet as of pass ${latest.pass}`);
+      const verdict = latest.verdicts.find((v) => v.clause === clause.id);
+      if (!verdict) issues.push(`proof clause ${clause.id} has no verdict in the latest audit pass (pass ${latest.pass})`);
+      else if (verdict.status === 'unmet') issues.push(`proof clause ${clause.id} is unmet as of pass ${latest.pass}`);
     }
   }
 
-  if (input.deliverableBaseline !== null && input.deliverableBaseline.trim() !== doc.deliverableSection.trim()) {
+  if (input.deliverableBaseline !== null && stripClauseTags(input.deliverableBaseline).trim() !== stripClauseTags(doc.deliverableSection).trim()) {
     issues.push(`${input.spec}'s ## Deliverable text differs from its most recent amendment (or its state at the branch's merge-base, if never amended)`);
   }
 
