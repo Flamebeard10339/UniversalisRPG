@@ -49,6 +49,14 @@ describe('parseSpecDoc', () => {
     ]);
   });
 
+  it('parses indented proof target metadata without folding it into clause text', () => {
+    const doc = '## Deliverable\n\nPromise.\n\nProof:\n\n- [c1] The command proof runs.\n  proof: command node --version\n- [c2] The vitest proof runs.\n  proof: vitest scripts/tasks.test.ts "audit-prompt prints a ready-to-use auditor prompt for a spec"\n';
+    expect(parseSpecDoc(doc).proofClauses).toEqual([
+      { id: 1, text: 'The command proof runs.', proofTargets: ['command node --version'] },
+      { id: 2, text: 'The vitest proof runs.', proofTargets: ['vitest scripts/tasks.test.ts "audit-prompt prints a ready-to-use auditor prompt for a spec"'] },
+    ]);
+  });
+
   it('leaves a clause that merely opens with a bracketed phrase untagged, text intact', () => {
     const doc = '## Deliverable\n\nPromise.\n\nProof:\n\n- [see docs] a clause that opens with a link-shaped phrase.\n';
     expect(parseSpecDoc(doc).proofClauses).toEqual([{ id: 1, text: '[see docs] a clause that opens with a link-shaped phrase.' }]);

@@ -2,6 +2,7 @@ export interface ProofClause {
   // A name, not a position: ids need be neither sequential nor in order.
   id: number;
   text: string;
+  proofTargets?: string[];
 }
 
 export type Verdict = 'met' | 'unmet';
@@ -52,6 +53,7 @@ interface ScannedClause {
   line: number;
   tag: number | null;
   text: string;
+  proofTargets: string[];
 }
 
 // "Proof:" introduces a bullet list within ## Deliverable; each top-level
@@ -68,14 +70,18 @@ function scanProofClauses(deliverableSection: string): ScannedClause[] {
     if (current) clauses[clauses.length - 1].text = current.join(' ').trim();
   };
   for (let i = proofIndex + 1; i < lines.length; i++) {
-    const bullet = /^- (.*)$/.exec(lines[i].trim());
+    const trimmed = lines[i].trim();
+    const bullet = /^- (.*)$/.exec(trimmed);
+    const proof = /^proof:\s*(.+)$/.exec(trimmed);
     if (bullet) {
       flush();
       const tagged = CLAUSE_TAG.exec(bullet[1]);
-      clauses.push({ line: i, tag: tagged ? Number(tagged[1]) : null, text: '' });
+      clauses.push({ line: i, tag: tagged ? Number(tagged[1]) : null, text: '', proofTargets: [] });
       current = [tagged ? tagged[2] : bullet[1]];
-    } else if (current && lines[i].trim() !== '') {
-      current.push(lines[i].trim());
+    } else if (current && proof) {
+      clauses[clauses.length - 1].proofTargets.push(proof[1].trim());
+    } else if (current && trimmed !== '') {
+      current.push(trimmed);
     }
   }
   flush();
@@ -96,7 +102,11 @@ function resolveIds(clauses: ScannedClause[]): number[] {
 function parseProofClauses(deliverableSection: string): ProofClause[] {
   const scanned = scanProofClauses(deliverableSection);
   const ids = resolveIds(scanned);
-  return scanned.map((clause, i) => ({ id: ids[i], text: clause.text }));
+  return scanned.map((clause, i) => ({
+    id: ids[i],
+    text: clause.text,
+    ...(clause.proofTargets.length > 0 ? { proofTargets: clause.proofTargets } : {}),
+  }));
 }
 
 // Turns each clause's id from something derived — position in the list —

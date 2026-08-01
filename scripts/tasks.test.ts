@@ -1073,7 +1073,8 @@ describe('tasks CLI', () => {
   });
 
   it('audit-prompt prints a ready-to-use auditor prompt for a spec', () => {
-    fixture(({ tasks }) => {
+    fixture(({ tasks, dir }) => {
+      writeFileSync(path.join(dir, 'specs', 'demo-spec.md'), '# Demo spec\n\n## Deliverable\n\nSomething this branch promises.\n\nProof:\n\n- [c1] The first clause holds.\n  proof: command node --version\n- [c2] The second clause holds.\n\n## Decisions\n\n## Open questions\n\nNone.\n', 'utf8');
       tasks('add', 'prove the runtime behavior', '--id', 'runtime-proof', '--spec', 'demo-spec', '--severity', 'high', '--system', 'Runtime', '--files', 'src/runtime/runtime.ts:1', '--deliverable', 'runtime behavior is proven');
       tasks('audit', 'demo-spec', '--proof', '1=met', '--evidence', '1=measured directly', '--proof', '2=met');
 
@@ -1083,6 +1084,7 @@ describe('tasks CLI', () => {
       expect(result.stdout).toContain('Diff range:');
       expect(result.stdout).toContain('Proof clauses:');
       expect(result.stdout).toContain('[c1] The first clause holds.');
+      expect(result.stdout).toContain('proof: command node --version');
       expect(result.stdout).toContain('Latest audit pass: pass 1');
       expect(result.stdout).toContain('runtime-proof [high] Runtime');
       expect(result.stdout).toContain('src/runtime/runtime.ts:1');
@@ -1201,6 +1203,30 @@ describe('tasks CLI', () => {
       const result = tasks('check', '--merge');
       expect(result.status).toBe(0);
       expect(result.stdout).toContain('0 issue(s)');
+    });
+  });
+
+  it('check --merge runs proof command targets and reports a failing target by clause id', () => {
+    fixture(({ tasks, dir }) => {
+      writeFileSync(path.join(dir, 'specs', 'demo-spec.md'), '# Demo spec\n\n## Deliverable\n\nPromise.\n\nProof:\n\n- [c1] The proof target passes.\n  proof: command node --version\n- [c2] The proof target fails.\n  proof: command node --definitely-not-a-real-node-flag\n\n## Decisions\n\n## Open questions\n\nNone.\n', 'utf8');
+      tasks('audit', 'demo-spec', '--proof', '1=met', '--proof', '2=met');
+
+      const result = tasks('check', '--merge');
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain('proof clause 2 target failed');
+      expect(result.stderr).toContain('command node --definitely-not-a-real-node-flag');
+      expect(result.stderr).not.toContain('proof clause 1 target failed');
+    });
+  });
+
+  it('check --merge reports an unsupported proof target shape by clause id', () => {
+    fixture(({ tasks, dir }) => {
+      writeFileSync(path.join(dir, 'specs', 'demo-spec.md'), '# Demo spec\n\n## Deliverable\n\nPromise.\n\nProof:\n\n- [c1] The proof target is unsupported.\n  proof: custom magic\n\n## Decisions\n\n## Open questions\n\nNone.\n', 'utf8');
+      tasks('audit', 'demo-spec', '--proof', '1=met');
+
+      const result = tasks('check', '--merge');
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain('proof clause 1 target has unsupported shape: custom magic');
     });
   });
 

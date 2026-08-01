@@ -1,4 +1,4 @@
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { createInterface } from 'node:readline';
@@ -263,9 +263,42 @@ function cmdCheck(flags: Record<string, string>): void {
     deliverableBaseline,
     members: tasks.filter((task) => task.spec === spec),
   });
-  for (const issue of mergeIssues) console.error(`merge gate: ${issue}`);
-  console.log(`merge gate: ${mergeIssues.length} issue(s)`);
-  if (mergeIssues.length > 0) process.exitCode = 1;
+  const proofIssues = doc ? runProofTargets(doc) : [];
+  const allMergeIssues = [...mergeIssues, ...proofIssues];
+  for (const issue of allMergeIssues) console.error(`merge gate: ${issue}`);
+  console.log(`merge gate: ${allMergeIssues.length} issue(s)`);
+  if (allMergeIssues.length > 0) process.exitCode = 1;
+}
+
+function runProofTargets(doc: { proofClauses: ProofClause[] }): string[] {
+  const issues: string[] = [];
+  for (const clause of doc.proofClauses) {
+    for (const target of clause.proofTargets ?? []) {
+      const issue = runProofTarget(clause.id, target);
+      if (issue) issues.push(issue);
+    }
+  }
+  return issues;
+}
+
+function runProofTarget(clause: number, target: string): string | null {
+  if (target.startsWith('command ')) {
+    const command = target.slice('command '.length).trim();
+    const result = spawnSync(command, { cwd: process.cwd(), encoding: 'utf8', shell: true, stdio: ['ignore', 'pipe', 'pipe'] });
+    if ((result.status ?? 1) !== 0) return `proof clause ${clause} target failed: ${target}`;
+    return null;
+  }
+
+  const vitest = /^vitest\s+(\S+)\s+"([^"]+)"$/.exec(target);
+  if (vitest) {
+    const [, file, name] = vitest;
+    const result = spawnSync(process.execPath, ['node_modules/vitest/vitest.mjs', 'run', file, '--configLoader', 'runner', '-t', name], { cwd: process.cwd(), encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+    if ((result.status ?? 1) !== 0) return `proof clause ${clause} target failed: ${target}`;
+    if (result.stdout.includes('0 passed') || result.stdout.includes('skipped')) return `proof clause ${clause} target missing or skipped: ${target}`;
+    return null;
+  }
+
+  return `proof clause ${clause} target has unsupported shape: ${target}`;
 }
 
 // Shared by add and edit: the two places content fields (severity, system,
@@ -1101,7 +1134,10 @@ function cmdAuditPrompt(args: Flags): void {
   console.log('Read the spec deliverable, the latest audit pass if any, and the diff above. Verify each proof clause independently.');
   console.log('');
   console.log('Proof clauses:');
-  for (const clause of doc.proofClauses) console.log(`- [c${clause.id}] ${clause.text}`);
+  for (const clause of doc.proofClauses) {
+    console.log(`- [c${clause.id}] ${clause.text}`);
+    for (const target of clause.proofTargets ?? []) console.log(`  proof: ${target}`);
+  }
   console.log('');
   console.log(latest ? `Latest audit pass: pass ${latest.pass} (${latest.date}), ${latest.verdicts.filter((verdict) => verdict.status === 'met').length}/${latest.verdicts.length} met` : 'Latest audit pass: none recorded');
   console.log('');
