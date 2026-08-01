@@ -3,6 +3,7 @@ import { DslError } from '../grammar/parser';
 import { point } from '../grammar/range';
 import { nextRandom } from './rng';
 import { armAction, createGameState, GameState, hitChance, initResources, resolve } from './runtime';
+import { IMPLICIT_TARGET_FULL } from './encounter';
 import { loadModule, Registry } from '../content/registry';
 import { secondsToMs, toMilliUnits } from './units';
 
@@ -237,48 +238,89 @@ describe('a contest inside a fight', () => {
     }
   });
 
-  it('unify-action-health-into-target: both paths apply the same damage formula (runtime-2026-07-30-m2)', () => {
-    // One stat at 2.5, two actions differing only in target.
-    // Both must use hitDamage and thus consume the same damage per hit.
-    const registry = loaded(
+  // The audit measured one stat at 2.5 spending 2.5 down the healthless path and
+  // 2.0 down the `target:` path — the same authored number worth two amounts.
+  // Neither action carries `accuracy:`, so every attempt lands and the figures
+  // below are exact rather than sampled.
+  function fighters(blow: number): Registry {
+    return loaded(
       MODULE +
         `
 # stat blow
-base: 2.5
+base: ${blow}
+
+# flag fled
 
 # entity test-fighter
 stats: max-health 100000, dodge 0
 test-pool:
-  repeating
   time: 60
-  accuracy: attack-skill
+  speed: attack-rate
   ability: blow
-  dr: dr
   target: health
 test-implicit:
-  repeating
   time: 60
-  accuracy: attack-skill
+  speed: attack-rate
   ability: blow
-  dr: dr
+  escape after 5
+test-escaper:
+  time: 60
+  speed: attack-rate
+  ability: blow
+  escape after 2
+  on escape:
+    set: fled
 `
     );
+  }
 
-    const viaTarget = createGameState('arena');
-    initResources(viaTarget, registry);
-    armAction('entity', 'test-fighter', 'test-pool', registry, viaTarget);
-    resolve(viaTarget, registry, secondsToMs(60));
+  function poolSpentPerAttempt(registry: Registry, attempts: number): number {
+    const state = createGameState('arena');
+    initResources(state, registry);
+    armAction('entity', 'test-fighter', 'test-pool', registry, state);
+    resolve(state, registry, secondsToMs(attempts));
+    const foe = state.activeAction!.actors!['test-fighter'];
+    return (toMilliUnits(100000) - foe.resources['health']) / attempts;
+  }
 
-    const viaImplicit = createGameState('arena');
-    initResources(viaImplicit, registry);
-    armAction('entity', 'test-fighter', 'test-implicit', registry, viaImplicit);
-    resolve(viaImplicit, registry, secondsToMs(60));
+  it('unify-action-health-into-target: a target: hit spends the authored ability at its authored scale (runtime-2026-07-30-m2)', () => {
+    // 2000 was the reading this finding recorded, from truncating to whole units.
+    expect(poolSpentPerAttempt(fighters(2.5), 4)).toBe(toMilliUnits(2.5));
+    // Below min-damage the old floor rounded a 0.4 hit UP to a whole unit.
+    expect(poolSpentPerAttempt(fighters(0.4), 2)).toBe(toMilliUnits(0.4));
+  });
 
-    // Both paths use hitDamage(blow:2.5, dr:0) = 2500 milli.
-    // The explicit target consumes from enemy health pool.
-    // The implicit target consumes from the 1000-milli implicit pool.
-    // Both should show damage was dealt.
-    expect(viaTarget.activeAction).toBeDefined();
-    expect(viaImplicit.activeAction).toBeDefined();
+  // `escape after` ends a fight with its target pool still full, so a completion
+  // test that reads the pool waits for a boundary the fight never reaches.
+  it('escapes a deterministic fight on its attempt count, not on an emptied pool', () => {
+    const registry = fighters(0.4); // ceil(1000/400) = 3 attempts to complete
+    const state = createGameState('arena');
+    initResources(state, registry);
+    armAction('entity', 'test-fighter', 'test-escaper', registry, state);
+
+    // Two attempts of 400 leave the implicit pool at 200, still unemptied.
+    resolve(state, registry, secondsToMs(2));
+    expect(state.activeAction).toBeNull();
+    expect(state.flags['fled']).toBe(true);
+  });
+
+  // A hit worth nothing empties no pool, so the fight would never end. An
+  // `ability:` naming a bare `# stat` reads zero, which the tutorial ships.
+  it('keeps a hit above zero when the ability stat reads zero', () => {
+    expect(poolSpentPerAttempt(fighters(0), 2)).toBe(1);
+  });
+
+  it('unify-action-health-into-target: the implicit target spends it at the same scale (runtime-2026-07-30-m2)', () => {
+    // ceil(1000 / 400) = 3 attempts, so `escape after 5` leaves the fight in
+    // flight at two attempts and the pool readable rather than reset.
+    const registry = fighters(0.4);
+    const state = createGameState('arena');
+    initResources(state, registry);
+    armAction('entity', 'test-fighter', 'test-implicit', registry, state);
+    resolve(state, registry, secondsToMs(2));
+
+    const spent = IMPLICIT_TARGET_FULL - state.activeAction!.implicitTarget;
+    expect(spent / 2).toBe(toMilliUnits(0.4));
+    expect(spent / 2).toBe(poolSpentPerAttempt(fighters(0.4), 2));
   });
 });

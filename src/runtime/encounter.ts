@@ -141,13 +141,19 @@ export function damageTarget(state: GameState, registry: Registry, action: Actio
   return damagePool(state, registry, actorId, action.target, milliAmount, deltas);
 }
 
+// Rounded, because the log is prose: sub-unit precision belongs in the pool,
+// not in a sentence reporting a hit for 4.873.
+function spoken(milliAmount: number): string {
+  return String(Math.round(fromMilliUnits(milliAmount) * 10) / 10);
+}
+
 export function logSwing(state: GameState, registry: Registry, self: string, other: string, damage: number | null): void {
   if (self === PLAYER) {
     const title = actorTitle(other, registry);
-    state.log.push(damage === null ? `You miss the ${title}.` : `You hit the ${title} for ${fromMilliUnits(damage)}.`);
+    state.log.push(damage === null ? `You miss the ${title}.` : `You hit the ${title} for ${spoken(damage)}.`);
   } else {
     const title = actorTitle(self, registry);
-    state.log.push(damage === null ? `The ${title} misses you.` : `The ${title} hits you for ${fromMilliUnits(damage)}.`);
+    state.log.push(damage === null ? `The ${title} misses you.` : `The ${title} hits you for ${spoken(damage)}.`);
   }
 }
 

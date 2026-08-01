@@ -14,7 +14,6 @@ import {
   travelPair,
 } from './actions';
 import {
-  anyDelta,
   applyResults,
   applyResultsNow,
   captureResourceRates,
@@ -303,7 +302,7 @@ function resolveSegment(state: GameState, registry: Registry, segEnd: number): v
 
   // Over the time actually consumed: a segment can stop short of segEnd.
   const elapsed = state.time - start;
-  if (elapsed > 0 || anyDelta(segment.deltas)) settlePools(state, registry, snapshots, Math.max(0, elapsed), segment.deltas);
+  if (elapsed > 0 || segment.deltas.size > 0) settlePools(state, registry, snapshots, Math.max(0, elapsed), segment.deltas);
 }
 
 function applyDueBoundaries(state: GameState, registry: Registry, at: number): void {
@@ -324,9 +323,11 @@ function applyDueBoundaries(state: GameState, registry: Registry, at: number): v
         changed = true;
       } else if (!resolvesPerAttempt(action)) {
         if (!state.activeAction.repeating) {
-          const { duration, outcome } = fightPlan(action, state, registry);
+          const { duration, attemptsToResolve, outcome } = fightPlan(action, state, registry);
+          // Attempts, not the pool: `escape after` ends a fight with the pool
+          // still full, so a pool read would wait for a boundary never reached.
           // The only place a zero-`time:` action fires; no segment advances it.
-          if (state.activeAction.implicitTarget <= 0 || duration <= 0) {
+          if (playerCadence(state.activeAction).attemptsMade >= attemptsToResolve || duration <= 0) {
             const batch = fightBatch(action, 1, outcome);
             applyResultsNow(state, registry, batch.results, batch.count);
             grantActionFoodBuff(state, registry);
@@ -344,11 +345,13 @@ function applyDueBoundaries(state: GameState, registry: Registry, at: number): v
   }
 }
 
-// Associative, as resolve.test.ts proves. Two accepted limitations: an `on full`
-// handler mutating a rate-referenced stat is not, and a pool already saturated
-// in its rate's direction is not, because settling it clamps the rate away and
-// drops the carried remainder, so where the span is cut decides how much it
-// wasted.
+// Associative, as resolve.test.ts proves. Three accepted limitations: an
+// `on full` handler mutating a rate-referenced stat is not; a pool already
+// saturated in its rate's direction is not, because settling it clamps the rate
+// away and drops the carried remainder, so where the span is cut decides how
+// much it wasted; and a DETERMINISTIC repeating action still applies its whole
+// batch at segment granularity, so a pool its results drain fires `on empty`
+// late. `drainedAPool` closes that only for the per-attempt path.
 export function resolve(state: GameState, registry: Registry, toTimeMs: number): void {
   if (toTimeMs < state.time) throw new RuntimeError(`resolve: toTime (${toTimeMs}) must be >= state.time (${state.time})`);
   if (!Number.isInteger(toTimeMs)) throw new RuntimeError(`resolve: toTime must be an integer millisecond value, got ${toTimeMs}`);

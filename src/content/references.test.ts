@@ -188,6 +188,7 @@ describe('references the walk used to step over', () => {
     expect(test('expect: start')).toThrow(/# test walk expect: names an unknown save: start/);
     expect(test('assert: has strawe')).toThrow(/# test walk assert: has names an unknown item: strawe/);
     expect(test('begin: travel shedd')).toThrow(/# test walk begin: travel: names an unknown location: shedd/);
+    expect(test('equip: strawe')).toThrow(/# test walk equip: names an unknown item: strawe/);
   });
 
   it('rejects a `use:` naming an unknown kind, object, or action', () => {

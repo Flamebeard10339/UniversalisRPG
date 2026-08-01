@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { armAction, createGameState, equip, GameState, initResources, resolve, unequip } from './runtime';
-import { loadModule, loadUniverse, Registry } from '../content/registry';
+import { readFileSync } from 'fs';
+import { armAction, createGameState, equip, GameState, initResources, resolve, statValue, unequip } from './runtime';
+import { loadModule, Registry } from '../content/registry';
 import { secondsToMs, toMilliUnits } from './units';
 
 const MODULE = `
@@ -125,56 +126,53 @@ describe('equipment', () => {
     expect(equippedTaken).toBeLessThan(bareTaken);
   });
 
-  it('equipment-slots: tutorial equipment is equippable and changes stats when equipped', () => {
-    const tutorial = loadUniverse([
-      {
-        name: 'tutorial',
-        text: `
-# info tutorial
-version: 1.0.0
+  // Against content/tutorial-island.dsl itself, not a copy of it: a copy would
+  // stay green after the shipped `slot:` or `+2 attack` changed underneath it.
+  it('equipment-slots: the SHIPPED tutorial sword and shield move real stats once equipped', () => {
+    const tutorial = loadModule(readFileSync('content/tutorial-island.dsl', 'utf8'));
+    const sword = 'tutorial-island.iron-sword';
+    const shield = 'tutorial-island.wooden-shield';
 
-# stat attack
-base: 10
+    expect(tutorial.items.get(sword)!.slot).toBe('mainhand');
+    expect(tutorial.items.get(shield)!.slot).toBe('offhand');
 
-# stat defense
-base: 5
-
-# stat max-health
-base: 30
-
-# resource health
-max: max-health
-
-# location home
-x: 0, y: 0
-starting
-
-# item iron-sword
-slot: mainhand
-weapon, +2 attack
-
-# item wooden-shield
-slot: offhand
-shield, +2 defense
-`,
-      },
-    ]);
-
-    const state = createGameState('tutorial.home');
+    const state = createGameState('tutorial-island.beach');
     initResources(state, tutorial);
-    state.inventory['tutorial.iron-sword'] = 1;
-    state.inventory['tutorial.wooden-shield'] = 1;
+    state.inventory[sword] = 1;
+    state.inventory[shield] = 1;
 
-    const bareAttack = Math.round(Math.min(10, 10 + 0) * 1000); // attack 10 - no bonus
-    const bareDefense = Math.round(Math.min(5, 5 + 0) * 1000); // defense 5 - no bonus
+    const bareAttack = statValue('tutorial-island.attack', state, tutorial);
+    const bareDefense = statValue('tutorial-island.defense', state, tutorial);
 
-    equip(state, tutorial, 'tutorial.iron-sword');
-    expect(state.equipped['mainhand']).toBe('tutorial.iron-sword');
+    // Carried, not equipped: the tutorial hands both over at node `skills`, and
+    // holding them must not by itself move a stat.
+    expect(statValue('tutorial-island.attack', state, tutorial)).toBe(bareAttack);
 
-    equip(state, tutorial, 'tutorial.wooden-shield');
-    expect(state.equipped['offhand']).toBe('tutorial.wooden-shield');
+    equip(state, tutorial, sword);
+    equip(state, tutorial, shield);
+    expect(statValue('tutorial-island.attack', state, tutorial)).toBe(bareAttack + 2);
+    expect(statValue('tutorial-island.defense', state, tutorial)).toBe(bareDefense + 2);
 
     unequip(state, 'mainhand');
-    expect(state.equipped['mainhand']).toBeUndefined();
+    expect(statValue('tutorial-island.attack', state, tutorial)).toBe(bareAttack);
+    expect(statValue('tutorial-island.defense', state, tutorial)).toBe(bareDefense + 2);
+  });
+
+  // The comment on statRange's equipment fold claims this trade, so it is a
+  // behavioural claim and belongs here rather than in the source.
+  it('equipment-slots: a slot keeps its item across losing and re-acquiring it', () => {
+    const registry = loaded();
+    const state = createGameState('arena');
+    initResources(state, registry);
+    state.inventory['attack-bonus'] = 1;
+    equip(state, registry, 'attack-bonus');
+    const equipped = statValue('attack', state, registry);
+
+    state.inventory['attack-bonus'] = 0;
+    expect(statValue('attack', state, registry)).toBe(equipped - 2);
+    expect(state.equipped['mainhand']).toBe('attack-bonus');
+
+    state.inventory['attack-bonus'] = 1;
+    expect(statValue('attack', state, registry)).toBe(equipped);
   });
 });

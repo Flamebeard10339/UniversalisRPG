@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { restorePools } from './effects';
-import { createGameState, PLAYER } from './runtime';
+import { createGameState, PLAYER, statValue } from './runtime';
 import { IMPLICIT_TARGET_FULL } from './encounter';
 import { loadModule } from '../content/registry';
 import { compareSave, diffState, initialState, loadSave, pruneStateForRegistry, SAVE_VERSION, serializeSave } from './save';
@@ -15,6 +15,13 @@ starting
 
 # item gold
 title: Gold
+
+# stat might
+base: 3
+
+# item charm
+slot: neck
++2 might
 
 # flag done
 
@@ -134,6 +141,9 @@ flags: lit
 x: 1, y: 0
 
 # item bread
+
+# item helm
+slot: head
 
 # flag known
 
@@ -270,6 +280,13 @@ starting
 # item gold
 title: Gold
 
+# stat might
+base: 3
+
+# item charm
+slot: neck
++2 might
+
 # entity chest
 open:
   give: 1 gold
@@ -285,7 +302,41 @@ expect: empty
 load: empty
 use: entity.chest.open
 expect: empty
+
+# test equips-a-charm
+equip: charm
+assert: has charm
+
+# test equips-then-unequips
+equip: charm
+unequip: neck
+assert: has charm
 `;
+
+// The deliverable claims equipping is reachable through the same directive
+// surface as every other play input; a `# test` section replaying it is what
+// that claim means.
+describe('a # test section records an equip', () => {
+  function replaying(testId: string): ReturnType<typeof createGameState> {
+    const registry = loadModule(SAVE_TEST_MODULE);
+    const state = createGameState('camp');
+    state.inventory['charm'] = 1;
+    expect(runTest(testId, registry, state)).toEqual({ passed: true });
+    return state;
+  }
+
+  it('equips by authored id, fills the slot, and moves the stat', () => {
+    const state = replaying('equips-a-charm');
+    expect(state.equipped).toEqual({ neck: 'charm' });
+    expect(statValue('might', state, loadModule(SAVE_TEST_MODULE))).toBe(5);
+    // Equipping moves no counts: the charm is still carried.
+    expect(state.inventory['charm']).toBe(1);
+  });
+
+  it('unequips by slot, emptying it again', () => {
+    expect(replaying('equips-then-unequips').equipped).toEqual({});
+  });
+});
 
 describe('# save section wired through load: / expect: test directives', () => {
   it('passes when the loaded state still matches the save', () => {
@@ -332,5 +383,39 @@ describe('a # save body is checked past its version', () => {
 
   it('rejects a fractional rng cursor (audit-2026-07-30-rng-integer-check)', () => {
     expect(load({ rng: 0.5 })).toThrow(/save field rng holds 0.5/);
+  });
+
+  it('requires each equipped slot to hold an item id', () => {
+    expect(load({ equipped: { head: 'helm' } })).not.toThrow();
+    expect(load({ equipped: { head: 7 } })).toThrow(/save field equipped.head holds 7/);
+  });
+});
+
+describe('equipped survives a registry that no longer matches it', () => {
+  const registry = loadModule(PRUNE_MODULE);
+
+  function pruned(equipped: Record<string, string>): { state: ReturnType<typeof createGameState>; warnings: ReturnType<typeof pruneStateForRegistry> } {
+    const state = createGameState('camp');
+    state.inventory['helm'] = 1;
+    state.equipped = equipped;
+    return { state, warnings: pruneStateForRegistry(state, registry) };
+  }
+
+  it('keeps a slot whose item still declares it', () => {
+    const { state, warnings } = pruned({ head: 'helm' });
+    expect(state.equipped).toEqual({ head: 'helm' });
+    expect(warnings).toEqual([]);
+  });
+
+  it('drops a slot whose item is gone, saying so rather than crashing', () => {
+    const { state, warnings } = pruned({ head: 'ghost-helm' });
+    expect(state.equipped).toEqual({});
+    expect(warnings.map((w) => w.message)).toEqual(['Unequipped head because its item ghost-helm is not loaded.']);
+  });
+
+  it('drops a slot the item no longer declares', () => {
+    const { state, warnings } = pruned({ tail: 'helm' });
+    expect(state.equipped).toEqual({});
+    expect(warnings.map((w) => w.message)).toEqual(['Unequipped tail because its item helm no longer declares that slot.']);
   });
 });

@@ -87,7 +87,7 @@ node greet:
   -> Bye
 
 # save blank
-{"version":4}
+{"version":6}
 
 # test smoke
 use: entity.npc.cheer

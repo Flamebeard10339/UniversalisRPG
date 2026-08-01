@@ -10,5 +10,6 @@ export function equip(state: GameState, registry: Registry, itemId: string): voi
 }
 
 export function unequip(state: GameState, slot: string): void {
+  if (state.equipped[slot] === undefined) throw new RuntimeError(`unequip: nothing is equipped in slot ${slot}`);
   delete state.equipped[slot];
 }

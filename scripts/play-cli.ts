@@ -209,8 +209,17 @@ function canonicalDirective(directive: Directive): string {
       return 'cancel';
     case 'wait':
       return `wait: ${directive.seconds}`;
-    default:
-      throw new Error(`canonicalDirective: unexpected directive kind: ${(directive as Directive).kind}`);
+    case 'equip':
+      return `equip: ${directive.item}`;
+    case 'unequip':
+      return `unequip: ${directive.slot}`;
+    // Exhaustive, so widening Directive is a type error here rather than a
+    // throw at the moment a player picks the new kind. These three are
+    // authored, never recorded, so they never reach this.
+    case 'run':
+    case 'expect':
+    case 'assert':
+      throw new RuntimeError(`canonicalDirective: ${directive.kind}: is authored, not recorded`);
   }
 }
 
