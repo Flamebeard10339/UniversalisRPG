@@ -4,7 +4,7 @@ import {
   actionFirstUnit, applyResultsNow, armAction, armCraft, craft, craftFirstUnit, createGameState, evaluateCondition, renderSegments, travelSecondsPerUnit, useAction } from './runtime';
 import { IMPLICIT_TARGET_FULL } from './encounter';
 import { loadModule } from '../content/registry';
-import { secondsToMs, toMilliUnits } from './units';
+import { secondsToMs } from './units';
 import { runTest } from './session';
 
 const MODULE = `
