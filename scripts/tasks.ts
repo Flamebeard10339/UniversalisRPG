@@ -1038,6 +1038,7 @@ interface AuditFinding {
   system: string | null;
   files: string[];
   deliverable: string | null;
+  evidence: string | null;
 }
 
 interface AuditArgs {
@@ -1059,11 +1060,10 @@ const CONFIG_FLAG_NAMES = new Set(['store', 'systems', 'specs-dir', 'branch']);
 // --finding's --severity/--system/--file belong to whichever --finding
 // came most recently, which a flat key-value map cannot express.
 //
-// --file is overloaded by position: while no --finding has been seen yet
-// it is clause-scoped and takes the same `N=value` shape as --proof and
-// --evidence (`--file 2=src/save.ts:88`); once a --finding is open it
-// attaches to that finding instead and takes a bare path, matching the
-// pre-existing behaviour.
+// --file and --evidence are overloaded by position: while no --finding has
+// been seen yet they are clause-scoped and take the same `N=value` shape as
+// --proof (`--file 2=src/save.ts:88`); once a --finding is open they attach
+// to that finding instead and take a bare value.
 function parseAuditArgs(args: string[]): AuditArgs {
   const configFlags: Record<string, string> = {};
   let baseBranch = 'main';
@@ -1090,11 +1090,13 @@ function parseAuditArgs(args: string[]): AuditArgs {
     } else if (key === 'proof') {
       const [clause, status] = (value ?? '').split('=');
       proofs.set(Number(clause), status as Verdict);
+    } else if (key === 'evidence' && current) {
+      current.evidence = value ?? null;
     } else if (key === 'evidence') {
       const eq = (value ?? '').indexOf('=');
       evidence.set(Number((value ?? '').slice(0, eq)), (value ?? '').slice(eq + 1));
     } else if (key === 'finding') {
-      current = { title: value ?? '', severity: null, system: null, files: [], deliverable: null };
+      current = { title: value ?? '', severity: null, system: null, files: [], deliverable: null, evidence: null };
       findings.push(current);
     } else if (key === 'severity' && current) {
       current.severity = value as Severity;
@@ -1118,7 +1120,7 @@ function parseAuditArgs(args: string[]): AuditArgs {
 }
 
 const AUDIT_USAGE =
-  'usage: tasks audit <spec> [--proof N=met|unmet ...] [--evidence N="..." ...] [--file N=path:line ...] [--finding "..." --severity high|medium|low --system "<name>" --deliverable "..." [--file path:line ...]]...  (with no --proof flags, walks the clauses interactively)';
+  'usage: tasks audit <spec> [--proof N=met|unmet ...] [--evidence N="..." ...] [--file N=path:line ...] [--finding "..." --severity high|medium|low --system "<name>" --deliverable "..." --evidence "..." [--file path:line ...]]...  (with no --proof flags, walks the clauses interactively)';
 
 async function walkClausesInteractively(clauses: ProofClause[]): Promise<AuditVerdict[]> {
   const rl = createInterface({ input: process.stdin, output: process.stdout });
@@ -1211,6 +1213,14 @@ async function cmdAudit(rawArgs: string[]): Promise<void> {
       process.exitCode = 1;
       return;
     }
+    // Triage shows both halves and decides on both: a finding with no
+    // evidence reaches the human as a proposed fix to a problem they have
+    // to take on faith, which is the one thing triage cannot do.
+    if (!finding.evidence) {
+      console.error(`error: finding "${finding.title}" needs --evidence "..." — a finding must say what is broken, not only what fixing it would mean`);
+      process.exitCode = 1;
+      return;
+    }
   }
 
   const passNumber = doc.auditPasses.length + 1;
@@ -1264,7 +1274,7 @@ async function cmdAudit(rawArgs: string[]): Promise<void> {
       requires: [],
       files: finding.files,
       deliverable: finding.deliverable,
-      evidence: null,
+      evidence: finding.evidence,
       source: { spec: slug, pass: passNumber },
       reason: null,
       closed: null,

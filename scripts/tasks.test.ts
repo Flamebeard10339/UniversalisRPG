@@ -510,7 +510,7 @@ describe('tasks CLI', () => {
     fixture(({ tasks }) => {
       tasks('add', 'a task', '--id', 'a-task');
       tasks('add', 'a finding', '--id', 'a-finding', '--kind', 'finding', '--severity', 'low', '--deliverable', 'fix it');
-      tasks('audit', 'demo-spec', '--proof', '1=met', '--proof', '2=met', '--finding', 'pass one finding', '--severity', 'low', '--deliverable', 'fix it');
+      tasks('audit', 'demo-spec', '--proof', '1=met', '--proof', '2=met', '--finding', 'pass one finding', '--severity', 'low', '--deliverable', 'fix it', '--evidence', 'seen in pass one');
       const added = tasks('spec', 'add', 'demo-spec', 'a-task', 'a-finding', 'demo-spec-pass1-pass-one-finding');
       expect(added.status).toBe(0);
       expect(tasks('show', 'a-task').stdout).toContain('spec: demo-spec');
@@ -531,7 +531,7 @@ describe('tasks CLI', () => {
     fixture(({ tasks }) => {
       tasks('add', 'a task', '--id', 'a-task');
       tasks('audit', 'demo-spec', '--proof', '1=met', '--proof', '2=met');
-      tasks('audit', 'demo-spec', '--proof', '1=met', '--proof', '2=met', '--finding', 'late finding', '--severity', 'low', '--deliverable', 'fix it');
+      tasks('audit', 'demo-spec', '--proof', '1=met', '--proof', '2=met', '--finding', 'late finding', '--severity', 'low', '--deliverable', 'fix it', '--evidence', 'seen late');
       const result = tasks('spec', 'add', 'demo-spec', 'a-task', 'demo-spec-pass2-late-finding');
       expect(result.status).toBe(1);
       expect(result.stderr).toContain('cannot be promoted');
@@ -891,9 +891,53 @@ describe('tasks CLI', () => {
     });
   });
 
+  it('audit refuses a --finding with no --evidence, recording nothing', () => {
+    fixture(({ tasks }) => {
+      const result = tasks('audit', 'demo-spec', '--proof', '1=met', '--proof', '2=met', '--finding', 'unevidenced bug', '--severity', 'high', '--deliverable', 'fix it somehow');
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain('needs --evidence');
+      expect(tasks('list', '--kind', 'finding').stdout).toContain('0 task(s)');
+    });
+  });
+
+  it('audit carries a --finding\'s --evidence onto the finding task, where triage reads it', () => {
+    fixture(({ tasks }) => {
+      tasks('audit', 'demo-spec', '--proof', '1=met', '--proof', '2=met', '--finding', 'a real bug', '--severity', 'high', '--deliverable', 'guard the null case', '--evidence', 'save.ts:88 dereferences before the null check');
+      const shown = tasks('list', '--kind', 'finding', '--state', 'unreviewed');
+      const id = shown.stdout.split('\n')[0].split(' ')[0];
+      expect(tasks('show', id).stdout).toContain('evidence: save.ts:88 dereferences before the null check');
+    });
+  });
+
+  it('--evidence stays clause-scoped before any --finding and finding-scoped after one, the way --file does', () => {
+    fixture(({ tasks }) => {
+      tasks(
+        'audit',
+        'demo-spec',
+        '--proof',
+        '1=unmet',
+        '--evidence',
+        '1=the clause did not hold',
+        '--proof',
+        '2=met',
+        '--finding',
+        'a separate bug',
+        '--severity',
+        'low',
+        '--deliverable',
+        'fix the separate bug',
+        '--evidence',
+        'the finding has its own evidence',
+      );
+      expect(tasks('show', 'demo-spec-clause-1').stdout).toContain('evidence: the clause did not hold');
+      const id = tasks('list', '--kind', 'finding', '--state', 'unreviewed').stdout.split('\n')[0].split(' ')[0];
+      expect(tasks('show', id).stdout).toContain('evidence: the finding has its own evidence');
+    });
+  });
+
   it('audit carries a --finding\'s --deliverable onto the finding task it creates', () => {
     fixture(({ tasks }) => {
-      tasks('audit', 'demo-spec', '--proof', '1=met', '--proof', '2=met', '--finding', 'a real bug', '--severity', 'high', '--deliverable', 'guard the null case');
+      tasks('audit', 'demo-spec', '--proof', '1=met', '--proof', '2=met', '--finding', 'a real bug', '--severity', 'high', '--deliverable', 'guard the null case', '--evidence', 'null deref on an empty save');
       const shown = tasks('list', '--kind', 'finding', '--state', 'unreviewed');
       const id = shown.stdout.split('\n')[0].split(' ')[0];
       expect(tasks('show', id).stdout).toContain('deliverable: guard the null case');
@@ -930,6 +974,8 @@ describe('tasks CLI', () => {
         'Runtime',
         '--deliverable',
         'add a guard before dereferencing',
+        '--evidence',
+        'save.ts:88 dereferences before the null check',
         '--file',
         'src/runtime/save.ts:1',
       );
@@ -973,6 +1019,8 @@ describe('tasks CLI', () => {
         'low',
         '--deliverable',
         'unrelated fix',
+        '--evidence',
+        'unrelated breakage',
         '--file',
         'src/ui/foo.ts:1',
       );
@@ -1238,7 +1286,7 @@ describe('tasks CLI', () => {
   it('triage refuses to promote a finding sourced from an audit pass 2 or later', () => {
     fixture(({ tasks, triage }) => {
       tasks('audit', 'demo-spec', '--proof', '1=met', '--proof', '2=met');
-      tasks('audit', 'demo-spec', '--proof', '1=met', '--proof', '2=met', '--finding', 'late finding', '--severity', 'low', '--deliverable', 'fix it');
+      tasks('audit', 'demo-spec', '--proof', '1=met', '--proof', '2=met', '--finding', 'late finding', '--severity', 'low', '--deliverable', 'fix it', '--evidence', 'seen late');
       const result = triage('1\n');
       expect(result.stdout).toContain('cannot be promoted');
       const shown = tasks('show', 'demo-spec-pass2-late-finding');
