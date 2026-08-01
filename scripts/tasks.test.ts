@@ -281,21 +281,52 @@ describe('tasks CLI', () => {
     });
   });
 
-  it('list defaults to not-closed (unreviewed + open), highest severity first, with a state summary', () => {
+  it('start claims an open unblocked task, next skips it, and stop returns it to open', () => {
+    fixture(({ tasks }) => {
+      tasks('add', 'claimed task', '--id', 'claimed', '--severity', 'high', '--spec', 'demo-spec');
+      tasks('add', 'next task', '--id', 'next-task', '--severity', 'low', '--spec', 'demo-spec');
+
+      const started = tasks('start', 'claimed');
+      expect(started.status).toBe(0);
+      expect(tasks('show', 'claimed').stdout).toContain('[task/in-progress/high]');
+      expect(tasks('next').stdout).toContain('next-task');
+
+      const stopped = tasks('stop', 'claimed');
+      expect(stopped.status).toBe(0);
+      expect(tasks('show', 'claimed').stdout).toContain('[task/open/high]');
+    });
+  });
+
+  it('start refuses blocked tasks', () => {
+    fixture(({ tasks }) => {
+      tasks('add', 'blocker', '--id', 'blocker', '--spec', 'demo-spec');
+      tasks('add', 'blocked', '--id', 'blocked', '--spec', 'demo-spec', '--requires', 'blocker');
+      const result = tasks('start', 'blocked');
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain('blocked by: blocker');
+      expect(tasks('show', 'blocked').stdout).toContain('[task/open]');
+    });
+  });
+
+  it('list defaults to not-closed (unreviewed + open + in-progress), highest severity first, with a state summary', () => {
     fixture(({ tasks }) => {
       tasks('add', 'low task', '--id', 'low-task', '--severity', 'low');
       tasks('add', 'high finding', '--id', 'high-finding', '--kind', 'finding', '--severity', 'high', '--deliverable', 'fix it');
+      tasks('add', 'claimed task', '--id', 'claimed-task', '--severity', 'medium');
+      tasks('start', 'claimed-task');
       tasks('add', 'closed task', '--id', 'closed-task');
       tasks('done', 'closed-task');
 
       const result = tasks('list');
       expect(result.status).toBe(0);
       const highIndex = result.stdout.indexOf('high-finding');
+      const claimedIndex = result.stdout.indexOf('claimed-task');
       const lowIndex = result.stdout.indexOf('low-task');
       expect(highIndex).toBeGreaterThan(-1);
-      expect(lowIndex).toBeGreaterThan(highIndex);
+      expect(claimedIndex).toBeGreaterThan(highIndex);
+      expect(lowIndex).toBeGreaterThan(claimedIndex);
       expect(result.stdout).not.toContain('closed-task');
-      expect(result.stdout).toContain('2 task(s) — unreviewed: 1, open: 1, done: 0, declined: 0');
+      expect(result.stdout).toContain('3 task(s) — unreviewed: 1, open: 1, in-progress: 1, done: 0, declined: 0');
     });
   });
 
@@ -305,7 +336,7 @@ describe('tasks CLI', () => {
       tasks('done', 'a-task');
       const result = tasks('list', '--state', 'done');
       expect(result.stdout).toContain('a-task');
-      expect(result.stdout).toContain('1 task(s) — unreviewed: 0, open: 0, done: 1, declined: 0');
+      expect(result.stdout).toContain('1 task(s) — unreviewed: 0, open: 0, in-progress: 0, done: 1, declined: 0');
     });
   });
 
@@ -1172,12 +1203,16 @@ describe('tasks CLI', () => {
   it('handoff prints the last commit\'s Next: line, the spec deliverable, and open fix-now tasks', () => {
     fixture(({ tasks }) => {
       tasks('add', 'open task', '--id', 'open-task', '--spec', 'demo-spec', '--severity', 'high');
+      tasks('add', 'claimed task', '--id', 'claimed-task', '--spec', 'demo-spec', '--severity', 'medium');
+      tasks('start', 'claimed-task');
       const result = tasks('handoff');
       expect(result.status).toBe(0);
       expect(result.stdout).toContain('branch: demo-spec');
       expect(result.stdout).toContain('spec: demo-spec');
       expect(result.stdout).toContain('1. The first clause holds.');
       expect(result.stdout).toContain('2. The second clause holds.');
+      expect(result.stdout).toContain('1 in-progress task(s):');
+      expect(result.stdout).toContain('claimed-task');
       expect(result.stdout).toContain('open-task');
     });
   });

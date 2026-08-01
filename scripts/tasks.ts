@@ -105,7 +105,7 @@ function resolveActiveSpec(config: Config, tasks: Task[], explicit: string | und
 
   const candidates = new Set<string>();
   for (const task of tasks) {
-    if (task.state !== 'open' || task.spec === null) continue;
+    if ((task.state !== 'open' && task.state !== 'in-progress') || task.spec === null) continue;
     if (existsSync(specFile(config, task.spec))) candidates.add(task.spec);
   }
   if (candidates.size !== 1) return { spec: null, note: null };
@@ -430,7 +430,7 @@ function cmdShow(args: Flags): void {
   printTask(task, tasks);
 }
 
-const LIST_STATES: State[] = ['unreviewed', 'open', 'done', 'declined'];
+const LIST_STATES: State[] = ['unreviewed', 'open', 'in-progress', 'done', 'declined'];
 const LIST_KINDS: Kind[] = ['task', 'finding', 'undelivered'];
 
 // The only verb that can read the whole store rather than one spec's
@@ -506,9 +506,9 @@ function runList(args: Flags, text: string | undefined): void {
     console.log(`${task.id}  [${tag}]  ${task.system ?? '(no system)'}  ${task.title}${matches}`);
   }
 
-  const counts: Record<State, number> = { unreviewed: 0, open: 0, done: 0, declined: 0 };
+  const counts: Record<State, number> = { unreviewed: 0, open: 0, 'in-progress': 0, done: 0, declined: 0 };
   for (const task of queue) counts[task.state]++;
-  console.log(`${queue.length} task(s) — unreviewed: ${counts.unreviewed}, open: ${counts.open}, done: ${counts.done}, declined: ${counts.declined}`);
+  console.log(`${queue.length} task(s) — unreviewed: ${counts.unreviewed}, open: ${counts.open}, in-progress: ${counts['in-progress']}, done: ${counts.done}, declined: ${counts.declined}`);
 }
 
 function cmdNext(args: Flags): void {
@@ -533,6 +533,63 @@ function cmdNext(args: Flags): void {
   }
   if (args.flags.full === 'true') printTask(queue[0], tasks);
   else printTaskConcise(queue[0], tasks);
+}
+
+function cmdStart(args: Flags): void {
+  const config = resolveConfig(args.flags);
+  const id = args.positional[0];
+  if (!id) {
+    console.error('usage: tasks start <id>');
+    process.exitCode = 1;
+    return;
+  }
+  const tasks = loadStore(config.storePath);
+  const task = tasks.find((candidate) => candidate.id === id);
+  if (!task) {
+    console.error(`error: no such task: ${id}`);
+    process.exitCode = 1;
+    return;
+  }
+  if (task.state !== 'open') {
+    console.error(`error: ${id} is ${task.state}, not open`);
+    process.exitCode = 1;
+    return;
+  }
+  const byId = new Map(tasks.map((t) => [t.id, t]));
+  if (isBlocked(task, byId)) {
+    const blockers = task.requires.filter((requirement) => byId.get(requirement)?.state !== 'done');
+    console.error(`error: ${id} is blocked by: ${blockers.join(', ')}`);
+    process.exitCode = 1;
+    return;
+  }
+  task.state = 'in-progress';
+  saveStore(tasks, config.storePath);
+  console.log(`started ${id}`);
+}
+
+function cmdStop(args: Flags): void {
+  const config = resolveConfig(args.flags);
+  const id = args.positional[0];
+  if (!id) {
+    console.error('usage: tasks stop <id>');
+    process.exitCode = 1;
+    return;
+  }
+  const tasks = loadStore(config.storePath);
+  const task = tasks.find((candidate) => candidate.id === id);
+  if (!task) {
+    console.error(`error: no such task: ${id}`);
+    process.exitCode = 1;
+    return;
+  }
+  if (task.state !== 'in-progress') {
+    console.error(`error: ${id} is ${task.state}, not in-progress`);
+    process.exitCode = 1;
+    return;
+  }
+  task.state = 'open';
+  saveStore(tasks, config.storePath);
+  console.log(`stopped ${id}`);
 }
 
 // Rule 7 requires an unmet deliverable to be able to reach `done` — a
@@ -569,8 +626,8 @@ function cmdDone(args: Flags): void {
     process.exitCode = 1;
     return;
   }
-  if (task.state !== 'open') {
-    console.error(`error: ${id} is ${task.state}, not open`);
+  if (task.state !== 'open' && task.state !== 'in-progress') {
+    console.error(`error: ${id} is ${task.state}, not open or in-progress`);
     process.exitCode = 1;
     return;
   }
@@ -1450,6 +1507,14 @@ function cmdHandoff(args: Flags): void {
   for (const clause of doc.proofClauses) console.log(`  ${clause.id}. ${truncateLine(clause.text)}`);
   console.log('');
 
+  const inProgress = tasks.filter((task) => task.spec === spec && task.state === 'in-progress');
+  if (inProgress.length > 0) {
+    console.log(`${inProgress.length} in-progress task(s):`);
+    for (const task of inProgress.slice(0, HANDOFF_QUEUE_CAP)) console.log(`- ${task.id} [${task.severity ?? '?'}] ${task.title}`);
+    if (inProgress.length > HANDOFF_QUEUE_CAP) console.log(`… ${inProgress.length - HANDOFF_QUEUE_CAP} more in progress`);
+    console.log('');
+  }
+
   const queue = fixNowQueue(tasks, spec);
   console.log(`${queue.length} open fix-now task(s):`);
   const shown = queue.slice(0, HANDOFF_QUEUE_CAP);
@@ -1489,7 +1554,7 @@ function cmdCheckCommitMessage(args: Flags): void {
   }
 }
 
-const USAGE = 'usage: npm run tasks -- <check|add|edit|show|list|search|next|done|decline|import|triage|spec|audit|handoff> ...';
+const USAGE = 'usage: npm run tasks -- <check|add|edit|show|list|search|next|start|stop|done|decline|import|triage|spec|audit|handoff> ...';
 
 export async function run(argv: string[]): Promise<void> {
   const [command, ...rest] = argv;
@@ -1515,6 +1580,10 @@ export async function run(argv: string[]): Promise<void> {
       return cmdSearch(args);
     case 'next':
       return cmdNext(args);
+    case 'start':
+      return cmdStart(args);
+    case 'stop':
+      return cmdStop(args);
     case 'done':
       return cmdDone(args);
     case 'decline':

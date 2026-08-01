@@ -1,7 +1,7 @@
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 
 export type Kind = 'task' | 'finding' | 'undelivered';
-export type State = 'unreviewed' | 'open' | 'done' | 'declined';
+export type State = 'unreviewed' | 'open' | 'in-progress' | 'done' | 'declined';
 export type Severity = 'high' | 'medium' | 'low';
 
 export interface Source {
@@ -30,7 +30,7 @@ export interface Task {
 export const DEFAULT_STORE_PATH = 'docs/tasks.jsonl';
 
 const KINDS: Kind[] = ['task', 'finding', 'undelivered'];
-const STATES: State[] = ['unreviewed', 'open', 'done', 'declined'];
+const STATES: State[] = ['unreviewed', 'open', 'in-progress', 'done', 'declined'];
 const SEVERITIES: Severity[] = ['high', 'medium', 'low'];
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -201,7 +201,7 @@ const SEARCHABLE = (task: Task): string => [task.id, task.title, task.system, ta
 export function listQueue(tasks: Task[], filter: ListFilter = {}): Task[] {
   return tasks
     .map((task, index) => ({ task, index }))
-    .filter(({ task }) => (filter.state !== undefined ? task.state === filter.state : task.state === 'unreviewed' || task.state === 'open'))
+    .filter(({ task }) => (filter.state !== undefined ? task.state === filter.state : task.state === 'unreviewed' || task.state === 'open' || task.state === 'in-progress'))
     .filter(({ task }) => filter.severity === undefined || task.severity === filter.severity)
     .filter(({ task }) => filter.system === undefined || task.system === filter.system)
     .filter(({ task }) => filter.spec === undefined || task.spec === filter.spec)

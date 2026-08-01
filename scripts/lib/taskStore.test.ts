@@ -174,7 +174,7 @@ describe('fixNowQueue', () => {
   });
 
   it('excludes non-open states', () => {
-    const tasks = [task({ id: 'done-task', spec: 's', state: 'done' }), task({ id: 'unreviewed-task', spec: 's', state: 'unreviewed' })];
+    const tasks = [task({ id: 'done-task', spec: 's', state: 'done' }), task({ id: 'unreviewed-task', spec: 's', state: 'unreviewed' }), task({ id: 'in-progress-task', spec: 's', state: 'in-progress' })];
     expect(fixNowQueue(tasks, 's')).toEqual([]);
   });
 
@@ -218,14 +218,15 @@ describe('listQueue text search', () => {
 });
 
 describe('listQueue', () => {
-  it('defaults to not-closed (unreviewed + open), highest severity first', () => {
+  it('defaults to not-closed (unreviewed + open + in-progress), highest severity first', () => {
     const tasks = [
       task({ id: 'declined', state: 'declined', reason: 'x', severity: 'high' }),
       task({ id: 'done', state: 'done', severity: 'high' }),
+      task({ id: 'in-flight', state: 'in-progress', severity: 'medium' }),
       task({ id: 'low-open', state: 'open', severity: 'low' }),
       task({ id: 'high-unreviewed', state: 'unreviewed', severity: 'high' }),
     ];
-    expect(listQueue(tasks).map((t) => t.id)).toEqual(['high-unreviewed', 'low-open']);
+    expect(listQueue(tasks).map((t) => t.id)).toEqual(['high-unreviewed', 'in-flight', 'low-open']);
   });
 
   it('breaks ties by creation order (file position)', () => {
