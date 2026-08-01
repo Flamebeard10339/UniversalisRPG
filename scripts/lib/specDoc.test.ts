@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { appendAmendment, appendAuditPass, parseSpecDoc, renderAuditPass, stampClauseIds, stripClauseTags } from './specDoc';
+import { appendAmendment, appendAuditPass, duplicateClauseIds, parseSpecDoc, renderAuditPass, stampClauseIds } from './specDoc';
 
 const DOC = `# Demo spec
 
@@ -47,6 +47,11 @@ describe('parseSpecDoc', () => {
       { id: 3, text: 'The clause that was third.' },
       { id: 1, text: 'The clause that was first.' },
     ]);
+  });
+
+  it('leaves a clause that merely opens with a bracketed phrase untagged, text intact', () => {
+    const doc = '## Deliverable\n\nPromise.\n\nProof:\n\n- [see docs] a clause that opens with a link-shaped phrase.\n';
+    expect(parseSpecDoc(doc).proofClauses).toEqual([{ id: 1, text: '[see docs] a clause that opens with a link-shaped phrase.' }]);
   });
 
   it('gives an untagged clause the lowest id no tag has claimed, so a new clause never steals an existing one', () => {
@@ -117,14 +122,14 @@ describe('stampClauseIds', () => {
   });
 });
 
-describe('stripClauseTags', () => {
-  it('takes the tags back off so a stamped section compares equal to its unstamped baseline', () => {
-    expect(stripClauseTags(stampClauseIds(DOC))).toBe(DOC);
+describe('duplicateClauseIds', () => {
+  it('reports nothing when every clause answers to its own id', () => {
+    expect(duplicateClauseIds(parseSpecDoc(DOC).proofClauses)).toEqual([]);
   });
 
-  it('leaves a bracketed phrase that is not a clause tag untouched', () => {
-    const line = '- [see docs] a clause that opens with a link-shaped phrase';
-    expect(stripClauseTags(line)).toBe(line);
+  it('reports an id two clauses both claim, once, however many clauses claim it', () => {
+    const doc = '## Deliverable\n\nPromise.\n\nProof:\n\n- [c1] One.\n- [c1] Two.\n- [c1] Three.\n- [c2] Four.\n';
+    expect(duplicateClauseIds(parseSpecDoc(doc).proofClauses)).toEqual([1]);
   });
 });
 

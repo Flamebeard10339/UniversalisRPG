@@ -1,16 +1,17 @@
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { createInterface } from 'node:readline';
 import { pathToFileURL } from 'node:url';
 import { harvestFiles, parseAuditDoc, systemForDoc } from './lib/auditImport';
 import { checkCommitMessage, extractNextTrailer, isExempt } from './lib/commitContract';
 import { checkMergeGate } from './lib/mergeGate';
-import { appendAmendment, appendAuditPass, parseSpecDoc, stampClauseIds, stripClauseTags, type AuditVerdict, type ProofClause, type Verdict } from './lib/specDoc';
+import { appendAmendment, appendAuditPass, duplicateClauseIds, parseSpecDoc, stampClauseIds, type AuditVerdict, type ProofClause, type Verdict } from './lib/specDoc';
 import { loadManifest, systemNames as manifestSystemNames } from './lib/systems';
 import {
   checkStore,
   DEFAULT_STORE_PATH,
+  type CheckIssue,
   fixNowQueue,
   isBlocked,
   listQueue,
@@ -169,10 +170,28 @@ function deliverableAtMergeBase(config: Config, spec: string, baseBranch: string
   }
 }
 
+// A clause id is a reference the store resolves through, the same way
+// `requires` is, so a spec that has stopped naming its clauses uniquely is
+// a broken reference and belongs in the check that runs on every push —
+// not only in the merge gate, which sees one branch's spec on a PR.
+function specIssues(config: Config): CheckIssue[] {
+  if (!existsSync(config.specsDir)) return [];
+  return readdirSync(config.specsDir)
+    .filter((entry) => entry.endsWith('.md'))
+    .flatMap((entry) => {
+      const spec = entry.replace(/\.md$/, '');
+      const doc = parseSpecDoc(readFileSync(`${config.specsDir}/${entry}`, 'utf8'));
+      return duplicateClauseIds(doc.proofClauses).map((id) => ({
+        level: 'error' as const,
+        message: `${spec} tags more than one proof clause [c${id}] — a clause id names exactly one clause`,
+      }));
+    });
+}
+
 function cmdCheck(flags: Record<string, string>): void {
   const config = resolveConfig(flags);
   const tasks = loadStore(config.storePath);
-  const issues = checkStore(tasks, systemNames(config), (spec) => existsSync(specFile(config, spec)));
+  const issues = [...checkStore(tasks, systemNames(config), (spec) => existsSync(specFile(config, spec))), ...specIssues(config)];
   const errors = issues.filter((issue) => issue.level === 'error');
   const warnings = issues.filter((issue) => issue.level === 'warning');
   for (const warning of warnings) console.warn(`warning: ${warning.message}`);
@@ -788,7 +807,10 @@ function cmdSpecAmend(args: Flags): void {
   // Recording an unchanged deliverable would leave the next edit failing the
   // gate against a baseline nobody meant to set.
   const previous = doc.amendments[doc.amendments.length - 1];
-  if (previous && stripClauseTags(previous.deliverableText).trim() === stripClauseTags(doc.deliverableSection).trim()) {
+  // Gaining clause tags is not a change worth adopting, so it is refused
+  // here on the same terms the gate accepts it on.
+  const unchanged = (before: string): boolean => doc.deliverableSection.trim() === before.trim() || doc.deliverableSection.trim() === stampClauseIds(before).trim();
+  if (previous && unchanged(previous.deliverableText)) {
     console.error(`error: ${slug}'s ## Deliverable is unchanged since the amendment of ${previous.date} — edit it first, then record what it became`);
     process.exitCode = 1;
     return;
@@ -1160,9 +1182,9 @@ async function cmdAudit(rawArgs: string[]): Promise<void> {
     process.exitCode = 1;
     return;
   }
-  const duplicates = doc.proofClauses.map((clause) => clause.id).filter((id, i, ids) => ids.indexOf(id) !== i);
+  const duplicates = duplicateClauseIds(doc.proofClauses);
   if (duplicates.length > 0) {
-    console.error(`error: ${slug} has more than one proof clause tagged [c${duplicates[0]}] — a clause id names exactly one clause`);
+    console.error(`error: ${slug} tags more than one proof clause [c${duplicates[0]}] — a clause id names exactly one clause`);
     process.exitCode = 1;
     return;
   }

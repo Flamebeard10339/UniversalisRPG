@@ -792,13 +792,65 @@ describe('tasks CLI', () => {
     });
   });
 
+  it('check refuses a spec whose clauses claim the same id, on every push and not only at the gate', () => {
+    fixture(({ tasks, dir }) => {
+      const specPath = path.join(dir, 'specs', 'demo-spec.md');
+      writeFileSync(specPath, readFileSync(specPath, 'utf8').replace('- The first clause holds.\n- The second clause holds.', '- [c1] The first clause holds.\n- [c1] The second clause holds.'), 'utf8');
+      const result = tasks('check');
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain('demo-spec tags more than one proof clause [c1]');
+    });
+  });
+
+  it('renumbering an unmet clause\'s tag cannot hide its verdict from the gate', () => {
+    fixture(({ tasks, dir }) => {
+      const specPath = path.join(dir, 'specs', 'demo-spec.md');
+      tasks('audit', 'demo-spec', '--proof', '1=unmet', '--evidence', '1=nope', '--proof', '2=met');
+      expect(tasks('check', '--merge').stderr).toContain('proof clause 1 is unmet as of pass 1');
+
+      // Prose untouched — only the tag the unmet verdict resolves through.
+      writeFileSync(specPath, readFileSync(specPath, 'utf8').replace('- [c1] The first clause holds.', '- [c2] The first clause holds.'), 'utf8');
+      const after = tasks('check', '--merge');
+      expect(after.status).toBe(1);
+      expect(after.stderr).toContain('tags more than one proof clause [c2]');
+      expect(after.stderr).toContain('pass 1 graded proof clause 1, which is no longer in the deliverable');
+    });
+  });
+
+  it('a hand-edited tag reads as deliverable drift once an amendment gives the gate a baseline', () => {
+    fixture(({ tasks, dir }) => {
+      const specPath = path.join(dir, 'specs', 'demo-spec.md');
+      tasks('audit', 'demo-spec', '--proof', '1=met', '--proof', '2=met');
+      tasks('spec', 'amend', 'demo-spec', '--reason', 'adopted after the first audit');
+      expect(tasks('check', '--merge').status).toBe(0);
+
+      // String.replace takes the first occurrence, which is the live
+      // section — the archived copy under ## Amendments sits below it.
+      writeFileSync(specPath, readFileSync(specPath, 'utf8').replace('- [c1] The first clause holds.', '- [c3] The first clause holds.'), 'utf8');
+      const after = tasks('check', '--merge');
+      expect(after.status).toBe(1);
+      expect(after.stderr).toContain('## Deliverable text differs');
+    });
+  });
+
+  it('spec amend refuses when the only change since the last amendment is the ids audit stamped on', () => {
+    fixture(({ tasks }) => {
+      expect(tasks('spec', 'amend', 'demo-spec', '--reason', 'adopted before any audit').status).toBe(0);
+      tasks('audit', 'demo-spec', '--proof', '1=met', '--proof', '2=met');
+
+      const second = tasks('spec', 'amend', 'demo-spec', '--reason', 'nothing but tags changed');
+      expect(second.status).toBe(1);
+      expect(second.stderr).toContain('unchanged since the amendment of');
+    });
+  });
+
   it('audit refuses a spec whose clauses carry the same tag twice', () => {
     fixture(({ tasks, dir }) => {
       const specPath = path.join(dir, 'specs', 'demo-spec.md');
       writeFileSync(specPath, readFileSync(specPath, 'utf8').replace('- The first clause holds.\n- The second clause holds.', '- [c1] The first clause holds.\n- [c1] The second clause holds.'), 'utf8');
       const result = tasks('audit', 'demo-spec', '--proof', '1=met');
       expect(result.status).toBe(1);
-      expect(result.stderr).toContain('more than one proof clause tagged [c1]');
+      expect(result.stderr).toContain('demo-spec tags more than one proof clause [c1]');
     });
   });
 

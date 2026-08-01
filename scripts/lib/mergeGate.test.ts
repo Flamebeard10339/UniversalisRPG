@@ -122,6 +122,31 @@ describe('checkMergeGate', () => {
     expect(checkMergeGate(baseInput({ deliverableBaseline: null }))).toEqual([]);
   });
 
+  it('accepts a live deliverable that differs from its baseline only by clause ids audit stamped on', () => {
+    const stamped = '## Deliverable\n\nSome promise.\n\nProof:\n\n- [c1] clause one\n- [c2] clause two';
+    const doc: SpecDoc = { ...cleanDoc, deliverableSection: stamped };
+    expect(checkMergeGate(baseInput({ doc, deliverableBaseline: cleanDoc.deliverableSection }))).toEqual([]);
+  });
+
+  it('refuses a tag edited by hand, even though the clause prose is untouched', () => {
+    const renumbered = '## Deliverable\n\nSome promise.\n\nProof:\n\n- [c9] clause one\n- [c2] clause two';
+    const doc: SpecDoc = { ...cleanDoc, deliverableSection: renumbered, proofClauses: [{ id: 9, text: 'clause one' }, { id: 2, text: 'clause two' }] };
+    const issues = checkMergeGate(baseInput({ doc, deliverableBaseline: cleanDoc.deliverableSection }));
+    expect(issues.some((issue) => issue.includes("## Deliverable text differs"))).toBe(true);
+  });
+
+  it('refuses when the latest pass graded a clause id the deliverable no longer has — a renumbered tag orphans its verdict', () => {
+    const doc: SpecDoc = { ...cleanDoc, proofClauses: [{ id: 2, text: 'clause one' }, { id: 3, text: 'clause two' }] };
+    const issues = checkMergeGate(baseInput({ doc, deliverableBaseline: null }));
+    expect(issues).toContain('pass 1 graded proof clause 1, which is no longer in the deliverable');
+  });
+
+  it('refuses when two clauses claim the same id, which would make every verdict against it ambiguous', () => {
+    const doc: SpecDoc = { ...cleanDoc, proofClauses: [{ id: 1, text: 'clause one' }, { id: 1, text: 'clause two' }] };
+    const issues = checkMergeGate(baseInput({ doc, deliverableBaseline: null }));
+    expect(issues).toContain('demo tags more than one proof clause [c1] — a clause id names exactly one clause');
+  });
+
   it('refuses when a finding on the spec is still unreviewed', () => {
     const members = [...baseInput().members, task({ id: 'c', kind: 'finding', state: 'unreviewed' })];
     const issues = checkMergeGate(baseInput({ members }));

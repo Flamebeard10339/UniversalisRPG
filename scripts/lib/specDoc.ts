@@ -122,14 +122,12 @@ export function stampClauseIds(text: string): string {
   return stamped.join('\n');
 }
 
-// A `[cN]` tag is bookkeeping `audit` writes, never part of what the branch
-// promised, so the freeze compares clause prose with the tags taken back
-// off — a spec that has only gained tags has not drifted.
-export function stripClauseTags(deliverableSection: string): string {
-  return deliverableSection
-    .split('\n')
-    .map((line) => line.replace(/^(\s*)- \[c\d+\] /, '$1- '))
-    .join('\n');
+// An id that names two clauses is worse than no id: the verdict, the
+// undelivered task and the gate all resolve through it, and each would pick
+// a different clause's prose while agreeing they had found one.
+export function duplicateClauseIds(clauses: ProofClause[]): number[] {
+  const ids = clauses.map((clause) => clause.id);
+  return [...new Set(ids.filter((id, i) => ids.indexOf(id) !== i))];
 }
 
 const PASS_HEADING = /^### Pass (\d+) — (.+)$/;

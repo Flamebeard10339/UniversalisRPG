@@ -1,4 +1,4 @@
-import { stripClauseTags, type SpecDoc } from './specDoc';
+import { duplicateClauseIds, stampClauseIds, type SpecDoc } from './specDoc';
 import type { Task } from './taskStore';
 
 export interface MergeGateInput {
@@ -34,6 +34,10 @@ export function checkMergeGate(input: MergeGateInput): string[] {
   const issues: string[] = [];
   const doc = input.doc;
 
+  for (const id of duplicateClauseIds(doc.proofClauses)) {
+    issues.push(`${input.spec} tags more than one proof clause [c${id}] — a clause id names exactly one clause`);
+  }
+
   if (doc.auditPasses.length === 0) {
     issues.push(`${input.spec} has no recorded audit pass`);
   } else {
@@ -43,9 +47,22 @@ export function checkMergeGate(input: MergeGateInput): string[] {
       if (!verdict) issues.push(`proof clause ${clause.id} has no verdict in the latest audit pass (pass ${latest.pass})`);
       else if (verdict.status === 'unmet') issues.push(`proof clause ${clause.id} is unmet as of pass ${latest.pass}`);
     }
+    // The other direction, which is what catches a tag edited after the
+    // pass was recorded: renumbering a clause leaves its verdict pointing
+    // at nothing, and walking only clauses to verdicts never reads it.
+    for (const verdict of latest.verdicts) {
+      if (!doc.proofClauses.some((clause) => clause.id === verdict.clause)) {
+        issues.push(`pass ${latest.pass} graded proof clause ${verdict.clause}, which is no longer in the deliverable`);
+      }
+    }
   }
 
-  if (input.deliverableBaseline !== null && stripClauseTags(input.deliverableBaseline).trim() !== stripClauseTags(doc.deliverableSection).trim()) {
+  // Stamping ids onto a baseline that predates them is the one edit a
+  // machine makes to a frozen deliverable, so it is the one difference
+  // accepted here. A tag altered by hand is the branch rewriting the
+  // mapping its own verdicts resolve through, and reads as drift.
+  const baseline = input.deliverableBaseline;
+  if (baseline !== null && doc.deliverableSection.trim() !== baseline.trim() && doc.deliverableSection.trim() !== stampClauseIds(baseline).trim()) {
     issues.push(`${input.spec}'s ## Deliverable text differs from its most recent amendment (or its state at the branch's merge-base, if never amended)`);
   }
 
