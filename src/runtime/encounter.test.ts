@@ -113,8 +113,9 @@ describe('encounter state', () => {
     const state = started(registry);
     armAction('entity', 'training-dummy', 'strike', registry, state);
 
-    // 12, from the dummy's own max-health — not the player's 30.
-    expect(state.activeAction!.actors).toEqual({ 'training-dummy': { resources: { health: toMilliUnits(12) } } });
+    // 12, from the dummy's own max-health — not the player's 30, and its own
+    // rate remainders, which start empty because no span has settled yet.
+    expect(state.activeAction!.actors).toEqual({ 'training-dummy': { resources: { health: toMilliUnits(12) }, rateRemainders: {} } });
     expect(state.resources['health']).toBe(toMilliUnits(30));
   });
 

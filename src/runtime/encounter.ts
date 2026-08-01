@@ -1,6 +1,6 @@
 import { Action } from '../content/entity';
 import { attemptDuration, statValue } from './stats';
-import { PoolDeltas, requireResource, addDelta } from './effects';
+import { addDelta, getDelta, PoolDeltas, requireResource } from './effects';
 import { Registry } from '../content/registry';
 import { findActiveAction, parseOwnerRef } from './actions';
 import { GameState, PLAYER, RuntimeError } from './state';
@@ -157,15 +157,11 @@ export function poolLevel(state: GameState, registry: Registry, actorId: string,
   return actorInEncounter(state, actorId).resources[resourceId] ?? 0;
 }
 
-// Damage is accrued as a delta for all actors, settled at segment end. Neither
-// path runs a non-player's `on empty`/`on full`, authored in the player's voice.
+// Accrued for every actor alike, so where a caller splits a span cannot change
+// the level reached. Neither path runs a non-player's `on empty`/`on full`,
+// authored in the player's voice.
 export function damagePool(state: GameState, registry: Registry, actorId: string, resourceId: string, milliAmount: number, deltas: PoolDeltas): number {
-  requireResource(registry, resourceId);
   addDelta(deltas, actorId, resourceId, -milliAmount);
   // Where the segment is heading; the clamped write happens at segment end.
-  if (actorId === PLAYER) {
-    return Math.max(0, (state.resources[resourceId] ?? 0) + (deltas.get(actorId)?.get(resourceId) ?? 0));
-  }
-  const pools = actorInEncounter(state, actorId).resources;
-  return Math.max(0, (pools[resourceId] ?? 0) + (deltas.get(actorId)?.get(resourceId) ?? 0));
+  return Math.max(0, poolLevel(state, registry, actorId, resourceId) + getDelta(deltas, actorId, resourceId));
 }

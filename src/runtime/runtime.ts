@@ -14,10 +14,12 @@ import {
   travelPair,
 } from './actions';
 import {
+  anyDelta,
   applyResults,
   applyResultsNow,
   captureResourceRates,
   clampResources,
+  clearActorDeltas,
   getDelta,
   Segment,
   settlePools,
@@ -58,9 +60,15 @@ export { choose, talk } from './dialogue-runtime';
 export type { DialogueSession } from './dialogue-runtime';
 
 
-function hasDeltas(deltas: Map<string, Map<string, number>>): boolean {
-  for (const actorDeltas of deltas.values()) {
-    if (actorDeltas.size > 0) return true;
+// A pool a result drained must settle at the instant it ran out, the same way a
+// hit that empties one already ends its segment.
+function drainedAPool(segment: Segment): boolean {
+  const { state, registry } = segment;
+  for (const resource of registry.resources.values()) {
+    if (resource.onEmpty.length === 0) continue;
+    const delta = getDelta(segment.deltas, PLAYER, resource.id);
+    if (delta >= 0) continue;
+    if ((state.resources[resource.id] ?? 0) + delta <= 0) return true;
   }
   return false;
 }
@@ -259,8 +267,10 @@ function resolveStochasticSegment(segment: Segment, action: Action, segEnd: numb
         return;
       }
       if (active.repeating) {
-        if (action.target) enterEncounter(active, next.other, state, registry);
-        else active.implicitTarget = IMPLICIT_TARGET_FULL;
+        if (action.target) {
+          clearActorDeltas(segment.deltas, next.other);
+          enterEncounter(active, next.other, state, registry);
+        } else active.implicitTarget = IMPLICIT_TARGET_FULL;
         playerCadence(active).attemptsMade = 0;
       } else {
         grantActionFoodBuff(state, registry);
@@ -269,7 +279,7 @@ function resolveStochasticSegment(segment: Segment, action: Action, segEnd: numb
       }
     }
 
-    if (state.time > segEnd) return;
+    if (state.time > segEnd || drainedAPool(segment)) return;
   }
 }
 
@@ -293,7 +303,7 @@ function resolveSegment(state: GameState, registry: Registry, segEnd: number): v
 
   // Over the time actually consumed: a segment can stop short of segEnd.
   const elapsed = state.time - start;
-  if (elapsed > 0 || hasDeltas(segment.deltas)) settlePools(state, registry, snapshots, Math.max(0, elapsed), segment.deltas);
+  if (elapsed > 0 || anyDelta(segment.deltas)) settlePools(state, registry, snapshots, Math.max(0, elapsed), segment.deltas);
 }
 
 function applyDueBoundaries(state: GameState, registry: Registry, at: number): void {
@@ -335,8 +345,10 @@ function applyDueBoundaries(state: GameState, registry: Registry, at: number): v
 }
 
 // Associative, as resolve.test.ts proves. Two accepted limitations: an `on full`
-// handler mutating a rate-referenced stat is not, and a stochastic action
-// emptying a pool fires `on empty` at segment granularity, not the exact instant.
+// handler mutating a rate-referenced stat is not, and a pool already saturated
+// in its rate's direction is not, because settling it clamps the rate away and
+// drops the carried remainder, so where the span is cut decides how much it
+// wasted.
 export function resolve(state: GameState, registry: Registry, toTimeMs: number): void {
   if (toTimeMs < state.time) throw new RuntimeError(`resolve: toTime (${toTimeMs}) must be >= state.time (${state.time})`);
   if (!Number.isInteger(toTimeMs)) throw new RuntimeError(`resolve: toTime must be an integer millisecond value, got ${toTimeMs}`);
