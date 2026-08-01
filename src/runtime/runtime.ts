@@ -23,7 +23,6 @@ import {
 } from './effects';
 import {
   ActiveAction,
-  damagePool,
   damageTarget,
   enterEncounter,
   IMPLICIT_TARGET_FULL,
@@ -32,7 +31,6 @@ import {
   Participant,
   participants,
   playerCadence,
-  poolLevel,
   targetLevel,
 } from './encounter';
 import { Action } from '../content/entity';

@@ -264,6 +264,10 @@ describe('entity action modifiers', () => {
     expect(() => parseOne(`# entity chest\nopen:\n  ${line}\n  ${line}\n  say: hi`, entitySchema)).toThrow(`action ${written} is defined more than once`);
   });
 
+  it('no longer accepts a health: field, which the implicit target pool replaced', () => {
+    expect(() => parseOne('# entity chest\nopen:\n  health: 3\n  say: hi', entitySchema)).toThrow(/unrecognized tag clause/);
+  });
+
   it('parses on failure inline and as a block, and rejects it defined more than once', () => {
     const inline = parseOne('# entity chest\nopen:\n  take: 5 cooked-shrimp\n  on failure: say: Not enough shrimp.', entitySchema);
     expect(inline.actions).toEqual([
