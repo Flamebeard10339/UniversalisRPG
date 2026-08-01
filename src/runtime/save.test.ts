@@ -328,4 +328,8 @@ describe('a # save body is checked past its version', () => {
   it('still accepts every field written correctly', () => {
     expect(load({ time: 3, location: 'camp', flags: { known: true }, inventory: { bread: 2 } })).not.toThrow();
   });
+
+  it('rejects a fractional rng cursor (audit-2026-07-30-rng-integer-check)', () => {
+    expect(load({ rng: 0.5 })).toThrow(/save field rng holds 0.5/);
+  });
 });
