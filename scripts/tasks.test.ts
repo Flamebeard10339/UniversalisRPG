@@ -1547,12 +1547,12 @@ describe('tasks CLI', () => {
       spawnSync('git', ['branch', '-M', 'main'], { cwd: dir });
       spawnSync('git', ['checkout', '-q', '-b', 'demo-spec'], { cwd: dir });
       commit('Branch plan\n\nA body.\n\nNext: the older branch-local plan.');
-      for (let i = 0; i < 21; i++) commit(`Fixup ${i}\n\nA mechanical commit with no trailer.`);
+      for (let i = 0; i < 4; i++) commit(`Fixup ${i}\n\nA mechanical commit with no trailer.`);
 
-      const result = tasks('handoff');
+      const result = tasks('handoff', '--scan-cap', '3');
       expect(result.status).toBe(0);
       expect(result.stdout).not.toContain('the older branch-local plan');
-      expect(result.stdout).toContain('no Next: trailer found in the last 20 branch commits');
+      expect(result.stdout).toContain('no Next: trailer found in the last 3 branch commits');
       expect(result.stdout).not.toContain('nothing recorded since it left main');
     });
   });

@@ -1672,7 +1672,9 @@ function branchCommitRange(baseBranch: string): BranchCommitRange {
 // first commit carries no trailer has nothing of its own to find, and
 // walking past its base reaches whatever the previous branch was planning
 // next. The commit cap stays as a bound on the scan, not on the reach.
-function findLatestNextTrailer(range: string | null, maxCommits = 20): FoundTrailer | null {
+const DEFAULT_HANDOFF_SCAN_CAP = 20;
+
+function findLatestNextTrailer(range: string | null, maxCommits: number): FoundTrailer | null {
   let log: string;
   try {
     log = execFileSync('git', ['log', `-${maxCommits}`, `--format=%H${FIELD_SEP}%B${COMMIT_SEP}`, ...(range === null ? [] : [range])], { encoding: 'utf8' });
@@ -1701,12 +1703,13 @@ function cmdHandoff(args: Flags): void {
   console.log(`branch: ${config.branch}`);
 
   const baseBranch = args.flags['base-branch'] ?? 'main';
+  const scanCap = args.flags['scan-cap'] !== undefined ? Number(args.flags['scan-cap']) : DEFAULT_HANDOFF_SCAN_CAP;
   const branchRange = branchCommitRange(baseBranch);
-  const found = branchRange.kind === 'range' ? findLatestNextTrailer(branchRange.range) : null;
+  const found = branchRange.kind === 'range' ? findLatestNextTrailer(branchRange.range, scanCap) : null;
   if (branchRange.kind === 'unknown') {
     console.log(`(could not find the branch point for ${baseBranch}; Next trailer scan skipped)`);
   } else if (found === null) {
-    console.log(branchRange.kind === 'empty' ? `(no Next: trailer yet on this branch — nothing recorded since it left ${baseBranch})` : branchRange.count > 20 ? '(no Next: trailer found in the last 20 branch commits)' : `(no Next: trailer yet on this branch; no Next: trailer found in ${branchRange.count} branch commit${branchRange.count === 1 ? '' : 's'} since it left ${baseBranch})`);
+    console.log(branchRange.kind === 'empty' ? `(no Next: trailer yet on this branch — nothing recorded since it left ${baseBranch})` : branchRange.count > scanCap ? `(no Next: trailer found in the last ${scanCap} branch commits)` : `(no Next: trailer yet on this branch; no Next: trailer found in ${branchRange.count} branch commit${branchRange.count === 1 ? '' : 's'} since it left ${baseBranch})`);
   } else {
     if (found.distance > 0) console.log(`(from ${found.sha.slice(0, 7)}, ${found.distance} commit${found.distance === 1 ? '' : 's'} back)`);
     console.log(found.trailer);
