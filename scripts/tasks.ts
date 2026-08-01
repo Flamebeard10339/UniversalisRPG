@@ -6,7 +6,7 @@ import { pathToFileURL } from 'node:url';
 import { harvestFiles, parseAuditDoc, systemForDoc } from './lib/auditImport';
 import { checkCommitMessage, extractNextTrailer, isExempt } from './lib/commitContract';
 import { checkMergeGate } from './lib/mergeGate';
-import { appendAmendment, appendAuditPass, duplicateClauseIds, parseSpecDoc, stampClauseIds, type AuditVerdict, type ProofClause, type Verdict } from './lib/specDoc';
+import { appendAmendment, appendAuditPass, appendBaseline, duplicateClauseIds, parseSpecDoc, stampClauseIds, type AuditVerdict, type ProofClause, type Verdict } from './lib/specDoc';
 import { loadManifest, systemNames as manifestSystemNames } from './lib/systems';
 import {
   checkStore,
@@ -231,6 +231,19 @@ function cmdCheck(flags: Record<string, string>): void {
   const baseBranch = flags['base-branch'] ?? 'main';
 
   if (spec === null) {
+    const openBySpec = new Map<string, string[]>();
+    for (const task of tasks) {
+      if (task.spec === null || task.state === 'done' || task.state === 'declined') continue;
+      const ids = openBySpec.get(task.spec) ?? [];
+      ids.push(task.id);
+      openBySpec.set(task.spec, ids);
+    }
+    if (openBySpec.size > 0) {
+      console.error('merge gate: open spec member(s) exist but this branch has no active spec');
+      for (const [memberSpec, ids] of openBySpec) console.error(`  ${memberSpec}: ${ids.join(', ')}`);
+      process.exitCode = 1;
+      return;
+    }
     console.log('merge gate: not applicable — no active spec for this branch, and no --spec given');
     return;
   }
@@ -241,7 +254,7 @@ function cmdCheck(flags: Record<string, string>): void {
   // 1 opens one spec per branch on that branch, so it never existed at the
   // merge-base either.
   const latestAmendment = doc ? doc.amendments[doc.amendments.length - 1] : undefined;
-  const deliverableBaseline = latestAmendment ? latestAmendment.deliverableText : deliverableAtMergeBase(config, spec, baseBranch);
+  const deliverableBaseline = latestAmendment ? latestAmendment.deliverableText : (doc?.baseline ?? deliverableAtMergeBase(config, spec, baseBranch));
 
   const mergeIssues = checkMergeGate({
     spec,
@@ -936,10 +949,40 @@ function cmdSpecAmend(args: Flags): void {
   console.log(`next: run \`tasks audit ${slug}\` to verify the new clauses`);
 }
 
+function cmdSpecFreeze(args: Flags): void {
+  const config = resolveConfig(args.flags);
+  const slug = args.positional[0];
+  if (!slug) {
+    console.error('usage: tasks spec freeze <slug>');
+    process.exitCode = 1;
+    return;
+  }
+  const path_ = specFile(config, slug);
+  if (!existsSync(path_)) {
+    console.error(`error: no such spec: ${slug}`);
+    process.exitCode = 1;
+    return;
+  }
+  const text = readFileSync(path_, 'utf8');
+  const doc = parseSpecDoc(text);
+  if (doc.baseline !== null) {
+    console.error(`error: ${slug} already has a frozen baseline`);
+    process.exitCode = 1;
+    return;
+  }
+  if (doc.deliverableSection.trim() === '') {
+    console.error(`error: ${slug}'s ## Deliverable is empty`);
+    process.exitCode = 1;
+    return;
+  }
+  writeFileSync(path_, appendBaseline(text, doc.deliverableSection), 'utf8');
+  console.log(`froze ${slug}'s current ## Deliverable as its opening baseline`);
+}
+
 function cmdSpec(args: Flags): void {
   const [sub, ...rest] = args.positional;
   const subArgs: Flags = { positional: rest, flags: args.flags };
-  if (sub && !['new', 'add', 'remove', 'show', 'done', 'amend'].includes(sub)) return cmdSpecShow({ positional: [sub, ...rest], flags: args.flags });
+  if (sub && !['new', 'add', 'remove', 'show', 'done', 'amend', 'freeze'].includes(sub)) return cmdSpecShow({ positional: [sub, ...rest], flags: args.flags });
   switch (sub) {
     case 'new':
       return cmdSpecNew(subArgs);
@@ -953,8 +996,10 @@ function cmdSpec(args: Flags): void {
       return cmdSpecDone(subArgs);
     case 'amend':
       return cmdSpecAmend(subArgs);
+    case 'freeze':
+      return cmdSpecFreeze(subArgs);
     default:
-      console.error(`usage: tasks spec <new|add|remove|show|done|amend> ...`);
+      console.error(`usage: tasks spec <new|add|remove|show|done|amend|freeze> ...`);
       process.exitCode = 1;
   }
 }

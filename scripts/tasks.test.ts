@@ -690,6 +690,21 @@ describe('tasks CLI', () => {
     });
   });
 
+  it('spec freeze records the current deliverable as the baseline and refuses a second freeze', () => {
+    fixture(({ tasks, dir }) => {
+      const frozen = tasks('spec', 'freeze', 'demo-spec');
+      expect(frozen.status).toBe(0);
+      expect(frozen.stdout).toContain('froze demo-spec');
+      const specText = readFileSync(path.join(dir, 'specs', 'demo-spec.md'), 'utf8');
+      expect(specText).toContain('## Baseline');
+      expect(specText.match(/^## Deliverable$/gm)).toHaveLength(1);
+
+      const again = tasks('spec', 'freeze', 'demo-spec');
+      expect(again.status).toBe(1);
+      expect(again.stderr).toContain('already has a frozen baseline');
+    });
+  });
+
   it('spec show --order lists dependencies before tasks that require them', () => {
     fixture(({ tasks }) => {
       tasks('add', 'dependent task', '--id', 'dependent', '--spec', 'demo-spec');
@@ -1189,6 +1204,19 @@ describe('tasks CLI', () => {
     });
   });
 
+  it('check --merge refuses when open spec members exist but the branch claims no active spec', () => {
+    fixture(({ tasks, dir }) => {
+      tasks('add', 'open task', '--id', 'open-task', '--spec', 'demo-spec', '--severity', 'high');
+      const storePath = path.join(dir, 'tasks.jsonl');
+      const systemsPath = path.join(dir, 'systems.json');
+      const specsDir = path.join(dir, 'specs');
+      const result = spawnSync(process.execPath, [tsx, script, 'check', '--merge', '--store', storePath, '--systems', systemsPath, '--specs-dir', specsDir, '--branch', 'renamed-branch'], { cwd: repoRoot, encoding: 'utf8' });
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain('open spec member(s) exist but this branch has no active spec');
+      expect(result.stderr).toContain('demo-spec: open-task');
+    });
+  });
+
   it('check --merge refuses when a promoted finding is still unreviewed', () => {
     fixture(({ tasks }) => {
       tasks('audit', 'demo-spec', '--proof', '1=met', '--proof', '2=met');
@@ -1415,9 +1443,9 @@ describe('tasks CLI', () => {
       const systemsPath = path.join(dir, 'systems.json');
       const specsDir = path.join(dir, 'specs');
       const result = spawnSync(process.execPath, [tsx, script, 'check', '--merge', '--store', storePath, '--systems', systemsPath, '--specs-dir', specsDir, '--branch', 'orphaned-branch'], { cwd: repoRoot, encoding: 'utf8' });
-      expect(result.status).toBe(0);
-      expect(result.stdout).toContain('not applicable');
-      expect(result.stdout).not.toContain('demo-spec');
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain('open spec member(s) exist but this branch has no active spec');
+      expect(result.stderr).toContain('demo-spec: open-task');
     });
   });
 

@@ -29,6 +29,7 @@ const cleanDoc: SpecDoc = {
     { id: 1, text: 'clause one' },
     { id: 2, text: 'clause two' },
   ],
+  baseline: null,
   amendments: [],
   auditPasses: [
     {

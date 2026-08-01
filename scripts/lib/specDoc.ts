@@ -33,6 +33,7 @@ export interface SpecDoc {
   proofClauses: ProofClause[];
   auditPasses: AuditPass[];
   amendments: Amendment[];
+  baseline: string | null;
 }
 
 function sectionText(lines: string[], heading: string): { text: string; startIndex: number; endIndex: number } | null {
@@ -183,6 +184,17 @@ function parseAmendments(text: string): Amendment[] {
   });
 }
 
+function parseBaseline(text: string): string | null {
+  const section = sectionText(text.split('\n'), '## Baseline');
+  if (!section) return null;
+  const body = section.text
+    .split('\n')
+    .slice(1)
+    .join('\n')
+    .trim();
+  return body ? body.replace(/^#### Deliverable/, '## Deliverable') : null;
+}
+
 export function parseSpecDoc(text: string): SpecDoc {
   const deliverable = sectionText(text.split('\n'), '## Deliverable');
   const deliverableSection = deliverable ? deliverable.text : '';
@@ -191,6 +203,7 @@ export function parseSpecDoc(text: string): SpecDoc {
     proofClauses: parseProofClauses(deliverableSection),
     auditPasses: parseAuditPasses(text),
     amendments: parseAmendments(text),
+    baseline: parseBaseline(text),
   };
 }
 
@@ -246,4 +259,18 @@ export function appendAmendment(text: string, amendment: Amendment): string {
   const after = lines.slice(insertAt);
   const needsBlank = before[before.length - 1]?.trim() !== '';
   return [...before, ...(needsBlank ? [''] : []), rendered, '', ...after].join('\n').trimEnd() + '\n';
+}
+
+export function appendBaseline(text: string, deliverableText: string): string {
+  const rendered = ['## Baseline', '', deliverableText.replace(/^## Deliverable/, '#### Deliverable')].join('\n');
+  const lines = text.trimEnd().split('\n');
+  const headingIndex = lines.findIndex((line) => line.trim() === '## Baseline');
+  if (headingIndex !== -1) return text;
+
+  const insertBefore = lines.findIndex((line) => line.trim() === '## Audit passes' || line.trim() === '## Amendments');
+  const insertAt = insertBefore === -1 ? lines.length : insertBefore;
+  const before = lines.slice(0, insertAt);
+  const after = lines.slice(insertAt);
+  const needsBlankBefore = before[before.length - 1]?.trim() !== '';
+  return [...before, ...(needsBlankBefore ? [''] : []), rendered, '', ...after].join('\n').trimEnd() + '\n';
 }

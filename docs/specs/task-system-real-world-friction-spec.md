@@ -355,3 +355,57 @@ Acceptance:
 ## Open Questions
 
 None. The three planning questions are answered in Decisions.
+
+## Baseline
+
+#### Deliverable
+
+The task system becomes a reliable swarm coordination surface under real
+multi-agent use. A planner can see what is blocked, in flight, and next; a
+worker can know which test proves a promised clause; an auditor can verify the
+branch without reconstructing the diff by hand; and routine task commands stop
+creating noisy or stale state.
+
+This spec is written as an implementation plan, not as a bootstrap exercise.
+Do not require the task system to manage this branch until the store serializer
+and spec binding work land. After that point, attach the folded task ids listed
+below if doing so produces a small, reviewable `docs/tasks.jsonl` diff.
+
+Proof:
+
+- [c1] Proof clauses can name executable proof targets, and
+  `tasks check --merge` fails when a named target is missing, skipped, or
+  failing. At minimum, support Vitest test-file-plus-test-name targets and a
+  command target for proof that is not a single test.
+- [c2] `tasks done` records the commit that closed a task, warns when its store
+  write is uncommitted, and `tasks check` reports task state that exists only in
+  the working tree or points at a closing commit not reachable from `HEAD`.
+- [c3] The store supports an `in-progress` state with `tasks start <id>` and
+  `tasks stop <id>`, and `tasks list`, `tasks next`, `tasks show`, `tasks
+  handoff`, and `tasks spec show` surface in-flight work without treating it as
+  complete.
+- [c4] Spec identity and proof identity cannot be changed accidentally: a branch
+  rename cannot make the merge gate not-applicable while open members exist, a
+  never-amended spec has an opening freeze baseline, top-level proof clauses are
+  the only clauses that receive ids, and a retired clause id is never reused for
+  a new clause that has not been audited.
+- [c5] The auditor path is explicit and repeatable: `tasks audit-prompt <spec>`
+  prints a recommended auditor prompt containing the diff range, proof clauses,
+  member tasks, relevant files, proof targets, required commands, and a mutation
+  testing instruction for pure logic/API proofs.
+- [c6] The command surface removes the real friction observed in
+  `combat-continuation-runtime`: `tasks --help` works, `tasks spec <slug>` means
+  `tasks spec show <slug>`, `tasks spec show --order` topologically sorts by
+  `requires`, `tasks next` is concise by default with `--full` for evidence, and
+  `tasks search` names the matching field.
+- [c7] The commit contract no longer requires `Next:` on every commit. The hook
+  still requires a useful body for non-exempt commits, accepts optional `Next:`
+  as an extra breadcrumb, and the installed hook uses the repo-local `tsx`
+  launcher before falling back to `npx`.
+- [c8] The testing and gate cost is paid where it buys reliability: most
+  `scripts/tasks.test.ts` command-semantics cases run in-process through
+  exported `run(argv)`, only subprocess/Git-history smoke cases stay
+  out-of-process, `noUnusedLocals` and `noUnusedParameters` are enabled, and
+  `npm test`, `npx tsc --noEmit`, `npm run layer-check`, `npm run tasks --
+  check`, and `npm run tasks -- check --merge --spec
+  task-system-real-world-friction-spec` pass.
