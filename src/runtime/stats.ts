@@ -6,10 +6,17 @@ import { nextRandom } from './rng';
 import { GameState, PLAYER, RuntimeError } from './state';
 import { contestSpread, minDamage } from './tuning';
 import { secondsToMs, toMilliUnits } from './units';
+import { TagClause } from '../grammar/tagClause';
 
 // Difficulty is a stat, never an authored probability, so gear and buffs move it.
 export function hitChance(accuracy: number, evasion: number, registry: Registry): number {
   return 1 / (1 + 10 ** ((evasion - accuracy) / contestSpread(registry)));
+}
+
+function foldStatBonusTag(tag: TagClause, statId: string, added: Range, increased: number): { added: Range; increased: number } {
+  if (tag.kind !== 'stat-bonus' || tag.statId !== statId) return { added, increased };
+  if (tag.percent) return { added, increased: increased + tag.amount / 100 };
+  return { added: addRanges(added, tag.amount), increased };
 }
 
 export function statRange(statId: string, state: GameState, registry: Registry, actorId: string = PLAYER): Range {
@@ -24,9 +31,19 @@ export function statRange(statId: string, state: GameState, registry: Registry, 
     if (state.activeAction) {
       const action = findActiveAction(state.activeAction, registry);
       for (const tag of action.tags ?? []) {
-        if (tag.kind !== 'stat-bonus' || tag.statId !== statId) continue;
-        if (tag.percent) increased += tag.amount / 100;
-        else added = addRanges(added, tag.amount);
+        const result = foldStatBonusTag(tag, statId, added, increased);
+        added = result.added;
+        increased = result.increased;
+      }
+    }
+    for (const itemId of Object.values(state.equipped)) {
+      if ((state.inventory[itemId] ?? 0) === 0) continue;
+      const item = registry.items.get(itemId);
+      if (!item) continue;
+      for (const tag of item.tags ?? []) {
+        const result = foldStatBonusTag(tag, statId, added, increased);
+        added = result.added;
+        increased = result.increased;
       }
     }
   }

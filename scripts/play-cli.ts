@@ -152,7 +152,11 @@ function formatView(v: PlayView): string[] {
 
 function formatInventory(state: GameState): string[] {
   const inventory = Object.fromEntries(Object.entries(state.inventory).filter(([, count]) => count > 0));
-  return [`Inventory: ${JSON.stringify(inventory)}`, `XP: ${JSON.stringify(state.xp)}`];
+  const lines = [`Inventory: ${JSON.stringify(inventory)}`, `XP: ${JSON.stringify(state.xp)}`];
+  if (Object.keys(state.equipped).length > 0) {
+    lines.push(`Equipped: ${JSON.stringify(state.equipped)}`);
+  }
+  return lines;
 }
 
 function formatState(session: PlaySession): string[] {

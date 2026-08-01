@@ -100,11 +100,13 @@ eat: take: 1 cooked-shrimp, say: You eat the shrimp. Simple, warm, and better th
 
 # item iron-sword
 examine: A well-balanced blade, standard adventurer's kit.
-weapon, mainhand, +2 attack
+slot: mainhand
+weapon, +2 attack
 
 # item wooden-shield
 examine: A sturdy shield of banded oak.
-shield, offhand, +2 defense
+slot: offhand
+shield, +2 defense
 
 # item lockpick
 examine: A bent sliver of metal, worn smooth from use.

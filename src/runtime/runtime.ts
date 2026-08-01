@@ -51,6 +51,7 @@ export { actionVisible, requiresMet } from './actions';
 export { hitChance, hitDamage, sampleStat, statRange, statValue } from './stats';
 export { applyResultsNow, initResources } from './effects';
 export { encounterView } from './encounter';
+export { equip, unequip } from './equipment';
 export type { ActiveAction, ActorState, Cadence, EncounterFoe, EncounterView } from './encounter';
 export { choose, talk } from './dialogue-runtime';
 export type { DialogueSession } from './dialogue-runtime';

@@ -14,7 +14,9 @@ export type Directive =
   | { kind: 'expect'; save: string }
   | { kind: 'load'; save: string }
   | { kind: 'cancel' }
-  | { kind: 'wait'; seconds: number };
+  | { kind: 'wait'; seconds: number }
+  | { kind: 'equip'; item: string }
+  | { kind: 'unequip'; slot: string };
 
 export interface Test {
   id: string;
@@ -42,6 +44,8 @@ const EXPECT = new RegExp(`^expect:[ \\t]*(?<id>${PATH})$`);
 const LOAD = new RegExp(`^load:[ \\t]*(?<id>${PATH})$`);
 const CANCEL = /^cancel$/;
 const WAIT = /^wait:[ \t]*(?<seconds>\d+(?:\.\d+)?)$/;
+const EQUIP = new RegExp(`^equip:[ \\t]*(?<item>${PATH})$`);
+const UNEQUIP = new RegExp(`^unequip:[ \\t]*(?<slot>${PATH})$`);
 
 function parseBegin(text: string, verb: string, rest: string): Directive {
   if (verb === 'use') {
@@ -98,6 +102,12 @@ export function parseDirectiveLine(text: string): Directive | null {
 
   const wait = WAIT.exec(text)?.groups;
   if (wait) return { kind: 'wait', seconds: Number(wait.seconds) };
+
+  const equip = EQUIP.exec(text)?.groups;
+  if (equip) return { kind: 'equip', item: equip.item };
+
+  const unequip = UNEQUIP.exec(text)?.groups;
+  if (unequip) return { kind: 'unequip', slot: unequip.slot };
 
   return null;
 }

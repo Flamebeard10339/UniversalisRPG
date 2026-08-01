@@ -127,6 +127,14 @@ describe('what a namespace does not reach', () => {
     const cook = module('cook', 'dependencies: kitchen', '# item bread', '# recipe bake', 'station: oven', 'out: bread');
     expect(loadUniverse([kitchen, cook]).recipes.get('cook.bake')!.requiresCapability).toBe('oven');
   });
+
+  it('leaves a slot global, because it is a contract between modules that never met', () => {
+    const armory = module('armory', '# item sword', 'slot: mainhand');
+    const shop = module('shop', 'dependencies: armory', '# item shield', 'slot: offhand');
+    const equipped = loadUniverse([armory, shop]);
+    expect(equipped.items.get('armory.sword')!.slot).toBe('mainhand');
+    expect(equipped.items.get('shop.shield')!.slot).toBe('offhand');
+  });
 });
 
 describe('a new game begins in exactly one place', () => {

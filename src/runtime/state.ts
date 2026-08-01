@@ -29,12 +29,13 @@ export interface GameState extends RngCursor {
   activeBuffs: Record<string, ActiveBuff>;
   resources: PoolLevels;
   resourceRateRemainders: Record<string, number>;
+  equipped: Record<string, string>;
   player: { name: string; race: string };
   pendingModal?: string;
 }
 
 export function createGameState(location = ''): GameState {
-  return { flags: {}, inventory: {}, location, visits: {}, xp: {}, log: [], time: 0, activeAction: null, activeBuffs: {}, resources: {}, resourceRateRemainders: {}, rng: DEFAULT_RNG_SEED, player: { name: '', race: '' } };
+  return { flags: {}, inventory: {}, location, visits: {}, xp: {}, log: [], time: 0, activeAction: null, activeBuffs: {}, resources: {}, resourceRateRemainders: {}, equipped: {}, rng: DEFAULT_RNG_SEED, player: { name: '', race: '' } };
 }
 
 // The one seam through which simulated time advances; nothing reads a real clock.

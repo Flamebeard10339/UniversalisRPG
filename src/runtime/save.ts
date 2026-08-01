@@ -43,6 +43,7 @@ const SAVE_FIELDS: Record<SaveField, SaveFieldRule> = {
   xp: { shape: 'record', holds: isNumber, prune: { of: 'skill', loaded: (registry, id) => registry.skills.has(id) } },
   resources: { shape: 'record', holds: isInteger, prune: { of: 'resource', loaded: (registry, id) => registry.resources.has(id) } },
   resourceRateRemainders: { shape: 'record', holds: isInteger, prune: { of: 'resource', loaded: (registry, id) => registry.resources.has(id) } },
+  equipped: { shape: 'record', holds: (value) => typeof value === 'string', prune: 'pruned by a rule of its own' },
   activeBuffs: { shape: 'record', holds: isObject, prune: 'pruned by a rule of its own' },
   activeAction: { shape: 'scalar', holds: (value) => value === null || isObject(value), prune: 'pruned by a rule of its own' },
   time: { shape: 'scalar', holds: isInteger, prune: 'holds no registry id' },
@@ -151,6 +152,17 @@ export function pruneStateForRegistry(state: GameState, registry: Registry): Pru
     if (!missing) continue;
     delete state.activeBuffs[key];
     addWarning(warnings, `activeBuffs.${key}`, key, `Removed active buff ${key} because its ${missing} is not loaded.`);
+  }
+
+  for (const [slot, itemId] of Object.entries(state.equipped)) {
+    const item = registry.items.get(itemId);
+    if (!item) {
+      delete state.equipped[slot];
+      addWarning(warnings, `equipped.${slot}`, itemId, `Removed equipped item ${itemId} from slot ${slot} because the item is not loaded.`);
+    } else if (item.slot !== slot) {
+      delete state.equipped[slot];
+      addWarning(warnings, `equipped.${slot}`, itemId, `Removed equipped item ${itemId} from slot ${slot} because the item no longer declares that slot.`);
+    }
   }
 
   const activeProblem = activeActionProblem(state, registry);
