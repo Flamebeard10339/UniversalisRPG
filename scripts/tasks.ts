@@ -155,6 +155,7 @@ function printTask(task: Task, tasks: Task[]): void {
   if (task.source) console.log(`source: ${task.source.spec} pass ${task.source.pass}`);
   if (task.reason) console.log(`reason: ${task.reason}`);
   if (task.closed) console.log(`closed: ${task.closed}`);
+  if (task.closedCommit) console.log(`closedCommit: ${task.closedCommit}`);
 }
 
 function preview(text: string): string {
@@ -214,7 +215,7 @@ function cmdCheck(flags: Record<string, string>): void {
     tasks = [];
     loadIssues.push({ level: 'error', message: error instanceof Error ? error.message : String(error) });
   }
-  const issues = [...loadIssues, ...checkStore(tasks, systemNames(config), (spec) => existsSync(specFile(config, spec))), ...specIssues(config)];
+  const issues = [...loadIssues, ...checkStore(tasks, systemNames(config), (spec) => existsSync(specFile(config, spec))), ...closedCommitIssues(tasks), ...specIssues(config)];
   const errors = issues.filter((issue) => issue.level === 'error');
   const warnings = issues.filter((issue) => issue.level === 'warning');
   for (const warning of warnings) console.warn(`warning: ${warning.message}`);
@@ -301,6 +302,24 @@ function runProofTarget(clause: number, target: string): string | null {
   return `proof clause ${clause} target has unsupported shape: ${target}`;
 }
 
+function closedCommitIssues(tasks: Task[]): CheckIssue[] {
+  const issues: CheckIssue[] = [];
+  for (const task of tasks) {
+    if (!task.closedCommit) continue;
+    const result = spawnSync('git', ['merge-base', '--is-ancestor', task.closedCommit, 'HEAD'], { stdio: 'ignore' });
+    if (result.status !== 0) issues.push({ level: 'warning', message: `${task.id} closed by a commit not reachable from HEAD: ${task.closedCommit}` });
+  }
+  return issues;
+}
+
+function currentHead(): string | null {
+  try {
+    return execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+  } catch {
+    return null;
+  }
+}
+
 // Shared by add and edit: the two places content fields (severity, system,
 // requires) are accepted from a human by hand rather than produced by a
 // state-transition verb or the auditor.
@@ -382,6 +401,7 @@ function cmdAdd(args: Flags): void {
     source: null,
     reason: null,
     closed: null,
+    closedCommit: null,
   };
   tasks.push(task);
   saveStore(tasks, config.storePath);
@@ -694,6 +714,7 @@ function cmdDone(args: Flags): void {
   }
   task.state = 'done';
   task.closed = today();
+  task.closedCommit = args.flags.commit ?? currentHead();
   saveStore(tasks, config.storePath);
   console.log(`done ${id}`);
 }
@@ -727,6 +748,7 @@ function cmdDecline(args: Flags): void {
   task.state = 'declined';
   task.reason = reason;
   task.closed = today();
+  task.closedCommit = null;
   saveStore(tasks, config.storePath);
   console.log(`declined ${id}`);
 }
@@ -1085,6 +1107,7 @@ function cmdImport(args: Flags): void {
       source: null,
       reason: null,
       closed: null,
+      closedCommit: null,
     };
     tasks.push(task);
     taken.add(id);
@@ -1511,6 +1534,7 @@ async function cmdAudit(rawArgs: string[]): Promise<void> {
       source: { spec: slug, pass: passNumber },
       reason: null,
       closed: null,
+      closedCommit: null,
     };
     tasks.push(undelivered);
     taken.add(id);
@@ -1536,6 +1560,7 @@ async function cmdAudit(rawArgs: string[]): Promise<void> {
       source: { spec: slug, pass: passNumber },
       reason: null,
       closed: null,
+      closedCommit: null,
     };
     tasks.push(task);
     taken.add(id);

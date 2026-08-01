@@ -419,6 +419,15 @@ describe('tasks CLI', () => {
     });
   });
 
+  it('done records the commit that closed the task when --commit is given', () => {
+    fixture(({ tasks }) => {
+      tasks('add', 'anchored task', '--id', 'anchored');
+      const closed = tasks('done', 'anchored', '--commit', '0123456789abcdef0123456789abcdef01234567');
+      expect(closed.status).toBe(0);
+      expect(tasks('show', 'anchored').stdout).toContain('closedCommit: 0123456789abcdef0123456789abcdef01234567');
+    });
+  });
+
   it('decline requires a reason and is refused for undelivered tasks', () => {
     fixture(({ tasks }) => {
       tasks('add', 'stale finding', '--id', 'stale', '--kind', 'finding', '--deliverable', 'fix it');
@@ -442,6 +451,15 @@ describe('tasks CLI', () => {
       const broken = tasks('check');
       expect(broken.status).toBe(1);
       expect(broken.stderr).toContain('system not in systems.json');
+    });
+  });
+
+  it('check warns when a done task names a closing commit not reachable from HEAD', () => {
+    fixture(({ tasks, dir }) => {
+      writeFileSync(path.join(dir, 'tasks.jsonl'), `${JSON.stringify({ id: 'anchored', title: 'anchored', kind: 'task', state: 'done', severity: null, system: null, spec: null, clause: null, requires: [], files: [], deliverable: null, evidence: null, source: null, reason: null, closed: '2026-08-01', closedCommit: '0123456789abcdef0123456789abcdef01234567' })}\n`, 'utf8');
+      const result = tasks('check');
+      expect(result.status).toBe(0);
+      expect(result.stderr).toContain('warning: anchored closed by a commit not reachable from HEAD');
     });
   });
 

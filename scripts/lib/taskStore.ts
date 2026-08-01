@@ -25,6 +25,7 @@ export interface Task {
   source: Source | null;
   reason: string | null;
   closed: string | null;
+  closedCommit: string | null;
 }
 
 export const DEFAULT_STORE_PATH = 'docs/tasks.jsonl';
@@ -94,6 +95,7 @@ function normalizeTask(value: unknown, where: string): Task {
     source: nullableSource(value, where),
     reason: nullableString(value, 'reason', where),
     closed: nullableString(value, 'closed', where),
+    closedCommit: nullableString(value, 'closedCommit', where),
   };
 }
 
@@ -114,6 +116,7 @@ function renderTask(task: Task): string {
     source: task.source,
     reason: task.reason,
     closed: task.closed,
+    closedCommit: task.closedCommit,
   });
 }
 

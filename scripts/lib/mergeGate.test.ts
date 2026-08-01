@@ -19,6 +19,7 @@ function task(overrides: Partial<Task> & { id: string }): Task {
     source: null,
     reason: null,
     closed: null,
+    closedCommit: null,
     ...overrides,
   };
 }
