@@ -111,3 +111,45 @@ state during combat-continuation-runtime, not a speculative improvement.
       state that exists only in the working tree.
     - a task records the commit that closed it, so a reverted `done` is
       detectable by asking whether that commit is still reachable.
+
+## Performance and process noise found after a long session
+
+18. **The slow `npm test` path is dominated by `scripts/tasks.test.ts`.** A full
+    `npm test -- --reporter=dot` run took ~88s. Running only
+    `scripts/tasks.test.ts` took ~94s, while the other CLI-heavy script tests
+    (`modportal`, `publish-local-changes`, `squash-local-changes`) together took
+    ~13s. This points at the task-system suite, not Vitest globally.
+
+19. **The task tests pay TypeScript startup over and over.** `scripts/tasks.ts`
+    already exports `run(argv)`, but `scripts/tasks.test.ts` mostly shells out
+    through `node node_modules/tsx/dist/cli.mjs scripts/tasks.ts ...`. With 98
+    `it(...)` cases, that cold-starts the TypeScript loader for command
+    semantics that could mostly be tested in-process. Keep a few subprocess
+    smoke tests; import `run` for the bulk.
+
+20. **Some task tests still need real Git, but not all CLI tests do.**
+    `git status --short` itself measured ~57 ms outside the sandbox, so Git is
+    not generally slow. The expensive part is repeatedly creating temp repos,
+    committing, and launching the TypeScript CLI around those Git calls. The
+    handoff walk-back tests need real commits; ordinary add/list/edit/triage
+    behavior does not.
+
+21. **The commit hook keeps its policy but pays an avoidable `npx` tax.** The
+    current hook runs `npx tsx scripts/tasks.ts check-commit-msg ...`, which
+    measured ~1.56s for a valid message. Calling the local installed CLI
+    directly:
+
+    ```
+    node node_modules/tsx/dist/cli.mjs scripts/tasks.ts check-commit-msg ...
+    ```
+
+    measured ~0.39s for the same check. That is the low-risk hook fix: local
+    `tsx` first, `npx tsx` fallback only when dependencies are absent.
+
+22. **Unrelated MCP servers can make the process list look like test leakage.**
+    After a long Codex/VS Code session there were 18 lingering Node processes,
+    but they were repeated `@coding-solo/godot-mcp` launches from the Codex app
+    server, not Vitest workers. They held ~412 MB total. The launcher was in
+    `C:\Users\yonat\.codex\config.toml` under `[mcp_servers.godot]`; setting
+    `enabled = false` and stopping the live `godot-mcp` process chain cleared
+    the issue.

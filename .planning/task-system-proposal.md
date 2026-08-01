@@ -94,9 +94,34 @@ being the coordination surface and the store being a write-only log.
    already-filed finding about recycled clause ids. Record the amendment as a
    diff, or as the reason plus a pointer, not a full copy.
 
+## Keep the checks, cut the startup tax
+
+9. **Most task CLI tests should run in-process.** `npm test` took ~88s, and
+   `scripts/tasks.test.ts` alone took ~94s. That file has 98 cases, and its
+   fixture cold-starts the TypeScript CLI through `tsx` for almost every one:
+   `node node_modules/tsx/dist/cli.mjs scripts/tasks.ts ...`. The script already
+   exports `run(argv)`, so most cases can import `run` once and capture
+   `stdout`/`stderr`/`process.exitCode` in-process.
+
+   Keep a small number of real subprocess smoke tests for argument wiring and
+   keep the Git-history handoff cases real where they need actual commits. The
+   bulk of the suite is checking command semantics, not Node process startup.
+
+10. **The commit hook should avoid `npx`.** The current hook path runs
+    `npx tsx scripts/tasks.ts check-commit-msg ...`. Timed locally, that costs
+    ~1.56s per commit. Calling the repo-local installed CLI directly:
+
+    ```
+    node node_modules/tsx/dist/cli.mjs scripts/tasks.ts check-commit-msg ...
+    ```
+
+    took ~0.39s for the same check. The hook can keep the same policy and get
+    most of the speed back by using local `tsx` when `node_modules` exists, with
+    an `npx tsx` fallback for a checkout that has not installed dependencies.
+
 ## One thing to stop doing
 
-9. **The `Next:` trailer hook should not fire on every commit.** It models a
+11. **The `Next:` trailer hook should not fire on every commit.** It models a
    single-session handoff. In a swarm there is no single next: the chunk-3 worker
    stamped `Next: Chunk 4 (equipment slots)`, stale the moment chunk 4 started
    and duplicating what the spec's member list already says. There is already a
@@ -106,7 +131,7 @@ being the coordination surface and the store being a write-only log.
 
 ## One gate that now earns its place
 
-10. **`noUnusedLocals` / `noUnusedParameters`.** CLAUDE.md says a gate earns its
+12. **`noUnusedLocals` / `noUnusedParameters`.** CLAUDE.md says a gate earns its
     place by preventing something that actually happened. This happened five
     times in one branch: `runtime.ts` kept `damagePool`/`poolLevel`,
     `equipment.ts` kept `PLAYER`, the equipment fixture kept three imports, and —
