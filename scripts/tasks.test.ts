@@ -1072,6 +1072,25 @@ describe('tasks CLI', () => {
     });
   });
 
+  it('audit-prompt prints a ready-to-use auditor prompt for a spec', () => {
+    fixture(({ tasks }) => {
+      tasks('add', 'prove the runtime behavior', '--id', 'runtime-proof', '--spec', 'demo-spec', '--severity', 'high', '--system', 'Runtime', '--files', 'src/runtime/runtime.ts:1', '--deliverable', 'runtime behavior is proven');
+      tasks('audit', 'demo-spec', '--proof', '1=met', '--evidence', '1=measured directly', '--proof', '2=met');
+
+      const result = tasks('audit-prompt', 'demo-spec');
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('You are auditing demo-spec on branch demo-spec.');
+      expect(result.stdout).toContain('Diff range:');
+      expect(result.stdout).toContain('Proof clauses:');
+      expect(result.stdout).toContain('[c1] The first clause holds.');
+      expect(result.stdout).toContain('Latest audit pass: pass 1');
+      expect(result.stdout).toContain('runtime-proof [high] Runtime');
+      expect(result.stdout).toContain('src/runtime/runtime.ts:1');
+      expect(result.stdout).toContain('prefer mutation testing');
+      expect(result.stdout).toContain('Do not promote pass-2+ findings.');
+    });
+  });
+
   it('audit records a pass, creates an undelivered task for an unmet clause, and records findings unreviewed', () => {
     fixture(({ tasks, dir }) => {
       const result = tasks(

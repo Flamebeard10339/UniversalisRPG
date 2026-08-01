@@ -1064,6 +1064,62 @@ function cmdImport(args: Flags): void {
   console.log(`imported ${imported} finding(s) from ${docPath}${skippedNote}${systemNote}`);
 }
 
+function cmdAuditPrompt(args: Flags): void {
+  const config = resolveConfig(args.flags);
+  const slug = args.positional[0];
+  if (!slug) {
+    console.error('usage: tasks audit-prompt <spec> [--base-branch main]');
+    process.exitCode = 1;
+    return;
+  }
+  const path_ = specFile(config, slug);
+  if (!existsSync(path_)) {
+    console.error(`error: no such spec: ${slug}`);
+    process.exitCode = 1;
+    return;
+  }
+
+  const baseBranch = args.flags['base-branch'] ?? 'main';
+  let base = '(unknown base)';
+  let head = '(unknown head)';
+  try {
+    base = execFileSync('git', ['merge-base', baseBranch, 'HEAD'], { encoding: 'utf8' }).trim();
+    head = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
+  } catch {
+    // Keep the prompt useful in throwaway fixtures or shallow clones.
+  }
+
+  const doc = parseSpecDoc(readFileSync(path_, 'utf8'));
+  const tasks = loadStore(config.storePath);
+  const members = tasks.filter((task) => task.spec === slug);
+  const latest = doc.auditPasses[doc.auditPasses.length - 1];
+
+  console.log(`You are auditing ${slug} on branch ${config.branch}.`);
+  console.log(`Spec: ${path_}`);
+  console.log(`Diff range: ${base}..${head}`);
+  console.log('');
+  console.log('Read the spec deliverable, the latest audit pass if any, and the diff above. Verify each proof clause independently.');
+  console.log('');
+  console.log('Proof clauses:');
+  for (const clause of doc.proofClauses) console.log(`- [c${clause.id}] ${clause.text}`);
+  console.log('');
+  console.log(latest ? `Latest audit pass: pass ${latest.pass} (${latest.date}), ${latest.verdicts.filter((verdict) => verdict.status === 'met').length}/${latest.verdicts.length} met` : 'Latest audit pass: none recorded');
+  console.log('');
+  console.log('Member tasks:');
+  if (members.length === 0) console.log('- none');
+  for (const task of members) {
+    console.log(`- ${task.id} [${task.severity ?? '?'}] ${task.system ?? '(no system)'} ${task.title}`);
+    if (task.files.length > 0) console.log(`  files: ${task.files.join(', ')}`);
+  }
+  console.log('');
+  console.log('For every clause with a proof target, confirm the target exists and fails under a meaningful mutation or reproduction before accepting it as proof.');
+  console.log('For pure domain logic and API layers, prefer mutation testing: temporarily remove, invert, or scale the behavior the test claims to prove and confirm the named proof fails for the right reason.');
+  console.log('For UI work, inspect behavior and add or run smoke tests after the implementation has settled.');
+  console.log('');
+  console.log('Report clause verdicts as met/unmet with one-sentence evidence; findings with severity, system, files, evidence, and deliverable; and any proof target that is missing, skipped, too broad, or non-specific.');
+  console.log('Do not promote pass-2+ findings. Do not treat green tests as proof unless they are tied to the clause they discharge.');
+}
+
 const EVIDENCE_INDENT = '          ';
 const EVIDENCE_WRAP_WIDTH = 78 - EVIDENCE_INDENT.length;
 
@@ -1599,7 +1655,7 @@ function cmdCheckCommitMessage(args: Flags): void {
   }
 }
 
-const USAGE = 'usage: npm run tasks -- <check|add|edit|show|list|search|next|start|stop|done|decline|import|triage|spec|audit|handoff> ...';
+const USAGE = 'usage: npm run tasks -- <check|add|edit|show|list|search|next|start|stop|done|decline|import|triage|spec|audit|audit-prompt|handoff> ...';
 
 export async function run(argv: string[]): Promise<void> {
   const [command, ...rest] = argv;
@@ -1641,6 +1697,8 @@ export async function run(argv: string[]): Promise<void> {
       return cmdSpec(args);
     case 'audit':
       return cmdAudit(rest);
+    case 'audit-prompt':
+      return cmdAuditPrompt(args);
     case 'handoff':
       return cmdHandoff(args);
     case 'check-commit-msg':
