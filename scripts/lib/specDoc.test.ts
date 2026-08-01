@@ -57,6 +57,15 @@ describe('parseSpecDoc', () => {
     ]);
   });
 
+  it('treats only top-level Proof bullets as clauses, leaving indented sub-bullets as prose', () => {
+    const doc = '## Deliverable\n\nPromise.\n\nProof:\n\n- [c1] The real clause.\n  - supporting detail, not a clause.\n- [c2] The other real clause.\n';
+    expect(parseSpecDoc(doc).proofClauses).toEqual([
+      { id: 1, text: 'The real clause. - supporting detail, not a clause.' },
+      { id: 2, text: 'The other real clause.' },
+    ]);
+    expect(stampClauseIds(doc)).toContain('  - supporting detail, not a clause.');
+  });
+
   it('leaves a clause that merely opens with a bracketed phrase untagged, text intact', () => {
     const doc = '## Deliverable\n\nPromise.\n\nProof:\n\n- [see docs] a clause that opens with a link-shaped phrase.\n';
     expect(parseSpecDoc(doc).proofClauses).toEqual([{ id: 1, text: '[see docs] a clause that opens with a link-shaped phrase.' }]);

@@ -484,6 +484,15 @@ describe('tasks CLI', () => {
     });
   });
 
+  it('check ignores a directory named like a markdown spec file', () => {
+    fixture(({ tasks, dir }) => {
+      mkdirSync(path.join(dir, 'specs', 'not-a-file.md'));
+      const result = tasks('check');
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('0 error(s)');
+    });
+  });
+
   it('import parses H/M/L findings out of an audit doc into unreviewed tasks, and is idempotent on re-run', () => {
     fixture(({ tasks, dir }) => {
       const docPath = path.join(dir, 'runtime-2026-08-01.md');

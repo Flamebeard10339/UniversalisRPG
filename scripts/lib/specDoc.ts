@@ -70,8 +70,9 @@ function scanProofClauses(deliverableSection: string): ScannedClause[] {
     if (current) clauses[clauses.length - 1].text = current.join(' ').trim();
   };
   for (let i = proofIndex + 1; i < lines.length; i++) {
-    const trimmed = lines[i].trim();
-    const bullet = /^- (.*)$/.exec(trimmed);
+    const line = lines[i];
+    const trimmed = line.trim();
+    const bullet = /^- (.*)$/.exec(line);
     const proof = /^proof:\s*(.+)$/.exec(trimmed);
     if (bullet) {
       flush();

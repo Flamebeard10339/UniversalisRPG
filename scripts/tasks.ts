@@ -1,5 +1,5 @@
 import { execFileSync, spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { createInterface } from 'node:readline';
 import { pathToFileURL } from 'node:url';
@@ -195,6 +195,7 @@ function specIssues(config: Config): CheckIssue[] {
   if (!existsSync(config.specsDir)) return [];
   return readdirSync(config.specsDir)
     .filter((entry) => entry.endsWith('.md'))
+    .filter((entry) => statSync(`${config.specsDir}/${entry}`).isFile())
     .flatMap((entry) => {
       const spec = entry.replace(/\.md$/, '');
       const doc = parseSpecDoc(readFileSync(`${config.specsDir}/${entry}`, 'utf8'));
