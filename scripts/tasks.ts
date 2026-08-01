@@ -188,8 +188,15 @@ function specIssues(config: Config): CheckIssue[] {
 
 function cmdCheck(flags: Record<string, string>): void {
   const config = resolveConfig(flags);
-  const tasks = loadStore(config.storePath);
-  const issues = [...checkStore(tasks, systemNames(config), (spec) => existsSync(specFile(config, spec))), ...specIssues(config)];
+  let tasks: Task[];
+  const loadIssues: CheckIssue[] = [];
+  try {
+    tasks = loadStore(config.storePath);
+  } catch (error) {
+    tasks = [];
+    loadIssues.push({ level: 'error', message: error instanceof Error ? error.message : String(error) });
+  }
+  const issues = [...loadIssues, ...checkStore(tasks, systemNames(config), (spec) => existsSync(specFile(config, spec))), ...specIssues(config)];
   const errors = issues.filter((issue) => issue.level === 'error');
   const warnings = issues.filter((issue) => issue.level === 'warning');
   for (const warning of warnings) console.warn(`warning: ${warning.message}`);

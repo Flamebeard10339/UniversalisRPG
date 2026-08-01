@@ -383,6 +383,27 @@ describe('tasks CLI', () => {
     });
   });
 
+  it('check reports a malformed store as a check error instead of a stack trace', () => {
+    fixture(({ tasks, dir }) => {
+      writeFileSync(path.join(dir, 'tasks.jsonl'), '<<<<<<< HEAD\n', 'utf8');
+      const result = tasks('check');
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain('malformed JSONL task record');
+      expect(result.stderr).toContain('tasks.jsonl:1');
+      expect(result.stderr).not.toContain('SyntaxError');
+    });
+  });
+
+  it('check reports a malformed task shape as a check error instead of a stack trace', () => {
+    fixture(({ tasks, dir }) => {
+      writeFileSync(path.join(dir, 'tasks.jsonl'), `${JSON.stringify({ id: 'broken', title: 'missing fields' })}\n`, 'utf8');
+      const result = tasks('check');
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain('task "broken" requires kind');
+      expect(result.stderr).toContain('tasks.jsonl:1');
+    });
+  });
+
   it('import parses H/M/L findings out of an audit doc into unreviewed tasks, and is idempotent on re-run', () => {
     fixture(({ tasks, dir }) => {
       const docPath = path.join(dir, 'runtime-2026-08-01.md');

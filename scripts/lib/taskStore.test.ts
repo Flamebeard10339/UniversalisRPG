@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -66,6 +66,69 @@ describe('loadStore / saveStore', () => {
       const file = path.join(dir, 'tasks.jsonl');
       saveStore([task({ id: 'a' })], file);
       expect(loadStore(file)).toHaveLength(1);
+    });
+  });
+
+  it('serializes every task in the same canonical key order after loading older rows', () => {
+    withTmpDir((dir) => {
+      const file = path.join(dir, 'tasks.jsonl');
+      writeFileSync(
+        file,
+        `${JSON.stringify({
+          id: 'legacy',
+          title: 'legacy',
+          kind: 'task',
+          state: 'open',
+          severity: null,
+          system: null,
+          spec: null,
+          requires: [],
+          files: [],
+          deliverable: null,
+          evidence: null,
+          source: null,
+          reason: null,
+          closed: null,
+        })}\n`,
+        'utf8',
+      );
+
+      saveStore(loadStore(file), file);
+      expect(readFileSync(file, 'utf8')).toBe(
+        `${JSON.stringify({
+          id: 'legacy',
+          title: 'legacy',
+          kind: 'task',
+          state: 'open',
+          severity: null,
+          system: null,
+          spec: null,
+          clause: null,
+          requires: [],
+          files: [],
+          deliverable: null,
+          evidence: null,
+          source: null,
+          reason: null,
+          closed: null,
+        })}\n`,
+      );
+    });
+  });
+
+  it('reports malformed JSONL with the store path and line number', () => {
+    withTmpDir((dir) => {
+      const file = path.join(dir, 'tasks.jsonl');
+      writeFileSync(file, `${JSON.stringify(task({ id: 'ok' }))}\n<<<<<<< HEAD\n`, 'utf8');
+      expect(() => loadStore(file)).toThrow(`${file}:2: malformed JSONL task record`);
+    });
+  });
+
+  it('reports malformed task shape with the store path and line number', () => {
+    withTmpDir((dir) => {
+      const file = path.join(dir, 'tasks.jsonl');
+      writeFileSync(file, `${JSON.stringify({ id: 'broken', title: 'missing arrays' })}\n`, 'utf8');
+      expect(() => loadStore(file)).toThrow(`${file}:1: task "broken" requires kind`);
     });
   });
 });

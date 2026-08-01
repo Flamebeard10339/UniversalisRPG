@@ -29,22 +29,115 @@ export interface Task {
 
 export const DEFAULT_STORE_PATH = 'docs/tasks.jsonl';
 
+const KINDS: Kind[] = ['task', 'finding', 'undelivered'];
+const STATES: State[] = ['unreviewed', 'open', 'done', 'declined'];
+const SEVERITIES: Severity[] = ['high', 'medium', 'low'];
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function requireString(record: Record<string, unknown>, key: string, where: string): string {
+  const value = record[key];
+  if (typeof value !== 'string') throw new Error(`${where}: task ${JSON.stringify(record.id ?? '(unknown)')} requires ${key}`);
+  return value;
+}
+
+function nullableString(record: Record<string, unknown>, key: string, where: string): string | null {
+  const value = record[key] ?? null;
+  if (value !== null && typeof value !== 'string') throw new Error(`${where}: task ${JSON.stringify(record.id ?? '(unknown)')} has non-string ${key}`);
+  return value;
+}
+
+function stringArray(record: Record<string, unknown>, key: string, where: string): string[] {
+  const value = record[key];
+  if (!Array.isArray(value) || value.some((entry) => typeof entry !== 'string')) throw new Error(`${where}: task ${JSON.stringify(record.id ?? '(unknown)')} requires ${key} as a string array`);
+  return value;
+}
+
+function nullableSource(record: Record<string, unknown>, where: string): Source | null {
+  const value = record.source ?? null;
+  if (value === null) return null;
+  if (!isRecord(value) || typeof value.spec !== 'string' || typeof value.pass !== 'number') throw new Error(`${where}: task ${JSON.stringify(record.id ?? '(unknown)')} has malformed source`);
+  return { spec: value.spec, pass: value.pass };
+}
+
+function normalizeTask(value: unknown, where: string): Task {
+  if (!isRecord(value)) throw new Error(`${where}: task record must be an object`);
+
+  const id = requireString(value, 'id', where);
+  const kind = requireString(value, 'kind', where);
+  if (!KINDS.includes(kind as Kind)) throw new Error(`${where}: task ${JSON.stringify(id)} has invalid kind: ${kind}`);
+
+  const state = requireString(value, 'state', where);
+  if (!STATES.includes(state as State)) throw new Error(`${where}: task ${JSON.stringify(id)} has invalid state: ${state}`);
+
+  const severity = value.severity ?? null;
+  if (severity !== null && (typeof severity !== 'string' || !SEVERITIES.includes(severity as Severity))) throw new Error(`${where}: task ${JSON.stringify(id)} has invalid severity: ${String(severity)}`);
+
+  const clause = value.clause ?? null;
+  if (clause !== null && typeof clause !== 'number') throw new Error(`${where}: task ${JSON.stringify(id)} has non-numeric clause`);
+
+  return {
+    id,
+    title: requireString(value, 'title', where),
+    kind: kind as Kind,
+    state: state as State,
+    severity: severity as Severity | null,
+    system: nullableString(value, 'system', where),
+    spec: nullableString(value, 'spec', where),
+    clause,
+    requires: stringArray(value, 'requires', where),
+    files: stringArray(value, 'files', where),
+    deliverable: nullableString(value, 'deliverable', where),
+    evidence: nullableString(value, 'evidence', where),
+    source: nullableSource(value, where),
+    reason: nullableString(value, 'reason', where),
+    closed: nullableString(value, 'closed', where),
+  };
+}
+
+function renderTask(task: Task): string {
+  return JSON.stringify({
+    id: task.id,
+    title: task.title,
+    kind: task.kind,
+    state: task.state,
+    severity: task.severity,
+    system: task.system,
+    spec: task.spec,
+    clause: task.clause,
+    requires: task.requires,
+    files: task.files,
+    deliverable: task.deliverable,
+    evidence: task.evidence,
+    source: task.source,
+    reason: task.reason,
+    closed: task.closed,
+  });
+}
+
 export function loadStore(path: string = DEFAULT_STORE_PATH): Task[] {
   if (!existsSync(path)) return [];
   return readFileSync(path, 'utf8')
     .split('\n')
-    .map((line) => line.trim())
-    .filter((line) => line.length > 0)
-    .map((line) => {
-      const task = JSON.parse(line) as Task;
-      return { ...task, clause: task.clause ?? null };
+    .map((line, index) => ({ line: line.trim(), number: index + 1 }))
+    .filter(({ line }) => line.length > 0)
+    .map(({ line, number }) => {
+      const where = `${path}:${number}`;
+      try {
+        return normalizeTask(JSON.parse(line) as unknown, where);
+      } catch (error) {
+        if (error instanceof SyntaxError) throw new Error(`${where}: malformed JSONL task record: ${error.message}`);
+        throw error;
+      }
     });
 }
 
 // One task per line, insertion order preserved and new tasks appended: what
 // changes is what moves, so concurrent branches usually merge clean.
 export function saveStore(tasks: Task[], path: string = DEFAULT_STORE_PATH): void {
-  const body = tasks.map((task) => JSON.stringify(task)).join('\n');
+  const body = tasks.map((task) => renderTask(task)).join('\n');
   writeFileSync(path, body.length > 0 ? `${body}\n` : '', 'utf8');
 }
 
