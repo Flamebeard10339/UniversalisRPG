@@ -1345,12 +1345,14 @@ describe('tasks CLI', () => {
     });
   });
 
-  it('check-commit-msg passes a subject, body, and Next: trailer', () => {
+  it('check-commit-msg passes a subject and body, with Next: optional', () => {
     fixture(({ tasks, dir }) => {
       const msgFile = path.join(dir, 'msg.txt');
+      writeFileSync(msgFile, 'Subject\n\nA body explaining the change.\n', 'utf8');
+      expect(tasks('check-commit-msg', msgFile).status).toBe(0);
+
       writeFileSync(msgFile, 'Subject\n\nA body explaining the change.\n\nNext: pick up X.\n', 'utf8');
-      const result = tasks('check-commit-msg', msgFile);
-      expect(result.status).toBe(0);
+      expect(tasks('check-commit-msg', msgFile).status).toBe(0);
     });
   });
 

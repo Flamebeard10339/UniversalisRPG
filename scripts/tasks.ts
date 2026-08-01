@@ -1427,7 +1427,7 @@ function cmdCheckCommitMessage(args: Flags): void {
   const reason = checkCommitMessage(message);
   if (reason) {
     console.error(`commit-msg: ${reason}`);
-    console.error('every commit needs a body (what was done) and a Next: trailer (what the following session should pick up). --no-verify to bypass.');
+    console.error('every commit needs a body saying what was done. Use `tasks handoff` or `tasks next` for resumability; an optional Next: trailer is only a breadcrumb. --no-verify to bypass.');
     process.exitCode = 1;
   }
 }

@@ -3,19 +3,16 @@ import { checkCommitMessage, extractNextTrailer, isExempt } from './commitContra
 import type { Manifest } from './systems';
 
 describe('checkCommitMessage', () => {
-  it('passes a subject, body, and Next: trailer', () => {
+  it('passes a subject and body, with or without a Next: trailer', () => {
     expect(checkCommitMessage('Subject line\n\nSome body explaining what was done.\n\nNext: pick up X.')).toBeNull();
+    expect(checkCommitMessage('Subject line\n\nSome body explaining what was done.')).toBeNull();
   });
 
   it('refuses a subject-only message', () => {
     expect(checkCommitMessage('Just a subject')).toMatch(/no body/);
   });
 
-  it('refuses a body with no Next: trailer', () => {
-    expect(checkCommitMessage('Subject\n\nA body with no trailer at all.')).toMatch(/Next:/);
-  });
-
-  it('does not count the Next: line itself as the body', () => {
+  it('does not count the optional Next: line itself as the body', () => {
     expect(checkCommitMessage('Subject\n\nNext: only a trailer, no body.')).toMatch(/no body/);
   });
 
