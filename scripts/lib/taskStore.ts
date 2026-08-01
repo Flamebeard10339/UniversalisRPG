@@ -17,6 +17,7 @@ export interface Task {
   severity: Severity | null;
   system: string | null;
   spec: string | null;
+  clause: number | null;
   requires: string[];
   files: string[];
   deliverable: string | null;
@@ -34,7 +35,10 @@ export function loadStore(path: string = DEFAULT_STORE_PATH): Task[] {
     .split('\n')
     .map((line) => line.trim())
     .filter((line) => line.length > 0)
-    .map((line) => JSON.parse(line) as Task);
+    .map((line) => {
+      const task = JSON.parse(line) as Task;
+      return { ...task, clause: task.clause ?? null };
+    });
 }
 
 // One task per line, insertion order preserved and new tasks appended: what
@@ -136,6 +140,8 @@ export function checkStore(tasks: Task[], systems: string[], specExists: (spec: 
     if (task.state === 'declined' && !task.reason) issues.push({ level: 'error', message: `${task.id} is declined but has no reason` });
     if (task.state !== 'declined' && task.reason) issues.push({ level: 'error', message: `${task.id} has a reason but is not declined` });
     if (task.kind === 'undelivered' && task.state === 'declined') issues.push({ level: 'error', message: `${task.id} is undelivered and cannot be declined` });
+    if (task.kind === 'undelivered' && task.clause === null) issues.push({ level: 'error', message: `${task.id} is undelivered but names no proof clause` });
+    if (task.kind !== 'undelivered' && task.clause !== null) issues.push({ level: 'error', message: `${task.id} names a proof clause but is not undelivered` });
     if (task.system !== null && !systems.includes(task.system)) issues.push({ level: 'error', message: `${task.id} has a system not in systems.json: ${task.system}` });
     if (task.spec !== null && !specExists(task.spec)) issues.push({ level: 'error', message: `${task.id} references a spec with no file: ${task.spec}` });
     for (const file of task.files) {

@@ -1,5 +1,6 @@
 export interface ProofClause {
-  index: number;
+  // A name, not a position: ids need be neither sequential nor in order.
+  id: number;
   text: string;
 }
 
@@ -42,27 +43,85 @@ function sectionText(lines: string[], heading: string): { text: string; startInd
   return { text: lines.slice(start, endIndex).join('\n').trimEnd(), startIndex: start, endIndex };
 }
 
+const CLAUSE_TAG = /^\[c(\d+)\] (.*)$/;
+
+interface ScannedClause {
+  // Only stampClauseIds needs this, and needing it is why scanning is
+  // separate from parsing.
+  line: number;
+  tag: number | null;
+  text: string;
+}
+
 // "Proof:" introduces a bullet list within ## Deliverable; each top-level
 // `- ` line is one clause, and any following non-bullet lines are its
 // wrapped continuation, joined back into one sentence.
-function parseProofClauses(deliverableSection: string): ProofClause[] {
+function scanProofClauses(deliverableSection: string): ScannedClause[] {
   const lines = deliverableSection.split('\n');
   const proofIndex = lines.findIndex((line) => line.trim() === 'Proof:');
   if (proofIndex === -1) return [];
 
-  const clauses: ProofClause[] = [];
+  const clauses: ScannedClause[] = [];
   let current: string[] | null = null;
-  for (const line of lines.slice(proofIndex + 1)) {
-    const bullet = /^- (.*)$/.exec(line.trim());
+  const flush = (): void => {
+    if (current) clauses[clauses.length - 1].text = current.join(' ').trim();
+  };
+  for (let i = proofIndex + 1; i < lines.length; i++) {
+    const bullet = /^- (.*)$/.exec(lines[i].trim());
     if (bullet) {
-      if (current) clauses.push({ index: clauses.length + 1, text: current.join(' ').trim() });
-      current = [bullet[1]];
-    } else if (current && line.trim() !== '') {
-      current.push(line.trim());
+      flush();
+      const tagged = CLAUSE_TAG.exec(bullet[1]);
+      clauses.push({ line: i, tag: tagged ? Number(tagged[1]) : null, text: '' });
+      current = [tagged ? tagged[2] : bullet[1]];
+    } else if (current && lines[i].trim() !== '') {
+      current.push(lines[i].trim());
     }
   }
-  if (current) clauses.push({ index: clauses.length + 1, text: current.join(' ').trim() });
+  flush();
   return clauses;
+}
+
+function resolveIds(clauses: ScannedClause[]): number[] {
+  const claimed = new Set(clauses.map((clause) => clause.tag).filter((tag): tag is number => tag !== null));
+  let next = 1;
+  return clauses.map((clause) => {
+    if (clause.tag !== null) return clause.tag;
+    while (claimed.has(next)) next++;
+    claimed.add(next);
+    return next;
+  });
+}
+
+function parseProofClauses(deliverableSection: string): ProofClause[] {
+  const scanned = scanProofClauses(deliverableSection);
+  const ids = resolveIds(scanned);
+  return scanned.map((clause, i) => ({ id: ids[i], text: clause.text }));
+}
+
+// Turns each clause's id from something derived — position in the list —
+// into something written down, which is what rewording and reordering then
+// leave alone.
+export function stampClauseIds(text: string): string {
+  const lines = text.split('\n');
+  const section = sectionText(lines, '## Deliverable');
+  if (!section) return text;
+
+  const scanned = scanProofClauses(section.text);
+  const ids = resolveIds(scanned);
+  const stamped = [...lines];
+  scanned.forEach((clause, i) => {
+    if (clause.tag !== null) return;
+    const at = section.startIndex + clause.line;
+    stamped[at] = stamped[at].replace(/^(\s*)- /, `$1- [c${ids[i]}] `);
+  });
+  return stamped.join('\n');
+}
+
+// An id two clauses answer to is worse than no id: every lookup through it
+// finds one of them and reports success.
+export function duplicateClauseIds(clauses: ProofClause[]): number[] {
+  const ids = clauses.map((clause) => clause.id);
+  return [...new Set(ids.filter((id, i) => ids.indexOf(id) !== i))];
 }
 
 const PASS_HEADING = /^### Pass (\d+) — (.+)$/;

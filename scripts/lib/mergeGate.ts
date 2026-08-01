@@ -1,4 +1,4 @@
-import type { SpecDoc } from './specDoc';
+import { duplicateClauseIds, stampClauseIds, type SpecDoc } from './specDoc';
 import type { Task } from './taskStore';
 
 export interface MergeGateInput {
@@ -34,18 +34,33 @@ export function checkMergeGate(input: MergeGateInput): string[] {
   const issues: string[] = [];
   const doc = input.doc;
 
+  for (const id of duplicateClauseIds(doc.proofClauses)) {
+    issues.push(`${input.spec} tags more than one proof clause [c${id}] — a clause id names exactly one clause`);
+  }
+
   if (doc.auditPasses.length === 0) {
     issues.push(`${input.spec} has no recorded audit pass`);
   } else {
     const latest = doc.auditPasses[doc.auditPasses.length - 1];
     for (const clause of doc.proofClauses) {
-      const verdict = latest.verdicts.find((v) => v.clause === clause.index);
-      if (!verdict) issues.push(`proof clause ${clause.index} has no verdict in the latest audit pass (pass ${latest.pass})`);
-      else if (verdict.status === 'unmet') issues.push(`proof clause ${clause.index} is unmet as of pass ${latest.pass}`);
+      const verdict = latest.verdicts.find((v) => v.clause === clause.id);
+      if (!verdict) issues.push(`proof clause ${clause.id} has no verdict in the latest audit pass (pass ${latest.pass})`);
+      else if (verdict.status === 'unmet') issues.push(`proof clause ${clause.id} is unmet as of pass ${latest.pass}`);
+    }
+    // Both directions, because the walk above never reads a verdict whose
+    // clause is gone — which is exactly what renumbering a tag produces.
+    for (const verdict of latest.verdicts) {
+      if (!doc.proofClauses.some((clause) => clause.id === verdict.clause)) {
+        issues.push(`pass ${latest.pass} graded proof clause ${verdict.clause}, which is no longer in the deliverable`);
+      }
     }
   }
 
-  if (input.deliverableBaseline !== null && input.deliverableBaseline.trim() !== doc.deliverableSection.trim()) {
+  // Stamping ids onto a baseline that predates them is the only edit a
+  // machine makes to a frozen deliverable, so it is the only difference
+  // accepted — a tag altered by hand is drift like any other.
+  const baseline = input.deliverableBaseline;
+  if (baseline !== null && doc.deliverableSection.trim() !== baseline.trim() && doc.deliverableSection.trim() !== stampClauseIds(baseline).trim()) {
     issues.push(`${input.spec}'s ## Deliverable text differs from its most recent amendment (or its state at the branch's merge-base, if never amended)`);
   }
 

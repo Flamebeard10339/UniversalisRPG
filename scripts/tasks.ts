@@ -1,16 +1,17 @@
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { createInterface } from 'node:readline';
 import { pathToFileURL } from 'node:url';
 import { harvestFiles, parseAuditDoc, systemForDoc } from './lib/auditImport';
 import { checkCommitMessage, extractNextTrailer, isExempt } from './lib/commitContract';
 import { checkMergeGate } from './lib/mergeGate';
-import { appendAmendment, appendAuditPass, parseSpecDoc, type AuditVerdict, type Verdict } from './lib/specDoc';
+import { appendAmendment, appendAuditPass, duplicateClauseIds, parseSpecDoc, stampClauseIds, type AuditVerdict, type ProofClause, type Verdict } from './lib/specDoc';
 import { loadManifest, systemNames as manifestSystemNames } from './lib/systems';
 import {
   checkStore,
   DEFAULT_STORE_PATH,
+  type CheckIssue,
   fixNowQueue,
   isBlocked,
   listQueue,
@@ -169,10 +170,26 @@ function deliverableAtMergeBase(config: Config, spec: string, baseBranch: string
   }
 }
 
+// Here rather than only in the merge gate because this runs on every push,
+// while the gate sees one branch's spec on a pull request.
+function specIssues(config: Config): CheckIssue[] {
+  if (!existsSync(config.specsDir)) return [];
+  return readdirSync(config.specsDir)
+    .filter((entry) => entry.endsWith('.md'))
+    .flatMap((entry) => {
+      const spec = entry.replace(/\.md$/, '');
+      const doc = parseSpecDoc(readFileSync(`${config.specsDir}/${entry}`, 'utf8'));
+      return duplicateClauseIds(doc.proofClauses).map((id) => ({
+        level: 'error' as const,
+        message: `${spec} tags more than one proof clause [c${id}] — a clause id names exactly one clause`,
+      }));
+    });
+}
+
 function cmdCheck(flags: Record<string, string>): void {
   const config = resolveConfig(flags);
   const tasks = loadStore(config.storePath);
-  const issues = checkStore(tasks, systemNames(config), (spec) => existsSync(specFile(config, spec)));
+  const issues = [...checkStore(tasks, systemNames(config), (spec) => existsSync(specFile(config, spec))), ...specIssues(config)];
   const errors = issues.filter((issue) => issue.level === 'error');
   const warnings = issues.filter((issue) => issue.level === 'warning');
   for (const warning of warnings) console.warn(`warning: ${warning.message}`);
@@ -286,6 +303,7 @@ function cmdAdd(args: Flags): void {
     severity: (args.flags.severity as Severity | undefined) ?? null,
     system: args.flags.system ?? null,
     spec,
+    clause: null,
     requires: splitList(args.flags.requires),
     files: splitList(args.flags.files),
     deliverable: args.flags.deliverable ?? null,
@@ -481,20 +499,18 @@ function cmdNext(args: Flags): void {
 // blanket refusal on kind:undelivered would make the merge gate
 // permanently unclosable — so this earns the close rather than blocking
 // it: refuse unless the spec's LATEST recorded audit pass grades this
-// task's clause `met`. `task.deliverable` carries the clause text verbatim
-// (see cmdAudit), so the clause is recovered by matching it against the
-// spec's current proof clauses rather than storing a second pointer.
+// task's clause `met`.
 function undeliveredDoneRefusal(config: Config, task: Task): string | null {
   if (!task.spec) return 'is undelivered but has no spec to verify a pass against';
+  if (task.clause === null) return 'is undelivered but names no proof clause';
   const path_ = specFile(config, task.spec);
   if (!existsSync(path_)) return `is undelivered but its spec file is missing: ${path_}`;
   const doc = parseSpecDoc(readFileSync(path_, 'utf8'));
-  const clause = doc.proofClauses.find((candidate) => candidate.text === task.deliverable);
-  if (!clause) return `is undelivered but its clause text no longer matches any proof clause in ${path_}`;
+  if (!doc.proofClauses.some((candidate) => candidate.id === task.clause)) return `is undelivered but proof clause ${task.clause} is no longer in ${path_}`;
   const latest = doc.auditPasses[doc.auditPasses.length - 1];
   if (!latest) return `is undelivered and ${task.spec} has no recorded audit pass`;
-  const verdict = latest.verdicts.find((v) => v.clause === clause.index);
-  if (!verdict || verdict.status !== 'met') return `is undelivered and proof clause ${clause.index} is not met in the latest audit pass (pass ${latest.pass})`;
+  const verdict = latest.verdicts.find((v) => v.clause === task.clause);
+  if (!verdict || verdict.status !== 'met') return `is undelivered and proof clause ${task.clause} is not met in the latest audit pass (pass ${latest.pass})`;
   return null;
 }
 
@@ -787,7 +803,9 @@ function cmdSpecAmend(args: Flags): void {
   // Recording an unchanged deliverable would leave the next edit failing the
   // gate against a baseline nobody meant to set.
   const previous = doc.amendments[doc.amendments.length - 1];
-  if (previous && previous.deliverableText.trim() === doc.deliverableSection.trim()) {
+  // Gaining clause tags is not a change worth adopting.
+  const unchanged = (before: string): boolean => doc.deliverableSection.trim() === before.trim() || doc.deliverableSection.trim() === stampClauseIds(before).trim();
+  if (previous && unchanged(previous.deliverableText)) {
     console.error(`error: ${slug}'s ## Deliverable is unchanged since the amendment of ${previous.date} — edit it first, then record what it became`);
     process.exitCode = 1;
     return;
@@ -860,6 +878,7 @@ function cmdImport(args: Flags): void {
       severity: finding.severity,
       system,
       spec: null,
+      clause: null,
       requires: [],
       files: [`${docPath}#${finding.code}`, ...harvestFiles(finding.body, existsSync)],
       deliverable: null,
@@ -1019,6 +1038,7 @@ interface AuditFinding {
   system: string | null;
   files: string[];
   deliverable: string | null;
+  evidence: string | null;
 }
 
 interface AuditArgs {
@@ -1040,11 +1060,10 @@ const CONFIG_FLAG_NAMES = new Set(['store', 'systems', 'specs-dir', 'branch']);
 // --finding's --severity/--system/--file belong to whichever --finding
 // came most recently, which a flat key-value map cannot express.
 //
-// --file is overloaded by position: while no --finding has been seen yet
-// it is clause-scoped and takes the same `N=value` shape as --proof and
-// --evidence (`--file 2=src/save.ts:88`); once a --finding is open it
-// attaches to that finding instead and takes a bare path, matching the
-// pre-existing behaviour.
+// --file and --evidence are overloaded by position: while no --finding has
+// been seen yet they are clause-scoped and take the same `N=value` shape as
+// --proof (`--file 2=src/save.ts:88`); once a --finding is open they attach
+// to that finding instead and take a bare value.
 function parseAuditArgs(args: string[]): AuditArgs {
   const configFlags: Record<string, string> = {};
   let baseBranch = 'main';
@@ -1071,11 +1090,13 @@ function parseAuditArgs(args: string[]): AuditArgs {
     } else if (key === 'proof') {
       const [clause, status] = (value ?? '').split('=');
       proofs.set(Number(clause), status as Verdict);
+    } else if (key === 'evidence' && current) {
+      current.evidence = value ?? null;
     } else if (key === 'evidence') {
       const eq = (value ?? '').indexOf('=');
       evidence.set(Number((value ?? '').slice(0, eq)), (value ?? '').slice(eq + 1));
     } else if (key === 'finding') {
-      current = { title: value ?? '', severity: null, system: null, files: [], deliverable: null };
+      current = { title: value ?? '', severity: null, system: null, files: [], deliverable: null, evidence: null };
       findings.push(current);
     } else if (key === 'severity' && current) {
       current.severity = value as Severity;
@@ -1099,9 +1120,9 @@ function parseAuditArgs(args: string[]): AuditArgs {
 }
 
 const AUDIT_USAGE =
-  'usage: tasks audit <spec> [--proof N=met|unmet ...] [--evidence N="..." ...] [--file N=path:line ...] [--finding "..." --severity high|medium|low --system "<name>" --deliverable "..." [--file path:line ...]]...  (with no --proof flags, walks the clauses interactively)';
+  'usage: tasks audit <spec> [--proof N=met|unmet ...] [--evidence N="..." ...] [--file N=path:line ...] [--finding "..." --severity high|medium|low --system "<name>" --deliverable "..." --evidence "..." [--file path:line ...]]...  (with no --proof flags, walks the clauses interactively)';
 
-async function walkClausesInteractively(clauses: { index: number; text: string }[]): Promise<AuditVerdict[]> {
+async function walkClausesInteractively(clauses: ProofClause[]): Promise<AuditVerdict[]> {
   const rl = createInterface({ input: process.stdin, output: process.stdout });
   const lines = rl[Symbol.asyncIterator]();
   const ask = async (prompt: string): Promise<string> => {
@@ -1112,7 +1133,7 @@ async function walkClausesInteractively(clauses: { index: number; text: string }
 
   const verdicts: AuditVerdict[] = [];
   for (const clause of clauses) {
-    console.log(`\nclause ${clause.index}: ${clause.text}`);
+    console.log(`\nclause ${clause.id}: ${clause.text}`);
     let status: Verdict | null = null;
     while (status === null) {
       const answer = (await ask('met/unmet? ')).trim().toLowerCase();
@@ -1123,7 +1144,7 @@ async function walkClausesInteractively(clauses: { index: number; text: string }
     // backing a completion claim is worth keeping, and staying optional
     // (an empty answer records nothing) costs a human one keystroke.
     const evidenceText = (await ask('evidence (optional): ')).trim() || null;
-    verdicts.push({ clause: clause.index, status, evidence: evidenceText });
+    verdicts.push({ clause: clause.id, status, evidence: evidenceText });
   }
   rl.close();
   return verdicts;
@@ -1147,10 +1168,19 @@ async function cmdAudit(rawArgs: string[]): Promise<void> {
     process.exitCode = 1;
     return;
   }
-  const text = readFileSync(path_, 'utf8');
+  // Stamped before anything is recorded, so this pass names ids the spec
+  // file already carries rather than ids it is about to be given.
+  const original = readFileSync(path_, 'utf8');
+  const text = stampClauseIds(original);
   const doc = parseSpecDoc(text);
   if (doc.proofClauses.length === 0) {
     console.error(`error: ${slug}'s ## Deliverable has no Proof: clauses to verify`);
+    process.exitCode = 1;
+    return;
+  }
+  const duplicates = duplicateClauseIds(doc.proofClauses);
+  if (duplicates.length > 0) {
+    console.error(`error: ${slug} tags more than one proof clause [c${duplicates[0]}] — a clause id names exactly one clause`);
     process.exitCode = 1;
     return;
   }
@@ -1159,16 +1189,16 @@ async function cmdAudit(rawArgs: string[]): Promise<void> {
   if (parsed.proofs.size === 0 && parsed.findings.length === 0) {
     verdicts = await walkClausesInteractively(doc.proofClauses);
   } else {
-    const missing = doc.proofClauses.filter((clause) => !parsed.proofs.has(clause.index));
+    const missing = doc.proofClauses.filter((clause) => !parsed.proofs.has(clause.id));
     if (missing.length > 0) {
-      console.error(`error: every proof clause needs a verdict before findings are accepted; missing: ${missing.map((clause) => clause.index).join(', ')}`);
+      console.error(`error: every proof clause needs a verdict before findings are accepted; missing: ${missing.map((clause) => clause.id).join(', ')}`);
       process.exitCode = 1;
       return;
     }
     verdicts = doc.proofClauses.map((clause) => ({
-      clause: clause.index,
-      status: parsed.proofs.get(clause.index)!,
-      evidence: parsed.evidence.get(clause.index) ?? null,
+      clause: clause.id,
+      status: parsed.proofs.get(clause.id)!,
+      evidence: parsed.evidence.get(clause.id) ?? null,
     }));
   }
 
@@ -1180,6 +1210,14 @@ async function cmdAudit(rawArgs: string[]): Promise<void> {
     }
     if (!finding.deliverable) {
       console.error(`error: finding "${finding.title}" needs --deliverable "..." — a finding must say what fixing it would mean`);
+      process.exitCode = 1;
+      return;
+    }
+    // Triage shows both halves and decides on both: a finding with no
+    // evidence reaches the human as a proposed fix to a problem they have
+    // to take on faith, which is the one thing triage cannot do.
+    if (!finding.evidence) {
+      console.error(`error: finding "${finding.title}" needs --evidence "..." — a finding must say what is broken, not only what fixing it would mean`);
       process.exitCode = 1;
       return;
     }
@@ -1198,7 +1236,7 @@ async function cmdAudit(rawArgs: string[]): Promise<void> {
     const baseId = `${slug}-clause-${verdict.clause}`;
     if (tasks.some((task) => task.id === baseId && task.state === 'open')) continue;
     const id = taken.has(baseId) ? `${baseId}-pass-${passNumber}` : baseId;
-    const clauseText = doc.proofClauses.find((clause) => clause.index === verdict.clause)?.text ?? '';
+    const clauseText = doc.proofClauses.find((clause) => clause.id === verdict.clause)?.text ?? '';
     const undelivered: Task = {
       id,
       title: `Unmet deliverable clause ${verdict.clause}: ${clauseText}`,
@@ -1207,6 +1245,7 @@ async function cmdAudit(rawArgs: string[]): Promise<void> {
       severity: 'high',
       system: null,
       spec: slug,
+      clause: verdict.clause,
       requires: [],
       files: parsed.clauseFiles.get(verdict.clause) ?? [],
       deliverable: clauseText,
@@ -1231,10 +1270,11 @@ async function cmdAudit(rawArgs: string[]): Promise<void> {
       severity: finding.severity,
       system: finding.system,
       spec: null,
+      clause: null,
       requires: [],
       files: finding.files,
       deliverable: finding.deliverable,
-      evidence: null,
+      evidence: finding.evidence,
       source: { spec: slug, pass: passNumber },
       reason: null,
       closed: null,
@@ -1249,6 +1289,7 @@ async function cmdAudit(rawArgs: string[]): Promise<void> {
 
   const met = verdicts.filter((verdict) => verdict.status === 'met').length;
   console.log(`recorded pass ${passNumber} for ${slug}: ${met}/${verdicts.length} clauses met`);
+  if (text !== original) console.log(`tagged ${slug}'s proof clauses [cN] — the tag is the clause's identity, so keep it when you reword or reorder`);
   if (undeliveredCreated > 0) console.log(`${undeliveredCreated} undelivered task(s) created for unmet clauses`);
   if (findingsCreated > 0) console.log(`${findingsCreated} finding(s) recorded, unreviewed`);
 }
@@ -1262,14 +1303,32 @@ interface FoundTrailer {
   distance: number;
 }
 
+// The branch's own commits, or null when that range can't be built or is
+// empty — the latter being the base branch itself, where "this branch's
+// work" is the whole history and the unscoped walk is the right one.
+function branchCommitRange(baseBranch: string): string | null {
+  try {
+    const mergeBase = execFileSync('git', ['merge-base', baseBranch, 'HEAD'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+    const count = execFileSync('git', ['rev-list', '--count', `${mergeBase}..HEAD`], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+    return count === '0' ? null : `${mergeBase}..HEAD`;
+  } catch {
+    return null;
+  }
+}
+
 // Only the last commit's Next: is meant to be live, but a mechanical or
-// fixup commit can carry none at all — walk back through recent history
-// (capped, so a long-dead trailer can't turn this into an unbounded scan)
-// to the most recent commit that actually has one.
-function findLatestNextTrailer(maxCommits = 20): FoundTrailer | null {
+// fixup commit can carry none at all — walk back to the most recent commit
+// that actually has one.
+//
+// Stopping at the merge-base is the difference between "nothing to resume
+// yet" and a confident pointer at another branch's plan: a branch whose
+// first commit carries no trailer has nothing of its own to find, and
+// walking past its base reaches whatever the previous branch was planning
+// next. The commit cap stays as a bound on the scan, not on the reach.
+function findLatestNextTrailer(range: string | null, maxCommits = 20): FoundTrailer | null {
   let log: string;
   try {
-    log = execFileSync('git', ['log', `-${maxCommits}`, `--format=%H${FIELD_SEP}%B${COMMIT_SEP}`], { encoding: 'utf8' });
+    log = execFileSync('git', ['log', `-${maxCommits}`, `--format=%H${FIELD_SEP}%B${COMMIT_SEP}`, ...(range === null ? [] : [range])], { encoding: 'utf8' });
   } catch {
     return null;
   }
@@ -1294,9 +1353,11 @@ function cmdHandoff(args: Flags): void {
   const config = resolveConfig(args.flags);
   console.log(`branch: ${config.branch}`);
 
-  const found = findLatestNextTrailer();
+  const baseBranch = args.flags['base-branch'] ?? 'main';
+  const range = branchCommitRange(baseBranch);
+  const found = findLatestNextTrailer(range);
   if (found === null) {
-    console.log('(no Next: trailer found in the last 20 commits)');
+    console.log(range === null ? '(no Next: trailer found in the last 20 commits)' : `(no Next: trailer yet on this branch — nothing recorded since it left ${baseBranch})`);
   } else {
     if (found.distance > 0) console.log(`(from ${found.sha.slice(0, 7)}, ${found.distance} commit${found.distance === 1 ? '' : 's'} back)`);
     console.log(found.trailer);
@@ -1322,7 +1383,7 @@ function cmdHandoff(args: Flags): void {
   // The proof clauses, not the whole ## Deliverable section: the section's
   // prose never changes between runs, and what a cold session needs from
   // it — what the branch still owes — is exactly what the clauses are.
-  for (const clause of doc.proofClauses) console.log(`  ${clause.index}. ${truncateLine(clause.text)}`);
+  for (const clause of doc.proofClauses) console.log(`  ${clause.id}. ${truncateLine(clause.text)}`);
   console.log('');
 
   const queue = fixNowQueue(tasks, spec);

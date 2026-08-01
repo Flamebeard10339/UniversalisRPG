@@ -12,6 +12,7 @@ function task(overrides: Partial<Task> & { id: string }): Task {
     severity: null,
     system: null,
     spec: null,
+    clause: null,
     requires: [],
     files: [],
     deliverable: null,
@@ -22,6 +23,18 @@ function task(overrides: Partial<Task> & { id: string }): Task {
     ...overrides,
   };
 }
+
+describe('checkStore clause binding', () => {
+  it('refuses an undelivered task that names no proof clause', () => {
+    const issues = checkStore([task({ id: 'u', kind: 'undelivered', spec: null })], []);
+    expect(issues).toContainEqual({ level: 'error', message: 'u is undelivered but names no proof clause' });
+  });
+
+  it('refuses a clause binding on any other kind, so the field cannot drift into meaning something else', () => {
+    const issues = checkStore([task({ id: 't', clause: 3 })], []);
+    expect(issues).toContainEqual({ level: 'error', message: 't names a proof clause but is not undelivered' });
+  });
+});
 
 function withTmpDir(run: (dir: string) => void): void {
   const dir = mkdtempSync(path.join(os.tmpdir(), 'universalis-taskstore-'));
