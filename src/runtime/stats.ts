@@ -5,7 +5,7 @@ import { Registry } from '../content/registry';
 import { nextRandom } from './rng';
 import { GameState, PLAYER, RuntimeError } from './state';
 import { contestSpread, minDamage } from './tuning';
-import { secondsToMs } from './units';
+import { secondsToMs, toMilliUnits } from './units';
 
 // Difficulty is a stat, never an authored probability, so gear and buffs move it.
 export function hitChance(accuracy: number, evasion: number, registry: Registry): number {
@@ -44,7 +44,7 @@ export function sampleStat(statId: string, state: GameState, registry: Registry,
 }
 
 export function hitDamage(attack: number, dr: number, registry: Registry): number {
-  return Math.max(minDamage(registry), Math.trunc(attack - dr));
+  return Math.max(toMilliUnits(minDamage(registry)), toMilliUnits(attack - dr));
 }
 
 export function attemptDuration(action: Action, state: GameState, registry: Registry, actorId: string = PLAYER): number {

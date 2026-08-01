@@ -127,10 +127,10 @@ export function encounterView(state: GameState, registry: Registry): EncounterVi
 export function logSwing(state: GameState, registry: Registry, self: string, other: string, damage: number | null): void {
   if (self === PLAYER) {
     const title = actorTitle(other, registry);
-    state.log.push(damage === null ? `You miss the ${title}.` : `You hit the ${title} for ${damage}.`);
+    state.log.push(damage === null ? `You miss the ${title}.` : `You hit the ${title} for ${fromMilliUnits(damage)}.`);
   } else {
     const title = actorTitle(self, registry);
-    state.log.push(damage === null ? `The ${title} misses you.` : `The ${title} hits you for ${damage}.`);
+    state.log.push(damage === null ? `The ${title} misses you.` : `The ${title} hits you for ${fromMilliUnits(damage)}.`);
   }
 }
 
@@ -142,9 +142,8 @@ export function poolLevel(state: GameState, registry: Registry, actorId: string,
 
 // An enemy's damage is written on the spot: no rate to net against. Neither path
 // runs a non-player's `on empty`/`on full`, authored in the player's voice.
-export function damagePool(state: GameState, registry: Registry, actorId: string, resourceId: string, amount: number, deltas: PoolDeltas): number {
+export function damagePool(state: GameState, registry: Registry, actorId: string, resourceId: string, milliAmount: number, deltas: PoolDeltas): number {
   const resource = requireResource(registry, resourceId);
-  const milliAmount = toMilliUnits(amount);
   if (actorId === PLAYER) {
     const pending = (deltas.get(resourceId) ?? 0) - milliAmount;
     deltas.set(resourceId, pending);
