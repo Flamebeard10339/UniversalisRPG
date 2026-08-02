@@ -42,9 +42,11 @@ Proof:
   threshold is reported cold; nothing is ever auto-released.
 - [c7] A decision that needs a human is a record the tool can return, not a
   paragraph of prose in a spec document.
-- [c8] No state is derived from git. Every recorded fact was asserted by an
-  agent that intended it; git is referenced as evidence by sha and is never an
-  input to state.
+- [c8] No *recorded fact* and no *refusal* is derived from git. Every fact in
+  the store was asserted by an agent that intended it, and git is referenced as
+  evidence by sha. Inferring a **default argument** — which spec a read command
+  should assume — is permitted and is not state, provided the output says the
+  inference happened and what it was drawn from.
 - [c9] No command answers a question it did not understand, and none silently
   discards one it did. An unrecognised flag is an error naming the flag; a
   recognised flag either takes effect or is refused, never accepted and dropped;
@@ -98,7 +100,7 @@ error is more instructive than the claim.
 | C-M3 — `check` exits 1 on done-but-not-committed | **dissolves**, but under `c4` and the Deliverable, not `c1`. `c1` is scoped to *read* commands and `doctor` writes — it repairs |
 | M3, A-H1 | **partial.** Three of five determinations die with the merge gate. Two survive in code *Carried forward* keeps: `taskStore.ts:217` `isBlocked` is tested only with `open` and `done` requirements, and `spec show`'s member line has no `in-progress` case. A-H1 stays open, narrowed, in U6 |
 | M4 | **does not dissolve.** It is `cmdDone`/`cmdStop` at `scripts/tasks.ts:680` and never touches the merge gate. `c2` deletes the stop guards; the `start → done` lifecycle test stays live. Open, in U3 |
-| B-M2 | **does not dissolve.** It looks identical to B-M3 and is not: B-M3's fix is to the target, B-M2's is to the *test*. `scripts/tasks.test.ts:1534` still passes with `relevantFiles` replaced by `[]`. `audit-prompt` is Carried forward, so that weak assertion stays. Open, in U2 |
+| B-M2 | **does not dissolve.** It looks identical to B-M3 and is not: B-M3's fix is to the target, B-M2's is to the *test*. now `scripts/tasks.test.ts:1349`, `expect(stdout).toContain('Relevant files:')` — the header prints unconditionally, so it passes with `relevantFiles` replaced by `[]`. `audit-prompt` is Carried forward, so the weak assertion stays. **Open, in U6** — I put it in U2 and then wrote a U2 scope that did not reach it |
 
 **The case for this spec does not rest on that count**, which is why the count
 being wrong changes nothing structural. None of the three survivors argues for
@@ -265,8 +267,18 @@ finding list disappears with it.
 - Remove proof-target execution as a gate, the deliverable freeze and its
   baselines, verdict-to-clause-text binding, and the merge gate's refusals
   (`c10`).
-- Remove every path that derives state from git — spec binding by branch name
-  and by diff both go, with nothing layered on top of them (`c8`).
+- Remove spec binding derived from git *for gating*: `specCandidatesFromDiff`
+  and `mergeGateSpecCandidates`, where the rename hole and the
+  unresolvable-merge-base fail-open lived (`c8`).
+- **`currentSpec`'s branch-name match stays.** U2 was originally told to delete
+  that too. It was wrong, and the worker refused with evidence rather than
+  reading my ambiguous wording as permission. `currentSpec` has a second caller,
+  `resolveActiveSpec`, backing `next`, `list`, `triage` and `handoff`; its only
+  other route is "exactly one spec file has open members", and two do — 5 and 19
+  — so it returns null and `tasks next` goes dark on the command CLAUDE.md tells
+  every agent to open with. Deleting it also requires *introducing* an asserted
+  binding, which is building, not deleting. Naming the inference in the output
+  is U3's work, under the clarified `c8`.
 - Delete the tests that exist only to prove the deleted behaviour. Keep the
   ones that prove something a reader still needs.
 - **CI invokes what this unit deletes.** `.github/workflows/test.yml:53` runs
