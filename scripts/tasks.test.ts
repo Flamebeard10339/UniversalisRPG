@@ -516,12 +516,52 @@ describe('tasks CLI', () => {
     });
   });
 
-  it('done records the commit that closed the task when --commit is given', () => {
+  // HEAD at `done`-time is, by definition, not the commit that closes the
+  // task — that commit does not exist yet. A wrong SHA reads as an answer;
+  // null reads as the gap it is.
+  it('done stores no closing commit by default, since the closing commit does not exist at done-time', () => {
+    fixture(({ tasks, dir }) => {
+      tasks('add', 'anchored task', '--id', 'anchored');
+      const closed = tasks('done', 'anchored');
+      expect(closed.status).toBe(0);
+      const record = JSON.parse(readFileSync(path.join(dir, 'tasks.jsonl'), 'utf8').trim());
+      expect(record.closedCommit).toBeNull();
+    });
+  });
+
+  it('done resolves a --commit revspec to a full SHA reachable from HEAD before storing it', () => {
+    fixture(({ tasks, dir }) => {
+      const head = spawnSync('git', ['rev-parse', 'HEAD'], { cwd: repoRoot, encoding: 'utf8' }).stdout.trim();
+      tasks('add', 'anchored task', '--id', 'anchored');
+      const closed = tasks('done', 'anchored', '--commit', head.slice(0, 12));
+      expect(closed.status).toBe(0);
+      const record = JSON.parse(readFileSync(path.join(dir, 'tasks.jsonl'), 'utf8').trim());
+      expect(record.closedCommit).toBe(head);
+    });
+  });
+
+  it('done refuses a --commit that does not resolve to a real commit, leaving the task open', () => {
     fixture(({ tasks }) => {
       tasks('add', 'anchored task', '--id', 'anchored');
-      const closed = tasks('done', 'anchored', '--commit', '0123456789abcdef0123456789abcdef01234567');
-      expect(closed.status).toBe(0);
-      expect(tasks('show', 'anchored').stdout).toContain('closedCommit: 0123456789abcdef0123456789abcdef01234567');
+      const result = tasks('done', 'anchored', '--commit', '0123456789abcdef0123456789abcdef01234567');
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain('does not resolve to a commit');
+      expect(tasks('show', 'anchored').stdout).toContain('[task/open]');
+    });
+  });
+
+  it('done refuses a --commit that resolves but is not reachable from HEAD', () => {
+    gitFixture(({ dir, commit, tasks }) => {
+      tasks('add', 'anchored task', '--id', 'anchored');
+      commit('add anchored task');
+      spawnSync('git', ['checkout', '-q', '-b', 'stray'], { cwd: dir });
+      const strayCommit = commit('stray work, never merged into demo-spec');
+      spawnSync('git', ['checkout', '-q', 'demo-spec'], { cwd: dir });
+
+      const result = tasks('done', 'anchored', '--commit', strayCommit);
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain('not reachable from HEAD');
+      expect(tasks('show', 'anchored').stdout).toContain('[task/open]');
     });
   });
 

@@ -370,6 +370,20 @@ function runProofTarget(clause: number, target: string): string | null {
   return `proof clause ${clause} target has unsupported shape: ${target}`;
 }
 
+// `--commit` is a revspec at the CLI boundary, and a revspec is not a fact —
+// `HEAD~2` names a different commit after every later commit. Resolve to the
+// full 40-char SHA it means right now, so what lands in the store is a fact
+// forever after, and refuse anything that does not name a real, reachable
+// commit rather than store it unchecked.
+function resolveCommit(value: string): string {
+  const resolved = spawnSync('git', ['rev-parse', '--verify', `${value}^{commit}`], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
+  if (resolved.status !== 0) throw new Error(`--commit does not resolve to a commit: ${value}`);
+  const sha = resolved.stdout.trim();
+  const reachable = spawnSync('git', ['merge-base', '--is-ancestor', sha, 'HEAD'], { stdio: 'ignore' });
+  if (reachable.status !== 0) throw new Error(`--commit is not reachable from HEAD: ${value}`);
+  return sha;
+}
+
 function closedCommitIssues(tasks: Task[]): CheckIssue[] {
   const issues: CheckIssue[] = [];
   for (const task of tasks) {
@@ -799,7 +813,7 @@ function cmdDone(args: Flags): void {
   const config = resolveConfig(args.flags);
   const id = args.positional[0];
   if (!id) {
-    console.error('usage: tasks done <id>');
+    console.error('usage: tasks done <id> [--commit <revspec>]  (default: none — the closing commit does not exist yet when `done` runs; see `tasks show` for a derived one)');
     process.exitCode = 1;
     return;
   }
@@ -830,9 +844,19 @@ function cmdDone(args: Flags): void {
     process.exitCode = 1;
     return;
   }
+  let closedCommit: string | null = null;
+  if (args.flags.commit !== undefined) {
+    try {
+      closedCommit = resolveCommit(args.flags.commit);
+    } catch (error) {
+      console.error(`error: ${error instanceof Error ? error.message : String(error)}`);
+      process.exitCode = 1;
+      return;
+    }
+  }
   task.state = 'done';
   task.closed = today();
-  task.closedCommit = args.flags.commit ?? currentHead();
+  task.closedCommit = closedCommit;
   saveStoreAndWarn(tasks, config);
   console.log(`done ${id}`);
 }
