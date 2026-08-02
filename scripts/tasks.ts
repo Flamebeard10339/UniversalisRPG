@@ -251,30 +251,75 @@ function requiresLine(task: Task, byId: Map<string, Task>): string {
     .join(', ')}`;
 }
 
-function printTask(task: Task, tasks: Task[]): void {
-  const byId = new Map(tasks.map((t) => [t.id, t]));
-  const blocked = isBlocked(task, byId);
-  const tag = [task.kind, task.state, task.severity].filter(Boolean).join('/');
-  console.log(`${task.id}  [${tag}]${blocked ? '  BLOCKED' : ''}`);
-  console.log(task.title);
-  if (task.system) console.log(`system: ${task.system}`);
-  console.log(`spec: ${task.spec ?? '(deferred)'}`);
-  if (task.requires.length > 0) console.log(requiresLine(task, byId));
-  if (task.files.length > 0) console.log(`files: ${task.files.join(', ')}`);
-  if (task.deliverable) console.log(`\ndeliverable: ${task.deliverable}`);
-  if (task.evidence) console.log(`evidence: ${task.evidence}`);
-  if (task.source) console.log(`source: ${task.source.spec} pass ${task.source.pass}`);
-  if (task.reason) console.log(`reason: ${task.reason}`);
-  if (task.closed) console.log(`closed: ${task.closed}`);
-  if (task.closedCommit) console.log(`closedCommit: ${task.closedCommit}`);
+type Detail = 'row' | 'brief' | 'full';
+
+interface RowStyle {
+  // Prefixes the row and indents its continuation lines, so a bullet, a
+  // list indent and a bare row are the same rendering at three margins.
+  indent?: string;
+  note?: string;
+  withFiles?: boolean;
+}
+
+function taskTag(task: Task): string {
+  return [task.kind, task.state, task.severity].filter(Boolean).join('/');
+}
+
+// The whole prose field on one line, cut at a character budget: store text
+// carries no line breaks of its own, so a summary that shortens by line
+// shortens nothing.
+function summarize(text: string): string {
+  return truncateLine(text.split('\n').map((line) => line.trim()).filter((line) => line.length > 0).join(' '));
+}
+
+// The one rendering of a task, at the three verbosities anything asking for
+// one has ever needed: a `row` for a queue or a member list, a `brief`
+// record whose prose is summarized, and the `full` record. Every command
+// that shows a task goes through here, so a field added to a task appears
+// everywhere a task appears, and `[kind/state/severity]` means the same
+// thing in all of them.
+function renderTask(task: Task, byId: Map<string, Task>, detail: Detail, style: RowStyle = {}): string[] {
+  const blocked = isBlocked(task, byId) ? '  BLOCKED' : '';
   const claim = claimSummary(task, today());
-  if (claim) console.log(claim);
+
+  if (detail === 'row') {
+    const indent = style.indent ?? '';
+    const note = style.note ? `  ${style.note}` : '';
+    const rows = [`${indent}${task.id}  [${taskTag(task)}]${blocked}  ${task.system ?? '(no system)'}  ${task.title}${note}${claim ? `  ${claim}` : ''}`];
+    if (style.withFiles && task.files.length > 0) rows.push(`${' '.repeat(indent.length)}    ${task.files.join('   ')}`);
+    return rows;
+  }
+
+  const prose = detail === 'full' ? (text: string): string => text : summarize;
+  const lines = [`${task.id}  [${taskTag(task)}]${blocked}`, task.title];
+  if (task.system) lines.push(`system: ${task.system}`);
+  lines.push(`spec: ${task.spec ?? '(deferred)'}`);
+  if (task.requires.length > 0) lines.push(requiresLine(task, byId));
+  if (task.files.length > 0) lines.push(`files: ${task.files.join(', ')}`);
+  if (task.deliverable || task.evidence) lines.push('');
+  if (task.deliverable) lines.push(`deliverable: ${prose(task.deliverable)}`);
+  if (task.evidence) lines.push(`evidence: ${prose(task.evidence)}`);
+  if (task.source) lines.push(`source: ${task.source.spec} pass ${task.source.pass}`);
+  if (task.reason) lines.push(`reason: ${prose(task.reason)}`);
+  if (task.closed) lines.push(`closed: ${task.closed}`);
+  if (task.closedCommit) lines.push(`closedCommit: ${task.closedCommit}`);
+  if (claim) lines.push(claim);
+  return lines;
+}
+
+function printTask(task: Task, byId: Map<string, Task>, detail: Detail): void {
+  for (const line of renderTask(task, byId, detail)) console.log(line);
+}
+
+function printRow(task: Task, byId: Map<string, Task>, style: RowStyle = {}): void {
+  for (const line of renderTask(task, byId, 'row', style)) console.log(line);
 }
 
 // A read answers the question it was asked even when the id resolves to
 // nothing — "no such task" plus the five nearest ids is an answer, and exits
 // 0. A write has nothing to write to, so the same text is an error.
 function reportUnknownIds(ids: string[], tasks: Task[], emit: (line: string) => void): void {
+  const byId = new Map(tasks.map((task) => [task.id, task]));
   emit(`no such task${ids.length === 1 ? '' : '(s)'}: ${ids.join(', ')}`);
   for (const id of ids) {
     const near = nearMatches(id, tasks);
@@ -283,7 +328,7 @@ function reportUnknownIds(ids: string[], tasks: Task[], emit: (line: string) => 
       continue;
     }
     emit(`  ${id} — did you mean:`);
-    for (const task of near) emit(`    ${task.id}  [${task.kind}/${task.state}]  ${task.title}`);
+    for (const task of near) for (const line of renderTask(task, byId, 'row', { indent: '    ' })) emit(line);
   }
 }
 
@@ -304,26 +349,6 @@ function refuseUnknownSpec(config: Config, slug: string): void {
   console.error(`error: no such spec: ${slug}`);
   console.error(specs.length === 0 ? `  no spec files in ${config.specsDir}` : `  specs in ${config.specsDir}: ${specs.join(', ')}`);
   process.exitCode = 1;
-}
-
-function preview(text: string): string {
-  return text.split('\n').map((line) => line.trim()).find((line) => line.length > 0) ?? '';
-}
-
-function printTaskConcise(task: Task, tasks: Task[]): void {
-  const byId = new Map(tasks.map((t) => [t.id, t]));
-  const blocked = isBlocked(task, byId);
-  const tag = [task.kind, task.state, task.severity].filter(Boolean).join('/');
-  console.log(`${task.id}  [${tag}]${blocked ? '  BLOCKED' : ''}`);
-  console.log(task.title);
-  if (task.system) console.log(`system: ${task.system}`);
-  console.log(`spec: ${task.spec ?? '(deferred)'}`);
-  if (task.requires.length > 0) console.log(requiresLine(task, byId));
-  if (task.files.length > 0) console.log(`files: ${task.files.join(', ')}`);
-  if (task.deliverable) console.log(`deliverable: ${preview(task.deliverable)}`);
-  if (task.evidence) console.log(`evidence: ${preview(task.evidence)}`);
-  const claim = claimSummary(task, today());
-  if (claim) console.log(claim);
 }
 
 function specIssues(config: Config): CheckIssue[] {
@@ -632,7 +657,7 @@ function cmdShow(args: Flags): void {
     reportUnknownIds([id], tasks, (line) => console.log(line));
     return;
   }
-  printTask(task, tasks);
+  printTask(task, new Map(tasks.map((candidate) => [candidate.id, candidate])), 'full');
   if (task.state === 'done' && task.closedCommit === null) {
     const derived = deriveClosingCommit(config, id);
     console.log(derived ? `closedCommit (derived): ${derived}` : 'closedCommit: (none recorded, and none could be derived from git history)');
@@ -708,11 +733,9 @@ function runList(args: Flags, text: string | undefined): void {
     text,
   });
 
+  const byId = new Map(tasks.map((task) => [task.id, task]));
   for (const task of queue) {
-    const tag = [task.kind, task.state, task.severity].filter(Boolean).join('/');
-    const matches = text === undefined ? '' : `  (matches: ${matchingFields(task, text).join(', ')})`;
-    const claim = claimSummary(task, today());
-    console.log(`${task.id}  [${tag}]  ${task.system ?? '(no system)'}  ${task.title}${matches}${claim ? `  ${claim}` : ''}`);
+    printRow(task, byId, { note: text === undefined ? undefined : `(matches: ${matchingFields(task, text).join(', ')})` });
   }
 
   const counts: Record<State, number> = { unreviewed: 0, open: 0, 'in-progress': 0, done: 0, declined: 0 };
@@ -735,7 +758,8 @@ function cmdNext(args: Flags): void {
   const filter = { system: args.flags.system, severity: args.flags.severity as Severity | undefined };
   const queue = fixNowQueue(tasks, spec, filter);
   const cold = coldClaims(tasks, spec, today(), filter);
-  const print = (task: Task): void => (args.flags.full === 'true' ? printTask(task, tasks) : printTaskConcise(task, tasks));
+  const byId = new Map(tasks.map((task) => [task.id, task]));
+  const print = (task: Task): void => printTask(task, byId, args.flags.full === 'true' ? 'full' : 'brief');
 
   // A cold claim is handed out, not released: the record stays in-progress
   // and keeps its holder, and what the caller gets is who to ask. Open work
@@ -756,7 +780,7 @@ function cmdNext(args: Flags): void {
   if (cold.length > 0) {
     console.log('');
     console.log(`${cold.length} cold claim(s) in ${spec}, not offered ahead of open work:`);
-    for (const task of cold) console.log(`- ${task.id} ${claimSummary(task, today())}`);
+    for (const task of cold) printRow(task, byId, { indent: '- ' });
   }
 }
 
@@ -1055,11 +1079,11 @@ function cmdSpecShow(args: Flags): void {
   console.log(`clause standing (${latest ? `latest pass ${latest.pass}` : 'no audit pass recorded'}): ${outstandingSummary(clauseStandings(doc.proofClauses, latest?.verdicts))}`);
   console.log('');
 
-  const members = specMembers(readStore(config).filter((task) => task.spec === slug), args.flags.order === 'true');
+  const tasks = readStore(config);
+  const byId = new Map(tasks.map((task) => [task.id, task]));
+  const members = specMembers(tasks.filter((task) => task.spec === slug), args.flags.order === 'true');
   console.log(`${members.length} member(s):`);
-  for (const member of members) {
-    console.log(`  ${member.id}  [${member.kind}/${member.state}${member.severity ? '/' + member.severity : ''}]  ${member.title}`);
-  }
+  for (const member of members) printRow(member, byId, { indent: '  ' });
 }
 
 function specMembers(members: Task[], ordered: boolean): Task[] {
@@ -1107,10 +1131,12 @@ function cmdSpecDone(args: Flags): void {
     console.log(`deferred ${stragglers.length} straggler(s) out of ${slug}: ${stragglers.map((task) => task.id).join(', ')}`);
   }
 
-  const stillOpen = loadStore(config.storePath).filter((task) => task.spec === slug && task.state !== 'done' && task.state !== 'declined');
+  const reloaded = loadStore(config.storePath);
+  const stillOpen = reloaded.filter((task) => task.spec === slug && task.state !== 'done' && task.state !== 'declined');
   if (stillOpen.length > 0) {
     console.log(`${slug} is not done — ${stillOpen.length} member(s) are neither done nor declined:`);
-    for (const task of stillOpen) console.log(`- ${task.id} [${task.kind}/${task.state}] ${task.title}`);
+    const byId = new Map(reloaded.map((task) => [task.id, task]));
+    for (const task of stillOpen) printRow(task, byId, { indent: '- ' });
     return;
   }
   console.log(`${slug} is done: every member is done or declined`);
@@ -1364,10 +1390,8 @@ function cmdAuditPrompt(args: Flags): void {
   console.log('');
   console.log('Member tasks:');
   if (members.length === 0) console.log('- none');
-  for (const task of members) {
-    console.log(`- ${task.id} [${task.severity ?? '?'}] ${task.system ?? '(no system)'} ${task.title}`);
-    if (task.files.length > 0) console.log(`  files: ${task.files.join(', ')}`);
-  }
+  const byId = new Map(tasks.map((task) => [task.id, task]));
+  for (const task of members) printRow(task, byId, { indent: '- ', withFiles: true });
   console.log('');
   console.log('For every clause with a proof target, confirm the target exists and fails under a meaningful mutation or reproduction before accepting it as proof.');
   console.log('For pure domain logic and API layers, prefer mutation testing: temporarily remove, invert, or scale the behavior the test claims to prove and confirm the named proof fails for the right reason.');
@@ -1913,13 +1937,11 @@ function cmdHandoff(args: Flags): void {
   for (const standing of standings) console.log(`  ${standing.clause}. [${standing.status}] ${truncateLine(doc.proofClauses.find((clause) => clause.id === standing.clause)!.text)}`);
   console.log('');
 
+  const byId = new Map(tasks.map((task) => [task.id, task]));
   const inProgress = tasks.filter((task) => task.spec === spec && task.state === 'in-progress');
   if (inProgress.length > 0) {
     console.log(`${inProgress.length} in-progress task(s):`);
-    for (const task of inProgress.slice(0, HANDOFF_QUEUE_CAP)) {
-      console.log(`- ${task.id} [${task.severity ?? '?'}] ${task.title}`);
-      console.log(`    ${claimSummary(task, today()) ?? 'claimed by nobody named, on a day nobody recorded'}`);
-    }
+    for (const task of inProgress.slice(0, HANDOFF_QUEUE_CAP)) printRow(task, byId, { indent: '- ' });
     if (inProgress.length > HANDOFF_QUEUE_CAP) console.log(`… ${inProgress.length - HANDOFF_QUEUE_CAP} more in progress`);
     console.log('');
   }
@@ -1927,10 +1949,7 @@ function cmdHandoff(args: Flags): void {
   const queue = fixNowQueue(tasks, spec);
   console.log(`${queue.length} open fix-now task(s):`);
   const shown = queue.slice(0, HANDOFF_QUEUE_CAP);
-  for (const task of shown) {
-    console.log(`- ${task.id} [${task.severity ?? '?'}] ${task.title}`);
-    if (task.files.length > 0) console.log(`    ${task.files.join('   ')}`);
-  }
+  for (const task of shown) printRow(task, byId, { indent: '- ', withFiles: true });
   // fixNowQueue is already severity-ordered, so truncating here drops the
   // least urgent — the queue can otherwise print 2 lines per member and
   // blow proof clause 6's 40-line cap as the store grows.

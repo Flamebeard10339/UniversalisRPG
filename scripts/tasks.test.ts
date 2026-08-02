@@ -399,19 +399,25 @@ describe('tasks CLI', () => {
     });
   });
 
-  it('next is concise by default and prints full task detail only with --full', () => {
+  // The evidence here is one unbroken line, which is the only shape `add`
+  // can write: a concise form that shortened by line rather than by
+  // character shortened nothing on a real record, and passed only against a
+  // fixture that injected newlines.
+  it('next summarizes prose by character and prints it whole only with --full', () => {
     fixture(({ tasks }) => {
-      const longEvidence = 'first line of evidence\nsecond line of evidence\nthird line of evidence';
+      const tail = 'and this tail is what a form that shortens by line would still print in full';
+      const longEvidence = `evidence that runs well past any single line a queue entry should occupy, ${tail}`;
       tasks('add', 'verbose task', '--id', 'verbose-task', '--severity', 'high', '--system', 'Runtime', '--spec', 'demo-spec', '--files', 'src/runtime/save.ts:1', '--deliverable', 'the fix exists', '--evidence', longEvidence);
 
       const concise = tasks('next');
       expect(concise.stdout).toContain('verbose-task  [task/open/high]');
       expect(concise.stdout).toContain('files: src/runtime/save.ts:1');
-      expect(concise.stdout).toContain('evidence: first line of evidence');
-      expect(concise.stdout).not.toContain('second line of evidence');
+      expect(concise.stdout).toContain('evidence: evidence that runs well past');
+      expect(concise.stdout).toContain('…');
+      expect(concise.stdout).not.toContain(tail);
 
       const full = tasks('next', '--full');
-      expect(full.stdout).toContain('second line of evidence');
+      expect(full.stdout).toContain(longEvidence);
       expect(full.stdout).toContain('deliverable: the fix exists');
     });
   });
@@ -640,7 +646,8 @@ describe('tasks CLI', () => {
       expect(next.status).toBe(0);
       expect(next.stdout).toContain('free');
       expect(next.stdout).toContain('1 cold claim(s) in demo-spec, not offered ahead of open work');
-      expect(next.stdout).toContain('stalled claimed by worker-a since');
+      expect(next.stdout).toContain('- stalled  [task/in-progress]');
+      expect(next.stdout).toContain('claimed by worker-a since');
     });
   });
 
@@ -1443,8 +1450,47 @@ describe('tasks CLI', () => {
       tasks('add', 'a member', '--id', 'a-member', '--spec', 'demo-spec');
       const shown = tasks('spec', 'show', 'demo-spec');
       expect(shown.stdout).toContain('The first clause holds.');
-      expect(shown.stdout).toContain('a-member');
+      expect(shown.stdout).toContain('a-member  [task/open]');
       expect(shown.stdout).toContain('0 audit pass(es) recorded');
+    });
+  });
+
+  // c9: one printer renders a task everywhere it appears. The tag is the
+  // part that had to travel — `handoff` printed severity alone, so a
+  // question awaiting a human sat in the fix-now queue reading exactly like
+  // work to implement.
+  it('renders the same kind, state and severity tag in every view a task appears in', () => {
+    fixture(({ tasks }) => {
+      tasks('add', 'a question for a human', '--id', 'a-question', '--kind', 'question', '--spec', 'demo-spec', '--severity', 'high');
+      const views = [['list'], ['search', 'question'], ['next'], ['show', 'a-question'], ['spec', 'show', 'demo-spec'], ['handoff']];
+      for (const view of views) {
+        const result = tasks(...view);
+        expect(result.status, view.join(' ')).toBe(0);
+        expect(result.stdout, view.join(' ')).toContain('a-question  [question/open/high]');
+      }
+    });
+  });
+
+  it('shows a held member as in-progress in every view, rather than as open work', () => {
+    fixture(({ tasks }) => {
+      tasks('add', 'a member', '--id', 'a-member', '--spec', 'demo-spec', '--severity', 'medium');
+      tasks('start', 'a-member', '--actor', 'worker-a');
+      for (const view of [['list'], ['spec', 'show', 'demo-spec'], ['show', 'a-member'], ['handoff']]) {
+        const result = tasks(...view);
+        expect(result.status, view.join(' ')).toBe(0);
+        expect(result.stdout, view.join(' ')).toContain('a-member  [task/in-progress/medium]');
+      }
+    });
+  });
+
+  it('marks a member BLOCKED in every view, not only in next', () => {
+    fixture(({ tasks }) => {
+      tasks('add', 'blocker task', '--id', 'blocker', '--spec', 'demo-spec');
+      tasks('add', 'held-up task', '--id', 'held-up', '--spec', 'demo-spec', '--requires', 'blocker');
+      for (const view of [['list'], ['spec', 'show', 'demo-spec'], ['show', 'held-up']]) {
+        const result = tasks(...view);
+        expect(result.stdout, view.join(' ')).toContain('held-up  [task/open]  BLOCKED');
+      }
     });
   });
 
@@ -1513,7 +1559,7 @@ describe('tasks CLI', () => {
       const result = tasks('spec', 'done', 'demo-spec');
       expect(result.status).toBe(0);
       expect(result.stdout).toContain('demo-spec is not done');
-      expect(result.stdout).toContain('- a-member [task/open] a member');
+      expect(result.stdout).toContain('- a-member  [task/open]  (no system)  a member');
     });
   });
 
@@ -1959,7 +2005,7 @@ describe('tasks CLI', () => {
       expect(result.stdout).toContain('1 of 2 clause(s) have no proof target');
 
       expect(result.stdout).toContain('Latest audit pass: pass 1');
-      expect(result.stdout).toContain('runtime-proof [high] Runtime');
+      expect(result.stdout).toContain('- runtime-proof  [task/open/high]  Runtime  prove the runtime behavior');
       expect(result.stdout).toContain('src/runtime/runtime.ts:1');
       expect(result.stdout).toContain('prefer mutation testing');
       expect(result.stdout).toContain('Do not promote pass-2+ findings.');
