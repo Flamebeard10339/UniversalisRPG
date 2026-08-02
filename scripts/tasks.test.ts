@@ -248,11 +248,46 @@ describe('tasks CLI', () => {
     });
   });
 
-  it('edit refuses an unknown id', () => {
+  it('edit refuses an unknown id, naming the nearest ids it could have meant', () => {
     fixture(({ tasks }) => {
-      const result = tasks('edit', 'no-such-task', '--deliverable', 'x');
+      tasks('add', 'check the merge shell', '--id', 'pass1-check-merge-shell');
+      const result = tasks('edit', 'pass1-check-merge', '--deliverable', 'x');
       expect(result.status).toBe(1);
-      expect(result.stderr).toContain('no such task: no-such-task');
+      expect(result.stderr).toContain('no such task: pass1-check-merge');
+      expect(result.stderr).toContain('did you mean:');
+      expect(result.stderr).toContain('pass1-check-merge-shell');
+    });
+  });
+
+  it('show answers an unknown id with near matches and a zero exit, rather than refusing a read', () => {
+    fixture(({ tasks }) => {
+      tasks('add', 'check the merge shell', '--id', 'pass1-check-merge-shell');
+      tasks('add', 'something else entirely', '--id', 'unrelated-record');
+
+      const guessed = tasks('show', 'pass1-check-merge-shel');
+      expect(guessed.status).toBe(0);
+      expect(guessed.stderr).toBe('');
+      expect(guessed.stdout).toContain('no such task: pass1-check-merge-shel');
+      expect(guessed.stdout).toContain('pass1-check-merge-shell');
+      expect(guessed.stdout).not.toContain('unrelated-record');
+    });
+  });
+
+  it('show says there is no near match rather than printing an empty suggestion list', () => {
+    fixture(({ tasks }) => {
+      tasks('add', 'a task', '--id', 'alpha');
+      const result = tasks('show', 'zzzzz');
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('no near match among 1 record(s)');
+    });
+  });
+
+  it('spec show names the specs that do exist when the slug does not', () => {
+    fixture(({ tasks }) => {
+      const result = tasks('spec', 'show', 'demo-spek');
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain('no such spec: demo-spek');
+      expect(result.stderr).toContain('demo-spec');
     });
   });
 
@@ -990,7 +1025,7 @@ describe('tasks CLI', () => {
     fixture(({ tasks }) => {
       const result = tasks('spec', 'remove', 'demo-spec', 'no-such-task');
       expect(result.status).toBe(1);
-      expect(result.stderr).toContain('no such task(s): no-such-task');
+      expect(result.stderr).toContain('no such task: no-such-task');
     });
   });
 

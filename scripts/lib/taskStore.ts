@@ -301,6 +301,33 @@ export function listQueue(tasks: Task[], filter: ListFilter = {}): Task[] {
     .map(({ task }) => task);
 }
 
+// An id that resolves to nothing is a guess that missed, and the guess is
+// usually close: ids are hyphenated words, so a shared word is the signal.
+// Whole-id containment outranks it, because `pass1-check` against
+// `pass1-check-merge-shell` is a prefix a caller truncated, not a coincidence.
+export function nearMatches(query: string, tasks: Task[], limit = 5): Task[] {
+  const normalized = query.toLowerCase();
+  const words = normalized.split(/[^a-z0-9]+/).filter((word) => word.length > 0);
+  if (words.length === 0) return [];
+  return tasks
+    .map((task, index) => {
+      const id = task.id.toLowerCase();
+      const idWords = new Set(id.split(/[^a-z0-9]+/));
+      const title = task.title.toLowerCase();
+      let score = id.includes(normalized) || normalized.includes(id) ? 4 : 0;
+      for (const word of words) {
+        if (idWords.has(word)) score += 3;
+        else if (id.includes(word)) score += 2;
+        else if (title.includes(word)) score += 1;
+      }
+      return { task, index, score };
+    })
+    .filter((entry) => entry.score > 0)
+    .sort((a, b) => b.score - a.score || a.index - b.index)
+    .slice(0, limit)
+    .map((entry) => entry.task);
+}
+
 export interface CheckIssue {
   level: 'error' | 'warning';
   message: string;

@@ -18,6 +18,7 @@ import {
   isBlocked,
   listQueue,
   loadStore,
+  nearMatches,
   parseStore,
   requirementStates,
   saveStore,
@@ -234,6 +235,41 @@ function printTask(task: Task, tasks: Task[]): void {
   if (task.closedCommit) console.log(`closedCommit: ${task.closedCommit}`);
 }
 
+// A read answers the question it was asked even when the id resolves to
+// nothing — "no such task" plus the five nearest ids is an answer, and exits
+// 0. A write has nothing to write to, so the same text is an error.
+function reportUnknownIds(ids: string[], tasks: Task[], emit: (line: string) => void): void {
+  emit(`no such task${ids.length === 1 ? '' : '(s)'}: ${ids.join(', ')}`);
+  for (const id of ids) {
+    const near = nearMatches(id, tasks);
+    if (near.length === 0) {
+      emit(`  ${id}: no near match among ${tasks.length} record(s) — \`tasks list\` or \`tasks search <term>\` to browse`);
+      continue;
+    }
+    emit(`  ${id} — did you mean:`);
+    for (const task of near) emit(`    ${task.id}  [${task.kind}/${task.state}]  ${task.title}`);
+  }
+}
+
+function refuseUnknownIds(ids: string[], tasks: Task[]): void {
+  reportUnknownIds(ids, tasks, (line) => console.error(line.startsWith(' ') ? line : `error: ${line}`));
+  process.exitCode = 1;
+}
+
+function knownSpecs(config: Config): string[] {
+  if (!existsSync(config.specsDir)) return [];
+  return readdirSync(config.specsDir)
+    .filter((entry) => entry.endsWith('.md') && statSync(`${config.specsDir}/${entry}`).isFile())
+    .map((entry) => entry.replace(/\.md$/, ''));
+}
+
+function refuseUnknownSpec(config: Config, slug: string): void {
+  const specs = knownSpecs(config);
+  console.error(`error: no such spec: ${slug}`);
+  console.error(specs.length === 0 ? `  no spec files in ${config.specsDir}` : `  specs in ${config.specsDir}: ${specs.join(', ')}`);
+  process.exitCode = 1;
+}
+
 function preview(text: string): string {
   return text.split('\n').map((line) => line.trim()).find((line) => line.length > 0) ?? '';
 }
@@ -253,13 +289,9 @@ function printTaskConcise(task: Task, tasks: Task[]): void {
 }
 
 function specIssues(config: Config): CheckIssue[] {
-  if (!existsSync(config.specsDir)) return [];
-  return readdirSync(config.specsDir)
-    .filter((entry) => entry.endsWith('.md'))
-    .filter((entry) => statSync(`${config.specsDir}/${entry}`).isFile())
-    .flatMap((entry) => {
-      const spec = entry.replace(/\.md$/, '');
-      const doc = parseSpecDoc(readFileSync(`${config.specsDir}/${entry}`, 'utf8'));
+  return knownSpecs(config)
+    .flatMap((spec) => {
+      const doc = parseSpecDoc(readFileSync(specFile(config, spec), 'utf8'));
       return duplicateClauseIds(doc.proofClauses).map((id) => ({
         level: 'error' as const,
         message: `${spec} tags more than one proof clause [c${id}] — a clause id names exactly one clause`,
@@ -422,8 +454,7 @@ function cmdEdit(args: Flags): void {
   const tasks = loadStore(config.storePath);
   const task = tasks.find((candidate) => candidate.id === id);
   if (!task) {
-    console.error(`error: no such task: ${id}`);
-    process.exitCode = 1;
+    refuseUnknownIds([id], tasks);
     return;
   }
 
@@ -517,8 +548,7 @@ function cmdShow(args: Flags): void {
   const tasks = loadStore(config.storePath);
   const task = tasks.find((candidate) => candidate.id === id);
   if (!task) {
-    console.error(`error: no such task: ${id}`);
-    process.exitCode = 1;
+    reportUnknownIds([id], tasks, (line) => console.log(line));
     return;
   }
   printTask(task, tasks);
@@ -681,8 +711,7 @@ function cmdStart(args: Flags): void {
   const tasks = loadStore(config.storePath);
   const task = tasks.find((candidate) => candidate.id === id);
   if (!task) {
-    console.error(`error: no such task: ${id}`);
-    process.exitCode = 1;
+    refuseUnknownIds([id], tasks);
     return;
   }
   if (task.state !== 'open') {
@@ -713,8 +742,7 @@ function cmdStop(args: Flags): void {
   const tasks = loadStore(config.storePath);
   const task = tasks.find((candidate) => candidate.id === id);
   if (!task) {
-    console.error(`error: no such task: ${id}`);
-    process.exitCode = 1;
+    refuseUnknownIds([id], tasks);
     return;
   }
   if (task.state !== 'in-progress') {
@@ -757,8 +785,7 @@ function cmdDone(args: Flags): void {
   const tasks = loadStore(config.storePath);
   const task = tasks.find((candidate) => candidate.id === id);
   if (!task) {
-    console.error(`error: no such task: ${id}`);
-    process.exitCode = 1;
+    refuseUnknownIds([id], tasks);
     return;
   }
   if (task.state !== 'open' && task.state !== 'in-progress') {
@@ -810,8 +837,7 @@ function cmdDecline(args: Flags): void {
   const tasks = loadStore(config.storePath);
   const task = tasks.find((candidate) => candidate.id === id);
   if (!task) {
-    console.error(`error: no such task: ${id}`);
-    process.exitCode = 1;
+    refuseUnknownIds([id], tasks);
     return;
   }
   if (task.kind === 'undelivered') {
@@ -878,16 +904,14 @@ function cmdSpecAdd(args: Flags): void {
     return;
   }
   if (!existsSync(specFile(config, slug))) {
-    console.error(`error: no such spec: ${slug}`);
-    process.exitCode = 1;
+    refuseUnknownSpec(config, slug);
     return;
   }
   const tasks = loadStore(config.storePath);
   const byId = new Map(tasks.map((task) => [task.id, task]));
   const missing = ids.filter((id) => !byId.has(id));
   if (missing.length > 0) {
-    console.error(`error: no such task(s): ${missing.join(', ')}`);
-    process.exitCode = 1;
+    refuseUnknownIds(missing, tasks);
     return;
   }
   // Rule 6: pass 2+ findings may defer or decline, never promote. `spec add`
@@ -919,8 +943,7 @@ function cmdSpecShow(args: Flags): void {
   }
   const path_ = specFile(config, slug);
   if (!existsSync(path_)) {
-    console.error(`error: no such spec: ${slug}`);
-    process.exitCode = 1;
+    refuseUnknownSpec(config, slug);
     return;
   }
   const doc = parseSpecDoc(readFileSync(path_, 'utf8'));
@@ -977,8 +1000,7 @@ function cmdSpecDone(args: Flags): void {
     return;
   }
   if (!existsSync(specFile(config, slug))) {
-    console.error(`error: no such spec: ${slug}`);
-    process.exitCode = 1;
+    refuseUnknownSpec(config, slug);
     return;
   }
   const tasks = loadStore(config.storePath);
@@ -1015,16 +1037,14 @@ function cmdSpecRemove(args: Flags): void {
     return;
   }
   if (!existsSync(specFile(config, slug))) {
-    console.error(`error: no such spec: ${slug}`);
-    process.exitCode = 1;
+    refuseUnknownSpec(config, slug);
     return;
   }
   const tasks = loadStore(config.storePath);
   const byId = new Map(tasks.map((task) => [task.id, task]));
   const missing = ids.filter((id) => !byId.has(id));
   if (missing.length > 0) {
-    console.error(`error: no such task(s): ${missing.join(', ')}`);
-    process.exitCode = 1;
+    refuseUnknownIds(missing, tasks);
     return;
   }
   const notMembers = ids.filter((id) => byId.get(id)!.spec !== slug);
@@ -1057,8 +1077,7 @@ function cmdSpecAmend(args: Flags): void {
   }
   const path_ = specFile(config, slug);
   if (!existsSync(path_)) {
-    console.error(`error: no such spec: ${slug}`);
-    process.exitCode = 1;
+    refuseUnknownSpec(config, slug);
     return;
   }
   const text = readFileSync(path_, 'utf8');
@@ -1204,8 +1223,7 @@ function cmdAuditPrompt(args: Flags): void {
   }
   const path_ = specFile(config, slug);
   if (!existsSync(path_)) {
-    console.error(`error: no such spec: ${slug}`);
-    process.exitCode = 1;
+    refuseUnknownSpec(config, slug);
     return;
   }
 
@@ -1551,8 +1569,7 @@ async function cmdAudit(rawArgs: string[]): Promise<void> {
   const slug = parsed.slug;
   const path_ = specFile(config, slug);
   if (!existsSync(path_)) {
-    console.error(`error: no such spec: ${slug}`);
-    process.exitCode = 1;
+    refuseUnknownSpec(config, slug);
     return;
   }
   // Stamped before anything is recorded, so this pass names ids the spec

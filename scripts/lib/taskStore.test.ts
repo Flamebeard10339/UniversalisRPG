@@ -2,7 +2,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { checkStore, dependencyCycles, fixNowQueue, isBlocked, listQueue, loadStore, requirementStates, saveStore, StoreError, unreviewedQueue, waitingOn, type Task } from './taskStore';
+import { checkStore, dependencyCycles, fixNowQueue, isBlocked, listQueue, loadStore, nearMatches, requirementStates, saveStore, StoreError, unreviewedQueue, waitingOn, type Task } from './taskStore';
 
 function task(overrides: Partial<Task> & { id: string }): Task {
   return {
@@ -251,6 +251,31 @@ describe('dependencyCycles', () => {
 
   it('finds nothing in an acyclic store', () => {
     expect(dependencyCycles([task({ id: 'a' }), task({ id: 'b', requires: ['a'] })])).toEqual([]);
+  });
+});
+
+describe('nearMatches', () => {
+  const store = [
+    task({ id: 'pass1-check-merge-shell', title: 'the merge shell is untested' }),
+    task({ id: 'pass2-check-merge-shell', title: 'the merge shell is still untested' }),
+    task({ id: 'runtime-save-corruption', title: 'saves are corrupted on quit' }),
+  ];
+
+  it('ranks a truncated id above one that only shares words', () => {
+    expect(nearMatches('pass1-check-merge', store).map((t) => t.id)).toEqual(['pass1-check-merge-shell', 'pass2-check-merge-shell']);
+  });
+
+  it('reaches a record through its title when the id shares nothing', () => {
+    expect(nearMatches('corrupted-saves', store).map((t) => t.id)).toEqual(['runtime-save-corruption']);
+  });
+
+  it('returns nothing rather than a ranked list of unrelated records', () => {
+    expect(nearMatches('zzzzz', store)).toEqual([]);
+  });
+
+  it('caps the list so a 275-record store cannot answer with 275 guesses', () => {
+    const many = Array.from({ length: 20 }, (_, i) => task({ id: `shared-word-${i}` }));
+    expect(nearMatches('shared', many)).toHaveLength(5);
   });
 });
 
