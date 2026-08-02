@@ -426,10 +426,20 @@ describe('checkStore', () => {
     expect(cycles).toHaveLength(1);
   });
 
-  it('requires a reason exactly when declined', () => {
+  it('requires a reason when declined, and reads a reason on any other state as a reopened decline', () => {
     expect(checkStore([task({ id: 'a', state: 'declined' })], systems)).toContainEqual({ level: 'error', message: 'a is declined but has no reason' });
-    expect(checkStore([task({ id: 'a', state: 'open', reason: 'no longer relevant' })], systems)).toContainEqual({ level: 'error', message: 'a has a reason but is not declined' });
+    expect(checkStore([task({ id: 'a', state: 'in-progress', reason: 'no longer relevant' })], systems)).toContainEqual({
+      level: 'warning',
+      message: 'a is in-progress and carries a decline reason, which reads as a decline that was reopened: no longer relevant',
+    });
     expect(checkStore([task({ id: 'a', state: 'declined', reason: 'stale' })], systems)).toEqual([]);
+  });
+
+  it('reads a closed date on a record that is not closed as residue worth reporting', () => {
+    expect(checkStore([task({ id: 'a', state: 'open', closed: '2026-08-02' })], systems)).toContainEqual({
+      level: 'warning',
+      message: 'a is open but still carries a closed date: 2026-08-02',
+    });
   });
 
   it('refuses a declined undelivered task', () => {

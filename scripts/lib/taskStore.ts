@@ -379,7 +379,8 @@ export function checkStore(tasks: Task[], systems: string[], specExists: (spec: 
       if (!byId.has(dep)) issues.push({ level: 'error', message: `${task.id} requires unresolved id: ${dep}` });
     }
     if (task.state === 'declined' && !task.reason) issues.push({ level: 'error', message: `${task.id} is declined but has no reason` });
-    if (task.state !== 'declined' && task.reason) issues.push({ level: 'error', message: `${task.id} has a reason but is not declined` });
+    if (task.state !== 'declined' && task.reason) issues.push({ level: 'warning', message: `${task.id} is ${task.state} and carries a decline reason, which reads as a decline that was reopened: ${task.reason}` });
+    if (task.state !== 'done' && task.state !== 'declined' && task.closed) issues.push({ level: 'warning', message: `${task.id} is ${task.state} but still carries a closed date: ${task.closed}` });
     if (task.kind === 'undelivered' && task.state === 'declined') issues.push({ level: 'error', message: `${task.id} is undelivered and cannot be declined` });
     if (task.kind === 'undelivered' && task.clause === null) issues.push({ level: 'error', message: `${task.id} is undelivered but names no proof clause` });
     if (task.kind !== 'undelivered' && task.clause !== null) issues.push({ level: 'error', message: `${task.id} names a proof clause but is not undelivered` });

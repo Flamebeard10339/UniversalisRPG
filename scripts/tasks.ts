@@ -730,6 +730,24 @@ function explainEmptyQueue(tasks: Task[], spec: string, filter: { system?: strin
   for (const cycle of cycles) console.log(`these block each other and someone must break the cycle: ${cycle.join(' -> ')}`);
 }
 
+// Every state verb moves a record and reports what the move displaced, so
+// that no transition is silent about the state it overwrote. Leaving a
+// closing state un-closes the record: its close date and closing commit
+// describe a close that no longer holds. The reason survives — it says why
+// the record was closed then, which stays true of the period it covers, and
+// is the only trace a reopened decline leaves.
+function transition(task: Task, to: State): string[] {
+  const from = task.state;
+  task.state = to;
+  if (from === to) return [`it was already ${to}`];
+  if (!CLOSING_STATES.includes(from)) return [`was ${from}`];
+  const kept = task.reason ? `, keeping its ${from} reason: ${task.reason}` : '';
+  const closed = task.closed ? ` (closed ${task.closed})` : '';
+  task.closed = null;
+  task.closedCommit = null;
+  return [`reopened a ${from} record${closed}${kept}`];
+}
+
 function cmdStart(args: Flags): void {
   const config = resolveConfig(args.flags);
   const id = args.positional[0];
@@ -744,21 +762,13 @@ function cmdStart(args: Flags): void {
     refuseUnknownIds([id], tasks);
     return;
   }
-  if (task.state !== 'open') {
-    console.error(`error: ${id} is ${task.state}, not open`);
-    process.exitCode = 1;
-    return;
-  }
   const byId = new Map(tasks.map((t) => [t.id, t]));
-  if (isBlocked(task, byId)) {
-    const blockers = waitingOn(task, byId);
-    console.error(`error: ${id} is blocked by: ${blockers.join(', ')}`);
-    process.exitCode = 1;
-    return;
-  }
-  task.state = 'in-progress';
+  const waiting = waitingOn(task, byId);
+  const notes = transition(task, 'in-progress');
   saveStoreAndWarn(tasks, config);
   console.log(`started ${id}`);
+  for (const note of notes) console.log(note);
+  if (waiting.length > 0) console.log(`started while still waiting on ${waiting.join(', ')} — the requirement stands, the claim is recorded anyway`);
 }
 
 function cmdStop(args: Flags): void {
@@ -775,33 +785,28 @@ function cmdStop(args: Flags): void {
     refuseUnknownIds([id], tasks);
     return;
   }
-  if (task.state !== 'in-progress') {
-    console.error(`error: ${id} is ${task.state}, not in-progress`);
-    process.exitCode = 1;
-    return;
-  }
-  task.state = 'open';
+  const notes = transition(task, 'open');
   saveStoreAndWarn(tasks, config);
   console.log(`stopped ${id}`);
+  for (const note of notes) console.log(note);
 }
 
-// Rule 7 requires an unmet deliverable to be able to reach `done` — a
-// blanket refusal on kind:undelivered would make the merge gate
-// permanently unclosable — so this earns the close rather than blocking
-// it: refuse unless the spec's LATEST recorded audit pass grades this
-// task's clause `met`.
-function undeliveredDoneRefusal(config: Config, task: Task): string | null {
-  if (!task.spec) return 'is undelivered but has no spec to verify a pass against';
-  if (task.clause === null) return 'is undelivered but names no proof clause';
+// The five determinations `done` used to refuse an undelivered task on,
+// reported beside the close instead of preventing it, so a clause closed
+// against an unmet verdict leaves a record of what its spec's latest pass
+// actually said at the moment it closed.
+function clauseStanding(config: Config, task: Task): string {
+  if (!task.spec) return 'it names no spec, so no audit pass can speak to it';
+  if (task.clause === null) return 'it names no proof clause';
   const path_ = specFile(config, task.spec);
-  if (!existsSync(path_)) return `is undelivered but its spec file is missing: ${path_}`;
+  if (!existsSync(path_)) return `its spec file is missing: ${path_}`;
   const doc = parseSpecDoc(readFileSync(path_, 'utf8'));
-  if (!doc.proofClauses.some((candidate) => candidate.id === task.clause)) return `is undelivered but proof clause ${task.clause} is no longer in ${path_}`;
+  if (!doc.proofClauses.some((candidate) => candidate.id === task.clause)) return `proof clause ${task.clause} is no longer in ${path_}`;
   const latest = doc.auditPasses[doc.auditPasses.length - 1];
-  if (!latest) return `is undelivered and ${task.spec} has no recorded audit pass`;
-  const verdict = latest.verdicts.find((v) => v.clause === task.clause);
-  if (!verdict || verdict.status !== 'met') return `is undelivered and proof clause ${task.clause} is not met in the latest audit pass (pass ${latest.pass})`;
-  return null;
+  if (!latest) return `${task.spec} has no recorded audit pass`;
+  const verdict = latest.verdicts.find((candidate) => candidate.clause === task.clause);
+  if (!verdict) return `proof clause ${task.clause} has no verdict in the latest audit pass (pass ${latest.pass})`;
+  return `proof clause ${task.clause} is ${verdict.status} in the latest audit pass (pass ${latest.pass})`;
 }
 
 function cmdDone(args: Flags): void {
@@ -818,26 +823,6 @@ function cmdDone(args: Flags): void {
     refuseUnknownIds([id], tasks);
     return;
   }
-  if (task.state !== 'open' && task.state !== 'in-progress') {
-    console.error(`error: ${id} is ${task.state}, not open or in-progress`);
-    process.exitCode = 1;
-    return;
-  }
-  if (task.kind === 'undelivered') {
-    const refusal = undeliveredDoneRefusal(config, task);
-    if (refusal) {
-      console.error(`error: ${id} ${refusal}`);
-      process.exitCode = 1;
-      return;
-    }
-  }
-  const byId = new Map(tasks.map((t) => [t.id, t]));
-  if (isBlocked(task, byId)) {
-    const blockers = waitingOn(task, byId);
-    console.error(`error: ${id} is blocked by: ${blockers.join(', ')}`);
-    process.exitCode = 1;
-    return;
-  }
   let closedCommit: string | null = null;
   if (args.flags.commit !== undefined) {
     try {
@@ -848,11 +833,25 @@ function cmdDone(args: Flags): void {
       return;
     }
   }
-  task.state = 'done';
-  task.closed = today();
-  task.closedCommit = closedCommit;
+  const byId = new Map(tasks.map((t) => [t.id, t]));
+  const waiting = waitingOn(task, byId);
+  const alreadyDone = task.state === 'done';
+  const notes = transition(task, 'done');
+  // A second `done` does not restate the close date: the first close is
+  // when it happened, and only a commit the first close could not name yet
+  // is new information.
+  if (!alreadyDone) {
+    task.closed = today();
+    task.closedCommit = closedCommit;
+  } else if (closedCommit !== null) {
+    task.closedCommit = closedCommit;
+  }
   saveStoreAndWarn(tasks, config);
   console.log(`done ${id}`);
+  for (const note of notes) console.log(note);
+  if (task.kind === 'undelivered') console.log(`clause standing at close: ${clauseStanding(config, task)}`);
+  if (alreadyDone) console.log(`the recorded close date stands: ${task.closed ?? 'undated'}`);
+  if (waiting.length > 0) console.log(`closed with ${waiting.length} requirement(s) still open: ${waiting.join(', ')}`);
 }
 
 function cmdDecline(args: Flags): void {

@@ -453,14 +453,62 @@ describe('tasks CLI', () => {
     });
   });
 
-  it('start refuses blocked tasks', () => {
+  it('start claims a blocked task and records that the requirement still stands', () => {
     fixture(({ tasks }) => {
       tasks('add', 'blocker', '--id', 'blocker', '--spec', 'demo-spec');
       tasks('add', 'blocked', '--id', 'blocked', '--spec', 'demo-spec', '--requires', 'blocker');
+
       const result = tasks('start', 'blocked');
-      expect(result.status).toBe(1);
-      expect(result.stderr).toContain('blocked by: blocker');
-      expect(tasks('show', 'blocked').stdout).toContain('[task/open]');
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('started while still waiting on blocker');
+      expect(tasks('show', 'blocked').stdout).toContain('[task/in-progress]');
+      expect(tasks('show', 'blocked').stdout).toContain('requires: blocker (waiting)');
+    });
+  });
+
+  it('start reopens a declined record, clears its close and keeps the reason it was declined for', () => {
+    fixture(({ tasks }) => {
+      tasks('add', 'a prediction', '--id', 'predicted', '--spec', 'demo-spec');
+      tasks('decline', 'predicted', '--reason', 'the merge gate will make this moot');
+      expect(tasks('show', 'predicted').stdout).toContain('closed: ');
+
+      const reopened = tasks('start', 'predicted');
+      expect(reopened.status).toBe(0);
+      expect(reopened.stdout).toContain('reopened a declined record');
+      expect(reopened.stdout).toContain('keeping its declined reason: the merge gate will make this moot');
+
+      const shown = tasks('show', 'predicted').stdout;
+      expect(shown).toContain('[task/in-progress]');
+      expect(shown).toContain('reason: the merge gate will make this moot');
+      expect(shown).not.toContain('closed: ');
+    });
+  });
+
+  it('a record walks start to done and back out again, each move naming the state it displaced', () => {
+    fixture(({ tasks }) => {
+      tasks('add', 'the whole lifecycle', '--id', 'lifecycle', '--spec', 'demo-spec');
+
+      expect(tasks('start', 'lifecycle').stdout).toContain('was open');
+      expect(tasks('show', 'lifecycle').stdout).toContain('[task/in-progress]');
+
+      const done = tasks('done', 'lifecycle');
+      expect(done.status).toBe(0);
+      expect(done.stdout).toContain('was in-progress');
+      expect(tasks('show', 'lifecycle').stdout).toContain('closed: ');
+
+      const reclosed = tasks('done', 'lifecycle');
+      expect(reclosed.status).toBe(0);
+      expect(reclosed.stdout).toContain('it was already done');
+      expect(reclosed.stdout).toContain('the recorded close date stands:');
+
+      const restarted = tasks('start', 'lifecycle');
+      expect(restarted.stdout).toContain('reopened a done record');
+      const shown = tasks('show', 'lifecycle').stdout;
+      expect(shown).toContain('[task/in-progress]');
+      expect(shown).not.toContain('closed: ');
+
+      expect(tasks('stop', 'lifecycle').stdout).toContain('was in-progress');
+      expect(tasks('show', 'lifecycle').stdout).toContain('[task/open]');
     });
   });
 
@@ -557,21 +605,20 @@ describe('tasks CLI', () => {
     });
   });
 
-  it('done closes an open, unblocked task and refuses a blocked one', () => {
+  it('done closes a blocked task and records which requirements were still open when it closed', () => {
     fixture(({ tasks }) => {
       tasks('add', 'blocker', '--id', 'blocker', '--spec', 'demo-spec');
       tasks('add', 'blocked', '--id', 'blocked', '--spec', 'demo-spec', '--requires', 'blocker');
 
-      const refused = tasks('done', 'blocked');
-      expect(refused.status).toBe(1);
-      expect(refused.stderr).toContain('blocked by: blocker');
-
-      const closed = tasks('done', 'blocker');
+      const closed = tasks('done', 'blocked');
       expect(closed.status).toBe(0);
-      expect(tasks('show', 'blocker').stdout).toContain('closed: ');
+      expect(closed.stdout).toContain('closed with 1 requirement(s) still open: blocker');
+      expect(tasks('show', 'blocked').stdout).toContain('closed: ');
 
-      const nowUnblocked = tasks('done', 'blocked');
-      expect(nowUnblocked.status).toBe(0);
+      const unblocked = tasks('done', 'blocker');
+      expect(unblocked.status).toBe(0);
+      expect(unblocked.stdout).not.toContain('still open');
+      expect(tasks('show', 'blocker').stdout).toContain('closed: ');
     });
   });
 
@@ -1221,16 +1268,17 @@ describe('tasks CLI', () => {
     });
   });
 
-  it('done on an undelivered task refuses while the latest audit pass still grades its clause unmet', () => {
+  it('done on an undelivered task closes against an unmet verdict, recording the verdict it closed against', () => {
     fixture(({ tasks }) => {
       tasks('audit', 'demo-spec', '--proof', '1=unmet', '--evidence', '1=nope', '--proof', '2=met');
       const result = tasks('done', 'demo-spec-clause-1');
-      expect(result.status).toBe(1);
-      expect(result.stderr).toContain('not met');
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('clause standing at close: proof clause 1 is unmet in the latest audit pass (pass 1)');
+      expect(tasks('show', 'demo-spec-clause-1').stdout).toContain('closed: ');
     });
   });
 
-  it('done on an undelivered task refuses when no audit pass is recorded at all', () => {
+  it('done on an undelivered task closes when no audit pass is recorded at all, and says so', () => {
     fixture(({ tasks, dir }) => {
       const storePath = path.join(dir, 'tasks.jsonl');
       writeFileSync(
@@ -1239,12 +1287,13 @@ describe('tasks CLI', () => {
         'utf8',
       );
       const result = tasks('done', 'demo-spec-clause-1');
-      expect(result.status).toBe(1);
-      expect(result.stderr).toContain('no recorded audit pass');
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('clause standing at close: demo-spec has no recorded audit pass');
+      expect(tasks('show', 'demo-spec-clause-1').stdout).toContain('closed: ');
     });
   });
 
-  it('done on an undelivered task refuses when its clause has been deleted from the spec outright', () => {
+  it('done on an undelivered task closes when its clause has been deleted from the spec outright, and says which clause is gone', () => {
     fixture(({ tasks, dir }) => {
       tasks('audit', 'demo-spec', '--proof', '1=met', '--proof', '2=met');
       const storePath = path.join(dir, 'tasks.jsonl');
@@ -1254,8 +1303,9 @@ describe('tasks CLI', () => {
         'utf8',
       );
       const result = tasks('done', 'stale-clause');
-      expect(result.status).toBe(1);
-      expect(result.stderr).toContain('proof clause 9 is no longer in');
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('clause standing at close: proof clause 9 is no longer in');
+      expect(tasks('show', 'stale-clause').stdout).toContain('closed: ');
     });
   });
 
