@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest';
 import { run as runTasks } from './tasks';
 
 const repoRoot = path.join(import.meta.dirname, '..');
+const today = new Date().toISOString().slice(0, 10);
 const tsx = path.join(repoRoot, 'node_modules/tsx/dist/cli.mjs');
 const script = path.join(repoRoot, 'scripts/tasks.ts');
 
@@ -523,6 +524,68 @@ describe('tasks CLI', () => {
       expect(shown).toContain('[task/in-progress]');
       expect(shown).toContain('reason: the merge gate will make this moot');
       expect(shown).not.toContain('closed: ');
+    });
+  });
+
+  it('start records who holds the task and the day they claimed it', () => {
+    fixture(({ tasks }) => {
+      tasks('add', 'claimed task', '--id', 'claimed', '--spec', 'demo-spec');
+
+      const started = tasks('start', 'claimed', '--actor', 'worker-u5');
+      expect(started.status).toBe(0);
+      expect(started.stdout).toContain(`claimed by worker-u5 since ${today} (0 days)`);
+      expect(tasks('show', 'claimed').stdout).toContain(`claimed by worker-u5 since ${today} (0 days)`);
+    });
+  });
+
+  // c2: a missing actor is not a refusal. The claim is recorded either way,
+  // and what could not be determined is said out loud.
+  it('start with no --actor still records the claim, and says the holder went unnamed', () => {
+    fixture(({ tasks }) => {
+      tasks('add', 'claimed task', '--id', 'claimed', '--spec', 'demo-spec');
+
+      const started = tasks('start', 'claimed');
+      expect(started.status).toBe(0);
+      expect(started.stdout).toContain('no --actor given: the claim is recorded with no holder named');
+      expect(started.stdout).toContain('claimed by (unnamed) since');
+      expect(tasks('show', 'claimed').stdout).toContain(`claimed by (unnamed) since ${today}`);
+    });
+  });
+
+  it('start on a task someone already holds records the takeover instead of refusing or merging it', () => {
+    fixture(({ tasks }) => {
+      tasks('add', 'contested task', '--id', 'contested', '--spec', 'demo-spec');
+      tasks('start', 'contested', '--actor', 'worker-a');
+
+      const takeover = tasks('start', 'contested', '--actor', 'worker-b');
+      expect(takeover.status).toBe(0);
+      expect(takeover.stdout).toContain('took over a claim: claimed by worker-a since');
+      expect(takeover.stdout).toContain('the previous claim is replaced, not merged');
+
+      const shown = tasks('show', 'contested').stdout;
+      expect(shown).toContain('claimed by worker-b since');
+      expect(shown).not.toContain('worker-a');
+    });
+  });
+
+  // A closed record that kept its holder would be reported cold forever, on
+  // work that is finished.
+  it.each([
+    ['stop', ['stop', 'held']],
+    ['done', ['done', 'held']],
+    ['decline', ['decline', 'held', '--reason', 'not worth it']],
+  ])('%s releases the claim and says whose it was', (_name, argv) => {
+    fixture(({ tasks }) => {
+      tasks('add', 'held task', '--id', 'held', '--spec', 'demo-spec');
+      tasks('start', 'held', '--actor', 'worker-a');
+
+      const result = tasks(...argv);
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('released the claim: claimed by worker-a since');
+
+      const shown = tasks('show', 'held').stdout;
+      expect(shown).not.toContain('claimed by');
+      expect(tasks('doctor').stdout).not.toContain('still carries a claim');
     });
   });
 

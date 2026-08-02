@@ -10,6 +10,7 @@ import { appendAmendment, appendAuditPass, clauseStandings, duplicateClauseIds, 
 import { loadManifest, systemNames as manifestSystemNames } from './lib/systems';
 import {
   checkStore,
+  claimSummary,
   DEFAULT_STORE_PATH,
   dependencyCycles,
   StoreError,
@@ -264,6 +265,8 @@ function printTask(task: Task, tasks: Task[]): void {
   if (task.reason) console.log(`reason: ${task.reason}`);
   if (task.closed) console.log(`closed: ${task.closed}`);
   if (task.closedCommit) console.log(`closedCommit: ${task.closedCommit}`);
+  const claim = claimSummary(task, today());
+  if (claim) console.log(claim);
 }
 
 // A read answers the question it was asked even when the id resolves to
@@ -317,6 +320,8 @@ function printTaskConcise(task: Task, tasks: Task[]): void {
   if (task.files.length > 0) console.log(`files: ${task.files.join(', ')}`);
   if (task.deliverable) console.log(`deliverable: ${preview(task.deliverable)}`);
   if (task.evidence) console.log(`evidence: ${preview(task.evidence)}`);
+  const claim = claimSummary(task, today());
+  if (claim) console.log(claim);
 }
 
 function specIssues(config: Config): CheckIssue[] {
@@ -770,6 +775,17 @@ function explainEmptyQueue(tasks: Task[], spec: string, filter: { system?: strin
   for (const cycle of cycles) console.log(`these block each other and someone must break the cycle: ${cycle.join(' -> ')}`);
 }
 
+// `in-progress` is the only state that means someone is holding the record,
+// so every move out of it releases the claim. A record that kept its holder
+// through `done` would be reported cold forever, on finished work.
+function releaseClaim(task: Task, to: State): string[] {
+  if (to === 'in-progress' || task.claimed === null) return [];
+  const released = claimSummary(task, today());
+  task.claimed = null;
+  task.claimedBy = null;
+  return [`released the claim: ${released}`];
+}
+
 // Every state verb moves a record and reports what the move displaced, so
 // that no transition is silent about the state it overwrote. Leaving a
 // closing state un-closes the record: its close date and closing commit
@@ -779,20 +795,21 @@ function explainEmptyQueue(tasks: Task[], spec: string, filter: { system?: strin
 function transition(task: Task, to: State): string[] {
   const from = task.state;
   task.state = to;
-  if (from === to) return [`it was already ${to}`];
-  if (!CLOSING_STATES.includes(from)) return [`was ${from}`];
+  const notes = releaseClaim(task, to);
+  if (from === to) return [...notes, `it was already ${to}`];
+  if (!CLOSING_STATES.includes(from)) return [...notes, `was ${from}`];
   const kept = task.reason ? `, keeping its ${from} reason: ${task.reason}` : '';
   const closed = task.closed ? ` (closed ${task.closed})` : '';
   task.closed = null;
   task.closedCommit = null;
-  return [`reopened a ${from} record${closed}${kept}`];
+  return [...notes, `reopened a ${from} record${closed}${kept}`];
 }
 
 function cmdStart(args: Flags): void {
   const config = resolveConfig(args.flags);
   const id = args.positional[0];
   if (!id) {
-    console.error('usage: tasks start <id>');
+    console.error('usage: tasks start <id> [--actor <name>]');
     process.exitCode = 1;
     return;
   }
@@ -804,10 +821,21 @@ function cmdStart(args: Flags): void {
   }
   const byId = new Map(tasks.map((t) => [t.id, t]));
   const waiting = waitingOn(task, byId);
+  const displaced = claimSummary(task, today());
   const notes = transition(task, 'in-progress');
+  // Not derived from git or the OS: every agent here commits as the same
+  // user, so an identity taken from the machine would distinguish nothing
+  // while reading as though someone had asserted it. Unclaimed by name is
+  // the honest record, and the time is what coldness actually needs.
+  const actor = args.flags.actor ?? null;
+  task.claimed = today();
+  task.claimedBy = actor;
   saveStoreAndWarn(tasks, config);
   console.log(`started ${id}`);
+  if (displaced !== null) console.log(`took over a claim: ${displaced} — the previous claim is replaced, not merged`);
   for (const note of notes) console.log(note);
+  console.log(claimSummary(task, today()));
+  if (actor === null) console.log(`no --actor given: the claim is recorded with no holder named — pass --actor <name> so a cold claim says who to ask`);
   if (waiting.length > 0) console.log(`started while still waiting on ${waiting.join(', ')} — the requirement stands, the claim is recorded anyway`);
 }
 
