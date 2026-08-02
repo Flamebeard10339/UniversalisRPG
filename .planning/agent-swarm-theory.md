@@ -1,3 +1,7 @@
+An orchestrators role is global project/branch architecture. Their job is not merely to dispatch tasks, but to navigate the shortest path to the goal that runs the lowest risk of grounding the project. 
+
+This document should be kept updated with lessons learned by orchestrators. 
+
 # Trees and leaves
 Descriptions of large tasks naturally take the shape of trees, with a goal at the root that subdivides recursively into basic units of work. Our swarm has two roles, both organized around that same tree-like decomposition:
 
@@ -54,6 +58,39 @@ have shipped otherwise.
 
 **Fixing one defect can promote another.** Severity is a property of a finding plus everything
 still broken around it. Re-rank after a round; do not carry the old ranking forward.
+
+The remaining items were learned from the recovery rather than the failure, and the recovery
+produced better designs than the fix round did.
+
+**Ask why a finding dissolves, not how to fix it.** "What would make this stop being a finding at
+all" is the question that turns a list into a design. Asked of the 25 reconciled entries above, it
+returned: a contradiction between two clauses disappears if the freeze compares the parsed model
+instead of rendered markdown; a rename hole and a fail-open disappear together if binding uses
+recorded membership instead of inferring from a name or a diff; and an entire tag-retirement
+subsystem becomes unnecessary if a verdict records a hash of the text it graded. None of those is
+on any finding's "deliverable" line. All three came from asking the dissolution question.
+
+**Synthesis is not clerical — commission someone to hold the whole picture.** A planner keeps its
+context lean by design, which means it reads summaries while the evidence sits in a dozen reports.
+The three resolutions above came from the agent asked to *reconcile* the audits, not from the
+planner who commissioned them, because it read all of it at once. Treat reconciliation as design
+work and staff it accordingly; do not hand it to the cheapest model as a formatting job.
+
+**Prefer a narrower mechanism to a guarded one.** When a feature keeps generating findings, try
+deleting the capability before hardening it. Shell-command proof targets had produced a CI
+execution path, a 17-minute gate, and a proof that proved nothing. Three options were on the table
+— sandbox it, allowlist it, never run it in CI. Removing it entirely closed all three findings and
+made the remaining mechanism easier to explain.
+
+**Audit your own claims of the form "X is handled by Y".** A planner's subsumption mapping, its
+"this is covered by that clause", its "this dissolves under the refactor" — nobody audits those,
+because they read as bookkeeping. One such claim in the spec above was wrong, and checking it
+surfaced a missing clause.
+
+**Persisting the evidence is planner work.** Audit reports written to a session scratchpad vanish
+with the session, and the next branch gets planned against a summary of a summary. Archive the
+reports into the repository before the session ends, keep each auditor's own finding labels so
+downstream documents can cite them, and plan against the archive.
 
 # References
 https://cursor.com/blog/agent-swarm-model-economics
