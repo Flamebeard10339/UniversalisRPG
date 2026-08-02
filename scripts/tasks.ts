@@ -935,23 +935,11 @@ function cmdSpecAdd(args: Flags): void {
     refuseUnknownIds(missing, tasks);
     return;
   }
-  // Rule 6: pass 2+ findings may defer or decline, never promote. `spec add`
-  // is the other door into a spec besides triage's [1], so it has to refuse
-  // the same thing. Refuse the whole invocation rather than skip the
-  // offending ids — this verb is non-interactive and takes a list, so
-  // partial application would be worse than a refusal naming the problem.
-  const unpromotable = ids.filter((id) => {
-    const source = byId.get(id)!.source;
-    return source !== null && source.pass >= 2;
-  });
-  if (unpromotable.length > 0) {
-    console.error(`error: pass 2+ findings cannot be promoted — defer or decline: ${unpromotable.join(', ')}`);
-    process.exitCode = 1;
-    return;
-  }
+  const latePass = ids.map((id) => byId.get(id)!).filter((task) => (task.source?.pass ?? 0) >= 2);
   for (const id of ids) byId.get(id)!.spec = slug;
   saveStoreAndWarn(tasks, config);
   console.log(`added ${ids.length} task(s) to ${slug}`);
+  if (latePass.length > 0) console.log(`${latePass.length} of those came from a pass 2 or later audit, which extends what ${slug} owes: ${latePass.map((task) => `${task.id} (pass ${task.source!.pass})`).join(', ')}`);
 }
 
 function cmdSpecShow(args: Flags): void {
@@ -1385,12 +1373,7 @@ async function cmdTriage(args: Flags): Promise<void> {
           console.log('no active spec to promote into — pass --spec, skipping');
           break;
         }
-        // Rule 6: pass 2 and later may defer or decline a finding, never
-        // promote — the only rule that terminates the audit-fix loop.
-        if (task.source !== null && task.source.pass >= 2) {
-          console.log(`pass ${task.source.pass} findings cannot be promoted — defer or decline, skipping`);
-          break;
-        }
+        if ((task.source?.pass ?? 0) >= 2) console.log(`promoting a pass ${task.source!.pass} finding, which extends what ${spec} owes`);
         task.state = 'open';
         task.spec = spec;
       } else if (answer === '2') {

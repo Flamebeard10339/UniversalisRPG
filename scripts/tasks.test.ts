@@ -1067,7 +1067,7 @@ describe('tasks CLI', () => {
     });
   });
 
-  it('spec add joins named tasks to a spec regardless of their state, as long as they are not a pass 2+ finding', () => {
+  it('spec add joins named tasks to a spec regardless of their state', () => {
     fixture(({ tasks }) => {
       tasks('add', 'a task', '--id', 'a-task');
       tasks('add', 'a finding', '--id', 'a-finding', '--kind', 'finding', '--severity', 'low', '--deliverable', 'fix it');
@@ -1088,17 +1088,17 @@ describe('tasks CLI', () => {
     });
   });
 
-  it('spec add refuses a pass 2+ finding, naming it and leaving it out of the spec', () => {
+  it('spec add promotes a pass 2+ finding and records that it extends what the spec owes', () => {
     fixture(({ tasks }) => {
       tasks('add', 'a task', '--id', 'a-task');
       tasks('audit', 'demo-spec', '--proof', '1=met', '--proof', '2=met');
       tasks('audit', 'demo-spec', '--proof', '1=met', '--proof', '2=met', '--finding', 'late finding', '--severity', 'low', '--deliverable', 'fix it', '--evidence', 'seen late');
       const result = tasks('spec', 'add', 'demo-spec', 'a-task', 'demo-spec-pass2-late-finding');
-      expect(result.status).toBe(1);
-      expect(result.stderr).toContain('cannot be promoted');
-      expect(result.stderr).toContain('demo-spec-pass2-late-finding');
-      expect(tasks('show', 'a-task').stdout).toContain('spec: (deferred)');
-      expect(tasks('show', 'demo-spec-pass2-late-finding').stdout).toContain('spec: (deferred)');
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('came from a pass 2 or later audit, which extends what demo-spec owes');
+      expect(result.stdout).toContain('demo-spec-pass2-late-finding (pass 2)');
+      expect(tasks('show', 'a-task').stdout).toContain('spec: demo-spec');
+      expect(tasks('show', 'demo-spec-pass2-late-finding').stdout).toContain('spec: demo-spec');
     });
   });
 
@@ -1973,14 +1973,14 @@ describe('tasks CLI', () => {
     });
   });
 
-  it('triage refuses to promote a finding sourced from an audit pass 2 or later', () => {
+  it('triage promotes a finding sourced from an audit pass 2 or later, saying that it extends the spec', () => {
     fixture(({ tasks, triage }) => {
       tasks('audit', 'demo-spec', '--proof', '1=met', '--proof', '2=met');
       tasks('audit', 'demo-spec', '--proof', '1=met', '--proof', '2=met', '--finding', 'late finding', '--severity', 'low', '--deliverable', 'fix it', '--evidence', 'seen late');
       const result = triage('1\n');
-      expect(result.stdout).toContain('cannot be promoted');
+      expect(result.stdout).toContain('promoting a pass 2 finding, which extends what demo-spec owes');
       const shown = tasks('show', 'demo-spec-pass2-late-finding');
-      expect(shown.stdout).toContain('spec: (deferred)');
+      expect(shown.stdout).toContain('spec: demo-spec');
     });
   });
 
