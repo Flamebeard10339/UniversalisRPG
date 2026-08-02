@@ -16,6 +16,11 @@ vite.*.log
 .planning/.scratch.md
 .planning/old/*
 
+# Ephemeral vitest fixtures scripts/tasks.test.ts writes to prove out
+# proof-target behavior; vite.config.ts sweeps anything left behind by an
+# interrupted run.
+scripts/proof-fixtures/
+
 
 # Emitted by tsc --build for the tsconfig.node project.
 tsconfig.node.tsbuildinfo

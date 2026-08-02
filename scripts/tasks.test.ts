@@ -161,10 +161,15 @@ function defaultStoreGitFixture(run: (context: { dir: string; tasks: (...args: s
 
 // runProofTarget's vitest branch spawns real vitest against a file path, and
 // vitest only resolves test files inside the project root — so the fixture
-// file has to live under the repo, not os.tmpdir(). Written and removed
-// around each test.
+// file has to live under the repo, not os.tmpdir(). It lives in its own
+// fixture-only directory rather than alongside scripts/lib's production
+// modules; vite.config.ts sweeps anything an interrupted run left behind
+// there before the next vitest start collects test files. Written and
+// removed around each test as well, for the common case.
 function vitestFixtureFile(run: (relPath: string) => void): void {
-  const relPath = `scripts/lib/__proof_fixture_${Date.now()}_${Math.random().toString(36).slice(2)}.test.ts`;
+  const fixturesDir = path.join(repoRoot, 'scripts/proof-fixtures');
+  mkdirSync(fixturesDir, { recursive: true });
+  const relPath = `scripts/proof-fixtures/__proof_fixture_${Date.now()}_${Math.random().toString(36).slice(2)}.test.ts`;
   const absPath = path.join(repoRoot, relPath);
   writeFileSync(
     absPath,
