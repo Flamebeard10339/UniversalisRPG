@@ -1859,16 +1859,19 @@ describe('tasks CLI', () => {
     });
   });
 
-  it('check --merge refuses when open spec members exist but the branch claims no active spec', () => {
+  // A branch's CI run must not redden over a spec it has nothing to do
+  // with — the gate is scoped to the branch's own spec (mergeGate.ts's
+  // vacuous-pass comment), never to every open spec in the store.
+  it('check --merge passes vacuously when the branch has no active spec, even though other specs have open members', () => {
     fixture(({ tasks, dir }) => {
       tasks('add', 'open task', '--id', 'open-task', '--spec', 'demo-spec', '--severity', 'high');
       const storePath = path.join(dir, 'tasks.jsonl');
       const systemsPath = path.join(dir, 'systems.json');
       const specsDir = path.join(dir, 'specs');
       const result = spawnSync(process.execPath, [tsx, script, 'check', '--merge', '--store', storePath, '--systems', systemsPath, '--specs-dir', specsDir, '--branch', 'renamed-branch'], { cwd: repoRoot, encoding: 'utf8' });
-      expect(result.status).toBe(1);
-      expect(result.stderr).toContain('open spec member(s) exist but this branch has no active spec');
-      expect(result.stderr).toContain('demo-spec: open-task');
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('not applicable');
+      expect(result.stderr).not.toContain('open spec member(s) exist');
     });
   });
 
@@ -2118,6 +2121,10 @@ describe('tasks CLI', () => {
     });
   });
 
+  // Contrast with the sibling test above ("triage promotes into the
+  // inferred spec"): read commands infer an active spec when exactly one
+  // candidate has open members, but the merge gate never does, even in
+  // that same unambiguous case — it stays "not applicable".
   it('check --merge never infers a spec — it stays "not applicable" even when exactly one spec has open members', () => {
     fixture(({ tasks, dir }) => {
       tasks('add', 'open task', '--id', 'open-task', '--spec', 'demo-spec', '--severity', 'high');
@@ -2125,9 +2132,8 @@ describe('tasks CLI', () => {
       const systemsPath = path.join(dir, 'systems.json');
       const specsDir = path.join(dir, 'specs');
       const result = spawnSync(process.execPath, [tsx, script, 'check', '--merge', '--store', storePath, '--systems', systemsPath, '--specs-dir', specsDir, '--branch', 'orphaned-branch'], { cwd: repoRoot, encoding: 'utf8' });
-      expect(result.status).toBe(1);
-      expect(result.stderr).toContain('open spec member(s) exist but this branch has no active spec');
-      expect(result.stderr).toContain('demo-spec: open-task');
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('not applicable');
     });
   });
 

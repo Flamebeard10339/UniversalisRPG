@@ -315,42 +315,35 @@ function cmdCheck(flags: Record<string, string>): void {
   const doc = specExists ? parseSpecDoc(readFileSync(specPath!, 'utf8')) : null;
   const baseBranch = flags['base-branch'] ?? 'main';
 
-  if (spec === null) {
-    const openBySpec = new Map<string, string[]>();
-    for (const task of tasks) {
-      if (task.spec === null || task.state === 'done' || task.state === 'declined') continue;
-      const ids = openBySpec.get(task.spec) ?? [];
-      ids.push(task.id);
-      openBySpec.set(task.spec, ids);
-    }
-    if (openBySpec.size > 0) {
-      console.error('merge gate: open spec member(s) exist but this branch has no active spec');
-      for (const [memberSpec, ids] of openBySpec) console.error(`  ${memberSpec}: ${ids.join(', ')}`);
-      process.exitCode = 1;
-      return;
-    }
-    console.log('merge gate: not applicable — no active spec for this branch, and no --spec given');
-    return;
-  }
-
   // An amendment's archived text wins when one exists — it is the freeze's
   // only sanctioned edit path. Merge-base is the fallback for a spec that
   // has never been amended, and is a known no-op for the common case: rule
   // 1 opens one spec per branch on that branch, so it never existed at the
   // merge-base either.
   const latestAmendment = doc ? doc.amendments[doc.amendments.length - 1] : undefined;
-  const deliverableBaseline = latestAmendment ? latestAmendment.deliverableText : (doc?.baseline ?? deliverableAtMergeBase(config, spec, baseBranch));
+  const deliverableBaseline = latestAmendment ? latestAmendment.deliverableText : (doc?.baseline ?? (spec === null ? null : deliverableAtMergeBase(config, spec, baseBranch)));
 
+  // checkMergeGate is the only place that decides whether there is
+  // anything to refuse, including the spec === null case: it passes
+  // vacuously there (see its own comment), so a branch with no active spec
+  // never reddens over a promise it never made, no matter what other specs
+  // in the store still have open members.
   const mergeIssues = checkMergeGate({
     spec,
     specExists,
     doc,
     deliverableBaseline,
-    members: tasks.filter((task) => task.spec === spec),
+    members: spec === null ? [] : tasks.filter((task) => task.spec === spec),
   });
   const proofIssues = doc ? runProofTargets(doc) : [];
-  const auditIssues = doc ? [staleAuditIssue(config, spec, doc)].filter((issue): issue is string => issue !== null) : [];
+  const auditIssues = doc && spec !== null ? [staleAuditIssue(config, spec, doc)].filter((issue): issue is string => issue !== null) : [];
   const allMergeIssues = [...mergeIssues, ...proofIssues, ...auditIssues];
+
+  if (spec === null) {
+    console.log('merge gate: not applicable — no active spec for this branch, and no --spec given');
+    return;
+  }
+
   for (const issue of allMergeIssues) console.error(`merge gate: ${issue}`);
   console.log(`merge gate: ${allMergeIssues.length} issue(s)`);
   if (allMergeIssues.length > 0) process.exitCode = 1;
