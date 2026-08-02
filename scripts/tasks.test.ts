@@ -2179,7 +2179,11 @@ describe('tasks CLI', () => {
       expect(result.stdout).toContain('- runtime-proof  [task/open/high]  Runtime  prove the runtime behavior');
       expect(result.stdout).toContain('src/runtime/runtime.ts:1');
       expect(result.stdout).toContain('prefer mutation testing');
-      expect(result.stdout).toContain('Do not promote pass-2+ findings.');
+      // The prompt must not instruct an auditor in a rule the tool does not
+      // have. Promotion at pass 2+ was removed from the tool; the prompt
+      // asked for it anyway, on every invocation, for every future auditor.
+      expect(result.stdout).not.toContain('Do not promote pass-2+ findings.');
+      expect(result.stdout).toContain('Promotion is the human triager\'s call at any pass');
     });
   });
 
