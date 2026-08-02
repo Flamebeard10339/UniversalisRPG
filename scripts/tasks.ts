@@ -378,23 +378,26 @@ function closedCommitIssues(tasks: Task[]): CheckIssue[] {
   return issues;
 }
 
-// Shared by add and edit: the two places content fields (severity, system,
-// requires) are accepted from a human by hand rather than produced by a
-// state-transition verb or the auditor.
-function validateContentFields(config: Config, tasks: Task[], flags: Record<string, string>): string | null {
+// Shared by add and edit: the two places content fields are accepted from a
+// human by hand rather than produced by a state-transition verb or the
+// auditor. Only values that name nothing in their own enumeration are
+// refused — an id is checked against the store by reportUnresolvedRequires,
+// which records it either way.
+function validateContentFields(config: Config, flags: Record<string, string>): string | null {
   if (flags.severity !== undefined && !['high', 'medium', 'low'].includes(flags.severity)) {
     return 'error: --severity must be high, medium or low';
   }
   if (flags.system !== undefined && !systemNames(config).includes(flags.system)) {
     return `error: --system not in systems.json: ${flags.system}`;
   }
-  const requires = splitList(flags.requires);
-  if (requires.length > 0) {
-    const known = new Set(tasks.map((task) => task.id));
-    const missing = requires.filter((id) => !known.has(id));
-    if (missing.length > 0) return `error: --requires references unknown id(s): ${missing.join(', ')}`;
-  }
   return null;
+}
+
+function reportUnresolvedRequires(task: Task, tasks: Task[]): void {
+  const known = new Set(tasks.map((candidate) => candidate.id));
+  const unresolved = task.requires.filter((id) => !known.has(id));
+  if (unresolved.length === 0) return;
+  console.log(`recorded ${unresolved.length} requirement(s) no record answers to: ${unresolved.join(', ')} — they do not block, and \`tasks doctor\` reports them until they resolve`);
 }
 
 const ADD_USAGE =
@@ -422,7 +425,7 @@ function cmdAdd(args: Flags): void {
   }
 
   const tasks = loadStore(config.storePath);
-  const validationError = validateContentFields(config, tasks, args.flags);
+  const validationError = validateContentFields(config, args.flags);
   if (validationError) {
     console.error(validationError);
     process.exitCode = 1;
@@ -465,6 +468,7 @@ function cmdAdd(args: Flags): void {
   tasks.push(task);
   saveStoreAndWarn(tasks, config);
   console.log(`added ${id} [${task.kind}/${task.state}]`);
+  reportUnresolvedRequires(task, tasks);
 }
 
 const EDIT_USAGE =
@@ -488,7 +492,7 @@ function cmdEdit(args: Flags): void {
     return;
   }
 
-  const validationError = validateContentFields(config, tasks, args.flags);
+  const validationError = validateContentFields(config, args.flags);
   if (validationError) {
     console.error(validationError);
     process.exitCode = 1;
@@ -534,6 +538,7 @@ function cmdEdit(args: Flags): void {
 
   saveStoreAndWarn(tasks, config);
   console.log(`edited ${id}: ${changes.join(', ')}`);
+  reportUnresolvedRequires(task, tasks);
 }
 
 function storeStateAt(config: Config, commit: string, id: string): State | null {

@@ -319,12 +319,18 @@ describe('tasks CLI', () => {
     });
   });
 
-  it('edit refuses a --requires id that does not resolve', () => {
+  it('edit records a --requires id that does not resolve, reports it, and does not let it block', () => {
     fixture(({ tasks }) => {
-      tasks('add', 'a task', '--id', 'editable');
+      tasks('add', 'a task', '--id', 'editable', '--spec', 'demo-spec');
       const result = tasks('edit', 'editable', '--requires', 'ghost');
-      expect(result.status).toBe(1);
-      expect(result.stderr).toContain('unknown id(s): ghost');
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('recorded 1 requirement(s) no record answers to: ghost');
+
+      const shown = tasks('show', 'editable').stdout;
+      expect(shown).toContain('requires: ghost (missing)');
+      expect(shown).not.toContain('BLOCKED');
+      expect(tasks('next').stdout).toContain('editable');
+      expect(tasks('check').stderr).toContain('editable requires unresolved id: ghost');
     });
   });
 
