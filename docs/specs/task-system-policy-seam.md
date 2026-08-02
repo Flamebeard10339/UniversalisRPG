@@ -112,11 +112,13 @@ The pass-2 audit filed A-H1, B-M2 and B-M3 together as "these do NOT dissolve."
 Walked individually they split three ways, so neither that grouping nor my table
 survived contact with the records.
 
-**C-H4** survives as filed: comment lines forbidden by name under CLAUDE.md's
-policy, still verbatim at `28d56cd` (`scripts/tasks.ts:108,148,155`,
-`mergeGate.ts:5`, `taskStore.ts:36`). One is also false — it claims
-`specCandidatesFromDiff` reuses quiet git plumbing when `diffChangedFiles`
-inherits stderr. Carried in U6.
+**C-H4 did not survive as filed** — a claim I made twice and checked neither
+time. Three of its five cited blocks went with U2: `mergeGate.ts:5`, and
+`tasks.ts:148`/`:155`, which were `specCandidatesFromDiff`'s comments. **The one
+both this spec and U6 called factually wrong is among the deleted**, so the
+example that made the finding vivid no longer exists. Two survive verbatim —
+`scripts/tasks.ts:107` and `scripts/lib/taskStore.ts:37` — and that is what U6
+carries.
 
 ## Decisions
 
