@@ -1586,7 +1586,9 @@ describe('tasks CLI', () => {
   });
 
   it('audit-prompt falls back to the diff\'s changed files so relevant files survives a spec with no members', () => {
-    fixture(({ tasks }) => {
+    gitFixture(({ commit, tasks }) => {
+      commit('A commit on demo-spec, after branching from main.');
+
       const result = tasks('audit-prompt', 'demo-spec');
       expect(result.status).toBe(0);
       expect(result.stdout).toContain('Member tasks:\n- none');
