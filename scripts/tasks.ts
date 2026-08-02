@@ -16,6 +16,7 @@ import {
   isBlocked,
   listQueue,
   loadStore,
+  parseStore,
   saveStore,
   unreviewedQueue,
   type Kind,
@@ -78,6 +79,15 @@ function usesDefaultStore(config: Config): boolean {
   return path.resolve(config.storePath) === path.resolve(DEFAULT_STORE_PATH);
 }
 
+// `git show <rev>:<path>` takes its path in `<rev>:<path>` colon syntax,
+// which git resolves relative to the repo root with forward slashes only —
+// unlike a `-- <path>` pathspec, it rejects an absolute Windows path outright
+// ("exists on disk, but not in <rev>"). config.storePath may be absolute
+// (tests pass one via --store), so normalize before every colon-syntax call.
+function gitPathspec(storePath: string): string {
+  return path.relative(process.cwd(), path.resolve(storePath)).split(path.sep).join('/');
+}
+
 function dirtyStoreIssue(config: Config): CheckIssue | null {
   if (!usesDefaultStore(config)) return null;
   const result = spawnSync('git', ['status', '--porcelain', '--', config.storePath], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
@@ -91,6 +101,39 @@ function dirtyStoreIssue(config: Config): CheckIssue | null {
 function warnIfStoreDirty(config: Config): void {
   const issue = dirtyStoreIssue(config);
   if (issue) console.warn(`warning: ${issue.message}`);
+}
+
+// c2's own comparison: `closedCommit` lives inside docs/tasks.jsonl, so a
+// `git checkout -- docs/tasks.jsonl` takes a `done` mark and its
+// `closedCommit` away together — a field in the reverted file cannot detect
+// the file being reverted. Only diffing the working tree against the last
+// *committed* version of the store can see what a discard would lose, so
+// that is what this does, independently of closedCommit.
+const CLOSING_STATES: State[] = ['done', 'declined'];
+
+function workingTreeOnlyIssues(config: Config, tasks: Task[]): CheckIssue[] {
+  if (!usesDefaultStore(config)) return [];
+  const committedText = spawnSync('git', ['show', `HEAD:${gitPathspec(config.storePath)}`], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
+  if ((committedText.status ?? 1) !== 0) return [];
+  let committed: Task[];
+  try {
+    committed = parseStore(committedText.stdout, `${config.storePath}@HEAD`);
+  } catch {
+    return [];
+  }
+
+  const committedById = new Map(committed.map((task) => [task.id, task]));
+  const issues: CheckIssue[] = [];
+  for (const task of tasks) {
+    const before = committedById.get(task.id);
+    if (!before || before.state === task.state) continue;
+    const closing = CLOSING_STATES.includes(task.state) && !CLOSING_STATES.includes(before.state);
+    issues.push({
+      level: closing ? 'error' : 'warning',
+      message: `${task.id} is ${task.state} only in the working tree (committed state: ${before.state})`,
+    });
+  }
+  return issues;
 }
 
 function saveStoreAndWarn(tasks: Task[], config: Config): void {
@@ -241,7 +284,14 @@ function cmdCheck(flags: Record<string, string>): void {
     loadIssues.push({ level: 'error', message: error instanceof Error ? error.message : String(error) });
   }
   const dirtyIssue = dirtyStoreIssue(config);
-  const issues = [...loadIssues, ...checkStore(tasks, systemNames(config), (spec) => existsSync(specFile(config, spec))), ...closedCommitIssues(tasks), ...specIssues(config), ...(dirtyIssue ? [dirtyIssue] : [])];
+  const issues = [
+    ...loadIssues,
+    ...checkStore(tasks, systemNames(config), (spec) => existsSync(specFile(config, spec))),
+    ...closedCommitIssues(tasks),
+    ...workingTreeOnlyIssues(config, tasks),
+    ...specIssues(config),
+    ...(dirtyIssue ? [dirtyIssue] : []),
+  ];
   const errors = issues.filter((issue) => issue.level === 'error');
   const warnings = issues.filter((issue) => issue.level === 'warning');
   for (const warning of warnings) console.warn(`warning: ${warning.message}`);
@@ -610,6 +660,37 @@ function cmdEdit(args: Flags): void {
   console.log(`edited ${id}: ${changes.join(', ')}`);
 }
 
+function storeStateAt(config: Config, commit: string, id: string): State | null {
+  const result = spawnSync('git', ['show', `${commit}:${gitPathspec(config.storePath)}`], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
+  if ((result.status ?? 1) !== 0) return null;
+  try {
+    return parseStore(result.stdout, `${config.storePath}@${commit}`).find((task) => task.id === id)?.state ?? null;
+  } catch {
+    return null;
+  }
+}
+
+// "What implemented this" for a task whose `closedCommit` is null (H6:
+// `done` cannot record it, since it does not exist yet) — a best-effort
+// answer read off history rather than a fact written at close-time, so
+// `show` labels it "derived" and callers must not treat it as `closedCommit`.
+// Walks commits touching the store newest-first and returns the most recent
+// one where this id's state is `done` and its predecessor's is not — i.e.
+// the commit that flipped the record. Only ever called from `show`: a
+// history walk per task is too slow to run from `check`, which runs on
+// every push.
+function deriveClosingCommit(config: Config, id: string): string | null {
+  const log = spawnSync('git', ['log', '--format=%H', '--', config.storePath], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
+  if ((log.status ?? 1) !== 0) return null;
+  const commits = log.stdout.split('\n').map((line) => line.trim()).filter((line) => line.length > 0);
+  for (let i = 0; i < commits.length; i++) {
+    if (storeStateAt(config, commits[i], id) !== 'done') continue;
+    const previous = commits[i + 1];
+    if (previous === undefined || storeStateAt(config, previous, id) !== 'done') return commits[i];
+  }
+  return null;
+}
+
 function cmdShow(args: Flags): void {
   const config = resolveConfig(args.flags);
   const id = args.positional[0];
@@ -626,6 +707,10 @@ function cmdShow(args: Flags): void {
     return;
   }
   printTask(task, tasks);
+  if (task.state === 'done' && task.closedCommit === null) {
+    const derived = deriveClosingCommit(config, id);
+    console.log(derived ? `closedCommit (derived): ${derived}` : 'closedCommit: (none recorded, and none could be derived from git history)');
+  }
 }
 
 const LIST_STATES: State[] = ['unreviewed', 'open', 'in-progress', 'done', 'declined'];

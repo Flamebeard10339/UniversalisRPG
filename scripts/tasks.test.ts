@@ -565,6 +565,47 @@ describe('tasks CLI', () => {
     });
   });
 
+  // closedCommit answers "what commit closed this", but `done` cannot know
+  // that at the time it runs (H6). `show` fills the gap after the fact by
+  // walking git history over the store for the commit that flipped this
+  // record to done — distinct from a recorded value, since it is a guess
+  // about the past rather than a fact written at close-time.
+  it('show derives the closing commit from git history when closedCommit was never recorded', () => {
+    gitFixture(({ commit, tasks }) => {
+      tasks('add', 'anchored task', '--id', 'anchored');
+      commit('add anchored task');
+      tasks('done', 'anchored');
+      const closingCommit = commit('close anchored task');
+
+      const result = tasks('show', 'anchored');
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain(`closedCommit (derived): ${closingCommit}`);
+    });
+  });
+
+  it('show falls back to unanchored when no closing commit is recorded and none can be derived', () => {
+    fixture(({ tasks }) => {
+      tasks('add', 'anchored task', '--id', 'anchored');
+      tasks('done', 'anchored');
+      const result = tasks('show', 'anchored');
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('closedCommit: (none recorded, and none could be derived from git history)');
+    });
+  });
+
+  it('show does not attempt derivation, and prints the recorded value, when closedCommit is set', () => {
+    gitFixture(({ commit, tasks }) => {
+      tasks('add', 'anchored task', '--id', 'anchored');
+      const sha = commit('add anchored task');
+      tasks('done', 'anchored', '--commit', sha);
+      commit('unrelated later commit');
+
+      const result = tasks('show', 'anchored');
+      expect(result.stdout).toContain(`closedCommit: ${sha}`);
+      expect(result.stdout).not.toContain('derived');
+    });
+  });
+
   it('decline requires a reason and is refused for undelivered tasks', () => {
     fixture(({ tasks }) => {
       tasks('add', 'stale finding', '--id', 'stale', '--kind', 'finding', '--deliverable', 'fix it');
@@ -610,6 +651,77 @@ describe('tasks CLI', () => {
       expect(result.stderr).toContain('warning: docs/tasks.jsonl has uncommitted task-state changes');
       expect(result.stdout).toContain('1 warning(s)');
     });
+  });
+
+  // The failure this branch exists to prevent: a `done` mark that only ever
+  // existed in the working tree is invisible to `git show HEAD:...`, so a
+  // `closedCommit` field (which lives in the same file) can never detect it.
+  // Only comparing the committed store against the working tree can.
+  it('check reports a working-tree-only done mark as an error naming the task and its committed state', () => {
+    defaultStoreGitFixture(({ dir, tasks }) => {
+      tasks('add', 'closable task', '--id', 'closable');
+      spawnSync('git', ['add', '.'], { cwd: dir });
+      spawnSync('git', ['commit', '--no-verify', '-m', 'add closable task'], { cwd: dir, encoding: 'utf8' });
+
+      tasks('done', 'closable');
+      const result = tasks('check');
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain('error: closable is done only in the working tree (committed state: open)');
+    });
+  });
+
+  it('check reports a working-tree-only declined mark as an error', () => {
+    defaultStoreGitFixture(({ dir, tasks }) => {
+      tasks('add', 'stale finding', '--id', 'stale', '--kind', 'finding', '--deliverable', 'fix it');
+      spawnSync('git', ['add', '.'], { cwd: dir });
+      spawnSync('git', ['commit', '--no-verify', '-m', 'add stale finding'], { cwd: dir, encoding: 'utf8' });
+
+      tasks('decline', 'stale', '--reason', 'already fixed elsewhere');
+      const result = tasks('check');
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain('error: stale is declined only in the working tree (committed state: unreviewed)');
+    });
+  });
+
+  it('check reports a working-tree-only in-progress transition as a warning, not an error', () => {
+    defaultStoreGitFixture(({ dir, tasks }) => {
+      tasks('add', 'startable task', '--id', 'startable');
+      spawnSync('git', ['add', '.'], { cwd: dir });
+      spawnSync('git', ['commit', '--no-verify', '-m', 'add startable task'], { cwd: dir, encoding: 'utf8' });
+
+      tasks('start', 'startable');
+      const result = tasks('check');
+      expect(result.status).toBe(0);
+      expect(result.stderr).toContain('warning: startable is in-progress only in the working tree (committed state: open)');
+    });
+  });
+
+  it('check does not flag a working-tree-only mark for a task that was never committed at all', () => {
+    defaultStoreGitFixture(({ tasks }) => {
+      tasks('add', 'never committed', '--id', 'uncommitted-only');
+      const result = tasks('check');
+      expect(result.stderr).not.toContain('only in the working tree');
+    });
+  });
+
+  it('check degrades to no working-tree-comparison issue when there is no committed store (unborn HEAD)', () => {
+    const dir = mkdtempSync(path.join(os.tmpdir(), 'universalis-no-commit-'));
+    try {
+      spawnSync('git', ['init', '-q'], { cwd: dir });
+      spawnSync('git', ['config', 'user.email', 'test@example.com'], { cwd: dir });
+      spawnSync('git', ['config', 'user.name', 'Test'], { cwd: dir });
+      mkdirSync(path.join(dir, 'docs', 'specs'), { recursive: true });
+      mkdirSync(path.join(dir, 'docs', 'audits'), { recursive: true });
+      writeFileSync(path.join(dir, 'docs', 'specs', 'demo-spec.md'), '# Demo spec\n\n## Deliverable\n\nX.\n\nProof:\n\n- clause.\n\n## Decisions\n\n## Open questions\n\nNone.\n', 'utf8');
+      writeFileSync(path.join(dir, 'docs', 'audits', 'systems.json'), JSON.stringify({ unowned: { note: '', paths: ['docs', '*.md'] }, systems: [] }), 'utf8');
+      writeFileSync(path.join(dir, 'docs', 'tasks.jsonl'), `${JSON.stringify({ id: 'a', title: 'a', kind: 'task', state: 'done', severity: null, system: null, spec: null, clause: null, requires: [], files: [], deliverable: null, evidence: null, source: null, reason: null, closed: '2026-08-01', closedCommit: null })}\n`, 'utf8');
+      // No commit at all — HEAD does not exist yet on this branch.
+      const result = spawnSync(process.execPath, [tsx, script, 'check', '--branch', 'demo-spec'], { cwd: dir, encoding: 'utf8' });
+      expect(result.status).toBe(0);
+      expect(result.stderr).not.toContain('only in the working tree');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 
   it('check warns when a done task names a closing commit not reachable from HEAD', () => {

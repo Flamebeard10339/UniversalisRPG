@@ -120,14 +120,16 @@ function renderTask(task: Task): string {
   });
 }
 
-export function loadStore(path: string = DEFAULT_STORE_PATH): Task[] {
-  if (!existsSync(path)) return [];
-  return readFileSync(path, 'utf8')
+// `label` is the `where`-prefix for error messages — a file path for
+// `loadStore`, or a `path@revision` tag for text read out of git history by
+// `tasks check`'s working-tree comparison, which has no path on disk to name.
+export function parseStore(text: string, label: string): Task[] {
+  return text
     .split('\n')
     .map((line, index) => ({ line: line.trim(), number: index + 1 }))
     .filter(({ line }) => line.length > 0)
     .map(({ line, number }) => {
-      const where = `${path}:${number}`;
+      const where = `${label}:${number}`;
       try {
         return normalizeTask(JSON.parse(line) as unknown, where);
       } catch (error) {
@@ -135,6 +137,11 @@ export function loadStore(path: string = DEFAULT_STORE_PATH): Task[] {
         throw error;
       }
     });
+}
+
+export function loadStore(path: string = DEFAULT_STORE_PATH): Task[] {
+  if (!existsSync(path)) return [];
+  return parseStore(readFileSync(path, 'utf8'), path);
 }
 
 // One task per line, insertion order preserved and new tasks appended: what
