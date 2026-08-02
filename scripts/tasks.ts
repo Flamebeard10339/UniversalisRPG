@@ -65,6 +65,19 @@ function flagArities(usage: string): Map<string, FlagArity> {
   return arities;
 }
 
+// The same contract as flagArities, for the other half of the argument list.
+// Positionals are written before flags in every usage string, so the prefix
+// up to the first flag is the arity: `<id>` and `["<new title>"]` are one
+// slot each, `<id>...` makes the tail unbounded, and a command whose prefix
+// holds no placeholder takes none. Null means unbounded.
+function positionalArity(usage: string): number | null {
+  const head = usage.split('\n')[0];
+  const flagStart = head.search(/\s\[?--/);
+  const prefix = flagStart === -1 ? head : head.slice(0, flagStart);
+  const slots = prefix.match(/<[^>]+>(\.\.\.)?/g) ?? [];
+  return slots.some((slot) => slot.endsWith('...')) ? null : slots.length;
+}
+
 // `--actor` is not here: a global flag is accepted by every command, and a
 // read command that accepted it would drop it, which is exactly the silent
 // no-op c9 forbids. Every command that writes names it in its own usage.
@@ -81,7 +94,7 @@ interface ParsedArgs {
 // A bare `--actor` used to become the string 'true' and record a holder by
 // that name; a `--order` swallowed the positional that followed it. Neither
 // is decidable from the argument list alone.
-function parseArgs(args: string[], arities: Map<string, FlagArity>): ParsedArgs {
+function parseArgs(args: string[], arities: Map<string, FlagArity>, maxPositional: number | null): ParsedArgs {
   const positional: string[] = [];
   const flags: Record<string, string> = {};
   const errors: string[] = [];
@@ -108,6 +121,9 @@ function parseArgs(args: string[], arities: Map<string, FlagArity>): ParsedArgs 
     }
     flags[key] = value;
     i++;
+  }
+  if (maxPositional !== null) {
+    for (const extra of positional.slice(maxPositional)) errors.push(`unexpected argument: ${JSON.stringify(extra)}`);
   }
   return { parsed: { positional, flags, raw: args }, errors };
 }
@@ -2270,7 +2286,7 @@ export function run(argv: string[]): void | Promise<void> {
   }
   const { command } = resolved;
   const arities = new Map([...flagArities(GLOBAL_USAGE), ...flagArities(command.usage)]);
-  const { parsed, errors } = parseArgs(resolved.args, arities);
+  const { parsed, errors } = parseArgs(resolved.args, arities, positionalArity(command.usage));
   if (errors.length > 0) {
     for (const message of errors) console.error(`error: ${message}`);
     console.error(command.usage);

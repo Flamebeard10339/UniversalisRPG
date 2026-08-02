@@ -258,9 +258,44 @@ describe('tasks CLI', () => {
     });
   });
 
+  it('refuses an argument past a command\'s positional arity instead of discarding it', () => {
+    fixture(({ tasks }) => {
+      tasks('add', 'alpha task', '--id', 'alpha');
+      // The natural typo: an unquoted title. `fix` was recorded and `the
+      // thing` dropped, so the id was slugified from a truncated title.
+      const unquoted = tasks('add', 'fix', 'the', 'thing');
+      expect(unquoted.status).toBe(1);
+      expect(unquoted.stderr).toContain('unexpected argument: "the"');
+      expect(unquoted.stderr).toContain('unexpected argument: "thing"');
+      expect(tasks('list').stdout).not.toContain('fix');
+
+      // The event log's own corruption: an id passed positionally landed in
+      // the note slot and the note in a slot nothing read.
+      const note = tasks('note', 'alpha', 'the real note');
+      expect(note.status).toBe(1);
+      expect(note.stderr).toContain('unexpected argument: "the real note"');
+
+      expect(tasks('show', 'alpha', 'beta').status).toBe(1);
+      expect(tasks('doctor', 'extraneous').status).toBe(1);
+      expect(tasks('show', 'alpha').status).toBe(0);
+    });
+  });
+
+  it('leaves a command whose usage ends in ... unbounded', () => {
+    fixture(({ tasks }) => {
+      tasks('spec', 'new', 'demo-spec');
+      tasks('add', 'one', '--id', 'one');
+      tasks('add', 'two', '--id', 'two');
+      tasks('add', 'three', '--id', 'three');
+      const result = tasks('spec', 'add', 'demo-spec', 'one', 'two', 'three');
+      expect(result.status).toBe(0);
+      expect(tasks('spec', 'show', 'demo-spec').stdout).toContain('three');
+    });
+  });
+
   it('answers --help on every command and subcommand, and names the flags it will accept', () => {
     fixture(({ tasks }) => {
-      const commands = [['doctor'], ['add'], ['edit'], ['show'], ['list'], ['search'], ['next'], ['start'], ['stop'], ['done'], ['decline'], ['import'], ['triage'], ['audit-prompt'], ['handoff'], ['check-commit-msg'], ['spec'], ['spec', 'new'], ['spec', 'add'], ['spec', 'remove'], ['spec', 'show'], ['spec', 'done'], ['note'], ['decision'], ['log']];
+      const commands = [['doctor'], ['add'], ['edit'], ['show'], ['list'], ['search'], ['next'], ['start'], ['stop'], ['done'], ['decline'], ['import'], ['triage'], ['audit'], ['audit-prompt'], ['handoff'], ['check-commit-msg'], ['spec'], ['spec', 'new'], ['spec', 'add'], ['spec', 'remove'], ['spec', 'show'], ['spec', 'done'], ['note'], ['decision'], ['log']];
       for (const command of commands) {
         const result = tasks(...command, '--help');
         expect(result.status, command.join(' ')).toBe(0);
