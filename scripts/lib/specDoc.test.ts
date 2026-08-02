@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { appendAmendment, appendAuditPass, appendBaseline, duplicateClauseIds, parseSpecDoc, renderAuditPass, stampClauseIds } from './specDoc';
+import { appendAmendment, appendAuditPass, duplicateClauseIds, parseSpecDoc, renderAuditPass, stampClauseIds } from './specDoc';
 
 const DOC = `# Demo spec
 
@@ -128,13 +128,8 @@ describe('parseSpecDoc', () => {
     expect(parseSpecDoc(DOC).amendments).toEqual([]);
   });
 
-  it('returns no baseline when none is recorded', () => {
-    expect(parseSpecDoc(DOC).baseline).toBeNull();
-  });
-
   // Structure, never content: a spec's clauses are amendable by design, and
-  // pinning their text here would be a second freeze enforced by a unit test
-  // failure rather than by the merge gate.
+  // pinning their text here would freeze them by unit-test failure.
   it('parses the real docs/specs/task-system-v2.md into well-formed, distinctly identified clauses', () => {
     const text = readFileSync('docs/specs/task-system-v2.md', 'utf8');
     const { proofClauses } = parseSpecDoc(text);
@@ -145,19 +140,6 @@ describe('parseSpecDoc', () => {
       // Wrapped continuation lines are joined, not left as their own clause.
       expect(clause.text).not.toMatch(/^- /);
     }
-  });
-});
-
-describe('appendBaseline / parseSpecDoc baseline round trip', () => {
-  it('records a frozen opening deliverable without adding a parseable second Deliverable section', () => {
-    const before = parseSpecDoc(DOC);
-    const frozen = appendBaseline(DOC, before.deliverableSection);
-    const parsed = parseSpecDoc(frozen);
-    expect(parsed.baseline).toBe(before.deliverableSection);
-    expect(parsed.deliverableSection).toBe(before.deliverableSection);
-    expect(frozen.match(/^## Deliverable$/gm)).toHaveLength(1);
-    expect(frozen).toContain('## Baseline');
-    expect(frozen).toContain('#### Deliverable');
   });
 });
 

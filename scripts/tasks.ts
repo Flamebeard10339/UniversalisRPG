@@ -6,7 +6,7 @@ import { pathToFileURL } from 'node:url';
 import { harvestFiles, parseAuditDoc, systemForDoc } from './lib/auditImport';
 import { checkCommitMessage, extractNextTrailer, isExempt } from './lib/commitContract';
 import * as git from './lib/git';
-import { appendAmendment, appendAuditPass, appendBaseline, duplicateClauseIds, parseSpecDoc, stampClauseIds, type AuditVerdict, type ProofClause, type Verdict } from './lib/specDoc';
+import { appendAmendment, appendAuditPass, duplicateClauseIds, parseSpecDoc, stampClauseIds, type AuditVerdict, type ProofClause, type Verdict } from './lib/specDoc';
 import { loadManifest, systemNames as manifestSystemNames } from './lib/systems';
 import {
   checkStore,
@@ -240,23 +240,18 @@ function printTaskConcise(task: Task, tasks: Task[]): void {
   if (task.evidence) console.log(`evidence: ${preview(task.evidence)}`);
 }
 
-function specIssues(config: Config, tasks: Task[]): CheckIssue[] {
+function specIssues(config: Config): CheckIssue[] {
   if (!existsSync(config.specsDir)) return [];
-  const specsWithMembers = new Set(tasks.filter((task) => task.spec !== null).map((task) => task.spec as string));
   return readdirSync(config.specsDir)
     .filter((entry) => entry.endsWith('.md'))
     .filter((entry) => statSync(`${config.specsDir}/${entry}`).isFile())
     .flatMap((entry) => {
       const spec = entry.replace(/\.md$/, '');
       const doc = parseSpecDoc(readFileSync(`${config.specsDir}/${entry}`, 'utf8'));
-      const issues: CheckIssue[] = duplicateClauseIds(doc.proofClauses).map((id) => ({
+      return duplicateClauseIds(doc.proofClauses).map((id) => ({
         level: 'error' as const,
         message: `${spec} tags more than one proof clause [c${id}] — a clause id names exactly one clause`,
       }));
-      if (doc.baseline === null && specsWithMembers.has(spec)) {
-        issues.push({ level: 'warning', message: `${spec} has member task(s) but no recorded baseline; run \`tasks spec freeze ${spec}\`` });
-      }
-      return issues;
     });
 }
 
@@ -276,7 +271,7 @@ function cmdCheck(flags: Record<string, string>): void {
     ...checkStore(tasks, systemNames(config), (spec) => existsSync(specFile(config, spec))),
     ...closedCommitIssues(tasks),
     ...workingTreeOnlyIssues(config, tasks),
-    ...specIssues(config, tasks),
+    ...specIssues(config),
     ...(dirtyIssue ? [dirtyIssue] : []),
   ];
   const errors = issues.filter((issue) => issue.level === 'error');
@@ -1020,8 +1015,6 @@ function cmdSpecAmend(args: Flags): void {
   const text = readFileSync(path_, 'utf8');
   const doc = parseSpecDoc(text);
   // An amendment records the text a spec adopted, so the edit comes first.
-  // Recording an unchanged deliverable would leave the next edit failing the
-  // gate against a baseline nobody meant to set.
   const previous = doc.amendments[doc.amendments.length - 1];
   // Gaining clause tags is not a change worth adopting.
   const unchanged = (before: string): boolean => doc.deliverableSection.trim() === before.trim() || doc.deliverableSection.trim() === stampClauseIds(before).trim();
@@ -1036,40 +1029,10 @@ function cmdSpecAmend(args: Flags): void {
   console.log(`next: run \`tasks audit ${slug}\` to verify the new clauses`);
 }
 
-function cmdSpecFreeze(args: Flags): void {
-  const config = resolveConfig(args.flags);
-  const slug = args.positional[0];
-  if (!slug) {
-    console.error('usage: tasks spec freeze <slug>');
-    process.exitCode = 1;
-    return;
-  }
-  const path_ = specFile(config, slug);
-  if (!existsSync(path_)) {
-    console.error(`error: no such spec: ${slug}`);
-    process.exitCode = 1;
-    return;
-  }
-  const text = readFileSync(path_, 'utf8');
-  const doc = parseSpecDoc(text);
-  if (doc.baseline !== null) {
-    console.error(`error: ${slug} already has a frozen baseline`);
-    process.exitCode = 1;
-    return;
-  }
-  if (doc.deliverableSection.trim() === '') {
-    console.error(`error: ${slug}'s ## Deliverable is empty`);
-    process.exitCode = 1;
-    return;
-  }
-  writeFileSync(path_, appendBaseline(text, doc.deliverableSection), 'utf8');
-  console.log(`froze ${slug}'s current ## Deliverable as its opening baseline`);
-}
-
 function cmdSpec(args: Flags): void {
   const [sub, ...rest] = args.positional;
   const subArgs: Flags = { positional: rest, flags: args.flags };
-  if (sub && !['new', 'add', 'remove', 'show', 'done', 'amend', 'freeze'].includes(sub)) return cmdSpecShow({ positional: [sub, ...rest], flags: args.flags });
+  if (sub && !['new', 'add', 'remove', 'show', 'done', 'amend'].includes(sub)) return cmdSpecShow({ positional: [sub, ...rest], flags: args.flags });
   switch (sub) {
     case 'new':
       return cmdSpecNew(subArgs);
@@ -1083,10 +1046,8 @@ function cmdSpec(args: Flags): void {
       return cmdSpecDone(subArgs);
     case 'amend':
       return cmdSpecAmend(subArgs);
-    case 'freeze':
-      return cmdSpecFreeze(subArgs);
     default:
-      console.error(`usage: tasks spec <new|add|remove|show|done|amend|freeze> ...`);
+      console.error(`usage: tasks spec <new|add|remove|show|done|amend> ...`);
       process.exitCode = 1;
   }
 }
@@ -1522,7 +1483,7 @@ async function walkClausesInteractively(clauses: ProofClause[]): Promise<AuditVe
   return verdicts;
 }
 
-// The only way a finding enters the store. Every frozen proof clause must
+// The only way a finding enters the store. Every proof clause must
 // carry a verdict before findings are accepted — an unanswered clause
 // refuses the whole call rather than silently accepting partial results.
 async function cmdAudit(rawArgs: string[]): Promise<void> {
@@ -1676,16 +1637,10 @@ async function cmdAudit(rawArgs: string[]): Promise<void> {
   }
 
   saveStoreAndWarn(tasks, config);
-  // An audited deliverable is by definition the reviewed text, so a spec
-  // that reaches its first audit pass with no baseline gets one recorded
-  // here — this is what removes "remember to run spec freeze first" as a
-  // failure mode, without requiring anyone to freeze an unchanged spec.
-  const withBaseline = doc.baseline === null ? appendBaseline(text, doc.deliverableSection) : text;
-  writeFileSync(path_, appendAuditPass(withBaseline, { pass: passNumber, date: today(), base, head, verdicts }), 'utf8');
+  writeFileSync(path_, appendAuditPass(text, { pass: passNumber, date: today(), base, head, verdicts }), 'utf8');
 
   const met = verdicts.filter((verdict) => verdict.status === 'met').length;
   console.log(`recorded pass ${passNumber} for ${slug}: ${met}/${verdicts.length} clauses met`);
-  if (doc.baseline === null) console.log(`froze ${slug}'s current ## Deliverable as its opening baseline (pass ${passNumber})`);
   if (text !== original) console.log(`tagged ${slug}'s proof clauses [cN] — the tag is the clause's identity, so keep it when you reword or reorder`);
   if (undeliveredCreated > 0) console.log(`${undeliveredCreated} undelivered task(s) created for unmet clauses`);
   if (findingsCreated > 0) console.log(`${findingsCreated} finding(s) recorded, unreviewed`);

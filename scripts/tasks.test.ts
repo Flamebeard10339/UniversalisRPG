@@ -980,70 +980,14 @@ describe('tasks CLI', () => {
     });
   });
 
-  it('spec freeze records the current deliverable as the baseline and refuses a second freeze', () => {
-    fixture(({ tasks, dir }) => {
-      const frozen = tasks('spec', 'freeze', 'demo-spec');
-      expect(frozen.status).toBe(0);
-      expect(frozen.stdout).toContain('froze demo-spec');
-      const specText = readFileSync(path.join(dir, 'specs', 'demo-spec.md'), 'utf8');
-      expect(specText).toContain('## Baseline');
-      expect(specText.match(/^## Deliverable$/gm)).toHaveLength(1);
-
-      const again = tasks('spec', 'freeze', 'demo-spec');
-      expect(again.status).toBe(1);
-      expect(again.stderr).toContain('already has a frozen baseline');
-    });
-  });
-
-  it('recording an audit pass establishes a baseline when none exists', () => {
+  it('recording an audit pass leaves the spec with exactly one Deliverable section and no baseline', () => {
     fixture(({ tasks, dir }) => {
       const specPath = path.join(dir, 'specs', 'demo-spec.md');
-      expect(readFileSync(specPath, 'utf8')).not.toContain('## Baseline');
-
       const audited = tasks('audit', 'demo-spec', '--proof', '1=met', '--proof', '2=met');
       expect(audited.status).toBe(0);
-      expect(audited.stdout).toContain("froze demo-spec's current ## Deliverable as its opening baseline");
-      expect(readFileSync(specPath, 'utf8')).toContain('## Baseline');
-    });
-  });
-
-  it('a second audit pass does not re-freeze an existing baseline', () => {
-    fixture(({ tasks, dir }) => {
-      const specPath = path.join(dir, 'specs', 'demo-spec.md');
-      tasks('audit', 'demo-spec', '--proof', '1=met', '--proof', '2=met');
-      const afterFirst = readFileSync(specPath, 'utf8').match(/^## Baseline$/gm);
-      expect(afterFirst).toHaveLength(1);
-
-      const second = tasks('audit', 'demo-spec', '--proof', '1=met', '--proof', '2=met');
-      expect(second.stdout).not.toContain('froze demo-spec');
-      expect(readFileSync(specPath, 'utf8').match(/^## Baseline$/gm)).toHaveLength(1);
-    });
-  });
-
-  it('check warns when a spec has member task(s) but no recorded baseline, naming the fix', () => {
-    fixture(({ tasks }) => {
-      tasks('add', 'a member', '--id', 'a-member', '--spec', 'demo-spec');
-      const result = tasks('check');
-      expect(result.status).toBe(0);
-      expect(result.stderr).toContain('demo-spec has member task(s) but no recorded baseline; run `tasks spec freeze demo-spec`');
-
-      expect(tasks('spec', 'freeze', 'demo-spec').status).toBe(0);
-      const after = tasks('check');
-      expect(after.stderr).not.toContain('no recorded baseline');
-    });
-  });
-
-  it('check does not warn about a baseline-less spec that has no members', () => {
-    fixture(({ tasks }) => {
-      const result = tasks('check');
-      expect(result.stderr).not.toContain('no recorded baseline');
-    });
-  });
-
-  it('tasks spec help lists freeze as a subcommand', () => {
-    fixture(({ tasks }) => {
-      const result = tasks('spec');
-      expect(result.stderr).toContain('freeze');
+      const specText = readFileSync(specPath, 'utf8');
+      expect(specText).not.toContain('## Baseline');
+      expect(specText.match(/^## Deliverable$/gm)).toHaveLength(1);
     });
   });
 
