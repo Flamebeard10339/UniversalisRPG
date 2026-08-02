@@ -258,18 +258,23 @@ function deliverableAtMergeBase(config: Config, spec: string, baseBranch: string
 
 // Here rather than only in the merge gate because this runs on every push,
 // while the gate sees one branch's spec on a pull request.
-function specIssues(config: Config): CheckIssue[] {
+function specIssues(config: Config, tasks: Task[]): CheckIssue[] {
   if (!existsSync(config.specsDir)) return [];
+  const specsWithMembers = new Set(tasks.filter((task) => task.spec !== null).map((task) => task.spec as string));
   return readdirSync(config.specsDir)
     .filter((entry) => entry.endsWith('.md'))
     .filter((entry) => statSync(`${config.specsDir}/${entry}`).isFile())
     .flatMap((entry) => {
       const spec = entry.replace(/\.md$/, '');
       const doc = parseSpecDoc(readFileSync(`${config.specsDir}/${entry}`, 'utf8'));
-      return duplicateClauseIds(doc.proofClauses).map((id) => ({
+      const issues: CheckIssue[] = duplicateClauseIds(doc.proofClauses).map((id) => ({
         level: 'error' as const,
         message: `${spec} tags more than one proof clause [c${id}] — a clause id names exactly one clause`,
       }));
+      if (doc.baseline === null && specsWithMembers.has(spec)) {
+        issues.push({ level: 'warning', message: `${spec} has member task(s) but no recorded baseline; run \`tasks spec freeze ${spec}\`` });
+      }
+      return issues;
     });
 }
 
@@ -289,7 +294,7 @@ function cmdCheck(flags: Record<string, string>): void {
     ...checkStore(tasks, systemNames(config), (spec) => existsSync(specFile(config, spec))),
     ...closedCommitIssues(tasks),
     ...workingTreeOnlyIssues(config, tasks),
-    ...specIssues(config),
+    ...specIssues(config, tasks),
     ...(dirtyIssue ? [dirtyIssue] : []),
   ];
   const errors = issues.filter((issue) => issue.level === 'error');
@@ -1810,10 +1815,16 @@ async function cmdAudit(rawArgs: string[]): Promise<void> {
   }
 
   saveStoreAndWarn(tasks, config);
-  writeFileSync(path_, appendAuditPass(text, { pass: passNumber, date: today(), base, head, verdicts }), 'utf8');
+  // An audited deliverable is by definition the reviewed text, so a spec
+  // that reaches its first audit pass with no baseline gets one recorded
+  // here — this is what removes "remember to run spec freeze first" as a
+  // failure mode, without requiring anyone to freeze an unchanged spec.
+  const withBaseline = doc.baseline === null ? appendBaseline(text, doc.deliverableSection) : text;
+  writeFileSync(path_, appendAuditPass(withBaseline, { pass: passNumber, date: today(), base, head, verdicts }), 'utf8');
 
   const met = verdicts.filter((verdict) => verdict.status === 'met').length;
   console.log(`recorded pass ${passNumber} for ${slug}: ${met}/${verdicts.length} clauses met`);
+  if (doc.baseline === null) console.log(`froze ${slug}'s current ## Deliverable as its opening baseline (pass ${passNumber})`);
   if (text !== original) console.log(`tagged ${slug}'s proof clauses [cN] — the tag is the clause's identity, so keep it when you reword or reorder`);
   if (undeliveredCreated > 0) console.log(`${undeliveredCreated} undelivered task(s) created for unmet clauses`);
   if (findingsCreated > 0) console.log(`${findingsCreated} finding(s) recorded, unreviewed`);
