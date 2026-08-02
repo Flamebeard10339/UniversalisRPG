@@ -344,6 +344,56 @@ describe('tasks CLI', () => {
     });
   });
 
+  it('a declined requirement stops blocking its dependents instead of stranding them forever', () => {
+    fixture(({ tasks }) => {
+      tasks('add', 'blocker', '--id', 'blocker', '--spec', 'demo-spec');
+      tasks('add', 'dependent', '--id', 'dependent', '--spec', 'demo-spec', '--requires', 'blocker');
+      tasks('decline', 'blocker', '--reason', 'the approach was wrong');
+
+      expect(tasks('next').stdout).toContain('dependent');
+      expect(tasks('show', 'dependent').stdout).toContain('requires: blocker (declined)');
+      expect(tasks('show', 'dependent').stdout).not.toContain('BLOCKED');
+    });
+  });
+
+  it('next says which requirement each blocked member is waiting on instead of going silent', () => {
+    fixture(({ tasks }) => {
+      tasks('add', 'blocker', '--id', 'blocker', '--spec', 'demo-spec');
+      tasks('add', 'dependent', '--id', 'dependent', '--spec', 'demo-spec', '--requires', 'blocker');
+      tasks('start', 'blocker');
+
+      const next = tasks('next');
+      expect(next.status).toBe(0);
+      expect(next.stdout).toContain('no open, unblocked tasks in spec demo-spec');
+      expect(next.stdout).toContain('1 open member(s) are waiting on a requirement');
+      expect(next.stdout).toContain('- dependent waits on blocker');
+    });
+  });
+
+  it('next returns a dependency cycle as the answer, naming the ring someone has to break', () => {
+    fixture(({ tasks }) => {
+      tasks('add', 'first', '--id', 'first', '--spec', 'demo-spec');
+      tasks('add', 'second', '--id', 'second', '--spec', 'demo-spec', '--requires', 'first');
+      tasks('edit', 'first', '--requires', 'second');
+
+      const next = tasks('next');
+      expect(next.status).toBe(0);
+      expect(next.stdout).toContain('these block each other and someone must break the cycle:');
+      expect(next.stdout).toMatch(/first -> second -> first|second -> first -> second/);
+    });
+  });
+
+  it('next says a spec is fully accounted for rather than reporting the same emptiness as a spec with no members', () => {
+    fixture(({ tasks }) => {
+      const empty = tasks('next');
+      expect(empty.stdout).toContain('demo-spec has no member tasks');
+
+      tasks('add', 'only member', '--id', 'only-member', '--spec', 'demo-spec');
+      tasks('done', 'only-member');
+      expect(tasks('next').stdout).toContain('all 1 member(s) are accounted for — done: 1');
+    });
+  });
+
   it('start claims an open unblocked task, next skips it, and stop returns it to open', () => {
     fixture(({ tasks }) => {
       tasks('add', 'claimed task', '--id', 'claimed', '--severity', 'high', '--spec', 'demo-spec');

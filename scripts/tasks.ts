@@ -11,6 +11,7 @@ import { loadManifest, systemNames as manifestSystemNames } from './lib/systems'
 import {
   checkStore,
   DEFAULT_STORE_PATH,
+  dependencyCycles,
   StoreError,
   type CheckIssue,
   fixNowQueue,
@@ -18,8 +19,10 @@ import {
   listQueue,
   loadStore,
   parseStore,
+  requirementStates,
   saveStore,
   unreviewedQueue,
+  waitingOn,
   type Kind,
   type Severity,
   type State,
@@ -204,6 +207,15 @@ function splitList(value: string | undefined): string[] {
     : [];
 }
 
+// Every requirement is printed with why it does or does not hold the task
+// up, because "BLOCKED" alone sent readers to the store to find out which
+// edge it meant and whether that edge was still live.
+function requiresLine(task: Task, byId: Map<string, Task>): string {
+  return `requires: ${requirementStates(task, byId)
+    .map((requirement) => `${requirement.id} (${requirement.status})`)
+    .join(', ')}`;
+}
+
 function printTask(task: Task, tasks: Task[]): void {
   const byId = new Map(tasks.map((t) => [t.id, t]));
   const blocked = isBlocked(task, byId);
@@ -212,7 +224,7 @@ function printTask(task: Task, tasks: Task[]): void {
   console.log(task.title);
   if (task.system) console.log(`system: ${task.system}`);
   console.log(`spec: ${task.spec ?? '(deferred)'}`);
-  if (task.requires.length > 0) console.log(`requires: ${task.requires.join(', ')}`);
+  if (task.requires.length > 0) console.log(requiresLine(task, byId));
   if (task.files.length > 0) console.log(`files: ${task.files.join(', ')}`);
   if (task.deliverable) console.log(`\ndeliverable: ${task.deliverable}`);
   if (task.evidence) console.log(`evidence: ${task.evidence}`);
@@ -234,7 +246,7 @@ function printTaskConcise(task: Task, tasks: Task[]): void {
   console.log(task.title);
   if (task.system) console.log(`system: ${task.system}`);
   console.log(`spec: ${task.spec ?? '(deferred)'}`);
-  if (task.requires.length > 0) console.log(`requires: ${task.requires.join(', ')}`);
+  if (task.requires.length > 0) console.log(requiresLine(task, byId));
   if (task.files.length > 0) console.log(`files: ${task.files.join(', ')}`);
   if (task.deliverable) console.log(`deliverable: ${preview(task.deliverable)}`);
   if (task.evidence) console.log(`evidence: ${preview(task.evidence)}`);
@@ -615,10 +627,47 @@ function cmdNext(args: Flags): void {
   });
   if (queue.length === 0) {
     console.log(`no open, unblocked tasks in spec ${spec}`);
+    explainEmptyQueue(tasks, spec, { system: args.flags.system, severity: args.flags.severity });
     return;
   }
   if (args.flags.full === 'true') printTask(queue[0], tasks);
   else printTaskConcise(queue[0], tasks);
+}
+
+// An empty queue has four causes that look identical from outside — no
+// members, every member closed, every member held by a live requirement, or
+// a ring of members holding each other — and the caller's next move differs
+// for each.
+function explainEmptyQueue(tasks: Task[], spec: string, filter: { system?: string; severity?: string }): void {
+  const members = tasks.filter((task) => task.spec === spec);
+  if (members.length === 0) {
+    console.log(`${spec} has no member tasks — \`tasks spec add ${spec} <id>...\` puts work in it`);
+    return;
+  }
+
+  const byId = new Map(tasks.map((task) => [task.id, task]));
+  const open = members.filter((task) => task.state === 'open');
+  const blocked = open.filter((task) => isBlocked(task, byId));
+
+  if (open.length === 0) {
+    const counts = new Map<State, number>();
+    for (const member of members) counts.set(member.state, (counts.get(member.state) ?? 0) + 1);
+    console.log(`all ${members.length} member(s) are accounted for — ${[...counts].map(([state, count]) => `${state}: ${count}`).join(', ')}`);
+    return;
+  }
+
+  if (blocked.length === 0) {
+    const narrowed = [filter.system && `--system ${filter.system}`, filter.severity && `--severity ${filter.severity}`].filter(Boolean).join(' ');
+    console.log(narrowed === '' ? `${open.length} open member(s) exist but none reached this queue` : `${open.length} open, unblocked member(s) exist but none match ${narrowed}`);
+    return;
+  }
+
+  console.log(`${blocked.length} open member(s) are waiting on a requirement:`);
+  for (const task of blocked) console.log(`- ${task.id} waits on ${waitingOn(task, byId).join(', ')}`);
+
+  const memberIds = new Set(members.map((task) => task.id));
+  const cycles = dependencyCycles(tasks).filter((cycle) => cycle.some((id) => memberIds.has(id)));
+  for (const cycle of cycles) console.log(`these block each other and someone must break the cycle: ${cycle.join(' -> ')}`);
 }
 
 function cmdStart(args: Flags): void {
@@ -643,7 +692,7 @@ function cmdStart(args: Flags): void {
   }
   const byId = new Map(tasks.map((t) => [t.id, t]));
   if (isBlocked(task, byId)) {
-    const blockers = task.requires.filter((requirement) => byId.get(requirement)?.state !== 'done');
+    const blockers = waitingOn(task, byId);
     console.error(`error: ${id} is blocked by: ${blockers.join(', ')}`);
     process.exitCode = 1;
     return;
@@ -727,7 +776,7 @@ function cmdDone(args: Flags): void {
   }
   const byId = new Map(tasks.map((t) => [t.id, t]));
   if (isBlocked(task, byId)) {
-    const blockers = task.requires.filter((requirement) => byId.get(requirement)?.state !== 'done');
+    const blockers = waitingOn(task, byId);
     console.error(`error: ${id} is blocked by: ${blockers.join(', ')}`);
     process.exitCode = 1;
     return;

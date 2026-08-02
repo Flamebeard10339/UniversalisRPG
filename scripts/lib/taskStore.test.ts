@@ -2,7 +2,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { checkStore, fixNowQueue, isBlocked, listQueue, loadStore, saveStore, StoreError, unreviewedQueue, type Task } from './taskStore';
+import { checkStore, dependencyCycles, fixNowQueue, isBlocked, listQueue, loadStore, requirementStates, saveStore, StoreError, unreviewedQueue, waitingOn, type Task } from './taskStore';
 
 function task(overrides: Partial<Task> & { id: string }): Task {
   return {
@@ -194,21 +194,63 @@ describe('loadStore / saveStore', () => {
 });
 
 describe('isBlocked', () => {
-  it('is blocked while any requirement is not done', () => {
-    const tasks = [task({ id: 'a', state: 'open' }), task({ id: 'b', requires: ['a'] })];
-    const byId = new Map(tasks.map((t) => [t.id, t]));
-    expect(isBlocked(tasks[1], byId)).toBe(true);
+  const blockedBy = (requirement: Partial<Task>): boolean => {
+    const tasks = [task({ id: 'a', ...requirement }), task({ id: 'b', requires: ['a'] })];
+    return isBlocked(tasks[1], new Map(tasks.map((t) => [t.id, t])));
+  };
+
+  it('is blocked while a requirement is unreviewed, open or in-progress', () => {
+    expect(blockedBy({ state: 'unreviewed' })).toBe(true);
+    expect(blockedBy({ state: 'open' })).toBe(true);
+    expect(blockedBy({ state: 'in-progress' })).toBe(true);
   });
 
   it('is unblocked once every requirement is done', () => {
-    const tasks = [task({ id: 'a', state: 'done' }), task({ id: 'b', requires: ['a'] })];
-    const byId = new Map(tasks.map((t) => [t.id, t]));
-    expect(isBlocked(tasks[1], byId)).toBe(false);
+    expect(blockedBy({ state: 'done' })).toBe(false);
+  });
+
+  it('is unblocked by a declined requirement, which nobody is ever going to finish', () => {
+    expect(blockedBy({ state: 'declined', reason: 'not worth it' })).toBe(false);
+  });
+
+  it('is unblocked by a requirement id no record answers to, which names nothing to wait for', () => {
+    const b = task({ id: 'b', requires: ['gone'] });
+    expect(isBlocked(b, new Map([[b.id, b]]))).toBe(false);
   });
 
   it('has nothing to be blocked by when requires is empty', () => {
     const t = task({ id: 'a' });
     expect(isBlocked(t, new Map([[t.id, t]]))).toBe(false);
+  });
+});
+
+describe('requirementStates', () => {
+  it('names each requirement and why it does or does not hold the task up', () => {
+    const tasks = [
+      task({ id: 'settled', state: 'done' }),
+      task({ id: 'live', state: 'open' }),
+      task({ id: 'abandoned', state: 'declined', reason: 'superseded' }),
+      task({ id: 'dependent', requires: ['settled', 'live', 'abandoned', 'phantom'] }),
+    ];
+    const byId = new Map(tasks.map((t) => [t.id, t]));
+    expect(requirementStates(tasks[3], byId)).toEqual([
+      { id: 'settled', status: 'done' },
+      { id: 'live', status: 'waiting' },
+      { id: 'abandoned', status: 'declined' },
+      { id: 'phantom', status: 'missing' },
+    ]);
+    expect(waitingOn(tasks[3], byId)).toEqual(['live']);
+  });
+});
+
+describe('dependencyCycles', () => {
+  it('returns a ring of requirements as a walkable path rather than a bare flag', () => {
+    const tasks = [task({ id: 'a', requires: ['b'] }), task({ id: 'b', requires: ['a'] })];
+    expect(dependencyCycles(tasks)).toEqual([['a', 'b', 'a']]);
+  });
+
+  it('finds nothing in an acyclic store', () => {
+    expect(dependencyCycles([task({ id: 'a' }), task({ id: 'b', requires: ['a'] })])).toEqual([]);
   });
 });
 

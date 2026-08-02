@@ -213,8 +213,31 @@ const SEVERITY_RANK: Record<Severity, number> = { high: 0, medium: 1, low: 2 };
 // before null, so this is the one comparator they all share.
 const severityRank = (severity: Severity | null): number => (severity === null ? 3 : SEVERITY_RANK[severity]);
 
+export type RequirementStatus = 'waiting' | 'done' | 'declined' | 'missing';
+
+export interface RequirementState {
+  id: string;
+  status: RequirementStatus;
+}
+
+export function requirementStates(task: Task, byId: Map<string, Task>): RequirementState[] {
+  return task.requires.map((id) => {
+    const dep = byId.get(id);
+    if (dep === undefined) return { id, status: 'missing' };
+    if (dep.state === 'done') return { id, status: 'done' };
+    if (dep.state === 'declined') return { id, status: 'declined' };
+    return { id, status: 'waiting' };
+  });
+}
+
+export function waitingOn(task: Task, byId: Map<string, Task>): string[] {
+  return requirementStates(task, byId)
+    .filter((requirement) => requirement.status === 'waiting')
+    .map((requirement) => requirement.id);
+}
+
 export function isBlocked(task: Task, byId: Map<string, Task>): boolean {
-  return task.requires.some((id) => byId.get(id)?.state !== 'done');
+  return waitingOn(task, byId).length > 0;
 }
 
 export interface QueueFilter {
@@ -311,12 +334,13 @@ export function checkStore(tasks: Task[], systems: string[], specExists: (spec: 
     }
   }
 
-  for (const cycle of dependencyCycles(tasks, byId)) issues.push({ level: 'error', message: `dependency cycle: ${cycle.join(' -> ')}` });
+  for (const cycle of dependencyCycles(tasks)) issues.push({ level: 'error', message: `dependency cycle: ${cycle.join(' -> ')}` });
 
   return issues;
 }
 
-function dependencyCycles(tasks: Task[], byId: Map<string, Task>): string[][] {
+export function dependencyCycles(tasks: Task[]): string[][] {
+  const byId = new Map(tasks.map((task) => [task.id, task]));
   const WHITE = 0;
   const GRAY = 1;
   const BLACK = 2;
