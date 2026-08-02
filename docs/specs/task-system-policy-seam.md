@@ -42,6 +42,9 @@ Proof:
 - [c8] The merge gate cannot be defeated by renaming a branch or by adopting a
   spec without touching its file, and it does not fail open when git cannot
   resolve a base.
+- [c9] An audit verdict is bound to the text it graded, not to a clause's
+  position or tag: rewriting a clause's text retires its verdict, and a
+  hand-written `[cN]` cannot inherit one.
 
 ## Decisions
 
@@ -74,6 +77,25 @@ satisfied: attaching a `proof:` line edits the deliverable, which the freeze
 reports as unaudited drift. This spec therefore ships **no `proof:` lines until
 Slice 5 lands the freeze exclusion**, then attaches them in Slice 6. Attaching
 them earlier reproduces the contradiction on this branch.
+
+### Identity is recorded, not positional
+
+The whole `[cN]` tag-and-retirement machinery exists only because a verdict is
+addressed by position. Pass 2 (A-H2) showed the consequence: a hand-written
+`[c1]` on wholly rewritten clause text rides the old `met` verdict to
+`0 issue(s)` in a fully committed workflow. An audit pass should record a hash
+of the text it graded. Then a rewritten clause has no verdict because nothing
+graded that text, tags stop carrying authority, and the retirement bookkeeping
+becomes unnecessary rather than better-enforced.
+
+### Bind a spec to a branch by recorded membership
+
+Neither the branch name nor the branch's diff is a reliable binding — the name
+loses to a rename, and the diff misses a branch that adopts a spec through
+`tasks spec add` without touching the spec file. Store membership is the fact
+that is actually recorded, and binding on it closes the rename hole and the
+unresolvable-merge-base fail-open at the same time (C-H1 / C-H2 / A-M1, reached
+independently by two auditors from opposite directions).
 
 ### Tests before implementation
 
@@ -127,6 +149,13 @@ Closed by this spec's clauses: pass 1 M3, M4, M5, M6, M13; pass 2 A-H1, A-H2,
 A-M1, A-M3, A-M4, B-H1, B-H2, B-M1, B-M2, B-M3, B-M4, C-H1, C-H2, C-H3, C-H4,
 C-M1, C-M2, C-M4, C-M6.
 
+Not dissolved by any structure, and inherited as authoring discipline rather
+than fixed by code: A-H1 (a proof target that survives the mutation of its own
+clause), B-M2 and B-M3 (targets that assert an incidental string rather than
+the clause's behaviour). Slice 6's attach-only-if-it-dies rule is the whole
+mechanism, and it has already failed once — treat a surviving target as a
+finding, not as a target to reword until it passes.
+
 Deliberately deferred, and to be triaged rather than assumed: pass 1 M10, M11,
 M12, M15, M16, M17 and the low findings of both passes. `tasks spec add`'s
 pass-2 guard (B-M5) is a policy question for triage, not a refactor task.
@@ -157,6 +186,9 @@ without a repository. Deleting any rule from the module fails a named test.
 - Distinguish "git could not answer" from "the answer is empty" — pass 2 found
   an unresolvable merge base is currently indistinguishable from "the diff
   touches no spec", which makes the gate fail open (`c8`).
+- Replace name-based and diff-based spec resolution with binding on recorded
+  store membership (`c8`). Delete both inference paths rather than layering a
+  third on top of them.
 - Enforce single-seam access with a check (`c2`).
 
 ### Slice 3 — Proof execution adapter
@@ -174,7 +206,13 @@ without a repository. Deleting any rule from the module fails a named test.
 
 ### Slice 5 — Regressions, freeze exclusion, and budget
 
-- Freeze comparison ignores `proof:` metadata lines so `c6` holds.
+- Freeze comparison runs over the parsed model — `clause.text` against
+  `clause.proofTargets`, which the parser already separates — instead of over
+  rendered `## Deliverable` markdown. Attaching a target then cannot read as
+  prose drift (`c6`).
+- An audit pass records a hash of the clause text it graded, and a verdict
+  applies only to matching text (`c9`). Retire the clause-id retirement
+  bookkeeping this replaces rather than keeping both.
 - Fix the ambient-repo test coupling; `npm test` must pass on a `main`
   checkout containing this work (`c7`).
 - Move the proof fixture out of `scripts/` and make leakage impossible.
