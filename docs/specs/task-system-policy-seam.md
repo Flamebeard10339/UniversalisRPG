@@ -24,9 +24,10 @@ Proof:
 - [c2] Every git invocation under `scripts/` goes through `scripts/lib/git.ts`.
   No other module in `scripts/` spawns git, and that is enforced by a check
   rather than by convention.
-- [c3] Proof-target execution is an adapter that batches targets by test file —
-  one process per file, not one per target — and returns results as data the
-  policy module consumes.
+- [c3] A proof target names one or more tests and nothing else — no target
+  executes a shell command. Execution is an adapter that batches targets by
+  test file, one process per file rather than one per target, and returns
+  results as data the policy module consumes.
 - [c4] `npm test` and every gate a PR must pass each complete in under five
   minutes of wall clock, measured and recorded in the audit evidence.
 - [c5] Policy tests construct facts and assert issues with no repository, no
@@ -77,6 +78,28 @@ satisfied: attaching a `proof:` line edits the deliverable, which the freeze
 reports as unaudited drift. This spec therefore ships **no `proof:` lines until
 Slice 5 lands the freeze exclusion**, then attaches them in Slice 6. Attaching
 them earlier reproduces the contradiction on this branch.
+
+### A proof target is a test, written before the implementation
+
+`proof: command <shell>` is removed, not guarded. A clause names a list of
+tests, and those tests are the ones the repo's tests-before-implementation rule
+already requires a worker to write first. Two consequences fall out for free:
+the CI shell-execution path both audits demonstrated ceases to exist rather
+than being sandboxed or allowlisted, and a clause's proof stops being something
+assembled afterwards to satisfy a gate.
+
+It also kills the aggregate target honestly. `command npm test` survived every
+mutation that falsified its own clause, because "the suite passes" is not
+evidence for any particular promise. A clause whose proof is genuinely "the
+standard gates pass" gets no target and is verified by a human — which is what
+the untargeted-clause callout is for.
+
+### The five-minute budget is measured, not gated
+
+Recorded in audit evidence, not enforced by a failing CI check. CLAUDE.md
+resists new gates, a timing gate is flaky on shared runners, and the number is
+useful as a trend long before it is useful as a threshold. Revisit if a
+measurement ever regresses without anyone noticing.
 
 ### Identity is recorded, not positional
 
@@ -162,6 +185,33 @@ pass-2 guard (B-M5) is a policy question for triage, not a refactor task.
 
 ## Implementation Slices
 
+### Slice 0 — Reconcile inherited state
+
+Four things carried in from the superseded branch. None is refactor work, and
+each will be silently forgotten if it is not done before the refactor starts.
+
+- The store still points 36 pass-1 findings and 5 auto-generated clause tasks
+  at `task-system-real-world-friction-spec`. Many were closed by commits this
+  branch inherits. Walk them: close what the inherited commits actually closed,
+  naming the commit; re-point what this spec subsumes; triage the rest.
+  `tasks next` is not usable until the store's answer is true.
+- Pass-2 findings were never recorded as tasks — they exist only in
+  `docs/audits/testing-procedure-2026-08-02-pass2.md`. The deferred list under
+  `## Subsumed findings` must be triaged into the store rather than assumed
+  handled.
+- **Verify this spec's subsumption mapping before trusting it.** It was written
+  by hand from audit summaries and has already been wrong once: `c9` exists
+  because a finding was listed as subsumed while no clause covered it. Check
+  each cited label against the archive and correct the list.
+- This branch **inherits both regressions live**, not merely as history: the
+  `Diff range` assertion that resolves against the ambient repository, and
+  `vitestFixtureFile` writing into `scripts/lib/`. `npm test` fails on a `main`
+  checkout containing this branch today. Slice 5 removes them; until it lands,
+  do not merge.
+
+Acceptance: the store's answer to "what is open in this system" matches the two
+audit records, and every claim in `## Subsumed findings` is checked.
+
 ### Slice 1 — Extract the policy core
 
 Files to read first: `scripts/tasks.ts`, `scripts/lib/mergeGate.ts`,
@@ -193,7 +243,9 @@ without a repository. Deleting any rule from the module fails a named test.
 
 ### Slice 3 — Proof execution adapter
 
-- Batch targets by test file; one process per file (`c3`).
+- Delete `proof: command` parsing and execution. A target names tests only.
+- Allow a clause to name several tests; batch by test file, one process per
+  file (`c3`).
 - Return structured results; the policy module decides pass/fail from data.
 - Keep the four distinguished outcomes: file missing, no test matched, matched
   but skipped, matched and failed. Zero matches must fail.
@@ -228,12 +280,6 @@ without a repository. Deleting any rule from the module fails a named test.
 
 ## Open questions
 
-1. **Do `proof: command` targets survive at all?** Both passes confirmed
-   `check --merge` shell-executes a command from a PR-authored spec file in CI,
-   and pass 2 demonstrated a working side effect. Options: drop `command`
-   targets and support only vitest targets; allow them but never execute them
-   in CI; or allow only an allowlisted set. This needs a decision before
-   Slice 3.
-2. **Does the five-minute budget belong in CI as a failing check**, or as a
-   measurement recorded in audit evidence? CLAUDE.md resists new gates, and a
-   timing gate is flaky by nature on shared runners.
+None. Both are answered in Decisions: `proof: command` is removed rather than
+guarded, and the five-minute budget is a recorded measurement rather than a
+gate.
