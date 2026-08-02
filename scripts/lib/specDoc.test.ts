@@ -94,6 +94,32 @@ describe('parseSpecDoc', () => {
     expect(parseSpecDoc(doc).proofClauses).toEqual([]);
   });
 
+  it('does not treat a `- ` line inside a fenced code block as a real clause, or run its proof: target', () => {
+    const doc = [
+      '## Deliverable',
+      '',
+      'Promise.',
+      '',
+      'Proof:',
+      '',
+      '- A real clause with an example:',
+      '',
+      '```md',
+      '- [c9] not a real clause',
+      '  proof: command rm -rf /',
+      '```',
+      '',
+      '## Decisions',
+      '',
+    ].join('\n');
+    expect(parseSpecDoc(doc).proofClauses).toEqual([{ id: 1, text: 'A real clause with an example:' }]);
+  });
+
+  it('tracks ~~~ fences the same as ``` fences', () => {
+    const doc = ['## Deliverable', '', 'Promise.', '', 'Proof:', '', '- A real clause.', '', '~~~', '- [c9] not a real clause', '~~~', '', '## Decisions', ''].join('\n');
+    expect(parseSpecDoc(doc).proofClauses).toEqual([{ id: 1, text: 'A real clause.' }]);
+  });
+
   it('returns no audit passes when none are recorded', () => {
     expect(parseSpecDoc(DOC).auditPasses).toEqual([]);
   });

@@ -66,12 +66,29 @@ function scanProofClauses(deliverableSection: string): ScannedClause[] {
 
   const clauses: ScannedClause[] = [];
   let current: string[] | null = null;
+  // A markdown example inside the deliverable — Slice 3 documents `proof:`
+  // syntax with one — must not have its own `- ` lines and `proof:` lines
+  // read as real clauses and real targets. `fence` holds the open fence's
+  // character (` or ~) until a matching close, and every line in between is
+  // skipped rather than scanned.
+  let fence: string | null = null;
   const flush = (): void => {
     if (current) clauses[clauses.length - 1].text = current.join(' ').trim();
   };
   for (let i = proofIndex + 1; i < lines.length; i++) {
     const line = lines[i];
     const trimmed = line.trim();
+
+    const fenceMatch = /^(`{3,}|~{3,})/.exec(trimmed);
+    if (fence !== null) {
+      if (fenceMatch && fenceMatch[1][0] === fence) fence = null;
+      continue;
+    }
+    if (fenceMatch) {
+      fence = fenceMatch[1][0];
+      continue;
+    }
+
     const bullet = /^- (.*)$/.exec(line);
     const proof = /^proof:\s*(.+)$/.exec(trimmed);
     if (bullet) {
