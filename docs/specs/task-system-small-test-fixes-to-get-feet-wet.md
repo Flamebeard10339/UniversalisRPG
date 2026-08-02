@@ -17,7 +17,7 @@ Proof:
 
 - [c1] A regression test covers this flow: create a spec with a proof clause, audit it as unmet, amend or reword the clause, audit the amended clause as met, then mark the undelivered task done.
 - [c2] The implementation no longer depends only on exact clause text matching between an undelivered task and the current proof-clause prose.
-- [c3] `npm test` and `npm run tasks -- doctor` pass. (This clause named `check --merge`, which no longer exists; `doctor` is the scan that replaced it. RG-L2.)
+- [c3] `npm test` and `npm run tasks -- doctor` pass. (This clause named `check --merge`, which no longer exists; `doctor` is the scan that replaced it.)
 - [c4] A finding recorded by `tasks audit` can carry evidence alongside its deliverable, and the command refuses a finding that carries only one of the two, so no pass can produce a queue item triage cannot decide.
 - [c5] `tasks handoff` never reports a Next: trailer written before the branch's first commit. On a branch carrying no trailer of its own it says so, and on the base branch, where there is no branch point to stop at, it walks recent history as before.
 

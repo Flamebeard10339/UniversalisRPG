@@ -114,6 +114,41 @@ describe('checkPlan', () => {
     expect(kinds(report.findings)).toContain('no-write-grant');
   });
 
+  // The failure this module exists to prevent, in the one place it was
+  // reachable: a grant it cannot resolve matched nothing, and the guard
+  // that catches "nothing to compare" only looked for an empty array. So
+  // the plan came back clean precisely where the check was blindest.
+  it('does not count a grant it cannot resolve as a grant', () => {
+    const plan = [
+      task({ id: 'globby', writes: ['src/**/*.ts'] }),
+      task({ id: 'literal', writes: ['src/a.ts'] }),
+    ];
+    const report = checkPlan(plan, plan);
+    expect(report.ungranted).toBe(1);
+    expect(kinds(report.findings)).toContain('unreadable-grant');
+    expect(report.findings.find((f) => f.kind === 'unreadable-grant')?.message).toContain('src/**/*.ts');
+  });
+
+  it('reads a leading ./ and a trailing slash as the same region, so a plan cannot be clean by punctuation', () => {
+    const plan = [
+      task({ id: 'a', writes: ['./src/runtime/'] }),
+      task({ id: 'b', writes: ['src/runtime/combat.ts'] }),
+    ];
+    expect(kinds(checkPlan(plan, plan).findings)).toContain('overlapping-writes');
+  });
+
+  it('matches two spellings of one path on a case-insensitive filesystem', () => {
+    const plan = [task({ id: 'a', writes: ['src/Runtime.ts'] }), task({ id: 'b', writes: ['src/runtime.ts'] })];
+    expect(kinds(checkPlan(plan, plan).findings)).toContain('overlapping-writes');
+  });
+
+  it('does not report a task against itself when a plan names it twice', () => {
+    const one = task({ id: 'solo', writes: ['src/p.ts'], produces: ['policy module'] });
+    // checkPlan takes a set; cmdPlan dedupes before calling it. Pinned here
+    // because the pairing is what would fabricate the self-collision.
+    expect(checkPlan([one], [one]).findings).toEqual([]);
+  });
+
   it('reports a plan concentrated in one file, ordered or not', () => {
     const plan = [
       task({ id: 'a', writes: ['scripts/tasks.ts'] }),

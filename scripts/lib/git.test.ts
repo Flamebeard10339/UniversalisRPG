@@ -44,8 +44,7 @@ describe('git seam', () => {
     spawnSync('git', ['checkout', '-q', '-b', 'named-branch'], { cwd: dir });
     expect(branch()).toBe('named-branch');
 
-    // resolveConfig calls this before every command body, so throwing here
-    // killed every command — reads included — with a raw Node stack trace.
+    // Called before every command body, so throwing here takes down reads too.
     const outside = mkdtempSync(path.join(os.tmpdir(), 'universalis-norepo-'));
     process.chdir(outside);
     try {

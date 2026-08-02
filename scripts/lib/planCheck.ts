@@ -1,3 +1,4 @@
+import { covers } from './systems';
 import { isBlocked, waitingOn, type Task } from './taskStore';
 
 // A plan is a set of tasks somebody is about to dispatch concurrently. Every
@@ -10,25 +11,40 @@ export type PlanLevel = 'defect' | 'note';
 
 export interface PlanFinding {
   level: PlanLevel;
-  kind: 'overlapping-writes' | 'unstated-dependency' | 'duplicate-produces' | 'no-write-grant' | 'starts-blocked' | 'cohesion';
+  kind: 'overlapping-writes' | 'unstated-dependency' | 'duplicate-produces' | 'no-write-grant' | 'unreadable-grant' | 'starts-blocked' | 'cohesion';
   message: string;
 }
 
-// Write grants name files or directories. A directory grant covers
-// everything beneath it, so `src/runtime` and `src/runtime/combat.ts`
-// overlap — treating them as distinct strings would let a plan declare
-// disjoint grants over the same region and pass.
+// Compared lowercase. On Linux `Foo.ts` and `foo.ts` are two files and on
+// Windows — this repo's primary platform — they are one, so a
+// case-sensitive comparison misses a real collision on the machine most of
+// this work happens on. A spurious finding costs a line in a report; a
+// missed collision costs the thing this module exists to prevent.
 function normalize(path: string): string {
-  return path.replace(/\\/g, '/').replace(/\/+$/, '');
+  return path.replace(/\\/g, '/').replace(/^\.\//, '').replace(/\/+$/, '').toLowerCase();
 }
 
+// A grant this check cannot resolve to a region of the tree. `covers`
+// understands a literal path, a directory prefix and systems.json's
+// root-level `*.ext` form; anything else containing a wildcard is a grant
+// whose meaning this module would have to guess at. Guessing is what makes
+// a check answer "clean" over a plan it never read.
+export function isReadableGrant(path: string): boolean {
+  const normalized = normalize(path);
+  return !normalized.includes('*') || /^\*\.[a-z0-9]+$/.test(normalized);
+}
+
+// `covers` is the repo's one answer to "does this declared path region
+// contain this file" — it is how audit-status attributes a diff to a
+// system, and a second implementation here would be a second set of edge
+// cases to keep in agreement. Overlap is containment in either direction.
 export function pathsOverlap(a: string, b: string): boolean {
   const [x, y] = [normalize(a), normalize(b)];
-  return x === y || x.startsWith(`${y}/`) || y.startsWith(`${x}/`);
+  return covers(x, y) || covers(y, x);
 }
 
 function overlappingPaths(a: Task, b: Task): string[] {
-  const shared = a.writes.filter((left) => b.writes.some((right) => pathsOverlap(left, right)));
+  const shared = readableWrites(a).filter((left) => readableWrites(b).some((right) => pathsOverlap(left, right)));
   return [...new Set(shared.map(normalize))].sort();
 }
 
@@ -68,11 +84,21 @@ function pairs<T>(items: T[]): Array<[T, T]> {
 
 export interface PlanReport {
   findings: PlanFinding[];
-  // How many of the plan's tasks carry no write grant. A check over
-  // declarations cannot see past a missing one, and saying so is the
-  // difference between "no defects" and "nothing to look at".
+  // How many of the plan's tasks this check could not read a region for —
+  // no grant at all, or a grant it cannot resolve. A check over
+  // declarations cannot see past either, and saying so is the difference
+  // between "no defects" and "nothing to look at". These are one number
+  // because a grant that matches nothing is a grant that is not there, and
+  // counting a wildcard as read is what let a plan answer "clean" over
+  // tasks nobody had compared.
   ungranted: number;
   tasks: Task[];
+}
+
+// Only the entries this module can resolve. Everything downstream compares
+// these, so an unreadable entry can never produce a silent non-match.
+function readableWrites(task: Task): string[] {
+  return task.writes.filter(isReadableGrant);
 }
 
 export function checkPlan(plan: Task[], all: Task[]): PlanReport {
@@ -123,8 +149,16 @@ export function checkPlan(plan: Task[], all: Task[]): PlanReport {
     if (isBlocked(task, byId)) findings.push({ level: 'note', kind: 'starts-blocked', message: `${task.id} starts blocked — it waits on ${waitingOn(task, byId).join(', ')}` });
   }
 
-  const ungranted = plan.filter((task) => task.writes.length === 0);
-  for (const task of ungranted) findings.push({ level: 'note', kind: 'no-write-grant', message: `${task.id} declares no writes — nothing here can tell whether it collides with anything` });
+  for (const task of plan) {
+    const unreadable = task.writes.filter((path) => !isReadableGrant(path));
+    if (unreadable.length > 0) findings.push({ level: 'note', kind: 'unreadable-grant', message: `${task.id} declares ${unreadable.join(', ')}, which this check cannot resolve to a region — name paths or directories, or it compares nothing` });
+  }
+
+  const ungranted = plan.filter((task) => readableWrites(task).length === 0);
+  for (const task of ungranted) {
+    if (task.writes.length > 0) continue;
+    findings.push({ level: 'note', kind: 'no-write-grant', message: `${task.id} declares no writes — nothing here can tell whether it collides with anything` });
+  }
 
   const cohesion = cohesionFinding(plan);
   if (cohesion) findings.push(cohesion);
@@ -137,12 +171,12 @@ export function checkPlan(plan: Task[], all: Task[]): PlanReport {
 // Reported whether or not the overlaps are ordered: a sequence through one
 // file is still one change, and adding workers to it buys nothing.
 function cohesionFinding(plan: Task[]): PlanFinding | null {
-  const granted = plan.filter((task) => task.writes.length > 0);
+  const granted = plan.filter((task) => readableWrites(task).length > 0);
   if (granted.length < 3) return null;
 
   const counts = new Map<string, number>();
   for (const task of granted) {
-    for (const path of new Set(task.writes.map(normalize))) counts.set(path, (counts.get(path) ?? 0) + 1);
+    for (const path of new Set(readableWrites(task).map(normalize))) counts.set(path, (counts.get(path) ?? 0) + 1);
   }
 
   let worst: [string, number] | null = null;

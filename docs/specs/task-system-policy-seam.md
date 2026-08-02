@@ -69,7 +69,6 @@ Proof:
   each a single invocation, and each answers from the log alone — not by joining
   to present-day state, which would rewrite history every time a record is
   re-pointed.
-
 - [c13] A task can say what it may change and what it brings into existence,
   and the two are distinct from `files`. `writes` is a forward-looking grant
   over a region of the tree; `produces` names an interface nothing owns until
@@ -248,9 +247,18 @@ append-only, never rewritten. Nothing migrates.
 The parts of the cut decision that survived measurement still hold and are not
 reopened: a single record edit is already a one-line diff, and two branches
 editing *different* records already merge cleanly. Only concurrent **appends**
-conflict, and `merge=union` in `.gitattributes` handles that for one line — with
-its one failure mode, two branches editing the same record keeping both versions
-as a duplicate id, caught by the `doctor` scan `c4` requires anyway.
+conflict.
+
+**Corrected 2026-08-02.** This paragraph originally continued: `merge=union` in
+`.gitattributes` handles that, with its one failure mode — two branches editing
+the same record keeping both versions as a duplicate id — "caught by the
+`doctor` scan `c4` requires anyway". `doctor` *reports* a duplicate id and exits
+0, because `c4` permits only an unparseable store to fail. So union produced a
+clean exit, a silently duplicated record, and a green CI, which is worse than
+the conflict it was configured to avoid. Union is right for an append-only log
+and wrong for a file whose records are edited; it is now set for
+`docs/events.jsonl` alone. Two branches appending to the store conflict, loudly,
+and that is the intended behaviour.
 
 ### Searchable is the requirement, not a feature of it
 
@@ -480,10 +488,13 @@ additive: `docs/tasks.jsonl` stays exactly as it is and nothing migrates.
   `## Amendments` sections from the three spec files that carry one; git holds
   the text, and `combat-continuation-runtime.md` is 120 lines of which 56 are
   that duplicate. An amendment becomes `decision` against the spec.
-- `merge=union` for both JSONL files in `.gitattributes`, plus a duplicate-id
-  scan in `doctor`. Prove both: two branches appending merge cleanly, and two
-  branches editing one record produce a duplicate that `doctor` reports. The log
-  is append-only, so union is exactly right for it.
+- `merge=union` for `docs/events.jsonl` only, plus a duplicate-id scan in
+  `doctor`. The log is append-only, so union is exactly right for it. The store
+  is not, so it is not configured for union: prove that two branches editing one
+  record conflict rather than silently producing a duplicate under one id.
+  (Amended 2026-08-02 — this originally said "both JSONL files" and asked for a
+  proof that the duplicate appears, which was a proof that the corruption was
+  correct.)
 
 Acceptance: the log answers a single record's history **exactly** — no false
 negative when a field is edited, and no false positive when the serializer

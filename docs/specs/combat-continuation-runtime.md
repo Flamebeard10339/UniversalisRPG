@@ -41,7 +41,7 @@ Proof:
 - [c8] `npm test`, `npm run build`, `npm run layer-check` and `npm run tasks -- doctor`
   pass before the spec is marked done. (`check --merge` was this clause's fourth
   command and no longer exists; `doctor` is the scan that replaced it, and the
-  spec's standing is reported by `tasks spec show` rather than gated. RG-L2.)
+  spec's standing is reported by `tasks spec show` rather than gated.)
 
 ## Decisions
 

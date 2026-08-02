@@ -536,6 +536,16 @@ describe('tasks CLI', () => {
     });
   });
 
+  it('grades a plan naming one task three times as a plan of one', () => {
+    fixture(({ tasks }) => {
+      tasks('add', 'the only task', '--id', 'solo', '--writes', 'src/p.ts', '--produces', 'policy module');
+      const result = tasks('plan', 'solo', 'solo', 'solo');
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('plan: 1 task(s)');
+      expect(result.stdout).toContain('no overlap, no unstated dependency, no duplicated interface');
+    });
+  });
+
   it('says how much of a clean answer it could not see, when nothing declares a write grant', () => {
     fixture(({ tasks }) => {
       tasks('add', 'ungranted one', '--id', 'u1');
@@ -574,7 +584,10 @@ describe('tasks CLI', () => {
       expect(shown).toContain('BLOCKED');
       const next = tasks('next').stdout;
       expect(next).toContain('no open, unblocked tasks');
-      expect(next).toContain('editable waits on ghost');
+      // `(missing)`, not a bare id: after the fail-closed flip a typo holds
+      // a task exactly as hard as a live requirement, and `next` is where
+      // the difference has to be visible or nobody will look for it.
+      expect(next).toContain('editable waits on ghost (missing)');
       expect(tasks('doctor').stdout).toContain('[error] editable requires unresolved id: ghost');
     });
   });
@@ -1934,13 +1947,30 @@ describe('tasks CLI', () => {
     });
   });
 
-  it('audit refuses a spec whose clauses carry the same tag twice', () => {
+  it('audit records a pass over a spec whose clauses carry the same tag twice, naming the ambiguity', () => {
     fixture(({ tasks, dir }) => {
       const specPath = path.join(dir, 'specs', 'demo-spec.md');
       writeFileSync(specPath, readFileSync(specPath, 'utf8').replace('- The first clause holds.\n- The second clause holds.', '- [c1] The first clause holds.\n- [c1] The second clause holds.'), 'utf8');
       const result = tasks('audit', 'demo-spec', '--proof', '1=met', '--evidence', '1=clause 1 checked');
-      expect(result.status).toBe(1);
-      expect(result.stderr).toContain('demo-spec tags more than one proof clause [c1]');
+      // A typo in a heading used to stop an auditor filing anything at all.
+      // doctor reports the identical condition at exit 0, so this was one
+      // fact with two polarities, refusing on the write path.
+      expect(result.status).toBe(0);
+      expect(result.stderr).toContain('tags more than one proof clause [c1]');
+      expect(result.stderr).toContain('cannot say which one it graded');
+      expect(readFileSync(specPath, 'utf8')).toContain('### Pass 1');
+      expect(tasks('doctor').stdout).toContain('tags more than one proof clause [c1]');
+    });
+  });
+
+  it('audit records a pass over a spec with no proof clauses, saying it graded nothing', () => {
+    fixture(({ tasks, dir }) => {
+      const specPath = path.join(dir, 'specs', 'demo-spec.md');
+      writeFileSync(specPath, '# Demo spec\n\n## Deliverable\n\nSomething this branch promises.\n', 'utf8');
+      const result = tasks('audit', 'demo-spec', '--finding', 'something is broken', '--severity', 'low', '--system', 'Runtime', '--deliverable', 'fix it', '--evidence', 'observed live');
+      expect(result.status).toBe(0);
+      expect(result.stderr).toContain('has no Proof: clauses');
+      expect(readFileSync(specPath, 'utf8')).toContain('### Pass 1');
     });
   });
 
@@ -1948,13 +1978,18 @@ describe('tasks CLI', () => {
   // --base-branch's merge-base with a bare git call and no catch, so a
   // typo'd base name threw a raw Node stack instead of a diagnostic — the
   // exact defect Slice 1 fixed for `check` one command over.
-  it('audit reports an unresolvable --base-branch as a diagnostic, not a stack trace', () => {
-    fixture(({ tasks }) => {
+  it('audit records a pass whose range this checkout could not compute, as unresolved rather than invented', () => {
+    fixture(({ tasks, dir }) => {
       const result = tasks('audit', 'demo-spec', '--proof', '1=met', '--evidence', '1=clause 1 checked', '--proof', '2=met', '--evidence', '2=clause 2 checked', '--base-branch', 'no-such-base-branch-xyz');
-      expect(result.status).toBe(1);
+      expect(result.status).toBe(0);
       expect(result.stderr).toContain('could not resolve a merge-base');
       expect(result.stderr).not.toContain('    at ');
       expect(result.stderr).not.toContain('Command failed');
+      // Recorded, and honest about what it could not determine — never a
+      // placeholder sha a later reader would take for a fact.
+      const written = readFileSync(path.join(dir, 'specs', 'demo-spec.md'), 'utf8');
+      expect(written).toContain('- base: `(unresolved)`');
+      expect(written).toContain('- proof 1: met');
     });
   });
 
@@ -3093,11 +3128,9 @@ describe('a record history git cannot answer', () => {
     });
   });
 
-  // The store is deliberately NOT merge=union. Two branches editing one record
-  // must collide loudly: union would keep both copies under one id, which
-  // `doctor` reports at exit 0, so CI stays green while every read answers from
-  // the first copy forever. Pass 3 (CL-M5, RG-H1) caught this test asserting the
-  // silent-duplicate outcome as correct.
+  // The store is deliberately NOT merge=union. Union would keep both copies
+  // under one id, which `doctor` reports at exit 0 — so CI stays green while
+  // every read answers from the first copy forever.
   it('conflicts when two branches edit one record, rather than keeping both copies under one id', () => {
     eventLogGitFixture(({ tasks, commit, git }) => {
       tasks('add', 'a contested record', '--id', 'contested', '--spec', 'demo-spec');
@@ -3118,6 +3151,48 @@ describe('a record history git cannot answer', () => {
       const doctor = tasks('doctor');
       expect(doctor.status).toBe(0);
       expect(doctor.stdout).not.toContain('duplicate id');
+    });
+  });
+
+  // The case the spec calls the only conflicting one, and the case dropping
+  // union actually changed: every filed finding is an append, so this is
+  // what two agents filing findings on two branches will hit. It conflicts,
+  // and the conflict is the correct outcome — but nothing exercised it,
+  // because the append test moved to `note` to isolate the log's union.
+  it('conflicts when two branches each append a record, and resolving by hand leaves a store that parses', () => {
+    eventLogGitFixture(({ dir, tasks, commit, git }) => {
+      tasks('add', 'the shared base', '--id', 'base', '--spec', 'demo-spec');
+      commit('Create a record\n\nSo both branches append after the same line.');
+
+      git('checkout', '-q', '-b', 'branch-a');
+      tasks('add', 'filed by A', '--id', 'from-a', '--spec', 'demo-spec', '--actor', 'a');
+      commit('A files a finding\n\nOne appended record.');
+
+      git('checkout', '-q', 'demo-spec');
+      git('checkout', '-q', '-b', 'branch-b');
+      tasks('add', 'filed by B', '--id', 'from-b', '--spec', 'demo-spec', '--actor', 'b');
+      commit('B files a finding\n\nOne appended record.');
+
+      expect(git('merge', '--no-edit', 'branch-a').status).not.toBe(0);
+
+      // Resolved the way a human would: keep both appended records. The
+      // point is that the store is left parseable and duplicate-free, so a
+      // hand resolution cannot silently produce the corruption union did.
+      const storePath = path.join(dir, 'docs', 'tasks.jsonl');
+      const kept = readFileSync(storePath, 'utf8')
+        .split('\n')
+        .filter((line) => line.trim() !== '' && !/^[<>=]{7}/.test(line));
+      writeFileSync(storePath, `${kept.join('\n')}\n`, 'utf8');
+      git('add', 'docs/tasks.jsonl');
+      commit('Resolve by keeping both\n\nBoth findings survive.');
+
+      const doctor = tasks('doctor');
+      expect(doctor.status).toBe(0);
+      expect(doctor.stdout).not.toContain('duplicate id');
+      expect(doctor.stdout).toContain('0 unparseable line(s)');
+      const listed = tasks('list').stdout;
+      expect(listed).toContain('from-a');
+      expect(listed).toContain('from-b');
     });
   });
 });

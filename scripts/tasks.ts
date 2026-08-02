@@ -145,11 +145,8 @@ function resolveConfig(flags: Record<string, string>): Config {
     eventsPath: eventsPathFor(storePath),
     systemsPath: flags.systems ?? 'docs/audits/systems.json',
     specsDir: flags['specs-dir'] ?? 'docs/specs',
-    // Through the seam, not around it. resolveConfig runs before every
-    // command body, so a raw execFileSync here killed every command —
-    // including every read — with a Node stack trace and git's stderr the
-    // moment the cwd was not a repo. `(no branch)` is what a spec inference
-    // that has no branch name to match against should see.
+    // Through the seam: this runs before every command body, so anything
+    // that throws here takes every command down with it, reads included.
     branch: flags.branch ?? git.branch() ?? '(no branch)',
     actor: flags.actor ?? null,
   };
@@ -536,18 +533,9 @@ function cmdDoctor(args: Flags): void {
 // `--commit` is a revspec at the CLI boundary, and a revspec is not a fact —
 // `HEAD~2` names a different commit after every later commit. Resolve to the
 // full 40-char SHA it means right now, so what lands in the store is a fact
-// forever after.
-//
-// A value git cannot resolve to a commit is refused: there is no sha to
-// record, and writing the raw string would put a non-fact in the store. That
-// is c2's malformed input, not a semantic disagreement.
-//
-// Reachability is a semantic disagreement, and it is not refused. A resolvable
-// 40-char sha is well-formed; whether it is an ancestor of this HEAD is a
-// question about which commit the caller meant, and about which checkout is
-// asking. closedCommitIssues already reports exactly this as a `doctor`
-// warning at exit 0, so refusing it here made one fact a report in one command
-// and a refusal in another, with the refusal on the write path.
+// forever after. Unresolvable is refused because there is no sha to write;
+// unreachable is recorded, because which commits this checkout can see is
+// not a fact about the record.
 function resolveCommit(value: string): string {
   const sha = git.resolveCommit(value);
   if (sha === null) throw new Error(`--commit does not resolve to a commit: ${value}`);
@@ -918,9 +906,13 @@ function cmdPlan(args: Flags): void {
 
   let plan: Task[];
   if (args.positional.length > 0) {
-    const unknown = args.positional.filter((id) => !byId.has(id));
+    // Deduped: a plan is a set. Pairing the argument list instead would
+    // report a task overlapping itself, producing what it produces twice,
+    // and not requiring itself — five defects for one real task.
+    const named = [...new Set(args.positional)];
+    const unknown = named.filter((id) => !byId.has(id));
     if (unknown.length > 0) reportUnknownIds(unknown, tasks, (line) => console.log(line));
-    plan = args.positional.map((id) => byId.get(id)).filter((task): task is Task => task !== undefined);
+    plan = named.map((id) => byId.get(id)).filter((task): task is Task => task !== undefined);
   } else {
     const activeSpec = resolveActiveSpec(config, tasks, args.flags.spec);
     if (activeSpec.note) console.log(activeSpec.note);
@@ -941,13 +933,13 @@ function cmdPlan(args: Flags): void {
   }
 
   const report = checkPlan(plan, tasks);
-  console.log(`plan: ${plan.length} task(s), ${plan.length - report.ungranted} with a write grant`);
+  console.log(`plan: ${plan.length} task(s), ${plan.length - report.ungranted} with a write grant this check can read`);
   for (const task of plan) printRow(task, byId, { indent: '  ' });
   console.log('');
 
   if (report.findings.length === 0) {
     console.log('no overlap, no unstated dependency, no duplicated interface.');
-    if (report.ungranted > 0) console.log(`${report.ungranted} task(s) declared no writes, so that answer covers less than it looks like it does.`);
+    if (report.ungranted > 0) console.log(`${report.ungranted} task(s) have no grant this check could read, so that answer covers less than it looks like it does.`);
     return;
   }
 
@@ -957,10 +949,10 @@ function cmdPlan(args: Flags): void {
   console.log(`${report.findings.length} finding(s) — ${defects} defect, ${report.findings.length - defects} note. Reported, not enforced: whether to dispatch is yours.`);
 }
 
-// An empty queue has four causes that look identical from outside — no
-// members, every member closed, every member held by a live requirement, or
-// a ring of members holding each other — and the caller's next move differs
-// for each.
+// An empty queue has causes that look identical from outside — no members,
+// every member closed, every member held by a live requirement, a
+// requirement naming no record, or a ring of members holding each other —
+// and the caller's next move differs for each.
 function explainEmptyQueue(tasks: Task[], spec: string, filter: { system?: string; severity?: string }): void {
   const members = tasks.filter((task) => task.spec === spec);
   if (members.length === 0) {
@@ -984,7 +976,16 @@ function explainEmptyQueue(tasks: Task[], spec: string, filter: { system?: strin
 
   if (blocked.length === 0) return;
   console.log(`${blocked.length} open member(s) are waiting on a requirement:`);
-  for (const task of blocked) console.log(`- ${task.id} waits on ${waitingOn(task, byId).join(', ')}`);
+  // Named with their status, not just their ids: a requirement no record
+  // answers to holds the task exactly as hard as a live one and is fixed
+  // completely differently — one is waiting, the other is a typo. `next` is
+  // the command an agent opens with, so collapsing them here is where a
+  // mistyped id would go unexplained for as long as it took someone to run
+  // `show` or `doctor` on a task the queue had stopped mentioning.
+  for (const task of blocked) {
+    const held = requirementStates(task, byId).filter((requirement) => requirement.status === 'waiting' || requirement.status === 'missing');
+    console.log(`- ${task.id} waits on ${held.map((requirement) => `${requirement.id} (${requirement.status})`).join(', ')}`);
+  }
 
   const memberIds = new Set(members.map((task) => task.id));
   const cycles = dependencyCycles(tasks).filter((cycle) => cycle.some((id) => memberIds.has(id)));
@@ -1860,16 +1861,17 @@ async function cmdAudit(args: Flags, usage: string): Promise<void> {
   const original = readFileSync(path_, 'utf8');
   const text = stampClauseIds(original);
   const doc = parseSpecDoc(text);
+  // Both of these are the state of the spec *document* disagreeing with the
+  // write, not malformed CLI input, and doctor already reports the second
+  // at exit 0. Refusing meant a typo in a heading stopped an auditor filing
+  // findings at all — a gate failing closed on a disagreement, which is the
+  // shape this branch exists to remove. Reported, and the pass is recorded.
   if (doc.proofClauses.length === 0) {
-    console.error(`error: ${slug}'s ## Deliverable has no Proof: clauses to verify`);
-    process.exitCode = 1;
-    return;
+    console.warn(`warning: ${slug}'s ## Deliverable has no Proof: clauses — recording a pass that grades nothing`);
   }
   const duplicates = duplicateClauseIds(doc.proofClauses);
   if (duplicates.length > 0) {
-    console.error(`error: ${slug} tags more than one proof clause [c${duplicates[0]}] — a clause id names exactly one clause`);
-    process.exitCode = 1;
-    return;
+    console.warn(`warning: ${slug} tags more than one proof clause [c${duplicates[0]}] — a verdict for it cannot say which one it graded; \`tasks doctor\` reports this until the tags are unique`);
   }
 
   // Whichever route graded the clauses, the ones it did not reach are
@@ -1911,18 +1913,13 @@ async function cmdAudit(args: Flags, usage: string): Promise<void> {
   }
 
   const passNumber = doc.auditPasses.length + 1;
-  const base = git.mergeBase(parsed.baseBranch);
-  if (base === null) {
-    console.error(`error: could not resolve a merge-base between HEAD and ${parsed.baseBranch}`);
-    process.exitCode = 1;
-    return;
-  }
-  const head = git.head();
-  if (head === null) {
-    console.error('error: could not resolve HEAD');
-    process.exitCode = 1;
-    return;
-  }
+  // A range this checkout cannot compute is recorded as unresolved rather
+  // than refused or invented. c8 permits git as evidence by sha; it does
+  // not permit a refusal derived from git, and `(unresolved)` says exactly
+  // what happened — the same answer c3 requires of a clause nobody graded.
+  const range = resolveDiffRange(parsed.baseBranch, (line) => console.warn(`warning: ${line} — recording the pass with an unresolved range`));
+  const base = range?.base ?? '(unresolved)';
+  const head = range?.head ?? '(unresolved)';
 
   const tasks = loadStore(config.storePath);
   const taken = new Set(tasks.map((task) => task.id));

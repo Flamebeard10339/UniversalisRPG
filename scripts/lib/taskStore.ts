@@ -20,14 +20,10 @@ export interface Task {
   clause: number | null;
   requires: string[];
   files: string[];
-  // What this task may change, and what it brings into existence. `files`
-  // is evidence — where a finding was observed, often an audit record and
-  // often with a line number. These two are forward-looking: `writes` is the
-  // region of the tree the task is expected to touch, `produces` the
-  // interfaces or concepts nothing owns until it lands. Two tasks whose
-  // `writes` intersect are one change; a task writing where another
-  // produces, without requiring it, is a dependency nobody stated. Both are
-  // decidable before either task is dispatched, which is the whole point.
+  // Forward-looking, unlike `files`, which is evidence about where
+  // something was observed. `writes` is the region of the tree this task is
+  // expected to touch; `produces` names what nothing owns until it lands.
+  // What reads them is planCheck.
   writes: string[];
   produces: string[];
   deliverable: string | null;
