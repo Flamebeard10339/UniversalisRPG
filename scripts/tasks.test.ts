@@ -490,6 +490,21 @@ describe('tasks CLI', () => {
     });
   });
 
+  it('records a write grant and a produced interface, and shows both back', () => {
+    fixture(({ tasks }) => {
+      const added = tasks('add', 'extract the policy module', '--id', 'seam', '--writes', 'scripts/lib/policy.ts,scripts/lib/policy.test.ts', '--produces', 'policy module,PolicyDecision type');
+      expect(added.status).toBe(0);
+
+      const shown = tasks('show', 'seam').stdout;
+      expect(shown).toContain('writes: scripts/lib/policy.ts, scripts/lib/policy.test.ts');
+      expect(shown).toContain('produces: policy module, PolicyDecision type');
+
+      const edited = tasks('edit', 'seam', '--writes', 'scripts/lib/policy.ts');
+      expect(edited.stdout).toContain('edited seam: writes');
+      expect(tasks('show', 'seam').stdout).toContain('writes: scripts/lib/policy.ts\n');
+    });
+  });
+
   it('edit records a --requires id that does not resolve, reports it, and lets it hold the task', () => {
     fixture(({ tasks }) => {
       tasks('add', 'a task', '--id', 'editable', '--spec', 'demo-spec');

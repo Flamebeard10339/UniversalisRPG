@@ -384,6 +384,8 @@ function renderTask(task: Task, byId: Map<string, Task>, detail: Detail, style: 
   lines.push(`spec: ${task.spec ?? '(deferred)'}`);
   if (task.requires.length > 0) lines.push(requiresLine(task, byId));
   if (task.files.length > 0) lines.push(`files: ${task.files.join(', ')}`);
+  if (task.writes.length > 0) lines.push(`writes: ${task.writes.join(', ')}`);
+  if (task.produces.length > 0) lines.push(`produces: ${task.produces.join(', ')}`);
   if (task.deliverable || task.evidence) lines.push('');
   if (task.deliverable) lines.push(`deliverable: ${prose(task.deliverable)}`);
   if (task.evidence) lines.push(`evidence: ${prose(task.evidence)}`);
@@ -613,6 +615,8 @@ function cmdAdd(args: Flags, usage: string): void {
     spec,
     clause: null,
     requires: splitList(args.flags.requires),
+    writes: splitList(args.flags.writes),
+    produces: splitList(args.flags.produces),
     files: splitList(args.flags.files),
     deliverable: args.flags.deliverable ?? null,
     evidence: args.flags.evidence ?? null,
@@ -684,6 +688,14 @@ function cmdEdit(args: Flags, usage: string): void {
   if (args.flags.requires !== undefined) {
     task.requires = splitList(args.flags.requires);
     changes.push('requires');
+  }
+  if (args.flags.writes !== undefined) {
+    task.writes = splitList(args.flags.writes);
+    changes.push('writes');
+  }
+  if (args.flags.produces !== undefined) {
+    task.produces = splitList(args.flags.produces);
+    changes.push('produces');
   }
 
   if (changes.length === 0) {
@@ -1326,6 +1338,8 @@ function cmdImport(args: Flags, usage: string): void {
       spec: null,
       clause: null,
       requires: [],
+      writes: [],
+      produces: [],
       files: [`${docPath}#${finding.code}`, ...harvestFiles(finding.body, existsSync)],
       deliverable: null,
       evidence: finding.body,
@@ -1849,6 +1863,8 @@ async function cmdAudit(args: Flags, usage: string): Promise<void> {
       spec: slug,
       clause: verdict.clause,
       requires: [],
+      writes: [],
+      produces: [],
       files: parsed.clauseFiles.get(verdict.clause) ?? [],
       deliverable: clauseText,
       evidence: verdict.evidence,
@@ -1879,6 +1895,8 @@ async function cmdAudit(args: Flags, usage: string): Promise<void> {
       spec: null,
       clause: null,
       requires: [],
+      writes: [],
+      produces: [],
       files: finding.files,
       deliverable: finding.deliverable,
       evidence: finding.evidence,
@@ -2186,11 +2204,11 @@ const SPEC_USAGE = `usage: tasks spec <new|add|remove|show|done> ...  (\`tasks s
 const COMMANDS: Record<string, Command> = {
   doctor: { usage: `usage: tasks doctor [--fix] ${ACTOR_USAGE}`, run: cmdDoctor },
   add: {
-    usage: `usage: tasks add "<title>" [--kind task|finding|question] [--severity high|medium|low] [--system "<name>"] [--spec <slug>] [--files a.ts:12,b.ts] [--requires id1,id2] [--deliverable "..." (required for --kind finding)] [--evidence "..."] [--id <id>] ${ACTOR_USAGE}`,
+    usage: `usage: tasks add "<title>" [--kind task|finding|question] [--severity high|medium|low] [--system "<name>"] [--spec <slug>] [--files a.ts:12,b.ts] [--requires id1,id2] [--writes src/a.ts,src/b/] [--produces \"policy module\"] [--deliverable "..." (required for --kind finding)] [--evidence "..."] [--id <id>] ${ACTOR_USAGE}`,
     run: cmdAdd,
   },
   edit: {
-    usage: `usage: tasks edit <id> ["<new title>"] [--title "..."] [--deliverable "..."] [--evidence "..."] [--severity high|medium|low] [--system "<name>"] [--files a.ts:12,b.ts] [--requires id1,id2] ${ACTOR_USAGE}  (content only: state, spec, kind and reason are moved by start/stop/done/decline/spec add, never by edit)`,
+    usage: `usage: tasks edit <id> ["<new title>"] [--title "..."] [--deliverable "..."] [--evidence "..."] [--severity high|medium|low] [--system "<name>"] [--files a.ts:12,b.ts] [--requires id1,id2] [--writes src/a.ts,src/b/] [--produces \"policy module\"] ${ACTOR_USAGE}  (content only: state, spec, kind and reason are moved by start/stop/done/decline/spec add, never by edit)`,
     run: cmdEdit,
   },
   show: { usage: 'usage: tasks show <id>', run: cmdShow },

@@ -20,6 +20,16 @@ export interface Task {
   clause: number | null;
   requires: string[];
   files: string[];
+  // What this task may change, and what it brings into existence. `files`
+  // is evidence — where a finding was observed, often an audit record and
+  // often with a line number. These two are forward-looking: `writes` is the
+  // region of the tree the task is expected to touch, `produces` the
+  // interfaces or concepts nothing owns until it lands. Two tasks whose
+  // `writes` intersect are one change; a task writing where another
+  // produces, without requiring it, is a dependency nobody stated. Both are
+  // decidable before either task is dispatched, which is the whole point.
+  writes: string[];
+  produces: string[];
   deliverable: string | null;
   evidence: string | null;
   source: Source | null;
@@ -66,6 +76,17 @@ function stringArray(record: Record<string, unknown>, key: string, where: string
   return value;
 }
 
+// A field added after records already existed. Absent means empty, so a
+// record written before the field was introduced still parses; present but
+// the wrong shape is still malformed, so a typo is not silently an empty
+// list. Neither `requires` nor `files` can use this — every record has
+// carried both since the store's first line, and defaulting them would turn
+// a truncated record into a valid one.
+function optionalStringArray(record: Record<string, unknown>, key: string, where: string): string[] {
+  if (record[key] === undefined) return [];
+  return stringArray(record, key, where);
+}
+
 function nullableSource(record: Record<string, unknown>, where: string): Source | null {
   const value = record.source ?? null;
   if (value === null) return null;
@@ -88,6 +109,8 @@ const KNOWN_KEYS: ReadonlyArray<keyof KnownFields> = Object.keys({
   clause: true,
   requires: true,
   files: true,
+  writes: true,
+  produces: true,
   deliverable: true,
   evidence: true,
   source: true,
@@ -134,6 +157,8 @@ function normalizeTask(value: unknown, where: string): Task {
     clause,
     requires: stringArray(value, 'requires', where),
     files: stringArray(value, 'files', where),
+    writes: optionalStringArray(value, 'writes', where),
+    produces: optionalStringArray(value, 'produces', where),
     deliverable: nullableString(value, 'deliverable', where),
     evidence: nullableString(value, 'evidence', where),
     source: nullableSource(value, where),
@@ -163,6 +188,8 @@ function renderTask(task: Task): string {
     clause: task.clause,
     requires: task.requires,
     files: task.files,
+    writes: task.writes,
+    produces: task.produces,
     deliverable: task.deliverable,
     evidence: task.evidence,
     source: task.source,

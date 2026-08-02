@@ -15,6 +15,8 @@ function task(overrides: Partial<Task> & { id: string }): Task {
     clause: null,
     requires: [],
     files: [],
+    writes: [],
+    produces: [],
     deliverable: null,
     evidence: null,
     source: null,
@@ -124,6 +126,8 @@ describe('loadStore / saveStore', () => {
           clause: null,
           requires: [],
           files: [],
+          writes: [],
+          produces: [],
           deliverable: null,
           evidence: null,
           source: null,
@@ -134,6 +138,31 @@ describe('loadStore / saveStore', () => {
           claimedBy: null,
         })}\n`,
       );
+    });
+  });
+
+  it('loads a record written before writes and produces existed, and treats absent as empty', () => {
+    withTmpDir((dir) => {
+      const file = path.join(dir, 'tasks.jsonl');
+      const { writes: _w, produces: _p, extra: _e, ...before } = task({ id: 'pre-existing', files: ['docs/audits/x.md#H1'] });
+      writeFileSync(file, `${JSON.stringify(before)}\n`, 'utf8');
+
+      const [loaded] = loadStore(file);
+      expect(loaded.writes).toEqual([]);
+      expect(loaded.produces).toEqual([]);
+      // Evidence survives untouched: the two new fields are not a rename of
+      // files, and a record that only ever had evidence must not acquire a
+      // write grant by being loaded.
+      expect(loaded.files).toEqual(['docs/audits/x.md#H1']);
+    });
+  });
+
+  it('still refuses writes or produces present in the wrong shape, so a typo is not silently empty', () => {
+    withTmpDir((dir) => {
+      const file = path.join(dir, 'tasks.jsonl');
+      const { extra: _e, ...known } = task({ id: 'bad-shape' });
+      writeFileSync(file, `${JSON.stringify({ ...known, writes: 'src/a.ts' })}\n`, 'utf8');
+      expect(() => loadStore(file)).toThrow('requires writes as a string array');
     });
   });
 
@@ -193,7 +222,7 @@ describe('loadStore / saveStore', () => {
 
       saveStore(loadStore(file), file);
       const line = readFileSync(file, 'utf8').trim();
-      const canonicalKeys = ['id', 'title', 'kind', 'state', 'severity', 'system', 'spec', 'clause', 'requires', 'files', 'deliverable', 'evidence', 'source', 'reason', 'closed', 'closedCommit', 'claimed', 'claimedBy'];
+      const canonicalKeys = ['id', 'title', 'kind', 'state', 'severity', 'system', 'spec', 'clause', 'requires', 'files', 'writes', 'produces', 'deliverable', 'evidence', 'source', 'reason', 'closed', 'closedCommit', 'claimed', 'claimedBy'];
       const keys = Object.keys(JSON.parse(line));
       expect(keys.slice(0, canonicalKeys.length)).toEqual(canonicalKeys);
       expect(keys.slice(canonicalKeys.length)).toEqual(['aField', 'mField', 'zField']);
