@@ -57,14 +57,18 @@ npm run tasks -- plan <id>...
 No workers run. It reports, in one command, what has previously taken a measurement pass to find
 by hand:
 
-| finding | what it means | remedy |
+Each line is tagged `[defect]` or `[note]` and says what it found in full; these are the seven
+situations it can report.
+
+| it reports | what it means | remedy |
 | --- | --- | --- |
-| `overlapping-writes` | two unordered tasks write the same region | merge them; they are one change |
-| `unstated-dependency` | one writes where another is producing an interface | add the `requires` edge |
-| `duplicate-produces` | two tasks claim the same interface | one is the owner, the other is a duplicate |
-| `cohesion` | most of the plan writes one path | it is one task, and more workers buy nothing |
-| `no-write-grant` | a task declared no `writes` | the check cannot see it — say so, or grant it |
-| `starts-blocked` | a requirement is unsettled | expected for a sequenced plan; a surprise otherwise |
+| *"both write X, and neither requires the other"* | two unordered tasks write one region | merge them; they are one change |
+| *"writes X, where Y is producing Z"* | one writes where another is inventing an interface | add the `requires` edge |
+| *"both claim to produce Z"* | two tasks claim one interface | one is the owner, the other is a duplicate |
+| *"N of M granted task(s) write X"* | most of the plan lands in one path | it is one task, and more workers buy nothing |
+| *"declares no writes"* | nothing to compare | grant it, or accept that this task was not checked |
+| *"cannot resolve to a region"* | a grant with a wildcard in it | name paths or directories — a glob compares nothing |
+| *"starts blocked — it waits on ..."* | a requirement is unsettled | expected in a sequenced plan; a surprise otherwise |
 
 It exits 0 and refuses nothing. Dispatching against a reported defect is a call a planner is
 allowed to make; making it unknowingly is not.
@@ -107,10 +111,19 @@ decomposition was wrong, and that is worth knowing before the next one is cut.
 `tasks audit-prompt <spec>` generates the auditor's brief; `tasks audit <spec>` records the pass.
 An audit reviews the diff a branch proposes to merge, not a running commit count.
 
-- **An audit cannot create work.** Every finding enters `unreviewed`. That decouples the auditor
-  from the cost of what it finds, which is the condition under which auditors are useful.
+A pass has **two outputs, and they behave differently.**
+
+- **A finding cannot create work.** Every finding enters `unreviewed` and waits for triage. That
+  decouples the auditor from the cost of what it finds, which is the condition under which
+  auditors are useful.
+- **An `unmet` clause creates work directly.** It becomes an open `undelivered` member of the spec
+  — high severity, no triage step — and `tasks next` will hand it to the next worker. This is not
+  an exception to the rule above so much as its other half: a finding is *new* scope, so it waits
+  for a human; an unmet clause is scope the branch **already promised**, so nothing is being added.
+  The first rule stops a spec growing, the second stops it closing falsely. Both have happened here.
 - **Every proof clause gets a verdict**: `met` carries evidence, `unmet` means it was checked and
-  fails, `unknown` means nobody looked. `unknown` and `unmet` never collapse.
+  fails, `unknown` means nobody looked. `unknown` and `unmet` never collapse — an ungraded clause
+  records `unknown` and creates nothing, because nobody has established there is work to do.
 - **Red-green proves a test can fail; only mutation proves it fails for the right reason.** For
   pure logic, remove, invert or scale the behaviour a proof claims and confirm the named test goes
   red.
@@ -121,9 +134,12 @@ An audit reviews the diff a branch proposes to merge, not a running commit count
 
 ## 7. Triage is a human's call
 
-`tasks triage` walks the unreviewed queue. Promote joins the current spec; defer leaves it open and
-unclaimed; decline closes it with a reason. Promotion is available at every pass — an auditor files,
-it does not schedule.
+`tasks triage` walks the unreviewed queue one finding at a time, offering
+`[1] promote  [2] defer  [3] decline  [4] redirect  [s] skip  [q] save and quit`. Promote joins the
+current spec; defer leaves it open and unclaimed; decline closes it with a reason; redirect
+re-displays the same finding so a mis-keyed answer is not a decision. Quitting saves, so a long
+queue survives being interrupted. Promotion is available at every pass — an auditor files, it does
+not schedule.
 
 Before promoting a list, read its *shape*. A finding list is evidence about a system, not a queue.
 Density in one file is a structural diagnosis. Two findings that contradict each other mean no
@@ -131,7 +147,31 @@ module owns that rule. Ask **what single change retires the most of the list** �
 seam that does not exist yet, build the seam first, because fixing items that dissolve under a
 restructure is work thrown away.
 
-## 8. Close and merge
+## 8. Record the reasoning, not just the outcome
+
+Every store write appends a line to `docs/events.jsonl` automatically — who, when, which branch,
+which head, and what changed. Nothing to remember and nothing to keep in sync. Two verbs add the
+part the tool cannot infer:
+
+```bash
+npm run tasks -- note "measured the queue at 87 records before touching it" --id <id>
+npm run tasks -- decision "cutting by command family, not by layer" --spec <slug>
+```
+
+`tasks log` answers from the log alone — never by joining to present-day state, which would rewrite
+history every time a record is re-pointed. `--id`, `--system`, `--spec`, `--op` and free text each
+answer in one invocation and compose:
+
+```bash
+npm run tasks -- log --id <id>            # this record's whole history
+npm run tasks -- log --op decision        # every decision, no text matching
+```
+
+This is what git cannot give you. `git log -S` finds one of five edits to a record; `tasks log --id`
+finds all five, in order, and stays exact after a serializer rewrite touches every line. **A
+decision made in a session and not recorded here is a decision the next planner will re-litigate.**
+
+## 9. Close and merge
 
 `tasks spec done <slug>` when every member is `done` or `declined`. `tasks doctor` scans the store
 and reports; it fails on exactly one condition, a line that will not parse.

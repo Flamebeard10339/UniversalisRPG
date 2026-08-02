@@ -281,6 +281,28 @@ describe('tasks CLI', () => {
     });
   });
 
+  // The arity is derived by regex from each usage string, so a derivation
+  // that reads too high is silent — the command just keeps discarding. This
+  // sweeps every surface rather than the ones somebody thought to check:
+  // `spec` derived 3 from prose in its own usage line and went unnoticed
+  // through two audits.
+  it('refuses five junk arguments on every bounded command surface', () => {
+    fixture(({ tasks }) => {
+      const unbounded = new Set(['spec add', 'spec remove', 'plan']);
+      const surfaces = [['doctor'], ['add'], ['edit'], ['show'], ['list'], ['search'], ['next'], ['start'], ['stop'], ['done'], ['decline'], ['import'], ['triage'], ['audit'], ['audit-prompt'], ['handoff'], ['check-commit-msg'], ['plan'], ['spec'], ['spec', 'new'], ['spec', 'add'], ['spec', 'remove'], ['spec', 'show'], ['spec', 'done'], ['note'], ['decision'], ['log']];
+      for (const surface of surfaces) {
+        const name = surface.join(' ');
+        const result = tasks(...surface, 'j1', 'j2', 'j3', 'j4', 'j5');
+        if (unbounded.has(name)) {
+          expect(result.stderr, name).not.toContain('unexpected argument');
+          continue;
+        }
+        expect(result.status, name).toBe(1);
+        expect(result.stderr, name).toContain('unexpected argument');
+      }
+    });
+  });
+
   it('leaves a command whose usage ends in ... unbounded', () => {
     fixture(({ tasks }) => {
       tasks('spec', 'new', 'demo-spec');
@@ -2853,6 +2875,36 @@ describe('the event log', () => {
     });
 
     expect(existsSync(projectLog) ? readFileSync(projectLog, 'utf8') : null).toBe(before);
+  });
+
+  // c11 is a universal over hand-paired call sites, and a universal that only
+  // its popular members exercise is not proven. Two audits in a row mutated
+  // doctor-fix, triage, import, decline and spec-defer to append nothing and
+  // watched the whole suite stay green. This drives every write verb once, so
+  // an unpaired sixteenth site fails here rather than in an audit.
+  it('records an event for every verb that writes the store, not only the well-travelled ones', () => {
+    fixture(({ tasks, dir, triage }) => {
+      const auditDoc = path.join(dir, 'legacy-audit.md');
+      writeFileSync(auditDoc, '# Runtime — 2026-01-01\n\n## H1 — an imported finding\n\n**Files:** `src/runtime/a.ts:1`\n\nEvidence prose.\n\n**Fix**: do the thing.\n', 'utf8');
+
+      tasks('import', auditDoc, '--actor', 'importer');
+      triage('2\n');
+      tasks('add', 'a decliner', '--id', 'to-decline', '--actor', 'w');
+      tasks('decline', 'to-decline', '--reason', 'not worth it', '--actor', 'w');
+      tasks('add', 'a deferred member', '--id', 'to-defer', '--spec', 'demo-spec', '--actor', 'w');
+      tasks('spec', 'done', 'demo-spec', '--defer-open', '--actor', 'w');
+      tasks('add', 'a fixable', '--id', 'fixable', '--actor', 'w');
+      tasks('edit', 'fixable', '--evidence', 'x', '--actor', 'w');
+      tasks('doctor', '--fix', '--actor', 'w');
+
+      // Every op the store can be written by. `start`/`stop`/`done`/`spec-add`
+      // are covered by the test below; these five are the ones two audits
+      // proved nothing was holding.
+      const ops = new Set(readEvents(dir).map((event) => event.op));
+      for (const op of ['import', 'triage', 'decline', 'spec-defer', 'add', 'edit']) {
+        expect(ops, `no event recorded for ${op}`).toContain(op);
+      }
+    });
   });
 
   it('appends exactly one event per record a write changed, in the order the writes happened', () => {

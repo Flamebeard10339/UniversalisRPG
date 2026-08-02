@@ -73,9 +73,14 @@ function flagArities(usage: string): Map<string, FlagArity> {
 // holds no placeholder takes none. Null means unbounded.
 function positionalArity(usage: string): number | null {
   const head = usage.split('\n')[0];
-  const flagStart = head.search(/\s\[?--/);
-  const prefix = flagStart === -1 ? head : head.slice(0, flagStart);
-  const slots = prefix.match(/<[^>]+>(\.\.\.)?/g) ?? [];
+  // Stop at the first flag or the first prose parenthetical, whichever comes
+  // first: everything after either is describing, not declaring. A
+  // `<a|b|c>` alternation names a choice among literal subcommand keywords,
+  // which resolveCommand consumes before the parser sees the list, so it is
+  // not a slot — counting it read `tasks spec` as taking three arguments.
+  const stop = head.search(/\s(\[?--|\()/);
+  const prefix = stop === -1 ? head : head.slice(0, stop);
+  const slots = (prefix.match(/<[^>]+>(\.\.\.)?/g) ?? []).filter((slot) => !slot.includes('|'));
   return slots.some((slot) => slot.endsWith('...')) ? null : slots.length;
 }
 

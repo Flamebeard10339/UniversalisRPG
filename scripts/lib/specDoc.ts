@@ -84,6 +84,16 @@ function scanProofClauses(deliverableSection: string): ScannedClause[] {
       continue;
     }
 
+    // A heading ends the clause it follows. Without this a `###` subsection
+    // written under the last clause becomes part of that clause's text —
+    // which is its identity, what an auditor is asked to grade, and what an
+    // undelivered task is titled with.
+    if (/^#{1,6}\s/.test(trimmed)) {
+      flush();
+      current = null;
+      continue;
+    }
+
     const bullet = /^- (.*)$/.exec(line);
     const proof = /^proof:\s*(.+)$/.exec(trimmed);
     if (bullet) {

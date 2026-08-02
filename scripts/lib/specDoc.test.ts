@@ -49,6 +49,32 @@ describe('parseSpecDoc', () => {
     ]);
   });
 
+  // A clause's text is its identity: it is what an auditor is asked to
+  // grade and what an `unmet` verdict titles its undelivered task with. A
+  // subsection written under the last clause was being absorbed into it,
+  // which produced a 900-character clause title in the live store.
+  it('ends a clause at a heading rather than absorbing the section that follows it', () => {
+    const doc = [
+      '## Deliverable',
+      '',
+      'Promise.',
+      '',
+      'Proof:',
+      '',
+      '- The first clause holds.',
+      '- The last clause holds.',
+      '',
+      '### A subsection explaining the clauses',
+      '',
+      'Prose that belongs to the section, not to the clause above it.',
+      '',
+    ].join('\n');
+    expect(parseSpecDoc(doc).proofClauses).toEqual([
+      { id: 1, text: 'The first clause holds.' },
+      { id: 2, text: 'The last clause holds.' },
+    ]);
+  });
+
   it('parses indented proof target metadata without folding it into clause text', () => {
     const doc = '## Deliverable\n\nPromise.\n\nProof:\n\n- [c1] The command proof runs.\n  proof: command node --version\n- [c2] The vitest proof runs.\n  proof: vitest scripts/tasks.test.ts "audit-prompt prints a ready-to-use auditor prompt for a spec"\n';
     expect(parseSpecDoc(doc).proofClauses).toEqual([

@@ -527,3 +527,26 @@ See the Decisions entry.
 deletes. Renaming costs re-pointing 38 member records through the operation the
 tool handles worst, so it waits until `c8` has removed the machinery that makes
 a rename dangerous.
+
+## Audit passes
+
+### Pass 1 — 2026-08-02
+
+- base: `91cd1ed87c7a4c179e68a834a8bad0cc48052749`
+- head: `d26aff81f998e48533c209aceb0a23ed6be99cce`
+- proof 1: met — Probed every dispatch-table command against unknown ids, unknown slugs, an unresolvable base branch, a dependency cycle and an unparseable store line: all exit 0. Both CL-M1 sites closed via reportUnknownSpec. Non-zero exits from reads are confined to malformed CLI input.
+- proof 2: met — All three CL-M3 refusals verified converted to warnings at exit 0 (done --commit non-ancestor, audit on a clause-less deliverable, audit on a duplicate clause id). Swept all 43 refusal sites; survivors are missing/invalid arguments, an unparseable store, and two name-already-taken cases. Accepts done --commit <unresolvable> as malformed input: no other command reports that condition at exit 0.
+- proof 3: met — Graded c1=met/c2=unmet on a 3-clause spec leaving c3 ungraded; output reads 'outstanding: c2 (unmet), c3 (unknown)' plus '1 clause(s) recorded unknown - nobody graded them'. No percentage, ratio or single bit anywhere in tasks.ts.
+- proof 4: met — Exit 0 on a dependency cycle, duplicate id, cold claims and working-tree-only closes; exit 1 only on an unparseable line. Gate wall clock recorded: npm test 50s, audit-status 11s, tsc 3s, doctor 2s, layer-check 1s.
+- proof 5: met — decline --reason on a real audit-created undelivered task closes it, stores the reason, prints 'declining it abandons the clause, it does not discharge it', and appends a decline event. No drop verb in the dispatch table.
+- proof 6: met — start --actor records the holder; a second start reports 'took over a claim - the previous claim is replaced, not merged'. Auto-release structurally impossible from next, which never saves.
+- proof 7: met — question is a fourth kind reachable through existing add/list/show with no new command, file or record shape.
+- proof 8: unmet — Refusal half is now met - every git-derived refusal about the work is gone. Recorded-fact half fails: resolveConfig defaults branch to git.branch() and recordEvents persists it into every event, undisclosed. This is a contradiction with c11, which requires the branch in the event, and needs a spec amendment rather than a code change - filed as the c8/c11 tension.
+- proof 9: met — Extra positionals refused on all 27 command surfaces including add's worst case; --help answers on all 27 with audit now in the coverage test; one printer confirmed, triage renders via printRow with the id. Residual: positionalArity derived 3 for bare spec from prose, unreachable outside --help, since fixed and swept by a per-surface test.
+- proof 10: met — git grep over scripts/ src/ .github/ CLAUDE.md for mergeGate, freeze, baseline, clause-text hash, spec amend and the amendment functions returns only two test fixtures whose content is a question record's title. mergeGate.ts and its test do not exist.
+- proof 11: met — All 15 saveStoreAndWarn sites paired with recordEvents; appendEvents never reads the file so the snapshot cannot become a join. Proof gap filed and since closed: five ops could be deleted with the suite green, now caught by a per-verb coverage test, mutation-verified.
+- proof 12: met — cmdLog never loads the store, so 'from the log alone' is structural rather than asserted. Each filter answers in one invocation and they compose; the acceptance test beats git log -S (1 of 5) and -G.
+- proof 13: met — Mutation-proved: removing the undefined tolerance in optionalStringArray fails the named test for the right reason. Distinction from files is real - a task with only --files is reported by plan as declaring no writes, and the three fields serialize separately.
+- proof 14: met — Mutation-proved: forcing inventor=null fails the named test. Adversarial sweep correct on ./ prefix, trailing slash, case, directory containment, the src/a vs src/ab.ts prefix trap, transitive ordering, self-reference, cycles, repeated ids, empty and 30-task plans. Both pass-4 defects re-tested and genuinely fixed.
+- proof 15: met — Mutation-proved: forcing ungranted=[] fails the named test. Live: unknown ids, a cycle and an empty plan all exit 0, and the count it could not read appears in the header and per task.
+- proof 16: unmet — Structural conjuncts hold - the doc exists, sits outside docs/specs, and CLAUDE.md points at it twice. Content does not: section 6 asserted 'an audit cannot create work' while an unmet clause creates an open high-severity undelivered spec member that next hands out with no triage, and the doc omitted the event log entirely. A workflow doc that misdescribes the tool is the defect this branch split a file to fix.
