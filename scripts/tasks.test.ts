@@ -712,7 +712,7 @@ describe('tasks CLI', () => {
     });
   });
 
-  it('decline requires a reason and is refused for undelivered tasks', () => {
+  it('decline requires a reason, and closes a record from any state it was in', () => {
     fixture(({ tasks }) => {
       tasks('add', 'stale finding', '--id', 'stale', '--kind', 'finding', '--deliverable', 'fix it');
       const missingReason = tasks('decline', 'stale');
@@ -721,6 +721,13 @@ describe('tasks CLI', () => {
       const declined = tasks('decline', 'stale', '--reason', 'already fixed elsewhere');
       expect(declined.status).toBe(0);
       expect(tasks('show', 'stale').stdout).toContain('reason: already fixed elsewhere');
+
+      tasks('add', 'in flight', '--id', 'in-flight', '--spec', 'demo-spec');
+      tasks('start', 'in-flight');
+      const late = tasks('decline', 'in-flight', '--reason', 'overtaken by events');
+      expect(late.status).toBe(0);
+      expect(late.stdout).toContain('was in-progress');
+      expect(tasks('show', 'in-flight').stdout).toContain('[task/declined]');
     });
   });
 
@@ -1125,22 +1132,25 @@ describe('tasks CLI', () => {
     });
   });
 
-  it('spec remove refuses an id that is not a member of that spec', () => {
+  it('spec remove reports an id that was not a member rather than refusing the whole call', () => {
     fixture(({ tasks }) => {
       tasks('add', 'unrelated', '--id', 'unrelated');
-      const result = tasks('spec', 'remove', 'demo-spec', 'unrelated');
-      expect(result.status).toBe(1);
-      expect(result.stderr).toContain('not member(s) of demo-spec: unrelated');
+      tasks('add', 'a member', '--id', 'a-member', '--spec', 'demo-spec');
+      const result = tasks('spec', 'remove', 'demo-spec', 'unrelated', 'a-member');
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('named a different spec, or none, and now name none: unrelated');
+      expect(tasks('show', 'a-member').stdout).toContain('spec: (deferred)');
     });
   });
 
-  it('spec remove refuses on an undelivered task, the same rule spec done --defer-open enforces', () => {
+  it('spec remove drops an undelivered task out of its spec and records that the clause is now tracked by none', () => {
     fixture(({ tasks }) => {
       tasks('audit', 'demo-spec', '--proof', '1=unmet', '--evidence', '1=not yet', '--proof', '2=met');
       const result = tasks('spec', 'remove', 'demo-spec', 'demo-spec-clause-1');
-      expect(result.status).toBe(1);
-      expect(result.stderr).toContain('undelivered task(s) cannot be removed');
-      expect(tasks('show', 'demo-spec-clause-1').stdout).toContain('spec: demo-spec');
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain("were demo-spec's outstanding promises");
+      expect(result.stdout).toContain('tracked by no spec: demo-spec-clause-1');
+      expect(tasks('show', 'demo-spec-clause-1').stdout).toContain('spec: (deferred)');
     });
   });
 
@@ -1186,12 +1196,13 @@ describe('tasks CLI', () => {
     });
   });
 
-  it('spec done refuses while a member is neither done nor declined, and names it', () => {
+  it('spec done reports that a spec is not done, naming every member that is not, and does not fail a build over it', () => {
     fixture(({ tasks }) => {
       tasks('add', 'a member', '--id', 'a-member', '--spec', 'demo-spec');
       const result = tasks('spec', 'done', 'demo-spec');
-      expect(result.status).toBe(1);
-      expect(result.stderr).toContain('a-member');
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('demo-spec is not done');
+      expect(result.stdout).toContain('- a-member [task/open] a member');
     });
   });
 
@@ -1680,12 +1691,17 @@ describe('tasks CLI', () => {
     });
   });
 
-  it("audit's undelivered task cannot be declined, matching every other undelivered task", () => {
+  it("audit's undelivered task can be declined, and the decline says the clause is abandoned rather than discharged", () => {
     fixture(({ tasks }) => {
       tasks('audit', 'demo-spec', '--proof', '1=unmet', '--evidence', '1=nope', '--proof', '2=met');
-      const result = tasks('decline', 'demo-spec-clause-1', '--reason', 'trying anyway');
-      expect(result.status).toBe(1);
-      expect(result.stderr).toContain('undelivered');
+      const result = tasks('decline', 'demo-spec-clause-1', '--reason', 'the spec that promised it is superseded');
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('declining it abandons the clause, it does not discharge it');
+
+      const shown = tasks('show', 'demo-spec-clause-1').stdout;
+      expect(shown).toContain('[undelivered/declined/high]');
+      expect(shown).toContain('reason: the spec that promised it is superseded');
+      expect(shown).toContain('closed: ');
     });
   });
 

@@ -442,9 +442,9 @@ describe('checkStore', () => {
     });
   });
 
-  it('refuses a declined undelivered task', () => {
-    const issues = checkStore([task({ id: 'a', kind: 'undelivered', state: 'declined', reason: 'x' })], systems);
-    expect(issues).toContainEqual({ level: 'error', message: 'a is undelivered and cannot be declined' });
+  it('accepts a declined undelivered task, which is now an abandonment the tool can record', () => {
+    const issues = checkStore([task({ id: 'a', kind: 'undelivered', clause: 1, state: 'declined', reason: 'x' })], systems);
+    expect(issues).toEqual([]);
   });
 
   it('flags a system not in systems.json', () => {

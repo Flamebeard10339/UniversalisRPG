@@ -869,22 +869,14 @@ function cmdDecline(args: Flags): void {
     refuseUnknownIds([id], tasks);
     return;
   }
-  if (task.kind === 'undelivered') {
-    console.error(`error: ${id} is undelivered and cannot be declined`);
-    process.exitCode = 1;
-    return;
-  }
-  if (task.state !== 'unreviewed' && task.state !== 'open') {
-    console.error(`error: ${id} is ${task.state}, cannot decline`);
-    process.exitCode = 1;
-    return;
-  }
-  task.state = 'declined';
+  const notes = transition(task, 'declined');
   task.reason = reason;
   task.closed = today();
   task.closedCommit = null;
   saveStoreAndWarn(tasks, config);
   console.log(`declined ${id}`);
+  for (const note of notes) console.log(note);
+  if (task.kind === 'undelivered') console.log(`this was ${task.spec ?? 'a spec'}'s outstanding promise on clause ${task.clause ?? '(none named)'} — declining it abandons the clause, it does not discharge it`);
 }
 
 const SPEC_SCAFFOLD = (slug: string): string => `# ${slug}
@@ -1015,11 +1007,6 @@ function specMembers(members: Task[], ordered: boolean): Task[] {
   return result;
 }
 
-// Rule 7: an undelivered task is the branch's outstanding promise and
-// cannot leave its spec by hand — `spec done --defer-open` skips it during
-// a sweep, `spec remove` refuses on it outright.
-const isUndelivered = (task: Task): boolean => task.kind === 'undelivered';
-
 function cmdSpecDone(args: Flags): void {
   const config = resolveConfig(args.flags);
   const slug = args.positional[0];
@@ -1037,17 +1024,15 @@ function cmdSpecDone(args: Flags): void {
   const stragglers = members.filter((task) => task.state !== 'done' && task.state !== 'declined');
 
   if (stragglers.length > 0 && args.flags['defer-open'] === 'true') {
-    for (const straggler of stragglers) {
-      if (isUndelivered(straggler)) continue;
-      straggler.spec = null;
-    }
+    for (const straggler of stragglers) straggler.spec = null;
     saveStoreAndWarn(tasks, config);
+    console.log(`deferred ${stragglers.length} straggler(s) out of ${slug}: ${stragglers.map((task) => task.id).join(', ')}`);
   }
 
   const stillOpen = loadStore(config.storePath).filter((task) => task.spec === slug && task.state !== 'done' && task.state !== 'declined');
   if (stillOpen.length > 0) {
-    console.error(`error: ${slug} is not done — neither done nor declined: ${stillOpen.map((task) => task.id).join(', ')}`);
-    process.exitCode = 1;
+    console.log(`${slug} is not done — ${stillOpen.length} member(s) are neither done nor declined:`);
+    for (const task of stillOpen) console.log(`- ${task.id} [${task.kind}/${task.state}] ${task.title}`);
     return;
   }
   console.log(`${slug} is done: every member is done or declined`);
@@ -1077,20 +1062,12 @@ function cmdSpecRemove(args: Flags): void {
     return;
   }
   const notMembers = ids.filter((id) => byId.get(id)!.spec !== slug);
-  if (notMembers.length > 0) {
-    console.error(`error: not member(s) of ${slug}: ${notMembers.join(', ')}`);
-    process.exitCode = 1;
-    return;
-  }
-  const undelivered = ids.filter((id) => isUndelivered(byId.get(id)!));
-  if (undelivered.length > 0) {
-    console.error(`error: undelivered task(s) cannot be removed from a spec: ${undelivered.join(', ')}`);
-    process.exitCode = 1;
-    return;
-  }
+  const undelivered = ids.filter((id) => byId.get(id)!.kind === 'undelivered');
   for (const id of ids) byId.get(id)!.spec = null;
   saveStoreAndWarn(tasks, config);
   console.log(`removed ${ids.length} task(s) from ${slug}`);
+  if (notMembers.length > 0) console.log(`${notMembers.length} of those named a different spec, or none, and now name none: ${notMembers.join(', ')}`);
+  if (undelivered.length > 0) console.log(`${undelivered.length} of those were ${slug}'s outstanding promises — the clauses they name are now tracked by no spec: ${undelivered.join(', ')}`);
 }
 
 // Archives the current ## Deliverable under ## Amendments, dated and
