@@ -309,7 +309,7 @@ export function coldClaims(tasks: Task[], spec: string | null, today: string, fi
     .filter((task) => task.state === 'in-progress' && task.spec === spec)
     .filter((task) => filter.system === undefined || task.system === filter.system)
     .filter((task) => filter.severity === undefined || task.severity === filter.severity)
-    .filter((task) => claimOf(task, today)?.cold ?? false)
+    .filter((task) => isColdClaim(task, today))
     .sort((a, b) => (claimOf(b, today)?.days ?? 0) - (claimOf(a, today)?.days ?? 0));
 }
 
@@ -422,11 +422,17 @@ export function claimSummary(task: Task, today: string): string | null {
   return `${holder} (${age}${claim.cold ? `, COLD — past the ${COLD_CLAIM_DAYS}-day threshold, never auto-released` : ''})`;
 }
 
+// `in-progress` is the only state that means someone is holding the record,
+// so a claim left on any other state is history, not a live hold.
+export function isColdClaim(task: Task, today: string): boolean {
+  return task.state === 'in-progress' && (claimOf(task, today)?.cold ?? false);
+}
+
 // Separate from checkStore because coldness is the one thing here that
 // depends on a clock, and a clock is an effect the caller passes in.
 export function coldClaimIssues(tasks: Task[], today: string): CheckIssue[] {
   return tasks
-    .filter((task) => task.state === 'in-progress' && (claimOf(task, today)?.cold ?? false))
+    .filter((task) => isColdClaim(task, today))
     .map((task) => ({
       level: 'warning' as const,
       message: `${task.id} ${claimSummary(task, today)}; \`tasks start ${task.id} --actor <you>\` takes it over and \`tasks stop ${task.id}\` returns it to the queue`,
