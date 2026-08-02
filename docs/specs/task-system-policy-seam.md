@@ -70,6 +70,42 @@ Proof:
   to present-day state, which would rewrite history every time a record is
   re-pointed.
 
+- [c13] A task can say what it may change and what it brings into existence,
+  and the two are distinct from `files`. `writes` is a forward-looking grant
+  over a region of the tree; `produces` names an interface nothing owns until
+  the task lands; `files` stays what it was, evidence about where something was
+  observed. A record written before these existed still loads.
+  proof: vitest scripts/lib/taskStore.test.ts "loads a record written before writes and produces existed, and treats absent as empty"
+- [c14] A dispatch set can be graded before it is dispatched, from the records
+  alone — no worker runs, nothing is read from the tree. It reports overlapping
+  write grants, an overlap where one side is producing an interface the other
+  does not require, two tasks claiming the same interface, and a plan
+  concentrated in one path. An ordering through a chain is an ordering, not a
+  collision.
+  proof: vitest scripts/lib/planCheck.test.ts "names the missing edge, not the merge, when one side is producing an interface"
+- [c15] The grading command refuses nothing and exits 0, and says how much it
+  could not see: a plan whose tasks declare no `writes` is reported as ungranted
+  rather than as clean.
+  proof: vitest scripts/tasks.test.ts "says how much of a clean answer it could not see, when nothing declares a write grant"
+- [c16] The end-to-end workflow every agent follows is written down in one live
+  document, separate from any branch's spec, and CLAUDE.md points at it. A
+  branch spec is a promise made at a moment and is history once merged; a
+  workflow description must never stop changing, and the two cannot be one file.
+
+### This spec widened on 2026-08-02, and by how much
+
+c13–c16 were not in the deliverable this branch opened with. They were added
+after research into orchestration literature identified the gap the ledger did
+not close: the store recorded what happened and had no way to express what a
+worker was *allowed* to do, which is the only thing that makes duplication
+decidable before two diffs collide. The polarity flip (c1–c12) is a
+precondition for it — every one of c14's findings is a report, and would have
+been a refusal under the design this branch replaced.
+
+Recorded here rather than left implicit because an audit that finds unrecorded
+scope is right to, and because the widening is the interesting part: the ledger
+was necessary and was not sufficient.
+
 ## Why this replaces the nine-unit refactor
 
 The previous plan reorganised the gate's rules into a policy module. That gives

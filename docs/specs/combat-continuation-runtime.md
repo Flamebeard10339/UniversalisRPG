@@ -38,9 +38,10 @@ Proof:
 - [c7] Save validation requires `rng` to be an integer cursor. A fractional saved `rng` is rejected or
   pruned before `nextRandom` can truncate it, and a regression test covers the audit's `rng: 0.5`
   collapse.
-- [c8] `npm test`, `npm run build`, `npm run layer-check`, and
-  `npm run tasks -- check --merge --spec combat-continuation-runtime` pass before the spec is
-  marked done.
+- [c8] `npm test`, `npm run build`, `npm run layer-check` and `npm run tasks -- doctor`
+  pass before the spec is marked done. (`check --merge` was this clause's fourth
+  command and no longer exists; `doctor` is the scan that replaced it, and the
+  spec's standing is reported by `tasks spec show` rather than gated. RG-L2.)
 
 ## Decisions
 
