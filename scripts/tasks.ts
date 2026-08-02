@@ -5,8 +5,9 @@ import { createInterface } from 'node:readline';
 import { pathToFileURL } from 'node:url';
 import { harvestFiles, parseAuditDoc, systemForDoc } from './lib/auditImport';
 import { checkCommitMessage, extractNextTrailer, isExempt } from './lib/commitContract';
+import { appendEvents, EVENT_OPS, eventsPathFor, filterEvents, loadEvents, type EventOp, type TaskEvent } from './lib/eventLog';
 import * as git from './lib/git';
-import { appendAmendment, appendAuditPass, clauseStandings, duplicateClauseIds, outstandingSummary, parseSpecDoc, stampClauseIds, VERDICTS, type AuditVerdict, type ProofClause, type Verdict } from './lib/specDoc';
+import { appendAuditPass, clauseStandings, duplicateClauseIds, outstandingSummary, parseSpecDoc, stampClauseIds, VERDICTS, type AuditVerdict, type ProofClause, type Verdict } from './lib/specDoc';
 import { loadManifest, systemNames as manifestSystemNames } from './lib/systems';
 import {
   checkStore,
@@ -64,7 +65,12 @@ function flagArities(usage: string): Map<string, FlagArity> {
   return arities;
 }
 
+// `--actor` is not here: a global flag is accepted by every command, and a
+// read command that accepted it would drop it, which is exactly the silent
+// no-op c9 forbids. Every command that writes names it in its own usage.
 const GLOBAL_USAGE = 'global: [--store <path>] [--systems <path>] [--specs-dir <dir>] [--branch <name>] [--help]';
+
+const ACTOR_USAGE = '[--actor <name>]';
 
 interface ParsedArgs {
   parsed: Flags;
@@ -108,18 +114,45 @@ function parseArgs(args: string[], arities: Map<string, FlagArity>): ParsedArgs 
 
 interface Config {
   storePath: string;
+  eventsPath: string;
   systemsPath: string;
   specsDir: string;
   branch: string;
+  actor: string | null;
 }
 
 function resolveConfig(flags: Record<string, string>): Config {
+  const storePath = flags.store ?? DEFAULT_STORE_PATH;
   return {
-    storePath: flags.store ?? DEFAULT_STORE_PATH,
+    storePath,
+    eventsPath: eventsPathFor(storePath),
     systemsPath: flags.systems ?? 'docs/audits/systems.json',
     specsDir: flags['specs-dir'] ?? 'docs/specs',
     branch: flags.branch ?? execFileSync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], { encoding: 'utf8' }).trim(),
+    actor: flags.actor ?? null,
   };
+}
+
+type EventSubject = Pick<TaskEvent, 'id' | 'system' | 'spec' | 'note'>;
+
+// Called after the store is saved, never before: an event says what
+// happened, so a write that failed must not leave one behind. `head` and the
+// timestamp are resolved once per batch rather than once per record.
+function recordEvents(config: Config, op: EventOp, subjects: EventSubject[]): void {
+  if (subjects.length === 0) return;
+  const t = new Date().toISOString();
+  const head = git.head();
+  appendEvents(
+    subjects.map((subject) => ({ t, by: config.actor, branch: config.branch, head, op, ...subject })),
+    config.eventsPath,
+  );
+}
+
+// The snapshot: what the record carries now that the write has landed, which
+// is what the event is a record of. Re-pointing the task later leaves this
+// line saying what was true when it was written.
+function subjectOf(task: Task, note: string): EventSubject {
+  return { id: task.id, system: task.system, spec: task.spec, note };
 }
 
 function systemNames(config: Config): string[] {
@@ -407,11 +440,11 @@ function specIssues(config: Config): CheckIssue[] {
 // Everything else this scan finds has several — a missing decline reason, an
 // unresolved requirement, a cycle, a duplicate id — and a doctor that picks
 // one of them is worse than one that describes them all.
-function repairStore(tasks: Task[]): string[] {
-  const repaired: string[] = [];
+function repairStore(tasks: Task[]): Array<{ task: Task; message: string }> {
+  const repaired: Array<{ task: Task; message: string }> = [];
   for (const task of tasks) {
     if (CLOSING_STATES.includes(task.state) || (task.closed === null && task.closedCommit === null)) continue;
-    repaired.push(`${task.id} is ${task.state}: cleared its close date (${task.closed ?? 'none'}) and closing commit (${task.closedCommit ?? 'none'})`);
+    repaired.push({ task, message: `${task.id} is ${task.state}: cleared its close date (${task.closed ?? 'none'}) and closing commit (${task.closedCommit ?? 'none'})` });
     task.closed = null;
     task.closedCommit = null;
   }
@@ -431,12 +464,15 @@ function cmdDoctor(args: Flags): void {
     ...(dirtyIssue ? [dirtyIssue] : []),
   ];
 
-  let repaired: string[] = [];
+  let repaired: Array<{ task: Task; message: string }> = [];
   if (args.flags.fix === 'true') {
     if (skipped.length > 0) console.log(`--fix declined to write: ${skipped.length} line(s) did not parse, and saving would delete them`);
     else {
       repaired = repairStore(tasks);
-      if (repaired.length > 0) saveStoreAndWarn(tasks, config);
+      if (repaired.length > 0) {
+        saveStoreAndWarn(tasks, config);
+        recordEvents(config, 'doctor-fix', repaired.map((entry) => subjectOf(entry.task, entry.message)));
+      }
     }
   }
 
@@ -446,7 +482,7 @@ function cmdDoctor(args: Flags): void {
   }
   if (repaired.length > 0) {
     console.log(`repaired ${repaired.length}:`);
-    for (const line of repaired) console.log(`  ${line}`);
+    for (const entry of repaired) console.log(`  ${entry.message}`);
   } else if (issues.length > 0 && args.flags.fix !== 'true') {
     console.log('none of these has exactly one correct repair; `--fix` clears a close date left on a record that is not closed, and nothing else');
   }
@@ -574,6 +610,7 @@ function cmdAdd(args: Flags, usage: string): void {
   };
   tasks.push(task);
   saveStoreAndWarn(tasks, config);
+  recordEvents(config, 'add', [subjectOf(task, `added as ${task.kind}/${task.state}: ${truncateLine(task.title, 80)}`)]);
   console.log(`added ${id} [${task.kind}/${task.state}]`);
   reportUnresolvedRequires(task, tasks);
 }
@@ -639,6 +676,7 @@ function cmdEdit(args: Flags, usage: string): void {
   }
 
   saveStoreAndWarn(tasks, config);
+  recordEvents(config, 'edit', [subjectOf(task, `edited ${changes.join(', ')}`)]);
   console.log(`edited ${id}: ${changes.join(', ')}`);
   reportUnresolvedRequires(task, tasks);
 }
@@ -901,10 +939,11 @@ function cmdStart(args: Flags, usage: string): void {
   // user, so an identity taken from the machine would distinguish nothing
   // while reading as though someone had asserted it. Unclaimed by name is
   // the honest record, and the time is what coldness actually needs.
-  const actor = args.flags.actor ?? null;
+  const actor = config.actor;
   task.claimed = today();
   task.claimedBy = actor;
   saveStoreAndWarn(tasks, config);
+  recordEvents(config, 'start', [subjectOf(task, ['started', ...notes].join('; '))]);
   console.log(`started ${id}`);
   if (displaced !== null) console.log(`took over a claim: ${displaced} — the previous claim is replaced, not merged`);
   for (const note of notes) console.log(note);
@@ -929,6 +968,7 @@ function cmdStop(args: Flags, usage: string): void {
   }
   const notes = transition(task, 'open');
   saveStoreAndWarn(tasks, config);
+  recordEvents(config, 'stop', [subjectOf(task, ['stopped', ...notes].join('; '))]);
   console.log(`stopped ${id}`);
   for (const note of notes) console.log(note);
 }
@@ -989,6 +1029,7 @@ function cmdDone(args: Flags, usage: string): void {
     task.closedCommit = closedCommit;
   }
   saveStoreAndWarn(tasks, config);
+  recordEvents(config, 'done', [subjectOf(task, ['done', ...notes, ...(task.closedCommit ? [`closing commit ${task.closedCommit}`] : []), ...(waiting.length > 0 ? [`${waiting.length} requirement(s) still open: ${waiting.join(', ')}`] : [])].join('; '))]);
   console.log(`done ${id}`);
   for (const note of notes) console.log(note);
   if (task.kind === 'undelivered') console.log(`clause standing at close: ${clauseStanding(config, task)}`);
@@ -1016,6 +1057,7 @@ function cmdDecline(args: Flags, usage: string): void {
   task.closed = today();
   task.closedCommit = null;
   saveStoreAndWarn(tasks, config);
+  recordEvents(config, 'decline', [subjectOf(task, [`declined: ${truncateLine(reason, 120)}`, ...notes].join('; '))]);
   console.log(`declined ${id}`);
   for (const note of notes) console.log(note);
   if (task.kind === 'undelivered') console.log(`this was ${task.spec ?? 'a spec'}'s outstanding promise on clause ${task.clause ?? '(none named)'} — declining it abandons the clause, it does not discharge it`);
@@ -1078,8 +1120,14 @@ function cmdSpecAdd(args: Flags, usage: string): void {
     return;
   }
   const latePass = ids.map((id) => byId.get(id)!).filter((task) => (task.source?.pass ?? 0) >= 2);
+  const from = new Map(ids.map((id) => [id, byId.get(id)!.spec]));
   for (const id of ids) byId.get(id)!.spec = slug;
   saveStoreAndWarn(tasks, config);
+  recordEvents(
+    config,
+    'spec-add',
+    ids.map((id) => subjectOf(byId.get(id)!, `moved into spec ${slug} from ${from.get(id) ?? '(deferred)'}`)),
+  );
   console.log(`added ${ids.length} task(s) to ${slug}`);
   if (latePass.length > 0) console.log(`${latePass.length} of those came from a pass 2 or later audit, which extends what ${slug} owes: ${latePass.map((task) => `${task.id} (pass ${task.source!.pass})`).join(', ')}`);
 }
@@ -1159,6 +1207,14 @@ function cmdSpecDone(args: Flags, usage: string): void {
   if (stragglers.length > 0 && args.flags['defer-open'] === 'true') {
     for (const straggler of stragglers) straggler.spec = null;
     saveStoreAndWarn(tasks, config);
+    // The spec named is the one the record just left, not the null it now
+    // carries: `tasks log --spec <slug>` has to be the whole membership
+    // history of that spec, and a departure is part of it.
+    recordEvents(
+      config,
+      'spec-defer',
+      stragglers.map((straggler) => ({ ...subjectOf(straggler, `deferred out of spec ${slug} when it closed, still ${straggler.state}`), spec: slug })),
+    );
     console.log(`deferred ${stragglers.length} straggler(s) out of ${slug}: ${stragglers.map((task) => task.id).join(', ')}`);
   }
 
@@ -1198,44 +1254,17 @@ function cmdSpecRemove(args: Flags, usage: string): void {
   }
   const notMembers = ids.filter((id) => byId.get(id)!.spec !== slug);
   const undelivered = ids.filter((id) => byId.get(id)!.kind === 'undelivered');
+  const from = new Map(ids.map((id) => [id, byId.get(id)!.spec]));
   for (const id of ids) byId.get(id)!.spec = null;
   saveStoreAndWarn(tasks, config);
+  recordEvents(
+    config,
+    'spec-remove',
+    ids.map((id) => ({ ...subjectOf(byId.get(id)!, `removed from spec ${slug}, and now names none`), spec: from.get(id) ?? slug })),
+  );
   console.log(`removed ${ids.length} task(s) from ${slug}`);
   if (notMembers.length > 0) console.log(`${notMembers.length} of those named a different spec, or none, and now name none: ${notMembers.join(', ')}`);
   if (undelivered.length > 0) console.log(`${undelivered.length} of those were ${slug}'s outstanding promises — the clauses they name are now tracked by no spec: ${undelivered.join(', ')}`);
-}
-
-// Archives the current ## Deliverable under ## Amendments, dated and
-// reasoned, and leaves the live section for a human to edit.
-function cmdSpecAmend(args: Flags, usage: string): void {
-  const config = resolveConfig(args.flags);
-  const slug = args.positional[0];
-  const reason = args.flags.reason;
-  if (!slug || !reason) {
-    console.error(usage);
-    process.exitCode = 1;
-    return;
-  }
-  const path_ = specFile(config, slug);
-  if (!existsSync(path_)) {
-    refuseUnknownSpec(config, slug);
-    return;
-  }
-  const text = readFileSync(path_, 'utf8');
-  const doc = parseSpecDoc(text);
-  // An amendment records the text a spec adopted, so the edit comes first.
-  const previous = doc.amendments[doc.amendments.length - 1];
-  // Gaining clause tags is not a change worth adopting.
-  const unchanged = (before: string): boolean => doc.deliverableSection.trim() === before.trim() || doc.deliverableSection.trim() === stampClauseIds(before).trim();
-  if (previous && unchanged(previous.deliverableText)) {
-    console.error(`error: ${slug}'s ## Deliverable is unchanged since the amendment of ${previous.date} — edit it first, then record what it became`);
-    process.exitCode = 1;
-    return;
-  }
-  const date = today();
-  writeFileSync(path_, appendAmendment(text, { date, reason, deliverableText: doc.deliverableSection }), 'utf8');
-  console.log(`amended ${slug}: recorded the current ## Deliverable as adopted (${date} — ${reason})`);
-  console.log(`next: run \`tasks audit ${slug}\` to verify the new clauses`);
 }
 
 // The migration path only, for the 22 legacy documents under docs/audits/.
@@ -1262,6 +1291,7 @@ function cmdImport(args: Flags, usage: string): void {
 
   const tasks = loadStore(config.storePath);
   const taken = new Set(tasks.map((task) => task.id));
+  const created: Task[] = [];
   let imported = 0;
   let skipped = 0;
   for (const finding of findings) {
@@ -1293,9 +1323,15 @@ function cmdImport(args: Flags, usage: string): void {
     };
     tasks.push(task);
     taken.add(id);
+    created.push(task);
     imported++;
   }
   saveStoreAndWarn(tasks, config);
+  recordEvents(
+    config,
+    'import',
+    created.map((task) => subjectOf(task, `imported from ${docPath} as ${task.severity ?? 'unrated'} finding ${truncateLine(task.title, 60)}`)),
+  );
 
   const skippedNote = skipped > 0 ? ` (${skipped} already present, skipped)` : '';
   const systemNote = system === null && findings.length > 0 ? ' — no system mapping for this doc name, system left null' : '';
@@ -1496,6 +1532,7 @@ async function cmdTriage(args: Flags): Promise<void> {
       if (answer === 'q') break outer;
       if (answer === '' || answer === 's') break;
 
+      let decision: string;
       if (answer === '1') {
         if (spec === null) {
           console.log('no active spec to promote into — pass --spec, skipping');
@@ -1504,9 +1541,11 @@ async function cmdTriage(args: Flags): Promise<void> {
         if ((task.source?.pass ?? 0) >= 2) console.log(`promoting a pass ${task.source!.pass} finding, which extends what ${spec} owes`);
         task.state = 'open';
         task.spec = spec;
+        decision = `promoted into spec ${spec}`;
       } else if (answer === '2') {
         task.state = 'open';
         task.spec = null;
+        decision = 'deferred: opened outside every spec';
       } else if (answer === '3') {
         const reason = (await ask('reason: ')).trim();
         if (reason === '') {
@@ -1516,6 +1555,7 @@ async function cmdTriage(args: Flags): Promise<void> {
         task.state = 'declined';
         task.reason = reason;
         task.closed = today();
+        decision = `declined: ${truncateLine(reason, 120)}`;
       } else if (answer === '4') {
         const replacement = (await ask('replacement deliverable: ')).trim();
         if (replacement === '') {
@@ -1524,12 +1564,14 @@ async function cmdTriage(args: Flags): Promise<void> {
         }
         task.deliverable = replacement;
         saveStoreAndWarn(tasks, config);
+        recordEvents(config, 'triage', [subjectOf(task, `redirected the deliverable to: ${truncateLine(replacement, 120)}`)]);
         continue;
       } else {
         console.log('unrecognised input, skipping');
         break;
       }
       saveStoreAndWarn(tasks, config);
+      recordEvents(config, 'triage', [subjectOf(task, decision)]);
       break;
     }
   }
@@ -1561,7 +1603,7 @@ interface AuditArgs {
   findings: AuditFinding[];
 }
 
-const CONFIG_FLAG_NAMES = new Set(['store', 'systems', 'specs-dir', 'branch']);
+const CONFIG_FLAG_NAMES = new Set(['store', 'systems', 'specs-dir', 'branch', 'actor']);
 
 // Repeated --proof/--evidence/--finding flags need a dedicated scanner: the
 // generic parseArgs collapses a repeated flag to its last value, and a
@@ -1639,7 +1681,7 @@ function parseAuditArgs(args: string[]): AuditArgs {
 }
 
 const AUDIT_USAGE =
-  'usage: tasks audit <spec> [--base-branch main] [--proof N=met|unmet|unknown ...] [--evidence N="..." ... (required for every met clause)] [--file N=path:line ...] [--finding "..." --severity high|medium|low --system "<name>" --deliverable "..." --evidence "..." [--file path:line ...]]...  (with no --proof flags, walks the clauses interactively; a clause left ungraded is recorded unknown, never unmet)';
+  `usage: tasks audit <spec> [--base-branch main] ${ACTOR_USAGE} [--proof N=met|unmet|unknown ...] [--evidence N="..." ... (required for every met clause)] [--file N=path:line ...] [--finding "..." --severity high|medium|low --system "<name>" --deliverable "..." --evidence "..." [--file path:line ...]]...  (with no --proof flags, walks the clauses interactively; a clause left ungraded is recorded unknown, never unmet)`;
 
 // Stops at the first clause the answerer walks away from rather than
 // looping on an exhausted stdin, and the caller grades the rest `unknown` —
@@ -1773,6 +1815,7 @@ async function cmdAudit(args: Flags, usage: string): Promise<void> {
   const tasks = loadStore(config.storePath);
   const taken = new Set(tasks.map((task) => task.id));
 
+  const created: Array<{ task: Task; note: string }> = [];
   let undeliveredCreated = 0;
   for (const verdict of verdicts) {
     if (verdict.status !== 'unmet') continue;
@@ -1803,6 +1846,7 @@ async function cmdAudit(args: Flags, usage: string): Promise<void> {
     };
     tasks.push(undelivered);
     taken.add(id);
+    created.push({ task: undelivered, note: `created by ${slug} pass ${passNumber} for unmet clause ${verdict.clause}` });
     undeliveredCreated++;
   }
 
@@ -1832,11 +1876,19 @@ async function cmdAudit(args: Flags, usage: string): Promise<void> {
     };
     tasks.push(task);
     taken.add(id);
+    created.push({ task, note: `recorded unreviewed by ${slug} pass ${passNumber}: ${truncateLine(finding.title, 60)}` });
     findingsCreated++;
   }
 
   saveStoreAndWarn(tasks, config);
   writeFileSync(path_, appendAuditPass(text, { pass: passNumber, date: today(), base, head, verdicts }), 'utf8');
+  // The pass itself is the event with no task — a pass that graded every
+  // clause met creates no record, and is still the thing someone asks the
+  // log about when they ask what was decided about this spec.
+  recordEvents(config, 'audit', [
+    { id: null, system: null, spec: slug, note: `recorded pass ${passNumber} against ${head.slice(0, 7)}: ${outstandingSummary(verdicts)}` },
+    ...created.map((entry) => subjectOf(entry.task, entry.note)),
+  ]);
 
   console.log(`recorded pass ${passNumber} for ${slug}: ${outstandingSummary(verdicts)}`);
   if (text !== original) console.log(`tagged ${slug}'s proof clauses [cN] — the tag is the clause's identity, so keep it when you reword or reorder`);
@@ -1977,6 +2029,93 @@ function cmdHandoff(args: Flags, usage: string): void {
   }
 }
 
+// The two writes that touch no task state. A decision is its own op rather
+// than a note by convention, because "what was decided about this" has to be
+// answerable without a text-matching heuristic.
+function recordStandaloneEvent(op: 'note' | 'decision') {
+  return (args: Flags, usage: string): void => {
+    const config = resolveConfig(args.flags);
+    const note = args.positional[0];
+    if (!note) {
+      console.error(usage);
+      process.exitCode = 1;
+      return;
+    }
+    // The one refusal, and it is malformed input: the whole log depends on
+    // one event being one line, and prose in a record is what made `next`
+    // cost thirty lines to call.
+    if (/[\r\n]/.test(note)) {
+      console.error(`error: a ${op} is one line — this one has ${note.split(/\r\n|\r|\n/).length}. Record the summary here and leave the prose in the commit message or the spec`);
+      process.exitCode = 1;
+      return;
+    }
+    const validationError = validateContentFields(config, args.flags);
+    if (validationError) {
+      console.error(validationError);
+      process.exitCode = 1;
+      return;
+    }
+
+    const id = args.flags.id ?? null;
+    const tasks = id === null ? [] : readStore(config);
+    const task = id === null ? undefined : tasks.find((candidate) => candidate.id === id);
+    const subject: EventSubject = {
+      id,
+      system: args.flags.system ?? task?.system ?? null,
+      spec: args.flags.spec ?? task?.spec ?? null,
+      note,
+    };
+    recordEvents(config, op, [subject]);
+
+    console.log(`recorded a ${op} against ${id ?? `${subject.system ?? 'no system'}/${subject.spec ?? 'no spec'}`} in ${config.eventsPath}`);
+    // An event about a record that does not exist yet is still a fact
+    // somebody asserted, so it is recorded and reported, never refused.
+    if (id !== null && task === undefined) console.log(`no record answers to ${id} — the ${op} is recorded against that id anyway, and \`tasks log --id ${id}\` finds it`);
+    // The spec file may since have been renamed or deleted, and an event
+    // about a spec that no longer exists is exactly what a log is for; a
+    // system name is drawn from a manifest that is authoritative right now,
+    // which is why validateContentFields refuses that one.
+    if (subject.spec !== null && !existsSync(specFile(config, subject.spec))) console.log(`no spec file at ${specFile(config, subject.spec)} — recorded against that slug anyway`);
+  };
+}
+
+function renderEventLine(event: TaskEvent): string {
+  return [`${event.t.slice(0, 19)}Z`, event.op, event.id ?? '(no task)', `${event.system ?? '(no system)'} / ${event.spec ?? '(no spec)'}`, event.by ?? '(unnamed)', event.note].join('  ');
+}
+
+// c12, answered from the log alone: joining to present-day state would
+// rewrite history every time a record is re-pointed, which is the whole
+// reason each event snapshots its own system and spec.
+function cmdLog(args: Flags): void {
+  const config = resolveConfig(args.flags);
+  const op = args.flags.op;
+  if (op !== undefined && !EVENT_OPS.includes(op as EventOp)) {
+    console.error(`error: --op must be one of ${EVENT_OPS.join(', ')}`);
+    process.exitCode = 1;
+    return;
+  }
+
+  const { events, skipped } = loadEvents(config.eventsPath);
+  const filter = { id: args.flags.id, system: args.flags.system, spec: args.flags.spec, op, text: args.positional[0] };
+  const matched = filterEvents(events, filter);
+  for (const event of matched) console.log(renderEventLine(event));
+
+  const asked = Object.entries(filter)
+    .filter(([, value]) => value !== undefined)
+    .map(([key, value]) => (key === 'text' ? `"${value as string}"` : `--${key} ${value as string}`));
+  // An empty log and a filter that matched nothing are different answers to
+  // different questions, and collapsing them tells a caller their query was
+  // wrong when the log is simply new.
+  if (events.length === 0) console.log(`no events recorded yet in ${config.eventsPath}`);
+  else if (matched.length === 0) console.log(`no event matches ${asked.join(' ')} — ${events.length} event(s) in ${config.eventsPath}`);
+  else console.log(`${matched.length} of ${events.length} event(s)${asked.length > 0 ? ` matching ${asked.join(' ')}` : ''}`);
+
+  if (skipped.length > 0) {
+    console.log(`skipped ${skipped.length} unreadable event line(s) — everything above is the rest of the log:`);
+    for (const message of skipped) console.log(`  ${message}`);
+  }
+}
+
 // Driven by .claude/hooks/commit-msg, which supplies what only git knows:
 // whether MERGE_HEAD/REVERT_HEAD exist, and the staged file list.
 function cmdCheckCommitMessage(args: Flags, usage: string): void {
@@ -2001,7 +2140,7 @@ function cmdCheckCommitMessage(args: Flags, usage: string): void {
   }
 }
 
-const USAGE = 'usage: npm run tasks -- <doctor|add|edit|show|list|search|next|start|stop|done|decline|import|triage|spec|audit|audit-prompt|handoff> ...';
+const USAGE = 'usage: npm run tasks -- <doctor|add|edit|show|list|search|next|start|stop|done|decline|import|triage|note|decision|log|spec|audit|audit-prompt|handoff> ...';
 
 interface Command {
   usage: string;
@@ -2018,26 +2157,24 @@ function refuseBareSpec(_args: Flags, usage: string): void {
 
 const SPEC_COMMANDS: Record<string, Command> = {
   new: { usage: 'usage: tasks spec new <slug>', run: cmdSpecNew },
-  add: { usage: 'usage: tasks spec add <slug> <id>...', run: cmdSpecAdd },
-  remove: { usage: 'usage: tasks spec remove <slug> <id>...', run: cmdSpecRemove },
+  add: { usage: `usage: tasks spec add <slug> <id>... ${ACTOR_USAGE}`, run: cmdSpecAdd },
+  remove: { usage: `usage: tasks spec remove <slug> <id>... ${ACTOR_USAGE}`, run: cmdSpecRemove },
   show: { usage: 'usage: tasks spec show <slug> [--order]', run: cmdSpecShow },
-  done: { usage: 'usage: tasks spec done <slug> [--defer-open]', run: cmdSpecDone },
-  amend: { usage: 'usage: tasks spec amend <slug> --reason "..."', run: cmdSpecAmend },
+  done: { usage: `usage: tasks spec done <slug> [--defer-open] ${ACTOR_USAGE}`, run: cmdSpecDone },
 };
 
-const SPEC_USAGE = `usage: tasks spec <new|add|remove|show|done|amend> ...  (\`tasks spec <slug>\` is short for \`tasks spec show <slug>\`)\n${Object.values(SPEC_COMMANDS)
+const SPEC_USAGE = `usage: tasks spec <new|add|remove|show|done> ...  (\`tasks spec <slug>\` is short for \`tasks spec show <slug>\`)\n${Object.values(SPEC_COMMANDS)
   .map((command) => `  ${command.usage}`)
   .join('\n')}`;
 
 const COMMANDS: Record<string, Command> = {
-  doctor: { usage: 'usage: tasks doctor [--fix]', run: cmdDoctor },
+  doctor: { usage: `usage: tasks doctor [--fix] ${ACTOR_USAGE}`, run: cmdDoctor },
   add: {
-    usage: 'usage: tasks add "<title>" [--kind task|finding|question] [--severity high|medium|low] [--system "<name>"] [--spec <slug>] [--files a.ts:12,b.ts] [--requires id1,id2] [--deliverable "..." (required for --kind finding)] [--evidence "..."] [--id <id>]',
+    usage: `usage: tasks add "<title>" [--kind task|finding|question] [--severity high|medium|low] [--system "<name>"] [--spec <slug>] [--files a.ts:12,b.ts] [--requires id1,id2] [--deliverable "..." (required for --kind finding)] [--evidence "..."] [--id <id>] ${ACTOR_USAGE}`,
     run: cmdAdd,
   },
   edit: {
-    usage:
-      'usage: tasks edit <id> ["<new title>"] [--title "..."] [--deliverable "..."] [--evidence "..."] [--severity high|medium|low] [--system "<name>"] [--files a.ts:12,b.ts] [--requires id1,id2]  (content only: state, spec, kind and reason are moved by start/stop/done/decline/spec add, never by edit)',
+    usage: `usage: tasks edit <id> ["<new title>"] [--title "..."] [--deliverable "..."] [--evidence "..."] [--severity high|medium|low] [--system "<name>"] [--files a.ts:12,b.ts] [--requires id1,id2] ${ACTOR_USAGE}  (content only: state, spec, kind and reason are moved by start/stop/done/decline/spec add, never by edit)`,
     run: cmdEdit,
   },
   show: { usage: 'usage: tasks show <id>', run: cmdShow },
@@ -2050,12 +2187,15 @@ const COMMANDS: Record<string, Command> = {
     run: cmdSearch,
   },
   next: { usage: 'usage: tasks next [--spec <slug>] [--system "<name>"] [--severity high|medium|low] [--full]', run: cmdNext },
-  start: { usage: 'usage: tasks start <id> [--actor <name>]', run: cmdStart },
-  stop: { usage: 'usage: tasks stop <id>', run: cmdStop },
-  done: { usage: 'usage: tasks done <id> [--commit <revspec>]  (default: none — the closing commit does not exist yet when `done` runs; see `tasks show` for a derived one)', run: cmdDone },
-  decline: { usage: 'usage: tasks decline <id> --reason "..."', run: cmdDecline },
-  import: { usage: 'usage: tasks import <audit-doc>', run: cmdImport },
-  triage: { usage: 'usage: tasks triage [--spec <slug>]', run: cmdTriage },
+  start: { usage: `usage: tasks start <id> ${ACTOR_USAGE}`, run: cmdStart },
+  stop: { usage: `usage: tasks stop <id> ${ACTOR_USAGE}`, run: cmdStop },
+  done: { usage: `usage: tasks done <id> [--commit <revspec>] ${ACTOR_USAGE}  (default: none — the closing commit does not exist yet when \`done\` runs; see \`tasks show\` for a derived one)`, run: cmdDone },
+  decline: { usage: `usage: tasks decline <id> --reason "..." ${ACTOR_USAGE}`, run: cmdDecline },
+  import: { usage: `usage: tasks import <audit-doc> ${ACTOR_USAGE}`, run: cmdImport },
+  triage: { usage: `usage: tasks triage [--spec <slug>] ${ACTOR_USAGE}`, run: cmdTriage },
+  note: { usage: `usage: tasks note "<one line>" [--id <id>] [--system "<name>"] [--spec <slug>] ${ACTOR_USAGE}  (appends to the event log; the store is untouched)`, run: recordStandaloneEvent('note') },
+  decision: { usage: `usage: tasks decision "<one line>" [--id <id>] [--system "<name>"] [--spec <slug>] ${ACTOR_USAGE}  (a decision is its own op, so \`tasks log --op decision\` needs no text matching)`, run: recordStandaloneEvent('decision') },
+  log: { usage: 'usage: tasks log [<text>] [--id <id>] [--system "<name>"] [--spec <slug>] [--op add|edit|start|stop|done|decline|triage|import|audit|spec-add|spec-remove|spec-defer|doctor-fix|note|decision]  (every filter given is ANDed, and all of them are answered from the log alone)', run: cmdLog },
   spec: { usage: SPEC_USAGE, run: refuseBareSpec },
   audit: { usage: AUDIT_USAGE, run: cmdAudit },
   'audit-prompt': { usage: 'usage: tasks audit-prompt <spec> [--base-branch main]', run: cmdAuditPrompt },

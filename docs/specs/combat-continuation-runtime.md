@@ -62,48 +62,6 @@ Proof:
 
 None.
 
-## Amendments
-
-### 2026-08-01 — The equipment clause resolved to a real equipped state with authored slots rather than carried-is-equipped, and enemy pool settlement resolved to actor-keyed segment deltas. Both widen the diff beyond what the original clauses named, so the deliverable names them before the work starts. New member: equipment-slots.
-
-#### Deliverable
-
-Combat continuation has one runtime model for action completion and combat damage. Authored
-`action.health` and saved `ActiveAction.healthRemaining` are removed from the live model; ordinary
-action completion, entity combat, enemy regeneration, equipment stat bonuses, and modifier-driven
-pool exhaustion all resolve through the same target-pool machinery and remain split-associative.
-This branch also closes the runtime audit's integer-cursor gap for `rng`.
-
-Proof:
-
-- Loading or serializing game content no longer accepts or emits action `health:` fields, and no
-  current `ActiveAction` value or current save produced by the runtime contains `healthRemaining`.
-  Existing saves that carry `healthRemaining` are handled through the existing save/load path for
-  this schema change, without adding a second persistence API.
-- A regression test demonstrates that the former action-health completion case and an explicit
-  `target: health` case consume the same authored `ability:` value at the same scale. The audit's
-  `ability: 2.5` reproduction no longer has a 2.5-vs-2.0 damage split between runtime paths.
-- Enemy-owned pools participate in rate capture and settlement while a fight is active. A
-  regenerating enemy health pool produces the same result for one-shot resolution and split
-  resolution, including the carried remainder.
-- Equipment is a real equipped state, not a property of carrying an item. An item declares the slot
-  it occupies the way a recipe declares its station; the player's equipped items are one item per
-  slot, held in game state, saved, and pruned when the item or its slot declaration goes away.
-  Equipping and unequipping are reachable through the same directive surface every other play input
-  goes through, so a `# test` section can record them.
-- Equipment stat bonuses affect runtime combat stats. A focused fixture proves an equipped attack
-  bonus changes outgoing damage and an equipped defense bonus changes incoming damage; shipped
-  tutorial equipment is not inert once equipped, and is inert while merely carried.
-- When a fight target pool is emptied by a modifier or rate settlement rather than by the hit that
-  opened the segment, the same `on empty:` behavior fires at the correct boundary and remains
-  associative across split resolution.
-- Save validation requires `rng` to be an integer cursor. A fractional saved `rng` is rejected or
-  pruned before `nextRandom` can truncate it, and a regression test covers the audit's `rng: 0.5`
-  collapse.
-- `npm test`, `npm run build`, `npm run layer-check`, and
-  `npm run tasks -- check --merge --spec combat-continuation-runtime` pass before the spec is
-  marked done.
-
 ## Audit passes
 
 ### Pass 1 — 2026-08-01

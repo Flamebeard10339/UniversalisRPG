@@ -260,7 +260,7 @@ describe('tasks CLI', () => {
 
   it('answers --help on every command and subcommand, and names the flags it will accept', () => {
     fixture(({ tasks }) => {
-      const commands = [['doctor'], ['add'], ['edit'], ['show'], ['list'], ['search'], ['next'], ['start'], ['stop'], ['done'], ['decline'], ['import'], ['triage'], ['audit-prompt'], ['handoff'], ['check-commit-msg'], ['spec'], ['spec', 'new'], ['spec', 'add'], ['spec', 'remove'], ['spec', 'show'], ['spec', 'done'], ['spec', 'amend']];
+      const commands = [['doctor'], ['add'], ['edit'], ['show'], ['list'], ['search'], ['next'], ['start'], ['stop'], ['done'], ['decline'], ['import'], ['triage'], ['audit-prompt'], ['handoff'], ['check-commit-msg'], ['spec'], ['spec', 'new'], ['spec', 'add'], ['spec', 'remove'], ['spec', 'show'], ['spec', 'done'], ['note'], ['decision'], ['log']];
       for (const command of commands) {
         const result = tasks(...command, '--help');
         expect(result.status, command.join(' ')).toBe(0);
@@ -1673,49 +1673,6 @@ describe('tasks CLI', () => {
     });
   });
 
-  it('spec amend refuses without --reason', () => {
-    fixture(({ tasks }) => {
-      const result = tasks('spec', 'amend', 'demo-spec');
-      expect(result.status).toBe(1);
-      expect(result.stderr).toContain('usage: tasks spec amend');
-    });
-  });
-
-  it('spec amend refuses an unknown spec', () => {
-    fixture(({ tasks }) => {
-      const result = tasks('spec', 'amend', 'no-such-spec', '--reason', 'x');
-      expect(result.status).toBe(1);
-      expect(result.stderr).toContain('no such spec');
-    });
-  });
-
-  it('spec amend records the adopted deliverable under ## Amendments and leaves the live section intact', () => {
-    fixture(({ tasks, dir }) => {
-      const result = tasks('spec', 'amend', 'demo-spec', '--reason', 'understood the requirement better after implementing it');
-      expect(result.status).toBe(0);
-      expect(result.stdout).toContain('amended demo-spec');
-      expect(result.stdout).toContain('recorded the current ## Deliverable as adopted');
-
-      const specText = readFileSync(path.join(dir, 'specs', 'demo-spec.md'), 'utf8');
-      expect(specText).toContain('## Amendments');
-      expect(specText).toContain('understood the requirement better after implementing it');
-      expect(specText).toContain('#### Deliverable');
-      // The live section is untouched: still exactly one real heading.
-      expect((specText.match(/^## Deliverable$/gm) ?? []).length).toBe(1);
-    });
-  });
-
-  it('spec amend refuses when the deliverable is unchanged since the last amendment', () => {
-    fixture(({ tasks }) => {
-      expect(tasks('spec', 'amend', 'demo-spec', '--reason', 'first').status).toBe(0);
-
-      const second = tasks('spec', 'amend', 'demo-spec', '--reason', 'nothing actually changed');
-      expect(second.status).toBe(1);
-      expect(second.stderr).toContain('unchanged since the amendment of');
-      expect(second.stderr).toContain('edit it first');
-    });
-  });
-
   it('done on an undelivered task closes once the spec\'s latest audit pass grades its clause met', () => {
     fixture(({ tasks }) => {
       tasks('audit', 'demo-spec', '--proof', '1=unmet', '--evidence', '1=not yet', '--proof', '2=met', '--evidence', '2=clause 2 checked');
@@ -1780,16 +1737,15 @@ describe('tasks CLI', () => {
     });
   });
 
-  it('an undelivered task survives its clause being reworded by an amendment, and closes on the next met verdict', () => {
+  it('an undelivered task survives its clause being reworded, and closes on the next met verdict', () => {
     fixture(({ tasks, dir }) => {
       const specPath = path.join(dir, 'specs', 'demo-spec.md');
       tasks('audit', 'demo-spec', '--proof', '1=unmet', '--evidence', '1=not yet', '--proof', '2=met', '--evidence', '2=clause 2 checked');
       expect(tasks('show', 'demo-spec-clause-1').stdout).toContain('[undelivered/open/high]');
 
       // The first audit stamped the clause, so the tag is already sitting in
-      // the line a human rewords when they amend around it.
+      // the line a human rewords when they narrow it.
       writeFileSync(specPath, readFileSync(specPath, 'utf8').replace('[c1] The first clause holds.', '[c1] The first clause holds, under a narrower reading.'), 'utf8');
-      expect(tasks('spec', 'amend', 'demo-spec', '--reason', 'narrowed after implementing it').status).toBe(0);
 
       tasks('audit', 'demo-spec', '--proof', '1=met', '--evidence', '1=clause 1 checked', '--proof', '2=met', '--evidence', '2=clause 2 checked');
       const result = tasks('done', 'demo-spec-clause-1');
@@ -1828,17 +1784,6 @@ describe('tasks CLI', () => {
       const result = tasks('doctor');
       expect(result.status).toBe(0);
       expect(result.stdout).toContain('[error] demo-spec tags more than one proof clause [c1]');
-    });
-  });
-
-  it('spec amend refuses when the only change since the last amendment is the ids audit stamped on', () => {
-    fixture(({ tasks }) => {
-      expect(tasks('spec', 'amend', 'demo-spec', '--reason', 'adopted before any audit').status).toBe(0);
-      tasks('audit', 'demo-spec', '--proof', '1=met', '--evidence', '1=clause 1 checked', '--proof', '2=met', '--evidence', '2=clause 2 checked');
-
-      const second = tasks('spec', 'amend', 'demo-spec', '--reason', 'nothing but tags changed');
-      expect(second.status).toBe(1);
-      expect(second.stderr).toContain('unchanged since the amendment of');
     });
   });
 
