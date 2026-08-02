@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -2574,6 +2574,388 @@ describe('tasks CLI', () => {
       writeFileSync(msgFile, 'Update docs and code\n', 'utf8');
       const result = tasks('check-commit-msg', msgFile, '--files', 'docs/specs/demo-spec.md,src/runtime/save.ts');
       expect(result.status).toBe(1);
+    });
+  });
+});
+
+interface LoggedEvent {
+  t: string;
+  by: string | null;
+  branch: string;
+  head: string | null;
+  op: string;
+  id: string | null;
+  system: string | null;
+  spec: string | null;
+  note: string;
+}
+
+function readEvents(dir: string): LoggedEvent[] {
+  const file = path.join(dir, 'events.jsonl');
+  if (!existsSync(file)) return [];
+  return readFileSync(file, 'utf8')
+    .split('\n')
+    .filter((line) => line.trim().length > 0)
+    .map((line) => JSON.parse(line) as LoggedEvent);
+}
+
+// A git repo whose store sits at docs/tasks.jsonl, carrying this repo's own
+// .gitattributes — so the merge tests below prove the lines actually shipped
+// rather than a copy of them written for the occasion.
+function eventLogGitFixture(
+  run: (context: { dir: string; storePath: string; tasks: (...args: string[]) => Run; commit: (message: string) => string; git: (...args: string[]) => { status: number; stdout: string } }) => void,
+): void {
+  const dir = mkdtempSync(path.join(os.tmpdir(), 'universalis-event-log-'));
+  try {
+    const git = (...args: string[]): { status: number; stdout: string } => {
+      const result = spawnSync('git', args, { cwd: dir, encoding: 'utf8' });
+      return { status: result.status ?? 1, stdout: result.stdout.trim() };
+    };
+    git('init', '-q');
+    git('config', 'user.email', 'test@example.com');
+    git('config', 'user.name', 'Test');
+
+    writeFileSync(path.join(dir, '.gitattributes'), readFileSync(path.join(repoRoot, '.gitattributes'), 'utf8'), 'utf8');
+    const specsDir = path.join(dir, 'docs', 'specs');
+    mkdirSync(specsDir, { recursive: true });
+    writeFileSync(path.join(specsDir, 'demo-spec.md'), '# Demo spec\n\n## Deliverable\n\nSomething this branch promises.\n\nProof:\n\n- The first clause holds.\n\n## Decisions\n\n## Open questions\n\nNone.\n', 'utf8');
+    const systemsPath = path.join(dir, 'systems.json');
+    writeFileSync(systemsPath, JSON.stringify({ unowned: { note: '', paths: ['docs', '*.md'] }, systems: [{ name: 'Runtime', paths: ['src/runtime'], lastAudit: null, lastAuditDoc: null, note: null }] }), 'utf8');
+    const storePath = path.join(dir, 'docs', 'tasks.jsonl');
+    writeFileSync(storePath, '', 'utf8');
+    writeFileSync(path.join(dir, 'docs', 'events.jsonl'), '', 'utf8');
+    const globals = ['--store', storePath, '--systems', systemsPath, '--specs-dir', specsDir, '--branch', 'demo-spec'];
+
+    git('add', '-A');
+    git('commit', '--no-verify', '-m', 'Initial fixture\n\nA tracked store and log exist.');
+    git('branch', '-M', 'main');
+    git('checkout', '-q', '-b', 'demo-spec');
+
+    run({
+      dir,
+      storePath,
+      tasks: (...args: string[]) => runInProcess([...args, ...globals]),
+      commit: (message: string) => {
+        git('add', '-A');
+        git('commit', '--no-verify', '-m', message);
+        return git('rev-parse', 'HEAD').stdout;
+      },
+      git,
+    });
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+describe('the event log', () => {
+  // The failure mode this derivation exists to make unreachable: a test run
+  // silently appending to the project's own history. There is no flag that
+  // could point the log somewhere the store is not.
+  it('writes beside whichever store it was given and leaves the project log untouched', () => {
+    const projectLog = path.join(repoRoot, 'docs', 'events.jsonl');
+    const before = existsSync(projectLog) ? readFileSync(projectLog, 'utf8') : null;
+
+    fixture(({ tasks, dir }) => {
+      tasks('add', 'a member', '--id', 'a-member', '--spec', 'demo-spec', '--actor', 'worker');
+      const events = readEvents(dir);
+      expect(events).toHaveLength(1);
+      expect(events[0].id).toBe('a-member');
+    });
+
+    expect(existsSync(projectLog) ? readFileSync(projectLog, 'utf8') : null).toBe(before);
+  });
+
+  it('appends exactly one event per record a write changed, in the order the writes happened', () => {
+    fixture(({ tasks, dir }) => {
+      tasks('add', 'a member', '--id', 'a-member', '--spec', 'demo-spec', '--actor', 'worker');
+      tasks('edit', 'a-member', '--evidence', 'measured', '--actor', 'worker');
+      tasks('start', 'a-member', '--actor', 'worker');
+      tasks('stop', 'a-member', '--actor', 'worker');
+      tasks('done', 'a-member', '--actor', 'worker');
+
+      const events = readEvents(dir);
+      expect(events.map((event) => event.op)).toEqual(['add', 'edit', 'start', 'stop', 'done']);
+      expect(new Set(events.map((event) => event.by))).toEqual(new Set(['worker']));
+      expect(new Set(events.map((event) => event.branch))).toEqual(new Set(['demo-spec']));
+      expect(events.map((event) => event.id)).toEqual(Array(5).fill('a-member'));
+    });
+  });
+
+  it('records one event per record when one write moves several', () => {
+    fixture(({ tasks, dir }) => {
+      tasks('add', 'first', '--id', 'first');
+      tasks('add', 'second', '--id', 'second');
+      tasks('spec', 'add', 'demo-spec', 'first', 'second', '--actor', 'worker');
+
+      const moved = readEvents(dir).filter((event) => event.op === 'spec-add');
+      expect(moved.map((event) => event.id)).toEqual(['first', 'second']);
+      expect(moved[0].spec).toBe('demo-spec');
+    });
+  });
+
+  it('leaves no event behind when a write changes nothing', () => {
+    fixture(({ tasks, dir }) => {
+      tasks('add', 'a member', '--id', 'a-member', '--spec', 'demo-spec');
+      const beforeCount = readEvents(dir).length;
+
+      const result = tasks('edit', 'a-member');
+      expect(result.stdout).toContain('nothing to change');
+      expect(readEvents(dir)).toHaveLength(beforeCount);
+    });
+  });
+
+  it('records an unnamed actor rather than refusing a write that named none', () => {
+    fixture(({ tasks, dir }) => {
+      tasks('add', 'a member', '--id', 'a-member', '--spec', 'demo-spec');
+      expect(readEvents(dir)[0].by).toBeNull();
+    });
+  });
+
+  // The snapshot. Joining to present-day state would make this event claim
+  // the record was never in demo-spec at all.
+  it('keeps the spec an event was written under after the record is re-pointed', () => {
+    fixture(({ tasks, dir }) => {
+      tasks('add', 'a member', '--id', 'a-member', '--spec', 'demo-spec');
+      tasks('spec', 'remove', 'demo-spec', 'a-member');
+
+      expect(tasks('show', 'a-member').stdout).toContain('spec: (deferred)');
+      const events = readEvents(dir);
+      expect(events[0].op).toBe('add');
+      expect(events[0].spec).toBe('demo-spec');
+      // The departure is part of that spec's history too, so it is filed
+      // under the spec the record left rather than the null it now carries.
+      expect(events[1].spec).toBe('demo-spec');
+      expect(tasks('log', '--spec', 'demo-spec').stdout).toContain('2 of 2 event(s)');
+    });
+  });
+
+  it('records the audit pass itself as an event with no task', () => {
+    fixture(({ tasks, dir }) => {
+      tasks('audit', 'demo-spec', '--proof', '1=met', '--evidence', '1=clause 1 checked', '--proof', '2=met', '--evidence', '2=clause 2 checked', '--actor', 'auditor');
+      const passes = readEvents(dir).filter((event) => event.op === 'audit');
+      expect(passes).toHaveLength(1);
+      expect(passes[0].id).toBeNull();
+      expect(passes[0].spec).toBe('demo-spec');
+      expect(passes[0].by).toBe('auditor');
+    });
+  });
+
+  it('records an undelivered task beside the pass that created it', () => {
+    fixture(({ tasks, dir }) => {
+      tasks('audit', 'demo-spec', '--proof', '1=unmet', '--evidence', '1=not yet', '--proof', '2=met', '--evidence', '2=clause 2 checked');
+      const events = readEvents(dir).filter((event) => event.op === 'audit');
+      expect(events.map((event) => event.id)).toEqual([null, 'demo-spec-clause-1']);
+    });
+  });
+});
+
+describe('tasks note and tasks decision', () => {
+  it('records a decision that names a system and no task', () => {
+    fixture(({ tasks, dir }) => {
+      const result = tasks('decision', 'union merge is right for an append-only log', '--system', 'Runtime', '--actor', 'worker');
+      expect(result.status).toBe(0);
+
+      const events = readEvents(dir);
+      expect(events).toHaveLength(1);
+      expect(events[0]).toMatchObject({ op: 'decision', id: null, system: 'Runtime', note: 'union merge is right for an append-only log' });
+    });
+  });
+
+  it('snapshots the system and spec of the record a note names', () => {
+    fixture(({ tasks, dir }) => {
+      tasks('add', 'a member', '--id', 'a-member', '--spec', 'demo-spec', '--system', 'Runtime');
+      tasks('note', 'the 277-line rewrite is why -G false-positives', '--id', 'a-member');
+
+      const note = readEvents(dir).find((event) => event.op === 'note')!;
+      expect(note).toMatchObject({ id: 'a-member', system: 'Runtime', spec: 'demo-spec' });
+    });
+  });
+
+  it('refuses a note that is more than one line, and writes nothing', () => {
+    fixture(({ tasks, dir }) => {
+      const result = tasks('note', 'first line\nsecond line');
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain('a note is one line');
+      expect(readEvents(dir)).toEqual([]);
+    });
+  });
+
+  it('records a note against an id no record answers to, and says so', () => {
+    fixture(({ tasks, dir }) => {
+      const result = tasks('note', 'the record for this is not written yet', '--id', 'not-yet-a-record');
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('no record answers to not-yet-a-record');
+      expect(readEvents(dir).map((event) => event.id)).toEqual(['not-yet-a-record']);
+    });
+  });
+
+  it('refuses a system that names nothing in systems.json', () => {
+    fixture(({ tasks, dir }) => {
+      const result = tasks('decision', 'a decision about nothing', '--system', 'No Such System');
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain('--system not in systems.json');
+      expect(readEvents(dir)).toEqual([]);
+    });
+  });
+
+  // A spec file may since have been renamed or deleted, and an event about a
+  // spec that no longer exists is exactly what a log is for.
+  it('records a decision against a spec with no file, and reports the gap', () => {
+    fixture(({ tasks, dir }) => {
+      const result = tasks('decision', 'superseded before it was written', '--spec', 'a-spec-that-went-away');
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('recorded against that slug anyway');
+      expect(readEvents(dir)[0].spec).toBe('a-spec-that-went-away');
+    });
+  });
+});
+
+describe('tasks log', () => {
+  it('composes filters by ANDing them, and answers from the log alone', () => {
+    fixture(({ tasks }) => {
+      tasks('add', 'a member', '--id', 'a-member', '--spec', 'demo-spec', '--system', 'Runtime');
+      tasks('decision', 'the gate is deleted, not guarded', '--id', 'a-member', '--system', 'Runtime');
+      tasks('decision', 'the modal renders unconditionally', '--system', 'UI');
+
+      expect(tasks('log', '--op', 'decision').stdout).toContain('2 of 3 event(s)');
+      expect(tasks('log', '--op', 'decision', '--system', 'Runtime').stdout).toContain('1 of 3 event(s)');
+      expect(tasks('log', '--system', 'UI', '--spec', 'demo-spec').stdout).toContain('no event matches');
+      expect(tasks('log', 'modal').stdout).toContain('the modal renders unconditionally');
+    });
+  });
+
+  // The same distinction `next` learned: a filter that matched nothing is a
+  // different answer from a log with nothing in it.
+  it('separates an empty log from a filter that matched nothing', () => {
+    fixture(({ tasks }) => {
+      expect(tasks('log').stdout).toContain('no events recorded yet');
+
+      tasks('add', 'a member', '--id', 'a-member', '--spec', 'demo-spec');
+      const missed = tasks('log', '--op', 'start');
+      expect(missed.status).toBe(0);
+      expect(missed.stdout).toContain('no event matches --op start');
+      expect(missed.stdout).toContain('1 event(s) in');
+    });
+  });
+
+  it('refuses an op that names nothing rather than answering with an empty log', () => {
+    fixture(({ tasks }) => {
+      const result = tasks('log', '--op', 'invented');
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain('--op must be one of');
+      expect(result.stderr).toContain('decision');
+    });
+  });
+
+  it('answers with the lines it could read when one is corrupt', () => {
+    fixture(({ tasks, dir }) => {
+      tasks('add', 'a member', '--id', 'a-member', '--spec', 'demo-spec');
+      const log = path.join(dir, 'events.jsonl');
+      writeFileSync(log, `${readFileSync(log, 'utf8')}{ not json\n`, 'utf8');
+
+      const result = tasks('log');
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('a-member');
+      expect(result.stdout).toContain('skipped 1 unreadable event line(s)');
+    });
+  });
+});
+
+// The measurement that cut this log was invalid, and the acceptance criterion
+// is aimed at exactly that error: `-S` counts occurrences of a string, so an
+// edit to a title or evidence is invisible to it; `-G` matches any diff line
+// containing the string, so one schema change lands in every record's history.
+describe('a record history git cannot answer', () => {
+  it('beats git log -S on the edits it misses and -G on the rewrites it over-reports', () => {
+    eventLogGitFixture(({ dir, storePath, tasks, commit, git }) => {
+      tasks('add', 'U5 claims', '--id', 'policy-seam-u5', '--spec', 'demo-spec', '--actor', 'worker');
+      commit('Create the record\n\nA task exists.');
+      tasks('add', 'an unrelated record', '--id', 'build-deployment-h2', '--spec', 'demo-spec', '--actor', 'worker');
+      commit('Create an unrelated record\n\nA second task exists.');
+      tasks('edit', 'policy-seam-u5', '--title', 'U5 claims: a claim says who holds it', '--actor', 'worker');
+      commit('Edit the title\n\nThe title changed.');
+      tasks('edit', 'policy-seam-u5', '--evidence', 'verified against a scratch copy of the live store', '--actor', 'worker');
+      commit('Edit the evidence\n\nThe evidence changed.');
+      tasks('start', 'policy-seam-u5', '--actor', 'worker');
+      commit('Claim it\n\nSomebody holds it.');
+      tasks('done', 'policy-seam-u5', '--actor', 'worker');
+      commit('Close it\n\nThe work landed.');
+
+      // b326230's shape: a field added to the serializer rewrites every line,
+      // so one commit joins the history of every record in the store.
+      const rewritten = readFileSync(storePath, 'utf8')
+        .split('\n')
+        .filter((line) => line.trim().length > 0)
+        .map((line) => JSON.stringify({ ...(JSON.parse(line) as Record<string, unknown>), addedByASchemaChange: null }));
+      writeFileSync(storePath, `${rewritten.join('\n')}\n`, 'utf8');
+      commit('Add a field to every record\n\nThe serializer rewrote all of them.');
+
+      const gitLogCount = (flag: string): number => {
+        const out = git('log', '--format=%H', flag, '--', 'docs/tasks.jsonl').stdout;
+        return out === '' ? 0 : out.split('\n').length;
+      };
+      const loggedCount = (...args: string[]): number => {
+        const stdout = tasks('log', ...args).stdout;
+        return Number(/^(\d+) of \d+ event\(s\)/m.exec(stdout)?.[1] ?? 0);
+      };
+
+      // Five things happened to this record, and git's own search finds one.
+      expect(gitLogCount('-Spolicy-seam-u5')).toBe(1);
+      expect(loggedCount('--id', 'policy-seam-u5')).toBe(5);
+
+      // One thing happened to this one, and -G answers with the schema change
+      // as well, because that commit moved every line in the file.
+      expect(gitLogCount('-Gbuild-deployment-h2')).toBeGreaterThan(1);
+      expect(loggedCount('--id', 'build-deployment-h2')).toBe(1);
+
+      // Exactness in both directions, which is what neither git search has.
+      const history = readEvents(path.join(dir, 'docs'))
+        .filter((event) => event.id === 'policy-seam-u5')
+        .map((event) => event.op);
+      expect(history).toEqual(['add', 'edit', 'edit', 'start', 'done']);
+    });
+  });
+
+  it("merges two branches appending to the log with no conflict, under the repo's own merge=union", () => {
+    eventLogGitFixture(({ dir, tasks, commit, git }) => {
+      git('checkout', '-q', '-b', 'branch-a');
+      tasks('add', 'from A', '--id', 'a-task', '--spec', 'demo-spec', '--actor', 'a');
+      commit('A appends\n\nOne record and one event.');
+
+      git('checkout', '-q', 'demo-spec');
+      git('checkout', '-q', '-b', 'branch-b');
+      tasks('add', 'from B', '--id', 'b-task', '--spec', 'demo-spec', '--actor', 'b');
+      commit('B appends\n\nOne record and one event.');
+
+      const merge = git('merge', '--no-edit', 'branch-a');
+      expect(merge.status).toBe(0);
+
+      const events = readEvents(path.join(dir, 'docs'));
+      expect(events.map((event) => event.id).sort()).toEqual(['a-task', 'b-task']);
+      expect(tasks('doctor').stdout).toContain('2 task(s), 0 error(s)');
+    });
+  });
+
+  it("turns union's one failure mode on the store into a duplicate id doctor reports", () => {
+    eventLogGitFixture(({ tasks, commit, git }) => {
+      tasks('add', 'a contested record', '--id', 'contested', '--spec', 'demo-spec');
+      commit('Create the record\n\nBoth branches will edit it.');
+
+      git('checkout', '-q', '-b', 'branch-a');
+      tasks('edit', 'contested', '--title', "A's title", '--actor', 'a');
+      commit('A edits the title\n\nOne line changed.');
+
+      git('checkout', '-q', 'demo-spec');
+      git('checkout', '-q', '-b', 'branch-b');
+      tasks('edit', 'contested', '--title', "B's title", '--actor', 'b');
+      commit('B edits the title\n\nThe same line changed.');
+
+      const merge = git('merge', '--no-edit', 'branch-a');
+      expect(merge.status).toBe(0);
+
+      const doctor = tasks('doctor');
+      expect(doctor.status).toBe(0);
+      expect(doctor.stdout).toContain('[error] duplicate id: contested');
     });
   });
 });

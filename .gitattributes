@@ -3,6 +3,14 @@
 # section to the one above it, and content is authored by pasting through GitHub.
 * text=auto eol=lf
 
+# Two branches appending to a line-per-record file conflict on the last line
+# for no reason a human can adjudicate. Union keeps both, which is exactly
+# right for an append-only log; on the store its one failure mode is two
+# branches editing the same record, which keeps both versions as a duplicate
+# id and is what `tasks doctor` scans for.
+docs/tasks.jsonl merge=union
+docs/events.jsonl merge=union
+
 # Windows tooling that needs its own line endings whatever the repo says.
 *.bat text eol=crlf
 *.cmd text eol=crlf
