@@ -2916,27 +2916,34 @@ describe('a record history git cannot answer', () => {
     });
   });
 
+  // `note` appends to the log and leaves the store alone, which isolates the
+  // union merge to the one file configured for it. A verb that writes both
+  // would collide on the store — deliberately, per the test below.
   it("merges two branches appending to the log with no conflict, under the repo's own merge=union", () => {
     eventLogGitFixture(({ dir, tasks, commit, git }) => {
       git('checkout', '-q', '-b', 'branch-a');
-      tasks('add', 'from A', '--id', 'a-task', '--spec', 'demo-spec', '--actor', 'a');
-      commit('A appends\n\nOne record and one event.');
+      tasks('note', 'from A', '--actor', 'a');
+      commit('A appends\n\nOne event, no record.');
 
       git('checkout', '-q', 'demo-spec');
       git('checkout', '-q', '-b', 'branch-b');
-      tasks('add', 'from B', '--id', 'b-task', '--spec', 'demo-spec', '--actor', 'b');
-      commit('B appends\n\nOne record and one event.');
+      tasks('note', 'from B', '--actor', 'b');
+      commit('B appends\n\nOne event, no record.');
 
       const merge = git('merge', '--no-edit', 'branch-a');
       expect(merge.status).toBe(0);
 
       const events = readEvents(path.join(dir, 'docs'));
-      expect(events.map((event) => event.id).sort()).toEqual(['a-task', 'b-task']);
-      expect(tasks('doctor').stdout).toContain('2 task(s), 0 error(s)');
+      expect(events.map((event) => event.note).sort()).toEqual(['from A', 'from B']);
     });
   });
 
-  it("turns union's one failure mode on the store into a duplicate id doctor reports", () => {
+  // The store is deliberately NOT merge=union. Two branches editing one record
+  // must collide loudly: union would keep both copies under one id, which
+  // `doctor` reports at exit 0, so CI stays green while every read answers from
+  // the first copy forever. Pass 3 (CL-M5, RG-H1) caught this test asserting the
+  // silent-duplicate outcome as correct.
+  it('conflicts when two branches edit one record, rather than keeping both copies under one id', () => {
     eventLogGitFixture(({ tasks, commit, git }) => {
       tasks('add', 'a contested record', '--id', 'contested', '--spec', 'demo-spec');
       commit('Create the record\n\nBoth branches will edit it.');
@@ -2950,12 +2957,12 @@ describe('a record history git cannot answer', () => {
       tasks('edit', 'contested', '--title', "B's title", '--actor', 'b');
       commit('B edits the title\n\nThe same line changed.');
 
-      const merge = git('merge', '--no-edit', 'branch-a');
-      expect(merge.status).toBe(0);
+      expect(git('merge', '--no-edit', 'branch-a').status).not.toBe(0);
+      git('merge', '--abort');
 
       const doctor = tasks('doctor');
       expect(doctor.status).toBe(0);
-      expect(doctor.stdout).toContain('[error] duplicate id: contested');
+      expect(doctor.stdout).not.toContain('duplicate id');
     });
   });
 });
