@@ -5,12 +5,14 @@ import { createInterface } from 'node:readline';
 import { pathToFileURL } from 'node:url';
 import { harvestFiles, parseAuditDoc, systemForDoc } from './lib/auditImport';
 import { checkCommitMessage, extractNextTrailer, isExempt } from './lib/commitContract';
+import * as git from './lib/git';
 import { checkMergeGate } from './lib/mergeGate';
 import { appendAmendment, appendAuditPass, appendBaseline, duplicateClauseIds, parseSpecDoc, stampClauseIds, type AuditVerdict, type ProofClause, type Verdict } from './lib/specDoc';
 import { loadManifest, systemNames as manifestSystemNames } from './lib/systems';
 import {
   checkStore,
   DEFAULT_STORE_PATH,
+  StoreError,
   type CheckIssue,
   fixNowQueue,
   isBlocked,
@@ -247,8 +249,9 @@ function printTaskConcise(task: Task, tasks: Task[]): void {
 // the spec file did not exist there (opened on this branch, so nothing has
 // drifted).
 function deliverableAtMergeBase(config: Config, spec: string, baseBranch: string): string | null {
+  const mergeBase = git.mergeBase(baseBranch);
+  if (mergeBase === null) return null;
   try {
-    const mergeBase = execFileSync('git', ['merge-base', baseBranch, 'HEAD'], { encoding: 'utf8' }).trim();
     const content = execFileSync('git', ['show', `${mergeBase}:${specFile(config, spec)}`], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
     return parseSpecDoc(content).deliverableSection;
   } catch {
@@ -434,8 +437,7 @@ function resolveCommit(value: string): string {
   const resolved = spawnSync('git', ['rev-parse', '--verify', `${value}^{commit}`], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
   if (resolved.status !== 0) throw new Error(`--commit does not resolve to a commit: ${value}`);
   const sha = resolved.stdout.trim();
-  const reachable = spawnSync('git', ['merge-base', '--is-ancestor', sha, 'HEAD'], { stdio: 'ignore' });
-  if (reachable.status !== 0) throw new Error(`--commit is not reachable from HEAD: ${value}`);
+  if (!git.isAncestor(sha, 'HEAD')) throw new Error(`--commit is not reachable from HEAD: ${value}`);
   return sha;
 }
 
@@ -443,18 +445,9 @@ function closedCommitIssues(tasks: Task[]): CheckIssue[] {
   const issues: CheckIssue[] = [];
   for (const task of tasks) {
     if (!task.closedCommit) continue;
-    const result = spawnSync('git', ['merge-base', '--is-ancestor', task.closedCommit, 'HEAD'], { stdio: 'ignore' });
-    if (result.status !== 0) issues.push({ level: 'warning', message: `${task.id} closed by a commit not reachable from HEAD: ${task.closedCommit}` });
+    if (!git.isAncestor(task.closedCommit, 'HEAD')) issues.push({ level: 'warning', message: `${task.id} closed by a commit not reachable from HEAD: ${task.closedCommit}` });
   }
   return issues;
-}
-
-function currentHead(): string | null {
-  try {
-    return execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
-  } catch {
-    return null;
-  }
 }
 
 // The paths a commit can touch after an audit pass without making that pass
@@ -487,24 +480,20 @@ function nonAuditRecordChanges(config: Config, spec: string, range: string): str
 function staleAuditIssue(config: Config, spec: string, doc: ReturnType<typeof parseSpecDoc>): string | null {
   const latest = doc.auditPasses[doc.auditPasses.length - 1];
   if (!latest || latest.head === '') return null;
-  const head = currentHead();
+  const head = git.head();
   if (head === null || head === latest.head) return null;
 
-  const ancestor = spawnSync('git', ['merge-base', '--is-ancestor', latest.head, 'HEAD'], { stdio: 'ignore' });
-  if (ancestor.status !== 0) return `${spec}'s latest audit pass reviewed ${latest.head}, which is not reachable from HEAD`;
+  if (!git.isAncestor(latest.head, 'HEAD')) return `${spec}'s latest audit pass reviewed ${latest.head}, which is not reachable from HEAD`;
 
   const range = `${latest.head}..HEAD`;
   const outside = nonAuditRecordChanges(config, spec, range);
   if (outside === null) return `${spec}'s latest audit pass reviewed ${latest.head}, but commits after it could not be inspected`;
   if (outside.length === 0) return null;
 
-  try {
-    const count = execFileSync('git', ['rev-list', '--count', range], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
-    const shown = outside.length > 5 ? `${outside.slice(0, 5).join(', ')}, … (${outside.length - 5} more)` : outside.join(', ');
-    return `${spec}'s latest audit pass reviewed ${latest.head}; HEAD has ${count} commit(s) after that audit, touching: ${shown}`;
-  } catch {
-    return `${spec}'s latest audit pass reviewed ${latest.head}, but commits after it could not be counted`;
-  }
+  const count = git.commitCount(range);
+  if (count === null) return `${spec}'s latest audit pass reviewed ${latest.head}, but commits after it could not be counted`;
+  const shown = outside.length > 5 ? `${outside.slice(0, 5).join(', ')}, … (${outside.length - 5} more)` : outside.join(', ');
+  return `${spec}'s latest audit pass reviewed ${latest.head}; HEAD has ${count} commit(s) after that audit, touching: ${shown}`;
 }
 
 // Shared by add and edit: the two places content fields (severity, system,
@@ -1359,18 +1348,14 @@ function cmdImport(args: Flags): void {
 // failure are reported as what each actually is, and neither is allowed
 // to fall back to a placeholder that still exits 0 (M9).
 function resolveDiffRange(baseBranch: string): { base: string; head: string } | null {
-  let base: string;
-  try {
-    base = execFileSync('git', ['merge-base', baseBranch, 'HEAD'], { encoding: 'utf8' }).trim();
-  } catch (error) {
-    console.error(`error: could not resolve a merge-base between HEAD and ${baseBranch}: ${error instanceof Error ? error.message : String(error)}`);
+  const base = git.mergeBase(baseBranch);
+  if (base === null) {
+    console.error(`error: could not resolve a merge-base between HEAD and ${baseBranch}`);
     return null;
   }
-  let head: string;
-  try {
-    head = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
-  } catch (error) {
-    console.error(`error: could not resolve HEAD: ${error instanceof Error ? error.message : String(error)}`);
+  const head = git.head();
+  if (head === null) {
+    console.error('error: could not resolve HEAD');
     return null;
   }
   return { base, head };
@@ -1806,8 +1791,18 @@ async function cmdAudit(rawArgs: string[]): Promise<void> {
   }
 
   const passNumber = doc.auditPasses.length + 1;
-  const base = execFileSync('git', ['merge-base', parsed.baseBranch, 'HEAD'], { encoding: 'utf8' }).trim();
-  const head = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
+  const base = git.mergeBase(parsed.baseBranch);
+  if (base === null) {
+    console.error(`error: could not resolve a merge-base between HEAD and ${parsed.baseBranch}`);
+    process.exitCode = 1;
+    return;
+  }
+  const head = git.head();
+  if (head === null) {
+    console.error('error: could not resolve HEAD');
+    process.exitCode = 1;
+    return;
+  }
 
   const tasks = loadStore(config.storePath);
   const taken = new Set(tasks.map((task) => task.id));
@@ -1904,13 +1899,11 @@ type BranchCommitRange =
 // empty — the latter being the base branch itself, where "this branch's
 // work" is the whole history and the unscoped walk is the right one.
 function branchCommitRange(baseBranch: string): BranchCommitRange {
-  try {
-    const mergeBase = execFileSync('git', ['merge-base', baseBranch, 'HEAD'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
-    const count = Number(execFileSync('git', ['rev-list', '--count', `${mergeBase}..HEAD`], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim());
-    return count === 0 ? { kind: 'empty', range: null, count } : { kind: 'range', range: `${mergeBase}..HEAD`, count };
-  } catch {
-    return { kind: 'unknown', range: null, count: 0 };
-  }
+  const mergeBase = git.mergeBase(baseBranch);
+  if (mergeBase === null) return { kind: 'unknown', range: null, count: 0 };
+  const count = git.commitCount(`${mergeBase}..HEAD`);
+  if (count === null) return { kind: 'unknown', range: null, count: 0 };
+  return count === 0 ? { kind: 'empty', range: null, count } : { kind: 'range', range: `${mergeBase}..HEAD`, count };
 }
 
 // Only the last commit's Next: is meant to be live, but a mechanical or
@@ -2037,9 +2030,7 @@ function cmdCheckCommitMessage(args: Flags): void {
 
 const USAGE = 'usage: npm run tasks -- <check|add|edit|show|list|search|next|start|stop|done|decline|import|triage|spec|audit|audit-prompt|handoff> ...';
 
-export function run(argv: string[]): void | Promise<void> {
-  const [command, ...rest] = argv;
-  const args = parseArgs(rest);
+function dispatch(command: string | undefined, args: Flags, rest: string[]): void | Promise<void> {
   switch (command) {
     case undefined:
     case '--help':
@@ -2087,6 +2078,31 @@ export function run(argv: string[]): void | Promise<void> {
       console.error(`unknown command: ${command ?? '(none)'}\n${USAGE}`);
       process.exitCode = 1;
   }
+}
+
+// A malformed or conflicted docs/tasks.jsonl is reported the same way —
+// check's own `path:line` diagnostic, non-zero exit — for every command,
+// not only `check`. One boundary here instead of a try/catch in each of
+// the other eight store-reading commands, which is where eight of them
+// were still missing it.
+function reportStoreErrors<T>(work: () => T): T | void {
+  try {
+    return work();
+  } catch (error) {
+    if (!(error instanceof StoreError)) throw error;
+    console.error(`error: ${error.message}`);
+    process.exitCode = 1;
+  }
+}
+
+export function run(argv: string[]): void | Promise<void> {
+  const [command, ...rest] = argv;
+  const args = parseArgs(rest);
+  return reportStoreErrors(() => {
+    const result = dispatch(command, args, rest);
+    if (result instanceof Promise) return result.catch((error) => reportStoreErrors(() => { throw error; }));
+    return result;
+  });
 }
 
 if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href) {

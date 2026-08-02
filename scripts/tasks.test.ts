@@ -754,6 +754,33 @@ describe('tasks CLI', () => {
     });
   });
 
+  it('every store-reading command reports a conflicted store as a diagnostic, not a stack trace', () => {
+    fixture(({ tasks, dir }) => {
+      writeFileSync(path.join(dir, 'tasks.jsonl'), '<<<<<<< HEAD\n', 'utf8');
+
+      const commands: Array<{ name: string; args: string[] }> = [
+        { name: 'check', args: ['check'] },
+        { name: 'next', args: ['next'] },
+        { name: 'list', args: ['list'] },
+        { name: 'show', args: ['show', 'ok'] },
+        { name: 'start', args: ['start', 'ok'] },
+        { name: 'done', args: ['done', 'ok'] },
+        { name: 'handoff', args: ['handoff'] },
+        { name: 'spec show', args: ['spec', 'show', 'demo-spec'] },
+        { name: 'audit-prompt', args: ['audit-prompt', 'demo-spec'] },
+      ];
+
+      for (const { name, args } of commands) {
+        const result = tasks(...args);
+        expect(result.status, `${name} exit status`).toBe(1);
+        expect(result.stderr, `${name} stderr`).toContain('malformed JSONL task record');
+        expect(result.stderr, `${name} stderr`).toContain('tasks.jsonl:1');
+        expect(result.stderr, `${name} stderr`).not.toContain('    at ');
+        expect(result.stderr, `${name} stderr`).not.toContain('SyntaxError');
+      }
+    });
+  });
+
   it('check ignores a directory named like a markdown spec file', () => {
     fixture(({ tasks, dir }) => {
       mkdirSync(path.join(dir, 'specs', 'not-a-file.md'));
@@ -1339,6 +1366,20 @@ describe('tasks CLI', () => {
       const result = tasks('audit', 'demo-spec', '--proof', '1=met');
       expect(result.status).toBe(1);
       expect(result.stderr).toContain('demo-spec tags more than one proof clause [c1]');
+    });
+  });
+
+  // The one call site the audit found unguarded: cmdAudit resolved
+  // --base-branch's merge-base with a bare git call and no catch, so a
+  // typo'd base name threw a raw Node stack instead of a diagnostic — the
+  // exact defect Slice 1 fixed for `check` one command over.
+  it('audit reports an unresolvable --base-branch as a diagnostic, not a stack trace', () => {
+    fixture(({ tasks }) => {
+      const result = tasks('audit', 'demo-spec', '--proof', '1=met', '--proof', '2=met', '--base-branch', 'no-such-base-branch-xyz');
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain('could not resolve a merge-base');
+      expect(result.stderr).not.toContain('    at ');
+      expect(result.stderr).not.toContain('Command failed');
     });
   });
 
