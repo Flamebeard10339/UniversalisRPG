@@ -168,6 +168,15 @@ function defaultStoreGitFixture(run: (context: { dir: string; tasks: (...args: s
   }
 }
 
+// Only the lines under `Relevant files:`. The same paths print again under
+// `Member tasks:`, so an assertion made against the whole output cannot
+// tell the relevant-files computation from its absence.
+function relevantFilesBlock(stdout: string): string {
+  const block = /Relevant files:\n((?:- .*\n)+)/.exec(stdout);
+  if (block === null) throw new Error(`no relevant-files block in audit-prompt output:\n${stdout}`);
+  return block[1];
+}
+
 // `list` prefixes its rows with whatever it had to infer to answer, so the
 // id of the first row is the first row that looks like one, not line zero.
 function firstListedId(stdout: string): string {
@@ -2088,8 +2097,11 @@ describe('tasks CLI', () => {
       expect(result.stdout).toContain('- npm run tasks -- doctor');
       expect(result.stdout).not.toContain('--merge');
 
-      expect(result.stdout).toContain('Relevant files:');
-      expect(result.stdout).toContain('src/runtime/runtime.ts:1');
+      // Under the header, not merely somewhere in the output: this path
+      // also prints under `Member tasks:`, so a `toContain` on the path
+      // alone passed with the whole relevant-files computation replaced by
+      // an empty list.
+      expect(relevantFilesBlock(result.stdout)).toContain('- src/runtime/runtime.ts:1\n');
 
       expect(result.stdout).toContain('Proof clauses:');
       expect(result.stdout).toContain('[c1] The first clause holds.');
@@ -2173,7 +2185,10 @@ describe('tasks CLI', () => {
       const result = tasks('audit-prompt', 'demo-spec');
       expect(result.status).toBe(0);
       expect(result.stdout).toContain('Member tasks:\n- none');
-      expect(result.stdout).not.toContain('Relevant files:\n- none');
+      // The file this commit added, named under the header. Asserting only
+      // that `- none` is absent passed with the print loop dropped, which
+      // leaves the header with nothing under it at all.
+      expect(relevantFilesBlock(result.stdout)).toMatch(/- file-[^\n]+\.txt\n/);
     });
   });
 

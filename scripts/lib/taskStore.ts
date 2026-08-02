@@ -36,11 +36,6 @@ export interface Task {
   extra: Record<string, unknown> | null;
 }
 
-// Thrown for a store line that cannot be parsed or does not have the shape
-// a Task requires — never for anything else — so the one catcher at the
-// command boundary (run(argv) in tasks.ts) can recognize "the store is
-// malformed" as a class, distinct from a programming error, without
-// matching on message text.
 export class StoreError extends Error {}
 
 export const DEFAULT_STORE_PATH = 'docs/tasks.jsonl';

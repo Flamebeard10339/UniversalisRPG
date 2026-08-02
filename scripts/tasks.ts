@@ -158,12 +158,6 @@ function warnIfStoreDirty(config: Config): void {
   if (issue) console.warn(`warning: ${issue.message}`);
 }
 
-// c2's own comparison: `closedCommit` lives inside docs/tasks.jsonl, so a
-// `git checkout -- docs/tasks.jsonl` takes a `done` mark and its
-// `closedCommit` away together — a field in the reverted file cannot detect
-// the file being reverted. Only diffing the working tree against the last
-// *committed* version of the store can see what a discard would lose, so
-// that is what this does, independently of closedCommit.
 const CLOSING_STATES: State[] = ['done', 'declined'];
 
 function workingTreeOnlyIssues(config: Config, tasks: Task[]): CheckIssue[] {
