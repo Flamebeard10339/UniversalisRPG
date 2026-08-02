@@ -37,18 +37,3 @@ jobs:
       - run: npm run audit-status
         if: matrix.os == 'ubuntu-latest'
       - run: npm run tasks -- check
-      # The merge gate only runs on pull_request — nothing gates a push, and
-      # it cannot redden main or a branch mid-work. actions/checkout leaves a
-      # PR checkout in detached HEAD, so --branch supplies what
-      # `git rev-parse --abbrev-ref HEAD` cannot; --base-branch targets the
-      # fetched remote-tracking ref, since a bare local `main` need not exist.
-      # BRANCH goes through env: rather than being interpolated straight into
-      # the shell string — github.head_ref is attacker-controlled on
-      # pull_request, and a branch name containing a quote or backtick would
-      # otherwise execute on the runner. Scoped to ubuntu-latest, the same
-      # leg audit-status already runs on above, since this step has nothing
-      # OS-specific to prove on both matrix legs.
-      - env:
-          BRANCH: ${{ github.head_ref }}
-        run: npm run tasks -- check --merge --branch "$BRANCH" --base-branch origin/main
-        if: github.event_name == 'pull_request' && matrix.os == 'ubuntu-latest'

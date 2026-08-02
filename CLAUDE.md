@@ -37,7 +37,7 @@ Audits are the one gate that has repeatedly caught real defects, so they stay. R
 5. **Testing procedure**
   1. `scripts/play-cli.ts` interactive REPL over `startSession`/`view`/`apply` (live `--live` real-time + instant piped/agent mode), named `# test` scripts run via `/test`
   2. `# test` sections in the DSL are the regression format: authored from a live session with `/create-test`, replayed with assertions by `runTest`, and run over the shipped content by `integration.test.ts`
-  3. CI: `.github/workflows/test.yml` runs `tsc --noEmit`, `npm test`, `npm run layer-check`, `npm run audit-status` on push and PR
+  3. CI: `.github/workflows/test.yml` runs `npx tsc --noEmit`, `npm test`, `npm run layer-check` and `npm run tasks -- check` on push and PR, plus `npm run audit-status` on the ubuntu leg
   4. **Five minutes, wall clock.** `npm test` and every gate a PR must pass stay under it, each. A gate nobody can afford to run is a gate that does not run. Buy the time back by making logic pure and passing effects in as data — git facts, clocks, subprocess results — so tests exercise the decision rather than the world. Mock or fake the effect at its seam; keep a handful of real-git and real-subprocess tests to prove the seam itself, and never pay that cost per case.
 6. **Build & deployment**
   1. Web: Vite build, tag-triggered publish to itch.io (`.github/workflows/publish.yml`)
