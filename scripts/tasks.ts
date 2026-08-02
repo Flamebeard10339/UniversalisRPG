@@ -18,6 +18,7 @@ import {
   isBlocked,
   listQueue,
   loadStore,
+  loadStoreTolerantly,
   nearMatches,
   parseStore,
   requirementStates,
@@ -139,6 +140,27 @@ function workingTreeOnlyIssues(config: Config, tasks: Task[]): CheckIssue[] {
     });
   }
   return issues;
+}
+
+// A read answers with the rest of the store rather than refusing over one
+// line it could not parse, and says so afterwards rather than instead — the
+// note has to follow the answer to be a footer, and every read has several
+// return paths, so `run` flushes it once at the boundary.
+const skippedStoreLines: string[] = [];
+
+function readStore(config: Config): Task[] {
+  const { tasks, skipped } = loadStoreTolerantly(config.storePath);
+  skippedStoreLines.push(...skipped);
+  return tasks;
+}
+
+function flushSkippedStoreLines(): void {
+  if (skippedStoreLines.length === 0) return;
+  console.log('');
+  console.log(`skipped ${skippedStoreLines.length} unparseable store line(s) — everything above is the rest of the store:`);
+  for (const message of skippedStoreLines) console.log(`  ${message}`);
+  console.log('write commands refuse until these parse, because saving would delete them; `tasks doctor` reports them and they are fixed by hand');
+  skippedStoreLines.length = 0;
 }
 
 function saveStoreAndWarn(tasks: Task[], config: Config): void {
@@ -545,7 +567,7 @@ function cmdShow(args: Flags): void {
     process.exitCode = 1;
     return;
   }
-  const tasks = loadStore(config.storePath);
+  const tasks = readStore(config);
   const task = tasks.find((candidate) => candidate.id === id);
   if (!task) {
     reportUnknownIds([id], tasks, (line) => console.log(line));
@@ -614,7 +636,7 @@ function runList(args: Flags, text: string | undefined): void {
     return;
   }
 
-  const tasks = loadStore(config.storePath);
+  const tasks = readStore(config);
   const activeSpec = resolveActiveSpec(config, tasks, flags.spec);
   if (activeSpec.note) console.log(activeSpec.note);
 
@@ -641,7 +663,7 @@ function runList(args: Flags, text: string | undefined): void {
 
 function cmdNext(args: Flags): void {
   const config = resolveConfig(args.flags);
-  const tasks = loadStore(config.storePath);
+  const tasks = readStore(config);
   const activeSpec = resolveActiveSpec(config, tasks, args.flags.spec);
   const spec = activeSpec.spec;
   // A resolved spec of null means "no active spec", not "match deferred
@@ -956,7 +978,7 @@ function cmdSpecShow(args: Flags): void {
   }
   console.log('');
 
-  const members = specMembers(loadStore(config.storePath).filter((task) => task.spec === slug), args.flags.order === 'true');
+  const members = specMembers(readStore(config).filter((task) => task.spec === slug), args.flags.order === 'true');
   console.log(`${members.length} member(s):`);
   for (const member of members) {
     console.log(`  ${member.id}  [${member.kind}/${member.state}${member.severity ? '/' + member.severity : ''}]  ${member.title}`);
@@ -1236,7 +1258,7 @@ function cmdAuditPrompt(args: Flags): void {
   const { base, head } = range;
 
   const doc = parseSpecDoc(readFileSync(path_, 'utf8'));
-  const tasks = loadStore(config.storePath);
+  const tasks = readStore(config);
   const members = tasks.filter((task) => task.spec === slug);
   const latest = doc.auditPasses[doc.auditPasses.length - 1];
 
@@ -1790,7 +1812,7 @@ function cmdHandoff(args: Flags): void {
   }
   console.log('');
 
-  const tasks = loadStore(config.storePath);
+  const tasks = readStore(config);
   const activeSpec = resolveActiveSpec(config, tasks, args.flags.spec);
   const spec = activeSpec.spec;
   if (spec === null) {
@@ -1931,7 +1953,8 @@ export function run(argv: string[]): void | Promise<void> {
   const args = parseArgs(rest);
   return reportStoreErrors(() => {
     const result = dispatch(command, args, rest);
-    if (result instanceof Promise) return result.catch((error) => reportStoreErrors(() => { throw error; }));
+    if (result instanceof Promise) return result.catch((error) => reportStoreErrors(() => { throw error; })).finally(flushSkippedStoreLines);
+    flushSkippedStoreLines();
     return result;
   });
 }

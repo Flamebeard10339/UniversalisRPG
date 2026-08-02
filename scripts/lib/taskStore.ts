@@ -179,25 +179,57 @@ function renderTask(task: Task): string {
 // `label` is the `where`-prefix for error messages — a file path for
 // `loadStore`, or a `path@revision` tag for text read out of git history by
 // `tasks check`'s working-tree comparison, which has no path on disk to name.
-export function parseStore(text: string, label: string): Task[] {
+function storeLines(text: string, label: string): Array<{ line: string; where: string }> {
   return text
     .split('\n')
-    .map((line, index) => ({ line: line.trim(), number: index + 1 }))
-    .filter(({ line }) => line.length > 0)
-    .map(({ line, number }) => {
-      const where = `${label}:${number}`;
-      try {
-        return normalizeTask(JSON.parse(line) as unknown, where);
-      } catch (error) {
-        if (error instanceof SyntaxError) throw new StoreError(`${where}: malformed JSONL task record: ${error.message}`);
-        throw error;
-      }
-    });
+    .map((line, index) => ({ line: line.trim(), where: `${label}:${index + 1}` }))
+    .filter(({ line }) => line.length > 0);
+}
+
+function parseLine(line: string, where: string): Task {
+  try {
+    return normalizeTask(JSON.parse(line) as unknown, where);
+  } catch (error) {
+    if (error instanceof SyntaxError) throw new StoreError(`${where}: malformed JSONL task record: ${error.message}`);
+    throw error;
+  }
+}
+
+export function parseStore(text: string, label: string): Task[] {
+  return storeLines(text, label).map(({ line, where }) => parseLine(line, where));
+}
+
+export interface ToleratedStore {
+  tasks: Task[];
+  skipped: string[];
+}
+
+// The tolerant twin of parseStore, for readers only. A writer must keep
+// using parseStore: saveStore rewrites the whole file from the tasks it was
+// given, so saving a store parsed this way would delete the very lines this
+// skipped.
+export function parseStoreTolerantly(text: string, label: string): ToleratedStore {
+  const tasks: Task[] = [];
+  const skipped: string[] = [];
+  for (const { line, where } of storeLines(text, label)) {
+    try {
+      tasks.push(parseLine(line, where));
+    } catch (error) {
+      if (!(error instanceof StoreError)) throw error;
+      skipped.push(error.message);
+    }
+  }
+  return { tasks, skipped };
 }
 
 export function loadStore(path: string = DEFAULT_STORE_PATH): Task[] {
   if (!existsSync(path)) return [];
   return parseStore(readFileSync(path, 'utf8'), path);
+}
+
+export function loadStoreTolerantly(path: string = DEFAULT_STORE_PATH): ToleratedStore {
+  if (!existsSync(path)) return { tasks: [], skipped: [] };
+  return parseStoreTolerantly(readFileSync(path, 'utf8'), path);
 }
 
 // One task per line, insertion order preserved and new tasks appended: what

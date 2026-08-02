@@ -2,7 +2,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { checkStore, dependencyCycles, fixNowQueue, isBlocked, listQueue, loadStore, nearMatches, requirementStates, saveStore, StoreError, unreviewedQueue, waitingOn, type Task } from './taskStore';
+import { checkStore, dependencyCycles, fixNowQueue, isBlocked, listQueue, loadStore, nearMatches, parseStore, parseStoreTolerantly, requirementStates, saveStore, StoreError, unreviewedQueue, waitingOn, type Task } from './taskStore';
 
 function task(overrides: Partial<Task> & { id: string }): Task {
   return {
@@ -190,6 +190,22 @@ describe('loadStore / saveStore', () => {
       saveStore(loadStore(file), file);
       expect(readFileSync(file, 'utf8')).toBe(before);
     });
+  });
+});
+
+describe('parseStoreTolerantly', () => {
+  it('returns every line it could parse and one message per line it could not', () => {
+    const text = `${JSON.stringify(task({ id: 'first' }))}\n<<<<<<< HEAD\n${JSON.stringify({ id: 'shapeless' })}\n${JSON.stringify(task({ id: 'last' }))}\n`;
+    const { tasks, skipped } = parseStoreTolerantly(text, 'store');
+    expect(tasks.map((t) => t.id)).toEqual(['first', 'last']);
+    expect(skipped).toHaveLength(2);
+    expect(skipped[0]).toContain('store:2: malformed JSONL task record');
+    expect(skipped[1]).toContain('store:3: task "shapeless" requires kind');
+  });
+
+  it('leaves parseStore strict, so a writer cannot round-trip a store minus its unparseable lines', () => {
+    const text = `${JSON.stringify(task({ id: 'first' }))}\n<<<<<<< HEAD\n`;
+    expect(() => parseStore(text, 'store')).toThrow(StoreError);
   });
 });
 

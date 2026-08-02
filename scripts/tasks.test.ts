@@ -805,20 +805,19 @@ describe('tasks CLI', () => {
     });
   });
 
-  it('every store-reading command reports a conflicted store as a diagnostic, not a stack trace', () => {
+  it('every store-writing command reports a conflicted store as a diagnostic, not a stack trace', () => {
     fixture(({ tasks, dir }) => {
       writeFileSync(path.join(dir, 'tasks.jsonl'), '<<<<<<< HEAD\n', 'utf8');
 
       const commands: Array<{ name: string; args: string[] }> = [
-        { name: 'check', args: ['check'] },
-        { name: 'next', args: ['next'] },
-        { name: 'list', args: ['list'] },
-        { name: 'show', args: ['show', 'ok'] },
+        { name: 'add', args: ['add', 'a task'] },
+        { name: 'edit', args: ['edit', 'ok', '--title', 'x'] },
         { name: 'start', args: ['start', 'ok'] },
+        { name: 'stop', args: ['stop', 'ok'] },
         { name: 'done', args: ['done', 'ok'] },
-        { name: 'handoff', args: ['handoff'] },
-        { name: 'spec show', args: ['spec', 'show', 'demo-spec'] },
-        { name: 'audit-prompt', args: ['audit-prompt', 'demo-spec'] },
+        { name: 'decline', args: ['decline', 'ok', '--reason', 'x'] },
+        { name: 'spec add', args: ['spec', 'add', 'demo-spec', 'ok'] },
+        { name: 'spec remove', args: ['spec', 'remove', 'demo-spec', 'ok'] },
       ];
 
       for (const { name, args } of commands) {
@@ -829,6 +828,48 @@ describe('tasks CLI', () => {
         expect(result.stderr, `${name} stderr`).not.toContain('    at ');
         expect(result.stderr, `${name} stderr`).not.toContain('SyntaxError');
       }
+    });
+  });
+
+  it('every store-reading command answers over an unparseable line, skipping it and noting the skip in a footer', () => {
+    fixture(({ tasks, dir }) => {
+      tasks('add', 'a readable task', '--id', 'readable', '--spec', 'demo-spec');
+      const store = path.join(dir, 'tasks.jsonl');
+      writeFileSync(store, `<<<<<<< HEAD\n${readFileSync(store, 'utf8')}`, 'utf8');
+
+      const commands: Array<{ name: string; args: string[] }> = [
+        { name: 'next', args: ['next'] },
+        { name: 'list', args: ['list'] },
+        { name: 'show', args: ['show', 'readable'] },
+        { name: 'search', args: ['search', 'readable'] },
+        { name: 'handoff', args: ['handoff'] },
+        { name: 'spec show', args: ['spec', 'show', 'demo-spec'] },
+      ];
+
+      for (const { name, args } of commands) {
+        const result = tasks(...args);
+        expect(result.status, `${name} exit status`).toBe(0);
+        expect(result.stdout, `${name} stdout`).toContain('readable');
+        expect(result.stdout, `${name} stdout`).toContain('skipped 1 unparseable store line(s)');
+        expect(result.stdout, `${name} stdout`).toContain('tasks.jsonl:1');
+        expect(result.stderr, `${name} stderr`).not.toContain('    at ');
+      }
+    });
+  });
+
+  it('the skip footer follows the answer rather than replacing it, and names the write consequence', () => {
+    fixture(({ tasks, dir }) => {
+      tasks('add', 'a readable task', '--id', 'readable', '--spec', 'demo-spec');
+      const store = path.join(dir, 'tasks.jsonl');
+      writeFileSync(store, `${readFileSync(store, 'utf8')}{"id":"half-written"\n`, 'utf8');
+
+      const listed = tasks('list');
+      expect(listed.stdout.indexOf('readable')).toBeLessThan(listed.stdout.indexOf('skipped 1 unparseable'));
+      expect(listed.stdout).toContain('write commands refuse until these parse');
+
+      const write = tasks('edit', 'readable', '--title', 'renamed');
+      expect(write.status).toBe(1);
+      expect(readFileSync(store, 'utf8')).toContain('half-written');
     });
   });
 
