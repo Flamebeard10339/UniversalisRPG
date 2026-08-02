@@ -45,11 +45,15 @@ Proof:
   threshold is reported cold; nothing is ever auto-released.
 - [c7] A decision that needs a human is a record the tool can return, not a
   paragraph of prose in a spec document.
-- [c8] No *recorded fact* and no *refusal* is derived from git. Every fact in
-  the store was asserted by an agent that intended it, and git is referenced as
-  evidence by sha. Inferring a **default argument** — which spec a read command
-  should assume — is permitted and is not state, provided the output says the
-  inference happened and what it was drawn from.
+- [c8] No *refusal* is derived from git, and no *fact about the work* is. Every
+  judgement in the store — what a task is, whether it is done, whether it was
+  declined and why — was asserted by an agent that intended it, and git is
+  referenced as evidence by sha. Inferring a **default argument** — which spec a
+  read command should assume, which branch it is running on — is permitted,
+  provided the output says the inference happened and what it was drawn from,
+  and provided the inferred value is *provenance* rather than a claim about the
+  work: an event may record the branch it was written on, because that says
+  where the writing happened and never what was true of the task.
 - [c9] No command answers a question it did not understand, and none silently
   discards one it did. An unrecognised flag is an error naming the flag; a
   recognised flag either takes effect or is refused, never accepted and dropped;

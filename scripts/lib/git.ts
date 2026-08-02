@@ -1,4 +1,5 @@
 import { spawnSync } from 'node:child_process';
+import path from 'node:path';
 
 // Every function here is quiet and nullable: a failed git invocation
 // (unknown ref, no repo, detached HEAD) returns null/false instead of
@@ -26,6 +27,17 @@ export function branch(): string | null {
 // resolve to something that is not a commit.
 export function resolveCommit(revspec: string): string | null {
   return run(['rev-parse', '--verify', `${revspec}^{commit}`]);
+}
+
+// `<rev>:<path>` colon syntax, which git resolves from the repo root with
+// forward slashes only — unlike a `-- <path>` pathspec it rejects an
+// absolute Windows path outright ("exists on disk, but not in <rev>"). The
+// normalization lives here rather than at each caller, because getting it
+// wrong fails as "no such file in that revision", which reads like an
+// answer rather than a bug.
+export function fileAt(rev: string, filePath: string): string | null {
+  const relative = path.relative(process.cwd(), path.resolve(filePath)).split(path.sep).join('/');
+  return run(['show', `${rev}:${relative}`]);
 }
 
 export function isAncestor(ancestor: string, descendant: string): boolean {

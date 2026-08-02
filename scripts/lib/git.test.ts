@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { branch, commitCount, head, isAncestor, mergeBase, resolveCommit } from './git';
+import { branch, commitCount, fileAt, head, isAncestor, mergeBase, resolveCommit } from './git';
 
 let dir: string;
 let originalCwd: string;
@@ -53,6 +53,29 @@ describe('git seam', () => {
       process.chdir(dir);
       rmSync(outside, { recursive: true, force: true });
     }
+  });
+
+  it('fileAt reads a path out of a revision, and is null rather than throwing when it is not there', () => {
+    writeFileSync(path.join(dir, 'tracked.txt'), 'first version\n', 'utf8');
+    spawnSync('git', ['add', '.'], { cwd: dir });
+    spawnSync('git', ['commit', '--no-verify', '-m', 'add tracked'], { cwd: dir });
+    writeFileSync(path.join(dir, 'tracked.txt'), 'second version\n', 'utf8');
+
+    // HEAD, not the working tree — the whole point of reading through a rev.
+    expect(fileAt('HEAD', 'tracked.txt')).toBe('first version');
+    expect(fileAt('HEAD', 'never-existed.txt')).toBeNull();
+    expect(fileAt('no-such-rev', 'tracked.txt')).toBeNull();
+  });
+
+  it('fileAt takes an absolute path, which git\'s colon syntax rejects on its own', () => {
+    writeFileSync(path.join(dir, 'tracked.txt'), 'content\n', 'utf8');
+    spawnSync('git', ['add', '.'], { cwd: dir });
+    spawnSync('git', ['commit', '--no-verify', '-m', 'add tracked'], { cwd: dir });
+
+    // `git show HEAD:C:/...` fails with "exists on disk, but not in HEAD" —
+    // an answer-shaped failure, which is why the normalization belongs
+    // inside the seam and not at each call site.
+    expect(fileAt('HEAD', path.join(dir, 'tracked.txt'))).toBe('content');
   });
 
   it('resolveCommit turns a revspec into the sha it means now, and is null for anything that is not a commit', () => {

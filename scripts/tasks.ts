@@ -191,15 +191,6 @@ function usesDefaultStore(config: Config): boolean {
   return path.resolve(config.storePath) === path.resolve(DEFAULT_STORE_PATH);
 }
 
-// `git show <rev>:<path>` takes its path in `<rev>:<path>` colon syntax,
-// which git resolves relative to the repo root with forward slashes only —
-// unlike a `-- <path>` pathspec, it rejects an absolute Windows path outright
-// ("exists on disk, but not in <rev>"). config.storePath may be absolute
-// (tests pass one via --store), so normalize before every colon-syntax call.
-function gitPathspec(storePath: string): string {
-  return path.relative(process.cwd(), path.resolve(storePath)).split(path.sep).join('/');
-}
-
 function dirtyStoreIssue(config: Config): CheckIssue | null {
   if (!usesDefaultStore(config)) return null;
   const result = spawnSync('git', ['status', '--porcelain', '--', config.storePath], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
@@ -219,11 +210,11 @@ const CLOSING_STATES: State[] = ['done', 'declined'];
 
 function workingTreeOnlyIssues(config: Config, tasks: Task[]): CheckIssue[] {
   if (!usesDefaultStore(config)) return [];
-  const committedText = spawnSync('git', ['show', `HEAD:${gitPathspec(config.storePath)}`], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
-  if ((committedText.status ?? 1) !== 0) return [];
+  const committedText = git.fileAt('HEAD', config.storePath);
+  if (committedText === null) return [];
   let committed: Task[];
   try {
-    committed = parseStore(committedText.stdout, `${config.storePath}@HEAD`);
+    committed = parseStore(committedText, `${config.storePath}@HEAD`);
   } catch {
     return [];
   }
@@ -727,10 +718,10 @@ function cmdEdit(args: Flags, usage: string): void {
 }
 
 function storeStateAt(config: Config, commit: string, id: string): State | null {
-  const result = spawnSync('git', ['show', `${commit}:${gitPathspec(config.storePath)}`], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
-  if ((result.status ?? 1) !== 0) return null;
+  const text = git.fileAt(commit, config.storePath);
+  if (text === null) return null;
   try {
-    return parseStore(result.stdout, `${config.storePath}@${commit}`).find((task) => task.id === id)?.state ?? null;
+    return parseStore(text, `${config.storePath}@${commit}`).find((task) => task.id === id)?.state ?? null;
   } catch {
     return null;
   }
