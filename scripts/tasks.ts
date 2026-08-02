@@ -756,12 +756,10 @@ function explainEmptyQueue(tasks: Task[], spec: string, filter: { system?: strin
     return;
   }
 
-  if (blocked.length === 0) {
-    const narrowed = [filter.system && `--system ${filter.system}`, filter.severity && `--severity ${filter.severity}`].filter(Boolean).join(' ');
-    console.log(narrowed === '' ? `${open.length} open member(s) exist but none reached this queue` : `${open.length} open, unblocked member(s) exist but none match ${narrowed}`);
-    return;
-  }
+  const narrowed = [filter.system && `--system ${filter.system}`, filter.severity && `--severity ${filter.severity}`].filter(Boolean).join(' ');
+  if (blocked.length < open.length) console.log(narrowed === '' ? `${open.length - blocked.length} open, unblocked member(s) exist but none reached this queue` : `${open.length - blocked.length} open, unblocked member(s) exist but none match ${narrowed}`);
 
+  if (blocked.length === 0) return;
   console.log(`${blocked.length} open member(s) are waiting on a requirement:`);
   for (const task of blocked) console.log(`- ${task.id} waits on ${waitingOn(task, byId).join(', ')}`);
 

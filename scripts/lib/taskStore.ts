@@ -177,8 +177,8 @@ function renderTask(task: Task): string {
 }
 
 // `label` is the `where`-prefix for error messages — a file path for
-// `loadStore`, or a `path@revision` tag for text read out of git history by
-// `tasks check`'s working-tree comparison, which has no path on disk to name.
+// `loadStore`, or a `path@revision` tag for text read out of git history by a
+// working-tree comparison, which has no path on disk to name.
 function storeLines(text: string, label: string): Array<{ line: string; where: string }> {
   return text
     .split('\n')

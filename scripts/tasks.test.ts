@@ -432,6 +432,15 @@ describe('tasks CLI', () => {
     });
   });
 
+  it('next separates a filter that matched nothing from a queue that is genuinely empty', () => {
+    fixture(({ tasks }) => {
+      tasks('add', 'a runtime task', '--id', 'runtime-task', '--spec', 'demo-spec', '--system', 'Runtime');
+      const filtered = tasks('next', '--system', 'UI');
+      expect(filtered.status).toBe(0);
+      expect(filtered.stdout).toContain('1 open, unblocked member(s) exist but none match --system UI');
+    });
+  });
+
   it('next says a spec is fully accounted for rather than reporting the same emptiness as a spec with no members', () => {
     fixture(({ tasks }) => {
       const empty = tasks('next');
