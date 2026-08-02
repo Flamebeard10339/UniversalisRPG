@@ -1519,11 +1519,6 @@ describe('tasks CLI', () => {
       expect(result.status).toBe(0);
       expect(result.stdout).toContain('You are auditing demo-spec on branch demo-spec.');
 
-      // c5/M9: the diff range must be real, resolved SHAs — not a label.
-      const diffRange = /Diff range: ([0-9a-f]{40})\.\.([0-9a-f]{40})/.exec(result.stdout);
-      expect(diffRange).not.toBeNull();
-      expect(diffRange![1]).not.toBe(diffRange![2]);
-
       expect(result.stdout).toContain('Required commands (all must pass):');
       expect(result.stdout).toContain('- npm test');
       expect(result.stdout).toContain('- npx tsc --noEmit');
@@ -1553,6 +1548,24 @@ describe('tasks CLI', () => {
       expect(result.stdout).toContain('src/runtime/runtime.ts:1');
       expect(result.stdout).toContain('prefer mutation testing');
       expect(result.stdout).toContain('Do not promote pass-2+ findings.');
+    });
+  });
+
+  // c5/M9: the diff range must be real, resolved SHAs — not a label — and
+  // base and head must actually differ. `fixture`'s audit-prompt call runs
+  // in-process, so its git resolution lands on whatever repository the test
+  // suite itself happens to be checked out in; proving a real, non-degenerate
+  // range needs its own dedicated repo instead, where the divergence is
+  // ours to control.
+  it('audit-prompt prints a real, resolved diff range from its own dedicated repo', () => {
+    gitFixture(({ commit, tasks }) => {
+      commit('A commit on demo-spec, after branching from main.');
+
+      const result = tasks('audit-prompt', 'demo-spec');
+      expect(result.status).toBe(0);
+      const diffRange = /Diff range: ([0-9a-f]{40})\.\.([0-9a-f]{40})/.exec(result.stdout);
+      expect(diffRange).not.toBeNull();
+      expect(diffRange![1]).not.toBe(diffRange![2]);
     });
   });
 
