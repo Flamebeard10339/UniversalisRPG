@@ -309,6 +309,50 @@ function runProofTargets(doc: { proofClauses: ProofClause[] }): string[] {
   return issues;
 }
 
+interface VitestAssertionResult {
+  title: string;
+  status: 'passed' | 'failed' | 'skipped' | 'todo' | 'pending';
+}
+
+interface VitestJsonReport {
+  testResults: { assertionResults: VitestAssertionResult[] }[];
+}
+
+// Distinguishes the four outcomes the merge gate must tell apart — missing
+// file, no matching test, a matched test that is skipped/todo, and a matched
+// test that failed — by parsing vitest's own machine-readable report instead
+// of scraping its human-formatted summary line. The prior scrape matched
+// vitest's own "N passed | M skipped" summary whenever the file had other
+// tests (every real target), and separately matched "0 passed" as a
+// substring of "10 passed"/"20 passed" — so it refused every legitimate
+// target and never observed a genuine failure via that branch.
+function runVitestProofTarget(clause: number, target: string, file: string, name: string): string | null {
+  if (!existsSync(file)) return `proof clause ${clause} target's test file does not exist: ${file}`;
+
+  const result = spawnSync(process.execPath, ['node_modules/vitest/vitest.mjs', 'run', file, '--configLoader', 'runner', '--reporter=json'], { cwd: process.cwd(), encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+
+  let report: VitestJsonReport;
+  try {
+    report = JSON.parse(result.stdout);
+  } catch {
+    return `proof clause ${clause} target could not be evaluated — vitest produced no readable report: ${target}`;
+  }
+
+  const matches = report.testResults.flatMap((suite) => suite.assertionResults).filter((assertion) => assertion.title === name);
+  if (matches.length === 0) return `proof clause ${clause} target matched no test named "${name}": ${target}`;
+
+  const failed = matches.filter((assertion) => assertion.status === 'failed');
+  if (failed.length > 0) return `proof clause ${clause} target failed (${failed.length}/${matches.length} matching test(s) failed): ${target}`;
+
+  const notPassed = matches.filter((assertion) => assertion.status !== 'passed');
+  if (notPassed.length > 0) return `proof clause ${clause} target matched only skipped or todo test(s) (${notPassed.length}/${matches.length}): ${target}`;
+
+  // A name that matches more than one test is over-broad rather than wrong
+  // — every match passing satisfies the clause, but the author should know.
+  if (matches.length > 1) console.warn(`warning: proof clause ${clause} target matched ${matches.length} test(s), all passing — name a more specific test: ${target}`);
+  return null;
+}
+
 function runProofTarget(clause: number, target: string): string | null {
   if (target.startsWith('command ')) {
     const command = target.slice('command '.length).trim();
@@ -320,10 +364,7 @@ function runProofTarget(clause: number, target: string): string | null {
   const vitest = /^vitest\s+(\S+)\s+"([^"]+)"$/.exec(target);
   if (vitest) {
     const [, file, name] = vitest;
-    const result = spawnSync(process.execPath, ['node_modules/vitest/vitest.mjs', 'run', file, '--configLoader', 'runner', '-t', name], { cwd: process.cwd(), encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
-    if ((result.status ?? 1) !== 0) return `proof clause ${clause} target failed: ${target}`;
-    if (result.stdout.includes('0 passed') || result.stdout.includes('skipped')) return `proof clause ${clause} target missing or skipped: ${target}`;
-    return null;
+    return runVitestProofTarget(clause, target, file, name);
   }
 
   return `proof clause ${clause} target has unsupported shape: ${target}`;
