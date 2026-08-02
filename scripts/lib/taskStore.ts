@@ -26,6 +26,8 @@ export interface Task {
   reason: string | null;
   closed: string | null;
   closedCommit: string | null;
+  claimed: string | null;
+  claimedBy: string | null;
   // Fields a store line carried that this version of Task does not know
   // about — kept so an old checkout's `tasks add`/`edit` cannot silently
   // erase a field a concurrent branch is adding, the mirror of the store's
@@ -97,6 +99,8 @@ const KNOWN_KEYS: ReadonlyArray<keyof KnownFields> = Object.keys({
   reason: true,
   closed: true,
   closedCommit: true,
+  claimed: true,
+  claimedBy: true,
 } satisfies Record<keyof KnownFields, true>) as ReadonlyArray<keyof KnownFields>;
 const KNOWN_KEY_SET = new Set<string>(KNOWN_KEYS);
 
@@ -141,6 +145,8 @@ function normalizeTask(value: unknown, where: string): Task {
     reason: nullableString(value, 'reason', where),
     closed: nullableString(value, 'closed', where),
     closedCommit: nullableString(value, 'closedCommit', where),
+    claimed: nullableString(value, 'claimed', where),
+    claimedBy: nullableString(value, 'claimedBy', where),
     extra: extraFields(value),
   };
 }
@@ -168,6 +174,8 @@ function renderTask(task: Task): string {
     reason: task.reason,
     closed: task.closed,
     closedCommit: task.closedCommit,
+    claimed: task.claimed,
+    claimedBy: task.claimedBy,
   };
   const merged: Record<string, unknown> = known;
   if (task.extra) {
@@ -365,6 +373,52 @@ export interface CheckIssue {
   message: string;
 }
 
+// One number, in one place, until someone needs to tune it. Past this many
+// days with no activity a claim is *reported* cold and never released:
+// releasing it would put two agents on one task, while telling the next
+// agent who holds it and for how long lets that agent decide in one read.
+export const COLD_CLAIM_DAYS = 3;
+
+export interface Claim {
+  by: string | null;
+  since: string;
+  // Null when `since` is not a date this can read. An unreadable claim is
+  // reported with its age unknown — never assumed fresh, never assumed cold.
+  days: number | null;
+  cold: boolean;
+}
+
+export function claimOf(task: Task, today: string): Claim | null {
+  if (task.claimed === null) return null;
+  const by = task.claimedBy;
+  const since = Date.parse(`${task.claimed}T00:00:00Z`);
+  const now = Date.parse(`${today}T00:00:00Z`);
+  if (Number.isNaN(since) || Number.isNaN(now)) return { by, since: task.claimed, days: null, cold: false };
+  const days = Math.floor((now - since) / 86_400_000);
+  return { by, since: task.claimed, days, cold: days >= COLD_CLAIM_DAYS };
+}
+
+// The one rendering of a claim, shared by every command that mentions one.
+export function claimSummary(task: Task, today: string): string | null {
+  const claim = claimOf(task, today);
+  if (claim === null) return null;
+  const holder = `claimed by ${claim.by ?? '(unnamed)'} since ${claim.since}`;
+  if (claim.days === null) return `${holder} (unreadable date, so its age is unknown)`;
+  const age = `${claim.days} day${claim.days === 1 ? '' : 's'}`;
+  return `${holder} (${age})${claim.cold ? `, COLD — no activity for ${age}, past the ${COLD_CLAIM_DAYS}-day threshold, and nothing is ever auto-released` : ''}`;
+}
+
+// Separate from checkStore because coldness is the one thing here that
+// depends on a clock, and a clock is an effect the caller passes in.
+export function coldClaimIssues(tasks: Task[], today: string): CheckIssue[] {
+  return tasks
+    .filter((task) => task.state === 'in-progress' && (claimOf(task, today)?.cold ?? false))
+    .map((task) => ({
+      level: 'warning' as const,
+      message: `${task.id} ${claimSummary(task, today)}; \`tasks start ${task.id} --actor <you>\` takes it over and \`tasks stop ${task.id}\` returns it to the queue`,
+    }));
+}
+
 export function checkStore(tasks: Task[], systems: string[], specExists: (spec: string) => boolean = (spec) => existsSync(`docs/specs/${spec}.md`)): CheckIssue[] {
   const issues: CheckIssue[] = [];
   const seen = new Set<string>();
@@ -381,6 +435,7 @@ export function checkStore(tasks: Task[], systems: string[], specExists: (spec: 
     if (task.state === 'declined' && !task.reason) issues.push({ level: 'error', message: `${task.id} is declined but has no reason` });
     if (task.state !== 'declined' && task.reason) issues.push({ level: 'warning', message: `${task.id} is ${task.state} and carries a decline reason, which reads as a decline that was reopened: ${task.reason}` });
     if (task.state !== 'done' && task.state !== 'declined' && task.closed) issues.push({ level: 'warning', message: `${task.id} is ${task.state} but still carries a closed date: ${task.closed}` });
+    if (task.state !== 'in-progress' && task.claimed) issues.push({ level: 'warning', message: `${task.id} is ${task.state} and still carries a claim by ${task.claimedBy ?? '(unnamed)'} from ${task.claimed}, which reads as a claim that was released` });
     if (task.kind === 'undelivered' && task.clause === null) issues.push({ level: 'error', message: `${task.id} is undelivered but names no proof clause` });
     if (task.kind !== 'undelivered' && task.clause !== null) issues.push({ level: 'error', message: `${task.id} names a proof clause but is not undelivered` });
     if (task.system !== null && !systems.includes(task.system)) issues.push({ level: 'error', message: `${task.id} has a system not in systems.json: ${task.system}` });

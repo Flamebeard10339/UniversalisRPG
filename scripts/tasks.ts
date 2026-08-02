@@ -499,6 +499,8 @@ function cmdAdd(args: Flags): void {
     reason: null,
     closed: null,
     closedCommit: null,
+    claimed: null,
+    claimedBy: null,
     extra: null,
   };
   tasks.push(task);
@@ -1204,6 +1206,8 @@ function cmdImport(args: Flags): void {
       reason: null,
       closed: null,
       closedCommit: null,
+      claimed: null,
+      claimedBy: null,
       extra: null,
     };
     tasks.push(task);
@@ -1713,6 +1717,8 @@ async function cmdAudit(rawArgs: string[]): Promise<void> {
       reason: null,
       closed: null,
       closedCommit: null,
+      claimed: null,
+      claimedBy: null,
       extra: null,
     };
     tasks.push(undelivered);
@@ -1740,6 +1746,8 @@ async function cmdAudit(rawArgs: string[]): Promise<void> {
       reason: null,
       closed: null,
       closedCommit: null,
+      claimed: null,
+      claimedBy: null,
       extra: null,
     };
     tasks.push(task);

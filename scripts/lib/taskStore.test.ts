@@ -2,7 +2,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { checkStore, dependencyCycles, fixNowQueue, isBlocked, KINDS, listQueue, loadStore, nearMatches, parseStore, parseStoreTolerantly, requirementStates, saveStore, StoreError, unreviewedQueue, waitingOn, type Task } from './taskStore';
+import { checkStore, claimSummary, COLD_CLAIM_DAYS, coldClaimIssues, dependencyCycles, fixNowQueue, isBlocked, KINDS, listQueue, loadStore, nearMatches, parseStore, parseStoreTolerantly, requirementStates, saveStore, StoreError, unreviewedQueue, waitingOn, type Task } from './taskStore';
 
 function task(overrides: Partial<Task> & { id: string }): Task {
   return {
@@ -21,6 +21,8 @@ function task(overrides: Partial<Task> & { id: string }): Task {
     reason: null,
     closed: null,
     closedCommit: null,
+    claimed: null,
+    claimedBy: null,
     extra: null,
     ...overrides,
   };
@@ -128,6 +130,8 @@ describe('loadStore / saveStore', () => {
           reason: null,
           closed: null,
           closedCommit: null,
+          claimed: null,
+          claimedBy: null,
         })}\n`,
       );
     });
@@ -189,7 +193,7 @@ describe('loadStore / saveStore', () => {
 
       saveStore(loadStore(file), file);
       const line = readFileSync(file, 'utf8').trim();
-      const canonicalKeys = ['id', 'title', 'kind', 'state', 'severity', 'system', 'spec', 'clause', 'requires', 'files', 'deliverable', 'evidence', 'source', 'reason', 'closed', 'closedCommit'];
+      const canonicalKeys = ['id', 'title', 'kind', 'state', 'severity', 'system', 'spec', 'clause', 'requires', 'files', 'deliverable', 'evidence', 'source', 'reason', 'closed', 'closedCommit', 'claimed', 'claimedBy'];
       const keys = Object.keys(JSON.parse(line));
       expect(keys.slice(0, canonicalKeys.length)).toEqual(canonicalKeys);
       expect(keys.slice(canonicalKeys.length)).toEqual(['aField', 'mField', 'zField']);
@@ -222,6 +226,75 @@ describe('parseStoreTolerantly', () => {
     expect(() => parseStore(text, 'store')).toThrow(StoreError);
   });
 });
+
+describe('claims', () => {
+  const held = (claimed: string | null, claimedBy: string | null = 'worker-a'): Task => task({ id: 'held', state: 'in-progress', claimed, claimedBy });
+
+  it('round-trips the holder and the date it was claimed on', () => {
+    const line = JSON.stringify(held('2026-07-27'));
+    expect(parseStore(line, 'store')[0]).toMatchObject({ claimed: '2026-07-27', claimedBy: 'worker-a' });
+  });
+
+  it('reads a record written before claims existed as unclaimed rather than refusing it', () => {
+    const { claimed: _c, claimedBy: _b, extra: _e, ...legacy } = task({ id: 'legacy' });
+    const parsed = parseStore(JSON.stringify(legacy), 'store')[0];
+    expect(parsed.claimed).toBeNull();
+    expect(parsed.claimedBy).toBeNull();
+    expect(claimSummary(parsed, '2026-08-02')).toBeNull();
+  });
+
+  it('summarizes a fresh claim by holder and age, with no cold marking', () => {
+    expect(claimSummary(held('2026-08-02'), '2026-08-02')).toBe('claimed by worker-a since 2026-08-02 (0 days)');
+    expect(claimSummary(held('2026-08-01'), '2026-08-02')).toBe('claimed by worker-a since 2026-08-01 (1 day)');
+  });
+
+  it('names an unnamed holder rather than hiding that a claim exists', () => {
+    expect(claimSummary(held('2026-08-02', null), '2026-08-02')).toBe('claimed by (unnamed) since 2026-08-02 (0 days)');
+  });
+
+  it('marks a claim cold exactly at the threshold, not before it', () => {
+    const dayBefore = claimSummary(held('2026-08-02'), addDays('2026-08-02', COLD_CLAIM_DAYS - 1));
+    const atThreshold = claimSummary(held('2026-08-02'), addDays('2026-08-02', COLD_CLAIM_DAYS));
+    expect(dayBefore).not.toContain('COLD');
+    expect(atThreshold).toContain(`COLD — no activity for ${COLD_CLAIM_DAYS} days, past the ${COLD_CLAIM_DAYS}-day threshold`);
+  });
+
+  it('reports a claim it cannot date rather than silently treating it as fresh or as cold', () => {
+    const summary = claimSummary(held('last tuesday'), '2026-08-02');
+    expect(summary).toBe('claimed by worker-a since last tuesday (unreadable date, so its age is unknown)');
+    expect(coldClaimIssues([held('last tuesday')], '2026-08-02')).toEqual([]);
+  });
+
+  it('reports a cold claim as a warning that names the holder and says nothing was released', () => {
+    const issues = coldClaimIssues([held('2026-07-27'), task({ id: 'free' })], '2026-08-02');
+    expect(issues).toHaveLength(1);
+    expect(issues[0].level).toBe('warning');
+    expect(issues[0].message).toContain('held claimed by worker-a since 2026-07-27 (6 days)');
+    expect(issues[0].message).toContain('COLD');
+    expect(issues[0].message).toContain('tasks start held --actor <you>');
+  });
+
+  it('does not report a claim on a record nobody is holding any more as cold', () => {
+    const released = task({ id: 'done-and-released', state: 'done', claimed: '2026-01-01', claimedBy: 'worker-a' });
+    expect(coldClaimIssues([released], '2026-08-02')).toEqual([]);
+  });
+
+  it('warns that a claim on a record which is not in progress describes a claim that was released', () => {
+    const issues = checkStore([task({ id: 'stale', state: 'open', claimed: '2026-08-01', claimedBy: 'worker-a' })], []);
+    expect(issues).toContainEqual({
+      level: 'warning',
+      message: 'stale is open and still carries a claim by worker-a from 2026-08-01, which reads as a claim that was released',
+    });
+  });
+
+  it('takes no exception to a claim on the one state that means someone holds it', () => {
+    expect(checkStore([held('2026-08-01')], [])).toEqual([]);
+  });
+});
+
+function addDays(date: string, days: number): string {
+  return new Date(Date.parse(`${date}T00:00:00Z`) + days * 86_400_000).toISOString().slice(0, 10);
+}
 
 describe('isBlocked', () => {
   const blockedBy = (requirement: Partial<Task>): boolean => {
