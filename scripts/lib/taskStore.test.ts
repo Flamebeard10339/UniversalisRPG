@@ -2,7 +2,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { checkStore, fixNowQueue, isBlocked, listQueue, loadStore, saveStore, unreviewedQueue, type Task } from './taskStore';
+import { checkStore, fixNowQueue, isBlocked, listQueue, loadStore, saveStore, StoreError, unreviewedQueue, type Task } from './taskStore';
 
 function task(overrides: Partial<Task> & { id: string }): Task {
   return {
@@ -21,6 +21,7 @@ function task(overrides: Partial<Task> & { id: string }): Task {
     reason: null,
     closed: null,
     closedCommit: null,
+    extra: null,
     ...overrides,
   };
 }
@@ -131,6 +132,63 @@ describe('loadStore / saveStore', () => {
       const file = path.join(dir, 'tasks.jsonl');
       writeFileSync(file, `${JSON.stringify({ id: 'broken', title: 'missing arrays' })}\n`, 'utf8');
       expect(() => loadStore(file)).toThrow(`${file}:1: task "broken" requires kind`);
+    });
+  });
+
+  // A distinct error class, not just a distinctive message, is what lets a
+  // single boundary at the top of every command tell "the store is
+  // malformed" apart from any other bug — string-matching a message is the
+  // kind of check that silently stops matching the moment the wording
+  // changes.
+  it('throws StoreError specifically for malformed JSONL and malformed task shape, not a plain Error', () => {
+    withTmpDir((dir) => {
+      const malformedJsonl = path.join(dir, 'a.jsonl');
+      writeFileSync(malformedJsonl, '<<<<<<< HEAD\n', 'utf8');
+      expect(() => loadStore(malformedJsonl)).toThrow(StoreError);
+
+      const malformedShape = path.join(dir, 'b.jsonl');
+      writeFileSync(malformedShape, `${JSON.stringify({ id: 'broken' })}\n`, 'utf8');
+      expect(() => loadStore(malformedShape)).toThrow(StoreError);
+    });
+  });
+
+  it('preserves a field this version of the store does not know about, round-tripping it unchanged', () => {
+    withTmpDir((dir) => {
+      const file = path.join(dir, 'tasks.jsonl');
+      const { extra: _unused, ...known } = task({ id: 'forward-compat' });
+      const legacy = { ...known, zebraField: 'z', futureField: 'must survive' };
+      writeFileSync(file, `${JSON.stringify(legacy)}\n`, 'utf8');
+
+      saveStore(loadStore(file), file);
+      const saved = JSON.parse(readFileSync(file, 'utf8').trim());
+      expect(saved.futureField).toBe('must survive');
+      expect(saved.zebraField).toBe('z');
+    });
+  });
+
+  it('emits unknown fields after the canonical keys, in sorted order', () => {
+    withTmpDir((dir) => {
+      const file = path.join(dir, 'tasks.jsonl');
+      const { extra: _unused, ...known } = task({ id: 'sorted-unknowns' });
+      const legacy = { ...known, zField: 1, aField: 2, mField: 3 };
+      writeFileSync(file, `${JSON.stringify(legacy)}\n`, 'utf8');
+
+      saveStore(loadStore(file), file);
+      const line = readFileSync(file, 'utf8').trim();
+      const canonicalKeys = ['id', 'title', 'kind', 'state', 'severity', 'system', 'spec', 'clause', 'requires', 'files', 'deliverable', 'evidence', 'source', 'reason', 'closed', 'closedCommit'];
+      const keys = Object.keys(JSON.parse(line));
+      expect(keys.slice(0, canonicalKeys.length)).toEqual(canonicalKeys);
+      expect(keys.slice(canonicalKeys.length)).toEqual(['aField', 'mField', 'zField']);
+    });
+  });
+
+  it('does not add an extra field to a line that has none, keeping ordinary round trips byte-identical', () => {
+    withTmpDir((dir) => {
+      const file = path.join(dir, 'tasks.jsonl');
+      saveStore([task({ id: 'plain' })], file);
+      const before = readFileSync(file, 'utf8');
+      saveStore(loadStore(file), file);
+      expect(readFileSync(file, 'utf8')).toBe(before);
     });
   });
 });

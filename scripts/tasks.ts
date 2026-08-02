@@ -589,6 +589,7 @@ function cmdAdd(args: Flags): void {
     reason: null,
     closed: null,
     closedCommit: null,
+    extra: null,
   };
   tasks.push(task);
   saveStoreAndWarn(tasks, config);
@@ -1340,6 +1341,7 @@ function cmdImport(args: Flags): void {
       reason: null,
       closed: null,
       closedCommit: null,
+      extra: null,
     };
     tasks.push(task);
     taken.add(id);
@@ -1834,6 +1836,7 @@ async function cmdAudit(rawArgs: string[]): Promise<void> {
       reason: null,
       closed: null,
       closedCommit: null,
+      extra: null,
     };
     tasks.push(undelivered);
     taken.add(id);
@@ -1860,6 +1863,7 @@ async function cmdAudit(rawArgs: string[]): Promise<void> {
       reason: null,
       closed: null,
       closedCommit: null,
+      extra: null,
     };
     tasks.push(task);
     taken.add(id);

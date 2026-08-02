@@ -26,7 +26,20 @@ export interface Task {
   reason: string | null;
   closed: string | null;
   closedCommit: string | null;
+  // Fields a store line carried that this version of Task does not know
+  // about — kept so an old checkout's `tasks add`/`edit` cannot silently
+  // erase a field a concurrent branch is adding, the mirror of the store's
+  // own forward-compat problem for `state`. null, never {}, when a line has
+  // none.
+  extra: Record<string, unknown> | null;
 }
+
+// Thrown for a store line that cannot be parsed or does not have the shape
+// a Task requires — never for anything else — so the one catcher at the
+// command boundary (run(argv) in tasks.ts) can recognize "the store is
+// malformed" as a class, distinct from a programming error, without
+// matching on message text.
+export class StoreError extends Error {}
 
 export const DEFAULT_STORE_PATH = 'docs/tasks.jsonl';
 
@@ -40,44 +53,76 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function requireString(record: Record<string, unknown>, key: string, where: string): string {
   const value = record[key];
-  if (typeof value !== 'string') throw new Error(`${where}: task ${JSON.stringify(record.id ?? '(unknown)')} requires ${key}`);
+  if (typeof value !== 'string') throw new StoreError(`${where}: task ${JSON.stringify(record.id ?? '(unknown)')} requires ${key}`);
   return value;
 }
 
 function nullableString(record: Record<string, unknown>, key: string, where: string): string | null {
   const value = record[key] ?? null;
-  if (value !== null && typeof value !== 'string') throw new Error(`${where}: task ${JSON.stringify(record.id ?? '(unknown)')} has non-string ${key}`);
+  if (value !== null && typeof value !== 'string') throw new StoreError(`${where}: task ${JSON.stringify(record.id ?? '(unknown)')} has non-string ${key}`);
   return value;
 }
 
 function stringArray(record: Record<string, unknown>, key: string, where: string): string[] {
   const value = record[key];
-  if (!Array.isArray(value) || value.some((entry) => typeof entry !== 'string')) throw new Error(`${where}: task ${JSON.stringify(record.id ?? '(unknown)')} requires ${key} as a string array`);
+  if (!Array.isArray(value) || value.some((entry) => typeof entry !== 'string')) throw new StoreError(`${where}: task ${JSON.stringify(record.id ?? '(unknown)')} requires ${key} as a string array`);
   return value;
 }
 
 function nullableSource(record: Record<string, unknown>, where: string): Source | null {
   const value = record.source ?? null;
   if (value === null) return null;
-  if (!isRecord(value) || typeof value.spec !== 'string' || typeof value.pass !== 'number') throw new Error(`${where}: task ${JSON.stringify(record.id ?? '(unknown)')} has malformed source`);
+  if (!isRecord(value) || typeof value.spec !== 'string' || typeof value.pass !== 'number') throw new StoreError(`${where}: task ${JSON.stringify(record.id ?? '(unknown)')} has malformed source`);
   return { spec: value.spec, pass: value.pass };
 }
 
+// The known Task fields a store line may carry, derived once from an
+// exhaustively-checked literal (below) so this and renderTask's canonical
+// key order can never disagree about what "known" means.
+type KnownFields = Omit<Task, 'extra'>;
+const KNOWN_KEYS: ReadonlyArray<keyof KnownFields> = Object.keys({
+  id: true,
+  title: true,
+  kind: true,
+  state: true,
+  severity: true,
+  system: true,
+  spec: true,
+  clause: true,
+  requires: true,
+  files: true,
+  deliverable: true,
+  evidence: true,
+  source: true,
+  reason: true,
+  closed: true,
+  closedCommit: true,
+} satisfies Record<keyof KnownFields, true>) as ReadonlyArray<keyof KnownFields>;
+const KNOWN_KEY_SET = new Set<string>(KNOWN_KEYS);
+
+function extraFields(record: Record<string, unknown>): Record<string, unknown> | null {
+  const unknownKeys = Object.keys(record).filter((key) => !KNOWN_KEY_SET.has(key));
+  if (unknownKeys.length === 0) return null;
+  const extra: Record<string, unknown> = {};
+  for (const key of unknownKeys) extra[key] = record[key];
+  return extra;
+}
+
 function normalizeTask(value: unknown, where: string): Task {
-  if (!isRecord(value)) throw new Error(`${where}: task record must be an object`);
+  if (!isRecord(value)) throw new StoreError(`${where}: task record must be an object`);
 
   const id = requireString(value, 'id', where);
   const kind = requireString(value, 'kind', where);
-  if (!KINDS.includes(kind as Kind)) throw new Error(`${where}: task ${JSON.stringify(id)} has invalid kind: ${kind}`);
+  if (!KINDS.includes(kind as Kind)) throw new StoreError(`${where}: task ${JSON.stringify(id)} has invalid kind: ${kind}`);
 
   const state = requireString(value, 'state', where);
-  if (!STATES.includes(state as State)) throw new Error(`${where}: task ${JSON.stringify(id)} has invalid state: ${state}`);
+  if (!STATES.includes(state as State)) throw new StoreError(`${where}: task ${JSON.stringify(id)} has invalid state: ${state}`);
 
   const severity = value.severity ?? null;
-  if (severity !== null && (typeof severity !== 'string' || !SEVERITIES.includes(severity as Severity))) throw new Error(`${where}: task ${JSON.stringify(id)} has invalid severity: ${String(severity)}`);
+  if (severity !== null && (typeof severity !== 'string' || !SEVERITIES.includes(severity as Severity))) throw new StoreError(`${where}: task ${JSON.stringify(id)} has invalid severity: ${String(severity)}`);
 
   const clause = value.clause ?? null;
-  if (clause !== null && typeof clause !== 'number') throw new Error(`${where}: task ${JSON.stringify(id)} has non-numeric clause`);
+  if (clause !== null && typeof clause !== 'number') throw new StoreError(`${where}: task ${JSON.stringify(id)} has non-numeric clause`);
 
   return {
     id,
@@ -96,11 +141,17 @@ function normalizeTask(value: unknown, where: string): Task {
     reason: nullableString(value, 'reason', where),
     closed: nullableString(value, 'closed', where),
     closedCommit: nullableString(value, 'closedCommit', where),
+    extra: extraFields(value),
   };
 }
 
+// The object literal below is typed as an exact mapped type over every
+// known Task field, so removing a field from Task without removing it here
+// is a missing-property compile error, and forgetting to add a new Task
+// field here is the same error the other way — the two ways this function
+// could silently drop data are both caught by tsc, not by review.
 function renderTask(task: Task): string {
-  return JSON.stringify({
+  const known: { [K in keyof KnownFields]: KnownFields[K] } = {
     id: task.id,
     title: task.title,
     kind: task.kind,
@@ -117,7 +168,12 @@ function renderTask(task: Task): string {
     reason: task.reason,
     closed: task.closed,
     closedCommit: task.closedCommit,
-  });
+  };
+  const merged: Record<string, unknown> = known;
+  if (task.extra) {
+    for (const key of Object.keys(task.extra).sort()) merged[key] = task.extra[key];
+  }
+  return JSON.stringify(merged);
 }
 
 // `label` is the `where`-prefix for error messages — a file path for
@@ -133,7 +189,7 @@ export function parseStore(text: string, label: string): Task[] {
       try {
         return normalizeTask(JSON.parse(line) as unknown, where);
       } catch (error) {
-        if (error instanceof SyntaxError) throw new Error(`${where}: malformed JSONL task record: ${error.message}`);
+        if (error instanceof SyntaxError) throw new StoreError(`${where}: malformed JSONL task record: ${error.message}`);
         throw error;
       }
     });
