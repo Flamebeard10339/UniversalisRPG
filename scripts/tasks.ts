@@ -176,8 +176,9 @@ function currentSpec(config: Config): string | null {
 
 interface ActiveSpec {
   spec: string | null;
-  // Non-null exactly when `spec` was guessed rather than resolved from the
-  // branch name — the caller must say so.
+  // Null only when the caller named the spec outright. Every other route
+  // here is an inference, and c8 permits an inferred default argument only
+  // on the condition that the output says so and says what from.
   note: string | null;
 }
 
@@ -186,21 +187,28 @@ interface ActiveSpec {
 // lived at a name the branch had since moved past — and exactly one spec
 // file has open members in the store, treat that as the active spec rather
 // than stranding a cold session with no queue and no signal anything is
-// wrong. Two or more candidates is exactly as ambiguous as zero, so both
-// fall back to today's "no active spec" behaviour.
+// wrong.
 function resolveActiveSpec(config: Config, tasks: Task[], explicit: string | undefined): ActiveSpec {
   if (explicit !== undefined) return { spec: explicit, note: null };
   const strict = currentSpec(config);
-  if (strict !== null) return { spec: strict, note: null };
+  if (strict !== null) return { spec: strict, note: `spec inferred from the branch name: ${strict} — ${specFile(config, strict)} exists` };
 
   const candidates = new Set<string>();
   for (const task of tasks) {
     if ((task.state !== 'open' && task.state !== 'in-progress') || task.spec === null) continue;
     if (existsSync(specFile(config, task.spec))) candidates.add(task.spec);
   }
-  if (candidates.size !== 1) return { spec: null, note: null };
-  const [spec] = candidates;
-  return { spec, note: `spec inferred: ${spec} — no docs/specs/${config.branch}.md, and ${spec} is the only spec with open members in the store` };
+  if (candidates.size === 1) {
+    const [spec] = candidates;
+    return { spec, note: `spec inferred from the store: ${spec} — no ${specFile(config, config.branch)}, and ${spec} is the only spec with open members` };
+  }
+  // Two candidates is exactly as ambiguous as none, but it is not as empty:
+  // naming both is what lets a caller pick one with --spec instead of
+  // rediscovering the contest.
+  if (candidates.size > 1) {
+    return { spec: null, note: `spec contested: no ${specFile(config, config.branch)}, and ${candidates.size} specs have open members — ${[...candidates].sort().join(', ')}. Pass --spec to pick one` };
+  }
+  return { spec: null, note: null };
 }
 
 function slugify(title: string): string {
@@ -665,6 +673,7 @@ function cmdNext(args: Flags): void {
   const config = resolveConfig(args.flags);
   const tasks = readStore(config);
   const activeSpec = resolveActiveSpec(config, tasks, args.flags.spec);
+  if (activeSpec.note) console.log(activeSpec.note);
   const spec = activeSpec.spec;
   // A resolved spec of null means "no active spec", not "match deferred
   // tasks" — those two must not collapse into the same query.
@@ -672,7 +681,6 @@ function cmdNext(args: Flags): void {
     console.log('no active spec for this branch, and no --spec given');
     return;
   }
-  if (activeSpec.note) console.log(activeSpec.note);
   const queue = fixNowQueue(tasks, spec, {
     system: args.flags.system,
     severity: args.flags.severity as Severity | undefined,
@@ -1814,12 +1822,12 @@ function cmdHandoff(args: Flags): void {
 
   const tasks = readStore(config);
   const activeSpec = resolveActiveSpec(config, tasks, args.flags.spec);
+  if (activeSpec.note) console.log(activeSpec.note);
   const spec = activeSpec.spec;
   if (spec === null) {
-    console.log(`spec: none — no docs/specs/${config.branch}.md, and no --spec given`);
+    console.log(`spec: none — no ${specFile(config, config.branch)}, and no --spec given`);
     return;
   }
-  if (activeSpec.note) console.log(activeSpec.note);
   const path_ = specFile(config, spec);
   console.log(`spec: ${spec} (${path_})`);
   if (!existsSync(path_)) {

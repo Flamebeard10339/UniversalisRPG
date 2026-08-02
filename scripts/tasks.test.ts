@@ -151,6 +151,14 @@ function defaultStoreGitFixture(run: (context: { dir: string; tasks: (...args: s
   }
 }
 
+// `list` prefixes its rows with whatever it had to infer to answer, so the
+// id of the first row is the first row that looks like one, not line zero.
+function firstListedId(stdout: string): string {
+  const row = stdout.split('\n').find((line) => /^\S+ {2}\[/.test(line));
+  if (row === undefined) throw new Error(`no task row in list output:\n${stdout}`);
+  return row.split(' ')[0];
+}
+
 describe('tasks CLI', () => {
   it('prints help without treating --help or help as unknown commands', () => {
     fixture(({ tasks }) => {
@@ -1387,7 +1395,7 @@ describe('tasks CLI', () => {
     fixture(({ tasks }) => {
       tasks('audit', 'demo-spec', '--proof', '1=met', '--proof', '2=met', '--finding', 'a real bug', '--severity', 'high', '--deliverable', 'guard the null case', '--evidence', 'save.ts:88 dereferences before the null check');
       const shown = tasks('list', '--kind', 'finding', '--state', 'unreviewed');
-      const id = shown.stdout.split('\n')[0].split(' ')[0];
+      const id = firstListedId(shown.stdout);
       expect(tasks('show', id).stdout).toContain('evidence: save.ts:88 dereferences before the null check');
     });
   });
@@ -1413,7 +1421,7 @@ describe('tasks CLI', () => {
         'the finding has its own evidence',
       );
       expect(tasks('show', 'demo-spec-clause-1').stdout).toContain('evidence: the clause did not hold');
-      const id = tasks('list', '--kind', 'finding', '--state', 'unreviewed').stdout.split('\n')[0].split(' ')[0];
+      const id = firstListedId(tasks('list', '--kind', 'finding', '--state', 'unreviewed').stdout);
       expect(tasks('show', id).stdout).toContain('evidence: the finding has its own evidence');
     });
   });
@@ -1423,7 +1431,7 @@ describe('tasks CLI', () => {
       const result = tasks('audit', 'demo-spec', '--proof', '1=met', '--proof', '2=unmet', '--finding', 'some bug', '--severity', 'low', '--deliverable', 'fix it', '--evidence', 'broken here', '--evidence', '2=the clause did not hold');
       expect(result.status).toBe(0);
       expect(tasks('show', 'demo-spec-clause-2').stdout).toContain('evidence: the clause did not hold');
-      const id = tasks('list', '--kind', 'finding', '--state', 'unreviewed').stdout.split('\n')[0].split(' ')[0];
+      const id = firstListedId(tasks('list', '--kind', 'finding', '--state', 'unreviewed').stdout);
       expect(tasks('show', id).stdout).toContain('evidence: broken here');
     });
   });
@@ -1441,7 +1449,7 @@ describe('tasks CLI', () => {
     fixture(({ tasks }) => {
       tasks('audit', 'demo-spec', '--proof', '1=met', '--proof', '2=met', '--finding', 'a real bug', '--severity', 'high', '--deliverable', 'guard the null case', '--evidence', 'null deref on an empty save');
       const shown = tasks('list', '--kind', 'finding', '--state', 'unreviewed');
-      const id = shown.stdout.split('\n')[0].split(' ')[0];
+      const id = firstListedId(shown.stdout);
       expect(tasks('show', id).stdout).toContain('deliverable: guard the null case');
     });
   });
@@ -1717,7 +1725,7 @@ describe('tasks CLI', () => {
       const specsDir = path.join(dir, 'specs');
       const result = spawnSync(process.execPath, [tsx, script, 'handoff', '--store', storePath, '--systems', systemsPath, '--specs-dir', specsDir, '--branch', 'no-such-spec-branch'], { cwd: repoRoot, encoding: 'utf8' });
       expect(result.stdout).toContain('branch: no-such-spec-branch');
-      expect(result.stdout).toContain('no docs/specs/no-such-spec-branch.md');
+      expect(result.stdout).toContain('no-such-spec-branch.md');
     });
   });
 
@@ -1817,7 +1825,7 @@ describe('tasks CLI', () => {
       const systemsPath = path.join(dir, 'systems.json');
       const specsDir = path.join(dir, 'specs');
       const result = spawnSync(process.execPath, [tsx, script, 'next', '--store', storePath, '--systems', systemsPath, '--specs-dir', specsDir, '--branch', 'orphaned-branch'], { cwd: repoRoot, encoding: 'utf8' });
-      expect(result.stdout).toContain('spec inferred: demo-spec');
+      expect(result.stdout).toContain('spec inferred from the store: demo-spec');
       expect(result.stdout).toContain('open task');
     });
   });
@@ -1832,6 +1840,29 @@ describe('tasks CLI', () => {
       const systemsPath = path.join(dir, 'systems.json');
       const result = spawnSync(process.execPath, [tsx, script, 'next', '--store', storePath, '--systems', systemsPath, '--specs-dir', specsDir, '--branch', 'orphaned-branch'], { cwd: repoRoot, encoding: 'utf8' });
       expect(result.stdout).toContain('no active spec for this branch');
+      expect(result.stdout).toContain('spec contested:');
+      expect(result.stdout).toContain('demo-spec, other-spec');
+      expect(result.stdout).toContain('Pass --spec to pick one');
+    });
+  });
+
+  it('the branch-name spec binding says it was inferred and what from, the condition c8 permits it on', () => {
+    fixture(({ tasks }) => {
+      tasks('add', 'a task', '--id', 'a-task', '--spec', 'demo-spec');
+      for (const command of [['next'], ['list'], ['handoff']]) {
+        const result = tasks(...command);
+        expect(result.stdout, command[0]).toContain('spec inferred from the branch name: demo-spec');
+        expect(result.stdout, command[0]).toMatch(/demo-spec\.md exists/);
+      }
+    });
+  });
+
+  it('an explicit --spec is not an inference and carries no note', () => {
+    fixture(({ tasks }) => {
+      tasks('add', 'a task', '--id', 'a-task', '--spec', 'demo-spec');
+      const result = tasks('next', '--spec', 'demo-spec');
+      expect(result.stdout).not.toContain('inferred');
+      expect(result.stdout).toContain('a-task');
     });
   });
 
@@ -1842,7 +1873,7 @@ describe('tasks CLI', () => {
       const systemsPath = path.join(dir, 'systems.json');
       const specsDir = path.join(dir, 'specs');
       const result = spawnSync(process.execPath, [tsx, script, 'handoff', '--store', storePath, '--systems', systemsPath, '--specs-dir', specsDir, '--branch', 'orphaned-branch'], { cwd: repoRoot, encoding: 'utf8' });
-      expect(result.stdout).toContain('spec inferred: demo-spec');
+      expect(result.stdout).toContain('spec inferred from the store: demo-spec');
       expect(result.stdout).toContain('spec: demo-spec');
     });
   });
@@ -1855,7 +1886,7 @@ describe('tasks CLI', () => {
       const systemsPath = path.join(dir, 'systems.json');
       const specsDir = path.join(dir, 'specs');
       const result = spawnSync(process.execPath, [tsx, script, 'list', '--store', storePath, '--systems', systemsPath, '--specs-dir', specsDir, '--branch', 'orphaned-branch'], { cwd: repoRoot, encoding: 'utf8' });
-      expect(result.stdout).toContain('spec inferred: demo-spec');
+      expect(result.stdout).toContain('spec inferred from the store: demo-spec');
       expect(result.stdout).toContain('a-task');
       expect(result.stdout).toContain('deferred-task');
     });
@@ -1870,7 +1901,7 @@ describe('tasks CLI', () => {
       const specsDir = path.join(dir, 'specs');
       const globals = ['--store', storePath, '--systems', systemsPath, '--specs-dir', specsDir, '--branch', 'orphaned-branch'];
       const result = spawnSync(process.execPath, [tsx, script, 'triage', ...globals], { cwd: repoRoot, encoding: 'utf8', input: '1\n' });
-      expect(result.stdout).toContain('spec inferred: demo-spec');
+      expect(result.stdout).toContain('spec inferred from the store: demo-spec');
       const shown = spawnSync(process.execPath, [tsx, script, 'show', 'a-finding', ...globals], { cwd: repoRoot, encoding: 'utf8' });
       expect(shown.stdout).toContain('spec: demo-spec');
     });
