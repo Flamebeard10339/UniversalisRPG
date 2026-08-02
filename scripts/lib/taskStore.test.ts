@@ -2,7 +2,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { checkStore, claimSummary, COLD_CLAIM_DAYS, coldClaimIssues, dependencyCycles, fixNowQueue, isBlocked, KINDS, listQueue, loadStore, nearMatches, parseStore, parseStoreTolerantly, requirementStates, saveStore, StoreError, unreviewedQueue, waitingOn, type Task } from './taskStore';
+import { checkStore, claimSummary, COLD_CLAIM_DAYS, coldClaimIssues, coldClaims, dependencyCycles, fixNowQueue, isBlocked, KINDS, listQueue, loadStore, nearMatches, parseStore, parseStoreTolerantly, requirementStates, saveStore, StoreError, unreviewedQueue, waitingOn, type Task } from './taskStore';
 
 function task(overrides: Partial<Task> & { id: string }): Task {
   return {
@@ -256,7 +256,7 @@ describe('claims', () => {
     const dayBefore = claimSummary(held('2026-08-02'), addDays('2026-08-02', COLD_CLAIM_DAYS - 1));
     const atThreshold = claimSummary(held('2026-08-02'), addDays('2026-08-02', COLD_CLAIM_DAYS));
     expect(dayBefore).not.toContain('COLD');
-    expect(atThreshold).toContain(`COLD — no activity for ${COLD_CLAIM_DAYS} days, past the ${COLD_CLAIM_DAYS}-day threshold`);
+    expect(atThreshold).toContain(`(${COLD_CLAIM_DAYS} days, COLD — past the ${COLD_CLAIM_DAYS}-day threshold, never auto-released)`);
   });
 
   it('reports a claim it cannot date rather than silently treating it as fresh or as cold', () => {
@@ -269,8 +269,7 @@ describe('claims', () => {
     const issues = coldClaimIssues([held('2026-07-27'), task({ id: 'free' })], '2026-08-02');
     expect(issues).toHaveLength(1);
     expect(issues[0].level).toBe('warning');
-    expect(issues[0].message).toContain('held claimed by worker-a since 2026-07-27 (6 days)');
-    expect(issues[0].message).toContain('COLD');
+    expect(issues[0].message).toContain('held claimed by worker-a since 2026-07-27 (6 days, COLD');
     expect(issues[0].message).toContain('tasks start held --actor <you>');
   });
 
@@ -289,6 +288,30 @@ describe('claims', () => {
 
   it('takes no exception to a claim on the one state that means someone holds it', () => {
     expect(checkStore([held('2026-08-01')], [])).toEqual([]);
+  });
+
+  // The queue fixNowQueue cannot answer for: an in-progress record is held,
+  // not open, so a dead worker's claim otherwise removes the work from every
+  // queue with nothing said about it.
+  describe('coldClaims', () => {
+    const claim = (id: string, days: number, rest: Partial<Task> = {}): Task =>
+      task({ id, state: 'in-progress', spec: 's', claimed: addDays('2026-08-02', -days), claimedBy: id, ...rest });
+
+    it('returns the coldest claim first, so the one most likely abandoned is offered first', () => {
+      const tasks = [claim('recent', COLD_CLAIM_DAYS), claim('ancient', 40), claim('middle', 10)];
+      expect(coldClaims(tasks, 's', '2026-08-02').map((t) => t.id)).toEqual(['ancient', 'middle', 'recent']);
+    });
+
+    it('leaves out a claim that has not gone cold, an open task, and another spec\'s member', () => {
+      const tasks = [claim('warm', COLD_CLAIM_DAYS - 1), task({ id: 'open-one', spec: 's' }), claim('elsewhere', 40, { spec: 'other' }), claim('cold-one', 40)];
+      expect(coldClaims(tasks, 's', '2026-08-02').map((t) => t.id)).toEqual(['cold-one']);
+    });
+
+    it('narrows by the same filters the fix-now queue takes, so a narrowed question gets a narrowed answer', () => {
+      const tasks = [claim('ui', 40, { system: 'UI', severity: 'low' }), claim('runtime', 40, { system: 'Runtime', severity: 'high' })];
+      expect(coldClaims(tasks, 's', '2026-08-02', { system: 'UI' }).map((t) => t.id)).toEqual(['ui']);
+      expect(coldClaims(tasks, 's', '2026-08-02', { severity: 'high' }).map((t) => t.id)).toEqual(['runtime']);
+    });
   });
 });
 

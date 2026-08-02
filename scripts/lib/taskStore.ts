@@ -299,6 +299,20 @@ export function fixNowQueue(tasks: Task[], spec: string | null, filter: QueueFil
     .map(({ task }) => task);
 }
 
+// The queue fixNowQueue cannot answer for: an in-progress record is held,
+// not open, so without this a dead worker's claim removes the work from
+// every queue and nothing ever says so. Coldest first — the claim most
+// likely abandoned is the one a caller should be offered first. Reported
+// only; nothing here writes.
+export function coldClaims(tasks: Task[], spec: string | null, today: string, filter: QueueFilter = {}): Task[] {
+  return tasks
+    .filter((task) => task.state === 'in-progress' && task.spec === spec)
+    .filter((task) => filter.system === undefined || task.system === filter.system)
+    .filter((task) => filter.severity === undefined || task.severity === filter.severity)
+    .filter((task) => claimOf(task, today)?.cold ?? false)
+    .sort((a, b) => (claimOf(b, today)?.days ?? 0) - (claimOf(a, today)?.days ?? 0));
+}
+
 // Severity first, then creation order: the shape `triage` walks the
 // unreviewed queue in.
 export function unreviewedQueue(tasks: Task[]): Task[] {
@@ -405,7 +419,7 @@ export function claimSummary(task: Task, today: string): string | null {
   const holder = `claimed by ${claim.by ?? '(unnamed)'} since ${claim.since}`;
   if (claim.days === null) return `${holder} (unreadable date, so its age is unknown)`;
   const age = `${claim.days} day${claim.days === 1 ? '' : 's'}`;
-  return `${holder} (${age})${claim.cold ? `, COLD — no activity for ${age}, past the ${COLD_CLAIM_DAYS}-day threshold, and nothing is ever auto-released` : ''}`;
+  return `${holder} (${age}${claim.cold ? `, COLD — past the ${COLD_CLAIM_DAYS}-day threshold, never auto-released` : ''})`;
 }
 
 // Separate from checkStore because coldness is the one thing here that

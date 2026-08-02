@@ -11,6 +11,8 @@ import { loadManifest, systemNames as manifestSystemNames } from './lib/systems'
 import {
   checkStore,
   claimSummary,
+  coldClaimIssues,
+  coldClaims,
   DEFAULT_STORE_PATH,
   dependencyCycles,
   StoreError,
@@ -359,6 +361,7 @@ function cmdDoctor(args: Flags): void {
   const issues = [
     ...checkStore(tasks, systemNames(config), (spec) => existsSync(specFile(config, spec))),
     ...closedCommitIssues(tasks),
+    ...coldClaimIssues(tasks, today()),
     ...workingTreeOnlyIssues(config, tasks),
     ...specIssues(config),
     ...(dirtyIssue ? [dirtyIssue] : []),
@@ -708,7 +711,8 @@ function runList(args: Flags, text: string | undefined): void {
   for (const task of queue) {
     const tag = [task.kind, task.state, task.severity].filter(Boolean).join('/');
     const matches = text === undefined ? '' : `  (matches: ${matchingFields(task, text).join(', ')})`;
-    console.log(`${task.id}  [${tag}]  ${task.system ?? '(no system)'}  ${task.title}${matches}`);
+    const claim = claimSummary(task, today());
+    console.log(`${task.id}  [${tag}]  ${task.system ?? '(no system)'}  ${task.title}${matches}${claim ? `  ${claim}` : ''}`);
   }
 
   const counts: Record<State, number> = { unreviewed: 0, open: 0, 'in-progress': 0, done: 0, declined: 0 };
@@ -728,17 +732,32 @@ function cmdNext(args: Flags): void {
     console.log('no active spec for this branch, and no --spec given');
     return;
   }
-  const queue = fixNowQueue(tasks, spec, {
-    system: args.flags.system,
-    severity: args.flags.severity as Severity | undefined,
-  });
+  const filter = { system: args.flags.system, severity: args.flags.severity as Severity | undefined };
+  const queue = fixNowQueue(tasks, spec, filter);
+  const cold = coldClaims(tasks, spec, today(), filter);
+  const print = (task: Task): void => (args.flags.full === 'true' ? printTask(task, tasks) : printTaskConcise(task, tasks));
+
+  // A cold claim is handed out, not released: the record stays in-progress
+  // and keeps its holder, and what the caller gets is who to ask. Open work
+  // still comes first — offering held work ahead of free work would put two
+  // agents on one task for no reason.
   if (queue.length === 0) {
+    if (cold.length > 0) {
+      console.log(`no open, unblocked tasks in spec ${spec}, and ${cold.length} claim(s) there have gone cold — the coldest is offered here rather than left invisible:`);
+      print(cold[0]);
+      console.log(`nothing was released and nothing was reassigned: \`tasks start ${cold[0].id} --actor <you>\` takes it over, \`tasks stop ${cold[0].id}\` returns it to the queue`);
+      return;
+    }
     console.log(`no open, unblocked tasks in spec ${spec}`);
     explainEmptyQueue(tasks, spec, { system: args.flags.system, severity: args.flags.severity });
     return;
   }
-  if (args.flags.full === 'true') printTask(queue[0], tasks);
-  else printTaskConcise(queue[0], tasks);
+  print(queue[0]);
+  if (cold.length > 0) {
+    console.log('');
+    console.log(`${cold.length} cold claim(s) in ${spec}, not offered ahead of open work:`);
+    for (const task of cold) console.log(`- ${task.id} ${claimSummary(task, today())}`);
+  }
 }
 
 // An empty queue has four causes that look identical from outside — no
@@ -1897,7 +1916,10 @@ function cmdHandoff(args: Flags): void {
   const inProgress = tasks.filter((task) => task.spec === spec && task.state === 'in-progress');
   if (inProgress.length > 0) {
     console.log(`${inProgress.length} in-progress task(s):`);
-    for (const task of inProgress.slice(0, HANDOFF_QUEUE_CAP)) console.log(`- ${task.id} [${task.severity ?? '?'}] ${task.title}`);
+    for (const task of inProgress.slice(0, HANDOFF_QUEUE_CAP)) {
+      console.log(`- ${task.id} [${task.severity ?? '?'}] ${task.title}`);
+      console.log(`    ${claimSummary(task, today()) ?? 'claimed by nobody named, on a day nobody recorded'}`);
+    }
     if (inProgress.length > HANDOFF_QUEUE_CAP) console.log(`… ${inProgress.length - HANDOFF_QUEUE_CAP} more in progress`);
     console.log('');
   }

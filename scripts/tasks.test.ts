@@ -46,6 +46,22 @@ function runInProcess(args: string[]): Run {
   }
 }
 
+// Backdates a claim in the store so coldness can be exercised without
+// waiting COLD_CLAIM_DAYS for it — the record is otherwise the one `start`
+// really wrote.
+function ageClaim(dir: string, id: string, days: number): void {
+  const file = path.join(dir, 'tasks.jsonl');
+  const lines = readFileSync(file, 'utf8')
+    .trim()
+    .split('\n')
+    .map((line) => {
+      const record = JSON.parse(line) as { id: string; claimed: string | null };
+      if (record.id === id) record.claimed = new Date(Date.now() - days * 86_400_000).toISOString().slice(0, 10);
+      return JSON.stringify(record);
+    });
+  writeFileSync(file, `${lines.join('\n')}\n`, 'utf8');
+}
+
 function fixture(run: (context: { dir: string; args: (extra?: string[]) => string[]; tasks: (...args: string[]) => Run; triage: (input: string, extra?: string[]) => Run }) => void): void {
   const dir = mkdtempSync(path.join(os.tmpdir(), 'universalis-tasks-'));
   try {
@@ -586,6 +602,105 @@ describe('tasks CLI', () => {
       const shown = tasks('show', 'held').stdout;
       expect(shown).not.toContain('claimed by');
       expect(tasks('doctor').stdout).not.toContain('still carries a claim');
+    });
+  });
+
+  // A claim is only ever reported cold. Auto-releasing it would put two
+  // agents on one task; saying who held it and for how long lets the next
+  // agent decide in one read.
+  it('next offers the coldest claim rather than reporting the spec as fully accounted for', () => {
+    fixture(({ dir, tasks }) => {
+      tasks('add', 'stalled task', '--id', 'stalled', '--spec', 'demo-spec');
+      tasks('add', 'older stall', '--id', 'older', '--spec', 'demo-spec');
+      tasks('start', 'stalled', '--actor', 'worker-a');
+      tasks('start', 'older', '--actor', 'worker-b');
+      ageClaim(dir, 'stalled', 4);
+      ageClaim(dir, 'older', 9);
+
+      const next = tasks('next');
+      expect(next.status).toBe(0);
+      expect(next.stdout).toContain('2 claim(s) there have gone cold');
+      expect(next.stdout).toContain('older');
+      expect(next.stdout).toContain('claimed by worker-b since');
+      expect(next.stdout).toContain('(9 days, COLD');
+      expect(next.stdout).toContain('nothing was released');
+      expect(next.stdout).toContain('tasks start older --actor <you>');
+      expect(next.stdout).not.toContain('all 2 member(s) are accounted for');
+    });
+  });
+
+  it('next still recommends open work first, and reports a cold claim beside it rather than instead of it', () => {
+    fixture(({ dir, tasks }) => {
+      tasks('add', 'stalled task', '--id', 'stalled', '--spec', 'demo-spec');
+      tasks('start', 'stalled', '--actor', 'worker-a');
+      ageClaim(dir, 'stalled', 6);
+      tasks('add', 'free task', '--id', 'free', '--spec', 'demo-spec');
+
+      const next = tasks('next');
+      expect(next.status).toBe(0);
+      expect(next.stdout).toContain('free');
+      expect(next.stdout).toContain('1 cold claim(s) in demo-spec, not offered ahead of open work');
+      expect(next.stdout).toContain('stalled claimed by worker-a since');
+    });
+  });
+
+  it('next answers a narrowed question with narrowed cold claims', () => {
+    fixture(({ dir, tasks }) => {
+      tasks('add', 'ui stall', '--id', 'ui-stall', '--spec', 'demo-spec', '--system', 'UI');
+      tasks('start', 'ui-stall', '--actor', 'worker-a');
+      ageClaim(dir, 'ui-stall', 6);
+
+      expect(tasks('next', '--system', 'Runtime').stdout).not.toContain('ui-stall');
+      expect(tasks('next', '--system', 'UI').stdout).toContain('ui-stall');
+    });
+  });
+
+  it('list marks a cold claim on the row so a browse does not read it as ordinary work in flight', () => {
+    fixture(({ dir, tasks }) => {
+      tasks('add', 'stalled task', '--id', 'stalled', '--spec', 'demo-spec');
+      tasks('add', 'fresh task', '--id', 'fresh', '--spec', 'demo-spec');
+      tasks('start', 'stalled', '--actor', 'worker-a');
+      tasks('start', 'fresh', '--actor', 'worker-b');
+      ageClaim(dir, 'stalled', 6);
+
+      const listed = tasks('list').stdout;
+      expect(listed).toMatch(/stalled .*claimed by worker-a since .*COLD/);
+      expect(listed).toMatch(/fresh .*claimed by worker-b since/);
+      expect(listed.split('\n').filter((line) => line.includes('COLD'))).toHaveLength(1);
+    });
+  });
+
+  it('show marks a cold claim, and doctor reports it as a warning without repairing it', () => {
+    fixture(({ dir, tasks }) => {
+      tasks('add', 'stalled task', '--id', 'stalled', '--spec', 'demo-spec');
+      tasks('start', 'stalled', '--actor', 'worker-a');
+      ageClaim(dir, 'stalled', 6);
+
+      expect(tasks('show', 'stalled').stdout).toContain('(6 days, COLD — past the 3-day threshold, never auto-released)');
+
+      const doctor = tasks('doctor', '--fix');
+      expect(doctor.status).toBe(0);
+      expect(doctor.stdout).toContain('[warning] stalled claimed by worker-a since');
+      expect(doctor.stdout).toContain('COLD');
+      expect(doctor.stdout).toContain('tasks start stalled --actor <you>');
+
+      const after = tasks('show', 'stalled').stdout;
+      expect(after).toContain('[task/in-progress]');
+      expect(after).toContain('claimed by worker-a since');
+    });
+  });
+
+  it('handoff names who holds each in-progress task, which is what a cold session came for', () => {
+    fixture(({ dir, tasks }) => {
+      tasks('add', 'stalled task', '--id', 'stalled', '--spec', 'demo-spec');
+      tasks('start', 'stalled', '--actor', 'worker-a');
+      ageClaim(dir, 'stalled', 6);
+
+      const result = tasks('handoff');
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('- stalled');
+      expect(result.stdout).toContain('claimed by worker-a since');
+      expect(result.stdout).toContain('COLD');
     });
   });
 
