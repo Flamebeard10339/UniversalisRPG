@@ -19,31 +19,48 @@ Proof:
   `tasks check --merge` fails when a named target is missing, skipped, or
   failing. At minimum, support Vitest test-file-plus-test-name targets and a
   command target for proof that is not a single test.
+  proof: vitest scripts/tasks.test.ts "check --merge fails a vitest proof target whose named test fails, and reports the match count"
+  proof: vitest scripts/tasks.test.ts "check --merge runs proof command targets and reports a failing target by clause id"
 - [c2] `tasks done` records the commit that closed a task, warns when its store
   write is uncommitted, and `tasks check` reports task state that exists only in
   the working tree or points at a closing commit not reachable from `HEAD`.
+  proof: vitest scripts/tasks.test.ts "check reports a working-tree-only done mark as an error naming the task and its committed state"
+  proof: vitest scripts/tasks.test.ts "check warns when a done task names a closing commit not reachable from HEAD"
 - [c3] The store supports an `in-progress` state with `tasks start <id>` and
   `tasks stop <id>`, and `tasks list`, `tasks next`, `tasks show`, `tasks
   handoff`, and `tasks spec show` surface in-flight work without treating it as
   complete.
+  proof: vitest scripts/tasks.test.ts "start claims an open unblocked task, next skips it, and stop returns it to open"
 - [c4] Spec identity and proof identity cannot be changed accidentally: a branch
   rename cannot make the merge gate not-applicable while open members exist, a
   never-amended spec has an opening freeze baseline, top-level proof clauses are
   the only clauses that receive ids, and a retired clause id is never reused for
   a new clause that has not been audited.
+  proof: vitest scripts/tasks.test.ts "check --merge applies to a branch renamed away from its spec's filename, as long as the branch's diff touched that spec file"
+  proof: vitest scripts/lib/specDoc.test.ts "treats only top-level Proof bullets as clauses, leaving indented sub-bullets as prose"
+  proof: vitest scripts/lib/specDoc.test.ts "does not reuse an audited clause id for a later untagged replacement clause"
+  proof: vitest scripts/tasks.test.ts "spec freeze records the current deliverable as the baseline and refuses a second freeze"
 - [c5] The auditor path is explicit and repeatable: `tasks audit-prompt <spec>`
   prints a recommended auditor prompt containing the diff range, proof clauses,
   member tasks, relevant files, proof targets, required commands, and a mutation
   testing instruction for pure logic/API proofs.
+  proof: vitest scripts/tasks.test.ts "audit-prompt prints a ready-to-use auditor prompt for a spec"
 - [c6] The command surface removes the real friction observed in
   `combat-continuation-runtime`: `tasks --help` works, `tasks spec <slug>` means
   `tasks spec show <slug>`, `tasks spec show --order` topologically sorts by
   `requires`, `tasks next` is concise by default with `--full` for evidence, and
   `tasks search` names the matching field.
+  proof: vitest scripts/tasks.test.ts "prints help without treating --help or help as unknown commands"
+  proof: vitest scripts/tasks.test.ts "spec <slug> is an alias for spec show <slug>"
+  proof: vitest scripts/tasks.test.ts "spec show --order lists dependencies before tasks that require them"
+  proof: vitest scripts/tasks.test.ts "next is concise by default and prints full task detail only with --full"
+  proof: vitest scripts/tasks.test.ts "search matches across a task and accepts the list filters"
 - [c7] The commit contract no longer requires `Next:` on every commit. The hook
   still requires a useful body for non-exempt commits, accepts optional `Next:`
   as an extra breadcrumb, and the installed hook uses the repo-local `tsx`
   launcher before falling back to `npx`.
+  proof: vitest scripts/lib/commitContract.test.ts "refuses a subject-only message"
+  proof: vitest scripts/lib/commitContract.test.ts "does not count the optional Next: line itself as the body"
 - [c8] The testing and gate cost is paid where it buys reliability: most
   `scripts/tasks.test.ts` command-semantics cases run in-process through
   exported `run(argv)`, only subprocess/Git-history smoke cases stay
@@ -51,6 +68,7 @@ Proof:
   `npm test`, `npx tsc --noEmit`, `npm run layer-check`, `npm run tasks --
   check`, and `npm run tasks -- check --merge --spec
   task-system-real-world-friction-spec` pass.
+  proof: command npm test
 
 ## Decisions
 
