@@ -1670,57 +1670,6 @@ describe('tasks CLI', () => {
     });
   });
 
-  it('check --merge refuses when commits landed after the latest audit pass', () => {
-    gitFixture(({ commit, tasks }) => {
-      tasks('audit', 'demo-spec', '--proof', '1=met');
-      commit('Later implementation\n\nA body after the audit.');
-
-      const result = tasks('check', '--merge');
-      expect(result.status).toBe(1);
-      expect(result.stderr).toContain('latest audit pass');
-      expect(result.stderr).toContain('1 commit(s) after that audit');
-    });
-  });
-
-  it('check --merge names a changed path outside the audit record as the reason a pass is stale', () => {
-    gitFixture(({ dir, tasks }) => {
-      tasks('audit', 'demo-spec', '--proof', '1=met');
-      writeFileSync(path.join(dir, 'src-change.txt'), 'not an audit record\n', 'utf8');
-      spawnSync('git', ['add', '.'], { cwd: dir });
-      spawnSync('git', ['commit', '--no-verify', '-m', 'Unrelated code change\n\nA body.'], { cwd: dir });
-
-      const result = tasks('check', '--merge');
-      expect(result.status).toBe(1);
-      expect(result.stderr).toContain('src-change.txt');
-    });
-  });
-
-  it('check --merge goes green when the only commit after an audit pass records the pass itself (spec + store)', () => {
-    gitFixture(({ dir, tasks }) => {
-      tasks('audit', 'demo-spec', '--proof', '1=met');
-      spawnSync('git', ['add', 'specs/demo-spec.md', 'tasks.jsonl'], { cwd: dir });
-      spawnSync('git', ['commit', '--no-verify', '-m', 'Record audit pass\n\nA body.'], { cwd: dir });
-
-      const result = tasks('check', '--merge');
-      expect(result.status).toBe(0);
-      expect(result.stdout).toContain('0 issue(s)');
-    });
-  });
-
-  it('check --merge goes green when a post-audit commit also touches docs/audits', () => {
-    gitFixture(({ dir, tasks }) => {
-      tasks('audit', 'demo-spec', '--proof', '1=met');
-      mkdirSync(path.join(dir, 'docs', 'audits'), { recursive: true });
-      writeFileSync(path.join(dir, 'docs', 'audits', 'note.md'), 'An audit note.\n', 'utf8');
-      spawnSync('git', ['add', 'specs/demo-spec.md', 'tasks.jsonl', 'docs/audits/note.md'], { cwd: dir });
-      spawnSync('git', ['commit', '--no-verify', '-m', 'Record audit pass and note\n\nA body.'], { cwd: dir });
-
-      const result = tasks('check', '--merge');
-      expect(result.status).toBe(0);
-      expect(result.stdout).toContain('0 issue(s)');
-    });
-  });
-
   it('check --merge refuses when there is no recorded audit pass', () => {
     fixture(({ tasks }) => {
       const result = tasks('check', '--merge');

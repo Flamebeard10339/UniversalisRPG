@@ -371,17 +371,15 @@ function cmdCheck(flags: Record<string, string>): void {
     deliverableBaseline,
     members: resolvedSpec === null ? [] : tasks.filter((task) => task.spec === resolvedSpec),
   });
-  const auditIssues = doc && resolvedSpec !== null ? [staleAuditIssue(config, resolvedSpec, doc)].filter((issue): issue is string => issue !== null) : [];
-  const allMergeIssues = [...mergeIssues, ...auditIssues];
 
   if (specCandidates.length === 0) {
     console.log('merge gate: not applicable — no active spec for this branch, and no --spec given');
     return;
   }
 
-  for (const issue of allMergeIssues) console.error(`merge gate: ${issue}`);
-  console.log(`merge gate: ${allMergeIssues.length} issue(s)`);
-  if (allMergeIssues.length > 0) process.exitCode = 1;
+  for (const issue of mergeIssues) console.error(`merge gate: ${issue}`);
+  console.log(`merge gate: ${mergeIssues.length} issue(s)`);
+  if (mergeIssues.length > 0) process.exitCode = 1;
 }
 
 // `--commit` is a revspec at the CLI boundary, and a revspec is not a fact —
@@ -404,52 +402,6 @@ function closedCommitIssues(tasks: Task[]): CheckIssue[] {
     if (!git.isAncestor(task.closedCommit, 'HEAD')) issues.push({ level: 'warning', message: `${task.id} closed by a commit not reachable from HEAD: ${task.closedCommit}` });
   }
   return issues;
-}
-
-// The paths a commit can touch after an audit pass without making that pass
-// stale: recording a pass necessarily commits its own record — the spec's
-// `## Audit passes` section — plus whatever store churn came from promoting
-// or closing tasks off the back of it, and any audit doc it was reconciled
-// from. None of that is code the pass didn't see: spec *content* drift is
-// already the freeze/clause-identity machinery's job, and store or audit-doc
-// churn from recording findings is not a code change. Keeping this narrow
-// and explicit is what makes the two checks stay separate instead of one
-// approximating the other.
-function auditRecordPaths(config: Config, spec: string): string[] {
-  return ['docs/audits', config.storePath, specFile(config, spec)];
-}
-
-// null return means "could not be determined" (git failure), distinct from
-// an empty array, which means every changed path is an audit record.
-function nonAuditRecordChanges(config: Config, spec: string, range: string): string[] | null {
-  try {
-    const all = execFileSync('git', ['diff', '--name-only', range], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
-    const allFiles = all === '' ? [] : all.split('\n');
-    const records = execFileSync('git', ['diff', '--name-only', range, '--', ...auditRecordPaths(config, spec)], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
-    const recordFiles = new Set(records === '' ? [] : records.split('\n'));
-    return allFiles.filter((file) => !recordFiles.has(file));
-  } catch {
-    return null;
-  }
-}
-
-function staleAuditIssue(config: Config, spec: string, doc: ReturnType<typeof parseSpecDoc>): string | null {
-  const latest = doc.auditPasses[doc.auditPasses.length - 1];
-  if (!latest || latest.head === '') return null;
-  const head = git.head();
-  if (head === null || head === latest.head) return null;
-
-  if (!git.isAncestor(latest.head, 'HEAD')) return `${spec}'s latest audit pass reviewed ${latest.head}, which is not reachable from HEAD`;
-
-  const range = `${latest.head}..HEAD`;
-  const outside = nonAuditRecordChanges(config, spec, range);
-  if (outside === null) return `${spec}'s latest audit pass reviewed ${latest.head}, but commits after it could not be inspected`;
-  if (outside.length === 0) return null;
-
-  const count = git.commitCount(range);
-  if (count === null) return `${spec}'s latest audit pass reviewed ${latest.head}, but commits after it could not be counted`;
-  const shown = outside.length > 5 ? `${outside.slice(0, 5).join(', ')}, … (${outside.length - 5} more)` : outside.join(', ');
-  return `${spec}'s latest audit pass reviewed ${latest.head}; HEAD has ${count} commit(s) after that audit, touching: ${shown}`;
 }
 
 // Shared by add and edit: the two places content fields (severity, system,
