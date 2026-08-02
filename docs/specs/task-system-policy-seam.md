@@ -314,10 +314,21 @@ subject is a silent write, which is the failure this spec exists to prevent.
 - `unknown`, `unmet` and `met` are distinct; `met` requires an evidence string,
   unvalidated and free text (`c3`).
 - Completeness is reported as the named outstanding criteria. No percentage.
-- A decision needing a human is a record the tool returns (`c7`). `B-M5` — the
-  `spec add` pass-2 guard — is the first one; it is a policy question that has
-  been waiting on a human through two branches because there was nowhere to
-  put it.
+- A decision needing a human is a record the tool returns (`c7`).
+
+  `B-M5` was named here as the first example and is not one any more. U3 removed
+  the `spec add` pass-2 guard under `c2`, closing it by making the question moot
+  rather than by answering it — a question that had waited two branches for a
+  human, dissolved by a clause.
+
+  The live example instead is **whether `spec amend` survives**. U2 established
+  that it now writes a dated copy of the deliverable into the spec file which
+  nothing reads, duplicating what `git log -p docs/specs/<slug>.md` already
+  gives — and left it standing rather than deleting it as collateral, because
+  whether the in-document convenience justifies a write command is a judgement
+  about how the workflow is used, not something the code answers. Its
+  unchanged-deliverable refusal, which U3 also deliberately left, stands or falls
+  with it.
 
 ### U5 — Claims and abandonment
 
