@@ -265,9 +265,16 @@ export function requirementStates(task: Task, byId: Map<string, Task>): Requirem
   });
 }
 
+// A requirement holds the task up until some record says it does not.
+// `done` releases it and `declined` releases it — both are records that
+// answered. `missing` is not an answer: nothing in the store can say the
+// prerequisite happened, so presenting the task as ready asserts something
+// no record supports. The two blocking statuses stay distinct in
+// requirementStates because "not yet" and "nobody can say" are different
+// answers to print, and only the second is also a doctor error.
 export function waitingOn(task: Task, byId: Map<string, Task>): string[] {
   return requirementStates(task, byId)
-    .filter((requirement) => requirement.status === 'waiting')
+    .filter((requirement) => requirement.status === 'waiting' || requirement.status === 'missing')
     .map((requirement) => requirement.id);
 }
 

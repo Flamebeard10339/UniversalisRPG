@@ -557,7 +557,7 @@ function reportUnresolvedRequires(task: Task, tasks: Task[]): void {
   const known = new Set(tasks.map((candidate) => candidate.id));
   const unresolved = task.requires.filter((id) => !known.has(id));
   if (unresolved.length === 0) return;
-  console.log(`recorded ${unresolved.length} requirement(s) no record answers to: ${unresolved.join(', ')} — they do not block, and \`tasks doctor\` reports them until they resolve`);
+  console.log(`recorded ${unresolved.length} requirement(s) no record answers to: ${unresolved.join(', ')} — they hold the task until the record exists, and \`tasks doctor\` reports them until it does`);
 }
 
 function cmdAdd(args: Flags, usage: string): void {

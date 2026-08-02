@@ -339,9 +339,16 @@ describe('isBlocked', () => {
     expect(blockedBy({ state: 'declined', reason: 'not worth it' })).toBe(false);
   });
 
-  it('is unblocked by a requirement id no record answers to, which names nothing to wait for', () => {
+  it('is blocked by a requirement id no record answers to, because nothing can say it happened', () => {
     const b = task({ id: 'b', requires: ['gone'] });
-    expect(isBlocked(b, new Map([[b.id, b]]))).toBe(false);
+    expect(isBlocked(b, new Map([[b.id, b]]))).toBe(true);
+  });
+
+  it('releases a forward reference the moment a record answers to it', () => {
+    const b = task({ id: 'b', requires: ['arrives-later'] });
+    expect(isBlocked(b, new Map([[b.id, b]]))).toBe(true);
+    const arrived = task({ id: 'arrives-later', state: 'done' });
+    expect(isBlocked(b, new Map([b, arrived].map((t) => [t.id, t])))).toBe(false);
   });
 
   it('has nothing to be blocked by when requires is empty', () => {
@@ -365,7 +372,9 @@ describe('requirementStates', () => {
       { id: 'abandoned', status: 'declined' },
       { id: 'phantom', status: 'missing' },
     ]);
-    expect(waitingOn(tasks[3], byId)).toEqual(['live']);
+    // The two that no record has settled. `done` and `declined` both
+    // answered; `waiting` and `missing` are the two that have not.
+    expect(waitingOn(tasks[3], byId)).toEqual(['live', 'phantom']);
   });
 });
 

@@ -490,7 +490,7 @@ describe('tasks CLI', () => {
     });
   });
 
-  it('edit records a --requires id that does not resolve, reports it, and does not let it block', () => {
+  it('edit records a --requires id that does not resolve, reports it, and lets it hold the task', () => {
     fixture(({ tasks }) => {
       tasks('add', 'a task', '--id', 'editable', '--spec', 'demo-spec');
       const result = tasks('edit', 'editable', '--requires', 'ghost');
@@ -499,9 +499,25 @@ describe('tasks CLI', () => {
 
       const shown = tasks('show', 'editable').stdout;
       expect(shown).toContain('requires: ghost (missing)');
-      expect(shown).not.toContain('BLOCKED');
-      expect(tasks('next').stdout).toContain('editable');
+      expect(shown).toContain('BLOCKED');
+      const next = tasks('next').stdout;
+      expect(next).toContain('no open, unblocked tasks');
+      expect(next).toContain('editable waits on ghost');
       expect(tasks('doctor').stdout).toContain('[error] editable requires unresolved id: ghost');
+    });
+  });
+
+  it('hands the forward-referenced task over once the record it named exists', () => {
+    fixture(({ tasks }) => {
+      tasks('add', 'a task', '--id', 'editable', '--spec', 'demo-spec', '--requires', 'arrives-later');
+      expect(tasks('next').stdout).toContain('no open, unblocked tasks');
+
+      tasks('add', 'the prerequisite', '--id', 'arrives-later', '--spec', 'demo-spec');
+      tasks('done', 'arrives-later');
+      const next = tasks('next').stdout;
+      expect(next).not.toContain('no open, unblocked tasks');
+      expect(next).toContain('editable');
+      expect(tasks('show', 'editable').stdout).not.toContain('BLOCKED');
     });
   });
 
