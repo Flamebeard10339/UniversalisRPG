@@ -291,7 +291,7 @@ function cmdCheck(flags: Record<string, string>): void {
     members: tasks.filter((task) => task.spec === spec),
   });
   const proofIssues = doc ? runProofTargets(doc) : [];
-  const auditIssues = doc ? [staleAuditIssue(spec, doc)].filter((issue): issue is string => issue !== null) : [];
+  const auditIssues = doc ? [staleAuditIssue(config, spec, doc)].filter((issue): issue is string => issue !== null) : [];
   const allMergeIssues = [...mergeIssues, ...proofIssues, ...auditIssues];
   for (const issue of allMergeIssues) console.error(`merge gate: ${issue}`);
   console.log(`merge gate: ${allMergeIssues.length} issue(s)`);
@@ -388,7 +388,34 @@ function currentHead(): string | null {
   }
 }
 
-function staleAuditIssue(spec: string, doc: ReturnType<typeof parseSpecDoc>): string | null {
+// The paths a commit can touch after an audit pass without making that pass
+// stale: recording a pass necessarily commits its own record — the spec's
+// `## Audit passes` section — plus whatever store churn came from promoting
+// or closing tasks off the back of it, and any audit doc it was reconciled
+// from. None of that is code the pass didn't see: spec *content* drift is
+// already the freeze/clause-identity machinery's job, and store or audit-doc
+// churn from recording findings is not a code change. Keeping this narrow
+// and explicit is what makes the two checks stay separate instead of one
+// approximating the other.
+function auditRecordPaths(config: Config, spec: string): string[] {
+  return ['docs/audits', config.storePath, specFile(config, spec)];
+}
+
+// null return means "could not be determined" (git failure), distinct from
+// an empty array, which means every changed path is an audit record.
+function nonAuditRecordChanges(config: Config, spec: string, range: string): string[] | null {
+  try {
+    const all = execFileSync('git', ['diff', '--name-only', range], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+    const allFiles = all === '' ? [] : all.split('\n');
+    const records = execFileSync('git', ['diff', '--name-only', range, '--', ...auditRecordPaths(config, spec)], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+    const recordFiles = new Set(records === '' ? [] : records.split('\n'));
+    return allFiles.filter((file) => !recordFiles.has(file));
+  } catch {
+    return null;
+  }
+}
+
+function staleAuditIssue(config: Config, spec: string, doc: ReturnType<typeof parseSpecDoc>): string | null {
   const latest = doc.auditPasses[doc.auditPasses.length - 1];
   if (!latest || latest.head === '') return null;
   const head = currentHead();
@@ -397,9 +424,15 @@ function staleAuditIssue(spec: string, doc: ReturnType<typeof parseSpecDoc>): st
   const ancestor = spawnSync('git', ['merge-base', '--is-ancestor', latest.head, 'HEAD'], { stdio: 'ignore' });
   if (ancestor.status !== 0) return `${spec}'s latest audit pass reviewed ${latest.head}, which is not reachable from HEAD`;
 
+  const range = `${latest.head}..HEAD`;
+  const outside = nonAuditRecordChanges(config, spec, range);
+  if (outside === null) return `${spec}'s latest audit pass reviewed ${latest.head}, but commits after it could not be inspected`;
+  if (outside.length === 0) return null;
+
   try {
-    const count = execFileSync('git', ['rev-list', '--count', `${latest.head}..HEAD`], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
-    return `${spec}'s latest audit pass reviewed ${latest.head}; HEAD has ${count} commit(s) after that audit`;
+    const count = execFileSync('git', ['rev-list', '--count', range], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+    const shown = outside.length > 5 ? `${outside.slice(0, 5).join(', ')}, … (${outside.length - 5} more)` : outside.join(', ');
+    return `${spec}'s latest audit pass reviewed ${latest.head}; HEAD has ${count} commit(s) after that audit, touching: ${shown}`;
   } catch {
     return `${spec}'s latest audit pass reviewed ${latest.head}, but commits after it could not be counted`;
   }

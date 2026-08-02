@@ -1409,6 +1409,45 @@ describe('tasks CLI', () => {
     });
   });
 
+  it('check --merge names a changed path outside the audit record as the reason a pass is stale', () => {
+    gitFixture(({ dir, tasks }) => {
+      tasks('audit', 'demo-spec', '--proof', '1=met');
+      writeFileSync(path.join(dir, 'src-change.txt'), 'not an audit record\n', 'utf8');
+      spawnSync('git', ['add', '.'], { cwd: dir });
+      spawnSync('git', ['commit', '--no-verify', '-m', 'Unrelated code change\n\nA body.'], { cwd: dir });
+
+      const result = tasks('check', '--merge');
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain('src-change.txt');
+    });
+  });
+
+  it('check --merge goes green when the only commit after an audit pass records the pass itself (spec + store)', () => {
+    gitFixture(({ dir, tasks }) => {
+      tasks('audit', 'demo-spec', '--proof', '1=met');
+      spawnSync('git', ['add', 'specs/demo-spec.md', 'tasks.jsonl'], { cwd: dir });
+      spawnSync('git', ['commit', '--no-verify', '-m', 'Record audit pass\n\nA body.'], { cwd: dir });
+
+      const result = tasks('check', '--merge');
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('0 issue(s)');
+    });
+  });
+
+  it('check --merge goes green when a post-audit commit also touches docs/audits', () => {
+    gitFixture(({ dir, tasks }) => {
+      tasks('audit', 'demo-spec', '--proof', '1=met');
+      mkdirSync(path.join(dir, 'docs', 'audits'), { recursive: true });
+      writeFileSync(path.join(dir, 'docs', 'audits', 'note.md'), 'An audit note.\n', 'utf8');
+      spawnSync('git', ['add', 'specs/demo-spec.md', 'tasks.jsonl', 'docs/audits/note.md'], { cwd: dir });
+      spawnSync('git', ['commit', '--no-verify', '-m', 'Record audit pass and note\n\nA body.'], { cwd: dir });
+
+      const result = tasks('check', '--merge');
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('0 issue(s)');
+    });
+  });
+
   it('check --merge reports an unsupported proof target shape by clause id', () => {
     fixture(({ tasks, dir }) => {
       writeFileSync(path.join(dir, 'specs', 'demo-spec.md'), '# Demo spec\n\n## Deliverable\n\nPromise.\n\nProof:\n\n- [c1] The proof target is unsupported.\n  proof: custom magic\n\n## Decisions\n\n## Open questions\n\nNone.\n', 'utf8');
