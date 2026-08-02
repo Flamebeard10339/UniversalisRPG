@@ -38,8 +38,8 @@ Proof:
   freeze reporting unaudited drift.
 - [c7] The superseded branch's regressions are absent: `npm test` passes on a
   `main` checkout containing this work, no test resolves git state from the
-  ambient repository, and the proof fixture helper cannot leave a file behind
-  in `scripts/`.
+  ambient repository, and a proof fixture left behind by an interrupted run
+  cannot fail `npm test`.
 - [c8] The merge gate cannot be defeated by renaming a branch or by adopting a
   spec without touching its file, and it does not fail open when git cannot
   resolve a base.
@@ -243,20 +243,63 @@ Proven by independent mutation testing in pass 2, and kept:
 
 ## Subsumed findings
 
-Closed by this spec's clauses: pass 1 M3, M4, M5, M6, M13; pass 2 A-H1, A-H2,
-A-M1, A-M3, A-M4, B-H1, B-H2, B-M1, B-M2, B-M3, B-M4, C-H1, C-H2, C-H3, C-H4,
-C-M1, C-M2, C-M4, C-M6.
+Checked label by label against both archives under U1. Every finding below is
+also a store record, so this section is a reader's index rather than the
+system of record — `tasks list --spec task-system-policy-seam` is.
+
+Closed by a clause of this spec, with the clause named:
+
+| finding | clause |
+|---|---|
+| pass 1 M5, pass 2 A-H2 — a hand-written `[cN]` inherits a retired `met` verdict | c9 |
+| pass 1 M6, pass 2 A-M4 — `check --merge` shell-executes a command from the PR's own tree | c3 |
+| pass 1 M13, pass 2 C-M5 — no git seam; the duplication survived and grew | c2 |
+| pass 1 M11 — the wall-clock measurement was never recorded | c4 |
+| pass 1 M12, pass 1 L4, pass 2 B-L2, pass 2 C-L1 — no command-specific help; unvalidated flags; `next`'s concise form answers nothing | c10 |
+| pass 2 A-M1, C-H1, C-H2, C-M4 — rename, adoption without touching the spec file, unresolvable merge base, and the two-spec refusal that the diff binding forced | c8 |
+| pass 2 A-M3, B-M1, C-M2 — one vitest process per target, 16–25 minutes in CI | c3, measured under c4 |
+| pass 2 B-H1 — the aggregate `command` target proves none of its clause's promises | c3 |
+| pass 2 B-H2, C-M1 — attaching a target reads as unaudited deliverable drift | c6 |
+| pass 2 B-M4, C-H3 — the leaked proof fixture and the ambient diff-range assertion | c7 |
+| pass 2 C-M6 — `scripts/tasks.ts` is 2 139 lines and the seam is not where the policy is | c1 |
+
+**Six labels the previous version of this list claimed and no clause covers.**
+Each is now an open store record instead of a claim:
+
+- **pass 1 M3 and M4, pass 2 A-H1** — that nothing proves `in-progress` is not
+  treated as complete, and that both `stop` guards are untested. c1 and c5
+  relocate these rules and make them testable without a repository; neither
+  promises the cases exist. A-H1 was listed as subsumed *and* as not-dissolved
+  in the same section, which cannot both be true — pass 2 says outright that it
+  does not dissolve.
+- **pass 2 B-M2 and B-M3** — targets that assert an incidental string. Same
+  double listing, same resolution: they are authoring discipline, and U9 is the
+  only mechanism.
+- **pass 2 C-H4** — 188 comment lines, several forbidden by name. c1 removes the
+  cause by giving policy a home; nothing in the clause set requires the comments
+  already in the tree to go, and they are still there at `28d56cd`.
+
+**Two labels the previous version listed neither as subsumed nor as deferred.**
+Both are open records with no spec:
+
+- **pass 2 A-M2** — the freeze baseline does not exist for most shipped specs,
+  so the drift check is a silent no-op on them. `tasks check` reports four such
+  specs today, this branch's own among them.
+- **pass 2 C-M3** — `tasks check` exits 1 on the ordinary done-but-not-committed
+  state. This is a live disagreement between two pass-2 auditors, recorded and
+  never resolved, and it reddens `check` for every worker between `tasks done`
+  and `git commit`.
 
 Not dissolved by any structure, and inherited as authoring discipline rather
-than fixed by code: A-H1 (a proof target that survives the mutation of its own
-clause), B-M2 and B-M3 (targets that assert an incidental string rather than
-the clause's behaviour). U9's attach-only-if-it-dies rule is the whole
-mechanism, and it has already failed once — treat a surviving target as a
-finding, not as a target to reword until it passes.
+than fixed by code: A-H1, B-M2 and B-M3. U9's attach-only-if-it-dies rule is
+the whole mechanism, and it has already failed once — treat a surviving target
+as a finding, not as a target to reword until it passes.
 
-Deliberately deferred, and to be triaged rather than assumed: pass 1 M10, M11,
-M12, M15, M16, M17 and the low findings of both passes. `tasks spec add`'s
-pass-2 guard (B-M5) is a policy question for triage, not a refactor task.
+Deliberately deferred: pass 1 M10, M15, M16, M17, and the lows of both passes
+except the four c10 absorbs above. `tasks spec add`'s pass-2 guard (B-M5) is a
+policy question, not a refactor task, and so is what to do with an undelivered
+clause task whose spec has been superseded — the five inherited ones cannot be
+closed by any verb the tool has.
 
 ## Implementation units
 
@@ -293,32 +336,36 @@ matched-and-failed.
 Four things carried in from the superseded branch. None is refactor work, and
 each will be silently forgotten if it is not done before the refactor starts.
 
-- The store points **12** records at `task-system-real-world-friction-spec`, 5
-  of them still open or unreviewed — not the 36 + 5 this slice originally
-  claimed. Establish first whether the rest of the pass-1 findings were filed
-  without a `spec` field or were never filed at all; the answer sets the size of
-  everything below. Then walk them: close what the inherited commits actually
-  closed, naming the commit; re-point what this spec subsumes; triage the rest.
-  `tasks next` is not usable until the store's answer is true.
-- The store holds 229 records, of which 82 of the 87 open-or-unreviewed carry
-  no spec at all, and this spec has zero members. A planner asking `tasks next`
-  on this branch is told there is nothing to do while nine units of work wait.
-- Pass-2 findings were never recorded as tasks — they exist only in
-  `docs/audits/testing-procedure-2026-08-02-pass2.md`. The deferred list under
-  `## Subsumed findings` must be triaged into the store rather than assumed
-  handled.
-- **Verify this spec's subsumption mapping before trusting it.** It was written
-  by hand from audit summaries and has already been wrong once: `c9` exists
-  because a finding was listed as subsumed while no clause covered it. Check
-  each cited label against the archive and correct the list.
-- This branch **inherits both regressions live**, not merely as history: the
-  `Diff range` assertion that resolves against the ambient repository, and
-  `vitestFixtureFile` writing into `scripts/lib/`. `npm test` fails on a `main`
-  checkout containing this branch today. U0 removes them; until it lands,
-  do not merge.
+- **Answered: 41 records, not 12.** The original 36 + 5 claim was right. The
+  36 pass-1 findings were filed with `spec: null` and their provenance only in
+  `source.spec`, because that is what `tasks audit` does with a finding, while
+  the 5 clause tasks got a `spec`. A count of the `spec` field therefore sees 5
+  of 41, and `next` and `list --spec` see the same 5. Walked under U1: 14 closed
+  by inherited commits and credited to them, 10 re-pointed at the clause that
+  subsumes them, 12 left open as deferred backlog, and 5 stuck — see below.
+- Done: this spec has members, so `tasks next` answers with a unit. Binding
+  them needed one thing the plan did not anticipate — `fixNowQueue` sorts by
+  severity before store order and the units carry none, so a promoted `high`
+  finding outranks every unit. Each promoted finding therefore `requires` the
+  unit that closes it, which keeps it out of the queue until there is something
+  to verify.
+- Done: pass 2's findings are 26 store records. Provenance is in their evidence
+  text, not in `source` — only `tasks audit` sets that field and it cannot parse
+  this document's heading shape. `tasks add` has no `--source` flag.
+- Done: every cited label was checked against the archive and the list rewritten.
+  Six claims did not hold, three of them findings the section listed as subsumed
+  *and* as not-dissolved in the same breath.
+- **Blocked, and a policy question rather than work.** The five inherited
+  undelivered clause tasks cannot be closed by any verb: `decline` refuses
+  `kind: undelivered` outright, `done` demands a `met` verdict in the superseded
+  spec's own latest pass — and pass 2 ruled three of them unmet — and `spec done
+  --defer-open` skips undelivered stragglers by construction. The remaining
+  paths are falsifying an audit pass or hand-editing the store. The store has no
+  way to say a spec was abandoned.
 
 Acceptance: the store's answer to "what is open in this system" matches the two
-audit records, and every claim in `## Subsumed findings` is checked.
+audit records, and every claim in `## Subsumed findings` is checked. Met except
+for the five records above, which no available verb can move.
 
 ### U2 — Scaffold: pin the shape, and write the clauses as failing tests
 
