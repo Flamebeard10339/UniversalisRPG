@@ -5,7 +5,12 @@ export interface ProofClause {
   proofTargets?: string[];
 }
 
-export type Verdict = 'met' | 'unmet';
+// `unmet` is "we checked and it fails"; `unknown` is "nobody looked". They
+// are different facts about a clause and no reader of this module may
+// collapse them.
+export type Verdict = 'met' | 'unmet' | 'unknown';
+
+export const VERDICTS: readonly Verdict[] = ['met', 'unmet', 'unknown'];
 
 export interface AuditVerdict {
   clause: number;
@@ -173,7 +178,7 @@ function parseAuditPasses(text: string): AuditPass[] {
     const body = lines.slice(start.index + 1, end);
     const base = /^- base: `(.+)`$/;
     const head = /^- head: `(.+)`$/;
-    const proof = /^- proof (\d+): (met|unmet)(?: — (.*))?$/;
+    const proof = new RegExp(`^- proof (\\d+): (${VERDICTS.join('|')})(?: — (.*))?$`);
     let baseSha = '';
     let headSha = '';
     const verdicts: AuditVerdict[] = [];
@@ -230,10 +235,6 @@ export function parseSpecDoc(text: string): SpecDoc {
 export function renderAuditPass(pass: AuditPass): string {
   const lines = [`### Pass ${pass.pass} — ${pass.date}`, '', `- base: \`${pass.base}\``, `- head: \`${pass.head}\``];
   for (const verdict of pass.verdicts) {
-    // Evidence is rendered for any verdict that carries it, met or unmet:
-    // this gate exists to stop false completion claims, so a measurement
-    // backing a `met` verdict is exactly what should survive, not be
-    // thrown away while an `unmet` one is kept.
     const evidence = verdict.evidence ? ` — ${verdict.evidence}` : '';
     lines.push(`- proof ${verdict.clause}: ${verdict.status}${evidence}`);
   }
@@ -256,6 +257,22 @@ export function appendAuditPass(text: string, pass: AuditPass): string {
   const after = lines.slice(insertAt);
   const needsBlank = before[before.length - 1]?.trim() !== '';
   return [...before, ...(needsBlank ? [''] : []), rendered, '', ...after].join('\n').trimEnd() + '\n';
+}
+
+// A clause the pass never graded is `unknown` — the pass says nothing about
+// it, and the reader is owed that as a stated fact rather than an omission.
+export function clauseStandings(clauses: ProofClause[], pass: AuditPass | undefined): AuditVerdict[] {
+  return clauses.map((clause) => pass?.verdicts.find((verdict) => verdict.clause === clause.id) ?? { clause: clause.id, status: 'unknown', evidence: null });
+}
+
+// Completeness as names, never as a ratio or a bit: which clause is
+// outstanding is the actionable part, and each keeps its own status so
+// "nobody looked" is never read as "we checked and it fails".
+export function outstandingSummary(verdicts: AuditVerdict[]): string {
+  if (verdicts.length === 0) return 'no clause to grade';
+  const outstanding = verdicts.filter((verdict) => verdict.status !== 'met');
+  if (outstanding.length === 0) return 'no clause outstanding';
+  return `outstanding: ${outstanding.map((verdict) => `c${verdict.clause} (${verdict.status})`).join(', ')}`;
 }
 
 export function renderAmendment(amendment: Amendment): string {

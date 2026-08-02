@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { appendAmendment, appendAuditPass, duplicateClauseIds, parseSpecDoc, renderAuditPass, stampClauseIds } from './specDoc';
+import { appendAmendment, appendAuditPass, clauseStandings, duplicateClauseIds, outstandingSummary, parseSpecDoc, renderAuditPass, stampClauseIds } from './specDoc';
 
 const DOC = `# Demo spec
 
@@ -272,6 +272,59 @@ describe('appendAuditPass / renderAuditPass round trip', () => {
     });
     const { auditPasses } = parseSpecDoc(withPass);
     expect(auditPasses[0].verdicts).toEqual([{ clause: 1, status: 'met', evidence: 'measured 70ms' }]);
+  });
+
+  it('round-trips an unknown verdict without turning it into unmet', () => {
+    const withPass = appendAuditPass(DOC, {
+      pass: 1,
+      date: '2026-08-02',
+      base: 'a',
+      head: 'b',
+      verdicts: [
+        { clause: 1, status: 'unknown', evidence: null },
+        { clause: 2, status: 'unknown', evidence: 'ran out of session before reaching it' },
+      ],
+    });
+    expect(withPass).toContain('- proof 1: unknown');
+    expect(parseSpecDoc(withPass).auditPasses[0].verdicts).toEqual([
+      { clause: 1, status: 'unknown', evidence: null },
+      { clause: 2, status: 'unknown', evidence: 'ran out of session before reaching it' },
+    ]);
+  });
+});
+
+describe('clauseStandings / outstandingSummary', () => {
+  const clauses = parseSpecDoc(DOC).proofClauses;
+
+  it('grades every clause the pass never mentioned as unknown, not as absent', () => {
+    const standings = clauseStandings(clauses, { pass: 1, date: 'd', base: 'a', head: 'b', verdicts: [{ clause: 1, status: 'met', evidence: 'measured' }] });
+    expect(standings).toEqual([
+      { clause: 1, status: 'met', evidence: 'measured' },
+      { clause: 2, status: 'unknown', evidence: null },
+      { clause: 3, status: 'unknown', evidence: null },
+    ]);
+  });
+
+  it('grades every clause unknown when no pass has been recorded at all', () => {
+    expect(clauseStandings(clauses, undefined).map((verdict) => verdict.status)).toEqual(['unknown', 'unknown', 'unknown']);
+  });
+
+  it('names each outstanding clause with its own status rather than counting them', () => {
+    const summary = outstandingSummary([
+      { clause: 1, status: 'met', evidence: 'measured' },
+      { clause: 2, status: 'unmet', evidence: null },
+      { clause: 3, status: 'unknown', evidence: null },
+    ]);
+    expect(summary).toBe('outstanding: c2 (unmet), c3 (unknown)');
+    expect(summary).not.toMatch(/\d+\s*\/\s*\d+|%/);
+  });
+
+  it('says nothing is outstanding rather than reporting a full score', () => {
+    expect(outstandingSummary([{ clause: 1, status: 'met', evidence: 'measured' }])).toBe('no clause outstanding');
+  });
+
+  it('reports a spec with no clauses at all as having none to grade, not as complete', () => {
+    expect(outstandingSummary([])).toBe('no clause to grade');
   });
 });
 
