@@ -76,22 +76,55 @@ Cutting from `task-system-real-world-friction-spec` inherits the proven work
 without sixteen cherry-picks, and what that branch got wrong is a short list to
 revert. Starting from `main` would mean re-landing good commits by hand.
 
-### Proof targets are attached last
+### Targets are attached before the baseline, and proved after the implementation
 
 Pass 2 found that `c1` and `c4` of the superseded spec could not both be
 satisfied: attaching a `proof:` line edits the deliverable, which the freeze
-reports as unaudited drift. This spec therefore ships **no `proof:` lines until
-U8 lands the freeze exclusion**, then attaches them in U9. Attaching
-them earlier reproduces the contradiction on this branch.
+reports as unaudited drift. The original response was to attach nothing until
+U8 landed a freeze exclusion. That gets the ordering backwards — the
+contradiction only bites when a baseline already exists to drift *from*. This
+spec has no baseline and no recorded pass, so attaching targets in U2 and
+freezing afterwards dissolves it by sequence rather than by machinery.
 
-### A proof target is a test, written before the implementation
+The two halves of a target therefore land at different times. Attachment is
+early, because the test is how the clause is written down. **Proof is late,
+because a target cannot be mutation-tested until there is an implementation to
+mutate.** A red test says only that it can fail; it does not say it fails for
+the right reason. Both of the surviving weak proofs from the superseded branch
+pass a clean red-green cycle — `expect(activeAction).toBeDefined()` is red
+before the feature and green after, and discharges nothing.
+
+`c6` stays load-bearing rather than becoming unnecessary: the audit pass edits
+targets, and by then the baseline exists.
+
+### TDD is offered to a planner, not imposed on one
+
+A clause backed by a test needs no prose restating it — the test is the
+statement. But a planner who wants prose gets prose, and a clause that resists
+codification stays prose rather than being forced into a weak assertion for the
+sake of uniformity. `c4` is a measurement and `c7` defeated an attempt at
+codification within this branch; neither is a defect.
+
+Nor is the clause set a ceiling on testing. A worker that judges its unit needs
+coverage the clauses do not name should write it. The clause tests are the
+branch's contract, not its test plan, and nobody planning a unit from outside
+knows what it will need to be robust.
+
+**The audit is where prose becomes tests.** By then mutation testing has
+established which assertion actually discharges which promise, which is exactly
+the knowledge that was missing when the clause was first written. A prose clause
+that survives to the audit with a mutation-proved test available should be
+promoted; that is a strictly more readable and more rigorous statement of the
+same promise, and it is the one moment in the branch when it can be written
+with evidence rather than intention.
+
+### A proof target is a test, not a shell command
 
 `proof: command <shell>` is removed, not guarded. A clause names a list of
-tests, and those tests are the ones the repo's tests-before-implementation rule
-already requires a worker to write first. Two consequences fall out for free:
-the CI shell-execution path both audits demonstrated ceases to exist rather
-than being sandboxed or allowlisted, and a clause's proof stops being something
-assembled afterwards to satisfy a gate.
+tests. Two consequences fall out for free: the CI shell-execution path both
+audits demonstrated ceases to exist rather than being sandboxed or allowlisted,
+and a clause's proof stops being something assembled afterwards to satisfy a
+gate.
 
 It also kills the aggregate target honestly. `command npm test` survived every
 mutation that falsified its own clause, because "the suite passes" is not
@@ -125,11 +158,17 @@ that is actually recorded, and binding on it closes the rename hole and the
 unresolvable-merge-base fail-open at the same time (C-H1 / C-H2 / A-M1, reached
 independently by two auditors from opposite directions).
 
-### Tests before implementation
+### Tests before implementation, at two different altitudes
 
-By system rule for non-UI work, and this branch is not UI work. Policy
-extraction is exactly the case where it pays: a pure function's test is written
-before its body without friction.
+The clause tests in U2 are the branch's contract, written once by the planner.
+Separately, a worker writes its own unit's tests before its body — the system
+rule for non-UI work, and this branch is not UI work. Policy extraction is
+exactly where it pays: a pure function's test is written before its body
+without friction.
+
+The two are not the same discipline and neither substitutes for the other. A
+green unit suite says the worker built what it set out to build; a green clause
+suite says the branch kept its promise.
 
 ### Cut the work by command family, not by layer
 
@@ -281,7 +320,7 @@ each will be silently forgotten if it is not done before the refactor starts.
 Acceptance: the store's answer to "what is open in this system" matches the two
 audit records, and every claim in `## Subsumed findings` is checked.
 
-### U2 — Scaffold: pin the fact types and the shared printers
+### U2 — Scaffold: pin the shape, and write the clauses as failing tests
 
 The one unit every later unit depends on, and the reason they can then proceed
 without colliding. It defines shape and moves almost nothing.
@@ -295,14 +334,36 @@ Files to read first: `scripts/tasks.ts`, `scripts/lib/mergeGate.ts`,
 - Move the shared printers — `printTask`, `printTaskConcise`, `preview`,
   `wrapText`, `truncateLine`, `printEvidence` — into a render module, returning
   strings instead of calling `console`. These are what U3–U6 would otherwise
-  each rewrite.
+  each rewrite, and the reason `list`, `spec show` and `next` disagree today
+  about whether a member is blocked.
+- **Write a failing test for every clause that admits one, and attach it as
+  that clause's `proof:` target.** `c1`, `c2`, `c3`, `c6`, `c8`, `c9` and `c10`
+  all admit one. `c4` is a recorded measurement rather than a gate and gets no
+  target. `c7` resisted codification when U0 tried it — its verification was
+  hand-tracing every call site — so it stays prose unless the audit finds a
+  test for it.
 - Move exactly one rule end to end as the worked example. `closedCommitIssues`
   is already pure over tasks and is the cheapest to carry.
 - Enforce the no-effects rule with a check, scoped to the policy module (`c1`).
 
+**Assert the promise, never the mechanism.** A test that pins *how* a clause is
+satisfied gets rewritten the moment a worker finds a better mechanism, and it
+will: U0's prescribed excluded-directory design died on contact with vitest's
+actual behaviour, while the promise it served — a leaked fixture cannot fail
+`npm test` — survived untouched and was satisfied a different way.
+
+These tests are red for most of the branch, so they must not be able to drown
+the signal a worker reads. Keep the clause suite out of the default `npm test`
+run and let `tasks check --merge` be what executes it. Note the consequence
+rather than absorbing it silently: CI runs `npm test`, `tsc`, `layer-check` and
+`audit-status`, and does not run the merge gate — so decide deliberately
+whether the clause suite is a gate a PR must pass or a check a planner runs.
+
 Acceptance: the example rule has a test that constructs facts directly and runs
 with no repository, no subprocess and no filesystem. The check fails if the
-policy module imports `fs`, `child_process` or `console`.
+policy module imports `fs`, `child_process` or `console`. Every clause listed
+above has a target that is red for the right reason — not red because it names
+a module that does not exist yet, which any typo also achieves.
 
 ### U3 — Gate and check family
 
@@ -374,13 +435,25 @@ one closes over.
 - Measure and record `npm test` and each PR gate against the five-minute
   budget (`c4`).
 
-### U9 — Attach proof targets and audit
+### U9 — Prove the targets, then audit
 
-- Attach a `proof:` target to each clause of this spec — and for each, mutate
-  the promised behaviour and confirm the named target dies. A target that
-  survives is not attached; the clause is left untargeted and that is recorded.
+U2 attached the targets. This unit establishes whether any of them is worth
+anything, which could not be known until there was an implementation to break.
+
+- For each clause carrying a target, mutate the promised behaviour and confirm
+  the named target dies. **A target that survives is a finding, not a target to
+  reword until it passes** — that rule has already failed once. Detach it and
+  record the clause as untargeted rather than leaving a green target that
+  proves nothing.
+- Promote what the mutation pass taught. A clause still in prose — `c7`, or any
+  clause whose U2 target was detached — gets a test now if the mutation work
+  surfaced one that discharges it. This is the only point in the branch where a
+  clause can be written with evidence instead of intention.
 - Commission an independent audit through `tasks audit-prompt`, and a second
   auditor whose only question is whether anything is worse than before U0.
+  Clause-by-clause verification structurally cannot see a regression: each
+  clause looks fine alone. On the superseded branch that second auditor found
+  all three regressions and the two clause auditors found none.
 
 ## Open questions
 

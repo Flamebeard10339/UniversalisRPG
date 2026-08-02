@@ -92,5 +92,55 @@ with the session, and the next branch gets planned against a summary of a summar
 reports into the repository before the session ends, keep each auditor's own finding labels so
 downstream documents can cite them, and plan against the archive.
 
+# Writing a spec's clauses as tests
+
+**Red-green proves a test can fail. Only mutation proves it fails for the right
+reason.** Of the four weak proofs that shipped green on
+`combat-continuation-runtime`, one had no test at all — writing it first would
+have made that impossible. The other two pass a clean red-green cycle and still
+discharge nothing: `expect(activeAction).toBeDefined()` is red before the
+feature and green after. Test-first eliminates the *missing test* class
+entirely and does nothing about the *wrong test* class. They are complements,
+and test-first is the cheap one.
+
+**Writing a test names a module, an export and a signature — that is the
+decomposition.** So "write the clause tests first" is not an alternative to
+decomposing; it performs the decomposition in the least reviewable medium
+available, by whoever types first. Which means it collapses into "pin the shape
+first", and belongs in the scaffold unit that was already going to do that.
+
+**Assert the promise, never the mechanism.** A test pinning *how* a clause is
+satisfied gets rewritten the moment a worker finds a better mechanism, and they
+do. A prescribed excluded-directory design died on contact with what vitest
+actually does; the promise it served — a leaked fixture cannot fail `npm test` —
+survived untouched and was met another way. Mechanism assertions are where the
+"tests will need rewriting" objection is true, and they are avoidable.
+
+**Attach targets before the baseline; prove them after the implementation.**
+Attaching a `proof:` line edits the deliverable, which a freeze reports as
+drift — but only if a baseline already exists to drift from. Attach while there
+is none and the contradiction never arises. The proof half has to wait
+regardless: there is nothing to mutate until something is built.
+
+**TDD is offered to a planner, not imposed.** A clause backed by a test needs no
+prose restating it. A clause that resists codification stays prose rather than
+being forced into a weak assertion for uniformity's sake — one clause on the
+policy-seam branch defeated an attempt at codification and its verification was
+hand-tracing every call site, which was the correct answer. And the clause set
+is the branch's *contract*, never its test plan: nobody planning a unit from
+outside knows what it will need to be robust, so a worker that judges it needs
+coverage the clauses do not name should write it.
+
+**Keep a long-red clause suite out of the signal a worker reads.** Forty red
+tests for the length of a branch means a worker cannot tell its own failures
+from clauses nobody has implemented yet. That is the same drift as a store the
+branch disagrees with.
+
+**The audit is where prose becomes tests.** By then the mutation pass has
+established which assertion actually discharges which promise — exactly the
+knowledge that was missing when the clause was first written in English. It is
+the one moment in a branch when a clause can be written from evidence instead
+of intention.
+
 # References
 https://cursor.com/blog/agent-swarm-model-economics
