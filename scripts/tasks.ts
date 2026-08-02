@@ -8,6 +8,7 @@ import { checkCommitMessage, extractNextTrailer, isExempt } from './lib/commitCo
 import { appendEvents, EVENT_OPS, eventsPathFor, filterEvents, loadEvents, type EventOp, type TaskEvent } from './lib/eventLog';
 import * as git from './lib/git';
 import { appendAuditPass, clauseStandings, duplicateClauseIds, outstandingSummary, parseSpecDoc, stampClauseIds, VERDICTS, type AuditVerdict, type ProofClause, type Verdict } from './lib/specDoc';
+import { checkPlan } from './lib/planCheck';
 import { loadManifest, systemNames as manifestSystemNames } from './lib/systems';
 import {
   checkStore,
@@ -879,6 +880,60 @@ function cmdNext(args: Flags): void {
     console.log(`${cold.length} cold claim(s) in ${spec}, not offered ahead of open work:`);
     for (const task of cold) printRow(task, byId, { indent: '- ' });
   }
+}
+
+// Grades a dispatch set before anyone works it. Everything it reports is
+// decidable from the records alone, so the cost of asking is one command and
+// the answer arrives while the decomposition is still cheap to change — which
+// is the only moment any of these findings is worth having.
+//
+// It reports and exits 0, like every other read. A planner who sees "3 of 4
+// tasks write one file" and dispatches anyway has made an informed call, and
+// c2 leaves that call to them.
+function cmdPlan(args: Flags): void {
+  const config = resolveConfig(args.flags);
+  const tasks = readStore(config);
+  const byId = new Map(tasks.map((task) => [task.id, task]));
+
+  let plan: Task[];
+  if (args.positional.length > 0) {
+    const unknown = args.positional.filter((id) => !byId.has(id));
+    if (unknown.length > 0) reportUnknownIds(unknown, tasks, (line) => console.log(line));
+    plan = args.positional.map((id) => byId.get(id)).filter((task): task is Task => task !== undefined);
+  } else {
+    const activeSpec = resolveActiveSpec(config, tasks, args.flags.spec);
+    if (activeSpec.note) console.log(activeSpec.note);
+    if (activeSpec.spec === null) {
+      console.log('no active spec for this branch, and no ids or --spec given — `tasks plan <id>...` grades a set directly');
+      return;
+    }
+    // What a planner would actually hand out: the spec's live work, held
+    // and unheld alike. A blocked member is included on purpose — "this
+    // starts blocked" is one of the answers worth having.
+    plan = tasks.filter((task) => task.spec === activeSpec.spec && (task.state === 'open' || task.state === 'in-progress'));
+    console.log(`plan taken from spec ${activeSpec.spec}: its ${plan.length} open and in-progress member(s)`);
+  }
+
+  if (plan.length === 0) {
+    console.log('nothing to grade — name the ids to dispatch, or add members to the spec');
+    return;
+  }
+
+  const report = checkPlan(plan, tasks);
+  console.log(`plan: ${plan.length} task(s), ${plan.length - report.ungranted} with a write grant`);
+  for (const task of plan) printRow(task, byId, { indent: '  ' });
+  console.log('');
+
+  if (report.findings.length === 0) {
+    console.log('no overlap, no unstated dependency, no duplicated interface.');
+    if (report.ungranted > 0) console.log(`${report.ungranted} task(s) declared no writes, so that answer covers less than it looks like it does.`);
+    return;
+  }
+
+  for (const finding of report.findings) console.log(`  [${finding.level}] ${finding.message}`);
+  console.log('');
+  const defects = report.findings.filter((finding) => finding.level === 'defect').length;
+  console.log(`${report.findings.length} finding(s) — ${defects} defect, ${report.findings.length - defects} note. Reported, not enforced: whether to dispatch is yours.`);
 }
 
 // An empty queue has four causes that look identical from outside — no
@@ -2174,7 +2229,7 @@ function cmdCheckCommitMessage(args: Flags, usage: string): void {
   }
 }
 
-const USAGE = 'usage: npm run tasks -- <doctor|add|edit|show|list|search|next|start|stop|done|decline|import|triage|note|decision|log|spec|audit|audit-prompt|handoff> ...';
+const USAGE = 'usage: npm run tasks -- <doctor|add|edit|show|list|search|next|plan|start|stop|done|decline|import|triage|note|decision|log|spec|audit|audit-prompt|handoff> ...';
 
 interface Command {
   usage: string;
@@ -2220,6 +2275,7 @@ const COMMANDS: Record<string, Command> = {
     usage: 'usage: tasks search <term> [--state unreviewed|open|in-progress|done|declined] [--severity high|medium|low] [--system "<name>"] [--spec <slug>] [--kind task|finding|undelivered|question] [--deferred]',
     run: cmdSearch,
   },
+  plan: { usage: 'usage: tasks plan [<id>...] [--spec <slug>]  (grades a dispatch set for overlap, unstated dependencies and duplicated interfaces; runs no workers and refuses nothing)', run: cmdPlan },
   next: { usage: 'usage: tasks next [--spec <slug>] [--system "<name>"] [--severity high|medium|low] [--full]', run: cmdNext },
   start: { usage: `usage: tasks start <id> ${ACTOR_USAGE}`, run: cmdStart },
   stop: { usage: `usage: tasks stop <id> ${ACTOR_USAGE}`, run: cmdStop },

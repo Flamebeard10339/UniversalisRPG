@@ -295,7 +295,7 @@ describe('tasks CLI', () => {
 
   it('answers --help on every command and subcommand, and names the flags it will accept', () => {
     fixture(({ tasks }) => {
-      const commands = [['doctor'], ['add'], ['edit'], ['show'], ['list'], ['search'], ['next'], ['start'], ['stop'], ['done'], ['decline'], ['import'], ['triage'], ['audit'], ['audit-prompt'], ['handoff'], ['check-commit-msg'], ['spec'], ['spec', 'new'], ['spec', 'add'], ['spec', 'remove'], ['spec', 'show'], ['spec', 'done'], ['note'], ['decision'], ['log']];
+      const commands = [['doctor'], ['add'], ['edit'], ['show'], ['list'], ['search'], ['next'], ['start'], ['stop'], ['done'], ['decline'], ['import'], ['triage'], ['audit'], ['audit-prompt'], ['handoff'], ['check-commit-msg'], ['plan'], ['spec'], ['spec', 'new'], ['spec', 'add'], ['spec', 'remove'], ['spec', 'show'], ['spec', 'done'], ['note'], ['decision'], ['log']];
       for (const command of commands) {
         const result = tasks(...command, '--help');
         expect(result.status, command.join(' ')).toBe(0);
@@ -487,6 +487,53 @@ describe('tasks CLI', () => {
       expect(result.status).toBe(1);
       expect(result.stderr).toContain('not in systems.json');
       expect(tasks('show', 'editable').stdout).not.toContain('system: Nonexistent');
+    });
+  });
+
+  it('grades a named dispatch set and answers at exit 0, refusing nothing', () => {
+    fixture(({ tasks }) => {
+      tasks('add', 'extract the policy', '--id', 's1', '--writes', 'scripts/tasks.ts', '--produces', 'policy module');
+      tasks('add', 'reroute git', '--id', 's2', '--writes', 'scripts/tasks.ts');
+      tasks('add', 'regression fixes', '--id', 's5', '--writes', 'scripts/tasks.test.ts');
+
+      const result = tasks('plan', 's1', 's2', 's5');
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('s2 writes scripts/tasks.ts, where s1 is producing policy module');
+      expect(result.stdout).toContain('does not require s1');
+      expect(result.stdout).toContain('Reported, not enforced');
+    });
+  });
+
+  it('grades the active spec when given no ids, and says where the plan came from', () => {
+    fixture(({ tasks }) => {
+      tasks('spec', 'new', 'demo-spec');
+      tasks('add', 'one', '--id', 'one', '--spec', 'demo-spec', '--writes', 'src/a.ts');
+      tasks('add', 'two', '--id', 'two', '--spec', 'demo-spec', '--writes', 'src/b.ts');
+      const result = tasks('plan');
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('plan taken from spec demo-spec');
+      expect(result.stdout).toContain('no overlap, no unstated dependency, no duplicated interface');
+    });
+  });
+
+  it('answers a plan naming an id that does not exist instead of refusing it', () => {
+    fixture(({ tasks }) => {
+      tasks('add', 'real', '--id', 'real', '--writes', 'src/a.ts');
+      const result = tasks('plan', 'real', 'ghost');
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('no such task');
+      expect(result.stdout).toContain('plan: 1 task(s)');
+    });
+  });
+
+  it('says how much of a clean answer it could not see, when nothing declares a write grant', () => {
+    fixture(({ tasks }) => {
+      tasks('add', 'ungranted one', '--id', 'u1');
+      tasks('add', 'ungranted two', '--id', 'u2');
+      const result = tasks('plan', 'u1', 'u2');
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('0 with a write grant');
+      expect(result.stdout).toContain('declares no writes');
     });
   });
 
