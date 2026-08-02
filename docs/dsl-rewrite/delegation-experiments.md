@@ -56,6 +56,9 @@ the result was correct, and what the review caught.
 | 39–43 | Sonnet 5 ×5 (cold spawn, Opus orchestrator) | **Fix round**, five sequential chunks against pass-1 findings (gate blockers; closing-commit anchor; freeze + audit-prompt; robustness seam; dogfooding). Each brief prescribed the *design decision* and demanded TDD + self-mutation. | ~1.07M | 532 | 8217s | very high (design prescribed, not delegated) | All five landed; suite went from 1 failing to 831 green. **But pass 2 found the round introduced 3 regressions.** Two workers correctly refused a prescribed acceptance criterion that was wrong (one proved a requested repro was information-theoretically impossible; one flagged that its fix retracted a protection). Prescribing design bought correctness *within* a chunk and bought nothing *across* chunks. |
 | 44–46 | Opus 5 ×3 (cold spawn, Opus orchestrator) | **Audit pass 2** in isolated worktrees: clauses c1–c4, clauses c5–c8, and one scoped purely to "did the fix round make anything worse". | 594k | 317 | 6454s | n/a (read-only; mutation mandate + explicit distrust of the prior agent's self-verification) | 6/8 clauses met, up from 3/8. The regression-scoped auditor found all 3 regressions; the two clause auditors found none of them — each clause looks fine in isolation. Also found a structural contradiction (two clauses that cannot both be satisfied) that neither pass-1 nor any single-clause view could surface. |
 | 47 | Opus 5 (cold spawn, Opus orchestrator) | **Pass-2 reconciliation** into a permanent audit record, with instructions to preserve per-auditor finding labels for downstream citation. | — | — | — | high (dedup rules, label-stability rule, output skeleton) | Written as the durable evidence base for the superseding refactor spec. |
+| 48a | Sonnet 5 (cold spawn, **worktree isolation**, Opus orchestrator) | U0: remove two inherited regressions from `scripts/tasks.test.ts` — an ambient-repo diff-range assertion and a fixture writing a failing test into `scripts/lib/`. | 61.8k | 13 | 196s | high (exact line refs, named acceptance, explicit refusal invitation) | **Refused, correctly.** The worktree was cut 54 commits stale: `tasks.test.ts` was 1372 lines, none of the target material existed, and the branch's own spec file was absent. It proved the staleness four ways (`merge-base` = HEAD, zero unique commits, 54 behind, ff clean) before declining, and declined the fast-forward too because that would have pulled in `docs/tasks.jsonl` — off-limits per the brief. Cost of the harness fault: 62k tokens, no damage. |
+| 48b | Sonnet 5 (cold spawn, **main tree**, Opus orchestrator) | Same brief, re-dispatched without worktree isolation after row 48a. | 184.6k | 98 | 22m15s | same brief plus a start-state assertion (`verify you see a7e71d9 or later`) | Both regressions fixed, mutation-proved. Notable: it ran the empirical question I asked instead of assuming, and **my prescribed design was wrong** — `test.exclude` suppresses a file even when named as an explicit vitest run target, so the excluded-directory approach would have silently broken all five proof-target tests. It found the narrower alternative (dedicated gitignored dir + a VITEST-gated sweep). Also reported a *third* test with the same ambient coupling, outside its named scope, rather than widening silently. 43 files / 832 green / 48s. |
+| 49 | Opus 5 (cold spawn, Opus orchestrator) | U1: reconcile inherited store state against two audit archives (2391 lines), verify the spec's 25-label subsumption mapping, triage unfiled pass-2 findings. | — | — | — | high (four numbered questions, the wrong-by-3x premise flagged up front, refusal invited) | Staffed as design work per the swarm theory's synthesis rule, not handed to a cheap model as bookkeeping. |
 
 ## The fix round is where delegation got expensive (rows 39–47)
 
@@ -64,6 +67,30 @@ the result was correct, and what the review caught.
 - **Fixing one defect can promote another.** A pass-1 medium became a pass-2 high purely because the fix removed the mask it was rated behind. Severity is not a property of a finding alone; it is a property of the finding plus everything still broken around it.
 - **Orchestrator-ordered work is not exempt from audit.** The single worst outcome of the round — a 17-minute gate, a live shell-exec path in CI, and two proof targets that prove nothing — came from a chunk the *planner* ordered, executed exactly as specified. Audit the planner's chunks hardest.
 - **Cost check.** The fix round cost ~1.07M subagent tokens and produced a branch that was still not mergeable. The two audit rounds cost ~1.18M and produced the finding that the real defect was structural. The audits were the better spend, and that has now been true in every row group where both appear.
+
+## The refusal invitation is now paying for itself (rows 48–49)
+
+- **Verify the worker's start state in the brief, not just its finish state.**
+  Row 48a burned 62k tokens because `isolation: "worktree"` cut from a base 54
+  commits stale. The worker caught it; the brief did not ask it to. Every brief
+  since carries a one-line assertion — *verify you see `<sha>` or later, stop if
+  not* — which costs one tool call and turns a silent wrong-tree run into an
+  immediate stop.
+- **"Run the experiment, don't reason about it" is worth a paragraph in the
+  brief.** Row 48b was asked two empirical questions about vitest rather than
+  told the answers. Both came back against my prescription: `test.exclude`
+  suppresses a file even when it is named as an explicit run target, which
+  would have silently broken all five tests the design was meant to protect.
+  Prescribing a mechanism from reading is how a planner injects a defect that
+  every downstream verification then confirms.
+- **Two correct refusals in two dispatches.** Rows 48a and 48b both declined
+  something — a stale tree, and a prescribed design — and both were right. The
+  invitation is cheap to write and it has now caught a harness fault and a
+  planner design error in a single round.
+- **A worker reporting out-of-scope defects beats a worker fixing them.** Row
+  48b found a third test with the same ambient coupling, named it, and left it
+  alone. That kept its diff auditable and kept the unit's acceptance honestly
+  unmet rather than quietly widened.
 
 ## Session usage snapshots
 
