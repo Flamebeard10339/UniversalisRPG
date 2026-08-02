@@ -71,11 +71,29 @@ will keep refusing until Slice 2 replaces it with store membership.
 open+unreviewed, **82 carry no spec at all**. `task-system-real-world-friction-spec`
 holds 12 records, 5 of them still open or unreviewed.
 
-Slice 0 of the spec says the store "still points 36 pass-1 findings and 5
-auto-generated clause tasks" at the superseded spec. The store holds 12 records
-with that spec field. That premise is wrong by roughly 3x and the reconcile is
-either much smaller than budgeted or the findings were filed without the spec
-field — determine which before working from the slice's estimate.
+**Corrected 2026-08-02 by U1 — the paragraph below was wrong, and how it was
+wrong is worth more than what it claimed.**
+
+It originally read: the spec says the store "still points 36 pass-1 findings and
+5 auto-generated clause tasks" at the superseded spec, the store holds 12 with
+that spec field, so the premise is wrong by roughly 3x.
+
+The spec was right and this measurement was wrong. All 41 records were filed.
+`cmdAudit` files an undelivered clause task with `spec` set
+(`scripts/tasks.ts:1853`) and a *finding* with `spec: null`, carrying its
+provenance in `source.spec` instead (`:1880`). Counting the `spec` field sees 5
+of 41 — and so do `tasks list --spec`, `tasks next` and `spec show`.
+
+So the planner's "what is next" was silently incomplete by 36 records, the store
+held the right answer the whole time, and the query surface could not reach it.
+A measurement pass explicitly commissioned to stop workers re-deriving facts
+wrote the wrong number into a document they were told to trust. Filed as
+`audit-findings-invisible-to-spec-queries` (high).
+
+The lesson for the next planner is not "measure more carefully". It is that a
+count over one field is not a measurement of membership when two fields express
+membership, and that the cheapest check on any store measurement is to ask the
+store the same question a second way.
 
 ## Structural measurements
 
