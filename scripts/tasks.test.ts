@@ -1469,15 +1469,61 @@ describe('tasks CLI', () => {
       const result = tasks('audit-prompt', 'demo-spec');
       expect(result.status).toBe(0);
       expect(result.stdout).toContain('You are auditing demo-spec on branch demo-spec.');
-      expect(result.stdout).toContain('Diff range:');
+
+      // c5/M9: the diff range must be real, resolved SHAs — not a label.
+      const diffRange = /Diff range: ([0-9a-f]{40})\.\.([0-9a-f]{40})/.exec(result.stdout);
+      expect(diffRange).not.toBeNull();
+      expect(diffRange![1]).not.toBe(diffRange![2]);
+
+      expect(result.stdout).toContain('Required commands (all must pass):');
+      expect(result.stdout).toContain('- npm test');
+      expect(result.stdout).toContain('- npx tsc --noEmit');
+      expect(result.stdout).toContain('- npm run layer-check');
+      expect(result.stdout).toContain('- npm run tasks -- check');
+      expect(result.stdout).toContain('- npm run tasks -- check --merge --spec demo-spec');
+
+      expect(result.stdout).toContain('Relevant files:');
+      expect(result.stdout).toContain('src/runtime/runtime.ts:1');
+
       expect(result.stdout).toContain('Proof clauses:');
       expect(result.stdout).toContain('[c1] The first clause holds.');
       expect(result.stdout).toContain('proof: command node --version');
+      // Clause 1 carries a proof target — mechanically checkable, so it
+      // gets the pure-logic/API mutation-testing line.
+      expect(result.stdout).toContain('pure logic/API');
+      // Clause 2 carries none — Slice 3's human-verification callout, and
+      // Slice 6's guidance that actually distinguishes the UI case from
+      // the logic case rather than repeating one blanket sentence.
+      expect(result.stdout).toContain('[c2] The second clause holds.');
+      expect(result.stdout).toContain('no proof target — requires human verification');
+      expect(result.stdout).toContain('UI work');
+      expect(result.stdout).toContain('1 of 2 clause(s) have no proof target');
+
       expect(result.stdout).toContain('Latest audit pass: pass 1');
       expect(result.stdout).toContain('runtime-proof [high] Runtime');
       expect(result.stdout).toContain('src/runtime/runtime.ts:1');
       expect(result.stdout).toContain('prefer mutation testing');
       expect(result.stdout).toContain('Do not promote pass-2+ findings.');
+    });
+  });
+
+  it('audit-prompt refuses with a non-zero exit instead of printing an unresolved diff range', () => {
+    fixture(({ tasks }) => {
+      const result = tasks('audit-prompt', 'demo-spec', '--base-branch', 'no-such-base-xyz');
+      expect(result.status).toBe(1);
+      expect(result.stdout).not.toContain('(unknown base)');
+      expect(result.stdout).not.toContain('(unknown head)');
+      expect(result.stdout).not.toContain('Diff range:');
+      expect(result.stderr).toContain('no-such-base-xyz');
+    });
+  });
+
+  it('audit-prompt falls back to the diff\'s changed files so relevant files survives a spec with no members', () => {
+    fixture(({ tasks }) => {
+      const result = tasks('audit-prompt', 'demo-spec');
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('Member tasks:\n- none');
+      expect(result.stdout).not.toContain('Relevant files:\n- none');
     });
   });
 

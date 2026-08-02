@@ -1352,6 +1352,41 @@ function cmdImport(args: Flags): void {
   console.log(`imported ${imported} finding(s) from ${docPath}${skippedNote}${systemNote}`);
 }
 
+// A prompt without a resolvable diff range cannot do its job — the two
+// git calls are kept apart so a base-branch typo and a detached-HEAD
+// failure are reported as what each actually is, and neither is allowed
+// to fall back to a placeholder that still exits 0 (M9).
+function resolveDiffRange(baseBranch: string): { base: string; head: string } | null {
+  let base: string;
+  try {
+    base = execFileSync('git', ['merge-base', baseBranch, 'HEAD'], { encoding: 'utf8' }).trim();
+  } catch (error) {
+    console.error(`error: could not resolve a merge-base between HEAD and ${baseBranch}: ${error instanceof Error ? error.message : String(error)}`);
+    return null;
+  }
+  let head: string;
+  try {
+    head = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
+  } catch (error) {
+    console.error(`error: could not resolve HEAD: ${error instanceof Error ? error.message : String(error)}`);
+    return null;
+  }
+  return { base, head };
+}
+
+function diffChangedFiles(range: string): string[] {
+  try {
+    const output = execFileSync('git', ['diff', '--name-only', range], { encoding: 'utf8' }).trim();
+    return output === '' ? [] : output.split('\n');
+  } catch {
+    return [];
+  }
+}
+
+function requiredCommands(slug: string): string[] {
+  return ['npm test', 'npx tsc --noEmit', 'npm run layer-check', 'npm run tasks -- check', `npm run tasks -- check --merge --spec ${slug}`];
+}
+
 function cmdAuditPrompt(args: Flags): void {
   const config = resolveConfig(args.flags);
   const slug = args.positional[0];
@@ -1368,19 +1403,20 @@ function cmdAuditPrompt(args: Flags): void {
   }
 
   const baseBranch = args.flags['base-branch'] ?? 'main';
-  let base = '(unknown base)';
-  let head = '(unknown head)';
-  try {
-    base = execFileSync('git', ['merge-base', baseBranch, 'HEAD'], { encoding: 'utf8' }).trim();
-    head = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
-  } catch {
-    // Keep the prompt useful in throwaway fixtures or shallow clones.
+  const range = resolveDiffRange(baseBranch);
+  if (range === null) {
+    process.exitCode = 1;
+    return;
   }
+  const { base, head } = range;
 
   const doc = parseSpecDoc(readFileSync(path_, 'utf8'));
   const tasks = loadStore(config.storePath);
   const members = tasks.filter((task) => task.spec === slug);
   const latest = doc.auditPasses[doc.auditPasses.length - 1];
+
+  const relevantFiles = [...new Set([...members.flatMap((task) => task.files), ...diffChangedFiles(`${base}..${head}`)])].sort();
+  const noTargetCount = doc.proofClauses.filter((clause) => (clause.proofTargets ?? []).length === 0).length;
 
   console.log(`You are auditing ${slug} on branch ${config.branch}.`);
   console.log(`Spec: ${path_}`);
@@ -1388,11 +1424,27 @@ function cmdAuditPrompt(args: Flags): void {
   console.log('');
   console.log('Read the spec deliverable, the latest audit pass if any, and the diff above. Verify each proof clause independently.');
   console.log('');
+  console.log('Required commands (all must pass):');
+  for (const command of requiredCommands(slug)) console.log(`- ${command}`);
+  console.log('');
+  console.log('Relevant files:');
+  if (relevantFiles.length === 0) console.log('- none');
+  for (const file of relevantFiles) console.log(`- ${file}`);
+  console.log('');
   console.log('Proof clauses:');
   for (const clause of doc.proofClauses) {
     console.log(`- [c${clause.id}] ${clause.text}`);
-    for (const target of clause.proofTargets ?? []) console.log(`  proof: ${target}`);
+    const targets = clause.proofTargets ?? [];
+    if (targets.length === 0) {
+      console.log('  no proof target — requires human verification: inspect the behavior directly.');
+      console.log('  If this is pure domain logic or an API layer, prefer naming a `proof: vitest <file> "<test>"` or `proof: command <cmd>` target so a future pass can mutation-test it. If this is UI work, add or run smoke coverage once the implementation has settled.');
+    } else {
+      for (const target of targets) console.log(`  proof: ${target}`);
+      console.log('  has a proof target — pure logic/API shape: temporarily remove, invert, or scale the behavior it proves and confirm it fails for the right reason before accepting it.');
+    }
   }
+  console.log('');
+  if (noTargetCount > 0) console.log(`${noTargetCount} of ${doc.proofClauses.length} clause(s) have no proof target and require human verification.`);
   console.log('');
   console.log(latest ? `Latest audit pass: pass ${latest.pass} (${latest.date}), ${latest.verdicts.filter((verdict) => verdict.status === 'met').length}/${latest.verdicts.length} met` : 'Latest audit pass: none recorded');
   console.log('');
