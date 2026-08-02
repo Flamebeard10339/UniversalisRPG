@@ -1,5 +1,17 @@
 # Task system
 
+> **Historical record of a merged branch. Not the live workflow — see `docs/workflow.md`.**
+>
+> This was read as current documentation because CLAUDE.md pointed at `docs/specs/` for the
+> workflow, and a branch spec is a promise made at a moment, not a description kept current. It
+> describes rules the tool no longer has: pass-2+ promotion was removed, an undelivered clause can
+> now be declined, `spec amend`, the deliverable freeze and `check --merge` are gone, and `check`
+> is now `doctor`. Every one of those is a deliberate later decision, recorded in the commits that
+> made it and in `docs/audits/testing-procedure-2026-08-02-pass3-regressions.md#RG-H2`.
+>
+> Read it for what this branch promised and what its audit passes found. Do not read it for how the
+> tool behaves.
+
 Replaces `backlog.md`, the per-feature deliverable logs, and the audit timer retired in `4beee54`.
 
 ## Deliverable

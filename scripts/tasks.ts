@@ -1528,7 +1528,8 @@ function cmdAuditPrompt(args: Flags, usage: string): void {
   console.log('');
   console.log('Report each clause as met, unmet or unknown. `met` carries the evidence that backs it and the tool refuses it without one; `unmet` means you checked and it fails; `unknown` means nobody looked, and reporting it as unmet instead hides that nothing was verified.');
   console.log('Report findings with severity, system, files, evidence, and deliverable; and any proof target that is missing, skipped, too broad, or non-specific.');
-  console.log('Do not promote pass-2+ findings. Do not treat green tests as proof unless they are tied to the clause they discharge.');
+  console.log('Do not treat green tests as proof unless they are tied to the clause they discharge.');
+  console.log('Promotion is the human triager\'s call at any pass — you file findings, you do not schedule them. Say plainly which of yours you believe this branch must not merge without.');
 }
 
 const EVIDENCE_INDENT = '          ';
