@@ -57,7 +57,18 @@ Proof:
   everywhere it appears.
 - [c10] These are gone, not guarded: proof-target execution as a gate, the
   deliverable freeze and its baselines, verdicts bound to clause-text hashes,
-  and the merge gate's refusals.
+  the merge gate's refusals, and `spec amend` with its `## Amendments` sections —
+  an amendment is an event, not a second copy of the deliverable.
+- [c11] Every write to the store appends one line to an append-only event log,
+  naming the record, the system and spec it carried **at that moment**, the
+  branch, the head sha, and a one-line note. Events are never rewritten and
+  never deleted. A decision, an amendment reason, or an abandonment is the same
+  kind of record as a state change, and an event may name a system with no task.
+- [c12] The log is searchable in one command. "What decisions were made about
+  this task", "about this system", "about this spec", and "about this topic" are
+  each a single invocation, and each answers from the log alone — not by joining
+  to present-day state, which would rewrite history every time a record is
+  re-pointed.
 
 ## Why this replaces the nine-unit refactor
 
@@ -149,40 +160,76 @@ refusal. **An unrecorded truth costs more than a recorded contradiction.**
 Blocking a write does not prevent the conflict it objects to; it prevents the
 *record* of the conflict, and the agent does the work regardless.
 
-### No storage split — git is already the event log
+### The event log, and the measurement that wrongly cut it
 
-Both shipped systems keep one file per task plus an append-only event log, and
-I proposed copying them. Measured against this repository, the case collapses.
+This spec previously cut the event log under the heading *"git is already the
+event log"*, on a table claiming git answered a record's history in 86ms. **That
+measurement was invalid** and the decision built on it is reversed here. The
+error is recorded rather than quietly replaced, because it is the same shape as
+the four weak proofs this branch exists to prevent: a green result from an
+assertion that was measuring the wrong thing.
 
-| what an event log would record | already in git? |
-|---|---|
-| who changed what, when | yes — 45 commits touch the store |
-| **why** | yes, and better: a commit message *plus the code diff beside it* |
-| a single record's history | yes — `git log -S'<id>' -- docs/tasks.jsonl`, **86ms** |
-| the sha at the time | yes; it *is* the commit |
-| which branch asserted it | yes, the graph |
+It used `git log -S`, which counts **occurrences** of a string. Editing a task's
+title or evidence does not change how many times its id appears, so the edit is
+invisible. Commit `b326230` edited `policy-seam-u5`'s title *and* evidence:
 
-The only gap is an event that never became a commit — a worker claims a task and
-dies. But a dead worker does not commit an event log either, so the split does
-not close it. Only committing does. And `tl`'s own stated reason for
-`events.jsonl` is not history: it is atomicity under concurrent access, which
-bites only with parallel writers in one tree.
+```
+git log -S'policy-seam-u5'  →  1 commit   (only the one that created it)
+git log -G'policy-seam-u5'  →  5 commits  (the real history)
+```
 
-The one-file-per-task half fares no better here. Two of its three benefits are
-already delivered: a single record edit is a **one-line diff** (the byte-stable
-serializer did that), and two branches editing *different* records already merge
-cleanly — tested. Only concurrent **appends** conflict, because both write at
-end-of-file.
+`-S` missed four of five. It was answering *"when did this id first appear"*,
+not *"what happened to this record."*
 
-That gap costs one line, not a storage rewrite: `merge=union` in
-`.gitattributes` merges concurrent appends cleanly. It has one failure mode —
-two branches editing the *same* record keep both versions silently, as a
-duplicate id — and that is exactly what `doctor` scans for under `c4`, which
-has to exist regardless. Union plus a duplicate-id check buys the only real
-benefit without the silent corruption, and without the risk.
+`-G` is not the repair. The control:
 
-So the split is cut. Revisit only if parallel writers in one working tree become
-normal, which is the one condition that would change the answer.
+```
+git log -G'build-deployment-2026-07-28-h2'   # an unrelated record
+→ b326230 Close U5: a claim says who holds it…
+```
+
+`b326230` added two fields, so the serializer rewrote all 277 lines — **277
+insertions, 276 deletions** — and it now appears in the history of *every record
+in the store*. Every schema change does this.
+
+So git offers false negatives or false positives with no way to tell them apart.
+That is a text search over a shared file whose every line moves whenever the
+schema changes, and it is not a record's history.
+
+**What actually belongs in an event log is not a file change at all.** An
+amendment is *the spec's promise widened on this date because X*. A decision, an
+abandonment reason, a claim, a note — none of these is primarily a diff, and
+deriving each one from git separately rebuilds the log badly, one bespoke report
+at a time. That is why the clean-room design and both shipped systems keep state
+and history as separate artifacts: `tl` has `tasks/` plus `events.jsonl`,
+`taskledger` has markdown records plus immutable events.
+
+### The log is additive, and one-file-per-task stays deferred
+
+`docs/tasks.jsonl` remains the state. `docs/events.jsonl` is added beside it,
+append-only, never rewritten. Nothing migrates.
+
+The parts of the cut decision that survived measurement still hold and are not
+reopened: a single record edit is already a one-line diff, and two branches
+editing *different* records already merge cleanly. Only concurrent **appends**
+conflict, and `merge=union` in `.gitattributes` handles that for one line — with
+its one failure mode, two branches editing the same record keeping both versions
+as a duplicate id, caught by the `doctor` scan `c4` requires anyway.
+
+### Searchable is the requirement, not a feature of it
+
+A log nobody can query is a log nobody reads. Two consequences shape the record
+format.
+
+An event **snapshots the system and spec its record carried at the time**. This
+is not the manual synchronisation CLAUDE.md forbids — an immutable event
+recording what was true when it was written is the correct shape, and joining to
+present-day state would silently rewrite history whenever a record is
+re-pointed, which happened repeatedly on this branch. It also lets an event name
+a system with no task at all, which is what a project-level decision is.
+
+Notes stay **one line**. The whole design depends on `log` output fitting on a
+screen, and prose in a record is what made `next` cost thirty lines to call.
 
 ### The policy extraction is deferred, and its stated justification was spent
 
@@ -373,17 +420,53 @@ them.
 - Close C-H4: remove the comment lines CLAUDE.md's policy forbids by name,
   starting with the one that is factually wrong.
 
-### U7 — Concurrent appends, measurements, and the audits
+### U7 — The event log
 
-- `merge=union` for `docs/tasks.jsonl` in `.gitattributes`, plus a duplicate-id
-  scan in `doctor`. Prove both: two branches appending different tasks merge
-  cleanly, and two branches editing one record produce a duplicate that
-  `doctor` reports.
-- Record `npm test` and each PR gate against the five-minute budget.
+Added to this branch after the measurement that cut it was found invalid. It is
+additive: `docs/tasks.jsonl` stays exactly as it is and nothing migrates.
+
+- `docs/events.jsonl`, append-only, one JSON object per line:
+  `{ t, by, branch, head, op, id, system, spec, note }`. `system` and `spec` are
+  snapshots of what the record carried at that moment, not joins (`c11`).
+  `id` is nullable, so an event can name a system with no task.
+- Every store write appends exactly one event. U5 folded state changes into
+  `transition`, so the wiring is a handful of sites, not one per verb. Find them
+  rather than trusting that count.
+- `op` covers the existing verbs plus two explicit writes: **`note`** and
+  **`decision`**. A decision is what makes `c12`'s first question answerable, so
+  it is its own op rather than a note by convention.
+- One read command answers `c12`: filter by `--id`, `--system`, `--spec`, `--op`
+  and free text, composable. Reuse U6's usage-string-derived flag validation —
+  do not add a second parser.
+- **Delete `spec amend`**, `parseAmendments`, `renderAmendment`,
+  `appendAmendment`, the `Amendment` type, `doc.amendments`, and the
+  unchanged-deliverable refusal U3 deliberately left standing. Strip the
+  `## Amendments` sections from the three spec files that carry one; git holds
+  the text, and `combat-continuation-runtime.md` is 120 lines of which 56 are
+  that duplicate. An amendment becomes `decision` against the spec.
+- `merge=union` for both JSONL files in `.gitattributes`, plus a duplicate-id
+  scan in `doctor`. Prove both: two branches appending merge cleanly, and two
+  branches editing one record produce a duplicate that `doctor` reports. The log
+  is append-only, so union is exactly right for it.
+
+Acceptance: the log answers a single record's history **exactly** — no false
+negative when a field is edited, and no false positive when the serializer
+rewrites every line. Prove it against the case that exposed the original error:
+`policy-seam-u5`, whose title and evidence changed in `b326230`, in a commit
+that rewrote all 277 lines. `git log -S` finds one of five and `-G` finds every
+record in the store; the log must do better than both, and a test must fail if
+it does not.
+
+### U8 — Measurements and the audits
+
+- Record `npm test` and each PR gate against the five-minute budget (`c4`).
 - Commission an independent audit through `tasks audit-prompt`, and a second
   auditor asked only whether anything is worse than before U0 — scoped against
-  `main`, not against a point inside the branch, because this branch carries
-  the superseded branch's diff too.
+  `main`, not a point inside the branch, because this branch carries the
+  superseded branch's diff too.
+- Give the second auditor the reversed event-log decision specifically. A spec
+  that cut a capability, then reinstated it after finding its own measurement
+  invalid, is exactly the shape a regression hides in.
 
 ## Open questions
 
