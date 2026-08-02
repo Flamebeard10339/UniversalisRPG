@@ -145,12 +145,45 @@ function saveStoreAndWarn(tasks: Task[], config: Config): void {
 
 // "the spec whose branch is checked out" — a branch not named after any spec
 // file has no active spec, and `--spec` on a read command overrides this.
-// Strict on purpose: `check --merge` resolves through this and only this,
-// never through resolveActiveSpec below — the gate keying off a mutable
-// branch name is a known hole, and inferring through it would make that
-// hole easier to trip rather than harder.
+// Used by resolveActiveSpec below for read commands, and — only as a last
+// resort, after specCandidatesFromDiff finds nothing — by `check --merge`
+// itself; see mergeGateSpecCandidates.
 function currentSpec(config: Config): string | null {
   return existsSync(specFile(config, config.branch)) ? config.branch : null;
+}
+
+// c4's diff-based binding: the spec file(s) this branch's own diff adds or
+// modifies, between the merge-base and HEAD — content-derived, so a branch
+// rename cannot change the answer. Reuses diffChangedFiles's already-quiet
+// git plumbing; a merge-base git itself cannot resolve reads the same as a
+// diff that touches nothing.
+function specCandidatesFromDiff(config: Config, baseBranch: string): string[] {
+  const mergeBase = git.mergeBase(baseBranch);
+  if (mergeBase === null) return [];
+  const prefix = `${gitPathspec(config.specsDir)}/`;
+  const slugs = new Set<string>();
+  for (const file of diffChangedFiles(`${mergeBase}..HEAD`)) {
+    if (file.startsWith(prefix) && file.endsWith('.md')) slugs.add(file.slice(prefix.length, -'.md'.length));
+  }
+  return [...slugs].sort();
+}
+
+// The merge gate's spec resolution, in priority order: an explicit --spec
+// always wins; otherwise the diff decides. The name-based fallback below
+// only fires when the diff touches zero spec files — it never overrides a
+// diff verdict, so it cannot reintroduce the rename regression c4 exists to
+// fix (a branch with open members has, by the time those members matter,
+// touched its spec file at least once — to open it, amend it, or record an
+// audit pass — so the diff finds it). It exists for the narrower case of a
+// branch whose name already matches its spec but hasn't touched the file
+// yet, which is common early in a spec's life and was the only resolution
+// path before this fix.
+function mergeGateSpecCandidates(config: Config, baseBranch: string, explicit: string | undefined): string[] {
+  if (explicit !== undefined) return [explicit];
+  const diffCandidates = specCandidatesFromDiff(config, baseBranch);
+  if (diffCandidates.length > 0) return diffCandidates;
+  const nameMatch = currentSpec(config);
+  return nameMatch === null ? [] : [nameMatch];
 }
 
 interface ActiveSpec {
@@ -309,11 +342,13 @@ function cmdCheck(flags: Record<string, string>): void {
 
   if (flags.merge !== 'true') return;
 
-  const spec = flags.spec ?? currentSpec(config);
-  const specPath = spec !== null ? specFile(config, spec) : null;
+  const baseBranch = flags['base-branch'] ?? 'main';
+
+  const specCandidates = mergeGateSpecCandidates(config, baseBranch, flags.spec);
+  const resolvedSpec = specCandidates.length === 1 ? specCandidates[0] : null;
+  const specPath = resolvedSpec !== null ? specFile(config, resolvedSpec) : null;
   const specExists = specPath !== null && existsSync(specPath);
   const doc = specExists ? parseSpecDoc(readFileSync(specPath!, 'utf8')) : null;
-  const baseBranch = flags['base-branch'] ?? 'main';
 
   // An amendment's archived text wins when one exists — it is the freeze's
   // only sanctioned edit path. Merge-base is the fallback for a spec that
@@ -321,25 +356,26 @@ function cmdCheck(flags: Record<string, string>): void {
   // 1 opens one spec per branch on that branch, so it never existed at the
   // merge-base either.
   const latestAmendment = doc ? doc.amendments[doc.amendments.length - 1] : undefined;
-  const deliverableBaseline = latestAmendment ? latestAmendment.deliverableText : (doc?.baseline ?? (spec === null ? null : deliverableAtMergeBase(config, spec, baseBranch)));
+  const deliverableBaseline = latestAmendment ? latestAmendment.deliverableText : (doc?.baseline ?? (resolvedSpec === null ? null : deliverableAtMergeBase(config, resolvedSpec, baseBranch)));
 
   // checkMergeGate is the only place that decides whether there is
-  // anything to refuse, including the spec === null case: it passes
-  // vacuously there (see its own comment), so a branch with no active spec
-  // never reddens over a promise it never made, no matter what other specs
-  // in the store still have open members.
+  // anything to refuse: zero candidates passes vacuously (see its own
+  // comment), so a branch whose diff touches no spec never reddens over a
+  // promise it never made, no matter what other specs in the store still
+  // have open members; more than one candidate is reported as an issue,
+  // not resolved by guessing.
   const mergeIssues = checkMergeGate({
-    spec,
+    specCandidates,
     specExists,
     doc,
     deliverableBaseline,
-    members: spec === null ? [] : tasks.filter((task) => task.spec === spec),
+    members: resolvedSpec === null ? [] : tasks.filter((task) => task.spec === resolvedSpec),
   });
   const proofIssues = doc ? runProofTargets(doc) : [];
-  const auditIssues = doc && spec !== null ? [staleAuditIssue(config, spec, doc)].filter((issue): issue is string => issue !== null) : [];
+  const auditIssues = doc && resolvedSpec !== null ? [staleAuditIssue(config, resolvedSpec, doc)].filter((issue): issue is string => issue !== null) : [];
   const allMergeIssues = [...mergeIssues, ...proofIssues, ...auditIssues];
 
-  if (spec === null) {
+  if (specCandidates.length === 0) {
     console.log('merge gate: not applicable — no active spec for this branch, and no --spec given');
     return;
   }

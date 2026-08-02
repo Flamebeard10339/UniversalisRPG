@@ -49,7 +49,7 @@ const cleanDoc: SpecDoc = {
 
 function baseInput(overrides: Partial<MergeGateInput> = {}): MergeGateInput {
   return {
-    spec: 'demo',
+    specCandidates: ['demo'],
     specExists: true,
     doc: cleanDoc,
     deliverableBaseline: cleanDoc.deliverableSection,
@@ -63,8 +63,15 @@ describe('checkMergeGate', () => {
     expect(checkMergeGate(baseInput())).toEqual([]);
   });
 
-  it('passes vacuously when there is no active spec — a branch that made no promise has nothing to check', () => {
-    expect(checkMergeGate(baseInput({ spec: null }))).toEqual([]);
+  it('passes vacuously when the branch touches no spec file — a branch that made no promise has nothing to check', () => {
+    expect(checkMergeGate(baseInput({ specCandidates: [] }))).toEqual([]);
+  });
+
+  it('refuses — naming both — when the branch touches two spec files, rather than guessing which one is "the" spec', () => {
+    const issues = checkMergeGate(baseInput({ specCandidates: ['demo', 'other'] }));
+    expect(issues).toHaveLength(1);
+    expect(issues[0]).toContain('demo');
+    expect(issues[0]).toContain('other');
   });
 
   it('refuses when the spec file is missing', () => {

@@ -87,7 +87,7 @@ function fixture(run: (context: { dir: string; args: (extra?: string[]) => strin
 // A dedicated git repo per test, distinct from `fixture`'s (which spawns
 // against this repo's own real checkout) — handoff's walk-back and
 // multi-line capture need commits with exact, controlled messages.
-function gitFixture(run: (context: { dir: string; commit: (message: string) => string; tasks: (...args: string[]) => Run }) => void): void {
+function gitFixture(run: (context: { dir: string; commit: (message: string) => string; tasks: (...args: string[]) => Run; tasksAs: (branch: string, ...args: string[]) => Run }) => void): void {
   const dir = mkdtempSync(path.join(os.tmpdir(), 'universalis-handoff-'));
   try {
     spawnSync('git', ['init', '-q'], { cwd: dir });
@@ -100,7 +100,8 @@ function gitFixture(run: (context: { dir: string; commit: (message: string) => s
     const systemsPath = path.join(dir, 'systems.json');
     writeFileSync(systemsPath, JSON.stringify({ unowned: { note: '', paths: ['docs', '*.md'] }, systems: [] }), 'utf8');
     const storePath = path.join(dir, 'tasks.jsonl');
-    const globals = ['--store', storePath, '--systems', systemsPath, '--specs-dir', specsDir, '--branch', 'demo-spec'];
+    const commonArgs = ['--store', storePath, '--systems', systemsPath, '--specs-dir', specsDir];
+    const globals = [...commonArgs, '--branch', 'demo-spec'];
     spawnSync('git', ['add', '.'], { cwd: dir });
     spawnSync('git', ['commit', '--no-verify', '-m', 'Initial fixture\n\nA branch base exists.'], { cwd: dir, encoding: 'utf8' });
     spawnSync('git', ['branch', '-M', 'main'], { cwd: dir });
@@ -116,6 +117,13 @@ function gitFixture(run: (context: { dir: string; commit: (message: string) => s
       },
       tasks: (...args: string[]) => {
         const result = spawnSync(process.execPath, [tsx, script, ...args, ...globals], { cwd: dir, encoding: 'utf8' });
+        return { status: result.status ?? 1, stdout: result.stdout, stderr: result.stderr };
+      },
+      // Same fixture, but with an explicit --branch instead of the fixed
+      // "demo-spec" — for proving the merge gate's spec resolution against
+      // a branch name that does or doesn't match a spec file on disk.
+      tasksAs: (branch: string, ...args: string[]) => {
+        const result = spawnSync(process.execPath, [tsx, script, ...args, ...commonArgs, '--branch', branch], { cwd: dir, encoding: 'utf8' });
         return { status: result.status ?? 1, stdout: result.stdout, stderr: result.stderr };
       },
     });
@@ -1872,6 +1880,60 @@ describe('tasks CLI', () => {
       expect(result.status).toBe(0);
       expect(result.stdout).toContain('not applicable');
       expect(result.stderr).not.toContain('open spec member(s) exist');
+    });
+  });
+
+  // c4's regression: a branch renamed away from its spec's filename must
+  // not make the merge gate not-applicable while that spec's members are
+  // still open. Content, not name: the branch's own diff still touched
+  // demo-spec.md (recording the audit pass), so the gate applies
+  // regardless of what --branch says.
+  it('check --merge applies to a branch renamed away from its spec\'s filename, as long as the branch\'s diff touched that spec file', () => {
+    gitFixture(({ dir, tasks, tasksAs }) => {
+      tasks('add', 'still open', '--id', 'still-open', '--spec', 'demo-spec', '--severity', 'high');
+      tasks('audit', 'demo-spec', '--proof', '1=met');
+      spawnSync('git', ['add', '.'], { cwd: dir });
+      spawnSync('git', ['commit', '--no-verify', '-m', 'Record audit pass\n\nA body.'], { cwd: dir });
+
+      const result = tasksAs('totally-different-branch-name', 'check', '--merge');
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain('member(s) of demo-spec neither done nor declined');
+      expect(result.stderr).toContain('still-open');
+    });
+  });
+
+  // M14, preserved under diff-based binding: a branch whose diff touches no
+  // spec file at all must stay vacuous even though a spec living in the
+  // same specs dir has an open member — the open member here is never
+  // reachable by the diff (only an unrelated file changed), so the branch
+  // name is the only other signal, and 'some-other-branch-name' matches
+  // nothing on disk either.
+  it("check --merge stays not applicable when the branch's diff touches no spec file, even though a spec in the same specs dir has open members", () => {
+    gitFixture(({ commit, tasks, tasksAs }) => {
+      tasks('add', 'still open', '--id', 'still-open', '--spec', 'demo-spec', '--severity', 'high');
+      commit('Unrelated work\n\nA body.');
+
+      const result = tasksAs('some-other-branch-name', 'check', '--merge');
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('not applicable');
+    });
+  });
+
+  // A branch that touches two spec files in one diff is ambiguous, not
+  // vacuous and not resolved by guessing — checkMergeGate reports it and
+  // names both candidates.
+  it("check --merge reports ambiguity, naming both, when the branch's diff touches two spec files", () => {
+    gitFixture(({ dir, tasks, tasksAs }) => {
+      writeFileSync(path.join(dir, 'specs', 'other-spec.md'), '# Other spec\n\n## Deliverable\n\nOther promise.\n\nProof:\n\n- The only clause holds.\n\n## Decisions\n\n## Open questions\n\nNone.\n', 'utf8');
+      tasks('audit', 'demo-spec', '--proof', '1=met');
+      spawnSync('git', ['add', '.'], { cwd: dir });
+      spawnSync('git', ['commit', '--no-verify', '-m', 'Touch two specs\n\nA body.'], { cwd: dir });
+
+      const result = tasksAs('feature-branch', 'check', '--merge');
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain('touches more than one spec file');
+      expect(result.stderr).toContain('demo-spec');
+      expect(result.stderr).toContain('other-spec');
     });
   });
 
