@@ -38,27 +38,72 @@ import {
 interface Flags {
   positional: string[];
   flags: Record<string, string>;
+  // The argument list as given. `audit` alone needs it: its repeated
+  // --proof/--finding flags carry an order and a scope that a flat
+  // key-value map cannot hold, so it rescans them itself.
+  raw: string[];
 }
 
-function parseArgs(args: string[]): Flags {
+type FlagArity = 'value' | 'boolean';
+
+// A command's usage string is its flag spec. Every flag it accepts is named
+// in the text it prints when asked for help, so what the parser enforces
+// and what the help documents cannot drift apart: a flag dropped from the
+// usage stops being accepted, and one never written there was never
+// reachable in the first place. A flag followed by anything that is not
+// another flag takes a value; one followed by nothing takes none.
+function flagArities(usage: string): Map<string, FlagArity> {
+  const tokens = usage.split(/\s+/);
+  const arities = new Map<string, FlagArity>();
+  for (let i = 0; i < tokens.length; i++) {
+    const name = /^\[?--([a-z][a-z0-9-]*)\]?$/.exec(tokens[i])?.[1];
+    if (name === undefined || arities.has(name)) continue;
+    const next = tokens[i + 1] ?? '';
+    arities.set(name, next === '' || next.startsWith('--') || next.startsWith('[--') || next.startsWith(']') ? 'boolean' : 'value');
+  }
+  return arities;
+}
+
+const GLOBAL_USAGE = 'global: [--store <path>] [--systems <path>] [--specs-dir <dir>] [--branch <name>] [--help]';
+
+interface ParsedArgs {
+  parsed: Flags;
+  errors: string[];
+}
+
+// Knowing a flag's arity is what lets the parser refuse rather than guess.
+// A bare `--actor` used to become the string 'true' and record a holder by
+// that name; a `--order` swallowed the positional that followed it. Neither
+// is decidable from the argument list alone.
+function parseArgs(args: string[], arities: Map<string, FlagArity>): ParsedArgs {
   const positional: string[] = [];
   const flags: Record<string, string> = {};
+  const errors: string[] = [];
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
-    if (arg.startsWith('--')) {
-      const key = arg.slice(2);
-      const next = args[i + 1];
-      if (next !== undefined && !next.startsWith('--')) {
-        flags[key] = next;
-        i++;
-      } else {
-        flags[key] = 'true';
-      }
-    } else {
+    if (!arg.startsWith('--')) {
       positional.push(arg);
+      continue;
     }
+    const key = arg.slice(2);
+    const arity = arities.get(key);
+    if (arity === undefined) {
+      errors.push(`unknown flag: ${arg}`);
+      continue;
+    }
+    if (arity === 'boolean') {
+      flags[key] = 'true';
+      continue;
+    }
+    const value = args[i + 1];
+    if (value === undefined || value.startsWith('--')) {
+      errors.push(`${arg} needs a value`);
+      continue;
+    }
+    flags[key] = value;
+    i++;
   }
-  return { positional, flags };
+  return { parsed: { positional, flags, raw: args }, errors };
 }
 
 interface Config {
@@ -469,14 +514,11 @@ function reportUnresolvedRequires(task: Task, tasks: Task[]): void {
   console.log(`recorded ${unresolved.length} requirement(s) no record answers to: ${unresolved.join(', ')} — they do not block, and \`tasks doctor\` reports them until they resolve`);
 }
 
-const ADD_USAGE =
-  'usage: tasks add "<title>" [--kind task|finding|question] [--severity high|medium|low] [--system "<name>"] [--spec <slug>] [--files a.ts:12,b.ts] [--requires id1,id2] [--deliverable "..." (required for --kind finding)] [--evidence "..."] [--id <id>]';
-
-function cmdAdd(args: Flags): void {
+function cmdAdd(args: Flags, usage: string): void {
   const config = resolveConfig(args.flags);
   const title = args.positional[0];
   if (!title) {
-    console.error(ADD_USAGE);
+    console.error(usage);
     process.exitCode = 1;
     return;
   }
@@ -542,16 +584,11 @@ function cmdAdd(args: Flags): void {
   reportUnresolvedRequires(task, tasks);
 }
 
-const EDIT_USAGE =
-  'usage: tasks edit <id> ["<new title>"] [--title "..."] [--deliverable "..."] [--evidence "..."] [--severity high|medium|low] [--system "<name>"] [--files a.ts:12,b.ts] [--requires id1,id2]';
-
-// Content only: id, kind, state, spec, reason, closed and source are state
-// transitions owned by the other verbs, so this never touches them.
-function cmdEdit(args: Flags): void {
+function cmdEdit(args: Flags, usage: string): void {
   const config = resolveConfig(args.flags);
   const id = args.positional[0];
   if (!id) {
-    console.error(EDIT_USAGE);
+    console.error(usage);
     process.exitCode = 1;
     return;
   }
@@ -643,11 +680,11 @@ function deriveClosingCommit(config: Config, id: string): string | null {
   return null;
 }
 
-function cmdShow(args: Flags): void {
+function cmdShow(args: Flags, usage: string): void {
   const config = resolveConfig(args.flags);
   const id = args.positional[0];
   if (!id) {
-    console.error('usage: tasks show <id>');
+    console.error(usage);
     process.exitCode = 1;
     return;
   }
@@ -669,10 +706,10 @@ const LIST_STATES: State[] = ['unreviewed', 'open', 'in-progress', 'done', 'decl
 // The only verb that can read the whole store rather than one spec's
 // fix-now queue — `next` refuses outside an active spec, and `spec: null`
 // findings otherwise have no command that surfaces them.
-function cmdSearch(args: Flags): void {
+function cmdSearch(args: Flags, usage: string): void {
   const term = args.positional[0];
   if (!term) {
-    console.error('usage: tasks search <term> [--state ...] [--severity ...] [--system ...] [--spec ...] [--deferred] [--kind ...]');
+    console.error(usage);
     process.exitCode = 1;
     return;
   }
@@ -848,11 +885,11 @@ function transition(task: Task, to: State): string[] {
   return [...notes, `reopened a ${from} record${closed}${kept}`];
 }
 
-function cmdStart(args: Flags): void {
+function cmdStart(args: Flags, usage: string): void {
   const config = resolveConfig(args.flags);
   const id = args.positional[0];
   if (!id) {
-    console.error('usage: tasks start <id> [--actor <name>]');
+    console.error(usage);
     process.exitCode = 1;
     return;
   }
@@ -882,11 +919,11 @@ function cmdStart(args: Flags): void {
   if (waiting.length > 0) console.log(`started while still waiting on ${waiting.join(', ')} — the requirement stands, the claim is recorded anyway`);
 }
 
-function cmdStop(args: Flags): void {
+function cmdStop(args: Flags, usage: string): void {
   const config = resolveConfig(args.flags);
   const id = args.positional[0];
   if (!id) {
-    console.error('usage: tasks stop <id>');
+    console.error(usage);
     process.exitCode = 1;
     return;
   }
@@ -920,11 +957,11 @@ function clauseStanding(config: Config, task: Task): string {
   return `proof clause ${task.clause} is ${status} in the latest audit pass (pass ${latest.pass})${nobodyLooked}`;
 }
 
-function cmdDone(args: Flags): void {
+function cmdDone(args: Flags, usage: string): void {
   const config = resolveConfig(args.flags);
   const id = args.positional[0];
   if (!id) {
-    console.error('usage: tasks done <id> [--commit <revspec>]  (default: none — the closing commit does not exist yet when `done` runs; see `tasks show` for a derived one)');
+    console.error(usage);
     process.exitCode = 1;
     return;
   }
@@ -965,12 +1002,12 @@ function cmdDone(args: Flags): void {
   if (waiting.length > 0) console.log(`closed with ${waiting.length} requirement(s) still open: ${waiting.join(', ')}`);
 }
 
-function cmdDecline(args: Flags): void {
+function cmdDecline(args: Flags, usage: string): void {
   const config = resolveConfig(args.flags);
   const id = args.positional[0];
   const reason = args.flags.reason;
   if (!id || !reason) {
-    console.error('usage: tasks decline <id> --reason "..."');
+    console.error(usage);
     process.exitCode = 1;
     return;
   }
@@ -1007,11 +1044,11 @@ Proof:
 None.
 `;
 
-function cmdSpecNew(args: Flags): void {
+function cmdSpecNew(args: Flags, usage: string): void {
   const config = resolveConfig(args.flags);
   const slug = args.positional[0];
   if (!slug) {
-    console.error('usage: tasks spec new <slug>');
+    console.error(usage);
     process.exitCode = 1;
     return;
   }
@@ -1026,12 +1063,12 @@ function cmdSpecNew(args: Flags): void {
   console.log(`created ${path_} — fill in ## Deliverable before opening the branch's first audit`);
 }
 
-function cmdSpecAdd(args: Flags): void {
+function cmdSpecAdd(args: Flags, usage: string): void {
   const config = resolveConfig(args.flags);
   const slug = args.positional[0];
   const ids = args.positional.slice(1);
   if (!slug || ids.length === 0) {
-    console.error('usage: tasks spec add <slug> <id>...');
+    console.error(usage);
     process.exitCode = 1;
     return;
   }
@@ -1053,11 +1090,11 @@ function cmdSpecAdd(args: Flags): void {
   if (latePass.length > 0) console.log(`${latePass.length} of those came from a pass 2 or later audit, which extends what ${slug} owes: ${latePass.map((task) => `${task.id} (pass ${task.source!.pass})`).join(', ')}`);
 }
 
-function cmdSpecShow(args: Flags): void {
+function cmdSpecShow(args: Flags, usage: string): void {
   const config = resolveConfig(args.flags);
   const slug = args.positional[0];
   if (!slug) {
-    console.error('usage: tasks spec show <slug>');
+    console.error(usage);
     process.exitCode = 1;
     return;
   }
@@ -1109,11 +1146,11 @@ function specMembers(members: Task[], ordered: boolean): Task[] {
   return result;
 }
 
-function cmdSpecDone(args: Flags): void {
+function cmdSpecDone(args: Flags, usage: string): void {
   const config = resolveConfig(args.flags);
   const slug = args.positional[0];
   if (!slug) {
-    console.error('usage: tasks spec done <slug> [--defer-open]');
+    console.error(usage);
     process.exitCode = 1;
     return;
   }
@@ -1145,12 +1182,12 @@ function cmdSpecDone(args: Flags): void {
 // The demotion counterpart to `spec add`: nothing else sets `spec` back to
 // null for named ids. `spec done --defer-open` sweeps every open member at
 // once; this targets specific ones without waiting for the spec to close.
-function cmdSpecRemove(args: Flags): void {
+function cmdSpecRemove(args: Flags, usage: string): void {
   const config = resolveConfig(args.flags);
   const slug = args.positional[0];
   const ids = args.positional.slice(1);
   if (!slug || ids.length === 0) {
-    console.error('usage: tasks spec remove <slug> <id>...');
+    console.error(usage);
     process.exitCode = 1;
     return;
   }
@@ -1176,12 +1213,12 @@ function cmdSpecRemove(args: Flags): void {
 
 // Archives the current ## Deliverable under ## Amendments, dated and
 // reasoned, and leaves the live section for a human to edit.
-function cmdSpecAmend(args: Flags): void {
+function cmdSpecAmend(args: Flags, usage: string): void {
   const config = resolveConfig(args.flags);
   const slug = args.positional[0];
   const reason = args.flags.reason;
   if (!slug || !reason) {
-    console.error('usage: tasks spec amend <slug> --reason "..."');
+    console.error(usage);
     process.exitCode = 1;
     return;
   }
@@ -1207,38 +1244,15 @@ function cmdSpecAmend(args: Flags): void {
   console.log(`next: run \`tasks audit ${slug}\` to verify the new clauses`);
 }
 
-function cmdSpec(args: Flags): void {
-  const [sub, ...rest] = args.positional;
-  const subArgs: Flags = { positional: rest, flags: args.flags };
-  if (sub && !['new', 'add', 'remove', 'show', 'done', 'amend'].includes(sub)) return cmdSpecShow({ positional: [sub, ...rest], flags: args.flags });
-  switch (sub) {
-    case 'new':
-      return cmdSpecNew(subArgs);
-    case 'add':
-      return cmdSpecAdd(subArgs);
-    case 'remove':
-      return cmdSpecRemove(subArgs);
-    case 'show':
-      return cmdSpecShow(subArgs);
-    case 'done':
-      return cmdSpecDone(subArgs);
-    case 'amend':
-      return cmdSpecAmend(subArgs);
-    default:
-      console.error(`usage: tasks spec <new|add|remove|show|done|amend> ...`);
-      process.exitCode = 1;
-  }
-}
-
 // The migration path only, for the 22 legacy documents under docs/audits/.
 // Findings under `## H1` / `## M2` / `## L3` become unreviewed tasks; every
 // other heading shape in those docs (Tier N, HIGH/MEDIUM/LOW, Findings) is a
 // superseded or reconciliation format and is silently left unimported.
-function cmdImport(args: Flags): void {
+function cmdImport(args: Flags, usage: string): void {
   const config = resolveConfig(args.flags);
   const docPath = args.positional[0];
   if (!docPath) {
-    console.error('usage: tasks import <audit-doc>');
+    console.error(usage);
     process.exitCode = 1;
     return;
   }
@@ -1325,11 +1339,11 @@ function requiredCommands(): string[] {
   return ['npm test', 'npx tsc --noEmit', 'npm run layer-check', 'npm run tasks -- doctor'];
 }
 
-function cmdAuditPrompt(args: Flags): void {
+function cmdAuditPrompt(args: Flags, usage: string): void {
   const config = resolveConfig(args.flags);
   const slug = args.positional[0];
   if (!slug) {
-    console.error('usage: tasks audit-prompt <spec> [--base-branch main]');
+    console.error(usage);
     process.exitCode = 1;
     return;
   }
@@ -1608,29 +1622,30 @@ function parseAuditArgs(args: string[]): AuditArgs {
     } else if (key === 'finding') {
       current = { title: value ?? '', severity: null, system: null, files: [], deliverable: null, evidence: null };
       findings.push(current);
-    } else if (key === 'severity' && current) {
-      current.severity = value as Severity;
-    } else if (key === 'system' && current) {
-      current.system = value ?? null;
-    } else if (key === 'deliverable' && current) {
-      current.deliverable = value ?? null;
-    } else if (key === 'file' && current) {
-      current.files.push(value ?? '');
-    } else if (key === 'file') {
+    } else if (key === 'file' && current === null) {
       const eq = (value ?? '').indexOf('=');
-      if (eq === -1) continue;
-      const clause = Number((value ?? '').slice(0, eq));
-      const filePath = (value ?? '').slice(eq + 1);
-      const existing = clauseFiles.get(clause) ?? [];
-      existing.push(filePath);
-      clauseFiles.set(clause, existing);
+      if (eq === -1) errors.push(`--file ${value ?? ''} names no clause — before any --finding, a file is clause-scoped and takes the same N=path:line shape as --proof`);
+      else {
+        const clause = Number((value ?? '').slice(0, eq));
+        clauseFiles.set(clause, [...(clauseFiles.get(clause) ?? []), (value ?? '').slice(eq + 1)]);
+      }
+    } else if (current === null) {
+      errors.push(`--${key} describes a finding, and no --finding has been opened yet — put it after the --finding it belongs to`);
+    } else if (key === 'severity') {
+      current.severity = value as Severity;
+    } else if (key === 'system') {
+      current.system = value ?? null;
+    } else if (key === 'deliverable') {
+      current.deliverable = value ?? null;
+    } else {
+      current.files.push(value ?? '');
     }
   }
   return { slug, configFlags, baseBranch, proofs, evidence, errors, clauseFiles, findings };
 }
 
 const AUDIT_USAGE =
-  'usage: tasks audit <spec> [--proof N=met|unmet|unknown ...] [--evidence N="..." ... (required for every met clause)] [--file N=path:line ...] [--finding "..." --severity high|medium|low --system "<name>" --deliverable "..." --evidence "..." [--file path:line ...]]...  (with no --proof flags, walks the clauses interactively; a clause left ungraded is recorded unknown, never unmet)';
+  'usage: tasks audit <spec> [--base-branch main] [--proof N=met|unmet|unknown ...] [--evidence N="..." ... (required for every met clause)] [--file N=path:line ...] [--finding "..." --severity high|medium|low --system "<name>" --deliverable "..." --evidence "..." [--file path:line ...]]...  (with no --proof flags, walks the clauses interactively; a clause left ungraded is recorded unknown, never unmet)';
 
 // Stops at the first clause the answerer walks away from rather than
 // looping on an exhausted stdin, and the caller grades the rest `unknown` —
@@ -1673,10 +1688,10 @@ async function walkClausesInteractively(clauses: ProofClause[]): Promise<AuditVe
 }
 
 // The only way a finding enters the store.
-async function cmdAudit(rawArgs: string[]): Promise<void> {
-  const parsed = parseAuditArgs(rawArgs);
+async function cmdAudit(args: Flags, usage: string): Promise<void> {
+  const parsed = parseAuditArgs(args.raw);
   if (!parsed.slug) {
-    console.error(AUDIT_USAGE);
+    console.error(usage);
     process.exitCode = 1;
     return;
   }
@@ -1896,12 +1911,22 @@ function findLatestNextTrailer(range: string | null, maxCommits: number): FoundT
 const HANDOFF_QUEUE_CAP = 8;
 
 // The first command of a cold session.
-function cmdHandoff(args: Flags): void {
+function cmdHandoff(args: Flags, usage: string): void {
+  const scanCap = args.flags['scan-cap'] === undefined ? DEFAULT_HANDOFF_SCAN_CAP : Number(args.flags['scan-cap']);
+  // `git log -<n>` takes this straight, so a non-number reaches git as NaN
+  // and a negative one reaches it as a flag: both make the walk silently
+  // scan something other than what was asked for.
+  if (!Number.isInteger(scanCap) || scanCap < 1) {
+    console.error(`error: --scan-cap must be a whole number of commits, at least 1: ${args.flags['scan-cap']}`);
+    console.error(usage);
+    process.exitCode = 1;
+    return;
+  }
+
   const config = resolveConfig(args.flags);
   console.log(`branch: ${config.branch}`);
 
   const baseBranch = args.flags['base-branch'] ?? 'main';
-  const scanCap = args.flags['scan-cap'] !== undefined ? Number(args.flags['scan-cap']) : DEFAULT_HANDOFF_SCAN_CAP;
   const branchRange = branchCommitRange(baseBranch);
   const found = branchRange.kind === 'range' ? findLatestNextTrailer(branchRange.range, scanCap) : null;
   if (branchRange.kind === 'unknown') {
@@ -1960,11 +1985,11 @@ function cmdHandoff(args: Flags): void {
 
 // Driven by .claude/hooks/commit-msg, which supplies what only git knows:
 // whether MERGE_HEAD/REVERT_HEAD exist, and the staged file list.
-function cmdCheckCommitMessage(args: Flags): void {
+function cmdCheckCommitMessage(args: Flags, usage: string): void {
   const config = resolveConfig(args.flags);
   const msgFile = args.positional[0];
   if (!msgFile) {
-    console.error('usage: tasks check-commit-msg <msg-file> [--merge-or-revert] [--files a,b,c]');
+    console.error(usage);
     process.exitCode = 1;
     return;
   }
@@ -1984,58 +2009,91 @@ function cmdCheckCommitMessage(args: Flags): void {
 
 const USAGE = 'usage: npm run tasks -- <doctor|add|edit|show|list|search|next|start|stop|done|decline|import|triage|spec|audit|audit-prompt|handoff> ...';
 
-function dispatch(command: string | undefined, args: Flags, rest: string[]): void | Promise<void> {
-  switch (command) {
-    case undefined:
-    case '--help':
-    case '-h':
-    case 'help':
-      console.log(USAGE);
-      return;
-    case 'check':
-      console.error('error: `check` is now `doctor` — the same scan, reporting what it finds instead of exiting 1 over it. It fails only on a store that will not parse.');
-      process.exitCode = 1;
-      return;
-    case 'doctor':
-      return cmdDoctor(args);
-    case 'add':
-      return cmdAdd(args);
-    case 'edit':
-      return cmdEdit(args);
-    case 'show':
-      return cmdShow(args);
-    case 'list':
-      return cmdList(args);
-    case 'search':
-      return cmdSearch(args);
-    case 'next':
-      return cmdNext(args);
-    case 'start':
-      return cmdStart(args);
-    case 'stop':
-      return cmdStop(args);
-    case 'done':
-      return cmdDone(args);
-    case 'decline':
-      return cmdDecline(args);
-    case 'import':
-      return cmdImport(args);
-    case 'triage':
-      return cmdTriage(args);
-    case 'spec':
-      return cmdSpec(args);
-    case 'audit':
-      return cmdAudit(rest);
-    case 'audit-prompt':
-      return cmdAuditPrompt(args);
-    case 'handoff':
-      return cmdHandoff(args);
-    case 'check-commit-msg':
-      return cmdCheckCommitMessage(args);
-    default:
-      console.error(`unknown command: ${command ?? '(none)'}\n${USAGE}`);
-      process.exitCode = 1;
+interface Command {
+  usage: string;
+  run: (args: Flags, usage: string) => void | Promise<void>;
+}
+
+// `tasks spec` names no subcommand and no slug, so it is a misuse; `tasks
+// spec --help` and `tasks spec help` are answered before this by the help
+// path every command shares.
+function refuseBareSpec(_args: Flags, usage: string): void {
+  console.error(usage);
+  process.exitCode = 1;
+}
+
+const SPEC_COMMANDS: Record<string, Command> = {
+  new: { usage: 'usage: tasks spec new <slug>', run: cmdSpecNew },
+  add: { usage: 'usage: tasks spec add <slug> <id>...', run: cmdSpecAdd },
+  remove: { usage: 'usage: tasks spec remove <slug> <id>...', run: cmdSpecRemove },
+  show: { usage: 'usage: tasks spec show <slug> [--order]', run: cmdSpecShow },
+  done: { usage: 'usage: tasks spec done <slug> [--defer-open]', run: cmdSpecDone },
+  amend: { usage: 'usage: tasks spec amend <slug> --reason "..."', run: cmdSpecAmend },
+};
+
+const SPEC_USAGE = `usage: tasks spec <new|add|remove|show|done|amend> ...  (\`tasks spec <slug>\` is short for \`tasks spec show <slug>\`)\n${Object.values(SPEC_COMMANDS)
+  .map((command) => `  ${command.usage}`)
+  .join('\n')}`;
+
+const COMMANDS: Record<string, Command> = {
+  doctor: { usage: 'usage: tasks doctor [--fix]', run: cmdDoctor },
+  add: {
+    usage: 'usage: tasks add "<title>" [--kind task|finding|question] [--severity high|medium|low] [--system "<name>"] [--spec <slug>] [--files a.ts:12,b.ts] [--requires id1,id2] [--deliverable "..." (required for --kind finding)] [--evidence "..."] [--id <id>]',
+    run: cmdAdd,
+  },
+  edit: {
+    usage:
+      'usage: tasks edit <id> ["<new title>"] [--title "..."] [--deliverable "..."] [--evidence "..."] [--severity high|medium|low] [--system "<name>"] [--files a.ts:12,b.ts] [--requires id1,id2]  (content only: state, spec, kind and reason are moved by start/stop/done/decline/spec add, never by edit)',
+    run: cmdEdit,
+  },
+  show: { usage: 'usage: tasks show <id>', run: cmdShow },
+  list: {
+    usage: 'usage: tasks list [--state unreviewed|open|in-progress|done|declined] [--severity high|medium|low] [--system "<name>"] [--spec <slug>] [--kind task|finding|undelivered|question] [--deferred]',
+    run: cmdList,
+  },
+  search: {
+    usage: 'usage: tasks search <term> [--state unreviewed|open|in-progress|done|declined] [--severity high|medium|low] [--system "<name>"] [--spec <slug>] [--kind task|finding|undelivered|question] [--deferred]',
+    run: cmdSearch,
+  },
+  next: { usage: 'usage: tasks next [--spec <slug>] [--system "<name>"] [--severity high|medium|low] [--full]', run: cmdNext },
+  start: { usage: 'usage: tasks start <id> [--actor <name>]', run: cmdStart },
+  stop: { usage: 'usage: tasks stop <id>', run: cmdStop },
+  done: { usage: 'usage: tasks done <id> [--commit <revspec>]  (default: none — the closing commit does not exist yet when `done` runs; see `tasks show` for a derived one)', run: cmdDone },
+  decline: { usage: 'usage: tasks decline <id> --reason "..."', run: cmdDecline },
+  import: { usage: 'usage: tasks import <audit-doc>', run: cmdImport },
+  triage: { usage: 'usage: tasks triage [--spec <slug>]', run: cmdTriage },
+  spec: { usage: SPEC_USAGE, run: refuseBareSpec },
+  audit: { usage: AUDIT_USAGE, run: cmdAudit },
+  'audit-prompt': { usage: 'usage: tasks audit-prompt <spec> [--base-branch main]', run: cmdAuditPrompt },
+  handoff: { usage: 'usage: tasks handoff [--spec <slug>] [--base-branch main] [--scan-cap <commits>]', run: cmdHandoff },
+  'check-commit-msg': { usage: 'usage: tasks check-commit-msg <msg-file> [--merge-or-revert] [--files a,b,c]', run: cmdCheckCommitMessage },
+};
+
+interface Resolved {
+  command: Command;
+  args: string[];
+}
+
+// `spec` is the one command with subcommands, and an unrecognised one is a
+// slug: `tasks spec <slug>` is short for `tasks spec show <slug>`, so the
+// token stays a positional rather than being consumed.
+function resolveCommand(name: string, rest: string[]): Resolved | null {
+  if (name !== 'spec') {
+    const command = COMMANDS[name];
+    return command === undefined ? null : { command, args: rest };
   }
+  const sub = rest[0];
+  if (sub === 'help') return { command: COMMANDS.spec, args: ['--help', ...rest.slice(1)] };
+  if (sub === undefined || sub.startsWith('--')) return { command: COMMANDS.spec, args: rest };
+  const command = SPEC_COMMANDS[sub];
+  return command === undefined ? { command: SPEC_COMMANDS.show, args: rest } : { command, args: rest.slice(1) };
+}
+
+function printRootHelp(): void {
+  console.log(USAGE);
+  for (const command of Object.values(COMMANDS)) console.log(`  ${command.usage.split('\n')[0]}`);
+  console.log(GLOBAL_USAGE);
+  console.log('`tasks <command> --help` prints that command\'s flags; a flag not named there is an error, never a silent no-op');
 }
 
 // A malformed or conflicted docs/tasks.jsonl is reported the same way —
@@ -2053,11 +2111,46 @@ function reportStoreErrors<T>(work: () => T): T | void {
   }
 }
 
+// c9's boundary: nothing runs until the arguments are understood. An
+// unrecognised flag is an error naming it, a flag that needs a value and
+// was given none is refused rather than defaulted, and `--help` answers on
+// every command and subcommand — all before the command body, so no
+// command can answer a question it did not understand.
 export function run(argv: string[]): void | Promise<void> {
-  const [command, ...rest] = argv;
-  const args = parseArgs(rest);
+  const [name, ...rest] = argv;
+  if (name === undefined || name === 'help' || name === '--help' || name === '-h') {
+    printRootHelp();
+    return;
+  }
+  if (name === 'check') {
+    console.error('error: `check` is now `doctor` — the same scan, reporting what it finds instead of exiting 1 over it. It fails only on a store that will not parse.');
+    process.exitCode = 1;
+    return;
+  }
+
+  const resolved = resolveCommand(name, rest);
+  if (resolved === null) {
+    console.error(`unknown command: ${name}\n${USAGE}`);
+    process.exitCode = 1;
+    return;
+  }
+  const { command } = resolved;
+  const arities = new Map([...flagArities(GLOBAL_USAGE), ...flagArities(command.usage)]);
+  const { parsed, errors } = parseArgs(resolved.args, arities);
+  if (errors.length > 0) {
+    for (const message of errors) console.error(`error: ${message}`);
+    console.error(command.usage);
+    process.exitCode = 1;
+    return;
+  }
+  if (parsed.flags.help === 'true') {
+    console.log(command.usage);
+    console.log(GLOBAL_USAGE);
+    return;
+  }
+
   return reportStoreErrors(() => {
-    const result = dispatch(command, args, rest);
+    const result = command.run(parsed, command.usage);
     if (result instanceof Promise) return result.catch((error) => reportStoreErrors(() => { throw error; })).finally(flushSkippedStoreLines);
     flushSkippedStoreLines();
     return result;

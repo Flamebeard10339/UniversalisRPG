@@ -191,6 +191,89 @@ describe('tasks CLI', () => {
     });
   });
 
+  // c9. `list --blocked` was the founding case: a planner asking what is
+  // blocked got the whole unfiltered list and a zero exit, which reads as a
+  // confident answer to a question the command never understood.
+  it('refuses an unrecognised flag by name instead of answering the command without it', () => {
+    fixture(({ tasks }) => {
+      tasks('add', 'a member', '--id', 'a-member', '--spec', 'demo-spec');
+      for (const flag of ['--blocked', '--totallyfakeflag', '--merge']) {
+        const result = tasks('list', flag);
+        expect(result.status, flag).toBe(1);
+        expect(result.stderr, flag).toContain(`unknown flag: ${flag}`);
+        expect(result.stderr, flag).toContain('usage: tasks list');
+        expect(result.stdout, flag).not.toContain('a-member');
+      }
+    });
+  });
+
+  // A flag a command never reads is the same defect wherever it appears:
+  // `edit --state open` used to drop the flag and then report `nothing to
+  // change`, which is a confident no-op.
+  it('refuses a flag another verb owns rather than dropping it and reporting no change', () => {
+    fixture(({ tasks }) => {
+      tasks('add', 'a member', '--id', 'a-member', '--spec', 'demo-spec');
+      const result = tasks('edit', 'a-member', '--state', 'done');
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain('unknown flag: --state');
+      expect(result.stdout).not.toContain('nothing to change');
+      expect(tasks('show', 'a-member').stdout).toContain('[task/open]');
+    });
+  });
+
+  // A flag with no value used to become the string 'true', so `start x
+  // --actor` recorded a holder named "true" — a fabricated fact, not a
+  // missing one. Fixed where the flag is parsed, so the actor genuinely
+  // named "true" is still recordable.
+  it('refuses a value-taking flag given no value, rather than inventing one', () => {
+    fixture(({ tasks }) => {
+      tasks('add', 'a member', '--id', 'a-member', '--spec', 'demo-spec');
+
+      const bare = tasks('start', 'a-member', '--actor');
+      expect(bare.status).toBe(1);
+      expect(bare.stderr).toContain('--actor needs a value');
+      expect(tasks('show', 'a-member').stdout).toContain('[task/open]');
+
+      tasks('start', 'a-member', '--actor', 'true');
+      expect(tasks('show', 'a-member').stdout).toContain('claimed by true since');
+    });
+  });
+
+  it('does not let a valueless flag swallow the positional that follows it', () => {
+    fixture(({ tasks }) => {
+      tasks('add', 'blocker task', '--id', 'blocker', '--spec', 'demo-spec');
+      tasks('add', 'held-up task', '--id', 'held-up', '--spec', 'demo-spec', '--requires', 'blocker');
+      const result = tasks('spec', 'show', '--order', 'demo-spec');
+      expect(result.status).toBe(0);
+      expect(result.stdout.indexOf('blocker')).toBeLessThan(result.stdout.indexOf('held-up'));
+    });
+  });
+
+  it('answers --help on every command and subcommand, and names the flags it will accept', () => {
+    fixture(({ tasks }) => {
+      const commands = [['doctor'], ['add'], ['edit'], ['show'], ['list'], ['search'], ['next'], ['start'], ['stop'], ['done'], ['decline'], ['import'], ['triage'], ['audit-prompt'], ['handoff'], ['check-commit-msg'], ['spec'], ['spec', 'new'], ['spec', 'add'], ['spec', 'remove'], ['spec', 'show'], ['spec', 'done'], ['spec', 'amend']];
+      for (const command of commands) {
+        const result = tasks(...command, '--help');
+        expect(result.status, command.join(' ')).toBe(0);
+        expect(result.stdout, command.join(' ')).toContain(`usage: tasks ${command.join(' ')}`);
+        expect(result.stderr, command.join(' ')).toBe('');
+      }
+      expect(tasks('spec', 'help').status).toBe(0);
+      expect(tasks('spec', 'help').stdout).toContain('usage: tasks spec');
+    });
+  });
+
+  it('validates the handoff scan cap rather than passing a NaN or a negative straight to git log', () => {
+    fixture(({ tasks }) => {
+      for (const value of ['abc', '-5', '0', '2.5']) {
+        const result = tasks('handoff', '--scan-cap', value);
+        expect(result.status, value).toBe(1);
+        expect(result.stderr, value).toContain('--scan-cap must be a whole number of commits');
+      }
+      expect(tasks('handoff', '--scan-cap', '3').status).toBe(0);
+    });
+  });
+
   it('adds a task and shows it back', () => {
     fixture(({ tasks }) => {
       const added = tasks('add', 'Fix the thing', '--severity', 'high', '--system', 'Runtime', '--deliverable', 'the thing is fixed');
@@ -1900,6 +1983,24 @@ describe('tasks CLI', () => {
       const result = tasks('audit', 'demo-spec', '--proof', '1=met', '--evidence', '1=clause 1 checked', '--proof', '2=met', '--evidence', '2=clause 2 checked', '--finding', 'some bug', '--severity', 'low', '--deliverable', 'fix it', '--evidence', 'first evidence', '--evidence', 'replacement evidence');
       expect(result.status).toBe(1);
       expect(result.stderr).toContain('already has evidence');
+      expect(tasks('list', '--kind', 'finding').stdout).toContain('0 task(s)');
+    });
+  });
+
+  // The audit scanner reads flags positionally, so a finding field written
+  // before the --finding it belongs to used to fall through every branch
+  // and vanish: the pass recorded a finding with no severity, and said so
+  // only later, about a value the caller did supply.
+  it('audit refuses a finding field written before the --finding it describes, and an unknown flag by name', () => {
+    fixture(({ tasks }) => {
+      const early = tasks('audit', 'demo-spec', '--severity', 'high', '--finding', 'some bug', '--deliverable', 'fix it', '--evidence', 'it is broken');
+      expect(early.status).toBe(1);
+      expect(early.stderr).toContain('--severity describes a finding, and no --finding has been opened yet');
+
+      const unknown = tasks('audit', 'demo-spec', '--totallyfakeflag', 'x');
+      expect(unknown.status).toBe(1);
+      expect(unknown.stderr).toContain('unknown flag: --totallyfakeflag');
+
       expect(tasks('list', '--kind', 'finding').stdout).toContain('0 task(s)');
     });
   });
