@@ -20,7 +20,7 @@ A file drifting toward heavy commenting is a design signal — read it as "this 
 
 Do not bloat CLAUDE.md with over 200 lines of instructions. 
 
-`.planning/.scratch.md` contains open thoughts. Vetted work, its state, and its archive all live in `docs/tasks.jsonl`, reached through `npm run tasks` — `tasks next` for what to work on, `tasks show <id>` for a task's full record. A branch's own spec lives at `docs/specs/<slug>.md`.
+`.planning/.scratch.md` contains open thoughts. Vetted work, its state, and its archive all live in `docs/tasks.jsonl`, reached through `npm run tasks` — `tasks next` for what to work on, `tasks show <id>` for a task's full record. A branch's own spec lives at `docs/specs/<slug>.md`. `.planning/agent-swarm-theory.md` holds what a planner owes the tree — read it before decomposing a finding list into worker chunks.
 
 # Repository systems
 
