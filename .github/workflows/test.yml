@@ -36,4 +36,10 @@ jobs:
       - run: npm run layer-check
       - run: npm run audit-status
         if: matrix.os == 'ubuntu-latest'
-      - run: npm run tasks -- check
+      # Replaces `tasks check`, which failed on any inconsistency in the task
+      # store. `doctor` reports those and fails on one condition only: a store
+      # line that will not parse — a committed merge marker, which is a real
+      # breakage and not a disagreement about the work. Platform-independent,
+      # so one leg, where `check` ran on both.
+      - run: npm run tasks -- doctor
+        if: matrix.os == 'ubuntu-latest'

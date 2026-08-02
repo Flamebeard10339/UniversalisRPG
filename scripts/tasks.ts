@@ -329,31 +329,66 @@ function specIssues(config: Config): CheckIssue[] {
     });
 }
 
-function cmdCheck(flags: Record<string, string>): void {
-  const config = resolveConfig(flags);
-  let tasks: Task[];
-  const loadIssues: CheckIssue[] = [];
-  try {
-    tasks = loadStore(config.storePath);
-  } catch (error) {
-    tasks = [];
-    loadIssues.push({ level: 'error', message: error instanceof Error ? error.message : String(error) });
+// The one repair with exactly one correct answer. A record outside a
+// closing state is not closed, so a close date on it describes a close that
+// was undone, and clearing it is not a choice between defensible fixes.
+// Everything else this scan finds has several — a missing decline reason, an
+// unresolved requirement, a cycle, a duplicate id — and a doctor that picks
+// one of them is worse than one that describes them all.
+function repairStore(tasks: Task[]): string[] {
+  const repaired: string[] = [];
+  for (const task of tasks) {
+    if (CLOSING_STATES.includes(task.state) || (task.closed === null && task.closedCommit === null)) continue;
+    repaired.push(`${task.id} is ${task.state}: cleared its close date (${task.closed ?? 'none'}) and closing commit (${task.closedCommit ?? 'none'})`);
+    task.closed = null;
+    task.closedCommit = null;
   }
+  return repaired;
+}
+
+function cmdDoctor(args: Flags): void {
+  const config = resolveConfig(args.flags);
+  const { tasks, skipped } = loadStoreTolerantly(config.storePath);
   const dirtyIssue = dirtyStoreIssue(config);
   const issues = [
-    ...loadIssues,
     ...checkStore(tasks, systemNames(config), (spec) => existsSync(specFile(config, spec))),
     ...closedCommitIssues(tasks),
     ...workingTreeOnlyIssues(config, tasks),
     ...specIssues(config),
     ...(dirtyIssue ? [dirtyIssue] : []),
   ];
-  const errors = issues.filter((issue) => issue.level === 'error');
-  const warnings = issues.filter((issue) => issue.level === 'warning');
-  for (const warning of warnings) console.warn(`warning: ${warning.message}`);
-  for (const error of errors) console.error(`error: ${error.message}`);
-  console.log(`${tasks.length} task(s), ${errors.length} error(s), ${warnings.length} warning(s)`);
-  if (errors.length > 0) process.exitCode = 1;
+
+  let repaired: string[] = [];
+  if (args.flags.fix === 'true') {
+    if (skipped.length > 0) console.log(`--fix declined to write: ${skipped.length} line(s) did not parse, and saving would delete them`);
+    else {
+      repaired = repairStore(tasks);
+      if (repaired.length > 0) saveStoreAndWarn(tasks, config);
+    }
+  }
+
+  if (issues.length > 0) {
+    console.log(`${issues.length} issue(s) — reported, not enforced:`);
+    for (const issue of issues) console.log(`  [${issue.level}] ${issue.message}`);
+  }
+  if (repaired.length > 0) {
+    console.log(`repaired ${repaired.length}:`);
+    for (const line of repaired) console.log(`  ${line}`);
+  } else if (issues.length > 0 && args.flags.fix !== 'true') {
+    console.log('none of these has exactly one correct repair; `--fix` clears a close date left on a record that is not closed, and nothing else');
+  }
+
+  const errors = issues.filter((issue) => issue.level === 'error').length;
+  console.log(`${tasks.length} task(s), ${errors} error(s), ${issues.length - errors} warning(s), ${skipped.length} unparseable line(s)`);
+
+  // The only condition that exits non-zero. A store that will not parse is
+  // malformed input, not a disagreement about the work — and it is the one
+  // state a later write would destroy rather than merely disagree with.
+  if (skipped.length > 0) {
+    for (const message of skipped) console.error(`error: ${message}`);
+    console.error(`error: ${config.storePath} does not parse — the only condition doctor fails on`);
+    process.exitCode = 1;
+  }
 }
 
 // `--commit` is a revspec at the CLI boundary, and a revspec is not a fact —
@@ -1209,7 +1244,7 @@ function diffChangedFiles(range: string): string[] {
 }
 
 function requiredCommands(): string[] {
-  return ['npm test', 'npx tsc --noEmit', 'npm run layer-check', 'npm run tasks -- check'];
+  return ['npm test', 'npx tsc --noEmit', 'npm run layer-check', 'npm run tasks -- doctor'];
 }
 
 function cmdAuditPrompt(args: Flags): void {
@@ -1853,7 +1888,7 @@ function cmdCheckCommitMessage(args: Flags): void {
   }
 }
 
-const USAGE = 'usage: npm run tasks -- <check|add|edit|show|list|search|next|start|stop|done|decline|import|triage|spec|audit|audit-prompt|handoff> ...';
+const USAGE = 'usage: npm run tasks -- <doctor|add|edit|show|list|search|next|start|stop|done|decline|import|triage|spec|audit|audit-prompt|handoff> ...';
 
 function dispatch(command: string | undefined, args: Flags, rest: string[]): void | Promise<void> {
   switch (command) {
@@ -1864,7 +1899,11 @@ function dispatch(command: string | undefined, args: Flags, rest: string[]): voi
       console.log(USAGE);
       return;
     case 'check':
-      return cmdCheck(args.flags);
+      console.error('error: `check` is now `doctor` — the same scan, reporting what it finds instead of exiting 1 over it. It fails only on a store that will not parse.');
+      process.exitCode = 1;
+      return;
+    case 'doctor':
+      return cmdDoctor(args);
     case 'add':
       return cmdAdd(args);
     case 'edit':

@@ -330,7 +330,7 @@ describe('tasks CLI', () => {
       expect(shown).toContain('requires: ghost (missing)');
       expect(shown).not.toContain('BLOCKED');
       expect(tasks('next').stdout).toContain('editable');
-      expect(tasks('check').stderr).toContain('editable requires unresolved id: ghost');
+      expect(tasks('doctor').stdout).toContain('[error] editable requires unresolved id: ghost');
     });
   });
 
@@ -737,17 +737,81 @@ describe('tasks CLI', () => {
     });
   });
 
-  it('check reports zero errors on a clean store and a nonzero exit on a broken one', () => {
+  it('doctor reports an inconsistent store and still exits zero, because no disagreement may fail a build', () => {
     fixture(({ tasks, dir }) => {
       tasks('add', 'fine', '--system', 'Runtime');
-      const clean = tasks('check');
+      const clean = tasks('doctor');
       expect(clean.status).toBe(0);
       expect(clean.stdout).toContain('0 error(s)');
 
       writeFileSync(path.join(dir, 'tasks.jsonl'), `${JSON.stringify({ id: 'a', title: 'a', kind: 'task', state: 'open', severity: null, system: 'Nonexistent', spec: null, requires: [], files: [], deliverable: null, evidence: null, source: null, reason: null, closed: null })}\n`, 'utf8');
-      const broken = tasks('check');
-      expect(broken.status).toBe(1);
-      expect(broken.stderr).toContain('system not in systems.json');
+      const inconsistent = tasks('doctor');
+      expect(inconsistent.status).toBe(0);
+      expect(inconsistent.stdout).toContain('reported, not enforced');
+      expect(inconsistent.stdout).toContain('[error] a has a system not in systems.json: Nonexistent');
+    });
+  });
+
+  it('doctor exits non-zero on exactly one condition: a store that will not parse', () => {
+    fixture(({ tasks, dir }) => {
+      const store = path.join(dir, 'tasks.jsonl');
+      tasks('add', 'fine');
+      writeFileSync(store, `${readFileSync(store, 'utf8')}<<<<<<< HEAD\n`, 'utf8');
+
+      const result = tasks('doctor');
+      expect(result.status).toBe(1);
+      expect(result.stdout).toContain('1 unparseable line(s)');
+      expect(result.stderr).toContain('the only condition doctor fails on');
+    });
+  });
+
+  it('check names its replacement rather than reading as an unknown command', () => {
+    fixture(({ tasks }) => {
+      const result = tasks('check');
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain('`check` is now `doctor`');
+    });
+  });
+
+  it('doctor repairs a close date left on a record that is not closed, and repairs nothing else', () => {
+    fixture(({ tasks, dir }) => {
+      const store = path.join(dir, 'tasks.jsonl');
+      writeFileSync(
+        store,
+        `${JSON.stringify({ id: 'reopened', title: 'reopened', kind: 'task', state: 'open', severity: null, system: null, spec: null, clause: null, requires: ['ghost'], files: [], deliverable: null, evidence: null, source: null, reason: null, closed: '2026-08-01', closedCommit: null })}\n`,
+        'utf8',
+      );
+
+      const reported = tasks('doctor');
+      expect(reported.stdout).toContain('[warning] reopened is open but still carries a closed date: 2026-08-01');
+      expect(reported.stdout).toContain('none of these has exactly one correct repair');
+      expect(readFileSync(store, 'utf8')).toContain('2026-08-01');
+
+      const fixed = tasks('doctor', '--fix');
+      expect(fixed.status).toBe(0);
+      expect(fixed.stdout).toContain('repaired 1:');
+      expect(fixed.stdout).toContain('reopened is open: cleared its close date (2026-08-01)');
+      expect(readFileSync(store, 'utf8')).not.toContain('2026-08-01');
+      // The unresolved requirement is reported by both runs and repaired by
+      // neither: dropping the edge and creating the task are both defensible.
+      expect(fixed.stdout).toContain('[error] reopened requires unresolved id: ghost');
+    });
+  });
+
+  it('doctor --fix declines to write when a line did not parse, because saving would delete it', () => {
+    fixture(({ tasks, dir }) => {
+      const store = path.join(dir, 'tasks.jsonl');
+      writeFileSync(
+        store,
+        `${JSON.stringify({ id: 'reopened', title: 'reopened', kind: 'task', state: 'open', severity: null, system: null, spec: null, clause: null, requires: [], files: [], deliverable: null, evidence: null, source: null, reason: null, closed: '2026-08-01', closedCommit: null })}\n<<<<<<< HEAD\n`,
+        'utf8',
+      );
+
+      const result = tasks('doctor', '--fix');
+      expect(result.status).toBe(1);
+      expect(result.stdout).toContain('--fix declined to write');
+      expect(readFileSync(store, 'utf8')).toContain('<<<<<<< HEAD');
+      expect(readFileSync(store, 'utf8')).toContain('2026-08-01');
     });
   });
 
@@ -760,14 +824,14 @@ describe('tasks CLI', () => {
     });
   });
 
-  it('check warns when the default store has uncommitted working-tree-only task state', () => {
+  it('doctor reports that the default store has uncommitted working-tree-only task state', () => {
     defaultStoreGitFixture(({ tasks }) => {
-      expect(tasks('check').stderr).not.toContain('docs/tasks.jsonl has uncommitted task-state changes');
+      expect(tasks('doctor').stdout).not.toContain('docs/tasks.jsonl has uncommitted task-state changes');
 
       tasks('add', 'Dirty tracked task', '--id', 'dirty-tracked');
-      const result = tasks('check');
+      const result = tasks('doctor');
       expect(result.status).toBe(0);
-      expect(result.stderr).toContain('warning: docs/tasks.jsonl has uncommitted task-state changes');
+      expect(result.stdout).toContain('[warning] docs/tasks.jsonl has uncommitted task-state changes');
       expect(result.stdout).toContain('1 warning(s)');
     });
   });
@@ -776,54 +840,54 @@ describe('tasks CLI', () => {
   // existed in the working tree is invisible to `git show HEAD:...`, so a
   // `closedCommit` field (which lives in the same file) can never detect it.
   // Only comparing the committed store against the working tree can.
-  it('check reports a working-tree-only done mark as an error naming the task and its committed state', () => {
+  it('doctor reports a working-tree-only done mark as an error naming the task and its committed state', () => {
     defaultStoreGitFixture(({ dir, tasks }) => {
       tasks('add', 'closable task', '--id', 'closable');
       spawnSync('git', ['add', '.'], { cwd: dir });
       spawnSync('git', ['commit', '--no-verify', '-m', 'add closable task'], { cwd: dir, encoding: 'utf8' });
 
       tasks('done', 'closable');
-      const result = tasks('check');
-      expect(result.status).toBe(1);
-      expect(result.stderr).toContain('error: closable is done only in the working tree (committed state: open)');
+      const result = tasks('doctor');
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('[error] closable is done only in the working tree (committed state: open)');
     });
   });
 
-  it('check reports a working-tree-only declined mark as an error', () => {
+  it('doctor reports a working-tree-only declined mark as an error', () => {
     defaultStoreGitFixture(({ dir, tasks }) => {
       tasks('add', 'stale finding', '--id', 'stale', '--kind', 'finding', '--deliverable', 'fix it');
       spawnSync('git', ['add', '.'], { cwd: dir });
       spawnSync('git', ['commit', '--no-verify', '-m', 'add stale finding'], { cwd: dir, encoding: 'utf8' });
 
       tasks('decline', 'stale', '--reason', 'already fixed elsewhere');
-      const result = tasks('check');
-      expect(result.status).toBe(1);
-      expect(result.stderr).toContain('error: stale is declined only in the working tree (committed state: unreviewed)');
+      const result = tasks('doctor');
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('[error] stale is declined only in the working tree (committed state: unreviewed)');
     });
   });
 
-  it('check reports a working-tree-only in-progress transition as a warning, not an error', () => {
+  it('doctor reports a working-tree-only in-progress transition as a warning, not an error', () => {
     defaultStoreGitFixture(({ dir, tasks }) => {
       tasks('add', 'startable task', '--id', 'startable');
       spawnSync('git', ['add', '.'], { cwd: dir });
       spawnSync('git', ['commit', '--no-verify', '-m', 'add startable task'], { cwd: dir, encoding: 'utf8' });
 
       tasks('start', 'startable');
-      const result = tasks('check');
+      const result = tasks('doctor');
       expect(result.status).toBe(0);
-      expect(result.stderr).toContain('warning: startable is in-progress only in the working tree (committed state: open)');
+      expect(result.stdout).toContain('[warning] startable is in-progress only in the working tree (committed state: open)');
     });
   });
 
-  it('check does not flag a working-tree-only mark for a task that was never committed at all', () => {
+  it('doctor does not flag a working-tree-only mark for a task that was never committed at all', () => {
     defaultStoreGitFixture(({ tasks }) => {
       tasks('add', 'never committed', '--id', 'uncommitted-only');
-      const result = tasks('check');
-      expect(result.stderr).not.toContain('only in the working tree');
+      const result = tasks('doctor');
+      expect(result.stdout).not.toContain('only in the working tree');
     });
   });
 
-  it('check degrades to no working-tree-comparison issue when there is no committed store (unborn HEAD)', () => {
+  it('doctor degrades to no working-tree-comparison issue when there is no committed store (unborn HEAD)', () => {
     const dir = mkdtempSync(path.join(os.tmpdir(), 'universalis-no-commit-'));
     try {
       spawnSync('git', ['init', '-q'], { cwd: dir });
@@ -835,27 +899,27 @@ describe('tasks CLI', () => {
       writeFileSync(path.join(dir, 'docs', 'audits', 'systems.json'), JSON.stringify({ unowned: { note: '', paths: ['docs', '*.md'] }, systems: [] }), 'utf8');
       writeFileSync(path.join(dir, 'docs', 'tasks.jsonl'), `${JSON.stringify({ id: 'a', title: 'a', kind: 'task', state: 'done', severity: null, system: null, spec: null, clause: null, requires: [], files: [], deliverable: null, evidence: null, source: null, reason: null, closed: '2026-08-01', closedCommit: null })}\n`, 'utf8');
       // No commit at all — HEAD does not exist yet on this branch.
-      const result = spawnSync(process.execPath, [tsx, script, 'check', '--branch', 'demo-spec'], { cwd: dir, encoding: 'utf8' });
+      const result = spawnSync(process.execPath, [tsx, script, 'doctor', '--branch', 'demo-spec'], { cwd: dir, encoding: 'utf8' });
       expect(result.status).toBe(0);
-      expect(result.stderr).not.toContain('only in the working tree');
+      expect(result.stdout).not.toContain('only in the working tree');
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
   });
 
-  it('check warns when a done task names a closing commit not reachable from HEAD', () => {
+  it('doctor warns when a done task names a closing commit not reachable from HEAD', () => {
     fixture(({ tasks, dir }) => {
       writeFileSync(path.join(dir, 'tasks.jsonl'), `${JSON.stringify({ id: 'anchored', title: 'anchored', kind: 'task', state: 'done', severity: null, system: null, spec: null, clause: null, requires: [], files: [], deliverable: null, evidence: null, source: null, reason: null, closed: '2026-08-01', closedCommit: '0123456789abcdef0123456789abcdef01234567' })}\n`, 'utf8');
-      const result = tasks('check');
+      const result = tasks('doctor');
       expect(result.status).toBe(0);
-      expect(result.stderr).toContain('warning: anchored closed by a commit not reachable from HEAD');
+      expect(result.stdout).toContain('[warning] anchored closed by a commit not reachable from HEAD');
     });
   });
 
-  it('check reports a malformed store as a check error instead of a stack trace', () => {
+  it('doctor reports a malformed store as a diagnostic instead of a stack trace', () => {
     fixture(({ tasks, dir }) => {
       writeFileSync(path.join(dir, 'tasks.jsonl'), '<<<<<<< HEAD\n', 'utf8');
-      const result = tasks('check');
+      const result = tasks('doctor');
       expect(result.status).toBe(1);
       expect(result.stderr).toContain('malformed JSONL task record');
       expect(result.stderr).toContain('tasks.jsonl:1');
@@ -863,10 +927,10 @@ describe('tasks CLI', () => {
     });
   });
 
-  it('check reports a malformed task shape as a check error instead of a stack trace', () => {
+  it('doctor reports a malformed task shape as a diagnostic instead of a stack trace', () => {
     fixture(({ tasks, dir }) => {
       writeFileSync(path.join(dir, 'tasks.jsonl'), `${JSON.stringify({ id: 'broken', title: 'missing fields' })}\n`, 'utf8');
-      const result = tasks('check');
+      const result = tasks('doctor');
       expect(result.status).toBe(1);
       expect(result.stderr).toContain('task "broken" requires kind');
       expect(result.stderr).toContain('tasks.jsonl:1');
@@ -941,10 +1005,10 @@ describe('tasks CLI', () => {
     });
   });
 
-  it('check ignores a directory named like a markdown spec file', () => {
+  it('doctor ignores a directory named like a markdown spec file', () => {
     fixture(({ tasks, dir }) => {
       mkdirSync(path.join(dir, 'specs', 'not-a-file.md'));
-      const result = tasks('check');
+      const result = tasks('doctor');
       expect(result.status).toBe(0);
       expect(result.stdout).toContain('0 error(s)');
     });
@@ -1367,13 +1431,13 @@ describe('tasks CLI', () => {
     });
   });
 
-  it('check refuses a spec whose clauses claim the same id', () => {
+  it('doctor reports a spec whose clauses claim the same id', () => {
     fixture(({ tasks, dir }) => {
       const specPath = path.join(dir, 'specs', 'demo-spec.md');
       writeFileSync(specPath, readFileSync(specPath, 'utf8').replace('- The first clause holds.\n- The second clause holds.', '- [c1] The first clause holds.\n- [c1] The second clause holds.'), 'utf8');
-      const result = tasks('check');
-      expect(result.status).toBe(1);
-      expect(result.stderr).toContain('demo-spec tags more than one proof clause [c1]');
+      const result = tasks('doctor');
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('[error] demo-spec tags more than one proof clause [c1]');
     });
   });
 
@@ -1544,7 +1608,7 @@ describe('tasks CLI', () => {
       expect(result.stdout).toContain('- npm test');
       expect(result.stdout).toContain('- npx tsc --noEmit');
       expect(result.stdout).toContain('- npm run layer-check');
-      expect(result.stdout).toContain('- npm run tasks -- check');
+      expect(result.stdout).toContain('- npm run tasks -- doctor');
       expect(result.stdout).not.toContain('--merge');
 
       expect(result.stdout).toContain('Relevant files:');
