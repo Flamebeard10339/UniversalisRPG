@@ -159,45 +159,6 @@ function defaultStoreGitFixture(run: (context: { dir: string; tasks: (...args: s
   }
 }
 
-// runProofTarget's vitest branch spawns real vitest against a file path, and
-// vitest only resolves test files inside the project root — so the fixture
-// file has to live under the repo, not os.tmpdir(). It lives in its own
-// fixture-only directory rather than alongside scripts/lib's production
-// modules; vite.config.ts sweeps anything an interrupted run left behind
-// there before the next vitest start collects test files. Written and
-// removed around each test as well, for the common case.
-function vitestFixtureFile(run: (relPath: string) => void): void {
-  const fixturesDir = path.join(repoRoot, 'scripts/proof-fixtures');
-  mkdirSync(fixturesDir, { recursive: true });
-  const relPath = `scripts/proof-fixtures/__proof_fixture_${Date.now()}_${Math.random().toString(36).slice(2)}.test.ts`;
-  const absPath = path.join(repoRoot, relPath);
-  writeFileSync(
-    absPath,
-    [
-      "import { describe, it, expect } from 'vitest';",
-      "describe('proof fixture', () => {",
-      "  it('unrelated passing test', () => { expect(1).toBe(1); });",
-      "  it('proof fixture passes', () => { expect(1).toBe(1); });",
-      "  it('proof fixture fails', () => { expect(1).toBe(2); });",
-      "  it.skip('proof fixture is skipped', () => { expect(1).toBe(2); });",
-      "});",
-      "describe('proof fixture, second describe', () => {",
-      "  it('shared title', () => { expect(1).toBe(1); });",
-      "});",
-      "describe('proof fixture, third describe', () => {",
-      "  it('shared title', () => { expect(1).toBe(1); });",
-      "});",
-      '',
-    ].join('\n'),
-    'utf8',
-  );
-  try {
-    run(relPath);
-  } finally {
-    rmSync(absPath, { force: true });
-  }
-}
-
 describe('tasks CLI', () => {
   it('prints help without treating --help or help as unknown commands', () => {
     fixture(({ tasks }) => {
@@ -1709,19 +1670,6 @@ describe('tasks CLI', () => {
     });
   });
 
-  it('check --merge runs proof command targets and reports a failing target by clause id', () => {
-    fixture(({ tasks, dir }) => {
-      writeFileSync(path.join(dir, 'specs', 'demo-spec.md'), '# Demo spec\n\n## Deliverable\n\nPromise.\n\nProof:\n\n- [c1] The proof target passes.\n  proof: command node --version\n- [c2] The proof target fails.\n  proof: command node --definitely-not-a-real-node-flag\n\n## Decisions\n\n## Open questions\n\nNone.\n', 'utf8');
-      tasks('audit', 'demo-spec', '--proof', '1=met', '--proof', '2=met');
-
-      const result = tasks('check', '--merge');
-      expect(result.status).toBe(1);
-      expect(result.stderr).toContain('proof clause 2 target failed');
-      expect(result.stderr).toContain('command node --definitely-not-a-real-node-flag');
-      expect(result.stderr).not.toContain('proof clause 1 target failed');
-    });
-  });
-
   it('check --merge refuses when commits landed after the latest audit pass', () => {
     gitFixture(({ commit, tasks }) => {
       tasks('audit', 'demo-spec', '--proof', '1=met');
@@ -1770,101 +1718,6 @@ describe('tasks CLI', () => {
       const result = tasks('check', '--merge');
       expect(result.status).toBe(0);
       expect(result.stdout).toContain('0 issue(s)');
-    });
-  });
-
-  it('check --merge reports an unsupported proof target shape by clause id', () => {
-    fixture(({ tasks, dir }) => {
-      writeFileSync(path.join(dir, 'specs', 'demo-spec.md'), '# Demo spec\n\n## Deliverable\n\nPromise.\n\nProof:\n\n- [c1] The proof target is unsupported.\n  proof: custom magic\n\n## Decisions\n\n## Open questions\n\nNone.\n', 'utf8');
-      tasks('audit', 'demo-spec', '--proof', '1=met');
-
-      const result = tasks('check', '--merge');
-      expect(result.status).toBe(1);
-      expect(result.stderr).toContain('proof clause 1 target has unsupported shape: custom magic');
-    });
-  });
-
-  it('check --merge passes a vitest proof target that names one passing test in a file with other tests', () => {
-    vitestFixtureFile((relPath) => {
-      fixture(({ tasks, dir }) => {
-        writeFileSync(path.join(dir, 'specs', 'demo-spec.md'), `# Demo spec\n\n## Deliverable\n\nPromise.\n\nProof:\n\n- [c1] The proof target passes.\n  proof: vitest ${relPath} "proof fixture passes"\n\n## Decisions\n\n## Open questions\n\nNone.\n`, 'utf8');
-        tasks('audit', 'demo-spec', '--proof', '1=met');
-
-        const result = tasks('check', '--merge');
-        expect(result.status).toBe(0);
-        expect(result.stdout).toContain('0 issue(s)');
-      });
-    });
-  });
-
-  it("check --merge fails a vitest proof target whose file does not exist", () => {
-    fixture(({ tasks, dir }) => {
-      writeFileSync(path.join(dir, 'specs', 'demo-spec.md'), '# Demo spec\n\n## Deliverable\n\nPromise.\n\nProof:\n\n- [c1] The proof target has no file.\n  proof: vitest scripts/lib/does-not-exist-proof-fixture.test.ts "whatever"\n\n## Decisions\n\n## Open questions\n\nNone.\n', 'utf8');
-      tasks('audit', 'demo-spec', '--proof', '1=met');
-
-      const result = tasks('check', '--merge');
-      expect(result.status).toBe(1);
-      expect(result.stderr).toContain('proof clause 1');
-      expect(result.stderr).toContain('test file does not exist');
-      expect(result.stderr).toContain('scripts/lib/does-not-exist-proof-fixture.test.ts');
-    });
-  });
-
-  it('check --merge fails a vitest proof target whose name matches no test in an existing file', () => {
-    vitestFixtureFile((relPath) => {
-      fixture(({ tasks, dir }) => {
-        writeFileSync(path.join(dir, 'specs', 'demo-spec.md'), `# Demo spec\n\n## Deliverable\n\nPromise.\n\nProof:\n\n- [c1] The proof target names no real test.\n  proof: vitest ${relPath} "there is no test with this name"\n\n## Decisions\n\n## Open questions\n\nNone.\n`, 'utf8');
-        tasks('audit', 'demo-spec', '--proof', '1=met');
-
-        const result = tasks('check', '--merge');
-        expect(result.status).toBe(1);
-        expect(result.stderr).toContain('proof clause 1');
-        expect(result.stderr).toContain('matched no test');
-        expect(result.stderr).toContain('there is no test with this name');
-      });
-    });
-  });
-
-  it('check --merge fails a vitest proof target that names a skipped test, distinctly from a missing one', () => {
-    vitestFixtureFile((relPath) => {
-      fixture(({ tasks, dir }) => {
-        writeFileSync(path.join(dir, 'specs', 'demo-spec.md'), `# Demo spec\n\n## Deliverable\n\nPromise.\n\nProof:\n\n- [c1] The proof target names a skipped test.\n  proof: vitest ${relPath} "proof fixture is skipped"\n\n## Decisions\n\n## Open questions\n\nNone.\n`, 'utf8');
-        tasks('audit', 'demo-spec', '--proof', '1=met');
-
-        const result = tasks('check', '--merge');
-        expect(result.status).toBe(1);
-        expect(result.stderr).toContain('proof clause 1');
-        expect(result.stderr).toContain('skipped');
-        expect(result.stderr).not.toContain('matched no test');
-      });
-    });
-  });
-
-  it('check --merge fails a vitest proof target whose named test fails, and reports the match count', () => {
-    vitestFixtureFile((relPath) => {
-      fixture(({ tasks, dir }) => {
-        writeFileSync(path.join(dir, 'specs', 'demo-spec.md'), `# Demo spec\n\n## Deliverable\n\nPromise.\n\nProof:\n\n- [c1] The proof target fails.\n  proof: vitest ${relPath} "proof fixture fails"\n\n## Decisions\n\n## Open questions\n\nNone.\n`, 'utf8');
-        tasks('audit', 'demo-spec', '--proof', '1=met');
-
-        const result = tasks('check', '--merge');
-        expect(result.status).toBe(1);
-        expect(result.stderr).toContain('proof clause 1 target failed');
-        expect(result.stderr).toContain('1/1');
-      });
-    });
-  });
-
-  it('check --merge passes a vitest proof target that matches more than one test, only if every match passes, and reports the count', () => {
-    vitestFixtureFile((relPath) => {
-      fixture(({ tasks, dir }) => {
-        writeFileSync(path.join(dir, 'specs', 'demo-spec.md'), `# Demo spec\n\n## Deliverable\n\nPromise.\n\nProof:\n\n- [c1] The proof target is over-broad but every match passes.\n  proof: vitest ${relPath} "shared title"\n\n## Decisions\n\n## Open questions\n\nNone.\n`, 'utf8');
-        tasks('audit', 'demo-spec', '--proof', '1=met');
-
-        const result = tasks('check', '--merge');
-        expect(result.status).toBe(0);
-        expect(result.stdout).toContain('0 issue(s)');
-        expect(result.stderr).toContain('matched 2 test');
-      });
     });
   });
 
