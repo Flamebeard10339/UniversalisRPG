@@ -35,9 +35,12 @@ Proof:
   Exactly one condition may exit non-zero: a store that will not parse, which is
   malformed input under `c2`. No semantic disagreement — a criterion
   outstanding, a mark uncommitted, a spec without a baseline — can fail a build.
-- [c5] Abandonment is a first-class write. `drop --because` closes any record,
-  including the five undelivered clause tasks of the superseded spec that no
-  command can close today.
+- [c5] Abandonment is a first-class write: any record closes with a stated
+  reason, including a superseded spec's undelivered clause tasks. **No new verb
+  — `decline --reason` already does this**, because `c2` removed the guards that
+  were the whole obstacle. The clause originally specified `drop --because`; a
+  synonym for a working command is exactly the bloat this branch exists to
+  reverse.
 - [c6] A claim records who holds it and when. A claim with no activity past a
   threshold is reported cold; nothing is ever auto-released.
 - [c7] A decision that needs a human is a record the tool can return, not a
@@ -311,9 +314,23 @@ subject is a silent write, which is the failure this spec exists to prevent.
 
 ### U4 — Three-valued completeness, and questions as records
 
-- `unknown`, `unmet` and `met` are distinct; `met` requires an evidence string,
-  unvalidated and free text (`c3`).
-- Completeness is reported as the named outstanding criteria. No percentage.
+This unit is smaller than it reads. `tasks audit` already takes
+`--evidence N="..."` and already stores `{clause, status, evidence}` per verdict,
+so nothing here is a new data model — it is one enum value, one required
+argument, and a report.
+
+- `unknown`, `unmet` and `met` are distinct; `met` requires the evidence string
+  that is today optional (`c3`). `unknown` is the default for a clause nobody
+  graded, and it must never be collapsed into `unmet` — "we checked and it
+  fails" and "nobody looked" are different facts, and the four weak proofs of
+  `combat-continuation-runtime` all lived in that gap.
+- Completeness is reported as the **named outstanding criteria**. No percentage,
+  no ratio, no single bit — a scalar invites the 90%-for-three-weeks pathology
+  and destroys the only actionable information, which is *which* clause is
+  outstanding.
+- **Reuse `kind` for `c7`.** A question is one more value in a field that
+  already carries `task|finding|undelivered`, reachable through the existing
+  `add`, `list` and `show`. No new command, no new file, no new record shape.
 - A decision needing a human is a record the tool returns (`c7`).
 
   `B-M5` was named here as the first example and is not one any more. U3 removed
@@ -330,14 +347,22 @@ subject is a silent write, which is the failure this spec exists to prevent.
   unchanged-deliverable refusal, which U3 also deliberately left, stands or falls
   with it.
 
-### U5 — Claims and abandonment
+### U5 — Claims
 
-- A claim records actor and time. Past a configurable threshold it is reported
-  **cold**, never expired and never auto-released (`c6`).
-- `drop --because` closes any record (`c5`). Prove it against the live
-  deadlock: the five undelivered clause tasks of
-  `task-system-real-world-friction-spec`, which `decline`, `done` and
-  `spec done --defer-open` each refuse by a different route.
+- A claim records actor and time. Past a threshold it is reported **cold**,
+  never expired and never auto-released — auto-release puts two agents on one
+  task, while "held six days, no activity" lets the next agent decide in one
+  read (`c6`).
+- The threshold is a **constant, not configuration**, until someone needs to
+  change it. A config surface for a number nobody has wanted to tune is the
+  bloat this branch is reversing.
+
+`c5` is already satisfied and this unit does not implement it. `decline --reason`
+closes an undelivered clause task today — verified against a scratch copy of the
+live store on 2026-08-02, on `task-system-real-world-friction-spec-clause-1`,
+which reported *"declining it abandons the clause, it does not discharge it"*.
+The deadlock was never about a missing verb; it was the guards, and `c2` removed
+them.
 
 ### U6 — One command surface
 
