@@ -32,7 +32,9 @@ Proof:
   criterion nobody checked reads `unknown`; completeness is reported as which
   criteria are outstanding, never as a percentage and never as one bit.
 - [c4] `doctor` runs the scan `check` ran and repairs or reports what it finds.
-  No command in the tool can block a merge.
+  Exactly one condition may exit non-zero: a store that will not parse, which is
+  malformed input under `c2`. No semantic disagreement — a criterion
+  outstanding, a mark uncommitted, a spec without a baseline — can fail a build.
 - [c5] Abandonment is a first-class write. `drop --because` closes any record,
   including the five undelivered clause tasks of the superseded spec that no
   command can close today.
@@ -43,9 +45,11 @@ Proof:
 - [c8] No state is derived from git. Every recorded fact was asserted by an
   agent that intended it; git is referenced as evidence by sha and is never an
   input to state.
-- [c9] No command answers a question it did not understand. An unrecognised
-  flag is an error naming the flag, `--help` works on every command and
-  subcommand, and one printer renders a task everywhere it appears.
+- [c9] No command answers a question it did not understand, and none silently
+  discards one it did. An unrecognised flag is an error naming the flag; a
+  recognised flag either takes effect or is refused, never accepted and dropped;
+  `--help` works on every command and subcommand; and one printer renders a task
+  everywhere it appears.
 - [c10] These are gone, not guarded: proof-target execution as a gate, the
   deliverable freeze and its baselines, verdicts bound to clause-text hashes,
   and the merge gate's refusals.
@@ -80,23 +84,37 @@ the approval mechanism. CLAUDE.md already says audits are the one gate that has
 repeatedly caught real defects. Mutation-testing discipline is a practice, not
 a feature of this tool.
 
-### The finding list dissolves rather than being worked
+### What the deletions actually retire
 
-Of the eight findings U1 established that no clause covered, **six disappear
-under this spec** rather than being fixed by it:
+I first claimed six of the eight uncovered findings dissolve here. Walked
+record by record against the archives, **two do**. The corrected table is below;
+the original is preserved in git and in the commit that fixed it, because the
+error is more instructive than the claim.
 
-| finding | why it stops existing |
+| finding | verdict |
 |---|---|
-| M3, M4, A-H1 — the merge gate calls an in-progress branch complete | there is no merge gate |
-| B-M2, B-M3 — proof targets asserting an incidental string | proof targets are not a gate; this returns to audit practice |
-| A-M2 — four shipped specs have no freeze baseline | there is no freeze |
-| C-M3 — `check` exits 1 on the ordinary done-but-not-committed state | reads answer (`c1`) |
+| B-M3 | **dissolves.** Its only defect was which target the spec named; the test that proves the clause already exists and is green |
+| A-M2 — four specs have no freeze baseline | **dissolves.** Both halves need the freeze |
+| C-M3 — `check` exits 1 on done-but-not-committed | **dissolves**, but under `c4` and the Deliverable, not `c1`. `c1` is scoped to *read* commands and `doctor` writes — it repairs |
+| M3, A-H1 | **partial.** Three of five determinations die with the merge gate. Two survive in code *Carried forward* keeps: `taskStore.ts:217` `isBlocked` is tested only with `open` and `done` requirements, and `spec show`'s member line has no `in-progress` case. A-H1 stays open, narrowed, in U6 |
+| M4 | **does not dissolve.** It is `cmdDone`/`cmdStop` at `scripts/tasks.ts:680` and never touches the merge gate. `c2` deletes the stop guards; the `start → done` lifecycle test stays live. Open, in U3 |
+| B-M2 | **does not dissolve.** It looks identical to B-M3 and is not: B-M3's fix is to the target, B-M2's is to the *test*. `scripts/tasks.test.ts:1534` still passes with `relevantFiles` replaced by `[]`. `audit-prompt` is Carried forward, so that weak assertion stays. Open, in U2 |
 
-Only **C-H4** survives: 188 comment lines in the task system, several forbidden
-by name under CLAUDE.md's comment policy and still verbatim in the tree at
-`28d56cd` (`scripts/tasks.ts:108,148,155`, `mergeGate.ts:5`, `taskStore.ts:36`).
-One of them is also false — it claims `specCandidatesFromDiff` reuses quiet git
-plumbing when `diffChangedFiles` inherits stderr. It is carried in U6.
+**The case for this spec does not rest on that count**, which is why the count
+being wrong changes nothing structural. None of the three survivors argues for
+the policy-seam refactor — they are a lifecycle test gap, a weak assertion, and
+two untested branches. What the deletions retire is the machinery, and that is
+unchanged.
+
+The pass-2 audit filed A-H1, B-M2 and B-M3 together as "these do NOT dissolve."
+Walked individually they split three ways, so neither that grouping nor my table
+survived contact with the records.
+
+**C-H4** survives as filed: comment lines forbidden by name under CLAUDE.md's
+policy, still verbatim at `28d56cd` (`scripts/tasks.ts:108,148,155`,
+`mergeGate.ts:5`, `taskStore.ts:36`). One is also false — it claims
+`specCandidatesFromDiff` reuses quiet git plumbing when `diffChangedFiles`
+inherits stderr. Carried in U6.
 
 ## Decisions
 
@@ -124,20 +142,40 @@ refusal. **An unrecorded truth costs more than a recorded contradiction.**
 Blocking a write does not prevent the conflict it objects to; it prevents the
 *record* of the conflict, and the agent does the work regardless.
 
-### One file per task, plus an append-only event log
+### No storage split — git is already the event log
 
-Both shipped systems converged on the same hybrid, and neither of our own
-designs proposed it: human-readable state, one record per file, alongside a
-separate immutable event log. State stays greppable and diffable; history is
-never lost.
+Both shipped systems keep one file per task plus an append-only event log, and
+I proposed copying them. Measured against this repository, the case collapses.
 
-The property that matters here is that two branches touching different tasks
-**merge with no resolution step**. That dissolves the two-key-orders diff noise
-and most of the exposure behind friction #17, without a fold-on-read rewrite.
+| what an event log would record | already in git? |
+|---|---|
+| who changed what, when | yes — 45 commits touch the store |
+| **why** | yes, and better: a commit message *plus the code diff beside it* |
+| a single record's history | yes — `git log -S'<id>' -- docs/tasks.jsonl`, **86ms** |
+| the sha at the time | yes; it *is* the commit |
+| which branch asserted it | yes, the graph |
 
-This is the largest single piece and the only one that is genuinely structural,
-so it is last and it is separable. If it becomes its own branch, everything
-above still delivers.
+The only gap is an event that never became a commit — a worker claims a task and
+dies. But a dead worker does not commit an event log either, so the split does
+not close it. Only committing does. And `tl`'s own stated reason for
+`events.jsonl` is not history: it is atomicity under concurrent access, which
+bites only with parallel writers in one tree.
+
+The one-file-per-task half fares no better here. Two of its three benefits are
+already delivered: a single record edit is a **one-line diff** (the byte-stable
+serializer did that), and two branches editing *different* records already merge
+cleanly — tested. Only concurrent **appends** conflict, because both write at
+end-of-file.
+
+That gap costs one line, not a storage rewrite: `merge=union` in
+`.gitattributes` merges concurrent appends cleanly. It has one failure mode —
+two branches editing the *same* record keep both versions silently, as a
+duplicate id — and that is exactly what `doctor` scans for under `c4`, which
+has to exist regardless. Union plus a duplicate-id check buys the only real
+benefit without the silent corruption, and without the risk.
+
+So the split is cut. Revisit only if parallel writers in one working tree become
+normal, which is the one condition that would change the answer.
 
 ### The policy extraction is deferred, and its stated justification was spent
 
@@ -231,10 +269,17 @@ finding list disappears with it.
   and by diff both go, with nothing layered on top of them (`c8`).
 - Delete the tests that exist only to prove the deleted behaviour. Keep the
   ones that prove something a reader still needs.
+- **CI invokes what this unit deletes.** `.github/workflows/test.yml:53` runs
+  `check --merge` on every PR and `:39` runs `check` on every push. Removing a
+  CI step is the shape CLAUDE.md flags in an audit, so name it in the commit
+  message and say what replaces it. Also correct `CLAUDE.md:40`, which lists CI
+  as `tsc --noEmit`, `npm test`, `layer-check` and `audit-status` and omits both
+  `tasks` steps — the document has been wrong about this independently of
+  anything this branch changes.
 
-Acceptance: `npm test` green; no command in the tool can exit non-zero on
-account of a merge being unsafe; `grep` for the removed concepts returns
-nothing outside the audit archive.
+Acceptance: `npm test` green; no command exits non-zero on account of a merge
+being unsafe; `grep` for the removed concepts returns nothing outside the audit
+archive; CI passes with no step invoking a command that no longer exists.
 
 ### U3 — Flip the polarity
 
@@ -278,13 +323,12 @@ subject is a silent write, which is the failure this spec exists to prevent.
 - Close C-H4: remove the comment lines CLAUDE.md's policy forbids by name,
   starting with the one that is factually wrong.
 
-### U7 — Storage, and the audits
+### U7 — Concurrent appends, measurements, and the audits
 
-Separable. If this becomes its own branch, U0 and U2–U6 still deliver.
-
-- One file per task, plus an append-only event log (`c8` history half). Prove
-  the property that motivates it: two branches editing different tasks merge
-  with no conflict.
+- `merge=union` for `docs/tasks.jsonl` in `.gitattributes`, plus a duplicate-id
+  scan in `doctor`. Prove both: two branches appending different tasks merge
+  cleanly, and two branches editing one record produce a duplicate that
+  `doctor` reports.
 - Record `npm test` and each PR gate against the five-minute budget.
 - Commission an independent audit through `tasks audit-prompt`, and a second
   auditor asked only whether anything is worse than before U0 — scoped against
@@ -293,10 +337,11 @@ Separable. If this becomes its own branch, U0 and U2–U6 still deliver.
 
 ## Open questions
 
-**Does the storage split belong on this branch?** It is the only structural
-piece and everything else delivers without it. Deferred to after U6, when its
-cost is visible against a working tool rather than estimated against a broken
-one.
+**Answered: the storage split is cut.** Measured, git already carries every
+field an event log would, a record edit is already a one-line diff, and
+different-record edits already merge. Only concurrent appends conflict, and
+`merge=union` plus a `doctor` duplicate-id scan closes that for one config line.
+See the Decisions entry.
 
 **Should the spec and branch be renamed?** The slug describes work this spec
 deletes. Renaming costs re-pointing 38 member records through the operation the
