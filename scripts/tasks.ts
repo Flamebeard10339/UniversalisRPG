@@ -6,7 +6,7 @@ import { pathToFileURL } from 'node:url';
 import { harvestFiles, parseAuditDoc, systemForDoc } from './lib/auditImport';
 import { checkCommitMessage, extractNextTrailer, isExempt } from './lib/commitContract';
 import * as git from './lib/git';
-import { appendAmendment, appendAuditPass, duplicateClauseIds, parseSpecDoc, stampClauseIds, type AuditVerdict, type ProofClause, type Verdict } from './lib/specDoc';
+import { appendAmendment, appendAuditPass, clauseStandings, duplicateClauseIds, outstandingSummary, parseSpecDoc, stampClauseIds, VERDICTS, type AuditVerdict, type ProofClause, type Verdict } from './lib/specDoc';
 import { loadManifest, systemNames as manifestSystemNames } from './lib/systems';
 import {
   checkStore,
@@ -16,6 +16,7 @@ import {
   type CheckIssue,
   fixNowQueue,
   isBlocked,
+  KINDS,
   listQueue,
   loadStore,
   loadStoreTolerantly,
@@ -436,7 +437,7 @@ function reportUnresolvedRequires(task: Task, tasks: Task[]): void {
 }
 
 const ADD_USAGE =
-  'usage: tasks add "<title>" [--kind task|finding] [--severity high|medium|low] [--system "<name>"] [--spec <slug>] [--files a.ts:12,b.ts] [--requires id1,id2] [--deliverable "..." (required for --kind finding)] [--evidence "..."] [--id <id>]';
+  'usage: tasks add "<title>" [--kind task|finding|question] [--severity high|medium|low] [--system "<name>"] [--spec <slug>] [--files a.ts:12,b.ts] [--requires id1,id2] [--deliverable "..." (required for --kind finding)] [--evidence "..."] [--id <id>]';
 
 function cmdAdd(args: Flags): void {
   const config = resolveConfig(args.flags);
@@ -448,8 +449,8 @@ function cmdAdd(args: Flags): void {
   }
 
   const kind = (args.flags.kind as Kind | undefined) ?? 'task';
-  if (kind !== 'task' && kind !== 'finding') {
-    console.error(`error: --kind must be task or finding (undelivered tasks are only created by \`audit\`)`);
+  if (kind !== 'task' && kind !== 'finding' && kind !== 'question') {
+    console.error(`error: --kind must be task, finding or question (undelivered tasks are only created by \`audit\`)`);
     process.exitCode = 1;
     return;
   }
@@ -629,7 +630,6 @@ function cmdShow(args: Flags): void {
 }
 
 const LIST_STATES: State[] = ['unreviewed', 'open', 'in-progress', 'done', 'declined'];
-const LIST_KINDS: Kind[] = ['task', 'finding', 'undelivered'];
 
 // The only verb that can read the whole store rather than one spec's
 // fix-now queue — `next` refuses outside an active spec, and `spec: null`
@@ -678,8 +678,8 @@ function runList(args: Flags, text: string | undefined): void {
     return;
   }
   const kind = flags.kind as Kind | undefined;
-  if (kind !== undefined && !LIST_KINDS.includes(kind)) {
-    console.error(`error: --kind must be one of ${LIST_KINDS.join(', ')}`);
+  if (kind !== undefined && !KINDS.includes(kind)) {
+    console.error(`error: --kind must be one of ${KINDS.join(', ')}`);
     process.exitCode = 1;
     return;
   }
@@ -842,9 +842,9 @@ function clauseStanding(config: Config, task: Task): string {
   if (!doc.proofClauses.some((candidate) => candidate.id === task.clause)) return `proof clause ${task.clause} is no longer in ${path_}`;
   const latest = doc.auditPasses[doc.auditPasses.length - 1];
   if (!latest) return `${task.spec} has no recorded audit pass`;
-  const verdict = latest.verdicts.find((candidate) => candidate.clause === task.clause);
-  if (!verdict) return `proof clause ${task.clause} has no verdict in the latest audit pass (pass ${latest.pass})`;
-  return `proof clause ${task.clause} is ${verdict.status} in the latest audit pass (pass ${latest.pass})`;
+  const status = latest.verdicts.find((candidate) => candidate.clause === task.clause)?.status ?? 'unknown';
+  const nobodyLooked = status === 'unknown' ? ' — nobody graded it, which is not the same as unmet' : '';
+  return `proof clause ${task.clause} is ${status} in the latest audit pass (pass ${latest.pass})${nobodyLooked}`;
 }
 
 function cmdDone(args: Flags): void {
@@ -998,9 +998,12 @@ function cmdSpecShow(args: Flags): void {
   console.log('');
   console.log(`${doc.auditPasses.length} audit pass(es) recorded`);
   for (const pass of doc.auditPasses) {
-    const met = pass.verdicts.filter((verdict) => verdict.status === 'met').length;
-    console.log(`  pass ${pass.pass} (${pass.date}): ${met}/${pass.verdicts.length} clauses met`);
+    console.log(`  pass ${pass.pass} (${pass.date}): ${outstandingSummary(pass.verdicts)}`);
   }
+  // The passes above are what each pass said; this is where the spec stands
+  // now, which differs whenever a clause was added after the last one.
+  const latest = doc.auditPasses[doc.auditPasses.length - 1];
+  console.log(`clause standing (${latest ? `latest pass ${latest.pass}` : 'no audit pass recorded'}): ${outstandingSummary(clauseStandings(doc.proofClauses, latest?.verdicts))}`);
   console.log('');
 
   const members = specMembers(readStore(config).filter((task) => task.spec === slug), args.flags.order === 'true');
@@ -1288,9 +1291,12 @@ function cmdAuditPrompt(args: Flags): void {
   if (relevantFiles.length === 0) console.log('- none');
   for (const file of relevantFiles) console.log(`- ${file}`);
   console.log('');
+  const standings = clauseStandings(doc.proofClauses, latest?.verdicts);
   console.log('Proof clauses:');
   for (const clause of doc.proofClauses) {
     console.log(`- [c${clause.id}] ${clause.text}`);
+    const standing = standings.find((verdict) => verdict.clause === clause.id)!;
+    console.log(`  latest verdict: ${standing.status}${standing.status === 'unknown' ? ' — nobody has graded this clause' : standing.evidence ? ` — ${standing.evidence}` : ''}`);
     const targets = clause.proofTargets ?? [];
     if (targets.length === 0) {
       console.log('  no proof target — requires human verification: inspect the behavior directly.');
@@ -1303,7 +1309,7 @@ function cmdAuditPrompt(args: Flags): void {
   console.log('');
   if (noTargetCount > 0) console.log(`${noTargetCount} of ${doc.proofClauses.length} clause(s) have no proof target and require human verification.`);
   console.log('');
-  console.log(latest ? `Latest audit pass: pass ${latest.pass} (${latest.date}), ${latest.verdicts.filter((verdict) => verdict.status === 'met').length}/${latest.verdicts.length} met` : 'Latest audit pass: none recorded');
+  console.log(`${latest ? `Latest audit pass: pass ${latest.pass} (${latest.date})` : 'Latest audit pass: none recorded'} — ${outstandingSummary(standings)}`);
   console.log('');
   console.log('Member tasks:');
   if (members.length === 0) console.log('- none');
@@ -1316,7 +1322,8 @@ function cmdAuditPrompt(args: Flags): void {
   console.log('For pure domain logic and API layers, prefer mutation testing: temporarily remove, invert, or scale the behavior the test claims to prove and confirm the named proof fails for the right reason.');
   console.log('For UI work, inspect behavior and add or run smoke tests after the implementation has settled.');
   console.log('');
-  console.log('Report clause verdicts as met/unmet with one-sentence evidence; findings with severity, system, files, evidence, and deliverable; and any proof target that is missing, skipped, too broad, or non-specific.');
+  console.log('Report each clause as met, unmet or unknown. `met` carries the evidence that backs it and the tool refuses it without one; `unmet` means you checked and it fails; `unknown` means nobody looked, and reporting it as unmet instead hides that nothing was verified.');
+  console.log('Report findings with severity, system, files, evidence, and deliverable; and any proof target that is missing, skipped, too broad, or non-specific.');
   console.log('Do not promote pass-2+ findings. Do not treat green tests as proof unless they are tied to the clause they discharge.');
 }
 
@@ -1508,7 +1515,8 @@ function parseAuditArgs(args: string[]): AuditArgs {
       baseBranch = value ?? 'main';
     } else if (key === 'proof') {
       const [clause, status] = (value ?? '').split('=');
-      proofs.set(Number(clause), status as Verdict);
+      if (!VERDICTS.includes(status as Verdict)) errors.push(`--proof ${value ?? ''} names no verdict — a clause is met, unmet or unknown`);
+      else proofs.set(Number(clause), status as Verdict);
     } else if (key === 'evidence' && current) {
       const raw = value ?? '';
       const eq = raw.indexOf('=');
@@ -1547,14 +1555,19 @@ function parseAuditArgs(args: string[]): AuditArgs {
 }
 
 const AUDIT_USAGE =
-  'usage: tasks audit <spec> [--proof N=met|unmet ...] [--evidence N="..." ...] [--file N=path:line ...] [--finding "..." --severity high|medium|low --system "<name>" --deliverable "..." --evidence "..." [--file path:line ...]]...  (with no --proof flags, walks the clauses interactively)';
+  'usage: tasks audit <spec> [--proof N=met|unmet|unknown ...] [--evidence N="..." ... (required for every met clause)] [--file N=path:line ...] [--finding "..." --severity high|medium|low --system "<name>" --deliverable "..." --evidence "..." [--file path:line ...]]...  (with no --proof flags, walks the clauses interactively; a clause left ungraded is recorded unknown, never unmet)';
 
+// Stops at the first clause the answerer walks away from rather than
+// looping on an exhausted stdin, and the caller grades the rest `unknown` —
+// a half-finished walk graded nothing, which is exactly what unknown says.
 async function walkClausesInteractively(clauses: ProofClause[]): Promise<AuditVerdict[]> {
   const rl = createInterface({ input: process.stdin, output: process.stdout });
   const lines = rl[Symbol.asyncIterator]();
+  let exhausted = false;
   const ask = async (prompt: string): Promise<string> => {
     process.stdout.write(prompt);
     const next = await lines.next();
+    if (next.done) exhausted = true;
     return next.done ? '' : next.value;
   };
 
@@ -1562,24 +1575,29 @@ async function walkClausesInteractively(clauses: ProofClause[]): Promise<AuditVe
   for (const clause of clauses) {
     console.log(`\nclause ${clause.id}: ${clause.text}`);
     let status: Verdict | null = null;
-    while (status === null) {
-      const answer = (await ask('met/unmet? ')).trim().toLowerCase();
-      if (answer === 'met' || answer === 'unmet') status = answer;
-      else console.log('type "met" or "unmet"');
+    while (status === null && !exhausted) {
+      const answer = (await ask('met/unmet/unknown? ')).trim().toLowerCase();
+      if (VERDICTS.includes(answer as Verdict)) status = answer as Verdict;
+      else if (!exhausted) console.log('type "met", "unmet" or "unknown"');
     }
-    // Evidence is askable on met too, not only unmet — a measurement
-    // backing a completion claim is worth keeping, and staying optional
-    // (an empty answer records nothing) costs a human one keystroke.
-    const evidenceText = (await ask('evidence (optional): ')).trim() || null;
+    if (status === null) break;
+    // A met verdict is a completion claim, so it is held until the claim
+    // names something the next auditor can re-run; unmet and unknown claim
+    // nothing and an empty answer records nothing.
+    let evidenceText: string | null = null;
+    while (evidenceText === null && !exhausted) {
+      evidenceText = (await ask(status === 'met' ? 'evidence (required for met): ' : 'evidence (optional): ')).trim() || null;
+      if (status !== 'met') break;
+      if (evidenceText === null && !exhausted) console.log('a met verdict needs evidence the next pass can re-run');
+    }
+    if (status === 'met' && evidenceText === null) break;
     verdicts.push({ clause: clause.id, status, evidence: evidenceText });
   }
   rl.close();
   return verdicts;
 }
 
-// The only way a finding enters the store. Every proof clause must
-// carry a verdict before findings are accepted — an unanswered clause
-// refuses the whole call rather than silently accepting partial results.
+// The only way a finding enters the store.
 async function cmdAudit(rawArgs: string[]): Promise<void> {
   const parsed = parseAuditArgs(rawArgs);
   if (!parsed.slug) {
@@ -1616,21 +1634,21 @@ async function cmdAudit(rawArgs: string[]): Promise<void> {
     return;
   }
 
-  let verdicts: AuditVerdict[];
-  if (parsed.proofs.size === 0 && parsed.findings.length === 0) {
-    verdicts = await walkClausesInteractively(doc.proofClauses);
-  } else {
-    const missing = doc.proofClauses.filter((clause) => !parsed.proofs.has(clause.id));
-    if (missing.length > 0) {
-      console.error(`error: every proof clause needs a verdict before findings are accepted; missing: ${missing.map((clause) => clause.id).join(', ')}`);
-      process.exitCode = 1;
-      return;
-    }
-    verdicts = doc.proofClauses.map((clause) => ({
-      clause: clause.id,
-      status: parsed.proofs.get(clause.id)!,
-      evidence: parsed.evidence.get(clause.id) ?? null,
-    }));
+  // Whichever route graded the clauses, the ones it did not reach are
+  // `unknown` rather than missing: a pass that says nothing about a clause
+  // is a pass that nobody ran on it, and that is a fact worth recording.
+  const graded =
+    parsed.proofs.size === 0 && parsed.findings.length === 0
+      ? await walkClausesInteractively(doc.proofClauses)
+      : doc.proofClauses.filter((clause) => parsed.proofs.has(clause.id)).map((clause) => ({ clause: clause.id, status: parsed.proofs.get(clause.id)!, evidence: parsed.evidence.get(clause.id) ?? null }));
+  const verdicts = clauseStandings(doc.proofClauses, graded);
+  const ungraded = verdicts.filter((verdict) => verdict.status === 'unknown').map((verdict) => `c${verdict.clause}`);
+
+  const unevidenced = verdicts.filter((verdict) => verdict.status === 'met' && !verdict.evidence);
+  if (unevidenced.length > 0) {
+    console.error(`error: ${unevidenced.map((verdict) => `clause ${verdict.clause} is met with no evidence`).join('; ')} — pass --evidence N="..." naming what you checked, so the next pass can re-run it`);
+    process.exitCode = 1;
+    return;
   }
 
   for (const finding of parsed.findings) {
@@ -1732,10 +1750,10 @@ async function cmdAudit(rawArgs: string[]): Promise<void> {
   saveStoreAndWarn(tasks, config);
   writeFileSync(path_, appendAuditPass(text, { pass: passNumber, date: today(), base, head, verdicts }), 'utf8');
 
-  const met = verdicts.filter((verdict) => verdict.status === 'met').length;
-  console.log(`recorded pass ${passNumber} for ${slug}: ${met}/${verdicts.length} clauses met`);
+  console.log(`recorded pass ${passNumber} for ${slug}: ${outstandingSummary(verdicts)}`);
   if (text !== original) console.log(`tagged ${slug}'s proof clauses [cN] — the tag is the clause's identity, so keep it when you reword or reorder`);
   if (undeliveredCreated > 0) console.log(`${undeliveredCreated} undelivered task(s) created for unmet clauses`);
+  if (ungraded.length > 0) console.log(`${ungraded.length} clause(s) recorded unknown — nobody graded them: ${ungraded.join(', ')}. No undelivered task was created, because an ungraded clause is not a broken promise`);
   if (findingsCreated > 0) console.log(`${findingsCreated} finding(s) recorded, unreviewed`);
 }
 
@@ -1836,7 +1854,8 @@ function cmdHandoff(args: Flags): void {
   // The proof clauses, not the whole ## Deliverable section: the section's
   // prose never changes between runs, and what a cold session needs from
   // it — what the branch still owes — is exactly what the clauses are.
-  for (const clause of doc.proofClauses) console.log(`  ${clause.id}. ${truncateLine(clause.text)}`);
+  const standings = clauseStandings(doc.proofClauses, doc.auditPasses[doc.auditPasses.length - 1]?.verdicts);
+  for (const standing of standings) console.log(`  ${standing.clause}. [${standing.status}] ${truncateLine(doc.proofClauses.find((clause) => clause.id === standing.clause)!.text)}`);
   console.log('');
 
   const inProgress = tasks.filter((task) => task.spec === spec && task.state === 'in-progress');

@@ -261,8 +261,8 @@ export function appendAuditPass(text: string, pass: AuditPass): string {
 
 // A clause the pass never graded is `unknown` — the pass says nothing about
 // it, and the reader is owed that as a stated fact rather than an omission.
-export function clauseStandings(clauses: ProofClause[], pass: AuditPass | undefined): AuditVerdict[] {
-  return clauses.map((clause) => pass?.verdicts.find((verdict) => verdict.clause === clause.id) ?? { clause: clause.id, status: 'unknown', evidence: null });
+export function clauseStandings(clauses: ProofClause[], graded: AuditVerdict[] = []): AuditVerdict[] {
+  return clauses.map((clause) => graded.find((verdict) => verdict.clause === clause.id) ?? { clause: clause.id, status: 'unknown', evidence: null });
 }
 
 // Completeness as names, never as a ratio or a bit: which clause is

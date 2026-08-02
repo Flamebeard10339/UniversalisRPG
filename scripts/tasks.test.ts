@@ -214,6 +214,33 @@ describe('tasks CLI', () => {
     });
   });
 
+  it('a question is a kind, reachable through the same add, list and show as every other record', () => {
+    fixture(({ tasks }) => {
+      const added = tasks('add', 'Does spec amend survive?', '--id', 'spec-amend-survives', '--kind', 'question', '--spec', 'demo-spec', '--system', 'Runtime', '--evidence', 'it writes a dated copy of the deliverable that nothing reads');
+      expect(added.status).toBe(0);
+      expect(added.stdout).toContain('added spec-amend-survives [question/open]');
+
+      const shown = tasks('show', 'spec-amend-survives');
+      expect(shown.stdout).toContain('[question/open]');
+      expect(shown.stdout).toContain('spec: demo-spec');
+      expect(shown.stdout).toContain('evidence: it writes a dated copy of the deliverable that nothing reads');
+
+      const listed = tasks('list', '--kind', 'question');
+      expect(listed.stdout).toContain('spec-amend-survives');
+      expect(listed.stdout).toContain('1 task(s)');
+      expect(tasks('list', '--kind', 'task').stdout).not.toContain('spec-amend-survives');
+    });
+  });
+
+  it('a question closes on the answer the same way every other record does', () => {
+    fixture(({ tasks }) => {
+      tasks('add', 'Does spec amend survive?', '--id', 'spec-amend-survives', '--kind', 'question');
+      const declined = tasks('decline', 'spec-amend-survives', '--reason', 'no: git log -p on the spec file already gives the archive');
+      expect(declined.status).toBe(0);
+      expect(tasks('show', 'spec-amend-survives').stdout).toContain('reason: no: git log -p on the spec file already gives the archive');
+    });
+  });
+
   it('--kind task (the default) does not require --deliverable', () => {
     fixture(({ tasks }) => {
       const result = tasks('add', 'a plain task', '--id', 'plain-task');
@@ -1150,7 +1177,7 @@ describe('tasks CLI', () => {
     fixture(({ tasks }) => {
       tasks('add', 'a task', '--id', 'a-task');
       tasks('add', 'a finding', '--id', 'a-finding', '--kind', 'finding', '--severity', 'low', '--deliverable', 'fix it');
-      tasks('audit', 'demo-spec', '--proof', '1=met', '--proof', '2=met', '--finding', 'pass one finding', '--severity', 'low', '--deliverable', 'fix it', '--evidence', 'seen in pass one');
+      tasks('audit', 'demo-spec', '--proof', '1=met', '--evidence', '1=clause 1 checked', '--proof', '2=met', '--evidence', '2=clause 2 checked', '--finding', 'pass one finding', '--severity', 'low', '--deliverable', 'fix it', '--evidence', 'seen in pass one');
       const added = tasks('spec', 'add', 'demo-spec', 'a-task', 'a-finding', 'demo-spec-pass1-pass-one-finding');
       expect(added.status).toBe(0);
       expect(tasks('show', 'a-task').stdout).toContain('spec: demo-spec');
@@ -1170,8 +1197,8 @@ describe('tasks CLI', () => {
   it('spec add promotes a pass 2+ finding and records that it extends what the spec owes', () => {
     fixture(({ tasks }) => {
       tasks('add', 'a task', '--id', 'a-task');
-      tasks('audit', 'demo-spec', '--proof', '1=met', '--proof', '2=met');
-      tasks('audit', 'demo-spec', '--proof', '1=met', '--proof', '2=met', '--finding', 'late finding', '--severity', 'low', '--deliverable', 'fix it', '--evidence', 'seen late');
+      tasks('audit', 'demo-spec', '--proof', '1=met', '--evidence', '1=clause 1 checked', '--proof', '2=met', '--evidence', '2=clause 2 checked');
+      tasks('audit', 'demo-spec', '--proof', '1=met', '--evidence', '1=clause 1 checked', '--proof', '2=met', '--evidence', '2=clause 2 checked', '--finding', 'late finding', '--severity', 'low', '--deliverable', 'fix it', '--evidence', 'seen late');
       const result = tasks('spec', 'add', 'demo-spec', 'a-task', 'demo-spec-pass2-late-finding');
       expect(result.status).toBe(0);
       expect(result.stdout).toContain('came from a pass 2 or later audit, which extends what demo-spec owes');
@@ -1224,7 +1251,7 @@ describe('tasks CLI', () => {
 
   it('spec remove drops an undelivered task out of its spec and records that the clause is now tracked by none', () => {
     fixture(({ tasks }) => {
-      tasks('audit', 'demo-spec', '--proof', '1=unmet', '--evidence', '1=not yet', '--proof', '2=met');
+      tasks('audit', 'demo-spec', '--proof', '1=unmet', '--evidence', '1=not yet', '--proof', '2=met', '--evidence', '2=clause 2 checked');
       const result = tasks('spec', 'remove', 'demo-spec', 'demo-spec-clause-1');
       expect(result.status).toBe(0);
       expect(result.stdout).toContain("were demo-spec's outstanding promises");
@@ -1243,6 +1270,33 @@ describe('tasks CLI', () => {
     });
   });
 
+  it('spec show names each outstanding clause and its status rather than scoring the spec', () => {
+    fixture(({ tasks }) => {
+      tasks('audit', 'demo-spec', '--proof', '1=met', '--evidence', '1=measured directly', '--proof', '2=unmet', '--evidence', '2=it fails');
+      const shown = tasks('spec', 'show', 'demo-spec');
+      expect(shown.stdout).toContain('pass 1 (');
+      expect(shown.stdout).toContain('outstanding: c2 (unmet)');
+      expect(shown.stdout).not.toContain('clauses met');
+      expect(shown.stdout).not.toMatch(/\d+\/\d+/);
+    });
+  });
+
+  it('spec show reports a clause the latest pass never graded as outstanding and unknown', () => {
+    fixture(({ tasks, dir }) => {
+      tasks('audit', 'demo-spec', '--proof', '1=met', '--evidence', '1=measured directly', '--proof', '2=met', '--evidence', '2=read the diff');
+      const specPath = path.join(dir, 'specs', 'demo-spec.md');
+      writeFileSync(specPath, readFileSync(specPath, 'utf8').replace('- [c2] The second clause holds.', '- [c2] The second clause holds.\n- A clause added after the pass.'), 'utf8');
+      const shown = tasks('spec', 'show', 'demo-spec');
+      expect(shown.stdout).toContain('clause standing (latest pass 1): outstanding: c3 (unknown)');
+    });
+  });
+
+  it('spec show with no audit pass calls every clause unknown rather than saying nothing about them', () => {
+    fixture(({ tasks }) => {
+      expect(tasks('spec', 'show', 'demo-spec').stdout).toContain('clause standing (no audit pass recorded): outstanding: c1 (unknown), c2 (unknown)');
+    });
+  });
+
   it('spec <slug> is an alias for spec show <slug>', () => {
     fixture(({ tasks }) => {
       tasks('add', 'a member', '--id', 'a-member', '--spec', 'demo-spec');
@@ -1253,7 +1307,7 @@ describe('tasks CLI', () => {
   it('recording an audit pass leaves the spec with exactly one Deliverable section and no baseline', () => {
     fixture(({ tasks, dir }) => {
       const specPath = path.join(dir, 'specs', 'demo-spec.md');
-      const audited = tasks('audit', 'demo-spec', '--proof', '1=met', '--proof', '2=met');
+      const audited = tasks('audit', 'demo-spec', '--proof', '1=met', '--evidence', '1=clause 1 checked', '--proof', '2=met', '--evidence', '2=clause 2 checked');
       expect(audited.status).toBe(0);
       const specText = readFileSync(specPath, 'utf8');
       expect(specText).not.toContain('## Baseline');
@@ -1348,10 +1402,10 @@ describe('tasks CLI', () => {
 
   it('done on an undelivered task closes once the spec\'s latest audit pass grades its clause met', () => {
     fixture(({ tasks }) => {
-      tasks('audit', 'demo-spec', '--proof', '1=unmet', '--evidence', '1=not yet', '--proof', '2=met');
+      tasks('audit', 'demo-spec', '--proof', '1=unmet', '--evidence', '1=not yet', '--proof', '2=met', '--evidence', '2=clause 2 checked');
       expect(tasks('show', 'demo-spec-clause-1').stdout).toContain('[undelivered/open/high]');
 
-      tasks('audit', 'demo-spec', '--proof', '1=met', '--proof', '2=met');
+      tasks('audit', 'demo-spec', '--proof', '1=met', '--evidence', '1=clause 1 checked', '--proof', '2=met', '--evidence', '2=clause 2 checked');
       const result = tasks('done', 'demo-spec-clause-1');
       expect(result.status).toBe(0);
       expect(tasks('show', 'demo-spec-clause-1').stdout).toContain('closed: ');
@@ -1360,11 +1414,22 @@ describe('tasks CLI', () => {
 
   it('done on an undelivered task closes against an unmet verdict, recording the verdict it closed against', () => {
     fixture(({ tasks }) => {
-      tasks('audit', 'demo-spec', '--proof', '1=unmet', '--evidence', '1=nope', '--proof', '2=met');
+      tasks('audit', 'demo-spec', '--proof', '1=unmet', '--evidence', '1=nope', '--proof', '2=met', '--evidence', '2=clause 2 checked');
       const result = tasks('done', 'demo-spec-clause-1');
       expect(result.status).toBe(0);
       expect(result.stdout).toContain('clause standing at close: proof clause 1 is unmet in the latest audit pass (pass 1)');
       expect(tasks('show', 'demo-spec-clause-1').stdout).toContain('closed: ');
+    });
+  });
+
+  it('done on an undelivered task reports a clause the latest pass never graded as unknown, not as unmet', () => {
+    fixture(({ tasks }) => {
+      tasks('audit', 'demo-spec', '--proof', '1=unmet', '--evidence', '1=nope', '--proof', '2=met', '--evidence', '2=clause 2 checked');
+      tasks('audit', 'demo-spec', '--proof', '2=met', '--evidence', '2=clause 2 checked');
+      const result = tasks('done', 'demo-spec-clause-1');
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('clause standing at close: proof clause 1 is unknown in the latest audit pass (pass 2) — nobody graded it');
+      expect(result.stdout).not.toContain('is unmet in the latest audit pass (pass 2)');
     });
   });
 
@@ -1385,7 +1450,7 @@ describe('tasks CLI', () => {
 
   it('done on an undelivered task closes when its clause has been deleted from the spec outright, and says which clause is gone', () => {
     fixture(({ tasks, dir }) => {
-      tasks('audit', 'demo-spec', '--proof', '1=met', '--proof', '2=met');
+      tasks('audit', 'demo-spec', '--proof', '1=met', '--evidence', '1=clause 1 checked', '--proof', '2=met', '--evidence', '2=clause 2 checked');
       const storePath = path.join(dir, 'tasks.jsonl');
       writeFileSync(
         storePath,
@@ -1402,7 +1467,7 @@ describe('tasks CLI', () => {
   it('an undelivered task survives its clause being reworded by an amendment, and closes on the next met verdict', () => {
     fixture(({ tasks, dir }) => {
       const specPath = path.join(dir, 'specs', 'demo-spec.md');
-      tasks('audit', 'demo-spec', '--proof', '1=unmet', '--evidence', '1=not yet', '--proof', '2=met');
+      tasks('audit', 'demo-spec', '--proof', '1=unmet', '--evidence', '1=not yet', '--proof', '2=met', '--evidence', '2=clause 2 checked');
       expect(tasks('show', 'demo-spec-clause-1').stdout).toContain('[undelivered/open/high]');
 
       // The first audit stamped the clause, so the tag is already sitting in
@@ -1410,7 +1475,7 @@ describe('tasks CLI', () => {
       writeFileSync(specPath, readFileSync(specPath, 'utf8').replace('[c1] The first clause holds.', '[c1] The first clause holds, under a narrower reading.'), 'utf8');
       expect(tasks('spec', 'amend', 'demo-spec', '--reason', 'narrowed after implementing it').status).toBe(0);
 
-      tasks('audit', 'demo-spec', '--proof', '1=met', '--proof', '2=met');
+      tasks('audit', 'demo-spec', '--proof', '1=met', '--evidence', '1=clause 1 checked', '--proof', '2=met', '--evidence', '2=clause 2 checked');
       const result = tasks('done', 'demo-spec-clause-1');
       expect(result.status).toBe(0);
       expect(tasks('show', 'demo-spec-clause-1').stdout).toContain('closed: ');
@@ -1420,7 +1485,7 @@ describe('tasks CLI', () => {
   it('a clause keeps its id when the Proof: list is reordered and a new clause is inserted above it', () => {
     fixture(({ tasks, dir }) => {
       const specPath = path.join(dir, 'specs', 'demo-spec.md');
-      tasks('audit', 'demo-spec', '--proof', '1=unmet', '--evidence', '1=not yet', '--proof', '2=met');
+      tasks('audit', 'demo-spec', '--proof', '1=unmet', '--evidence', '1=not yet', '--proof', '2=met', '--evidence', '2=clause 2 checked');
 
       writeFileSync(
         specPath,
@@ -1431,7 +1496,7 @@ describe('tasks CLI', () => {
         'utf8',
       );
 
-      const audited = tasks('audit', 'demo-spec', '--proof', '1=met', '--proof', '2=met', '--proof', '3=met');
+      const audited = tasks('audit', 'demo-spec', '--proof', '1=met', '--evidence', '1=clause 1 checked', '--proof', '2=met', '--evidence', '2=clause 2 checked', '--proof', '3=met', '--evidence', '3=clause 3 checked');
       expect(audited.status).toBe(0);
       expect(audited.stdout).toContain("keep it when you reword or reorder");
       // The insertion took a fresh id instead of displacing clause 1's.
@@ -1453,7 +1518,7 @@ describe('tasks CLI', () => {
   it('spec amend refuses when the only change since the last amendment is the ids audit stamped on', () => {
     fixture(({ tasks }) => {
       expect(tasks('spec', 'amend', 'demo-spec', '--reason', 'adopted before any audit').status).toBe(0);
-      tasks('audit', 'demo-spec', '--proof', '1=met', '--proof', '2=met');
+      tasks('audit', 'demo-spec', '--proof', '1=met', '--evidence', '1=clause 1 checked', '--proof', '2=met', '--evidence', '2=clause 2 checked');
 
       const second = tasks('spec', 'amend', 'demo-spec', '--reason', 'nothing but tags changed');
       expect(second.status).toBe(1);
@@ -1465,7 +1530,7 @@ describe('tasks CLI', () => {
     fixture(({ tasks, dir }) => {
       const specPath = path.join(dir, 'specs', 'demo-spec.md');
       writeFileSync(specPath, readFileSync(specPath, 'utf8').replace('- The first clause holds.\n- The second clause holds.', '- [c1] The first clause holds.\n- [c1] The second clause holds.'), 'utf8');
-      const result = tasks('audit', 'demo-spec', '--proof', '1=met');
+      const result = tasks('audit', 'demo-spec', '--proof', '1=met', '--evidence', '1=clause 1 checked');
       expect(result.status).toBe(1);
       expect(result.stderr).toContain('demo-spec tags more than one proof clause [c1]');
     });
@@ -1477,7 +1542,7 @@ describe('tasks CLI', () => {
   // exact defect Slice 1 fixed for `check` one command over.
   it('audit reports an unresolvable --base-branch as a diagnostic, not a stack trace', () => {
     fixture(({ tasks }) => {
-      const result = tasks('audit', 'demo-spec', '--proof', '1=met', '--proof', '2=met', '--base-branch', 'no-such-base-branch-xyz');
+      const result = tasks('audit', 'demo-spec', '--proof', '1=met', '--evidence', '1=clause 1 checked', '--proof', '2=met', '--evidence', '2=clause 2 checked', '--base-branch', 'no-such-base-branch-xyz');
       expect(result.status).toBe(1);
       expect(result.stderr).toContain('could not resolve a merge-base');
       expect(result.stderr).not.toContain('    at ');
@@ -1494,28 +1559,56 @@ describe('tasks CLI', () => {
     });
   });
 
-  it('audit\'s interactive clause walk asks for evidence on a met verdict, not only unmet, and it survives to the spec file', () => {
+  function walkClauses(dir: string, input: string): Run {
+    const globals = ['--store', path.join(dir, 'tasks.jsonl'), '--systems', path.join(dir, 'systems.json'), '--specs-dir', path.join(dir, 'specs'), '--branch', 'demo-spec'];
+    const result = spawnSync(process.execPath, [tsx, script, 'audit', 'demo-spec', ...globals], { cwd: repoRoot, encoding: 'utf8', input });
+    return { status: result.status ?? 1, stdout: result.stdout, stderr: result.stderr };
+  }
+
+  it('audit\'s interactive clause walk holds a met verdict until evidence is typed, and it survives to the spec file', () => {
     fixture(({ dir }) => {
-      const storePath = path.join(dir, 'tasks.jsonl');
-      const systemsPath = path.join(dir, 'systems.json');
-      const specsDir = path.join(dir, 'specs');
-      const globals = ['--store', storePath, '--systems', systemsPath, '--specs-dir', specsDir, '--branch', 'demo-spec'];
-      const result = spawnSync(process.execPath, [tsx, script, 'audit', 'demo-spec', ...globals], {
-        cwd: repoRoot,
-        encoding: 'utf8',
-        input: 'met\nmeasured 70ms\nmet\n\n',
-      });
+      const result = walkClauses(dir, 'met\n\nmeasured 70ms\nmet\nread the diff\n');
       expect(result.status).toBe(0);
-      expect(result.stdout).toContain('evidence (optional)');
-      const specText = readFileSync(path.join(specsDir, 'demo-spec.md'), 'utf8');
+      expect(result.stdout).toContain('evidence (required for met)');
+      const specText = readFileSync(path.join(dir, 'specs', 'demo-spec.md'), 'utf8');
       expect(specText).toContain('- proof 1: met — measured 70ms');
-      expect(specText).toContain('- proof 2: met\n');
+      expect(specText).toContain('- proof 2: met — read the diff');
+    });
+  });
+
+  it('audit\'s interactive clause walk offers unknown as a third answer and leaves its evidence optional', () => {
+    fixture(({ dir }) => {
+      const result = walkClauses(dir, 'unknown\n\nunmet\n\n');
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('met/unmet/unknown?');
+      const specText = readFileSync(path.join(dir, 'specs', 'demo-spec.md'), 'utf8');
+      expect(specText).toContain('- proof 1: unknown\n');
+      expect(specText).toContain('- proof 2: unmet\n');
+    });
+  });
+
+  it('audit\'s interactive clause walk re-asks rather than accepting an answer outside the three verdicts', () => {
+    fixture(({ dir }) => {
+      const result = walkClauses(dir, 'probably\nunknown\n\nunknown\n\n');
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('type "met", "unmet" or "unknown"');
+      expect(readFileSync(path.join(dir, 'specs', 'demo-spec.md'), 'utf8')).toContain('- proof 1: unknown');
+    });
+  });
+
+  it('audit\'s interactive clause walk ends on exhausted input and grades what it never reached unknown', () => {
+    fixture(({ dir }) => {
+      const result = walkClauses(dir, 'unmet\n');
+      expect(result.status).toBe(0);
+      const specText = readFileSync(path.join(dir, 'specs', 'demo-spec.md'), 'utf8');
+      expect(specText).toContain('- proof 1: unmet');
+      expect(specText).toContain('- proof 2: unknown');
     });
   });
 
   it('audit refuses a --finding with no --deliverable, recording nothing', () => {
     fixture(({ tasks }) => {
-      const result = tasks('audit', 'demo-spec', '--proof', '1=met', '--proof', '2=met', '--finding', 'undeliverable bug', '--severity', 'high');
+      const result = tasks('audit', 'demo-spec', '--proof', '1=met', '--evidence', '1=clause 1 checked', '--proof', '2=met', '--evidence', '2=clause 2 checked', '--finding', 'undeliverable bug', '--severity', 'high');
       expect(result.status).toBe(1);
       expect(result.stderr).toContain('needs --deliverable');
       expect(tasks('list', '--kind', 'finding').stdout).toContain('0 task(s)');
@@ -1524,7 +1617,7 @@ describe('tasks CLI', () => {
 
   it('audit refuses a --finding with no --evidence, recording nothing', () => {
     fixture(({ tasks }) => {
-      const result = tasks('audit', 'demo-spec', '--proof', '1=met', '--proof', '2=met', '--finding', 'unevidenced bug', '--severity', 'high', '--deliverable', 'fix it somehow');
+      const result = tasks('audit', 'demo-spec', '--proof', '1=met', '--evidence', '1=clause 1 checked', '--proof', '2=met', '--evidence', '2=clause 2 checked', '--finding', 'unevidenced bug', '--severity', 'high', '--deliverable', 'fix it somehow');
       expect(result.status).toBe(1);
       expect(result.stderr).toContain('needs --evidence');
       expect(tasks('list', '--kind', 'finding').stdout).toContain('0 task(s)');
@@ -1533,7 +1626,7 @@ describe('tasks CLI', () => {
 
   it('audit carries a --finding\'s --evidence onto the finding task, where triage reads it', () => {
     fixture(({ tasks }) => {
-      tasks('audit', 'demo-spec', '--proof', '1=met', '--proof', '2=met', '--finding', 'a real bug', '--severity', 'high', '--deliverable', 'guard the null case', '--evidence', 'save.ts:88 dereferences before the null check');
+      tasks('audit', 'demo-spec', '--proof', '1=met', '--evidence', '1=clause 1 checked', '--proof', '2=met', '--evidence', '2=clause 2 checked', '--finding', 'a real bug', '--severity', 'high', '--deliverable', 'guard the null case', '--evidence', 'save.ts:88 dereferences before the null check');
       const shown = tasks('list', '--kind', 'finding', '--state', 'unreviewed');
       const id = firstListedId(shown.stdout);
       expect(tasks('show', id).stdout).toContain('evidence: save.ts:88 dereferences before the null check');
@@ -1551,6 +1644,8 @@ describe('tasks CLI', () => {
         '1=the clause did not hold',
         '--proof',
         '2=met',
+        '--evidence',
+        '2=clause 2 checked',
         '--finding',
         'a separate bug',
         '--severity',
@@ -1568,7 +1663,7 @@ describe('tasks CLI', () => {
 
   it('clause-shaped evidence after a finding still goes to the clause rather than overwriting the finding', () => {
     fixture(({ tasks }) => {
-      const result = tasks('audit', 'demo-spec', '--proof', '1=met', '--proof', '2=unmet', '--finding', 'some bug', '--severity', 'low', '--deliverable', 'fix it', '--evidence', 'broken here', '--evidence', '2=the clause did not hold');
+      const result = tasks('audit', 'demo-spec', '--proof', '1=met', '--evidence', '1=clause 1 checked', '--proof', '2=unmet', '--finding', 'some bug', '--severity', 'low', '--deliverable', 'fix it', '--evidence', 'broken here', '--evidence', '2=the clause did not hold');
       expect(result.status).toBe(0);
       expect(tasks('show', 'demo-spec-clause-2').stdout).toContain('evidence: the clause did not hold');
       const id = firstListedId(tasks('list', '--kind', 'finding', '--state', 'unreviewed').stdout);
@@ -1578,7 +1673,7 @@ describe('tasks CLI', () => {
 
   it('audit refuses a second bare finding evidence instead of silently replacing the first', () => {
     fixture(({ tasks }) => {
-      const result = tasks('audit', 'demo-spec', '--proof', '1=met', '--proof', '2=met', '--finding', 'some bug', '--severity', 'low', '--deliverable', 'fix it', '--evidence', 'first evidence', '--evidence', 'replacement evidence');
+      const result = tasks('audit', 'demo-spec', '--proof', '1=met', '--evidence', '1=clause 1 checked', '--proof', '2=met', '--evidence', '2=clause 2 checked', '--finding', 'some bug', '--severity', 'low', '--deliverable', 'fix it', '--evidence', 'first evidence', '--evidence', 'replacement evidence');
       expect(result.status).toBe(1);
       expect(result.stderr).toContain('already has evidence');
       expect(tasks('list', '--kind', 'finding').stdout).toContain('0 task(s)');
@@ -1587,19 +1682,67 @@ describe('tasks CLI', () => {
 
   it('audit carries a --finding\'s --deliverable onto the finding task it creates', () => {
     fixture(({ tasks }) => {
-      tasks('audit', 'demo-spec', '--proof', '1=met', '--proof', '2=met', '--finding', 'a real bug', '--severity', 'high', '--deliverable', 'guard the null case', '--evidence', 'null deref on an empty save');
+      tasks('audit', 'demo-spec', '--proof', '1=met', '--evidence', '1=clause 1 checked', '--proof', '2=met', '--evidence', '2=clause 2 checked', '--finding', 'a real bug', '--severity', 'high', '--deliverable', 'guard the null case', '--evidence', 'null deref on an empty save');
       const shown = tasks('list', '--kind', 'finding', '--state', 'unreviewed');
       const id = firstListedId(shown.stdout);
       expect(tasks('show', id).stdout).toContain('deliverable: guard the null case');
     });
   });
 
-  it('audit refuses when a proof clause is missing a verdict', () => {
+  it('audit records a clause nobody graded as unknown instead of refusing the pass', () => {
+    fixture(({ tasks, dir }) => {
+      const result = tasks('audit', 'demo-spec', '--proof', '1=met', '--evidence', '1=clause 1 checked');
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('recorded pass 1 for demo-spec: outstanding: c2 (unknown)');
+      expect(result.stdout).toContain('1 clause(s) recorded unknown — nobody graded them: c2');
+      expect(readFileSync(path.join(dir, 'specs', 'demo-spec.md'), 'utf8')).toContain('- proof 2: unknown');
+    });
+  });
+
+  it('an unknown clause creates no undelivered task, because nobody looked is not a broken promise', () => {
     fixture(({ tasks }) => {
-      const result = tasks('audit', 'demo-spec', '--proof', '1=met');
+      tasks('audit', 'demo-spec', '--proof', '1=unmet', '--evidence', '1=it fails');
+      expect(tasks('show', 'demo-spec-clause-1').stdout).toContain('[undelivered/open/high]');
+      const missing = tasks('show', 'demo-spec-clause-2');
+      expect(missing.stdout).toContain('no such task: demo-spec-clause-2');
+    });
+  });
+
+  it('audit takes unknown as an explicit verdict and never renders it as unmet', () => {
+    fixture(({ tasks, dir }) => {
+      const result = tasks('audit', 'demo-spec', '--proof', '1=unknown', '--proof', '2=unmet', '--evidence', '2=it fails');
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('outstanding: c1 (unknown), c2 (unmet)');
+      const specText = readFileSync(path.join(dir, 'specs', 'demo-spec.md'), 'utf8');
+      expect(specText).toContain('- proof 1: unknown');
+      expect(specText).toContain('- proof 2: unmet — it fails');
+    });
+  });
+
+  it('audit refuses a met verdict with no evidence, naming the clause, and records nothing', () => {
+    fixture(({ tasks, dir }) => {
+      const result = tasks('audit', 'demo-spec', '--proof', '1=met', '--proof', '2=met', '--evidence', '2=clause 2 checked');
       expect(result.status).toBe(1);
-      expect(result.stderr).toContain('missing');
-      expect(result.stderr).toContain('2');
+      expect(result.stderr).toContain('clause 1 is met with no evidence');
+      expect(readFileSync(path.join(dir, 'specs', 'demo-spec.md'), 'utf8')).not.toContain('## Audit passes');
+    });
+  });
+
+  it('unmet and unknown need no evidence, because neither is a completion claim', () => {
+    fixture(({ tasks }) => {
+      const result = tasks('audit', 'demo-spec', '--proof', '1=unmet', '--proof', '2=unknown');
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('outstanding: c1 (unmet), c2 (unknown)');
+    });
+  });
+
+  it('audit refuses a --proof value that is not one of the three verdicts, naming what it got', () => {
+    fixture(({ tasks, dir }) => {
+      const result = tasks('audit', 'demo-spec', '--proof', '1=probably', '--proof', '2=unknown');
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain('--proof 1=probably');
+      expect(result.stderr).toContain('met, unmet or unknown');
+      expect(readFileSync(path.join(dir, 'specs', 'demo-spec.md'), 'utf8')).not.toContain('## Audit passes');
     });
   });
 
@@ -1607,7 +1750,7 @@ describe('tasks CLI', () => {
     fixture(({ tasks, dir }) => {
       writeFileSync(path.join(dir, 'specs', 'demo-spec.md'), '# Demo spec\n\n## Deliverable\n\nSomething this branch promises.\n\nProof:\n\n- [c1] The first clause holds.\n  proof: command node --version\n- [c2] The second clause holds.\n\n## Decisions\n\n## Open questions\n\nNone.\n', 'utf8');
       tasks('add', 'prove the runtime behavior', '--id', 'runtime-proof', '--spec', 'demo-spec', '--severity', 'high', '--system', 'Runtime', '--files', 'src/runtime/runtime.ts:1', '--deliverable', 'runtime behavior is proven');
-      tasks('audit', 'demo-spec', '--proof', '1=met', '--evidence', '1=measured directly', '--proof', '2=met');
+      tasks('audit', 'demo-spec', '--proof', '1=met', '--evidence', '1=measured directly', '--proof', '2=met', '--evidence', '2=clause 2 checked');
 
       const result = tasks('audit-prompt', 'demo-spec');
       expect(result.status).toBe(0);
@@ -1642,6 +1785,30 @@ describe('tasks CLI', () => {
       expect(result.stdout).toContain('src/runtime/runtime.ts:1');
       expect(result.stdout).toContain('prefer mutation testing');
       expect(result.stdout).toContain('Do not promote pass-2+ findings.');
+    });
+  });
+
+  it('audit-prompt shows each clause its latest verdict, spelling out that unknown means nobody looked', () => {
+    fixture(({ tasks }) => {
+      tasks('audit', 'demo-spec', '--proof', '1=met', '--evidence', '1=measured directly');
+
+      const result = tasks('audit-prompt', 'demo-spec');
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('latest verdict: met — measured directly');
+      expect(result.stdout).toContain('latest verdict: unknown — nobody has graded this clause');
+      expect(result.stdout).toContain('Latest audit pass: pass 1');
+      expect(result.stdout).toContain('outstanding: c2 (unknown)');
+      expect(result.stdout).toContain('`unknown` means nobody looked');
+      expect(result.stdout).not.toMatch(/\d+\/\d+ met/);
+    });
+  });
+
+  it('audit-prompt calls every clause unknown when no pass has been recorded', () => {
+    fixture(({ tasks }) => {
+      const result = tasks('audit-prompt', 'demo-spec');
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('Latest audit pass: none recorded');
+      expect(result.stdout).toContain('outstanding: c1 (unknown), c2 (unknown)');
     });
   });
 
@@ -1692,6 +1859,8 @@ describe('tasks CLI', () => {
         'demo-spec',
         '--proof',
         '1=met',
+        '--evidence',
+        '1=clause 1 checked',
         '--proof',
         '2=unmet',
         '--evidence',
@@ -1745,6 +1914,8 @@ describe('tasks CLI', () => {
         '1=src/runtime/save.test.ts',
         '--proof',
         '2=met',
+        '--evidence',
+        '2=clause 2 checked',
         '--finding',
         'unrelated finding',
         '--severity',
@@ -1764,7 +1935,7 @@ describe('tasks CLI', () => {
 
   it('an unmet clause with no --file leaves the undelivered task with no files, unchanged', () => {
     fixture(({ tasks }) => {
-      tasks('audit', 'demo-spec', '--proof', '1=unmet', '--evidence', '1=nope', '--proof', '2=met');
+      tasks('audit', 'demo-spec', '--proof', '1=unmet', '--evidence', '1=nope', '--proof', '2=met', '--evidence', '2=clause 2 checked');
       const undelivered = tasks('show', 'demo-spec-clause-1');
       expect(undelivered.stdout).not.toContain('files:');
     });
@@ -1772,7 +1943,7 @@ describe('tasks CLI', () => {
 
   it("audit's undelivered task can be declined, and the decline says the clause is abandoned rather than discharged", () => {
     fixture(({ tasks }) => {
-      tasks('audit', 'demo-spec', '--proof', '1=unmet', '--evidence', '1=nope', '--proof', '2=met');
+      tasks('audit', 'demo-spec', '--proof', '1=unmet', '--evidence', '1=nope', '--proof', '2=met', '--evidence', '2=clause 2 checked');
       const result = tasks('decline', 'demo-spec-clause-1', '--reason', 'the spec that promised it is superseded');
       expect(result.status).toBe(0);
       expect(result.stdout).toContain('declining it abandons the clause, it does not discharge it');
@@ -1786,8 +1957,8 @@ describe('tasks CLI', () => {
 
   it('a second unmet pass for the same clause reuses the open undelivered task rather than duplicating it', () => {
     fixture(({ tasks }) => {
-      tasks('audit', 'demo-spec', '--proof', '1=unmet', '--evidence', '1=first', '--proof', '2=met');
-      tasks('audit', 'demo-spec', '--proof', '1=unmet', '--evidence', '1=still not', '--proof', '2=met');
+      tasks('audit', 'demo-spec', '--proof', '1=unmet', '--evidence', '1=first', '--proof', '2=met', '--evidence', '2=clause 2 checked');
+      tasks('audit', 'demo-spec', '--proof', '1=unmet', '--evidence', '1=still not', '--proof', '2=met', '--evidence', '2=clause 2 checked');
       const spec = tasks('spec', 'show', 'demo-spec');
       const occurrences = (spec.stdout.match(/demo-spec-clause-1/g) ?? []).length;
       expect(occurrences).toBe(1);
@@ -1803,8 +1974,8 @@ describe('tasks CLI', () => {
       expect(result.status).toBe(0);
       expect(result.stdout).toContain('branch: demo-spec');
       expect(result.stdout).toContain('spec: demo-spec');
-      expect(result.stdout).toContain('1. The first clause holds.');
-      expect(result.stdout).toContain('2. The second clause holds.');
+      expect(result.stdout).toContain('1. [unknown] The first clause holds.');
+      expect(result.stdout).toContain('2. [unknown] The second clause holds.');
       expect(result.stdout).toContain('1 in-progress task(s):');
       expect(result.stdout).toContain('claimed-task');
       expect(result.stdout).toContain('open-task');
@@ -1818,8 +1989,18 @@ describe('tasks CLI', () => {
       const result = tasks('handoff');
       expect(result.status).toBe(0);
       expect(result.stdout).not.toContain('Prose that should not appear');
-      expect(result.stdout).toContain('1. ' + 'x'.repeat(99) + '…');
+      expect(result.stdout).toContain('1. [unknown] ' + 'x'.repeat(99) + '…');
       expect(result.stdout).not.toContain(longClause);
+    });
+  });
+
+  it('handoff tells a cold session which clauses nobody has graded', () => {
+    fixture(({ tasks }) => {
+      tasks('audit', 'demo-spec', '--proof', '1=met', '--evidence', '1=measured directly');
+      const result = tasks('handoff');
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('1. [met] The first clause holds.');
+      expect(result.stdout).toContain('2. [unknown] The second clause holds.');
     });
   });
 
@@ -2054,8 +2235,8 @@ describe('tasks CLI', () => {
 
   it('triage promotes a finding sourced from an audit pass 2 or later, saying that it extends the spec', () => {
     fixture(({ tasks, triage }) => {
-      tasks('audit', 'demo-spec', '--proof', '1=met', '--proof', '2=met');
-      tasks('audit', 'demo-spec', '--proof', '1=met', '--proof', '2=met', '--finding', 'late finding', '--severity', 'low', '--deliverable', 'fix it', '--evidence', 'seen late');
+      tasks('audit', 'demo-spec', '--proof', '1=met', '--evidence', '1=clause 1 checked', '--proof', '2=met', '--evidence', '2=clause 2 checked');
+      tasks('audit', 'demo-spec', '--proof', '1=met', '--evidence', '1=clause 1 checked', '--proof', '2=met', '--evidence', '2=clause 2 checked', '--finding', 'late finding', '--severity', 'low', '--deliverable', 'fix it', '--evidence', 'seen late');
       const result = triage('1\n');
       expect(result.stdout).toContain('promoting a pass 2 finding, which extends what demo-spec owes');
       const shown = tasks('show', 'demo-spec-pass2-late-finding');

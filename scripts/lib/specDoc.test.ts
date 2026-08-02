@@ -297,7 +297,7 @@ describe('clauseStandings / outstandingSummary', () => {
   const clauses = parseSpecDoc(DOC).proofClauses;
 
   it('grades every clause the pass never mentioned as unknown, not as absent', () => {
-    const standings = clauseStandings(clauses, { pass: 1, date: 'd', base: 'a', head: 'b', verdicts: [{ clause: 1, status: 'met', evidence: 'measured' }] });
+    const standings = clauseStandings(clauses, [{ clause: 1, status: 'met', evidence: 'measured' }]);
     expect(standings).toEqual([
       { clause: 1, status: 'met', evidence: 'measured' },
       { clause: 2, status: 'unknown', evidence: null },

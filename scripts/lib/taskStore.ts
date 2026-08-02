@@ -1,6 +1,6 @@
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 
-export type Kind = 'task' | 'finding' | 'undelivered';
+export type Kind = 'task' | 'finding' | 'undelivered' | 'question';
 export type State = 'unreviewed' | 'open' | 'in-progress' | 'done' | 'declined';
 export type Severity = 'high' | 'medium' | 'low';
 
@@ -43,7 +43,7 @@ export class StoreError extends Error {}
 
 export const DEFAULT_STORE_PATH = 'docs/tasks.jsonl';
 
-const KINDS: Kind[] = ['task', 'finding', 'undelivered'];
+export const KINDS: Kind[] = ['task', 'finding', 'undelivered', 'question'];
 const STATES: State[] = ['unreviewed', 'open', 'in-progress', 'done', 'declined'];
 const SEVERITIES: Severity[] = ['high', 'medium', 'low'];
 

@@ -2,7 +2,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { checkStore, dependencyCycles, fixNowQueue, isBlocked, listQueue, loadStore, nearMatches, parseStore, parseStoreTolerantly, requirementStates, saveStore, StoreError, unreviewedQueue, waitingOn, type Task } from './taskStore';
+import { checkStore, dependencyCycles, fixNowQueue, isBlocked, KINDS, listQueue, loadStore, nearMatches, parseStore, parseStoreTolerantly, requirementStates, saveStore, StoreError, unreviewedQueue, waitingOn, type Task } from './taskStore';
 
 function task(overrides: Partial<Task> & { id: string }): Task {
   return {
@@ -35,6 +35,20 @@ describe('checkStore clause binding', () => {
   it('refuses a clause binding on any other kind, so the field cannot drift into meaning something else', () => {
     const issues = checkStore([task({ id: 't', clause: 3 })], []);
     expect(issues).toContainEqual({ level: 'error', message: 't names a proof clause but is not undelivered' });
+  });
+});
+
+describe('question as a kind', () => {
+  it('parses a question record and takes no exception to it', () => {
+    const line = JSON.stringify(task({ id: 'q', kind: 'question' }));
+    expect(parseStore(line, 'store')[0].kind).toBe('question');
+    expect(checkStore(parseStore(line, 'store'), [])).toEqual([]);
+  });
+
+  it('is one more value in the kind field, not a record shape of its own', () => {
+    expect(KINDS).toEqual(['task', 'finding', 'undelivered', 'question']);
+    const question = task({ id: 'q', kind: 'question' });
+    expect(parseStore(JSON.stringify({ ...question, extra: undefined }), 'store')[0]).toEqual(question);
   });
 });
 
