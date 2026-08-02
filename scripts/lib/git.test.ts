@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { commitCount, head, isAncestor, mergeBase } from './git';
+import { branch, commitCount, head, isAncestor, mergeBase, resolveCommit } from './git';
 
 let dir: string;
 let originalCwd: string;
@@ -37,6 +37,32 @@ describe('git seam', () => {
 
   it('head returns null on an unborn HEAD, instead of throwing', () => {
     expect(head()).toBeNull();
+  });
+
+  it('branch names the current branch, and is null outside a repo rather than throwing', () => {
+    commit('first');
+    spawnSync('git', ['checkout', '-q', '-b', 'named-branch'], { cwd: dir });
+    expect(branch()).toBe('named-branch');
+
+    // resolveConfig calls this before every command body, so throwing here
+    // killed every command — reads included — with a raw Node stack trace.
+    const outside = mkdtempSync(path.join(os.tmpdir(), 'universalis-norepo-'));
+    process.chdir(outside);
+    try {
+      expect(branch()).toBeNull();
+    } finally {
+      process.chdir(dir);
+      rmSync(outside, { recursive: true, force: true });
+    }
+  });
+
+  it('resolveCommit turns a revspec into the sha it means now, and is null for anything that is not a commit', () => {
+    const first = commit('first');
+    expect(resolveCommit('HEAD')).toBe(first);
+    const second = commit('second');
+    expect(resolveCommit('HEAD~1')).toBe(first);
+    expect(resolveCommit('HEAD')).toBe(second);
+    expect(resolveCommit('no-such-ref-anywhere')).toBeNull();
   });
 
   it('mergeBase resolves the common ancestor of two branches', () => {

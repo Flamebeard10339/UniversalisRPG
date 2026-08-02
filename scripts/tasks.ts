@@ -145,7 +145,12 @@ function resolveConfig(flags: Record<string, string>): Config {
     eventsPath: eventsPathFor(storePath),
     systemsPath: flags.systems ?? 'docs/audits/systems.json',
     specsDir: flags['specs-dir'] ?? 'docs/specs',
-    branch: flags.branch ?? execFileSync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], { encoding: 'utf8' }).trim(),
+    // Through the seam, not around it. resolveConfig runs before every
+    // command body, so a raw execFileSync here killed every command —
+    // including every read — with a Node stack trace and git's stderr the
+    // moment the cwd was not a repo. `(no branch)` is what a spec inference
+    // that has no branch name to match against should see.
+    branch: flags.branch ?? git.branch() ?? '(no branch)',
     actor: flags.actor ?? null,
   };
 }
@@ -435,10 +440,19 @@ function knownSpecs(config: Config): string[] {
     .map((entry) => entry.replace(/\.md$/, ''));
 }
 
-function refuseUnknownSpec(config: Config, slug: string): void {
+// The same read/write split reportUnknownIds and refuseUnknownIds already
+// make for task ids, applied to spec slugs — c1 against c2. "No such spec,
+// here are the ones that exist" is an answer to what a read asked, and the
+// answer was already being written before the exit code disagreed with it.
+// A write has nothing to write to, so the identical text is an error.
+function reportUnknownSpec(config: Config, slug: string, emit: (line: string) => void): void {
   const specs = knownSpecs(config);
-  console.error(`error: no such spec: ${slug}`);
-  console.error(specs.length === 0 ? `  no spec files in ${config.specsDir}` : `  specs in ${config.specsDir}: ${specs.join(', ')}`);
+  emit(`no such spec: ${slug}`);
+  emit(specs.length === 0 ? `  no spec files in ${config.specsDir}` : `  specs in ${config.specsDir}: ${specs.join(', ')}`);
+}
+
+function refuseUnknownSpec(config: Config, slug: string): void {
+  reportUnknownSpec(config, slug, (line) => console.error(line.startsWith(' ') ? line : `error: ${line}`));
   process.exitCode = 1;
 }
 
@@ -522,13 +536,22 @@ function cmdDoctor(args: Flags): void {
 // `--commit` is a revspec at the CLI boundary, and a revspec is not a fact —
 // `HEAD~2` names a different commit after every later commit. Resolve to the
 // full 40-char SHA it means right now, so what lands in the store is a fact
-// forever after, and refuse anything that does not name a real, reachable
-// commit rather than store it unchecked.
+// forever after.
+//
+// A value git cannot resolve to a commit is refused: there is no sha to
+// record, and writing the raw string would put a non-fact in the store. That
+// is c2's malformed input, not a semantic disagreement.
+//
+// Reachability is a semantic disagreement, and it is not refused. A resolvable
+// 40-char sha is well-formed; whether it is an ancestor of this HEAD is a
+// question about which commit the caller meant, and about which checkout is
+// asking. closedCommitIssues already reports exactly this as a `doctor`
+// warning at exit 0, so refusing it here made one fact a report in one command
+// and a refusal in another, with the refusal on the write path.
 function resolveCommit(value: string): string {
-  const resolved = spawnSync('git', ['rev-parse', '--verify', `${value}^{commit}`], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
-  if (resolved.status !== 0) throw new Error(`--commit does not resolve to a commit: ${value}`);
-  const sha = resolved.stdout.trim();
-  if (!git.isAncestor(sha, 'HEAD')) throw new Error(`--commit is not reachable from HEAD: ${value}`);
+  const sha = git.resolveCommit(value);
+  if (sha === null) throw new Error(`--commit does not resolve to a commit: ${value}`);
+  if (!git.isAncestor(sha, 'HEAD')) console.warn(`warning: --commit is not reachable from HEAD: ${value} — recorded, and \`tasks doctor\` reports it until it is`);
   return sha;
 }
 
@@ -726,9 +749,8 @@ function storeStateAt(config: Config, commit: string, id: string): State | null 
 // `show` labels it "derived" and callers must not treat it as `closedCommit`.
 // Walks commits touching the store newest-first and returns the most recent
 // one where this id's state is `done` and its predecessor's is not — i.e.
-// the commit that flipped the record. Only ever called from `show`: a
-// history walk per task is too slow to run from `check`, which runs on
-// every push.
+// the commit that flipped the record. One git log plus a parse per commit,
+// so it is called for a single task on demand and never for a whole queue.
 function deriveClosingCommit(config: Config, id: string): string | null {
   const log = spawnSync('git', ['log', '--format=%H', '--', config.storePath], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
   if ((log.status ?? 1) !== 0) return null;
@@ -764,9 +786,8 @@ function cmdShow(args: Flags, usage: string): void {
 
 const LIST_STATES: State[] = ['unreviewed', 'open', 'in-progress', 'done', 'declined'];
 
-// The only verb that can read the whole store rather than one spec's
-// fix-now queue — `next` refuses outside an active spec, and `spec: null`
-// findings otherwise have no command that surfaces them.
+// The only verb that reads the whole store rather than one spec's fix-now
+// queue, which is how a `spec: null` finding is reachable at all.
 function cmdSearch(args: Flags, usage: string): void {
   const term = args.positional[0];
   if (!term) {
@@ -1225,7 +1246,7 @@ function cmdSpecShow(args: Flags, usage: string): void {
   }
   const path_ = specFile(config, slug);
   if (!existsSync(path_)) {
-    refuseUnknownSpec(config, slug);
+    reportUnknownSpec(config, slug, (line) => console.log(line));
     return;
   }
   const doc = parseSpecDoc(readFileSync(path_, 'utf8'));
@@ -1427,15 +1448,15 @@ function cmdImport(args: Flags, usage: string): void {
 // git calls are kept apart so a base-branch typo and a detached-HEAD
 // failure are reported as what each actually is, and neither is allowed
 // to fall back to a placeholder that still exits 0 (M9).
-function resolveDiffRange(baseBranch: string): { base: string; head: string } | null {
+function resolveDiffRange(baseBranch: string, emit: (line: string) => void): { base: string; head: string } | null {
   const base = git.mergeBase(baseBranch);
   if (base === null) {
-    console.error(`error: could not resolve a merge-base between HEAD and ${baseBranch}`);
+    emit(`could not resolve a merge-base between HEAD and ${baseBranch}`);
     return null;
   }
   const head = git.head();
   if (head === null) {
-    console.error('error: could not resolve HEAD');
+    emit('could not resolve HEAD');
     return null;
   }
   return { base, head };
@@ -1464,16 +1485,17 @@ function cmdAuditPrompt(args: Flags, usage: string): void {
   }
   const path_ = specFile(config, slug);
   if (!existsSync(path_)) {
-    refuseUnknownSpec(config, slug);
+    reportUnknownSpec(config, slug, (line) => console.log(line));
     return;
   }
 
   const baseBranch = args.flags['base-branch'] ?? 'main';
-  const range = resolveDiffRange(baseBranch);
-  if (range === null) {
-    process.exitCode = 1;
-    return;
-  }
+  // A read answers, including when the answer is that it could not resolve
+  // the range. `handoff --base-branch <bad>` already reported the identical
+  // condition at exit 0, which is the evidence this refusal was avoidable
+  // rather than intrinsic.
+  const range = resolveDiffRange(baseBranch, (line) => console.log(line));
+  if (range === null) return;
   const { base, head } = range;
 
   const doc = parseSpecDoc(readFileSync(path_, 'utf8'));
@@ -1581,6 +1603,7 @@ async function cmdTriage(args: Flags): Promise<void> {
     console.log('no unreviewed findings');
     return;
   }
+  const byId = new Map(tasks.map((task) => [task.id, task]));
 
   const rl = createInterface({ input: process.stdin, output: process.stdout });
   // rl.question()'s once('line') listener drops any line that arrives before
@@ -1600,10 +1623,13 @@ async function cmdTriage(args: Flags): Promise<void> {
     // Redirect re-displays this same task and asks again rather than
     // advancing, so displaying and deciding is a loop, not a single pass.
     while (true) {
-      const severityTag = task.severity ? task.severity[0].toUpperCase() : '?';
       console.log('');
-      console.log(`[${i + 1}/${total}]  ${severityTag}  ${task.system ?? '(no system)'}   ${task.title}`);
-      if (task.files.length > 0) console.log(`          ${task.files.join('   ')}`);
+      // c9's one printer, not a fifth bespoke one. The hand-rolled row
+      // collapsed severity to an initial and dropped the id entirely, so a
+      // human triaging could not copy an id out of the pane to `tasks show`
+      // it — which is the one thing this pane makes you want to do.
+      console.log(`[${i + 1}/${total}]`);
+      printRow(task, byId, { indent: '  ', withFiles: true });
       console.log('');
       console.log('evidence — what is broken:');
       printEvidence(task.evidence);
@@ -2321,11 +2347,9 @@ function printRootHelp(): void {
   console.log('`tasks <command> --help` prints that command\'s flags; a flag not named there is an error, never a silent no-op');
 }
 
-// A malformed or conflicted docs/tasks.jsonl is reported the same way —
-// check's own `path:line` diagnostic, non-zero exit — for every command,
-// not only `check`. One boundary here instead of a try/catch in each of
-// the other eight store-reading commands, which is where eight of them
-// were still missing it.
+// A malformed docs/tasks.jsonl is reported as `path:line` and a non-zero
+// exit by every command, from one boundary here rather than a try/catch in
+// each store-reading command — which is where eight of them were missing.
 function reportStoreErrors<T>(work: () => T): T | void {
   try {
     return work();

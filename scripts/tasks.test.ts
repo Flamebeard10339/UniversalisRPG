@@ -461,12 +461,22 @@ describe('tasks CLI', () => {
     });
   });
 
-  it('spec show names the specs that do exist when the slug does not', () => {
+  it('spec show answers a slug that names nothing, the way show already answers an unknown id', () => {
     fixture(({ tasks }) => {
       const result = tasks('spec', 'show', 'demo-spek');
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('no such spec: demo-spek');
+      expect(result.stdout).toContain('demo-spec');
+      expect(result.stderr).toBe('');
+    });
+  });
+
+  it('spec add still refuses a slug that names nothing, because a write has nothing to write to', () => {
+    fixture(({ tasks }) => {
+      tasks('add', 'a task', '--id', 'orphan');
+      const result = tasks('spec', 'add', 'demo-spek', 'orphan');
       expect(result.status).toBe(1);
       expect(result.stderr).toContain('no such spec: demo-spek');
-      expect(result.stderr).toContain('demo-spec');
     });
   });
 
@@ -1088,7 +1098,7 @@ describe('tasks CLI', () => {
     });
   });
 
-  it('done refuses a --commit that resolves but is not reachable from HEAD', () => {
+  it('done records a --commit that resolves but is not reachable from HEAD, and warns rather than refusing', () => {
     gitFixture(({ dir, commit, tasks }) => {
       tasks('add', 'anchored task', '--id', 'anchored');
       commit('add anchored task');
@@ -1097,9 +1107,23 @@ describe('tasks CLI', () => {
       spawnSync('git', ['checkout', '-q', 'demo-spec'], { cwd: dir });
 
       const result = tasks('done', 'anchored', '--commit', strayCommit);
-      expect(result.status).toBe(1);
+      expect(result.status).toBe(0);
       expect(result.stderr).toContain('not reachable from HEAD');
-      expect(tasks('show', 'anchored').stdout).toContain('[task/open]');
+      expect(tasks('show', 'anchored').stdout).toContain('[task/done]');
+      // The same fact doctor already reported as a warning. One condition,
+      // one polarity — it was a report in one command and a refusal in the
+      // other, and the refusal was the one on the write path.
+      expect(tasks('doctor').stdout).toContain('closed by a commit not reachable from HEAD');
+    });
+  });
+
+  it('done still refuses a --commit that names no commit at all, which leaves no sha to record', () => {
+    gitFixture(({ commit, tasks }) => {
+      tasks('add', 'anchored task', '--id', 'anchored');
+      commit('add anchored task');
+      const result = tasks('done', 'anchored', '--commit', 'not-a-revspec-at-all');
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain('does not resolve to a commit');
     });
   });
 
@@ -1699,6 +1723,16 @@ describe('tasks CLI', () => {
     });
   });
 
+  it('shows a triaged finding through the same printer, id included, so it can be copied to `tasks show`', () => {
+    fixture(({ tasks, triage }) => {
+      tasks('add', 'a finding to triage', '--id', 'triage-me', '--kind', 'finding', '--severity', 'high', '--deliverable', 'fix it', '--evidence', 'it is broken');
+      // `q` on the first prompt: the pane is displayed, nothing is decided.
+      const result = triage('q\n');
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('triage-me  [finding/unreviewed/high]');
+    });
+  });
+
   it('spec show names each outstanding clause and its status rather than scoring the spec', () => {
     fixture(({ tasks }) => {
       tasks('audit', 'demo-spec', '--proof', '1=met', '--evidence', '1=measured directly', '--proof', '2=unmet', '--evidence', '2=it fails');
@@ -2229,14 +2263,18 @@ describe('tasks CLI', () => {
     });
   });
 
-  it('audit-prompt refuses with a non-zero exit instead of printing an unresolved diff range', () => {
+  it('audit-prompt says it could not resolve the diff range, and never invents one', () => {
     fixture(({ tasks }) => {
       const result = tasks('audit-prompt', 'demo-spec', '--base-branch', 'no-such-base-xyz');
-      expect(result.status).toBe(1);
+      // handoff answered the identical condition at exit 0 all along, which
+      // is what made this refusal avoidable rather than intrinsic. The
+      // placeholder half of the original claim is the part that mattered and
+      // it still holds: no range is better than a made-up one.
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('no-such-base-xyz');
       expect(result.stdout).not.toContain('(unknown base)');
       expect(result.stdout).not.toContain('(unknown head)');
       expect(result.stdout).not.toContain('Diff range:');
-      expect(result.stderr).toContain('no-such-base-xyz');
     });
   });
 

@@ -18,6 +18,16 @@ export function head(): string | null {
   return run(['rev-parse', 'HEAD']);
 }
 
+export function branch(): string | null {
+  return run(['rev-parse', '--abbrev-ref', 'HEAD']);
+}
+
+// `^{commit}` makes this refuse a tag or tree that rev-parse would otherwise
+// resolve to something that is not a commit.
+export function resolveCommit(revspec: string): string | null {
+  return run(['rev-parse', '--verify', `${revspec}^{commit}`]);
+}
+
 export function isAncestor(ancestor: string, descendant: string): boolean {
   return run(['merge-base', '--is-ancestor', ancestor, descendant]) !== null;
 }
