@@ -6,7 +6,6 @@ import { pathToFileURL } from 'node:url';
 import { harvestFiles, parseAuditDoc, systemForDoc } from './lib/auditImport';
 import { checkCommitMessage, extractNextTrailer, isExempt } from './lib/commitContract';
 import * as git from './lib/git';
-import { checkMergeGate } from './lib/mergeGate';
 import { appendAmendment, appendAuditPass, appendBaseline, duplicateClauseIds, parseSpecDoc, stampClauseIds, type AuditVerdict, type ProofClause, type Verdict } from './lib/specDoc';
 import { loadManifest, systemNames as manifestSystemNames } from './lib/systems';
 import {
@@ -145,45 +144,8 @@ function saveStoreAndWarn(tasks: Task[], config: Config): void {
 
 // "the spec whose branch is checked out" — a branch not named after any spec
 // file has no active spec, and `--spec` on a read command overrides this.
-// Used by resolveActiveSpec below for read commands, and — only as a last
-// resort, after specCandidatesFromDiff finds nothing — by `check --merge`
-// itself; see mergeGateSpecCandidates.
 function currentSpec(config: Config): string | null {
   return existsSync(specFile(config, config.branch)) ? config.branch : null;
-}
-
-// c4's diff-based binding: the spec file(s) this branch's own diff adds or
-// modifies, between the merge-base and HEAD — content-derived, so a branch
-// rename cannot change the answer. Reuses diffChangedFiles's already-quiet
-// git plumbing; a merge-base git itself cannot resolve reads the same as a
-// diff that touches nothing.
-function specCandidatesFromDiff(config: Config, baseBranch: string): string[] {
-  const mergeBase = git.mergeBase(baseBranch);
-  if (mergeBase === null) return [];
-  const prefix = `${gitPathspec(config.specsDir)}/`;
-  const slugs = new Set<string>();
-  for (const file of diffChangedFiles(`${mergeBase}..HEAD`)) {
-    if (file.startsWith(prefix) && file.endsWith('.md')) slugs.add(file.slice(prefix.length, -'.md'.length));
-  }
-  return [...slugs].sort();
-}
-
-// The merge gate's spec resolution, in priority order: an explicit --spec
-// always wins; otherwise the diff decides. The name-based fallback below
-// only fires when the diff touches zero spec files — it never overrides a
-// diff verdict, so it cannot reintroduce the rename regression c4 exists to
-// fix (a branch with open members has, by the time those members matter,
-// touched its spec file at least once — to open it, amend it, or record an
-// audit pass — so the diff finds it). It exists for the narrower case of a
-// branch whose name already matches its spec but hasn't touched the file
-// yet, which is common early in a spec's life and was the only resolution
-// path before this fix.
-function mergeGateSpecCandidates(config: Config, baseBranch: string, explicit: string | undefined): string[] {
-  if (explicit !== undefined) return [explicit];
-  const diffCandidates = specCandidatesFromDiff(config, baseBranch);
-  if (diffCandidates.length > 0) return diffCandidates;
-  const nameMatch = currentSpec(config);
-  return nameMatch === null ? [] : [nameMatch];
 }
 
 interface ActiveSpec {
@@ -278,22 +240,6 @@ function printTaskConcise(task: Task, tasks: Task[]): void {
   if (task.evidence) console.log(`evidence: ${preview(task.evidence)}`);
 }
 
-// null means "nothing to compare against" — merge-base lookup failed, or
-// the spec file did not exist there (opened on this branch, so nothing has
-// drifted).
-function deliverableAtMergeBase(config: Config, spec: string, baseBranch: string): string | null {
-  const mergeBase = git.mergeBase(baseBranch);
-  if (mergeBase === null) return null;
-  try {
-    const content = execFileSync('git', ['show', `${mergeBase}:${specFile(config, spec)}`], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
-    return parseSpecDoc(content).deliverableSection;
-  } catch {
-    return null;
-  }
-}
-
-// Here rather than only in the merge gate because this runs on every push,
-// while the gate sees one branch's spec on a pull request.
 function specIssues(config: Config, tasks: Task[]): CheckIssue[] {
   if (!existsSync(config.specsDir)) return [];
   const specsWithMembers = new Set(tasks.filter((task) => task.spec !== null).map((task) => task.spec as string));
@@ -339,47 +285,6 @@ function cmdCheck(flags: Record<string, string>): void {
   for (const error of errors) console.error(`error: ${error.message}`);
   console.log(`${tasks.length} task(s), ${errors.length} error(s), ${warnings.length} warning(s)`);
   if (errors.length > 0) process.exitCode = 1;
-
-  if (flags.merge !== 'true') return;
-
-  const baseBranch = flags['base-branch'] ?? 'main';
-
-  const specCandidates = mergeGateSpecCandidates(config, baseBranch, flags.spec);
-  const resolvedSpec = specCandidates.length === 1 ? specCandidates[0] : null;
-  const specPath = resolvedSpec !== null ? specFile(config, resolvedSpec) : null;
-  const specExists = specPath !== null && existsSync(specPath);
-  const doc = specExists ? parseSpecDoc(readFileSync(specPath!, 'utf8')) : null;
-
-  // An amendment's archived text wins when one exists — it is the freeze's
-  // only sanctioned edit path. Merge-base is the fallback for a spec that
-  // has never been amended, and is a known no-op for the common case: rule
-  // 1 opens one spec per branch on that branch, so it never existed at the
-  // merge-base either.
-  const latestAmendment = doc ? doc.amendments[doc.amendments.length - 1] : undefined;
-  const deliverableBaseline = latestAmendment ? latestAmendment.deliverableText : (doc?.baseline ?? (resolvedSpec === null ? null : deliverableAtMergeBase(config, resolvedSpec, baseBranch)));
-
-  // checkMergeGate is the only place that decides whether there is
-  // anything to refuse: zero candidates passes vacuously (see its own
-  // comment), so a branch whose diff touches no spec never reddens over a
-  // promise it never made, no matter what other specs in the store still
-  // have open members; more than one candidate is reported as an issue,
-  // not resolved by guessing.
-  const mergeIssues = checkMergeGate({
-    specCandidates,
-    specExists,
-    doc,
-    deliverableBaseline,
-    members: resolvedSpec === null ? [] : tasks.filter((task) => task.spec === resolvedSpec),
-  });
-
-  if (specCandidates.length === 0) {
-    console.log('merge gate: not applicable — no active spec for this branch, and no --spec given');
-    return;
-  }
-
-  for (const issue of mergeIssues) console.error(`merge gate: ${issue}`);
-  console.log(`merge gate: ${mergeIssues.length} issue(s)`);
-  if (mergeIssues.length > 0) process.exitCode = 1;
 }
 
 // `--commit` is a revspec at the CLI boundary, and a revspec is not a fact —
@@ -1095,11 +1000,8 @@ function cmdSpecRemove(args: Flags): void {
   console.log(`removed ${ids.length} task(s) from ${slug}`);
 }
 
-// The only sanctioned way to change a frozen ## Deliverable mid-branch:
-// archive the current text under ## Amendments, dated and reasoned, then
-// leave the live section for a human to edit. checkMergeGate compares
-// against the latest archived copy from here on, so drift is still caught
-// — it is just no longer required to close the spec and open another.
+// Archives the current ## Deliverable under ## Amendments, dated and
+// reasoned, and leaves the live section for a human to edit.
 function cmdSpecAmend(args: Flags): void {
   const config = resolveConfig(args.flags);
   const slug = args.positional[0];
@@ -1278,8 +1180,8 @@ function diffChangedFiles(range: string): string[] {
   }
 }
 
-function requiredCommands(slug: string): string[] {
-  return ['npm test', 'npx tsc --noEmit', 'npm run layer-check', 'npm run tasks -- check', `npm run tasks -- check --merge --spec ${slug}`];
+function requiredCommands(): string[] {
+  return ['npm test', 'npx tsc --noEmit', 'npm run layer-check', 'npm run tasks -- check'];
 }
 
 function cmdAuditPrompt(args: Flags): void {
@@ -1320,7 +1222,7 @@ function cmdAuditPrompt(args: Flags): void {
   console.log('Read the spec deliverable, the latest audit pass if any, and the diff above. Verify each proof clause independently.');
   console.log('');
   console.log('Required commands (all must pass):');
-  for (const command of requiredCommands(slug)) console.log(`- ${command}`);
+  for (const command of requiredCommands()) console.log(`- ${command}`);
   console.log('');
   console.log('Relevant files:');
   if (relevantFiles.length === 0) console.log('- none');

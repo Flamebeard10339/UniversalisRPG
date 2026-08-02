@@ -87,7 +87,7 @@ function fixture(run: (context: { dir: string; args: (extra?: string[]) => strin
 // A dedicated git repo per test, distinct from `fixture`'s (which spawns
 // against this repo's own real checkout) — handoff's walk-back and
 // multi-line capture need commits with exact, controlled messages.
-function gitFixture(run: (context: { dir: string; commit: (message: string) => string; tasks: (...args: string[]) => Run; tasksAs: (branch: string, ...args: string[]) => Run }) => void): void {
+function gitFixture(run: (context: { dir: string; commit: (message: string) => string; tasks: (...args: string[]) => Run }) => void): void {
   const dir = mkdtempSync(path.join(os.tmpdir(), 'universalis-handoff-'));
   try {
     spawnSync('git', ['init', '-q'], { cwd: dir });
@@ -100,8 +100,7 @@ function gitFixture(run: (context: { dir: string; commit: (message: string) => s
     const systemsPath = path.join(dir, 'systems.json');
     writeFileSync(systemsPath, JSON.stringify({ unowned: { note: '', paths: ['docs', '*.md'] }, systems: [] }), 'utf8');
     const storePath = path.join(dir, 'tasks.jsonl');
-    const commonArgs = ['--store', storePath, '--systems', systemsPath, '--specs-dir', specsDir];
-    const globals = [...commonArgs, '--branch', 'demo-spec'];
+    const globals = ['--store', storePath, '--systems', systemsPath, '--specs-dir', specsDir, '--branch', 'demo-spec'];
     spawnSync('git', ['add', '.'], { cwd: dir });
     spawnSync('git', ['commit', '--no-verify', '-m', 'Initial fixture\n\nA branch base exists.'], { cwd: dir, encoding: 'utf8' });
     spawnSync('git', ['branch', '-M', 'main'], { cwd: dir });
@@ -117,13 +116,6 @@ function gitFixture(run: (context: { dir: string; commit: (message: string) => s
       },
       tasks: (...args: string[]) => {
         const result = spawnSync(process.execPath, [tsx, script, ...args, ...globals], { cwd: dir, encoding: 'utf8' });
-        return { status: result.status ?? 1, stdout: result.stdout, stderr: result.stderr };
-      },
-      // Same fixture, but with an explicit --branch instead of the fixed
-      // "demo-spec" — for proving the merge gate's spec resolution against
-      // a branch name that does or doesn't match a spec file on disk.
-      tasksAs: (branch: string, ...args: string[]) => {
-        const result = spawnSync(process.execPath, [tsx, script, ...args, ...commonArgs, '--branch', branch], { cwd: dir, encoding: 'utf8' });
         return { status: result.status ?? 1, stdout: result.stdout, stderr: result.stderr };
       },
     });
@@ -1003,7 +995,7 @@ describe('tasks CLI', () => {
     });
   });
 
-  it('recording an audit pass establishes a baseline when none exists, and check --merge uses it to catch a later deliverable edit', () => {
+  it('recording an audit pass establishes a baseline when none exists', () => {
     fixture(({ tasks, dir }) => {
       const specPath = path.join(dir, 'specs', 'demo-spec.md');
       expect(readFileSync(specPath, 'utf8')).not.toContain('## Baseline');
@@ -1012,12 +1004,6 @@ describe('tasks CLI', () => {
       expect(audited.status).toBe(0);
       expect(audited.stdout).toContain("froze demo-spec's current ## Deliverable as its opening baseline");
       expect(readFileSync(specPath, 'utf8')).toContain('## Baseline');
-      expect(tasks('check', '--merge').status).toBe(0);
-
-      writeFileSync(specPath, readFileSync(specPath, 'utf8').replace('Something this branch promises.', 'Something entirely different, never audited.'), 'utf8');
-      const drifted = tasks('check', '--merge');
-      expect(drifted.status).toBe(1);
-      expect(drifted.stderr).toContain("demo-spec's ## Deliverable text differs from its most recent amendment");
     });
   });
 
@@ -1145,24 +1131,6 @@ describe('tasks CLI', () => {
     });
   });
 
-  it('check --merge compares the live deliverable against the most recent amendment once one exists, refusing on a later unrecorded edit', () => {
-    fixture(({ tasks, dir }) => {
-      tasks('audit', 'demo-spec', '--proof', '1=met', '--proof', '2=met');
-      tasks('spec', 'amend', 'demo-spec', '--reason', 'clarified after implementation');
-
-      const clean = tasks('check', '--merge');
-      expect(clean.status).toBe(0);
-
-      const specPath = path.join(dir, 'specs', 'demo-spec.md');
-      const original = readFileSync(specPath, 'utf8');
-      writeFileSync(specPath, original.replace('Something this branch promises.', 'Something this branch promises, revised.'), 'utf8');
-
-      const drifted = tasks('check', '--merge');
-      expect(drifted.status).toBe(1);
-      expect(drifted.stderr).toContain("differs from its most recent amendment");
-    });
-  });
-
   it('done on an undelivered task closes once the spec\'s latest audit pass grades its clause met', () => {
     fixture(({ tasks }) => {
       tasks('audit', 'demo-spec', '--proof', '1=unmet', '--evidence', '1=not yet', '--proof', '2=met');
@@ -1254,71 +1222,13 @@ describe('tasks CLI', () => {
     });
   });
 
-  it('replacing an audited clause with an untagged new clause requires a fresh audit verdict', () => {
-    fixture(({ tasks, dir }) => {
-      const specPath = path.join(dir, 'specs', 'demo-spec.md');
-      tasks('audit', 'demo-spec', '--proof', '1=met', '--proof', '2=met');
-
-      writeFileSync(specPath, readFileSync(specPath, 'utf8').replace('- [c1] The first clause holds.', '- A replacement clause needs its own verdict.'), 'utf8');
-
-      const result = tasks('check', '--merge');
-      expect(result.status).toBe(1);
-      expect(result.stderr).toContain('proof clause 3 has no verdict in the latest audit pass');
-      expect(result.stderr).toContain('pass 1 graded proof clause 1, which is no longer in the deliverable');
-    });
-  });
-
-  it('stamping a clause id is not deliverable drift — the gate compares the promise, not its bookkeeping', () => {
-    fixture(({ tasks, dir }) => {
-      const specPath = path.join(dir, 'specs', 'demo-spec.md');
-      // Amend before any audit, so the archived baseline predates every tag.
-      writeFileSync(specPath, readFileSync(specPath, 'utf8').replace('Something this branch promises.', 'Something this branch promises, restated.'), 'utf8');
-      expect(tasks('spec', 'amend', 'demo-spec', '--reason', 'restated before the first audit').status).toBe(0);
-
-      tasks('audit', 'demo-spec', '--proof', '1=met', '--proof', '2=met');
-      expect(readFileSync(specPath, 'utf8')).toContain('- [c1] The first clause holds.');
-      expect(tasks('check', '--merge').status).toBe(0);
-    });
-  });
-
-  it('check refuses a spec whose clauses claim the same id, on every push and not only at the gate', () => {
+  it('check refuses a spec whose clauses claim the same id', () => {
     fixture(({ tasks, dir }) => {
       const specPath = path.join(dir, 'specs', 'demo-spec.md');
       writeFileSync(specPath, readFileSync(specPath, 'utf8').replace('- The first clause holds.\n- The second clause holds.', '- [c1] The first clause holds.\n- [c1] The second clause holds.'), 'utf8');
       const result = tasks('check');
       expect(result.status).toBe(1);
       expect(result.stderr).toContain('demo-spec tags more than one proof clause [c1]');
-    });
-  });
-
-  it('renumbering an unmet clause\'s tag cannot hide its verdict from the gate', () => {
-    fixture(({ tasks, dir }) => {
-      const specPath = path.join(dir, 'specs', 'demo-spec.md');
-      tasks('audit', 'demo-spec', '--proof', '1=unmet', '--evidence', '1=nope', '--proof', '2=met');
-      expect(tasks('check', '--merge').stderr).toContain('proof clause 1 is unmet as of pass 1');
-
-      // Prose untouched — only the tag the unmet verdict resolves through.
-      writeFileSync(specPath, readFileSync(specPath, 'utf8').replace('- [c1] The first clause holds.', '- [c2] The first clause holds.'), 'utf8');
-      const after = tasks('check', '--merge');
-      expect(after.status).toBe(1);
-      expect(after.stderr).toContain('tags more than one proof clause [c2]');
-      expect(after.stderr).toContain('pass 1 graded proof clause 1, which is no longer in the deliverable');
-    });
-  });
-
-  it('a hand-edited tag reads as deliverable drift once an amendment gives the gate a baseline', () => {
-    fixture(({ tasks, dir }) => {
-      const specPath = path.join(dir, 'specs', 'demo-spec.md');
-      tasks('audit', 'demo-spec', '--proof', '1=met', '--proof', '2=met');
-      tasks('spec', 'amend', 'demo-spec', '--reason', 'adopted after the first audit');
-      expect(tasks('check', '--merge').status).toBe(0);
-
-      // String.replace takes the first occurrence, which is the live
-      // section — the archived copy under ## Amendments sits below it.
-      writeFileSync(specPath, readFileSync(specPath, 'utf8').replace('- [c1] The first clause holds.', '- [c3] The first clause holds.'), 'utf8');
-      const after = tasks('check', '--merge');
-      expect(after.status).toBe(1);
-      expect(after.stderr).toContain('## Deliverable text differs');
     });
   });
 
@@ -1490,7 +1400,7 @@ describe('tasks CLI', () => {
       expect(result.stdout).toContain('- npx tsc --noEmit');
       expect(result.stdout).toContain('- npm run layer-check');
       expect(result.stdout).toContain('- npm run tasks -- check');
-      expect(result.stdout).toContain('- npm run tasks -- check --merge --spec demo-spec');
+      expect(result.stdout).not.toContain('--merge');
 
       expect(result.stdout).toContain('Relevant files:');
       expect(result.stdout).toContain('src/runtime/runtime.ts:1');
@@ -1658,115 +1568,6 @@ describe('tasks CLI', () => {
       const spec = tasks('spec', 'show', 'demo-spec');
       const occurrences = (spec.stdout.match(/demo-spec-clause-1/g) ?? []).length;
       expect(occurrences).toBe(1);
-    });
-  });
-
-  it('check --merge passes once every proof clause is met in the latest pass and no member is open', () => {
-    fixture(({ tasks }) => {
-      tasks('audit', 'demo-spec', '--proof', '1=met', '--proof', '2=met');
-      const result = tasks('check', '--merge');
-      expect(result.status).toBe(0);
-      expect(result.stdout).toContain('0 issue(s)');
-    });
-  });
-
-  it('check --merge refuses when there is no recorded audit pass', () => {
-    fixture(({ tasks }) => {
-      const result = tasks('check', '--merge');
-      expect(result.status).toBe(1);
-      expect(result.stderr).toContain('no recorded audit pass');
-    });
-  });
-
-  it('check --merge passes when the branch has no active spec at all — the gate is opt-in, not universal', () => {
-    fixture(({ dir }) => {
-      const storePath = path.join(dir, 'tasks.jsonl');
-      const systemsPath = path.join(dir, 'systems.json');
-      const specsDir = path.join(dir, 'specs');
-      const result = spawnSync(process.execPath, [tsx, script, 'check', '--merge', '--store', storePath, '--systems', systemsPath, '--specs-dir', specsDir, '--branch', 'no-such-spec-branch'], { cwd: repoRoot, encoding: 'utf8' });
-      expect(result.status).toBe(0);
-      expect(result.stdout).toContain('not applicable');
-    });
-  });
-
-  // A branch's CI run must not redden over a spec it has nothing to do
-  // with — the gate is scoped to the branch's own spec (mergeGate.ts's
-  // vacuous-pass comment), never to every open spec in the store.
-  it('check --merge passes vacuously when the branch has no active spec, even though other specs have open members', () => {
-    fixture(({ tasks, dir }) => {
-      tasks('add', 'open task', '--id', 'open-task', '--spec', 'demo-spec', '--severity', 'high');
-      const storePath = path.join(dir, 'tasks.jsonl');
-      const systemsPath = path.join(dir, 'systems.json');
-      const specsDir = path.join(dir, 'specs');
-      const result = spawnSync(process.execPath, [tsx, script, 'check', '--merge', '--store', storePath, '--systems', systemsPath, '--specs-dir', specsDir, '--branch', 'renamed-branch'], { cwd: repoRoot, encoding: 'utf8' });
-      expect(result.status).toBe(0);
-      expect(result.stdout).toContain('not applicable');
-      expect(result.stderr).not.toContain('open spec member(s) exist');
-    });
-  });
-
-  // c4's regression: a branch renamed away from its spec's filename must
-  // not make the merge gate not-applicable while that spec's members are
-  // still open. Content, not name: the branch's own diff still touched
-  // demo-spec.md (recording the audit pass), so the gate applies
-  // regardless of what --branch says.
-  it('check --merge applies to a branch renamed away from its spec\'s filename, as long as the branch\'s diff touched that spec file', () => {
-    gitFixture(({ dir, tasks, tasksAs }) => {
-      tasks('add', 'still open', '--id', 'still-open', '--spec', 'demo-spec', '--severity', 'high');
-      tasks('audit', 'demo-spec', '--proof', '1=met');
-      spawnSync('git', ['add', '.'], { cwd: dir });
-      spawnSync('git', ['commit', '--no-verify', '-m', 'Record audit pass\n\nA body.'], { cwd: dir });
-
-      const result = tasksAs('totally-different-branch-name', 'check', '--merge');
-      expect(result.status).toBe(1);
-      expect(result.stderr).toContain('member(s) of demo-spec neither done nor declined');
-      expect(result.stderr).toContain('still-open');
-    });
-  });
-
-  // M14, preserved under diff-based binding: a branch whose diff touches no
-  // spec file at all must stay vacuous even though a spec living in the
-  // same specs dir has an open member — the open member here is never
-  // reachable by the diff (only an unrelated file changed), so the branch
-  // name is the only other signal, and 'some-other-branch-name' matches
-  // nothing on disk either.
-  it("check --merge stays not applicable when the branch's diff touches no spec file, even though a spec in the same specs dir has open members", () => {
-    gitFixture(({ commit, tasks, tasksAs }) => {
-      tasks('add', 'still open', '--id', 'still-open', '--spec', 'demo-spec', '--severity', 'high');
-      commit('Unrelated work\n\nA body.');
-
-      const result = tasksAs('some-other-branch-name', 'check', '--merge');
-      expect(result.status).toBe(0);
-      expect(result.stdout).toContain('not applicable');
-    });
-  });
-
-  // A branch that touches two spec files in one diff is ambiguous, not
-  // vacuous and not resolved by guessing — checkMergeGate reports it and
-  // names both candidates.
-  it("check --merge reports ambiguity, naming both, when the branch's diff touches two spec files", () => {
-    gitFixture(({ dir, tasks, tasksAs }) => {
-      writeFileSync(path.join(dir, 'specs', 'other-spec.md'), '# Other spec\n\n## Deliverable\n\nOther promise.\n\nProof:\n\n- The only clause holds.\n\n## Decisions\n\n## Open questions\n\nNone.\n', 'utf8');
-      tasks('audit', 'demo-spec', '--proof', '1=met');
-      spawnSync('git', ['add', '.'], { cwd: dir });
-      spawnSync('git', ['commit', '--no-verify', '-m', 'Touch two specs\n\nA body.'], { cwd: dir });
-
-      const result = tasksAs('feature-branch', 'check', '--merge');
-      expect(result.status).toBe(1);
-      expect(result.stderr).toContain('touches more than one spec file');
-      expect(result.stderr).toContain('demo-spec');
-      expect(result.stderr).toContain('other-spec');
-    });
-  });
-
-  it('check --merge refuses when a promoted finding is still unreviewed', () => {
-    fixture(({ tasks }) => {
-      tasks('audit', 'demo-spec', '--proof', '1=met', '--proof', '2=met');
-      tasks('add', 'a finding', '--id', 'a-finding', '--kind', 'finding', '--severity', 'low', '--deliverable', 'fix it');
-      tasks('spec', 'add', 'demo-spec', 'a-finding');
-      const result = tasks('check', '--merge');
-      expect(result.status).toBe(1);
-      expect(result.stderr).toContain('still unreviewed');
     });
   });
 
@@ -2002,22 +1803,6 @@ describe('tasks CLI', () => {
       expect(result.stdout).toContain('spec inferred: demo-spec');
       const shown = spawnSync(process.execPath, [tsx, script, 'show', 'a-finding', ...globals], { cwd: repoRoot, encoding: 'utf8' });
       expect(shown.stdout).toContain('spec: demo-spec');
-    });
-  });
-
-  // Contrast with the sibling test above ("triage promotes into the
-  // inferred spec"): read commands infer an active spec when exactly one
-  // candidate has open members, but the merge gate never does, even in
-  // that same unambiguous case — it stays "not applicable".
-  it('check --merge never infers a spec — it stays "not applicable" even when exactly one spec has open members', () => {
-    fixture(({ tasks, dir }) => {
-      tasks('add', 'open task', '--id', 'open-task', '--spec', 'demo-spec', '--severity', 'high');
-      const storePath = path.join(dir, 'tasks.jsonl');
-      const systemsPath = path.join(dir, 'systems.json');
-      const specsDir = path.join(dir, 'specs');
-      const result = spawnSync(process.execPath, [tsx, script, 'check', '--merge', '--store', storePath, '--systems', systemsPath, '--specs-dir', specsDir, '--branch', 'orphaned-branch'], { cwd: repoRoot, encoding: 'utf8' });
-      expect(result.status).toBe(0);
-      expect(result.stdout).toContain('not applicable');
     });
   });
 
