@@ -117,3 +117,50 @@ Recorded against the two task records as this branch opened; both had stale evid
   `src/runtime/tuning.ts` or `content/`. Corrected before dispatch.
 - Both are filed under system "DSL load path" while writing `src/runtime`, which the partition
   assigns to Runtime. The work is genuinely cross-system; the audit reads the diff, not the label.
+
+## Audit passes
+
+### Pass 1 — 2026-08-03
+
+- base: `8f1de469c8609e685c500a1ae490ad5e1bc10c0c`
+- head: `319b5b94128c727f7c072a218826e254e419b844`
+- proof 1: met — repeating gone from the Action interface and BOOLEAN_ACTION_FLAGS; armAction reads actionKind(action)==='continuous'. Forcing actionKind to 'duration' reddens 9 tests across cadence/stopping/time.
+- proof 2: unmet
+- proof 3: met — speed gone from Action, Recipe, referenceSites, serialize and every fixture. cadence.test.ts pins 25/min=2400ms, 16/min=3750ms, hasted 31.25/min=1920ms, rate:15 identical to time:4; scaling MS_PER_MINUTE/perMinute reddens it.
+- proof 4: met — DEFAULT_ACTION_DURATION read through tuning.ts like contestSpread/minDamage, ships at 0, TODO deleted. time.test.ts sets it to 7 and asserts the untagged action spans it while the instant one stays 0; ignoring the variable reddens exactly that test. Clause says 'N milliseconds worth' where code uses seconds — the wording is wrong, not the code.
+- proof 5: met — mirror look-in, four stairs actions and both eat: carry instant; oven carries continuous; variable ships at 0. Enumerating every shipped action's effective kind leaves only pick-lock and search-drawer untagged with no cadence, and both plausibly span.
+- proof 6: met — entityTypeSchema fields:{} refuses a non-action line; structuredClone per entity, and sharing the reference reddens the three-way non-identity assertion.
+- proof 7: met — one merge implementation: entityTypeBase feeds the existing mergeSection. Overlay, addition, inheritance-whole and -label removal each covered; dropping the base reddens 4 entityType + 12 cadence tests.
+- proof 8: met — own-context reference validation, serialize emits # entitytype and it reloads, # remove entitytype.x works, unresolvable type: names the entity — each pinned. The entity-SIDE round-trip is finding H3.
+- proof 9: met — rat is type: melee-foe plus a 6-line fight block; punchbag is type: melee-foe plus -bite:. Zero assertion values changed across contest/encounter/enemy-pool/equipment/stopping — the diffs there are purely the mechanical vocabulary rewrite.
+- proof 10: met — tsc --noEmit clean, 968 tests green in 62s, build clean, layer-check 482 imports all downward, tasks doctor 0 errors.
+
+### Pass 2 — 2026-08-03
+
+- base: `8f1de469c8609e685c500a1ae490ad5e1bc10c0c`
+- head: `319b5b94128c727f7c072a218826e254e419b844`
+- proof 1: unknown
+- proof 2: unknown
+- proof 3: unknown
+- proof 4: unknown
+- proof 5: unknown
+- proof 6: unknown
+- proof 7: unknown
+- proof 8: unknown
+- proof 9: unknown
+- proof 10: unknown
+
+### Pass 3 — 2026-08-03
+
+- base: `8f1de469c8609e685c500a1ae490ad5e1bc10c0c`
+- head: `319b5b94128c727f7c072a218826e254e419b844`
+- proof 1: met — repeating gone from the Action interface and BOOLEAN_ACTION_FLAGS; armAction reads actionKind(action)==='continuous'. Forcing actionKind to 'duration' reddens 9 tests across cadence/stopping/time.
+- proof 2: unmet
+- proof 3: met — speed gone from Action, Recipe, referenceSites, serialize and every fixture. cadence.test.ts pins 25/min=2400ms, 16/min=3750ms, hasted 31.25/min=1920ms, rate:15 identical to time:4; scaling MS_PER_MINUTE/perMinute reddens it.
+- proof 4: met — DEFAULT_ACTION_DURATION read through tuning.ts like contestSpread/minDamage, ships at 0, TODO deleted. time.test.ts sets it to 7 and asserts the untagged action spans it while the instant one stays 0; ignoring the variable reddens exactly that test. Clause says 'N milliseconds worth' where code uses seconds — the wording is wrong, not the code.
+- proof 5: met — mirror look-in, four stairs actions and both eat: carry instant; oven carries continuous; variable ships at 0. Enumerating every shipped action's effective kind leaves only pick-lock and search-drawer untagged with no cadence, and both plausibly span.
+- proof 6: met — entityTypeSchema fields:{} refuses a non-action line; structuredClone per entity, and sharing the reference reddens the three-way non-identity assertion.
+- proof 7: met — one merge implementation: entityTypeBase feeds the existing mergeSection. Overlay, addition, inheritance-whole and -label removal each covered; dropping the base reddens 4 entityType + 12 cadence tests.
+- proof 8: met — own-context reference validation, serialize emits # entitytype and it reloads, # remove entitytype.x works, unresolvable type: names the entity — each pinned. The entity-SIDE round-trip is the serialize finding.
+- proof 9: met — rat is type: melee-foe plus a 6-line fight block; punchbag is type: melee-foe plus -bite:. Zero assertion values changed across contest/encounter/enemy-pool/equipment/stopping — the diffs there are purely the mechanical vocabulary rewrite.
+- proof 10: met — tsc --noEmit clean, 968 tests green in 62s, build clean, layer-check 482 imports all downward, tasks doctor 0 errors.
