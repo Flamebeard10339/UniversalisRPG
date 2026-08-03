@@ -1,5 +1,6 @@
+import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { formatReport, parseManifest, parseVitestTally, runMutations, type FileStore, type Mutation, type TestRun } from './mutate';
+import { applyTo, escapesRoot, formatReport, journalVerdict, outputTail, parseManifest, parseVitestTally, recoverFrom, runMutations, type FileStore, type Mutation, type TestRun } from './mutate';
 
 const ORIGINAL = 'const base = entityTypeBase(merged, section);\nconst other = 1;\n';
 
@@ -177,6 +178,12 @@ describe('mutate: the verdict', () => {
     expect(report.results[0].detail).toMatch(/no tests/i);
   });
 
+  it('keeps the run output on an errored mutation, which is where the reason is', () => {
+    const report = runMutations([mutation()], store({ 'a.ts': ORIGINAL }), () => ({ failed: 0, total: 0, raw: 'Transform failed\nUnexpected token (14:8)\nTests  no tests' }));
+    expect(report.results[0].output).toContain('Unexpected token');
+    expect(formatReport(report)).toContain('Unexpected token');
+  });
+
   it('is not satisfied by a run that produced a survivor', () => {
     expect(runMutations([mutation()], store({ 'a.ts': ORIGINAL }), surviving).ok).toBe(false);
     expect(runMutations([mutation()], store({ 'a.ts': ORIGINAL }), killing).ok).toBe(true);
@@ -194,6 +201,148 @@ describe('mutate: proving the restore', () => {
 
   it('says nothing about restoration when every file came back byte-identical', () => {
     expect(runMutations([mutation()], store({ 'a.ts': ORIGINAL }), killing).unrestored).toEqual([]);
+  });
+
+  // A restore that throws must not become the exception that escapes the loop:
+  // that would abandon the remaining mutations and skip this proof entirely.
+  it('survives a restore write that throws, still runs the rest, and still reports', () => {
+    const files = store({ 'a.ts': ORIGINAL, 'b.ts': 'other' });
+    let restores = 0;
+    const flaky: FileStore = {
+      read: files.read,
+      write(file, text) {
+        if (file === 'a.ts' && text === ORIGINAL && restores++ === 0) throw new Error('EPERM: operation not permitted');
+        files.write(file, text);
+      },
+    };
+    const report = runMutations([mutation({ name: 'first' }), mutation({ name: 'second', file: 'b.ts', find: 'other', replace: 'changed' })], flaky, killing);
+    expect(report.results.map((result) => result.name)).toEqual(['first', 'second']);
+    expect(report.unrestored).toContain('a.ts');
+    expect(report.ok).toBe(false);
+  });
+});
+
+describe('mutate: the output tail', () => {
+  it('keeps the last lines, which is where a build error lands', () => {
+    expect(outputTail('one\ntwo\nthree', 2)).toBe('two\nthree');
+  });
+
+  it('drops blank lines rather than spending the budget on them', () => {
+    expect(outputTail('one\n\n\n\ntwo', 2)).toBe('one\ntwo');
+  });
+
+  it('returns everything when there is less than the budget', () => {
+    expect(outputTail('only', 12)).toBe('only');
+  });
+});
+
+describe('mutate: applying the text', () => {
+  // The whole reason this is split/join and not String.replace, whose
+  // replacement argument reads `$&`, `` $` ``, `$'` and `$1` as instructions.
+  it('treats a replacement containing $ sequences as literal text', () => {
+    expect(applyTo('const x = HERE;', { find: 'HERE', replace: "$& $` $' $1 $$" })).toBe("const x = $& $` $' $1 $$;");
+  });
+
+  it('treats $ sequences in the find text as literal too', () => {
+    expect(applyTo('a $& b', { find: '$&', replace: 'X' })).toBe('a X b');
+  });
+
+  it('replaces every occurrence when asked, and the count is what refuse() gates on', () => {
+    expect(applyTo('x x x', { find: 'x', replace: 'y' })).toBe('y y y');
+  });
+});
+
+describe('mutate: staying inside the repository', () => {
+  const root = path.resolve('/repo');
+
+  it('accepts a path under the root', () => {
+    expect(escapesRoot(root, 'src/content/registry.ts')).toBe(false);
+  });
+
+  it('refuses a climb out of the root', () => {
+    expect(escapesRoot(root, '../elsewhere/file.ts')).toBe(true);
+    expect(escapesRoot(root, 'src/../../file.ts')).toBe(true);
+  });
+
+  it('refuses an absolute path outside the root', () => {
+    expect(escapesRoot(root, path.resolve('/somewhere/else.ts'))).toBe(true);
+  });
+
+  it('accepts an absolute path that is inside the root', () => {
+    expect(escapesRoot(root, path.join(root, 'src/x.ts'))).toBe(false);
+  });
+
+  it('refuses the root itself, which is a directory rather than a file', () => {
+    expect(escapesRoot(root, '.')).toBe(true);
+  });
+});
+
+describe('mutate: whose journal it is', () => {
+  const dead = () => false;
+  const live = () => true;
+
+  it('recovers from a journal whose owner is gone', () => {
+    expect(journalVerdict({ pid: 4242 }, 1, dead)).toBe('recover');
+  });
+
+  // Recovering here would restore files another run is deliberately holding
+  // mutated, and delete the only record it has of their originals.
+  it('refuses a journal whose owner is still running', () => {
+    expect(journalVerdict({ pid: 4242 }, 1, live)).toBe('busy');
+  });
+
+  it('recovers its own journal, since a live pid that is us is not another run', () => {
+    expect(journalVerdict({ pid: 7 }, 7, live)).toBe('recover');
+  });
+
+  it('recovers a journal with no pid at all, rather than deadlocking on an old format', () => {
+    expect(journalVerdict({} as unknown as { pid: number }, 1, live)).toBe('recover');
+  });
+});
+
+describe('mutate: recovering an interrupted run', () => {
+  it('puts back a file the journal says was mutated', () => {
+    const files = store({ 'a.ts': 'MUTATED' });
+    expect(recoverFrom({ 'a.ts': ORIGINAL }, files)).toEqual(['a.ts']);
+    expect(files.read('a.ts')).toBe(ORIGINAL);
+  });
+
+  it('leaves a file that is already correct alone, and reports nothing for it', () => {
+    const files = store({ 'a.ts': ORIGINAL });
+    expect(recoverFrom({ 'a.ts': ORIGINAL }, files)).toEqual([]);
+    expect(files.writes).toEqual([]);
+  });
+
+  it('survives a journal naming a file that no longer exists', () => {
+    const files = store({ 'a.ts': 'MUTATED' });
+    expect(recoverFrom({ 'gone.ts': 'x', 'a.ts': ORIGINAL }, files)).toEqual(['a.ts']);
+  });
+});
+
+describe('mutate: the baseline', () => {
+  it('reports how many tests stopped running when the denominator shrank', () => {
+    const report = runMutations([mutation()], store({ 'a.ts': ORIGINAL }), () => tally(3, 950), new Map([['whole suite', 1000]]));
+    expect(report.results[0].shortfall).toBe(50);
+    expect(formatReport(report)).toContain('50 fewer tests ran');
+  });
+
+  it('says nothing when the count held', () => {
+    const report = runMutations([mutation()], store({ 'a.ts': ORIGINAL }), () => tally(3, 1000), new Map([['whole suite', 1000]]));
+    expect(report.results[0].shortfall).toBeUndefined();
+    expect(formatReport(report)).not.toContain('fewer tests');
+  });
+
+  it('does not treat a suite that grew as a shortfall', () => {
+    expect(runMutations([mutation()], store({ 'a.ts': ORIGINAL }), () => tally(3, 1100), new Map([['whole suite', 1000]])).results[0].shortfall).toBeUndefined();
+  });
+
+  it('matches a baseline to the scope it was measured for', () => {
+    const report = runMutations([mutation({ tests: ['one.test.ts'] })], store({ 'a.ts': ORIGINAL }), () => tally(1, 5), new Map([['one.test.ts', 9]]));
+    expect(report.results[0].shortfall).toBe(4);
+  });
+
+  it('reports nothing when no baseline was measured at all', () => {
+    expect(runMutations([mutation()], store({ 'a.ts': ORIGINAL }), () => tally(3, 950)).results[0].shortfall).toBeUndefined();
   });
 });
 
@@ -216,6 +365,16 @@ describe('mutate: reading vitest back', () => {
 
   it('returns null when there is no Tests line at all', () => {
     expect(parseVitestTally('command not found')).toBeNull();
+  });
+
+  // Not the same answer as "no tests ran". Collapsing them would let a garbled
+  // run read as a clean zero, and the `no tests` branch would be dead code.
+  it('returns null for a Tests line it cannot read a count out of', () => {
+    expect(parseVitestTally('Tests  something went very wrong')).toBeNull();
+  });
+
+  it('still reads a genuine no-tests run as a tally of zero', () => {
+    expect(parseVitestTally('Tests  no tests')).toEqual({ failed: 0, total: 0 });
   });
 
   it('takes the last tally when the output carries more than one', () => {

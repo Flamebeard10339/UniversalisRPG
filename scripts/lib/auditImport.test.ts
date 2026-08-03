@@ -97,7 +97,7 @@ describe('harvestFiles', () => {
 });
 
 describe('the real docs/audits/ corpus', () => {
-  it('parses to exactly 21 high, 54 medium and 63 low findings, each mapped to a system', () => {
+  it('parses to exactly 23 high, 59 medium and 72 low findings, each mapped to a system', () => {
     const counts: Record<Severity, number> = { high: 0, medium: 0, low: 0 };
     const unmapped: string[] = [];
     for (const file of readdirSync('docs/audits')) {
@@ -107,7 +107,7 @@ describe('the real docs/audits/ corpus', () => {
       if (findings.length > 0 && systemForDoc(basename) === null) unmapped.push(basename);
       for (const finding of findings) counts[finding.severity]++;
     }
-    expect(counts).toEqual({ high: 21, medium: 54, low: 63 });
+    expect(counts).toEqual({ high: 23, medium: 59, low: 72 });
     expect(unmapped).toEqual([]);
   });
 });

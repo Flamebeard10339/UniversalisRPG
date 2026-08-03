@@ -1,5 +1,6 @@
 import { spawnSync } from 'node:child_process';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 
 export interface Mutation {
@@ -36,6 +37,8 @@ export interface MutationResult {
   total: number;
   scope: string;
   detail?: string;
+  output?: string;
+  shortfall?: number;
 }
 
 export interface MutationReport {
@@ -69,8 +72,6 @@ export function parseManifest(text: string): Mutation[] {
     for (const key of ['file', 'find'] as const) {
       if (typeof entry[key] !== 'string' || entry[key] === '') throw new Error(`${at}: ${key} is required and must be a non-empty string`);
     }
-    // Empty is the point: deleting the text you found is the most direct way to
-    // ask whether anything was checking it.
     if (typeof entry.replace !== 'string') throw new Error(`${at}: replace is required, and may be empty to delete what find matched`);
     if (entry.tests !== undefined && (!Array.isArray(entry.tests) || entry.tests.length === 0 || entry.tests.some((each) => typeof each !== 'string'))) {
       throw new Error(`${at}: tests must be a non-empty list of strings, or absent to measure against the whole suite`);
@@ -88,16 +89,25 @@ export function parseVitestTally(output: string): { failed: number; total: numbe
   if (matches.length === 0) return null;
   const summary = matches[matches.length - 1][1];
   if (/no tests/i.test(summary)) return { failed: 0, total: 0 };
-  return { failed: Number(/(\d+) failed/.exec(summary)?.[1] ?? 0), total: Number(/\((\d+)\)/.exec(summary)?.[1] ?? 0) };
+  const total = /\((\d+)\)/.exec(summary);
+  if (total === null) return null;
+  return { failed: Number(/(\d+) failed/.exec(summary)?.[1] ?? 0), total: Number(total[1]) };
 }
 
-const scopeOf = (mutation: Mutation): string => (mutation.tests && mutation.tests.length > 0 ? mutation.tests.join(', ') : 'whole suite');
+export function outputTail(raw: string, lines = 12): string {
+  return raw.split('\n').filter((line) => line.trim() !== '').slice(-lines).join('\n');
+}
+
+export function escapesRoot(root: string, file: string): boolean {
+  const relative = path.relative(root, path.resolve(root, file));
+  return relative === '' || relative.startsWith('..') || path.isAbsolute(relative);
+}
+
+export const scopeOf = (mutation: Pick<Mutation, 'tests'>): string => (mutation.tests && mutation.tests.length > 0 ? mutation.tests.join(', ') : 'whole suite');
 
 const occurrences = (text: string, find: string): number => text.split(find).length - 1;
 
-// split/join rather than String.replace, whose replacement string reads `$&`
-// and `$'` as instructions. Source code is full of both.
-const applyTo = (text: string, mutation: Mutation): string => text.split(mutation.find).join(mutation.replace);
+export const applyTo = (text: string, mutation: Pick<Mutation, 'find' | 'replace'>): string => text.split(mutation.find).join(mutation.replace);
 
 function refuse(mutations: readonly Mutation[], files: FileStore, originals: Map<string, string>): string[] {
   const refusals: string[] = [];
@@ -122,32 +132,36 @@ function refuse(mutations: readonly Mutation[], files: FileStore, originals: Map
   return refusals;
 }
 
-function verdictOf(mutation: Mutation, run: TestRun): MutationResult {
+function verdictOf(mutation: Mutation, run: TestRun, baseline: number | undefined): MutationResult {
   const scope = scopeOf(mutation);
-  // A run that collected nothing says nothing about the suite. Reading it as
-  // KILLED would credit the tests for a failure they never produced.
-  if (run.total === 0) return { name: mutation.name, verdict: 'ERROR', failed: 0, total: 0, scope, detail: 'the run reported no tests — the mutation may not build' };
+  if (run.total === 0) return { name: mutation.name, verdict: 'ERROR', failed: 0, total: 0, scope, detail: 'the run reported no tests — the mutation may not build', output: outputTail(run.raw) };
   const verdict: Verdict = run.failed > 0 ? 'KILLED' : 'SURVIVED';
-  return { name: mutation.name, verdict, failed: run.failed, total: run.total, scope };
+  const shortfall = baseline !== undefined && run.total < baseline ? baseline - run.total : undefined;
+  return { name: mutation.name, verdict, failed: run.failed, total: run.total, scope, shortfall };
 }
 
-export function runMutations(mutations: readonly Mutation[], files: FileStore, runTests: RunTests): MutationReport {
+export function runMutations(mutations: readonly Mutation[], files: FileStore, runTests: RunTests, baselines?: ReadonlyMap<string, number>): MutationReport {
   const originals = new Map<string, string>();
   const refusals = refuse(mutations, files, originals);
   if (refusals.length > 0) return { results: [], refusals, unrestored: [], ok: false };
 
   const results: MutationResult[] = [];
   const touched = new Set<string>();
+  const restoreFailures = new Set<string>();
   for (const mutation of mutations) {
     const original = originals.get(mutation.file)!;
     touched.add(mutation.file);
     files.write(mutation.file, applyTo(original, mutation));
     try {
-      results.push(verdictOf(mutation, runTests(mutation.tests)));
+      results.push(verdictOf(mutation, runTests(mutation.tests), baselines?.get(scopeOf(mutation))));
     } catch (error) {
       results.push({ name: mutation.name, verdict: 'ERROR', failed: 0, total: 0, scope: scopeOf(mutation), detail: (error as Error).message });
     } finally {
-      files.write(mutation.file, original);
+      try {
+        files.write(mutation.file, original);
+      } catch {
+        restoreFailures.add(mutation.file);
+      }
     }
   }
 
@@ -162,7 +176,7 @@ export function runMutations(mutations: readonly Mutation[], files: FileStore, r
     } catch {
       current = null;
     }
-    if (current !== originals.get(file)) unrestored.push(file);
+    if (current !== originals.get(file) || restoreFailures.has(file)) unrestored.push(file);
   }
 
   return { results, refusals, unrestored, ok: unrestored.length === 0 && results.every((result) => result.verdict === 'KILLED') };
@@ -175,9 +189,11 @@ export function formatReport(report: MutationReport): string {
 
   const sorted = [...report.results].sort((a, b) => ORDER[a.verdict] - ORDER[b.verdict]);
   const width = Math.max(0, ...sorted.map((result) => result.name.length));
-  const lines = sorted.map((result) => {
+  const lines = sorted.flatMap((result) => {
     const measure = result.verdict === 'ERROR' ? (result.detail ?? 'errored') : `${result.failed} failed of ${result.total}`;
-    return `${result.name.padEnd(width)}  ${result.verdict.padEnd(8)}  ${measure}  [${result.scope}]`;
+    const shortfall = result.shortfall === undefined ? '' : `  (${result.shortfall} fewer tests ran than the unmutated baseline — they cannot have killed it)`;
+    const row = `${result.name.padEnd(width)}  ${result.verdict.padEnd(8)}  ${measure}  [${result.scope}]${shortfall}`;
+    return result.output === undefined || result.output === '' ? [row] : [row, ...result.output.split('\n').map((line) => `    | ${line}`)];
   });
 
   const survived = sorted.filter((result) => result.verdict === 'SURVIVED');
@@ -205,8 +221,46 @@ const usage = [
   'which is what a SURVIVED verdict needs to mean anything.',
   '',
   'The mutated file is wrong on disk for as long as its tests take to run. Nothing',
-  'else should be reading the tree during a run.',
+  'else should be reading the tree during a run. If a run is killed outright, the',
+  'next one restores from its journal before doing anything else.',
+  '',
+  'Each distinct test scope is run once unmutated first, so a mutation that stops',
+  'tests from being collected is reported as a shortfall rather than as a verdict',
+  'over a silently smaller suite.',
 ].join('\n');
+
+// The captured bytes live in this process, which is the design's strength — git
+// cannot discard uncommitted work it never sees — and its single point of
+// failure. The journal is the same bytes on disk, so a killed run is recoverable
+// by the next one.
+const JOURNAL = path.join(os.tmpdir(), 'universalis-mutate-journal.json');
+
+export interface Journal {
+  pid: number;
+  startedAt: string;
+  files: Record<string, string>;
+}
+
+// A journal left by a run that is still going is not wreckage to clean up, it is
+// another process's only copy of the truth. Recovering from it would restore
+// files that run is deliberately holding mutated.
+export function journalVerdict(journal: Pick<Journal, 'pid'>, self: number, alive: (pid: number) => boolean): 'recover' | 'busy' {
+  if (typeof journal.pid !== 'number' || journal.pid === self) return 'recover';
+  return alive(journal.pid) ? 'busy' : 'recover';
+}
+
+export function recoverFrom(journal: Record<string, string>, files: FileStore): string[] {
+  const restored: string[] = [];
+  for (const [file, text] of Object.entries(journal)) {
+    try {
+      if (files.read(file) === text) continue;
+      files.write(file, text);
+      restored.push(file);
+    } catch {
+    }
+  }
+  return restored;
+}
 
 function main(): void {
   const manifestPath = process.argv[2];
@@ -220,6 +274,12 @@ function main(): void {
     mutations = parseManifest(readFileSync(manifestPath, 'utf8'));
   } catch (error) {
     console.error((error as Error).message);
+    process.exit(2);
+  }
+
+  const outside = mutations.filter((mutation) => escapesRoot(repoRoot, mutation.file));
+  if (outside.length > 0) {
+    console.error(`refusing to mutate outside the repository: ${outside.map((mutation) => `${mutation.name} (${mutation.file})`).join(', ')}`);
     process.exit(2);
   }
 
@@ -237,6 +297,38 @@ function main(): void {
     },
   };
 
+  const alive = (pid: number): boolean => {
+    try {
+      process.kill(pid, 0);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  if (existsSync(JOURNAL)) {
+    const journal = JSON.parse(readFileSync(JOURNAL, 'utf8')) as Journal;
+    if (journalVerdict(journal, process.pid, alive) === 'busy') {
+      console.error(`another mutate run (pid ${journal.pid}, started ${journal.startedAt}) is holding the working tree. Wait for it, or delete ${JOURNAL} if you know it is gone.`);
+      process.exit(2);
+    }
+    const restored = recoverFrom(journal.files ?? {}, files);
+    console.error(restored.length > 0 ? `recovered ${restored.length} file(s) left mutated by an interrupted run: ${restored.join(', ')}` : 'a journal from an interrupted run was found; every file in it was already correct');
+    rmSync(JOURNAL, { force: true });
+    captured.clear();
+  }
+
+  // Read every target before the first write, so the journal on disk is the
+  // pre-mutation content of everything this run can touch.
+  for (const file of new Set(mutations.map((mutation) => mutation.file))) {
+    try {
+      files.read(file);
+    } catch {
+      // runMutations refuses it by name a moment later, with a better message.
+    }
+  }
+  writeFileSync(JOURNAL, JSON.stringify({ pid: process.pid, startedAt: new Date().toISOString(), files: Object.fromEntries(captured) } satisfies Journal), 'utf8');
+
   const putBack = (): void => {
     for (const [file, text] of captured) {
       try {
@@ -253,14 +345,31 @@ function main(): void {
 
   const runTests: RunTests = (tests) => {
     const result = spawnSync(process.execPath, [path.join(repoRoot, 'node_modules/vitest/vitest.mjs'), 'run', '--configLoader', 'runner', ...(tests ?? [])], { cwd: repoRoot, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
-    const raw = `${result.stdout ?? ''}${result.stderr ?? ''}`;
-    const tally = parseVitestTally(raw);
-    if (tally === null) throw new Error(`could not read a test tally out of the run${result.error ? `: ${result.error.message}` : ''}`);
-    return { ...tally, raw };
+    const stdout = result.stdout ?? '';
+    const stderr = result.stderr ?? '';
+    // stdout alone. vitest writes its summary there and the failure detail to
+    // stderr, and a test that prints a tally-shaped line of its own would
+    // otherwise win the "last Tests line" race and invert the verdict.
+    const tally = parseVitestTally(stdout);
+    if (tally === null) throw new Error(`could not read a test tally out of the run${result.error ? `: ${result.error.message}` : ''}\n${outputTail(`${stdout}${stderr}`)}`);
+    return { ...tally, raw: `${stdout}${stderr}` };
   };
 
-  const report = runMutations(mutations, files, runTests);
+  const scopes = new Map<string, readonly string[] | undefined>();
+  for (const mutation of mutations) scopes.set(scopeOf(mutation), mutation.tests);
+  console.error(`measuring ${scopes.size} unmutated baseline(s)...`);
+  const baselines = new Map<string, number>();
+  for (const [scope, tests] of scopes) {
+    try {
+      baselines.set(scope, runTests(tests).total);
+    } catch (error) {
+      console.error(`  ${scope}: no baseline — ${(error as Error).message.split('\n')[0]}`);
+    }
+  }
+
+  const report = runMutations(mutations, files, runTests, baselines);
   console.log(formatReport(report));
+  if (report.unrestored.length === 0) rmSync(JOURNAL, { force: true });
   process.exit(report.ok ? 0 : 1);
 }
 

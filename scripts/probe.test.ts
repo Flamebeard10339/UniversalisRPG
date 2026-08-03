@@ -68,20 +68,28 @@ describe('probe: --show', () => {
   });
 
   it('accepts every kind the loader defines, without naming any of them itself', () => {
-    // The point of deriving from CONTENT_SECTION_MAPS: a section kind added to
-    // the loader is probeable without this file being edited.
     for (const [kind] of CONTENT_SECTION_MAPS) {
       const result = report([BASE], { show: [`${kind}.base.nothing-by-this-name`], roundTrip: false });
-      expect(result.lines.join('\n'), kind).not.toContain('not a section kind');
+      expect(result.lines.join('\n'), kind).not.toContain('names nothing the registry holds');
     }
   });
 
-  it('refuses an unknown kind and lists the ones it takes', () => {
+  it('shows the kinds that have no section kind of their own, under the name the summary counts them by', () => {
+    const source = { name: 'v', text: '# info v\nversion: 1.0.0\n\n# variable travel-seconds-per-unit\nvalue: 5\n' };
+    const summary = text([source]);
+    expect(summary).toContain('variables 1');
+    const shown = report([source], { show: ['variables.travel-seconds-per-unit'], roundTrip: false });
+    expect(shown.ok).toBe(true);
+    expect(shown.lines.join('\n')).toContain('"value": 5');
+  });
+
+  it('refuses an unknown name and lists everything it takes, kinds and maps alike', () => {
     const result = report([BASE], { show: ['widget.base.rat'], roundTrip: false });
     expect(result.ok).toBe(false);
     const lines = result.lines.join('\n');
-    expect(lines).toContain('not a section kind');
+    expect(lines).toContain('names nothing the registry holds');
     for (const [kind] of CONTENT_SECTION_MAPS) expect(lines).toContain(kind);
+    for (const map of ['flags', 'variables', 'saves']) expect(lines).toContain(map);
   });
 
   it('refuses an absent id and lists what that kind does define', () => {
@@ -121,13 +129,16 @@ describe('probe: --round-trip', () => {
     expect(result.lines.join('\n')).not.toContain('variables: missing');
   });
 
-  it('names what a serialized module would lose, and refuses', () => {
-    // A patch module owns none of the ids it edits, and the serializer filters
-    // by module, so printing the patch alone drops the edit. This is the live
-    // contribution-system H1, reachable in one command.
+  it('survives a universe whose modules patch each other', () => {
     const result = report([BASE, patch('# item base.bread', 'title: Toast')], { show: [], roundTrip: true });
-    expect(result.ok).toBe(false);
-    expect(result.lines.join('\n')).toContain('items: changed base.bread');
+    expect(result.ok).toBe(true);
+    expect(result.lines.join('\n')).toContain('round-trips clean');
+  });
+
+  it('survives a universe holding a # remove, which one-module-at-a-time blamed on the wrong module', () => {
+    const result = report([BASE, patch('# remove item.base.bread')], { show: [], roundTrip: true });
+    expect(result.ok).toBe(true);
+    expect(result.lines.join('\n')).not.toContain('does not load');
   });
 
   it('says a source with no # info cannot be round-tripped, rather than reporting it as dropped', () => {

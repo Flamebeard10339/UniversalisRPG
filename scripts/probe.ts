@@ -3,8 +3,8 @@ import path from 'node:path';
 import { formatVersion } from '../src/grammar/dependency';
 import { CONTENT_SECTION_MAPS, formatModuleDiagnostic, loadUniverseWithDiagnostics, type Registry } from '../src/content/registry';
 import { REGISTRY_DIFF_MAPS } from '../src/content/registryDiff';
-import { declaredVariableIds, roundTripModule } from '../src/content/roundTrip';
-import { parseUniverse, type ModuleSource } from '../src/content/universe';
+import { canSerialize, roundTripUniverse } from '../src/content/roundTrip';
+import { type ModuleSource, type ParsedModule } from '../src/content/universe';
 
 export interface ProbeOptions {
   show: string[];
@@ -21,11 +21,8 @@ export interface ProbeReport {
   ok: boolean;
 }
 
-// Section kinds are the authoring vocabulary, so they are what --show takes.
-// The three maps with no kind beside them carry no references and cannot be
-// authored as a section a reference points into; they are counted, not shown.
-const KIND_TO_MAP = new Map<string, keyof Registry>(CONTENT_SECTION_MAPS.map(([kind, map]) => [kind, map]));
 const KINDLESS_MAPS = REGISTRY_DIFF_MAPS.filter((map) => !CONTENT_SECTION_MAPS.some(([, named]) => named === map));
+const SHOWABLE = new Map<string, keyof Registry>([...CONTENT_SECTION_MAPS.map(([kind, map]) => [kind, map] as const), ...KINDLESS_MAPS.map((map) => [map as string, map] as const)]);
 
 export const DOCUMENT_SEPARATOR = '---';
 
@@ -34,7 +31,8 @@ const usage = [
   '',
   '  <source>       a DSL file, or - to read from stdin',
   '  --show         print one registry record as JSON; repeatable',
-  '  --round-trip   serialize each loaded module, reload it, and report what changed',
+  '  --round-trip   serialize every loaded module, reload the universe from those',
+  '                 serializations alone, and report what changed',
   '  --each         load every source on its own and report a verdict per source,',
   '                 instead of loading them together as one universe',
   '',
@@ -70,9 +68,6 @@ export function parseProbeArgs(raw: readonly string[]): ProbeArgs {
   }
   if (args.sources.length === 0) throw new Error(`name at least one source\n\n${usage}`);
   if (args.sources.filter((source) => source === '-').length > 1) throw new Error('stdin can only be read once — pass - at most once, and split the body on a line of ---');
-  // A survey loads each source alone, so there is no one universe for --show to
-  // look in and no one module for --round-trip to name. Silently dropping them
-  // would report a clean survey for a question nobody answered.
   if (args.each && (args.show.length > 0 || args.roundTrip)) throw new Error('--each surveys sources one at a time, so it cannot be combined with --show or --round-trip');
   return args;
 }
@@ -95,8 +90,8 @@ function showRecord(registry: Registry, spec: string): { lines: string[]; ok: bo
   if (dot < 1 || dot === spec.length - 1) return { lines: [`${spec}: not a <kind>.<id>, as in entity.base.rat`], ok: false };
   const kind = spec.slice(0, dot);
   const id = spec.slice(dot + 1);
-  const map = KIND_TO_MAP.get(kind);
-  if (map === undefined) return { lines: [`${spec}: ${kind} is not a section kind. Takes: ${[...KIND_TO_MAP.keys()].join(', ')}`], ok: false };
+  const map = SHOWABLE.get(kind);
+  if (map === undefined) return { lines: [`${spec}: ${kind} names nothing the registry holds. Takes: ${[...SHOWABLE.keys()].join(', ')}`], ok: false };
   const records = registry[map] as ReadonlyMap<string, unknown>;
   const record = records.get(id);
   if (record === undefined) {
@@ -106,10 +101,25 @@ function showRecord(registry: Registry, spec: string): { lines: string[]; ok: bo
   return { lines: [`${kind}.${id}`, JSON.stringify(record, null, 2)], ok: true };
 }
 
-// One line per source: what the loader said, and nothing else. A table of
-// eighteen variants is the shape this exists for, and eighteen rejections is a
-// normal answer to ask for — so the verdicts are the output and the exit code
-// says only that the survey ran.
+function roundTrip(parsed: readonly ParsedModule[], loaded: Registry): { lines: string[]; ok: boolean } {
+  const unserializable = parsed.filter((module) => !canSerialize(module));
+  if (unserializable.length > 0) {
+    return {
+      lines: [
+        `not round-tripped: ${unserializable.map((module) => module.info.id).join(', ')} declare no # info, so their ids are root ids that no namespace prefix matches and they serialize to nothing.`,
+        'The universe is round-tripped whole, so one such source ends the check for all of them. Give each a # info to run it.',
+      ],
+      ok: true,
+    };
+  }
+
+  const trip = roundTripUniverse(loaded, parsed, (printed) => loadUniverseWithDiagnostics(printed));
+  const named = parsed.map((module) => module.info.id).join(', ');
+  if (trip.diagnostics.length > 0) return { lines: [`${named}: the serialization does not load`, ...trip.diagnostics.map((each) => `  ${formatModuleDiagnostic(each)}`)], ok: false };
+  if (trip.differences.length > 0) return { lines: [`${named}: the serialization loads to a different registry`, ...trip.differences], ok: false };
+  return { lines: [`${named}: round-trips clean`], ok: true };
+}
+
 function survey(sources: readonly ModuleSource[]): ProbeReport {
   const lines = sources.map((source) => {
     const loaded = loadUniverseWithDiagnostics([source]);
@@ -127,7 +137,7 @@ export function probe(sources: readonly ModuleSource[], options: ProbeOptions): 
     return { lines: loaded.diagnostics.map(formatModuleDiagnostic), ok: false };
   }
 
-  const parsed = parseUniverse(sources);
+  const parsed = loaded.parsed;
   const lines = [`loaded ${parsed.length} module(s): ${parsed.map((module) => `${module.info.id} ${formatVersion(module.info.version)}`).join(', ')}`, `  ${counts(loaded.registry)}`];
   let ok = true;
 
@@ -138,27 +148,9 @@ export function probe(sources: readonly ModuleSource[], options: ProbeOptions): 
   }
 
   if (options.roundTrip) {
-    for (const module of parsed) {
-      // The serializer emits a module by filtering ids on its namespace prefix.
-      // A source with no # info declares root ids, so that filter matches
-      // nothing and every id reads as dropped — a fact about the snippet, not a
-      // defect in the serializer, so it is not reported as one.
-      if (module.namespace === null) {
-        lines.push('', `${module.info.id}: no # info, so its ids are root ids and there is no module for the serializer to filter by — declare # info to round-trip it`);
-        continue;
-      }
-      const others = sources.filter((source) => source !== module.source);
-      const trip = roundTripModule(loaded.registry, { info: module.info, globalVariables: declaredVariableIds(module) }, (printed) => loadUniverseWithDiagnostics([...others, { ...module.source, text: printed }]));
-      if (trip.diagnostics.length > 0) {
-        lines.push('', `${module.info.id}: its serialization does not load`, ...trip.diagnostics.map((each) => `  ${formatModuleDiagnostic(each)}`));
-        ok = false;
-      } else if (trip.differences.length > 0) {
-        lines.push('', `${module.info.id}: its serialization loads to a different registry`, ...trip.differences);
-        ok = false;
-      } else {
-        lines.push('', `${module.info.id}: round-trips clean`);
-      }
-    }
+    const trip = roundTrip(parsed, loaded.registry);
+    lines.push('', ...trip.lines);
+    if (!trip.ok) ok = false;
   }
 
   return { lines, ok };
@@ -167,8 +159,6 @@ export function probe(sources: readonly ModuleSource[], options: ProbeOptions): 
 export function splitDocuments(name: string, text: string): ModuleSource[] {
   const documents = text.split(new RegExp(`^${DOCUMENT_SEPARATOR}[ \\t]*$`, 'm'));
   if (documents.length === 1) return [{ name, text }];
-  // A body that opens or closes with the separator yields blank documents, which
-  // would load as anonymous empty modules and confuse the count.
   return documents.map((document, index) => ({ name: `${name}[${index + 1}]`, text: document })).filter((source) => source.text.trim() !== '');
 }
 
@@ -177,14 +167,16 @@ function readSources(files: readonly string[]): ModuleSource[] {
 }
 
 function main(): void {
+  let sources: ModuleSource[];
   let args: ProbeArgs;
   try {
     args = parseProbeArgs(process.argv.slice(2));
+    sources = readSources(args.sources);
   } catch (error) {
     console.error((error as Error).message);
     process.exit(2);
   }
-  const report = probe(readSources(args.sources), args);
+  const report = probe(sources, args);
   console.log(report.lines.join('\n'));
   if (!report.ok) process.exit(1);
 }

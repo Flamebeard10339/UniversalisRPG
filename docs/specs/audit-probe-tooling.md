@@ -34,9 +34,13 @@ Proof:
   `CONTENT_SECTION_MAPS`, so a section kind added to the loader is accepted here without this file
   being edited; an unknown kind is refused with the accepted list, and a known kind with an absent id
   is refused with the ids that are defined.
-- [c4] `--round-trip` serializes each loaded module, reloads the universe with that serialization in
-  place of the original source, and reports `registryDiff` differences. Clean output means the module
-  survives a serialize/reload cycle; differences are listed and exit non-zero.
+- [c4] `--round-trip` serializes every loaded module and reloads the universe from **those
+  serializations alone**, then reports `registryDiff` differences. One module at a time is not a
+  well-defined question — a module is serialized from the merged registry, so it already carries what
+  other modules did to its ids, and leaving any original source in the reload applies those edits
+  twice. Idempotent edits survive that and `# remove` does not, so the per-module form reported the
+  wrong module as broken. Clean output means the universe survives a serialize/reload cycle;
+  differences are listed and exit non-zero.
 - [c5] That round trip is one implementation, and it lives in `src/content/` rather than beside the
   scripts that call it, because `content < scripts` means a content-layer test cannot import
   upward. Its callers are the probe, `scripts/squash-local-changes.ts`'s publish guard, and
@@ -73,6 +77,12 @@ Proof:
   layer rule forbids from importing anything under `scripts/`. Putting a concept about
   `ParsedModule` and `serializeRegistryModule` in the scripts layer was the mistake; two of its
   three callers being scripts is incidental.
+- Round-tripping the universe rather than each module costs one thing knowingly: `--round-trip` no
+  longer surfaces the live contribution-system H1, where a patch module owns none of the ids it edits
+  and so serializes to nothing. That is a different question — "does serializing module X alone
+  preserve X's edits" — and it is the one `squash-local-changes.ts` asks through `roundTripModule`,
+  which stays. Probing asks whether the content survives a serialize/reload cycle, and the honest
+  answer to that is whole-universe.
 - `--each` was added mid-branch, after the one-invocation-per-row cost was measured against the
   probe that motivated this work: its largest block was a table of eighteen one-line variants. A tool
   that answers that in eighteen commands is worse than the vitest file it replaces, so auditors would
