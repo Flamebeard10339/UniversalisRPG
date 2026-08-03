@@ -2653,6 +2653,40 @@ describe('tasks CLI', () => {
     });
   });
 
+  // Found by running `handoff` on main straight after a merge: it inferred a
+  // superseded spec and opened the session with five unmet clauses about a
+  // command deleted in that very merge. The inference is a resume aid for a
+  // branch whose name drifted from its spec file; main is never working a
+  // spec, so every answer it can give there is a guess about a branch the
+  // caller is not on. Asserted on a store where a spec DOES have open
+  // members, because that is the only state in which the bug is reachable.
+  it('does not infer a spec from the store on the default branch', () => {
+    fixture(({ tasks, dir }) => {
+      tasks('add', 'open task', '--id', 'open-task', '--spec', 'demo-spec', '--severity', 'high');
+      const globals = ['--store', path.join(dir, 'tasks.jsonl'), '--systems', path.join(dir, 'systems.json'), '--specs-dir', path.join(dir, 'specs')];
+      const on = (branch: string, command: string): { stdout: string } => spawnSync(process.execPath, [tsx, script, command, ...globals, '--branch', branch], { cwd: repoRoot, encoding: 'utf8' });
+
+      for (const command of ['next', 'handoff']) {
+        const onMain = on('main', command);
+        expect(onMain.stdout, command).not.toContain('spec inferred from the store');
+        expect(onMain.stdout, command).not.toContain('open task');
+
+        // The same store, one branch name different: still inferred, so what
+        // changed is the rule for main and not the inference itself.
+        expect(on('orphaned-branch', command).stdout, command).toContain('spec inferred from the store: demo-spec');
+      }
+    });
+  });
+
+  it('still takes an explicit --spec on the default branch, which is asked for rather than guessed', () => {
+    fixture(({ tasks, dir }) => {
+      tasks('add', 'open task', '--id', 'open-task', '--spec', 'demo-spec', '--severity', 'high');
+      const globals = ['--store', path.join(dir, 'tasks.jsonl'), '--systems', path.join(dir, 'systems.json'), '--specs-dir', path.join(dir, 'specs')];
+      const result = spawnSync(process.execPath, [tsx, script, 'next', ...globals, '--branch', 'main', '--spec', 'demo-spec'], { cwd: repoRoot, encoding: 'utf8' });
+      expect(result.stdout).toContain('open task');
+    });
+  });
+
   it('next does not infer when two specs both have open members — as ambiguous as none', () => {
     fixture(({ tasks, dir }) => {
       const specsDir = path.join(dir, 'specs');
