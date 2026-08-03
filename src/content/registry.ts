@@ -1,7 +1,8 @@
 import { ActionResult } from '../grammar/actionResult';
-import { Action } from '../grammar/action';
+import { Action, actionProblem, actionTableProblem } from '../grammar/action';
 import { Dialogue } from './dialogue';
 import { Entity, entitySchema } from './entity';
+import { EntityType, entityTypeSchema } from './entityType';
 import { Flag, flagSchema } from './flag';
 import { Item, itemSchema } from './item';
 import { Location, locationSchema, recursivelyResolveRelativeCoordinates } from './location';
@@ -27,6 +28,7 @@ import { Variable, variableSchema } from './variable';
 
 export interface Registry {
   entities: Map<string, Entity>;
+  entityTypes: Map<string, EntityType>;
   locations: Map<string, Location>;
   items: Map<string, Item>;
   stats: Map<string, Stat>;
@@ -49,6 +51,7 @@ export interface Registry {
 // every section a reference can be authored inside.
 export const CONTENT_SECTION_MAPS: readonly (readonly [string, keyof Registry])[] = [
   ['entity', 'entities'],
+  ['entitytype', 'entityTypes'],
   ['location', 'locations'],
   ['item', 'items'],
   ['stat', 'stats'],
@@ -96,15 +99,18 @@ function recipeAction(recipe: Recipe): Action {
   if (recipe.skill) results.push({ kind: 'xp', skill: recipe.skill.skill, amount: recipe.skill.amount });
   if (recipe.say) results.push({ kind: 'say', text: recipe.say });
 
-  const time = recipe.time ?? 0;
+  // A craft with a cadence keeps going; one without is over the moment it is
+  // used, which is `instant` in the vocabulary this compiles into. Whatever was
+  // authored is carried through unexamined, so the same table that judges an
+  // authored action judges this one rather than a recipe-shaped copy of it.
+  const cadence = recipe.rate !== undefined ? { rate: recipe.rate } : recipe.time !== undefined ? { time: recipe.time } : {};
   const action: Action = {
     label: `Craft ${humanize(recipe.id)}`,
+    kind: 'rate' in cadence || 'time' in cadence ? 'continuous' : 'instant',
     results,
-    time,
-    speed: recipe.speed,
+    ...cadence,
     accuracy: recipe.accuracy,
     evasion: recipe.evasion,
-    repeating: time > 0,
   };
 
   if (recipe.accuracy) {
@@ -121,6 +127,7 @@ function recipeAction(recipe: Recipe): Action {
 function emptyRegistry(): Registry {
   return {
     entities: new Map(),
+    entityTypes: new Map(),
     locations: new Map(),
     items: new Map(),
     stats: new Map(),
@@ -197,6 +204,11 @@ function applySection(registry: Registry, section: ModuleSection): void {
         }
       }
       registry.entities.set(entity.id, entity);
+      break;
+    }
+    case 'entitytype': {
+      const entityType = hydrateSection(section.value as Authored<EntityType>, entityTypeSchema);
+      registry.entityTypes.set(entityType.id, entityType);
       break;
     }
     case 'location': {
@@ -277,6 +289,34 @@ interface BuildFailure {
   error: DslError;
 }
 
+// What an entity naming a `type:` is merged onto, in place of the nothing an
+// entity is normally created from. Everything an entity can say about an action
+// — override it, add one, remove one — then goes through the single merge rule
+// instead of a second one bolted on after the fact.
+//
+// Whether the section creates the entity or edits one that is already there is
+// not declared — it follows from what was loaded — so the template has to slide
+// underneath at whichever of the two first names a `type:`. What the entity
+// already held is treated as overrides of the template it just acquired, which
+// is the same relationship a first declaration's own blocks have to it.
+function entityTypeBase(merged: Map<string, Map<string, OwnedSection>>, section: ModuleSection, held: object | undefined): object | undefined {
+  if (section.kind !== 'entity') return held;
+  const entity = section.value as Authored<Entity>;
+  const already = (held as Authored<Entity> | undefined)?.type;
+  if (entity.type === undefined || entity.type === already) return held;
+  if (already !== undefined) throw new DslError(`# entity ${entity.id} is already type: ${already}, and an entity inherits one template`);
+
+  // A `type:` naming nothing is left for the reference check that owns that
+  // message for every kind; inheriting nothing is what an absent template means.
+  const template = merged.get('entitytype')?.get(entity.type)?.value as Authored<EntityType> | undefined;
+  if (!template) return held;
+  // The clone is load-bearing: reference resolution rewrote ids in place before
+  // this ran, and a template object reachable from two entities would be walked
+  // once per entity and bound to whichever went last.
+  const inherited = { id: entity.id, actions: structuredClone(template.actions ?? []) };
+  return held === undefined ? inherited : mergeSection('entity', inherited, held);
+}
+
 class DanglingReference extends Error {}
 
 const ownerKey = (kind: string, id: string): string => `${kind}\0${id}`;
@@ -316,6 +356,17 @@ function referencesLoaded(check: () => void): boolean {
   }
 }
 
+// The grammar refuses an unauthorable action, but an action can also be
+// ASSEMBLED — merged onto a template, patched across modules, or compiled from a
+// recipe — and none of those went through the grammar. Same rule, applied where
+// the section that owns the action can name itself.
+function validateActionTable(where: string, actions: readonly Action[] | undefined): void {
+  for (const action of actions ?? []) {
+    const problem = actionTableProblem(action);
+    if (problem) throw new DslError(`${where} ${actionProblem(action.label, problem)}`);
+  }
+}
+
 function pruneActions(actions: Action[], where: string, visit: Visit): Action[] {
   return actions.filter((action) => referencesLoaded(() => visitAction(action, `${where} action ${JSON.stringify(action.label)}`, visit)));
 }
@@ -335,11 +386,22 @@ function pruneRegistryDanglingReferences(registry: Registry, danglingRoots: Read
     let changed = false;
     const visit = danglingVisit(danglingRoots, pruned);
 
+    for (const [id, entityType] of registry.entityTypes) {
+      const actions = pruneActions(entityType.actions, `# entitytype ${id}`, visit);
+      if (actions.length !== entityType.actions.length) {
+        registry.entityTypes.set(id, { ...entityType, actions });
+        changed = true;
+      }
+    }
+
     for (const [id, entity] of registry.entities) {
       const stats = Object.fromEntries(Object.entries(entity.stats).filter(([statId]) => referencesLoaded(() => visit('stat', statId, `# entity ${id} stats:`))));
       const actions = pruneActions(entity.actions, `# entity ${id}`, visit);
-      if (Object.keys(stats).length !== Object.keys(entity.stats).length || actions.length !== entity.actions.length) {
-        registry.entities.set(id, { ...entity, stats, actions });
+      // The template's actions are already copied in, so a type: whose template
+      // went with a missing dependency has nothing left to say.
+      const type = entity.type !== undefined && referencesLoaded(() => visit('entitytype', entity.type!, `# entity ${id} type:`)) ? entity.type : undefined;
+      if (Object.keys(stats).length !== Object.keys(entity.stats).length || actions.length !== entity.actions.length || type !== entity.type) {
+        registry.entities.set(id, { ...entity, stats, actions, type });
         changed = true;
       }
     }
@@ -444,11 +506,21 @@ function validateBuiltRegistry(registry: Registry, owners: ReadonlyMap<string, P
   for (const [kind, map] of CONTENT_SECTION_MAPS) {
     for (const [id, value] of registry[map] as ReadonlyMap<string, object>) {
       try {
+        validateActionTable(`# ${kind} ${id}`, (value as { actions?: Action[] }).actions);
         validateSectionReferences(kind, id, value, registry);
       } catch (error) {
         if (!(error instanceof DslError)) throw error;
         return { module: sectionOwner(owners, kind, id)!, stage: 'validate', error };
       }
+    }
+  }
+
+  for (const [id, action] of registry.recipeActions) {
+    try {
+      validateActionTable(`# recipe ${id}`, [action]);
+    } catch (error) {
+      if (!(error instanceof DslError)) throw error;
+      return { module: sectionOwner(owners, 'recipe', id)!, stage: 'validate', error };
     }
   }
 
@@ -510,34 +582,47 @@ function compileModules(modules: readonly ParsedModule[]): { registry: Registry 
       }
     }
   }
-  for (const module of modules) {
-    try {
-      for (const section of module.sections) {
-        // Removal is applied where it stands, so a later module can name the id
-        // again and get a fresh one rather than a hole.
-        if (section.kind === 'remove') {
-          const { kind, target, id } = section.value as Removal;
-          if (!merged.get(kind)?.delete(target)) throw new DslError(`# remove ${id} names nothing that is loaded`);
-          owners.delete(ownerKey(kind, target));
-          // Undeclared here rather than during resolution, so that what a name
-          // resolves to stays independent of load order while the namespace and
-          // the surviving universe still agree — which is what lets the
-          // post-build reference check see a member go with its owner.
-          namespace.undeclare(kind, target);
-          continue;
+  const mergePass = (owns: (kind: string) => boolean): BuildFailure | null => {
+    for (const module of modules) {
+      try {
+        for (const section of module.sections) {
+          // Removal is applied where it stands, so a later module can name the id
+          // again and get a fresh one rather than a hole.
+          if (section.kind === 'remove') {
+            const { kind, target, id } = section.value as Removal;
+            if (!owns(kind)) continue;
+            if (!merged.get(kind)?.delete(target)) throw new DslError(`# remove ${id} names nothing that is loaded`);
+            owners.delete(ownerKey(kind, target));
+            // Undeclared here rather than during resolution, so that what a name
+            // resolves to stays independent of load order while the namespace and
+            // the surviving universe still agree — which is what lets the
+            // post-build reference check see a member go with its owner.
+            namespace.undeclare(kind, target);
+            continue;
+          }
+          if (!owns(section.kind)) continue;
+          const byId = merged.get(section.kind) ?? new Map<string, OwnedSection>();
+          const id = (section.value as { id: string }).id;
+          const base = entityTypeBase(merged, section, byId.get(id)?.value);
+          byId.set(id, { kind: section.kind, value: mergeSection(section.kind, base, section.value), module });
+          owners.set(ownerKey(section.kind, id), module);
+          merged.set(section.kind, byId);
         }
-        const byId = merged.get(section.kind) ?? new Map<string, OwnedSection>();
-        const id = (section.value as { id: string }).id;
-        const existing = byId.get(id);
-        byId.set(id, { kind: section.kind, value: mergeSection(section.kind, existing?.value, section.value), module });
-        owners.set(ownerKey(section.kind, id), module);
-        merged.set(section.kind, byId);
+      } catch (error) {
+        if (!(error instanceof DslError)) throw error;
+        return { module, stage: 'merge', error };
       }
-    } catch (error) {
-      if (!(error instanceof DslError)) throw error;
-      return { failure: { module, stage: 'merge', error } };
     }
-  }
+    return null;
+  };
+
+  // Templates settle before anything that inherits one, because a template is
+  // what an entity is merged ONTO: the entity's own blocks then override, add
+  // and remove against it through the one merge rule, rather than through a
+  // second one bolted on after the fact.
+  const isTemplate = (kind: string): boolean => kind === 'entitytype';
+  const templateFailure = mergePass(isTemplate) ?? mergePass((kind) => !isTemplate(kind));
+  if (templateFailure) return { failure: templateFailure };
   for (const [kind, byId] of merged) {
     for (const section of byId.values()) {
       try {

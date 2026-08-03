@@ -221,7 +221,7 @@ examine: Split and steaming.
 
 # entity oven
 roast:
-  repeating
+  continuous
   time: 4
   give: 1 roasted-chestnut
 
@@ -433,7 +433,7 @@ examine: Split and steaming.
 
 # entity oven
 roast:
-  repeating
+  continuous
   time: 4
   give: 1 roasted-chestnut
 
@@ -516,9 +516,8 @@ entities: dummy
 title: Dummy
 stats: attack 0, max-health 1000000, accuracy 100, evasion 0, swings-per-minute 60
 hit:
-  repeating
-  time: 60
-  speed: swings-per-minute
+  continuous
+  rate: swings-per-minute
   accuracy: accuracy
   evasion: evasion
   ability: attack

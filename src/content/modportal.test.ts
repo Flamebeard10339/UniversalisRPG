@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { buildContributionIssueBody } from './contribution';
-import { loadUniverseWithDiagnostics } from './registry';
+import { loadUniverse, loadUniverseWithDiagnostics } from './registry';
 import { emptyModportalManifest, issueTier, materializeApprovedModIssue, planModportalSync } from './modportal';
 import type { MaterializedMod, ModportalManifest, ModTier } from './modportal';
 
@@ -80,6 +80,19 @@ describe('approved mod issues', () => {
     expect(materialized.text).toContain('+2 approved-mod-42.vigor');
     expect(materialized.text).not.toContain('# info local-changes');
     expect(materialized.text).not.toContain('local-changes.vigor');
+  });
+
+  // A kind the rename does not reach keeps its `local-changes.` id, is dropped
+  // by serialize's own-module filter, and leaves every reference that WAS
+  // renamed pointing at a section the published mod no longer contains — so
+  // the published module fails to load, blaming the contributor.
+  it('carries every section kind through the rename, so the published module still loads', () => {
+    const local = [LOCAL, '# entitytype foe', 'fight:', '  continuous', '  rate: local-changes.vigor', '  say: Swing.', '', '# entity rat', 'type: local-changes.foe'].join('\n');
+    const materialized = materialize({ number: 44, title: 'Foes', body: issueBody(local) });
+
+    expect(materialized.text).toContain('# entitytype foe');
+    expect(materialized.text).toContain('type: approved-mod-44.foe');
+    expect(() => loadUniverse([...base, { name: materialized.file, text: materialized.text }])).not.toThrow();
   });
 
   it('canonicalizes approved local-changes modules without rewriting prose', () => {

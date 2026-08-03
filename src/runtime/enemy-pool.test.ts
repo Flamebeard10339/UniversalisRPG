@@ -46,15 +46,13 @@ entities: brute
 # entity brute
 stats: foe-max 100, foe-regen 7
 wear-down:
-  time: 60
-  speed: swing-rate
+  rate: swing-rate
   target: stamina
   ability: attack
 
 grind-down:
-  repeating
-  time: 60
-  speed: swing-rate
+  continuous
+  rate: swing-rate
   target: stamina
   ability: attack
   give: trophy

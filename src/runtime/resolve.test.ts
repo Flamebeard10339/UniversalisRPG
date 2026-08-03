@@ -7,17 +7,19 @@ import { secondsToMs, toMilliUnits } from './units';
 
 // Fixtures: campfire-cook (no in:, so an infinite input limit), smokehouse-cook
 // (in: raw-shrimp bounds it), grill-cook (accuracy-gated, burns on a miss),
-// torch (non-repeating with a real time:), broken-oven (repeating with no time:,
-// for the positive-duration guard), and tree (a deterministic multi-hit fight).
+// torch (a plain duration action with a real time:), and tree (a deterministic
+// multi-hit fight).
 // The three cooks are recipes because turning inputs into outputs is what a
 // recipe models; tree stays an entity action, for the reason given at its use.
 const MODULE = `
-# stat cooking-speed
-base: 1
+// Completions per minute: 60/min is one a second, and a +100% buff halves that
+// to 0.5s without the action naming a number at all.
+# stat cooking-rate
+base: 60
 
 # item quickroot
 examine: A root that quickens the hands at the stove.
-food, +100% cooking-speed, 500s
+food, +100% cooking-rate, 500s
 eat: take: 1 quickroot, say: You chew the root. Your hands feel quick.
 
 // Quickroot is eaten instantly; stew takes 3s to eat. That difference is the
@@ -25,7 +27,7 @@ eat: take: 1 quickroot, say: You chew the root. Your hands feel quick.
 // is where the buff used to be dropped on the floor.
 # item stew
 examine: Thick, hot, and slow to get through.
-food, +100% cooking-speed, 60s
+food, +100% cooking-rate, 60s
 eat:
   time: 3
   take: 1 stew
@@ -54,8 +56,7 @@ examine: Fired clay.
 # skill cooking
 
 # recipe campfire-cook
-speed: cooking-speed
-time: 1
+rate: cooking-rate
 out: 1 cooked-shrimp
 skill: cooking 3
 
@@ -69,23 +70,17 @@ light:
   time: 5
   say: The torch flares to life.
 
-# entity broken-oven
-cook:
-  repeating
-  give: 1 cooked-shrimp
-
 // Declared, so the load-time reference pass is satisfied, but with no base: —
 // which the stat schema defaults to 0. A typo'd stat id is a load error now;
 // this is the case that survives it, and the tutorial ships two such stats.
-# stat rusty-speed
+# stat rusty-rate
 
 # entity shrine
-// Speed 0 makes this action's attempt duration 1/0 = Infinity, which every
-// "non-positive duration" guard passes happily.
+// A rate of 0 makes this action's attempt duration 60000/0 = Infinity, which
+// every "non-positive duration" guard passes happily.
 chant:
-  repeating
-  time: 1
-  speed: rusty-speed
+  continuous
+  rate: rusty-rate
   give: 1 blessing
 
 // A skill and a difficulty, never an authored probability: the pair is
@@ -118,7 +113,7 @@ base: 0.34
 // into an output stack, so it stays a plain repeating entity action instead
 // of becoming a recipe (recipes always compile to completion in one attempt).
 chop:
-  repeating
+  continuous
   ability: chop-power
   time: 1
   give: 1 wood
@@ -140,7 +135,7 @@ start: 30
 // per-write clamp gets wrong (drain to 0, then regen, versus letting the two
 // net out), so this is the associativity gate for the direct pool write.
 sharpen:
-  repeating
+  continuous
   time: 1
   drain: 2 vigor
   give: 1 edge
@@ -149,7 +144,7 @@ sharpen:
 // The same drain on the stochastic path, where completions land at random
 // attempt counts instead of a closed-form cadence.
 grind:
-  repeating
+  continuous
   time: 1
   accuracy: cooking
   drain: 2 vigor
@@ -165,7 +160,7 @@ flags: bricks-fired
 // cooking gates above moved to recipes, which would otherwise have left that
 // exact bug class untested even though onSuccess is still live content.
 fire:
-  repeating
+  continuous
   time: 1
   give: 1 brick
   on success:
@@ -181,13 +176,13 @@ function loaded(): Registry {
 // depend on guessing the compiled action's label text.
 function recipeActive(registry: Registry, recipeId: string): ActiveAction {
   const action = registry.recipeActions.get(recipeId)!;
-  return { ownerRef: `recipe.${recipeId}`, actionLabel: action.label, repeating: action.repeating === true, implicitTarget: IMPLICIT_TARGET_FULL, cadences: { [PLAYER]: newCadence() } };
+  return { ownerRef: `recipe.${recipeId}`, actionLabel: action.label, repeating: action.kind === 'continuous', implicitTarget: IMPLICIT_TARGET_FULL, cadences: { [PLAYER]: newCadence() } };
 }
 
 function withCampfireCooking(registry: Registry, buffed: boolean): GameState {
   const state = createGameState('nowhere');
   if (buffed) {
-    state.activeBuffs['quickroot:cooking-speed'] = { statId: 'cooking-speed', amount: 1, kind: 'increased', expiresAt: secondsToMs(500) };
+    state.activeBuffs['quickroot:cooking-rate'] = { statId: 'cooking-rate', amount: 1, kind: 'increased', expiresAt: secondsToMs(500) };
   }
   state.activeAction = recipeActive(registry, 'campfire-cook');
   return state;
@@ -396,15 +391,15 @@ describe('resolve: buff expiry', () => {
   it('the buff is present and boosts the stat right up until expiresAt, then is gone', () => {
     const registry = loaded();
     const state = createGameState('nowhere');
-    state.activeBuffs['quickroot:cooking-speed'] = { statId: 'cooking-speed', amount: 1, kind: 'increased', expiresAt: secondsToMs(500) };
+    state.activeBuffs['quickroot:cooking-rate'] = { statId: 'cooking-rate', amount: 1, kind: 'increased', expiresAt: secondsToMs(500) };
 
     resolve(state, registry, secondsToMs(499));
-    expect(statValue('cooking-speed', state, registry)).toBe(2);
-    expect(state.activeBuffs['quickroot:cooking-speed']).toBeDefined();
+    expect(statValue('cooking-rate', state, registry)).toBe(120);
+    expect(state.activeBuffs['quickroot:cooking-rate']).toBeDefined();
 
     resolve(state, registry, secondsToMs(500));
-    expect(state.activeBuffs['quickroot:cooking-speed']).toBeUndefined();
-    expect(statValue('cooking-speed', state, registry)).toBe(1);
+    expect(state.activeBuffs['quickroot:cooking-rate']).toBeUndefined();
+    expect(statValue('cooking-rate', state, registry)).toBe(60);
   });
 });
 
@@ -432,8 +427,8 @@ describe('useAction/craft integration: repeating actions, eating grants a live b
 
     expect(state.inventory['quickroot']).toBe(0);
     expect(state.log).toContain('You chew the root. Your hands feel quick.');
-    expect(state.activeBuffs['quickroot:cooking-speed']).toEqual({ statId: 'cooking-speed', amount: 1, kind: 'increased', expiresAt: secondsToMs(500) });
-    expect(statValue('cooking-speed', state, registry)).toBe(2);
+    expect(state.activeBuffs['quickroot:cooking-rate']).toEqual({ statId: 'cooking-rate', amount: 1, kind: 'increased', expiresAt: secondsToMs(500) });
+    expect(statValue('cooking-rate', state, registry)).toBe(120);
   });
 
   // While this hung off useAction, a food with a `time:` buffed in instant mode
@@ -452,9 +447,9 @@ describe('useAction/craft integration: repeating actions, eating grants a live b
 
     for (const state of [instant, armed]) {
       expect(state.inventory['stew']).toBe(0);
-      expect(statValue('cooking-speed', state, registry)).toBe(2);
+      expect(statValue('cooking-rate', state, registry)).toBe(120);
       // The 60s window starts at the last spoonful, not when the bowl was picked up.
-      expect(state.activeBuffs['stew:cooking-speed'].expiresAt).toBe(secondsToMs(63));
+      expect(state.activeBuffs['stew:cooking-rate'].expiresAt).toBe(secondsToMs(63));
     }
   });
 
@@ -467,15 +462,17 @@ describe('useAction/craft integration: repeating actions, eating grants a live b
     expect(state.log).toEqual(['The torch flares to life.']);
   });
 
-  it('a repeating action with no time: (duration resolves to 0) refuses to start rather than looping forever', () => {
-    const registry = loaded();
-    const state = createGameState('nowhere');
-    expect(() => useAction('entity', 'broken-oven', 'cook', registry, state)).toThrow(RuntimeError);
+  // A continuous action with no cadence used to reach the runtime and be caught
+  // by a positive-duration guard there; the kind refuses it at load instead, so
+  // the loop it would have spun is now unauthorable.
+  it('a continuous action with no cadence is a load error, not a runtime one', () => {
+    const module = ['# item ash', 'examine: Grey.', '# entity broken-oven', 'cook:', '  continuous', '  give: 1 ash'].join('\n');
+    expect(() => loadModule(module)).toThrow(/continuous action needs a time: or rate:/);
   });
 
-  // A speed stat reading 0 makes the duration Infinity, which slips through every
+  // A rate stat reading 0 makes the duration Infinity, which slips through every
   // `<= 0` guard; the resulting NaN serializes to null and survives a save.
-  it('an action whose speed stat reads 0 refuses to start rather than resolving an infinite attempt duration', () => {
+  it('an action whose rate stat reads 0 refuses to start rather than resolving an infinite attempt duration', () => {
     const registry = loaded();
     const state = createGameState('nowhere');
 
@@ -657,7 +654,7 @@ on full:
 
 # entity engine
 run:
-  repeating
+  continuous
   time: 1
   -120 regen-rate
   +240 spark-rate

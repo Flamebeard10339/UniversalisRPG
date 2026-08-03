@@ -36,6 +36,7 @@ import {
   targetLevel,
 } from './encounter';
 import { Action } from '../content/entity';
+import { actionKind } from '../grammar/action';
 import { Item } from '../content/item';
 import { Recipe } from '../content/recipe';
 import { Registry } from '../content/registry';
@@ -148,7 +149,7 @@ function resolveDeterministicSegment(segment: Segment, action: Action, segEnd: n
   const { duration, abilityAmount, attemptsToResolve, outcome } = fightPlan(action, state, registry);
 
   if (active.repeating && duration <= 0) {
-    throw new RuntimeError(`repeating action ${active.ownerRef}.${active.actionLabel} resolved a non-positive duration (${duration}) — give it a positive time: or a positive speed stat`);
+    throw new RuntimeError(`repeating action ${active.ownerRef}.${active.actionLabel} resolved a non-positive duration (${duration}) — give it a positive time: or a rate: that reads positive`);
   }
 
   const player = playerCadence(active);
@@ -223,7 +224,7 @@ function resolveStochasticSegment(segment: Segment, action: Action, segEnd: numb
     for (const participant of roster) {
       const duration = attemptDuration(participant.action, state, registry, participant.self);
       if (duration <= 0) {
-        throw new RuntimeError(`action ${active.ownerRef}.${participant.action.label} resolved a non-positive attempt duration (${duration}) — give it a positive time: or a positive speed stat`);
+        throw new RuntimeError(`action ${active.ownerRef}.${participant.action.label} resolved a non-positive attempt duration (${duration}) — give it a positive time: or a rate: that reads positive`);
       }
       // Progress can land past its duration, so an overdue swing floors at now.
       const at = state.time + Math.max(0, duration - participant.cadence.progress);
@@ -416,10 +417,10 @@ export function armAction(obj: string, objId: string, actionId: string, registry
     return { armed: false };
   }
 
-  const repeating = action.repeating === true;
+  const repeating = actionKind(action) === 'continuous';
   const duration = attemptDuration(action, state, registry);
   if (repeating && duration <= 0) {
-    throw new RuntimeError(`repeating action ${obj}.${objId}.${actionId} needs a positive time: after speed scaling`);
+    throw new RuntimeError(`continuous action ${obj}.${objId}.${actionId} resolved a non-positive cadence (${duration}ms)`);
   }
 
   // First in, so the player wins a tie between cadences due at the same instant.

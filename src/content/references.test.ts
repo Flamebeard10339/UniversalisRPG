@@ -41,9 +41,8 @@ x: 1, y: 0
 # entity training-dummy
 stats: max-health 12, dr 2
 strike:
-  repeating
-  time: 60
-  speed: attack-rate
+  continuous
+  rate: attack-rate
   target: health
   ability: attack
   dr: dr
@@ -68,20 +67,18 @@ describe('load-time reference resolution', () => {
   });
 
   it('names the section and the field it failed in', () => {
-    expect(loading('speed: attack-rate', 'speed: attack-rat')).toThrow(
-      /# entity training-dummy action "strike" speed: names an unknown stat: attack-rat/,
-    );
+    expect(loading('rate: attack-rate', 'rate: attack-rat')).toThrow(/# entity training-dummy action "strike" rate: names an unknown stat: attack-rat/);
   });
 
   // Each fell through to a different silent default, so they are pinned
   // individually rather than as one representative case.
   it.each([
-    ['speed: attack-rate', 'speed: nope', /unknown stat: nope/],
+    ['rate: attack-rate', 'rate: nope', /unknown stat: nope/],
     ['ability: attack', 'ability: nope', /unknown stat: nope/],
     ['dr: dr', 'dr: nope', /unknown stat: nope/],
     ['target: health', 'target: helth', /unknown resource: helth/],
-    ['  time: 60', '  time: 60\n  accuracy: nope', /unknown stat: nope/],
-    ['  time: 60', '  time: 60\n  evasion: nope', /unknown stat: nope/],
+    ['  rate: attack-rate', '  rate: attack-rate\n  accuracy: nope', /unknown stat: nope/],
+    ['  rate: attack-rate', '  rate: attack-rate\n  evasion: nope', /unknown stat: nope/],
   ])('rejects %s → %s', (from, to, message) => {
     expect(loading(from, to)).toThrow(message);
   });
@@ -103,10 +100,8 @@ describe('load-time reference resolution', () => {
   });
 
   it('checks an item action and a recipe the same way', () => {
-    expect(loading('examine: A fistful of straw.', 'examine: A fistful of straw.\neat:\n  time: 1\n  speed: nope\n  take: 1 straw')).toThrow(
-      /# item straw action "eat" speed: names an unknown stat: nope/,
-    );
-    expect(() => loadModule(`${VALID}\n# recipe weave\ntime: 1\nspeed: nope\nout: 1 straw\n`)).toThrow(/# recipe weave speed: names an unknown stat: nope/);
+    expect(loading('examine: A fistful of straw.', 'examine: A fistful of straw.\neat:\n  rate: nope\n  take: 1 straw')).toThrow(/# item straw action "eat" rate: names an unknown stat: nope/);
+    expect(() => loadModule(`${VALID}\n# recipe weave\nrate: nope\nout: 1 straw\n`)).toThrow(/# recipe weave rate: names an unknown stat: nope/);
   });
 
   // An action's RESULTS name ids too, each with its own silent failure mode.
@@ -118,7 +113,7 @@ describe('load-time reference resolution', () => {
     ['  ability: attack', '  ability: attack\n  relocate: bogus', /relocate: names an unknown location: bogus/],
     ['  ability: attack', '  ability: attack\n  discover: bogus', /discover: names an unknown location: bogus/],
     ['  xp: brawling 2', '  xp: bogus 2', /xp: names an unknown skill: bogus/],
-    ['  repeating', '  repeating\n  +100% bogus', /tag names an unknown stat: bogus/],
+    ['  continuous', '  continuous\n  +100% bogus', /tag names an unknown stat: bogus/],
   ])('rejects a result or tag naming nothing: %s → %s', (from, to, message) => {
     expect(loading(from, to)).toThrow(message);
   });
@@ -154,16 +149,16 @@ describe('load-time reference resolution', () => {
 // recipe craftable nowhere, a test that only breaks when it runs.
 describe('references the walk used to step over', () => {
   it('rejects a `has` naming no item, wherever the condition sits', () => {
-    expect(loading('  repeating', '  repeating\n  requires: has strawe')).toThrow(/# entity training-dummy action "strike" requires: has names an unknown item: strawe/);
-    expect(loading('  repeating', '  repeating\n  hidden if: has strawe')).toThrow(/hidden if: has names an unknown item: strawe/);
+    expect(loading('  continuous', '  continuous\n  requires: has strawe')).toThrow(/# entity training-dummy action "strike" requires: has names an unknown item: strawe/);
+    expect(loading('  continuous', '  continuous\n  hidden if: has strawe')).toThrow(/hidden if: has names an unknown item: strawe/);
     expect(loading('starting', 'starting\nadjacent: shed while has strawe')).toThrow(/# location den adjacent: shed while has names an unknown item: strawe/);
     expect(loading('  when: time >= 0', '  when: has strawe')).toThrow(/# dialogue caretaker node hello when: has names an unknown item: strawe/);
   });
 
   it('reaches inside not/and/or rather than stopping at the operator', () => {
-    expect(loading('  repeating', '  repeating\n  requires: not has strawe')).toThrow(/has names an unknown item: strawe/);
-    expect(loading('  repeating', '  repeating\n  requires: has straw and has strawe')).toThrow(/has names an unknown item: strawe/);
-    expect(loading('  repeating', '  repeating\n  requires: has strawe or has straw')).toThrow(/has names an unknown item: strawe/);
+    expect(loading('  continuous', '  continuous\n  requires: not has strawe')).toThrow(/has names an unknown item: strawe/);
+    expect(loading('  continuous', '  continuous\n  requires: has straw and has strawe')).toThrow(/has names an unknown item: strawe/);
+    expect(loading('  continuous', '  continuous\n  requires: has strawe or has straw')).toThrow(/has names an unknown item: strawe/);
   });
 
   it('rejects a `has` inside a choice condition and inside interpolated text', () => {

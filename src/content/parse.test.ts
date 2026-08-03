@@ -222,14 +222,15 @@ describe('entity actions', () => {
 
 describe('entity action modifiers', () => {
   it('parses requires, hidden if, bare tags and on success, treating require as requires', () => {
-    const source = ['# entity front-door', 'pick lock:', '  requires: lockpick', '  hidden if: unlocked', '  once, 4s', '  xp: thieving 4', '  on success:', '    set: unlocked', '    say: The lock clicks.'].join('\n');
+    const source = ['# entity front-door', 'pick lock:', '  requires: lockpick', '  hidden if: unlocked', '  retaliates', '  xp: thieving 4', '  on success:', '    set: unlocked', '    say: The lock clicks.'].join('\n');
     const door = parseOne(source, entitySchema);
     expect(door.actions).toEqual([
       {
         label: 'pick lock',
         requires: ref('lockpick'),
         hiddenIf: ref('unlocked'),
-        tags: [{ kind: 'keyword', value: 'once' }, { kind: 'duration', seconds: 4 }],
+        tags: [{ kind: 'keyword', value: 'retaliates' }],
+        retaliates: true,
         results: [{ kind: 'xp', skill: 'thieving', amount: 4 }],
         onSuccess: [{ kind: 'set', variable: 'unlocked' }, { kind: 'say', text: 'The lock clicks.' }],
       },
@@ -252,7 +253,7 @@ describe('entity action modifiers', () => {
     ['on failure: say: a', 'on failure'],
     ['on escape: say: a', 'on escape'],
     ['time: 1', 'time'],
-    ['speed: quickness', 'speed'],
+    ['rate: quickness', 'rate'],
     ['accuracy: aim', 'accuracy'],
     ['evasion: dodge', 'evasion'],
     ['ability: might', 'ability'],
@@ -261,7 +262,7 @@ describe('entity action modifiers', () => {
     ['escape after 3', 'escape after'],
   ])('rejects %s written twice', (line, written) => {
     expect(parseOne(`# entity chest\nopen:\n  ${line}\n  say: hi`, entitySchema).actions).toHaveLength(1);
-    expect(() => parseOne(`# entity chest\nopen:\n  ${line}\n  ${line}\n  say: hi`, entitySchema)).toThrow(`action ${written} is defined more than once`);
+    expect(() => parseOne(`# entity chest\nopen:\n  ${line}\n  ${line}\n  say: hi`, entitySchema)).toThrow(`action "open": ${written} is defined more than once`);
   });
 
   it('no longer accepts a health: field, which the implicit target pool replaced', () => {
@@ -286,6 +287,74 @@ describe('entity action modifiers', () => {
 
   it('surfaces result-related errors for malformed results, not tag errors', () => {
     expect(() => parseOne('# entity chest\nopen:\n  give:', entitySchema)).toThrow(/expected an id/);
+  });
+});
+
+// A kind says what ends the action; a cadence says how fast it attempts. The
+// table is the pair, and every combination it has no meaning for is a load
+// error rather than a silent default the runtime has to guess at.
+describe('action kinds and their cadence', () => {
+  const parseAction = (...lines: string[]) => parseOne(['# entity forge', 'work:', ...lines.map((line) => `  ${line}`)].join('\n'), entitySchema).actions![0];
+
+  it('makes an untagged action a duration, and lifts the two written kinds off their tags', () => {
+    expect(parseAction('say: hi').kind).toBeUndefined();
+    expect(parseAction('instant', 'say: hi').kind).toBe('instant');
+    expect(parseAction('continuous', 'time: 2', 'say: hi').kind).toBe('continuous');
+  });
+
+  it('keeps both cadence spellings, a stat rate apart from a literal one', () => {
+    expect(parseAction('time: 2.5', 'say: hi')).toMatchObject({ time: 2.5 });
+    expect(parseAction('rate: 15', 'say: hi')).toMatchObject({ rate: 15 });
+    expect(parseAction('rate: quickness', 'say: hi')).toMatchObject({ rate: 'quickness' });
+  });
+
+  // A tag list is the one place an action takes a free-form word, so it is the
+  // one place a typo has nowhere to land. `once` sat in shipped content doing
+  // nothing until this rule; `4s` was the front door meaning `time: 4`.
+  it.each([
+    [['once'], /tag "once" was never implemented/],
+    [['repeating'], /tag "repeating" was renamed — write `continuous`/],
+    [['instnt'], /unknown tag "instnt" — an action's bare tags are instant, continuous, retaliates/],
+    [['4s'], /a duration clause paces nothing on an action/],
+  ])('refuses the bare tag %s rather than keeping a word nothing reads', (lines, message) => {
+    expect(() => parseAction(...lines, 'say: hi')).toThrow(message);
+  });
+
+  it('keeps the tags an action does read: the two kinds, retaliates, and a stat bonus', () => {
+    expect(parseAction('continuous', 'time: 2', 'retaliates', '+2 attack', 'say: hi')).toMatchObject({
+      kind: 'continuous',
+      retaliates: true,
+      tags: [{ kind: 'keyword', value: 'continuous' }, { kind: 'keyword', value: 'retaliates' }, { kind: 'stat-bonus', statId: 'attack' }],
+    });
+  });
+
+  // The compiled craft is judged by the same table as an authored action, so a
+  // recipe cannot express a cadence the grammar would have refused.
+  it.each([['rate: 0'], ['rate: -30'], ['time: 0'], ['time: -3']])('refuses %s on a recipe, naming the recipe and its craft', (line) => {
+    expect(() => loadModule(`# item ore\nexamine: Rock.\n# recipe dig\n${line}\nout: 1 ore\n`)).toThrow(/# recipe dig action "Craft Dig": (time|rate): must be positive/);
+  });
+
+  // A shared value parser says what it expected but not what it was reading;
+  // an author needs the field and the action as much as the table's errors do.
+  it.each([
+    [['rate:'], /action "work": rate: expected an id/],
+    [['time: abc'], /action "work": time: expected a number/],
+    [['accuracy:'], /action "work": accuracy: expected an id/],
+  ])('names the field and the action when a value will not read: %s', (lines, message) => {
+    expect(() => parseAction(...lines, 'say: hi')).toThrow(message);
+  });
+
+  it.each([
+    [['instant', 'time: 2'], /action "work": an instant action takes no time:/],
+    [['instant', 'rate: 15'], /an instant action takes no rate:/],
+    [['continuous', 'say: hi'], /action "work": a continuous action needs a time: or rate:/],
+    [['time: 2', 'rate: 15'], /action "work": time: and rate: are the same axis/],
+    [['instant', 'continuous'], /action "work": cannot be both instant and continuous/],
+    [['time: 0'], /action "work": time: must be positive/],
+    [['rate: 0'], /action "work": rate: must be positive/],
+    [['speed: quickness'], /action "work": speed: was retired — write rate:/],
+  ])('rejects %s', (lines, message) => {
+    expect(() => parseAction(...lines)).toThrow(message);
   });
 });
 
