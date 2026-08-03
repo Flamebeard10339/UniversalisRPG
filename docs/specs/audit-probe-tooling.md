@@ -112,3 +112,20 @@ None.
 - proof 10: met — npm run audit-status exit 0; four new script files under Testing procedure, both new src/content files under Contribution system and the src/content grant
 - proof 12: met — one heredoc of three documents split on --- gave two rejections and one load, one line each, exit 0; splitDocuments anchors the separator to a whole line
 - proof 11: met — 1074 passing in 59.57s, tsc and layer-check clean; mutate takes RunTests/FileStore as parameters so decision tests run with no subprocess, with three real tsx spawns to prove the seam
+
+### Pass 2 — 2026-08-03
+
+- base: `3d3386ac7ca181b04b1684efe305b35bb021009e`
+- head: `bb5c62057a7f9fdaa75c334d6d085ca332aa34a5`
+- proof 1: met — unchanged path; a rejecting stdin source prints the loader diagnostic and exits 1
+- proof 2: met — probe base.dsl cut.dsl reports both module ids; --show resolves by module id, now sourced from loaded.parsed
+- proof 3: met — SHOWABLE still derives from CONTENT_SECTION_MAPS; unknown name and absent id both refuse with the list. M6 is against the vocabulary, not the clause
+- proof 4: met — the pass-1 # remove reproduction reports round-trips clean, and a mutated serialize.ts is still KILLED through probe.test.ts. Caveat H1: the mechanism itself is unfalsifiable by the suite
+- proof 5: met — serialize.test.ts calls roundTripModule and asserts diagnostics as well as differences; the open-coded copy is gone and no private variableIds survives
+- proof 6: met — restore held byte-identical across ~40 mutations this pass; originals captured in refuse() before any write; holds on non-zero, on throw, and on a throwing restore write
+- proof 7: met — a manifest with a bad find reported applied nothing and wrote nothing; M3 is about when the check runs, not whether
+- proof 8: met — this pass is the clause's own proof: universe-drops-globals read SURVIVED at file scope and KILLED at suite scope
+- proof 9: met — the pass-1 M2 escape is closed; unrestored is reached on every path through runMutations
+- proof 10: met — audit-status exit 0; the new record is under docs/ and the friction logs under .planning, both unowned
+- proof 12: met — unchanged; --each surveys and exits 0 on a table of rejections
+- proof 11: met — 1113 passing in 52.49s, tsc and layer-check clean. Caveat H1: runTests is the one decision not passed in as data, which is why H2's fix is untestable
