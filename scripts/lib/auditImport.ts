@@ -83,6 +83,7 @@ const DOC_SYSTEM_PREFIXES: [prefix: string, system: string][] = [
   ['dsl-modules', 'DSL load path'],
   ['game-engine', 'Runtime'],
   ['runtime', 'Runtime'],
+  ['task-system', 'Task system'],
   ['testing-procedure', 'Testing procedure'],
   ['user-interface', 'User interface'],
 ];

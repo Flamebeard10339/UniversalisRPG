@@ -14,7 +14,9 @@ export type FlagArity = 'value' | 'boolean';
 // and what the help documents cannot drift apart: a flag dropped from the
 // usage stops being accepted, and one never written there was never
 // reachable in the first place. A flag followed by anything that is not
-// another flag takes a value; one followed by nothing takes none.
+// another flag takes a value; one followed by nothing, or by a prose
+// parenthetical, takes none — a `(` opens description, not declaration,
+// which is the same stop positionalArity applies to its half.
 export function flagArities(usage: string): Map<string, FlagArity> {
   const tokens = usage.split(/\s+/);
   const arities = new Map<string, FlagArity>();
@@ -22,7 +24,7 @@ export function flagArities(usage: string): Map<string, FlagArity> {
     const name = /^\[?--([a-z][a-z0-9-]*)\]?$/.exec(tokens[i])?.[1];
     if (name === undefined || arities.has(name)) continue;
     const next = tokens[i + 1] ?? '';
-    arities.set(name, next === '' || next.startsWith('--') || next.startsWith('[--') || next.startsWith(']') ? 'boolean' : 'value');
+    arities.set(name, next === '' || next.startsWith('--') || next.startsWith('[--') || next.startsWith(']') || next.startsWith('(') ? 'boolean' : 'value');
   }
   return arities;
 }

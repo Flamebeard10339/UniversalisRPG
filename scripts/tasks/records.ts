@@ -625,14 +625,20 @@ export function cmdPromote(args: Flags, usage: string): void {
   }
   const resolved = resolveTaskIds(args.positional, tasks);
   if (resolved === null) return;
-  const promotions: Array<{ task: Task; note: string }> = [];
+  // All-or-nothing, validated before anything is printed or moved: a batch
+  // that announced promotions and then refused on a later id had asserted
+  // writes that never happened — resolveTaskIds's own contract, applied to
+  // the state check it cannot make.
   for (const task of resolved) {
-    const from = task.state;
-    if (from !== 'unreviewed' && from !== 'open') {
-      console.error(`error: ${task.id} is ${from} — promote moves unreviewed or deferred records into a spec, it does not reopen closed ones`);
+    if (task.state !== 'unreviewed' && task.state !== 'open') {
+      console.error(`error: ${task.id} is ${task.state} — promote moves unreviewed or deferred records into a spec, it does not reopen closed ones. Nothing was promoted`);
       process.exitCode = 1;
       return;
     }
+  }
+  const promotions: Array<{ task: Task; note: string }> = [];
+  for (const task of resolved) {
+    const from = task.state;
     if ((task.source?.pass ?? 0) >= 2) console.log(`promoting a pass ${task.source!.pass} finding, which extends what ${spec} owes: ${task.id}`);
     task.state = 'open';
     task.spec = spec;

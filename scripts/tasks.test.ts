@@ -5,6 +5,8 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { run as runTasks } from './tasks';
 import { parseAuditArgs } from './tasks/audit';
+import { flagArities } from './tasks/cli';
+import { allUsages } from './tasks/commands';
 
 const repoRoot = path.join(import.meta.dirname, '..');
 const today = new Date().toISOString().slice(0, 10);
@@ -308,6 +310,34 @@ describe('tasks CLI', () => {
         expect(result.status, name).toBe(1);
         expect(result.stderr, name).toContain('unexpected argument');
       }
+    });
+  });
+
+  // The flag-arity twin of the junk-argument sweep: a `[--x]` written
+  // self-closed is boolean by construction, and `spec show`'s `[--full]`
+  // was silently classified value-taking because a prose parenthetical
+  // followed it — dead as documented, a no-op as accepted.
+  it('classifies every self-closed [--flag] in every usage as boolean, whatever prose follows it', () => {
+    const usages = allUsages();
+    expect(usages.length).toBeGreaterThan(20);
+    for (const usage of usages) {
+      const arities = flagArities(usage);
+      for (const [, name] of usage.matchAll(/\[--([a-z][a-z0-9-]*)\]/g)) {
+        expect(arities.get(name), `--${name} in: ${usage.split('\n')[0]}`).toBe('boolean');
+      }
+    }
+  });
+
+  it('spec show --full prints the whole Deliverable at exit 0, as its usage documents', () => {
+    fixture(({ tasks }) => {
+      const full = tasks('spec', 'show', 'demo-spec', '--full');
+      expect(full.status).toBe(0);
+      expect(full.stderr).toBe('');
+      expect(full.stdout).toContain('Something this branch promises.');
+
+      const standings = tasks('spec', 'show', 'demo-spec');
+      expect(standings.stdout).not.toContain('Something this branch promises.');
+      expect(standings.stdout).toContain('[unknown] The first clause holds.');
     });
   });
 
@@ -1728,6 +1758,16 @@ describe('tasks CLI', () => {
       const closed = tasks('promote', 'first-finding');
       expect(closed.status).toBe(1);
       expect(closed.stderr).toContain('it does not reopen closed ones');
+
+      // A mixed batch is all-or-nothing, and nothing is announced that was
+      // not written: the valid record stays where it was and no success
+      // line precedes the refusal.
+      tasks('add', 'third finding', '--id', 'third-finding', '--kind', 'finding', '--severity', 'low', '--deliverable', 'fix it');
+      const mixed = tasks('promote', 'third-finding', 'first-finding');
+      expect(mixed.status).toBe(1);
+      expect(mixed.stdout).not.toContain('promoted third-finding');
+      expect(mixed.stderr).toContain('Nothing was promoted');
+      expect(tasks('show', 'third-finding').stdout).toContain('[finding/unreviewed/low]');
     });
   });
 

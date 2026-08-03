@@ -152,6 +152,7 @@ describe('systemForDoc', () => {
     expect(systemForDoc('dsl-modules-2026-07-29-full')).toBe('DSL load path');
     expect(systemForDoc('game-engine-2026-07-27-pass2')).toBe('Runtime');
     expect(systemForDoc('runtime-2026-07-30')).toBe('Runtime');
+    expect(systemForDoc('task-system-refactor-pass2-a')).toBe('Task system');
     expect(systemForDoc('testing-procedure-2026-07-30-pass3')).toBe('Testing procedure');
     expect(systemForDoc('user-interface-2026-07-30')).toBe('User interface');
   });

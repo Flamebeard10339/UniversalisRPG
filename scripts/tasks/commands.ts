@@ -81,6 +81,13 @@ const COMMANDS: Record<string, Command> = {
   'check-commit-msg': { usage: 'usage: tasks check-commit-msg <msg-file> [--merge-or-revert] [--files a,b,c]', run: cmdCheckCommitMessage },
 };
 
+// Every usage string, for the arity sweep: a flag written `[--x]` with a
+// prose note after it was silently classified value-taking, and only a
+// sweep over the real table can keep the next documented flag honest.
+export function allUsages(): string[] {
+  return [...Object.values(COMMANDS), ...Object.values(SPEC_COMMANDS)].map((command) => command.usage);
+}
+
 interface Resolved {
   command: Command;
   args: string[];
