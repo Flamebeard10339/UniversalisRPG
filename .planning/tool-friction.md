@@ -225,3 +225,64 @@ plainly that it recorded nothing.
 
    The `npm run tasks` session above found this independently as its item 6. Two sessions
    reaching the same entry without seeing each other is the strongest evidence in this file.
+
+### `doctor` reports a merge in progress as 31 defects in the store
+
+5. **Resolving a conflict in `docs/tasks.jsonl` produced 3 errors and 28 warnings that were all
+   artifacts.** `doctor` anchors two of its checks to git: a record whose state differs from its
+   committed state is "done only in the working tree", and a `closedCommit` not reachable from
+   HEAD is a closure that was reverted. Both are exactly right on a normal working tree, and both
+   are meaningless mid-merge, because HEAD is still the pre-merge commit — every record the *other*
+   side closed looks like an uncommitted edit, and every commit that closed one looks unreachable.
+
+   ```
+   [error] action-time-taxonomy is done only in the working tree (committed state: open)
+   [warning] the-once-tag-... closed by a commit not reachable from HEAD: aeb9af8
+   ```
+
+   Committing the merge cleared all 31 with no other change. The cost is that the report is at its
+   most alarming — three *errors*, in a tool that fails on one condition and reports everything
+   else — at the exact moment a human is deciding whether their hand-resolution of the store was
+   correct. I read the list twice looking for a resolution mistake before noticing that HEAD had
+   not moved yet.
+
+   **Wishlist.** Detect the merge — `.git/MERGE_HEAD` exists, and `git rev-parse MERGE_HEAD` names
+   the other side — and either compare against both parents or say once that git-anchored checks
+   are suspended until the merge is committed. The store checks that need no git (duplicate ids,
+   unresolved requires, cycles) stay useful throughout and are the ones actually worth reading
+   while resolving a conflict.
+
+### A guard that asks the wrong directory which branch it is on
+
+6. **`block-main-git-writes.sh` reported the primary checkout's branch for every worktree.** Line 8
+   was a bare `git rev-parse --abbrev-ref HEAD`, which answers for whatever directory the hook
+   process runs in — never the directory the blocked command was going to run in. It cut both ways
+   and neither was the intended rule: while the primary checkout sat on a feature branch the guard
+   passed *every* write, including any genuinely on main; the moment that checkout moved to `main`
+   it blocked *every* worktree, on any branch. Eleven commits landed under the first mode and the
+   twelfth was refused under the second, with nothing about this branch having changed in between.
+
+   The fix reads the `cwd` the hook payload already carries and asks `git -C "$cwd"`. It needed one
+   other change: `hook-field.js` drains stdin, so a second call returns an empty string that is
+   indistinguishable from an absent field. The payload is captured into a variable once and every
+   field taken from that.
+
+   Two things learned applying it. The hook that runs is the **primary checkout's** copy, because
+   `settings.json` names it by a relative path resolved from the hook process's own directory — so
+   a worktree cannot repair its own guard, and the fix stays inert until the branch merges. And the
+   pattern matches the whole command string, so a command that merely *quotes* the blocked verbs —
+   a heredoc writing this very entry — is blocked as though it were performing them.
+
+   **Wishlist.** A hook that decides something about a repository should be handed the repository
+   rather than inferring it from its own working directory. Worth checking every other hook for the
+   same assumption before one fails open the way this one did.
+
+### A `bash`-tagged command block runs in PowerShell
+
+7. **A `cd … && …` one-liner failed with "The token '&&' is not a valid statement separator in this
+   version."** The harness asks for shell commands in bash-tagged blocks so the app can offer a Run
+   button, but the button runs them in the user's shell, which here is a PowerShell old enough to
+   reject `&&`. The tag that makes a command runnable is also the tag that makes it wrong.
+
+   **Wishlist.** Either translate on the way to the Run button, or let the block declare its target
+   shell. Failing both, chain with `;` rather than `&&` when handing commands to a Windows user.
