@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { checkPlan, pathsOverlap, type PlanFinding } from './planCheck';
+import { checkPlan, type PlanFinding } from './planCheck';
+import type { Producer } from './producers';
 import type { Task } from './taskStore';
 
 function task(overrides: Partial<Task> & { id: string }): Task {
@@ -29,23 +30,6 @@ function task(overrides: Partial<Task> & { id: string }): Task {
 }
 
 const kinds = (findings: PlanFinding[]): string[] => findings.map((finding) => finding.kind);
-
-describe('pathsOverlap', () => {
-  it('treats a directory grant as covering everything beneath it', () => {
-    expect(pathsOverlap('src/runtime', 'src/runtime/combat.ts')).toBe(true);
-    expect(pathsOverlap('src/runtime/', 'src/runtime/combat.ts')).toBe(true);
-    expect(pathsOverlap('src/runtime/combat.ts', 'src/runtime')).toBe(true);
-  });
-
-  it('does not treat a shared name prefix as a shared directory', () => {
-    expect(pathsOverlap('src/run', 'src/runtime')).toBe(false);
-    expect(pathsOverlap('scripts/tasks.ts', 'scripts/tasks.test.ts')).toBe(false);
-  });
-
-  it('reads a windows separator as the same path', () => {
-    expect(pathsOverlap('src\\runtime\\combat.ts', 'src/runtime/combat.ts')).toBe(true);
-  });
-});
 
 describe('checkPlan', () => {
   it('reports two unordered tasks writing the same file as one change', () => {
@@ -184,6 +168,57 @@ describe('checkPlan', () => {
 
   it('has nothing to say about a plan of one', () => {
     const plan = [task({ id: 'a', writes: ['src/one.ts'] })];
+    expect(checkPlan(plan, plan).findings).toEqual([]);
+  });
+});
+
+// The half `duplicate-produces` could never see: it compares a dispatch set
+// against itself, so a capability the repository already has was invisible.
+describe('checkPlan against producers that already exist', () => {
+  const concept: Producer = { name: 'buff engine', kind: 'concept', owner: 'Runtime', where: 'Runtime in docs/audits/systems.json', state: null };
+  const closed: Producer = { name: 'droptable system', kind: 'task', owner: 'old-task', where: 'task old-task', state: 'done' };
+
+  it('reports a plan task claiming a capability a system already registers', () => {
+    const plan = [task({ id: 'a', produces: ['buff engine'] })];
+    const { findings } = checkPlan(plan, plan, [concept]);
+    expect(kinds(findings)).toContain('existing-producer');
+    expect(findings[0]).toMatchObject({ level: 'defect' });
+    expect(findings[0].message).toContain('Runtime already has it as a registered concept');
+  });
+
+  it('reports a claim a task made and closed long ago', () => {
+    const plan = [task({ id: 'a', produces: ['droptable system'] })];
+    const { findings } = checkPlan(plan, plan, [closed]);
+    expect(findings[0].message).toContain('task old-task (done) already claims it');
+  });
+
+  it('reports a partial name match as a note, not a defect', () => {
+    const plan = [task({ id: 'a', produces: ['buff'] })];
+    const findings = checkPlan(plan, plan, [concept]).findings.filter((finding) => finding.kind === 'existing-producer');
+    expect(findings).toHaveLength(1);
+    expect(findings[0].level).toBe('note');
+  });
+
+  it('stays quiet about a shared word, which is a lead and not a collision', () => {
+    const plan = [task({ id: 'a', produces: ['buff stacking rules'] })];
+    expect(kinds(checkPlan(plan, plan, [concept]).findings)).not.toContain('existing-producer');
+  });
+
+  // The index is built from the whole store, so a plan member's own claim is
+  // in it. Without this a task collides with itself every time.
+  it('does not report a task against its own claim', () => {
+    const plan = [task({ id: 'a', produces: ['buff engine'] })];
+    const own: Producer = { name: 'buff engine', kind: 'task', owner: 'a', where: 'task a', state: 'open' };
+    expect(kinds(checkPlan(plan, plan, [own]).findings)).not.toContain('existing-producer');
+  });
+
+  it('still reports two plan members claiming one interface, which is a different finding', () => {
+    const plan = [task({ id: 'a', produces: ['modal system'] }), task({ id: 'b', produces: ['modal system'] })];
+    expect(kinds(checkPlan(plan, plan, []).findings)).toContain('duplicate-produces');
+  });
+
+  it('says nothing when no producer index is supplied, so existing callers are unaffected', () => {
+    const plan = [task({ id: 'a', writes: ['src/one.ts'], produces: ['buff engine'] })];
     expect(checkPlan(plan, plan).findings).toEqual([]);
   });
 });
