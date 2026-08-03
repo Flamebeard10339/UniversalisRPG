@@ -1,4 +1,4 @@
-import { covers } from './systems';
+import { normalizePath as normalize, pathsOverlap } from './systems';
 import { isBlocked, waitingOn, type Task } from './taskStore';
 
 // A plan is a set of tasks somebody is about to dispatch concurrently. Every
@@ -15,15 +15,6 @@ export interface PlanFinding {
   message: string;
 }
 
-// Compared lowercase. On Linux `Foo.ts` and `foo.ts` are two files and on
-// Windows — this repo's primary platform — they are one, so a
-// case-sensitive comparison misses a real collision on the machine most of
-// this work happens on. A spurious finding costs a line in a report; a
-// missed collision costs the thing this module exists to prevent.
-function normalize(path: string): string {
-  return path.replace(/\\/g, '/').replace(/^\.\//, '').replace(/\/+$/, '').toLowerCase();
-}
-
 // A grant this check cannot resolve to a region of the tree. `covers`
 // understands a literal path, a directory prefix and systems.json's
 // root-level `*.ext` form; anything else containing a wildcard is a grant
@@ -32,15 +23,6 @@ function normalize(path: string): string {
 export function isReadableGrant(path: string): boolean {
   const normalized = normalize(path);
   return !normalized.includes('*') || /^\*\.[a-z0-9]+$/.test(normalized);
-}
-
-// `covers` is the repo's one answer to "does this declared path region
-// contain this file" — it is how audit-status attributes a diff to a
-// system, and a second implementation here would be a second set of edge
-// cases to keep in agreement. Overlap is containment in either direction.
-export function pathsOverlap(a: string, b: string): boolean {
-  const [x, y] = [normalize(a), normalize(b)];
-  return covers(x, y) || covers(y, x);
 }
 
 function overlappingPaths(a: Task, b: Task): string[] {

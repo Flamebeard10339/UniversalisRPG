@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { checkPlan, pathsOverlap, type PlanFinding } from './planCheck';
+import { checkPlan, type PlanFinding } from './planCheck';
 import type { Task } from './taskStore';
 
 function task(overrides: Partial<Task> & { id: string }): Task {
@@ -29,23 +29,6 @@ function task(overrides: Partial<Task> & { id: string }): Task {
 }
 
 const kinds = (findings: PlanFinding[]): string[] => findings.map((finding) => finding.kind);
-
-describe('pathsOverlap', () => {
-  it('treats a directory grant as covering everything beneath it', () => {
-    expect(pathsOverlap('src/runtime', 'src/runtime/combat.ts')).toBe(true);
-    expect(pathsOverlap('src/runtime/', 'src/runtime/combat.ts')).toBe(true);
-    expect(pathsOverlap('src/runtime/combat.ts', 'src/runtime')).toBe(true);
-  });
-
-  it('does not treat a shared name prefix as a shared directory', () => {
-    expect(pathsOverlap('src/run', 'src/runtime')).toBe(false);
-    expect(pathsOverlap('scripts/tasks.ts', 'scripts/tasks.test.ts')).toBe(false);
-  });
-
-  it('reads a windows separator as the same path', () => {
-    expect(pathsOverlap('src\\runtime\\combat.ts', 'src/runtime/combat.ts')).toBe(true);
-  });
-});
 
 describe('checkPlan', () => {
   it('reports two unordered tasks writing the same file as one change', () => {
