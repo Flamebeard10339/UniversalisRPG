@@ -200,3 +200,77 @@ re-inflates the shipped rat), **M2**, **L1**, **L2**.
 H1, H2, H3. All three are silent — no error, no failing test — and all three sit outside what the
 shipped content exercises, so the green suite says nothing about them. c2 is unmet and becomes an
 open `undelivered` member rather than a triage item.
+
+---
+
+# Pass 2 — same branch, after the pass-1 fixes, 2026-08-03
+
+A second independent pass, commissioned to verify the pass-1 fixes rather than trust them and to
+audit those fixes as new code. It confirmed all six pass-1 findings closed (L2 closed for `time:`
+only — see below), graded **every clause met, c2 included**, and found the arithmetic, the save
+shape and merge ordering unchanged. It found three things the fixes themselves introduced.
+
+## H1 — a section kind the mod portal never learned about
+
+`src/content/modportal.ts:123-134`
+
+`canonicalLocalChangesModule` hand-maintained its own kind-to-registry-map list for renaming a
+contribution's `local-changes.` ids. This branch added `entitytype` to `SCHEMAS`,
+`CONTENT_SECTION_MAPS`, `NAMESPACED_KINDS`, `ReferenceKind` and `visitSection` — five sites — and
+missed this sixth. Reproduced end to end on a contribution declaring `# entitytype foe` and
+`# entity rat / type: foe`:
+
+```
+# entity rat
+type: approved-mod-7.foe      <- renamed
+                              <- the # entitytype section is GONE
+=> # entity approved-mod-7.rat type: names an unknown entitytype: approved-mod-7.foe
+```
+
+The template kept its `local-changes.foe` id, so `serializeRegistryModule`'s own-module filter
+dropped the section, while the reference to it was rewritten. The published mod fails to load and
+the diagnostic blames the contributor. Same shape as the contribution system's own open 2026-07-30
+H1.
+
+**Fixed** by deriving the rename set from `CONTENT_SECTION_MAPS` plus the two kinds that partition
+omits, so a kind added to the loader cannot be forgotten here. Pinned by a modportal test that
+loads the published module; dropping `entitytype` from the derived set reddens it.
+
+## M1 — the spec's Decisions block contradicted the code
+
+`docs/specs/action-kinds-and-templates.md:102-104` recorded "an unknown bare tag on an action stays
+silently ignored" as settled. The promoted `once` work reversed that decision and the record was
+never corrected — and a spec becomes the historical record on merge. Three inputs that loaded on
+`main` now fail, none of them named in the spec.
+
+**Fixed**: the block records the reversal, its reason, and the three compatibility breaks.
+
+## Lows
+
+- **L1** the positivity remedy ("an action that takes no time is tagged instant") reached recipes
+  verbatim, advising a surface with no tags. Reworded for both.
+- **L2** `rate:` and the stat-valued fields raised through the shared value parsers as anonymously
+  as `speed:` used to — the same defect pass 1's L2 named, fixed for `time:` only. Every reader is
+  now wrapped so an unreadable value names its field, its action and its line; the hand-rolled
+  number parser that fix had added is gone.
+- **L3** `default-action-duration` clamped a negative to 0 while `contest-spread` refused its own
+  bad value. One policy now: both refuse.
+- **L4** the clone rationale was copied verbatim into two comments. One copy.
+- **L5** `structuredClone` is a second deep-clone idiom in `src/content` beside modportal's
+  JSON-round-trip `cloned()`. Left as is — they are not interchangeable, and neither is wrong.
+
+## Clause verdicts
+
+Every clause `met`, including **c2**, which pass 1 graded `unmet`. The reviewer reproduced all six
+table errors naming the action, confirmed enforcement now reaches assembled actions (entity over
+template, and a plain cross-module `# item` patch), and mutation-verified that disabling
+`validateActionTable` reddens exactly six tests. c5 is stronger than at pass 1: `pick lock` gained a
+cadence, so `dresser.search drawer` is the only shipped action left untagged with no cadence.
+
+## Regression question
+
+No regression in arithmetic, save shape, or merge ordering for non-template kinds — each measured,
+not assumed. `# save miki-route-end` is byte-identical, `time: 107200` included, which pins the
+whole tutorial route's clock. Serialize and merge are strictly better than `main` for
+template-bearing entities. The loader is stricter in three named ways (M1). The one genuine
+regression was H1.

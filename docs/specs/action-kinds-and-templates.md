@@ -23,7 +23,7 @@ The cadence table, whole:
 
 `time:` is seconds per attempt and takes a literal only. `rate:` is attempts per minute and takes a
 literal **or** a stat id, read live against whoever is swinging. Any cadence value must be positive:
-a zero span is `instant`, and that is the error's wording.
+something that takes no time carries no cadence at all, and that is the error's wording.
 
 Proof:
 
@@ -43,7 +43,7 @@ Proof:
   none, read through `src/runtime/tuning.ts` like every other tuning variable, defaulting to 0 so no
   shipped timing moves. `TODO(default-duration)` is deleted, because an absent `time:` no longer
   means instant — `kind: 'instant'` does. A test proves that setting the variable to N spans an
-  untagged action N milliseconds' worth and leaves an `instant` one at 0.
+  untagged action by N seconds and leaves an `instant` one at 0.
 - [c5] Shipped content declares intent rather than relying on the default staying 0: the actions that
   are genuinely instant (the mirror's `look in`, the stairs, eating) carry `instant`, and the oven's
   craft carries `continuous`. Raising the variable above 0 is a later content change and lands no
@@ -172,3 +172,48 @@ Recorded against the two task records as this branch opened; both had stale evid
 - proof 8: met — own-context reference validation, serialize emits # entitytype and it reloads, # remove entitytype.x works, unresolvable type: names the entity — each pinned. The entity-SIDE round-trip is the serialize finding.
 - proof 9: met — rat is type: melee-foe plus a 6-line fight block; punchbag is type: melee-foe plus -bite:. Zero assertion values changed across contest/encounter/enemy-pool/equipment/stopping — the diffs there are purely the mechanical vocabulary rewrite.
 - proof 10: met — tsc --noEmit clean, 968 tests green in 62s, build clean, layer-check 482 imports all downward, tasks doctor 0 errors.
+
+### Pass 4 — 2026-08-03
+
+- base: `8f1de469c8609e685c500a1ae490ad5e1bc10c0c`
+- head: `2812f3fb61969231ad5fd50c8468b7a11bdc57f9`
+- proof 1: met — repeating gone from the Action interface and BOOLEAN_ACTION_FLAGS; armAction reads actionKind(action)==='continuous'. Forcing actionKind to 'duration' reddens 9 tests across cadence/stopping/time.
+- proof 2: met — Pass 1 graded this unmet: the six errors fired but named no action. EntryBody now carries its label, so every action error is prefixed 'action "<label>":', and a section that owns one prefixes itself. Enforcement also reaches ASSEMBLED actions — entity-over-template and a plain cross-module item patch both fail at load naming the section and action. Disabling validateActionTable reddens exactly 6 tests.
+- proof 3: met — speed gone from Action, Recipe, referenceSites, serialize and every fixture. cadence.test.ts pins 25/min=2400ms, 16/min=3750ms, hasted 31.25/min=1920ms, rate:15 identical to time:4; scaling MS_PER_MINUTE reddens 8 cases. # save miki-route-end is byte-identical, time: 107200 included.
+- proof 4: met — DEFAULT_ACTION_DURATION read through tuning.ts beside contestSpread/minDamage, ships at 0, TODO deleted, and a negative value is now refused rather than clamped. time.test.ts sets it to 7 and asserts the untagged action spans it while the instant one stays 0; ignoring the variable reddens that test plus the front-door integration test.
+- proof 5: met — Enumerated every shipped action's effective kind: instant on the mirror, four stairs actions and both eat:; continuous on the oven; a cadence on pick lock, both rat swings and both crafts. Only dresser.search drawer is left untagged with no cadence, so raising the variable moves exactly one shipped action, deliberately.
+- proof 6: met — entityTypeSchema fields:{} refuses a non-action line; structuredClone per entity. Sharing the template array reddens the three-way non-identity assertion and nothing else.
+- proof 7: met — One implementation: entityTypeBase feeds the existing mergeSection, and it now fires wherever type: FIRST appears rather than only on an entity's first declaration. Dropping the base reddens 21 tests across entityType and cadence.
+- proof 8: met — Own-context validation, # remove entitytype.x, unresolvable type: naming the entity, and a print-then-load fixpoint measured at registryDiff === [] over four shapes including the shipped module. The published-mod path is covered too after the modportal rename fix.
+- proof 9: met — Rat is type: melee-foe plus a 6-line fight block; punchbag is type: melee-foe plus -bite:. Zero assertion values moved across contest/encounter/enemy-pool/equipment/stopping/session — those diffs are the mechanical vocabulary rewrite only.
+- proof 10: met — tsc --noEmit clean, 989 tests green, build clean, layer-check 488 imports all downward, tasks doctor 0 errors 0 warnings, audit-status partition intact.
+
+### Pass 5 — 2026-08-03
+
+- base: `8f1de469c8609e685c500a1ae490ad5e1bc10c0c`
+- head: `2812f3fb61969231ad5fd50c8468b7a11bdc57f9`
+- proof 1: unknown
+- proof 2: unknown
+- proof 3: unknown
+- proof 4: unknown
+- proof 5: unknown
+- proof 6: unknown
+- proof 7: unknown
+- proof 8: unknown
+- proof 9: unknown
+- proof 10: unknown
+
+### Pass 6 — 2026-08-03
+
+- base: `8f1de469c8609e685c500a1ae490ad5e1bc10c0c`
+- head: `2812f3fb61969231ad5fd50c8468b7a11bdc57f9`
+- proof 1: met — repeating gone from the Action interface and BOOLEAN_ACTION_FLAGS; armAction reads actionKind(action)==='continuous'. Forcing actionKind to 'duration' reddens 9 tests.
+- proof 2: met — Pass 1 graded this unmet. EntryBody now carries its label so every action error names the action, and enforcement reaches ASSEMBLED actions (entity over template, cross-module item patch) as well as authored ones. Disabling validateActionTable reddens exactly 6 tests.
+- proof 3: met — speed gone everywhere; cadence.test pins 2400/3750/1920ms and rate:15 identical to time:4; # save miki-route-end byte-identical including time: 107200.
+- proof 4: met — Read through tuning.ts beside contestSpread/minDamage, ships at 0, TODO deleted, negative refused rather than clamped; time.test sets it to 7 and pins both halves.
+- proof 5: met — Every shipped action's effective kind enumerated; only dresser.search drawer is untagged with no cadence, so raising the variable moves exactly one action.
+- proof 6: met — fields:{} refuses a non-action line; structuredClone per entity, and sharing the array reddens the non-identity assertion.
+- proof 7: met — One implementation feeding the existing mergeSection, now firing wherever type: first appears; dropping the base reddens 21 tests.
+- proof 8: met — Own-context validation, # remove, unresolvable type:, and a print-then-load fixpoint at registryDiff === [] over four shapes plus the published-mod path.
+- proof 9: met — Zero assertion values moved across the five combat test files; the diffs there are the mechanical vocabulary rewrite only.
+- proof 10: met — tsc clean, 989 tests green, build clean, layer-check 488 downward, doctor 0/0, audit-status partition intact.
