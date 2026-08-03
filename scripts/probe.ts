@@ -3,8 +3,8 @@ import path from 'node:path';
 import { formatVersion } from '../src/grammar/dependency';
 import { CONTENT_SECTION_MAPS, formatModuleDiagnostic, loadUniverseWithDiagnostics, type Registry } from '../src/content/registry';
 import { REGISTRY_DIFF_MAPS } from '../src/content/registryDiff';
+import { declaredVariableIds, roundTripModule } from '../src/content/roundTrip';
 import { parseUniverse, type ModuleSource } from '../src/content/universe';
-import { declaredVariableIds, roundTripModule } from './lib/roundTrip';
 
 export interface ProbeOptions {
   show: string[];
@@ -69,6 +69,11 @@ export function parseProbeArgs(raw: readonly string[]): ProbeArgs {
     }
   }
   if (args.sources.length === 0) throw new Error(`name at least one source\n\n${usage}`);
+  if (args.sources.filter((source) => source === '-').length > 1) throw new Error('stdin can only be read once — pass - at most once, and split the body on a line of ---');
+  // A survey loads each source alone, so there is no one universe for --show to
+  // look in and no one module for --round-trip to name. Silently dropping them
+  // would report a clean survey for a question nobody answered.
+  if (args.each && (args.show.length > 0 || args.roundTrip)) throw new Error('--each surveys sources one at a time, so it cannot be combined with --show or --round-trip');
   return args;
 }
 
@@ -154,7 +159,9 @@ export function probe(sources: readonly ModuleSource[], options: ProbeOptions): 
 export function splitDocuments(name: string, text: string): ModuleSource[] {
   const documents = text.split(new RegExp(`^${DOCUMENT_SEPARATOR}[ \\t]*$`, 'm'));
   if (documents.length === 1) return [{ name, text }];
-  return documents.map((document, index) => ({ name: `${name}[${index + 1}]`, text: document }));
+  // A body that opens or closes with the separator yields blank documents, which
+  // would load as anonymous empty modules and confuse the count.
+  return documents.map((document, index) => ({ name: `${name}[${index + 1}]`, text: document })).filter((source) => source.text.trim() !== '');
 }
 
 function readSources(files: readonly string[]): ModuleSource[] {

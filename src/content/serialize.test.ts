@@ -3,8 +3,9 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { loadModule, loadUniverse } from './registry';
 import { registryDiff } from './registryDiff';
+import { declaredVariableIds } from './roundTrip';
 import { serializeRegistryModule } from './serialize';
-import { ModuleSource, parseModuleSource, ParsedModule } from './universe';
+import { ModuleSource, parseModuleSource } from './universe';
 
 const FULL_MODULE = `
 # info base
@@ -109,16 +110,12 @@ expect: blank
 `;
 
 describe('serializeRegistryModule', () => {
-  function variableIds(module: ParsedModule): string[] {
-    return module.sections.filter((section) => section.kind === 'variable').map((section) => (section.value as { id: string }).id);
-  }
-
   function expectSemanticRoundTrip(source: ModuleSource): void {
     const parsed = parseModuleSource(source);
     const registry = loadUniverse([source]);
     const printed = serializeRegistryModule(registry, {
       info: parsed.info,
-      globalVariables: variableIds(parsed),
+      globalVariables: declaredVariableIds(parsed),
     });
     const roundTrip = loadUniverse([{ ...source, text: printed }]);
 

@@ -55,6 +55,7 @@ export function parseManifest(text: string): Mutation[] {
     throw new Error(`the manifest is not JSON: ${(error as Error).message}`);
   }
   if (!Array.isArray(parsed)) throw new Error('the manifest must be a list of mutations');
+  if (parsed.length === 0) throw new Error('the manifest is an empty list, so there is nothing to measure');
 
   const names = new Set<string>();
   return parsed.map((raw, index) => {

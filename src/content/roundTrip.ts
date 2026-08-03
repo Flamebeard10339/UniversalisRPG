@@ -1,7 +1,7 @@
-import type { ModuleDiagnostic, Registry, UniverseLoadResult } from '../../src/content/registry';
-import { registryDiff } from '../../src/content/registryDiff';
-import { serializeRegistryModule, type SerializeModuleOptions } from '../../src/content/serialize';
-import type { ParsedModule } from '../../src/content/universe';
+import type { ModuleDiagnostic, Registry, UniverseLoadResult } from './registry';
+import { registryDiff } from './registryDiff';
+import { serializeRegistryModule, type SerializeModuleOptions } from './serialize';
+import type { ParsedModule } from './universe';
 
 export interface RoundTrip {
   printed: string;

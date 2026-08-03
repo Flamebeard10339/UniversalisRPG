@@ -249,6 +249,10 @@ describe('mutate: the manifest', () => {
     expect(() => parseManifest('[{"name":"c6","file":"a.ts","find":"x","replace":"y"},{"name":"c6","file":"a.ts","find":"z","replace":"w"}]')).toThrow(/c6/);
   });
 
+  it('refuses an empty manifest rather than reporting a clean run of nothing', () => {
+    expect(() => parseManifest('[]')).toThrow(/nothing to measure/);
+  });
+
   it('refuses tests that is not a list of strings', () => {
     expect(() => parseManifest('[{"name":"c6","file":"a.ts","find":"x","replace":"y","tests":"a.test.ts"}]')).toThrow(/tests/);
   });

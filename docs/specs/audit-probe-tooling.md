@@ -37,9 +37,10 @@ Proof:
 - [c4] `--round-trip` serializes each loaded module, reloads the universe with that serialization in
   place of the original source, and reports `registryDiff` differences. Clean output means the module
   survives a serialize/reload cycle; differences are listed and exit non-zero.
-- [c5] That round trip is one implementation. `scripts/squash-local-changes.ts` performs the same
-  serialize-reload-diff as its publish guard and calls the same function afterwards; there is no
-  second copy of the sequence.
+- [c5] That round trip is one implementation, and it lives in `src/content/` rather than beside the
+  scripts that call it, because `content < scripts` means a content-layer test cannot import
+  upward. Its callers are the probe, `scripts/squash-local-changes.ts`'s publish guard, and
+  `src/content/serialize.test.ts`; the private `variableIds` that stood in all three is gone.
 - [c6] `npm run mutate <manifest.json>` applies every mutation in the manifest in one invocation, and
   restores each file from bytes captured in this process before any mutation was written — never from
   git, so a mutation run cannot discard uncommitted work in the file it mutates. Restoration holds
@@ -67,6 +68,11 @@ Proof:
   editing with an in-memory restore is correct on a dirty tree, which is the case `git checkout --`
   gets wrong. The residual cost is a window of seconds where the file on disk is wrong for a
   concurrent reader; that is documented at the command, not designed away.
+- The round trip started in `scripts/lib/` and moved down to `src/content/`. A self-review grep for
+  the helper it had absorbed found a third copy inside `src/content/serialize.test.ts`, which the
+  layer rule forbids from importing anything under `scripts/`. Putting a concept about
+  `ParsedModule` and `serializeRegistryModule` in the scripts layer was the mistake; two of its
+  three callers being scripts is incidental.
 - `--each` was added mid-branch, after the one-invocation-per-row cost was measured against the
   probe that motivated this work: its largest block was a table of eighteen one-line variants. A tool
   that answers that in eighteen commands is worse than the vitest file it replaces, so auditors would

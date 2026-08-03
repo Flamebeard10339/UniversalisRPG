@@ -181,6 +181,10 @@ describe('probe: stdin carrying several documents', () => {
   it('tolerates trailing whitespace on the separator line', () => {
     expect(splitDocuments('stdin', 'a\n---  \nb\n')).toHaveLength(2);
   });
+
+  it('drops the blank documents a leading or trailing separator produces', () => {
+    expect(splitDocuments('stdin', '---\n# info a\nversion: 1.0.0\n---\n').map((each) => each.name)).toEqual(['stdin[2]']);
+  });
 });
 
 describe('probe: arguments', () => {
@@ -203,6 +207,17 @@ describe('probe: arguments', () => {
 
   it('refuses no sources at all', () => {
     expect(() => parseProbeArgs(['--round-trip'])).toThrow(/source/);
+  });
+
+  it('refuses --each beside --show or --round-trip rather than dropping them', () => {
+    // A survey has no single universe to look in, so answering --show against
+    // it would be answering a different question than the one asked.
+    expect(() => parseProbeArgs(['a.dsl', '--each', '--show', 'entity.a'])).toThrow(/--each/);
+    expect(() => parseProbeArgs(['a.dsl', '--each', '--round-trip'])).toThrow(/--each/);
+  });
+
+  it('refuses stdin named twice, which would read empty the second time', () => {
+    expect(() => parseProbeArgs(['-', '-'])).toThrow(/stdin/);
   });
 });
 

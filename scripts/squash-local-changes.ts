@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { formatModuleDiagnostic, loadUniverseWithDiagnostics } from '../src/content/registry';
 import { ModuleSource, parseModuleSource, ParsedModule } from '../src/content/universe';
-import { declaredVariableIds, roundTripModule } from './lib/roundTrip';
+import { declaredVariableIds, roundTripModule } from '../src/content/roundTrip';
 
 const repoRoot = path.join(import.meta.dirname, '..');
 const defaultContent = 'content/tutorial-island.dsl';

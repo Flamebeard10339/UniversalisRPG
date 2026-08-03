@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { loadModule, loadUniverseWithDiagnostics, type ModuleDiagnostic, type UniverseLoadResult } from '../../src/content/registry';
+import { loadModule, loadUniverseWithDiagnostics, type ModuleDiagnostic, type UniverseLoadResult } from './registry';
 import { roundTripModule } from './roundTrip';
 
 const BASE = ['# info base', 'version: 1.0.0', '', '# item bread', 'title: Bread', '', '# location camp', 'x: 0, y: 0', 'starting'].join('\n');
