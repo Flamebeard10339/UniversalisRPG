@@ -182,12 +182,12 @@ describe('entity actions', () => {
   it('parses an inline action and a space-labelled block action', () => {
     const stairs = parseOne('# entity stairs-up\ntitle: Stairs\nascend: relocate: guide-house-upstairs, say: You climb the stairs.', entitySchema);
     expect(stairs.actions).toEqual([
-      { label: 'ascend', results: [{ kind: 'relocate', location: 'guide-house-upstairs' }, { kind: 'say', text: 'You climb the stairs.' }] },
+      { label: 'ascend', kind: 'duration', results: [{ kind: 'relocate', location: 'guide-house-upstairs' }, { kind: 'say', text: 'You climb the stairs.' }] },
     ]);
 
     const window = parseOne(['# entity window', 'look through:', '  discover: beach', '  say: Through the window, a bridge.'].join('\n'), entitySchema);
     expect(window.actions).toEqual([
-      { label: 'look through', results: [{ kind: 'discover', location: 'beach' }, { kind: 'say', text: 'Through the window, a bridge.' }] },
+      { label: 'look through', kind: 'duration', results: [{ kind: 'discover', location: 'beach' }, { kind: 'say', text: 'Through the window, a bridge.' }] },
     ]);
   });
 
@@ -227,6 +227,7 @@ describe('entity action modifiers', () => {
     expect(door.actions).toEqual([
       {
         label: 'pick lock',
+        kind: 'duration',
         requires: ref('lockpick'),
         hiddenIf: ref('unlocked'),
         tags: [{ kind: 'keyword', value: 'once' }, { kind: 'duration', seconds: 4 }],
@@ -252,7 +253,7 @@ describe('entity action modifiers', () => {
     ['on failure: say: a', 'on failure'],
     ['on escape: say: a', 'on escape'],
     ['time: 1', 'time'],
-    ['speed: quickness', 'speed'],
+    ['rate: quickness', 'rate'],
     ['accuracy: aim', 'accuracy'],
     ['evasion: dodge', 'evasion'],
     ['ability: might', 'ability'],
@@ -273,6 +274,7 @@ describe('entity action modifiers', () => {
     expect(inline.actions).toEqual([
       {
         label: 'open',
+        kind: 'duration',
         results: [{ kind: 'take', item: 'cooked-shrimp', amount: 5 }],
         onFailure: [{ kind: 'say', text: 'Not enough shrimp.' }],
       },
@@ -286,6 +288,38 @@ describe('entity action modifiers', () => {
 
   it('surfaces result-related errors for malformed results, not tag errors', () => {
     expect(() => parseOne('# entity chest\nopen:\n  give:', entitySchema)).toThrow(/expected an id/);
+  });
+});
+
+// A kind says what ends the action; a cadence says how fast it attempts. The
+// table is the pair, and every combination it has no meaning for is a load
+// error rather than a silent default the runtime has to guess at.
+describe('action kinds and their cadence', () => {
+  const parseAction = (...lines: string[]) => parseOne(['# entity forge', 'work:', ...lines.map((line) => `  ${line}`)].join('\n'), entitySchema).actions![0];
+
+  it('makes an untagged action a duration, and lifts the two written kinds off their tags', () => {
+    expect(parseAction('say: hi').kind).toBe('duration');
+    expect(parseAction('instant', 'say: hi').kind).toBe('instant');
+    expect(parseAction('continuous', 'time: 2', 'say: hi').kind).toBe('continuous');
+  });
+
+  it('keeps both cadence spellings, a stat rate apart from a literal one', () => {
+    expect(parseAction('time: 2.5', 'say: hi')).toMatchObject({ kind: 'duration', time: 2.5 });
+    expect(parseAction('rate: 15', 'say: hi')).toMatchObject({ kind: 'duration', rate: 15 });
+    expect(parseAction('rate: quickness', 'say: hi')).toMatchObject({ kind: 'duration', rate: 'quickness' });
+  });
+
+  it.each([
+    [['instant', 'time: 2'], /an instant action takes no time:/],
+    [['instant', 'rate: 15'], /an instant action takes no rate:/],
+    [['continuous', 'say: hi'], /a continuous action needs a time: or rate:/],
+    [['time: 2', 'rate: 15'], /time: and rate: are the same axis/],
+    [['instant', 'continuous'], /cannot be both instant and continuous/],
+    [['time: 0'], /action time must be positive/],
+    [['rate: 0'], /action rate must be positive/],
+    [['speed: quickness'], /action speed: was retired; write rate:/],
+  ])('rejects %s', (lines, message) => {
+    expect(() => parseAction(...lines)).toThrow(message);
   });
 });
 

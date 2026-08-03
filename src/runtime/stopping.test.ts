@@ -55,17 +55,15 @@ entities: giant-rat, shrine, beacon, training-post, treadmill, altar, straw-man
 # entity giant-rat
 stats: attack 10, dr 0, max-health 1000, attack-rate 16
 fight:
-  repeating
-  time: 60
-  speed: attack-rate
+  continuous
+  rate: attack-rate
   target: health
   ability: attack
   dr: dr
   give: 1 rat-tail
 bite:
   retaliates
-  time: 60
-  speed: attack-rate
+  rate: attack-rate
   target: health
   ability: attack
   dr: dr
@@ -73,7 +71,7 @@ bite:
 # entity shrine
 flags: moon-up
 chant:
-  repeating
+  continuous
   requires: moon-up
   time: 1
   give: 1 blessing
@@ -81,7 +79,7 @@ chant:
 # entity beacon
 flags: dawn
 tend:
-  repeating
+  continuous
   hidden if: dawn
   time: 1
   give: 1 blessing
@@ -90,10 +88,9 @@ tend:
 flags: permitted
 stats: max-health 30, dr 0
 drill:
-  repeating
+  continuous
   requires: permitted
-  time: 60
-  speed: attack-rate
+  rate: attack-rate
   target: health
   ability: attack
   dr: dr
@@ -101,7 +98,7 @@ drill:
 
 # entity treadmill
 run:
-  repeating
+  continuous
   time: 1
   -60 regeneration
   give: 1 blessing
@@ -115,7 +112,7 @@ run:
 // Deterministic and repeating — the shape that batches. One completion a second
 // over a 100s span is 100 batched completions, of which exactly one may happen.
 chant:
-  repeating
+  continuous
   time: 1
   give: 1 blessing
   on success:
@@ -129,9 +126,8 @@ chant:
 // attempt-by-attempt.
 stats: max-health 20, dr 0
 spar:
-  repeating
-  time: 60
-  speed: attack-rate
+  continuous
+  rate: attack-rate
   target: health
   ability: attack
   dr: dr

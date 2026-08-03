@@ -41,7 +41,7 @@ flags:
   awake
 cheer:
   requires: levered
-  repeating
+  continuous
   time: 2
   give: 1 ore
   on success:
@@ -50,6 +50,13 @@ sequence:
   set: levered
   say: Middle.
   unset: levered
+glance:
+  instant
+  say: A quick look.
+swing:
+  continuous
+  rate: vigor
+  give: 1 ore
 
 # location camp
 x: 0, y: 0

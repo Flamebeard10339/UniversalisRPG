@@ -416,10 +416,10 @@ export function armAction(obj: string, objId: string, actionId: string, registry
     return { armed: false };
   }
 
-  const repeating = action.repeating === true;
+  const repeating = action.kind === 'continuous';
   const duration = attemptDuration(action, state, registry);
   if (repeating && duration <= 0) {
-    throw new RuntimeError(`repeating action ${obj}.${objId}.${actionId} needs a positive time: after speed scaling`);
+    throw new RuntimeError(`continuous action ${obj}.${objId}.${actionId} resolved a non-positive cadence (${duration}ms)`);
   }
 
   // First in, so the player wins a tie between cadences due at the same instant.

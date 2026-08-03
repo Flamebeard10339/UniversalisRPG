@@ -1,5 +1,5 @@
 import type { Registry } from '../content/registry';
-import { CONTEST_SPREAD, MIN_DAMAGE, TRAVEL_SECONDS_PER_UNIT } from '../content/tuningVariables';
+import { CONTEST_SPREAD, DEFAULT_ACTION_DURATION, MIN_DAMAGE, TRAVEL_SECONDS_PER_UNIT } from '../content/tuningVariables';
 
 const DEFAULT_TRAVEL_SECONDS_PER_UNIT = 5;
 
@@ -19,4 +19,13 @@ const DEFAULT_CONTEST_SPREAD = 100;
 
 export function contestSpread(registry: Registry): number {
   return registry.variables.get(CONTEST_SPREAD)?.value ?? DEFAULT_CONTEST_SPREAD;
+}
+
+// Seconds a duration action takes when it names no cadence of its own. Zero is
+// what the engine shipped for years as "absent time: means instant"; the kind
+// carries that meaning now, so this is free to be raised by content.
+const DEFAULT_DEFAULT_ACTION_DURATION = 0;
+
+export function defaultActionDuration(registry: Registry): number {
+  return Math.max(0, registry.variables.get(DEFAULT_ACTION_DURATION)?.value ?? DEFAULT_DEFAULT_ACTION_DURATION);
 }

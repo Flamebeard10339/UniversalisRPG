@@ -43,9 +43,8 @@ entities: dummy, phantom, biter
 # entity dummy
 stats: max-health 1000000, dodge 0
 strike:
-  repeating
-  time: 60
-  speed: attack-rate
+  continuous
+  rate: attack-rate
   target: health
   accuracy: attack-skill
   evasion: dodge
@@ -55,9 +54,8 @@ strike:
 # entity phantom
 stats: max-health 1000000, dodge 100
 strike:
-  repeating
-  time: 60
-  speed: attack-rate
+  continuous
+  rate: attack-rate
   target: health
   accuracy: attack-skill
   evasion: dodge
@@ -67,9 +65,8 @@ strike:
 # entity biter
 stats: max-health 1000000, dodge 0
 strike:
-  repeating
-  time: 60
-  speed: attack-rate
+  continuous
+  rate: attack-rate
   target: health
   accuracy: attack-skill
   evasion: dodge
@@ -77,8 +74,7 @@ strike:
   dr: dr
 bite:
   retaliates
-  time: 60
-  speed: attack-rate
+  rate: attack-rate
   target: health
   accuracy: rat-skill
   evasion: dodge
@@ -254,18 +250,15 @@ base: ${blow}
 # entity test-fighter
 stats: max-health 100000, dodge 0
 test-pool:
-  time: 60
-  speed: attack-rate
+  rate: attack-rate
   ability: blow
   target: health
 test-implicit:
-  time: 60
-  speed: attack-rate
+  rate: attack-rate
   ability: blow
   escape after 5
 test-escaper:
-  time: 60
-  speed: attack-rate
+  rate: attack-rate
   ability: blow
   escape after 2
   on escape:

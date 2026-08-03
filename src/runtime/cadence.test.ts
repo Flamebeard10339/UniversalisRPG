@@ -3,10 +3,11 @@ import { point } from '../grammar/range';
 import { armAction, createGameState, GameState, initResources, PLAYER, resolve } from './runtime';
 import { loadModule, Registry } from '../content/registry';
 import { startSession, view } from './session';
+import { attemptDuration } from './stats';
 import { secondsToMs, toMilliUnits } from './units';
 
-// `time: 60` with `speed:` on a per-minute rate stat means attempts per minute:
-//   player 60/25 = 2.4s, rat 60/16 = 3.75s, hasted 60/31.25 = 1.92s.
+// `rate:` is attempts per minute, read straight off the stat: player 25/min =
+// 2.4s, rat 16/min = 3.75s, hasted 31.25/min = 1.92s.
 // giant-rat carries a deep pool; punchbag has no `retaliates` and keeps no clock.
 const MODULE = `
 # stat attack
@@ -39,17 +40,15 @@ entities: giant-rat, punchbag
 # entity giant-rat
 stats: attack 4, dr 2, max-health 1000, attack-rate 16
 fight:
-  repeating
-  time: 60
-  speed: attack-rate
+  continuous
+  rate: attack-rate
   target: health
   ability: attack
   dr: dr
   give: 1 rat-tail
 bite:
   retaliates
-  time: 60
-  speed: attack-rate
+  rate: attack-rate
   target: health
   ability: attack
   dr: dr
@@ -57,9 +56,8 @@ bite:
 # entity punchbag
 stats: max-health 24, dr 0
 hit:
-  repeating
-  time: 60
-  speed: attack-rate
+  continuous
+  rate: attack-rate
   target: health
   ability: attack
   dr: dr
@@ -231,5 +229,32 @@ describe('the rat sheet', () => {
     expect(() => loadModule(`${MODULE}\n# entity giant-rat\nclaw:\n  retaliates\n  time: 60\n  target: health\n`)).toThrow(
       /retaliating action "claw" conflicts with "bite"; only one retaliates action is supported/,
     );
+  });
+});
+
+// The rewrite from `time: 60` + `speed: <per-minute stat>` to `rate: <stat>` has
+// to be arithmetic-neutral, or every timing assertion above is measuring the
+// change rather than the engine. These are the durations the suite is built on.
+describe('rate: as the per-minute cadence, to the millisecond', () => {
+  const action = (registry: Registry, entityId: string, label: string) => registry.entities.get(entityId)!.actions.find((each) => each.label === label)!;
+
+  it('reads the stat against whoever is swinging, and a buff moves it', () => {
+    const registry = loaded();
+    const state = fighting(registry);
+
+    expect(attemptDuration(action(registry, 'giant-rat', 'fight'), state, registry)).toBe(secondsToMs(2.4));
+    expect(attemptDuration(action(registry, 'giant-rat', 'bite'), state, registry, 'giant-rat')).toBe(secondsToMs(3.75));
+
+    state.activeBuffs['haste:attack-rate'] = { statId: 'attack-rate', amount: 0.25, kind: 'increased', expiresAt: secondsToMs(60) };
+    expect(attemptDuration(action(registry, 'giant-rat', 'fight'), state, registry)).toBe(secondsToMs(1.92));
+  });
+
+  it('takes a flat per-minute literal, where 15 is the 4s the oven used to write as time: 4', () => {
+    const source = ['# item chestnut', 'examine: Warm.', '# entity oven', 'roast:', '  continuous', '  rate: 15', '  give: 1 chestnut', '# entity slow-oven', 'roast:', '  continuous', '  time: 4', '  give: 1 chestnut'].join('\n');
+    const registry = loadModule(source);
+    const state = createGameState();
+
+    expect(attemptDuration(action(registry, 'oven', 'roast'), state, registry)).toBe(secondsToMs(4));
+    expect(attemptDuration(action(registry, 'slow-oven', 'roast'), state, registry)).toBe(secondsToMs(4));
   });
 });

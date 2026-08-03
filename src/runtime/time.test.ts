@@ -53,10 +53,10 @@ cook:
 draw:
   say: You draw water.
 
-# entity clock
-tick:
-  time: 0
-  say: Tick.
+# entity mirror
+glance:
+  instant
+  say: You glance at yourself.
 `;
 
   it('advances state.time by the action\'s time: on success', () => {
@@ -75,18 +75,29 @@ tick:
     expect(state.inventory['cooked-shrimp'] ?? 0).toBe(0);
   });
 
-  it('defaults an action with no time: to a zero-cost, time-neutral action', () => {
+  it('gives an action that names no cadence the default-action-duration, which ships at 0', () => {
     const registry = loadModule(MODULE);
     const state = createGameState();
     useAction('entity', 'well', 'draw', registry, state);
     expect(state.time).toBe(0);
   });
 
-  it('accepts an explicit time: 0', () => {
-    const registry = loadModule(MODULE);
-    const state = createGameState();
-    useAction('entity', 'clock', 'tick', registry, state);
-    expect(state.time).toBe(0);
+  // The whole point of separating the kind from the cadence: raising the default
+  // must move every action that never said it was over instantly, and no other.
+  it('spans an untagged action by a raised default-action-duration and leaves an instant one at 0', () => {
+    const registry = loadModule(`# variable default-action-duration\nvalue: 7\n${MODULE}`);
+
+    const drawing = createGameState();
+    useAction('entity', 'well', 'draw', registry, drawing);
+    expect(drawing.time).toBe(secondsToMs(7));
+
+    const glancing = createGameState();
+    useAction('entity', 'mirror', 'glance', registry, glancing);
+    expect(glancing.time).toBe(0);
+  });
+
+  it('refuses time: 0 and names the tag that means it', () => {
+    expect(() => loadModule('# entity clock\ntick:\n  time: 0\n  say: Tick.\n')).toThrow(/action time must be positive.*tagged instant/);
   });
 });
 

@@ -96,15 +96,16 @@ function recipeAction(recipe: Recipe): Action {
   if (recipe.skill) results.push({ kind: 'xp', skill: recipe.skill.skill, amount: recipe.skill.amount });
   if (recipe.say) results.push({ kind: 'say', text: recipe.say });
 
-  const time = recipe.time ?? 0;
+  // A craft with a cadence keeps going; one without is over the moment it is
+  // used, which is `instant` in the vocabulary this compiles into.
+  const spannable = recipe.rate !== undefined || (recipe.time ?? 0) > 0;
   const action: Action = {
     label: `Craft ${humanize(recipe.id)}`,
+    kind: spannable ? 'continuous' : 'instant',
     results,
-    time,
-    speed: recipe.speed,
+    ...(recipe.rate !== undefined ? { rate: recipe.rate } : spannable ? { time: recipe.time } : {}),
     accuracy: recipe.accuracy,
     evasion: recipe.evasion,
-    repeating: time > 0,
   };
 
   if (recipe.accuracy) {

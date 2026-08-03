@@ -138,15 +138,15 @@ function actionLines(action: Action): Lines {
     action.onSuccess?.length ||
     action.onFailure?.length ||
     action.onEscape?.length ||
+    action.kind !== 'duration' ||
     action.time !== undefined ||
-    action.speed ||
+    action.rate !== undefined ||
     action.accuracy ||
     action.evasion ||
     action.ability ||
     action.target ||
     action.dr ||
     action.escapeAfter !== undefined ||
-    action.repeating ||
     action.retaliates;
 
   if (!modifiers && action.results.length === 1) return [`${action.label}: ${results(action.results)}`];
@@ -154,12 +154,15 @@ function actionLines(action: Action): Lines {
   const lines = [`${action.label}:`];
   if (action.requires) lines.push(`  requires: ${condition(action.requires)}`);
   if (action.hiddenIf) lines.push(`  hidden if: ${condition(action.hiddenIf)}`);
-  if (action.repeating) lines.push('  repeating');
+  if (action.kind !== 'duration') lines.push(`  ${action.kind}`);
   if (action.retaliates) lines.push('  retaliates');
-  const tags = (action.tags ?? []).filter((each) => each.kind !== 'keyword' || (each.value !== 'repeating' && each.value !== 'retaliates'));
+  // The tags the kind and the flags above already spell; re-emitting one would
+  // round-trip into a second copy of the same fact.
+  const lifted = new Set(['instant', 'continuous', 'retaliates']);
+  const tags = (action.tags ?? []).filter((each) => each.kind !== 'keyword' || !lifted.has(each.value));
   if (tags.length > 0) lines.push(`  ${tags.map(tag).join(', ')}`);
   if (action.time !== undefined) lines.push(`  time: ${n(action.time)}`);
-  if (action.speed) lines.push(`  speed: ${action.speed}`);
+  if (action.rate !== undefined) lines.push(`  rate: ${typeof action.rate === 'string' ? action.rate : n(action.rate)}`);
   if (action.accuracy) lines.push(`  accuracy: ${action.accuracy}`);
   if (action.evasion) lines.push(`  evasion: ${action.evasion}`);
   if (action.ability) lines.push(`  ability: ${action.ability}`);
@@ -272,7 +275,7 @@ function recipeSection(moduleId: string, recipe: Recipe): string {
   if (recipe.skill) lines.push(`skill: ${recipe.skill.skill} ${n(recipe.skill.amount)}`);
   if (recipe.say) lines.push(`say: ${recipe.say}`);
   if (recipe.time !== undefined) lines.push(`time: ${n(recipe.time)}`);
-  if (recipe.speed) lines.push(`speed: ${recipe.speed}`);
+  if (recipe.rate !== undefined) lines.push(`rate: ${typeof recipe.rate === 'string' ? recipe.rate : n(recipe.rate)}`);
   if (recipe.accuracy) lines.push(`accuracy: ${recipe.accuracy}`);
   if (recipe.evasion) lines.push(`evasion: ${recipe.evasion}`);
   block(lines, 'burnt', recipe.burnt.map(quantified));

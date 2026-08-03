@@ -48,6 +48,7 @@ export function travelAction(originId: string, destId: string, registry: Registr
   if (!dest) throw new RuntimeError(`unknown travel destination: ${destId}`);
   return {
     label: `Travel to ${dest.title}`,
+    kind: 'duration',
     results: [{ kind: 'relocate', location: destId }],
     time: locationDistance(origin, dest) * travelSecondsPerUnit(registry),
   };

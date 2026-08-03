@@ -4,8 +4,8 @@ import { findActiveAction } from './actions';
 import { Registry } from '../content/registry';
 import { nextRandom } from './rng';
 import { GameState, PLAYER, RuntimeError } from './state';
-import { contestSpread, minDamage } from './tuning';
-import { secondsToMs, toMilliUnits } from './units';
+import { contestSpread, defaultActionDuration, minDamage } from './tuning';
+import { MS_PER_MINUTE, secondsToMs, toMilliUnits } from './units';
 import { TagClause } from '../grammar/tagClause';
 
 // Difficulty is a stat, never an authored probability, so gear and buffs move it.
@@ -64,14 +64,17 @@ export function hitDamage(attack: number, dr: number, registry: Registry): numbe
   return Math.max(floor, toMilliUnits(attack - dr));
 }
 
+// The one place the three kinds and the two cadence spellings meet a clock.
+// `rate` is the live half: a stat there is read against whoever is swinging, so
+// a buff moves the cadence without the action knowing.
 export function attemptDuration(action: Action, state: GameState, registry: Registry, actorId: string = PLAYER): number {
-  const speed = action.speed ? statValue(action.speed, state, registry, actorId) : 1;
-  const timeMs = secondsToMs(action.time ?? 0);
-  const duration = Math.floor(timeMs / speed);
+  if (action.kind === 'instant') return 0;
+  if (action.rate === undefined) return secondsToMs(action.time ?? defaultActionDuration(registry));
+
+  const perMinute = typeof action.rate === 'string' ? statValue(action.rate, state, registry, actorId) : action.rate;
+  const duration = Math.floor(MS_PER_MINUTE / perMinute);
   if (!Number.isFinite(duration) || duration < 0) {
-    throw new RuntimeError(
-      `action ${action.label} resolved an impossible attempt duration (${duration}) from time: ${action.time ?? 0} and speed stat ${action.speed ?? '1'} = ${speed}`,
-    );
+    throw new RuntimeError(`action ${action.label} resolved an impossible attempt duration (${duration}) from rate: ${action.rate} = ${perMinute} per minute`);
   }
   return duration;
 }

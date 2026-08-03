@@ -344,7 +344,7 @@ examine: Split and steaming.
 
 # entity oven
 roast:
-  repeating
+  continuous
   time: 4
   give: 1 roasted-chestnut
 
