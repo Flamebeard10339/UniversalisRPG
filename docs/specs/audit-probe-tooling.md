@@ -157,3 +157,22 @@ None.
 - proof 13: met — --round-trip=module finds the contribution-system H1 in one command; H2 is that the mode does not carry canSerialize
 - proof 14: unmet
 - proof 11: met — 1153 passing in 53.29s; tallyOf is the subprocess-as-data seam the clause asks for. L5 records that main()'s composition is still outside it
+
+### Pass 4 — 2026-08-03
+
+- base: `3d3386ac7ca181b04b1684efe305b35bb021009e`
+- head: `9ade314b2afe4d3ed2b26f70688d8da3314f8c3a`
+- proof 1: met — pass 3, independent: a rejecting source prints the loader diagnostic and exits 1
+- proof 2: met — pass 3, independent: two sources load in dependency order from loaded.parsed
+- proof 3: met — pass 3, independent: SHOWABLE derives from CONTENT_SECTION_MAPS and the refusal groups kinds and maps separately
+- proof 4: met — pass 3, independent: the # remove universe reports clean and universe-reloads-originals is KILLED
+- proof 5: met — pass 3, independent: one implementation in src/content with three callers; UniverseRoundTrip no longer extends RoundTrip
+- proof 6: met — pass 3, independent: restore held byte-identical across ~20 mutations, tree clean after every run
+- proof 7: met — pass 3, independent: a refused manifest wrote nothing, and the check runs before the baselines
+- proof 8: met — pass 3, independent: every row names its scope; unmeasured marks a verdict with no baseline
+- proof 9: met — pass 3, independent: unrestored is reached on every path through runMutations
+- proof 10: met — audit-status exit 0
+- proof 12: met — pass 3, independent: --each surveys and exits 0 on a table of rejections
+- proof 13: met — author-verified after pass 3 H2: canSerialize now guards the module path too, so a source with no # info is reported as unserializable rather than as a missing item, and H2-module-mode-unguarded is KILLED
+- proof 14: met — author-verified after pass 3 H1, not independently re-audited: escalation is a second phase so both baselines are taken on an unmutated tree, and a file that fails to collect is an ERROR rather than a verdict. The auditor's own instrumentation now reads ORIGINAL for both baselines and reports the shortfall of 15 it lost; their breaks-collection case reports ERROR where it read KILLED 3 failed of 1086. Six mutations of these decisions all KILLED
+- proof 11: met — 1165 passing in 58s; tsc, layer-check and doctor clean
