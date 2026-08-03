@@ -91,6 +91,10 @@ const GLOBAL_USAGE = 'global: [--store <path>] [--systems <path>] [--specs-dir <
 
 const ACTOR_USAGE = '[--actor <name>]';
 
+// Named once. A second spelling of this string somewhere else would be a
+// second answer to "which branch is not working a spec".
+const DEFAULT_BRANCH = 'main';
+
 interface ParsedArgs {
   parsed: Flags;
   errors: string[];
@@ -283,6 +287,14 @@ function resolveActiveSpec(config: Config, tasks: Task[], explicit: string | und
   if (explicit !== undefined) return { spec: explicit, note: null };
   const strict = currentSpec(config);
   if (strict !== null) return { spec: strict, note: `spec inferred from the branch name: ${strict} — ${specFile(config, strict)} exists` };
+
+  // The store route is a resume aid for a working branch whose name has
+  // drifted from its spec file. The default branch is never working a spec,
+  // so anything it inferred would be a guess about a branch the caller is
+  // not on — and the guess lands on whichever spec is slowest to retire,
+  // which is exactly the one whose clauses describe deleted machinery.
+  // `--spec` still works here, because that is asked for rather than guessed.
+  if (config.branch === DEFAULT_BRANCH) return { spec: null, note: null };
 
   const candidates = new Set<string>();
   for (const task of tasks) {
