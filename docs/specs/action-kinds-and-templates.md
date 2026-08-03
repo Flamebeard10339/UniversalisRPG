@@ -86,6 +86,19 @@ a zero span is `instant`, and that is the error's wording.
   body sets stats only" stops reading cleanly the moment the template can set them too.
 - **`ActiveAction.repeating` keeps its name.** It is derived runtime state that is persisted in
   saves; renaming it is a save-shape change that buys nothing this branch promises.
+- **`Action.kind` is optional, and absent means `duration`.** Recorded during implementation, not
+  planned: `parseBlock` stamped `kind: 'duration'` on every untagged block, so an entity overriding
+  one field of a `continuous` template action would have silently reset it. Absent is what an
+  untagged action records now, `actionKind()` is the single place that says absent means duration,
+  and c6's overlay test is the guard.
+- **The template is the entity's merge base, applied in its own pass before entities merge.** Also
+  recorded during implementation. The planned shape — apply templates after the merge loop — cannot
+  work: an entry removal (`-bite:`) is consumed by the first merge that sees it, so a template
+  applied afterwards never sees one, and the punchbag is exactly that case. Making the template the
+  base puts override, addition and removal through the one merge rule. Templates settling first also
+  means an entity may name a template declared after it, which nothing else in the DSL requires you
+  to order; the price is that removing a template removes it outright, and an entity still naming it
+  fails rather than quietly keeping what it was built from. Both are pinned.
 - **An unknown bare tag on an action stays silently ignored.** Rejecting them is a strictly larger
   change than this table and would turn the dresser's inert `once` into a load failure. That `once`
   does nothing is a real defect and is filed as a finding, not fixed here.
