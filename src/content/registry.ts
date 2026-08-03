@@ -363,7 +363,7 @@ function referencesLoaded(check: () => void): boolean {
 // ASSEMBLED — merged onto a template, patched across modules, or compiled from a
 // recipe — and none of those went through the grammar. Same rule, applied where
 // the section that owns the action can name itself.
-function validateSectionActions(where: string, actions: readonly Action[] | undefined): void {
+function validateActionTable(where: string, actions: readonly Action[] | undefined): void {
   for (const action of actions ?? []) {
     const problem = actionTableProblem(action);
     if (problem) throw new DslError(`${where} ${actionProblem(action.label, problem)}`);
@@ -509,7 +509,7 @@ function validateBuiltRegistry(registry: Registry, owners: ReadonlyMap<string, P
   for (const [kind, map] of CONTENT_SECTION_MAPS) {
     for (const [id, value] of registry[map] as ReadonlyMap<string, object>) {
       try {
-        validateSectionActions(`# ${kind} ${id}`, (value as { actions?: Action[] }).actions);
+        validateActionTable(`# ${kind} ${id}`, (value as { actions?: Action[] }).actions);
         validateSectionReferences(kind, id, value, registry);
       } catch (error) {
         if (!(error instanceof DslError)) throw error;
@@ -520,7 +520,7 @@ function validateBuiltRegistry(registry: Registry, owners: ReadonlyMap<string, P
 
   for (const [id, action] of registry.recipeActions) {
     try {
-      validateSectionActions(`# recipe ${id}`, [action]);
+      validateActionTable(`# recipe ${id}`, [action]);
     } catch (error) {
       if (!(error instanceof DslError)) throw error;
       return { module: sectionOwner(owners, 'recipe', id)!, stage: 'validate', error };

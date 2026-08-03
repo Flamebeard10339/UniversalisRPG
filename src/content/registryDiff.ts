@@ -12,6 +12,10 @@ function stable(value: unknown): unknown {
   return value;
 }
 
+// Value equality over loaded content: array order is meaningful, key order is
+// not, because two equal values can have been built by different code paths.
+export const sameValue = (a: unknown, b: unknown): boolean => JSON.stringify(stable(a)) === JSON.stringify(stable(b));
+
 export function registryDiff(before: Registry, after: Registry): string[] {
   const lines: string[] = [];
   for (const name of REGISTRY_DIFF_MAPS) {
@@ -19,7 +23,7 @@ export function registryDiff(before: Registry, after: Registry): string[] {
     const right = after[name] as ReadonlyMap<string, unknown>;
     for (const key of [...left.keys()].sort()) {
       if (!right.has(key)) lines.push(`  ${name}: missing ${key}`);
-      else if (JSON.stringify(stable(left.get(key))) !== JSON.stringify(stable(right.get(key)))) lines.push(`  ${name}: changed ${key}`);
+      else if (!sameValue(left.get(key), right.get(key))) lines.push(`  ${name}: changed ${key}`);
     }
     for (const key of [...right.keys()].sort()) if (!left.has(key)) lines.push(`  ${name}: added ${key}`);
   }

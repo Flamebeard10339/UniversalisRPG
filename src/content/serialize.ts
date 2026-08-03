@@ -12,6 +12,7 @@ import { Item } from './item';
 import { Location } from './location';
 import { Recipe } from './recipe';
 import { Registry } from './registry';
+import { sameValue } from './registryDiff';
 import { Resource } from './resource';
 import { ParsedSave } from './saveSection';
 import { Test, Directive } from './test';
@@ -252,8 +253,7 @@ function entityTypeSection(moduleId: string, entityType: EntityType): string {
 // moment the entity changed the kind or the cadence — and would freeze the
 // entity against edits to the template it still claims to follow.
 function actionOverride(action: Action, inherited: Action): Lines {
-  const same = (key: keyof Action): boolean => JSON.stringify(action[key]) === JSON.stringify(inherited[key]);
-  const kept = Object.keys(action).filter((key) => key !== 'label' && !same(key as keyof Action));
+  const kept = Object.keys(action).filter((key) => key !== 'label' && !sameValue(action[key as keyof Action], inherited[key as keyof Action]));
   if (kept.length === 0) return [];
   const override: Record<string, unknown> = { label: action.label, results: [] };
   for (const key of kept) override[key] = action[key as keyof Action];
