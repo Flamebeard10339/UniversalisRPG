@@ -175,6 +175,9 @@ export function cmdAuditPrompt(args: Flags, usage: string): void {
   console.log('Required commands (all must pass; `npm run tasks -- merge-ready` runs them together):');
   console.log('- npm run tasks -- merge-ready');
   console.log('');
+  console.log('Log any task tool friction in .planning/feedback/tool-friction.md');
+  console.log('Log any audit tool friction in .planning/feedback/audit-tool-friction.md');
+  console.log('');
   console.log('Relevant files:');
   if (relevantFiles.length === 0) console.log('- none');
   for (const file of relevantFiles) console.log(`- ${file}`);
