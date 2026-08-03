@@ -203,6 +203,8 @@
         "scripts/lib/commitContract.test.ts",
         "scripts/lib/architecture.ts",
         "scripts/lib/architecture.test.ts",
+        "scripts/lib/roadmap.ts",
+        "scripts/lib/roadmap.test.ts",
         "scripts/lib/bytes.ts",
         "scripts/lib/bytes.test.ts"
       ],
@@ -258,6 +260,13 @@
             "scripts/lib/producers.ts"
           ],
           "note": "Produced by arch-query-commands; the claim is recorded on that task."
+        },
+        {
+          "name": "roadmap view",
+          "paths": [
+            "scripts/lib/roadmap.ts"
+          ],
+          "note": "produced by roadmap-view; the deferred-backlog frontier tasks next cannot answer"
         }
       ]
     },

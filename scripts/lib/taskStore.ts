@@ -269,7 +269,7 @@ const SEVERITY_RANK: Record<Severity, number> = { high: 0, medium: 1, low: 2 };
 
 // Unset ranks last: every queue below sorts high before medium before low
 // before null, so this is the one comparator they all share.
-const severityRank = (severity: Severity | null): number => (severity === null ? 3 : SEVERITY_RANK[severity]);
+export const severityRank = (severity: Severity | null): number => (severity === null ? 3 : SEVERITY_RANK[severity]);
 
 export type RequirementStatus = 'waiting' | 'done' | 'declined' | 'missing';
 

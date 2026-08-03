@@ -8,10 +8,11 @@ import { cmdDoctor } from './doctor';
 import { cmdCheckCommitMessage, cmdHandoff, cmdLog, recordStandaloneEvent } from './handoff';
 import { cmdMergeReady } from './mergeReady';
 import { cmdAdd, cmdDecline, cmdDone, cmdEdit, cmdList, cmdNext, cmdPromote, cmdSearch, cmdShow, cmdStart, cmdStop } from './records';
+import { cmdRoadmap } from './roadmapCmd';
 import { cmdSpecAdd, cmdSpecDone, cmdSpecNew, cmdSpecRemove, cmdSpecShow } from './specCmds';
 import { cmdTriage } from './triage';
 
-const USAGE = 'usage: npm run tasks -- <doctor|add|edit|show|list|search|next|plan|system|where|produces|concept|start|stop|done|decline|promote|import|triage|note|decision|log|spec|audit|audit-prompt|handoff|merge-ready> ...';
+const USAGE = 'usage: npm run tasks -- <doctor|add|edit|show|list|search|next|roadmap|plan|system|where|produces|concept|start|stop|done|decline|promote|import|triage|note|decision|log|spec|audit|audit-prompt|handoff|merge-ready> ...';
 
 interface Command {
   usage: string;
@@ -63,6 +64,7 @@ const COMMANDS: Record<string, Command> = {
   produces: { usage: 'usage: tasks produces <term>  (does anything already do this — searched over registered concepts and every `produces` claim any task ever made, closed ones included)', run: cmdProduces },
   concept: { usage: 'usage: tasks concept "<system>" "<name>" --paths a.ts,b/ [--note "where the name came from"]  (registers a capability so `tasks produces` can find it)', run: cmdConcept },
   next: { usage: 'usage: tasks next [--spec <slug>] [--system "<name>"] [--severity high|medium|low] [--full]', run: cmdNext },
+  roadmap: { usage: 'usage: tasks roadmap  (the deferred backlog from main: store counts, the unblocked topics ordered by what they unblock, and a counted footer for everything left out)', run: cmdRoadmap },
   start: { usage: `usage: tasks start <id> ${ACTOR_USAGE}`, run: cmdStart },
   stop: { usage: `usage: tasks stop <id> ${ACTOR_USAGE}`, run: cmdStop },
   done: { usage: `usage: tasks done <id>... [--commit <revspec>] ${ACTOR_USAGE}  (default: none — the closing commit does not exist yet when \`done\` runs; see \`tasks show\` for a derived one)`, run: cmdDone },
