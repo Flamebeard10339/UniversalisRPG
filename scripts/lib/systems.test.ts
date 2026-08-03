@@ -119,6 +119,16 @@ describe('owningSystem', () => {
     expect(owningSystem(nested, 'src/runtime/save.ts')).toBe('Outer');
   });
 
+  // `bestClaim` takes the most specific of a *single* system's own paths, and
+  // that only decides anything when one system declares two overlapping
+  // regions. Here the broad claim would lose to the rival and the exact one
+  // must win it back, so taking the least specific of the two is visible.
+  it('judges a system by its most specific claim, not its broadest, when it declares both', () => {
+    const m = manifestOf([system('Owner', ['src', 'src/runtime/combat.ts']), system('Rival', ['src/runtime'])]);
+    expect(owningSystem(m, 'src/runtime/combat.ts')).toBe('Owner');
+    expect(owningSystem(m, 'src/runtime/travel.ts')).toBe('Rival');
+  });
+
   it('breaks an exact tie without consulting manifest order, and says who it tied with', () => {
     const [a, b] = [system('Zeta', ['src/runtime']), system('Alpha', ['src/runtime'])];
     expect(owningSystem(manifestOf([a, b]), 'src/runtime/save.ts')).toBe('Alpha');
