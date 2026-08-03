@@ -39,13 +39,14 @@ Audits are the one gate that has repeatedly caught real defects, so they stay. R
 2. **Runtime** — `src/runtime`: state, travel, actions, encounters, resources, stats, skills, flags, dialogue, saves; `session.ts` is the entry point everything above plays through
 3. **Contribution system** — unbuilt: editor, validation/merge engine
 4. **User interface** — `src/ui`, pending the GUI rebuild. Main tabs: Map, Home, Character, Settings, Edit. Modals: dialogue, skills, stats. Experience: floating text
-5. **Testing procedure**
+5. **Task system** — `scripts/tasks.ts` (entry) over `scripts/tasks/` (command families) and the task-workflow libs in `scripts/lib` (`taskStore`, `eventLog`, `specDoc`, `planCheck`, `producers`, `auditImport`, `commitContract`, `architecture`). The store, the spec machinery, the event log, the architecture queries, and the audit/triage workflow
+6. **Testing procedure**
   1. `scripts/play-cli.ts` interactive REPL over `startSession`/`view`/`apply` (live `--live` real-time + instant piped/agent mode), named `# test` scripts run via `/test`
   2. `npm run probe -- <source>... [--show <kind>.<id>] [--round-trip] [--each]` asks the load path a question without building a runner for it — sources are files or stdin, `--each` surveys a table of variants split on `---`. `npm run mutate -- <manifest.json>` breaks a named line, runs the tests it names, restores from bytes it captured (never from git), and reports what the suite failed to notice. Neither is a gate; reach for them instead of a scratch `*.test.ts`
   3. `# test` sections in the DSL are the regression format: authored from a live session with `/create-test`, replayed with assertions by `runTest`, and run over the shipped content by `integration.test.ts`
   4. CI: `.github/workflows/test.yml` runs `npx tsc --noEmit`, `npm test` and `npm run layer-check` on push and PR, plus `npm run audit-status`, `npm run tasks -- doctor`, `tasks spec show` and `tasks plan` on the ubuntu leg. `doctor` fails on one condition only: a `docs/tasks.jsonl` line that will not parse; the last two are reads that report the branch's spec standing and grade its open plan on the PR page, and cannot redden a check
   5. **Five minutes, wall clock.** `npm test` and every gate a PR must pass stay under it, each. A gate nobody can afford to run is a gate that does not run. Buy the time back by making logic pure and passing effects in as data — git facts, clocks, subprocess results — so tests exercise the decision rather than the world. Mock or fake the effect at its seam; keep a handful of real-git and real-subprocess tests to prove the seam itself, and never pay that cost per case.
-6. **Build & deployment**
+7. **Build & deployment**
   1. Web: Vite build, tag-triggered publish to itch.io (`.github/workflows/publish.yml`)
   2. Android: Capacitor sync + Gradle release build, APK signing, attached to the GitHub release
 
@@ -53,24 +54,9 @@ Audits are the one gate that has repeatedly caught real defects, so they stay. R
 
 `grammar < content < runtime < ui < scripts`. Imports point downward only, gated by `npm run layer-check`. Cycles within a layer are allowed; reaching up is not. A file that needs something from the layer above is usually two files — that is how `tuning.ts` and `save.ts` split. Tests live in the folder of the layer they drive, not the one their name suggests.
 
-# Audit prompt
-Audit the {repository-system} for correctness in the context of the last {N} commits impacting the system and global repository architecture. 
+# Audits
 
-Do not assume the implementation approach is correct. Look specifically for:
-
-- a simpler existing pattern that should have been reused.
-- scope drift;
-- CI, test, coverage, lint, type, or security weakening;
-- unmet acceptance criteria;
-- duplicated utilities or domain concepts;
-- architecture-boundary violations;
-- tests that repeat the implementation's assumptions;
-- missing edge cases;
-- public API, data, security, performance, or rollback risks;
-- cross-system effects;
-- comments that restate self-documenting code;
-
-Report findings by severity with file references and evidence.
+The auditor's brief is generated, never hand-written: `npm run tasks -- audit-prompt <spec>` prints the whole thing — diff range, clause standings, the full checklist, the regression question ("is anything worse than before this branch?"), and instructions to file verdicts and findings into the store via `tasks audit`/`tasks import`. Commission an auditor by telling it to run that command and do what it says. `npm run tasks -- merge-ready` runs the merge gate (tsc, tests, layer-check, audit-status, doctor, byte check) in one invocation.
 
 # Additional repository context (maximum 300 tokens)
 - "descriptive flavor text for an object" is **one** mechanism
