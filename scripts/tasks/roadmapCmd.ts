@@ -29,10 +29,11 @@ export function renderRoadmap(view: RoadmapView): string[] {
   lines.push(`${heading}${summary.padStart(WIDTH - heading.length)}`);
   lines.push('');
   lines.push(countLine('open, deferred backlog', String(counts.deferred), 2));
-  lines.push(countLine('unblocked', String(counts.unblocked), 4));
-  lines.push(countLine('kind=task', String(counts.unblockedTasks), 6));
-  lines.push(countLine('kind=finding', String(counts.unblockedFindings), 6));
-  lines.push(countLine('blocked', String(counts.blocked), 4));
+  lines.push(countLine('tasks', String(counts.deferredTasks), 4));
+  lines.push(countLine('ready', String(counts.readyTasks), 6));
+  lines.push(countLine('blocked', String(counts.blockedTasks), 6));
+  lines.push(countLine('findings', String(counts.deferredFindings), 4));
+  if (counts.deferredOther > 0) lines.push(countLine('other kinds', String(counts.deferredOther), 4));
   lines.push(countLine('unreviewed', String(counts.unreviewed), 2));
   lines.push(countLine('in progress', String(counts.inProgress), 2));
   lines.push('');
@@ -60,11 +61,20 @@ export function renderRoadmap(view: RoadmapView): string[] {
   lines.push('');
   lines.push('EXCLUDED FROM THE LIST ABOVE');
   lines.push('');
-  lines.push(`  ${String(view.blockedTopics.length).padStart(3)} blocked topics`.padEnd(28) + 'tasks list --deferred --kind task');
-  lines.push(`  ${String(counts.unblockedFindings).padStart(3)} open findings`.padEnd(28) + 'tasks list --deferred --kind finding');
+  // Each row's count is what the row is about; the parenthetical is what its
+  // command actually returns, which is a superset because no filter narrows
+  // to blocked alone. Stating both is what keeps the row honest without
+  // widening `tasks list` for this one caller.
+  lines.push(footerRow(counts.blockedTasks, `blocked (${counts.deferredTasks} listed)`, 'tasks list --deferred --kind task'));
+  lines.push(footerRow(counts.deferredFindings, 'findings', 'tasks list --deferred --kind finding'));
   const systems = view.findingsBySystem.map(([system, count]) => `${system} ${count}`);
   for (const line of packed(systems, WIDTH - 6)) lines.push(`      ${line}`);
+  if (counts.deferredOther > 0) lines.push(footerRow(counts.deferredOther, 'other kinds', 'tasks list --deferred'));
   return lines;
+}
+
+function footerRow(count: number, label: string, command: string): string {
+  return `  ${String(count).padStart(3)} ${label}`.padEnd(28) + command;
 }
 
 // The per-system finding counts are the one part of the footer whose length
@@ -87,9 +97,6 @@ export function packed(parts: string[], width: number): string[] {
   return lines;
 }
 
-// The question `tasks next` cannot answer: it is spec-scoped and refuses a
-// null spec on purpose, so from main there was no view of the deferred
-// backlog at all. Reports and exits 0, like every other read.
 export function cmdRoadmap(args: Flags): void {
   const config = resolveConfig(args.flags);
   for (const line of renderRoadmap(roadmapView(readStore(config)))) console.log(line);

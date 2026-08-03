@@ -1,4 +1,4 @@
-import { isBlocked, severityRank, waitingOn, type Task } from './taskStore';
+import { isBlocked, listQueue, severityRank, waitingOn, type Task } from './taskStore';
 
 export interface RoadmapCounts {
   total: number;
@@ -7,10 +7,11 @@ export interface RoadmapCounts {
   open: number;
   heldBySpec: number;
   deferred: number;
-  unblocked: number;
-  unblockedTasks: number;
-  unblockedFindings: number;
-  blocked: number;
+  deferredTasks: number;
+  readyTasks: number;
+  blockedTasks: number;
+  deferredFindings: number;
+  deferredOther: number;
 }
 
 export interface Waiter {
@@ -26,7 +27,9 @@ export interface RoadmapTopic {
 export interface RoadmapView {
   counts: RoadmapCounts;
   topics: RoadmapTopic[];
-  blockedTopics: Task[];
+  blockedTasks: Task[];
+  findings: Task[];
+  other: Task[];
   findingsBySystem: Array<[system: string, count: number]>;
 }
 
@@ -46,22 +49,24 @@ function waiterIndex(tasks: Task[]): Map<string, Task[]> {
   return index;
 }
 
-// The deferred backlog is `open` with no spec: vetted work that no branch has
-// claimed. `tasks next` deliberately refuses to read a null spec as this
-// query, so it is computed here rather than borrowed from fixNowQueue.
 export function roadmapView(tasks: Task[]): RoadmapView {
   const byId = new Map(tasks.map((task) => [task.id, task]));
   const order = new Map(tasks.map((task, index) => [task.id, index]));
-  const open = tasks.filter((task) => task.state === 'open');
-  const deferred = open.filter((task) => task.spec === null);
-  const unblocked = deferred.filter((task) => !isBlocked(task, byId));
-  const blocked = deferred.filter((task) => isBlocked(task, byId));
+  const deferred = listQueue(tasks, { deferred: true });
   const waiters = waiterIndex(tasks);
 
-  const unblockedTasks = unblocked.filter((task) => task.kind === 'task');
-  const unblockedFindings = unblocked.filter((task) => task.kind === 'finding');
+  // Three groups partitioning the deferred backlog, so every record lands in
+  // the body or in exactly one footer row. Splitting on kind first and on
+  // blockedness second is what makes that true: grouping the other way put a
+  // blocked finding in neither, which is the shape of hole this view exists
+  // to not have.
+  const deferredTasks = deferred.filter((task) => task.kind === 'task');
+  const findings = deferred.filter((task) => task.kind === 'finding');
+  const other = deferred.filter((task) => task.kind !== 'task' && task.kind !== 'finding');
+  const readyTasks = deferredTasks.filter((task) => !isBlocked(task, byId));
+  const blockedTasks = deferredTasks.filter((task) => isBlocked(task, byId));
 
-  const topics: RoadmapTopic[] = unblockedTasks
+  const topics: RoadmapTopic[] = readyTasks
     .map((task) => ({
       task,
       unblocks: (waiters.get(task.id) ?? []).map((waiter) => ({
@@ -77,11 +82,12 @@ export function roadmapView(tasks: Task[]): RoadmapView {
     );
 
   const perSystem = new Map<string, number>();
-  for (const finding of unblockedFindings) {
+  for (const finding of findings) {
     const system = finding.system ?? '(no system)';
     perSystem.set(system, (perSystem.get(system) ?? 0) + 1);
   }
 
+  const open = tasks.filter((task) => task.state === 'open');
   return {
     counts: {
       total: tasks.length,
@@ -90,13 +96,16 @@ export function roadmapView(tasks: Task[]): RoadmapView {
       open: open.length,
       heldBySpec: open.length - deferred.length,
       deferred: deferred.length,
-      unblocked: unblocked.length,
-      unblockedTasks: unblockedTasks.length,
-      unblockedFindings: unblockedFindings.length,
-      blocked: blocked.length,
+      deferredTasks: deferredTasks.length,
+      readyTasks: readyTasks.length,
+      blockedTasks: blockedTasks.length,
+      deferredFindings: findings.length,
+      deferredOther: other.length,
     },
     topics,
-    blockedTopics: blocked.filter((task) => task.kind === 'task'),
+    blockedTasks,
+    findings,
+    other,
     findingsBySystem: [...perSystem].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])),
   };
 }

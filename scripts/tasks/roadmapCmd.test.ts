@@ -69,10 +69,37 @@ describe('renderRoadmap', () => {
 
   it('gives every excluded group a count and a command that expands it', () => {
     const text = render([task({ id: 'a' }), task({ id: 'blocked-one', requires: ['a'] }), task({ id: 'debt', kind: 'finding' })]).join('\n');
-    expect(text).toContain('1 blocked topics');
+    expect(text).toContain('1 blocked (2 listed)');
     expect(text).toContain('tasks list --deferred --kind task');
-    expect(text).toContain('1 open findings');
+    expect(text).toContain('1 findings');
     expect(text).toContain('tasks list --deferred --kind finding');
+  });
+
+  // The row counts what it is about; the parenthetical warns that its
+  // command returns the ready tasks too. Both numbers have to be printed or
+  // the row promises a list it does not produce.
+  it('states what its command returns alongside what the row counts', () => {
+    const tasks = [task({ id: 'gate' }), task({ id: 'also-ready' }), task({ id: 'waiting', requires: ['gate'] })];
+    const row = render(tasks).find((line) => line.includes('listed'));
+    expect(row).toContain('1 blocked (3 listed)');
+    expect(row).toContain('tasks list --deferred --kind task');
+  });
+
+  it('shows a blocked finding in the footer instead of losing it between the rows', () => {
+    const text = render([task({ id: 'gate' }), task({ id: 'held-defect', kind: 'finding', system: 'Runtime', requires: ['gate'] })]).join('\n');
+    expect(text).toContain('1 findings');
+    expect(text).toContain('Runtime 1');
+    expect(text).toContain('0 blocked');
+  });
+
+  it('gives a kind that is neither task nor finding its own footer row', () => {
+    const text = render([task({ id: 'q', kind: 'question' }), task({ id: 'u', kind: 'undelivered' })]).join('\n');
+    expect(text).toContain('2 other kinds');
+    expect(text).toMatch(/other kinds\s+2$/m);
+  });
+
+  it('leaves the other-kinds row out entirely when there are none', () => {
+    expect(render([task({ id: 'a' })]).join('\n')).not.toContain('other kinds');
   });
 
   it('says so plainly when nothing is ready rather than printing an empty body', () => {

@@ -45,8 +45,29 @@ describe('roadmapView', () => {
   it('never offers a finding as a topic, and counts it instead', () => {
     const view = roadmapView([task({ id: 'a-defect', kind: 'finding', system: 'Runtime' })]);
     expect(view.topics).toEqual([]);
-    expect(view.counts.unblockedFindings).toBe(1);
+    expect(view.counts.deferredFindings).toBe(1);
     expect(view.findingsBySystem).toEqual([['Runtime', 1]]);
+  });
+
+  it('counts a blocked finding with the findings, not out of the view entirely', () => {
+    const view = roadmapView([task({ id: 'gate' }), task({ id: 'held-defect', kind: 'finding', system: 'Runtime', requires: ['gate'] })]);
+    expect(view.counts.deferredFindings).toBe(1);
+    expect(view.findingsBySystem).toEqual([['Runtime', 1]]);
+    expect(view.blockedTasks).toEqual([]);
+  });
+
+  it('partitions the deferred backlog, so no record falls between the body and the footer', () => {
+    const tasks = [
+      task({ id: 'ready' }),
+      task({ id: 'blocked-task', requires: ['ready'] }),
+      task({ id: 'finding', kind: 'finding' }),
+      task({ id: 'blocked-finding', kind: 'finding', requires: ['ready'] }),
+      task({ id: 'a-question', kind: 'question' }),
+      task({ id: 'undelivered-clause', kind: 'undelivered' }),
+    ];
+    const { counts } = roadmapView(tasks);
+    expect(counts.readyTasks + counts.blockedTasks + counts.deferredFindings + counts.deferredOther).toBe(counts.deferred);
+    expect(counts.deferredOther).toBe(2);
   });
 
   it('orders by how many live records the topic unblocks, before severity', () => {
@@ -100,17 +121,18 @@ describe('roadmapView', () => {
       open: 4,
       heldBySpec: 1,
       deferred: 3,
-      unblocked: 2,
-      unblockedTasks: 1,
-      unblockedFindings: 1,
-      blocked: 1,
+      deferredTasks: 2,
+      readyTasks: 1,
+      blockedTasks: 1,
+      deferredFindings: 1,
+      deferredOther: 0,
     });
   });
 
   it('reads a requirement nothing in the store answers as still blocking', () => {
     const view = roadmapView([task({ id: 'orphan', requires: ['never-filed'] })]);
     expect(view.topics).toEqual([]);
-    expect(view.counts.blocked).toBe(1);
+    expect(view.counts.blockedTasks).toBe(1);
   });
 
   it('releases a topic whose only requirement was declined', () => {
