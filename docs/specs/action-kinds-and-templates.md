@@ -25,7 +25,7 @@ The cadence table, whole:
 literal **or** a stat id, read live against whoever is swinging. Any cadence value must be positive:
 a zero span is `instant`, and that is the error's wording.
 
-## Proof
+Proof:
 
 - [c1] An action carries a kind. `instant` and `continuous` are bare tags; an untagged action is
   `duration`. `Action.kind` is what the runtime reads to decide re-arming, and the authored
