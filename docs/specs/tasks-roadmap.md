@@ -64,3 +64,19 @@ which the body reads as "24 things exist" rather than "24 of 73".
 ## Open questions
 
 None.
+
+## Audit passes
+
+### Pass 1 — 2026-08-03
+
+- base: `dcc8574001b06b5c89516f8a9afcefa8ce64163b`
+- head: `2a6966f6ea3e63128ab0ab2b12bf3cd089cebb2c`
+- proof 1: met — `npm run tasks -- roadmap` prints header, body and footer in one invocation with no flags; cmdRoadmap takes no arguments and only console.logs. Mutation 'the header counts vanish' is KILLED by scripts/tasks/roadmapCmd.test.ts.
+- proof 2: met — roadmapView takes listQueue(tasks, {deferred:true}) — open && spec===null — then kind==='task' then !isBlocked. Three mutations all KILLED against roadmap.test.ts + roadmapCmd.test.ts: widening the kind filter (7 failures), dropping the isBlocked filter (6), dropping the deferred filter (3). Tests 'offers only deferred, open, unblocked tasks as topics' and 'never offers a finding as a topic' are the direct proof.
+- proof 3: met — Four ordering mutations all KILLED against scripts/lib/roadmap.test.ts: zeroing the fan-out comparator, zeroing the severity tiebreak, counting done/declined records as waiters (LIVE_STATES), and leaving the topic itself in alsoWaitsOn. Live output agrees — droptables (fan-out 2) leads and reads 'unblocks archetype-mods (also waits on buffs-generalized)'.
+- proof 4: met — Test 'partitions the deferred backlog, so no record falls between the body and the footer' asserts readyTasks+blockedTasks+deferredFindings+deferredOther === deferred, so every excluded record is in exactly one footer row; deleting the other-kinds row is KILLED. Every footer command returns a superset containing its row's records, so a reader reaches any excluded record. Residual filed as a low finding on the other-kinds row.
+- proof 5: met — Measured over the shipped store: renderRoadmap(roadmapView(parseStore(docs/tasks.jsonl))) is 50 lines, max width exactly 78, 0 over. Mutations 'fit wraps instead of truncating' (3 failures) and 'the waiter line stops being fitted' (1) both KILLED by roadmapCmd.test.ts. Residual filed as a low finding: packed() overflows rather than truncating a single overlong part.
+- proof 6: met — roadmapView is Task[] -> RoadmapView with no effects; grep for readFile/writeFile/node:fs/node:child_process/Date/Math.random/process./execSync/tasks.jsonl over roadmap.ts, roadmap.test.ts, roadmapCmd.ts and roadmapCmd.test.ts returns nothing. Both test files build records from a local task() factory. The only import is taskStore for isBlocked/listQueue/severityRank/waitingOn.
+- proof 7: met — git diff dcc8574..2a6966f touches 10 files; the only taskStore.ts change is adding `export` to severityRank — the Task interface is untouched. No new data file, no second store, no .github change. cmdRoadmap sets no exit code and throws nothing. `npm run tasks -- merge-ready`: every leg passed (tsc, npm test, layer-check, audit-status, doctor, bytes).
+- proof 8: unmet — Sixteen task titles shortened, no finding retitled — the rule c8 sets. But gui-rebuild lost a fact the record does not otherwise hold: 'Make the thin RPG GUI work again, a thin wrapper over CLI commands, designed for mobile' became 'Rebuild the GUI over the CLI', deliverable is null, and evidence names only the placeholder and what it blocks. `grep -c mobile docs/tasks.jsonl` is 0. Filed as a finding.
+- proof 9: met — `npm test` on this branch: 54 files, 1343 tests, all passing, Duration 63.23s — a fifth of the budget. The two new test files add 24 in-memory cases with no fs or subprocess cost.
