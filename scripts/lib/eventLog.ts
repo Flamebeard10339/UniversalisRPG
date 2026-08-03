@@ -4,7 +4,7 @@ import path from 'node:path';
 // The verbs that write, plus the two writes that exist only to be recorded.
 // `decision` is its own op rather than a note by convention, because "what
 // was decided about this" has to be answerable without a text heuristic.
-export const EVENT_OPS = ['add', 'edit', 'start', 'stop', 'done', 'decline', 'triage', 'import', 'audit', 'spec-add', 'spec-remove', 'spec-defer', 'doctor-fix', 'note', 'decision'] as const;
+export const EVENT_OPS = ['add', 'edit', 'start', 'stop', 'done', 'decline', 'triage', 'import', 'audit', 'spec-add', 'spec-remove', 'spec-defer', 'spec-done', 'doctor-fix', 'note', 'decision'] as const;
 
 export type EventOp = (typeof EVENT_OPS)[number];
 

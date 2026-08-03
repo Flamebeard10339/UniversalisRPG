@@ -288,8 +288,8 @@ describe('tasks CLI', () => {
   // through two audits.
   it('refuses five junk arguments on every bounded command surface', () => {
     fixture(({ tasks }) => {
-      const unbounded = new Set(['spec add', 'spec remove', 'plan']);
-      const surfaces = [['doctor'], ['add'], ['edit'], ['show'], ['list'], ['search'], ['next'], ['start'], ['stop'], ['done'], ['decline'], ['import'], ['triage'], ['audit'], ['audit-prompt'], ['handoff'], ['check-commit-msg'], ['plan'], ['spec'], ['spec', 'new'], ['spec', 'add'], ['spec', 'remove'], ['spec', 'show'], ['spec', 'done'], ['note'], ['decision'], ['log']];
+      const unbounded = new Set(['spec add', 'spec remove', 'plan', 'done', 'decline', 'promote']);
+      const surfaces = [['doctor'], ['add'], ['edit'], ['show'], ['list'], ['search'], ['next'], ['start'], ['stop'], ['done'], ['decline'], ['promote'], ['import'], ['triage'], ['audit'], ['audit-prompt'], ['handoff'], ['check-commit-msg'], ['plan'], ['spec'], ['spec', 'new'], ['spec', 'add'], ['spec', 'remove'], ['spec', 'show'], ['spec', 'done'], ['note'], ['decision'], ['log'], ['merge-ready']];
       for (const surface of surfaces) {
         const name = surface.join(' ');
         const result = tasks(...surface, 'j1', 'j2', 'j3', 'j4', 'j5');
@@ -317,7 +317,7 @@ describe('tasks CLI', () => {
 
   it('answers --help on every command and subcommand, and names the flags it will accept', () => {
     fixture(({ tasks }) => {
-      const commands = [['doctor'], ['add'], ['edit'], ['show'], ['list'], ['search'], ['next'], ['start'], ['stop'], ['done'], ['decline'], ['import'], ['triage'], ['audit'], ['audit-prompt'], ['handoff'], ['check-commit-msg'], ['plan'], ['spec'], ['spec', 'new'], ['spec', 'add'], ['spec', 'remove'], ['spec', 'show'], ['spec', 'done'], ['note'], ['decision'], ['log']];
+      const commands = [['doctor'], ['add'], ['edit'], ['show'], ['list'], ['search'], ['next'], ['start'], ['stop'], ['done'], ['decline'], ['promote'], ['import'], ['triage'], ['audit'], ['audit-prompt'], ['handoff'], ['check-commit-msg'], ['plan'], ['spec'], ['spec', 'new'], ['spec', 'add'], ['spec', 'remove'], ['spec', 'show'], ['spec', 'done'], ['note'], ['decision'], ['log'], ['merge-ready']];
       for (const command of commands) {
         const result = tasks(...command, '--help');
         expect(result.status, command.join(' ')).toBe(0);
@@ -449,27 +449,44 @@ describe('tasks CLI', () => {
     });
   });
 
-  it('edit refuses an unknown id, naming the nearest ids it could have meant', () => {
+  it('edit resolves a unique prefix, names the resolution, and refuses an ambiguous or unknown fragment', () => {
     fixture(({ tasks }) => {
       tasks('add', 'check the merge shell', '--id', 'pass1-check-merge-shell');
-      const result = tasks('edit', 'pass1-check-merge', '--deliverable', 'x');
-      expect(result.status).toBe(1);
-      expect(result.stderr).toContain('no such task: pass1-check-merge');
-      expect(result.stderr).toContain('did you mean:');
-      expect(result.stderr).toContain('pass1-check-merge-shell');
+      tasks('add', 'check the merge gate', '--id', 'pass1-check-merge-gate');
+
+      // Unique fragment: resolves, says so, and the edit lands.
+      const resolvedEdit = tasks('edit', 'pass1-check-merge-shell', '--deliverable', 'x');
+      expect(resolvedEdit.status).toBe(0);
+      const prefix = tasks('edit', 'pass1-check-merge-g', '--deliverable', 'y');
+      expect(prefix.status).toBe(0);
+      expect(prefix.stdout).toContain('resolved pass1-check-merge-g -> pass1-check-merge-gate');
+      expect(tasks('show', 'pass1-check-merge-gate').stdout).toContain('deliverable: y');
+
+      // Ambiguous: refused with the candidates, nothing edited.
+      const ambiguous = tasks('edit', 'pass1-check-merge', '--deliverable', 'z');
+      expect(ambiguous.status).toBe(1);
+      expect(ambiguous.stderr).toContain('matches 2 ids');
+      expect(ambiguous.stderr).toContain('pass1-check-merge-shell');
+      expect(ambiguous.stderr).toContain('pass1-check-merge-gate');
+
+      // Unknown: refused with the near matches.
+      const unknown = tasks('edit', 'zzz-nothing', '--deliverable', 'z');
+      expect(unknown.status).toBe(1);
+      expect(unknown.stderr).toContain('no such task: zzz-nothing');
     });
   });
 
-  it('show answers an unknown id with near matches and a zero exit, rather than refusing a read', () => {
+  it('show resolves a unique fragment to the record, and answers a truly unknown id at exit zero', () => {
     fixture(({ tasks }) => {
       tasks('add', 'check the merge shell', '--id', 'pass1-check-merge-shell');
       tasks('add', 'something else entirely', '--id', 'unrelated-record');
 
+      // The exact friction case: a truncated paste of a long id now resolves.
       const guessed = tasks('show', 'pass1-check-merge-shel');
       expect(guessed.status).toBe(0);
       expect(guessed.stderr).toBe('');
-      expect(guessed.stdout).toContain('no such task: pass1-check-merge-shel');
-      expect(guessed.stdout).toContain('pass1-check-merge-shell');
+      expect(guessed.stdout).toContain('resolved pass1-check-merge-shel -> pass1-check-merge-shell');
+      expect(guessed.stdout).toContain('check the merge shell');
       expect(guessed.stdout).not.toContain('unrelated-record');
     });
   });
@@ -1321,11 +1338,14 @@ describe('tasks CLI', () => {
     });
   });
 
-  // The failure this branch exists to prevent: a `done` mark that only ever
-  // existed in the working tree is invisible to `git show HEAD:...`, so a
-  // `closedCommit` field (which lives in the same file) can never detect it.
-  // Only comparing the committed store against the working tree can.
-  it('doctor reports a working-tree-only done mark as an error naming the task and its committed state', () => {
+  // A `done` mark that only ever existed in the working tree is invisible
+  // to `git show HEAD:...`, so a `closedCommit` field (which lives in the
+  // same file) can never detect it. Only comparing the committed store
+  // against the working tree can. It reports at [warning]: between `tasks
+  // done` and the commit that carries the store change this is the
+  // documented order of work, and an error that fires on the correct
+  // workflow trains readers to skip errors.
+  it('doctor reports a working-tree-only done mark as a warning naming the task, its committed state, and the risk', () => {
     defaultStoreGitFixture(({ dir, tasks }) => {
       tasks('add', 'closable task', '--id', 'closable');
       spawnSync('git', ['add', '.'], { cwd: dir });
@@ -1334,11 +1354,11 @@ describe('tasks CLI', () => {
       tasks('done', 'closable');
       const result = tasks('doctor');
       expect(result.status).toBe(0);
-      expect(result.stdout).toContain('[error] closable is done only in the working tree (committed state: open)');
+      expect(result.stdout).toContain('[warning] closable is done only in the working tree (committed state: open) — commit the store change');
     });
   });
 
-  it('doctor reports a working-tree-only declined mark as an error', () => {
+  it('doctor reports a working-tree-only declined mark as a warning', () => {
     defaultStoreGitFixture(({ dir, tasks }) => {
       tasks('add', 'stale finding', '--id', 'stale', '--kind', 'finding', '--deliverable', 'fix it');
       spawnSync('git', ['add', '.'], { cwd: dir });
@@ -1347,7 +1367,7 @@ describe('tasks CLI', () => {
       tasks('decline', 'stale', '--reason', 'already fixed elsewhere');
       const result = tasks('doctor');
       expect(result.status).toBe(0);
-      expect(result.stdout).toContain('[error] stale is declined only in the working tree (committed state: unreviewed)');
+      expect(result.stdout).toContain('[warning] stale is declined only in the working tree (committed state: unreviewed) — commit the store change');
     });
   });
 
@@ -1989,10 +2009,34 @@ describe('tasks CLI', () => {
     fixture(({ tasks, dir }) => {
       const specPath = path.join(dir, 'specs', 'demo-spec.md');
       writeFileSync(specPath, '# Demo spec\n\n## Deliverable\n\nSomething this branch promises.\n', 'utf8');
-      const result = tasks('audit', 'demo-spec', '--finding', 'something is broken', '--severity', 'low', '--system', 'Runtime', '--deliverable', 'fix it', '--evidence', 'observed live');
+      const result = tasks('audit', 'demo-spec', '--proof', '1=met', '--evidence', '1=checked');
       expect(result.status).toBe(0);
       expect(result.stderr).toContain('has no Proof: clauses');
       expect(readFileSync(specPath, 'utf8')).toContain('### Pass 1');
+    });
+  });
+
+  // The verdict-wiping trap, closed: filing findings used to append a pass
+  // that graded nothing, and the standing reads from the latest pass only —
+  // so recorded verdicts were reset to unknown by the act of filing, twice,
+  // on the branch that recorded the friction.
+  it('audit with findings and no proofs files the findings without appending a pass, so verdicts stand', () => {
+    fixture(({ tasks, dir }) => {
+      const specPath = path.join(dir, 'specs', 'demo-spec.md');
+      tasks('audit', 'demo-spec', '--proof', '1=met', '--evidence', '1=clause 1 checked', '--proof', '2=met', '--evidence', '2=clause 2 checked');
+      const before = readFileSync(specPath, 'utf8');
+
+      const result = tasks('audit', 'demo-spec', '--finding', 'a late finding', '--severity', 'low', '--system', 'Runtime', '--deliverable', 'fix it', '--evidence', 'observed live');
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('no pass appended, so recorded clause verdicts stand');
+      expect(readFileSync(specPath, 'utf8')).toBe(before);
+      expect(readFileSync(specPath, 'utf8')).not.toContain('### Pass 2');
+
+      const standing = tasks('spec', 'show', 'demo-spec');
+      expect(standing.stdout).toContain('clause standing (latest pass 1): no clause outstanding');
+
+      const filed = tasks('list', '--state', 'unreviewed');
+      expect(filed.stdout).toContain('a late finding');
     });
   });
 
@@ -2239,12 +2283,18 @@ describe('tasks CLI', () => {
       expect(result.status).toBe(0);
       expect(result.stdout).toContain('You are auditing demo-spec on branch demo-spec.');
 
-      expect(result.stdout).toContain('Required commands (all must pass):');
-      expect(result.stdout).toContain('- npm test');
-      expect(result.stdout).toContain('- npx tsc --noEmit');
-      expect(result.stdout).toContain('- npm run layer-check');
-      expect(result.stdout).toContain('- npm run tasks -- doctor');
-      expect(result.stdout).not.toContain('--merge');
+      expect(result.stdout).toContain('Required commands (all must pass; `npm run tasks -- merge-ready` runs them together):');
+      expect(result.stdout).toContain('- npm run tasks -- merge-ready');
+
+      // The checklist and the regression question live in the generated
+      // prompt, not in CLAUDE.md — a hand-copied brief is what trained
+      // agents to fabricate their own.
+      expect(result.stdout).toContain('Is anything worse than before this branch?');
+      expect(result.stdout).toContain('scope drift;');
+      expect(result.stdout).toContain('tests that repeat the implementation\'s assumptions;');
+      expect(result.stdout).toContain('comments that restate self-documenting code;');
+      expect(result.stdout).toContain('Deliver your results into the store');
+      expect(result.stdout).toContain('files the findings without recording a pass');
 
       // Under the header, not merely somewhere in the output: this path
       // also prints under `Member tasks:`, so a `toContain` on the path
@@ -2269,7 +2319,7 @@ describe('tasks CLI', () => {
       expect(result.stdout).toContain('Latest audit pass: pass 1');
       expect(result.stdout).toContain('- runtime-proof  [task/open/high]  Runtime  prove the runtime behavior');
       expect(result.stdout).toContain('src/runtime/runtime.ts:1');
-      expect(result.stdout).toContain('prefer mutation testing');
+      expect(result.stdout).toContain('npm run mutate');
       // The prompt must not instruct an auditor in a rule the tool does not
       // have. Promotion at pass 2+ was removed from the tool; the prompt
       // asked for it anyway, on every invocation, for every future auditor.
@@ -2391,8 +2441,22 @@ describe('tasks CLI', () => {
       expect(undelivered.stdout).toContain('spec: demo-spec');
       expect(undelivered.stdout).toContain('files: src/runtime/save.ts:88');
 
+      // Not a member — but no longer invisible either: the finding this
+      // spec's audit filed is listed in its own awaiting-triage section.
       const finding = tasks('spec', 'show', 'demo-spec');
-      expect(finding.stdout).not.toContain('a fresh bug'); // findings are not spec members until promoted
+      expect(finding.stdout).toContain('1 member(s):');
+      expect(finding.stdout).not.toContain('2 member(s)');
+      expect(finding.stdout).toContain("unreviewed finding(s) filed by this spec's audits, awaiting triage (not members):");
+      expect(finding.stdout).toContain('a fresh bug');
+
+      const listed = tasks('list', '--spec', 'demo-spec');
+      expect(listed.stdout).toContain('a fresh bug');
+      expect(listed.stdout).toContain("(filed by this spec's audit — awaiting triage)");
+
+      // next reports the count but never offers a finding as work.
+      const next = tasks('next', '--spec', 'demo-spec');
+      expect(next.stdout).toContain("1 unreviewed finding(s) filed by demo-spec's audits await triage");
+      expect(next.stdout).not.toContain('a fresh bug');
     });
   });
 
