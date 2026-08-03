@@ -7,10 +7,12 @@ import { TagClause } from '../grammar/tagClause';
 import { Quantified } from '../grammar/values';
 import { Dialogue, TextSegment } from './dialogue';
 import { Entity } from './entity';
+import { EntityType } from './entityType';
 import { Item } from './item';
 import { Location } from './location';
 import { Recipe } from './recipe';
 import { Registry } from './registry';
+import { sameValue } from './registryDiff';
 import { Resource } from './resource';
 import { ParsedSave } from './saveSection';
 import { Test, Directive } from './test';
@@ -138,15 +140,15 @@ function actionLines(action: Action): Lines {
     action.onSuccess?.length ||
     action.onFailure?.length ||
     action.onEscape?.length ||
+    (action.kind !== undefined && action.kind !== 'duration') ||
     action.time !== undefined ||
-    action.speed ||
+    action.rate !== undefined ||
     action.accuracy ||
     action.evasion ||
     action.ability ||
     action.target ||
     action.dr ||
     action.escapeAfter !== undefined ||
-    action.repeating ||
     action.retaliates;
 
   if (!modifiers && action.results.length === 1) return [`${action.label}: ${results(action.results)}`];
@@ -154,12 +156,15 @@ function actionLines(action: Action): Lines {
   const lines = [`${action.label}:`];
   if (action.requires) lines.push(`  requires: ${condition(action.requires)}`);
   if (action.hiddenIf) lines.push(`  hidden if: ${condition(action.hiddenIf)}`);
-  if (action.repeating) lines.push('  repeating');
+  if (action.kind !== undefined && action.kind !== 'duration') lines.push(`  ${action.kind}`);
   if (action.retaliates) lines.push('  retaliates');
-  const tags = (action.tags ?? []).filter((each) => each.kind !== 'keyword' || (each.value !== 'repeating' && each.value !== 'retaliates'));
+  // The tags the kind and the flags above already spell; re-emitting one would
+  // round-trip into a second copy of the same fact.
+  const lifted = new Set(['instant', 'continuous', 'retaliates']);
+  const tags = (action.tags ?? []).filter((each) => each.kind !== 'keyword' || !lifted.has(each.value));
   if (tags.length > 0) lines.push(`  ${tags.map(tag).join(', ')}`);
   if (action.time !== undefined) lines.push(`  time: ${n(action.time)}`);
-  if (action.speed) lines.push(`  speed: ${action.speed}`);
+  if (action.rate !== undefined) lines.push(`  rate: ${typeof action.rate === 'string' ? action.rate : n(action.rate)}`);
   if (action.accuracy) lines.push(`  accuracy: ${action.accuracy}`);
   if (action.evasion) lines.push(`  evasion: ${action.evasion}`);
   if (action.ability) lines.push(`  ability: ${action.ability}`);
@@ -236,14 +241,43 @@ function itemSection(moduleId: string, item: Item): string {
   return lines.join('\n');
 }
 
-function entitySection(moduleId: string, entity: Entity): string {
+function entityTypeSection(moduleId: string, entityType: EntityType): string {
+  const lines = [`# entitytype ${moduleLocalId(moduleId, entityType.id)}`];
+  for (const action of entityType.actions) lines.push(...actionLines(action));
+  return lines.join('\n');
+}
+
+// What the entity said about an action its template already defines: the fields
+// that differ, and nothing else. Printing the inherited ones back would make the
+// reload merge them onto the template a second time — which is a load error the
+// moment the entity changed the kind or the cadence — and would freeze the
+// entity against edits to the template it still claims to follow.
+function actionOverride(action: Action, inherited: Action): Lines {
+  const kept = Object.keys(action).filter((key) => key !== 'label' && !sameValue(action[key as keyof Action], inherited[key as keyof Action]));
+  if (kept.length === 0) return [];
+  const override: Record<string, unknown> = { label: action.label, results: [] };
+  for (const key of kept) override[key] = action[key as keyof Action];
+  return actionLines(override as unknown as Action);
+}
+
+function entitySection(moduleId: string, entity: Entity, template: EntityType | undefined): string {
   const lines = [`# entity ${moduleLocalId(moduleId, entity.id)}`];
+  if (entity.type) lines.push(`type: ${entity.type}`);
   titled(lines, entity);
   block(lines, 'stations', entity.capabilities);
   const stats = Object.entries(entity.stats).map(([statId, value]) => `${statId} ${range(value)}`);
   if (stats.length > 0) lines.push(`stats: ${stats.join(', ')}`);
   block(lines, 'flags', entity.flags);
-  for (const action of entity.actions) lines.push(...actionLines(action));
+
+  const inheritable = new Map((template?.actions ?? []).map((action) => [action.label, action]));
+  for (const action of entity.actions) {
+    const inherited = inheritable.get(action.label);
+    lines.push(...(inherited ? actionOverride(action, inherited) : actionLines(action)));
+  }
+  // A template action the entity no longer has was removed, and only `-label:`
+  // says so; without it the reload would inherit it straight back.
+  const held = new Set(entity.actions.map((action) => action.label));
+  for (const label of inheritable.keys()) if (!held.has(label)) lines.push(`-${label}:`);
   return lines.join('\n');
 }
 
@@ -272,7 +306,7 @@ function recipeSection(moduleId: string, recipe: Recipe): string {
   if (recipe.skill) lines.push(`skill: ${recipe.skill.skill} ${n(recipe.skill.amount)}`);
   if (recipe.say) lines.push(`say: ${recipe.say}`);
   if (recipe.time !== undefined) lines.push(`time: ${n(recipe.time)}`);
-  if (recipe.speed) lines.push(`speed: ${recipe.speed}`);
+  if (recipe.rate !== undefined) lines.push(`rate: ${typeof recipe.rate === 'string' ? recipe.rate : n(recipe.rate)}`);
   if (recipe.accuracy) lines.push(`accuracy: ${recipe.accuracy}`);
   if (recipe.evasion) lines.push(`evasion: ${recipe.evasion}`);
   block(lines, 'burnt', recipe.burnt.map(quantified));
@@ -344,7 +378,8 @@ export function serializeRegistryModule(registry: Registry, options: SerializeMo
   for (const stat of registry.stats.values()) if (inModule(moduleId, stat.id)) sections.push([`# stat ${moduleLocalId(moduleId, stat.id)}`, `title: ${stat.title}`, `base: ${range(stat.base)}`].join('\n'));
   for (const skill of registry.skills.values()) if (inModule(moduleId, skill.id)) sections.push([`# skill ${moduleLocalId(moduleId, skill.id)}`, `title: ${skill.title}`, ...(skill['stat-id'] ? [`stat-id: ${skill['stat-id']}`] : [])].join('\n'));
   for (const item of registry.items.values()) if (inModule(moduleId, item.id)) sections.push(itemSection(moduleId, item));
-  for (const entity of registry.entities.values()) if (inModule(moduleId, entity.id)) sections.push(entitySection(moduleId, entity));
+  for (const entityType of registry.entityTypes.values()) if (inModule(moduleId, entityType.id)) sections.push(entityTypeSection(moduleId, entityType));
+  for (const entity of registry.entities.values()) if (inModule(moduleId, entity.id)) sections.push(entitySection(moduleId, entity, entity.type ? registry.entityTypes.get(entity.type) : undefined));
   for (const location of registry.locations.values()) if (inModule(moduleId, location.id)) sections.push(locationSection(moduleId, location));
   for (const recipe of registry.recipes.values()) if (inModule(moduleId, recipe.id)) sections.push(recipeSection(moduleId, recipe));
   for (const resource of registry.resources.values()) if (inModule(moduleId, resource.id)) sections.push(resourceSection(moduleId, resource));

@@ -13,6 +13,12 @@ version: 1.0.0
 # variable travel-seconds-per-unit
 value: 5
 
+// What a duration action takes when it names no cadence of its own. At 0 an
+// untagged action is over the instant it is used; raising it makes every action
+// that has not declared itself `instant` a span the world moves through.
+# variable default-action-duration
+value: 0
+
 // --- stats ---
 
 // The player's sheet. An entity that fights names its own values for these in a
@@ -33,8 +39,8 @@ base: 100
 
 # stat evasion
 
-// Attacks per minute. `time: 60` + `speed: attack-rate` on an action turns this
-// into seconds per swing: 25/min is one swing every 2.4s.
+// Attacks per minute, which is what `rate:` on an action reads directly:
+// 25/min is one swing every 2.4s.
 # stat attack-rate
 base: 25
 
@@ -43,8 +49,9 @@ base: 25
 # stat max-health
 base: 30
 
-# stat cooking-speed
-base: 1
+// Chestnuts per minute: 15/min is one every 4 seconds.
+# stat cooking-rate
+base: 15
 
 // --- resources ---
 
@@ -96,7 +103,10 @@ stat-id: attack
 # item cooked-shrimp
 examine: A simple meal.
 food, +3 regeneration, 60s
-eat: take: 1 cooked-shrimp, say: You eat the shrimp. Simple, warm, and better than it looks.
+eat:
+  instant
+  take: 1 cooked-shrimp
+  say: You eat the shrimp. Simple, warm, and better than it looks.
 
 # item iron-sword
 examine: A well-balanced blade, standard adventurer's kit.
@@ -124,7 +134,10 @@ examine: A ball of raw dough, ready for the oven.
 # item bread
 examine: A warm, golden loaf.
 food, +5 regeneration, 90s
-eat: take: 1 bread, say: You tear into the warm loaf - simple, filling, and worth the trouble.
+eat:
+  instant
+  take: 1 bread
+  say: You tear into the warm loaf - simple, filling, and worth the trouble.
 
 # item roasted-chestnut
 examine: A chestnut roasted soft and sweet in the oven's embers.
@@ -175,7 +188,7 @@ flags: unlocked
 pick lock:
   requires: has lockpick
   hidden if: unlocked
-  once, 4s
+  time: 4
   xp: thieving 4
   on success:
     set: unlocked
@@ -184,6 +197,7 @@ pick lock:
 # entity mirror
 examine: A tall mirror in a gilt frame. Your reflection waits, nameless.
 look in:
+  instant
   hidden if: mirror-done
   open modal: character-creation
   set: mirror-done
@@ -192,67 +206,84 @@ look in:
 examine: A stone oven, its coals still glowing.
 stations: oven
 roast chestnuts:
-  repeating
-  speed: cooking-speed
-  time: 4
+  continuous
+  rate: cooking-rate
   give: 1 roasted-chestnut
   on success:
     say: Another chestnut pops from the embers, roasted through.
 
 # entity stairs
 title: Stairs
-ascend: relocate: guide-house-upstairs, say: You climb to the second floor.
-descend: relocate: basement, say: You head down into the basement.
+ascend:
+  instant
+  relocate: guide-house-upstairs
+  say: You climb to the second floor.
+descend:
+  instant
+  relocate: basement
+  say: You head down into the basement.
 
 # entity stairs-down
 title: Stairs
-descend: relocate: guide-house, say: You head back down to the ground floor.
+descend:
+  instant
+  relocate: guide-house
+  say: You head back down to the ground floor.
 
 # entity stairs-up
 title: Stairs
-ascend: relocate: guide-house, say: You climb back up to the ground floor.
+ascend:
+  instant
+  relocate: guide-house
+  say: You climb back up to the ground floor.
 
 # entity dresser
 examine: A dusty dresser, one drawer left slightly ajar.
+flags: searched
 search drawer:
-  once
+  hidden if: searched
   give: lockpick
   say: Tucked beneath old linens, a set of worn lockpicks.
+  set: searched
 
-// A real fight, and the shape every combattable thing in the game shares: its
-// own stat sheet, a swing of its own on its own clock, and a pool that runs out.
-// The two actions are the same action seen from either end — `speed`, `ability`
-// and `accuracy` read whoever is swinging, `target`, `dr` and `evasion` whoever
-// is being hit — so `fight` and `bite` differ only in who runs them.
+// The shape every combattable thing in the game shares, written once: a swing
+// of its own on its own clock, and a pool that runs out. The two actions are
+// the same action seen from either end — `rate`, `ability` and `accuracy` read
+// whoever is swinging, `target`, `dr` and `evasion` whoever is being hit — so
+// `fight` and `bite` differ only in who runs them.
 //
+// A foe naming this supplies its own stat sheet and, where it has something of
+// its own to say, a block under one of these labels.
+# entitytype melee-foe
+fight:
+  rate: attack-rate
+  accuracy: accuracy
+  evasion: evasion
+  ability: attack
+  dr: defense
+  target: health
+bite:
+  retaliates
+  rate: attack-rate
+  accuracy: accuracy
+  evasion: evasion
+  ability: attack
+  dr: defense
+  target: health
+
 // 20 health against the player's 10 a hit is two hits, ~2.5 swings at 80%, so a
 // rat falls in about six seconds and lands a bite or two on the way out.
 # entity giant-rat
+type: melee-foe
 title: Giant Rat
 examine: A hunched rat claws at an overturned crate, eyes red in the dark.
 stats: attack 8, defense 0, max-health 20, attack-rate 16, accuracy 60, evasion 40
 fight:
   hidden if: rats-killed >= 3
-  time: 60
-  speed: attack-rate
-  accuracy: accuracy
-  evasion: evasion
-  ability: attack
-  dr: defense
-  target: health
   xp: melee 5
   on success:
     add: rats-killed 1
     say: You put down another rat.
-bite:
-  retaliates
-  time: 60
-  speed: attack-rate
-  accuracy: accuracy
-  evasion: evasion
-  ability: attack
-  dr: defense
-  target: health
 
 // --- recipes ---
 

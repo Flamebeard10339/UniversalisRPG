@@ -12,12 +12,23 @@ export const number: Parser<number> = {
   },
 };
 
+export const DECIMAL = /-?\d+(?:\.\d+)?/;
+
 // Item, xp and flag counts stay on the integer-only `number` above.
 export const decimal: Parser<number> = {
   parse: (cursor) => {
-    const raw = cursor.take(/-?\d+(?:\.\d+)?/);
+    const raw = cursor.take(DECIMAL);
     if (raw === null) throw new DslError('expected a number', { start: cursor.abs(cursor.pos), end: cursor.abs(cursor.pos) });
     return Number(raw);
+  },
+};
+
+// A flat number, or the id of the stat holding one. What a field takes when the
+// same quantity can be authored once or moved live by gear and buffs.
+export const numberOrStat: Parser<number | string> = {
+  parse(cursor) {
+    const raw = cursor.take(DECIMAL);
+    return raw === null ? id.parse(cursor) : Number(raw);
   },
 };
 

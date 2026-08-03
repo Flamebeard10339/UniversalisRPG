@@ -32,6 +32,29 @@ describe('tutorial-island content', () => {
       expect(runTest(id, registry, createGameState())).toEqual({ passed: true });
     });
   }
+
+  // The shipped route unlocks the front door through a dialogue effect, so it
+  // never picks the lock and never opens the dresser. Both carried a `once` tag
+  // that did nothing and the door a `4s` that paced nothing; these are the two
+  // places that authoring became real, and no route covers them.
+  it('spans the front door by the 4 seconds its inert 4s tag used to only suggest', () => {
+    const state = createGameState('tutorial-island.guide-house');
+    state.inventory['tutorial-island.lockpick'] = 1;
+
+    useAction('entity', 'tutorial-island.front-door', 'pick lock', registry, state);
+    expect(state.time).toBe(secondsToMs(4));
+    expect(state.flags['tutorial-island.front-door.unlocked']).toBe(true);
+  });
+
+  it('hands out one lockpick from the dresser, not one per search', () => {
+    const state = createGameState();
+    const search = () => useAction('entity', 'tutorial-island.dresser', 'search drawer', registry, state);
+
+    search();
+    expect(state.inventory['tutorial-island.lockpick']).toBe(1);
+    expect(search).toThrow(/action hidden/);
+    expect(state.inventory['tutorial-island.lockpick']).toBe(1);
+  });
 });
 
 describe('tutorial-island health resource (Pass 2 end-to-end)', () => {

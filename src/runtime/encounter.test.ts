@@ -35,7 +35,7 @@ examine: A fistful of straw.
 flags: dummies-felled
 stats: max-health 12, dr 2
 strike:
-  repeating
+  continuous
   time: 1
   target: health
   ability: attack
@@ -46,7 +46,7 @@ strike:
 # entity straw-man
 stats: max-health 40, dr 1
 flail:
-  repeating
+  continuous
   time: 1
   target: health
   ability: wild-attack

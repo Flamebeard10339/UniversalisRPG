@@ -8,7 +8,7 @@ import { isFieldEdits, listMembers } from '../grammar/section';
 import { Quantified } from '../grammar/values';
 import { TagClause } from '../grammar/tagClause';
 
-export type ReferenceKind = 'stat' | 'resource' | 'entity' | 'location' | 'item' | 'skill' | 'recipe' | 'save' | 'test' | 'capability' | 'flag' | 'node';
+export type ReferenceKind = 'stat' | 'resource' | 'entity' | 'entitytype' | 'location' | 'item' | 'skill' | 'recipe' | 'save' | 'test' | 'capability' | 'flag' | 'node';
 
 // Returns what the id should become. Resolution rewrites it into a namespaced
 // key; validation hands it back and throws if it names nothing.
@@ -110,7 +110,9 @@ function tags(list: unknown, where: string, visit: Visit): void {
 }
 
 export function visitAction(action: Action, where: string, visit: Visit): void {
-  for (const field of ['speed', 'accuracy', 'evasion', 'ability', 'dr'] as const) put(action, field, 'stat', `${where} ${field}:`, visit);
+  // `rate` is a stat only when it is written as a name; `put` leaves the
+  // per-minute literal alone because it is not a string.
+  for (const field of ['rate', 'accuracy', 'evasion', 'ability', 'dr'] as const) put(action, field, 'stat', `${where} ${field}:`, visit);
   put(action, 'target', 'resource', `${where} target:`, visit);
   tags(action.tags, where, visit);
   condition(action.requires, `${where} requires:`, visit);
@@ -190,9 +192,13 @@ export function visitSection(kind: string, value: object, where: string, visit: 
       // A stat sheet is authored as a list of assignments; the stat id leading
       // each one is the reference.
       for (const assignment of listMembers<[string, unknown]>(section.stats)) assignment[0] = visit('stat', assignment[0], `${where} stats:`);
+      put(section, 'type', 'entitytype', `${where} type:`, visit);
       actions(section.actions, where, visit);
       return;
     }
+    case 'entitytype':
+      actions(section.actions, where, visit);
+      return;
     case 'item':
       tags(section.tags, where, visit);
       actions(section.actions, where, visit);
@@ -211,7 +217,7 @@ export function visitSection(kind: string, value: object, where: string, visit: 
       return;
     case 'recipe':
       for (const field of ['in', 'out', 'burnt'] as const) quantified(section[field], 'item', `${where} ${field}:`, visit);
-      for (const field of ['speed', 'accuracy', 'evasion'] as const) put(section, field, 'stat', `${where} ${field}:`, visit);
+      for (const field of ['rate', 'accuracy', 'evasion'] as const) put(section, field, 'stat', `${where} ${field}:`, visit);
       put(section, 'requiresCapability', 'capability', `${where} station`, visit);
       if (section.skill) put(section.skill as Loose & { skill: string }, 'skill', 'skill', `${where} skill:`, visit);
       return;

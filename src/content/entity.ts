@@ -10,6 +10,8 @@ export type { Action } from '../grammar/action';
 export interface Entity {
   id: string;
   title: string;
+  // The action template this entity inherits, compiled into `actions` at load.
+  type?: string;
   examine?: string;
   capabilities: string[];
   // Replaces the global `# stat` default per name; the player names nothing.
@@ -30,6 +32,7 @@ const statAssignment: Parser<[string, Range]> = {
 export const entitySchema: SectionSchema<Entity, never, 'actions'> = {
   kind: 'entity',
   fields: {
+    type: { parser: id },
     title: { parser: text, default: (self) => humanize(self.id) },
     examine: { parser: text },
     capabilities: { parser: list(id), keyword: 'stations', default: () => [] },

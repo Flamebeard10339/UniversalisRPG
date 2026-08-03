@@ -30,16 +30,14 @@ entities: target
 # entity target
 stats: max-health 100000, dodge 0
 strike:
-  repeating
-  time: 60
-  speed: attack-rate
+  continuous
+  rate: attack-rate
   target: health
   ability: attack
   dr: defense
 bite:
   retaliates
-  time: 60
-  speed: attack-rate
+  rate: attack-rate
   target: health
   ability: attack
   dr: defense
