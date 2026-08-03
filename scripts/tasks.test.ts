@@ -3443,3 +3443,71 @@ describe('tasks plan, against producers that already exist', () => {
       expect(tasks('plan', 'lonely').stdout).not.toContain('existing-producer');
     }));
 });
+
+// A read answers. The store is what grading a plan needs; the registry only
+// widens what it can say, so losing it costs the concept half of the answer
+// and must not cost the exit code — `tasks plan` is an unguarded CI step.
+describe('tasks plan, when the manifest will not parse', () => {
+  it('still grades the plan, and says which half of the answer it lost', () =>
+    fixture(({ dir, tasks }) => {
+      tasks('add', 'some work', '--writes', 'src/runtime/a.ts', '--id', 'work', '--spec', 'demo-spec');
+      writeFileSync(path.join(dir, 'systems.json'), '{"unowned":{"paths":[]},"systems":', 'utf8');
+      const result = tasks('plan', 'work');
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('recorded `produces` claims only');
+      expect(result.stdout).toContain('plan: 1 task(s)');
+    }));
+});
+
+describe('a command that cannot work without the manifest', () => {
+  it('refuses it as malformed input, naming the file, rather than crashing', () =>
+    fixture(({ dir, tasks }) => {
+      writeFileSync(path.join(dir, 'systems.json'), '{"unowned":{"paths":[]},"systems":', 'utf8');
+      const result = tasks('system');
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain('error: ');
+      expect(result.stderr).toContain('systems.json');
+    }));
+});
+
+describe('concept paths are stored in one spelling', () => {
+  it('strips a trailing slash, so the concept claims files instead of nothing', () =>
+    fixture(({ tasks }) => {
+      tasks('concept', 'Runtime', 'everything', '--paths', 'src/runtime/', '--note', 'probe');
+      const shown = tasks('system', 'Runtime');
+      expect(shown.stdout).toMatch(/everything — [1-9]\d* file\(s\)/);
+      expect(shown.stdout).not.toContain('(none matching)');
+    }));
+
+  it('reads a windows separator as the same declared region', () =>
+    fixture(({ dir, tasks }) => {
+      tasks('concept', 'Runtime', 'saves', '--paths', 'src\\runtime\\save.ts', '--note', 'probe');
+      const raw = JSON.parse(readFileSync(path.join(dir, 'systems.json'), 'utf8')) as { systems: Array<{ concepts?: Array<{ paths: string[] }> }> };
+      expect(raw.systems[0].concepts?.[0].paths).toEqual(['src/runtime/save.ts']);
+    }));
+
+  it('refuses a name that is only whitespace, which nothing could ever find', () =>
+    fixture(({ tasks }) => {
+      expect(tasks('concept', 'Runtime', '   ', '--paths', 'src/runtime/save.ts').status).toBe(1);
+    }));
+});
+
+// A real repo, because the defect is precisely the gap between what git's
+// index lists and what is on disk, and no fixture tree can hold that gap.
+// This is the moment the command exists for: a worker has deleted or renamed
+// a file and asks where the thing it imports now lives.
+describe('the architecture queries, against a tracked file deleted from the working tree', () => {
+  it('answers instead of dying on the missing file', () =>
+    gitFixture(({ dir, commit, tasks }) => {
+      writeFileSync(path.join(dir, 'kept.ts'), "import './gone';\nexport const kept = 1;\n", 'utf8');
+      writeFileSync(path.join(dir, 'gone.ts'), 'export const gone = 1;\n', 'utf8');
+      commit('Add two modules\n\nA base for the deletion below.');
+      rmSync(path.join(dir, 'gone.ts'));
+
+      const where = tasks('where', 'kept.ts');
+      expect(where.status).toBe(0);
+      expect(where.stdout).toContain('kept.ts');
+
+      expect(tasks('system').status).toBe(0);
+    }));
+});

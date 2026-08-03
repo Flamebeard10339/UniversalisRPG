@@ -1,5 +1,6 @@
+import { existsSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { deriveModules, exportedNames, fileView, resolveImport, systemEdges, systemView, type SourceTree } from './architecture';
+import { deriveModules, exportedNames, fileView, repoSourceTree, resolveImport, systemEdges, systemView, type SourceTree } from './architecture';
 import type { Concept, Manifest, System } from './systems';
 
 function system(name: string, paths: string[], concepts: Concept[] = []): System {
@@ -228,5 +229,37 @@ describe('fileView', () => {
   it('answers for a path no system owns instead of refusing', () => {
     const view = fileView(overlapping, modules, 'docs/workflow.md');
     expect(view).toMatchObject({ owner: null, coveredBy: [], concepts: [], exports: [], importsOut: [], importedBy: [] });
+  });
+});
+
+// Real-seam tests: these reach git and the disk on purpose, because the seam
+// is the only part a fixture cannot exercise, and both defects they pin lived
+// exactly there.
+describe('repoSourceTree', () => {
+  it('lists only files that are actually there', () => {
+    expect(repoSourceTree().files.filter((file) => !existsSync(file))).toEqual([]);
+  });
+
+  it('reads every typescript file it listed', () => {
+    const tree = repoSourceTree();
+    const sources = tree.files.filter((file) => /[.]tsx?$/.test(file));
+    expect(sources.length).toBeGreaterThan(0);
+    expect(() => sources.forEach((file) => tree.read(file))).not.toThrow();
+  });
+});
+
+// A NUL makes a file binary to git and to grep: no diff to review on any pull
+// request, no line numbers from ripgrep, and a whole-file conflict when two
+// branches touch disjoint lines. One reached this branch's own audit inside a
+// template literal that was meant to hold a separator, and nothing noticed
+// because every other check reads the file through a parser that does not care.
+describe('the tracked source tree', () => {
+  const TEXTUAL = new Set([9, 10, 13]);
+
+  it('holds no control byte that would make a file binary to git', () => {
+    const offenders = repoSourceTree()
+      .files.filter((file) => /[.]tsx?$/.test(file))
+      .filter((file) => readFileSync(file).some((byte) => byte < 32 && !TEXTUAL.has(byte)));
+    expect(offenders).toEqual([]);
   });
 });

@@ -34,15 +34,24 @@ export const DEFAULT_MANIFEST_PATH = 'docs/audits/systems.json';
 
 export const covers = (path: string, file: string): boolean => (path.startsWith('*.') ? file.endsWith(path.slice(1)) && !file.includes('/') : file === path || file.startsWith(`${path}/`));
 
-// Compared lowercase, and this is the one place that rule lives. On Linux
-// `Foo.ts` and `foo.ts` are two files and on Windows — this repo's primary
-// platform — they are one, so a case-sensitive comparison misses a real
-// collision on the machine most of this work happens on. `covers` itself
-// stays case-sensitive: it answers about paths git produced, which are
-// already canonical, while everything routed through here compares regions
-// somebody typed by hand.
+// The form a declared path is stored in: one separator, no `./`, no trailing
+// slash. `covers` is exact, so a path that reaches it wearing any other
+// spelling matches nothing — `src/runtime/` claimed no files at all while
+// still overlapping every one of them, because only half the readers
+// normalised first. Canonicalising on the way in leaves one spelling for
+// every reader instead of one rule per reader.
+export function canonicalPath(path: string): string {
+  return path.replace(/\\/g, '/').replace(/^\.\//, '').replace(/\/+$/, '');
+}
+
+// Canonical and case-folded, for comparing two regions somebody typed by
+// hand. On Linux `Foo.ts` and `foo.ts` are two files and on Windows — this
+// repo's primary platform — they are one, so a case-sensitive comparison
+// misses a real collision on the machine most of this work happens on.
+// `covers` itself stays case-sensitive: it answers about paths git produced,
+// which are already canonical.
 export function normalizePath(path: string): string {
-  return path.replace(/\\/g, '/').replace(/^\.\//, '').replace(/\/+$/, '').toLowerCase();
+  return canonicalPath(path).toLowerCase();
 }
 
 // Containment in either direction. Two declared regions intersect when one
@@ -87,7 +96,7 @@ function parseConcepts(system: Record<string, unknown>, where: string): Concept[
   return value.map((entry, index) => {
     const at = `${where}: concept ${index + 1}`;
     const concept = asRecord(entry, at);
-    return { name: asString(concept, 'name', at), paths: asStringArray(concept, 'paths', at), note: asNullableString(concept, 'note', at) };
+    return { name: asString(concept, 'name', at), paths: asStringArray(concept, 'paths', at).map(canonicalPath), note: asNullableString(concept, 'note', at) };
   });
 }
 

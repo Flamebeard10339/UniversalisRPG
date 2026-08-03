@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   allConcepts,
+  canonicalPath,
   checkManifest,
   conceptsClaiming,
   covers,
@@ -48,6 +49,22 @@ describe('covers', () => {
   it('matches a *.ext glob only at the repo root', () => {
     expect(covers('*.md', 'README.md')).toBe(true);
     expect(covers('*.md', 'docs/audits/systems.md')).toBe(false);
+  });
+});
+
+describe('canonicalPath', () => {
+  it('strips a trailing slash, which covers would otherwise never match', () => {
+    expect(canonicalPath('src/runtime/')).toBe('src/runtime');
+    expect(canonicalPath('src/runtime///')).toBe('src/runtime');
+  });
+
+  it('reads a windows separator and a leading ./ as the same path', () => {
+    expect(canonicalPath('src\\runtime\\save.ts')).toBe('src/runtime/save.ts');
+    expect(canonicalPath('./src/runtime')).toBe('src/runtime');
+  });
+
+  it('leaves case alone, because a path is compared against a real file', () => {
+    expect(canonicalPath('src/Runtime/Save.ts')).toBe('src/Runtime/Save.ts');
   });
 });
 
@@ -214,6 +231,11 @@ describe('parseManifest', () => {
   it('reads a concept whole', () => {
     const text = JSON.stringify({ ...base, systems: [{ ...base.systems[0], concepts: [{ name: 'saves', paths: ['src/runtime/save.ts'], note: 'from produces claim' }] }] });
     expect(parseManifest(text, 'm.json').systems[0].concepts).toEqual([{ name: 'saves', paths: ['src/runtime/save.ts'], note: 'from produces claim' }]);
+  });
+
+  it('canonicalises a concept path, so every reader sees one spelling', () => {
+    const text = JSON.stringify({ ...base, systems: [{ ...base.systems[0], concepts: [{ name: 'all', paths: ['src/runtime/', 'src\\runtime\\save.ts'] }] }] });
+    expect(parseManifest(text, 'm.json').systems[0].concepts[0].paths).toEqual(['src/runtime', 'src/runtime/save.ts']);
   });
 
   it('defaults a concept note to null rather than inventing one', () => {

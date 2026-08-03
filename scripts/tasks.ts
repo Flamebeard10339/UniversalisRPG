@@ -10,8 +10,8 @@ import * as git from './lib/git';
 import { appendAuditPass, clauseStandings, duplicateClauseIds, outstandingSummary, parseSpecDoc, stampClauseIds, VERDICTS, type AuditVerdict, type ProofClause, type Verdict } from './lib/specDoc';
 import { checkPlan } from './lib/planCheck';
 import { deriveModules, fileView, repoSourceTree, systemView, type Module, type SourceTree, type SystemEdge, type SystemView } from './lib/architecture';
-import { findProducers, producerIndex } from './lib/producers';
-import { checkManifest, isUnowned, loadManifest, overlappingConcepts, parseManifest, systemNames as manifestSystemNames, type Manifest } from './lib/systems';
+import { findProducers, producerIndex, type Producer } from './lib/producers';
+import { canonicalPath, checkManifest, isUnowned, loadManifest, ManifestError, overlappingConcepts, parseManifest, systemNames as manifestSystemNames, type Manifest } from './lib/systems';
 import {
   checkStore,
   claimSummary,
@@ -901,6 +901,21 @@ function cmdNext(args: Flags): void {
   }
 }
 
+// Grading a plan needs the store; the registry only widens what it can say.
+// So an unreadable manifest costs the concept half of the answer and nothing
+// else, and the report says which half it lost rather than refusing the
+// whole grade over it. `tasks plan` is a CI step held to answering.
+function knownProducers(config: Config, tasks: Task[]): Producer[] {
+  try {
+    return producerIndex(loadManifest(config.systemsPath), tasks);
+  } catch (error) {
+    if (!(error instanceof ManifestError)) throw error;
+    console.log(`note: ${error.message}`);
+    console.log('grading against recorded `produces` claims only — registered concepts could not be read');
+    return producerIndex({ unowned: { note: '', paths: [] }, systems: [] }, tasks);
+  }
+}
+
 // Grades a dispatch set before anyone works it. Everything it reports is
 // decidable from the records alone, so the cost of asking is one command and
 // the answer arrives while the decomposition is still cheap to change — which
@@ -942,7 +957,7 @@ function cmdPlan(args: Flags): void {
     return;
   }
 
-  const report = checkPlan(plan, tasks, producerIndex(loadManifest(config.systemsPath), tasks));
+  const report = checkPlan(plan, tasks, knownProducers(config, tasks));
   console.log(`plan: ${plan.length} task(s), ${plan.length - report.ungranted} with a write grant this check can read`);
   for (const task of plan) printRow(task, byId, { indent: '  ' });
   console.log('');
@@ -1089,8 +1104,8 @@ function cmdProduces(args: Flags, usage: string): void {
 function cmdConcept(args: Flags, usage: string): void {
   const config = resolveConfig(args.flags);
   const [systemName, name] = args.positional;
-  const paths = splitList(args.flags.paths);
-  if (!systemName || !name || paths.length === 0) {
+  const paths = splitList(args.flags.paths).map(canonicalPath);
+  if (!systemName || !name.trim() || paths.length === 0) {
     console.error(usage);
     process.exitCode = 1;
     return;
@@ -2546,14 +2561,17 @@ function printRootHelp(): void {
   console.log('`tasks <command> --help` prints that command\'s flags; a flag not named there is an error, never a silent no-op');
 }
 
-// A malformed docs/tasks.jsonl is reported as `path:line` and a non-zero
-// exit by every command, from one boundary here rather than a try/catch in
-// each store-reading command — which is where eight of them were missing.
-function reportStoreErrors<T>(work: () => T): T | void {
+// Malformed input, reported as `path:line` and a non-zero exit by every
+// command, from one boundary here rather than a try/catch in each reading
+// command — which is where eight of them were missing. The store and the
+// systems manifest are the two files a command parses, so both refusals
+// arrive the same way; a manifest that will not parse used to reach the
+// terminal as a raw stack from whichever command happened to read it.
+function reportReadErrors<T>(work: () => T): T | void {
   try {
     return work();
   } catch (error) {
-    if (!(error instanceof StoreError)) throw error;
+    if (!(error instanceof StoreError) && !(error instanceof ManifestError)) throw error;
     console.error(`error: ${error.message}`);
     process.exitCode = 1;
   }
@@ -2597,9 +2615,9 @@ export function run(argv: string[]): void | Promise<void> {
     return;
   }
 
-  return reportStoreErrors(() => {
+  return reportReadErrors(() => {
     const result = command.run(parsed, command.usage);
-    if (result instanceof Promise) return result.catch((error) => reportStoreErrors(() => { throw error; })).finally(flushSkippedStoreLines);
+    if (result instanceof Promise) return result.catch((error) => reportReadErrors(() => { throw error; })).finally(flushSkippedStoreLines);
     flushSkippedStoreLines();
     return result;
   });
