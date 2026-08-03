@@ -8,17 +8,20 @@ export interface ParsedFinding {
 }
 
 const ANY_HEADING = /^## /;
-const FINDING_HEADING = /^## ([HML])(\d+)\s+(.+)$/;
+// An optional short uppercase prefix (`## RG-H1`, `## CL-M6`) is the shape
+// multi-auditor passes use to keep two finding lists apart in one document;
+// the prefix stays in the code so the two lists cannot collide as ids.
+const FINDING_HEADING = /^## ((?:[A-Z]{1,4}-)?)([HML])(\d+)\s+(.+)$/;
 const SEVERITY_FOR_LETTER: Record<string, Severity> = { H: 'high', M: 'medium', L: 'low' };
 
-// Findings under `## H1` / `## M2` / `## L3` are the load-bearing convention
-// docs/specs/task-system-v2.md names — every other heading shape (Tier 1,
-// HIGH/MEDIUM/LOW sections, Findings/Non-Findings) belongs to a superseded
-// or reconciliation document and is deliberately left unimported. A body
-// still ends at the next `##` of ANY shape, not just the next finding —
-// otherwise the last finding before a "## Verified closed" swallows it.
+// Findings under `## H1` / `## M2` / `## L3` are the load-bearing
+// convention — every other heading shape (Tier 1, HIGH/MEDIUM/LOW sections,
+// Findings/Non-Findings) belongs to a superseded or reconciliation document
+// and is deliberately left unimported. A body still ends at the next `##`
+// of ANY shape, not just the next finding — otherwise the last finding
+// before a "## Verified closed" swallows it.
 export function parseAuditDoc(text: string): ParsedFinding[] {
-  const lines = text.split('\n');
+  const lines = text.replace(/\r\n/g, '\n').split('\n');
   const headingIndexes = lines.map((line, index) => (ANY_HEADING.test(line) ? index : -1)).filter((index) => index >= 0);
 
   const findings: ParsedFinding[] = [];
@@ -27,7 +30,7 @@ export function parseAuditDoc(text: string): ParsedFinding[] {
     if (!match) continue;
     const end = headingIndexes.find((candidate) => candidate > index) ?? lines.length;
     const body = trimDividers(lines.slice(index + 1, end)).join('\n');
-    findings.push({ code: `${match[1]}${match[2]}`, severity: SEVERITY_FOR_LETTER[match[1]], title: stripLeadingDash(match[3]), body });
+    findings.push({ code: `${match[1]}${match[2]}${match[3]}`, severity: SEVERITY_FOR_LETTER[match[2]], title: stripLeadingDash(match[4]), body });
   }
   return findings;
 }

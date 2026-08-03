@@ -29,7 +29,7 @@ function contentLines(message: string): string[] {
 
 // Returns a refusal reason, or null if the message satisfies the contract:
 // a body (at least one line past the subject). Next: is an optional
-// breadcrumb that `tasks handoff` can surface, not the source of truth.
+// breadcrumb, not the source of truth.
 export function checkCommitMessage(message: string): string | null {
   const lines = contentLines(message);
   if (lines.length === 0) return 'commit message is empty';

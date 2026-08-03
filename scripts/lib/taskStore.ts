@@ -47,7 +47,7 @@ export class StoreError extends Error {}
 export const DEFAULT_STORE_PATH = 'docs/tasks.jsonl';
 
 export const KINDS: Kind[] = ['task', 'finding', 'undelivered', 'question'];
-const STATES: State[] = ['unreviewed', 'open', 'in-progress', 'done', 'declined'];
+export const STATES: State[] = ['unreviewed', 'open', 'in-progress', 'done', 'declined'];
 const SEVERITIES: Severity[] = ['high', 'medium', 'low'];
 
 function isRecord(value: unknown): value is Record<string, unknown> {

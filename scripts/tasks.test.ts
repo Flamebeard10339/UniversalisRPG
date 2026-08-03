@@ -107,7 +107,8 @@ function fixture(run: (context: { dir: string; args: (extra?: string[]) => strin
   }
 }
 
-// A dedicated git repo per test, distinct from `fixture`'s (which spawns
+// A dedicated git repo per test, distinct from `fixture`'s (which runs
+// non-audit commands in-process and spawns audit
 // against this repo's own real checkout) — handoff's walk-back and
 // multi-line capture need commits with exact, controlled messages.
 function gitFixture(run: (context: { dir: string; commit: (message: string) => string; tasks: (...args: string[]) => Run }) => void): void {
@@ -2403,15 +2404,17 @@ describe('tasks CLI', () => {
       // Under the header, not merely somewhere in the output: this path
       // also prints under `Member tasks:`, so a `toContain` on the path
       // alone passed with the whole relevant-files computation replaced by
-      // an empty list.
-      expect(relevantFilesBlock(result.stdout)).toContain('- src/runtime/runtime.ts:1\n');
+      // an empty list. The `:1` locator is stripped — the list is of
+      // openable paths, not evidence references.
+      expect(relevantFilesBlock(result.stdout)).toContain('- src/runtime/runtime.ts\n');
+      expect(relevantFilesBlock(result.stdout)).not.toContain('- src/runtime/runtime.ts:1\n');
 
       expect(result.stdout).toContain('Proof clauses:');
       expect(result.stdout).toContain('[c1] The first clause holds.');
       expect(result.stdout).toContain('proof: command node --version');
-      // Clause 1 carries a proof target — mechanically checkable, so it
-      // gets the pure-logic/API mutation-testing line.
-      expect(result.stdout).toContain('pure logic/API');
+      // Clause 1 carries a proof target — the guidance names both shapes
+      // rather than presuming the logic one.
+      expect(result.stdout).toContain('if it names pure logic or an API');
       // Clause 2 carries none — Slice 3's human-verification callout, and
       // Slice 6's guidance that actually distinguishes the UI case from
       // the logic case rather than repeating one blanket sentence.
@@ -3688,4 +3691,16 @@ describe('the architecture queries, against a tracked file deleted from the work
 
       expect(tasks('system').status).toBe(0);
     }));
+});
+
+// The tsx-before-npx launcher choice was verified by hand and rested on
+// nothing executable — a future hook edit would not have reddened anything.
+describe('the commit-msg hook launcher', () => {
+  it('prefers the repo-local tsx, keeping npx only as the fallback for an uninstalled checkout', () => {
+    const hook = readFileSync(path.join(repoRoot, '.claude', 'hooks', 'commit-msg'), 'utf8');
+    const local = hook.indexOf('node node_modules/tsx/dist/cli.mjs scripts/tasks.ts check-commit-msg');
+    const fallback = hook.indexOf('npx tsx scripts/tasks.ts check-commit-msg');
+    expect(local).toBeGreaterThan(-1);
+    expect(fallback).toBeGreaterThan(local);
+  });
 });

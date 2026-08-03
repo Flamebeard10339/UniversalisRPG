@@ -16,6 +16,7 @@ import {
   parseStore,
   requirementStates,
   SEARCH_FIELDS,
+  STATES,
   unreviewedFiledBy,
   waitingOn,
   type Kind,
@@ -246,8 +247,6 @@ export function cmdShow(args: Flags, usage: string): void {
   }
 }
 
-const LIST_STATES: State[] = ['unreviewed', 'open', 'in-progress', 'done', 'declined'];
-
 // The only verb that reads the whole store rather than one spec's fix-now
 // queue, which is how a `spec: null` finding is reachable at all.
 export function cmdSearch(args: Flags, usage: string): void {
@@ -274,8 +273,8 @@ function runList(args: Flags, text: string | undefined): void {
   const flags = args.flags;
 
   const state = flags.state as State | undefined;
-  if (state !== undefined && !LIST_STATES.includes(state)) {
-    console.error(`error: --state must be one of ${LIST_STATES.join(', ')}`);
+  if (state !== undefined && !STATES.includes(state)) {
+    console.error(`error: --state must be one of ${STATES.join(', ')}`);
     process.exitCode = 1;
     return;
   }

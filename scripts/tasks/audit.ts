@@ -153,7 +153,10 @@ export function cmdAuditPrompt(args: Flags, usage: string): void {
   const members = tasks.filter((task) => task.spec === slug);
   const latest = doc.auditPasses[doc.auditPasses.length - 1];
 
-  const relevantFiles = [...new Set([...members.flatMap((task) => task.files), ...diffChangedFiles(`${base}..${head}`)])].sort();
+  // Locators (`path:12`, `path#H1`) are evidence on the record; what the
+  // auditor opens is the path, so the union is over paths — otherwise one
+  // file appears twice, once openable and once not.
+  const relevantFiles = [...new Set([...members.flatMap((task) => task.files), ...diffChangedFiles(`${base}..${head}`)].map((file) => file.split(/[:#]/)[0]))].sort();
   const noTargetCount = doc.proofClauses.filter((clause) => (clause.proofTargets ?? []).length === 0).length;
 
   console.log(`You are auditing ${slug} on branch ${config.branch}.`);
@@ -188,7 +191,7 @@ export function cmdAuditPrompt(args: Flags, usage: string): void {
       console.log('  If this is pure domain logic or an API layer, prefer naming a `proof: vitest <file> "<test>"` or `proof: command <cmd>` target so a future pass can mutation-test it. If this is UI work, add or run smoke coverage once the implementation has settled.');
     } else {
       for (const target of targets) console.log(`  proof: ${target}`);
-      console.log('  has a proof target — pure logic/API shape: temporarily remove, invert, or scale the behavior it proves and confirm it fails for the right reason before accepting it.');
+      console.log('  has a proof target — if it names pure logic or an API, temporarily remove, invert, or scale the behavior it proves and confirm it fails for the right reason before accepting it; a UI or smoke target is inspected, not mutation-tested.');
     }
   }
   console.log('');
