@@ -1,6 +1,7 @@
 import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { checkBytes, type ByteFinding } from '../lib/bytes';
+import { trackedFiles } from '../lib/sourceFiles';
 import type { Flags } from './cli';
 import { resolveConfig } from './context';
 
@@ -62,19 +63,13 @@ export function runMergeReady(deps: MergeReadyDeps): boolean {
   return failed.length === 0;
 }
 
-function gitTrackedFiles(): string[] {
-  const result = spawnSync('git', ['ls-files'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
-  if ((result.status ?? 1) !== 0) throw new Error('git ls-files failed — cannot enumerate tracked files');
-  return result.stdout.split('\n').map((line) => line.trim()).filter((line) => line.length > 0);
-}
-
 export function cmdMergeReady(args: Flags): void {
   resolveConfig(args.flags);
   console.log('running the merge gate — the same legs CI runs, in order (several minutes):');
   const ok = runMergeReady({
     // shell: npm and npx are .cmd shims on Windows, unreachable without one.
     run: (command) => spawnSync(command, { shell: true, stdio: ['ignore', 'inherit', 'inherit'] }),
-    trackedFiles: gitTrackedFiles,
+    trackedFiles,
     read: (file) => {
       try {
         return readFileSync(file);

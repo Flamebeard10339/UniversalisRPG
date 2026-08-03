@@ -3,7 +3,7 @@ import { clauseStandings, outstandingSummary, parseSpecDoc } from '../lib/specDo
 import { loadStore, unreviewedFiledBy, type Task } from '../lib/taskStore';
 import type { Flags } from './cli';
 import { readStore, recordEvents, refuseUnknownSpec, reportUnknownSpec, resolveConfig, saveStoreAndWarn, specFile, subjectOf } from './context';
-import { printRow, refuseUnknownIds } from './render';
+import { printRow, refuseUnknownIds, truncateLine } from './render';
 
 const SPEC_SCAFFOLD = (slug: string): string => `# ${slug}
 
@@ -88,7 +88,17 @@ export function cmdSpecShow(args: Flags, usage: string): void {
     return;
   }
   const doc = parseSpecDoc(readFileSync(path_, 'utf8'));
-  console.log(doc.deliverableSection);
+  const latest = doc.auditPasses[doc.auditPasses.length - 1];
+  // The clauses with their standings, not the whole ## Deliverable: a
+  // planner's context is the scarce resource a store read spends, and the
+  // section's prose never changes between reads. `--full` prints it.
+  if (args.flags.full === 'true') {
+    console.log(doc.deliverableSection);
+  } else {
+    const standings = clauseStandings(doc.proofClauses, latest?.verdicts);
+    for (const standing of standings) console.log(`  ${standing.clause}. [${standing.status}] ${truncateLine(doc.proofClauses.find((clause) => clause.id === standing.clause)!.text)}`);
+    if (standings.length === 0) console.log('  (no proof clauses — `--full` prints the whole ## Deliverable)');
+  }
   console.log('');
   console.log(`${doc.auditPasses.length} audit pass(es) recorded`);
   for (const pass of doc.auditPasses) {
@@ -96,7 +106,6 @@ export function cmdSpecShow(args: Flags, usage: string): void {
   }
   // The passes above are what each pass said; this is where the spec stands
   // now, which differs whenever a clause was added after the last one.
-  const latest = doc.auditPasses[doc.auditPasses.length - 1];
   console.log(`clause standing (${latest ? `latest pass ${latest.pass}` : 'no audit pass recorded'}): ${outstandingSummary(clauseStandings(doc.proofClauses, latest?.verdicts))}`);
   console.log('');
 

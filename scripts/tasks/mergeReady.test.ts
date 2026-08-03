@@ -30,7 +30,7 @@ describe('runMergeReady', () => {
     const { deps: d, recorded } = deps();
     expect(runMergeReady(d)).toBe(true);
     expect(recorded.commands).toEqual(LEGS.map((leg) => leg.command));
-    expect(recorded.lines.at(-1)).toBe('merge-ready: every leg passed');
+    expect(recorded.lines[recorded.lines.length - 1]).toBe('merge-ready: every leg passed');
   });
 
   it('keeps running after a red leg — one answer per run, not one rerun per defect — and names what failed', () => {
@@ -42,7 +42,7 @@ describe('runMergeReady', () => {
     });
     expect(runMergeReady(d)).toBe(false);
     expect(recorded.commands).toEqual(LEGS.map((leg) => leg.command));
-    expect(recorded.lines.at(-1)).toContain('NOT merge-ready: tsc failed');
+    expect(recorded.lines[recorded.lines.length - 1]).toContain('NOT merge-ready: tsc failed');
   });
 
   it('fails the bytes leg on a corrupt tracked file, naming it', () => {
@@ -52,7 +52,7 @@ describe('runMergeReady', () => {
     });
     expect(runMergeReady(d)).toBe(false);
     expect(recorded.lines.join('\n')).toContain('broken.ts: NUL byte at offset 0');
-    expect(recorded.lines.at(-1)).toContain('bytes failed');
+    expect(recorded.lines[recorded.lines.length - 1]).toContain('bytes failed');
   });
 
   it('treats a null exit status as failure, not success', () => {

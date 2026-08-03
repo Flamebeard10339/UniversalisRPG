@@ -30,7 +30,7 @@ const SPEC_COMMANDS: Record<string, Command> = {
   new: { usage: 'usage: tasks spec new <slug>', run: cmdSpecNew },
   add: { usage: `usage: tasks spec add <slug> <id>... ${ACTOR_USAGE}`, run: cmdSpecAdd },
   remove: { usage: `usage: tasks spec remove <slug> <id>... ${ACTOR_USAGE}`, run: cmdSpecRemove },
-  show: { usage: 'usage: tasks spec show <slug> [--order]', run: cmdSpecShow },
+  show: { usage: 'usage: tasks spec show <slug> [--order] [--full]  (default shows clause standings; --full prints the whole ## Deliverable)', run: cmdSpecShow },
   done: { usage: `usage: tasks spec done <slug> [--defer-open] ${ACTOR_USAGE}`, run: cmdSpecDone },
 };
 

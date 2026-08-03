@@ -56,6 +56,11 @@ describe('exportedNames', () => {
     expect(exportedNames('export default { a: 1 };')).toEqual(['default']);
   });
 
+  it('reads a type-only re-export list, which runtime.ts uses for eight of its names', () => {
+    expect(exportedNames("export type { GameState, Save } from './save';")).toEqual(['GameState', 'Save']);
+    expect(exportedNames('export type { Thing as PublicThing };')).toEqual(['PublicThing']);
+  });
+
   it('records a star re-export, named when it is aliased', () => {
     expect(exportedNames("export * from './other';")).toEqual(['*']);
     expect(exportedNames("export * as helpers from './other';")).toEqual(['helpers']);
@@ -65,6 +70,12 @@ describe('exportedNames', () => {
   // not part of the surface.
   it('ignores an export inside a comment', () => {
     expect(exportedNames('// export const gone = 1;\n/* export const also = 2; */\nexport const here = 3;')).toEqual(['here']);
+  });
+
+  // The declaration anchors on line start, so only a block comment whose
+  // inner line begins with `export` can tell stripping from not stripping.
+  it('ignores an export on its own line inside a block comment', () => {
+    expect(exportedNames('/*\nexport const hidden = 1;\n*/\nexport const kept = 2;')).toEqual(['kept']);
   });
 
   it('ignores a non-exported declaration', () => {
@@ -204,7 +215,8 @@ describe('fileView', () => {
   };
   const source = tree({
     'src/grammar/parser.ts': 'export const parse = 1;',
-    'src/content/registry.ts': "import './modportal';",
+    'src/content/universe.ts': 'export const universe = 1;',
+    'src/content/registry.ts': "import './modportal';\nimport './universe';",
     'src/content/modportal.ts': "import { parse } from '../grammar/parser';\nexport const portal = 1;",
   });
   const modules = deriveModules(overlapping, source);
@@ -220,6 +232,11 @@ describe('fileView', () => {
     const view = fileView(overlapping, modules, 'src/content/modportal.ts');
     expect(view.importsOut).toEqual([{ path: 'src/grammar/parser.ts', system: 'Grammar' }]);
     expect(view.importedBy).toEqual([{ path: 'src/content/registry.ts', system: 'DSL load path' }]);
+  });
+
+  it('leaves a same-system import out of importsOut, since inside a system it is ordinary coupling', () => {
+    const view = fileView(overlapping, modules, 'src/content/registry.ts');
+    expect(view.importsOut).toEqual([{ path: 'src/content/modportal.ts', system: 'Contribution system' }]);
   });
 
   it('reads a windows separator as the same file', () => {

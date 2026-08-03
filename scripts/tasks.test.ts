@@ -3100,10 +3100,12 @@ describe('the event log', () => {
       tasks('doctor', '--fix', '--actor', 'w');
 
       // Every op the store can be written by. `start`/`stop`/`done`/`spec-add`
-      // are covered by the test below; these five are the ones two audits
-      // proved nothing was holding.
+      // are covered by the test below; the first five are the ones two audits
+      // proved nothing was holding. `spec-done` is the one event with no
+      // store write behind it — the close is derived from member states, and
+      // recording it is the whole point.
       const ops = new Set(readEvents(dir).map((event) => event.op));
-      for (const op of ['import', 'triage', 'decline', 'spec-defer', 'add', 'edit']) {
+      for (const op of ['import', 'triage', 'decline', 'spec-defer', 'spec-done', 'add', 'edit']) {
         expect(ops, `no event recorded for ${op}`).toContain(op);
       }
     });
@@ -3527,6 +3529,14 @@ describe('tasks concept', () => {
       const added = tasks('concept', 'Runtime', 'saves', '--paths', 'src/runtime/save.ts', '--note', 'from a produces claim');
       expect(added.status).toBe(0);
       expect(tasks('produces', 'saves').stdout).toContain('owned by Runtime');
+    }));
+
+  it('refuses an empty --paths, since a concept nothing resolves to answers every lookup wrongly', () =>
+    fixture(({ tasks }) => {
+      const empty = tasks('concept', 'Runtime', 'saves', '--paths', '');
+      expect(empty.status).toBe(1);
+      expect(empty.stderr).toContain('usage: tasks concept');
+      expect(tasks('produces', 'saves').stdout).toContain('nothing produces');
     }));
 
   it('refuses a name another system already registers', () =>

@@ -217,9 +217,12 @@ export function cmdConcept(args: Flags, usage: string): void {
     return;
   }
 
-  // Mutated as raw JSON rather than re-serialised from the parsed model, so
-  // a field this version of the tool does not know about survives the write —
-  // the manifest's version of the store's `extra`.
+  // Read through parseManifest first, so a malformed manifest is refused as
+  // a labelled ManifestError; then mutate the raw JSON rather than
+  // re-serialising the parsed model, so a field this version of the tool
+  // does not know about survives the write — the manifest's version of the
+  // store's `extra`.
+  const manifest = loadManifest(config.systemsPath);
   const raw = JSON.parse(readFileSync(config.systemsPath, 'utf8')) as { systems: Array<{ name: string; concepts?: unknown[] }> };
   const system = raw.systems.find((candidate) => candidate.name === systemName);
   if (system === undefined) {
@@ -228,7 +231,7 @@ export function cmdConcept(args: Flags, usage: string): void {
     return;
   }
 
-  const existing = findProducers(name, producerIndex(loadManifest(config.systemsPath), readStore(config))).filter((match) => match.strength === 'exact' && match.producer.kind === 'concept');
+  const existing = findProducers(name, producerIndex(manifest, readStore(config))).filter((match) => match.strength === 'exact' && match.producer.kind === 'concept');
   if (existing.length > 0) {
     console.error(`error: ${existing[0].producer.owner} already registers a concept named ${JSON.stringify(existing[0].producer.name)} — a name with two owners answers every lookup with the wrong one`);
     process.exitCode = 1;

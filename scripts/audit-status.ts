@@ -1,15 +1,9 @@
 import { execFileSync } from 'node:child_process';
+import { trackedFiles } from './lib/sourceFiles';
 import { checkManifest, covers, loadManifest, overlappingConcepts, sharedOwnership, type Manifest, type System } from './lib/systems';
 import { codeOnly } from './lib/stripComments';
 
 const MANIFEST = 'docs/audits/systems.json';
-
-function trackedFiles(): string[] {
-  return git('ls-files')
-    .trim()
-    .split('\n')
-    .filter((file) => file !== '');
-}
 
 // Membership only means something if it is a partition. A file owned by no
 // system can never trigger an audit, and nothing used to notice one appearing.
