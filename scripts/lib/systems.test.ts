@@ -12,6 +12,7 @@ import {
   owningSystem,
   parseManifest,
   pathsOverlap,
+  sharedOwnership,
   systemNames,
   type Concept,
   type Manifest,
@@ -242,7 +243,22 @@ describe('checkManifest', () => {
 
   it('refuses a concept reaching outside its own system', () => {
     const m = manifestOf([system('Runtime', ['src/runtime'], [concept('parsing', ['src/grammar/parser.ts'])])]);
-    expect(checkManifest(m, always)).toContainEqual({ level: 'error', message: expect.stringContaining('does not own') as unknown as string });
+    expect(messages(m).some((message) => /no system owns/.test(message))).toBe(true);
+  });
+
+  // Coverage would allow this and ownership does not: the DSL load path
+  // covers all of `src/content`, but the Contribution system owns the file.
+  it('refuses a concept over a file its system only covers, where another system owns it', () => {
+    const m = manifestOf([
+      system('DSL load path', ['src/content'], [concept('serialising', ['src/content/serialize.ts'])]),
+      system('Contribution system', ['src/content/serialize.ts']),
+    ]);
+    expect(messages(m).some((message) => /Contribution system owns/.test(message))).toBe(true);
+  });
+
+  it('accepts a concept over a directory its system owns', () => {
+    const m = manifestOf([system('Runtime', ['src/runtime'], [concept('combat', ['src/runtime/combat'])])]);
+    expect(checkManifest(m, always)).toEqual([]);
   });
 
   it('reports a concept name claimed by two systems', () => {
@@ -286,5 +302,26 @@ describe('checkManifest', () => {
     const m = manifestOf([system('Runtime', ['src/runtime'], [concept('a', ['src/runtime/f.ts']), concept('b', ['src/runtime/f.ts'])])]);
     expect(checkManifest(m, always)).toEqual([]);
     expect(overlappingConcepts(m)).toHaveLength(1);
+  });
+});
+
+describe('sharedOwnership', () => {
+  const both = manifestOf([system('DSL load path', ['src/content']), system('Contribution system', ['src/content/modportal.ts'])]);
+
+  it('names the owner and the systems that still audit it', () => {
+    expect(sharedOwnership(both, ['src/content/modportal.ts'])).toEqual([{ file: 'src/content/modportal.ts', owner: 'Contribution system', alsoCovered: ['DSL load path'], tied: false }]);
+  });
+
+  it('says nothing about a file exactly one system claims', () => {
+    expect(sharedOwnership(both, ['src/content/registry.ts'])).toEqual([]);
+  });
+
+  it('says nothing about a file no system claims, which the orphan check owns', () => {
+    expect(sharedOwnership(both, ['docs/workflow.md'])).toEqual([]);
+  });
+
+  it('marks the case specificity did not decide', () => {
+    const tie = manifestOf([system('Zeta', ['src/runtime']), system('Alpha', ['src/runtime'])]);
+    expect(sharedOwnership(tie, ['src/runtime/save.ts'])).toEqual([{ file: 'src/runtime/save.ts', owner: 'Alpha', alsoCovered: ['Zeta'], tied: true }]);
   });
 });

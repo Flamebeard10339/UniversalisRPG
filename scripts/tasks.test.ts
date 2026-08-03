@@ -3374,7 +3374,7 @@ describe('tasks concept', () => {
       const before = readFileSync(path.join(dir, 'systems.json'), 'utf8');
       const result = tasks('concept', 'Runtime', 'parsing', '--paths', 'src/grammar/parser.ts');
       expect(result.status).toBe(1);
-      expect(result.stderr).toContain('does not own');
+      expect(result.stderr).toContain('cannot reach outside it');
       expect(readFileSync(path.join(dir, 'systems.json'), 'utf8')).toBe(before);
     }));
 

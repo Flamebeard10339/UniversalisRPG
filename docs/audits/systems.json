@@ -1,22 +1,100 @@
 {
   "unowned": {
     "note": "Deliberately chargeable to no system: prose, audit records, and the repo-wide manifests that change for every system's reasons and none of their own. Everything else must be owned, and audit-status fails when a tracked file is neither.",
-    "paths": ["docs", ".claude/launch.json", ".gitignore", "package.json", "package-lock.json", "tsconfig.json", "*.md", ".planning"]
+    "paths": [
+      "docs",
+      ".claude/launch.json",
+      ".gitignore",
+      "package.json",
+      "package-lock.json",
+      "tsconfig.json",
+      "*.md",
+      ".planning"
+    ]
   },
   "systems": [
     {
       "name": "DSL load path",
-      "paths": ["src/grammar", "src/content", "content"],
+      "paths": [
+        "src/grammar",
+        "src/content",
+        "content"
+      ],
       "lastAudit": "f8c8c8d",
       "lastAuditDoc": "docs/audits/dsl-load-path-2026-07-30-pass2.md",
-      "note": "Pass 2 (2026-07-30) audited the half no previous pass had: content/, the shipped DSL. Its one in-window commit changed two lines of a # save fixture, and that fixture is H1 — integration.test.ts runs every shipped # test from a bare createGameState(), so the whole tutorial route plays with the health pool never initialised, on empty: can never fire (setPoolLevel needs current > 0), and miki-route-end pins health at 0. The same test against a live session fails 21000 vs 0, so /test and CI disagree about it; this is also the root cause of Runtime M1, which measured the symptom. M1: the route skips node skills, so 4 of 8 dialogue nodes and both equipment items are unreached and the stat-bonus system has no shipped coverage. M2 is a fourth reproduction of pass 1's open H1, on dependencies: — block form silently drops the version constraint. Pass 1 (dsl-load-path-2026-07-30.md) is the loader audit and every one of its findings is still open; read it for the loader, this one for the content. Earlier history is in dsl-modules-2026-07-29-reconciled.md. The contribution system's files under src/content are owned by both, which is double coverage rather than a gap."
+      "note": "Pass 2 (2026-07-30) audited the half no previous pass had: content/, the shipped DSL. Its one in-window commit changed two lines of a # save fixture, and that fixture is H1 — integration.test.ts runs every shipped # test from a bare createGameState(), so the whole tutorial route plays with the health pool never initialised, on empty: can never fire (setPoolLevel needs current > 0), and miki-route-end pins health at 0. The same test against a live session fails 21000 vs 0, so /test and CI disagree about it; this is also the root cause of Runtime M1, which measured the symptom. M1: the route skips node skills, so 4 of 8 dialogue nodes and both equipment items are unreached and the stat-bonus system has no shipped coverage. M2 is a fourth reproduction of pass 1's open H1, on dependencies: — block form silently drops the version constraint. Pass 1 (dsl-load-path-2026-07-30.md) is the loader audit and every one of its findings is still open; read it for the loader, this one for the content. Earlier history is in dsl-modules-2026-07-29-reconciled.md. The contribution system's files under src/content are owned by both, which is double coverage rather than a gap.",
+      "concepts": [
+        {
+          "name": "the parser",
+          "paths": [
+            "src/grammar/parser.ts"
+          ],
+          "note": "Named 'the parser' throughout docs/audits/dsl-load-path-*.md; CLAUDE.md calls src/grammar the text-to-syntax half of this system."
+        },
+        {
+          "name": "the section field engine",
+          "paths": [
+            "src/grammar/section.ts",
+            "src/grammar/action.ts"
+          ],
+          "note": "Named by dsl-load-path-2026-07-28-m2, which verified action.ts holds a second, laxer copy of it — hence the second path."
+        },
+        {
+          "name": "action parsing",
+          "paths": [
+            "src/grammar/action.ts"
+          ],
+          "note": "The action clause grammar. dsl-load-path-2026-07-28-m2 records that this file also carries a copy of the section field engine, which is why two concepts claim it."
+        },
+        {
+          "name": "reference validation",
+          "paths": [
+            "src/content/references.ts",
+            "src/content/referenceSites.ts"
+          ],
+          "note": "Named 'reference validation' by dsl-load-path-2026-07-28-h2 and game-engine-2026-07-27-pass2-m1, both of which measured how much of the class it covers."
+        },
+        {
+          "name": "the registry",
+          "paths": [
+            "src/content/registry.ts",
+            "src/content/universe.ts"
+          ],
+          "note": "CLAUDE.md defines this system's second half as syntax to registry, including load-time reference resolution."
+        }
+      ]
     },
     {
       "name": "Runtime",
-      "paths": ["src/runtime"],
+      "paths": [
+        "src/runtime"
+      ],
       "lastAudit": "d7c6493",
       "lastAuditDoc": "docs/audits/runtime-2026-07-30.md",
-      "note": "The 2026-07-30 pass verified the integer conversion's core claim — 875 split points across a sign-changing rate all agree with the one-shot resolve, and every write into state.resources/time/progress is closed under the integer scale — and found H1: checkSave gives the three object-shaped save fields (activeAction, player, activeBuffs) no check past isObject, so a body whose ids are all real but whose cadences is absent crashes loadSave with a raw TypeError from inside the validator that exists to prevent it. Its mediums are all about what the window did not measure: the shipped # test regressions pass with every pool off by 1000x (mutation-verified, because the one save fixture pins health at 0, the value a scale change fixes), ability: 2.5 deals 2.5 down the healthless path and 2.0 down the target: path, and rng is the one GameState number left as isNumber so a fractional cursor collapses onto a fixed stream. Pass-1 L4 and L6 stay open and BLOCKED on the action.health/target: unification; M2 is fresh measured evidence for it. Pass-2 L1 and pass-1 L2 closed 2026-07-29. Counter restarts at the restructure; pre-move commits are not attributable per layer."
+      "note": "The 2026-07-30 pass verified the integer conversion's core claim — 875 split points across a sign-changing rate all agree with the one-shot resolve, and every write into state.resources/time/progress is closed under the integer scale — and found H1: checkSave gives the three object-shaped save fields (activeAction, player, activeBuffs) no check past isObject, so a body whose ids are all real but whose cadences is absent crashes loadSave with a raw TypeError from inside the validator that exists to prevent it. Its mediums are all about what the window did not measure: the shipped # test regressions pass with every pool off by 1000x (mutation-verified, because the one save fixture pins health at 0, the value a scale change fixes), ability: 2.5 deals 2.5 down the healthless path and 2.0 down the target: path, and rng is the one GameState number left as isNumber so a fractional cursor collapses onto a fixed stream. Pass-1 L4 and L6 stay open and BLOCKED on the action.health/target: unification; M2 is fresh measured evidence for it. Pass-2 L1 and pass-1 L2 closed 2026-07-29. Counter restarts at the restructure; pre-move commits are not attributable per layer.",
+      "concepts": [
+        {
+          "name": "saves",
+          "paths": [
+            "src/runtime/save.ts"
+          ],
+          "note": "runtime-2026-07-30-h1 is about checkSave and loadSave in this file."
+        },
+        {
+          "name": "the session entry point",
+          "paths": [
+            "src/runtime/session.ts"
+          ],
+          "note": "CLAUDE.md: session.ts is the entry point everything above plays through."
+        },
+        {
+          "name": "the random cursor",
+          "paths": [
+            "src/runtime/rng.ts"
+          ],
+          "note": "runtime-2026-07-30 records rng as the one GameState number left as isNumber, so a fractional cursor collapses onto a fixed stream."
+        }
+      ]
     },
     {
       "name": "Contribution system",
@@ -42,11 +120,61 @@
       ],
       "lastAudit": "f8c8c8d",
       "lastAuditDoc": "docs/audits/contribution-system-2026-07-30.md",
-      "note": "The 2026-07-30 pass verified R1, R3 and R4 closed — enable stages and proves before writing, sync admits incrementally so one bad mod cannot withhold the portal, extraction finds the shipped form's label by what it says — and found H1: bd77f26's canonicalisation serialises a module, and serializeRegistryModule filters by inModule, so every edit to base content and every # remove is silently dropped. A contribution that adds a path between two base locations is stored as a bare # info, loads clean, and is reported enabled. The fix is written in a sibling file: squash-local-changes.ts:125 does the same serialize-then-reload and refuses on registryDiff, and c9c88e1 promoted registryDiff into the content layer one commit before bd77f26 declined to use it. Its mediums are all 'the rule is enforced at one granularity and not the next one down': the publisher refuses a DSL heading in the notes but not an unbalanced fence (M2), two dsl fences under one heading resolve by position although the comment says two delimiters are refused (M3), and the manifest records what each contribution claimed as its base but not what the portal itself was proved against, so enable/sources can answer against a different universe than sync (M1). L1 is why H1 is green: every materialize test builds an additive contribution and asserts substrings. Earlier baseline is contribution-system-2026-07-29-reconciled.md. The editor and the validation/merge engine are still unbuilt."
+      "note": "The 2026-07-30 pass verified R1, R3 and R4 closed — enable stages and proves before writing, sync admits incrementally so one bad mod cannot withhold the portal, extraction finds the shipped form's label by what it says — and found H1: bd77f26's canonicalisation serialises a module, and serializeRegistryModule filters by inModule, so every edit to base content and every # remove is silently dropped. A contribution that adds a path between two base locations is stored as a bare # info, loads clean, and is reported enabled. The fix is written in a sibling file: squash-local-changes.ts:125 does the same serialize-then-reload and refuses on registryDiff, and c9c88e1 promoted registryDiff into the content layer one commit before bd77f26 declined to use it. Its mediums are all 'the rule is enforced at one granularity and not the next one down': the publisher refuses a DSL heading in the notes but not an unbalanced fence (M2), two dsl fences under one heading resolve by position although the comment says two delimiters are refused (M3), and the manifest records what each contribution claimed as its base but not what the portal itself was proved against, so enable/sources can answer against a different universe than sync (M1). L1 is why H1 is green: every materialize test builds an additive contribution and asserts substrings. Earlier baseline is contribution-system-2026-07-29-reconciled.md. The editor and the validation/merge engine are still unbuilt.",
+      "concepts": [
+        {
+          "name": "local changes",
+          "paths": [
+            "src/content/localChanges.ts",
+            "scripts/publish-local-changes.ts",
+            "scripts/squash-local-changes.ts"
+          ],
+          "note": "Named 'Local Changes' eleven times across docs/audits/contribution-system-*.md."
+        },
+        {
+          "name": "mod portal",
+          "paths": [
+            "src/content/modportal.ts",
+            "scripts/modportal.ts",
+            "scripts/lib/modportalCache.ts"
+          ],
+          "note": "Named 'mod portal' in docs/audits/contribution-system-2026-07-30.md, whose H1 and M1 are both about it."
+        },
+        {
+          "name": "the serializer",
+          "paths": [
+            "src/content/serialize.ts"
+          ],
+          "note": "Named 'the serializer' six times in docs/audits/contribution-system-*.md; contribution-system-2026-07-30-h1 is about what it drops."
+        },
+        {
+          "name": "registry diff",
+          "paths": [
+            "src/content/registryDiff.ts"
+          ],
+          "note": "Named 'registry diff' by contribution-system-2026-07-30-h1, which points at it as the fix already written in a sibling file."
+        },
+        {
+          "name": "issue form",
+          "paths": [
+            ".github/ISSUE_TEMPLATE/content-contribution.yml"
+          ],
+          "note": "Named 'issue form' four times in docs/audits/contribution-system-*.md."
+        }
+      ]
     },
     {
       "name": "User interface",
-      "paths": ["src/ui", "src/main.tsx", "src/index.css", "src/vite-env.d.ts", "index.html", "public", "postcss.config.js", "tailwind.config.js"],
+      "paths": [
+        "src/ui",
+        "src/main.tsx",
+        "src/index.css",
+        "src/vite-env.d.ts",
+        "index.html",
+        "public",
+        "postcss.config.js",
+        "tailwind.config.js"
+      ],
       "lastAudit": "f8c8c8d",
       "lastAuditDoc": "docs/audits/user-interface-2026-07-30.md",
       "note": "src/ui still does not exist, so coverage stays structurally limited until the GUI rebuild. The 2026-07-30 pass verified 060dd3e closed UI-H1 (the attic exclude), UI-M1 (270 to 70 lines of CSS, 16.57 to 6.98 kB), UI-M2 (public/content/) and UI-M3 (twelve unimported dependencies, reactflow included), and that 73a73f3's partition closed the 2026-07-28 orphan list — public/, postcss.config.js, tailwind.config.js and src/vite-env.d.ts are members now, which is why this system had a window at all. M1 is the one file of that sweep left standing: public/changelog.txt has no reader by the same grep that condemned public/content/, ships to itch.io and into the APK, and advertises the deleted legacy GUI's features under version 0.1.0. Its lows are the inherited remainder — 14 unused colour properties and seven data-theme/data-font-size rules nothing sets, a Tailwind glob sweeping three layers below this one, and a theme-color hand-copied from the stylesheet."
@@ -67,11 +195,91 @@
       ],
       "lastAudit": "4631baa",
       "lastAuditDoc": "docs/audits/testing-procedure-2026-07-30.md",
-      "note": "The 2026-07-30 pass verified the 2026-07-28 closures and found H1: /test runs a # test against the LIVE session state, so it rewinds the player and makes /create-valid-test emit a test that fails on its own first replay — reproduced end to end. Its mediums are one theme, gates claiming more than they check: an unresolvable lastAudit aborts the whole ledger before any verdict, the doc gate or the partition check, and 7676c09's hook reads that crash as silence (M1); layer-check never reads any file directly under src/, in either direction (M2); /create-test is the one authoring command that bypasses the /dsl machinery that would validate and persist it (M3). Owns .claude/hooks (2026-07-28 M5). Its scripts coverage names the files it implements, except that scripts/lib is declared whole and so double-charges the contribution system's modportalCache.ts — L4, open. Eleven of this window's sixteen commits reached it only through scripts/play-cli.ts, which is a downstream consumer of every layer beneath it; the coverage is still earned, since nobody else audits that file and H1 and M3 are both in it. runTest and # test parsing live under src/ and are covered by the DSL load path and Runtime as well."
+      "note": "The 2026-07-30 pass verified the 2026-07-28 closures and found H1: /test runs a # test against the LIVE session state, so it rewinds the player and makes /create-valid-test emit a test that fails on its own first replay — reproduced end to end. Its mediums are one theme, gates claiming more than they check: an unresolvable lastAudit aborts the whole ledger before any verdict, the doc gate or the partition check, and 7676c09's hook reads that crash as silence (M1); layer-check never reads any file directly under src/, in either direction (M2); /create-test is the one authoring command that bypasses the /dsl machinery that would validate and persist it (M3). Owns .claude/hooks (2026-07-28 M5). Its scripts coverage names the files it implements, except that scripts/lib is declared whole and so double-charges the contribution system's modportalCache.ts — L4, open. Eleven of this window's sixteen commits reached it only through scripts/play-cli.ts, which is a downstream consumer of every layer beneath it; the coverage is still earned, since nobody else audits that file and H1 and M3 are both in it. runTest and # test parsing live under src/ and are covered by the DSL load path and Runtime as well.",
+      "concepts": [
+        {
+          "name": "the systems manifest",
+          "paths": [
+            "scripts/lib/systems.ts"
+          ],
+          "note": "testing-procedure-2026-07-30-pass2-m6 is about this concept having had two readers and two type declarations; arch-ownership-seam produced its ownership rule and concept schema here."
+        },
+        {
+          "name": "plan report",
+          "paths": [
+            "scripts/lib/planCheck.ts"
+          ],
+          "note": "Produced by coord-plan, closed; the claim is recorded on that task."
+        },
+        {
+          "name": "derived architecture view",
+          "paths": [
+            "scripts/lib/architecture.ts"
+          ],
+          "note": "Produced by arch-derived-view, closed; the claim is recorded on that task."
+        },
+        {
+          "name": "whole-store produces query",
+          "paths": [
+            "scripts/lib/producers.ts"
+          ],
+          "note": "Produced by arch-query-commands; the claim is recorded on that task."
+        },
+        {
+          "name": "the event log",
+          "paths": [
+            "scripts/lib/eventLog.ts"
+          ],
+          "note": "Named 'the event log' three times across docs/audits/testing-procedure-*.md."
+        },
+        {
+          "name": "the commit contract",
+          "paths": [
+            "scripts/lib/commitContract.ts"
+          ],
+          "note": "Named 'the commit contract' three times across docs/audits/testing-procedure-*.md."
+        },
+        {
+          "name": "the task record",
+          "paths": [
+            "scripts/lib/taskStore.ts"
+          ],
+          "note": "coord-fields produced 'writes grant' and 'produces claim', both fields of the record this file defines."
+        },
+        {
+          "name": "spec documents",
+          "paths": [
+            "scripts/lib/specDoc.ts"
+          ],
+          "note": "The clause and audit-pass machinery; testing-procedure-2026-07-30-pass2-m3 is about its writers."
+        },
+        {
+          "name": "the layer rule",
+          "paths": [
+            "scripts/lib/layers.ts",
+            "scripts/layer-check.ts"
+          ],
+          "note": "testing-procedure-2026-07-30-m2 is about what layer-check does and does not read."
+        },
+        {
+          "name": "the play CLI",
+          "paths": [
+            "scripts/play-cli.ts"
+          ],
+          "note": "testing-procedure-2026-07-30-h1 is about /test running against live session state in this file."
+        }
+      ]
     },
     {
       "name": "Build & deployment",
-      "paths": [".github/workflows/publish.yml", "android", "capacitor.config.ts", "vite.config.ts", ".gitattributes", "run-web.cmd"],
+      "paths": [
+        ".github/workflows/publish.yml",
+        "android",
+        "capacitor.config.ts",
+        "vite.config.ts",
+        ".gitattributes",
+        "run-web.cmd"
+      ],
       "lastAudit": "f8c8c8d",
       "lastAuditDoc": "docs/audits/build-deployment-2026-07-30.md",
       "note": "The 2026-07-30 pass verified BD-H1 (base is './' and the built HTML proves it), BD-M2/M3 (every action pinned by commit, least-privilege permissions), BD-L1 (versionCode/versionName derived from package.json) and BD-L3/L4 closed, and found H1: capacitor.config.ts reads NODE_ENV, npm run build sets it inside the Vite process only, and cap sync is the next process in the chain — so the signed release APK is built in dev configuration, pointing its WebView at http://10.0.2.2:5173 with cleartext on. Reproduced under the exact environment publish.yml provides. BD-H2 stays open and wants the same release-readiness gate. Mediums: the two publish jobs have no needs: between them so a tag can half-publish, and neither runs the test suite, because test.yml fires on branches and pull_request and a tag push matches neither; and pinning stops at the actions, not at what Gradle resolves in the job holding SIGNING_KEY. L1 records that .gitattributes and test.yml justify each other with a claim the same commit made false — with eol=lf in the index both runners check out identical bytes, and the real CRLF guard is integration.test.ts. M1 of 2026-07-28 stays fixed: package.json and tsconfig.json are not members, which is why this window is two commits rather than twelve."

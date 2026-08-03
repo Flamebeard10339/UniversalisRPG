@@ -46,6 +46,35 @@ improvement. Newest section last.
    backslash. Losing a character silently in a code-generating command is the worst shape of bug —
    it looks like the model wrote broken code.
 
+### A git worktree gets no `node_modules`, and 97 tests fail for that reason alone
+
+4. **`npm test` reported 98 failures across four files, and 97 of them were the environment.**
+   `EnterWorktree` creates the worktree and the session works there, but nothing installs or links
+   dependencies into it. `npx tsx` still works, because npx resolves upward — so every command
+   used during development succeeds, and the gap stays invisible until the test suite runs.
+
+   The suites that fail are the ones spawning a subprocess through a *hardcoded* interpreter path:
+
+   ```
+   const tsx = path.join(repoRoot, 'node_modules/tsx/dist/cli.mjs');
+   ```
+
+   In a worktree that path does not exist, `node` exits 1 with `Cannot find module`, and the test
+   sees empty stdout. The assertion that then fails is `expected '' to contain 'Enabled ...'` —
+   which reads exactly like a logic bug in the code under test. I spent a stash-and-bisect cycle
+   confirming the failures predated my changes before finding the real cause.
+
+   Fix: `rm -rf node_modules && cmd //c "mklink /J node_modules <main-checkout>\node_modules"`.
+   A junction rather than a copy, and `node_modules/` is already gitignored so nothing leaks.
+   Worth noting the worktree also had an *empty* `node_modules/` containing only vitest's `.vite`
+   cache, which is why a bare `ls -d node_modules` says it exists.
+
+   **Wishlist.** `EnterWorktree` should link or install dependencies when the repo has a
+   `node_modules` and the new worktree does not — or say, once, that it has not. Failing that, the
+   test helpers should resolve the interpreter rather than hardcode a path
+   (`require.resolve('tsx/cli')`), so a worktree run fails with a real message instead of an
+   assertion about output that was never produced.
+
 ### `tasks` warns about uncommitted store state on every single write
 
 3. **Six consecutive `tasks add` calls printed the same warning six times.** `docs/tasks.jsonl has

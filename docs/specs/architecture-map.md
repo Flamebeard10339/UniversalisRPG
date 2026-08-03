@@ -42,7 +42,7 @@ Proof:
   already-closed task's claim. The existing in-set check keeps working and is not duplicated by a
   second implementation.
 - [c8] A file claimed by two concepts of the same system is reported as one file doing two jobs.
-  `src/content/action.ts` — `dsl-load-path-2026-07-28-m2`, "a second, laxer copy of the section
+  `src/grammar/action.ts` — `dsl-load-path-2026-07-28-m2`, "a second, laxer copy of the section
   field engine" — is the worked example, and the report names it once the registry describes it.
 - [c9] The registry is seeded **from evidence**: the twenty `produces` claims already in the store
   and the audit archive in `docs/audits/`. A seeded concept that cannot cite where its name came

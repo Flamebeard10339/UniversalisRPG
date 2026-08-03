@@ -187,6 +187,29 @@ export function coveringSystems(manifest: Manifest, file: string): string[] {
 // Every concept of this system that claims the file. Not single-valued on
 // purpose: two concepts claiming one file is the signal that the file does
 // two jobs, so the overlap is the answer rather than something to resolve.
+export interface SharedFile {
+  file: string;
+  owner: string;
+  alsoCovered: string[];
+  // True when specificity did not decide it and the name tie-break did.
+  tied: boolean;
+}
+
+// The end of the partition an orphan check cannot see: a file every system
+// claims passes "is anything unowned" as easily as a file exactly one claims.
+// Reported, never failed — redundant audit coverage is deliberate here, and
+// the thing worth knowing is which system a diff will now be charged to.
+export function sharedOwnership(manifest: Manifest, files: string[]): SharedFile[] {
+  return files.flatMap((file) => {
+    const ownership = ownerOf(manifest, file);
+    // Owned by nobody: the orphan check's business, and it fails on it.
+    if (ownership === null) return [];
+    const covering = coveringSystems(manifest, file);
+    if (covering.length < 2) return [];
+    return [{ file, owner: ownership.system.name, alsoCovered: covering.filter((name) => name !== ownership.system.name), tied: ownership.tiedWith.length > 0 }];
+  });
+}
+
 export function conceptsClaiming(system: System, file: string): Concept[] {
   return system.concepts.filter((concept) => concept.paths.some((path) => covers(path, file)));
 }
@@ -268,8 +291,12 @@ export function checkManifest(manifest: Manifest, exists: (path: string) => bool
     if (concept.note === null) issues.push({ level: 'warning', message: `concept "${concept.name}" (${system.name}) has no note saying where its name came from` });
 
     for (const path of concept.paths) {
-      if (!system.paths.some((owned) => covers(owned, path))) {
-        issues.push({ level: 'error', message: `concept "${concept.name}" names ${path}, which its system ${system.name} does not own — a concept refines its system and cannot reach outside it` });
+      // Ownership, not coverage: `src/content` covers `modportal.ts`, which
+      // the Contribution system owns, so a coverage test would let the DSL
+      // load path register a concept over another system's module.
+      const owner = ownerOf(manifest, path)?.system.name ?? null;
+      if (owner !== system.name) {
+        issues.push({ level: 'error', message: `concept "${concept.name}" names ${path}, which ${owner === null ? 'no system owns' : `${owner} owns`} — a concept refines its own system and cannot reach outside it` });
       }
       if (!exists(path)) issues.push({ level: 'warning', message: `concept "${concept.name}" (${system.name}) names a path that does not exist: ${path}` });
     }
