@@ -83,3 +83,22 @@ Proof:
 ## Open questions
 
 None.
+
+## Audit passes
+
+### Pass 1 — 2026-08-03
+
+- base: `3d3386ac7ca181b04b1684efe305b35bb021009e`
+- head: `7b169107b34ae35eae01e73524ef82d3498c90ff`
+- proof 1: met — printf an instant+time: snippet | npm run probe -- - prints the loader diagnostic and exits 1; no test file, runner or log involved
+- proof 2: met — probe base.dsl cut.dsl loads both in declared dependency order and --show resolves by module id; probe.test.ts proves argument order does not decide it
+- proof 3: met — KIND_TO_MAP is derived from CONTENT_SECTION_MAPS and probe.test.ts iterates it, so a new kind needs no edit here; unknown kind and absent id both refuse with the list. M5 is against the clause premise, not the clause
+- proof 4: unmet
+- proof 5: unmet
+- proof 6: met — nine mutations across three files in one invocation, tree byte-identical after; restore held on non-zero exit, on a throwing runner, and on uncommitted content; originals populated in refuse() before any write
+- proof 7: met — a four-entry manifest with three bad entries reported all three by name, wrote nothing, and left git status --porcelain empty
+- proof 8: met — every reported line carries its scope; scopeOf defaults to whole suite and formatReport cannot print a verdict without it
+- proof 9: met — an injected corrupting store yields unrestored:[a.ts] and ok:false; M2 is an escape at the runMutations API level, filed open
+- proof 10: met — npm run audit-status exit 0; four new script files under Testing procedure, both new src/content files under Contribution system and the src/content grant
+- proof 12: met — one heredoc of three documents split on --- gave two rejections and one load, one line each, exit 0; splitDocuments anchors the separator to a whole line
+- proof 11: met — 1074 passing in 59.57s, tsc and layer-check clean; mutate takes RunTests/FileStore as parameters so decision tests run with no subprocess, with three real tsx spawns to prove the seam
