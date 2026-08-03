@@ -1,4 +1,5 @@
-import { covers } from './systems';
+import { findProducers, type Producer } from './producers';
+import { normalizePath as normalize, pathsOverlap } from './systems';
 import { isBlocked, waitingOn, type Task } from './taskStore';
 
 // A plan is a set of tasks somebody is about to dispatch concurrently. Every
@@ -11,17 +12,8 @@ export type PlanLevel = 'defect' | 'note';
 
 export interface PlanFinding {
   level: PlanLevel;
-  kind: 'overlapping-writes' | 'unstated-dependency' | 'duplicate-produces' | 'no-write-grant' | 'unreadable-grant' | 'starts-blocked' | 'cohesion';
+  kind: 'overlapping-writes' | 'unstated-dependency' | 'duplicate-produces' | 'existing-producer' | 'no-write-grant' | 'unreadable-grant' | 'starts-blocked' | 'cohesion';
   message: string;
-}
-
-// Compared lowercase. On Linux `Foo.ts` and `foo.ts` are two files and on
-// Windows — this repo's primary platform — they are one, so a
-// case-sensitive comparison misses a real collision on the machine most of
-// this work happens on. A spurious finding costs a line in a report; a
-// missed collision costs the thing this module exists to prevent.
-function normalize(path: string): string {
-  return path.replace(/\\/g, '/').replace(/^\.\//, '').replace(/\/+$/, '').toLowerCase();
 }
 
 // A grant this check cannot resolve to a region of the tree. `covers`
@@ -32,15 +24,6 @@ function normalize(path: string): string {
 export function isReadableGrant(path: string): boolean {
   const normalized = normalize(path);
   return !normalized.includes('*') || /^\*\.[a-z0-9]+$/.test(normalized);
-}
-
-// `covers` is the repo's one answer to "does this declared path region
-// contain this file" — it is how audit-status attributes a diff to a
-// system, and a second implementation here would be a second set of edge
-// cases to keep in agreement. Overlap is containment in either direction.
-export function pathsOverlap(a: string, b: string): boolean {
-  const [x, y] = [normalize(a), normalize(b)];
-  return covers(x, y) || covers(y, x);
 }
 
 function overlappingPaths(a: Task, b: Task): string[] {
@@ -101,7 +84,11 @@ function readableWrites(task: Task): string[] {
   return task.writes.filter(isReadableGrant);
 }
 
-export function checkPlan(plan: Task[], all: Task[]): PlanReport {
+// `known` is every producer that already exists — registered concepts and
+// every claim any task ever made. It is built by the caller, which is the one
+// party holding both the manifest and the store, and entries belonging to
+// plan members are dropped here so a task can never collide with itself.
+export function checkPlan(plan: Task[], all: Task[], known: Producer[] = []): PlanReport {
   const findings: PlanFinding[] = [];
   const byId = new Map(all.map((task) => [task.id, task]));
 
@@ -143,6 +130,25 @@ export function checkPlan(plan: Task[], all: Task[]): PlanReport {
   }
   for (const [name, owners] of claims) {
     if (owners.length > 1) findings.push({ level: 'defect', kind: 'duplicate-produces', message: `${owners.join(' and ')} both claim to produce "${name}" — one of them is the owner and the other is a duplicate` });
+  }
+
+  // The same question the check above asks, widened past the dispatch set:
+  // two tasks in one plan claiming one interface is the rare case, and
+  // claiming something the repository already has is the common one.
+  const inPlan = new Set(plan.map((task) => task.id));
+  const outside = known.filter((producer) => !(producer.kind === 'task' && inPlan.has(producer.owner)));
+  for (const task of plan) {
+    for (const name of task.produces) {
+      for (const { producer, strength } of findProducers(name, outside)) {
+        if (strength === 'word') continue;
+        const held = producer.kind === 'concept' ? `${producer.owner} already has it as a registered concept` : `task ${producer.owner} (${producer.state}) already claims it`;
+        findings.push({
+          level: strength === 'exact' ? 'defect' : 'note',
+          kind: 'existing-producer',
+          message: `${task.id} claims to produce "${name}", and ${held} as "${producer.name}" — reuse it, or say why a second one is right`,
+        });
+      }
+    }
   }
 
   for (const task of plan) {

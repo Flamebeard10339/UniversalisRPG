@@ -1,18 +1,23 @@
 import { execFileSync } from 'node:child_process';
-import { covers, loadManifest, type Manifest, type System } from './lib/systems';
+import { checkManifest, covers, loadManifest, overlappingConcepts, sharedOwnership, type Manifest, type System } from './lib/systems';
 import { codeOnly } from './lib/stripComments';
 
 const MANIFEST = 'docs/audits/systems.json';
 
-// Membership only means something if it is a partition. A file owned by no
-// system can never trigger an audit, and nothing used to notice one appearing.
-function orphanedFiles(manifest: Manifest): string[] {
-  const declared = [...manifest.systems.flatMap((system) => system.paths), ...manifest.unowned.paths];
+function trackedFiles(): string[] {
   return git('ls-files')
     .trim()
     .split('\n')
-    .filter((file) => file !== '' && !declared.some((path) => covers(path, file)));
+    .filter((file) => file !== '');
 }
+
+// Membership only means something if it is a partition. A file owned by no
+// system can never trigger an audit, and nothing used to notice one appearing.
+function orphanedFiles(manifest: Manifest, tracked: string[]): string[] {
+  const declared = [...manifest.systems.flatMap((system) => system.paths), ...manifest.unowned.paths];
+  return tracked.filter((file) => !declared.some((path) => covers(path, file)));
+}
+
 
 function git(...args: string[]): string {
   return execFileSync('git', args, { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
@@ -78,7 +83,12 @@ function touchesSince(system: System): Touch[] {
 
 const manifest = loadManifest(MANIFEST);
 const verbose = process.argv.includes('--verbose');
+const tracked = trackedFiles();
 
+// A system's audit window is its declared paths — the coverage relation,
+// deliberately many-to-many. Ownership narrowed to one answer per file so
+// that "which files are in this system" could be asked; it is not consulted
+// here, so no window moved when it did.
 for (const system of manifest.systems) {
   const touches = touchesSince(system);
   const changing = touches.filter((touch) => touch.code).length;
@@ -94,10 +104,28 @@ for (const system of manifest.systems) {
   if (verbose) for (const touch of touches) console.log(`      ${touch.code ? 'code ' : 'no-op'} ${touch.sha} ${touch.subject}`);
 }
 
-const orphans = orphanedFiles(manifest);
-
 console.log(`\nSystems and their paths are declared in ${MANIFEST}. Counts are informational: an audit reviews a branch's diff, not a commit total.`);
 
+const shared = sharedOwnership(manifest, tracked);
+if (shared.length > 0) {
+  console.log(`\nshared:        ${shared.length} tracked file(s) sit in more than one audit window. Ownership resolves each to the system whose claim is most specific:`);
+  for (const entry of shared) console.log(`               ${entry.file} -> ${entry.owner}${entry.tied ? ' (BY TIE-BREAK, not by specificity)' : ''}, also audited by ${entry.alsoCovered.join(', ')}`);
+}
+
+const overlaps = overlappingConcepts(manifest);
+if (overlaps.length > 0) {
+  console.log(`\nconcepts:      ${overlaps.length} path(s) claimed by two concepts of one system. A file doing two jobs is where a seam belongs:`);
+  for (const entry of overlaps) console.log(`               ${entry.path} — ${entry.concepts.join(' and ')} (${entry.system})`);
+}
+
+for (const issue of checkManifest(manifest)) console.log(`\n${issue.level === 'error' ? 'manifest err' : 'manifest    '}:  ${issue.message}`);
+
+const orphans = orphanedFiles(manifest, tracked);
+
+// The one condition this exits non-zero on, unchanged: attributing a diff to
+// a system depends on every file being attributable at all. Everything above
+// reports, because a report that names the problem is worth more than a gate
+// that hides it behind a rerun.
 if (orphans.length > 0) {
   console.error(`\nunowned:       ${orphans.length} tracked file(s) belong to no system and are not declared unowned in ${MANIFEST}:`);
   for (const file of orphans) console.error(`               ${file}`);

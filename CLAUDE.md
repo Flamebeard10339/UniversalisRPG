@@ -20,7 +20,7 @@ A file drifting toward heavy commenting is a design signal — read it as "this 
 
 Do not bloat CLAUDE.md with over 200 lines of instructions. 
 
-`.planning/.scratch.md` contains open thoughts. Vetted work, its state, and its archive all live in `docs/tasks.jsonl`, reached through `npm run tasks` — `tasks next` for what to work on, `tasks show <id>` for a task's full record. A branch's own spec lives at `docs/specs/<slug>.md`. `docs/workflow.md` is the end-to-end protocol every agent follows — decompose against disjoint `writes` grants, grade the set with `tasks plan` before dispatching it, and let a worker correct its own grant before it writes code. `.planning/agent-swarm-theory.md` holds what a planner owes the tree — read it before decomposing a finding list into worker chunks.
+`.planning/.scratch.md` contains open thoughts. Vetted work, its state, and its archive all live in `docs/tasks.jsonl`, reached through `npm run tasks` — `tasks next` for what to work on, `tasks show <id>` for a task's full record. A branch's own spec lives at `docs/specs/<slug>.md`. `docs/workflow.md` is the end-to-end protocol every agent follows — decompose against disjoint `writes` grants, grade the set with `tasks plan` before dispatching it, and let a worker correct its own grant, and register what it produces, before it writes code. `.planning/agent-swarm-theory.md` holds what a planner owes the tree — read it before decomposing a finding list into worker chunks.
 
 # Wisdom that reduces audit issues
 - Enforce where a value is assembled, not where it is written
@@ -29,7 +29,9 @@ Do not bloat CLAUDE.md with over 200 lines of instructions.
 
 A system owns a set of paths, declared in `docs/audits/systems.json` — the one place membership is defined, so a diff's system follows from the files it touches. Membership is a partition: every tracked file is owned by a system or listed under `unowned` (prose, audit records, repo-wide manifests). That partition is the one condition `npm run audit-status` fails on, because attributing a diff to a system depends on it.
 
-`npm run audit-status` otherwise only reports: per system, how much has changed since its last whole-system sweep. Those counts trigger nothing, and a sweep has no cadence — it is requested by hand and logged, so that a cadence can eventually be derived from how often that happens rather than guessed. Record one by setting that system's `lastAudit` to the reviewed SHA.
+Two relations, deliberately different. **Ownership** is single-valued — one file, one system, resolved by the most specific declaration, never by manifest order — and is what `tasks where` and `tasks system` answer from. **Coverage** stays many-to-many and is what an audit window is drawn from, so a file two systems both read is audited twice on purpose. A system's paths may also carry **concepts**, one per thing the system knows how to do; `tasks produces "<name>"` asks whether a capability already exists before anything is built, and two concepts claiming one file is the report that the file does two jobs.
+
+`npm run audit-status` otherwise only reports: per system, how much has changed since its last whole-system sweep, which files sit in more than one audit window, and which files two concepts both claim. Those counts trigger nothing, and a sweep has no cadence — it is requested by hand and logged, so that a cadence can eventually be derived from how often that happens rather than guessed. Record one by setting that system's `lastAudit` to the reviewed SHA.
 
 Audits are the one gate that has repeatedly caught real defects, so they stay. Resist adding new automated gates: a gate earns its place by preventing something that actually happened, not by sounding rigorous.
 

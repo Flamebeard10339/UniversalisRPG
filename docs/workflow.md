@@ -48,6 +48,36 @@ npm run tasks -- add "extract the policy module" --writes scripts/lib/policy.ts 
 - **`requires`** — the tasks that must land first. A forward reference to a record that does not
   exist yet is allowed and holds the task until that record arrives.
 
+Before granting `produces`, ask whether it already exists:
+
+```bash
+npm run tasks -- produces "batching"
+```
+
+That searches every concept a system has registered and every `produces` claim any task ever
+made, closed ones included. A miss is a weak "no" — it says the *record* is silent, not that the
+code is — so grep as well. A hit names the owner, and reusing it is cheaper than a second one.
+
+### The architecture is a query, not a document
+
+Three reads, all computed from the tree when you ask and stored nowhere:
+
+```bash
+npm run tasks -- system                     # every system, with its counts and dependencies
+npm run tasks -- system "Runtime"           # one system: owned files, exports, both directions, concepts
+npm run tasks -- where src/runtime/save.ts  # the reverse: who owns this file, what claims it
+```
+
+`system` is the planner's view and `where` is the worker's. **Dependencies are between systems,
+not files** — `where` shows only the imports that cross a boundary, because everything inside one
+system is ordinary coupling.
+
+A **concept** is one thing a system knows how to do. Concepts live inside
+`docs/audits/systems.json`, refining systems rather than partitioning the tree a third time
+alongside layers and systems, so a concept's paths always sit inside its own system's. Two
+concepts claiming one file is not an error — it is the report that the file does two jobs, and
+`npm run audit-status` names it.
+
 ## 3. Grade the plan before dispatching it
 
 ```bash
@@ -57,7 +87,7 @@ npm run tasks -- plan <id>...
 No workers run. It reports, in one command, what has previously taken a measurement pass to find
 by hand:
 
-Each line is tagged `[defect]` or `[note]` and says what it found in full; these are the seven
+Each line is tagged `[defect]` or `[note]` and says what it found in full; these are the eight
 situations it can report.
 
 | it reports | what it means | remedy |
@@ -65,6 +95,7 @@ situations it can report.
 | *"both write X, and neither requires the other"* | two unordered tasks write one region | merge them; they are one change |
 | *"writes X, where Y is producing Z"* | one writes where another is inventing an interface | add the `requires` edge |
 | *"both claim to produce Z"* | two tasks claim one interface | one is the owner, the other is a duplicate |
+| *"claims to produce Z, and X already has it"* | the repository already has that capability | reuse it, or record why a second is right |
 | *"N of M granted task(s) write X"* | most of the plan lands in one path | it is one task, and more workers buy nothing |
 | *"declares no writes"* | nothing to compare | grant it, or accept that this task was not checked |
 | *"cannot resolve to a region"* | a grant with a wildcard in it | name paths or directories — a glob compares nothing |
@@ -93,6 +124,20 @@ worker is the first party who has. It is also where refusal gets a slot instead 
 initiative: **briefs must invite refusal, and a planner must believe it.** Twice that produced a
 correct refusal — a reproduction that was information-theoretically impossible, and a fix that
 silently retracted a protection. Both would otherwise have shipped.
+
+**This is where a concept gets registered, and it is the only place.** The worker has just read the
+region and is the first party who knows what is actually there, which is exactly what the registry
+needs and what the planner did not have. So in the same round trip: run `tasks produces` for
+anything the task claims, and if the capability is real and nothing owns it yet, name its owner.
+
+```bash
+npm run tasks -- concept "Runtime" "buff engine" --paths src/runtime/buffs.ts --note "produced by buffs-generalized"
+```
+
+Register durable capabilities only. A branch's output — "playtest findings", "balance numbers" —
+is not one, and a registry full of those answers "no owner" with confidence about things that were
+never capabilities. `tasks done` prints the claims it did not find registered and the command that
+would register them; it never writes one itself, because that judgement is the whole point.
 
 One round trip. If it grows a protocol, it has failed.
 
