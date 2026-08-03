@@ -138,3 +138,22 @@ None.
 - proof 10: met — audit-status exit 0; the new record is under docs/ and the friction logs under .planning, both unowned
 - proof 12: met — unchanged; --each surveys and exits 0 on a table of rejections
 - proof 11: met — 1113 passing in 52.49s, tsc and layer-check clean. Caveat H1: runTests is the one decision not passed in as data, which is why H2's fix is untestable
+
+### Pass 3 — 2026-08-03
+
+- base: `3d3386ac7ca181b04b1684efe305b35bb021009e`
+- head: `9b2a4b3df5ae8153e155538cfc104f296a375032`
+- proof 1: met — unchanged; a rejecting source prints the loader diagnostic and exits 1
+- proof 2: met — two sources load in dependency order from loaded.parsed; --show and --round-trip name module ids
+- proof 3: met — SHOWABLE derives from CONTENT_SECTION_MAPS; the refusal groups section kinds and registry maps separately
+- proof 4: met — the # remove universe reports clean and universe-reloads-originals is now KILLED, so the mechanism is falsifiable; pass 2 caveat discharged
+- proof 5: met — one implementation in src/content; serialize.test.ts calls roundTripModule; UniverseRoundTrip no longer extends RoundTrip
+- proof 6: met — restore held byte-identical across ~20 mutations this pass; tree clean after every run
+- proof 7: met — applied nothing on a refused manifest, nothing written, and the check now runs before the baselines
+- proof 8: met — every row names its scope and unmeasured marks a verdict with no baseline; pass-3 H1 is that the baseline is wrong, not that it is unnamed
+- proof 9: met — unrestored is reached on every path and restoreFailures is folded in and pinned
+- proof 10: met — audit-status exit 0
+- proof 12: met — unchanged; --each surveys and exits 0 on a table of rejections
+- proof 13: met — --round-trip=module finds the contribution-system H1 in one command; H2 is that the mode does not carry canSerialize
+- proof 14: unmet
+- proof 11: met — 1153 passing in 53.29s; tallyOf is the subprocess-as-data seam the clause asks for. L5 records that main()'s composition is still outside it

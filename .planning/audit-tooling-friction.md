@@ -134,3 +134,91 @@ closed gap as open.
   `registry maps:`, so the two are visibly two. Both spellings are still not accepted for one record.
 - **Entries 2 (`--keep-output`), 4 (`--dry-run`) and the rest of 6 are open**, and entry 8's two
   "leave it out" arguments are accepted as written.
+
+**One correction, pass 3.** "Baselines are measured on first use for the same reason" reads as a
+cost-only change and is not. Moving the baseline to first use moved its call site inside the mutated
+window — `baselineFor` is invoked from `measure`, which runs after the mutant is on disk — so the
+"unmutated baseline" is measured against the mutant. That is pass-3 H1, not friction. Everything else
+in this block matches what I measured, except the headline number: a fifteen-mutation battery over
+four scopes with one escalation took **2m12s** here, against roughly fourteen minutes under pass-2
+rules. Still the same order of improvement; 33 seconds is a floor rather than a typical figure.
+
+### `audit-probe-tooling` pass 3 — 2026-08-03, independent auditor
+
+Escalation changed how I work, not just what I type — details in item 6. The rest is what I still
+could not ask.
+
+**1. "Was that baseline measured on a clean tree?" — the report asserts it and cannot show it.**
+
+`measuring the unmutated baseline for X...` is an adjective I have to trust. Nothing in the output
+distinguishes a baseline taken before the write from one taken after it, and the row only carries the
+*derived* shortfall — so when the baseline is wrong, the symptom is silence. To find out which it was
+I read `measure()` and reasoned about JavaScript argument evaluation order, then wrote a `tsx`
+harness driving `runMutations` with an instrumented `FileStore` and `RunTests` that logged whether
+each run saw the original or the mutant. Cost: about twenty minutes, and it produced the highest
+finding of the pass.
+
+**What would have answered it:** print the baseline as a number, not as an adjective —
+`SURVIVED  0 failed of 30  (baseline 48)`. A number I can check against a plain `npm test` needs no
+trust. The silence-on-failure shape is the problem: every other claim this tool makes is falsifiable
+from its own output, and this one is not.
+
+**2. "Show me both verdicts, not the survivor of them."**
+
+Escalation collapses two measurements into one row. When narrow and wide disagree, the disagreement
+*is* the finding — `SURVIVED at one.test.ts, KILLED at whole suite` says exactly which file was
+missing a test. The row prints `one.test.ts -> whole suite` and only the wide numbers, so the shape
+of the coverage gap is discarded at the moment it is discovered. I reached for a scratch harness
+again to see both. `narrow SURVIVED (0 of 20) -> wide KILLED (1 of 900)` costs one line and answers
+"where should the test go".
+
+**3. "Is the suite green right now?"**
+
+Every escalated verdict depends on it and nothing says. One unrelated red test anywhere makes every
+escalation report `KILLED`, because the verdict is `failed > 0` rather than `failed > baseline
+failures`. I could only establish this by construction, in the same scratch harness. The whole-suite
+baseline already runs unmutated — recording its `failed` alongside its `total` would answer the
+question for free, and a red baseline is worth refusing over rather than reporting through.
+
+**4. "Re-run just this one."**
+
+No `--only <name>`. Re-running one mutation out of fifteen meant hand-copying the manifest and
+deleting fourteen entries; I did that three times. `--only` / `--skip` taking mutation names would
+have cost nothing — the names are already the primary key and already unique by validation.
+
+**5. The journal is still invisible until it bites.**
+
+Pass-2 entry 6 is closed in the part that reports a *broken* journal and open in the part that
+matters day to day. To check whether a refused run had left one behind, I recomputed the sha256 path
+by hand in `node -e`. `--journal` (print it, `--journal clear` to drop it) is still the answer, and
+it is now more useful than it was in pass 2, because the path is per-checkout and therefore no longer
+guessable.
+
+**6. Escalation: the cost went away rather than moving.** *(the thing you asked about)*
+
+Fifteen mutations across four scopes, one escalation, **2m12s wall clock**. The same battery under
+pass-2 rules — everything at whole-suite scope so the verdicts would stand — was about fourteen
+minutes. Fourteen of the fifteen died narrow and never paid for the suite.
+
+The behavioural change is real and is not about speed. In pass 2 I chose scope as a *claim*: naming a
+narrow scope meant accepting a weaker verdict, so I named the whole suite and waited. Now I choose
+scope as a *filter*: the narrowest set of files that could plausibly contain the test, because being
+wrong is free — a wrong guess just escalates. I stopped thinking about scope before writing a
+manifest, which is the first time any part of this workflow got cheaper to *think* about rather than
+to run. That is the effect worth keeping, more than the six-fold clock saving.
+
+The one place it moved cost rather than removing it: a battery where most mutations survive pays for
+the suite once per survivor's escalation *plus* the whole-suite baseline, so a badly-covered area is
+now slower than it was. That is the right way round.
+
+**7. What should stay out of the tools.**
+
+- I wanted a way to say "exit 0 when everything died except these known survivors", so a battery
+  could be re-run as a check. No. A survivor is the finding, and an exit code with an allowlist is a
+  gate that lies. If a survivor is accepted, it belongs in `docs/audits/`, not in a manifest flag.
+- `--round-trip=module` should not become the default, and has not. Universe is the question about
+  the content; module is the question about publishing. An auditor who has not thought about which
+  one they want should get the one that does not blame a healthy module.
+- I did not want `probe` to gain a `--diff` against a previous run. A probe is a question asked now;
+  storing the previous answer makes it a fixture, and fixtures rot exactly the way this branch's
+  Deliverable says mutation manifests do.
