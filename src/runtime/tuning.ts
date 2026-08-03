@@ -27,5 +27,5 @@ export function contestSpread(registry: Registry): number {
 const DEFAULT_DEFAULT_ACTION_DURATION = 0;
 
 export function defaultActionDuration(registry: Registry): number {
-  return Math.max(0, registry.variables.get(DEFAULT_ACTION_DURATION)?.value ?? DEFAULT_DEFAULT_ACTION_DURATION);
+  return registry.variables.get(DEFAULT_ACTION_DURATION)?.value ?? DEFAULT_DEFAULT_ACTION_DURATION;
 }

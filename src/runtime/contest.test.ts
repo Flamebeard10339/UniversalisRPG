@@ -150,7 +150,7 @@ describe('the opposed roll', () => {
 
   it('rejects a spread that cannot divide a gap', () => {
     expect(() => loaded('# variable contest-spread\nvalue: 0\n')).toThrow(DslError);
-    expect(() => loaded('# variable contest-spread\nvalue: -5\n')).toThrow(/must be positive/);
+    expect(() => loaded('# variable contest-spread\nvalue: -5\n')).toThrow(/must be at least 1/);
   });
 });
 

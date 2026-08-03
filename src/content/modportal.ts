@@ -2,7 +2,8 @@ import { LOCAL_CHANGES_MODULE_ID } from './localChanges';
 import { contributionBase, extractContributionDsl } from './contribution';
 import type { ContributionBase } from './contribution';
 import { parseModuleSource } from './universe';
-import { formatModuleDiagnostic, loadUniverseWithDiagnostics } from './registry';
+import { CONTENT_SECTION_MAPS, formatModuleDiagnostic, loadUniverseWithDiagnostics } from './registry';
+import type { Registry } from './registry';
 import type { ModuleSource } from './universe';
 import { serializeRegistryModule } from './serialize';
 import { visitSection } from './referenceSites';
@@ -115,24 +116,24 @@ function localVariableIds(parsed: ReturnType<typeof parseModuleSource>, moduleId
     .map((section) => renamedId((section.value as { id: string }).id, LOCAL_CHANGES_MODULE_ID, moduleId));
 }
 
+// Every section the rename has to reach, derived rather than restated: a kind
+// listed for the loader and forgotten here would keep its `local-changes.` id,
+// be dropped by serialize's own-module filter, and leave every reference that
+// WAS renamed pointing at a section the published mod no longer contains.
+// `flag` and `variable` are the two the loader's partition leaves out because
+// they hold no references of their own; `save` is renamed separately below.
+const RENAMED_SECTION_MAPS: readonly (readonly [string, keyof Registry])[] = [
+  ...CONTENT_SECTION_MAPS,
+  ['flag', 'flags'],
+  ['variable', 'variables'],
+];
+
 function canonicalLocalChangesModule(source: string, moduleId: string, base: readonly ModuleSource[]): string {
   const checked = loadUniverseWithDiagnostics([...base, { name: LOCAL_CHANGES_MODULE_ID, text: source }]);
   if (checked.diagnostics.length > 0) return replaceInfoId(source, LOCAL_CHANGES_MODULE_ID, moduleId);
   const parsed = parseModuleSource({ name: LOCAL_CHANGES_MODULE_ID, text: source });
   const registry = { ...checked.registry };
-  for (const [kind, mapName] of [
-    ['stat', 'stats'],
-    ['skill', 'skills'],
-    ['item', 'items'],
-    ['entity', 'entities'],
-    ['location', 'locations'],
-    ['recipe', 'recipes'],
-    ['resource', 'resources'],
-    ['dialogue', 'dialogues'],
-    ['flag', 'flags'],
-    ['variable', 'variables'],
-    ['test', 'tests'],
-  ] as const) {
+  for (const [kind, mapName] of RENAMED_SECTION_MAPS) {
     const sourceMap = checked.registry[mapName] as ReadonlyMap<string, { id: string }>;
     const next = new Map(sourceMap);
     for (const [id, value] of sourceMap) {

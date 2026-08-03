@@ -99,9 +99,17 @@ Proof:
   means an entity may name a template declared after it, which nothing else in the DSL requires you
   to order; the price is that removing a template removes it outright, and an entity still naming it
   fails rather than quietly keeping what it was built from. Both are pinned.
-- **An unknown bare tag on an action stays silently ignored.** Rejecting them is a strictly larger
-  change than this table and would turn the dresser's inert `once` into a load failure. That `once`
-  does nothing is a real defect and is filed as a finding, not fixed here.
+- **~~An unknown bare tag on an action stays silently ignored.~~ Reversed after the audit: an
+  action's bare tags are a closed set.** The original decision deferred the inert `once` as a
+  finding. Triage promoted it, and by then the taxonomy had made the case worse rather than better:
+  a mistyped `instnt` is silently `duration`, which is a wrong action rather than a missing one. So
+  `instant`, `continuous`, `retaliates` and stat bonuses are all an action may carry; `once` and
+  `repeating` name their replacements and everything else is refused.
+
+  **Three inputs that loaded on `main` are now load errors**, which is the compatibility cost of
+  that reversal: any unread bare tag on an action, a duration clause on an action (`4s` — the front
+  door's, which meant `time: 4`), and `# recipe … / time: 0` (which compiled to an instant craft and
+  now says so by carrying no cadence).
 
 ## Corrections to the task store
 

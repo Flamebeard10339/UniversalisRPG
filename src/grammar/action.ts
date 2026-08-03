@@ -5,7 +5,7 @@ import { Cursor, DslError, requireEnd } from './parser';
 import { EntryBody } from './section';
 import { RawLine } from './structure';
 import { TagClause, tagClause } from './tagClause';
-import { DECIMAL, id, numberOrStat } from './values';
+import { decimal, id, numberOrStat } from './values';
 
 // What ends the action, which is a different question from how fast it attempts.
 export type ActionKind = 'instant' | 'duration' | 'continuous';
@@ -70,21 +70,27 @@ export const actionKind = (action: Action): ActionKind => action.kind ?? 'durati
 type ActionValue = (cursor: Cursor, line: RawLine, label: string) => unknown;
 
 const conditionValue: ActionValue = (cursor) => (cursor.done ? undefined : condition.parse(cursor));
-const statValue: ActionValue = (cursor) => id.parse(cursor);
+const statValue = (written: string): ActionValue => (cursor, line, label) => named(written, label, line, () => id.parse(cursor));
 const resultsValue: ActionValue = (cursor, line) => (!cursor.done ? results.parse(cursor) : line.children.length > 0 ? results.parseBlock(line.children) : undefined);
 
-// Named rather than delegated to the generic `decimal`, whose message cannot
-// say which field it was reading and whose span is the bare cursor position.
-const seconds: ActionValue = (cursor, line, label) => {
-  const raw = cursor.take(DECIMAL);
-  if (raw === null) throw new DslError(actionProblem(label, 'time: takes a number of seconds'), line.span);
-  return Number(raw);
-};
+// A shared value parser reports what it expected but not what it was reading,
+// and pins the span to the cursor rather than the line. Every reader below is
+// wrapped so an unreadable value names its field, its action, and its line.
+function named<T>(written: string, label: string, line: RawLine, read: () => T): T {
+  try {
+    return read();
+  } catch (error) {
+    if (!(error instanceof DslError)) throw error;
+    throw new DslError(actionProblem(label, `${written}: ${error.message}`), line.span);
+  }
+}
+
+const seconds: ActionValue = (cursor, line, label) => named('time', label, line, () => decimal.parse(cursor));
 
 // A literal is attempts per minute; a name is the stat holding that number,
 // which is what makes a haste buff move a swing without touching the action.
 // Positivity is the table's business, checked once for both spellings.
-const perMinute: ActionValue = (cursor) => numberOrStat.parse(cursor);
+const perMinute: ActionValue = (cursor, line, label) => named('rate', label, line, () => numberOrStat.parse(cursor));
 
 const positiveCount =
   (written: string): ActionValue =>
@@ -105,11 +111,11 @@ const ACTION_FIELDS: readonly { written: string; label: RegExp; name: keyof Omit
   { written: 'on escape', label: /on escape:[ \t]*/, name: 'onEscape', value: resultsValue },
   { written: 'time', label: /time:[ \t]*/, name: 'time', value: seconds },
   { written: 'rate', label: /rate:[ \t]*/, name: 'rate', value: perMinute },
-  { written: 'accuracy', label: /accuracy:[ \t]*/, name: 'accuracy', value: statValue },
-  { written: 'evasion', label: /evasion:[ \t]*/, name: 'evasion', value: statValue },
-  { written: 'ability', label: /ability:[ \t]*/, name: 'ability', value: statValue },
-  { written: 'target', label: /target:[ \t]*/, name: 'target', value: statValue },
-  { written: 'dr', label: /dr:[ \t]*/, name: 'dr', value: statValue },
+  { written: 'accuracy', label: /accuracy:[ \t]*/, name: 'accuracy', value: statValue('accuracy') },
+  { written: 'evasion', label: /evasion:[ \t]*/, name: 'evasion', value: statValue('evasion') },
+  { written: 'ability', label: /ability:[ \t]*/, name: 'ability', value: statValue('ability') },
+  { written: 'target', label: /target:[ \t]*/, name: 'target', value: statValue('target') },
+  { written: 'dr', label: /dr:[ \t]*/, name: 'dr', value: statValue('dr') },
   { written: 'escape after', label: /escape after[ \t]+/, name: 'escapeAfter', value: positiveCount('escape after') },
 ];
 
@@ -166,7 +172,7 @@ export function actionTableProblem(action: Action): string | undefined {
 
   const written = action.time !== undefined ? 'time:' : 'rate:';
   const value = action.time ?? (typeof action.rate === 'number' ? action.rate : undefined);
-  if (value !== undefined && !(value > 0)) return `${written} must be positive — an action that takes no time is tagged instant`;
+  if (value !== undefined && !(value > 0)) return `${written} must be positive — something that takes no time carries no cadence at all`;
   return undefined;
 }
 

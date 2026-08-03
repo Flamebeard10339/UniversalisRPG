@@ -294,9 +294,6 @@ interface BuildFailure {
 // — override it, add one, remove one — then goes through the single merge rule
 // instead of a second one bolted on after the fact.
 //
-// The clone is load-bearing: reference resolution rewrote ids in place before
-// this ran, and a template object reachable from two entities would be walked
-// once per entity and bound to whichever went last.
 // Whether the section creates the entity or edits one that is already there is
 // not declared — it follows from what was loaded — so the template has to slide
 // underneath at whichever of the two first names a `type:`. What the entity

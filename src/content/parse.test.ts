@@ -334,6 +334,16 @@ describe('action kinds and their cadence', () => {
     expect(() => loadModule(`# item ore\nexamine: Rock.\n# recipe dig\n${line}\nout: 1 ore\n`)).toThrow(/# recipe dig action "Craft Dig": (time|rate): must be positive/);
   });
 
+  // A shared value parser says what it expected but not what it was reading;
+  // an author needs the field and the action as much as the table's errors do.
+  it.each([
+    [['rate:'], /action "work": rate: expected an id/],
+    [['time: abc'], /action "work": time: expected a number/],
+    [['accuracy:'], /action "work": accuracy: expected an id/],
+  ])('names the field and the action when a value will not read: %s', (lines, message) => {
+    expect(() => parseAction(...lines, 'say: hi')).toThrow(message);
+  });
+
   it.each([
     [['instant', 'time: 2'], /action "work": an instant action takes no time:/],
     [['instant', 'rate: 15'], /an instant action takes no rate:/],

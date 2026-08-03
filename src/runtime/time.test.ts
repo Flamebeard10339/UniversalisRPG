@@ -96,8 +96,14 @@ glance:
     expect(glancing.time).toBe(0);
   });
 
+  // A clamped-to-zero negative is a typo that survives to be wondered about
+  // later; contest-spread already refused its own bad value rather than clamp.
+  it('refuses a negative default-action-duration instead of quietly reading it as 0', () => {
+    expect(() => loadModule('# variable default-action-duration\nvalue: -5\n')).toThrow(/# variable default-action-duration must be at least 0, got -5/);
+  });
+
   it('refuses time: 0 and names the tag that means it', () => {
-    expect(() => loadModule('# entity clock\ntick:\n  time: 0\n  say: Tick.\n')).toThrow(/action "tick": time: must be positive.*tagged instant/);
+    expect(() => loadModule('# entity clock\ntick:\n  time: 0\n  say: Tick.\n')).toThrow(/action "tick": time: must be positive.*carries no cadence/);
   });
 });
 
