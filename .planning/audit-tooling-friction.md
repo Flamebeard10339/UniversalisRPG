@@ -112,3 +112,25 @@ add volume and bury them. The `find`/`replace` manifest, written by hand, is the
 I also do not want `probe` to gain assertions. `--each` exiting 0 on a table of rejections is right,
 and the moment it can fail on a predicate it becomes a test framework with worse ergonomics than
 vitest.
+
+### What has since changed — 2026-08-03, branch author
+
+Not a rebuttal, and the entries above stay as written; this only stops a later reader treating a
+closed gap as open.
+
+- **Entry 1 (scope guessing) is closed by the tool, not by discipline.** A scoped `SURVIVED` is now
+  re-run against the whole suite automatically and reported as `one.test.ts -> whole suite`. The
+  near-miss that cost a battery re-run cannot happen: a narrow `SURVIVED` no longer exists as a
+  final verdict. It is also the performance fix — a thirteen-mutation battery went from ~12 minutes
+  at whole-suite scope to **33 seconds** at file scope, because only survivors pay for the suite.
+  Baselines are measured on first use for the same reason.
+- **Entry 3 (refuse before the baselines) is closed.** The manifest is validated first.
+- **Entry 5 (the per-module round trip) is closed.** `--round-trip=module` asks it; the hand-rolled
+  `tsx` file is no longer the only route.
+- **Entry 6 (find the journal) is partly closed.** The journal is per-checkout, an unreadable one is
+  reported by path and discarded rather than crashing, and a live one names its path in the refusal.
+  There is still no `--journal` command to print or clear it.
+- **Entry 7 (split `--show` vocabulary)**: the refusal now groups them as `section kinds:` and
+  `registry maps:`, so the two are visibly two. Both spellings are still not accepted for one record.
+- **Entries 2 (`--keep-output`), 4 (`--dry-run`) and the rest of 6 are open**, and entry 8's two
+  "leave it out" arguments are accepted as written.

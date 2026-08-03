@@ -83,13 +83,16 @@ describe('probe: --show', () => {
     expect(shown.lines.join('\n')).toContain('"value": 5');
   });
 
-  it('refuses an unknown name and lists everything it takes, kinds and maps alike', () => {
+  // Two vocabularies — authoring kinds and registry map names — printed as one
+  // undifferentiated row is what made `variable` the natural wrong guess.
+  it('refuses an unknown name and lists the two vocabularies separately', () => {
     const result = report([BASE], { show: ['widget.base.rat'], roundTrip: false });
     expect(result.ok).toBe(false);
     const lines = result.lines.join('\n');
     expect(lines).toContain('names nothing the registry holds');
+    expect(lines).toMatch(/section kinds: .*\bentity\b/);
+    expect(lines).toMatch(/registry maps: .*\bvariables\b/);
     for (const [kind] of CONTENT_SECTION_MAPS) expect(lines).toContain(kind);
-    for (const map of ['flags', 'variables', 'saves']) expect(lines).toContain(map);
   });
 
   it('refuses an absent id and lists what that kind does define', () => {
@@ -129,6 +132,16 @@ describe('probe: --round-trip', () => {
     expect(result.lines.join('\n')).not.toContain('variables: missing');
   });
 
+  // Both patch fixtures below own no ids of their own, so a serialization that
+  // silently covered only some of the universe would be invisible through them.
+  // This one owns content, so dropping it from the set loses that content.
+  it('serializes every module, not the first', () => {
+    const owning = patch('# item ribbon', 'title: Ribbon', '', '# item lantern', 'title: Lantern');
+    const result = report([BASE, owning], { show: [], roundTrip: true });
+    expect(result.ok).toBe(true);
+    expect(result.lines.join('\n')).toContain('round-trips clean');
+  });
+
   it('survives a universe whose modules patch each other', () => {
     const result = report([BASE, patch('# item base.bread', 'title: Toast')], { show: [], roundTrip: true });
     expect(result.ok).toBe(true);
@@ -147,6 +160,26 @@ describe('probe: --round-trip', () => {
     const result = report([{ name: 'snippet', text: '# item rock\ntitle: Rock\n' }], { show: [], roundTrip: true });
     expect(result.lines.join('\n')).toContain('no # info');
     expect(result.lines.join('\n')).not.toContain('items: missing');
+    expect(result.ok).toBe(true);
+  });
+
+  // The question the universe form cannot answer, and the reason it did not have
+  // to be a trade: a patch module owns none of the ids it edits, so serializing
+  // it alone drops them. This is the live contribution-system H1.
+  it('asks the per-module question under --round-trip=module, and reports what publishing one alone would lose', () => {
+    const result = report([BASE, patch('# item base.bread', 'title: Toast')], { show: [], roundTrip: true, roundTripMode: 'module' });
+    expect(result.ok).toBe(false);
+    expect(result.lines.join('\n')).toContain('items: changed base.bread');
+  });
+
+  it('reports a module that does survive publication on its own', () => {
+    const result = report([BASE], { show: [], roundTrip: true, roundTripMode: 'module' });
+    expect(result.ok).toBe(true);
+    expect(result.lines.join('\n')).toContain('round-trips clean on its own');
+  });
+
+  it('answers the universe question by default, where that same pair is clean', () => {
+    const result = report([BASE, patch('# item base.bread', 'title: Toast')], { show: [], roundTrip: true });
     expect(result.ok).toBe(true);
   });
 
@@ -210,7 +243,7 @@ describe('probe: stdin carrying several documents', () => {
 describe('probe: arguments', () => {
   it('reads sources, --show and --round-trip', () => {
     const args = parseProbeArgs(['a.dsl', 'b.dsl', '--show', 'entity.base.rat', '--round-trip']);
-    expect(args).toEqual({ sources: ['a.dsl', 'b.dsl'], show: ['entity.base.rat'], roundTrip: true, each: false });
+    expect(args).toEqual({ sources: ['a.dsl', 'b.dsl'], show: ['entity.base.rat'], roundTrip: true, roundTripMode: 'universe', each: false });
   });
 
   it('takes --show more than once', () => {
@@ -227,6 +260,16 @@ describe('probe: arguments', () => {
 
   it('refuses no sources at all', () => {
     expect(() => parseProbeArgs(['--round-trip'])).toThrow(/source/);
+  });
+
+  it('reads --round-trip=module and defaults to universe', () => {
+    expect(parseProbeArgs(['a.dsl', '--round-trip'])).toMatchObject({ roundTrip: true, roundTripMode: 'universe' });
+    expect(parseProbeArgs(['a.dsl', '--round-trip=module'])).toMatchObject({ roundTrip: true, roundTripMode: 'module' });
+    expect(parseProbeArgs(['a.dsl', '--round-trip=universe'])).toMatchObject({ roundTripMode: 'universe' });
+  });
+
+  it('refuses a round-trip mode it does not have, naming the two it does', () => {
+    expect(() => parseProbeArgs(['a.dsl', '--round-trip=sideways'])).toThrow(/universe or module/);
   });
 
   it('refuses --each beside --show or --round-trip rather than dropping them', () => {

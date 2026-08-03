@@ -3,12 +3,15 @@ import path from 'node:path';
 import { formatVersion } from '../src/grammar/dependency';
 import { CONTENT_SECTION_MAPS, formatModuleDiagnostic, loadUniverseWithDiagnostics, type Registry } from '../src/content/registry';
 import { REGISTRY_DIFF_MAPS } from '../src/content/registryDiff';
-import { canSerialize, roundTripUniverse } from '../src/content/roundTrip';
+import { canSerialize, declaredVariableIds, roundTripModule, roundTripUniverse } from '../src/content/roundTrip';
 import { type ModuleSource, type ParsedModule } from '../src/content/universe';
+
+export type RoundTripMode = 'universe' | 'module';
 
 export interface ProbeOptions {
   show: string[];
   roundTrip: boolean;
+  roundTripMode?: RoundTripMode;
   each?: boolean;
 }
 
@@ -31,8 +34,13 @@ const usage = [
   '',
   '  <source>       a DSL file, or - to read from stdin',
   '  --show         print one registry record as JSON; repeatable',
-  '  --round-trip   serialize every loaded module, reload the universe from those',
-  '                 serializations alone, and report what changed',
+  '  --round-trip[=universe|module]',
+  '                 universe (the default): serialize every loaded module, reload',
+  '                 the universe from those serializations alone, and report what',
+  '                 changed. module: serialize each module and reload it beside the',
+  '                 other sources unchanged — which is what publishing one module',
+  '                 does, and is how a patch module that owns no ids shows up as',
+  '                 serializing to nothing',
   '  --each         load every source on its own and report a verdict per source,',
   '                 instead of loading them together as one universe',
   '',
@@ -47,15 +55,18 @@ const usage = [
 ].join('\n');
 
 export function parseProbeArgs(raw: readonly string[]): ProbeArgs {
-  const args: ProbeArgs = { sources: [], show: [], roundTrip: false, each: false };
+  const args: ProbeArgs = { sources: [], show: [], roundTrip: false, roundTripMode: 'universe', each: false };
   for (let i = 0; i < raw.length; i++) {
     const arg = raw[i];
     if (arg === '--help' || arg === '-h') {
       throw new Error(usage);
     } else if (arg === '--each') {
       args.each = true;
-    } else if (arg === '--round-trip') {
+    } else if (arg === '--round-trip' || arg.startsWith('--round-trip=')) {
       args.roundTrip = true;
+      const mode = arg.startsWith('--round-trip=') ? arg.slice('--round-trip='.length) : 'universe';
+      if (mode !== 'universe' && mode !== 'module') throw new Error(`--round-trip takes universe or module, not ${mode}`);
+      args.roundTripMode = mode;
     } else if (arg === '--show') {
       const spec = raw[++i];
       if (spec === undefined) throw new Error('--show wants a <kind>.<id> after it');
@@ -91,7 +102,10 @@ function showRecord(registry: Registry, spec: string): { lines: string[]; ok: bo
   const kind = spec.slice(0, dot);
   const id = spec.slice(dot + 1);
   const map = SHOWABLE.get(kind);
-  if (map === undefined) return { lines: [`${spec}: ${kind} names nothing the registry holds. Takes: ${[...SHOWABLE.keys()].join(', ')}`], ok: false };
+  if (map === undefined) {
+    const kinds = CONTENT_SECTION_MAPS.map(([each]) => each).join(', ');
+    return { lines: [`${spec}: ${kind} names nothing the registry holds.`, `  section kinds: ${kinds}`, `  registry maps: ${KINDLESS_MAPS.join(', ')}`], ok: false };
+  }
   const records = registry[map] as ReadonlyMap<string, unknown>;
   const record = records.get(id);
   if (record === undefined) {
@@ -99,6 +113,30 @@ function showRecord(registry: Registry, spec: string): { lines: string[]; ok: bo
     return { lines: [`${spec}: no ${kind} with that id. Defined: ${defined.length > 0 ? defined.join(', ') : 'none'}`], ok: false };
   }
   return { lines: [`${kind}.${id}`, JSON.stringify(record, null, 2)], ok: true };
+}
+
+// One module at a time, reloaded beside the other sources unchanged. That is
+// what publishing a single module does, and it is the only shape in which a
+// patch module owning no ids shows up as serializing to nothing. It is not the
+// question `--round-trip` answers by default, because those other sources then
+// replay their own edits over the print.
+function roundTripEachModule(sources: readonly ModuleSource[], parsed: readonly ParsedModule[], loaded: Registry): { lines: string[]; ok: boolean } {
+  const lines: string[] = [];
+  let ok = true;
+  for (const module of parsed) {
+    const others = sources.filter((source) => source !== module.source);
+    const trip = roundTripModule(loaded, { info: module.info, globalVariables: declaredVariableIds(module) }, (printed) => loadUniverseWithDiagnostics([...others, { ...module.source, text: printed }]));
+    if (trip.diagnostics.length > 0) {
+      lines.push(`${module.info.id}: its serialization does not load beside the others`, ...trip.diagnostics.map((each) => `  ${formatModuleDiagnostic(each)}`));
+      ok = false;
+    } else if (trip.differences.length > 0) {
+      lines.push(`${module.info.id}: publishing this module alone would not preserve the universe`, ...trip.differences);
+      ok = false;
+    } else {
+      lines.push(`${module.info.id}: round-trips clean on its own`);
+    }
+  }
+  return { lines, ok };
 }
 
 function roundTrip(parsed: readonly ParsedModule[], loaded: Registry): { lines: string[]; ok: boolean } {
@@ -148,7 +186,7 @@ export function probe(sources: readonly ModuleSource[], options: ProbeOptions): 
   }
 
   if (options.roundTrip) {
-    const trip = roundTrip(parsed, loaded.registry);
+    const trip = options.roundTripMode === 'module' ? roundTripEachModule(sources, parsed, loaded.registry) : roundTrip(parsed, loaded.registry);
     lines.push('', ...trip.lines);
     if (!trip.ok) ok = false;
   }

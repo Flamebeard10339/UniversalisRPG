@@ -29,8 +29,13 @@ export function roundTripModule(loaded: Registry, options: SerializeModuleOption
   return compare(loaded, printed, reload(printed));
 }
 
-export interface UniverseRoundTrip extends RoundTrip {
+// Deliberately not a RoundTrip. A universe has no single reloadable text — the
+// concatenation of several modules declares `# info` more than once and will not
+// load — so `printed` would carry a second meaning on an inherited field.
+export interface UniverseRoundTrip {
   sources: ModuleSource[];
+  diagnostics: ModuleDiagnostic[];
+  differences: string[];
 }
 
 // Every source is replaced at once. A module is serialized from the merged
@@ -38,8 +43,8 @@ export interface UniverseRoundTrip extends RoundTrip {
 // original source in the reload would apply those edits a second time.
 export function roundTripUniverse(loaded: Registry, modules: readonly ParsedModule[], reload: (printed: readonly ModuleSource[]) => UniverseLoadResult): UniverseRoundTrip {
   const sources = modules.map((module) => ({ ...module.source, text: serializeRegistryModule(loaded, { info: module.info, globalVariables: declaredVariableIds(module) }) }));
-  const printed = sources.map((source) => `// --- ${source.name} ---\n${source.text}`).join('\n');
-  return { ...compare(loaded, printed, reload(sources)), sources };
+  const { diagnostics, differences } = compare(loaded, '', reload(sources));
+  return { sources, diagnostics, differences };
 }
 
 export const canSerialize = (module: ParsedModule): boolean => module.namespace !== null;

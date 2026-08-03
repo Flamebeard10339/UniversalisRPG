@@ -273,3 +273,24 @@ close what a commit retired in one call.
   `tasks audit` are for the case where no document exists yet, which is rare.
 - Grading twelve clauses in one `tasks audit` call, with findings already filed by `import`, avoided
   the verdict-wiping trap of item 1 entirely. `import` and `audit` do not contend.
+
+## 3. The scratchpad path is per-session, and only the session id varies
+
+Recorded once already as item 6 of the previous session, sharpened by a second session of using it.
+The path is:
+
+```
+C:/Users/yonat/AppData/Local/Temp/claude/C--Users-yonat-Projects-UniversalisRPG/<session-uuid>/scratchpad
+```
+
+Everything but `<session-uuid>` is fixed and derivable — it is the temp root, a slug of the project
+directory, and a literal. Yet there is no way to name it except in full, so every command that
+touches it either carries 130 characters inline or opens with a `SCRATCH=...` assignment that has to
+be repeated in each new shell invocation, because shell state does not persist between calls.
+
+The cost is not typing. It is that a path this expensive to mention gets captured into whatever file
+is nearest, which is exactly how the probe that started this work ended up with an absolute
+scratchpad path hard-coded into `src/content/` and committed.
+
+**What would fix it:** export it into the environment (`$CLAUDE_SCRATCH`) so it can be named without
+being spelled.

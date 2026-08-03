@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import { loadModule, loadUniverseWithDiagnostics, type ModuleDiagnostic, type UniverseLoadResult } from './registry';
 import { canSerialize, declaredVariableIds, roundTripModule, roundTripUniverse } from './roundTrip';
 import { parseUniverse, type ModuleSource } from './universe';
@@ -88,11 +88,42 @@ describe('canSerialize', () => {
 });
 
 describe('roundTripUniverse', () => {
+  // Every case records what the reload was actually handed. Asserting only on
+  // what the closure does to its argument cannot see the argument being wrong,
+  // and handing back the original sources makes every round trip report clean.
+  let handed: ModuleSource[][] = [];
+
+  beforeEach(() => {
+    handed = [];
+  });
+
+  const reloading = (transform: (printed: readonly ModuleSource[]) => readonly ModuleSource[] = (printed) => printed) => (printed: readonly ModuleSource[]) => {
+    handed.push([...printed]);
+    return loadUniverseWithDiagnostics(transform(printed));
+  };
+
   const trip = (sources: ModuleSource[]) => {
     const loaded = loadUniverseWithDiagnostics(sources);
     expect(loaded.diagnostics).toEqual([]);
-    return roundTripUniverse(loaded.registry, parseUniverse(sources), (printed) => loadUniverseWithDiagnostics(printed));
+    return roundTripUniverse(loaded.registry, parseUniverse(sources), reloading());
   };
+
+  it('hands the reload the serializations, never the sources it was given', () => {
+    const source: ModuleSource = { name: 'base', text: '# info base\nversion: 1.0.0\n\n# item rope\ntitle: Rope\n' };
+    const result = trip([source]);
+    expect(handed).toHaveLength(1);
+    expect(handed[0]).toEqual(result.sources);
+    expect(handed[0]).not.toEqual([source]);
+  });
+
+  it('hands over one serialization per module, and no original among them', () => {
+    const other: ModuleSource = { name: 'more', text: '# info more\nversion: 1.0.0\ndependencies:\n  base\n\n# item ribbon\ntitle: Ribbon\n' };
+    const base: ModuleSource = { name: 'base', text: '# info base\nversion: 1.0.0\n\n# item rope\ntitle: Rope\n' };
+    const result = trip([base, other]);
+    expect(handed[0]).toHaveLength(2);
+    expect(handed[0]).toEqual(result.sources);
+    expect(handed[0].map((each) => each.text)).not.toContain(base.text);
+  });
 
   const BASE_TWO: ModuleSource = { name: 'base', text: '# info base\nversion: 1.0.0\n\n# item rope\ntitle: Rope\n\n# item bread\ntitle: Bread\n' };
 
@@ -121,20 +152,22 @@ describe('roundTripUniverse', () => {
 
   it('still reports a real loss, so the reframing did not make it blind', () => {
     const loaded = loadUniverseWithDiagnostics([BASE_TWO]);
-    const result = roundTripUniverse(loaded.registry, parseUniverse([BASE_TWO]), (printed) => loadUniverseWithDiagnostics(printed.map((source) => ({ ...source, text: source.text.split('\n\n').filter((section) => !section.startsWith('# item rope')).join('\n\n') }))));
+    const result = roundTripUniverse(loaded.registry, parseUniverse([BASE_TWO]), reloading((printed) => printed.map((source) => ({ ...source, text: source.text.split('\n\n').filter((section) => !section.startsWith('# item rope')).join('\n\n') }))));
     expect(result.differences).toEqual(['  items: missing base.rope']);
   });
 
   it('stops at diagnostics rather than diffing a universe that never loaded', () => {
     const loaded = loadUniverseWithDiagnostics([BASE_TWO]);
-    const result = roundTripUniverse(loaded.registry, parseUniverse([BASE_TWO]), (printed) => loadUniverseWithDiagnostics(printed.map((source) => ({ ...source, text: `${source.text}\n# item \n` }))));
+    const result = roundTripUniverse(loaded.registry, parseUniverse([BASE_TWO]), reloading((printed) => printed.map((source) => ({ ...source, text: `${source.text}\n# item \n` }))));
     expect(result.diagnostics.length).toBeGreaterThan(0);
     expect(result.differences).toEqual([]);
   });
 
-  it('returns each module\'s serialization, labelled, so the printed text is readable', () => {
+  it('returns each module\'s serialization under its own name, and no single printed text', () => {
     const result = trip([BASE_TWO]);
     expect(result.sources.map((source) => source.name)).toEqual(['base']);
-    expect(result.printed).toContain('// --- base ---');
+    expect(result.sources[0].text).toContain('# item rope');
+    // A universe has no one reloadable text, so there is no field claiming one.
+    expect('printed' in result).toBe(false);
   });
 });

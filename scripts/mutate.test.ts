@@ -1,6 +1,6 @@
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { applyTo, escapesRoot, formatReport, journalVerdict, outputTail, parseManifest, parseVitestTally, recoverFrom, runMutations, type FileStore, type Mutation, type TestRun } from './mutate';
+import { applyTo, escapesRoot, formatReport, journalVerdict, outputTail, parseManifest, parseVitestTally, journalPathFor, pidIsAlive, readJournal, scopeOf, type BaselineFor, recoverFrom, refusalsFor, runMutations, tallyOf, type FileStore, type Mutation, type TestRun } from './mutate';
 
 const ORIGINAL = 'const base = entityTypeBase(merged, section);\nconst other = 1;\n';
 
@@ -25,6 +25,8 @@ const mutation = (over: Partial<Mutation> = {}): Mutation => ({ name: 'c1', file
 
 const tally = (failed: number, total: number): TestRun => ({ failed, total, raw: `Tests ${failed} failed | ${total - failed} passed (${total})` });
 const noTests: TestRun = { failed: 0, total: 0, raw: 'Tests  no tests' };
+
+const baseline = (totals: Record<string, number>): BaselineFor => (tests) => totals[scopeOf({ tests: tests === undefined ? undefined : [...tests] })];
 
 const killing = () => tally(3, 20);
 const surviving = () => tally(0, 20);
@@ -152,7 +154,7 @@ describe('mutate: the verdict', () => {
   });
 
   it('records the scope every verdict was measured against', () => {
-    const scoped = runMutations([mutation({ tests: ['src/content/entityType.test.ts'] })], store({ 'a.ts': ORIGINAL }), surviving);
+    const scoped = runMutations([mutation({ tests: ['src/content/entityType.test.ts'] })], store({ 'a.ts': ORIGINAL }), killing);
     expect(scoped.results[0].scope).toBe('src/content/entityType.test.ts');
   });
 
@@ -201,6 +203,23 @@ describe('mutate: proving the restore', () => {
 
   it('says nothing about restoration when every file came back byte-identical', () => {
     expect(runMutations([mutation()], store({ 'a.ts': ORIGINAL }), killing).unrestored).toEqual([]);
+  });
+
+  // The byte-compare alone cannot see this: the content is correct, and only the
+  // failure of the write says the file may not be settled on disk.
+  it('reports a restore that threw even though the bytes did land', () => {
+    const files = store({ 'a.ts': ORIGINAL });
+    const flushedThenFailed: FileStore = {
+      read: files.read,
+      write(file, text) {
+        files.write(file, text);
+        if (text === ORIGINAL) throw new Error('EIO: bytes written, close failed');
+      },
+    };
+    const report = runMutations([mutation()], flushedThenFailed, killing);
+    expect(files.read('a.ts')).toBe(ORIGINAL);
+    expect(report.unrestored).toEqual(['a.ts']);
+    expect(report.ok).toBe(false);
   });
 
   // A restore that throws must not become the exception that escapes the loop:
@@ -280,69 +299,249 @@ describe('mutate: staying inside the repository', () => {
 describe('mutate: whose journal it is', () => {
   const dead = () => false;
   const live = () => true;
+  const now = Date.parse('2026-08-03T12:00:00Z');
+  const recent = { pid: 4242, startedAt: '2026-08-03T11:00:00Z' };
 
   it('recovers from a journal whose owner is gone', () => {
-    expect(journalVerdict({ pid: 4242 }, 1, dead)).toBe('recover');
+    expect(journalVerdict(recent, 1, dead, now)).toBe('recover');
   });
 
-  // Recovering here would restore files another run is deliberately holding
-  // mutated, and delete the only record it has of their originals.
   it('refuses a journal whose owner is still running', () => {
-    expect(journalVerdict({ pid: 4242 }, 1, live)).toBe('busy');
+    expect(journalVerdict(recent, 1, live, now)).toBe('busy');
   });
 
   it('recovers its own journal, since a live pid that is us is not another run', () => {
-    expect(journalVerdict({ pid: 7 }, 7, live)).toBe('recover');
+    expect(journalVerdict({ pid: 7, startedAt: recent.startedAt }, 7, live, now)).toBe('recover');
   });
 
-  it('recovers a journal with no pid at all, rather than deadlocking on an old format', () => {
-    expect(journalVerdict({} as unknown as { pid: number }, 1, live)).toBe('recover');
+  // Otherwise a recycled pid wedges every later run behind a permanent "busy",
+  // and the only escape is deleting a file the error does not name.
+  it('recovers from a live pid that has held the journal implausibly long, which is pid reuse', () => {
+    expect(journalVerdict({ pid: 4242, startedAt: '2026-08-01T00:00:00Z' }, 1, live, now)).toBe('recover');
+  });
+
+  it('treats an unparseable startedAt as busy rather than as ancient', () => {
+    expect(journalVerdict({ pid: 4242, startedAt: 'whenever' }, 1, live, now)).toBe('busy');
+  });
+});
+
+describe('mutate: deciding whether a pid is alive', () => {
+  const throwing = (code: string) => () => {
+    throw Object.assign(new Error(code), { code });
+  };
+
+  it('is alive when the probe returns', () => {
+    expect(pidIsAlive(1, () => undefined)).toBe(true);
+  });
+
+  it('is dead only on ESRCH', () => {
+    expect(pidIsAlive(1, throwing('ESRCH'))).toBe(false);
+  });
+
+  // A process owned by another user is the most alive a pid can be. Reading
+  // EPERM as dead would recover a journal a live run is still holding.
+  it('is alive on EPERM, which means it exists and is not ours', () => {
+    expect(pidIsAlive(1, throwing('EPERM'))).toBe(true);
+  });
+
+  it('is dead on anything else it cannot interpret', () => {
+    expect(pidIsAlive(1, throwing('EINVAL'))).toBe(false);
+  });
+});
+
+describe('mutate: reading a journal off disk', () => {
+  const whole = JSON.stringify({ root: '/repo', pid: 7, startedAt: 'now', files: { 'a.ts': 'x' } });
+
+  it('reads a whole one', () => {
+    expect(readJournal(whole)).toEqual({ root: '/repo', pid: 7, startedAt: 'now', files: { 'a.ts': 'x' } });
+  });
+
+  // The wedge: a run killed mid-write left a half journal, and every later run
+  // died on it before reading the manifest, recovering, or restoring anything.
+  it('returns null for a truncated journal rather than throwing', () => {
+    expect(readJournal(whole.slice(0, 40))).toBeNull();
+    expect(readJournal('')).toBeNull();
+  });
+
+  it('returns null for JSON that is not a journal', () => {
+    expect(readJournal('[]')).toBeNull();
+    expect(readJournal('null')).toBeNull();
+    expect(readJournal('{"pid":7}')).toBeNull();
+    expect(readJournal('{"root":"/r","pid":"seven","files":{}}')).toBeNull();
+    expect(readJournal('{"root":"/r","pid":7,"files":{"a.ts":42}}')).toBeNull();
+  });
+
+  it('tolerates a missing startedAt, which journalVerdict then reads as busy', () => {
+    expect(readJournal('{"root":"/r","pid":7,"files":{}}')?.startedAt).toBe('');
+  });
+});
+
+describe('mutate: where a journal lives', () => {
+  it('gives two checkouts two different journals, so one cannot recover into the other', () => {
+    expect(journalPathFor(path.resolve('/a/repo'))).not.toBe(journalPathFor(path.resolve('/b/repo')));
+  });
+
+  it('gives one checkout the same journal every time, however the path was spelled', () => {
+    expect(journalPathFor(path.resolve('/a/repo'))).toBe(journalPathFor(path.resolve('/a/repo/sub/..')));
   });
 });
 
 describe('mutate: recovering an interrupted run', () => {
+  const anywhere = () => true;
+
   it('puts back a file the journal says was mutated', () => {
     const files = store({ 'a.ts': 'MUTATED' });
-    expect(recoverFrom({ 'a.ts': ORIGINAL }, files)).toEqual(['a.ts']);
+    expect(recoverFrom({ 'a.ts': ORIGINAL }, files, anywhere).restored).toEqual(['a.ts']);
     expect(files.read('a.ts')).toBe(ORIGINAL);
   });
 
   it('leaves a file that is already correct alone, and reports nothing for it', () => {
     const files = store({ 'a.ts': ORIGINAL });
-    expect(recoverFrom({ 'a.ts': ORIGINAL }, files)).toEqual([]);
+    expect(recoverFrom({ 'a.ts': ORIGINAL }, files, anywhere).restored).toEqual([]);
     expect(files.writes).toEqual([]);
   });
 
-  it('survives a journal naming a file that no longer exists', () => {
+  it('survives a journal naming a file that no longer exists, and says which', () => {
     const files = store({ 'a.ts': 'MUTATED' });
-    expect(recoverFrom({ 'gone.ts': 'x', 'a.ts': ORIGINAL }, files)).toEqual(['a.ts']);
+    const recovery = recoverFrom({ 'gone.ts': 'x', 'a.ts': ORIGINAL }, files, anywhere);
+    expect(recovery.restored).toEqual(['a.ts']);
+    expect(recovery.refused).toEqual(['gone.ts']);
+  });
+
+  // Journal keys are data this process never validated, and recovery runs before
+  // anything else. Without this, containment guards only the manifest.
+  it('refuses a journal key that escapes the tree, and writes nothing for it', () => {
+    // The escaping file must exist and differ, or the guard is indistinguishable
+    // from the read simply failing.
+    const files = store({ 'a.ts': 'MUTATED', '../outside.ts': 'SOMEONE ELSE\'S FILE' });
+    const recovery = recoverFrom({ '../outside.ts': 'journal bytes', 'a.ts': ORIGINAL }, files, (file) => !escapesRoot(path.resolve('/repo'), file));
+    expect(recovery.restored).toEqual(['a.ts']);
+    expect(recovery.refused).toEqual(['../outside.ts']);
+    expect(files.writes.map((each) => each.file)).toEqual(['a.ts']);
+    expect(files.read('../outside.ts')).toBe('SOMEONE ELSE\'S FILE');
+  });
+});
+
+describe('mutate: escalating a narrow survivor', () => {
+  const narrow = { tests: ['one.test.ts'] };
+
+  // A file-scope SURVIVED says only that those files missed it. Re-running just
+  // the survivors is also what makes a narrow scope affordable: the mutations
+  // that die never pay for the whole suite.
+  it('re-runs a scoped survivor against the whole suite, and reports both scopes', () => {
+    const asked: (readonly string[] | undefined)[] = [];
+    const report = runMutations([mutation(narrow)], store({ 'a.ts': ORIGINAL }), (tests) => {
+      asked.push(tests);
+      return tests === undefined ? tally(2, 900) : tally(0, 12);
+    });
+    expect(asked).toEqual([['one.test.ts'], undefined]);
+    expect(report.results[0].verdict).toBe('KILLED');
+    expect(report.results[0].total).toBe(900);
+    expect(report.results[0].escalatedFrom).toBe('one.test.ts');
+    expect(formatReport(report)).toContain('one.test.ts -> whole suite');
+  });
+
+  it('leaves a survivor a survivor when the whole suite misses it too', () => {
+    const report = runMutations([mutation(narrow)], store({ 'a.ts': ORIGINAL }), (tests) => (tests === undefined ? tally(0, 900) : tally(0, 12)));
+    expect(report.results[0].verdict).toBe('SURVIVED');
+    expect(report.results[0].total).toBe(900);
+    expect(report.results[0].escalatedFrom).toBe('one.test.ts');
+  });
+
+  it('does not escalate a mutation the narrow scope already killed', () => {
+    const asked: (readonly string[] | undefined)[] = [];
+    runMutations([mutation(narrow)], store({ 'a.ts': ORIGINAL }), (tests) => {
+      asked.push(tests);
+      return killing();
+    });
+    expect(asked).toEqual([['one.test.ts']]);
+  });
+
+  it('does not escalate a mutation already measured against the whole suite', () => {
+    const asked: (readonly string[] | undefined)[] = [];
+    runMutations([mutation()], store({ 'a.ts': ORIGINAL }), (tests) => {
+      asked.push(tests);
+      return surviving();
+    });
+    expect(asked).toEqual([undefined]);
+  });
+
+  it('does not escalate an errored mutation, which measured nothing to escalate', () => {
+    const asked: (readonly string[] | undefined)[] = [];
+    runMutations([mutation(narrow)], store({ 'a.ts': ORIGINAL }), (tests) => {
+      asked.push(tests);
+      return noTests;
+    });
+    expect(asked).toEqual([['one.test.ts']]);
+  });
+
+  it('keeps the file mutated across the escalation, so the wider run measures the same thing', () => {
+    const files = store({ 'a.ts': ORIGINAL });
+    const seen: string[] = [];
+    runMutations([mutation(narrow)], files, (tests) => {
+      seen.push(files.read('a.ts'));
+      return tests === undefined ? tally(0, 900) : tally(0, 12);
+    });
+    expect(seen).toHaveLength(2);
+    expect(seen[1]).toBe(seen[0]);
+    expect(seen[1]).toContain('const base = undefined;');
+  });
+
+  it('asks for the whole suite baseline only when something escalates', () => {
+    const asked: string[] = [];
+    const watching: BaselineFor = (tests) => {
+      asked.push(scopeOf({ tests: tests === undefined ? undefined : [...tests] }));
+      return 12;
+    };
+    runMutations([mutation(narrow)], store({ 'a.ts': ORIGINAL }), killing, watching);
+    expect(asked).toEqual(['one.test.ts']);
   });
 });
 
 describe('mutate: the baseline', () => {
   it('reports how many tests stopped running when the denominator shrank', () => {
-    const report = runMutations([mutation()], store({ 'a.ts': ORIGINAL }), () => tally(3, 950), new Map([['whole suite', 1000]]));
+    const report = runMutations([mutation()], store({ 'a.ts': ORIGINAL }), () => tally(3, 950), baseline({ 'whole suite': 1000 }));
     expect(report.results[0].shortfall).toBe(50);
     expect(formatReport(report)).toContain('50 fewer tests ran');
   });
 
   it('says nothing when the count held', () => {
-    const report = runMutations([mutation()], store({ 'a.ts': ORIGINAL }), () => tally(3, 1000), new Map([['whole suite', 1000]]));
+    const report = runMutations([mutation()], store({ 'a.ts': ORIGINAL }), () => tally(3, 1000), baseline({ 'whole suite': 1000 }));
     expect(report.results[0].shortfall).toBeUndefined();
     expect(formatReport(report)).not.toContain('fewer tests');
   });
 
   it('does not treat a suite that grew as a shortfall', () => {
-    expect(runMutations([mutation()], store({ 'a.ts': ORIGINAL }), () => tally(3, 1100), new Map([['whole suite', 1000]])).results[0].shortfall).toBeUndefined();
+    expect(runMutations([mutation()], store({ 'a.ts': ORIGINAL }), () => tally(3, 1100), baseline({ 'whole suite': 1000 })).results[0].shortfall).toBeUndefined();
   });
 
   it('matches a baseline to the scope it was measured for', () => {
-    const report = runMutations([mutation({ tests: ['one.test.ts'] })], store({ 'a.ts': ORIGINAL }), () => tally(1, 5), new Map([['one.test.ts', 9]]));
+    const report = runMutations([mutation({ tests: ['one.test.ts'] })], store({ 'a.ts': ORIGINAL }), () => tally(1, 5), baseline({ 'one.test.ts': 9 }));
     expect(report.results[0].shortfall).toBe(4);
   });
 
   it('reports nothing when no baseline was measured at all', () => {
     expect(runMutations([mutation()], store({ 'a.ts': ORIGINAL }), () => tally(3, 950)).results[0].shortfall).toBeUndefined();
+  });
+
+  // A SURVIVED measured without a baseline is a weaker claim than one measured
+  // with, and the report is what gets pasted into an audit.
+  it('says on the row when a scope had no baseline, rather than looking like a clean measurement', () => {
+    const report = runMutations([mutation()], store({ 'a.ts': ORIGINAL }), surviving);
+    expect(report.results[0].unmeasured).toBe(true);
+    expect(formatReport(report)).toContain('no baseline');
+  });
+
+  it('says nothing of the sort when the scope did have one', () => {
+    const report = runMutations([mutation()], store({ 'a.ts': ORIGINAL }), surviving, baseline({ 'whole suite': 20 }));
+    expect(report.results[0].unmeasured).toBe(false);
+    expect(formatReport(report)).not.toContain('no baseline');
+  });
+
+  it('refuses a manifest with the same answer whether the check runs early or late', () => {
+    const files = store({ 'a.ts': ORIGINAL });
+    expect(refusalsFor([mutation({ name: 'bad', find: 'absent' })], files)).toHaveLength(1);
+    expect(files.writes).toEqual([]);
   });
 });
 
@@ -379,6 +578,32 @@ describe('mutate: reading vitest back', () => {
 
   it('takes the last tally when the output carries more than one', () => {
     expect(parseVitestTally('Tests  1 failed | 1 passed (2)\nrerun\nTests  4 failed | 1 passed (5)')).toEqual({ failed: 4, total: 5 });
+  });
+});
+
+describe('mutate: which stream the tally comes from', () => {
+  const SUMMARY = ' Test Files  2 passed (2)\n      Tests  1 failed | 1 passed (2)\n';
+
+  // The pass-1 HIGH, now reachable. Reading stdout+stderr and taking the last
+  // match let a test's own output decide the verdict.
+  it('ignores a tally-shaped line a failing test printed to stderr', () => {
+    const run = tallyOf({ stdout: SUMMARY, stderr: 'Tests  0 failed | 999 passed (999)\n' });
+    expect(run.failed).toBe(1);
+    expect(run.total).toBe(2);
+  });
+
+  it('ignores a stderr decoy that would have inverted the verdict the other way', () => {
+    const run = tallyOf({ stdout: ' Test Files  1 passed (1)\n      Tests  20 passed (20)\n', stderr: 'Tests  3 failed | 1 passed (4)\n' });
+    expect(run.failed).toBe(0);
+    expect(run.total).toBe(20);
+  });
+
+  it('keeps both streams in raw, so the report can still show what happened', () => {
+    expect(tallyOf({ stdout: SUMMARY, stderr: 'the failure detail lives here' }).raw).toContain('the failure detail lives here');
+  });
+
+  it('throws rather than guessing when stdout carries no tally at all', () => {
+    expect(() => tallyOf({ stdout: '', stderr: 'Tests  1 failed | 1 passed (2)' })).toThrow(/could not read a test tally/);
   });
 });
 

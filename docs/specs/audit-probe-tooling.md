@@ -61,6 +61,15 @@ Proof:
 - [c12] `--each` loads every source on its own and reports one verdict per source, and a stdin body
   splits on a line of `---`, so a table of variants is one heredoc and one invocation rather than one
   invocation per row. `--each` exits 0 on a table of rejections: it is a survey, not an assertion.
+- [c13] `--round-trip=module` asks the other question — serialize one module and reload it beside the
+  other sources unchanged, which is what publishing a single module does, and is the only shape in
+  which a patch module owning no ids shows up as serializing to nothing. The universe form stays the
+  default.
+- [c14] A `SURVIVED` measured against a named scope is re-run against the whole suite before it is
+  reported, and the row names both (`one.test.ts -> whole suite`). A narrow `SURVIVED` therefore never
+  stands as a final verdict, and a narrow scope becomes the cheap default rather than a weaker claim:
+  only survivors pay for the suite. Baselines are measured on first use, so a scope nothing reaches is
+  never run.
 - [c11] `npm test`, `npx tsc --noEmit` and `npm run layer-check` pass. The two scripts are covered by
   tests that drive their decisions directly, with the subprocess passed in as data rather than run,
   and the suite stays inside the five-minute budget.
@@ -77,12 +86,12 @@ Proof:
   layer rule forbids from importing anything under `scripts/`. Putting a concept about
   `ParsedModule` and `serializeRegistryModule` in the scripts layer was the mistake; two of its
   three callers being scripts is incidental.
-- Round-tripping the universe rather than each module costs one thing knowingly: `--round-trip` no
-  longer surfaces the live contribution-system H1, where a patch module owns none of the ids it edits
-  and so serializes to nothing. That is a different question — "does serializing module X alone
-  preserve X's edits" — and it is the one `squash-local-changes.ts` asks through `roundTripModule`,
-  which stays. Probing asks whether the content survives a serialize/reload cycle, and the honest
-  answer to that is whole-universe.
+- Round-tripping the universe is the right default, but making it the only mode was wrong, and the
+  second audit pass said so: `squash-local-changes.ts` is hardwired to `local-changes` and a target in
+  the repo's own content directory, so it cannot be pointed at two arbitrary sources. The per-module
+  question was therefore not delegated but unaskable, which is the friction this branch exists to
+  remove — the auditor reached for a hand-rolled `tsx` file importing `src/content/`. Nothing forced
+  the two to be exclusive; `--round-trip=module` is a flag and a branch, and it is c13.
 - `--each` was added mid-branch, after the one-invocation-per-row cost was measured against the
   probe that motivated this work: its largest block was a table of eighteen one-line variants. A tool
   that answers that in eighteen commands is worse than the vitest file it replaces, so auditors would
