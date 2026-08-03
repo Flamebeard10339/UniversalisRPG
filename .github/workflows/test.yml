@@ -36,19 +36,34 @@ jobs:
       - run: npm run layer-check
       - run: npm run audit-status
         if: matrix.os == 'ubuntu-latest'
-      - run: npm run tasks -- check
-      # The merge gate only runs on pull_request — nothing gates a push, and
-      # it cannot redden main or a branch mid-work. actions/checkout leaves a
-      # PR checkout in detached HEAD, so --branch supplies what
-      # `git rev-parse --abbrev-ref HEAD` cannot; --base-branch targets the
-      # fetched remote-tracking ref, since a bare local `main` need not exist.
-      # BRANCH goes through env: rather than being interpolated straight into
-      # the shell string — github.head_ref is attacker-controlled on
-      # pull_request, and a branch name containing a quote or backtick would
-      # otherwise execute on the runner. Scoped to ubuntu-latest, the same
-      # leg audit-status already runs on above, since this step has nothing
-      # OS-specific to prove on both matrix legs.
-      - env:
-          BRANCH: ${{ github.head_ref }}
-        run: npm run tasks -- check --merge --branch "$BRANCH" --base-branch origin/main
-        if: github.event_name == 'pull_request' && matrix.os == 'ubuntu-latest'
+      # Replaces `tasks check`, which failed on any inconsistency in the task
+      # store. `doctor` reports those and fails on one condition only: a store
+      # line that will not parse — a committed merge marker, which is a real
+      # breakage and not a disagreement about the work. Platform-independent,
+      # so one leg, where `check` ran on both.
+      - run: npm run tasks -- doctor
+        if: matrix.os == 'ubuntu-latest'
+      # The gate that used to run here printed the spec's outstanding issues on
+      # the PR page — no recorded audit pass, a clause unmet or ungraded, a
+      # member neither done nor declined — and turned the check red. Removing
+      # the refusal was the point; removing the *report* with it was not, and
+      # for one branch a reviewer had to think to run a local command to learn
+      # anything about spec standing at all.
+      #
+      # These two are reads. They answer, they exit 0, and they cannot redden a
+      # check. Neither `|| true` nor `continue-on-error` is present, and that is
+      # the point: a read that exits non-zero has broken c1, and suppressing it
+      # here would hide the one thing this step can prove. A branch name that
+      # matches no spec is answered, not refused — the fix that made that true
+      # is what makes this step safe to run unguarded.
+      #
+      # --branch explicitly: a PR builds a detached merge ref, so inferring the
+      # spec from the checked-out branch name would infer from "HEAD".
+      - run: npm run tasks -- spec show "$SPEC_BRANCH" --branch "$SPEC_BRANCH"
+        if: matrix.os == 'ubuntu-latest'
+        env:
+          SPEC_BRANCH: ${{ github.head_ref || github.ref_name }}
+      - run: npm run tasks -- plan --branch "$SPEC_BRANCH"
+        if: matrix.os == 'ubuntu-latest'
+        env:
+          SPEC_BRANCH: ${{ github.head_ref || github.ref_name }}

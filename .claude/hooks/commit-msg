@@ -16,4 +16,8 @@ fi
 
 files=$(git diff --cached --name-only | tr '\n' ',' | sed 's/,$//')
 
-npx tsx scripts/tasks.ts check-commit-msg "$msg_file" $merge_or_revert --files "$files"
+if [ -f "node_modules/tsx/dist/cli.mjs" ]; then
+  node node_modules/tsx/dist/cli.mjs scripts/tasks.ts check-commit-msg "$msg_file" $merge_or_revert --files "$files"
+else
+  npx tsx scripts/tasks.ts check-commit-msg "$msg_file" $merge_or_revert --files "$files"
+fi

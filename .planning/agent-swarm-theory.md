@@ -1,3 +1,7 @@
+An orchestrators role is global project/branch architecture. Their job is not merely to dispatch tasks, but to navigate the shortest path to the goal that runs the lowest risk of grounding the project. 
+
+This document should be kept updated with lessons learned by orchestrators. 
+
 # Trees and leaves
 Descriptions of large tasks naturally take the shape of trees, with a goal at the root that subdivides recursively into basic units of work. Our swarm has two roles, both organized around that same tree-like decomposition:
 
@@ -13,6 +17,130 @@ When a single agent takes on a complete task, it has to walk the entire tree its
 We think this explains why long-running single agents drift. They can either focus on the work in front of them and lose sight of the bigger picture, or hold the big picture and do a worse job on the piece.
 
 In a swarm, a planner never implements, so its context never fills with low-level detail, and a worker never plans, so it can spend all its context on one narrow piece of work.
+
+# What a planner owes the tree
+
+A planner never implements, so its context stays clean. That is the benefit. The cost is that a
+planner can accept the *shape* of the problem it was handed and spend the whole session executing
+it well. Every item below was learned from a round where that happened: an audit returned 36
+findings, five worker chunks fixed them, every chunk was mutation-verified and green — and the
+next audit found the round had introduced three regressions, a 17-minute gate, and two proof
+targets that proved nothing, while the actual defect went untouched.
+
+**A finding list is evidence about a system, not a queue.** Read its shape before sequencing it.
+Density in one file is a structural diagnosis. Two findings that contradict each other mean no
+module owns that rule. A list that keeps regrowing after each fix round is telling you the fixes
+are landing at call sites instead of at a seam.
+
+**Measure before you schedule.** File length, handler count, output-site count, and the size of
+the module that supposedly owns a concern cost one tool call. In the round above, the owning
+module was 92 lines and the CLI file holding all its rules was 2139 — visible from the start, and
+not looked at until five chunks had shipped.
+
+**Ask what single change retires the most of the list.** If the answer is "a seam that does not
+exist yet", build the seam first. Fixing items that dissolve under a restructure is work thrown
+away, and it is worse than nothing because it also adds risk.
+
+**Chunks touching one file are not independent.** Parallel or sequential, they are one change.
+Local verification says nothing about their interactions — every chunk above mutation-tested
+itself, and the interactions were verified by nobody.
+
+**Your own orders are the least-audited work in the swarm.** Workers get audited; planner
+instructions do not. After a fix round, commission an auditor whose only question is "is anything
+worse than before" — clause-by-clause verification cannot see a regression, because each clause
+looks fine in isolation. In the round above that auditor found all three; the two clause auditors
+found none.
+
+**Invite refusal, then believe it.** Briefs should say: flag anything where my prescribed design
+turns out to be wrong. Twice that produced a correct refusal — a requested reproduction that was
+information-theoretically impossible, and a fix that silently retracted a protection. Both would
+have shipped otherwise.
+
+**Fixing one defect can promote another.** Severity is a property of a finding plus everything
+still broken around it. Re-rank after a round; do not carry the old ranking forward.
+
+The remaining items were learned from the recovery rather than the failure, and the recovery
+produced better designs than the fix round did.
+
+**Ask why a finding dissolves, not how to fix it.** "What would make this stop being a finding at
+all" is the question that turns a list into a design. Asked of the 25 reconciled entries above, it
+returned: a contradiction between two clauses disappears if the freeze compares the parsed model
+instead of rendered markdown; a rename hole and a fail-open disappear together if binding uses
+recorded membership instead of inferring from a name or a diff; and an entire tag-retirement
+subsystem becomes unnecessary if a verdict records a hash of the text it graded. None of those is
+on any finding's "deliverable" line. All three came from asking the dissolution question.
+
+**Synthesis is not clerical — commission someone to hold the whole picture.** A planner keeps its
+context lean by design, which means it reads summaries while the evidence sits in a dozen reports.
+The three resolutions above came from the agent asked to *reconcile* the audits, not from the
+planner who commissioned them, because it read all of it at once. Treat reconciliation as design
+work and staff it accordingly; do not hand it to the cheapest model as a formatting job.
+
+**Prefer a narrower mechanism to a guarded one.** When a feature keeps generating findings, try
+deleting the capability before hardening it. Shell-command proof targets had produced a CI
+execution path, a 17-minute gate, and a proof that proved nothing. Three options were on the table
+— sandbox it, allowlist it, never run it in CI. Removing it entirely closed all three findings and
+made the remaining mechanism easier to explain.
+
+**Audit your own claims of the form "X is handled by Y".** A planner's subsumption mapping, its
+"this is covered by that clause", its "this dissolves under the refactor" — nobody audits those,
+because they read as bookkeeping. One such claim in the spec above was wrong, and checking it
+surfaced a missing clause.
+
+**Persisting the evidence is planner work.** Audit reports written to a session scratchpad vanish
+with the session, and the next branch gets planned against a summary of a summary. Archive the
+reports into the repository before the session ends, keep each auditor's own finding labels so
+downstream documents can cite them, and plan against the archive.
+
+# Writing a spec's clauses as tests
+
+**Red-green proves a test can fail. Only mutation proves it fails for the right
+reason.** Of the four weak proofs that shipped green on
+`combat-continuation-runtime`, one had no test at all — writing it first would
+have made that impossible. The other two pass a clean red-green cycle and still
+discharge nothing: `expect(activeAction).toBeDefined()` is red before the
+feature and green after. Test-first eliminates the *missing test* class
+entirely and does nothing about the *wrong test* class. They are complements,
+and test-first is the cheap one.
+
+**Writing a test names a module, an export and a signature — that is the
+decomposition.** So "write the clause tests first" is not an alternative to
+decomposing; it performs the decomposition in the least reviewable medium
+available, by whoever types first. Which means it collapses into "pin the shape
+first", and belongs in the scaffold unit that was already going to do that.
+
+**Assert the promise, never the mechanism.** A test pinning *how* a clause is
+satisfied gets rewritten the moment a worker finds a better mechanism, and they
+do. A prescribed excluded-directory design died on contact with what vitest
+actually does; the promise it served — a leaked fixture cannot fail `npm test` —
+survived untouched and was met another way. Mechanism assertions are where the
+"tests will need rewriting" objection is true, and they are avoidable.
+
+**Attach targets before the baseline; prove them after the implementation.**
+Attaching a `proof:` line edits the deliverable, which a freeze reports as
+drift — but only if a baseline already exists to drift from. Attach while there
+is none and the contradiction never arises. The proof half has to wait
+regardless: there is nothing to mutate until something is built.
+
+**TDD is offered to a planner, not imposed.** A clause backed by a test needs no
+prose restating it. A clause that resists codification stays prose rather than
+being forced into a weak assertion for uniformity's sake — one clause on the
+policy-seam branch defeated an attempt at codification and its verification was
+hand-tracing every call site, which was the correct answer. And the clause set
+is the branch's *contract*, never its test plan: nobody planning a unit from
+outside knows what it will need to be robust, so a worker that judges it needs
+coverage the clauses do not name should write it.
+
+**Keep a long-red clause suite out of the signal a worker reads.** Forty red
+tests for the length of a branch means a worker cannot tell its own failures
+from clauses nobody has implemented yet. That is the same drift as a store the
+branch disagrees with.
+
+**The audit is where prose becomes tests.** By then the mutation pass has
+established which assertion actually discharges which promise — exactly the
+knowledge that was missing when the clause was first written in English. It is
+the one moment in a branch when a clause can be written from evidence instead
+of intention.
 
 # References
 https://cursor.com/blog/agent-swarm-model-economics

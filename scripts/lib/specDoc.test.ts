@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { appendAmendment, appendAuditPass, duplicateClauseIds, parseSpecDoc, renderAuditPass, stampClauseIds } from './specDoc';
+import { appendAuditPass, clauseStandings, duplicateClauseIds, outstandingSummary, parseSpecDoc, renderAuditPass, stampClauseIds } from './specDoc';
 
 const DOC = `# Demo spec
 
@@ -49,6 +49,49 @@ describe('parseSpecDoc', () => {
     ]);
   });
 
+  // A clause's text is its identity: it is what an auditor is asked to
+  // grade and what an `unmet` verdict titles its undelivered task with. A
+  // subsection written under the last clause was being absorbed into it,
+  // which produced a 900-character clause title in the live store.
+  it('ends a clause at a heading rather than absorbing the section that follows it', () => {
+    const doc = [
+      '## Deliverable',
+      '',
+      'Promise.',
+      '',
+      'Proof:',
+      '',
+      '- The first clause holds.',
+      '- The last clause holds.',
+      '',
+      '### A subsection explaining the clauses',
+      '',
+      'Prose that belongs to the section, not to the clause above it.',
+      '',
+    ].join('\n');
+    expect(parseSpecDoc(doc).proofClauses).toEqual([
+      { id: 1, text: 'The first clause holds.' },
+      { id: 2, text: 'The last clause holds.' },
+    ]);
+  });
+
+  it('parses indented proof target metadata without folding it into clause text', () => {
+    const doc = '## Deliverable\n\nPromise.\n\nProof:\n\n- [c1] The command proof runs.\n  proof: command node --version\n- [c2] The vitest proof runs.\n  proof: vitest scripts/tasks.test.ts "audit-prompt prints a ready-to-use auditor prompt for a spec"\n';
+    expect(parseSpecDoc(doc).proofClauses).toEqual([
+      { id: 1, text: 'The command proof runs.', proofTargets: ['command node --version'] },
+      { id: 2, text: 'The vitest proof runs.', proofTargets: ['vitest scripts/tasks.test.ts "audit-prompt prints a ready-to-use auditor prompt for a spec"'] },
+    ]);
+  });
+
+  it('treats only top-level Proof bullets as clauses, leaving indented sub-bullets as prose', () => {
+    const doc = '## Deliverable\n\nPromise.\n\nProof:\n\n- [c1] The real clause.\n  - supporting detail, not a clause.\n- [c2] The other real clause.\n';
+    expect(parseSpecDoc(doc).proofClauses).toEqual([
+      { id: 1, text: 'The real clause. - supporting detail, not a clause.' },
+      { id: 2, text: 'The other real clause.' },
+    ]);
+    expect(stampClauseIds(doc)).toContain('  - supporting detail, not a clause.');
+  });
+
   it('leaves a clause that merely opens with a bracketed phrase untagged, text intact', () => {
     const doc = '## Deliverable\n\nPromise.\n\nProof:\n\n- [see docs] a clause that opens with a link-shaped phrase.\n';
     expect(parseSpecDoc(doc).proofClauses).toEqual([{ id: 1, text: '[see docs] a clause that opens with a link-shaped phrase.' }]);
@@ -59,22 +102,56 @@ describe('parseSpecDoc', () => {
     expect(parseSpecDoc(doc).proofClauses.map((clause) => clause.id)).toEqual([2, 1, 3]);
   });
 
+  it('does not reuse an audited clause id for a later untagged replacement clause', () => {
+    const audited = appendAuditPass('## Deliverable\n\nPromise.\n\nProof:\n\n- [c1] The original clause.\n', {
+      pass: 1,
+      date: '2026-08-01',
+      base: 'abc1234',
+      head: 'def5678',
+      verdicts: [{ clause: 1, status: 'met', evidence: null }],
+    });
+    const replaced = audited.replace('- [c1] The original clause.', '- A replacement clause.');
+    expect(parseSpecDoc(replaced).proofClauses).toEqual([{ id: 2, text: 'A replacement clause.' }]);
+    expect(stampClauseIds(replaced)).toContain('- [c2] A replacement clause.');
+  });
+
   it('returns no proof clauses when there is no Proof: line', () => {
     const doc = '## Deliverable\n\nJust prose, no proof list.\n\n## Decisions\n';
     expect(parseSpecDoc(doc).proofClauses).toEqual([]);
+  });
+
+  it('does not treat a `- ` line inside a fenced code block as a real clause, or run its proof: target', () => {
+    const doc = [
+      '## Deliverable',
+      '',
+      'Promise.',
+      '',
+      'Proof:',
+      '',
+      '- A real clause with an example:',
+      '',
+      '```md',
+      '- [c9] not a real clause',
+      '  proof: command rm -rf /',
+      '```',
+      '',
+      '## Decisions',
+      '',
+    ].join('\n');
+    expect(parseSpecDoc(doc).proofClauses).toEqual([{ id: 1, text: 'A real clause with an example:' }]);
+  });
+
+  it('tracks ~~~ fences the same as ``` fences', () => {
+    const doc = ['## Deliverable', '', 'Promise.', '', 'Proof:', '', '- A real clause.', '', '~~~', '- [c9] not a real clause', '~~~', '', '## Decisions', ''].join('\n');
+    expect(parseSpecDoc(doc).proofClauses).toEqual([{ id: 1, text: 'A real clause.' }]);
   });
 
   it('returns no audit passes when none are recorded', () => {
     expect(parseSpecDoc(DOC).auditPasses).toEqual([]);
   });
 
-  it('returns no amendments when none are recorded', () => {
-    expect(parseSpecDoc(DOC).amendments).toEqual([]);
-  });
-
   // Structure, never content: a spec's clauses are amendable by design, and
-  // pinning their text here would be a second freeze enforced by a unit test
-  // failure rather than by the merge gate.
+  // pinning their text here would freeze them by unit-test failure.
   it('parses the real docs/specs/task-system-v2.md into well-formed, distinctly identified clauses', () => {
     const text = readFileSync('docs/specs/task-system-v2.md', 'utf8');
     const { proofClauses } = parseSpecDoc(text);
@@ -218,49 +295,57 @@ describe('appendAuditPass / renderAuditPass round trip', () => {
     const { auditPasses } = parseSpecDoc(withPass);
     expect(auditPasses[0].verdicts).toEqual([{ clause: 1, status: 'met', evidence: 'measured 70ms' }]);
   });
+
+  it('round-trips an unknown verdict without turning it into unmet', () => {
+    const withPass = appendAuditPass(DOC, {
+      pass: 1,
+      date: '2026-08-02',
+      base: 'a',
+      head: 'b',
+      verdicts: [
+        { clause: 1, status: 'unknown', evidence: null },
+        { clause: 2, status: 'unknown', evidence: 'ran out of session before reaching it' },
+      ],
+    });
+    expect(withPass).toContain('- proof 1: unknown');
+    expect(parseSpecDoc(withPass).auditPasses[0].verdicts).toEqual([
+      { clause: 1, status: 'unknown', evidence: null },
+      { clause: 2, status: 'unknown', evidence: 'ran out of session before reaching it' },
+    ]);
+  });
 });
 
-describe('appendAmendment / parseSpecDoc amendments round trip', () => {
-  it('creates the ## Amendments section when absent, archiving the current deliverable text', () => {
-    const before = parseSpecDoc(DOC);
-    const amended = appendAmendment(DOC, { date: '2026-08-01', reason: 'understood the requirement better after implementing it', deliverableText: before.deliverableSection });
-    expect(amended).toContain('## Amendments');
-    const { amendments } = parseSpecDoc(amended);
-    expect(amendments).toEqual([{ date: '2026-08-01', reason: 'understood the requirement better after implementing it', deliverableText: before.deliverableSection }]);
+describe('clauseStandings / outstandingSummary', () => {
+  const clauses = parseSpecDoc(DOC).proofClauses;
+
+  it('grades every clause the pass never mentioned as unknown, not as absent', () => {
+    const standings = clauseStandings(clauses, [{ clause: 1, status: 'met', evidence: 'measured' }]);
+    expect(standings).toEqual([
+      { clause: 1, status: 'met', evidence: 'measured' },
+      { clause: 2, status: 'unknown', evidence: null },
+      { clause: 3, status: 'unknown', evidence: null },
+    ]);
   });
 
-  it('never touches the live ## Deliverable when archiving a copy of it', () => {
-    const before = parseSpecDoc(DOC);
-    const amended = appendAmendment(DOC, { date: '2026-08-01', reason: 'x', deliverableText: before.deliverableSection });
-    expect(parseSpecDoc(amended).deliverableSection).toBe(before.deliverableSection);
+  it('grades every clause unknown when no pass has been recorded at all', () => {
+    expect(clauseStandings(clauses, undefined).map((verdict) => verdict.status)).toEqual(['unknown', 'unknown', 'unknown']);
   });
 
-  it('appends a second amendment after the first rather than replacing it', () => {
-    const before = parseSpecDoc(DOC);
-    const afterOne = appendAmendment(DOC, { date: '2026-08-01', reason: 'first amendment', deliverableText: before.deliverableSection });
-    const afterTwo = appendAmendment(afterOne, { date: '2026-08-02', reason: 'second amendment', deliverableText: '## Deliverable\n\nA revised promise.' });
-    const { amendments } = parseSpecDoc(afterTwo);
-    expect(amendments.map((a) => a.reason)).toEqual(['first amendment', 'second amendment']);
-    expect(amendments[1].deliverableText).toBe('## Deliverable\n\nA revised promise.');
+  it('names each outstanding clause with its own status rather than counting them', () => {
+    const summary = outstandingSummary([
+      { clause: 1, status: 'met', evidence: 'measured' },
+      { clause: 2, status: 'unmet', evidence: null },
+      { clause: 3, status: 'unknown', evidence: null },
+    ]);
+    expect(summary).toBe('outstanding: c2 (unmet), c3 (unknown)');
+    expect(summary).not.toMatch(/\d+\s*\/\s*\d+|%/);
   });
 
-  it('demotes the archived heading so it cannot be mistaken for a real ## section boundary', () => {
-    const before = parseSpecDoc(DOC);
-    const amended = appendAmendment(DOC, { date: '2026-08-01', reason: 'x', deliverableText: before.deliverableSection });
-    // Only the live section's own heading may appear at "## " depth — the
-    // archived copy's must not, or a second amendment's insertion point
-    // (and any later ## Decisions / ## Open questions lookup) would misparse.
-    expect(amended.match(/^## Deliverable$/gm)).toHaveLength(1);
-    expect(amended).toContain('#### Deliverable');
+  it('says nothing is outstanding rather than reporting a full score', () => {
+    expect(outstandingSummary([{ clause: 1, status: 'met', evidence: 'measured' }])).toBe('no clause outstanding');
   });
 
-  it('coexists with ## Audit passes without either section corrupting the other', () => {
-    const withPass = appendAuditPass(DOC, { pass: 1, date: '2026-07-31', base: 'a', head: 'b', verdicts: [] });
-    const before = parseSpecDoc(withPass);
-    const withBoth = appendAmendment(withPass, { date: '2026-08-01', reason: 'x', deliverableText: before.deliverableSection });
-    const doc = parseSpecDoc(withBoth);
-    expect(doc.auditPasses).toHaveLength(1);
-    expect(doc.amendments).toHaveLength(1);
-    expect(doc.deliverableSection).toBe(before.deliverableSection);
+  it('reports a spec with no clauses at all as having none to grade, not as complete', () => {
+    expect(outstandingSummary([])).toBe('no clause to grade');
   });
 });

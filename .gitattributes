@@ -3,6 +3,17 @@
 # section to the one above it, and content is authored by pasting through GitHub.
 * text=auto eol=lf
 
+# Union keeps both sides of a conflicting hunk. That is exactly right for an
+# append-only log — two branches appending events collide on the last line for
+# no reason a human can adjudicate, and keeping both is always the answer.
+#
+# It is wrong for the store, whose records are edited rather than only appended.
+# Two branches editing one record would keep both copies under one id; `doctor`
+# reports that and exits 0, so CI stays green while every read answers from the
+# first copy forever and `edit` writes both back. A conflict is loud and
+# fixable. A silent duplicate is neither.
+docs/events.jsonl merge=union
+
 # Windows tooling that needs its own line endings whatever the repo says.
 *.bat text eol=crlf
 *.cmd text eol=crlf

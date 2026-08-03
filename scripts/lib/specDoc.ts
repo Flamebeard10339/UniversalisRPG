@@ -2,9 +2,15 @@ export interface ProofClause {
   // A name, not a position: ids need be neither sequential nor in order.
   id: number;
   text: string;
+  proofTargets?: string[];
 }
 
-export type Verdict = 'met' | 'unmet';
+// `unmet` is "we checked and it fails"; `unknown` is "nobody looked". They
+// are different facts about a clause and no reader of this module may
+// collapse them.
+export type Verdict = 'met' | 'unmet' | 'unknown';
+
+export const VERDICTS: readonly Verdict[] = ['met', 'unmet', 'unknown'];
 
 export interface AuditVerdict {
   clause: number;
@@ -20,19 +26,10 @@ export interface AuditPass {
   verdicts: AuditVerdict[];
 }
 
-export interface Amendment {
-  date: string;
-  reason: string;
-  // The archived `## Deliverable` section, in the same shape as
-  // SpecDoc.deliverableSection — directly comparable to it.
-  deliverableText: string;
-}
-
 export interface SpecDoc {
   deliverableSection: string;
   proofClauses: ProofClause[];
   auditPasses: AuditPass[];
-  amendments: Amendment[];
 }
 
 function sectionText(lines: string[], heading: string): { text: string; startIndex: number; endIndex: number } | null {
@@ -51,6 +48,7 @@ interface ScannedClause {
   line: number;
   tag: number | null;
   text: string;
+  proofTargets: string[];
 }
 
 // "Proof:" introduces a bullet list within ## Deliverable; each top-level
@@ -63,26 +61,62 @@ function scanProofClauses(deliverableSection: string): ScannedClause[] {
 
   const clauses: ScannedClause[] = [];
   let current: string[] | null = null;
+  // A markdown example inside the deliverable — Slice 3 documents `proof:`
+  // syntax with one — must not have its own `- ` lines and `proof:` lines
+  // read as real clauses and real targets. `fence` holds the open fence's
+  // character (` or ~) until a matching close, and every line in between is
+  // skipped rather than scanned.
+  let fence: string | null = null;
   const flush = (): void => {
     if (current) clauses[clauses.length - 1].text = current.join(' ').trim();
   };
   for (let i = proofIndex + 1; i < lines.length; i++) {
-    const bullet = /^- (.*)$/.exec(lines[i].trim());
+    const line = lines[i];
+    const trimmed = line.trim();
+
+    const fenceMatch = /^(`{3,}|~{3,})/.exec(trimmed);
+    if (fence !== null) {
+      if (fenceMatch && fenceMatch[1][0] === fence) fence = null;
+      continue;
+    }
+    if (fenceMatch) {
+      fence = fenceMatch[1][0];
+      continue;
+    }
+
+    // A heading ends the clause it follows. Without this a `###` subsection
+    // written under the last clause becomes part of that clause's text —
+    // which is its identity, what an auditor is asked to grade, and what an
+    // undelivered task is titled with.
+    if (/^#{1,6}\s/.test(trimmed)) {
+      flush();
+      current = null;
+      continue;
+    }
+
+    const bullet = /^- (.*)$/.exec(line);
+    const proof = /^proof:\s*(.+)$/.exec(trimmed);
     if (bullet) {
       flush();
       const tagged = CLAUSE_TAG.exec(bullet[1]);
-      clauses.push({ line: i, tag: tagged ? Number(tagged[1]) : null, text: '' });
+      clauses.push({ line: i, tag: tagged ? Number(tagged[1]) : null, text: '', proofTargets: [] });
       current = [tagged ? tagged[2] : bullet[1]];
-    } else if (current && lines[i].trim() !== '') {
-      current.push(lines[i].trim());
+    } else if (current && proof) {
+      clauses[clauses.length - 1].proofTargets.push(proof[1].trim());
+    } else if (current && trimmed !== '') {
+      current.push(trimmed);
     }
   }
   flush();
   return clauses;
 }
 
-function resolveIds(clauses: ScannedClause[]): number[] {
-  const claimed = new Set(clauses.map((clause) => clause.tag).filter((tag): tag is number => tag !== null));
+function auditedClauseIds(text: string): number[] {
+  return parseAuditPasses(text).flatMap((pass) => pass.verdicts.map((verdict) => verdict.clause));
+}
+
+function resolveIds(clauses: ScannedClause[], reserved: number[] = []): number[] {
+  const claimed = new Set([...reserved, ...clauses.map((clause) => clause.tag).filter((tag): tag is number => tag !== null)]);
   let next = 1;
   return clauses.map((clause) => {
     if (clause.tag !== null) return clause.tag;
@@ -92,10 +126,14 @@ function resolveIds(clauses: ScannedClause[]): number[] {
   });
 }
 
-function parseProofClauses(deliverableSection: string): ProofClause[] {
+function parseProofClauses(deliverableSection: string, reserved: number[] = []): ProofClause[] {
   const scanned = scanProofClauses(deliverableSection);
-  const ids = resolveIds(scanned);
-  return scanned.map((clause, i) => ({ id: ids[i], text: clause.text }));
+  const ids = resolveIds(scanned, reserved);
+  return scanned.map((clause, i) => ({
+    id: ids[i],
+    text: clause.text,
+    ...(clause.proofTargets.length > 0 ? { proofTargets: clause.proofTargets } : {}),
+  }));
 }
 
 // Turns each clause's id from something derived — position in the list —
@@ -107,7 +145,7 @@ export function stampClauseIds(text: string): string {
   if (!section) return text;
 
   const scanned = scanProofClauses(section.text);
-  const ids = resolveIds(scanned);
+  const ids = resolveIds(scanned, auditedClauseIds(text));
   const stamped = [...lines];
   scanned.forEach((clause, i) => {
     if (clause.tag !== null) return;
@@ -141,7 +179,7 @@ function parseAuditPasses(text: string): AuditPass[] {
     const body = lines.slice(start.index + 1, end);
     const base = /^- base: `(.+)`$/;
     const head = /^- head: `(.+)`$/;
-    const proof = /^- proof (\d+): (met|unmet)(?: — (.*))?$/;
+    const proof = new RegExp(`^- proof (\\d+): (${VERDICTS.join('|')})(?: — (.*))?$`);
     let baseSha = '';
     let headSha = '';
     const verdicts: AuditVerdict[] = [];
@@ -158,49 +196,20 @@ function parseAuditPasses(text: string): AuditPass[] {
   });
 }
 
-const AMENDMENT_HEADING = /^### (\d{4}-\d{2}-\d{2}) — (.+)$/;
-
-// Mirrors parseAuditPasses' shape, but each entry's body is the archived
-// `## Deliverable` text — stored with its heading demoted to `#### ` so it
-// cannot be mistaken for a real section boundary by sectionText's `^## `
-// scan, then promoted back here for the caller.
-function parseAmendments(text: string): Amendment[] {
-  const section = sectionText(text.split('\n'), '## Amendments');
-  if (!section) return [];
-  const lines = section.text.split('\n');
-  const starts: { index: number; date: string; reason: string }[] = [];
-  for (let i = 0; i < lines.length; i++) {
-    const match = AMENDMENT_HEADING.exec(lines[i]);
-    if (match) starts.push({ index: i, date: match[1], reason: match[2].trim() });
-  }
-  return starts.map((start, i) => {
-    const end = i + 1 < starts.length ? starts[i + 1].index : lines.length;
-    const body = lines
-      .slice(start.index + 1, end)
-      .join('\n')
-      .trim();
-    return { date: start.date, reason: start.reason, deliverableText: body.replace(/^#### Deliverable/, '## Deliverable') };
-  });
-}
-
 export function parseSpecDoc(text: string): SpecDoc {
   const deliverable = sectionText(text.split('\n'), '## Deliverable');
   const deliverableSection = deliverable ? deliverable.text : '';
+  const auditPasses = parseAuditPasses(text);
   return {
     deliverableSection,
-    proofClauses: parseProofClauses(deliverableSection),
-    auditPasses: parseAuditPasses(text),
-    amendments: parseAmendments(text),
+    proofClauses: parseProofClauses(deliverableSection, auditPasses.flatMap((pass) => pass.verdicts.map((verdict) => verdict.clause))),
+    auditPasses,
   };
 }
 
 export function renderAuditPass(pass: AuditPass): string {
   const lines = [`### Pass ${pass.pass} — ${pass.date}`, '', `- base: \`${pass.base}\``, `- head: \`${pass.head}\``];
   for (const verdict of pass.verdicts) {
-    // Evidence is rendered for any verdict that carries it, met or unmet:
-    // this gate exists to stop false completion claims, so a measurement
-    // backing a `met` verdict is exactly what should survive, not be
-    // thrown away while an `unmet` one is kept.
     const evidence = verdict.evidence ? ` — ${verdict.evidence}` : '';
     lines.push(`- proof ${verdict.clause}: ${verdict.status}${evidence}`);
   }
@@ -225,25 +234,18 @@ export function appendAuditPass(text: string, pass: AuditPass): string {
   return [...before, ...(needsBlank ? [''] : []), rendered, '', ...after].join('\n').trimEnd() + '\n';
 }
 
-export function renderAmendment(amendment: Amendment): string {
-  const demoted = amendment.deliverableText.replace(/^## Deliverable/, '#### Deliverable');
-  return [`### ${amendment.date} — ${amendment.reason}`, '', demoted].join('\n');
+// A clause the pass never graded is `unknown` — the pass says nothing about
+// it, and the reader is owed that as a stated fact rather than an omission.
+export function clauseStandings(clauses: ProofClause[], graded: AuditVerdict[] = []): AuditVerdict[] {
+  return clauses.map((clause) => graded.find((verdict) => verdict.clause === clause.id) ?? { clause: clause.id, status: 'unknown', evidence: null });
 }
 
-// Same append-or-create shape as appendAuditPass, targeting `## Amendments`
-// instead. Never touches ## Deliverable itself — the live section stays
-// exactly where and what it was, this only archives a copy of it.
-export function appendAmendment(text: string, amendment: Amendment): string {
-  const rendered = renderAmendment(amendment);
-  const lines = text.trimEnd().split('\n');
-  const headingIndex = lines.findIndex((line) => line.trim() === '## Amendments');
-  if (headingIndex === -1) {
-    return `${lines.join('\n')}\n\n## Amendments\n\n${rendered}\n`;
-  }
-  const nextHeading = lines.findIndex((line, index) => index > headingIndex && /^## /.test(line));
-  const insertAt = nextHeading === -1 ? lines.length : nextHeading;
-  const before = lines.slice(0, insertAt);
-  const after = lines.slice(insertAt);
-  const needsBlank = before[before.length - 1]?.trim() !== '';
-  return [...before, ...(needsBlank ? [''] : []), rendered, '', ...after].join('\n').trimEnd() + '\n';
+// Completeness as names, never as a ratio or a bit: which clause is
+// outstanding is the actionable part, and each keeps its own status so
+// "nobody looked" is never read as "we checked and it fails".
+export function outstandingSummary(verdicts: AuditVerdict[]): string {
+  if (verdicts.length === 0) return 'no clause to grade';
+  const outstanding = verdicts.filter((verdict) => verdict.status !== 'met');
+  if (outstanding.length === 0) return 'no clause outstanding';
+  return `outstanding: ${outstanding.map((verdict) => `c${verdict.clause} (${verdict.status})`).join(', ')}`;
 }

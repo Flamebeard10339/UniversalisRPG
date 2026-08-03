@@ -2,7 +2,7 @@
 
 Optimize for correctness, bounded scope, reuse, architectural coherence, strong evidence, and clean review—not patch volume. Passing tests is necessary. Avoid patches that accrue technical debt. Prefer self documenting code over comments or updating repository context. 
 
-An audit reviews the diff a branch proposes to merge, not a running commit count. The workflow and the tool that carries it are specified under `docs/specs/`; `npm run tasks` and `docs/tasks.jsonl` are the store. Keep independent systems independent. Do not create systems that are required to be manually kept in sync. 
+An audit reviews the diff a branch proposes to merge, not a running commit count. The workflow and the tool that carries it are specified in `docs/workflow.md`, which is kept current; a `docs/specs/<slug>.md` is one branch's promise and is history once merged. `npm run tasks` and `docs/tasks.jsonl` are the store. Keep independent systems independent. Do not create systems that are required to be manually kept in sync. 
 
 Make commits after each logical chunk.
 
@@ -20,7 +20,7 @@ A file drifting toward heavy commenting is a design signal — read it as "this 
 
 Do not bloat CLAUDE.md with over 200 lines of instructions. 
 
-`.planning/.scratch.md` contains open thoughts. Vetted work, its state, and its archive all live in `docs/tasks.jsonl`, reached through `npm run tasks` — `tasks next` for what to work on, `tasks show <id>` for a task's full record. A branch's own spec lives at `docs/specs/<slug>.md`.
+`.planning/.scratch.md` contains open thoughts. Vetted work, its state, and its archive all live in `docs/tasks.jsonl`, reached through `npm run tasks` — `tasks next` for what to work on, `tasks show <id>` for a task's full record. A branch's own spec lives at `docs/specs/<slug>.md`. `docs/workflow.md` is the end-to-end protocol every agent follows — decompose against disjoint `writes` grants, grade the set with `tasks plan` before dispatching it, and let a worker correct its own grant before it writes code. `.planning/agent-swarm-theory.md` holds what a planner owes the tree — read it before decomposing a finding list into worker chunks.
 
 # Repository systems
 
@@ -37,7 +37,8 @@ Audits are the one gate that has repeatedly caught real defects, so they stay. R
 5. **Testing procedure**
   1. `scripts/play-cli.ts` interactive REPL over `startSession`/`view`/`apply` (live `--live` real-time + instant piped/agent mode), named `# test` scripts run via `/test`
   2. `# test` sections in the DSL are the regression format: authored from a live session with `/create-test`, replayed with assertions by `runTest`, and run over the shipped content by `integration.test.ts`
-  3. CI: `.github/workflows/test.yml` runs `tsc --noEmit`, `npm test`, `npm run layer-check`, `npm run audit-status` on push and PR
+  3. CI: `.github/workflows/test.yml` runs `npx tsc --noEmit`, `npm test` and `npm run layer-check` on push and PR, plus `npm run audit-status`, `npm run tasks -- doctor`, `tasks spec show` and `tasks plan` on the ubuntu leg. `doctor` fails on one condition only: a `docs/tasks.jsonl` line that will not parse; the last two are reads that report the branch's spec standing and grade its open plan on the PR page, and cannot redden a check
+  4. **Five minutes, wall clock.** `npm test` and every gate a PR must pass stay under it, each. A gate nobody can afford to run is a gate that does not run. Buy the time back by making logic pure and passing effects in as data — git facts, clocks, subprocess results — so tests exercise the decision rather than the world. Mock or fake the effect at its seam; keep a handful of real-git and real-subprocess tests to prove the seam itself, and never pay that cost per case.
 6. **Build & deployment**
   1. Web: Vite build, tag-triggered publish to itch.io (`.github/workflows/publish.yml`)
   2. Android: Capacitor sync + Gradle release build, APK signing, attached to the GitHub release

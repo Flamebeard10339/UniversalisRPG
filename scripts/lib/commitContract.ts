@@ -28,16 +28,14 @@ function contentLines(message: string): string[] {
 }
 
 // Returns a refusal reason, or null if the message satisfies the contract:
-// a body (at least one line past the subject) and a Next: trailer.
+// a body (at least one line past the subject). Next: is an optional
+// breadcrumb that `tasks handoff` can surface, not the source of truth.
 export function checkCommitMessage(message: string): string | null {
   const lines = contentLines(message);
   if (lines.length === 0) return 'commit message is empty';
 
   const body = lines.slice(1).filter((line) => line.trim() !== '' && !NEXT_TRAILER.test(line.trim()));
   if (body.length === 0) return 'commit message has no body — at least one line past the subject, saying what was done';
-
-  const hasNext = lines.slice(1).some((line) => NEXT_TRAILER.test(line.trim()));
-  if (!hasNext) return 'commit message has no Next: trailer saying what the following session should pick up';
 
   return null;
 }
