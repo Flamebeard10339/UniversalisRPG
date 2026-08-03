@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -82,13 +82,19 @@ function fixture(run: (context: { dir: string; args: (extra?: string[]) => strin
     );
     const storePath = path.join(dir, 'tasks.jsonl');
     const globals = ['--store', storePath, '--systems', systemsPath, '--specs-dir', specsDir, '--branch', 'demo-spec'];
+    // A bare `--` ends flag parsing, so the fixture's own flags must land
+    // before it, never after.
+    const withGlobals = (args: string[]): string[] => {
+      const term = args.indexOf('--');
+      return term === -1 ? [...args, ...globals] : [...args.slice(0, term), ...globals, ...args.slice(term)];
+    };
 
     run({
       dir,
       args: (extra = []) => [...globals, ...extra],
       tasks: (...args: string[]) => {
-        if (args[0] !== 'audit') return runInProcess([...args, ...globals]);
-        const result = spawnSync(process.execPath, [tsx, script, ...args, ...globals], { cwd: repoRoot, encoding: 'utf8' });
+        if (args[0] !== 'audit') return runInProcess(withGlobals(args));
+        const result = spawnSync(process.execPath, [tsx, script, ...withGlobals(args)], { cwd: repoRoot, encoding: 'utf8' });
         return { status: result.status ?? 1, stdout: result.stdout, stderr: result.stderr };
       },
       triage: (input: string, extra: string[] = []) => {
@@ -1317,12 +1323,31 @@ describe('tasks CLI', () => {
     });
   });
 
-  it('state-changing default-store writes warn when task state is only in the working tree', () => {
-    defaultStoreGitFixture(({ tasks }) => {
-      const result = tasks('add', 'Dirty tracked task', '--id', 'dirty-tracked');
-      expect(result.status).toBe(0);
-      expect(result.stdout).toContain('added dirty-tracked [task/open]');
-      expect(result.stderr).toContain('warning: docs/tasks.jsonl has uncommitted task-state changes');
+  // The uncommitted-store warning fires for state an *earlier* session left
+  // behind, never for the session's own writes: measured six-for-six and
+  // eight-for-eight across two recorded sessions, a warning on every write
+  // is a warning nobody reads. Freshness is the store's pre-write mtime.
+  it('default-store writes stay silent about their own dirtiness, and warn once over stale uncommitted state', () => {
+    defaultStoreGitFixture(({ dir, tasks }) => {
+      // A write that itself dirties a clean store is the session acting on
+      // purpose — no warning.
+      const own = tasks('add', 'Dirty tracked task', '--id', 'dirty-tracked');
+      expect(own.status).toBe(0);
+      expect(own.stderr).not.toContain('uncommitted task-state changes');
+
+      // A second write while the dirtiness is fresh is the same session
+      // still working — still no warning.
+      const fresh = tasks('add', 'Second task', '--id', 'second-task');
+      expect(fresh.stderr).not.toContain('uncommitted task-state changes');
+
+      // Backdate the store: now the uncommitted state predates the writing
+      // session, which is exactly the walked-away shape the warning is for.
+      const store = path.join(dir, 'docs', 'tasks.jsonl');
+      const old = new Date(Date.now() - 40 * 60 * 1000);
+      utimesSync(store, old, old);
+      const stale = tasks('add', 'Third task', '--id', 'third-task');
+      expect(stale.status).toBe(0);
+      expect(stale.stderr).toContain('warning: docs/tasks.jsonl has uncommitted task-state changes from an earlier session');
     });
   });
 
@@ -1627,6 +1652,85 @@ describe('tasks CLI', () => {
       const result = triage('q\n');
       expect(result.stdout).toContain('2 unreviewed finding(s) left');
       expect(tasks('show', 'first').stdout).toContain('unreviewed');
+    });
+  });
+
+  it('triage [a] records a question on the finding and leaves it unreviewed', () => {
+    fixture(({ tasks, triage }) => {
+      tasks('add', 'needs context', '--id', 'needs-context', '--kind', 'finding', '--severity', 'high', '--evidence', 'the original evidence', '--deliverable', 'fix it');
+      const result = triage('a\nwhich universe was this measured against?\n');
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('it stays unreviewed until the question is answered');
+      expect(result.stdout).toContain('1 unreviewed finding(s) left');
+      const shown = tasks('show', 'needs-context').stdout;
+      expect(shown).toContain('the original evidence');
+      expect(shown).toContain('triage asked');
+      expect(shown).toContain('which universe was this measured against?');
+    });
+  });
+
+  it('triage [a] with an empty question asks nothing and re-offers the same finding', () => {
+    fixture(({ tasks, triage }) => {
+      tasks('add', 'needs context', '--id', 'needs-context', '--kind', 'finding', '--severity', 'high', '--evidence', 'original', '--deliverable', 'fix it');
+      const result = triage('a\n\ns\n');
+      expect(result.stdout).toContain('empty — nothing asked');
+      expect(tasks('show', 'needs-context').stdout).not.toContain('triage asked');
+    });
+  });
+
+  it('promote moves several findings into the spec in one call, and refuses a closed record', () => {
+    fixture(({ tasks }) => {
+      tasks('add', 'first finding', '--id', 'first-finding', '--kind', 'finding', '--severity', 'high', '--deliverable', 'fix it');
+      tasks('add', 'second finding', '--id', 'second-finding', '--kind', 'finding', '--severity', 'high', '--deliverable', 'fix it');
+      const result = tasks('promote', 'first-finding', 'second-finding');
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('promoted first-finding into demo-spec');
+      expect(result.stdout).toContain('promoted second-finding into demo-spec');
+      expect(tasks('show', 'first-finding').stdout).toContain('[finding/open/high]');
+      expect(tasks('show', 'first-finding').stdout).toContain('spec: demo-spec');
+
+      tasks('decline', 'first-finding', '--reason', 'not worth it');
+      const closed = tasks('promote', 'first-finding');
+      expect(closed.status).toBe(1);
+      expect(closed.stderr).toContain('it does not reopen closed ones');
+    });
+  });
+
+  it('done closes several ids in one call, and one unknown id refuses the batch before anything is written', () => {
+    fixture(({ tasks }) => {
+      tasks('add', 'first task', '--id', 'first-task');
+      tasks('add', 'second task', '--id', 'second-task');
+
+      const refused = tasks('done', 'first-task', 'zzz-no-such-task');
+      expect(refused.status).toBe(1);
+      expect(tasks('show', 'first-task').stdout).toContain('[task/open]');
+
+      const closed = tasks('done', 'first-task', 'second-task');
+      expect(closed.status).toBe(0);
+      expect(closed.stdout).toContain('done first-task');
+      expect(closed.stdout).toContain('done second-task');
+      expect(tasks('show', 'first-task').stdout).toContain('[task/done]');
+      expect(tasks('show', 'second-task').stdout).toContain('[task/done]');
+    });
+  });
+
+  it('decline closes several ids under one shared reason', () => {
+    fixture(({ tasks }) => {
+      tasks('add', 'first task', '--id', 'first-task');
+      tasks('add', 'second task', '--id', 'second-task');
+      const result = tasks('decline', 'first-task', 'second-task', '--reason', 'superseded by the rework');
+      expect(result.status).toBe(0);
+      expect(tasks('show', 'first-task').stdout).toContain('reason: superseded by the rework');
+      expect(tasks('show', 'second-task').stdout).toContain('reason: superseded by the rework');
+    });
+  });
+
+  it('a bare -- ends flag parsing, so a decision may start with a dash', () => {
+    fixture(({ tasks }) => {
+      const result = tasks('decision', '--', '--each added mid-branch: the survey shape won');
+      expect(result.status).toBe(0);
+      const log = tasks('log', '--op', 'decision');
+      expect(log.stdout).toContain('--each added mid-branch: the survey shape won');
     });
   });
 

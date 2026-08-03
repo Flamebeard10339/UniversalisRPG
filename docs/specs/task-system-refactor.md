@@ -19,7 +19,9 @@ Proof:
 - [c2] `scripts/tasks.ts` is an entry point of under 100 lines re-exporting `run`; the command
   bodies live under `scripts/tasks/` in modules cut by command family, none over 700 lines, and
   the CLI surface is unchanged except where a clause below changes it deliberately.
-- [c3] The uncommitted-store warning prints at most once per process invocation.
+- [c3] The uncommitted-store warning fires only for uncommitted state that predates the writing
+  session (pre-write store mtime older than a 30-minute margin), at most once per process; a
+  session's own writes stay silent, and `tasks doctor` still reports dirtiness unconditionally.
 - [c4] `tasks done` and `tasks decline` accept several ids in one invocation; each id is
   recorded and reported individually, and one bad id refuses the batch before anything is written.
 - [c5] Anywhere a command resolves a task id, an unambiguous prefix or substring of exactly one id

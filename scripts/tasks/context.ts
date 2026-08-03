@@ -85,19 +85,29 @@ export function dirtyStoreIssue(config: Config): CheckIssue | null {
   };
 }
 
-// Once per process: the warning exists for the session that walks away from
-// uncommitted store state, and a batch of fifteen writes printing it fifteen
-// times is how a real warning becomes invisible — measured at six-for-six
-// and eight-for-eight across two recorded sessions.
+// The warning exists for uncommitted state a session left behind, not for
+// the write a session is making on purpose — fired on every write it was
+// measured at six-for-six and eight-for-eight across two recorded sessions,
+// which is how a real warning becomes invisible. So it fires only when the
+// store's uncommitted state predates the writing session by a margin, and
+// at most once per process. An actively-writing session keeps the mtime
+// fresh and stays silent; `tasks doctor` still reports dirtiness
+// unconditionally, which is where the pre-cleanup check belongs.
+const STALE_DIRTY_MS = 30 * 60 * 1000;
 let warnedStoreDirty = false;
 
-export function warnIfStoreDirty(config: Config): void {
+function warnIfStoreDirtyAndStale(config: Config): void {
   if (warnedStoreDirty) return;
-  const issue = dirtyStoreIssue(config);
-  if (issue) {
-    console.warn(`warning: ${issue.message}`);
-    warnedStoreDirty = true;
+  if (dirtyStoreIssue(config) === null) return;
+  let mtimeMs: number;
+  try {
+    mtimeMs = statSync(config.storePath).mtimeMs;
+  } catch {
+    return;
   }
+  if (Date.now() - mtimeMs < STALE_DIRTY_MS) return;
+  console.warn(`warning: ${config.storePath} has uncommitted task-state changes from an earlier session; commit them before cleanup/reset, or another session may miss working-tree-only state`);
+  warnedStoreDirty = true;
 }
 
 export const CLOSING_STATES: State[] = ['done', 'declined'];
@@ -153,9 +163,11 @@ export function flushSkippedStoreLines(): void {
   skippedStoreLines.length = 0;
 }
 
+// The staleness check reads the pre-write state, so it runs before the
+// save: after it, the mtime is this write's own and the question is gone.
 export function saveStoreAndWarn(tasks: Task[], config: Config): void {
+  warnIfStoreDirtyAndStale(config);
   saveStore(tasks, config.storePath);
-  warnIfStoreDirty(config);
 }
 
 // "the spec whose branch is checked out" — a branch not named after any spec
