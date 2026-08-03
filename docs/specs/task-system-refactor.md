@@ -24,9 +24,11 @@ Proof:
   session's own writes stay silent, and `tasks doctor` still reports dirtiness unconditionally.
 - [c4] `tasks done` and `tasks decline` accept several ids in one invocation; each id is
   recorded and reported individually, and one bad id refuses the batch before anything is written.
-- [c5] Anywhere a command resolves a task id, an unambiguous prefix or substring of exactly one id
-  resolves to it and the output names the resolution; an ambiguous fragment is refused with the
-  candidates.
+- [c5] The record verbs that take a task id — `show`, `edit`, `start`, `stop`, `done`, `decline`,
+  `promote` — resolve an unambiguous prefix or substring of exactly one id, naming the resolution
+  in the output; an ambiguous fragment is refused with the candidates, and an exact id always wins
+  outright. The other id inlets (`spec add`/`spec remove`, `plan`, `note`/`decision --id`,
+  `--requires`) take exact ids; extending them is deferred, tracked by the pass-2 M3 findings.
 - [c6] A bare `--` in the argument list ends flag parsing, so `tasks decision "--each added
   mid-branch: ..."` records the text as given.
 - [c7] `tasks audit <spec>` invoked with findings and no `--proof` flags files the findings

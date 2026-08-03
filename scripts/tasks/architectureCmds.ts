@@ -211,7 +211,7 @@ export function cmdConcept(args: Flags, usage: string): void {
   const config = resolveConfig(args.flags);
   const [systemName, name] = args.positional;
   const paths = splitList(args.flags.paths).map(canonicalPath);
-  if (!systemName || !name.trim() || paths.length === 0) {
+  if (!systemName || !name?.trim() || paths.length === 0) {
     console.error(usage);
     process.exitCode = 1;
     return;

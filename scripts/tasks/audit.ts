@@ -464,6 +464,20 @@ export async function cmdAudit(args: Flags, usage: string): Promise<void> {
     console.warn(`warning: ${slug} tags more than one proof clause [c${duplicates[0]}] — a verdict for it cannot say which one it graded; \`tasks doctor\` reports this until the tags are unique`);
   }
 
+  // A verdict for a clause the spec does not have is a typo, and silently
+  // dropping it turned `--proof 99=met` into a recorded pass that graded
+  // nothing — superseding real verdicts, since the standing reads from the
+  // latest pass only. Refused by name, the way an unscoped --evidence is.
+  const clauseIds = new Set(doc.proofClauses.map((clause) => clause.id));
+  const unmatched = [...parsed.proofs.keys()].filter((id) => !clauseIds.has(id));
+  if (unmatched.length > 0) {
+    const shown = unmatched.map((id) => (Number.isNaN(id) ? '(not a number)' : `c${id}`)).join(', ');
+    const known = doc.proofClauses.map((clause) => `c${clause.id}`).join(', ') || '(none)';
+    console.error(`error: --proof names no clause in ${slug}: ${shown} — its clauses are ${known}. Nothing was recorded`);
+    process.exitCode = 1;
+    return;
+  }
+
   // Whichever route graded the clauses, the ones it did not reach are
   // `unknown` rather than missing: a pass that says nothing about a clause
   // is a pass that nobody ran on it, and that is a fact worth recording.
@@ -471,6 +485,16 @@ export async function cmdAudit(args: Flags, usage: string): Promise<void> {
     parsed.proofs.size === 0 && parsed.findings.length === 0
       ? await walkClausesInteractively(doc.proofClauses)
       : doc.proofClauses.filter((clause) => parsed.proofs.has(clause.id)).map((clause) => ({ clause: clause.id, status: parsed.proofs.get(clause.id)!, evidence: parsed.evidence.get(clause.id) ?? null }));
+
+  // A walk abandoned before its first verdict — an exhausted stdin, a
+  // caller with no TTY — used to record a full all-unknown pass, which is
+  // the same verdict-wiping trap the findings-only route closed. A pass
+  // that graded zero clauses is not a pass.
+  if (doc.proofClauses.length > 0 && graded.length === 0) {
+    console.error('error: this pass graded no clause, and recording it would reset every recorded verdict to unknown. Pass --proof N=met|unmet|unknown, or file findings without proofs — they append no pass');
+    process.exitCode = 1;
+    return;
+  }
   const verdicts = clauseStandings(doc.proofClauses, graded);
   const ungraded = verdicts.filter((verdict) => verdict.status === 'unknown').map((verdict) => `c${verdict.clause}`);
 

@@ -514,6 +514,20 @@ describe('tasks CLI', () => {
     });
   });
 
+  // uniqueId manufactures strict prefix pairs (`foo`, `foo-2`) on slug
+  // collision, so the exact-wins rule is load-bearing by construction.
+  it('an exact id wins outright over the prefix pair uniqueId itself manufactures', () => {
+    fixture(({ tasks }) => {
+      tasks('add', 'first foo', '--id', 'foo');
+      tasks('add', 'second foo', '--id', 'foo-2');
+      const shown = tasks('show', 'foo');
+      expect(shown.status).toBe(0);
+      expect(shown.stdout).toContain('first foo');
+      expect(shown.stdout).not.toContain('second foo');
+      expect(shown.stdout).not.toContain('resolved');
+    });
+  });
+
   it('show resolves a unique fragment to the record, and answers a truly unknown id at exit zero', () => {
     fixture(({ tasks }) => {
       tasks('add', 'check the merge shell', '--id', 'pass1-check-merge-shell');
@@ -1428,6 +1442,43 @@ describe('tasks CLI', () => {
     });
   });
 
+  // The once-per-process half of c3, which no spawn-per-call fixture can
+  // observe: the second write is made stale again by hand, so only the
+  // module-level flag can explain its silence.
+  it('the dirty-store warning prints at most once per process, even across two stale writes', () => {
+    const dir = mkdtempSync(path.join(os.tmpdir(), 'universalis-warn-once-'));
+    const cwd = process.cwd();
+    try {
+      spawnSync('git', ['init', '-q'], { cwd: dir });
+      spawnSync('git', ['config', 'user.email', 'test@example.com'], { cwd: dir });
+      spawnSync('git', ['config', 'user.name', 'Test'], { cwd: dir });
+      mkdirSync(path.join(dir, 'docs'), { recursive: true });
+      const store = path.join(dir, 'docs', 'tasks.jsonl');
+      const record = (id: string): string =>
+        `${JSON.stringify({ id, title: id, kind: 'task', state: 'open', severity: null, system: null, spec: null, clause: null, requires: [], files: [], deliverable: null, evidence: null, source: null, reason: null, closed: null, closedCommit: null, claimed: null, claimedBy: null })}\n`;
+      writeFileSync(store, record('committed-task'), 'utf8');
+      spawnSync('git', ['add', '.'], { cwd: dir });
+      spawnSync('git', ['commit', '--no-verify', '-m', 'store baseline'], { cwd: dir, encoding: 'utf8' });
+      writeFileSync(store, record('committed-task') + record('left-behind'), 'utf8');
+      const old = new Date(Date.now() - 40 * 60 * 1000);
+      utimesSync(store, old, old);
+
+      process.chdir(dir);
+      const first = runInProcess(['add', 'warn one', '--id', 'warn-one']);
+      expect(first.stderr).toContain('uncommitted task-state changes from an earlier session');
+
+      // Stale again by hand: without the process-level flag this second
+      // write would warn identically.
+      utimesSync(store, old, old);
+      const second = runInProcess(['add', 'warn two', '--id', 'warn-two']);
+      expect(second.status).toBe(0);
+      expect(second.stderr).not.toContain('uncommitted task-state changes');
+    } finally {
+      process.chdir(cwd);
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   // Mid-merge, HEAD is still the pre-merge commit, so both git-anchored
   // checks answer about a tree that does not exist yet — the exact state in
   // which a hand-resolved store most needs the store-only checks readable.
@@ -2188,10 +2239,16 @@ describe('tasks CLI', () => {
     fixture(({ tasks, dir }) => {
       const specPath = path.join(dir, 'specs', 'demo-spec.md');
       writeFileSync(specPath, '# Demo spec\n\n## Deliverable\n\nSomething this branch promises.\n', 'utf8');
-      const result = tasks('audit', 'demo-spec', '--proof', '1=met', '--evidence', '1=checked');
+      const result = tasks('audit', 'demo-spec');
       expect(result.status).toBe(0);
       expect(result.stderr).toContain('has no Proof: clauses');
       expect(readFileSync(specPath, 'utf8')).toContain('### Pass 1');
+
+      // A --proof against a clauseless spec is a typo by definition, and
+      // the zero-clause escape hatch above does not excuse it.
+      const typo = tasks('audit', 'demo-spec', '--proof', '1=met', '--evidence', '1=checked');
+      expect(typo.status).toBe(1);
+      expect(typo.stderr).toContain('its clauses are (none)');
     });
   });
 
@@ -2216,6 +2273,43 @@ describe('tasks CLI', () => {
 
       const filed = tasks('list', '--state', 'unreviewed');
       expect(filed.stdout).toContain('a late finding');
+    });
+  });
+
+  // The two remaining doors into the verdict-wiping trap, closed: a typo'd
+  // clause number and an abandoned interactive walk each used to record a
+  // full all-unknown pass, and the standing reads from the latest pass only.
+  it('audit refuses a --proof naming no clause, so a typo cannot record an all-unknown pass', () => {
+    fixture(({ tasks, dir }) => {
+      const specPath = path.join(dir, 'specs', 'demo-spec.md');
+      tasks('audit', 'demo-spec', '--proof', '1=met', '--evidence', '1=clause 1 checked', '--proof', '2=met', '--evidence', '2=clause 2 checked');
+      const before = readFileSync(specPath, 'utf8');
+
+      const typo = tasks('audit', 'demo-spec', '--proof', '99=met', '--evidence', '99=x');
+      expect(typo.status).toBe(1);
+      expect(typo.stderr).toContain('names no clause in demo-spec: c99');
+      expect(typo.stderr).toContain('its clauses are c1, c2');
+
+      const nan = tasks('audit', 'demo-spec', '--proof', 'c1=met', '--evidence', '1=x');
+      expect(nan.status).toBe(1);
+      expect(nan.stderr).toContain('(not a number)');
+
+      expect(readFileSync(specPath, 'utf8')).toBe(before);
+      expect(tasks('spec', 'show', 'demo-spec').stdout).toContain('clause standing (latest pass 1): no clause outstanding');
+    });
+  });
+
+  it('audit on exhausted stdin refuses to record a pass that graded nothing', () => {
+    fixture(({ tasks, dir }) => {
+      const specPath = path.join(dir, 'specs', 'demo-spec.md');
+      tasks('audit', 'demo-spec', '--proof', '1=met', '--evidence', '1=clause 1 checked', '--proof', '2=met', '--evidence', '2=clause 2 checked');
+      const before = readFileSync(specPath, 'utf8');
+
+      const abandoned = tasks('audit', 'demo-spec');
+      expect(abandoned.status).toBe(1);
+      expect(abandoned.stderr).toContain('graded no clause');
+      expect(readFileSync(specPath, 'utf8')).toBe(before);
+      expect(tasks('spec', 'show', 'demo-spec').stdout).toContain('clause standing (latest pass 1): no clause outstanding');
     });
   });
 
@@ -3623,6 +3717,13 @@ describe('tasks concept', () => {
       expect(empty.status).toBe(1);
       expect(empty.stderr).toContain('usage: tasks concept');
       expect(tasks('produces', 'saves').stdout).toContain('nothing produces');
+    }));
+
+  it('refuses a missing concept name with usage, not a raw TypeError', () =>
+    fixture(({ tasks }) => {
+      const missing = tasks('concept', 'Runtime', '--paths', 'src/runtime/save.ts');
+      expect(missing.status).toBe(1);
+      expect(missing.stderr).toContain('usage: tasks concept');
     }));
 
   it('refuses a name another system already registers', () =>

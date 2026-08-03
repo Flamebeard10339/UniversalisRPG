@@ -10,7 +10,9 @@ detail. A **worker** implements and never plans, so its context is spent on one 
 
 ## The session, in order
 
-Every command is `npm run tasks -- <verb>`. Any id may be given as a unique prefix or substring.
+Every command is `npm run tasks -- <verb>`. The record verbs (`show`, `edit`, `start`, `stop`,
+`done`, `decline`, `promote`) accept a unique prefix or substring of an id; everywhere else —
+`spec add`/`remove`, `plan`, `--id`, `--requires` — an id is exact.
 
 1. **`tasks handoff`** — the first command of a cold session: branch, active spec, clause
    standings, open queue.
