@@ -1,6 +1,6 @@
 import { CONTENT_SECTION_MAPS, Registry } from './registry';
 
-const REGISTRY_DIFF_MAPS: readonly (keyof Registry)[] = [...CONTENT_SECTION_MAPS.map(([, map]) => map), 'flags', 'variables', 'saves'];
+export const REGISTRY_DIFF_MAPS: readonly (keyof Registry)[] = [...CONTENT_SECTION_MAPS.map(([, map]) => map), 'flags', 'variables', 'saves'];
 
 function stable(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(stable);

@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { formatModuleDiagnostic, loadUniverseWithDiagnostics } from '../src/content/registry';
 import { ModuleSource, parseModuleSource, ParsedModule } from '../src/content/universe';
-import { roundTripModule } from './lib/roundTrip';
+import { declaredVariableIds, roundTripModule } from './lib/roundTrip';
 
 const repoRoot = path.join(import.meta.dirname, '..');
 const defaultContent = 'content/tutorial-island.dsl';
@@ -82,10 +82,6 @@ function parsed(source: ModuleSource): ParsedModule {
   }
 }
 
-function variableIds(module: ParsedModule): string[] {
-  return module.sections.filter((section) => section.kind === 'variable').map((section) => (section.value as { id: string }).id);
-}
-
 function writeOutput(file: string, text: string): void {
   const target = repoPath(file);
   mkdirSync(path.dirname(target), { recursive: true });
@@ -105,12 +101,12 @@ if (!target) fail([`No loaded source declares module id ${targetId}`]);
 const loaded = loadUniverseWithDiagnostics([...baseSources, localSource]);
 if (loaded.diagnostics.length > 0) fail(['Cannot squash while diagnostics are present:', ...loaded.diagnostics.map((diagnostic) => `  ${formatModuleDiagnostic(diagnostic)}`)]);
 
-const globals = new Set<string>(variableIds(target));
+const globals = new Set<string>(declaredVariableIds(target));
 const localParsed = parsedModules.find((module) => module.source === localSource);
 // Variables are global tuning knobs rather than module-owned content, so a
 // local-created variable can become part of the squashed module's globals. A
 // local-created item/entity/etc. is still refused by registryDiff below.
-if (localParsed && localParsed.info.id !== targetId) for (const id of variableIds(localParsed)) globals.add(id);
+if (localParsed && localParsed.info.id !== targetId) for (const id of declaredVariableIds(localParsed)) globals.add(id);
 
 const validationSources = parsedModules
   .filter((module) => module.info.id !== targetId)

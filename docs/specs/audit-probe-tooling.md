@@ -53,6 +53,9 @@ Proof:
   that is not is reported as a failure of the run rather than a result.
 - [c10] Every file this branch adds is a member of a system in `docs/audits/systems.json`, and
   `npm run audit-status` reports the partition intact.
+- [c12] `--each` loads every source on its own and reports one verdict per source, and a stdin body
+  splits on a line of `---`, so a table of variants is one heredoc and one invocation rather than one
+  invocation per row. `--each` exits 0 on a table of rejections: it is a survey, not an assertion.
 - [c11] `npm test`, `npx tsc --noEmit` and `npm run layer-check` pass. The two scripts are covered by
   tests that drive their decisions directly, with the subprocess passed in as data rather than run,
   and the suite stays inside the five-minute budget.
@@ -64,6 +67,10 @@ Proof:
   editing with an in-memory restore is correct on a dirty tree, which is the case `git checkout --`
   gets wrong. The residual cost is a window of seconds where the file on disk is wrong for a
   concurrent reader; that is documented at the command, not designed away.
+- `--each` was added mid-branch, after the one-invocation-per-row cost was measured against the
+  probe that motivated this work: its largest block was a table of eighteen one-line variants. A tool
+  that answers that in eighteen commands is worse than the vitest file it replaces, so auditors would
+  keep writing vitest files. The clause is c12, added rather than folded into c1.
 - Nothing here is a CI gate and no mutation manifest is tracked. `CLAUDE.md` grants a gate a place
   only when it prevents something that happened; these prevent nothing, they answer questions.
 
