@@ -4,6 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { run as runTasks } from './tasks';
+import { parseAuditArgs } from './tasks/audit';
 
 const repoRoot = path.join(import.meta.dirname, '..');
 const today = new Date().toISOString().slice(0, 10);
@@ -1397,6 +1398,39 @@ describe('tasks CLI', () => {
     });
   });
 
+  // Mid-merge, HEAD is still the pre-merge commit, so both git-anchored
+  // checks answer about a tree that does not exist yet — the exact state in
+  // which a hand-resolved store most needs the store-only checks readable.
+  it('doctor suspends the git-anchored checks during an unresolved merge, and the store-only checks still run', () => {
+    defaultStoreGitFixture(({ dir, tasks }) => {
+      // A working-tree-only close, which doctor would otherwise warn about.
+      tasks('add', 'closable task', '--id', 'closable', '--requires', 'ghost-requirement');
+      spawnSync('git', ['add', '.'], { cwd: dir });
+      spawnSync('git', ['commit', '--no-verify', '-m', 'add closable'], { cwd: dir, encoding: 'utf8' });
+      tasks('done', 'closable');
+
+      // A conflicted merge in an unrelated file leaves MERGE_HEAD behind.
+      writeFileSync(path.join(dir, 'conflict.txt'), 'base\n', 'utf8');
+      spawnSync('git', ['add', '.'], { cwd: dir });
+      spawnSync('git', ['commit', '--no-verify', '-m', 'base'], { cwd: dir, encoding: 'utf8' });
+      spawnSync('git', ['checkout', '-q', '-b', 'side'], { cwd: dir });
+      writeFileSync(path.join(dir, 'conflict.txt'), 'side\n', 'utf8');
+      spawnSync('git', ['commit', '--no-verify', '-am', 'side edit'], { cwd: dir, encoding: 'utf8' });
+      spawnSync('git', ['checkout', '-q', '-'], { cwd: dir });
+      writeFileSync(path.join(dir, 'conflict.txt'), 'ours\n', 'utf8');
+      spawnSync('git', ['commit', '--no-verify', '-am', 'our edit'], { cwd: dir, encoding: 'utf8' });
+      spawnSync('git', ['merge', 'side'], { cwd: dir, encoding: 'utf8' });
+
+      const result = tasks('doctor');
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('a merge is in progress (MERGE_HEAD exists)');
+      expect(result.stdout).not.toContain('only in the working tree');
+      // The store-only checks are the ones worth reading mid-merge, and the
+      // unresolved requirement proves they still ran.
+      expect(result.stdout).toContain('closable requires unresolved id: ghost-requirement');
+    });
+  });
+
   it('doctor reports a working-tree-only in-progress transition as a warning, not an error', () => {
     defaultStoreGitFixture(({ dir, tasks }) => {
       tasks('add', 'startable task', '--id', 'startable');
@@ -2565,6 +2599,15 @@ describe('tasks CLI', () => {
       expect(next.stdout).toContain("1 unreviewed finding(s) filed by demo-spec's audits await triage");
       expect(next.stdout).not.toContain('a fresh bug');
     });
+  });
+
+  // The CLI's generic parser already refuses a flag the usage never names,
+  // so this defends the exported scanner itself: called directly, it used
+  // to record any unknown flag's value as a file with no error.
+  it('parseAuditArgs refuses an unknown flag after a --finding by name, instead of recording its value as a file', () => {
+    const parsed = parseAuditArgs(['demo-spec', '--finding', 'a finding', '--severity', 'low', '--note', 'stray']);
+    expect(parsed.errors).toEqual(['unknown flag --note after --finding "a finding" — a finding takes --severity, --system, --deliverable, --evidence and --file']);
+    expect(parsed.findings[0].files).toEqual([]);
   });
 
   it('--file on a proof clause carries multiple paths onto its undelivered task, and stays separate from a finding\'s own --file', () => {

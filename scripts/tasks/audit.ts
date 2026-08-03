@@ -309,8 +309,10 @@ export function parseAuditArgs(args: string[]): AuditArgs {
       current.system = value ?? null;
     } else if (key === 'deliverable') {
       current.deliverable = value ?? null;
-    } else {
+    } else if (key === 'file') {
       current.files.push(value ?? '');
+    } else {
+      errors.push(`unknown flag --${key} after --finding ${JSON.stringify(current.title)} — a finding takes --severity, --system, --deliverable, --evidence and --file`);
     }
   }
   return { slug, configFlags, baseBranch, proofs, evidence, errors, clauseFiles, findings };
