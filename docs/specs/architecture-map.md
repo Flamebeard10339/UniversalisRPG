@@ -94,3 +94,21 @@ explicit that a gate earns its place by preventing something that actually happe
 None outstanding. The one that blocked planning — who writes concept entries and when — is settled
 by c10: the worker, in the `writes`/`produces` correction round trip it already performs before
 writing code.
+
+## Audit passes
+
+### Pass 1 — 2026-08-03
+
+- base: `8f1de469c8609e685c500a1ae490ad5e1bc10c0c`
+- head: `af0ef8bf120f5c9e5ab486cc8b111260a7fa33c3`
+- proof 1: met — All 11 double-claimed files resolve to the more specific claim; Math.max->Math.min and tie-break reversal both killed by mutation.
+- proof 2: met — Manifest diffed base to head: paths, lastAudit, note and unowned identical for all six systems, only concepts added. owningSystem had no production caller at base.
+- proof 3: met — Coverage-for-ownership mutation killed. Out-of-system path errors, nonexistent path warns, a path escaping the repo is refused.
+- proof 4: met — tasks system answers files, exports and both directions with nothing written back; export surface understates by 9 names, filed as M4.
+- proof 5: met — tasks where returns owner, coverers, concept, and cross-boundary imports in both directions.
+- proof 6: met — Finds a closed task's claim and a registered concept; a miss prints an explicit weak-no.
+- proof 7: met — Three mutations killed; duplicate-produces still fires; findProducers is the single implementation of the match rule.
+- proof 8: met — audit-status names src/grammar/action.ts as claimed by action parsing and the section field engine, once.
+- proof 9: met — Every one of the 23 citations checked: 9 finding ids and 5 task ids all exist, tasks are done and their produces match. No invented name.
+- proof 10: met — Registration sits inside the existing step-4 correction round trip; no new step or role.
+- proof 11: unmet — Test budget met at 54s and audit-status verified single-condition by injection, but tasks plan gained a failing condition on a malformed manifest, proven base-vs-head. See M3.
