@@ -231,3 +231,45 @@ is nameable without being quotable.
 - `npm run audit-status` exiting non-zero on an unowned file is the one gate that caught a real
   omission here: two new scripts and a moved module, none of which would have been attributable to a
   system without it.
+
+# Tool friction — `audit-probe-tooling`, hardening pass, 2026-08-03
+
+Two more, both from running one audit through `tasks` end to end.
+
+## 1. Archiving an audit document breaks a test, because a test pins the corpus totals
+
+`scripts/lib/auditImport.test.ts` asserts `{ high: 21, medium: 54, low: 63 }` across every file in
+`docs/audits/`. Archiving one new report — the ordinary, required act of persisting evidence — turns
+the suite red, and the repair is to hand-edit the expected numbers to match reality. That is a
+system required to be manually kept in sync with another, which `CLAUDE.md` forbids by name.
+
+It also fails *late*. I ran the whole suite green, then archived the report, then committed; the
+break arrived in the next run, and for two commits the branch was red for a reason unrelated to any
+code in it.
+
+The test is trying to prove the parser handles the real corpus, which is worth proving. The totals
+are not what proves it — parsing every document without throwing, and mapping every one to a system,
+is. `unmapped` in the same test already does the second half and needs no maintenance.
+
+**What would fix it:** assert the invariants (every doc parses, every finding maps to a system,
+counts are non-negative) rather than a snapshot of the numbers. If a total is genuinely wanted, read
+it from a manifest the import writes, so archiving updates it.
+
+## 2. Closing a finding list is one invocation per finding
+
+Seventeen findings, seventeen `tasks done <id> --commit HEAD` calls, each with its own store write
+and its own copy of the uncommitted-store warning. Triage has a batch walk (`tasks triage`); closing
+does not. A fix round that retires a whole audit pass is the normal shape here — the previous
+session's was 36 — and the tool treats it as seventeen unrelated events.
+
+**What would fix it:** `tasks done <id>...` taking several ids, or `--spec <slug> --state open` to
+close what a commit retired in one call.
+
+## What worked
+
+- `tasks import <audit-doc>` is the answer to item 2 of the first session — the 6000-character
+  command line for filing findings. Sixteen findings from a markdown document in one invocation, and
+  the document is the archive anyway. It should be the documented path; the `--finding` flags on
+  `tasks audit` are for the case where no document exists yet, which is rare.
+- Grading twelve clauses in one `tasks audit` call, with findings already filed by `import`, avoided
+  the verdict-wiping trap of item 1 entirely. `import` and `audit` do not contend.
