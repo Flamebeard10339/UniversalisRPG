@@ -111,6 +111,17 @@ Not a tool issue but the same class: I wrote `# remove entitytype melee-foe` and
 line but not the expected form, while `parseRemoval` has a good message
 (`# remove names a kind and an id, as in \`# remove entity.mirror\``) that this path never reaches.
 
+## 8. Closing a spec leaves no trace in the event log
+
+`tasks spec done <slug>` on a spec whose members are all closed reports
+"action-kinds-and-templates is done: every member is done or declined" and writes nothing — no
+store change, no `docs/events.jsonl` line. The workflow says every store write appends to the log
+automatically, and "a spec closed" is the one event a later reader most wants a date for. `tasks log
+--spec <slug>` can tell you when every member closed but not when the spec did.
+
+**What would fix it:** append a `spec-done` op even when the state transition is a no-op, or say
+plainly that it recorded nothing.
+
 ## What worked, and is worth keeping
 
 - `tasks plan` graded the two-task set in one command and correctly reported the sequencing note

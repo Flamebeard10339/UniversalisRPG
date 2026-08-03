@@ -22,6 +22,9 @@ Do not bloat CLAUDE.md with over 200 lines of instructions.
 
 `.planning/.scratch.md` contains open thoughts. Vetted work, its state, and its archive all live in `docs/tasks.jsonl`, reached through `npm run tasks` — `tasks next` for what to work on, `tasks show <id>` for a task's full record. A branch's own spec lives at `docs/specs/<slug>.md`. `docs/workflow.md` is the end-to-end protocol every agent follows — decompose against disjoint `writes` grants, grade the set with `tasks plan` before dispatching it, and let a worker correct its own grant before it writes code. `.planning/agent-swarm-theory.md` holds what a planner owes the tree — read it before decomposing a finding list into worker chunks.
 
+# Wisdom that reduces audit issues
+- Enforce where a value is assembled, not where it is written
+
 # Repository systems
 
 A system owns a set of paths, declared in `docs/audits/systems.json` — the one place membership is defined, so a diff's system follows from the files it touches. Membership is a partition: every tracked file is owned by a system or listed under `unowned` (prose, audit records, repo-wide manifests). That partition is the one condition `npm run audit-status` fails on, because attributing a diff to a system depends on it.
