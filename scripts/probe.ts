@@ -124,6 +124,10 @@ function roundTripEachModule(sources: readonly ModuleSource[], parsed: readonly 
   const lines: string[] = [];
   let ok = true;
   for (const module of parsed) {
+    if (!canSerialize(module)) {
+      lines.push(`${module.info.id}: no # info, so its ids are root ids that no namespace prefix matches — it serializes to nothing, which is a fact about the source rather than a defect`);
+      continue;
+    }
     const others = sources.filter((source) => source !== module.source);
     const trip = roundTripModule(loaded, { info: module.info, globalVariables: declaredVariableIds(module) }, (printed) => loadUniverseWithDiagnostics([...others, { ...module.source, text: printed }]));
     if (trip.diagnostics.length > 0) {

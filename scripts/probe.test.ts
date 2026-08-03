@@ -172,6 +172,16 @@ describe('probe: --round-trip', () => {
     expect(result.lines.join('\n')).toContain('items: changed base.bread');
   });
 
+  // 7b16910 fixed exactly this for the universe form; the module form is a
+  // second path and the guard has to be on both. A check that could not run is
+  // not a check that failed.
+  it('does not blame the serializer for a source with no # info, in module mode either', () => {
+    const result = report([{ name: 'snippet', text: '# item rock\ntitle: Rock\n' }], { show: [], roundTrip: true, roundTripMode: 'module' });
+    expect(result.lines.join('\n')).toContain('no # info');
+    expect(result.lines.join('\n')).not.toContain('items: missing');
+    expect(result.ok).toBe(true);
+  });
+
   it('reports a module that does survive publication on its own', () => {
     const result = report([BASE], { show: [], roundTrip: true, roundTripMode: 'module' });
     expect(result.ok).toBe(true);

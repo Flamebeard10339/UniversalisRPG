@@ -1,6 +1,6 @@
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { applyTo, escapesRoot, formatReport, journalVerdict, outputTail, parseManifest, parseVitestTally, journalPathFor, pidIsAlive, readJournal, scopeOf, type BaselineFor, recoverFrom, refusalsFor, runMutations, tallyOf, type FileStore, type Mutation, type TestRun } from './mutate';
+import { applyTo, escapesRoot, formatReport, journalVerdict, outputTail, parseManifest, parseVitestTally, journalPathFor, pidIsAlive, readJournal, scopeOf, type BaselineFor, type RunTests, recoverFrom, refusalsFor, runMutations, tallyOf, type FileStore, type Mutation, type TestRun } from './mutate';
 
 const ORIGINAL = 'const base = entityTypeBase(merged, section);\nconst other = 1;\n';
 
@@ -23,10 +23,13 @@ function store(files: Record<string, string>): FileStore & { writes: { file: str
 
 const mutation = (over: Partial<Mutation> = {}): Mutation => ({ name: 'c1', file: 'a.ts', find: 'entityTypeBase(merged, section)', replace: 'undefined', ...over });
 
-const tally = (failed: number, total: number): TestRun => ({ failed, total, raw: `Tests ${failed} failed | ${total - failed} passed (${total})` });
-const noTests: TestRun = { failed: 0, total: 0, raw: 'Tests  no tests' };
+const tally = (failed: number, total: number, filesFailed = 0): TestRun => ({ failed, total, filesFailed, raw: `Tests ${failed} failed | ${total - failed} passed (${total})` });
+const noTests: TestRun = { failed: 0, total: 0, filesFailed: 1, raw: 'Tests  no tests' };
 
-const baseline = (totals: Record<string, number>): BaselineFor => (tests) => totals[scopeOf({ tests: tests === undefined ? undefined : [...tests] })];
+const baseline = (totals: Record<string, number>, failed = 0): BaselineFor => (tests) => {
+  const total = totals[scopeOf({ tests: tests === undefined ? undefined : [...tests] })];
+  return total === undefined ? undefined : { failed, total };
+};
 
 const killing = () => tally(3, 20);
 const surviving = () => tally(0, 20);
@@ -181,7 +184,7 @@ describe('mutate: the verdict', () => {
   });
 
   it('keeps the run output on an errored mutation, which is where the reason is', () => {
-    const report = runMutations([mutation()], store({ 'a.ts': ORIGINAL }), () => ({ failed: 0, total: 0, raw: 'Transform failed\nUnexpected token (14:8)\nTests  no tests' }));
+    const report = runMutations([mutation()], store({ 'a.ts': ORIGINAL }), () => ({ failed: 0, total: 0, filesFailed: 1, raw: 'Transform failed\nUnexpected token (14:8)\nTests  no tests' }));
     expect(report.results[0].output).toContain('Unexpected token');
     expect(formatReport(report)).toContain('Unexpected token');
   });
@@ -491,10 +494,106 @@ describe('mutate: escalating a narrow survivor', () => {
     const asked: string[] = [];
     const watching: BaselineFor = (tests) => {
       asked.push(scopeOf({ tests: tests === undefined ? undefined : [...tests] }));
-      return 12;
+      return { failed: 0, total: 12 };
     };
     runMutations([mutation(narrow)], store({ 'a.ts': ORIGINAL }), killing, watching);
     expect(asked).toEqual(['one.test.ts']);
+  });
+});
+
+describe('mutate: taking the baseline on an unmutated tree', () => {
+  // A baseline measured with the mutant on disk is not a baseline, it is a
+  // second reading of the same thing — and the shortfall it exists to expose is
+  // exactly what it then suppresses.
+  const watchTree = (files: { read(file: string): string }) => {
+    const seen: { at: string; sawMutant: boolean }[] = [];
+    return {
+      seen,
+      baselineFor: ((tests) => {
+        seen.push({ at: `baseline(${tests ? 'narrow' : 'whole'})`, sawMutant: files.read('a.ts') !== ORIGINAL });
+        return { failed: 0, total: 40 };
+      }) as BaselineFor,
+      runTests: ((tests) => {
+        const mutated = files.read('a.ts') !== ORIGINAL;
+        seen.push({ at: `run(${tests ? 'narrow' : 'whole'})`, sawMutant: mutated });
+        return tally(0, mutated ? 25 : 40);
+      }) as RunTests,
+    };
+  };
+
+  it('measures the narrow baseline before the mutant is written', () => {
+    const files = store({ 'a.ts': ORIGINAL });
+    const watch = watchTree(files);
+    runMutations([mutation({ tests: ['a.test.ts'] })], files, watch.runTests, watch.baselineFor);
+    expect(watch.seen.filter((each) => each.at.startsWith('baseline')).every((each) => each.sawMutant)).toBe(false);
+    expect(watch.seen[0]).toEqual({ at: 'baseline(narrow)', sawMutant: false });
+  });
+
+  it('measures the whole-suite baseline before re-writing the mutant to escalate', () => {
+    const files = store({ 'a.ts': ORIGINAL });
+    const watch = watchTree(files);
+    runMutations([mutation({ tests: ['a.test.ts'] })], files, watch.runTests, watch.baselineFor);
+    const whole = watch.seen.find((each) => each.at === 'baseline(whole)');
+    expect(whole).toEqual({ at: 'baseline(whole)', sawMutant: false });
+  });
+
+  it('reports the shortfall a mutated baseline would have hidden', () => {
+    const files = store({ 'a.ts': ORIGINAL });
+    const watch = watchTree(files);
+    const report = runMutations([mutation({ tests: ['a.test.ts'] })], files, watch.runTests, watch.baselineFor);
+    expect(report.results[0].shortfall).toBe(15);
+  });
+
+  it('asks for the whole-suite baseline only once, however many survivors escalate', () => {
+    const files = store({ 'a.ts': ORIGINAL });
+    const watch = watchTree(files);
+    runMutations([mutation({ name: 'a', tests: ['a.test.ts'] }), mutation({ name: 'b', find: 'const other = 1', replace: 'const other = 2', tests: ['a.test.ts'] })], files, watch.runTests, watch.baselineFor);
+    expect(watch.seen.filter((each) => each.at === 'baseline(whole)')).toHaveLength(1);
+  });
+});
+
+describe('mutate: a file that failed to collect', () => {
+  // vitest counts a collection failure on `Test Files` and not in `Tests`, so
+  // the tests that did collect would otherwise read as a clean sweep of a suite
+  // that never assembled — a SURVIVED for a mutation that did not build.
+  it('is an error, not a verdict, when files failed and no test did', () => {
+    const report = runMutations([mutation()], store({ 'a.ts': ORIGINAL }), () => tally(0, 30, 1));
+    expect(report.results[0].verdict).toBe('ERROR');
+    expect(report.results[0].detail).toContain('failed to collect');
+  });
+
+  it('is still a kill when a test actually failed alongside it', () => {
+    expect(runMutations([mutation()], store({ 'a.ts': ORIGINAL }), () => tally(2, 30, 1)).results[0].verdict).toBe('KILLED');
+  });
+
+  it('leaves an ordinary clean run alone', () => {
+    expect(runMutations([mutation()], store({ 'a.ts': ORIGINAL }), () => tally(0, 30, 0)).results[0].verdict).toBe('SURVIVED');
+  });
+
+  it('reads the failed file count off the Test Files line', () => {
+    expect(parseVitestTally(' Test Files  1 failed | 1 passed (2)\n      Tests  30 passed (30)\n')).toEqual({ failed: 0, total: 30, filesFailed: 1 });
+  });
+});
+
+describe('mutate: a tree that was already red', () => {
+  // Escalation pushes every survivor into the full suite, where any unrelated
+  // failing test lives. Comparing against zero would call them all KILLED.
+  it('does not credit a mutation for failures the baseline already had', () => {
+    const report = runMutations([mutation()], store({ 'a.ts': ORIGINAL }), () => tally(2, 100), baseline({ 'whole suite': 100 }, 2));
+    expect(report.results[0].verdict).toBe('SURVIVED');
+    expect(report.results[0].baselineFailed).toBe(2);
+    expect(formatReport(report)).toContain('already failing');
+  });
+
+  it('still kills a mutation that broke something beyond what was already red', () => {
+    const report = runMutations([mutation()], store({ 'a.ts': ORIGINAL }), () => tally(3, 100), baseline({ 'whole suite': 100 }, 2));
+    expect(report.results[0].verdict).toBe('KILLED');
+  });
+
+  it('says nothing about a red baseline when the tree was green', () => {
+    const report = runMutations([mutation()], store({ 'a.ts': ORIGINAL }), () => tally(1, 100), baseline({ 'whole suite': 100 }));
+    expect(report.results[0].baselineFailed).toBeUndefined();
+    expect(formatReport(report)).not.toContain('already failing');
   });
 });
 
@@ -547,19 +646,19 @@ describe('mutate: the baseline', () => {
 
 describe('mutate: reading vitest back', () => {
   it('reads a mixed tally', () => {
-    expect(parseVitestTally('   Tests  1 failed | 15 passed (16)\n')).toEqual({ failed: 1, total: 16 });
+    expect(parseVitestTally('   Tests  1 failed | 15 passed (16)\n')).toEqual({ failed: 1, total: 16, filesFailed: 0 });
   });
 
   it('reads an all-passing tally', () => {
-    expect(parseVitestTally(' Test Files  45 passed (45)\n      Tests  985 passed (985)\n')).toEqual({ failed: 0, total: 985 });
+    expect(parseVitestTally(' Test Files  45 passed (45)\n      Tests  985 passed (985)\n')).toEqual({ failed: 0, total: 985, filesFailed: 0 });
   });
 
   it('reads a tally carrying skips', () => {
-    expect(parseVitestTally('Tests  2 failed | 3 passed | 1 skipped (6)')).toEqual({ failed: 2, total: 6 });
+    expect(parseVitestTally('Tests  2 failed | 3 passed | 1 skipped (6)')).toEqual({ failed: 2, total: 6, filesFailed: 0 });
   });
 
   it('reports no tally when the run collected nothing', () => {
-    expect(parseVitestTally(' Test Files  1 failed (1)\n      Tests  no tests\n')).toEqual({ failed: 0, total: 0 });
+    expect(parseVitestTally(' Test Files  1 failed (1)\n      Tests  no tests\n')).toEqual({ failed: 0, total: 0, filesFailed: 1 });
   });
 
   it('returns null when there is no Tests line at all', () => {
@@ -573,11 +672,11 @@ describe('mutate: reading vitest back', () => {
   });
 
   it('still reads a genuine no-tests run as a tally of zero', () => {
-    expect(parseVitestTally('Tests  no tests')).toEqual({ failed: 0, total: 0 });
+    expect(parseVitestTally('Tests  no tests')).toEqual({ failed: 0, total: 0, filesFailed: 0 });
   });
 
   it('takes the last tally when the output carries more than one', () => {
-    expect(parseVitestTally('Tests  1 failed | 1 passed (2)\nrerun\nTests  4 failed | 1 passed (5)')).toEqual({ failed: 4, total: 5 });
+    expect(parseVitestTally('Tests  1 failed | 1 passed (2)\nrerun\nTests  4 failed | 1 passed (5)')).toEqual({ failed: 4, total: 5, filesFailed: 0 });
   });
 });
 

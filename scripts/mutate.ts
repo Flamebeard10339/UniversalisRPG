@@ -24,14 +24,25 @@ export interface FileStore {
 export interface TestRun {
   failed: number;
   total: number;
+  // Files that failed as files. A file that could not be collected reports here
+  // and not in `failed`, so a mutation that does not build looks like a clean
+  // run of whatever else collected.
+  filesFailed: number;
   raw: string;
 }
 
 export type RunTests = (tests: readonly string[] | undefined) => TestRun;
 
+export interface Baseline {
+  failed: number;
+  total: number;
+}
+
 // Looked up rather than handed over as a map, so a scope nobody reaches is never
-// measured — including the whole suite, which only an escalation needs.
-export type BaselineFor = (tests: readonly string[] | undefined) => number | undefined;
+// measured — including the whole suite, which only an escalation needs. Every
+// call must happen while the tree is unmutated; runMutations is what guarantees
+// that, by asking before it writes.
+export type BaselineFor = (tests: readonly string[] | undefined) => Baseline | undefined;
 
 export type Verdict = 'KILLED' | 'SURVIVED' | 'ERROR';
 
@@ -46,6 +57,7 @@ export interface MutationResult {
   shortfall?: number;
   unmeasured?: boolean;
   escalatedFrom?: string;
+  baselineFailed?: number;
 }
 
 export interface MutationReport {
@@ -91,14 +103,16 @@ export function parseManifest(text: string): Mutation[] {
 
 // The whole tally, not the exit code: a run that exits non-zero because it
 // collected nothing has not killed anything.
-export function parseVitestTally(output: string): { failed: number; total: number } | null {
+export function parseVitestTally(output: string): { failed: number; total: number; filesFailed: number } | null {
+  const files = [...output.matchAll(/^[ \t]*Test Files[ \t]+(.+)$/gm)];
+  const filesFailed = files.length === 0 ? 0 : Number(/(\d+) failed/.exec(files[files.length - 1][1])?.[1] ?? 0);
   const matches = [...output.matchAll(/^[ \t]*Tests[ \t]+(.+)$/gm)];
   if (matches.length === 0) return null;
   const summary = matches[matches.length - 1][1];
-  if (/no tests/i.test(summary)) return { failed: 0, total: 0 };
+  if (/no tests/i.test(summary)) return { failed: 0, total: 0, filesFailed };
   const total = /\((\d+)\)/.exec(summary);
   if (total === null) return null;
-  return { failed: Number(/(\d+) failed/.exec(summary)?.[1] ?? 0), total: Number(total[1]) };
+  return { failed: Number(/(\d+) failed/.exec(summary)?.[1] ?? 0), total: Number(total[1]), filesFailed };
 }
 
 // Which stream the tally is read from is a decision, so it is data here rather
@@ -150,49 +164,69 @@ export function refusalsFor(mutations: readonly Mutation[], files: FileStore, or
   return refusals;
 }
 
-function verdictOf(mutation: Mutation, run: TestRun, baseline: number | undefined): MutationResult {
-  const scope = scopeOf(mutation);
-  if (run.total === 0) return { name: mutation.name, verdict: 'ERROR', failed: 0, total: 0, scope, detail: 'the run reported no tests — the mutation may not build', output: outputTail(run.raw) };
-  const verdict: Verdict = run.failed > 0 ? 'KILLED' : 'SURVIVED';
-  const shortfall = baseline !== undefined && run.total < baseline ? baseline - run.total : undefined;
-  return { name: mutation.name, verdict, failed: run.failed, total: run.total, scope, shortfall, unmeasured: baseline === undefined };
+function verdictOf(mutation: Mutation, scope: string, run: TestRun, baseline: Baseline | undefined): MutationResult {
+  const errored = (detail: string): MutationResult => ({ name: mutation.name, verdict: 'ERROR', failed: 0, total: 0, scope, detail, output: outputTail(run.raw) });
+  if (run.total === 0) return errored('the run reported no tests — the mutation may not build');
+  // A file that fails as a file while no test fails did not run: vitest counts a
+  // collection failure on `Test Files` only, so the tests that did collect would
+  // otherwise read as a clean sweep of a suite that never assembled.
+  if (run.filesFailed > 0 && run.failed === 0) return errored(`${run.filesFailed} test file(s) failed to collect — the mutation may not build`);
+
+  // Against the baseline's failures, not against zero. A tree that was already
+  // red would otherwise report every mutation as KILLED by tests that were
+  // failing before it was applied.
+  const wasFailing = baseline?.failed ?? 0;
+  const verdict: Verdict = run.failed > wasFailing ? 'KILLED' : 'SURVIVED';
+  const shortfall = baseline !== undefined && run.total < baseline.total ? baseline.total - run.total : undefined;
+  return { name: mutation.name, verdict, failed: run.failed, total: run.total, scope, shortfall, unmeasured: baseline === undefined, baselineFailed: wasFailing > 0 ? wasFailing : undefined };
 }
 
 const WHOLE_SUITE: readonly string[] | undefined = undefined;
-
-// A SURVIVED measured against a few files is not a claim about the suite, and
-// re-running only the survivors is what makes a narrow scope affordable: a
-// mutation that dies at file scope has already been caught by something, and
-// nothing wider needs asking.
-function measure(mutation: Mutation, runTests: RunTests, baselineFor: BaselineFor | undefined): MutationResult {
-  const narrow = verdictOf(mutation, runTests(mutation.tests), baselineFor?.(mutation.tests));
-  if (narrow.verdict !== 'SURVIVED' || mutation.tests === undefined || mutation.tests.length === 0) return narrow;
-  const wide = verdictOf({ ...mutation, tests: undefined }, runTests(WHOLE_SUITE), baselineFor?.(WHOLE_SUITE));
-  return { ...wide, escalatedFrom: narrow.scope };
-}
 
 export function runMutations(mutations: readonly Mutation[], files: FileStore, runTests: RunTests, baselineFor?: BaselineFor): MutationReport {
   const originals = new Map<string, string>();
   const refusals = refusalsFor(mutations, files, originals);
   if (refusals.length > 0) return { results: [], refusals, unrestored: [], ok: false };
 
-  const results: MutationResult[] = [];
   const touched = new Set<string>();
   const restoreFailures = new Set<string>();
-  for (const mutation of mutations) {
+
+  // Mutate, measure, put back. Every baseline is taken by the caller BEFORE this
+  // is entered, because a baseline measured with the mutant on disk is not a
+  // baseline — it is a second reading of the same thing.
+  const around = (mutation: Mutation, scope: string, measure: () => MutationResult): MutationResult => {
     const original = originals.get(mutation.file)!;
     touched.add(mutation.file);
     files.write(mutation.file, applyTo(original, mutation));
     try {
-      results.push(measure(mutation, runTests, baselineFor));
+      return measure();
     } catch (error) {
-      results.push({ name: mutation.name, verdict: 'ERROR', failed: 0, total: 0, scope: scopeOf(mutation), detail: (error as Error).message });
+      return { name: mutation.name, verdict: 'ERROR', failed: 0, total: 0, scope, detail: (error as Error).message };
     } finally {
       try {
         files.write(mutation.file, original);
       } catch {
         restoreFailures.add(mutation.file);
       }
+    }
+  };
+
+  const results = mutations.map((mutation) => {
+    const baseline = baselineFor?.(mutation.tests);
+    return around(mutation, scopeOf(mutation), () => verdictOf(mutation, scopeOf(mutation), runTests(mutation.tests), baseline));
+  });
+
+  // Escalation is a second phase rather than a nested run, so the whole-suite
+  // baseline is taken on a clean tree too — and only when something survived a
+  // narrow scope, which is what keeps a narrow scope cheap.
+  const escalating = results.map((_, index) => index).filter((index) => results[index].verdict === 'SURVIVED' && (mutations[index].tests?.length ?? 0) > 0);
+  if (escalating.length > 0) {
+    const wide = baselineFor?.(WHOLE_SUITE);
+    for (const index of escalating) {
+      const mutation = mutations[index];
+      const escalatedFrom = results[index].scope;
+      const whole = scopeOf({ tests: undefined });
+      results[index] = { ...around(mutation, whole, () => verdictOf(mutation, whole, runTests(WHOLE_SUITE), wide)), escalatedFrom };
     }
   }
 
@@ -224,8 +258,9 @@ export function formatReport(report: MutationReport): string {
     const measured = result.verdict === 'ERROR' ? (result.detail ?? 'errored') : `${result.failed} failed of ${result.total}`;
     const shortfall = result.shortfall === undefined ? '' : `  (${result.shortfall} fewer tests ran than the unmutated baseline — they cannot have killed it)`;
     const unmeasured = result.unmeasured && result.verdict !== 'ERROR' ? '  (no baseline for this scope — the total is unchecked)' : '';
+    const red = result.baselineFailed === undefined ? '' : `  (${result.baselineFailed} test(s) were already failing before this mutation)`;
     const scope = result.escalatedFrom === undefined ? result.scope : `${result.escalatedFrom} -> ${result.scope}`;
-    const row = `${result.name.padEnd(width)}  ${result.verdict.padEnd(8)}  ${measured}  [${scope}]${shortfall}${unmeasured}`;
+    const row = `${result.name.padEnd(width)}  ${result.verdict.padEnd(8)}  ${measured}  [${scope}]${shortfall}${unmeasured}${red}`;
     return result.output === undefined || result.output === '' ? [row] : [row, ...result.output.split('\n').map((line) => `    | ${line}`)];
   });
 
@@ -260,9 +295,9 @@ const usage = [
   'next one restores from its journal before doing anything else; a journal held',
   'by a live run makes this one refuse rather than fight it for the tree.',
   '',
-  'Each distinct test scope is run once unmutated first, so a mutation that stops',
-  'tests from being collected is reported as a shortfall rather than as a verdict',
-  'over a silently smaller suite.',
+  'Each test scope is measured once on the unmutated tree before anything is',
+  'written, so a mutation that stops tests from being collected is reported as a',
+  'shortfall rather than as a verdict over a silently smaller suite.',
 ].join('\n');
 
 // The captured bytes live in this process, which is the design's strength — git
@@ -461,13 +496,14 @@ function main(): void {
   // Measured on first use and remembered, so a run pays for the scopes it
   // actually reaches. An escalation is what asks for the whole suite, and most
   // runs never need it.
-  const measured = new Map<string, number | undefined>();
+  const measured = new Map<string, Baseline | undefined>();
   const baselineFor: BaselineFor = (tests) => {
     const key = scopeOf({ tests: tests === undefined ? undefined : [...tests] });
     if (!measured.has(key)) {
       console.error(`measuring the unmutated baseline for ${key}...`);
       try {
-        measured.set(key, runTests(tests).total);
+        const run = runTests(tests);
+        measured.set(key, { failed: run.failed, total: run.total });
       } catch (error) {
         console.error(`  no baseline for ${key} — ${outputTail((error as Error).message, 1)}`);
         measured.set(key, undefined);
