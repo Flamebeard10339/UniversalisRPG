@@ -139,6 +139,14 @@ export function probe(sources: readonly ModuleSource[], options: ProbeOptions): 
 
   if (options.roundTrip) {
     for (const module of parsed) {
+      // The serializer emits a module by filtering ids on its namespace prefix.
+      // A source with no # info declares root ids, so that filter matches
+      // nothing and every id reads as dropped — a fact about the snippet, not a
+      // defect in the serializer, so it is not reported as one.
+      if (module.namespace === null) {
+        lines.push('', `${module.info.id}: no # info, so its ids are root ids and there is no module for the serializer to filter by — declare # info to round-trip it`);
+        continue;
+      }
       const others = sources.filter((source) => source !== module.source);
       const trip = roundTripModule(loaded.registry, { info: module.info, globalVariables: declaredVariableIds(module) }, (printed) => loadUniverseWithDiagnostics([...others, { ...module.source, text: printed }]));
       if (trip.diagnostics.length > 0) {

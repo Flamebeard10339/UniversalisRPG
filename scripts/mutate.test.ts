@@ -249,6 +249,14 @@ describe('mutate: the manifest', () => {
     expect(() => parseManifest('[{"name":"c6","file":"a.ts","find":"x","replace":"y"},{"name":"c6","file":"a.ts","find":"z","replace":"w"}]')).toThrow(/c6/);
   });
 
+  it('takes an empty replace, because deleting what you found is the most direct mutation', () => {
+    expect(parseManifest('[{"name":"c6","file":"a.ts","find":"x","replace":""}]')[0].replace).toBe('');
+  });
+
+  it('still refuses an empty find, which would match everywhere', () => {
+    expect(() => parseManifest('[{"name":"c6","file":"a.ts","find":"","replace":"y"}]')).toThrow(/find/);
+  });
+
   it('refuses an empty manifest rather than reporting a clean run of nothing', () => {
     expect(() => parseManifest('[]')).toThrow(/nothing to measure/);
   });

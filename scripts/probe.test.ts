@@ -130,6 +130,15 @@ describe('probe: --round-trip', () => {
     expect(result.lines.join('\n')).toContain('items: changed base.bread');
   });
 
+  it('says a source with no # info cannot be round-tripped, rather than reporting it as dropped', () => {
+    // Its ids are root ids, so the serializer's namespace filter matches
+    // nothing. Calling that a difference would read as a serializer defect.
+    const result = report([{ name: 'snippet', text: '# item rock\ntitle: Rock\n' }], { show: [], roundTrip: true });
+    expect(result.lines.join('\n')).toContain('no # info');
+    expect(result.lines.join('\n')).not.toContain('items: missing');
+    expect(result.ok).toBe(true);
+  });
+
   it('round-trips the shipped content clean', () => {
     const result = report([{ name: 'tutorial-island', text: readFileSync('content/tutorial-island.dsl', 'utf8') }], { show: [], roundTrip: true });
     expect(result.lines.join('\n')).toContain('round-trips clean');

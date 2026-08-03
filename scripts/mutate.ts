@@ -66,9 +66,12 @@ export function parseManifest(text: string): Mutation[] {
     if (names.has(entry.name)) throw new Error(`${entry.name}: two mutations share this name, so their verdicts could not be told apart`);
     names.add(entry.name);
     for (const key of Object.keys(entry)) if (!FIELDS.has(key)) throw new Error(`${at}: unknown field ${key}. Takes: ${[...FIELDS].join(', ')}`);
-    for (const key of ['file', 'find', 'replace'] as const) {
+    for (const key of ['file', 'find'] as const) {
       if (typeof entry[key] !== 'string' || entry[key] === '') throw new Error(`${at}: ${key} is required and must be a non-empty string`);
     }
+    // Empty is the point: deleting the text you found is the most direct way to
+    // ask whether anything was checking it.
+    if (typeof entry.replace !== 'string') throw new Error(`${at}: replace is required, and may be empty to delete what find matched`);
     if (entry.tests !== undefined && (!Array.isArray(entry.tests) || entry.tests.length === 0 || entry.tests.some((each) => typeof each !== 'string'))) {
       throw new Error(`${at}: tests must be a non-empty list of strings, or absent to measure against the whole suite`);
     }
