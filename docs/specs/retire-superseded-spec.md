@@ -31,3 +31,13 @@ Proof:
   whether or not today's members are closed — neither is the other's fix, and a
   test proves the rule holds on a store where a superseded spec still has open
   members.
+
+## Audit passes
+
+### Pass 1 — 2026-08-03
+
+- base: `354be57726f70e6d3070d7b3bb913e14a16b55a9`
+- head: `9107d4cc2e707a5321ba3ee7785be88e1bb04de3`
+- proof 1: met — Verified live: tasks list --spec task-system-real-world-friction-spec --state open returns 0 records. All five were closed against evidence gathered from the tree rather than the clause text - c2's three conjuncts checked at tasks.ts:200/:230/:546 and closedCommit on 28 records, c5's seven elements by running audit-prompt, c8's runner/tsconfig/52s-suite measured. c1 and c4 declined with the deletion that voided them named by commit.
+- proof 2: met — Written test-first and mutation-verified. Red for the right reason before the guard existed ('expected ... not to contain spec inferred from the store'); green after; red again when the guard is deleted. The test asserts the same store still infers under branch name 'orphaned-branch', so what changed is the rule for main and not the inference. A second test pins --spec still working on main. Confirmed against the real store: handoff --branch main now reports 'spec: none'.
+- proof 3: met — Structural, and asserted by construction: the c2 test builds a store where demo-spec HAS an open member and still expects no inference on main, so the rule holds independently of whether any spec has been retired. Conversely the five members were closed on their own evidence, none of it referencing the inference rule. Neither half is the other's fix.
