@@ -42,7 +42,7 @@ export function producerIndex(manifest: Manifest, tasks: Task[]): Producer[] {
 // relevance heuristic pretending to be a rule.
 const NOISE = new Set(['the', 'and', 'for', 'its', 'a', 'an', 'of', 'to']);
 
-export function normalizeName(name: string): string {
+function normalizeName(name: string): string {
   return name.trim().toLowerCase().replace(/\s+/g, ' ');
 }
 
