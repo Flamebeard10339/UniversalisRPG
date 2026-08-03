@@ -9,7 +9,9 @@ import { appendEvents, EVENT_OPS, eventsPathFor, filterEvents, loadEvents, type 
 import * as git from './lib/git';
 import { appendAuditPass, clauseStandings, duplicateClauseIds, outstandingSummary, parseSpecDoc, stampClauseIds, VERDICTS, type AuditVerdict, type ProofClause, type Verdict } from './lib/specDoc';
 import { checkPlan } from './lib/planCheck';
-import { loadManifest, systemNames as manifestSystemNames } from './lib/systems';
+import { deriveModules, fileView, repoSourceTree, systemView, type Module, type SourceTree, type SystemEdge, type SystemView } from './lib/architecture';
+import { findProducers, producerIndex } from './lib/producers';
+import { checkManifest, isUnowned, loadManifest, overlappingConcepts, parseManifest, systemNames as manifestSystemNames, type Manifest } from './lib/systems';
 import {
   checkStore,
   claimSummary,
@@ -940,7 +942,7 @@ function cmdPlan(args: Flags): void {
     return;
   }
 
-  const report = checkPlan(plan, tasks);
+  const report = checkPlan(plan, tasks, producerIndex(loadManifest(config.systemsPath), tasks));
   console.log(`plan: ${plan.length} task(s), ${plan.length - report.ungranted} with a write grant this check can read`);
   for (const task of plan) printRow(task, byId, { indent: '  ' });
   console.log('');
@@ -955,6 +957,178 @@ function cmdPlan(args: Flags): void {
   console.log('');
   const defects = report.findings.filter((finding) => finding.level === 'defect').length;
   console.log(`${report.findings.length} finding(s) — ${defects} defect, ${report.findings.length - defects} note. Reported, not enforced: whether to dispatch is yours.`);
+}
+
+// The architecture questions. All three are reads over data computed at call
+// time from the manifest and the tree; none of them writes anything, and
+// nothing downstream of them can fail a build.
+
+function architecture(config: Config): { manifest: Manifest; tree: SourceTree; modules: Module[] } {
+  const manifest = loadManifest(config.systemsPath);
+  const tree = repoSourceTree();
+  return { manifest, tree, modules: deriveModules(manifest, tree) };
+}
+
+function printSystemSummary(view: SystemView): void {
+  const out = view.dependsOn.map((edge) => edge.to).join(', ') || 'nothing';
+  console.log(`  ${view.system.name.padEnd(22)} ${String(view.files.length).padStart(3)} file(s), ${String(view.exportCount).padStart(3)} export(s), ${view.system.concepts.length} concept(s), depends on ${out}`);
+}
+
+function cmdSystem(args: Flags): void {
+  const config = resolveConfig(args.flags);
+  const { manifest, tree, modules } = architecture(config);
+  const name = args.positional[0];
+
+  if (name === undefined) {
+    console.log(`${manifest.systems.length} system(s) declared in ${config.systemsPath}; every count below is derived from the tree, never stored`);
+    for (const system of manifest.systems) printSystemSummary(systemView(manifest, tree, modules, system.name)!);
+    console.log('\n`tasks system "<name>"` opens one; `tasks where <path>` answers the other direction');
+    return;
+  }
+
+  const view = systemView(manifest, tree, modules, name);
+  if (view === null) {
+    console.error(`error: no system named ${JSON.stringify(name)} in ${config.systemsPath}\nknown: ${systemNames(config).join(', ')}`);
+    process.exitCode = 1;
+    return;
+  }
+
+  console.log(`${view.system.name} — ${view.files.length} owned file(s), ${view.modules.length} module(s), ${view.exportCount} export(s) in production modules`);
+  // The manifest's note is audit standing, not architecture, and it runs to
+  // paragraphs. `npm run audit-status` is where it belongs whole; repeating
+  // it here would bury the answer this command was asked for.
+  if (view.system.note) console.log(`\nlast audit: ${view.system.lastAudit ?? 'never swept'}${view.system.lastAuditDoc ? ` (${view.system.lastAuditDoc})` : ''} — \`npm run audit-status\` prints its standing in full`);
+
+  console.log('\ndepends on:');
+  if (view.dependsOn.length === 0) console.log('  nothing — no file it owns imports across a system boundary');
+  for (const edge of view.dependsOn) console.log(`  ${edge.to.padEnd(22)} ${describeEdge(edge)}`);
+
+  console.log('\ndepended on by:');
+  if (view.dependedOnBy.length === 0) console.log('  nothing');
+  for (const edge of view.dependedOnBy) console.log(`  ${edge.from.padEnd(22)} ${describeEdge(edge)}`);
+
+  console.log('\nconcepts:');
+  if (view.concepts.length === 0) console.log(`  none registered — \`tasks produces\` cannot answer for this system yet`);
+  for (const entry of view.concepts) {
+    console.log(`  ${entry.concept.name} — ${entry.files.length} file(s): ${entry.files.join(', ') || '(none matching)'}`);
+    if (entry.concept.note) console.log(`    ${entry.concept.note}`);
+  }
+
+  if (view.unclaimed.length > 0) {
+    console.log(`\n${view.unclaimed.length} production file(s) no concept claims:`);
+    for (const file of view.unclaimed) console.log(`  ${file}`);
+  }
+
+  const overlaps = overlappingConcepts(manifest).filter((entry) => entry.system === view.system.name);
+  for (const entry of overlaps) console.log(`\n  [note] ${entry.path} is claimed by ${entry.concepts.join(' and ')} — one file doing two jobs is where a seam belongs`);
+}
+
+const describeEdge = (edge: SystemEdge): string => {
+  const production = edge.imports.filter((entry) => !entry.test).length;
+  const only = production === 0 ? ', all of them in tests' : production === edge.imports.length ? '' : `, ${production} of them in production code`;
+  return `${edge.imports.length} import(s)${only} — e.g. ${edge.imports[0].from} -> ${edge.imports[0].to}`;
+};
+
+function cmdWhere(args: Flags, usage: string): void {
+  const config = resolveConfig(args.flags);
+  const target = args.positional[0];
+  if (!target) {
+    console.error(usage);
+    process.exitCode = 1;
+    return;
+  }
+  const { manifest, modules } = architecture(config);
+  const view = fileView(manifest, modules, target);
+
+  console.log(`${view.path}`);
+  console.log(`  system:   ${view.owner ?? `none — it is ${isUnowned(manifest, view.path) ? 'declared unowned' : 'owned by nobody, which `npm run audit-status` fails on'}`}`);
+  if (view.coveredBy.length > 1) console.log(`  audited by: ${view.coveredBy.join(', ')} — coverage is many-to-many, ownership is not`);
+  console.log(`  concept:  ${view.concepts.join(', ') || 'none claims it'}`);
+  if (view.exports.length > 0) console.log(`  exports:  ${view.exports.join(', ')}`);
+  if (view.importsOut.length > 0) {
+    console.log('  imports across a system boundary:');
+    for (const entry of view.importsOut) console.log(`    ${entry.path} (${entry.system})`);
+  }
+  if (view.importedBy.length > 0) {
+    console.log('  imported from outside its system by:');
+    for (const entry of view.importedBy) console.log(`    ${entry.path} (${entry.system})`);
+  }
+}
+
+// The check a worker runs before building: is this already somebody's job?
+// Answered against every concept a system has registered and every claim any
+// task ever made, closed ones included — which is the half `tasks plan` could
+// never see, because a claim went inert the moment its task closed.
+function cmdProduces(args: Flags, usage: string): void {
+  const config = resolveConfig(args.flags);
+  const query = args.positional[0];
+  if (!query) {
+    console.error(usage);
+    process.exitCode = 1;
+    return;
+  }
+  const manifest = loadManifest(config.systemsPath);
+  const matches = findProducers(query, producerIndex(manifest, readStore(config)));
+
+  if (matches.length === 0) {
+    console.log(`nothing produces ${JSON.stringify(query)}.`);
+    console.log('That is a weak "no": only registered concepts and recorded `produces` claims are searched, and most of the tree carries neither.');
+    console.log(`Widen it with \`tasks search ${JSON.stringify(query)}\`, and grep before you build.`);
+    return;
+  }
+
+  console.log(`${matches.length} producer(s) of ${JSON.stringify(query)}:`);
+  for (const { producer, strength, on } of matches) {
+    const held = producer.kind === 'concept' ? `owned by ${producer.owner}` : `claimed by ${producer.owner} (${producer.state})`;
+    const how = strength === 'word' ? `, sharing the word "${on}" and nothing more` : strength === 'contains' ? ', one name inside the other' : '';
+    console.log(`  [${strength}] ${producer.name} — ${held}, in ${producer.where}${how}`);
+  }
+  if (matches.some((match) => match.strength === 'exact')) console.log('\nAn exact match means the capability exists. Use it, or record why a second one is right.');
+}
+
+function cmdConcept(args: Flags, usage: string): void {
+  const config = resolveConfig(args.flags);
+  const [systemName, name] = args.positional;
+  const paths = splitList(args.flags.paths);
+  if (!systemName || !name || paths.length === 0) {
+    console.error(usage);
+    process.exitCode = 1;
+    return;
+  }
+
+  // Mutated as raw JSON rather than re-serialised from the parsed model, so
+  // a field this version of the tool does not know about survives the write —
+  // the manifest's version of the store's `extra`.
+  const raw = JSON.parse(readFileSync(config.systemsPath, 'utf8')) as { systems: Array<{ name: string; concepts?: unknown[] }> };
+  const system = raw.systems.find((candidate) => candidate.name === systemName);
+  if (system === undefined) {
+    console.error(`error: no system named ${JSON.stringify(systemName)} in ${config.systemsPath}\nknown: ${systemNames(config).join(', ')}`);
+    process.exitCode = 1;
+    return;
+  }
+
+  const existing = findProducers(name, producerIndex(loadManifest(config.systemsPath), readStore(config))).filter((match) => match.strength === 'exact' && match.producer.kind === 'concept');
+  if (existing.length > 0) {
+    console.error(`error: ${existing[0].producer.owner} already registers a concept named ${JSON.stringify(existing[0].producer.name)} — a name with two owners answers every lookup with the wrong one`);
+    process.exitCode = 1;
+    return;
+  }
+
+  system.concepts = [...(system.concepts ?? []), { name, paths, note: args.flags.note ?? null }];
+
+  const candidate = parseManifest(JSON.stringify(raw), config.systemsPath);
+  const blocking = checkManifest(candidate).filter((issue) => issue.level === 'error');
+  if (blocking.length > 0) {
+    for (const issue of blocking) console.error(`error: ${issue.message}`);
+    process.exitCode = 1;
+    return;
+  }
+
+  writeFileSync(config.systemsPath, `${JSON.stringify(raw, null, 2)}\n`, 'utf8');
+  recordEvents(config, 'note', [{ id: null, system: systemName, spec: null, note: `registered concept "${name}" over ${paths.join(', ')}` }]);
+  console.log(`registered "${name}" to ${systemName} over ${paths.join(', ')}`);
+  for (const issue of checkManifest(candidate)) console.log(`  [${issue.level}] ${issue.message}`);
+  console.log(`next: \`tasks produces "${name}"\` now answers, and \`tasks system "${systemName}"\` lists it`);
 }
 
 // An empty queue has causes that look identical from outside — no members,
@@ -1148,6 +1322,22 @@ function cmdDone(args: Flags, usage: string): void {
   if (task.kind === 'undelivered') console.log(`clause standing at close: ${clauseStanding(config, task)}`);
   if (alreadyDone) console.log(`the recorded close date stands: ${task.closed ?? 'undated'}`);
   if (waiting.length > 0) console.log(`closed with ${waiting.length} requirement(s) still open: ${waiting.join(', ')}`);
+  reportUnregisteredProduces(config, task);
+}
+
+// A claim that closes without being registered is a capability the next
+// worker's `tasks produces` will not find. Printed, never written: half the
+// claims in this store name a branch's output — "playtest findings",
+// "balance numbers" — and auto-graduating those would fill the architecture
+// map with things that are not capabilities at all.
+function reportUnregisteredProduces(config: Config, task: Task): void {
+  if (task.produces.length === 0) return;
+  const index = producerIndex(loadManifest(config.systemsPath), []);
+  const unregistered = task.produces.filter((name) => !findProducers(name, index).some((match) => match.strength === 'exact'));
+  if (unregistered.length === 0) return;
+  console.log(`\n${unregistered.length} of this task's produces claim(s) are not registered concepts, so \`tasks produces\` will only find them as a closed task's claim:`);
+  for (const name of unregistered) console.log(`  tasks concept ${JSON.stringify(task.system ?? '<system>')} ${JSON.stringify(name)} --paths <paths> --note "produced by ${task.id}"`);
+  console.log('Register the ones that are durable capabilities. A branch\'s output is not one.');
 }
 
 function cmdDecline(args: Flags, usage: string): void {
@@ -2261,7 +2451,7 @@ function cmdCheckCommitMessage(args: Flags, usage: string): void {
   }
 }
 
-const USAGE = 'usage: npm run tasks -- <doctor|add|edit|show|list|search|next|plan|start|stop|done|decline|import|triage|note|decision|log|spec|audit|audit-prompt|handoff> ...';
+const USAGE = 'usage: npm run tasks -- <doctor|add|edit|show|list|search|next|plan|system|where|produces|concept|start|stop|done|decline|import|triage|note|decision|log|spec|audit|audit-prompt|handoff> ...';
 
 interface Command {
   usage: string;
@@ -2308,6 +2498,10 @@ const COMMANDS: Record<string, Command> = {
     run: cmdSearch,
   },
   plan: { usage: 'usage: tasks plan [<id>...] [--spec <slug>]  (grades a dispatch set for overlap, unstated dependencies and duplicated interfaces; runs no workers and refuses nothing)', run: cmdPlan },
+  system: { usage: 'usage: tasks system ["<name>"]  (with no name, every system; with one, its owned files, exported surface, dependencies in both directions and registered concepts — all derived from the tree, none of it stored)', run: cmdSystem },
+  where: { usage: 'usage: tasks where <path>  (which system owns it, which concept claims it, and what it imports across a system boundary)', run: cmdWhere },
+  produces: { usage: 'usage: tasks produces <term>  (does anything already do this — searched over registered concepts and every `produces` claim any task ever made, closed ones included)', run: cmdProduces },
+  concept: { usage: 'usage: tasks concept "<system>" "<name>" --paths a.ts,b/ [--note "where the name came from"]  (registers a capability so `tasks produces` can find it)', run: cmdConcept },
   next: { usage: 'usage: tasks next [--spec <slug>] [--system "<name>"] [--severity high|medium|low] [--full]', run: cmdNext },
   start: { usage: `usage: tasks start <id> ${ACTOR_USAGE}`, run: cmdStart },
   stop: { usage: `usage: tasks stop <id> ${ACTOR_USAGE}`, run: cmdStop },

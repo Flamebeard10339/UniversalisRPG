@@ -33,8 +33,14 @@ improvement. Newest section last.
    expansion, so the corruption is silent and the error surfaces at parse time in a file that looks
    right in the transcript.
 
-   The reliable path is the `Write` tool for any file containing backslashes; `Write` also refuses
-   to overwrite a file that has not been read, which caught nothing here but is the safer default.
+   It recurred in a different shape when appending a block of TypeScript to a test file: the shell
+   failed with ``unexpected EOF while looking for matching `'`` at a line inside a `<<'TSEOF'`
+   body, so the terminator was not recognised and *nothing was written*. That failure at least was
+   loud; the backslash one was silent, which is worse. Both cost a round trip.
+
+   The reliable path is the `Write` tool for any file containing backslashes or quote-heavy code —
+   write to the scratchpad, then `cat` it into place. `Write` also refuses to overwrite a file that
+   has not been read, which is the safer default.
 
    **Wishlist.** Either fix the escaping, or have the Bash tool warn when a heredoc body contains a
    backslash. Losing a character silently in a code-generating command is the worst shape of bug —

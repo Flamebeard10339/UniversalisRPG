@@ -3282,3 +3282,164 @@ describe('a record history git cannot answer', () => {
     });
   });
 });
+
+// The architecture queries. Their logic is unit-tested over fixture trees in
+// `lib/architecture.test.ts` and `lib/producers.test.ts`; what these prove is
+// the wiring — that the command reaches the derived view and the manifest at
+// all. They read this repository's real tree on purpose, because that seam is
+// the only part a fixture cannot exercise.
+describe('tasks system', () => {
+  it('lists every declared system with counts derived from the tree', () =>
+    fixture(({ tasks }) => {
+      const result = tasks('system');
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('2 system(s) declared');
+      expect(result.stdout).toMatch(/Runtime\s+\d+ file\(s\)/);
+    }));
+
+  it('opens one system, naming its dependencies and its unclaimed files', () =>
+    fixture(({ tasks }) => {
+      const result = tasks('system', 'Runtime');
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('export(s) in production modules');
+      expect(result.stdout).toContain('depends on:');
+      expect(result.stdout).toContain('no concept claims');
+    }));
+
+  it('refuses a system the manifest does not declare, and says which exist', () =>
+    fixture(({ tasks }) => {
+      const result = tasks('system', 'Nope');
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain('Runtime');
+    }));
+});
+
+describe('tasks where', () => {
+  it('answers ownership, exports and cross-boundary imports for a file', () =>
+    fixture(({ tasks }) => {
+      const result = tasks('where', 'src/runtime/save.ts');
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('system:   Runtime');
+      expect(result.stdout).toContain('exports:');
+    }));
+
+  it('answers for a path no system owns rather than refusing', () =>
+    fixture(({ tasks }) => {
+      const result = tasks('where', 'docs/workflow.md');
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('declared unowned');
+    }));
+
+  it('refuses with usage when given no path', () =>
+    fixture(({ tasks }) => {
+      expect(tasks('where').status).toBe(1);
+    }));
+});
+
+describe('tasks produces', () => {
+  it('finds a claim made by a task that has already closed', () =>
+    fixture(({ tasks }) => {
+      tasks('add', 'build the buff engine', '--produces', 'buff engine', '--id', 'buffs');
+      tasks('done', 'buffs');
+      const result = tasks('produces', 'buff engine');
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('[exact]');
+      expect(result.stdout).toContain('claimed by buffs (done)');
+    }));
+
+  it('calls its own miss a weak one instead of asserting nothing exists', () =>
+    fixture(({ tasks }) => {
+      expect(tasks('produces', 'quest journal').stdout).toContain('weak "no"');
+    }));
+});
+
+describe('tasks concept', () => {
+  it('registers a capability, after which produces answers for it', () =>
+    fixture(({ tasks }) => {
+      const added = tasks('concept', 'Runtime', 'saves', '--paths', 'src/runtime/save.ts', '--note', 'from a produces claim');
+      expect(added.status).toBe(0);
+      expect(tasks('produces', 'saves').stdout).toContain('owned by Runtime');
+    }));
+
+  it('refuses a name another system already registers', () =>
+    fixture(({ tasks }) => {
+      tasks('concept', 'Runtime', 'saves', '--paths', 'src/runtime/save.ts');
+      const again = tasks('concept', 'UI', 'saves', '--paths', 'src/ui');
+      expect(again.status).toBe(1);
+      expect(again.stderr).toContain('already registers a concept');
+    }));
+
+  it('refuses a concept reaching outside its own system, and writes nothing', () =>
+    fixture(({ dir, tasks }) => {
+      const before = readFileSync(path.join(dir, 'systems.json'), 'utf8');
+      const result = tasks('concept', 'Runtime', 'parsing', '--paths', 'src/grammar/parser.ts');
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain('does not own');
+      expect(readFileSync(path.join(dir, 'systems.json'), 'utf8')).toBe(before);
+    }));
+
+  it('refuses a system that does not exist', () =>
+    fixture(({ tasks }) => {
+      expect(tasks('concept', 'Nope', 'thing', '--paths', 'src/runtime').status).toBe(1);
+    }));
+
+  it('keeps a manifest field it does not know about', () =>
+    fixture(({ dir, tasks }) => {
+      const file = path.join(dir, 'systems.json');
+      const raw = JSON.parse(readFileSync(file, 'utf8')) as { systems: Array<Record<string, unknown>> };
+      raw.systems[0].futureField = 'kept';
+      writeFileSync(file, JSON.stringify(raw), 'utf8');
+      tasks('concept', 'Runtime', 'saves', '--paths', 'src/runtime/save.ts');
+      const after = JSON.parse(readFileSync(file, 'utf8')) as { systems: Array<Record<string, unknown>> };
+      expect(after.systems[0].futureField).toBe('kept');
+    }));
+});
+
+describe('tasks done, on a task that claimed to produce something', () => {
+  it('names the command that would register the claim, and registers nothing itself', () =>
+    fixture(({ dir, tasks }) => {
+      tasks('add', 'build it', '--produces', 'droptable system', '--system', 'Runtime', '--id', 'drops');
+      const before = readFileSync(path.join(dir, 'systems.json'), 'utf8');
+      const result = tasks('done', 'drops');
+      expect(result.stdout).toContain('tasks concept "Runtime" "droptable system"');
+      expect(readFileSync(path.join(dir, 'systems.json'), 'utf8')).toBe(before);
+    }));
+
+  it('says nothing when the claim is already a registered concept', () =>
+    fixture(({ tasks }) => {
+      tasks('concept', 'Runtime', 'droptable system', '--paths', 'src/runtime/save.ts');
+      tasks('add', 'build it', '--produces', 'droptable system', '--system', 'Runtime', '--id', 'drops');
+      expect(tasks('done', 'drops').stdout).not.toContain('not registered concepts');
+    }));
+
+  it('says nothing for a task that claims nothing', () =>
+    fixture(({ tasks }) => {
+      tasks('add', 'plain work', '--id', 'plain');
+      expect(tasks('done', 'plain').stdout).not.toContain('not registered concepts');
+    }));
+});
+
+describe('tasks plan, against producers that already exist', () => {
+  it('reports a plan member claiming what a closed task already produced', () =>
+    fixture(({ tasks }) => {
+      tasks('add', 'old work', '--produces', 'buff engine', '--id', 'old');
+      tasks('done', 'old');
+      tasks('add', 'new work', '--produces', 'buff engine', '--writes', 'src/runtime/buffs.ts', '--id', 'new', '--spec', 'demo-spec');
+      const result = tasks('plan', 'new');
+      expect(result.stdout).toContain('already claims it');
+      expect(result.stdout).toContain('old');
+    }));
+
+  it('reports a plan member claiming a registered concept', () =>
+    fixture(({ tasks }) => {
+      tasks('concept', 'Runtime', 'buff engine', '--paths', 'src/runtime/save.ts');
+      tasks('add', 'new work', '--produces', 'buff engine', '--writes', 'src/runtime/buffs.ts', '--id', 'new', '--spec', 'demo-spec');
+      expect(tasks('plan', 'new').stdout).toContain('already has it as a registered concept');
+    }));
+
+  it('does not report a plan member against its own claim', () =>
+    fixture(({ tasks }) => {
+      tasks('add', 'only work', '--produces', 'lonely thing', '--writes', 'src/runtime/lonely.ts', '--id', 'lonely', '--spec', 'demo-spec');
+      expect(tasks('plan', 'lonely').stdout).not.toContain('existing-producer');
+    }));
+});
