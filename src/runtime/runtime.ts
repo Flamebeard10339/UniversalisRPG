@@ -36,6 +36,7 @@ import {
   targetLevel,
 } from './encounter';
 import { Action } from '../content/entity';
+import { actionKind } from '../grammar/action';
 import { Item } from '../content/item';
 import { Recipe } from '../content/recipe';
 import { Registry } from '../content/registry';
@@ -416,7 +417,7 @@ export function armAction(obj: string, objId: string, actionId: string, registry
     return { armed: false };
   }
 
-  const repeating = action.kind === 'continuous';
+  const repeating = actionKind(action) === 'continuous';
   const duration = attemptDuration(action, state, registry);
   if (repeating && duration <= 0) {
     throw new RuntimeError(`continuous action ${obj}.${objId}.${actionId} resolved a non-positive cadence (${duration}ms)`);

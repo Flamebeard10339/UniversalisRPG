@@ -37,15 +37,13 @@ x: 0, y: 0
 starting
 entities: giant-rat, punchbag
 
-# entity giant-rat
-stats: attack 4, dr 2, max-health 1000, attack-rate 16
+# entitytype melee-foe
 fight:
   continuous
   rate: attack-rate
   target: health
   ability: attack
   dr: dr
-  give: 1 rat-tail
 bite:
   retaliates
   rate: attack-rate
@@ -53,14 +51,18 @@ bite:
   ability: attack
   dr: dr
 
+# entity giant-rat
+type: melee-foe
+stats: attack 4, dr 2, max-health 1000, attack-rate 16
+fight:
+  give: 1 rat-tail
+
+// The same foe minus its answer: dropping the inherited retaliation is what
+// makes this one a punchbag rather than a second rat.
 # entity punchbag
+type: melee-foe
 stats: max-health 24, dr 0
-hit:
-  continuous
-  rate: attack-rate
-  target: health
-  ability: attack
-  dr: dr
+-bite:
 `;
 
 function loaded(): Registry {
@@ -102,7 +104,7 @@ describe('independent cadences', () => {
 
   it('gives an inert target no clock at all', () => {
     const registry = loaded();
-    const state = fighting(registry, 'punchbag', 'hit');
+    const state = fighting(registry, 'punchbag');
     expect(state.activeAction!.cadences['punchbag']).toBeUndefined();
 
     resolve(state, registry, secondsToMs(12));
@@ -111,7 +113,7 @@ describe('independent cadences', () => {
 
   it('stands a fresh target up with a restarted clock, not the dead one half-swing', () => {
     const registry = loaded();
-    const state = fighting(registry, 'punchbag', 'hit');
+    const state = fighting(registry, 'punchbag');
     // 24 hp at 10 a hit: three swings, so the fight turns over at t=7.2.
     resolve(state, registry, secondsToMs(8));
 

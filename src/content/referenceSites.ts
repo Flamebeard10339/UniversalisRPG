@@ -8,7 +8,7 @@ import { isFieldEdits, listMembers } from '../grammar/section';
 import { Quantified } from '../grammar/values';
 import { TagClause } from '../grammar/tagClause';
 
-export type ReferenceKind = 'stat' | 'resource' | 'entity' | 'location' | 'item' | 'skill' | 'recipe' | 'save' | 'test' | 'capability' | 'flag' | 'node';
+export type ReferenceKind = 'stat' | 'resource' | 'entity' | 'entitytype' | 'location' | 'item' | 'skill' | 'recipe' | 'save' | 'test' | 'capability' | 'flag' | 'node';
 
 // Returns what the id should become. Resolution rewrites it into a namespaced
 // key; validation hands it back and throws if it names nothing.
@@ -192,9 +192,13 @@ export function visitSection(kind: string, value: object, where: string, visit: 
       // A stat sheet is authored as a list of assignments; the stat id leading
       // each one is the reference.
       for (const assignment of listMembers<[string, unknown]>(section.stats)) assignment[0] = visit('stat', assignment[0], `${where} stats:`);
+      put(section, 'type', 'entitytype', `${where} type:`, visit);
       actions(section.actions, where, visit);
       return;
     }
+    case 'entitytype':
+      actions(section.actions, where, visit);
+      return;
     case 'item':
       tags(section.tags, where, visit);
       actions(section.actions, where, visit);

@@ -12,7 +12,9 @@ export type ActionKind = 'instant' | 'duration' | 'continuous';
 
 export interface Action {
   label: string;
-  kind: ActionKind;
+  // Absent is `duration`, and absent is what an untagged action records — so a
+  // block overriding a template's action inherits the kind it did not restate.
+  kind?: ActionKind;
   requires?: Condition;
   hiddenIf?: Condition;
   tags?: TagClause[];
@@ -48,7 +50,8 @@ const BOOLEAN_ACTION_FLAG_SET: ReadonlySet<string> = new Set<string>(BOOLEAN_ACT
 // The kinds an author writes. `duration` is what an untagged action is, so it
 // has no tag to write and naming it would give one kind two spellings.
 const TAGGED_ACTION_KINDS = ['instant', 'continuous'] as const;
-const DEFAULT_ACTION_KIND: ActionKind = 'duration';
+
+export const actionKind = (action: Action): ActionKind => action.kind ?? 'duration';
 
 type ActionValue = (cursor: Cursor, line: RawLine) => unknown;
 
@@ -136,7 +139,7 @@ function parseActionField(line: RawLine, cursor: Cursor, action: Omit<Action, 'l
 // The whole table: a kind says what ends the action, and carries exactly one
 // cadence or none. Every combination the vocabulary allows but the model has no
 // meaning for is refused here, which is the only place that can see both halves.
-function resolveKind(action: Omit<Action, 'label' | 'kind'>, lines: RawLine[]): ActionKind {
+function resolveKind(action: Omit<Action, 'label' | 'kind'>, lines: RawLine[]): ActionKind | undefined {
   const span = lines[0]?.span;
   const tagged = TAGGED_ACTION_KINDS.filter((kind) => (action.tags ?? []).some((tag) => tag.kind === 'keyword' && tag.value === kind));
   if (tagged.length > 1) throw new DslError(`an action cannot be both ${tagged.join(' and ')}`, span);
@@ -144,7 +147,7 @@ function resolveKind(action: Omit<Action, 'label' | 'kind'>, lines: RawLine[]): 
   const cadence = [action.time !== undefined && 'time:', action.rate !== undefined && 'rate:'].filter((written): written is string => written !== false);
   if (cadence.length > 1) throw new DslError('action time: and rate: are the same axis written two ways; give one', span);
 
-  const kind = tagged[0] ?? DEFAULT_ACTION_KIND;
+  const kind = tagged[0];
   if (kind === 'instant' && cadence.length > 0) throw new DslError(`an instant action takes no ${cadence[0]}`, span);
   // Nothing else ends it, so a cadence it does not have is one the tuning
   // default would have to supply, and a default of 0 spins the resolver.
@@ -153,7 +156,7 @@ function resolveKind(action: Omit<Action, 'label' | 'kind'>, lines: RawLine[]): 
 }
 
 export const actionBody: EntryBody = {
-  parse: (cursor) => ({ kind: DEFAULT_ACTION_KIND, results: results.parse(cursor) }),
+  parse: (cursor) => ({ results: results.parse(cursor) }),
   parseBlock: (lines) => {
     const action: Omit<Action, 'label' | 'kind'> = { results: [] };
     for (const line of lines) parseActionLine(line, action as Omit<Action, 'label'>);
@@ -162,6 +165,7 @@ export const actionBody: EntryBody = {
         (action as Omit<Action, 'label'>)[tag.value as BooleanActionField] = true;
       }
     }
-    return { ...action, kind: resolveKind(action, lines) };
+    const kind = resolveKind(action, lines);
+    return kind === undefined ? action : { ...action, kind };
   },
 };

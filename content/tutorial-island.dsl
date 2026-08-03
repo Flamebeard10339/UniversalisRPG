@@ -244,30 +244,22 @@ search drawer:
   give: lockpick
   say: Tucked beneath old linens, a set of worn lockpicks.
 
-// A real fight, and the shape every combattable thing in the game shares: its
-// own stat sheet, a swing of its own on its own clock, and a pool that runs out.
-// The two actions are the same action seen from either end — `rate`, `ability`
-// and `accuracy` read whoever is swinging, `target`, `dr` and `evasion` whoever
-// is being hit — so `fight` and `bite` differ only in who runs them.
+// The shape every combattable thing in the game shares, written once: a swing
+// of its own on its own clock, and a pool that runs out. The two actions are
+// the same action seen from either end — `rate`, `ability` and `accuracy` read
+// whoever is swinging, `target`, `dr` and `evasion` whoever is being hit — so
+// `fight` and `bite` differ only in who runs them.
 //
-// 20 health against the player's 10 a hit is two hits, ~2.5 swings at 80%, so a
-// rat falls in about six seconds and lands a bite or two on the way out.
-# entity giant-rat
-title: Giant Rat
-examine: A hunched rat claws at an overturned crate, eyes red in the dark.
-stats: attack 8, defense 0, max-health 20, attack-rate 16, accuracy 60, evasion 40
+// A foe naming this supplies its own stat sheet and, where it has something of
+// its own to say, a block under one of these labels.
+# entitytype melee-foe
 fight:
-  hidden if: rats-killed >= 3
   rate: attack-rate
   accuracy: accuracy
   evasion: evasion
   ability: attack
   dr: defense
   target: health
-  xp: melee 5
-  on success:
-    add: rats-killed 1
-    say: You put down another rat.
 bite:
   retaliates
   rate: attack-rate
@@ -276,6 +268,20 @@ bite:
   ability: attack
   dr: defense
   target: health
+
+// 20 health against the player's 10 a hit is two hits, ~2.5 swings at 80%, so a
+// rat falls in about six seconds and lands a bite or two on the way out.
+# entity giant-rat
+type: melee-foe
+title: Giant Rat
+examine: A hunched rat claws at an overturned crate, eyes red in the dark.
+stats: attack 8, defense 0, max-health 20, attack-rate 16, accuracy 60, evasion 40
+fight:
+  hidden if: rats-killed >= 3
+  xp: melee 5
+  on success:
+    add: rats-killed 1
+    say: You put down another rat.
 
 // --- recipes ---
 

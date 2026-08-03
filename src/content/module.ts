@@ -1,5 +1,6 @@
 import { parseDialogue } from './dialogue';
 import { entitySchema } from './entity';
+import { entityTypeSchema } from './entityType';
 import { flagSchema } from './flag';
 import { infoSchema } from './info';
 import { itemSchema } from './item';
@@ -23,6 +24,7 @@ export const SCHEMAS: Record<string, AnySchema> = {
   skill: skillSchema,
   location: locationSchema,
   entity: entitySchema,
+  entitytype: entityTypeSchema,
   flag: flagSchema,
   recipe: recipeSchema,
   resource: resourceSchema,

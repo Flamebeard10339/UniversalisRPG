@@ -33,7 +33,14 @@ title: Snack
 food, +2 vigor, 30s
 eat: take: 1 snack, say: You eat it.
 
+# entitytype worker
+haul:
+  continuous
+  rate: 12
+  give: 1 ore
+
 # entity npc
+type: worker
 title: NPC
 stations: forge
 stats: vigor 3-4
@@ -137,10 +144,12 @@ describe('serializeRegistryModule', () => {
 
     expect(printed).toContain('# info base');
     expect(printed).toContain('# entity npc');
+    expect(printed).toContain('# entitytype worker');
     expect(printed).toContain('use: entity.base.npc.cheer');
-    expect(roundTrip.entities.get('base.npc')?.actions[0].label).toBe('cheer');
-    expect(roundTrip.entities.get('base.npc')?.actions[0].onSuccess).toEqual([{ kind: 'say', text: 'Hello.' }]);
-    expect(roundTrip.entities.get('base.npc')?.actions[1].results).toEqual([
+    const npcAction = (label: string) => roundTrip.entities.get('base.npc')?.actions.find((each) => each.label === label);
+    expect(npcAction('haul')).toMatchObject({ kind: 'continuous', rate: 12 });
+    expect(npcAction('cheer')?.onSuccess).toEqual([{ kind: 'say', text: 'Hello.' }]);
+    expect(npcAction('sequence')?.results).toEqual([
       { kind: 'set', variable: 'base.levered' },
       { kind: 'say', text: 'Middle.' },
       { kind: 'unset', variable: 'base.levered' },

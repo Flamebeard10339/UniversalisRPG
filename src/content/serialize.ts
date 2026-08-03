@@ -7,6 +7,7 @@ import { TagClause } from '../grammar/tagClause';
 import { Quantified } from '../grammar/values';
 import { Dialogue, TextSegment } from './dialogue';
 import { Entity } from './entity';
+import { EntityType } from './entityType';
 import { Item } from './item';
 import { Location } from './location';
 import { Recipe } from './recipe';
@@ -138,7 +139,7 @@ function actionLines(action: Action): Lines {
     action.onSuccess?.length ||
     action.onFailure?.length ||
     action.onEscape?.length ||
-    action.kind !== 'duration' ||
+    (action.kind !== undefined && action.kind !== 'duration') ||
     action.time !== undefined ||
     action.rate !== undefined ||
     action.accuracy ||
@@ -154,7 +155,7 @@ function actionLines(action: Action): Lines {
   const lines = [`${action.label}:`];
   if (action.requires) lines.push(`  requires: ${condition(action.requires)}`);
   if (action.hiddenIf) lines.push(`  hidden if: ${condition(action.hiddenIf)}`);
-  if (action.kind !== 'duration') lines.push(`  ${action.kind}`);
+  if (action.kind !== undefined && action.kind !== 'duration') lines.push(`  ${action.kind}`);
   if (action.retaliates) lines.push('  retaliates');
   // The tags the kind and the flags above already spell; re-emitting one would
   // round-trip into a second copy of the same fact.
@@ -239,8 +240,15 @@ function itemSection(moduleId: string, item: Item): string {
   return lines.join('\n');
 }
 
+function entityTypeSection(moduleId: string, entityType: EntityType): string {
+  const lines = [`# entitytype ${moduleLocalId(moduleId, entityType.id)}`];
+  for (const action of entityType.actions) lines.push(...actionLines(action));
+  return lines.join('\n');
+}
+
 function entitySection(moduleId: string, entity: Entity): string {
   const lines = [`# entity ${moduleLocalId(moduleId, entity.id)}`];
+  if (entity.type) lines.push(`type: ${entity.type}`);
   titled(lines, entity);
   block(lines, 'stations', entity.capabilities);
   const stats = Object.entries(entity.stats).map(([statId, value]) => `${statId} ${range(value)}`);
@@ -347,6 +355,7 @@ export function serializeRegistryModule(registry: Registry, options: SerializeMo
   for (const stat of registry.stats.values()) if (inModule(moduleId, stat.id)) sections.push([`# stat ${moduleLocalId(moduleId, stat.id)}`, `title: ${stat.title}`, `base: ${range(stat.base)}`].join('\n'));
   for (const skill of registry.skills.values()) if (inModule(moduleId, skill.id)) sections.push([`# skill ${moduleLocalId(moduleId, skill.id)}`, `title: ${skill.title}`, ...(skill['stat-id'] ? [`stat-id: ${skill['stat-id']}`] : [])].join('\n'));
   for (const item of registry.items.values()) if (inModule(moduleId, item.id)) sections.push(itemSection(moduleId, item));
+  for (const entityType of registry.entityTypes.values()) if (inModule(moduleId, entityType.id)) sections.push(entityTypeSection(moduleId, entityType));
   for (const entity of registry.entities.values()) if (inModule(moduleId, entity.id)) sections.push(entitySection(moduleId, entity));
   for (const location of registry.locations.values()) if (inModule(moduleId, location.id)) sections.push(locationSection(moduleId, location));
   for (const recipe of registry.recipes.values()) if (inModule(moduleId, recipe.id)) sections.push(recipeSection(moduleId, recipe));

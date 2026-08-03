@@ -1,4 +1,5 @@
 import { Action } from '../content/entity';
+import { actionKind } from '../grammar/action';
 import { addRanges, isPoint, midpoint, point, Range, sampleRange, scaleRange } from '../grammar/range';
 import { findActiveAction } from './actions';
 import { Registry } from '../content/registry';
@@ -68,7 +69,7 @@ export function hitDamage(attack: number, dr: number, registry: Registry): numbe
 // `rate` is the live half: a stat there is read against whoever is swinging, so
 // a buff moves the cadence without the action knowing.
 export function attemptDuration(action: Action, state: GameState, registry: Registry, actorId: string = PLAYER): number {
-  if (action.kind === 'instant') return 0;
+  if (actionKind(action) === 'instant') return 0;
   if (action.rate === undefined) return secondsToMs(action.time ?? defaultActionDuration(registry));
 
   const perMinute = typeof action.rate === 'string' ? statValue(action.rate, state, registry, actorId) : action.rate;
