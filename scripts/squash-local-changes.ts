@@ -1,9 +1,8 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { formatModuleDiagnostic, loadUniverseWithDiagnostics } from '../src/content/registry';
-import { registryDiff } from '../src/content/registryDiff';
-import { serializeRegistryModule } from '../src/content/serialize';
 import { ModuleSource, parseModuleSource, ParsedModule } from '../src/content/universe';
+import { roundTripModule } from './lib/roundTrip';
 
 const repoRoot = path.join(import.meta.dirname, '..');
 const defaultContent = 'content/tutorial-island.dsl';
@@ -113,23 +112,23 @@ const localParsed = parsedModules.find((module) => module.source === localSource
 // local-created item/entity/etc. is still refused by registryDiff below.
 if (localParsed && localParsed.info.id !== targetId) for (const id of variableIds(localParsed)) globals.add(id);
 
-const squashed = serializeRegistryModule(loaded.registry, { info: target.info, globalVariables: [...globals].sort() });
 const validationSources = parsedModules
   .filter((module) => module.info.id !== targetId)
   .map((module) => module.source)
   .filter((source) => source !== localSource);
-const checked = loadUniverseWithDiagnostics([...validationSources, { ...target.source, text: squashed }]);
-if (checked.diagnostics.length > 0) {
-  fail(['Squashed output did not validate:', ...checked.diagnostics.map((diagnostic) => `  ${formatModuleDiagnostic(diagnostic)}`)]);
+const trip = roundTripModule(loaded.registry, { info: target.info, globalVariables: [...globals].sort() }, (printed) =>
+  loadUniverseWithDiagnostics([...validationSources, { ...target.source, text: printed }]),
+);
+if (trip.diagnostics.length > 0) {
+  fail(['Squashed output did not validate:', ...trip.diagnostics.map((diagnostic) => `  ${formatModuleDiagnostic(diagnostic)}`)]);
 }
-const differences = registryDiff(loaded.registry, checked.registry);
-if (differences.length > 0) {
+if (trip.differences.length > 0) {
   fail([
     `Squashed output would not preserve the loaded universe for module ${targetId}.`,
     'Run the command once per touched module, or publish local-changes as its own module when it creates new content.',
-    ...differences,
+    ...trip.differences,
   ]);
 }
 
-if (args.outFile) writeOutput(args.outFile, squashed);
-else console.log(squashed.trimEnd());
+if (args.outFile) writeOutput(args.outFile, trip.printed);
+else console.log(trip.printed.trimEnd());
