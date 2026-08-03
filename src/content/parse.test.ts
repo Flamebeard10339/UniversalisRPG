@@ -262,7 +262,7 @@ describe('entity action modifiers', () => {
     ['escape after 3', 'escape after'],
   ])('rejects %s written twice', (line, written) => {
     expect(parseOne(`# entity chest\nopen:\n  ${line}\n  say: hi`, entitySchema).actions).toHaveLength(1);
-    expect(() => parseOne(`# entity chest\nopen:\n  ${line}\n  ${line}\n  say: hi`, entitySchema)).toThrow(`action ${written} is defined more than once`);
+    expect(() => parseOne(`# entity chest\nopen:\n  ${line}\n  ${line}\n  say: hi`, entitySchema)).toThrow(`action "open": ${written} is defined more than once`);
   });
 
   it('no longer accepts a health: field, which the implicit target pool replaced', () => {
@@ -342,7 +342,7 @@ describe('action kinds and their cadence', () => {
     [['instant', 'continuous'], /action "work": cannot be both instant and continuous/],
     [['time: 0'], /action "work": time: must be positive/],
     [['rate: 0'], /action "work": rate: must be positive/],
-    [['speed: quickness'], /action speed: was retired; write rate:/],
+    [['speed: quickness'], /action "work": speed: was retired — write rate:/],
   ])('rejects %s', (lines, message) => {
     expect(() => parseAction(...lines)).toThrow(message);
   });

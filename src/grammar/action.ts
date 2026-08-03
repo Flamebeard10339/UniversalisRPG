@@ -51,9 +51,9 @@ const BOOLEAN_ACTION_FLAG_SET: ReadonlySet<string> = new Set<string>(BOOLEAN_ACT
 // has no tag to write and naming it would give one kind two spellings.
 const TAGGED_ACTION_KINDS = ['instant', 'continuous'] as const;
 
-// Every bare word an action's tag list may hold. A word outside it used to be
-// kept and never read, which is how `once` sat in shipped content doing nothing
-// and how a typo'd `instnt` would quietly mean `duration`.
+// Every bare word an action's tag list may hold. The set is closed because a
+// word an action keeps and never reads cannot be told apart from a typo, and a
+// mistyped kind would silently mean `duration`.
 const ACTION_KEYWORD_TAGS: ReadonlySet<string> = new Set<string>([...TAGGED_ACTION_KINDS, ...BOOLEAN_ACTION_FLAGS]);
 
 // Words that meant something once, or look like they should. Each names what to
@@ -65,7 +65,9 @@ const RETIRED_ACTION_TAGS: Readonly<Record<string, string>> = {
 
 export const actionKind = (action: Action): ActionKind => action.kind ?? 'duration';
 
-type ActionValue = (cursor: Cursor, line: RawLine) => unknown;
+// Every value reader takes the label for the same reason the table check does:
+// an error about an action is unreadable if it cannot say which action.
+type ActionValue = (cursor: Cursor, line: RawLine, label: string) => unknown;
 
 const conditionValue: ActionValue = (cursor) => (cursor.done ? undefined : condition.parse(cursor));
 const statValue: ActionValue = (cursor) => id.parse(cursor);
@@ -73,9 +75,9 @@ const resultsValue: ActionValue = (cursor, line) => (!cursor.done ? results.pars
 
 // Named rather than delegated to the generic `decimal`, whose message cannot
 // say which field it was reading and whose span is the bare cursor position.
-const seconds: ActionValue = (cursor, line) => {
+const seconds: ActionValue = (cursor, line, label) => {
   const raw = cursor.take(DECIMAL);
-  if (raw === null) throw new DslError('action time takes a number of seconds', line.span);
+  if (raw === null) throw new DslError(actionProblem(label, 'time: takes a number of seconds'), line.span);
   return Number(raw);
 };
 
@@ -86,9 +88,9 @@ const perMinute: ActionValue = (cursor) => numberOrStat.parse(cursor);
 
 const positiveCount =
   (written: string): ActionValue =>
-  (cursor, line) => {
+  (cursor, line, label) => {
     const raw = cursor.take(/\d+/);
-    if (raw === null || Number(raw) <= 0) throw new DslError(`action ${written} requires a positive integer`, line.span);
+    if (raw === null || Number(raw) <= 0) throw new DslError(actionProblem(label, `${written} requires a positive integer`), line.span);
     return Number(raw);
   };
 
@@ -115,27 +117,27 @@ const ACTION_FIELDS: readonly { written: string; label: RegExp; name: keyof Omit
 // here, `speed: cooking-speed` falls through to the tag parser and reports an
 // unrecognized clause, which says nothing about where the field went.
 const RETIRED_ACTION_FIELDS: readonly { label: RegExp; message: string }[] = [
-  { label: /speed:[ \t]*/, message: 'action speed: was retired; write rate: for attempts per minute, either a number or the stat holding one' },
+  { label: /speed:[ \t]*/, message: 'speed: was retired — write rate: for attempts per minute, either a number or the stat holding one' },
 ];
 
 // One field per line, and the whole line: `requireEnd` is what the generic
 // section engine does by looping to the end of the line, and without it a typo
 // after a value — `time: 1 typo`, `escape after 3 times` — is silently dropped.
-function parseActionLine(line: RawLine, action: Omit<Action, 'label'>): void {
+function parseActionLine(line: RawLine, action: Omit<Action, 'label'>, label: string): void {
   const cursor = new Cursor(line.text, 0, line.span.start);
-  parseActionField(line, cursor, action);
+  parseActionField(line, cursor, action, label);
   requireEnd(cursor, 'an action field');
 }
 
-function parseActionField(line: RawLine, cursor: Cursor, action: Omit<Action, 'label'>): void {
+function parseActionField(line: RawLine, cursor: Cursor, action: Omit<Action, 'label'>, label: string): void {
   const held = action as Record<string, unknown>;
   for (const retired of RETIRED_ACTION_FIELDS) {
-    if (cursor.take(retired.label) !== null) throw new DslError(retired.message, line.span);
+    if (cursor.take(retired.label) !== null) throw new DslError(actionProblem(label, retired.message), line.span);
   }
   for (const field of ACTION_FIELDS) {
     if (cursor.take(field.label) === null) continue;
-    if (held[field.name] !== undefined) throw new DslError(`action ${field.written} is defined more than once`, line.span);
-    const value = field.value(cursor, line);
+    if (held[field.name] !== undefined) throw new DslError(actionProblem(label, `${field.written} is defined more than once`), line.span);
+    const value = field.value(cursor, line, label);
     if (value !== undefined) held[field.name] = value;
     return;
   }
@@ -198,7 +200,7 @@ export const actionBody: EntryBody = {
   parse: (cursor) => ({ results: results.parse(cursor) }),
   parseBlock: (lines, label) => {
     const action: Omit<Action, 'label'> = { results: [] };
-    for (const line of lines) parseActionLine(line, action);
+    for (const line of lines) parseActionLine(line, action, label);
     for (const tag of action.tags ?? []) {
       if (tag.kind === 'keyword' && BOOLEAN_ACTION_FLAG_SET.has(tag.value)) action[tag.value as BooleanActionField] = true;
     }
