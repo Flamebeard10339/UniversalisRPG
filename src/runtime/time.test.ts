@@ -97,7 +97,7 @@ glance:
   });
 
   it('refuses time: 0 and names the tag that means it', () => {
-    expect(() => loadModule('# entity clock\ntick:\n  time: 0\n  say: Tick.\n')).toThrow(/action time must be positive.*tagged instant/);
+    expect(() => loadModule('# entity clock\ntick:\n  time: 0\n  say: Tick.\n')).toThrow(/action "tick": time: must be positive.*tagged instant/);
   });
 });
 

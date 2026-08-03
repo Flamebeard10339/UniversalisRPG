@@ -1,5 +1,5 @@
 import { ActionResult } from '../grammar/actionResult';
-import { Action } from '../grammar/action';
+import { Action, actionProblem, actionTableProblem } from '../grammar/action';
 import { Dialogue } from './dialogue';
 import { Entity, entitySchema } from './entity';
 import { EntityType, entityTypeSchema } from './entityType';
@@ -100,13 +100,15 @@ function recipeAction(recipe: Recipe): Action {
   if (recipe.say) results.push({ kind: 'say', text: recipe.say });
 
   // A craft with a cadence keeps going; one without is over the moment it is
-  // used, which is `instant` in the vocabulary this compiles into.
-  const spannable = recipe.rate !== undefined || (recipe.time ?? 0) > 0;
+  // used, which is `instant` in the vocabulary this compiles into. Whatever was
+  // authored is carried through unexamined, so the same table that judges an
+  // authored action judges this one rather than a recipe-shaped copy of it.
+  const cadence = recipe.rate !== undefined ? { rate: recipe.rate } : recipe.time !== undefined ? { time: recipe.time } : {};
   const action: Action = {
     label: `Craft ${humanize(recipe.id)}`,
-    kind: spannable ? 'continuous' : 'instant',
+    kind: 'rate' in cadence || 'time' in cadence ? 'continuous' : 'instant',
     results,
-    ...(recipe.rate !== undefined ? { rate: recipe.rate } : spannable ? { time: recipe.time } : {}),
+    ...cadence,
     accuracy: recipe.accuracy,
     evasion: recipe.evasion,
   };
@@ -295,13 +297,27 @@ interface BuildFailure {
 // The clone is load-bearing: reference resolution rewrote ids in place before
 // this ran, and a template object reachable from two entities would be walked
 // once per entity and bound to whichever went last.
-function entityTypeBase(merged: Map<string, Map<string, OwnedSection>>, section: ModuleSection): object | undefined | DslError {
-  if (section.kind !== 'entity') return undefined;
+// Whether the section creates the entity or edits one that is already there is
+// not declared — it follows from what was loaded — so the template has to slide
+// underneath at whichever of the two first names a `type:`. What the entity
+// already held is treated as overrides of the template it just acquired, which
+// is the same relationship a first declaration's own blocks have to it.
+function entityTypeBase(merged: Map<string, Map<string, OwnedSection>>, section: ModuleSection, held: object | undefined): object | undefined {
+  if (section.kind !== 'entity') return held;
   const entity = section.value as Authored<Entity>;
-  if (entity.type === undefined) return undefined;
+  const already = (held as Authored<Entity> | undefined)?.type;
+  if (entity.type === undefined || entity.type === already) return held;
+  if (already !== undefined) throw new DslError(`# entity ${entity.id} is already type: ${already}, and an entity inherits one template`);
+
+  // A `type:` naming nothing is left for the reference check that owns that
+  // message for every kind; inheriting nothing is what an absent template means.
   const template = merged.get('entitytype')?.get(entity.type)?.value as Authored<EntityType> | undefined;
-  if (!template) return new DslError(`# entity ${entity.id} type: names an unknown entitytype: ${entity.type}`);
-  return { id: entity.id, actions: structuredClone(template.actions ?? []) };
+  if (!template) return held;
+  // The clone is load-bearing: reference resolution rewrote ids in place before
+  // this ran, and a template object reachable from two entities would be walked
+  // once per entity and bound to whichever went last.
+  const inherited = { id: entity.id, actions: structuredClone(template.actions ?? []) };
+  return held === undefined ? inherited : mergeSection('entity', inherited, held);
 }
 
 class DanglingReference extends Error {}
@@ -340,6 +356,17 @@ function referencesLoaded(check: () => void): boolean {
   } catch (error) {
     if (error instanceof DanglingReference) return false;
     throw error;
+  }
+}
+
+// The grammar refuses an unauthorable action, but an action can also be
+// ASSEMBLED — merged onto a template, patched across modules, or compiled from a
+// recipe — and none of those went through the grammar. Same rule, applied where
+// the section that owns the action can name itself.
+function validateSectionActions(where: string, actions: readonly Action[] | undefined): void {
+  for (const action of actions ?? []) {
+    const problem = actionTableProblem(action);
+    if (problem) throw new DslError(`${where} ${actionProblem(action.label, problem)}`);
   }
 }
 
@@ -482,11 +509,21 @@ function validateBuiltRegistry(registry: Registry, owners: ReadonlyMap<string, P
   for (const [kind, map] of CONTENT_SECTION_MAPS) {
     for (const [id, value] of registry[map] as ReadonlyMap<string, object>) {
       try {
+        validateSectionActions(`# ${kind} ${id}`, (value as { actions?: Action[] }).actions);
         validateSectionReferences(kind, id, value, registry);
       } catch (error) {
         if (!(error instanceof DslError)) throw error;
         return { module: sectionOwner(owners, kind, id)!, stage: 'validate', error };
       }
+    }
+  }
+
+  for (const [id, action] of registry.recipeActions) {
+    try {
+      validateSectionActions(`# recipe ${id}`, [action]);
+    } catch (error) {
+      if (!(error instanceof DslError)) throw error;
+      return { module: sectionOwner(owners, 'recipe', id)!, stage: 'validate', error };
     }
   }
 
@@ -569,8 +606,7 @@ function compileModules(modules: readonly ParsedModule[]): { registry: Registry 
           if (!owns(section.kind)) continue;
           const byId = merged.get(section.kind) ?? new Map<string, OwnedSection>();
           const id = (section.value as { id: string }).id;
-          const base = byId.get(id)?.value ?? entityTypeBase(merged, section);
-          if (base instanceof DslError) throw base;
+          const base = entityTypeBase(merged, section, byId.get(id)?.value);
           byId.set(id, { kind: section.kind, value: mergeSection(section.kind, base, section.value), module });
           owners.set(ownerKey(section.kind, id), module);
           merged.set(section.kind, byId);

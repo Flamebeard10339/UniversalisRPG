@@ -149,16 +149,16 @@ describe('load-time reference resolution', () => {
 // recipe craftable nowhere, a test that only breaks when it runs.
 describe('references the walk used to step over', () => {
   it('rejects a `has` naming no item, wherever the condition sits', () => {
-    expect(loading('  continuous', '  repeating\n  requires: has strawe')).toThrow(/# entity training-dummy action "strike" requires: has names an unknown item: strawe/);
-    expect(loading('  continuous', '  repeating\n  hidden if: has strawe')).toThrow(/hidden if: has names an unknown item: strawe/);
+    expect(loading('  continuous', '  continuous\n  requires: has strawe')).toThrow(/# entity training-dummy action "strike" requires: has names an unknown item: strawe/);
+    expect(loading('  continuous', '  continuous\n  hidden if: has strawe')).toThrow(/hidden if: has names an unknown item: strawe/);
     expect(loading('starting', 'starting\nadjacent: shed while has strawe')).toThrow(/# location den adjacent: shed while has names an unknown item: strawe/);
     expect(loading('  when: time >= 0', '  when: has strawe')).toThrow(/# dialogue caretaker node hello when: has names an unknown item: strawe/);
   });
 
   it('reaches inside not/and/or rather than stopping at the operator', () => {
-    expect(loading('  continuous', '  repeating\n  requires: not has strawe')).toThrow(/has names an unknown item: strawe/);
-    expect(loading('  continuous', '  repeating\n  requires: has straw and has strawe')).toThrow(/has names an unknown item: strawe/);
-    expect(loading('  continuous', '  repeating\n  requires: has strawe or has straw')).toThrow(/has names an unknown item: strawe/);
+    expect(loading('  continuous', '  continuous\n  requires: not has strawe')).toThrow(/has names an unknown item: strawe/);
+    expect(loading('  continuous', '  continuous\n  requires: has straw and has strawe')).toThrow(/has names an unknown item: strawe/);
+    expect(loading('  continuous', '  continuous\n  requires: has strawe or has straw')).toThrow(/has names an unknown item: strawe/);
   });
 
   it('rejects a `has` inside a choice condition and inside interpolated text', () => {

@@ -134,22 +134,35 @@ body lines — the section engine applies the label afterwards — so the fix is
 edit. `formatModuleDiagnostic` supplies file:line only on the diagnostics path, and points at the
 first modifier line rather than the block header.
 
-## Lows
+## L1 — two runtime cadence errors still tell authors to fix `speed:`
 
-- **L1** `src/runtime/runtime.ts:152` and `:227` still tell authors to "give it a positive time: or
-  a positive speed stat". The sibling at `:421` was reworded; these two were missed.
-- **L2** `time: abc` now reports `expected a number` where main reported `action time requires a
-  non-negative number`. `seconds` delegates to `decimal.parse`, whose generic message has no field
-  context and builds a zero-width span rather than using `line.span`.
-- **L3** `src/content/references.test.ts:152-153, 159-161` inject the retired word `repeating` into
-  their fixture, so `strike` becomes an untagged cadence-less action rather than the continuous one
-  the comment describes. The assertions pass because they check a different error.
-- **L4** `content/tutorial-island.dsl` `front-door.pick lock` (which carries an inert `4s` tag) and
-  `dresser.search drawer` are the two shipped actions left untagged with no cadence. Both plausibly
-  should span, so c5 holds, but the forward claim is weaker than the clause states.
-- **L5** the "unknown entitytype" message has two producers — `registry.ts:301` and the
-  `referenceSites.ts:195` validation path — and `entityType.test.ts:118`/`:135` hit them with one
-  regex, so drift in either is invisible.
+`src/runtime/runtime.ts:152`, `:227` both end "give it a positive time: or a positive speed stat".
+The sibling at `:421` was reworded in b93f18d; these two were missed, and `speed:` is now a load
+error so the advice cannot be followed.
+
+## L2 — `time:` with a non-numeric value lost its field-named parse error
+
+Measured both sides: on main `time: abc` reports "action time requires a non-negative number"; on
+this branch, "expected a number". `seconds` delegates to `decimal.parse`, whose generic message has
+no field context and builds a zero-width span rather than using `line.span`.
+
+## L3 — three `references.test.ts` cases inject the retired word `repeating` into their fixture
+
+`src/content/references.test.ts:152-153, 159-161` replace the `continuous` tag with `repeating`, now
+a silently ignored unknown bare tag, so `strike` becomes an untagged cadence-less action rather than
+the continuous one the comment describes. The assertions pass because they check a different error.
+
+## L4 — two shipped actions untagged where c5's forward claim needs them tagged
+
+`content/tutorial-island.dsl` `front-door.pick lock` (which carries an inert `4s` tag) and
+`dresser.search drawer` are the only shipped actions left untagged with no cadence. Both plausibly
+should span, so c5 holds, but the forward claim is weaker than the clause states.
+
+## L5 — the unknown-entitytype message has two hand-duplicated producers
+
+`src/content/registry.ts:301` emits it from the merge path and `src/content/referenceSites.ts:195`
+from post-build validation. `entityType.test.ts:118` and `:135` hit the two different producers with
+one regex each, so either can drift without a test noticing.
 
 ## Regression question
 

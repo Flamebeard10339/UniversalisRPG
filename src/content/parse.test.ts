@@ -222,14 +222,15 @@ describe('entity actions', () => {
 
 describe('entity action modifiers', () => {
   it('parses requires, hidden if, bare tags and on success, treating require as requires', () => {
-    const source = ['# entity front-door', 'pick lock:', '  requires: lockpick', '  hidden if: unlocked', '  once, 4s', '  xp: thieving 4', '  on success:', '    set: unlocked', '    say: The lock clicks.'].join('\n');
+    const source = ['# entity front-door', 'pick lock:', '  requires: lockpick', '  hidden if: unlocked', '  retaliates', '  xp: thieving 4', '  on success:', '    set: unlocked', '    say: The lock clicks.'].join('\n');
     const door = parseOne(source, entitySchema);
     expect(door.actions).toEqual([
       {
         label: 'pick lock',
         requires: ref('lockpick'),
         hiddenIf: ref('unlocked'),
-        tags: [{ kind: 'keyword', value: 'once' }, { kind: 'duration', seconds: 4 }],
+        tags: [{ kind: 'keyword', value: 'retaliates' }],
+        retaliates: true,
         results: [{ kind: 'xp', skill: 'thieving', amount: 4 }],
         onSuccess: [{ kind: 'set', variable: 'unlocked' }, { kind: 'say', text: 'The lock clicks.' }],
       },
@@ -307,14 +308,40 @@ describe('action kinds and their cadence', () => {
     expect(parseAction('rate: quickness', 'say: hi')).toMatchObject({ rate: 'quickness' });
   });
 
+  // A tag list is the one place an action takes a free-form word, so it is the
+  // one place a typo has nowhere to land. `once` sat in shipped content doing
+  // nothing until this rule; `4s` was the front door meaning `time: 4`.
   it.each([
-    [['instant', 'time: 2'], /an instant action takes no time:/],
+    [['once'], /tag "once" was never implemented/],
+    [['repeating'], /tag "repeating" was renamed — write `continuous`/],
+    [['instnt'], /unknown tag "instnt" — an action's bare tags are instant, continuous, retaliates/],
+    [['4s'], /a duration clause paces nothing on an action/],
+  ])('refuses the bare tag %s rather than keeping a word nothing reads', (lines, message) => {
+    expect(() => parseAction(...lines, 'say: hi')).toThrow(message);
+  });
+
+  it('keeps the tags an action does read: the two kinds, retaliates, and a stat bonus', () => {
+    expect(parseAction('continuous', 'time: 2', 'retaliates', '+2 attack', 'say: hi')).toMatchObject({
+      kind: 'continuous',
+      retaliates: true,
+      tags: [{ kind: 'keyword', value: 'continuous' }, { kind: 'keyword', value: 'retaliates' }, { kind: 'stat-bonus', statId: 'attack' }],
+    });
+  });
+
+  // The compiled craft is judged by the same table as an authored action, so a
+  // recipe cannot express a cadence the grammar would have refused.
+  it.each([['rate: 0'], ['rate: -30'], ['time: 0'], ['time: -3']])('refuses %s on a recipe, naming the recipe and its craft', (line) => {
+    expect(() => loadModule(`# item ore\nexamine: Rock.\n# recipe dig\n${line}\nout: 1 ore\n`)).toThrow(/# recipe dig action "Craft Dig": (time|rate): must be positive/);
+  });
+
+  it.each([
+    [['instant', 'time: 2'], /action "work": an instant action takes no time:/],
     [['instant', 'rate: 15'], /an instant action takes no rate:/],
-    [['continuous', 'say: hi'], /a continuous action needs a time: or rate:/],
-    [['time: 2', 'rate: 15'], /time: and rate: are the same axis/],
-    [['instant', 'continuous'], /cannot be both instant and continuous/],
-    [['time: 0'], /action time must be positive/],
-    [['rate: 0'], /action rate must be positive/],
+    [['continuous', 'say: hi'], /action "work": a continuous action needs a time: or rate:/],
+    [['time: 2', 'rate: 15'], /action "work": time: and rate: are the same axis/],
+    [['instant', 'continuous'], /action "work": cannot be both instant and continuous/],
+    [['time: 0'], /action "work": time: must be positive/],
+    [['rate: 0'], /action "work": rate: must be positive/],
     [['speed: quickness'], /action speed: was retired; write rate:/],
   ])('rejects %s', (lines, message) => {
     expect(() => parseAction(...lines)).toThrow(message);

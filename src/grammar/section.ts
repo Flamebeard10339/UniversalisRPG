@@ -22,9 +22,11 @@ export interface MappedField<T, Self> {
 
 // An open-ended, dynamically-labelled collection (e.g. an entity's actions):
 // each `<label>:` that is not a fixed field becomes one entry `{ label, ...body }`.
+// The label is passed in because an entry body cannot see its own heading, and
+// an error about the entry has to be able to name which one it is about.
 export interface EntryBody {
-  parse(cursor: Cursor): object;
-  parseBlock(lines: RawLine[]): object;
+  parse(cursor: Cursor, label: string): object;
+  parseBlock(lines: RawLine[], label: string): object;
 }
 
 export interface SectionSchema<H extends { id: string }, Flags extends keyof H = never, Entries extends keyof H = never> {
@@ -172,7 +174,7 @@ function parseLine(line: RawLine, fields: AnyFields, byKeyword: Record<string, s
       } else if (op === '-') {
         ((authored[entries!.into] ??= []) as object[]).push({ label: key, removed: true });
       } else {
-        const body = cursor.done ? entries!.body.parseBlock(line.children) : entries!.body.parse(cursor);
+        const body = cursor.done ? entries!.body.parseBlock(line.children, key) : entries!.body.parse(cursor, key);
         ((authored[entries!.into] ??= []) as object[]).push({ label: key, ...body });
       }
     } else if (labelsBareField) {

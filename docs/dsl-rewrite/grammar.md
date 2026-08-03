@@ -246,22 +246,27 @@ can't silently rewrite it to a single owner's namespace.
 A comma-separated micro-grammar, disambiguated by shape (never by keyword
 lookup), used for item tags and for an entity action's modifiers:
 
-- a bare word → keyword: `mainhand`, `once`, `food`, `repeating`
+- a bare word → keyword: `mainhand`, `food`, `instant`, `continuous`
 - `+<n>[%] <stat-id>` or `-<n>[%] <stat-id>` → a stat bonus: `+3 regeneration`, `+2% attack`
 - `<n>m<n>s` (either half optional) → a duration: `4s`, `1m40s`, `1m`
 
 ```
 food, +3 regeneration, 60s
-once, 4s
+continuous, +2 attack
 ```
+
+An **action's** tags are a closed set — `instant`, `continuous`, `retaliates`
+and stat bonuses. Any other bare word is a load error naming what to write
+instead, because a word an action keeps and never reads is indistinguishable
+from a typo. A duration clause (`4s`) is refused there too: an action's pace is
+`time:`/`rate:`, never a tag.
 
 Three of these clauses are live, not just parsed data:
 
 - An item tagged `food` grants its stat-bonus clauses as **timed buffs** the
   moment an action *eats* it — see [Eating](#eating) below.
-- An entity/item action tagged `repeating` is a **spannable, looping**
-  action rather than a one-shot — see `time:`/`speed:` and
-  [Spannable & repeating actions](#spannable--repeating-actions) below.
+- An action tagged `instant` or `continuous` declares its **kind** — what ends
+  it — see [Action kinds and cadence](#action-kinds-and-cadence) below.
 - An action's stat-bonus clauses are **modifiers that apply only while that
   action runs** — the same math as a buff, with no add/remove bookkeeping (they
   vanish the instant the action stops). This is how an action drains or feeds a
@@ -333,9 +338,16 @@ stat-id: attack
 ### variable
 
 A named numeric constant, for pacing/tuning values the engine would otherwise
-bake in. The engine reads specific well-known ids; today the only one is
-`travel-seconds-per-unit` (seconds of real-time travel per unit of straight-line
-distance between locations).
+bake in. The engine reads specific well-known ids:
+
+- `travel-seconds-per-unit` — seconds of travel per unit of straight-line
+  distance between locations. Falls back to 5.
+- `default-action-duration` — seconds a `duration` action takes when it names no
+  cadence of its own. Falls back to 0, which is why an untagged action is over
+  the instant it is used today; raising it spans every action that has not
+  declared itself `instant`.
+- `min-damage` and `contest-spread` — the combat floor and the opposed-roll
+  spread; see [entity](#entity).
 
 ```
 variable:
@@ -360,6 +372,8 @@ recipe:
   out: list of "[<n>] <item-id>", defaults to []
   skill: "<skill-id> <n>", no default
   say: text, no default
+  time: positive number, no default — seconds per craft
+  rate: positive number or stat-id, no default — crafts per minute
 ```
 
 ```
@@ -387,6 +401,10 @@ lists that entity id in its `entities:`. Recipes are pure declarative data —
 crafting consumes `in`, produces `out`, grants the `skill:` xp if present, and
 appends `say:` to the log if present. There is no `on craft:` effect block;
 recipes cannot set flags or fire arbitrary results.
+
+A recipe with neither `time:` nor `rate:` compiles to an instant craft; one with
+either compiles to a continuous one, and is judged by the same cadence table an
+authored action is — so a recipe cannot express a pace the grammar would refuse.
 
 ### resource
 
@@ -420,7 +438,7 @@ positive net value regenerates, a negative one drains. There is no separate
 ```
 # entity rat
 attack:
-  repeating
+  continuous
   time: 1
   -5 regeneration          # net regeneration goes negative WHILE attacking => health drains
   give: 1 rat-tail
@@ -513,24 +531,27 @@ pick lock:
 
 - `requires:` (or `require:`, same meaning) — condition; action unusable if false.
 - `hidden if:` — condition; action not even shown if true.
-- bare clause lines (not a result verb) are tag clauses — `once, 4s` above
-  marks the action single-use with a 4-second duration.
+- bare clause lines (not a result verb) are tag clauses — `instant`,
+  `continuous`, `retaliates`, and stat bonuses that apply while it runs.
 - any result-verb line becomes part of `results`, fired when the action runs.
 - `on success:` — a further list of results (inline or as its own block),
   fired only when the action succeeds (see below).
 - `on failure:` — mirrors `on success:` exactly (inline or block form, at
   most once), fired only when the action fails on an unaffordable `take:`.
-- `time:` — `time: <non-negative number>` (integer or decimal), at most
-  once. The action **occupies** that many seconds (scaled by `speed:` below)
-  before its results apply; defaults to `0` (instant) if omitted. An
-  unaffordable action (the `take:` shortfall branch) never starts, let alone
-  advances time, regardless of `time:`. See the reserved `time` reference
-  under [References](#references) for reading the clock back.
-- `speed:` — `speed: <stat-id>`, at most once. Names an existing `# stat`
-  whose current value scales this action's duration: `time: / statValue(<stat-id>)`.
-  Omitted means a fixed multiplier of `1`. A stat named this way needs its
-  own `base:` (a stat's default base is `0`, which would make the action
-  take forever) — see [stat](#stat).
+- `time:` — `time: <positive number>` (integer or decimal), at most once:
+  seconds per attempt, as a flat literal.
+- `rate:` — `rate: <positive number>` **or** `rate: <stat-id>`, at most once:
+  attempts per minute. A stat id is read live against whoever is swinging, so
+  gear and buffs move the cadence without the action naming a number. A stat
+  named this way needs its own `base:` — a stat's default base is `0`, which
+  would make the action take forever. See [stat](#stat).
+
+`time:` and `rate:` are two spellings of one axis and an action carries at most
+one; which one it may carry follows from its kind, in
+[Action kinds and cadence](#action-kinds-and-cadence) below. An unaffordable
+action (the `take:` shortfall branch) never starts, let alone advances time,
+whatever its cadence. See the reserved `time` reference under
+[References](#references) for reading the clock back.
 
 **`take:` implies affordability.** An action whose `results` include one or
 more `take:` verbs is a soft-take: before anything is applied, each item's
@@ -556,35 +577,49 @@ instant action (a bare `results` list with no modifiers) are both just
 entities — the design distinction between them is intentional at the content
 level, not a grammar-level one.
 
-#### Spannable & repeating actions
+#### Action kinds and cadence
 
-A plain action (no `repeating` tag) *spans* `time:` seconds and fires its
-`results`/`on success:` exactly once at the end — starting it occupies the
-engine until that single completion, same as before, just no longer
-instantaneous under the hood.
+What **ends** an action and how fast it **attempts** are separate axes. The kind
+is the first; the cadence is the second, and each kind carries at most one.
 
-A `repeating` action instead loops for as long as it stays active: every
-`time:` seconds (scaled by `speed:`) it fires another completion of its
-`results` (not `on success:` — a repeating action's `on success:`, if
-authored, fires at most once per `resolve()`/`wait` call, never once per
-completion, so a long wait can't spam the log). Starting one via an action
-choice produces exactly one completion and leaves it running; a later
-`/wait` (or the session `wait()`/test `wait:` directive) continues it.
-Running out of a `take:` input mid-run quietly ends it — no `on failure:`,
-since it already succeeded at starting.
+| kind | written | cadence |
+| --- | --- | --- |
+| instant | bare tag `instant` | neither `time:` nor `rate:` |
+| duration | untagged; the default | at most one; absent falls back to `# variable default-action-duration` |
+| continuous | bare tag `continuous` | exactly one |
+
+An **instant** action is over the moment it is used, whatever the tuning default
+becomes. A **duration** action spans its cadence once and fires its
+`results`/`on success:` at the end. A **continuous** action loops for as long as
+it stays active: every attempt it fires another completion of its `results` (not
+`on success:` — that fires at most once per `resolve()`/`wait` call, never once
+per completion, so a long wait cannot spam the log). Starting one via an action
+choice produces exactly one completion and leaves it running; a later `/wait`
+(or the session `wait()`/test `wait:` directive) continues it. Running out of a
+`take:` input mid-run quietly ends it — no `on failure:`, since it already
+succeeded at starting.
+
+Every combination the table has no meaning for is a load error naming the
+action: a cadence on an `instant`, no cadence on a `continuous`, both spellings
+at once, both kind tags at once, and a cadence that is not positive — a zero
+span is what `instant` means.
+
+The table is enforced wherever an action is *assembled*, not only where it is
+authored: an entity block overlaying an [entitytype](#entitytype) action, or a
+patch across modules, is checked the same way, so merge cannot produce an action
+nobody could have written.
 
 ```
 # entity oven
 roast chestnuts:
-  repeating
-  speed: cooking-speed
-  time: 4
+  continuous
+  rate: cooking-rate
   give: 1 roasted-chestnut
 ```
 
-Whatever a repeating action `take:`s bounds how many completions the current
+Whatever a continuous action `take:`s bounds how many completions the current
 inventory affords; there's no separate limit to author. Output items have no
-stack cap in this schema, so only inputs can end a repeating action early.
+stack cap in this schema, so only inputs can end a continuous action early.
 
 #### Eating
 
@@ -600,11 +635,66 @@ food, +3 regeneration, 60s
 eat: take: 1 cooked-shrimp, say: You eat the shrimp.
 ```
 
-A stat's live value (read by `speed:` above, and by anything else that needs
+A stat's live value (read by `rate:` above, and by anything else that needs
 it) is its `base:` plus every active buff's `added` amount, then multiplied
 by `1 +` the sum of every active buff's `increased` amount — a percent
-stat-bonus tag (`+100% cooking-speed`) is `increased`; a flat one (`+3
+stat-bonus tag (`+100% cooking-rate`) is `increased`; a flat one (`+3
 regeneration`) is `added`.
+
+### entitytype
+
+```
+entitytype:
+  <label>: entries — the whole body, keyed by label — become actions
+```
+
+An action template. Its body is action blocks and **nothing else**: stats stay
+on the entity, so an entity's own body has one meaning and a block inside it
+names an action of the template it inherits.
+
+An entity names one with `type: <entitytype-id>`, at most one, and inherits its
+actions as its own copies. What the entity then writes is merged onto them by
+label, through the same rule that merges a patch onto a section:
+
+- a block whose label matches a template action **overrides** it field by field,
+  keeping every field the block does not restate — including the kind, so
+  overriding one field of a `continuous` action leaves it continuous;
+- a label the template does not have is simply the entity's own action;
+- a template action the entity never mentions is inherited whole;
+- `-<label>:` **removes** an inherited action.
+
+```
+# entitytype melee-foe
+fight:
+  rate: attack-rate
+  accuracy: accuracy
+  ability: attack
+  target: health
+bite:
+  retaliates
+  rate: attack-rate
+  accuracy: accuracy
+  ability: attack
+  target: health
+
+# entity giant-rat
+type: melee-foe
+stats: attack 8, max-health 20, attack-rate 16, accuracy 60
+fight:
+  xp: melee 5
+
+# entity punchbag
+type: melee-foe
+stats: max-health 24
+-bite:
+```
+
+Templates settle before any entity merges, so an entity may name one declared
+after it, and a module may add `type:` to an entity another module created.
+Removing a template with `# remove entitytype.<id>` removes it outright — an
+entity still naming it is a load error, not an entity quietly keeping the
+actions it happened to be built from. An entity inherits one template; a second,
+different `type:` is refused rather than layering two.
 
 ### dialogue
 

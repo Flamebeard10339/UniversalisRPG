@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { loadModule, Registry } from './registry';
+import { loadModule, loadUniverse, Registry } from './registry';
+import { registryDiff } from './registryDiff';
+import { serializeRegistryModule } from './serialize';
 
 // One shared shape, three foes that differ only in what they say about it.
 const MODULE = [
@@ -112,6 +114,48 @@ describe('an entity inheriting an action template', () => {
     const late = ['# entity crab', 'type: pincher', 'stats: nothing 1', '', '# stat nothing', '', '# entitytype pincher', 'pinch:', '  instant', '  say: Snip.'].join('\n');
     const registry = loadModule(late);
     expect(action(registry, 'crab', 'pinch')).toMatchObject({ kind: 'instant' });
+  });
+
+  // Whether a section creates the entity or edits one already loaded is not
+  // declared — it follows from what came before — so a patch that introduces
+  // type: has to inherit exactly as a first declaration would.
+  it('inherits when a later module patches type: onto an entity that already exists', () => {
+    const base = { name: 'base', text: ['# info base', 'version: 1.0.0', '', '# entitytype foe', 'fight:', '  instant', '  say: Swing.', 'bite:', '  instant', '  say: Nip.', '', '# entity rat'].join('\n') };
+    const patch = { name: 'patch', text: ['# info patch', 'version: 1.0.0', 'dependencies: base', '', '# entity base.rat', 'type: base.foe', '-bite:'].join('\n') };
+    const registry = loadUniverse([base, patch]);
+
+    expect(registry.entities.get('base.rat')!.actions.map((each) => each.label)).toEqual(['fight']);
+  });
+
+  it('refuses a second, different type: rather than layering two templates', () => {
+    const source = [MODULE, '# entitytype other', 'wave:', '  instant', '  say: Hi.', '', '# entity rat', 'type: other'].join('\n');
+    expect(() => loadModule(source)).toThrow(/# entity rat is already type: melee-foe, and an entity inherits one template/);
+  });
+
+  // The grammar refuses these when they are authored in one block. An overlay
+  // can assemble them out of two blocks that were each fine on their own, and
+  // the runtime would have resolved the contradiction by dropping a field.
+  it.each([
+    [['fight:', '  time: 5'], /# entity rat action "fight": time: and rate: are the same axis/],
+    [['fight:', '  instant'], /# entity rat action "fight": an instant action takes no rate:/],
+  ])('refuses an action the overlay assembled but nobody could have written: %s', (block, message) => {
+    const source = ['# stat swing-rate', 'base: 30', '', '# entitytype foe', 'fight:', '  continuous', '  rate: swing-rate', '  say: Swing.', '', '# entity rat', 'type: foe', ...block].join('\n');
+    expect(() => loadModule(source)).toThrow(message);
+  });
+
+  // Printing the inherited fields back would make the reload merge them onto
+  // the template a second time — a load error the moment the entity changed the
+  // kind or cadence — and would freeze the entity against later template edits.
+  it('prints only what the entity said over its template, and reloads to the same thing', () => {
+    const text = ['# info base', 'version: 1.0.0', '', '# entitytype foe', 'fight:', '  continuous', '  rate: 30', '  say: Swing.', 'bite:', '  instant', '  say: Nip.', '', '# entity rat', 'type: foe', 'fight:', '  say: Slash.', '-bite:'].join('\n');
+    const registry = loadUniverse([{ name: 'base', text }]);
+    const printed = serializeRegistryModule(registry, { info: { id: 'base', version: [1, 0, 0] } });
+
+    const entity = printed.slice(printed.indexOf('# entity rat'));
+    expect(entity).toContain('type: base.foe');
+    expect(entity).toContain('-bite:');
+    expect(entity).not.toContain('rate: 30'); // inherited, so not the entity's to restate
+    expect(registryDiff(registry, loadUniverse([{ name: 'base', text: printed }]))).toEqual([]);
   });
 
   it('rejects a type: that names no template', () => {

@@ -188,7 +188,7 @@ flags: unlocked
 pick lock:
   requires: has lockpick
   hidden if: unlocked
-  once, 4s
+  time: 4
   xp: thieving 4
   on success:
     set: unlocked
@@ -239,10 +239,12 @@ ascend:
 
 # entity dresser
 examine: A dusty dresser, one drawer left slightly ajar.
+flags: searched
 search drawer:
-  once
+  hidden if: searched
   give: lockpick
   say: Tucked beneath old linens, a set of worn lockpicks.
+  set: searched
 
 // The shape every combattable thing in the game shares, written once: a swing
 // of its own on its own clock, and a pool that runs out. The two actions are

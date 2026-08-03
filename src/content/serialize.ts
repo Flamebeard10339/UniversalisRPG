@@ -246,7 +246,21 @@ function entityTypeSection(moduleId: string, entityType: EntityType): string {
   return lines.join('\n');
 }
 
-function entitySection(moduleId: string, entity: Entity): string {
+// What the entity said about an action its template already defines: the fields
+// that differ, and nothing else. Printing the inherited ones back would make the
+// reload merge them onto the template a second time — which is a load error the
+// moment the entity changed the kind or the cadence — and would freeze the
+// entity against edits to the template it still claims to follow.
+function actionOverride(action: Action, inherited: Action): Lines {
+  const same = (key: keyof Action): boolean => JSON.stringify(action[key]) === JSON.stringify(inherited[key]);
+  const kept = Object.keys(action).filter((key) => key !== 'label' && !same(key as keyof Action));
+  if (kept.length === 0) return [];
+  const override: Record<string, unknown> = { label: action.label, results: [] };
+  for (const key of kept) override[key] = action[key as keyof Action];
+  return actionLines(override as unknown as Action);
+}
+
+function entitySection(moduleId: string, entity: Entity, template: EntityType | undefined): string {
   const lines = [`# entity ${moduleLocalId(moduleId, entity.id)}`];
   if (entity.type) lines.push(`type: ${entity.type}`);
   titled(lines, entity);
@@ -254,7 +268,16 @@ function entitySection(moduleId: string, entity: Entity): string {
   const stats = Object.entries(entity.stats).map(([statId, value]) => `${statId} ${range(value)}`);
   if (stats.length > 0) lines.push(`stats: ${stats.join(', ')}`);
   block(lines, 'flags', entity.flags);
-  for (const action of entity.actions) lines.push(...actionLines(action));
+
+  const inheritable = new Map((template?.actions ?? []).map((action) => [action.label, action]));
+  for (const action of entity.actions) {
+    const inherited = inheritable.get(action.label);
+    lines.push(...(inherited ? actionOverride(action, inherited) : actionLines(action)));
+  }
+  // A template action the entity no longer has was removed, and only `-label:`
+  // says so; without it the reload would inherit it straight back.
+  const held = new Set(entity.actions.map((action) => action.label));
+  for (const label of inheritable.keys()) if (!held.has(label)) lines.push(`-${label}:`);
   return lines.join('\n');
 }
 
@@ -356,7 +379,7 @@ export function serializeRegistryModule(registry: Registry, options: SerializeMo
   for (const skill of registry.skills.values()) if (inModule(moduleId, skill.id)) sections.push([`# skill ${moduleLocalId(moduleId, skill.id)}`, `title: ${skill.title}`, ...(skill['stat-id'] ? [`stat-id: ${skill['stat-id']}`] : [])].join('\n'));
   for (const item of registry.items.values()) if (inModule(moduleId, item.id)) sections.push(itemSection(moduleId, item));
   for (const entityType of registry.entityTypes.values()) if (inModule(moduleId, entityType.id)) sections.push(entityTypeSection(moduleId, entityType));
-  for (const entity of registry.entities.values()) if (inModule(moduleId, entity.id)) sections.push(entitySection(moduleId, entity));
+  for (const entity of registry.entities.values()) if (inModule(moduleId, entity.id)) sections.push(entitySection(moduleId, entity, entity.type ? registry.entityTypes.get(entity.type) : undefined));
   for (const location of registry.locations.values()) if (inModule(moduleId, location.id)) sections.push(locationSection(moduleId, location));
   for (const recipe of registry.recipes.values()) if (inModule(moduleId, recipe.id)) sections.push(recipeSection(moduleId, recipe));
   for (const resource of registry.resources.values()) if (inModule(moduleId, resource.id)) sections.push(resourceSection(moduleId, resource));

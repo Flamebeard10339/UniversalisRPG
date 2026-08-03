@@ -12,7 +12,7 @@ export const number: Parser<number> = {
   },
 };
 
-const DECIMAL = /-?\d+(?:\.\d+)?/;
+export const DECIMAL = /-?\d+(?:\.\d+)?/;
 
 // Item, xp and flag counts stay on the integer-only `number` above.
 export const decimal: Parser<number> = {

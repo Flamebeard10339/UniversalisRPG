@@ -5,7 +5,7 @@ import { Cursor, DslError, requireEnd } from './parser';
 import { EntryBody } from './section';
 import { RawLine } from './structure';
 import { TagClause, tagClause } from './tagClause';
-import { decimal, id, numberOrStat } from './values';
+import { DECIMAL, id, numberOrStat } from './values';
 
 // What ends the action, which is a different question from how fast it attempts.
 export type ActionKind = 'instant' | 'duration' | 'continuous';
@@ -51,6 +51,18 @@ const BOOLEAN_ACTION_FLAG_SET: ReadonlySet<string> = new Set<string>(BOOLEAN_ACT
 // has no tag to write and naming it would give one kind two spellings.
 const TAGGED_ACTION_KINDS = ['instant', 'continuous'] as const;
 
+// Every bare word an action's tag list may hold. A word outside it used to be
+// kept and never read, which is how `once` sat in shipped content doing nothing
+// and how a typo'd `instnt` would quietly mean `duration`.
+const ACTION_KEYWORD_TAGS: ReadonlySet<string> = new Set<string>([...TAGGED_ACTION_KINDS, ...BOOLEAN_ACTION_FLAGS]);
+
+// Words that meant something once, or look like they should. Each names what to
+// write instead, because "unknown tag" is not an answer to "then how do I?".
+const RETIRED_ACTION_TAGS: Readonly<Record<string, string>> = {
+  once: 'tag "once" was never implemented — gate the action with `hidden if: <flag>` and `set:` that flag among its results',
+  repeating: 'tag "repeating" was renamed — write `continuous`',
+};
+
 export const actionKind = (action: Action): ActionKind => action.kind ?? 'duration';
 
 type ActionValue = (cursor: Cursor, line: RawLine) => unknown;
@@ -59,19 +71,18 @@ const conditionValue: ActionValue = (cursor) => (cursor.done ? undefined : condi
 const statValue: ActionValue = (cursor) => id.parse(cursor);
 const resultsValue: ActionValue = (cursor, line) => (!cursor.done ? results.parse(cursor) : line.children.length > 0 ? results.parseBlock(line.children) : undefined);
 
-function positiveCadence(value: number, written: string, line: RawLine): number {
-  if (!(value > 0)) throw new DslError(`action ${written} must be positive — an action that takes no time is tagged instant`, line.span);
-  return value;
-}
-
-const seconds: ActionValue = (cursor, line) => positiveCadence(decimal.parse(cursor), 'time', line);
+// Named rather than delegated to the generic `decimal`, whose message cannot
+// say which field it was reading and whose span is the bare cursor position.
+const seconds: ActionValue = (cursor, line) => {
+  const raw = cursor.take(DECIMAL);
+  if (raw === null) throw new DslError('action time takes a number of seconds', line.span);
+  return Number(raw);
+};
 
 // A literal is attempts per minute; a name is the stat holding that number,
 // which is what makes a haste buff move a swing without touching the action.
-const perMinute: ActionValue = (cursor, line) => {
-  const value = numberOrStat.parse(cursor);
-  return typeof value === 'number' ? positiveCadence(value, 'rate', line) : value;
-};
+// Positivity is the table's business, checked once for both spellings.
+const perMinute: ActionValue = (cursor) => numberOrStat.parse(cursor);
 
 const positiveCount =
   (written: string): ActionValue =>
@@ -136,36 +147,62 @@ function parseActionField(line: RawLine, cursor: Cursor, action: Omit<Action, 'l
   }
 }
 
-// The whole table: a kind says what ends the action, and carries exactly one
-// cadence or none. Every combination the vocabulary allows but the model has no
-// meaning for is refused here, which is the only place that can see both halves.
-function resolveKind(action: Omit<Action, 'label' | 'kind'>, lines: RawLine[]): ActionKind | undefined {
-  const span = lines[0]?.span;
-  const tagged = TAGGED_ACTION_KINDS.filter((kind) => (action.tags ?? []).some((tag) => tag.kind === 'keyword' && tag.value === kind));
-  if (tagged.length > 1) throw new DslError(`an action cannot be both ${tagged.join(' and ')}`, span);
-
+// The whole table, as one predicate over a finished action: a kind says what
+// ends the action, and carries exactly one positive cadence or none. Returning
+// the problem rather than throwing is what lets the two places an action can be
+// assembled — authored, and merged onto a template — share the rule instead of
+// each growing its own copy of it.
+export function actionTableProblem(action: Action): string | undefined {
   const cadence = [action.time !== undefined && 'time:', action.rate !== undefined && 'rate:'].filter((written): written is string => written !== false);
-  if (cadence.length > 1) throw new DslError('action time: and rate: are the same axis written two ways; give one', span);
+  if (cadence.length > 1) return 'time: and rate: are the same axis written two ways; give one';
 
-  const kind = tagged[0];
-  if (kind === 'instant' && cadence.length > 0) throw new DslError(`an instant action takes no ${cadence[0]}`, span);
+  const kind = actionKind(action);
+  if (kind === 'instant' && cadence.length > 0) return `an instant action takes no ${cadence[0]}`;
   // Nothing else ends it, so a cadence it does not have is one the tuning
   // default would have to supply, and a default of 0 spins the resolver.
-  if (kind === 'continuous' && cadence.length === 0) throw new DslError('a continuous action needs a time: or rate: to set its pace', span);
-  return kind;
+  if (kind === 'continuous' && cadence.length === 0) return 'a continuous action needs a time: or rate: to set its pace';
+
+  const written = action.time !== undefined ? 'time:' : 'rate:';
+  const value = action.time ?? (typeof action.rate === 'number' ? action.rate : undefined);
+  if (value !== undefined && !(value > 0)) return `${written} must be positive — an action that takes no time is tagged instant`;
+  return undefined;
+}
+
+// Reported wherever an action is finished, so every message names the action it
+// is about. A section that owns one prefixes itself; see `validateSectionActions`.
+export const actionProblem = (label: string, problem: string): string => `action ${JSON.stringify(label)}: ${problem}`;
+
+// A tag list is the one place an action accepts free-form words, so it is the
+// one place a typo has nowhere to land.
+function checkTags(action: Omit<Action, 'label'>, label: string, span: RawLine['span'] | undefined): void {
+  for (const tag of action.tags ?? []) {
+    if (tag.kind === 'duration') throw new DslError(actionProblem(label, 'a duration clause paces nothing on an action — write `time: <seconds>` or `rate: <per minute>`'), span);
+    if (tag.kind !== 'keyword' || ACTION_KEYWORD_TAGS.has(tag.value)) continue;
+    const retired = RETIRED_ACTION_TAGS[tag.value];
+    throw new DslError(actionProblem(label, retired ?? `unknown tag ${JSON.stringify(tag.value)} — an action's bare tags are ${[...ACTION_KEYWORD_TAGS].join(', ')}`), span);
+  }
+}
+
+function resolveKind(action: Omit<Action, 'label'>, label: string, lines: RawLine[]): ActionKind | undefined {
+  const span = lines[0]?.span;
+  checkTags(action, label, span);
+  const tagged = TAGGED_ACTION_KINDS.filter((kind) => (action.tags ?? []).some((tag) => tag.kind === 'keyword' && tag.value === kind));
+  if (tagged.length > 1) throw new DslError(actionProblem(label, `cannot be both ${tagged.join(' and ')}`), span);
+
+  const problem = actionTableProblem({ ...action, label, kind: tagged[0] });
+  if (problem) throw new DslError(actionProblem(label, problem), span);
+  return tagged[0];
 }
 
 export const actionBody: EntryBody = {
   parse: (cursor) => ({ results: results.parse(cursor) }),
-  parseBlock: (lines) => {
-    const action: Omit<Action, 'label' | 'kind'> = { results: [] };
-    for (const line of lines) parseActionLine(line, action as Omit<Action, 'label'>);
+  parseBlock: (lines, label) => {
+    const action: Omit<Action, 'label'> = { results: [] };
+    for (const line of lines) parseActionLine(line, action);
     for (const tag of action.tags ?? []) {
-      if (tag.kind === 'keyword' && BOOLEAN_ACTION_FLAG_SET.has(tag.value)) {
-        (action as Omit<Action, 'label'>)[tag.value as BooleanActionField] = true;
-      }
+      if (tag.kind === 'keyword' && BOOLEAN_ACTION_FLAG_SET.has(tag.value)) action[tag.value as BooleanActionField] = true;
     }
-    const kind = resolveKind(action, lines);
+    const kind = resolveKind(action, label, lines);
     return kind === undefined ? action : { ...action, kind };
   },
 };

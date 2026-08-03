@@ -149,7 +149,7 @@ function resolveDeterministicSegment(segment: Segment, action: Action, segEnd: n
   const { duration, abilityAmount, attemptsToResolve, outcome } = fightPlan(action, state, registry);
 
   if (active.repeating && duration <= 0) {
-    throw new RuntimeError(`repeating action ${active.ownerRef}.${active.actionLabel} resolved a non-positive duration (${duration}) — give it a positive time: or a positive speed stat`);
+    throw new RuntimeError(`repeating action ${active.ownerRef}.${active.actionLabel} resolved a non-positive duration (${duration}) — give it a positive time: or a rate: that reads positive`);
   }
 
   const player = playerCadence(active);
@@ -224,7 +224,7 @@ function resolveStochasticSegment(segment: Segment, action: Action, segEnd: numb
     for (const participant of roster) {
       const duration = attemptDuration(participant.action, state, registry, participant.self);
       if (duration <= 0) {
-        throw new RuntimeError(`action ${active.ownerRef}.${participant.action.label} resolved a non-positive attempt duration (${duration}) — give it a positive time: or a positive speed stat`);
+        throw new RuntimeError(`action ${active.ownerRef}.${participant.action.label} resolved a non-positive attempt duration (${duration}) — give it a positive time: or a rate: that reads positive`);
       }
       // Progress can land past its duration, so an overdue swing floors at now.
       const at = state.time + Math.max(0, duration - participant.cadence.progress);
