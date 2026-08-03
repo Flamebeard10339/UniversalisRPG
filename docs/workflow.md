@@ -171,7 +171,11 @@ A pass has **two outputs, and they behave differently.**
   records `unknown` and creates nothing, because nobody has established there is work to do.
 - **Red-green proves a test can fail; only mutation proves it fails for the right reason.** For
   pure logic, remove, invert or scale the behaviour a proof claims and confirm the named test goes
-  red.
+  red. `npm run mutate -- <manifest.json>` is the tool: it restores from bytes it captured rather
+  than from git, so it is safe on a tree carrying uncommitted work, and it reports every verdict
+  with the test scope it was measured against — a `SURVIVED` against two hand-picked files is not
+  the same claim as a `SURVIVED` against the suite. Keep the manifest in a scratch directory; a
+  mutation set rots the moment the source moves, so nothing here is worth tracking.
 - **Commission an auditor whose only question is "is anything worse than before".** Clause-by-clause
   verification cannot see a regression, because each clause looks fine in isolation.
 - **Persisting the evidence is planner work.** Archive audit reports into `docs/audits/` before the

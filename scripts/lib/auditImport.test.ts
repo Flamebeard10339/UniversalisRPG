@@ -97,18 +97,35 @@ describe('harvestFiles', () => {
 });
 
 describe('the real docs/audits/ corpus', () => {
-  it('parses to exactly 21 high, 54 medium and 63 low findings, each mapped to a system', () => {
+  // Asserted as invariants rather than as a snapshot of the totals. Pinning the
+  // counts made archiving a report — a required step of the workflow — turn the
+  // suite red, repaired by hand-editing a constant to match reality, which is
+  // the manual sync CLAUDE.md forbids. It cost two hand-edits on one branch.
+  it('parses every document, maps every finding to a system, and gives each one a code and a title', () => {
     const counts: Record<Severity, number> = { high: 0, medium: 0, low: 0 };
     const unmapped: string[] = [];
+    const malformed: string[] = [];
+    let documents = 0;
     for (const file of readdirSync('docs/audits')) {
       if (!file.endsWith('.md')) continue;
+      documents++;
       const basename = file.replace(/\.md$/, '');
       const findings = parseAuditDoc(readFileSync(`docs/audits/${file}`, 'utf8'));
       if (findings.length > 0 && systemForDoc(basename) === null) unmapped.push(basename);
-      for (const finding of findings) counts[finding.severity]++;
+      for (const finding of findings) {
+        counts[finding.severity]++;
+        if (!/^[HML]\d+$/.test(finding.code) || finding.title.trim() === '') malformed.push(`${basename} ${finding.code}`);
+      }
     }
-    expect(counts).toEqual({ high: 21, medium: 54, low: 63 });
     expect(unmapped).toEqual([]);
+    expect(malformed).toEqual([]);
+    expect(documents).toBeGreaterThan(20);
+    // A floor, not a total: a parser that silently returned nothing would still
+    // satisfy every assertion above.
+    expect(counts.high + counts.medium + counts.low).toBeGreaterThan(100);
+    expect(counts.high).toBeGreaterThan(0);
+    expect(counts.medium).toBeGreaterThan(0);
+    expect(counts.low).toBeGreaterThan(0);
   });
 });
 

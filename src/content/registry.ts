@@ -86,6 +86,10 @@ export interface UniverseLoadResult {
   registry: Registry;
   diagnostics: ModuleDiagnostic[];
   modules: ModuleStatus[];
+  // The modules that built this registry, in the order they were applied. The
+  // load already parsed them; handing them back is what stops every caller that
+  // needs an id, a version or a section list from parsing the same sources again.
+  parsed: ParsedModule[];
   loadedModules: string[];
   disabledModules: string[];
 }
@@ -695,7 +699,7 @@ export function loadUniverseWithDiagnostics(sources: readonly ModuleSource[]): U
 
     if (modules.length === 0) {
       const modules = sources.map((source) => statuses.get(source) ?? moduleStatus(source, source.name, undefined, false));
-      return { registry: emptyRegistry(), diagnostics, modules, loadedModules: [], disabledModules: summarizeDisabled(modules) };
+      return { registry: emptyRegistry(), diagnostics, modules, parsed: [], loadedModules: [], disabledModules: summarizeDisabled(modules) };
     }
 
     const orderProblems = moduleOrderProblems(modules);
@@ -718,6 +722,7 @@ export function loadUniverseWithDiagnostics(sources: readonly ModuleSource[]): U
         registry: compiled.registry,
         diagnostics,
         modules,
+        parsed: ordered,
         loadedModules: ordered.map((module) => module.info.id),
         disabledModules: summarizeDisabled(modules),
       };

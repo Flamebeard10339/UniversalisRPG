@@ -140,6 +140,166 @@ plainly that it recorded nothing.
 - `tasks doctor` failing on exactly one condition, and reporting everything else, meant I never
   once fought the tool to land a commit.
 
+# Tool friction — `audit-probe-tooling`, session of 2026-08-03
+
+A second pass, collected while building `npm run probe` and `npm run mutate`. Same ordering: what
+cost the most first. Items 1 and 2 are not `tasks` at all.
+
+## 1. Nothing can answer "is another agent writing to this tree right now"
+
+**Cost: highest. It produced a confident, wrong diagnosis that I nearly reported as a finding.**
+
+Measuring the suite before starting, `npm test` came back `2 failed | 983 passed`, naming two tests
+by name. Both passed when run alone. I formed a test-pollution hypothesis, ran a comparison with
+`--exclude`, and was one step from filing it. The next plain run returned `989 passed` — four more
+tests than ninety seconds earlier. Another agent was mid-edit in the same working tree, which I
+learned only because the user said so.
+
+Every read I had — `git status`, `npm test`, `Read` — answers about a tree that is being written
+underneath the answer, and none of them says so. The cost is not the wasted runs; it is that a
+snapshot of someone else's half-finished edit is indistinguishable from a real defect, and reads
+*more* like a real defect the more precisely you measure it.
+
+**What would fix it:** anything that makes concurrent writers visible — a session registry, a lock
+file with a holder, or `git status` noting that the index changed during the command. Failing that,
+a convention that agents working a shared tree announce it somewhere a sibling can read.
+
+## 2. `vitest --exclude` on the command line did not exclude, and said nothing
+
+Testing the pollution hypothesis, I ran `npx vitest run --exclude '**/zzprobe*' --exclude
+'**/node_modules/**'` and got `45 passed (45)`, against `2 failed | 43 passed (45)` moments before.
+That reads as proof. It is not: the test count was `985` both times, so the same set had run and the
+difference was the concurrent edit, not my exclude.
+
+A flag that silently matches nothing is bad; a flag that silently matches nothing while the run
+*looks* different is worse, because the surrounding noise supplies a false confirmation. Only the
+identical test total gave it away, and nothing in the output invited me to check it.
+
+**What would fix it:** report the filter that was applied and how many files it removed. Zero
+removed is the interesting case.
+
+## 3. `tasks decision` reads a leading `--` in the message as a flag
+
+```
+npm run tasks -- decision "--each added mid-branch: ..."
+```
+
+printed the usage line. The message is a positional string that happens to start with a dash,
+and the tool has no `--` terminator of its own, so the text is unwritable as typed. I dropped the
+dashes and the sentence now records a flag name that is not spelled the way the flag is spelled.
+
+**What would fix it:** treat the first positional after `decision`/`note` as text unconditionally, or
+say "that looks like a flag; pass it after `--`" instead of the usage block.
+
+## 4. `tasks doctor` calls the normal mid-branch state an error
+
+```
+[error] apt-mutate is done only in the working tree (committed state: open)
+```
+
+This is what every branch looks like between `tasks done <id>` and the commit that carries the store
+change — which is *the documented order*, since `done --commit HEAD` needs the commit to exist. It
+is reported at `[error]`, one level above the two genuine warnings beside it. An error that fires on
+the correct workflow trains you to read past errors.
+
+**What would fix it:** it is a warning, or it is suppressed when the working-tree change is the
+current branch's and newer than its last commit.
+
+## 5. The uncommitted-store warning still fires on every write
+
+Item 6 of the previous session, unchanged and reconfirmed: eight `add`/`edit`/`done`/`start` calls,
+eight identical warnings. Worth recording only because it is now the second session in which every
+single store write printed it, which is the definition of a warning nobody reads.
+
+## 6. The scratchpad path is 130 characters and appears in every command that uses it
+
+```
+C:/Users/yonat/AppData/Local/Temp/claude/C--Users-yonat-Projects-UniversalisRPG/<uuid>/scratchpad
+```
+
+This is not cosmetic. The probe that motivated this branch **hard-coded that absolute path into
+TypeScript source** and committed the file to `src/content/`, because writing it once into a `const`
+was cheaper than passing it around. A path that expensive to mention gets captured into whatever
+file is nearest.
+
+**What would fix it:** an environment variable set in the session (`$CLAUDE_SCRATCH`), so the path
+is nameable without being quotable.
+
+## What worked, and is worth keeping
+
+- Running `tasks spec new <slug>` **before** writing the spec avoided item 3 of the previous
+  session entirely. The friction doc paid for itself the first time it was read.
+- `tasks plan --spec <slug>` graded four tasks in one command, reported the two sequencing notes as
+  `[note]` and zero defects, and cost one call before any code existed.
+- `tasks edit <id> --writes ...` mid-branch, to record that the work had reached two files the grant
+  did not name, is the workflow's own §5 and it worked exactly as written — the correction is a
+  record rather than an argument.
+- `npm run audit-status` exiting non-zero on an unowned file is the one gate that caught a real
+  omission here: two new scripts and a moved module, none of which would have been attributable to a
+  system without it.
+
+# Tool friction — `audit-probe-tooling`, hardening pass, 2026-08-03
+
+Two more, both from running one audit through `tasks` end to end.
+
+## 1. Archiving an audit document breaks a test, because a test pins the corpus totals
+
+`scripts/lib/auditImport.test.ts` asserts `{ high: 21, medium: 54, low: 63 }` across every file in
+`docs/audits/`. Archiving one new report — the ordinary, required act of persisting evidence — turns
+the suite red, and the repair is to hand-edit the expected numbers to match reality. That is a
+system required to be manually kept in sync with another, which `CLAUDE.md` forbids by name.
+
+It also fails *late*. I ran the whole suite green, then archived the report, then committed; the
+break arrived in the next run, and for two commits the branch was red for a reason unrelated to any
+code in it.
+
+The test is trying to prove the parser handles the real corpus, which is worth proving. The totals
+are not what proves it — parsing every document without throwing, and mapping every one to a system,
+is. `unmapped` in the same test already does the second half and needs no maintenance.
+
+**What would fix it:** assert the invariants (every doc parses, every finding maps to a system,
+counts are non-negative) rather than a snapshot of the numbers. If a total is genuinely wanted, read
+it from a manifest the import writes, so archiving updates it.
+
+## 2. Closing a finding list is one invocation per finding
+
+Seventeen findings, seventeen `tasks done <id> --commit HEAD` calls, each with its own store write
+and its own copy of the uncommitted-store warning. Triage has a batch walk (`tasks triage`); closing
+does not. A fix round that retires a whole audit pass is the normal shape here — the previous
+session's was 36 — and the tool treats it as seventeen unrelated events.
+
+**What would fix it:** `tasks done <id>...` taking several ids, or `--spec <slug> --state open` to
+close what a commit retired in one call.
+
+## What worked
+
+- `tasks import <audit-doc>` is the answer to item 2 of the first session — the 6000-character
+  command line for filing findings. Sixteen findings from a markdown document in one invocation, and
+  the document is the archive anyway. It should be the documented path; the `--finding` flags on
+  `tasks audit` are for the case where no document exists yet, which is rare.
+- Grading twelve clauses in one `tasks audit` call, with findings already filed by `import`, avoided
+  the verdict-wiping trap of item 1 entirely. `import` and `audit` do not contend.
+
+## 3. The scratchpad path is per-session, and only the session id varies
+
+Recorded once already as item 6 of the previous session, sharpened by a second session of using it.
+The path is:
+
+```
+C:/Users/yonat/AppData/Local/Temp/claude/C--Users-yonat-Projects-UniversalisRPG/<session-uuid>/scratchpad
+```
+
+Everything but `<session-uuid>` is fixed and derivable — it is the temp root, a slug of the project
+directory, and a literal. Yet there is no way to name it except in full, so every command that
+touches it either carries 130 characters inline or opens with a `SCRATCH=...` assignment that has to
+be repeated in each new shell invocation, because shell state does not persist between calls.
+
+The cost is not typing. It is that a path this expensive to mention gets captured into whatever file
+is nearest, which is exactly how the probe that started this work ended up with an absolute
+scratchpad path hard-coded into `src/content/` and committed.
+
+**What would fix it:** export it into the environment (`$CLAUDE_SCRATCH`) so it can be named without
+being spelled.
 ## The harness and the worktree, running architecture-map
 
 ### Verifying new library code against real repo data has no home

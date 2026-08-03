@@ -272,3 +272,34 @@ describe('loadUniverseWithDiagnostics', () => {
     });
   });
 });
+
+describe('the parsed modules a load hands back', () => {
+  it('are in the order they were applied, not the order the sources arrived in', () => {
+    const sources = [module('zebra', '# info zebra', 'dependencies: alpha'), module('alpha', '# info alpha')];
+    const result = loadUniverseWithDiagnostics(sources);
+    expect(result.parsed.map((each) => each.info.id)).toEqual(['alpha', 'zebra']);
+    expect(result.parsed.map((each) => each.info.id)).toEqual(result.loadedModules);
+  });
+
+  it('carry the sections each module declared, which is what a serializer needs off them', () => {
+    const result = loadUniverseWithDiagnostics([module('m', '# info m', '# item rock', '# variable pace', 'value: 3')]);
+    expect(result.parsed[0].sections.map((section) => section.kind)).toEqual(['item', 'variable']);
+  });
+
+  it('hold the same source objects that were passed in, so a caller can match them up', () => {
+    const source = module('m', '# info m', '# item rock');
+    expect(loadUniverseWithDiagnostics([source]).parsed[0].source).toBe(source);
+  });
+
+  it('exclude a module that failed to load, since it contributed nothing to the registry', () => {
+    const good = module('good', '# info good', '# item rock');
+    const bad = module('bad', '# info bad', '# recipe nope', 'out: missing');
+    const result = loadUniverseWithDiagnostics([good, bad]);
+    expect(result.diagnostics.length).toBeGreaterThan(0);
+    expect(result.parsed.map((each) => each.info.id)).toEqual(['good']);
+  });
+
+  it('are empty when nothing loaded at all', () => {
+    expect(loadUniverseWithDiagnostics([]).parsed).toEqual([]);
+  });
+});

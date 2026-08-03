@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
-import { loadModule, loadUniverse } from './registry';
-import { registryDiff } from './registryDiff';
+import { formatModuleDiagnostic, loadModule, loadUniverse, loadUniverseWithDiagnostics } from './registry';
+import { declaredVariableIds, roundTripModule } from './roundTrip';
 import { serializeRegistryModule } from './serialize';
-import { ModuleSource, parseModuleSource, ParsedModule } from './universe';
+import { ModuleSource, parseModuleSource } from './universe';
 
 const FULL_MODULE = `
 # info base
@@ -109,20 +109,14 @@ expect: blank
 `;
 
 describe('serializeRegistryModule', () => {
-  function variableIds(module: ParsedModule): string[] {
-    return module.sections.filter((section) => section.kind === 'variable').map((section) => (section.value as { id: string }).id);
-  }
-
   function expectSemanticRoundTrip(source: ModuleSource): void {
     const parsed = parseModuleSource(source);
-    const registry = loadUniverse([source]);
-    const printed = serializeRegistryModule(registry, {
-      info: parsed.info,
-      globalVariables: variableIds(parsed),
-    });
-    const roundTrip = loadUniverse([{ ...source, text: printed }]);
+    const trip = roundTripModule(loadUniverse([source]), { info: parsed.info, globalVariables: declaredVariableIds(parsed) }, (printed) =>
+      loadUniverseWithDiagnostics([{ ...source, text: printed }]),
+    );
 
-    expect(registryDiff(registry, roundTrip)).toEqual([]);
+    expect(trip.diagnostics.map(formatModuleDiagnostic)).toEqual([]);
+    expect(trip.differences).toEqual([]);
   }
 
   it('preserves the loaded semantics of a broad fixture', () => {
