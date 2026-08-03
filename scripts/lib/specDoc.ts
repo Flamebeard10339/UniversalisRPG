@@ -136,10 +136,16 @@ function parseProofClauses(deliverableSection: string, reserved: number[] = []):
   }));
 }
 
+// Every reader and writer here anchors regexes to line ends, so a carriage
+// return defeats them silently — a CRLF spec reported having no recorded
+// passes at all. One normalization at each entry beats a trim per regex.
+const lfOnly = (text: string): string => text.replace(/\r\n/g, '\n');
+
 // Turns each clause's id from something derived — position in the list —
 // into something written down, which is what rewording and reordering then
 // leave alone.
-export function stampClauseIds(text: string): string {
+export function stampClauseIds(rawText: string): string {
+  const text = lfOnly(rawText);
   const lines = text.split('\n');
   const section = sectionText(lines, '## Deliverable');
   if (!section) return text;
@@ -196,14 +202,14 @@ function parseAuditPasses(text: string): AuditPass[] {
   });
 }
 
-export function parseSpecDoc(text: string): SpecDoc {
+export function parseSpecDoc(rawText: string): SpecDoc {
+  const text = lfOnly(rawText);
   const deliverable = sectionText(text.split('\n'), '## Deliverable');
   const deliverableSection = deliverable ? deliverable.text : '';
-  const auditPasses = parseAuditPasses(text);
   return {
     deliverableSection,
-    proofClauses: parseProofClauses(deliverableSection, auditPasses.flatMap((pass) => pass.verdicts.map((verdict) => verdict.clause))),
-    auditPasses,
+    proofClauses: parseProofClauses(deliverableSection, auditedClauseIds(text)),
+    auditPasses: parseAuditPasses(text),
   };
 }
 
@@ -219,9 +225,9 @@ export function renderAuditPass(pass: AuditPass): string {
 // Appends inside the existing `## Audit passes` section if present, else
 // creates it at the end of the document — never touches ## Deliverable,
 // ## Decisions or ## Open questions, since those are what a human reads.
-export function appendAuditPass(text: string, pass: AuditPass): string {
+export function appendAuditPass(rawText: string, pass: AuditPass): string {
   const rendered = renderAuditPass(pass);
-  const lines = text.trimEnd().split('\n');
+  const lines = lfOnly(rawText).trimEnd().split('\n');
   const headingIndex = lines.findIndex((line) => line.trim() === '## Audit passes');
   if (headingIndex === -1) {
     return `${lines.join('\n')}\n\n## Audit passes\n\n${rendered}\n`;

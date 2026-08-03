@@ -1,242 +1,109 @@
 # The workflow
 
 The live specification of how work moves through this repository, and of the tool that carries it.
-Kept current: when the tool and this document disagree, that is a defect in one of them.
+Kept current: when the tool and this document disagree, that is a defect in one of them. A branch's
+promise lives at `docs/specs/<slug>.md` and becomes a historical record the moment it merges — this
+file never does.
 
-This is **not** a branch spec. A branch's promise lives at `docs/specs/<slug>.md` and becomes a
-historical record the moment it merges — `task-system-v2.md` is one of those, and it rotted into
-being read as live documentation, which is the drift this file exists to end.
+Two roles. A **planner** decomposes and never implements, so its context never fills with low-level
+detail. A **worker** implements and never plans, so its context is spent on one piece.
 
-## The shape
+## The session, in order
 
-```
-  spec ─▶ plan ─▶ claim ─▶ work ─▶ audit ─▶ triage ─┬─ promote ─▶ work
-                    ▲                                │
-                    └── replan ◀── refusal           └─ defer / decline
-                                                             │
-                                                    spec done ─▶ merge
-```
+Every command is `npm run tasks -- <verb>`. The record verbs (`show`, `edit`, `start`, `stop`,
+`done`, `decline`, `promote`) accept a unique prefix or substring of an id; everywhere else —
+`spec add`/`remove`, `plan`, `--id`, `--requires` — an id is exact.
 
-Two roles. A **planner** decomposes and never implements, so its context never fills with
-low-level detail. A **worker** implements and never plans, so its context is spent on one piece.
-`.planning/agent-swarm-theory.md` holds what a planner owes the tree; read it before decomposing.
+1. **`tasks handoff`** — the first command of a cold session: branch, active spec, clause
+   standings, open queue.
+2. **`tasks spec new <slug>`**, then write `docs/specs/<slug>.md` — one spec per branch, numbered
+   proof clauses under `## Deliverable`. The spec is the contract, never the test plan.
+3. **Decompose** into tasks whose `--writes` regions are disjoint:
+   `tasks add "<title>" --writes <paths> --produces "<capability>" --requires <ids>`.
+   Before granting `produces`, ask `tasks produces "<name>"` — a hit names an owner to reuse.
+   `tasks system` / `tasks system "<name>"` / `tasks where <path>` answer the architecture.
+4. **`tasks plan`** — grades the set for overlap, unstated dependencies and duplicated
+   interfaces before anyone works it. It reports and refuses nothing.
+5. **The worker proposes before it implements**: `tasks start <id> --actor <name>`, then
+   `tasks edit <id> --writes <what it will actually touch>` — the worker has just read the region
+   and the planner has not. Briefs must invite refusal, and a planner must believe it. This is
+   also the only place a durable capability gets registered:
+   `tasks concept "<system>" "<name>" --paths <paths> --note "produced by <id>"`.
+6. **Work.** `tasks next` for what to pick up; commit after each logical chunk;
+   `tasks done <id>... --commit HEAD` closes against the commit (several ids in one call). If the
+   diff diverges from the grant, correct the record and say so in the commit body — that is
+   information, not a violation.
+7. **Audit.** Commission an auditor with the one instruction "run
+   `npm run tasks -- audit-prompt <slug>` and do what it says" — the brief is generated and
+   carries the checklist, the regression question, and how to file. The auditor records verdicts
+   and findings with `tasks audit` (or archives a report under `docs/audits/` and
+   `tasks import`s it). Filing findings without `--proof` flags appends no pass, so late findings
+   never reset verdicts.
+8. **Triage.** Findings from the branch's **own first pass** skip the walk: promote HIGHs and
+   anything judged fix-now with `tasks promote <id>... ` — they are always promoted anyway, and a
+   human can interrupt. From pass 2 on, promotion extends what the spec owes, so it waits for the
+   human: `tasks triage` walks the queue (`[1] promote [2] defer [3] decline [4] redirect
+   [a] ask [s] skip [q] quit`; `[a]` records a question on the finding and leaves it unreviewed).
+9. **Close and merge.** `tasks spec done <slug>` when every member is done or declined.
+   `tasks merge-ready` runs the whole merge gate — tsc, tests, layer-check, audit-status, doctor,
+   byte check — one line per leg, non-zero when a leg fails.
+10. **Record the reasoning**: `tasks note "<one line>" --id <id>` and
+    `tasks decision "<one line>" --spec <slug>` as they happen; `tasks log --id <id>` /
+    `--op decision` answers later, from the log alone. A decision made in a session and not
+    recorded here is a decision the next planner will re-litigate.
 
-## 1. The spec is the promise
+## Advice that is known good
 
-One spec per branch, at `docs/specs/<slug>.md`, naming what the branch promises to close. Its
-`## Deliverable` carries numbered proof clauses. It is the contract, never the test plan — nobody
-planning a unit from outside knows what it will need to be robust, so a worker that judges it needs
-coverage the clauses do not name should write it.
+- **Cut by write grants, not by layers.** The most expensive recurring mistake is slicing work so
+  every slice touches the same file. Chunks touching one file are one task.
+- **Do not add workers to buy speed.** Agent count is the one lever measured to correlate with
+  nothing. Fewer workers over disjoint regions is not a compromise.
+- **A finding cannot create work; an unmet clause creates work directly.** The first rule stops a
+  spec growing without a human; the second stops it closing falsely. Both have happened here.
+- **`met` carries evidence, `unmet` means checked-and-fails, `unknown` means nobody looked.** The
+  three never collapse.
+- **Red-green proves a test can fail; only mutation proves it fails for the right reason.**
+  `npm run mutate -- <manifest.json>` is the tool; keep manifests in scratch, they rot.
+- **Commission one auditor whose only question is "is anything worse than before".**
+  Clause-by-clause verification cannot see a regression.
+- **Read a finding list's shape before promoting it.** Density in one file is a structural
+  diagnosis; ask what single change retires the most of the list, and build that seam first.
+- **Persisting evidence is planner work.** Archive audit reports into `docs/audits/` before the
+  session ends; the store is the record of note.
 
-## 2. Decompose against write grants, not against layers
+## Why it is shaped this way
 
-The single most expensive mistake this repo has made repeatedly is cutting work by *layer* —
-extract the policy, then reroute git, then move the output sites — when every slice touches the
-same file. Chunks touching one file are not independent, parallel or sequential.
+**Write grants.** `writes` is what a task may change (files or directories; a directory covers
+everything beneath it) — not `files`, which is evidence about where a finding was observed.
+`produces` names an interface nothing owns until the task lands, so "who owns batching?" is a
+query instead of a guess. `requires` orders tasks; a forward reference to a record that does not
+exist yet holds the task until it does. `tasks plan` reports eight shapes of defect and note —
+two unordered tasks writing one region, a write into a region another task is producing an
+interface for, two claims on one interface, a claim the repository already answers, a plan
+concentrated in one path, a grant it cannot read, a wildcard it cannot resolve, and a task that
+starts blocked. Dispatching against a reported defect is a call a planner may make; making it
+unknowingly is not.
 
-Cut so that **each task owns a disjoint region of the tree**, and record that region:
+**Concepts.** A concept is one thing a system knows how to do, declared in
+`docs/audits/systems.json` inside its owning system. Register durable capabilities only — a
+branch's output ("playtest findings") is not one. `tasks done` prints unregistered claims and the
+registering command; it never writes one itself, because that judgement is the point. Two
+concepts claiming one file is the report that the file does two jobs.
 
-```bash
-npm run tasks -- add "extract the policy module" --writes scripts/lib/policy.ts --produces "policy module"
-```
+**Audit outputs.** A pass has two outputs that behave differently. A finding enters `unreviewed`
+and waits — that decouples the auditor from the cost of what it finds, which is the condition
+under which auditors are useful. An `unmet` clause becomes an open `undelivered` member of the
+spec directly — high severity, no triage — because it is scope the branch already promised.
+An ungraded clause records `unknown` and creates nothing.
 
-- **`writes`** — what this task may change. Files or directories; a directory covers everything
-  beneath it. This is *not* `files`, which is evidence about where a finding was observed.
-- **`produces`** — the interfaces or concepts nothing owns until this task lands. It answers
-  "who owns batching?" with a query instead of a guess, and a guess that goes the wrong way is a
-  duplicate subsystem.
-- **`requires`** — the tasks that must land first. A forward reference to a record that does not
-  exist yet is allowed and holds the task until that record arrives.
+**The store is the record.** Every store write appends to `docs/events.jsonl` automatically —
+who, when, branch, head, what changed. `tasks log` answers from the log alone, never by joining
+to present-day state, so history stays exact after records are re-pointed. `tasks doctor` scans
+and reports; it fails on exactly one condition, a line that will not parse. Reads always answer;
+writes refuse only malformed input; no semantic disagreement fails a build.
 
-Before granting `produces`, ask whether it already exists:
-
-```bash
-npm run tasks -- produces "batching"
-```
-
-That searches every concept a system has registered and every `produces` claim any task ever
-made, closed ones included. A miss is a weak "no" — it says the *record* is silent, not that the
-code is — so grep as well. A hit names the owner, and reusing it is cheaper than a second one.
-
-### The architecture is a query, not a document
-
-Three reads, all computed from the tree when you ask and stored nowhere:
-
-```bash
-npm run tasks -- system                     # every system, with its counts and dependencies
-npm run tasks -- system "Runtime"           # one system: owned files, exports, both directions, concepts
-npm run tasks -- where src/runtime/save.ts  # the reverse: who owns this file, what claims it
-```
-
-`system` is the planner's view and `where` is the worker's. **Dependencies are between systems,
-not files** — `where` shows only the imports that cross a boundary, because everything inside one
-system is ordinary coupling.
-
-A **concept** is one thing a system knows how to do. Concepts live inside
-`docs/audits/systems.json`, refining systems rather than partitioning the tree a third time
-alongside layers and systems, so a concept's paths always sit inside its own system's. Two
-concepts claiming one file is not an error — it is the report that the file does two jobs, and
-`npm run audit-status` names it.
-
-## 3. Grade the plan before dispatching it
-
-```bash
-npm run tasks -- plan <id>...
-```
-
-No workers run. It reports, in one command, what has previously taken a measurement pass to find
-by hand:
-
-Each line is tagged `[defect]` or `[note]` and says what it found in full; these are the eight
-situations it can report.
-
-| it reports | what it means | remedy |
-| --- | --- | --- |
-| *"both write X, and neither requires the other"* | two unordered tasks write one region | merge them; they are one change |
-| *"writes X, where Y is producing Z"* | one writes where another is inventing an interface | add the `requires` edge |
-| *"both claim to produce Z"* | two tasks claim one interface | one is the owner, the other is a duplicate |
-| *"claims to produce Z, and X already has it"* | the repository already has that capability | reuse it, or record why a second is right |
-| *"N of M granted task(s) write X"* | most of the plan lands in one path | it is one task, and more workers buy nothing |
-| *"declares no writes"* | nothing to compare | grant it, or accept that this task was not checked |
-| *"cannot resolve to a region"* | a grant with a wildcard in it | name paths or directories — a glob compares nothing |
-| *"starts blocked — it waits on ..."* | a requirement is unsettled | expected in a sequenced plan; a surprise otherwise |
-
-It exits 0 and refuses nothing. Dispatching against a reported defect is a call a planner is
-allowed to make; making it unknowingly is not.
-
-**Do not add workers to buy speed.** Agent count is the one lever measured to correlate with
-nothing. Fewer workers over disjoint regions is not a compromise.
-
-## 4. The worker proposes before it implements
-
-A dispatched worker's **first** deliverable is not code. It is a proposed correction to its own
-ledger entry:
-
-```bash
-npm run tasks -- start <id> --actor <name>
-npm run tasks -- edit <id> --writes <what it will actually touch> --requires <what it actually needs>
-```
-
-The planner accepts it, or corrects it, and re-runs `tasks plan`. Then the worker writes code.
-
-This exists because the planner declared the write grant without having read the region, and the
-worker is the first party who has. It is also where refusal gets a slot instead of requiring
-initiative: **briefs must invite refusal, and a planner must believe it.** Twice that produced a
-correct refusal — a reproduction that was information-theoretically impossible, and a fix that
-silently retracted a protection. Both would otherwise have shipped.
-
-**This is where a concept gets registered, and it is the only place.** The worker has just read the
-region and is the first party who knows what is actually there, which is exactly what the registry
-needs and what the planner did not have. So in the same round trip: run `tasks produces` for
-anything the task claims, and if the capability is real and nothing owns it yet, name its owner.
-
-```bash
-npm run tasks -- concept "Runtime" "buff engine" --paths src/runtime/buffs.ts --note "produced by buffs-generalized"
-```
-
-Register durable capabilities only. A branch's output — "playtest findings", "balance numbers" —
-is not one, and a registry full of those answers "no owner" with confidence about things that were
-never capabilities. `tasks done` prints the claims it did not find registered and the command that
-would register them; it never writes one itself, because that judgement is the whole point.
-
-One round trip. If it grows a protocol, it has failed.
-
-## 5. Work, and close against a commit
-
-`tasks next` for what to pick up, `tasks show <id>` for the full record, `tasks done <id>` to close.
-`tasks done <id> --commit <sha>` when the closing commit already exists. Commit after each logical
-chunk; every non-exempt commit carries a body saying what was done.
-
-If the work diverges from the declared `writes`, that is information, not a violation — say so in
-the commit body and correct the record. A diff that does not match its grant means the
-decomposition was wrong, and that is worth knowing before the next one is cut.
-
-## 6. Audit reads the diff
-
-`tasks audit-prompt <spec>` generates the auditor's brief; `tasks audit <spec>` records the pass.
-An audit reviews the diff a branch proposes to merge, not a running commit count.
-
-A pass has **two outputs, and they behave differently.**
-
-- **A finding cannot create work.** Every finding enters `unreviewed` and waits for triage. That
-  decouples the auditor from the cost of what it finds, which is the condition under which
-  auditors are useful.
-- **An `unmet` clause creates work directly.** It becomes an open `undelivered` member of the spec
-  — high severity, no triage step — and `tasks next` will hand it to the next worker. This is not
-  an exception to the rule above so much as its other half: a finding is *new* scope, so it waits
-  for a human; an unmet clause is scope the branch **already promised**, so nothing is being added.
-  The first rule stops a spec growing, the second stops it closing falsely. Both have happened here.
-- **Every proof clause gets a verdict**: `met` carries evidence, `unmet` means it was checked and
-  fails, `unknown` means nobody looked. `unknown` and `unmet` never collapse — an ungraded clause
-  records `unknown` and creates nothing, because nobody has established there is work to do.
-- **Red-green proves a test can fail; only mutation proves it fails for the right reason.** For
-  pure logic, remove, invert or scale the behaviour a proof claims and confirm the named test goes
-  red. `npm run mutate -- <manifest.json>` is the tool: it restores from bytes it captured rather
-  than from git, so it is safe on a tree carrying uncommitted work, and it reports every verdict
-  with the test scope it was measured against — a `SURVIVED` against two hand-picked files is not
-  the same claim as a `SURVIVED` against the suite. Keep the manifest in a scratch directory; a
-  mutation set rots the moment the source moves, so nothing here is worth tracking.
-- **Commission an auditor whose only question is "is anything worse than before".** Clause-by-clause
-  verification cannot see a regression, because each clause looks fine in isolation.
-- **Persisting the evidence is planner work.** Archive audit reports into `docs/audits/` before the
-  session ends and plan against the archive, not against a summary of a summary.
-
-## 7. Triage is a human's call
-
-`tasks triage` walks the unreviewed queue one finding at a time, offering
-`[1] promote  [2] defer  [3] decline  [4] redirect  [s] skip  [q] save and quit`. Promote joins the
-current spec; defer leaves it open and unclaimed; decline closes it with a reason; redirect
-re-displays the same finding so a mis-keyed answer is not a decision. Quitting saves, so a long
-queue survives being interrupted. Promotion is available at every pass — an auditor files, it does
-not schedule.
-
-Before promoting a list, read its *shape*. A finding list is evidence about a system, not a queue.
-Density in one file is a structural diagnosis. Two findings that contradict each other mean no
-module owns that rule. Ask **what single change retires the most of the list** — if the answer is a
-seam that does not exist yet, build the seam first, because fixing items that dissolve under a
-restructure is work thrown away.
-
-## 8. Record the reasoning, not just the outcome
-
-Every store write appends a line to `docs/events.jsonl` automatically — who, when, which branch,
-which head, and what changed. Nothing to remember and nothing to keep in sync. Two verbs add the
-part the tool cannot infer:
-
-```bash
-npm run tasks -- note "measured the queue at 87 records before touching it" --id <id>
-npm run tasks -- decision "cutting by command family, not by layer" --spec <slug>
-```
-
-`tasks log` answers from the log alone — never by joining to present-day state, which would rewrite
-history every time a record is re-pointed. `--id`, `--system`, `--spec`, `--op` and free text each
-answer in one invocation and compose:
-
-```bash
-npm run tasks -- log --id <id>            # this record's whole history
-npm run tasks -- log --op decision        # every decision, no text matching
-```
-
-This is what git cannot give you. `git log -S` finds one of five edits to a record; `tasks log --id`
-finds all five, in order, and stays exact after a serializer rewrite touches every line. **A
-decision made in a session and not recorded here is a decision the next planner will re-litigate.**
-
-## 9. Close and merge
-
-`tasks spec done <slug>` when every member is `done` or `declined`. `tasks doctor` scans the store
-and reports; it fails on exactly one condition, a line that will not parse.
-
-Nothing else refuses. Reads always answer, writes refuse only malformed input, and no semantic
-disagreement fails a build — a report that names the problem is worth more than a gate that hides
-it behind a rerun.
-
-## The cold start
-
-`tasks handoff` is the first command of a new session: the branch, the active spec, the live
-`Next:` and the open queue.
-
-## Where the reasoning lives
+## Where the deeper reasoning lives
 
 - `.planning/agent-swarm-theory.md` — what a planner owes the tree, learned from rounds that failed
-- `.planning/orchestration-research-2026-08-02.md` — the literature this protocol is drawn from,
-  including which of its premises did not survive checking
+- `.planning/orchestration-research-2026-08-02.md` — the literature this protocol draws on
 - `docs/audits/` — the archive; every finding label cited above is traceable there

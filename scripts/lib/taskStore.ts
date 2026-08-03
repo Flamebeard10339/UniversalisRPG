@@ -47,7 +47,7 @@ export class StoreError extends Error {}
 export const DEFAULT_STORE_PATH = 'docs/tasks.jsonl';
 
 export const KINDS: Kind[] = ['task', 'finding', 'undelivered', 'question'];
-const STATES: State[] = ['unreviewed', 'open', 'in-progress', 'done', 'declined'];
+export const STATES: State[] = ['unreviewed', 'open', 'in-progress', 'done', 'declined'];
 const SEVERITIES: Severity[] = ['high', 'medium', 'low'];
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -338,6 +338,14 @@ export function coldClaims(tasks: Task[], spec: string | null, today: string, fi
     .sort((a, b) => (claimOf(b, today)?.days ?? 0) - (claimOf(a, today)?.days ?? 0));
 }
 
+// The findings a spec's own audit passes filed that triage has not admitted
+// yet. `spec` on the record stays null until a human moves it — this reads
+// the provenance the record already carries, so spec-scoped views can show
+// what the spec's audits raised without pretending triage happened.
+export function unreviewedFiledBy(tasks: Task[], spec: string): Task[] {
+  return unreviewedQueue(tasks).filter((task) => task.source?.spec === spec);
+}
+
 // Severity first, then creation order: the shape `triage` walks the
 // unreviewed queue in.
 export function unreviewedQueue(tasks: Task[]): Task[] {
@@ -360,8 +368,22 @@ export interface ListFilter {
 
 // Topic search until the store has a topic: the words a task already
 // carries are the only thing to match on, so "combat" reaches everything
-// whose id, title, system or prose mentions it.
-const SEARCHABLE = (task: Task): string => [task.id, task.title, task.system, task.deliverable, task.evidence].filter(Boolean).join('\n').toLowerCase();
+// whose id, title, system or prose mentions it. The labelled list is the
+// one definition of "searchable" — `search` reports which field matched
+// from the same list this filters by, so the two cannot disagree.
+export const SEARCH_FIELDS: Array<[label: string, read: (task: Task) => string | null]> = [
+  ['id', (task) => task.id],
+  ['title', (task) => task.title],
+  ['system', (task) => task.system],
+  ['deliverable', (task) => task.deliverable],
+  ['evidence', (task) => task.evidence],
+];
+
+const SEARCHABLE = (task: Task): string =>
+  SEARCH_FIELDS.map(([, read]) => read(task))
+    .filter(Boolean)
+    .join('\n')
+    .toLowerCase();
 
 // The one query with no built-in state filter: with no --state, "not
 // closed" (unreviewed + open) is the useful default, since done and
@@ -464,7 +486,10 @@ export function coldClaimIssues(tasks: Task[], today: string): CheckIssue[] {
     }));
 }
 
-export function checkStore(tasks: Task[], systems: string[], specExists: (spec: string) => boolean = (spec) => existsSync(`docs/specs/${spec}.md`)): CheckIssue[] {
+// `specExists` has no default on purpose: the spec directory is the
+// caller's configuration, and a default here would hard-code a path that
+// `specFile` owns.
+export function checkStore(tasks: Task[], systems: string[], specExists: (spec: string) => boolean): CheckIssue[] {
   const issues: CheckIssue[] = [];
   const seen = new Set<string>();
   for (const task of tasks) {

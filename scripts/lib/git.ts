@@ -50,3 +50,10 @@ export function commitCount(range: string): number | null {
   const count = Number(output);
   return Number.isNaN(count) ? null : count;
 }
+
+// Asked of git rather than the filesystem: `.git` is a file in a worktree,
+// so probing `.git/MERGE_HEAD` by path answers wrongly exactly where this
+// repo does most of its work.
+export function mergeInProgress(): boolean {
+  return run(['rev-parse', '--verify', '--quiet', 'MERGE_HEAD']) !== null;
+}

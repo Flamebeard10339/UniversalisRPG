@@ -1,6 +1,7 @@
 import { join } from 'node:path';
 import { posix } from './sourceFiles';
 import { stripComments } from './stripComments';
+import { covers } from './systems';
 
 export const LAYERS = ['grammar', 'content', 'runtime', 'ui', 'scripts'] as const;
 export type Layer = (typeof LAYERS)[number];
@@ -24,8 +25,7 @@ const IMPORT_PATTERN = /\b(?:from|import|require)\s*\(?\s*(['"`])(\.[^'"`]*)\1/g
 
 // A directory import names the layer root itself, with the index file implied.
 export function layerOf(path: string): Layer | null {
-  const normalized = posix(path);
-  return LAYERS.find((layer) => normalized === ROOTS[layer] || normalized.startsWith(`${ROOTS[layer]}/`)) ?? null;
+  return LAYERS.find((layer) => covers(ROOTS[layer], posix(path))) ?? null;
 }
 
 // Comments are blanked first, so an import someone commented out is not an

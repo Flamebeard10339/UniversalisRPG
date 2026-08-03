@@ -32,12 +32,12 @@ function task(overrides: Partial<Task> & { id: string }): Task {
 
 describe('checkStore clause binding', () => {
   it('refuses an undelivered task that names no proof clause', () => {
-    const issues = checkStore([task({ id: 'u', kind: 'undelivered', spec: null })], []);
+    const issues = checkStore([task({ id: 'u', kind: 'undelivered', spec: null })], [], () => true);
     expect(issues).toContainEqual({ level: 'error', message: 'u is undelivered but names no proof clause' });
   });
 
   it('refuses a clause binding on any other kind, so the field cannot drift into meaning something else', () => {
-    const issues = checkStore([task({ id: 't', clause: 3 })], []);
+    const issues = checkStore([task({ id: 't', clause: 3 })], [], () => true);
     expect(issues).toContainEqual({ level: 'error', message: 't names a proof clause but is not undelivered' });
   });
 });
@@ -46,7 +46,7 @@ describe('question as a kind', () => {
   it('parses a question record and takes no exception to it', () => {
     const line = JSON.stringify(task({ id: 'q', kind: 'question' }));
     expect(parseStore(line, 'store')[0].kind).toBe('question');
-    expect(checkStore(parseStore(line, 'store'), [])).toEqual([]);
+    expect(checkStore(parseStore(line, 'store'), [], () => true)).toEqual([]);
   });
 
   it('is one more value in the kind field, not a record shape of its own', () => {
@@ -308,7 +308,7 @@ describe('claims', () => {
   });
 
   it('warns that a claim on a record which is not in progress describes a claim that was released', () => {
-    const issues = checkStore([task({ id: 'stale', state: 'open', claimed: '2026-08-01', claimedBy: 'worker-a' })], []);
+    const issues = checkStore([task({ id: 'stale', state: 'open', claimed: '2026-08-01', claimedBy: 'worker-a' })], [], () => true);
     expect(issues).toContainEqual({
       level: 'warning',
       message: 'stale is open and still carries a claim by worker-a from 2026-08-01, which reads as a claim that was released',
@@ -316,7 +316,7 @@ describe('claims', () => {
   });
 
   it('takes no exception to a claim on the one state that means someone holds it', () => {
-    expect(checkStore([held('2026-08-01')], [])).toEqual([]);
+    expect(checkStore([held('2026-08-01')], [], () => true)).toEqual([]);
   });
 
   // The queue fixNowQueue cannot answer for: an in-progress record is held,
@@ -555,48 +555,48 @@ describe('checkStore', () => {
   const systems = ['Runtime', 'UI'];
 
   it('passes on an empty store', () => {
-    expect(checkStore([], systems)).toEqual([]);
+    expect(checkStore([], systems, () => true)).toEqual([]);
   });
 
   it('flags a duplicate id', () => {
-    const issues = checkStore([task({ id: 'a' }), task({ id: 'a' })], systems);
+    const issues = checkStore([task({ id: 'a' }), task({ id: 'a' })], systems, () => true);
     expect(issues).toContainEqual({ level: 'error', message: 'duplicate id: a' });
   });
 
   it('flags an unresolved requires reference', () => {
-    const issues = checkStore([task({ id: 'a', requires: ['ghost'] })], systems);
+    const issues = checkStore([task({ id: 'a', requires: ['ghost'] })], systems, () => true);
     expect(issues).toContainEqual({ level: 'error', message: 'a requires unresolved id: ghost' });
   });
 
   it('detects a dependency cycle exactly once', () => {
-    const issues = checkStore([task({ id: 'a', requires: ['b'] }), task({ id: 'b', requires: ['a'] })], systems);
+    const issues = checkStore([task({ id: 'a', requires: ['b'] }), task({ id: 'b', requires: ['a'] })], systems, () => true);
     const cycles = issues.filter((issue) => issue.message.startsWith('dependency cycle'));
     expect(cycles).toHaveLength(1);
   });
 
   it('requires a reason when declined, and reads a reason on any other state as a reopened decline', () => {
-    expect(checkStore([task({ id: 'a', state: 'declined' })], systems)).toContainEqual({ level: 'error', message: 'a is declined but has no reason' });
-    expect(checkStore([task({ id: 'a', state: 'in-progress', reason: 'no longer relevant' })], systems)).toContainEqual({
+    expect(checkStore([task({ id: 'a', state: 'declined' })], systems, () => true)).toContainEqual({ level: 'error', message: 'a is declined but has no reason' });
+    expect(checkStore([task({ id: 'a', state: 'in-progress', reason: 'no longer relevant' })], systems, () => true)).toContainEqual({
       level: 'warning',
       message: 'a is in-progress and carries a decline reason, which reads as a decline that was reopened: no longer relevant',
     });
-    expect(checkStore([task({ id: 'a', state: 'declined', reason: 'stale' })], systems)).toEqual([]);
+    expect(checkStore([task({ id: 'a', state: 'declined', reason: 'stale' })], systems, () => true)).toEqual([]);
   });
 
   it('reads a closed date on a record that is not closed as residue worth reporting', () => {
-    expect(checkStore([task({ id: 'a', state: 'open', closed: '2026-08-02' })], systems)).toContainEqual({
+    expect(checkStore([task({ id: 'a', state: 'open', closed: '2026-08-02' })], systems, () => true)).toContainEqual({
       level: 'warning',
       message: 'a is open but still carries a closed date: 2026-08-02',
     });
   });
 
   it('accepts a declined undelivered task, which is now an abandonment the tool can record', () => {
-    const issues = checkStore([task({ id: 'a', kind: 'undelivered', clause: 1, state: 'declined', reason: 'x' })], systems);
+    const issues = checkStore([task({ id: 'a', kind: 'undelivered', clause: 1, state: 'declined', reason: 'x' })], systems, () => true);
     expect(issues).toEqual([]);
   });
 
   it('flags a system not in systems.json', () => {
-    const issues = checkStore([task({ id: 'a', system: 'Ghost system' })], systems);
+    const issues = checkStore([task({ id: 'a', system: 'Ghost system' })], systems, () => true);
     expect(issues).toContainEqual({ level: 'error', message: 'a has a system not in systems.json: Ghost system' });
   });
 
@@ -606,7 +606,7 @@ describe('checkStore', () => {
   });
 
   it('warns, but does not error, on a file that no longer exists', () => {
-    const issues = checkStore([task({ id: 'a', files: ['no/such/file.ts:12'] })], systems);
+    const issues = checkStore([task({ id: 'a', files: ['no/such/file.ts:12'] })], systems, () => true);
     expect(issues).toEqual([{ level: 'warning', message: 'a lists a file that no longer exists: no/such/file.ts:12' }]);
   });
 
@@ -614,10 +614,10 @@ describe('checkStore', () => {
     // docs/audits/systems.json is a real file in this repo's own checkout,
     // so a #anchor suffix on it must not warn — only a code reference's
     // `:line` suffix was being stripped before this fix.
-    const clean = checkStore([task({ id: 'a', files: ['docs/audits/systems.json#H1'] })], systems);
+    const clean = checkStore([task({ id: 'a', files: ['docs/audits/systems.json#H1'] })], systems, () => true);
     expect(clean).toEqual([]);
 
-    const missing = checkStore([task({ id: 'b', files: ['docs/audits/no-such-doc.md#H1'] })], systems);
+    const missing = checkStore([task({ id: 'b', files: ['docs/audits/no-such-doc.md#H1'] })], systems, () => true);
     expect(missing).toEqual([{ level: 'warning', message: 'b lists a file that no longer exists: docs/audits/no-such-doc.md#H1' }]);
   });
 });

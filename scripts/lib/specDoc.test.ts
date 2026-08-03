@@ -349,3 +349,17 @@ describe('clauseStandings / outstandingSummary', () => {
     expect(outstandingSummary([])).toBe('no clause to grade');
   });
 });
+
+// A CRLF spec used to report having no recorded passes at all: every
+// heading and verdict regex anchors to line end, and the carriage return
+// defeated each one silently.
+describe('a CRLF spec document', () => {
+  it('parses clauses and audit passes the same as an LF one', () => {
+    const lf = '# s\n\n## Deliverable\n\np\n\nProof:\n\n- [c1] The clause holds.\n\n## Audit passes\n\n### Pass 1 — 2026-08-03\n\n- base: `a`\n- head: `b`\n- proof 1: met — checked\n';
+    const crlf = lf.replace(/\n/g, '\r\n');
+    const parsed = parseSpecDoc(crlf);
+    expect(parsed.proofClauses).toEqual(parseSpecDoc(lf).proofClauses);
+    expect(parsed.auditPasses).toHaveLength(1);
+    expect(parsed.auditPasses[0].verdicts).toEqual([{ clause: 1, status: 'met', evidence: 'checked' }]);
+  });
+});

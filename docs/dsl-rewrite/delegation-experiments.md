@@ -319,6 +319,60 @@ tokens total. Early and directional:
   ~2 headline claims per audit at the line level cost far less than the audits
   and caught nothing wrong — which is itself the data point.
 
+## Audit through the generated brief (task-system-refactor pass 1, 2026-08-03)
+
+First audit commissioned as one sentence — "run `npm run tasks -- audit-prompt
+<spec>` and do what it says" — after the brief moved into the tool. What the
+row records:
+
+- **The brief carried the whole protocol.** The auditor graded all 16 clauses
+  with live reproductions (ran the prefix resolution, the `--` terminator and
+  the findings-only audit path itself), filed verdicts and two findings
+  straight into the store with deliverable and evidence attached, and recorded
+  the pass — no hand-built prompt, no orphan report document, no verdict wipe.
+- **Fast, and speed alone is unsigned.** Historical passes found a dozen-plus
+  findings with at least one HIGH; this one found 2 lows, both real, both
+  closed same-day. Whether that means clean work or a shallow pass is exactly
+  what a second independent auditor discriminates (see rows 29–32:
+  convergence from cold agents is the strong evidence).
+- **The environment, not the task, cost the retry.** A fresh worktree ships
+  without `node_modules`; the first `merge-ready` run failed 104 subprocess
+  tests before `npm ci` fixed it — third session to hit this. `merge-ready`
+  now names the trap up front.
+
+## Three parallel auditors against pass 1 (task-system-refactor pass 2, 2026-08-03)
+
+Three cold Opus auditors, de-correlated emphases (store/state, audit
+machinery + behavioral regression diffing, CLI surface), no store writes,
+reports returned in-message and imported serially. Cost: 811k subagent
+tokens (A 308k/139 tool calls, B 318k/149, C 185k/111), plus one fully
+cancelled first round (a session interrupt propagated to the background
+agents) and a shared-node_modules contention tax — one auditor's `npm ci`
+against the primary checkout emptied the directory every sibling's
+junction pointed at.
+
+- **Pass 1's speed was shallowness, settled.** One sentence commissioned
+  pass 1; it found 2 lows and graded 16/16 met in minutes. Three
+  independent auditors found a real HIGH regression (`spec show --full`
+  dead as documented, in a CI-visible command), overturned two clause
+  verdicts (c2, c5) and half of a third (c3), and filed 25 findings.
+- **Convergence is the product.** All three found the HIGH and the same
+  `promote` atomicity defect independently; two found the same
+  ownership miss; the two audit-machinery findings (B and C) turned out
+  to be two doors into the same verdict-wiping trap, found from different
+  directions. Unique finds tracked the assigned emphases, so the
+  de-correlation bought coverage, not redundancy.
+- **The narrow-mandate auditor was not weaker, only cheaper.** C (185k,
+  standard-depth brief) found the HIGH, three of the four convergent
+  mediums, and the only finding about the docs. The mandate text mattered;
+  the per-agent depth mostly bought mutation verification (A ran 20+
+  mutations and found the two clause halves nothing holds).
+- **Parallel agents must not share a mutable dependency.** The junction
+  fix that solved the serial worktree problem became the round's biggest
+  tax in parallel. Next round: per-worktree `npm ci`, never the primary's
+  directory; private scratch subdirectories; and never `npm ci` in a
+  checkout you did not create.
+
 ## Clause audits with a mutation mandate (rows 33–38)
 
 Six delegations, ~987k subagent tokens, auditing a branch against its spec's

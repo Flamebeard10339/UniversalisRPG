@@ -182,55 +182,34 @@
       "note": "src/ui still does not exist, so coverage stays structurally limited until the GUI rebuild. The 2026-07-30 pass verified 060dd3e closed UI-H1 (the attic exclude), UI-M1 (270 to 70 lines of CSS, 16.57 to 6.98 kB), UI-M2 (public/content/) and UI-M3 (twelve unimported dependencies, reactflow included), and that 73a73f3's partition closed the 2026-07-28 orphan list — public/, postcss.config.js, tailwind.config.js and src/vite-env.d.ts are members now, which is why this system had a window at all. M1 is the one file of that sweep left standing: public/changelog.txt has no reader by the same grep that condemned public/content/, ships to itch.io and into the APK, and advertises the deleted legacy GUI's features under version 0.1.0. Its lows are the inherited remainder — 14 unused colour properties and seven data-theme/data-font-size rules nothing sets, a Tailwind glob sweeping three layers below this one, and a theme-color hand-copied from the stylesheet."
     },
     {
-      "name": "Testing procedure",
+      "name": "Task system",
       "paths": [
-        "scripts/play-cli.ts",
-        "scripts/play-cli.test.ts",
-        "scripts/probe.ts",
-        "scripts/probe.test.ts",
-        "scripts/mutate.ts",
-        "scripts/mutate.test.ts",
-        "scripts/audit-status.ts",
-        "scripts/layer-check.ts",
         "scripts/tasks.ts",
         "scripts/tasks.test.ts",
-        "scripts/lib",
-        ".claude/hooks",
-        ".claude/settings.json",
-        ".github/workflows/test.yml"
+        "scripts/tasks",
+        "scripts/lib/taskStore.ts",
+        "scripts/lib/taskStore.test.ts",
+        "scripts/lib/eventLog.ts",
+        "scripts/lib/eventLog.test.ts",
+        "scripts/lib/specDoc.ts",
+        "scripts/lib/specDoc.test.ts",
+        "scripts/lib/planCheck.ts",
+        "scripts/lib/planCheck.test.ts",
+        "scripts/lib/producers.ts",
+        "scripts/lib/producers.test.ts",
+        "scripts/lib/auditImport.ts",
+        "scripts/lib/auditImport.test.ts",
+        "scripts/lib/commitContract.ts",
+        "scripts/lib/commitContract.test.ts",
+        "scripts/lib/architecture.ts",
+        "scripts/lib/architecture.test.ts",
+        "scripts/lib/bytes.ts",
+        "scripts/lib/bytes.test.ts"
       ],
-      "lastAudit": "4631baa",
-      "lastAuditDoc": "docs/audits/testing-procedure-2026-07-30.md",
-      "note": "The 2026-07-30 pass verified the 2026-07-28 closures and found H1: /test runs a # test against the LIVE session state, so it rewinds the player and makes /create-valid-test emit a test that fails on its own first replay — reproduced end to end. Its mediums are one theme, gates claiming more than they check: an unresolvable lastAudit aborts the whole ledger before any verdict, the doc gate or the partition check, and 7676c09's hook reads that crash as silence (M1); layer-check never reads any file directly under src/, in either direction (M2); /create-test is the one authoring command that bypasses the /dsl machinery that would validate and persist it (M3). Owns .claude/hooks (2026-07-28 M5). Its scripts coverage names the files it implements, except that scripts/lib is declared whole and so double-charges the contribution system's modportalCache.ts — L4, open. Eleven of this window's sixteen commits reached it only through scripts/play-cli.ts, which is a downstream consumer of every layer beneath it; the coverage is still earned, since nobody else audits that file and H1 and M3 are both in it. runTest and # test parsing live under src/ and are covered by the DSL load path and Runtime as well. Since then this system gained scripts/probe.ts and scripts/mutate.ts, audited three times at branch level (not a system sweep, so lastAudit is unmoved): testing-procedure-2026-08-03-probe-tooling.md, -pass2.md and -pass3.md. Each pass found HIGHs in the code the previous pass's fixes had just written, and the recurring shape was a decision placed where no test could reach it — inside main(), or behind a test that asserted on a callback's output rather than its argument. Nine pass-3 mediums and lows are open and unreviewed; the branch merged with only its HIGHs closed, by decision.",
+      "lastAudit": null,
+      "lastAuditDoc": null,
+      "note": "Carved out of Testing procedure on 2026-08-03 by task-system-refactor: the workflow tool is a system, not a testing utility. Branch-level audit history for this code lives in the task-system-* and testing-procedure-2026-08-0x docs under docs/audits/. Never swept as its own system yet.",
       "concepts": [
-        {
-          "name": "the systems manifest",
-          "paths": [
-            "scripts/lib/systems.ts"
-          ],
-          "note": "testing-procedure-2026-07-30-pass2-m6 is about this concept having had two readers and two type declarations; arch-ownership-seam produced its ownership rule and concept schema here."
-        },
-        {
-          "name": "plan report",
-          "paths": [
-            "scripts/lib/planCheck.ts"
-          ],
-          "note": "Produced by coord-plan, closed; the claim is recorded on that task."
-        },
-        {
-          "name": "derived architecture view",
-          "paths": [
-            "scripts/lib/architecture.ts"
-          ],
-          "note": "Produced by arch-derived-view, closed; the claim is recorded on that task."
-        },
-        {
-          "name": "whole-store produces query",
-          "paths": [
-            "scripts/lib/producers.ts"
-          ],
-          "note": "Produced by arch-query-commands; the claim is recorded on that task."
-        },
         {
           "name": "the event log",
           "paths": [
@@ -258,6 +237,56 @@
             "scripts/lib/specDoc.ts"
           ],
           "note": "The clause and audit-pass machinery; testing-procedure-2026-07-30-pass2-m3 is about its writers."
+        },
+        {
+          "name": "plan report",
+          "paths": [
+            "scripts/lib/planCheck.ts"
+          ],
+          "note": "Produced by coord-plan, closed; the claim is recorded on that task."
+        },
+        {
+          "name": "derived architecture view",
+          "paths": [
+            "scripts/lib/architecture.ts"
+          ],
+          "note": "Produced by arch-derived-view, closed; the claim is recorded on that task."
+        },
+        {
+          "name": "whole-store produces query",
+          "paths": [
+            "scripts/lib/producers.ts"
+          ],
+          "note": "Produced by arch-query-commands; the claim is recorded on that task."
+        }
+      ]
+    },
+    {
+      "name": "Testing procedure",
+      "paths": [
+        "scripts/play-cli.ts",
+        "scripts/play-cli.test.ts",
+        "scripts/probe.ts",
+        "scripts/probe.test.ts",
+        "scripts/mutate.ts",
+        "scripts/mutate.test.ts",
+        "scripts/audit-status.ts",
+        "scripts/layer-check.ts",
+        "scripts/lib",
+        ".claude/hooks",
+        ".claude/settings.json",
+        ".github/workflows/test.yml"
+      ],
+      "lastAudit": "4631baa",
+      "lastAuditDoc": "docs/audits/testing-procedure-2026-07-30.md",
+      "note": "The 2026-07-30 pass verified the 2026-07-28 closures and found H1: /test runs a # test against the LIVE session state, so it rewinds the player and makes /create-valid-test emit a test that fails on its own first replay — reproduced end to end. Its mediums are one theme, gates claiming more than they check: an unresolvable lastAudit aborts the whole ledger before any verdict, the doc gate or the partition check, and 7676c09's hook reads that crash as silence (M1); layer-check never reads any file directly under src/, in either direction (M2); /create-test is the one authoring command that bypasses the /dsl machinery that would validate and persist it (M3). Owns .claude/hooks (2026-07-28 M5). Its scripts coverage names the files it implements, except that scripts/lib is declared whole and so double-charges the contribution system's modportalCache.ts — L4, open. Eleven of this window's sixteen commits reached it only through scripts/play-cli.ts, which is a downstream consumer of every layer beneath it; the coverage is still earned, since nobody else audits that file and H1 and M3 are both in it. runTest and # test parsing live under src/ and are covered by the DSL load path and Runtime as well. Since then this system gained scripts/probe.ts and scripts/mutate.ts, audited three times at branch level (not a system sweep, so lastAudit is unmoved): testing-procedure-2026-08-03-probe-tooling.md, -pass2.md and -pass3.md. Each pass found HIGHs in the code the previous pass's fixes had just written, and the recurring shape was a decision placed where no test could reach it — inside main(), or behind a test that asserted on a callback's output rather than its argument. Nine pass-3 mediums and lows are open and unreviewed; the branch merged with only its HIGHs closed, by decision.",
+      "concepts": [
+        {
+          "name": "the systems manifest",
+          "paths": [
+            "scripts/lib/systems.ts"
+          ],
+          "note": "testing-procedure-2026-07-30-pass2-m6 is about this concept having had two readers and two type declarations; arch-ownership-seam produced its ownership rule and concept schema here."
         },
         {
           "name": "the layer rule",

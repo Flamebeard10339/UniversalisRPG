@@ -1,9 +1,12 @@
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { run as runTasks } from './tasks';
+import { parseAuditArgs } from './tasks/audit';
+import { flagArities } from './tasks/cli';
+import { allUsages } from './tasks/commands';
 
 const repoRoot = path.join(import.meta.dirname, '..');
 const today = new Date().toISOString().slice(0, 10);
@@ -82,13 +85,19 @@ function fixture(run: (context: { dir: string; args: (extra?: string[]) => strin
     );
     const storePath = path.join(dir, 'tasks.jsonl');
     const globals = ['--store', storePath, '--systems', systemsPath, '--specs-dir', specsDir, '--branch', 'demo-spec'];
+    // A bare `--` ends flag parsing, so the fixture's own flags must land
+    // before it, never after.
+    const withGlobals = (args: string[]): string[] => {
+      const term = args.indexOf('--');
+      return term === -1 ? [...args, ...globals] : [...args.slice(0, term), ...globals, ...args.slice(term)];
+    };
 
     run({
       dir,
       args: (extra = []) => [...globals, ...extra],
       tasks: (...args: string[]) => {
-        if (args[0] !== 'audit') return runInProcess([...args, ...globals]);
-        const result = spawnSync(process.execPath, [tsx, script, ...args, ...globals], { cwd: repoRoot, encoding: 'utf8' });
+        if (args[0] !== 'audit') return runInProcess(withGlobals(args));
+        const result = spawnSync(process.execPath, [tsx, script, ...withGlobals(args)], { cwd: repoRoot, encoding: 'utf8' });
         return { status: result.status ?? 1, stdout: result.stdout, stderr: result.stderr };
       },
       triage: (input: string, extra: string[] = []) => {
@@ -101,7 +110,8 @@ function fixture(run: (context: { dir: string; args: (extra?: string[]) => strin
   }
 }
 
-// A dedicated git repo per test, distinct from `fixture`'s (which spawns
+// A dedicated git repo per test, distinct from `fixture`'s (which runs
+// non-audit commands in-process and spawns audit
 // against this repo's own real checkout) — handoff's walk-back and
 // multi-line capture need commits with exact, controlled messages.
 function gitFixture(run: (context: { dir: string; commit: (message: string) => string; tasks: (...args: string[]) => Run }) => void): void {
@@ -288,8 +298,8 @@ describe('tasks CLI', () => {
   // through two audits.
   it('refuses five junk arguments on every bounded command surface', () => {
     fixture(({ tasks }) => {
-      const unbounded = new Set(['spec add', 'spec remove', 'plan']);
-      const surfaces = [['doctor'], ['add'], ['edit'], ['show'], ['list'], ['search'], ['next'], ['start'], ['stop'], ['done'], ['decline'], ['import'], ['triage'], ['audit'], ['audit-prompt'], ['handoff'], ['check-commit-msg'], ['plan'], ['spec'], ['spec', 'new'], ['spec', 'add'], ['spec', 'remove'], ['spec', 'show'], ['spec', 'done'], ['note'], ['decision'], ['log']];
+      const unbounded = new Set(['spec add', 'spec remove', 'plan', 'done', 'decline', 'promote']);
+      const surfaces = [['doctor'], ['add'], ['edit'], ['show'], ['list'], ['search'], ['next'], ['start'], ['stop'], ['done'], ['decline'], ['promote'], ['import'], ['triage'], ['audit'], ['audit-prompt'], ['handoff'], ['check-commit-msg'], ['plan'], ['spec'], ['spec', 'new'], ['spec', 'add'], ['spec', 'remove'], ['spec', 'show'], ['spec', 'done'], ['note'], ['decision'], ['log'], ['merge-ready']];
       for (const surface of surfaces) {
         const name = surface.join(' ');
         const result = tasks(...surface, 'j1', 'j2', 'j3', 'j4', 'j5');
@@ -300,6 +310,34 @@ describe('tasks CLI', () => {
         expect(result.status, name).toBe(1);
         expect(result.stderr, name).toContain('unexpected argument');
       }
+    });
+  });
+
+  // The flag-arity twin of the junk-argument sweep: a `[--x]` written
+  // self-closed is boolean by construction, and `spec show`'s `[--full]`
+  // was silently classified value-taking because a prose parenthetical
+  // followed it — dead as documented, a no-op as accepted.
+  it('classifies every self-closed [--flag] in every usage as boolean, whatever prose follows it', () => {
+    const usages = allUsages();
+    expect(usages.length).toBeGreaterThan(20);
+    for (const usage of usages) {
+      const arities = flagArities(usage);
+      for (const [, name] of usage.matchAll(/\[--([a-z][a-z0-9-]*)\]/g)) {
+        expect(arities.get(name), `--${name} in: ${usage.split('\n')[0]}`).toBe('boolean');
+      }
+    }
+  });
+
+  it('spec show --full prints the whole Deliverable at exit 0, as its usage documents', () => {
+    fixture(({ tasks }) => {
+      const full = tasks('spec', 'show', 'demo-spec', '--full');
+      expect(full.status).toBe(0);
+      expect(full.stderr).toBe('');
+      expect(full.stdout).toContain('Something this branch promises.');
+
+      const standings = tasks('spec', 'show', 'demo-spec');
+      expect(standings.stdout).not.toContain('Something this branch promises.');
+      expect(standings.stdout).toContain('[unknown] The first clause holds.');
     });
   });
 
@@ -317,7 +355,7 @@ describe('tasks CLI', () => {
 
   it('answers --help on every command and subcommand, and names the flags it will accept', () => {
     fixture(({ tasks }) => {
-      const commands = [['doctor'], ['add'], ['edit'], ['show'], ['list'], ['search'], ['next'], ['start'], ['stop'], ['done'], ['decline'], ['import'], ['triage'], ['audit'], ['audit-prompt'], ['handoff'], ['check-commit-msg'], ['plan'], ['spec'], ['spec', 'new'], ['spec', 'add'], ['spec', 'remove'], ['spec', 'show'], ['spec', 'done'], ['note'], ['decision'], ['log']];
+      const commands = [['doctor'], ['add'], ['edit'], ['show'], ['list'], ['search'], ['next'], ['start'], ['stop'], ['done'], ['decline'], ['promote'], ['import'], ['triage'], ['audit'], ['audit-prompt'], ['handoff'], ['check-commit-msg'], ['plan'], ['spec'], ['spec', 'new'], ['spec', 'add'], ['spec', 'remove'], ['spec', 'show'], ['spec', 'done'], ['note'], ['decision'], ['log'], ['merge-ready']];
       for (const command of commands) {
         const result = tasks(...command, '--help');
         expect(result.status, command.join(' ')).toBe(0);
@@ -449,27 +487,58 @@ describe('tasks CLI', () => {
     });
   });
 
-  it('edit refuses an unknown id, naming the nearest ids it could have meant', () => {
+  it('edit resolves a unique prefix, names the resolution, and refuses an ambiguous or unknown fragment', () => {
     fixture(({ tasks }) => {
       tasks('add', 'check the merge shell', '--id', 'pass1-check-merge-shell');
-      const result = tasks('edit', 'pass1-check-merge', '--deliverable', 'x');
-      expect(result.status).toBe(1);
-      expect(result.stderr).toContain('no such task: pass1-check-merge');
-      expect(result.stderr).toContain('did you mean:');
-      expect(result.stderr).toContain('pass1-check-merge-shell');
+      tasks('add', 'check the merge gate', '--id', 'pass1-check-merge-gate');
+
+      // Unique fragment: resolves, says so, and the edit lands.
+      const resolvedEdit = tasks('edit', 'pass1-check-merge-shell', '--deliverable', 'x');
+      expect(resolvedEdit.status).toBe(0);
+      const prefix = tasks('edit', 'pass1-check-merge-g', '--deliverable', 'y');
+      expect(prefix.status).toBe(0);
+      expect(prefix.stdout).toContain('resolved pass1-check-merge-g -> pass1-check-merge-gate');
+      expect(tasks('show', 'pass1-check-merge-gate').stdout).toContain('deliverable: y');
+
+      // Ambiguous: refused with the candidates, nothing edited.
+      const ambiguous = tasks('edit', 'pass1-check-merge', '--deliverable', 'z');
+      expect(ambiguous.status).toBe(1);
+      expect(ambiguous.stderr).toContain('matches 2 ids');
+      expect(ambiguous.stderr).toContain('pass1-check-merge-shell');
+      expect(ambiguous.stderr).toContain('pass1-check-merge-gate');
+
+      // Unknown: refused with the near matches.
+      const unknown = tasks('edit', 'zzz-nothing', '--deliverable', 'z');
+      expect(unknown.status).toBe(1);
+      expect(unknown.stderr).toContain('no such task: zzz-nothing');
     });
   });
 
-  it('show answers an unknown id with near matches and a zero exit, rather than refusing a read', () => {
+  // uniqueId manufactures strict prefix pairs (`foo`, `foo-2`) on slug
+  // collision, so the exact-wins rule is load-bearing by construction.
+  it('an exact id wins outright over the prefix pair uniqueId itself manufactures', () => {
+    fixture(({ tasks }) => {
+      tasks('add', 'first foo', '--id', 'foo');
+      tasks('add', 'second foo', '--id', 'foo-2');
+      const shown = tasks('show', 'foo');
+      expect(shown.status).toBe(0);
+      expect(shown.stdout).toContain('first foo');
+      expect(shown.stdout).not.toContain('second foo');
+      expect(shown.stdout).not.toContain('resolved');
+    });
+  });
+
+  it('show resolves a unique fragment to the record, and answers a truly unknown id at exit zero', () => {
     fixture(({ tasks }) => {
       tasks('add', 'check the merge shell', '--id', 'pass1-check-merge-shell');
       tasks('add', 'something else entirely', '--id', 'unrelated-record');
 
+      // The exact friction case: a truncated paste of a long id now resolves.
       const guessed = tasks('show', 'pass1-check-merge-shel');
       expect(guessed.status).toBe(0);
       expect(guessed.stderr).toBe('');
-      expect(guessed.stdout).toContain('no such task: pass1-check-merge-shel');
-      expect(guessed.stdout).toContain('pass1-check-merge-shell');
+      expect(guessed.stdout).toContain('resolved pass1-check-merge-shel -> pass1-check-merge-shell');
+      expect(guessed.stdout).toContain('check the merge shell');
       expect(guessed.stdout).not.toContain('unrelated-record');
     });
   });
@@ -1300,12 +1369,31 @@ describe('tasks CLI', () => {
     });
   });
 
-  it('state-changing default-store writes warn when task state is only in the working tree', () => {
-    defaultStoreGitFixture(({ tasks }) => {
-      const result = tasks('add', 'Dirty tracked task', '--id', 'dirty-tracked');
-      expect(result.status).toBe(0);
-      expect(result.stdout).toContain('added dirty-tracked [task/open]');
-      expect(result.stderr).toContain('warning: docs/tasks.jsonl has uncommitted task-state changes');
+  // The uncommitted-store warning fires for state an *earlier* session left
+  // behind, never for the session's own writes: measured six-for-six and
+  // eight-for-eight across two recorded sessions, a warning on every write
+  // is a warning nobody reads. Freshness is the store's pre-write mtime.
+  it('default-store writes stay silent about their own dirtiness, and warn once over stale uncommitted state', () => {
+    defaultStoreGitFixture(({ dir, tasks }) => {
+      // A write that itself dirties a clean store is the session acting on
+      // purpose — no warning.
+      const own = tasks('add', 'Dirty tracked task', '--id', 'dirty-tracked');
+      expect(own.status).toBe(0);
+      expect(own.stderr).not.toContain('uncommitted task-state changes');
+
+      // A second write while the dirtiness is fresh is the same session
+      // still working — still no warning.
+      const fresh = tasks('add', 'Second task', '--id', 'second-task');
+      expect(fresh.stderr).not.toContain('uncommitted task-state changes');
+
+      // Backdate the store: now the uncommitted state predates the writing
+      // session, which is exactly the walked-away shape the warning is for.
+      const store = path.join(dir, 'docs', 'tasks.jsonl');
+      const old = new Date(Date.now() - 40 * 60 * 1000);
+      utimesSync(store, old, old);
+      const stale = tasks('add', 'Third task', '--id', 'third-task');
+      expect(stale.status).toBe(0);
+      expect(stale.stderr).toContain('warning: docs/tasks.jsonl has uncommitted task-state changes from an earlier session');
     });
   });
 
@@ -1321,11 +1409,14 @@ describe('tasks CLI', () => {
     });
   });
 
-  // The failure this branch exists to prevent: a `done` mark that only ever
-  // existed in the working tree is invisible to `git show HEAD:...`, so a
-  // `closedCommit` field (which lives in the same file) can never detect it.
-  // Only comparing the committed store against the working tree can.
-  it('doctor reports a working-tree-only done mark as an error naming the task and its committed state', () => {
+  // A `done` mark that only ever existed in the working tree is invisible
+  // to `git show HEAD:...`, so a `closedCommit` field (which lives in the
+  // same file) can never detect it. Only comparing the committed store
+  // against the working tree can. It reports at [warning]: between `tasks
+  // done` and the commit that carries the store change this is the
+  // documented order of work, and an error that fires on the correct
+  // workflow trains readers to skip errors.
+  it('doctor reports a working-tree-only done mark as a warning naming the task, its committed state, and the risk', () => {
     defaultStoreGitFixture(({ dir, tasks }) => {
       tasks('add', 'closable task', '--id', 'closable');
       spawnSync('git', ['add', '.'], { cwd: dir });
@@ -1334,11 +1425,11 @@ describe('tasks CLI', () => {
       tasks('done', 'closable');
       const result = tasks('doctor');
       expect(result.status).toBe(0);
-      expect(result.stdout).toContain('[error] closable is done only in the working tree (committed state: open)');
+      expect(result.stdout).toContain('[warning] closable is done only in the working tree (committed state: open) — commit the store change');
     });
   });
 
-  it('doctor reports a working-tree-only declined mark as an error', () => {
+  it('doctor reports a working-tree-only declined mark as a warning', () => {
     defaultStoreGitFixture(({ dir, tasks }) => {
       tasks('add', 'stale finding', '--id', 'stale', '--kind', 'finding', '--deliverable', 'fix it');
       spawnSync('git', ['add', '.'], { cwd: dir });
@@ -1347,7 +1438,77 @@ describe('tasks CLI', () => {
       tasks('decline', 'stale', '--reason', 'already fixed elsewhere');
       const result = tasks('doctor');
       expect(result.status).toBe(0);
-      expect(result.stdout).toContain('[error] stale is declined only in the working tree (committed state: unreviewed)');
+      expect(result.stdout).toContain('[warning] stale is declined only in the working tree (committed state: unreviewed) — commit the store change');
+    });
+  });
+
+  // The once-per-process half of c3, which no spawn-per-call fixture can
+  // observe: the second write is made stale again by hand, so only the
+  // module-level flag can explain its silence.
+  it('the dirty-store warning prints at most once per process, even across two stale writes', () => {
+    const dir = mkdtempSync(path.join(os.tmpdir(), 'universalis-warn-once-'));
+    const cwd = process.cwd();
+    try {
+      spawnSync('git', ['init', '-q'], { cwd: dir });
+      spawnSync('git', ['config', 'user.email', 'test@example.com'], { cwd: dir });
+      spawnSync('git', ['config', 'user.name', 'Test'], { cwd: dir });
+      mkdirSync(path.join(dir, 'docs'), { recursive: true });
+      const store = path.join(dir, 'docs', 'tasks.jsonl');
+      const record = (id: string): string =>
+        `${JSON.stringify({ id, title: id, kind: 'task', state: 'open', severity: null, system: null, spec: null, clause: null, requires: [], files: [], deliverable: null, evidence: null, source: null, reason: null, closed: null, closedCommit: null, claimed: null, claimedBy: null })}\n`;
+      writeFileSync(store, record('committed-task'), 'utf8');
+      spawnSync('git', ['add', '.'], { cwd: dir });
+      spawnSync('git', ['commit', '--no-verify', '-m', 'store baseline'], { cwd: dir, encoding: 'utf8' });
+      writeFileSync(store, record('committed-task') + record('left-behind'), 'utf8');
+      const old = new Date(Date.now() - 40 * 60 * 1000);
+      utimesSync(store, old, old);
+
+      process.chdir(dir);
+      const first = runInProcess(['add', 'warn one', '--id', 'warn-one']);
+      expect(first.stderr).toContain('uncommitted task-state changes from an earlier session');
+
+      // Stale again by hand: without the process-level flag this second
+      // write would warn identically.
+      utimesSync(store, old, old);
+      const second = runInProcess(['add', 'warn two', '--id', 'warn-two']);
+      expect(second.status).toBe(0);
+      expect(second.stderr).not.toContain('uncommitted task-state changes');
+    } finally {
+      process.chdir(cwd);
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  // Mid-merge, HEAD is still the pre-merge commit, so both git-anchored
+  // checks answer about a tree that does not exist yet — the exact state in
+  // which a hand-resolved store most needs the store-only checks readable.
+  it('doctor suspends the git-anchored checks during an unresolved merge, and the store-only checks still run', () => {
+    defaultStoreGitFixture(({ dir, tasks }) => {
+      // A working-tree-only close, which doctor would otherwise warn about.
+      tasks('add', 'closable task', '--id', 'closable', '--requires', 'ghost-requirement');
+      spawnSync('git', ['add', '.'], { cwd: dir });
+      spawnSync('git', ['commit', '--no-verify', '-m', 'add closable'], { cwd: dir, encoding: 'utf8' });
+      tasks('done', 'closable');
+
+      // A conflicted merge in an unrelated file leaves MERGE_HEAD behind.
+      writeFileSync(path.join(dir, 'conflict.txt'), 'base\n', 'utf8');
+      spawnSync('git', ['add', '.'], { cwd: dir });
+      spawnSync('git', ['commit', '--no-verify', '-m', 'base'], { cwd: dir, encoding: 'utf8' });
+      spawnSync('git', ['checkout', '-q', '-b', 'side'], { cwd: dir });
+      writeFileSync(path.join(dir, 'conflict.txt'), 'side\n', 'utf8');
+      spawnSync('git', ['commit', '--no-verify', '-am', 'side edit'], { cwd: dir, encoding: 'utf8' });
+      spawnSync('git', ['checkout', '-q', '-'], { cwd: dir });
+      writeFileSync(path.join(dir, 'conflict.txt'), 'ours\n', 'utf8');
+      spawnSync('git', ['commit', '--no-verify', '-am', 'our edit'], { cwd: dir, encoding: 'utf8' });
+      spawnSync('git', ['merge', 'side'], { cwd: dir, encoding: 'utf8' });
+
+      const result = tasks('doctor');
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('a merge is in progress (MERGE_HEAD exists)');
+      expect(result.stdout).not.toContain('only in the working tree');
+      // The store-only checks are the ones worth reading mid-merge, and the
+      // unresolved requirement proves they still ran.
+      expect(result.stdout).toContain('closable requires unresolved id: ghost-requirement');
     });
   });
 
@@ -1607,6 +1768,95 @@ describe('tasks CLI', () => {
       const result = triage('q\n');
       expect(result.stdout).toContain('2 unreviewed finding(s) left');
       expect(tasks('show', 'first').stdout).toContain('unreviewed');
+    });
+  });
+
+  it('triage [a] records a question on the finding and leaves it unreviewed', () => {
+    fixture(({ tasks, triage }) => {
+      tasks('add', 'needs context', '--id', 'needs-context', '--kind', 'finding', '--severity', 'high', '--evidence', 'the original evidence', '--deliverable', 'fix it');
+      const result = triage('a\nwhich universe was this measured against?\n');
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('it stays unreviewed until the question is answered');
+      expect(result.stdout).toContain('1 unreviewed finding(s) left');
+      const shown = tasks('show', 'needs-context').stdout;
+      expect(shown).toContain('the original evidence');
+      expect(shown).toContain('triage asked');
+      expect(shown).toContain('which universe was this measured against?');
+    });
+  });
+
+  it('triage [a] with an empty question asks nothing and re-offers the same finding', () => {
+    fixture(({ tasks, triage }) => {
+      tasks('add', 'needs context', '--id', 'needs-context', '--kind', 'finding', '--severity', 'high', '--evidence', 'original', '--deliverable', 'fix it');
+      const result = triage('a\n\ns\n');
+      expect(result.stdout).toContain('empty — nothing asked');
+      expect(tasks('show', 'needs-context').stdout).not.toContain('triage asked');
+    });
+  });
+
+  it('promote moves several findings into the spec in one call, and refuses a closed record', () => {
+    fixture(({ tasks }) => {
+      tasks('add', 'first finding', '--id', 'first-finding', '--kind', 'finding', '--severity', 'high', '--deliverable', 'fix it');
+      tasks('add', 'second finding', '--id', 'second-finding', '--kind', 'finding', '--severity', 'high', '--deliverable', 'fix it');
+      const result = tasks('promote', 'first-finding', 'second-finding');
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('promoted first-finding into demo-spec');
+      expect(result.stdout).toContain('promoted second-finding into demo-spec');
+      expect(tasks('show', 'first-finding').stdout).toContain('[finding/open/high]');
+      expect(tasks('show', 'first-finding').stdout).toContain('spec: demo-spec');
+
+      tasks('decline', 'first-finding', '--reason', 'not worth it');
+      const closed = tasks('promote', 'first-finding');
+      expect(closed.status).toBe(1);
+      expect(closed.stderr).toContain('it does not reopen closed ones');
+
+      // A mixed batch is all-or-nothing, and nothing is announced that was
+      // not written: the valid record stays where it was and no success
+      // line precedes the refusal.
+      tasks('add', 'third finding', '--id', 'third-finding', '--kind', 'finding', '--severity', 'low', '--deliverable', 'fix it');
+      const mixed = tasks('promote', 'third-finding', 'first-finding');
+      expect(mixed.status).toBe(1);
+      expect(mixed.stdout).not.toContain('promoted third-finding');
+      expect(mixed.stderr).toContain('Nothing was promoted');
+      expect(tasks('show', 'third-finding').stdout).toContain('[finding/unreviewed/low]');
+    });
+  });
+
+  it('done closes several ids in one call, and one unknown id refuses the batch before anything is written', () => {
+    fixture(({ tasks }) => {
+      tasks('add', 'first task', '--id', 'first-task');
+      tasks('add', 'second task', '--id', 'second-task');
+
+      const refused = tasks('done', 'first-task', 'zzz-no-such-task');
+      expect(refused.status).toBe(1);
+      expect(tasks('show', 'first-task').stdout).toContain('[task/open]');
+
+      const closed = tasks('done', 'first-task', 'second-task');
+      expect(closed.status).toBe(0);
+      expect(closed.stdout).toContain('done first-task');
+      expect(closed.stdout).toContain('done second-task');
+      expect(tasks('show', 'first-task').stdout).toContain('[task/done]');
+      expect(tasks('show', 'second-task').stdout).toContain('[task/done]');
+    });
+  });
+
+  it('decline closes several ids under one shared reason', () => {
+    fixture(({ tasks }) => {
+      tasks('add', 'first task', '--id', 'first-task');
+      tasks('add', 'second task', '--id', 'second-task');
+      const result = tasks('decline', 'first-task', 'second-task', '--reason', 'superseded by the rework');
+      expect(result.status).toBe(0);
+      expect(tasks('show', 'first-task').stdout).toContain('reason: superseded by the rework');
+      expect(tasks('show', 'second-task').stdout).toContain('reason: superseded by the rework');
+    });
+  });
+
+  it('a bare -- ends flag parsing, so a decision may start with a dash', () => {
+    fixture(({ tasks }) => {
+      const result = tasks('decision', '--', '--each added mid-branch: the survey shape won');
+      expect(result.status).toBe(0);
+      const log = tasks('log', '--op', 'decision');
+      expect(log.stdout).toContain('--each added mid-branch: the survey shape won');
     });
   });
 
@@ -1989,10 +2239,77 @@ describe('tasks CLI', () => {
     fixture(({ tasks, dir }) => {
       const specPath = path.join(dir, 'specs', 'demo-spec.md');
       writeFileSync(specPath, '# Demo spec\n\n## Deliverable\n\nSomething this branch promises.\n', 'utf8');
-      const result = tasks('audit', 'demo-spec', '--finding', 'something is broken', '--severity', 'low', '--system', 'Runtime', '--deliverable', 'fix it', '--evidence', 'observed live');
+      const result = tasks('audit', 'demo-spec');
       expect(result.status).toBe(0);
       expect(result.stderr).toContain('has no Proof: clauses');
       expect(readFileSync(specPath, 'utf8')).toContain('### Pass 1');
+
+      // A --proof against a clauseless spec is a typo by definition, and
+      // the zero-clause escape hatch above does not excuse it.
+      const typo = tasks('audit', 'demo-spec', '--proof', '1=met', '--evidence', '1=checked');
+      expect(typo.status).toBe(1);
+      expect(typo.stderr).toContain('its clauses are (none)');
+    });
+  });
+
+  // The verdict-wiping trap, closed: filing findings used to append a pass
+  // that graded nothing, and the standing reads from the latest pass only —
+  // so recorded verdicts were reset to unknown by the act of filing, twice,
+  // on the branch that recorded the friction.
+  it('audit with findings and no proofs files the findings without appending a pass, so verdicts stand', () => {
+    fixture(({ tasks, dir }) => {
+      const specPath = path.join(dir, 'specs', 'demo-spec.md');
+      tasks('audit', 'demo-spec', '--proof', '1=met', '--evidence', '1=clause 1 checked', '--proof', '2=met', '--evidence', '2=clause 2 checked');
+      const before = readFileSync(specPath, 'utf8');
+
+      const result = tasks('audit', 'demo-spec', '--finding', 'a late finding', '--severity', 'low', '--system', 'Runtime', '--deliverable', 'fix it', '--evidence', 'observed live');
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('no pass appended, so recorded clause verdicts stand');
+      expect(readFileSync(specPath, 'utf8')).toBe(before);
+      expect(readFileSync(specPath, 'utf8')).not.toContain('### Pass 2');
+
+      const standing = tasks('spec', 'show', 'demo-spec');
+      expect(standing.stdout).toContain('clause standing (latest pass 1): no clause outstanding');
+
+      const filed = tasks('list', '--state', 'unreviewed');
+      expect(filed.stdout).toContain('a late finding');
+    });
+  });
+
+  // The two remaining doors into the verdict-wiping trap, closed: a typo'd
+  // clause number and an abandoned interactive walk each used to record a
+  // full all-unknown pass, and the standing reads from the latest pass only.
+  it('audit refuses a --proof naming no clause, so a typo cannot record an all-unknown pass', () => {
+    fixture(({ tasks, dir }) => {
+      const specPath = path.join(dir, 'specs', 'demo-spec.md');
+      tasks('audit', 'demo-spec', '--proof', '1=met', '--evidence', '1=clause 1 checked', '--proof', '2=met', '--evidence', '2=clause 2 checked');
+      const before = readFileSync(specPath, 'utf8');
+
+      const typo = tasks('audit', 'demo-spec', '--proof', '99=met', '--evidence', '99=x');
+      expect(typo.status).toBe(1);
+      expect(typo.stderr).toContain('names no clause in demo-spec: c99');
+      expect(typo.stderr).toContain('its clauses are c1, c2');
+
+      const nan = tasks('audit', 'demo-spec', '--proof', 'c1=met', '--evidence', '1=x');
+      expect(nan.status).toBe(1);
+      expect(nan.stderr).toContain('(not a number)');
+
+      expect(readFileSync(specPath, 'utf8')).toBe(before);
+      expect(tasks('spec', 'show', 'demo-spec').stdout).toContain('clause standing (latest pass 1): no clause outstanding');
+    });
+  });
+
+  it('audit on exhausted stdin refuses to record a pass that graded nothing', () => {
+    fixture(({ tasks, dir }) => {
+      const specPath = path.join(dir, 'specs', 'demo-spec.md');
+      tasks('audit', 'demo-spec', '--proof', '1=met', '--evidence', '1=clause 1 checked', '--proof', '2=met', '--evidence', '2=clause 2 checked');
+      const before = readFileSync(specPath, 'utf8');
+
+      const abandoned = tasks('audit', 'demo-spec');
+      expect(abandoned.status).toBe(1);
+      expect(abandoned.stderr).toContain('graded no clause');
+      expect(readFileSync(specPath, 'utf8')).toBe(before);
+      expect(tasks('spec', 'show', 'demo-spec').stdout).toContain('clause standing (latest pass 1): no clause outstanding');
     });
   });
 
@@ -2239,25 +2556,33 @@ describe('tasks CLI', () => {
       expect(result.status).toBe(0);
       expect(result.stdout).toContain('You are auditing demo-spec on branch demo-spec.');
 
-      expect(result.stdout).toContain('Required commands (all must pass):');
-      expect(result.stdout).toContain('- npm test');
-      expect(result.stdout).toContain('- npx tsc --noEmit');
-      expect(result.stdout).toContain('- npm run layer-check');
-      expect(result.stdout).toContain('- npm run tasks -- doctor');
-      expect(result.stdout).not.toContain('--merge');
+      expect(result.stdout).toContain('Required commands (all must pass; `npm run tasks -- merge-ready` runs them together):');
+      expect(result.stdout).toContain('- npm run tasks -- merge-ready');
+
+      // The checklist and the regression question live in the generated
+      // prompt, not in CLAUDE.md — a hand-copied brief is what trained
+      // agents to fabricate their own.
+      expect(result.stdout).toContain('Is anything worse than before this branch?');
+      expect(result.stdout).toContain('scope drift;');
+      expect(result.stdout).toContain('tests that repeat the implementation\'s assumptions;');
+      expect(result.stdout).toContain('comments that restate self-documenting code;');
+      expect(result.stdout).toContain('Deliver your results into the store');
+      expect(result.stdout).toContain('files the findings without recording a pass');
 
       // Under the header, not merely somewhere in the output: this path
       // also prints under `Member tasks:`, so a `toContain` on the path
       // alone passed with the whole relevant-files computation replaced by
-      // an empty list.
-      expect(relevantFilesBlock(result.stdout)).toContain('- src/runtime/runtime.ts:1\n');
+      // an empty list. The `:1` locator is stripped — the list is of
+      // openable paths, not evidence references.
+      expect(relevantFilesBlock(result.stdout)).toContain('- src/runtime/runtime.ts\n');
+      expect(relevantFilesBlock(result.stdout)).not.toContain('- src/runtime/runtime.ts:1\n');
 
       expect(result.stdout).toContain('Proof clauses:');
       expect(result.stdout).toContain('[c1] The first clause holds.');
       expect(result.stdout).toContain('proof: command node --version');
-      // Clause 1 carries a proof target — mechanically checkable, so it
-      // gets the pure-logic/API mutation-testing line.
-      expect(result.stdout).toContain('pure logic/API');
+      // Clause 1 carries a proof target — the guidance names both shapes
+      // rather than presuming the logic one.
+      expect(result.stdout).toContain('if it names pure logic or an API');
       // Clause 2 carries none — Slice 3's human-verification callout, and
       // Slice 6's guidance that actually distinguishes the UI case from
       // the logic case rather than repeating one blanket sentence.
@@ -2269,7 +2594,7 @@ describe('tasks CLI', () => {
       expect(result.stdout).toContain('Latest audit pass: pass 1');
       expect(result.stdout).toContain('- runtime-proof  [task/open/high]  Runtime  prove the runtime behavior');
       expect(result.stdout).toContain('src/runtime/runtime.ts:1');
-      expect(result.stdout).toContain('prefer mutation testing');
+      expect(result.stdout).toContain('npm run mutate');
       // The prompt must not instruct an auditor in a rule the tool does not
       // have. Promotion at pass 2+ was removed from the tool; the prompt
       // asked for it anyway, on every invocation, for every future auditor.
@@ -2391,9 +2716,32 @@ describe('tasks CLI', () => {
       expect(undelivered.stdout).toContain('spec: demo-spec');
       expect(undelivered.stdout).toContain('files: src/runtime/save.ts:88');
 
+      // Not a member — but no longer invisible either: the finding this
+      // spec's audit filed is listed in its own awaiting-triage section.
       const finding = tasks('spec', 'show', 'demo-spec');
-      expect(finding.stdout).not.toContain('a fresh bug'); // findings are not spec members until promoted
+      expect(finding.stdout).toContain('1 member(s):');
+      expect(finding.stdout).not.toContain('2 member(s)');
+      expect(finding.stdout).toContain("unreviewed finding(s) filed by this spec's audits, awaiting triage (not members):");
+      expect(finding.stdout).toContain('a fresh bug');
+
+      const listed = tasks('list', '--spec', 'demo-spec');
+      expect(listed.stdout).toContain('a fresh bug');
+      expect(listed.stdout).toContain("(filed by this spec's audit — awaiting triage)");
+
+      // next reports the count but never offers a finding as work.
+      const next = tasks('next', '--spec', 'demo-spec');
+      expect(next.stdout).toContain("1 unreviewed finding(s) filed by demo-spec's audits await triage");
+      expect(next.stdout).not.toContain('a fresh bug');
     });
+  });
+
+  // The CLI's generic parser already refuses a flag the usage never names,
+  // so this defends the exported scanner itself: called directly, it used
+  // to record any unknown flag's value as a file with no error.
+  it('parseAuditArgs refuses an unknown flag after a --finding by name, instead of recording its value as a file', () => {
+    const parsed = parseAuditArgs(['demo-spec', '--finding', 'a finding', '--severity', 'low', '--note', 'stray']);
+    expect(parsed.errors).toEqual(['unknown flag --note after --finding "a finding" — a finding takes --severity, --system, --deliverable, --evidence and --file']);
+    expect(parsed.findings[0].files).toEqual([]);
   });
 
   it('--file on a proof clause carries multiple paths onto its undelivered task, and stays separate from a finding\'s own --file', () => {
@@ -2932,10 +3280,12 @@ describe('the event log', () => {
       tasks('doctor', '--fix', '--actor', 'w');
 
       // Every op the store can be written by. `start`/`stop`/`done`/`spec-add`
-      // are covered by the test below; these five are the ones two audits
-      // proved nothing was holding.
+      // are covered by the test below; the first five are the ones two audits
+      // proved nothing was holding. `spec-done` is the one event with no
+      // store write behind it — the close is derived from member states, and
+      // recording it is the whole point.
       const ops = new Set(readEvents(dir).map((event) => event.op));
-      for (const op of ['import', 'triage', 'decline', 'spec-defer', 'add', 'edit']) {
+      for (const op of ['import', 'triage', 'decline', 'spec-defer', 'spec-done', 'add', 'edit']) {
         expect(ops, `no event recorded for ${op}`).toContain(op);
       }
     });
@@ -3361,6 +3711,21 @@ describe('tasks concept', () => {
       expect(tasks('produces', 'saves').stdout).toContain('owned by Runtime');
     }));
 
+  it('refuses an empty --paths, since a concept nothing resolves to answers every lookup wrongly', () =>
+    fixture(({ tasks }) => {
+      const empty = tasks('concept', 'Runtime', 'saves', '--paths', '');
+      expect(empty.status).toBe(1);
+      expect(empty.stderr).toContain('usage: tasks concept');
+      expect(tasks('produces', 'saves').stdout).toContain('nothing produces');
+    }));
+
+  it('refuses a missing concept name with usage, not a raw TypeError', () =>
+    fixture(({ tasks }) => {
+      const missing = tasks('concept', 'Runtime', '--paths', 'src/runtime/save.ts');
+      expect(missing.status).toBe(1);
+      expect(missing.stderr).toContain('usage: tasks concept');
+    }));
+
   it('refuses a name another system already registers', () =>
     fixture(({ tasks }) => {
       tasks('concept', 'Runtime', 'saves', '--paths', 'src/runtime/save.ts');
@@ -3510,4 +3875,16 @@ describe('the architecture queries, against a tracked file deleted from the work
 
       expect(tasks('system').status).toBe(0);
     }));
+});
+
+// The tsx-before-npx launcher choice was verified by hand and rested on
+// nothing executable — a future hook edit would not have reddened anything.
+describe('the commit-msg hook launcher', () => {
+  it('prefers the repo-local tsx, keeping npx only as the fallback for an uninstalled checkout', () => {
+    const hook = readFileSync(path.join(repoRoot, '.claude', 'hooks', 'commit-msg'), 'utf8');
+    const local = hook.indexOf('node node_modules/tsx/dist/cli.mjs scripts/tasks.ts check-commit-msg');
+    const fallback = hook.indexOf('npx tsx scripts/tasks.ts check-commit-msg');
+    expect(local).toBeGreaterThan(-1);
+    expect(fallback).toBeGreaterThan(local);
+  });
 });

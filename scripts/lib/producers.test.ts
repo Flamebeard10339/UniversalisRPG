@@ -100,6 +100,17 @@ describe('findProducers', () => {
     expect(found[0]).toMatchObject({ strength: 'contains', producer: { name: 'droptable system' } });
   });
 
+  // Both strengths present in one answer, so a reversed rank cannot pass:
+  // the exact hit must come before the word hit, whatever the index order.
+  it('orders across strengths when one query matches at several', () => {
+    const mixed = producerIndex(manifest, [task('stacker', ['buff stacking'])]);
+    const found = findProducers('buff stacking', mixed);
+    expect(found.map((match) => [match.strength, match.producer.name])).toEqual([
+      ['exact', 'buff stacking'],
+      ['word', 'buff engine'],
+    ]);
+  });
+
   it('answers with nothing for a capability nobody claims', () => {
     expect(findProducers('quest journal', index)).toEqual([]);
   });

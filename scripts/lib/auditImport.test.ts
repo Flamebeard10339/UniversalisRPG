@@ -63,6 +63,21 @@ tail content
     expect(parseAuditDoc(doc)).toEqual([]);
   });
 
+  // The shape multi-auditor passes use to keep two finding lists apart in
+  // one document; the prefix stays in the code so ids cannot collide.
+  it('parses a prefixed heading, keeping the prefix in the code', () => {
+    const doc = '## RG-H1 — a regression finding\nbody one\n\n## CL-M6 — a clause finding\nbody two\n';
+    expect(parseAuditDoc(doc).map((finding) => [finding.code, finding.severity, finding.title])).toEqual([
+      ['RG-H1', 'high', 'a regression finding'],
+      ['CL-M6', 'medium', 'a clause finding'],
+    ]);
+  });
+
+  it('parses a CRLF document the same as an LF one', () => {
+    const doc = '## H1 — carriage returned\r\nbody\r\n';
+    expect(parseAuditDoc(doc)).toEqual([{ code: 'H1', severity: 'high', title: 'carriage returned', body: 'body' }]);
+  });
+
   it('parses every heading in the real runtime audit doc with the documented 17/50/58 H/M/L split repo-wide', () => {
     const text = readFileSync('docs/audits/runtime-2026-07-30.md', 'utf8');
     const findings = parseAuditDoc(text);
@@ -114,7 +129,7 @@ describe('the real docs/audits/ corpus', () => {
       if (findings.length > 0 && systemForDoc(basename) === null) unmapped.push(basename);
       for (const finding of findings) {
         counts[finding.severity]++;
-        if (!/^[HML]\d+$/.test(finding.code) || finding.title.trim() === '') malformed.push(`${basename} ${finding.code}`);
+        if (!/^(?:[A-Z]{1,4}-)?[HML]\d+$/.test(finding.code) || finding.title.trim() === '') malformed.push(`${basename} ${finding.code}`);
       }
     }
     expect(unmapped).toEqual([]);
@@ -137,6 +152,7 @@ describe('systemForDoc', () => {
     expect(systemForDoc('dsl-modules-2026-07-29-full')).toBe('DSL load path');
     expect(systemForDoc('game-engine-2026-07-27-pass2')).toBe('Runtime');
     expect(systemForDoc('runtime-2026-07-30')).toBe('Runtime');
+    expect(systemForDoc('task-system-refactor-pass2-a')).toBe('Task system');
     expect(systemForDoc('testing-procedure-2026-07-30-pass3')).toBe('Testing procedure');
     expect(systemForDoc('user-interface-2026-07-30')).toBe('User interface');
   });

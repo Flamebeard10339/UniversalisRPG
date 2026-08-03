@@ -1,7 +1,6 @@
-import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { importedPaths } from './layers';
-import { posix } from './sourceFiles';
+import { posix, trackedFiles } from './sourceFiles';
 import { stripComments } from './stripComments';
 import { conceptsClaiming, covers, coveringSystems, ownerOf, type Concept, type Manifest, type System } from './systems';
 
@@ -31,20 +30,15 @@ const isTestFile = (path: string): boolean => TEST.test(path);
 // where something lives. A view derived from the tree describes the tree as
 // it is, so what is not there is not in it, and the read still answers.
 export function repoSourceTree(): SourceTree {
-  const files = execFileSync('git', ['ls-files'], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 })
-    .trim()
-    .split('\n')
-    .filter((file) => file !== '')
+  const files = trackedFiles()
     .map(posix)
     .filter((file) => existsSync(file));
   return { files, read: (path) => readFileSync(path, 'utf8') };
 }
 
 // An import names a module, not a file: `./save` is `save.ts`, `save.tsx` or
-// `save/index.ts` depending on what exists. Resolving it matters here in a way
-// it does not for `layer-check`, which only ever needs the leading directory —
-// a system that declares an exact file (`src/content/modportal.ts`, as the
-// Contribution system does ten times) never matches an unresolved specifier.
+// `save/index.ts` depending on what exists. Resolving it matters here because
+// a system that declares an exact file never matches an unresolved specifier.
 export function resolveImport(specifier: string, files: ReadonlySet<string>): string | null {
   for (const candidate of [specifier, `${specifier}.ts`, `${specifier}.tsx`, `${specifier}/index.ts`, `${specifier}/index.tsx`]) {
     if (files.has(candidate)) return candidate;
@@ -53,7 +47,7 @@ export function resolveImport(specifier: string, files: ReadonlySet<string>): st
 }
 
 const DECLARATION = /^\s*export\s+(?:declare\s+)?(?:default\s+)?(?:async\s+)?(?:abstract\s+)?(?:function\s*\*?|const|let|var|class|interface|type|enum)\s+([A-Za-z_$][\w$]*)/gm;
-const NAMED_LIST = /^\s*export\s*\{([^}]*)\}/gm;
+const NAMED_LIST = /^\s*export\s*(?:type\s*)?\{([^}]*)\}/gm;
 const STAR_REEXPORT = /^\s*export\s*\*\s*(?:as\s+([A-Za-z_$][\w$]*)\s*)?from/gm;
 const BARE_DEFAULT = /^\s*export\s+default\s+(?!(?:async\s+)?(?:function|class)\s+[A-Za-z_$])/m;
 
