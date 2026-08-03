@@ -18,7 +18,9 @@ Proof:
   intact, and `tasks where scripts/tasks.ts` answers `Task system`.
 - [c2] `scripts/tasks.ts` is an entry point of under 100 lines re-exporting `run`; the command
   bodies live under `scripts/tasks/` in modules cut by command family, none over 700 lines, and
-  the CLI surface is unchanged except where a clause below changes it deliberately.
+  the CLI surface is unchanged except where a clause below changes it deliberately — plus one
+  change pass 2 caught undeclared and this clause now declares: `spec show` defaults to clause
+  standings, with the whole `## Deliverable` behind a working `--full`.
 - [c3] The uncommitted-store warning fires only for uncommitted state that predates the writing
   session (pre-write store mtime older than a 30-minute margin), at most once per process; a
   session's own writes stay silent, and `tasks doctor` still reports dirtiness unconditionally.
@@ -106,3 +108,24 @@ None.
 - proof 14: met — docs/workflow.md is 107 lines against the promised under-242, opens with the 10-step command protocol, reasoning demoted below it, and documents promote, triage [a], merge-ready and first-pass HIGH promotion in step 8
 - proof 15: met — tasks list --state unreviewed answers 0; decisions on slug ids, squash-merging, first-pass HIGH policy and the declined-list re-review are all in docs/events.jsonl at 2026-08-03T16:01; tsr-backlog closed at 4aceb21
 - proof 16: met — merge-ready green: 1310 tests in 64.5s wall, tsc and layer-check pass; new tests drive commands through runInProcess (tasks.test.ts:19), spawning only the async audit/triage seams
+
+### Pass 2 — 2026-08-03
+
+- base: `354682d6628108b5fd921fb49e414e825102649d`
+- head: `55975f75e2077f9791af4d12bc9ebf8590d2f247`
+- proof 1: met — pass 2 A/B/C each verified ownership and the partition; bytes.ts joined the system at 5884716
+- proof 2: met — entry 12 lines, largest module 644; surface delta enumerated by B/C matches the declared changes, spec show --full fixed and declared at 5884716
+- proof 3: met — stale-margin mutations KILLED (pass 2A); once-per-process test added at HEAD after 2A/2C proved the guard survived deletion
+- proof 4: met — pass 2A verified both directions live; resolveTaskIds refusal mutation KILLED
+- proof 5: met — narrowed to the seven resolving verbs after pass-2 M3; exact-id-wins test added at HEAD; ambiguity-guessing mutation KILLED (2A)
+- proof 6: met — pass 2A/2C verified live across note, decision, add, edit, search, log; terminator mutation KILLED
+- proof 7: met — pass 2B verified byte-identical spec after findings-only filing; the typo'd --proof and exhausted-stdin doors closed at HEAD
+- proof 8: met — verified by all three passes across spec show, list --spec, next; import-provenance and state-filter gaps tracked as deferred pass-2 findings
+- proof 9: met — promote made all-or-nothing at 5884716 after 3/3 auditors found the premature print; triage ask mutations KILLED
+- proof 10: met — pass 2C exercised both halves live in a worktree; mergeInProgress mutation KILLED (2A)
+- proof 11: met — all six legs green in every pass-2 run; red-leg filter mutation KILLED 4 of 5
+- proof 12: met — NUL-offset and invalid-UTF-8 verified by 2A mutation, bytes.indexOf KILLED 3
+- proof 13: met — two audit rounds were commissioned as one sentence and the brief carried the whole protocol; CLAUDE.md pointer verified by 2C
+- proof 14: met — 107 lines, protocol-first; the id-resolution claim narrowed to match the tool after pass-2 M3
+- proof 15: met — the three commit-less closes stamped at 3a7432c; all 25 pass-2 findings triaged per the human dispositions; decisions in the event log
+- proof 16: met — suite green at every pass-2 measurement (1312-1330 tests, 60-100s); new tests run in-process through runInProcess
