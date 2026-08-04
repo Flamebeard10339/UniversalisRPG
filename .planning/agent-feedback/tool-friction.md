@@ -166,3 +166,28 @@ against the repo's five-minutes rule will guess wrong. Splitting the manifest by
 in one file escalate without dragging the rest, was the workaround. Worth a line in the tool's own
 usage that a survivor costs a whole-suite run, since the manifest is written before anyone knows
 which mutations will survive.
+
+## `tool-friction-backlog` auditor, pass 2, 2026-08-04
+
+### `mutate`'s narrowest scope is a file, and one file here is the whole suite
+
+Eleven mutations scoped to `scripts/tasks.test.ts` took roughly twenty minutes. `scripts/tasks.test.ts`
+alone runs in 93 seconds — the whole 59-file suite runs in 92, because it is 315 CLI tests each
+spawning a process — so "name a narrow scope" bought nothing, and every mutation paid a full-suite
+cost to be killed by one test.
+
+`Mutation.tests` takes file paths and hands them to `vitest run`. There is no way to say "this
+mutation can only be killed by these three tests", which is exactly what the manifest author knows and
+`vitest -t` already accepts. A `-t` field passed through would have turned twenty minutes into about
+one, and the verdict would be sharper: `1 failed of 315` does not say which test, so confirming *which*
+test holds a behaviour still needs a second run by hand. That second run is what this pass needed to
+establish that clause 19's five named proof targets do not hold its fix — the mutation reported KILLED,
+and only a hand-run `vitest -t` over the five named targets showed that none of them was the killer.
+
+### `npm run inspect`'s refusal of `require` is a raw ReferenceError
+
+`npm run inspect -- "require('./scripts/tasks/audit')"` answers `ReferenceError: require is not
+defined`. The usage does say to reach a module with `load`, but the failure is silent about it, and
+`require` is what a reader who has not read the usage will try first. Same shape as clause 8: the
+command knows the answer — there is exactly one way in and it is named in the usage two lines above —
+and prints the runtime's error instead of it.
