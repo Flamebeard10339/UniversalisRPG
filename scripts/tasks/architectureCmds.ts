@@ -1,12 +1,12 @@
 import { readFileSync, writeFileSync } from 'node:fs';
-import { deriveModules, fileView, repoSourceTree, systemView, type Module, type SourceTree, type SystemEdge, type SystemView } from '../lib/architecture';
+import { deriveModules, regionView, repoSourceTree, systemView, type Module, type ModuleSurface, type RegionView, type SourceTree, type SystemEdge, type SystemView } from '../lib/architecture';
 import { checkPlan } from '../lib/planCheck';
-import { findProducers, producerIndex, type Producer } from '../lib/producers';
+import { findProducers, priorArt, producerIndex, type PriorArt, type Producer } from '../lib/producers';
 import { canonicalPath, checkManifest, isUnowned, loadManifest, ManifestError, overlappingConcepts, parseManifest, type Manifest } from '../lib/systems';
 import type { Task } from '../lib/taskStore';
 import type { Flags } from './cli';
 import { readStore, recordEvents, resolveActiveSpec, resolveConfig, splitList, systemNames, type Config } from './context';
-import { printRow, reportUnknownIds } from './render';
+import { printRow, reportUnknownIds, wrapUnder } from './render';
 
 // Grading a plan needs the store; the registry only widens what it can say.
 // So an unreadable manifest costs the concept half of the answer and nothing
@@ -92,7 +92,15 @@ function architecture(config: Config): { manifest: Manifest; tree: SourceTree; m
 
 function printSystemSummary(view: SystemView): void {
   const out = view.dependsOn.map((edge) => edge.to).join(', ') || 'nothing';
-  console.log(`  ${view.system.name.padEnd(22)} ${String(view.files.length).padStart(3)} file(s), ${String(view.exportCount).padStart(3)} export(s), ${view.system.concepts.length} concept(s), depends on ${out}`);
+  console.log(`  ${view.system.name.padEnd(22)} ${String(view.files.length).padStart(3)} file(s), ${view.system.concepts.length} concept(s), depends on ${out}`);
+}
+
+// A surface is names. One line per module, the module's own path as the
+// label, and a long list continuing under itself rather than under column
+// zero, where the terminal's soft wrap would make a continuation look like
+// another module.
+function printSurface(surface: ModuleSurface[], indent: string): void {
+  for (const module of surface) for (const line of wrapUnder(module.exports.join(', '), `${indent}${module.path} — `, `${indent}  `)) console.log(line);
 }
 
 export function cmdSystem(args: Flags): void {
@@ -114,11 +122,15 @@ export function cmdSystem(args: Flags): void {
     return;
   }
 
-  console.log(`${view.system.name} — ${view.files.length} owned file(s), ${view.modules.length} module(s), ${view.exportCount} export(s) in production modules`);
+  console.log(`${view.system.name} — ${view.files.length} owned file(s), ${view.modules.length} module(s)`);
   // The manifest's note is audit standing, not architecture, and it runs to
   // paragraphs. `npm run audit-status` is where it belongs whole; repeating
   // it here would bury the answer this command was asked for.
   if (view.system.note) console.log(`\nlast audit: ${view.system.lastAudit ?? 'never swept'}${view.system.lastAuditDoc ? ` (${view.system.lastAuditDoc})` : ''} — \`npm run audit-status\` prints its standing in full`);
+
+  console.log('\nexported surface, production modules only:');
+  if (view.surface.length === 0) console.log('  nothing — no production module it owns exports a name');
+  printSurface(view.surface, '  ');
 
   console.log('\ndepends on:');
   if (view.dependsOn.length === 0) console.log('  nothing — no file it owns imports across a system boundary');
@@ -150,6 +162,37 @@ const describeEdge = (edge: SystemEdge): string => {
   return `${edge.imports.length} import(s)${only} — e.g. ${edge.imports[0].from} -> ${edge.imports[0].to}`;
 };
 
+// Ownership is single-valued per file, so more than one name here means the
+// query named a region rather than a file, and every diff under it is
+// charged to whichever system owns the file it touched.
+function ownership(manifest: Manifest, view: RegionView): string {
+  if (view.owners.length === 0) return `none — it is ${isUnowned(manifest, view.path) ? 'declared unowned' : 'owned by nobody, which `npm run audit-status` fails on'}`;
+  return view.owners.length === 1 ? view.owners[0] : `${view.owners.join(', ')} — this region spans ${view.owners.length} systems, and a diff under it is charged to each`;
+}
+
+// The one rendering of "what has already claimed these paths", so a caller
+// asking by hand and a check that fires on `--writes` cannot answer the same
+// question in two shapes.
+export function printPriorArt(art: PriorArt): void {
+  const where = art.paths.join(', ');
+  if (art.concepts.length === 0 && art.claims.length === 0) {
+    console.log(`nothing has claimed ${where}: no registered concept covers it, and no task's writes or files name it in any state.`);
+    return;
+  }
+
+  console.log(`prior art on ${where}:`);
+  for (const { system, concept, on } of art.concepts) {
+    console.log(`  [concept] ${concept.name} — registered to ${system} over ${on.join(', ')}`);
+    if (concept.note) console.log(`            ${concept.note}`);
+  }
+  for (const { task, on } of art.claims) {
+    console.log(`  [${task.state}] ${task.id} — ${task.title}`);
+    console.log(`            ${[...new Set(on.map((match) => `${match.field} ${match.declared}`))].join(', ')}`);
+    if (task.produces.length > 0) console.log(`            produces ${task.produces.join(', ')}`);
+  }
+  console.log('\nA claim in any state is prior art: a closed one is a decision already made, and an open one is a collision.');
+}
+
 export function cmdWhere(args: Flags, usage: string): void {
   const config = resolveConfig(args.flags);
   const target = args.positional[0];
@@ -158,14 +201,17 @@ export function cmdWhere(args: Flags, usage: string): void {
     process.exitCode = 1;
     return;
   }
-  const { manifest, modules } = architecture(config);
-  const view = fileView(manifest, modules, target);
+  const { manifest, tree, modules } = architecture(config);
+  const view = regionView(manifest, tree, modules, target);
 
   console.log(`${view.path}`);
-  console.log(`  system:   ${view.owner ?? `none — it is ${isUnowned(manifest, view.path) ? 'declared unowned' : 'owned by nobody, which `npm run audit-status` fails on'}`}`);
+  if (view.files.length !== 1) console.log(`  ${view.files.length} tracked file(s) under it`);
+  console.log(`  system:   ${ownership(manifest, view)}`);
   if (view.coveredBy.length > 1) console.log(`  audited by: ${view.coveredBy.join(', ')} — coverage is many-to-many, ownership is not`);
-  console.log(`  concept:  ${view.concepts.join(', ') || 'none claims it'}`);
-  if (view.exports.length > 0) console.log(`  exports:  ${view.exports.join(', ')}`);
+  if (view.surface.length > 0) {
+    console.log('  exports:');
+    printSurface(view.surface, '    ');
+  }
   if (view.importsOut.length > 0) {
     console.log('  imports across a system boundary:');
     for (const entry of view.importsOut) console.log(`    ${entry.path} (${entry.system})`);
@@ -174,6 +220,9 @@ export function cmdWhere(args: Flags, usage: string): void {
     console.log('  imported from outside its system by:');
     for (const entry of view.importedBy) console.log(`    ${entry.path} (${entry.system})`);
   }
+
+  console.log('');
+  printPriorArt(priorArt(manifest, readStore(config), [view.path]));
 }
 
 // The check a worker runs before building: is this already somebody's job?

@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { importedPaths } from './layers';
 import { posix, trackedFiles } from './sourceFiles';
 import { stripComments } from './stripComments';
-import { conceptsClaiming, covers, coveringSystems, ownerOf, type Concept, type Manifest, type System } from './systems';
+import { canonicalPath, conceptsClaiming, covers, coveringSystems, ownerOf, type Concept, type Manifest, type System } from './systems';
 
 // Everything here is computed from the tree at call time and written back
 // nowhere. A stored architecture map is a second model of the same code that
@@ -139,13 +139,26 @@ export interface ConceptView {
   files: string[];
 }
 
+export interface ModuleSurface {
+  path: string;
+  exports: string[];
+}
+
+// The names, not a total. Every caller that used to reduce this to a number
+// was discarding the one thing the caller then had to go and look up by
+// hand: what a region would make you import. Modules arrive path-sorted from
+// `deriveModules`, and one exporting nothing is not part of a surface.
+export function exportedSurface(modules: Module[]): ModuleSurface[] {
+  return modules.filter((module) => module.exports.length > 0).map((module) => ({ path: module.path, exports: module.exports }));
+}
+
 export interface SystemView {
   system: System;
   // Every tracked file the system owns, not only its source: a workflow file
   // or a fixture is membership too.
   files: string[];
   modules: Module[];
-  exportCount: number;
+  surface: ModuleSurface[];
   dependsOn: SystemEdge[];
   dependedOnBy: SystemEdge[];
   concepts: ConceptView[];
@@ -169,10 +182,10 @@ export function systemView(manifest: Manifest, tree: SourceTree, modules: Module
     files,
     modules: own,
     // A test file's exports are helpers for itself, never surface anyone
-    // else may depend on, so the count is of production modules. Every
+    // else may depend on, so a system's is of production modules. Every
     // module still carries its own exports — the policy lives here, in the
     // summary, rather than being hidden in what was collected.
-    exportCount: own.filter((module) => !module.test).reduce((total, module) => total + module.exports.length, 0),
+    surface: exportedSurface(own.filter((module) => !module.test)),
     dependsOn: edges.filter((edge) => edge.from === name),
     dependedOnBy: edges.filter((edge) => edge.to === name),
     concepts,
@@ -180,35 +193,55 @@ export function systemView(manifest: Manifest, tree: SourceTree, modules: Module
   };
 }
 
-export interface FileView {
+export interface RegionView {
   path: string;
-  owner: string | null;
+  // Every tracked file at or beneath the queried path: the file itself when
+  // the query names one, the whole region when it names a directory, and
+  // nothing when the tree does not hold it — which is the honest answer for
+  // a write grant on a file nobody has written yet.
+  files: string[];
+  // Not single-valued, because a directory can straddle two systems and
+  // naming one of them would be a wrong answer rather than a short one.
+  owners: string[];
   coveredBy: string[];
-  concepts: string[];
-  exports: string[];
-  // Only the imports that leave the owning system. Everything inside it is
-  // ordinary coupling; what crosses a boundary is the architectural fact.
+  surface: ModuleSurface[];
+  // Only the imports that leave the region's owning system. Everything
+  // inside it is ordinary coupling; what crosses a boundary is the
+  // architectural fact.
   importsOut: Array<{ path: string; system: string }>;
   importedBy: Array<{ path: string; system: string }>;
 }
 
-export function fileView(manifest: Manifest, modules: Module[], path: string): FileView {
-  const target = posix(path);
-  const owner = ownerOf(manifest, target);
-  const module = modules.find((candidate) => candidate.path === target);
+export function regionView(manifest: Manifest, tree: SourceTree, modules: Module[], path: string): RegionView {
+  const target = canonicalPath(posix(path));
+  const files = tree.files.filter((file) => covers(target, file));
+  const inRegion = new Set(files);
+  const own = modules.filter((module) => inRegion.has(module.path));
   const byPath = new Map(modules.map((candidate) => [candidate.path, candidate]));
+
+  // A path the tree does not hold is still owned: `systems.json` declares
+  // regions, not files, so ownership answers for a file that is only planned.
+  const claimants = files.length > 0 ? files : [target];
+
+  const importsOut = new Map<string, string>();
+  for (const module of own) {
+    for (const to of module.imports) {
+      const system = byPath.get(to)?.system ?? null;
+      if (inRegion.has(to) || system === null || system === module.system) continue;
+      importsOut.set(to, system);
+    }
+  }
 
   return {
     path: target,
-    owner: owner?.system.name ?? null,
-    coveredBy: coveringSystems(manifest, target),
-    concepts: owner ? conceptsClaiming(owner.system, target).map((concept) => concept.name) : [],
-    exports: module?.exports ?? [],
-    importsOut: (module?.imports ?? [])
-      .map((to) => ({ path: to, system: byPath.get(to)?.system ?? null }))
-      .filter((entry): entry is { path: string; system: string } => entry.system !== null && entry.system !== (owner?.system.name ?? null)),
+    files,
+    owners: [...new Set(claimants.map((file) => ownerOf(manifest, file)?.system.name).filter((name): name is string => name !== undefined))].sort(),
+    coveredBy: [...new Set(claimants.flatMap((file) => coveringSystems(manifest, file)))],
+    surface: exportedSurface(own),
+    importsOut: [...importsOut].map(([to, system]) => ({ path: to, system })),
     importedBy: modules
-      .filter((candidate) => candidate.imports.includes(target) && candidate.system !== null && candidate.system !== (owner?.system.name ?? null))
+      .filter((candidate) => !inRegion.has(candidate.path) && candidate.system !== null)
+      .filter((candidate) => candidate.imports.some((to) => inRegion.has(to) && byPath.get(to)?.system !== candidate.system))
       .map((candidate) => ({ path: candidate.path, system: candidate.system as string })),
   };
 }

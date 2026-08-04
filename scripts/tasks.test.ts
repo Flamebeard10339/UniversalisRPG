@@ -3773,9 +3773,20 @@ describe('tasks system', () => {
     fixture(({ tasks }) => {
       const result = tasks('system', 'Runtime');
       expect(result.status).toBe(0);
-      expect(result.stdout).toContain('export(s) in production modules');
       expect(result.stdout).toContain('depends on:');
       expect(result.stdout).toContain('no concept claims');
+    }));
+
+  // The names are already in `Module.exports` at the point a total was taken
+  // over them, and the total is what a planner then had to go and look up by
+  // hand before it could import anything.
+  it('names its exported surface instead of counting it', () =>
+    fixture(({ tasks }) => {
+      const result = tasks('system', 'Runtime');
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('exported surface, production modules only:');
+      expect(result.stdout).toMatch(/src\/runtime\/save\.ts — \w/);
+      expect(result.stdout).not.toMatch(/export\(s\)/);
     }));
 
   it('refuses a system the manifest does not declare, and says which exist', () =>
@@ -3805,6 +3816,56 @@ describe('tasks where', () => {
   it('refuses with usage when given no path', () =>
     fixture(({ tasks }) => {
       expect(tasks('where').status).toBe(1);
+    }));
+
+  // The prior art that bit was in finished work: `droptables` was done and
+  // merged when its batched-chance rule was re-derived from scratch. So a
+  // query that stops at live records answers the easy half.
+  it('names every task that has ever claimed the path, closed and declined ones included', () =>
+    fixture(({ tasks }) => {
+      tasks('add', 'the save format pass', '--id', 'saves-v2', '--writes', 'src/runtime/save.ts');
+      tasks('done', 'saves-v2');
+      tasks('add', 'a save rewrite nobody wanted', '--id', 'save-rewrite', '--writes', 'src/runtime/save.ts');
+      tasks('decline', 'save-rewrite', '--reason', 'the format is fine');
+
+      const result = tasks('where', 'src/runtime/save.ts');
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('[done] saves-v2');
+      expect(result.stdout).toContain('[declined] save-rewrite');
+    }));
+
+  it('resolves a directory grant against a path beneath it', () =>
+    fixture(({ tasks }) => {
+      tasks('add', 'the travel pass', '--id', 'travel', '--writes', 'src/runtime');
+      const result = tasks('where', 'src/runtime/save.ts');
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('[open] travel');
+      expect(result.stdout).toContain('writes src/runtime');
+    }));
+
+  it('answers with the owning system, the concepts on the path and the produces claims naming them', () =>
+    fixture(({ tasks }) => {
+      tasks('concept', 'Runtime', 'saves', '--paths', 'src/runtime/save.ts', '--note', 'from a produces claim');
+      tasks('add', 'build the save migrator', '--id', 'migrator', '--writes', 'src/runtime/save.ts', '--produces', 'save migrator');
+
+      const result = tasks('where', 'src/runtime/save.ts');
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('system:   Runtime');
+      expect(result.stdout).toContain('[concept] saves — registered to Runtime');
+      expect(result.stdout).toContain('produces save migrator');
+    }));
+
+  it('says outright that nothing has claimed a path, rather than printing an empty section', () =>
+    fixture(({ tasks }) => {
+      expect(tasks('where', 'src/runtime/save.ts').stdout).toContain('nothing has claimed src/runtime/save.ts');
+    }));
+
+  it('answers for a directory with the files under it and the whole surface they export', () =>
+    fixture(({ tasks }) => {
+      const result = tasks('where', 'src/runtime');
+      expect(result.status).toBe(0);
+      expect(result.stdout).toMatch(/\d+ tracked file\(s\) under it/);
+      expect(result.stdout).toMatch(/src\/runtime\/save\.ts — \w/);
     }));
 });
 

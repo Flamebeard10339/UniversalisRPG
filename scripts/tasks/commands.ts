@@ -61,7 +61,7 @@ const COMMANDS: Record<string, Command> = {
   },
   plan: { usage: 'usage: tasks plan [<id>...] [--spec <slug>]  (grades a dispatch set for overlap, unstated dependencies and duplicated interfaces; runs no workers and refuses nothing)', run: cmdPlan },
   system: { usage: 'usage: tasks system ["<name>"]  (with no name, every system; with one, its owned files, exported surface, dependencies in both directions and registered concepts — all derived from the tree, none of it stored)', run: cmdSystem },
-  where: { usage: 'usage: tasks where <path>  (which system owns it, which concept claims it, and what it imports across a system boundary)', run: cmdWhere },
+  where: { usage: 'usage: tasks where <path>  (a file or a directory: which system owns it, what it exports, what it imports across a system boundary, and the prior art on it — every concept registered over it and every task whose writes or files have ever claimed it, in any state)', run: cmdWhere },
   produces: { usage: 'usage: tasks produces <term>  (does anything already do this — searched over registered concepts and every `produces` claim any task ever made, closed ones included)', run: cmdProduces },
   concept: { usage: 'usage: tasks concept "<system>" "<name>" --paths a.ts,b/ [--note "where the name came from"]  (registers a capability so `tasks produces` can find it)', run: cmdConcept },
   next: { usage: 'usage: tasks next [--spec <slug>] [--system "<name>"] [--severity high|medium|low] [--full]', run: cmdNext },
