@@ -1,4 +1,4 @@
-import { allConcepts, type Manifest } from './systems';
+import { allConcepts, canonicalPath, pathsOverlap, type Concept, type Manifest } from './systems';
 import type { State, Task } from './taskStore';
 
 // "Does anything already do this?" — the question a worker is supposed to ask
@@ -85,4 +85,80 @@ export function findProducers(query: string, index: Producer[]): ProducerMatch[]
       return match === null ? [] : [{ producer, strength: match.strength, on: match.on }];
     })
     .sort((a, b) => RANK[a.strength] - RANK[b.strength] || (a.producer.kind === b.producer.kind ? 0 : a.producer.kind === 'concept' ? -1 : 1) || a.producer.name.localeCompare(b.producer.name));
+}
+
+// The same question keyed by path rather than by name. Everything above
+// depends on two people independently choosing the same words for one
+// capability, which is how `+N <stat> per <counter>` was built twice under
+// two names; a path is the same string for everyone who touches it. So this
+// is the primary index and the name match is the secondary signal.
+
+// Which field carried the claim. A `writes` grant is a forecast about a
+// region and a `files` entry is evidence about where something was observed
+// — different claims about the same path, so they are reported apart rather
+// than flattened into "mentioned".
+export type ClaimField = 'writes' | 'files';
+
+export interface PathMatch {
+  field: ClaimField;
+  // The entry as the record spells it, so a directory grant is visible as
+  // one rather than as the file it happened to reach.
+  declared: string;
+  // Which of the queried paths it reached, for a query that asked about
+  // several.
+  query: string;
+}
+
+export interface PathClaim {
+  task: Task;
+  on: PathMatch[];
+}
+
+export interface ConceptClaim {
+  system: string;
+  concept: Concept;
+  on: string[];
+}
+
+export interface PriorArt {
+  paths: string[];
+  concepts: ConceptClaim[];
+  claims: PathClaim[];
+}
+
+// `src/runtime/save.ts:88` and `docs/workflow.md#H1` are a path with a
+// location on the end: the suffix says where inside the file something was
+// seen, and is not part of what was claimed.
+const declaredPath = (entry: string): string => canonicalPath(entry.split(/[:#]/)[0]);
+
+// Live work first, because an open claim on a path is a collision and a
+// closed one is a precedent to read. Within a group, store order — which is
+// creation order for an append-only store.
+const STATE_RANK: Record<State, number> = { 'in-progress': 0, open: 1, unreviewed: 2, done: 3, declined: 4 };
+
+function pathMatches(task: Task, queries: string[]): PathMatch[] {
+  const declared: Array<[ClaimField, string]> = [...task.writes.map((entry): [ClaimField, string] => ['writes', entry]), ...task.files.map((entry): [ClaimField, string] => ['files', entry])];
+  return declared.flatMap(([field, entry]) => queries.filter((query) => pathsOverlap(declaredPath(entry), query)).map((query) => ({ field, declared: entry, query })));
+}
+
+// Everything that has ever claimed these paths: every task's `writes` and
+// `files` in every state, `done` and `declined` included — the half a
+// dispatch-set check cannot see, and the half the duplications were in —
+// beside the concepts registered over them. Containment runs both ways
+// through `pathsOverlap`, so a directory grant answers for a file beneath
+// it and a directory query answers for the files under it.
+export function priorArt(manifest: Manifest, tasks: Task[], paths: string[]): PriorArt {
+  const queries = paths.map(canonicalPath).filter((path) => path !== '');
+
+  const claims = tasks
+    .map((task, index) => ({ task, index, on: pathMatches(task, queries) }))
+    .filter((entry) => entry.on.length > 0)
+    .sort((a, b) => STATE_RANK[a.task.state] - STATE_RANK[b.task.state] || a.index - b.index)
+    .map(({ task, on }) => ({ task, on }));
+
+  const concepts = allConcepts(manifest)
+    .map(({ system, concept }) => ({ system: system.name, concept, on: queries.filter((query) => concept.paths.some((path) => pathsOverlap(path, query))) }))
+    .filter((entry) => entry.on.length > 0);
+
+  return { paths: queries, concepts, claims };
 }

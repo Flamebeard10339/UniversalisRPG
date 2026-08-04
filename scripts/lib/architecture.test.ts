@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { deriveModules, exportedNames, fileView, repoSourceTree, resolveImport, systemEdges, systemView, type SourceTree } from './architecture';
+import { deriveModules, exportedNames, regionView, repoSourceTree, resolveImport, systemEdges, systemView, type SourceTree } from './architecture';
 import type { Concept, Manifest, System } from './systems';
 
 function system(name: string, paths: string[], concepts: Concept[] = []): System {
@@ -189,8 +189,11 @@ describe('systemView', () => {
     expect(systemView(manifest, source, modules, 'Grammar')!.dependedOnBy.map((edge) => edge.from)).toEqual(['Runtime']);
   });
 
-  it('counts the exported surface of production modules only', () => {
-    expect(systemView(manifest, source, modules, 'Runtime')!.exportCount).toBe(3);
+  it('names the exported surface of production modules, rather than counting it', () => {
+    expect(systemView(manifest, source, modules, 'Runtime')!.surface).toEqual([
+      { path: 'src/runtime/save.ts', exports: ['load', 'save'] },
+      { path: 'src/runtime/travel.ts', exports: ['travel'] },
+    ]);
   });
 
   it('names the files each concept claims, and the production files no concept claims', () => {
@@ -204,7 +207,7 @@ describe('systemView', () => {
   });
 });
 
-describe('fileView', () => {
+describe('regionView', () => {
   const overlapping: Manifest = {
     unowned: { note: '', paths: ['docs'] },
     systems: [
@@ -221,31 +224,64 @@ describe('fileView', () => {
   });
   const modules = deriveModules(overlapping, source);
 
-  it('reports the single owner, the many coverers, and the claiming concept', () => {
-    const view = fileView(overlapping, modules, 'src/content/modportal.ts');
-    expect(view.owner).toBe('Contribution system');
+  it('reports the single owner and the many coverers of one file', () => {
+    const view = regionView(overlapping, source, modules, 'src/content/modportal.ts');
+    expect(view.files).toEqual(['src/content/modportal.ts']);
+    expect(view.owners).toEqual(['Contribution system']);
     expect(view.coveredBy).toEqual(['DSL load path', 'Contribution system']);
-    expect(view.concepts).toEqual(['mod portal']);
+  });
+
+  it('names what a file exports rather than counting it', () => {
+    expect(regionView(overlapping, source, modules, 'src/content/modportal.ts').surface).toEqual([{ path: 'src/content/modportal.ts', exports: ['portal'] }]);
   });
 
   it('reports only the imports that leave the owning system', () => {
-    const view = fileView(overlapping, modules, 'src/content/modportal.ts');
+    const view = regionView(overlapping, source, modules, 'src/content/modportal.ts');
     expect(view.importsOut).toEqual([{ path: 'src/grammar/parser.ts', system: 'Grammar' }]);
     expect(view.importedBy).toEqual([{ path: 'src/content/registry.ts', system: 'DSL load path' }]);
   });
 
   it('leaves a same-system import out of importsOut, since inside a system it is ordinary coupling', () => {
-    const view = fileView(overlapping, modules, 'src/content/registry.ts');
+    const view = regionView(overlapping, source, modules, 'src/content/registry.ts');
     expect(view.importsOut).toEqual([{ path: 'src/content/modportal.ts', system: 'Contribution system' }]);
   });
 
-  it('reads a windows separator as the same file', () => {
-    expect(fileView(overlapping, modules, 'src\\content\\modportal.ts').owner).toBe('Contribution system');
+  // The region a planner actually asks about: a directory, whose surface is
+  // what they would have to import and whose ownership is not single-valued.
+  it('answers for a directory with every file under it, its whole surface and every system it spans', () => {
+    const view = regionView(overlapping, source, modules, 'src/content');
+    expect(view.files).toEqual(['src/content/universe.ts', 'src/content/registry.ts', 'src/content/modportal.ts']);
+    expect(view.owners).toEqual(['Contribution system', 'DSL load path']);
+    expect(view.surface).toEqual([
+      { path: 'src/content/modportal.ts', exports: ['portal'] },
+      { path: 'src/content/universe.ts', exports: ['universe'] },
+    ]);
+  });
+
+  // Inside the region the boundary crossing is not the reader's business:
+  // they asked about the region, and `registry.ts -> modportal.ts` is a
+  // dependency it already contains.
+  it('leaves an import whose target is inside the region out of both directions', () => {
+    const view = regionView(overlapping, source, modules, 'src/content');
+    expect(view.importsOut).toEqual([{ path: 'src/grammar/parser.ts', system: 'Grammar' }]);
+    expect(view.importedBy).toEqual([]);
+  });
+
+  it('reads a windows separator and a trailing slash as the same region', () => {
+    expect(regionView(overlapping, source, modules, 'src\\content\\modportal.ts').owners).toEqual(['Contribution system']);
+    expect(regionView(overlapping, source, modules, 'src/content/').files).toHaveLength(3);
+  });
+
+  // A write grant names a file before anyone has written it, and ownership
+  // is declared over regions, so the answer is the system that will own it.
+  it('still names the owner of a path the tree does not hold', () => {
+    const view = regionView(overlapping, source, modules, 'src/content/planned.ts');
+    expect(view).toMatchObject({ files: [], owners: ['DSL load path'], surface: [], importsOut: [], importedBy: [] });
   });
 
   it('answers for a path no system owns instead of refusing', () => {
-    const view = fileView(overlapping, modules, 'docs/workflow.md');
-    expect(view).toMatchObject({ owner: null, coveredBy: [], concepts: [], exports: [], importsOut: [], importedBy: [] });
+    const view = regionView(overlapping, source, modules, 'docs/workflow.md');
+    expect(view).toMatchObject({ owners: [], coveredBy: [], surface: [], importsOut: [], importedBy: [] });
   });
 });
 

@@ -26,18 +26,29 @@ Every command is `npm run tasks -- <verb>`. The record verbs (`show`, `edit`, `s
    planner would otherwise re-litigate. A survey that finds an owner is a success: reuse it, or
    write down why a second one is right.
 3. **`tasks spec new <slug>`**, then write `docs/specs/<slug>.md` — one spec per branch, numbered
-   proof clauses under `## Deliverable`. The spec is the contract, never the test plan.
+   proof clauses under `## Deliverable`. The spec is the contract, never the test plan. `spec new`
+   prints step 2's survey rather than trusting anyone to remember it, and never writes a thing.
 4. **Decompose** into tasks whose `--writes` regions are disjoint:
    `tasks add "<title>" --writes <paths> --produces "<capability>" --requires <ids>`.
    A `--produces` here is a **forecast** of a capability, answerable to the survey in step 2; the
-   registration that makes it durable happens later, once someone has read the region.
-   `tasks system` / `tasks system "<name>"` / `tasks where <path>` answer the architecture.
+   registration that makes it durable happens later, once someone has read the region. `--discharges
+   c3,c6` records which proof clauses a slice would settle, so `tasks spec show` can name the owner
+   of every clause standing and say which clause has none. The grant
+   is a forecast too, and is recorded as one — declare the region you honestly mean, a directory
+   included, rather than inventing file paths to make step 5 quiet. Setting `--writes` prints
+   everything that has ever claimed those paths, so step 2's survey happens again whether or not
+   anyone asked for it. `tasks system` / `tasks system "<name>"` / `tasks where <path>` answer
+   the architecture.
 5. **`tasks plan`** — grades the set for overlap, unstated dependencies and duplicated
    interfaces before anyone works it. It reports and refuses nothing.
-6. **The worker proposes before it implements**: `tasks start <id> --actor <name>`, then
-   `tasks edit <id> --writes <what it will actually touch>` — the worker has just read the region
-   and the planner has not. Briefs must invite refusal, and a planner must believe it. This is
-   also the only place a durable capability gets registered:
+6. **Dispatch a worker with one instruction**: "run `npm run tasks -- work-prompt <id>` and do what
+   it says" — symmetric with the auditor's in step 8, and for the same reason: a hand-written brief
+   is a copy of the record that drifts from it, and composing one is where a planner smuggles in
+   detail nobody asked it to hold. The brief invites refusal, and a planner must believe it.
+   **The worker proposes before it implements**: `tasks start <id> --actor <name>`, then
+   `tasks edit <id> --writes <what it will actually touch> --grant commitment` — the worker has
+   just read the region and the planner has not, and `--grant commitment` is the word that turns
+   the forecast into a promise. This is also the only place a durable capability gets registered:
    `tasks concept "<system>" "<name>" --paths <paths> --note "produced by <id>"`.
 7. **Work.** `tasks next` for what to pick up; commit after each logical chunk;
    `tasks done <id>... --commit HEAD` closes against the commit (several ids in one call). If the
@@ -46,8 +57,10 @@ Every command is `npm run tasks -- <verb>`. The record verbs (`show`, `edit`, `s
 8. **Audit.** Commission an auditor with the one instruction "run
    `npm run tasks -- audit-prompt <slug>` and do what it says" — the brief is generated and
    carries the checklist, the regression question, and how to file. The auditor records verdicts
-   and findings with `tasks audit` (or archives a report under `docs/audits/` and
-   `tasks import`s it). Filing findings without `--proof` flags appends no pass, so late findings
+   and findings with `tasks audit`, whose flags also read from a file with `--args-from <file>`
+   — one flag per line, any unprefixed line continuing the value above it — because a full pass
+   carrying evidence a next pass can re-run does not fit on a command line (or archives a report
+   under `docs/audits/` and `tasks import`s it). Filing findings without `--proof` flags appends no pass, so late findings
    never reset verdicts.
 9. **Triage.** A separate step with a separate actor: the auditor files findings and never promotes
    one, and `audit-prompt` tells it so. Findings from the branch's **own first pass** skip the walk:
@@ -56,13 +69,21 @@ Every command is `npm run tasks -- <verb>`. The record verbs (`show`, `edit`, `s
    so it waits for the human: `tasks triage` walks the queue (`[1] promote [2] defer [3] decline
    [4] redirect [a] ask [s] skip [q] quit`; `[a]` records a question on the finding and leaves it
    unreviewed).
-10. **Close and merge.** `tasks spec done <slug>` when every member is done or declined.
-    `tasks merge-ready` runs the whole merge gate — tsc, tests, layer-check, audit-status, doctor,
-    byte check — one line per leg, non-zero when a leg fails.
+10. **Close and merge.** `tasks merge-ready` runs the whole merge gate — tsc, tests, layer-check,
+    audit-status, doctor, byte check — plus this branch's standing: is the tree clean, has the base
+    branch moved past the merge base, is every spec member closed, does the latest pass leave a
+    clause outstanding. One line per leg, non-zero when a leg fails, and **every failing leg names
+    the command that advances it** — an outstanding clause names `tasks next`, an unreviewed finding
+    names `tasks triage`, a moved base names the merge of it into this branch. A fully green run
+    names `tasks spec done <slug>` and then the merge, so "work until `merge-ready` is green" is an
+    instruction rather than a judgement. It stops short of merging: the merge body is the one
+    artifact whoever did the work has to write.
 11. **Record the reasoning**: `tasks note "<one line>" --id <id>` and
     `tasks decision "<one line>" --spec <slug>` as they happen; `tasks log --id <id>` /
-    `--op decision` answers later, from the log alone. A decision made in a session and not
-    recorded here is a decision the next planner will re-litigate.
+    `--op decision` answers later, from the log alone, and `tasks show <id>` prints both back
+    against the record they name. A decision made in a session and not recorded here is a
+    decision the next planner will re-litigate — which is why `done`, `decline` and `triage`
+    each print the command rather than leaving you to remember it.
 
 ## Advice that is known good
 
@@ -102,6 +123,14 @@ interface for, two claims on one interface, a claim the repository already answe
 concentrated in one path, a grant it cannot read, a wildcard it cannot resolve, and a task that
 starts blocked. Dispatching against a reported defect is a call a planner may make; making it
 unknowingly is not.
+
+**Forecast and commitment.** A grant also records which side of step 6 it is on, and `plan`
+grades an overlap as a **defect** only between two commitments. Anything else is a note naming
+the soft side. The reason is measured: four independent roadmap tasks reported five collisions
+because the honest grant on unread code is a directory and a directory overlaps everything
+beneath it, and narrowing them to invented file paths took the count to zero by making the
+record false. So the check moved rather than the record. A grant that has said nothing is a
+third answer and is weighed like a forecast — it has no more read the code than one.
 
 **Concepts.** A concept is one thing a system knows how to do, declared in
 `docs/audits/systems.json` inside its owning system. Register durable capabilities only — a

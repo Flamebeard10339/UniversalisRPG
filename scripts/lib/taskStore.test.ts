@@ -13,9 +13,11 @@ function task(overrides: Partial<Task> & { id: string }): Task {
     system: null,
     spec: null,
     clause: null,
+    discharges: [],
     requires: [],
     files: [],
     writes: [],
+    grant: null,
     produces: [],
     deliverable: null,
     evidence: null,
@@ -124,9 +126,11 @@ describe('loadStore / saveStore', () => {
           system: null,
           spec: null,
           clause: null,
+          discharges: [],
           requires: [],
           files: [],
           writes: [],
+          grant: null,
           produces: [],
           deliverable: null,
           evidence: null,
@@ -222,7 +226,7 @@ describe('loadStore / saveStore', () => {
 
       saveStore(loadStore(file), file);
       const line = readFileSync(file, 'utf8').trim();
-      const canonicalKeys = ['id', 'title', 'kind', 'state', 'severity', 'system', 'spec', 'clause', 'requires', 'files', 'writes', 'produces', 'deliverable', 'evidence', 'source', 'reason', 'closed', 'closedCommit', 'claimed', 'claimedBy'];
+      const canonicalKeys = ['id', 'title', 'kind', 'state', 'severity', 'system', 'spec', 'clause', 'discharges', 'requires', 'files', 'writes', 'grant', 'produces', 'deliverable', 'evidence', 'source', 'reason', 'closed', 'closedCommit', 'claimed', 'claimedBy'];
       const keys = Object.keys(JSON.parse(line));
       expect(keys.slice(0, canonicalKeys.length)).toEqual(canonicalKeys);
       expect(keys.slice(canonicalKeys.length)).toEqual(['aField', 'mField', 'zField']);

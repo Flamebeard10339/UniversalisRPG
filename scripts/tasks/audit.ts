@@ -54,6 +54,8 @@ export function cmdImport(args: Flags, usage: string): void {
       clause: null,
       requires: [],
       writes: [],
+      discharges: [],
+      grant: null,
       produces: [],
       files: [`${docPath}#${finding.code}`, ...harvestFiles(finding.body, existsSync)],
       deliverable: null,
@@ -127,6 +129,44 @@ const AUDIT_CHECKLIST = [
   'comments that restate self-documenting code;',
 ];
 
+// A `proof: vitest <file> "<name>"` target naming a test that does not exist
+// is worse than no target: `vitest -t "<no such name>"` skips every test and
+// exits 0, so an auditor following the brief gets a green run that asserted
+// nothing. Measured at 40 of 49 targets on this spec's own first pass. The
+// title is a string literal in the file, so a text search answers without
+// running the suite — this is a read printed beside the target, not a gate.
+export function unresolvedTarget(target: string, read: (file: string) => string | null = readIfPresent): string | null {
+  const parsed = /^vitest\s+(\S+)\s+"(.*)"\s*$/.exec(target);
+  if (parsed === null) return null;
+  const [, file, name] = parsed;
+  const text = read(file);
+  if (text === null) return `   <-- names no file in this checkout: ${file}`;
+  return testTitles(text).includes(name) ? null : `   <-- ${file} has no test by this name, and \`vitest -t\` would skip every test and exit 0`;
+}
+
+// Titles only, never the whole file. Searching the text made an `expect(...)`
+// argument and a comment read as a resolved target — the pass-1 defect
+// surviving through the guard installed against it, and failing in the one
+// direction that hides recurrence.
+//
+// Backslashes are dropped from the captured title because a title with an
+// apostrophe is written `'doctor\'s name'` in the source and is
+// `doctor's name` at runtime; a check that called those missing would be the
+// false alarm that teaches readers to skip it.
+// The optional `(...)` between the name and the title is `it.each([…])`,
+// whose title sits in a second call.
+export function testTitles(text: string): string[] {
+  return [...text.matchAll(/\bit(?:\.\w+)*\s*(?:\([^()'"`]*\)\s*)?\(\s*(['"`])((?:\\.|(?!\1)[^\\])*)\1/g)].map((match) => match[2].replace(/\\/g, ''));
+}
+
+function readIfPresent(file: string): string | null {
+  try {
+    return readFileSync(file, 'utf8');
+  } catch {
+    return null;
+  }
+}
+
 export function cmdAuditPrompt(args: Flags, usage: string): void {
   const config = resolveConfig(args.flags);
   const slug = args.positional[0];
@@ -192,7 +232,7 @@ export function cmdAuditPrompt(args: Flags, usage: string): void {
       console.log('  no proof target — requires human verification: inspect the behavior directly.');
       console.log('  If this is pure domain logic or an API layer, prefer naming a `proof: vitest <file> "<test>"` or `proof: command <cmd>` target so a future pass can mutation-test it. If this is UI work, add or run smoke coverage once the implementation has settled.');
     } else {
-      for (const target of targets) console.log(`  proof: ${target}`);
+      for (const target of targets) console.log(`  proof: ${target}${unresolvedTarget(target) ?? ''}`);
       console.log('  has a proof target — if it names pure logic or an API, temporarily remove, invert, or scale the behavior it proves and confirm it fails for the right reason before accepting it; a UI or smoke target is inspected, not mutation-tested.');
     }
   }
@@ -320,8 +360,59 @@ export function parseAuditArgs(args: string[]): AuditArgs {
   return { slug, configFlags, baseBranch, proofs, evidence, errors, clauseFiles, findings };
 }
 
+// The same flags, off a file, because a full pass does not fit on a command
+// line. Twelve --proof/--evidence pairs carrying test names, mutation
+// verdicts and probe output ran past the Windows 8191-character limit in two
+// separate sessions — roughly 13k characters over nine clauses and five
+// findings, refused as "The command line is too long", nothing run — and the
+// pass after it compressed its evidence to fit. The command asks for
+// evidence a next pass can re-run and then rationed how much of it there was
+// room for; only the transport moves, and the parser below is the same one.
+//
+// A line opening with `--` is a flag and everything after the first space is
+// its value; any other line continues the value above it, which is what lets
+// a clause's evidence be a paragraph. Blank lines and `#` at column zero are
+// skipped, so a file can be annotated.
+export function parseAuditFile(text: string, label: string): { argv: string[]; errors: string[] } {
+  const argv: string[] = [];
+  const errors: string[] = [];
+  text.split('\n').forEach((raw, index) => {
+    const line = raw.replace(/\r$/, '').trimEnd();
+    if (line.trim() === '' || line.startsWith('#')) return;
+    if (line.startsWith('--')) {
+      const space = line.indexOf(' ');
+      argv.push(space === -1 ? line : line.slice(0, space), space === -1 ? '' : line.slice(space + 1));
+      return;
+    }
+    if (argv.length === 0) {
+      errors.push(`${label}:${index + 1}: a value line before any flag — every line here either opens a flag with -- or continues the one above it`);
+      return;
+    }
+    argv[argv.length - 1] = `${argv[argv.length - 1]}\n${line}`;
+  });
+  return { argv, errors };
+}
+
+// `--args-from` is consumed here rather than by parseAuditArgs, which would
+// have to know about a flag that is not part of a pass.
+function readAuditFile(raw: string[]): { argv: string[]; rest: string[]; errors: string[] } {
+  const at = raw.indexOf('--args-from');
+  if (at === -1) return { argv: [], rest: raw, errors: [] };
+  const path_ = raw[at + 1];
+  const rest = [...raw.slice(0, at), ...raw.slice(at + 2)];
+  if (path_ === undefined || path_.startsWith('--')) return { argv: [], rest, errors: ['--args-from needs a path to a file of audit flags'] };
+  let text: string;
+  try {
+    text = readFileSync(path_, 'utf8');
+  } catch (error) {
+    return { argv: [], rest, errors: [`--args-from could not read ${path_}: ${error instanceof Error ? error.message : String(error)}`] };
+  }
+  const parsed = parseAuditFile(text, path_);
+  return { argv: parsed.argv, rest, errors: parsed.errors };
+}
+
 export const AUDIT_USAGE =
-  `usage: tasks audit <spec> [--base-branch main] [--actor <name>] [--proof N=met|unmet|unknown ...] [--evidence N="..." ... (required for every met clause)] [--file N=path:line ...] [--finding "..." --severity high|medium|low --system "<name>" --deliverable "..." --evidence "..." [--file path:line ...]]...  (with no --proof flags and no findings, walks the clauses interactively; findings with no --proof flags are filed without recording a pass, so late findings never reset verdicts; a clause left ungraded is recorded unknown, never unmet)`;
+  `usage: tasks audit <spec> [--args-from <file>] [--base-branch main] [--actor <name>] [--proof N=met|unmet|unknown ...] [--evidence N="..." ... (required for every met clause)] [--file N=path:line ...] [--finding "..." --severity high|medium|low --system "<name>" --deliverable "..." --evidence "..." [--file path:line ...]]...  (a file of the same flags, one per line, with any unprefixed line continuing the value above it — which is how a pass carrying evidence specific enough to re-run gets past the command-line length limit. With no --proof flags and no findings, walks the clauses interactively; findings with no --proof flags are filed without recording a pass, so late findings never reset verdicts; a clause left ungraded is recorded unknown, never unmet)`;
 
 // Stops at the first clause the answerer walks away from rather than
 // looping on an exhausted stdin, and the caller grades the rest `unknown` —
@@ -367,6 +458,8 @@ function buildFindingTask(finding: AuditFinding, slug: string, pass: number, tak
     clause: null,
     requires: [],
     writes: [],
+    discharges: [],
+    grant: null,
     produces: [],
     files: finding.files,
     deliverable: finding.deliverable,
@@ -407,7 +500,16 @@ function refuseInvalidFindings(findings: AuditFinding[]): boolean {
 
 // The only way a finding enters the store.
 export async function cmdAudit(args: Flags, usage: string): Promise<void> {
-  const parsed = parseAuditArgs(args.raw);
+  const fromFile = readAuditFile(args.raw);
+  if (fromFile.errors.length > 0) {
+    console.error(`error: ${fromFile.errors[0]}`);
+    process.exitCode = 1;
+    return;
+  }
+  // The file's flags first and the command line's after, so a `--base-branch`
+  // typed beside `--args-from` still wins: the transport did not change
+  // which argument is the more specific one.
+  const parsed = parseAuditArgs([...fromFile.argv, ...fromFile.rest]);
   if (!parsed.slug) {
     console.error(usage);
     process.exitCode = 1;
@@ -538,6 +640,8 @@ export async function cmdAudit(args: Flags, usage: string): Promise<void> {
       clause: verdict.clause,
       requires: [],
       writes: [],
+      discharges: [],
+      grant: null,
       produces: [],
       files: parsed.clauseFiles.get(verdict.clause) ?? [],
       deliverable: clauseText,

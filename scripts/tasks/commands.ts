@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { ManifestError } from '../lib/systems';
 import { StoreError } from '../lib/taskStore';
 import { AUDIT_USAGE, cmdAudit, cmdAuditPrompt, cmdImport } from './audit';
@@ -11,8 +12,9 @@ import { cmdAdd, cmdDecline, cmdDone, cmdEdit, cmdList, cmdNext, cmdPromote, cmd
 import { cmdRoadmap } from './roadmapCmd';
 import { cmdSpecAdd, cmdSpecDone, cmdSpecNew, cmdSpecRemove, cmdSpecShow } from './specCmds';
 import { cmdTriage } from './triage';
+import { cmdWorkPrompt } from './workPrompt';
 
-const USAGE = 'usage: npm run tasks -- <doctor|add|edit|show|list|search|next|roadmap|plan|system|where|produces|concept|start|stop|done|decline|promote|import|triage|note|decision|log|spec|audit|audit-prompt|handoff|merge-ready> ...';
+const USAGE = 'usage: npm run tasks -- <doctor|add|edit|show|list|search|next|roadmap|plan|system|where|produces|concept|start|stop|done|decline|promote|import|triage|note|decision|log|spec|audit|audit-prompt|work-prompt|handoff|merge-ready> ...';
 
 interface Command {
   usage: string;
@@ -42,11 +44,11 @@ const SPEC_USAGE = `usage: tasks spec <new|add|remove|show|done> ...  (\`tasks s
 const COMMANDS: Record<string, Command> = {
   doctor: { usage: `usage: tasks doctor [--fix] ${ACTOR_USAGE}`, run: cmdDoctor },
   add: {
-    usage: `usage: tasks add "<title>" [--kind task|finding|question] [--severity high|medium|low] [--system "<name>"] [--spec <slug>] [--files a.ts:12,b.ts] [--requires id1,id2] [--writes src/a.ts,src/b/] [--produces \"policy module\"] [--deliverable "..." (required for --kind finding)] [--evidence "..."] [--id <id>] ${ACTOR_USAGE}`,
+    usage: `usage: tasks add "<title>" [--kind task|finding|question] [--severity high|medium|low] [--system "<name>"] [--spec <slug>] [--discharges c3,c6] [--files a.ts:12,b.ts] [--requires id1,id2] [--writes src/a.ts,src/b/] [--grant forecast|commitment] [--produces \"policy module\"] [--deliverable "..." (required for --kind finding)] [--evidence "..."] [--id <id>] ${ACTOR_USAGE}`,
     run: cmdAdd,
   },
   edit: {
-    usage: `usage: tasks edit <id> ["<new title>"] [--title "..."] [--deliverable "..."] [--evidence "..."] [--severity high|medium|low] [--system "<name>"] [--files a.ts:12,b.ts] [--requires id1,id2] [--writes src/a.ts,src/b/] [--produces \"policy module\"] ${ACTOR_USAGE}  (content only: state, spec, kind and reason are moved by start/stop/done/decline/spec add, never by edit)`,
+    usage: `usage: tasks edit <id> ["<new title>"] [--title "..."] [--deliverable "..."] [--evidence "..."] [--severity high|medium|low] [--system "<name>"] [--discharges c3,c6] [--files a.ts:12,b.ts] [--requires id1,id2] [--writes src/a.ts,src/b/] [--grant forecast|commitment] [--produces \"policy module\"] ${ACTOR_USAGE}  (content only: state, spec, kind and reason are moved by start/stop/done/decline/spec add, never by edit)`,
     run: cmdEdit,
   },
   show: { usage: 'usage: tasks show <id>', run: cmdShow },
@@ -60,7 +62,7 @@ const COMMANDS: Record<string, Command> = {
   },
   plan: { usage: 'usage: tasks plan [<id>...] [--spec <slug>]  (grades a dispatch set for overlap, unstated dependencies and duplicated interfaces; runs no workers and refuses nothing)', run: cmdPlan },
   system: { usage: 'usage: tasks system ["<name>"]  (with no name, every system; with one, its owned files, exported surface, dependencies in both directions and registered concepts — all derived from the tree, none of it stored)', run: cmdSystem },
-  where: { usage: 'usage: tasks where <path>  (which system owns it, which concept claims it, and what it imports across a system boundary)', run: cmdWhere },
+  where: { usage: 'usage: tasks where <path>  (a file or a directory: which system owns it, what it exports, what it imports across a system boundary, and the prior art on it — every concept registered over it and every task whose writes or files have ever claimed it, in any state)', run: cmdWhere },
   produces: { usage: 'usage: tasks produces <term>  (does anything already do this — searched over registered concepts and every `produces` claim any task ever made, closed ones included)', run: cmdProduces },
   concept: { usage: 'usage: tasks concept "<system>" "<name>" --paths a.ts,b/ [--note "where the name came from"]  (registers a capability so `tasks produces` can find it)', run: cmdConcept },
   next: { usage: 'usage: tasks next [--spec <slug>] [--system "<name>"] [--severity high|medium|low] [--full]', run: cmdNext },
@@ -78,8 +80,9 @@ const COMMANDS: Record<string, Command> = {
   spec: { usage: SPEC_USAGE, run: refuseBareSpec },
   audit: { usage: AUDIT_USAGE, run: cmdAudit },
   'audit-prompt': { usage: 'usage: tasks audit-prompt <spec> [--base-branch main]  (the auditor\'s brief, generated — do not hand-write one)', run: cmdAuditPrompt },
+  'work-prompt': { usage: 'usage: tasks work-prompt <id>  (the worker\'s brief, generated — do not hand-write one)', run: cmdWorkPrompt },
   handoff: { usage: 'usage: tasks handoff [--spec <slug>] [--base-branch main] [--scan-cap <commits>]', run: cmdHandoff },
-  'merge-ready': { usage: 'usage: tasks merge-ready  (runs the merge gate: tsc, npm test, layer-check, audit-status, doctor, and the tracked-text byte check; exits non-zero when a leg fails)', run: cmdMergeReady },
+  'merge-ready': { usage: 'usage: tasks merge-ready [--base-branch main]  (runs the merge gate: tsc, npm test, layer-check, audit-status, doctor, and the tracked-text byte check; exits non-zero when a leg fails)', run: cmdMergeReady },
   'check-commit-msg': { usage: 'usage: tasks check-commit-msg <msg-file> [--merge-or-revert] [--files a,b,c]', run: cmdCheckCommitMessage },
 };
 
@@ -88,6 +91,76 @@ const COMMANDS: Record<string, Command> = {
 // sweep over the real table can keep the next documented flag honest.
 export function allUsages(): string[] {
   return [...Object.values(COMMANDS), ...Object.values(SPEC_COMMANDS)].map((command) => command.usage);
+}
+
+// Every verb's usage, keyed the way a caller types it, so a refusal can be
+// answered out of the same table the parser enforces. Nothing here is a
+// second list to keep in sync: both halves read COMMANDS.
+function everyVerb(): Array<[name: string, usage: string]> {
+  return [...Object.entries(COMMANDS).map(([name, command]): [string, string] => [name, command.usage]), ...Object.entries(SPEC_COMMANDS).map(([name, command]): [string, string] => [`spec ${name}`, command.usage])];
+}
+
+// A refusal that already knows the vocabulary should spend it. Both misses
+// measured came from the CLI's own words: `tasks spec add <slug> --id <id>`,
+// where ids are positionals and `--id` is a flag of `add`; and `tasks add
+// "<title>" --note`, where the field wanted is `--evidence` and `--note`
+// belongs to `concept`. So the answer is the placeholder this flag matches,
+// the verbs that do take it, and the flags this verb does — all read off the
+// usage strings rather than a hand-kept map of likely mistakes.
+// The token a usage string writes after a flag, which is the only thing here
+// that says what kind of value the flag wants.
+function placeholderOf(usage: string, flag: string): string | null {
+  const tokens = usage.split(/\s+/);
+  const at = tokens.findIndex((token) => /^\[?--([a-z][a-z0-9-]*)\]?$/.exec(token)?.[1] === flag);
+  const next = at === -1 ? undefined : tokens[at + 1];
+  return next === undefined || next.startsWith('--') || next.startsWith('[--') || next.startsWith(']') || next.startsWith('(') ? null : next;
+}
+
+type ValueShape = 'prose' | 'list' | 'choice' | 'name' | 'none';
+
+// `"..."` is free prose, `"<name>"` is an identifier that happens to need
+// quoting, `a,b` is a list and `x|y` is a choice. Derived from the
+// placeholder rather than declared, so a flag added to a usage string is
+// classified by the same text that documents it.
+function shapeOf(placeholder: string | null): ValueShape {
+  if (placeholder === null) return 'none';
+  if (placeholder.includes('|')) return 'choice';
+  if (placeholder.includes(',')) return 'list';
+  return placeholder.startsWith('"') && !placeholder.includes('<') ? 'prose' : 'name';
+}
+
+function reportUnknownFlags(name: string, usage: string, unknown: string[]): void {
+  const head = usage.split('\n')[0];
+  for (const flag of unknown) {
+    if (new RegExp(`<${flag}>`).test(head.split(/\s\[?--/)[0])) {
+      console.error(`  --${flag}: \`${name}\` takes <${flag}> as a positional, not as a flag`);
+      continue;
+    }
+    const owners = everyVerb().filter(([verb, other]) => verb !== name && flagArities(other).has(flag));
+    if (owners.length > 0) console.error(`  --${flag}: not a flag of \`${name}\` — it belongs to ${owners.map(([verb]) => `\`${verb}\``).join(', ')}`);
+
+    // The near miss inside the verb that was called, by the shape of the
+    // value this flag wants where it does exist: a prose flag misses a prose
+    // flag. Naming the owning verb and then fourteen undifferentiated flags
+    // still left a caller to pick.
+    const wanted = shapeOf(owners.map(([, other]) => placeholderOf(other, flag)).find((placeholder) => placeholder !== null) ?? null);
+    const known = [...flagArities(usage).keys()].filter((candidate) => candidate !== 'help');
+    const alike = wanted === 'none' ? [] : known.filter((candidate) => shapeOf(placeholderOf(usage, candidate)) === wanted);
+    if (alike.length > 0) console.error(`  \`${name}\` takes ${wanted === 'prose' ? 'prose' : `a ${wanted}`} in: ${alike.map((candidate) => `--${candidate}`).join(', ')}`);
+    else if (known.length > 0) console.error(`  \`${name}\` takes: ${known.map((candidate) => `--${candidate}`).join(', ')}`);
+  }
+}
+
+// The scripts this repo runs, read from its own package.json. `tasks
+// audit-status` is refused by a verb list that already knows the name is not
+// one of its own; what it could not say is that `npm run audit-status` is
+// where that name lives.
+function npmScriptNames(): string[] {
+  try {
+    return Object.keys((JSON.parse(readFileSync('package.json', 'utf8')) as { scripts?: Record<string, string> }).scripts ?? {});
+  } catch {
+    return [];
+  }
 }
 
 interface Resolved {
@@ -152,7 +225,9 @@ export function run(argv: string[]): void | Promise<void> {
 
   const resolved = resolveCommand(name, restRaw);
   if (resolved === null) {
-    console.error(`unknown command: ${name}\n${USAGE}`);
+    console.error(`unknown command: ${name}`);
+    if (npmScriptNames().includes(name)) console.error(`\`${name}\` is an npm script of this repository, not a tasks verb — run \`npm run ${name}\``);
+    console.error(USAGE);
     process.exitCode = 1;
     return;
   }
@@ -163,7 +238,7 @@ export function run(argv: string[]): void | Promise<void> {
   const literalTail = terminator === -1 ? [] : resolved.args.slice(terminator + 1);
 
   const arities = new Map([...flagArities(GLOBAL_USAGE), ...flagArities(command.usage)]);
-  const { parsed, errors } = parseArgs(flagArgs, arities, null);
+  const { parsed, errors, unknown } = parseArgs(flagArgs, arities, null);
   parsed.positional.push(...literalTail);
   // `audit` rescans the argument list itself; hand it the whole thing, not
   // the flag half of the terminator split.
@@ -174,6 +249,7 @@ export function run(argv: string[]): void | Promise<void> {
   }
   if (errors.length > 0) {
     for (const message of errors) console.error(`error: ${message}`);
+    reportUnknownFlags(name === 'spec' ? `spec ${restRaw[0]}` : name, command.usage, unknown);
     console.error(command.usage);
     process.exitCode = 1;
     return;

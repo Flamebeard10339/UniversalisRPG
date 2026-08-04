@@ -1,7 +1,7 @@
 import { spawnSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import path from 'node:path';
-import { appendEvents, eventsPathFor, type EventOp, type TaskEvent } from '../lib/eventLog';
+import { appendEvents, eventsPathFor, loadEvents, type EventOp, type TaskEvent } from '../lib/eventLog';
 import * as git from '../lib/git';
 import { duplicateClauseIds, parseSpecDoc } from '../lib/specDoc';
 import { loadManifest, systemNames as manifestSystemNames } from '../lib/systems';
@@ -154,6 +154,16 @@ export function readStore(config: Config): Task[] {
   return tasks;
 }
 
+// The store is versioned with the code, so every query is scoped to whatever
+// ref this working tree holds — and after a `git checkout main` a search for
+// a branch's records answers `0 task(s)`, which is indistinguishable from
+// "those records are gone". Said only when the answer is empty, because that
+// is the only moment the two look alike.
+export function reportStoreScope(config: Config, total: number): void {
+  console.log(`nothing matched. This read is scoped to ${config.storePath} as ${config.branch} has it — ${total} record(s) in the whole file.`);
+  console.log(`A record written on another branch is not in this one until that branch merges; \`git log --oneline -- ${config.storePath}\` is what this checkout can see.`);
+}
+
 export function flushSkippedStoreLines(): void {
   if (skippedStoreLines.length === 0) return;
   console.log('');
@@ -190,18 +200,41 @@ export interface ActiveSpec {
 // file has open members in the store, treat that as the active spec rather
 // than stranding a cold session with no queue and no signal anything is
 // wrong.
+// Which spec this branch has been working, read off the log rather than
+// declared: every store write records the branch it was made from, so the
+// answer is derivable and no second place has to be kept in sync. It is what
+// the branch-name route cannot answer for a generated worktree branch —
+// `claude/<topic>-<hash>` looks for a nested spec path that cannot exist —
+// nor for a branch whose name has dropped a word its spec still carries.
+export function lastSpecWrittenFromBranch(config: Config): string | null {
+  const written = loadEvents(config.eventsPath).events.filter((event) => event.branch === config.branch && event.spec !== null);
+  for (let i = written.length - 1; i >= 0; i--) {
+    const spec = written[i].spec as string;
+    if (existsSync(specFile(config, spec))) return spec;
+  }
+  return null;
+}
+
 export function resolveActiveSpec(config: Config, tasks: Task[], explicit: string | undefined): ActiveSpec {
   if (explicit !== undefined) return { spec: explicit, note: null };
   const strict = currentSpec(config);
   if (strict !== null) return { spec: strict, note: `spec inferred from the branch name: ${strict} — ${specFile(config, strict)} exists` };
 
-  // The store route is a resume aid for a working branch whose name has
+  // The routes below are resume aids for a working branch whose name has
   // drifted from its spec file. The default branch is never working a spec,
   // so anything it inferred would be a guess about a branch the caller is
   // not on — and the guess lands on whichever spec is slowest to retire,
   // which is exactly the one whose clauses describe deleted machinery.
   // `--spec` still works here, because that is asked for rather than guessed.
   if (config.branch === DEFAULT_BRANCH) return { spec: null, note: null };
+
+  // Ahead of the open-members route, which contests whenever more than one
+  // spec is live — nine of them today, so it answers nothing on the branch
+  // most likely to be asking. A branch that wrote to ten specs answers with
+  // the one it touched last; a cold worktree that has written nothing falls
+  // through to the store route unchanged.
+  const logged = lastSpecWrittenFromBranch(config);
+  if (logged !== null) return { spec: logged, note: `spec inferred from the event log: ${logged} — the most recent spec written from ${config.branch}` };
 
   const candidates = new Set<string>();
   for (const task of tasks) {

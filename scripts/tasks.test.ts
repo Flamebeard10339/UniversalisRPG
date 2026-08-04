@@ -1,12 +1,13 @@
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
+import { appendFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { tsxCli } from './lib/tsxCli';
 import { run as runTasks } from './tasks';
-import { parseAuditArgs } from './tasks/audit';
+import { parseAuditArgs, parseAuditFile, unresolvedTarget } from './tasks/audit';
 import { flagArities } from './tasks/cli';
+import { TERMINAL_WIDTH } from './tasks/render';
 import { allUsages } from './tasks/commands';
 
 const repoRoot = path.join(import.meta.dirname, '..');
@@ -63,6 +64,15 @@ function ageClaim(dir: string, id: string, days: number): void {
       return JSON.stringify(record);
     });
   writeFileSync(file, `${lines.join('\n')}\n`, 'utf8');
+}
+
+// A store write no fixture command can make: `fixture` pins `--branch`, and
+// what the provenance line reads off the log is the branch an event was
+// written from, which is a different branch from the one reading it exactly
+// when the line is worth having.
+function appendEvent(dir: string, event: { branch: string; spec: string; id?: string }): void {
+  const line = { t: new Date().toISOString(), by: null, branch: event.branch, head: null, op: 'edit', id: event.id ?? null, system: null, spec: event.spec, note: 'edited' };
+  appendFileSync(path.join(dir, 'events.jsonl'), `${JSON.stringify(line)}\n`, 'utf8');
 }
 
 function fixture(run: (context: { dir: string; args: (extra?: string[]) => string[]; tasks: (...args: string[]) => Run; triage: (input: string, extra?: string[]) => Run }) => void): void {
@@ -299,7 +309,7 @@ describe('tasks CLI', () => {
   it('refuses five junk arguments on every bounded command surface', () => {
     fixture(({ tasks }) => {
       const unbounded = new Set(['spec add', 'spec remove', 'plan', 'done', 'decline', 'promote']);
-      const surfaces = [['doctor'], ['add'], ['edit'], ['show'], ['list'], ['search'], ['next'], ['start'], ['stop'], ['done'], ['decline'], ['promote'], ['import'], ['triage'], ['audit'], ['audit-prompt'], ['handoff'], ['check-commit-msg'], ['plan'], ['spec'], ['spec', 'new'], ['spec', 'add'], ['spec', 'remove'], ['spec', 'show'], ['spec', 'done'], ['note'], ['decision'], ['log'], ['merge-ready']];
+      const surfaces = [['doctor'], ['add'], ['edit'], ['show'], ['list'], ['search'], ['next'], ['start'], ['stop'], ['done'], ['decline'], ['promote'], ['import'], ['triage'], ['audit'], ['audit-prompt'], ['work-prompt'], ['handoff'], ['check-commit-msg'], ['plan'], ['spec'], ['spec', 'new'], ['spec', 'add'], ['spec', 'remove'], ['spec', 'show'], ['spec', 'done'], ['note'], ['decision'], ['log'], ['merge-ready']];
       for (const surface of surfaces) {
         const name = surface.join(' ');
         const result = tasks(...surface, 'j1', 'j2', 'j3', 'j4', 'j5');
@@ -355,7 +365,7 @@ describe('tasks CLI', () => {
 
   it('answers --help on every command and subcommand, and names the flags it will accept', () => {
     fixture(({ tasks }) => {
-      const commands = [['doctor'], ['add'], ['edit'], ['show'], ['list'], ['search'], ['next'], ['start'], ['stop'], ['done'], ['decline'], ['promote'], ['import'], ['triage'], ['audit'], ['audit-prompt'], ['handoff'], ['check-commit-msg'], ['plan'], ['spec'], ['spec', 'new'], ['spec', 'add'], ['spec', 'remove'], ['spec', 'show'], ['spec', 'done'], ['note'], ['decision'], ['log'], ['merge-ready']];
+      const commands = [['doctor'], ['add'], ['edit'], ['show'], ['list'], ['search'], ['next'], ['start'], ['stop'], ['done'], ['decline'], ['promote'], ['import'], ['triage'], ['audit'], ['audit-prompt'], ['work-prompt'], ['handoff'], ['check-commit-msg'], ['plan'], ['spec'], ['spec', 'new'], ['spec', 'add'], ['spec', 'remove'], ['spec', 'show'], ['spec', 'done'], ['note'], ['decision'], ['log'], ['merge-ready']];
       for (const command of commands) {
         const result = tasks(...command, '--help');
         expect(result.status, command.join(' ')).toBe(0);
@@ -654,12 +664,12 @@ describe('tasks CLI', () => {
       expect(added.status).toBe(0);
 
       const shown = tasks('show', 'seam').stdout;
-      expect(shown).toContain('writes: scripts/lib/policy.ts, scripts/lib/policy.test.ts');
+      expect(shown).toContain('writes (forecast): scripts/lib/policy.ts, scripts/lib/policy.test.ts');
       expect(shown).toContain('produces: policy module, PolicyDecision type');
 
       const edited = tasks('edit', 'seam', '--writes', 'scripts/lib/policy.ts');
       expect(edited.stdout).toContain('edited seam: writes');
-      expect(tasks('show', 'seam').stdout).toContain('writes: scripts/lib/policy.ts\n');
+      expect(tasks('show', 'seam').stdout).toContain('writes (forecast): scripts/lib/policy.ts\n');
     });
   });
 
@@ -730,14 +740,24 @@ describe('tasks CLI', () => {
       const longEvidence = `evidence that runs well past any single line a queue entry should occupy, ${tail}`;
       tasks('add', 'verbose task', '--id', 'verbose-task', '--severity', 'high', '--system', 'Runtime', '--spec', 'demo-spec', '--files', 'src/runtime/save.ts:1', '--deliverable', 'the fix exists', '--evidence', longEvidence);
 
+      // The field wraps under its own label now, so nothing is cut and no
+      // continuation lands flush at column zero against the next label.
+      // Collapsing the run of whitespace is what puts the value back.
+      const flat = (output: string): string => output.replace(/\s+/g, ' ');
+
       const concise = tasks('next');
       expect(concise.stdout).toContain('verbose-task  [task/open/high]');
       expect(concise.stdout).toContain('files: src/runtime/save.ts:1');
-      expect(concise.stdout).toContain(`evidence: ${longEvidence}`);
-      expect(concise.stdout).toContain(tail);
+      expect(flat(concise.stdout)).toContain(`evidence: ${longEvidence}`);
+      expect(flat(concise.stdout)).toContain(tail);
+      // The prose field and its continuations fit the report. A record's id,
+      // title and file list are single values and are never cut.
+      const wrapped = concise.stdout.split('\n').filter((line) => line.startsWith('evidence:') || line.startsWith('          '));
+      expect(wrapped.length).toBeGreaterThan(1);
+      for (const line of wrapped) expect(line.length).toBeLessThanOrEqual(TERMINAL_WIDTH);
 
       const full = tasks('next', '--full');
-      expect(full.stdout).toContain(longEvidence);
+      expect(flat(full.stdout)).toContain(longEvidence);
       expect(full.stdout).toContain('deliverable: the fix exists');
     });
   });
@@ -2681,6 +2701,129 @@ describe('tasks CLI', () => {
     });
   });
 
+  // c19. The worker's half of the generated-brief rule the auditor's half
+  // has had all along: what a dispatcher hand-writes is a copy of the record
+  // that drifts from it, so the record renders itself.
+  it('work-prompt names the task\'s deliverable, grant, requirements and clause standings', () => {
+    fixture(({ tasks }) => {
+      tasks('add', 'the dependency', '--id', 'dep', '--spec', 'demo-spec');
+      tasks('done', 'dep');
+      tasks('audit', 'demo-spec', '--proof', '1=unmet', '--evidence', '1=it does not actually hold', '--proof', '2=met', '--evidence', '2=clause 2 checked');
+      tasks('edit', 'demo-spec-clause-1', '--writes', 'src/runtime/save.ts,src/runtime/invented-by-a-planner.ts', '--requires', 'dep', '--deliverable', 'the first clause is delivered', '--evidence', 'the audit graded it unmet');
+
+      const result = tasks('work-prompt', 'demo-spec-clause-1');
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('You are implementing demo-spec-clause-1 on branch demo-spec.');
+      expect(result.stdout).toContain('deliverable: the first clause is delivered');
+      expect(result.stdout).toContain('evidence: the audit graded it unmet');
+      // Every requirement with why it does or does not hold the task up —
+      // "requirements and whether they are closed" is the whole point of
+      // printing them rather than the ids alone.
+      expect(result.stdout).toContain('requires: dep (done)');
+
+      // The grant resolved against the tree is what a worker checks a
+      // forecast against: a path nobody opened matches nothing, and saying
+      // so is what makes the invitation to refuse actionable rather than
+      // polite.
+      expect(result.stdout).toContain('- src/runtime/save.ts\n');
+      expect(result.stdout).toContain('- src/runtime/invented-by-a-planner.ts — matches no tracked file');
+
+      // The clause this record discharges, at its latest standing — and not
+      // the spec's other clause, which is somebody else's brief.
+      expect(result.stdout).toContain('1. [unmet] The first clause holds.');
+      expect(result.stdout).not.toContain('The second clause holds.');
+    });
+  });
+
+  // The record kind the brief is actually generated for. `doctor` errors on
+  // a `clause` outside an `undelivered` record, so reading `clause` alone
+  // made this unreachable for every ordinary task: the record block printed
+  // the clauses and the clause block, eight lines later, said none were
+  // recorded. The test above uses an `undelivered` fixture and so only ever
+  // exercised the path that already worked.
+  it('work-prompt reads the clauses an ordinary task discharges, not only an undelivered record\'s own', () => {
+    fixture(({ tasks }) => {
+      tasks('audit', 'demo-spec', '--proof', '1=unmet', '--evidence', '1=it does not actually hold', '--proof', '2=met', '--evidence', '2=clause 2 checked');
+      tasks('add', 'a slice', '--id', 'slice', '--spec', 'demo-spec', '--discharges', 'c2,c1');
+
+      const result = tasks('work-prompt', 'slice');
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('discharges: c1, c2');
+      expect(result.stdout).not.toContain('none recorded on this record');
+      expect(result.stdout).toContain('1. [unmet] The first clause holds.');
+      expect(result.stdout).toContain('2. [met] The second clause holds.');
+    });
+  });
+
+  it('work-prompt names the claim, grant-correction and concept-registration steps a worker owes before writing code', () => {
+    fixture(({ tasks }) => {
+      tasks('add', 'a member', '--id', 'a-member', '--spec', 'demo-spec', '--system', 'Runtime', '--produces', 'a policy module');
+
+      const result = tasks('work-prompt', 'a-member');
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('npm run tasks -- start a-member --actor <you>');
+      expect(result.stdout).toContain('npm run tasks -- edit a-member --writes');
+      expect(result.stdout).toContain('npm run tasks -- concept');
+      expect(result.stdout).toContain('produced by a-member');
+      // The registration step is the one a `produces` claim looks like it
+      // already discharged and does not — workflow.md step 6 puts the
+      // judgement on the worker, so the brief has to name both.
+      expect(result.stdout).toContain('produces: a policy module');
+      expect(result.stdout).toContain('a forecast, not a registration');
+    });
+  });
+
+  it('work-prompt invites refusal of the grant it prints', () => {
+    fixture(({ tasks }) => {
+      tasks('add', 'a member', '--id', 'a-member', '--spec', 'demo-spec', '--writes', 'src/runtime/save.ts');
+
+      const result = tasks('work-prompt', 'a-member');
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('You may refuse this grant');
+      // An invitation with no verb behind it is a courtesy. Both exits are
+      // named, because "stop, it is not mine" and "decline, it should not be
+      // done" are different answers.
+      expect(result.stdout).toContain('npm run tasks -- stop a-member');
+      expect(result.stdout).toContain('npm run tasks -- decline a-member --reason');
+    });
+  });
+
+  it('work-prompt refuses an id the store does not hold, without inventing a brief', () => {
+    fixture(({ tasks }) => {
+      tasks('add', 'a member', '--id', 'a-member', '--spec', 'demo-spec');
+
+      const result = tasks('work-prompt', 'no-such-record');
+      // A read answers, the way audit-prompt answers an unknown spec. What
+      // it must not do is print a brief anyway: a dispatch instruction for a
+      // record nobody holds is the one output here that would be invented.
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('no such task: no-such-record');
+      expect(result.stdout).not.toContain('You are implementing');
+      expect(result.stdout).not.toContain('Write grant');
+      expect(result.stdout).not.toContain('Three things the workflow puts on you');
+    });
+  });
+
+  it('work-prompt names the branch this spec was last written from', () => {
+    fixture(({ tasks, dir }) => {
+      tasks('add', 'a member', '--id', 'a-member', '--spec', 'demo-spec');
+      appendEvent(dir, { branch: 'claude/earlier-4f21a0', spec: 'demo-spec', id: 'a-member' });
+      appendEvent(dir, { branch: 'claude/later-9c1d3e', spec: 'demo-spec', id: 'a-member' });
+      appendEvent(dir, { branch: 'claude/another-spec-7b02', spec: 'some-other-spec' });
+
+      const result = tasks('work-prompt', 'a-member');
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('demo-spec was last written from branch claude/later-9c1d3e.');
+      expect(result.stdout).not.toContain('claude/earlier-4f21a0');
+      expect(result.stdout).not.toContain('claude/another-spec-7b02');
+      // It states the fact and stops. A worktree's environment belongs to
+      // whoever spawned it, and a brief that starts repairing one is a
+      // second, unowned copy of that job.
+      expect(result.stdout).not.toContain('git reset');
+      expect(result.stdout).not.toContain('node_modules');
+    });
+  });
+
   it('audit records a pass, creates an undelivered task for an unmet clause, and records findings unreviewed', () => {
     fixture(({ tasks, dir }) => {
       const result = tasks(
@@ -2811,9 +2954,12 @@ describe('tasks CLI', () => {
     fixture(({ tasks }) => {
       tasks('audit', 'demo-spec', '--proof', '1=unmet', '--evidence', '1=first', '--proof', '2=met', '--evidence', '2=clause 2 checked');
       tasks('audit', 'demo-spec', '--proof', '1=unmet', '--evidence', '1=still not', '--proof', '2=met', '--evidence', '2=clause 2 checked');
-      const spec = tasks('spec', 'show', 'demo-spec');
-      const occurrences = (spec.stdout.match(/demo-spec-clause-1/g) ?? []).length;
-      expect(occurrences).toBe(1);
+      // Counted over the records, not over the report: `spec show` now names
+      // the owner of every clause standing as well as listing the members, so
+      // one record legitimately appears in two places.
+      const undelivered = tasks('list', '--kind', 'undelivered', '--spec', 'demo-spec');
+      expect((undelivered.stdout.match(/demo-spec-clause-1/g) ?? []).length).toBe(1);
+      expect(undelivered.stdout).toContain('1 task(s)');
     });
   });
 
@@ -3064,7 +3210,7 @@ describe('tasks CLI', () => {
   it('the branch-name spec binding says it was inferred and what from, the condition c8 permits it on', () => {
     fixture(({ tasks }) => {
       tasks('add', 'a task', '--id', 'a-task', '--spec', 'demo-spec');
-      for (const command of [['next'], ['list'], ['handoff']]) {
+      for (const command of [['next'], ['handoff'], ['spec', 'show']]) {
         const result = tasks(...command);
         expect(result.stdout, command[0]).toContain('spec inferred from the branch name: demo-spec');
         expect(result.stdout, command[0]).toMatch(/demo-spec\.md exists/);
@@ -3093,7 +3239,10 @@ describe('tasks CLI', () => {
     });
   });
 
-  it('list infers the active spec and announces it, without narrowing which tasks it lists', () => {
+  // `list` filters on no spec unless one is given, so resolving one was
+  // three lines contesting an answer the query never read. A read infers a
+  // spec only where it uses one.
+  it('list neither infers a spec nor mentions one, because it does not filter on one', () => {
     fixture(({ tasks, dir }) => {
       tasks('add', 'a task', '--id', 'a-task', '--spec', 'demo-spec');
       tasks('add', 'deferred task', '--id', 'deferred-task');
@@ -3101,7 +3250,8 @@ describe('tasks CLI', () => {
       const systemsPath = path.join(dir, 'systems.json');
       const specsDir = path.join(dir, 'specs');
       const result = spawnSync(process.execPath, [tsxCli, script, 'list', '--store', storePath, '--systems', systemsPath, '--specs-dir', specsDir, '--branch', 'orphaned-branch'], { cwd: repoRoot, encoding: 'utf8' });
-      expect(result.stdout).toContain('spec inferred from the store: demo-spec');
+      expect(result.stdout).not.toContain('spec inferred');
+      expect(result.stdout).not.toContain('spec contested');
       expect(result.stdout).toContain('a-task');
       expect(result.stdout).toContain('deferred-task');
     });
@@ -3661,9 +3811,20 @@ describe('tasks system', () => {
     fixture(({ tasks }) => {
       const result = tasks('system', 'Runtime');
       expect(result.status).toBe(0);
-      expect(result.stdout).toContain('export(s) in production modules');
       expect(result.stdout).toContain('depends on:');
       expect(result.stdout).toContain('no concept claims');
+    }));
+
+  // The names are already in `Module.exports` at the point a total was taken
+  // over them, and the total is what a planner then had to go and look up by
+  // hand before it could import anything.
+  it('system names its exported surface instead of counting it', () =>
+    fixture(({ tasks }) => {
+      const result = tasks('system', 'Runtime');
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('exported surface, production modules only:');
+      expect(result.stdout).toMatch(/src\/runtime\/save\.ts — \w/);
+      expect(result.stdout).not.toMatch(/export\(s\)/);
     }));
 
   it('refuses a system the manifest does not declare, and says which exist', () =>
@@ -3693,6 +3854,56 @@ describe('tasks where', () => {
   it('refuses with usage when given no path', () =>
     fixture(({ tasks }) => {
       expect(tasks('where').status).toBe(1);
+    }));
+
+  // The prior art that bit was in finished work: `droptables` was done and
+  // merged when its batched-chance rule was re-derived from scratch. So a
+  // query that stops at live records answers the easy half.
+  it('where names every task that has ever claimed the path, closed and declined ones included', () =>
+    fixture(({ tasks }) => {
+      tasks('add', 'the save format pass', '--id', 'saves-v2', '--writes', 'src/runtime/save.ts');
+      tasks('done', 'saves-v2');
+      tasks('add', 'a save rewrite nobody wanted', '--id', 'save-rewrite', '--writes', 'src/runtime/save.ts');
+      tasks('decline', 'save-rewrite', '--reason', 'the format is fine');
+
+      const result = tasks('where', 'src/runtime/save.ts');
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('[done] saves-v2');
+      expect(result.stdout).toContain('[declined] save-rewrite');
+    }));
+
+  it('where resolves a directory grant against a path beneath it', () =>
+    fixture(({ tasks }) => {
+      tasks('add', 'the travel pass', '--id', 'travel', '--writes', 'src/runtime');
+      const result = tasks('where', 'src/runtime/save.ts');
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('[open] travel');
+      expect(result.stdout).toContain('writes src/runtime');
+    }));
+
+  it('where answers with the owning system, the concepts on the path and the produces claims naming them', () =>
+    fixture(({ tasks }) => {
+      tasks('concept', 'Runtime', 'saves', '--paths', 'src/runtime/save.ts', '--note', 'from a produces claim');
+      tasks('add', 'build the save migrator', '--id', 'migrator', '--writes', 'src/runtime/save.ts', '--produces', 'save migrator');
+
+      const result = tasks('where', 'src/runtime/save.ts');
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('system:   Runtime');
+      expect(result.stdout).toContain('[concept] saves — registered to Runtime');
+      expect(result.stdout).toContain('produces save migrator');
+    }));
+
+  it('where says outright that nothing has claimed a path, rather than printing an empty section', () =>
+    fixture(({ tasks }) => {
+      expect(tasks('where', 'src/runtime/save.ts').stdout).toContain('nothing has claimed src/runtime/save.ts');
+    }));
+
+  it('where answers for a directory with the files under it and the whole surface they export', () =>
+    fixture(({ tasks }) => {
+      const result = tasks('where', 'src/runtime');
+      expect(result.status).toBe(0);
+      expect(result.stdout).toMatch(/\d+ tracked file\(s\) under it/);
+      expect(result.stdout).toMatch(/src\/runtime\/save\.ts — \w/);
     }));
 });
 
@@ -3792,6 +4003,299 @@ describe('tasks done, on a task that claimed to produce something', () => {
       tasks('add', 'plain work', '--id', 'plain');
       expect(tasks('done', 'plain').stdout).not.toContain('not registered concepts');
     }));
+});
+
+// Six clauses meeting on one surface: what a grant declares, what setting
+// one asks, what a close says back, and the two behaviours that had to
+// survive all of it.
+describe('a record that declares its grant kind', () => {
+  it('records a grant declared at add time as a forecast, and names the command that commits it', () =>
+    fixture(({ tasks }) => {
+      const added = tasks('add', 'unread work', '--id', 'unread', '--writes', 'src/runtime/');
+      expect(added.stdout).toContain('recorded as a forecast');
+      expect(added.stdout).toContain('--grant commitment');
+      expect(tasks('show', 'unread').stdout).toContain('writes (forecast): src/runtime/');
+    }));
+
+  it('keeps a commitment through an edit that changes something else', () =>
+    fixture(({ tasks }) => {
+      tasks('add', 'read work', '--id', 'read', '--writes', 'src/runtime/combat.ts', '--grant', 'commitment');
+      tasks('edit', 'read', '--title', 'read work, retitled');
+      expect(tasks('show', 'read').stdout).toContain('writes (commitment):');
+    }));
+
+  it('leaves a record that has said nothing saying nothing, rather than defaulting it', () =>
+    fixture(({ tasks }) => {
+      tasks('add', 'no grant', '--id', 'silent');
+      expect(tasks('show', 'silent').stdout).not.toContain('writes');
+      expect(tasks('edit', 'silent', '--severity', 'low').stdout).toBe('edited silent: severity\n');
+    }));
+
+  it('refuses a grant kind it does not know, rather than recording it', () =>
+    fixture(({ tasks }) => {
+      const result = tasks('add', 'bad grant', '--id', 'bad', '--writes', 'src/runtime/', '--grant', 'maybe');
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain('--grant must be one of forecast, commitment');
+    }));
+
+  it('grades an overlap between two commitments as a defect and the same overlap under a forecast as a note', () =>
+    fixture(({ tasks }) => {
+      tasks('add', 'left', '--id', 'left', '--spec', 'demo-spec', '--writes', 'src/runtime/combat.ts', '--grant', 'commitment');
+      tasks('add', 'right', '--id', 'right', '--spec', 'demo-spec', '--writes', 'src/runtime/combat.ts', '--grant', 'commitment');
+      const committed = tasks('plan', 'left', 'right').stdout;
+      expect(committed).toContain('2 of those a commitment');
+      expect(committed).toContain('[defect] left and right both write');
+
+      tasks('edit', 'right', '--grant', 'forecast');
+      const forecast = tasks('plan', 'left', 'right').stdout;
+      expect(forecast).toContain("[note] left and right both write");
+      expect(forecast).toContain("right's grant is forecast");
+    }));
+});
+
+describe('setting a write grant, which asks what already claims those paths', () => {
+  it('answers without being asked, and does not report the record against its own grant', () =>
+    fixture(({ tasks }) => {
+      tasks('add', 'the first claim', '--id', 'first', '--writes', 'src/runtime/combat.ts');
+      const second = tasks('add', 'the second claim', '--id', 'second', '--writes', 'src/runtime/combat.ts');
+      expect(second.stdout).toContain('prior art on src/runtime/combat.ts');
+      expect(second.stdout).toContain('first — the first claim');
+      expect(second.stdout).not.toContain('second — the second claim');
+    }));
+
+  it('reaches a claim that closed, which is what a dispatch-set check cannot see', () =>
+    fixture(({ tasks }) => {
+      tasks('add', 'settled long ago', '--id', 'settled', '--writes', 'src/runtime/save.ts');
+      tasks('done', 'settled');
+      expect(tasks('add', 'the same region again', '--id', 'again', '--writes', 'src/runtime/save.ts').stdout).toContain('[done] settled');
+    }));
+
+  it('fires on edit as well as add, and says plainly when nothing has claimed the paths', () =>
+    fixture(({ tasks }) => {
+      tasks('add', 'a task', '--id', 'lonely');
+      expect(tasks('edit', 'lonely', '--writes', 'src/ui/untouched.ts').stdout).toContain('nothing has claimed src/ui/untouched.ts');
+    }));
+
+  it('stays quiet on an edit that sets no grant', () =>
+    fixture(({ tasks }) => {
+      tasks('add', 'a task', '--id', 'quiet', '--writes', 'src/runtime/combat.ts');
+      expect(tasks('edit', 'quiet', '--severity', 'low').stdout).not.toContain('prior art');
+    }));
+});
+
+describe('a close that says back what it knows', () => {
+  it('surfaces on the record the evidence a closer recorded with tasks note', () =>
+    fixture(({ tasks }) => {
+      tasks('add', 'the renaming', '--id', 'renames', '--spec', 'demo-spec');
+      tasks('done', 'renames');
+      tasks('note', 'checked all 28 renamed titles against the store; none had dropped', '--id', 'renames', '--actor', 'worker');
+      tasks('decision', 'the rewrite is one change, so one commit', '--id', 'renames', '--actor', 'worker');
+
+      const shown = tasks('show', 'renames').stdout;
+      expect(shown).toContain('2 judgement(s) recorded against this record');
+      expect(shown).toContain('checked all 28 renamed titles');
+      expect(shown).toContain('[decision]');
+      expect(shown).toContain('worker');
+    }));
+
+  it('says nothing about judgements on a record that carries none', () =>
+    fixture(({ tasks }) => {
+      tasks('add', 'plain work', '--id', 'plain');
+      expect(tasks('show', 'plain').stdout).not.toContain('judgement(s)');
+    }));
+
+  it('names the tasks decision command from done and from decline', () =>
+    fixture(({ tasks }) => {
+      tasks('add', 'closed work', '--id', 'closing');
+      expect(tasks('done', 'closing').stdout).toContain('tasks decision "<one line>" --id closing');
+
+      tasks('add', 'refused work', '--id', 'refusing');
+      expect(tasks('decline', 'refusing', '--reason', 'not worth it').stdout).toContain('tasks decision "<one line>" --id refusing');
+    }));
+
+  it('names it from triage too, which is the third place a disposition is decided', () =>
+    fixture(({ tasks, triage }) => {
+      tasks('add', 'a finding', '--id', 'a-finding', '--kind', 'finding', '--severity', 'high', '--deliverable', 'fix it', '--evidence', 'seen');
+      expect(triage('1\n').stdout).toContain('tasks decision "<one line>" --id a-finding');
+    }));
+});
+
+// The two behaviours this branch had to leave alone. Both are the tool
+// declining to let a close look tidier than it is, at the moment the
+// judgement is made.
+describe('what already worked, after the record verbs changed around it', () => {
+  it('still prints the clause standing a done closed against', () =>
+    fixture(({ tasks }) => {
+      tasks('audit', 'demo-spec', '--proof', '1=unmet', '--evidence', '1=the seam is still open', '--proof', '2=met', '--evidence', '2=clause 2 checked');
+      expect(tasks('done', 'demo-spec-clause-1').stdout).toContain('clause standing at close: proof clause 1 is unmet in the latest audit pass (pass 1)');
+    }));
+
+  it('still names a pass-2 promotion as extending what the spec owes', () =>
+    fixture(({ tasks }) => {
+      tasks('audit', 'demo-spec', '--proof', '1=met', '--evidence', '1=clause 1 checked', '--proof', '2=met', '--evidence', '2=clause 2 checked');
+      tasks('audit', 'demo-spec', '--proof', '1=met', '--evidence', '1=clause 1 checked', '--proof', '2=met', '--evidence', '2=clause 2 checked', '--finding', 'late finding', '--severity', 'low', '--deliverable', 'fix it', '--evidence', 'seen late');
+      const result = tasks('promote', 'demo-spec-pass2-late-finding');
+      expect(result.stdout).toContain('promoting a pass 2 finding, which extends what demo-spec owes: demo-spec-pass2-late-finding');
+    }));
+});
+
+describe('a read that resolves a spec only where it uses one', () => {
+  // `claude/<topic>-<hash>` looks for a nested spec path that cannot exist,
+  // and the open-members route contests whenever more than one spec is live.
+  // The log already records the branch of every store write, so which spec a
+  // branch is working is derivable rather than declared.
+  it('infers the spec this branch last wrote to, which the branch name cannot answer for a worktree', () => {
+    fixture(({ tasks, dir, args }) => {
+      tasks('add', 'a member', '--id', 'a-member', '--spec', 'demo-spec');
+      tasks('add', 'elsewhere', '--id', 'elsewhere');
+      appendEvent(dir, { branch: 'claude/generated-2f9a11', spec: 'demo-spec', id: 'a-member' });
+      const result = runInProcess(['next', ...args(), '--branch', 'claude/generated-2f9a11']);
+      expect(result.stdout).toContain('spec inferred from the event log: demo-spec');
+      expect(result.stdout).toContain('the most recent spec written from claude/generated-2f9a11');
+    });
+  });
+
+  it('leaves the default branch inferring nothing, whatever the log holds', () => {
+    fixture(({ tasks, dir, args }) => {
+      tasks('add', 'a member', '--id', 'a-member', '--spec', 'demo-spec');
+      appendEvent(dir, { branch: 'main', spec: 'demo-spec', id: 'a-member' });
+      expect(runInProcess(['next', ...args(), '--branch', 'main']).stdout).toContain('no active spec for this branch');
+    });
+  });
+
+  it('answers `spec show` with no slug the way `next` answers with no --spec', () => {
+    fixture(({ tasks }) => {
+      tasks('add', 'a member', '--id', 'a-member', '--spec', 'demo-spec');
+      const result = tasks('spec', 'show');
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('spec inferred from the branch name: demo-spec');
+      expect(result.stdout).toContain('a-member');
+    });
+  });
+});
+
+// The store is versioned with the code, so a checkout that predates a
+// branch's writes answers `0 task(s)` — indistinguishable from "those
+// records are gone", which is what sent a session to `git show` piped
+// through `node -e` to recover them.
+describe('a query that cannot see a record', () => {
+  it('says the read is scoped to this checkout, and how much the file holds', () => {
+    fixture(({ tasks }) => {
+      tasks('add', 'a task', '--id', 'a-task');
+      const result = tasks('search', 'a-word-no-record-carries');
+      expect(result.stdout).toContain('0 task(s)');
+      expect(result.stdout).toContain('1 record(s) in the whole file');
+      expect(result.stdout).toContain('A record written on another branch is not in this one until that branch merges');
+    });
+  });
+
+  it('says nothing of the sort when the query did match', () => {
+    fixture(({ tasks }) => {
+      tasks('add', 'a task', '--id', 'a-task');
+      expect(tasks('search', 'a-task').stdout).not.toContain('in the whole file');
+    });
+  });
+});
+
+// Both misses measured came from the CLI's own vocabulary, so the refusal
+// can answer them out of the same usage strings the parser enforces.
+describe('a refusal that names the near miss', () => {
+  it('tells `spec add --id` that ids go here as positionals', () => {
+    fixture(({ tasks }) => {
+      const result = tasks('spec', 'add', 'demo-spec', '--id', 'a-task');
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain('`spec add` takes <id> as a positional, not as a flag');
+    });
+  });
+
+  // Naming the owning verb and then fourteen undifferentiated flags still
+  // left a caller to pick, and the clause's own text is that `--note` wants
+  // `--evidence`. The near miss is derived from the shape of the value the
+  // flag wants where it does exist: prose misses prose.
+  it('tells `add --note` which verb owns that flag and which of this verb takes prose', () => {
+    fixture(({ tasks }) => {
+      const result = tasks('add', 'a title', '--note', 'some prose');
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain('--note: not a flag of `add` — it belongs to `concept`');
+      // The list flags, the choices and the identifiers are not the near
+      // miss and are not offered as one — checked on the near-miss line
+      // itself, since the usage printed below it names every flag.
+      const nearMiss = result.stderr.split('\n').find((line) => line.includes('takes prose in'));
+      expect(nearMiss).toBe('  `add` takes prose in: --produces, --deliverable, --evidence');
+    });
+  });
+
+  it('points an npm script refused as a verb at npm run', () => {
+    fixture(({ tasks }) => {
+      const result = tasks('audit-status');
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain('`audit-status` is an npm script of this repository, not a tasks verb — run `npm run audit-status`');
+    });
+  });
+});
+
+// The map from clauses to owners is a decomposition session's whole output,
+// and it had nowhere to go but prose: seventeen clauses and twelve members,
+// with the mapping in twelve deliverable strings no reader can join.
+describe('a task that records which clauses it discharges', () => {
+  it('records them from add, reads c3 and 3 alike, and shows them back', () => {
+    fixture(({ tasks }) => {
+      const added = tasks('add', 'a slice', '--id', 'slice', '--spec', 'demo-spec', '--discharges', 'c2,1,c1');
+      expect(added.status).toBe(0);
+      expect(tasks('show', 'slice').stdout).toContain('discharges: c1, c2');
+    });
+  });
+
+  it('adds and removes the clauses a task discharges through edit', () => {
+    fixture(({ tasks }) => {
+      tasks('add', 'a slice', '--id', 'slice', '--spec', 'demo-spec', '--discharges', 'c1');
+      expect(tasks('edit', 'slice', '--discharges', 'c1,c2').stdout).toContain('edited slice: discharges');
+      expect(tasks('show', 'slice').stdout).toContain('discharges: c1, c2');
+
+      // An empty value clears them, so a slice that turns out to owe nothing
+      // can say so without the record keeping a claim it no longer makes.
+      tasks('edit', 'slice', '--discharges', '');
+      expect(tasks('show', 'slice').stdout).not.toContain('discharges:');
+    });
+  });
+
+  it('refuses something that is not a clause number rather than recording it', () => {
+    fixture(({ tasks }) => {
+      const result = tasks('add', 'a slice', '--id', 'slice', '--spec', 'demo-spec', '--discharges', 'the second one');
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain('--discharges takes clause numbers, as 3 or c3');
+    });
+  });
+
+  it('names the owner of every clause standing, and says plainly which clause has none', () => {
+    fixture(({ tasks }) => {
+      tasks('add', 'a slice', '--id', 'slice', '--spec', 'demo-spec', '--discharges', 'c1');
+      const shown = tasks('spec', 'show', 'demo-spec').stdout;
+      expect(shown).toContain('owed by: slice (open)');
+      expect(shown).toContain('owed by: nobody — `tasks edit <id> --discharges c2` names the slice that does');
+    });
+  });
+
+  it('reports a claim on a clause when no spec says what the number means', () => {
+    fixture(({ tasks }) => {
+      tasks('add', 'a slice', '--id', 'slice', '--discharges', 'c1');
+      expect(tasks('doctor').stdout).toContain('slice claims to discharge clause(s) 1 and names no spec');
+    });
+  });
+});
+
+// The one moment the whole capability landscape is in view, and the moment a
+// planner is least likely to stop and ask.
+describe('tasks spec new', () => {
+  it('prints the capability survey and the reminder that the judgement belongs in ## Decisions', () => {
+    fixture(({ tasks }) => {
+      const result = tasks('spec', 'new', 'a-fresh-spec');
+      expect(result.stdout).toContain('tasks where <path>');
+      expect(result.stdout).toContain('tasks produces "<name>"');
+      expect(result.stdout).toContain('## Decisions');
+      expect(result.stdout).toContain('adds, extends');
+    });
+  });
 });
 
 describe('tasks plan, against producers that already exist', () => {
@@ -3896,5 +4400,133 @@ describe('the commit-msg hook launcher', () => {
     const fallback = hook.indexOf('npx tsx scripts/tasks.ts check-commit-msg');
     expect(local).toBeGreaterThan(-1);
     expect(fallback).toBeGreaterThan(local);
+  });
+});
+
+// Twelve --proof/--evidence pairs carrying test names, mutation verdicts and
+// probe output ran past the Windows 8191-character command line in two
+// separate sessions, and the pass after them compressed its evidence to fit.
+// Only the transport moves: the same parser, the same one store write.
+// A target naming a test that does not exist is worse than no target:
+// `vitest -t "<no such name>"` skips every test and exits 0, so an auditor
+// following the brief gets a green run that asserted nothing. Measured at 40
+// of 49 on this spec's own first pass, and unobservable until someone tried
+// to run one.
+describe('a proof target that names no test', () => {
+  // A real test file: titles, but also an assertion argument and a comment
+  // carrying strings that are not titles. The first fixture here made every
+  // string a title, which is exactly why none of these tests could see the
+  // checker matching the whole file rather than the titles in it.
+  const file = [
+    '// a comment mentioning a phrase nobody named a test after',
+    "it('a test that exists', () => {",
+    "  expect(report).toContain('a phrase asserted but never named');",
+    '});',
+    "it('one with an apostrophe in doctor\\'s name', () => {});",
+    "it.each([1])('a parameterised title', () => {});",
+  ].join('\n');
+  const read = (): string => file;
+
+  it('says so, and says why a green run would not have caught it', () => {
+    const note = unresolvedTarget('vitest a.test.ts "a test nobody wrote"', read);
+    expect(note).toContain('a.test.ts has no test by this name');
+    expect(note).toContain('exit 0');
+  });
+
+  it('stays quiet on a target that resolves', () => {
+    expect(unresolvedTarget('vitest a.test.ts "a test that exists"', read)).toBeNull();
+    expect(unresolvedTarget('vitest a.test.ts "a parameterised title"', read)).toBeNull();
+  });
+
+  // The hole this checker was installed to close, reopened one level up: a
+  // target naming an assertion argument or a comment read as resolved, and
+  // `vitest -t` on it still skips every test and exits 0. A guard that fails
+  // in the direction that hides recurrence is worse than none.
+  it('reads titles only, so an assertion argument or a comment is not a resolved target', () => {
+    expect(unresolvedTarget('vitest a.test.ts "a phrase asserted but never named"', read)).toContain('has no test by this name');
+    expect(unresolvedTarget('vitest a.test.ts "a phrase nobody named a test after"', read)).toContain('has no test by this name');
+  });
+
+  // The subtlety that would make the check lie: a title carrying an
+  // apostrophe is escaped in the source and is not at runtime, and a check
+  // that cried wolf over those would be one readers learn to skip.
+  it('does not cry wolf over a title whose apostrophe is escaped in the source', () => {
+    expect(unresolvedTarget(`vitest a.test.ts "one with an apostrophe in doctor's name"`, read)).toBeNull();
+  });
+
+  it('names a file that is not in this checkout as that, rather than as a missing test', () => {
+    expect(unresolvedTarget('vitest gone.test.ts "anything"', () => null)).toContain('names no file in this checkout');
+  });
+
+  it('has nothing to say about a target that is not a vitest one', () => {
+    expect(unresolvedTarget('command npm run layer-check', read)).toBeNull();
+  });
+});
+
+describe('an audit pass read from a file', () => {
+  it('reads the same flags, and lets a clause\'s evidence be a paragraph', () => {
+    const { argv } = parseAuditFile(
+      ['--proof 1=met', '--evidence 1=ran npm test: 914 passed.', '  and `npm run mutate` killed all six.', '--proof 2=unmet', '--evidence 2=the seam is still open'].join('\n'),
+      'pass.txt',
+    );
+    expect(argv).toEqual([
+      '--proof',
+      '1=met',
+      '--evidence',
+      '1=ran npm test: 914 passed.\n  and `npm run mutate` killed all six.',
+      '--proof',
+      '2=unmet',
+      '--evidence',
+      '2=the seam is still open',
+    ]);
+  });
+
+  it('skips blank lines and comments, so a file can be annotated', () => {
+    const { argv } = parseAuditFile('# the pass for 2026-08-04\n\n--proof 1=met\n\n--evidence 1=checked\n', 'pass.txt');
+    expect(argv).toEqual(['--proof', '1=met', '--evidence', '1=checked']);
+  });
+
+  it('refuses a value line that continues nothing', () => {
+    const { errors } = parseAuditFile('evidence with no flag above it\n', 'pass.txt');
+    expect(errors[0]).toContain('pass.txt:1: a value line before any flag');
+  });
+
+  it('records a whole pass from a file, and a flag typed beside it still wins', () => {
+    fixture(({ tasks, dir }) => {
+      const passFile = path.join(dir, 'pass.txt');
+      writeFileSync(passFile, '--proof 1=met\n--evidence 1=clause 1 checked against the suite\n--proof 2=unmet\n--evidence 2=the seam is still open\n', 'utf8');
+      const result = tasks('audit', 'demo-spec', '--args-from', passFile);
+      expect(result.status).toBe(0);
+
+      const shown = tasks('spec', 'show', 'demo-spec').stdout;
+      expect(shown).toContain('1 audit pass(es) recorded');
+      expect(shown).toContain('c2 (unmet)');
+      expect(tasks('show', 'demo-spec-clause-2').stdout).toContain('[undelivered/open/high]');
+    });
+  });
+
+  // The second half of the name above, which nothing asserted: the file's
+  // flags are parsed first and the command line's after, so a flag given in
+  // both places resolves to what was typed. The transport moved; which
+  // argument is the more specific one did not.
+  it('lets a flag typed beside --args-from override the same flag inside it', () => {
+    fixture(({ tasks, dir }) => {
+      const passFile = path.join(dir, 'pass.txt');
+      writeFileSync(passFile, '--proof 1=met\n--evidence 1=from the file\n--proof 2=met\n--evidence 2=from the file\n', 'utf8');
+      expect(tasks('audit', 'demo-spec', '--args-from', passFile, '--proof', '2=unmet', '--evidence', '2=typed beside it').status).toBe(0);
+
+      const shown = tasks('spec', 'show', 'demo-spec').stdout;
+      expect(shown).toContain('c2 (unmet)');
+      expect(shown).not.toContain('c2 (met)');
+      expect(tasks('show', 'demo-spec-clause-2').stdout).toContain('[undelivered/open/high]');
+    });
+  });
+
+  it('says which file it could not read rather than recording an empty pass', () => {
+    fixture(({ tasks, dir }) => {
+      const result = tasks('audit', 'demo-spec', '--args-from', path.join(dir, 'absent.txt'));
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain('--args-from could not read');
+    });
   });
 });

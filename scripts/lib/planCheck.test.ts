@@ -12,9 +12,11 @@ function task(overrides: Partial<Task> & { id: string }): Task {
     system: null,
     spec: null,
     clause: null,
+    discharges: [],
     requires: [],
     files: [],
     writes: [],
+    grant: null,
     produces: [],
     deliverable: null,
     evidence: null,
@@ -169,6 +171,67 @@ describe('checkPlan', () => {
   it('has nothing to say about a plan of one', () => {
     const plan = [task({ id: 'a', writes: ['src/one.ts'] })];
     expect(checkPlan(plan, plan).findings).toEqual([]);
+  });
+});
+
+// The measurement this weighing exists for: four independent roadmap tasks
+// reported five collisions on directory grants nobody had read the code
+// behind, and narrowing them to invented file paths made the check quiet by
+// making the record false. Only a pair of commitments is evidence.
+describe('checkPlan weighing a forecast against a commitment', () => {
+  const overlap = (a: Partial<Task>, b: Partial<Task>): Task[] => [
+    task({ id: 'a', writes: ['src/runtime'], ...a }),
+    task({ id: 'b', writes: ['src/runtime/combat.ts'], ...b }),
+  ];
+  const overlapping = (plan: Task[]): PlanFinding => checkPlan(plan, plan).findings.find((finding) => finding.kind === 'overlapping-writes') as PlanFinding;
+
+  it('calls an overlap between two commitments a defect', () => {
+    const finding = overlapping(overlap({ grant: 'commitment' }, { grant: 'commitment' }));
+    expect(finding.level).toBe('defect');
+    expect(finding.message).toContain('one change, split across two workers');
+    expect(finding.message).not.toContain('weighed as a note');
+  });
+
+  it('reports the same overlap as a note when one side is only a forecast, and names that side', () => {
+    const finding = overlapping(overlap({ grant: 'forecast' }, { grant: 'commitment' }));
+    expect(finding.level).toBe('note');
+    expect(finding.message).toContain("a's grant is forecast");
+  });
+
+  it('reports an overlap a record has said nothing about as a note that says so', () => {
+    const finding = overlapping(overlap({}, { grant: 'commitment' }));
+    expect(finding.level).toBe('note');
+    expect(finding.message).toContain("a's grant is unstated");
+  });
+
+  it('weighs an unstated dependency the same way, because it rests on the same paths', () => {
+    const plan = [
+      task({ id: 'seam', writes: ['scripts/lib/policy.ts'], produces: ['policy module'], grant: 'forecast' }),
+      task({ id: 'caller', writes: ['scripts/lib/policy.ts'], grant: 'commitment' }),
+    ];
+    const finding = checkPlan(plan, plan).findings.find((f) => f.kind === 'unstated-dependency') as PlanFinding;
+    expect(finding.level).toBe('note');
+    expect(finding.message).toContain('caller does not require seam');
+  });
+
+  it('weighs a concentrated plan by the grants concentrating it', () => {
+    const forecasts = ['a', 'b', 'c'].map((id) => task({ id, writes: ['scripts/tasks.ts'], grant: 'forecast' }));
+    expect(checkPlan(forecasts, forecasts).findings.find((f) => f.kind === 'cohesion')?.level).toBe('note');
+
+    const committed = forecasts.map((one) => ({ ...one, grant: 'commitment' as const }));
+    expect(checkPlan(committed, committed).findings.find((f) => f.kind === 'cohesion')?.level).toBe('defect');
+  });
+
+  it('counts how many readable grants are commitments, so a clean plan of forecasts cannot read as compared', () => {
+    const plan = [
+      task({ id: 'a', writes: ['src/one.ts'], grant: 'commitment' }),
+      task({ id: 'b', writes: ['src/two.ts'], grant: 'forecast' }),
+      task({ id: 'c', writes: ['src/**/*.ts'], grant: 'commitment' }),
+      task({ id: 'd' }),
+    ];
+    const report = checkPlan(plan, plan);
+    expect(report.commitments).toBe(1);
+    expect(report.ungranted).toBe(2);
   });
 });
 

@@ -34,6 +34,18 @@ export function summarize(text: string): string {
   return text.split('\n').map((line) => line.trim()).filter((line) => line.length > 0).join(' ');
 }
 
+// A stored prose field is the value half of a labelled line printed among
+// `files:`, `writes:` and `produces:`, so its soft-wrapped tail lands flush
+// at column zero against the next label — the exact shape wrapUnder was
+// added to prevent, and `tasks next` was emitting one line of 2171
+// characters into it. `full` keeps the author's own line breaks and wraps
+// each of them; `brief` has already been joined to one line by `summarize`.
+function proseLines(label: string, text: string): string[] {
+  const [first, ...rest] = text.split('\n');
+  const hanging = ' '.repeat(label.length + 2);
+  return [...wrapUnder(first, `${label}: `), ...rest.flatMap((line) => wrapUnder(line, hanging))].map((line) => line.trimEnd());
+}
+
 // The one rendering of a task, at the three verbosities anything asking for
 // one has ever needed: a `row` for a queue or a member list, a `brief`
 // record whose prose is summarized, and the `full` record. Every command
@@ -56,13 +68,16 @@ export function renderTask(task: Task, byId: Map<string, Task>, detail: Detail, 
   const lines = [`${task.id}  [${taskTag(task)}]${blocked}`, task.title];
   if (task.system) lines.push(`system: ${task.system}`);
   lines.push(`spec: ${task.spec ?? '(deferred)'}`);
+  if (task.discharges.length > 0) lines.push(`discharges: ${task.discharges.map((clause) => `c${clause}`).join(', ')}`);
   if (task.requires.length > 0) lines.push(requiresLine(task, byId));
   if (task.files.length > 0) lines.push(`files: ${task.files.join(', ')}`);
-  if (task.writes.length > 0) lines.push(`writes: ${task.writes.join(', ')}`);
+  // The kind rides with the grant, never on its own line: a reader deciding
+  // whether these paths are a promise or a guess is looking at the paths.
+  if (task.writes.length > 0) lines.push(`writes (${task.grant ?? 'kind unstated'}): ${task.writes.join(', ')}`);
   if (task.produces.length > 0) lines.push(`produces: ${task.produces.join(', ')}`);
   if (task.deliverable || task.evidence) lines.push('');
-  if (task.deliverable) lines.push(`deliverable: ${prose(task.deliverable)}`);
-  if (task.evidence) lines.push(`evidence: ${prose(task.evidence)}`);
+  if (task.deliverable) lines.push(...proseLines('deliverable', prose(task.deliverable)));
+  if (task.evidence) lines.push(...proseLines('evidence', prose(task.evidence)));
   if (task.source) lines.push(`source: ${task.source.spec} pass ${task.source.pass}`);
   if (task.reason) lines.push(`reason: ${prose(task.reason)}`);
   if (task.closed) lines.push(`closed: ${task.closed}`);
@@ -104,7 +119,6 @@ export function refuseUnknownIds(ids: string[], tasks: Task[]): void {
 export const TERMINAL_WIDTH = 78;
 
 const EVIDENCE_INDENT = '          ';
-const EVIDENCE_WRAP_WIDTH = TERMINAL_WIDTH - EVIDENCE_INDENT.length;
 
 export function packGreedy(parts: string[], separator: string, width: number): string[] {
   const lines: string[] = [];
@@ -142,10 +156,16 @@ export function truncateLine(text: string, max: number): string {
 // makes a continuation look like a new entry. So a line too long for the
 // report continues under its own structure instead. Nothing is cut: a word
 // wider than the budget keeps its line whole rather than losing its tail.
-const MIN_WRAP_WIDTH = 24;
+export const MIN_WRAP_WIDTH = 24;
 
 export function wrapUnder(text: string, first: string, hanging = ' '.repeat(first.length)): string[] {
-  const [head, ...rest] = wrapText(text, Math.max(TERMINAL_WIDTH - first.length, MIN_WRAP_WIDTH));
+  // Budgeted against whichever prefix is wider, because every line but the
+  // first carries the hanging one: budgeting from `first` alone put a
+  // 60-character hanging indent on top of a full-width line and returned a
+  // 134-character line. No caller trips it today — five of them pass a
+  // hanging indent no wider than their first — so the invariant this
+  // function's shape implies held by coincidence.
+  const [head, ...rest] = wrapText(text, Math.max(TERMINAL_WIDTH - Math.max(first.length, hanging.length), MIN_WRAP_WIDTH));
   return [`${first}${head}`, ...rest.map((line) => `${hanging}${line}`)];
 }
 
@@ -158,7 +178,7 @@ export function clauseStandingLines(standing: AuditVerdict, clauses: ProofClause
 
 export function printEvidence(evidence: string | null, maxLines = 12): void {
   if (!evidence) return;
-  const lines = evidence.split('\n').flatMap((line) => wrapText(line, EVIDENCE_WRAP_WIDTH));
-  for (const line of lines.slice(0, maxLines)) console.log(`${EVIDENCE_INDENT}${line}`);
+  const lines = evidence.split('\n').flatMap((line) => wrapUnder(line, EVIDENCE_INDENT));
+  for (const line of lines.slice(0, maxLines)) console.log(line);
   if (lines.length > maxLines) console.log(`${EVIDENCE_INDENT}… (${lines.length - maxLines} more line(s), see \`tasks show\`)`);
 }

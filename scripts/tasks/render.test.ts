@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { clauseStandingLines, packGreedy, summarize, TERMINAL_WIDTH, truncateLine, wrapText, wrapUnder } from './render';
+import { clauseStandingLines, MIN_WRAP_WIDTH, printEvidence, packGreedy, summarize, TERMINAL_WIDTH, truncateLine, wrapText, wrapUnder } from './render';
 
 describe('packGreedy', () => {
   it('fills each line to the width before starting the next', () => {
@@ -63,6 +63,25 @@ describe('wrapUnder', () => {
     const word = 'x'.repeat(TERMINAL_WIDTH + 20);
     expect(wrapUnder(word, '  - ')).toEqual([`  - ${word}`]);
   });
+
+  // Every line but the first carries the hanging indent, so budgeting from
+  // the first prefix alone put a 60-character indent on top of a full-width
+  // line: [76, 134] against a report of 78. No caller passes a hanging
+  // indent wider than its first prefix, so the invariant this function's own
+  // shape implies held only by coincidence across five call sites.
+  it('budgets against a hanging indent wider than its first prefix', () => {
+    const lines = wrapUnder('word '.repeat(30).trim(), '  ', ' '.repeat(40));
+    expect(lines.length).toBeGreaterThan(1);
+    for (const line of lines) expect(line.length).toBeLessThanOrEqual(TERMINAL_WIDTH);
+  });
+
+  // The one case that still overflows, and it is the floor doing it on
+  // purpose: a prefix leaving less than MIN_WRAP_WIDTH would otherwise wrap
+  // every line to a few characters, and nothing here ever cuts.
+  it('overflows only by the wrap floor when the indent leaves less than it', () => {
+    const lines = wrapUnder('word '.repeat(30).trim(), '  ', ' '.repeat(60));
+    for (const line of lines.slice(1)) expect(line.length).toBeLessThanOrEqual(60 + MIN_WRAP_WIDTH);
+  });
 });
 
 describe('clauseStandingLines', () => {
@@ -74,5 +93,42 @@ describe('clauseStandingLines', () => {
     for (const line of lines) expect(line.length).toBeLessThanOrEqual(TERMINAL_WIDTH);
     for (const line of lines.slice(1)) expect(line.startsWith('             ')).toBe(true);
     expect(lines.join(' ').replace(/\s+/g, ' ').trim()).toBe(`3. [unmet] ${text}`);
+  });
+});
+
+// printEvidence was the one wrap-and-indent loop in this file still written
+// out by hand, against a width constant that had to be re-derived whenever
+// TERMINAL_WIDTH or the indent moved. It goes through wrapUnder now, so
+// there is one wrap in the file rather than two.
+describe('printEvidence', () => {
+  const captured = (evidence: string | null, maxLines?: number): string[] => {
+    const lines: string[] = [];
+    const original = console.log;
+    console.log = (value: unknown) => void lines.push(String(value));
+    try {
+      printEvidence(evidence, maxLines);
+    } finally {
+      console.log = original;
+    }
+    return lines;
+  };
+
+  it('indents and wraps every line inside the report width', () => {
+    const lines = captured('word '.repeat(40).trim());
+    expect(lines.length).toBeGreaterThan(1);
+    for (const line of lines) {
+      expect(line.startsWith('          ')).toBe(true);
+      expect(line.length).toBeLessThanOrEqual(TERMINAL_WIDTH);
+    }
+  });
+
+  it('keeps its cap, and says how many lines it left out', () => {
+    const lines = captured('word '.repeat(200).trim(), 3);
+    expect(lines).toHaveLength(4);
+    expect(lines[3]).toContain('more line(s), see `tasks show`');
+  });
+
+  it('prints nothing at all for no evidence', () => {
+    expect(captured(null)).toEqual([]);
   });
 });

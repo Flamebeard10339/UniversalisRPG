@@ -15,6 +15,7 @@ import {
   systemNames,
   today,
   workingTreeOnlyIssues,
+  type Config,
 } from './context';
 
 // The one repair with exactly one correct answer. A record outside a
@@ -34,26 +35,33 @@ function repairStore(tasks: Task[]): Array<{ task: Task; message: string }> {
   return repaired;
 }
 
-export function cmdDoctor(args: Flags): void {
-  const config = resolveConfig(args.flags);
-  const { tasks, skipped } = loadStoreTolerantly(config.storePath);
+// Every check `doctor` reports, in one place, so a caller that needs the
+// count — `merge-ready`, whose summary was swallowing five warnings about
+// closes that existed only in the working tree — reads the same list the
+// report prints rather than parsing it back out of the output.
+export function doctorIssues(config: Config, tasks: Task[]): CheckIssue[] {
   const dirtyIssue = dirtyStoreIssue(config);
-
   // Mid-merge, HEAD is still the pre-merge commit: every record the other
   // side closed reads as a working-tree edit and every commit that closed
   // one reads as unreachable. Both checks answer about a tree that does not
   // exist yet, so they are suspended — the store-only checks are the ones
   // worth reading while resolving a conflict.
-  const merging = git.mergeInProgress();
-  const gitAnchored = merging ? [] : [...closedCommitIssues(tasks), ...workingTreeOnlyIssues(config, tasks)];
-
-  const issues = [
+  const gitAnchored = git.mergeInProgress() ? [] : [...closedCommitIssues(tasks), ...workingTreeOnlyIssues(config, tasks)];
+  return [
     ...checkStore(tasks, systemNames(config), (spec) => existsSync(specFile(config, spec))),
     ...gitAnchored,
     ...coldClaimIssues(tasks, today()),
     ...specIssues(config),
     ...(dirtyIssue ? [dirtyIssue] : []),
   ];
+}
+
+export function cmdDoctor(args: Flags): void {
+  const config = resolveConfig(args.flags);
+  const { tasks, skipped } = loadStoreTolerantly(config.storePath);
+
+  const merging = git.mergeInProgress();
+  const issues = doctorIssues(config, tasks);
 
   if (merging) console.log('a merge is in progress (MERGE_HEAD exists) — the git-anchored checks (working-tree-only state, closing-commit reachability) are suspended until it is committed');
 

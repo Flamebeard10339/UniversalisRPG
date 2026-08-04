@@ -230,7 +230,7 @@ describe('probe: --each, a survey of variants', () => {
 describe('probe: stdin carrying several documents', () => {
   it('splits on a line of ---, so one heredoc is a table', () => {
     const documents = splitDocuments('stdin', '# info a\nversion: 1.0.0\n---\n# info b\nversion: 1.0.0\n');
-    expect(documents.map((each) => each.name)).toEqual(['stdin[1]', 'stdin[2]']);
+    expect(documents.map((each) => each.name)).toEqual(['stdin-1', 'stdin-2']);
     expect(documents[1].text).toContain('# info b');
   });
 
@@ -247,7 +247,17 @@ describe('probe: stdin carrying several documents', () => {
   });
 
   it('drops the blank documents a leading or trailing separator produces', () => {
-    expect(splitDocuments('stdin', '---\n# info a\nversion: 1.0.0\n---\n').map((each) => each.name)).toEqual(['stdin[2]']);
+    expect(splitDocuments('stdin', '---\n# info a\nversion: 1.0.0\n---\n').map((each) => each.name)).toEqual(['stdin-2']);
+  });
+
+  // What the survey exists to answer: which variants load. A document with no
+  // `# info` takes its module id from its source name, so `stdin[3]` made
+  // every such variant report a refusal about its own name and nothing about
+  // the DSL under test.
+  it('names a document with an id the loader accepts, so a variant that loads says so', () => {
+    const documents = splitDocuments('stdin', '# variable a\nvalue: 1\n---\n# variable b\nvalue: 2\n');
+    const report = probe(documents, { show: [], roundTrip: false, each: true });
+    expect(report.lines).toEqual(['stdin-1: loads — variables 1', 'stdin-2: loads — variables 1']);
   });
 });
 

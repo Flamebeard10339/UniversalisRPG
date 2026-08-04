@@ -76,3 +76,118 @@ uncapped list on the real one.
 Worth considering: `blockerText` filters blockers whose `spec` equals the row's own spec, and says
 `N member(s) ordered behind others` if it wants to say anything at all. The annotation it already
 prints is the evidence that it knows which ones they are.
+
+### `npm run mutate` cannot find vitest from a git worktree
+
+Every one of twelve mutations came back `ERROR — could not read a test tally out of the run`, with
+a `MODULE_NOT_FOUND` stack under each. `mutate.ts:481` spawns
+`path.join(repoRoot, 'node_modules/vitest/vitest.mjs')`, and a worktree cut under
+`.claude/worktrees/` has no `node_modules` of its own — only an empty directory left by the spawn.
+`npx vitest` and `npm test` both work there, because node's resolution walks up to the main
+checkout's `node_modules`; the hardcoded join is the one path that does not.
+
+The report is honest — `errored`, not `survived`, so nothing was falsely certified — but the twelve
+stack traces bury the one fact that would fix it, which is that the file it tried to run is not
+there. The cost was one full mutation run plus the archaeology; the fix was a junction, and the
+tool never suggested one.
+
+Worth considering: resolve vitest the way node would rather than by joining to `repoRoot` — or,
+when that join misses, say `no vitest at <path> — this looks like a worktree without its own
+node_modules` once, before running anything, instead of once per mutation as a stack trace. Same
+shape as clause 8: a refusal that holds the information the caller needs and prints something else.
+
+## `prior-art-by-path` worker, 2026-08-04
+
+### `git worktree remove` follows a junction and deletes the main checkout's `node_modules`
+
+On Windows, never `git worktree remove` a worktree that contains a junction. Unlink the junction
+first — `rmdir` on a junction removes the link and leaves the target alone:
+
+    cmd //c "rmdir .claude\worktrees\<name>\node_modules"
+
+then remove the worktree.
+
+The part worth noticing: that junction only ever existed because of the `mutate.ts` bug —
+`path.join(repoRoot, 'node_modules/vitest/vitest.mjs')` instead of resolving the way node does.
+The first worker measured that `npm test` and `npx vitest` work fine from a worktree with no
+junction at all; the junction was a workaround for one hardcoded path, and the workaround is what
+wiped the dependencies.
+
+So the fix already folded into `load-path-tool-refusals` retires this whole failure class, not just
+twelve errored mutations. That raises its priority: it is cheap, `scripts/lib/tsxCli.ts` is the
+in-repo pattern for it, and until it lands every worker that reaches for mutation testing recreates
+the hazard.
+
+### `npx tsx -e`'s silent exit is not an inconvenience, it erases a stored field
+
+Appending one sentence to `load-path-tool-refusals`' `evidence` meant reading the current value
+first, and the obvious read was `EV=$(npx tsx -e "import { loadStore } … process.stdout.write(…)")`.
+That is the exact call clause 14 already describes: it exits 0 with no output and no error. So `$EV`
+was the empty string, `tasks edit --evidence "$EV <new sentence>"` was a well-formed command, and
+`edit` correctly reported `edited load-path-tool-refusals: evidence` while replacing 1011 characters
+of measured evidence with 350. It was caught by reading the record back; nothing in the chain said
+anything was wrong, because nothing in the chain was wrong.
+
+Recovery was `git show HEAD:docs/tasks.jsonl` and a `node -e` over plain JSON — no repo imports, so
+it worked. The store being versioned with the code is what made this a two-minute repair rather than
+a loss, which is the argument for that design and not a reason to leave the hazard.
+
+The clause already asks for repo-resolved evaluation and is owned by `expression-inspector`. What
+this adds is the severity: a silent empty result feeding a write command is a data-loss shape, not a
+convenience gap, and it is reachable by any session that composes a read into an `edit`. Worth
+considering alongside it: `edit` refusing an `--evidence` that would shrink a non-empty field by an
+order of magnitude, the way a diff tool asks before discarding. That is a guess at a rule and the
+repo is right to resist new gates — but the failure it would have caught is recorded here now, which
+is the evidence a gate is supposed to earn its place with.
+
+### A `proof:` target naming no test is green, not red
+
+Verifying `tool-friction-backlog`'s clauses meant running each `proof: vitest <file> "<name>"` the
+brief points at. `npx vitest run scripts/tasks/mergeReady.test.ts -t "merge-ready fails on a dirty
+tree"` reports `Test Files 1 skipped (1) / Tests 12 skipped (12)` and exits 0. Nothing distinguishes
+that from a target that ran and passed, so an auditor doing exactly what the brief says can record
+`met` on the strength of a command that asserted nothing. Forty of that spec's forty-nine targets are
+in this state, which is how it was noticed at all: the count was too high to be coincidence.
+
+The audit's own findings cover the drifted names. What belongs here is the harness half — a filter
+that matches nothing is indistinguishable from a filter that matches and passes, so the drift is
+undetectable at the moment it matters. Whether the answer is `--allowOnly`-style strictness, a
+`doctor` read over `proofTargets` (which today only `audit.ts` reads, and only to print), or nothing
+at all, the fact is that the one mechanism the spec's `## Decisions` defends as "a declaration to the
+auditor" has no way to say it has gone stale.
+
+### `npm run mutate` escalating survivors past the tool timeout
+
+A nine-mutation manifest over `scripts/tasks.test.ts` and `scripts/tasks/mergeReady.test.ts` ran past
+the 600-second harness timeout and had to be backgrounded. The cost is correct and by design — two
+survivors each escalate to the whole suite, and the whole-suite baseline is measured once — but it
+means a mutation-testing pass is not a foreground command at this size, and an auditor budgeting
+against the repo's five-minutes rule will guess wrong. Splitting the manifest by scope, so survivors
+in one file escalate without dragging the rest, was the workaround. Worth a line in the tool's own
+usage that a survivor costs a whole-suite run, since the manifest is written before anyone knows
+which mutations will survive.
+
+## `tool-friction-backlog` auditor, pass 2, 2026-08-04
+
+### `mutate`'s narrowest scope is a file, and one file here is the whole suite
+
+Eleven mutations scoped to `scripts/tasks.test.ts` took roughly twenty minutes. `scripts/tasks.test.ts`
+alone runs in 93 seconds — the whole 59-file suite runs in 92, because it is 315 CLI tests each
+spawning a process — so "name a narrow scope" bought nothing, and every mutation paid a full-suite
+cost to be killed by one test.
+
+`Mutation.tests` takes file paths and hands them to `vitest run`. There is no way to say "this
+mutation can only be killed by these three tests", which is exactly what the manifest author knows and
+`vitest -t` already accepts. A `-t` field passed through would have turned twenty minutes into about
+one, and the verdict would be sharper: `1 failed of 315` does not say which test, so confirming *which*
+test holds a behaviour still needs a second run by hand. That second run is what this pass needed to
+establish that clause 19's five named proof targets do not hold its fix — the mutation reported KILLED,
+and only a hand-run `vitest -t` over the five named targets showed that none of them was the killer.
+
+### `npm run inspect`'s refusal of `require` is a raw ReferenceError
+
+`npm run inspect -- "require('./scripts/tasks/audit')"` answers `ReferenceError: require is not
+defined`. The usage does say to reach a module with `load`, but the failure is silent about it, and
+`require` is what a reader who has not read the usage will try first. Same shape as clause 8: the
+command knows the answer — there is exactly one way in and it is named in the usage two lines above —
+and prints the runtime's error instead of it.
