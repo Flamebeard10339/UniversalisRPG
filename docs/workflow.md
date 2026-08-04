@@ -49,11 +49,13 @@ Every command is `npm run tasks -- <verb>`. The record verbs (`show`, `edit`, `s
    and findings with `tasks audit` (or archives a report under `docs/audits/` and
    `tasks import`s it). Filing findings without `--proof` flags appends no pass, so late findings
    never reset verdicts.
-9. **Triage.** Findings from the branch's **own first pass** skip the walk: promote HIGHs and
-   anything judged fix-now with `tasks promote <id>... ` — they are always promoted anyway, and a
-   human can interrupt. From pass 2 on, promotion extends what the spec owes, so it waits for the
-   human: `tasks triage` walks the queue (`[1] promote [2] defer [3] decline [4] redirect
-   [a] ask [s] skip [q] quit`; `[a]` records a question on the finding and leaves it unreviewed).
+9. **Triage.** A separate step with a separate actor: the auditor files findings and never promotes
+   one, and `audit-prompt` tells it so. Findings from the branch's **own first pass** skip the walk:
+   promote HIGHs and anything judged fix-now with `tasks promote <id>... ` — they are always
+   promoted anyway, and a human can interrupt. From pass 2 on, promotion extends what the spec owes,
+   so it waits for the human: `tasks triage` walks the queue (`[1] promote [2] defer [3] decline
+   [4] redirect [a] ask [s] skip [q] quit`; `[a]` records a question on the finding and leaves it
+   unreviewed).
 10. **Close and merge.** `tasks spec done <slug>` when every member is done or declined.
     `tasks merge-ready` runs the whole merge gate — tsc, tests, layer-check, audit-status, doctor,
     byte check — one line per leg, non-zero when a leg fails.

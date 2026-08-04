@@ -2600,7 +2600,13 @@ describe('tasks CLI', () => {
       // have. Promotion at pass 2+ was removed from the tool; the prompt
       // asked for it anyway, on every invocation, for every future auditor.
       expect(result.stdout).not.toContain('Do not promote pass-2+ findings.');
-      expect(result.stdout).toContain('Promotion is the human triager\'s call at any pass');
+      // The brief and workflow.md step 9 describe one rule from two sides, so
+      // they have to agree on the pass asymmetry: an auditor never promotes,
+      // and the triage step that does treats pass 1 differently from pass 2+.
+      expect(result.stdout).toContain('You file findings; you never promote them');
+      expect(result.stdout).toContain('first-pass findings are promoted without a walk');
+      expect(result.stdout).toContain('from pass 2 on, promotion extends what the spec already owes');
+      expect(result.stdout).not.toContain('at any pass');
     });
   });
 

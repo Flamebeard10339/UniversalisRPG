@@ -216,7 +216,7 @@ export function cmdAuditPrompt(args: Flags, usage: string): void {
   console.log('If you write a report document, archive it under docs/audits/ before the session ends — but the store is the record of note.');
   console.log('');
   console.log('Report each clause as met, unmet or unknown. `met` carries the evidence that backs it and the tool refuses it without one; `unmet` means you checked and it fails; `unknown` means nobody looked, and reporting it as unmet instead hides that nothing was verified.');
-  console.log('Promotion is the human triager\'s call at any pass — you file findings, you do not schedule them. Say plainly which of yours you believe this branch must not merge without.');
+  console.log('You file findings; you never promote them. Triage is a separate step with a separate actor, and its rule differs by pass: a branch\'s own first-pass findings are promoted without a walk, so a HIGH you file here will be scheduled without anyone asking you again; from pass 2 on, promotion extends what the spec already owes and waits for a human. Say plainly which of yours you believe this branch must not merge without.');
 }
 
 interface AuditFinding {

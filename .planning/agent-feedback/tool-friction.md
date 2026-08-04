@@ -4,264 +4,75 @@ Raw notes on where the tooling — repo scripts, the agent harness, the CLI — 
 produced a wrong state. Each entry is something that actually happened, not a speculative
 improvement. One section per session, newest last.
 
+An entry leaves this file when a spec clause has taken it over, and the clause carries its evidence
+verbatim; `git log -- .planning/agent-feedback/tool-friction.md` holds the original wording. The
+2026-07-28 through 2026-08-04 entries were drained into `docs/specs/tool-friction-backlog.md` at
+`f004048` — twenty entries into sixteen clauses, plus one that was already fixed before the drain
+(`audit-prompt` naming two log paths that did not exist, repaired in `605b868`).
+
 ## Entries
 
 <!-- Append below. Newest last. Name the pass and the date. -->
 
-## `tasks-roadmap`, audit pass 1 — 2026-08-03
-
-Folded in from `.planning/feedback/audit-tool-friction.md`, which was a second log at a second
-path for the same purpose; see the 2026-08-04 entry below.
-
-### `tasks audit` with a full pass plus findings exceeds the Windows argument limit
-
-`audit-prompt` asks for verdicts and findings "in the same `tasks audit` call". Nine clauses with
-re-runnable evidence plus five findings with both halves came to roughly 13k characters of argv, and
-the shell answered `The command line is too long.` — nothing ran, and the failure arrives after the
-whole invocation has been composed.
-
-Worked around by splitting into six calls: one carrying all nine `--proof`/`--evidence` pairs, then
-one finding each. That is safe by the command's own design (`findings with no --proof flags are filed
-without recording a pass`), and the output confirms it each time — but the prompt's phrasing reads as
-though one call is required, so the split looks like a workflow violation until you check.
-
-Worth considering: `tasks audit --from <file>` reading the same flags from a JSON or argfile, which
-would also stop long evidence from being escaped through two shells.
-
-### No cheap way to ask a `scripts/` renderer a question with a synthetic store
-
-`npm run probe` asks the DSL load path questions without a scratch runner, and CLAUDE.md says to reach
-for it instead of a scratch `*.test.ts`. There is no equivalent for the task-system CLI: verifying the
-78-column clause against a store the real one cannot contain meant writing a throwaway `.ts` at the
-repo root and deleting it, because `npx tsx -e` does not resolve the repo's relative imports. `npm run
-mutate` covered the rest of the clauses well — twelve mutations, twelve killed — so the gap is
-specifically "render this view over records I made up", not "test the logic".
-
-## `tasks-roadmap`, closing the pass-1 findings through to merge — 2026-08-04
-
-Four promoted findings fixed, self-review, pass 2 commissioned, triage, merge to main.
-
-### `tasks spec show` refuses the slug `tasks next` infers
-
-First command of the session, and it was a wrong guess. `tasks next` prints `spec inferred from the
-branch name: tasks-roadmap — docs/specs/tasks-roadmap.md exists`, so inference reads as ambient;
-`tasks spec show` answers with usage. Every read verb that can infer the spec should, or none should.
-
-### Querying the store from a different branch answers `0 task(s)` instead of refusing
-
-After `git checkout main` for the merge, `tasks search per-system` and `tasks list --spec
-tasks-roadmap` both returned `0 task(s) — unreviewed: 0, open: 0, …`. Nothing was wrong: main's
-`docs/tasks.jsonl` predated the branch, so the records genuinely did not exist at that ref. But the
-answer is indistinguishable from "those findings are gone", and the store being versioned with the
-code makes every query silently ref-scoped. Recovered by piping `git show tasks-roadmap:docs/tasks.jsonl`
-into a `node -e` script, because `--store` takes a path and there is no way to name a revision.
-
-Worth considering: a global `--at <ref>`, or a one-line warning when the inferred branch and the
-newest event in the store disagree about which branch is live.
-
-### `tasks show` does not surface what `tasks note` records
-
-Closing `…-the-gui-rebuild-title-rewrite-dropped-de` required a mechanical check over all 28 renamed
-titles. That check — the actual evidence for closing a medium finding — went into `tasks note --id
-<finding>`, since editing the finding's `evidence` would have rewritten the auditor's statement.
-`tasks show` on that record then prints `closed`, `closedCommit` and nothing else. The record says
-*that* it closed and never *why*, and carries no pointer to `tasks log --id`, so the evidence is only
-reachable by someone who already knows it exists.
-
-### The synthetic-store gap above reproduced, independently
-
-Verifying the 78-column clause still held after the renderer refactor meant the same throwaway script.
-`tsx` could not resolve the repo's relative imports from the scratchpad path, so it ended as
-`npm run tasks -- roadmap | node -e '…'` — which also turned out to be necessary for a second reason:
-`awk`'s `length()` counts bytes, and the footer's `·` separator is multi-byte, so a byte-counting
-measurement reports the shipped output at 79 columns against a 78-column clause. Two sessions now have
-hit the "render this view over records I made up" gap from opposite directions.
-
-### Two friction logs at two paths, because `audit-prompt` names two that do not exist
-
-This file and `.planning/feedback/audit-tool-friction.md` were the same log in two places, neither
-referencing the other. Not an accident: `audit.ts:178-179` printed `Log any task tool friction in
-.planning/feedback/tool-friction.md` and `Log any audit tool friction in
-.planning/feedback/audit-tool-friction.md`, and every auditor is commissioned by being told to run
-`audit-prompt` and do what it says. Both named paths were wrong — the log has always been at
-`.planning/agent-feedback/tool-friction.md` — so the auditor created the file the brief asked for,
-in the directory the brief invented.
-
-Merged here and the other deleted, and `audit.ts` now names one log. Deleting the file without
-fixing the generator would have recreated it on the next audit. Worth noticing that the failure
-CLAUDE.md warns about — a system required to be manually kept in sync — landed in the file that
-exists to catch exactly that, via the one document nobody hand-writes.
-
-### Merge readiness is six reads across two tools, and `merge-ready` answers none of them
-
-Preparing the merge, the questions that had to be answered by hand were: is the tree clean
-(`git status`), has main moved past the merge base (`git rev-parse` + `git merge-base`), is every spec
-member done or declined and does the latest pass leave a clause outstanding (`tasks spec show`, twice
-over), and what subject shape do this repo's merge commits use (`git log --first-parent main`, then
-reading two previous merge bodies). `tasks merge-ready` ran last and passed every leg — but its six
-legs are all *repo* health (tsc, tests, layer-check, audit-status, doctor, bytes) and not one of them
-is about *this branch's standing*.
-
-Worth considering: `merge-ready` already sits at the right place in workflow step 9 and already reads
-git. Adding `branch`, `spec` and `clauses` legs would collapse six commands into none, and would fail
-loudly on the case that actually bites — main moved, so merge main in first. Printing the conventional
-merge command as its closing line would cover the rest. Stopping short of a `tasks merge` verb looks
-right: the merge body is the one artifact that has to be written by whoever did the work.
-
-### Commit messages are winning the reasoning against `tasks decision`
-
-Of 17 commits on this branch, 5 changed source code; 12 changed none (10 touched only
-`tasks.jsonl` + `events.jsonl`, 2 also touched the spec doc). The commit count itself costs little —
-`events.jsonl` already carries who, when, branch and head for every store write, so per-write commits
-are close to redundant with it.
-
-The cost is elsewhere. `workflow.md` step 10 says to record reasoning with `tasks decision "<one
-line>" --spec <slug>`, warning that a decision not recorded there is one the next planner
-re-litigates. It was never run this session. Every judgement — why the mechanical title check gets no
-gate, why the packing rule moved to `render.ts`, why the two pass-2 findings were triaged out of the
-spec — went into a commit body, because a commit was being written anyway and the message wanted one.
-The store, which is what a cold session actually reads, got only the terse auto-notes. Two channels
-for one thing, and the one with the writing prompt attached wins.
-
-Worth considering: have `done`, `decline` and `triage` print the `tasks decision` command the way
-`tasks done` already prints unregistered `produces` claims. Same nudge, same reason — the judgement is
-the point, so the store should be the path of least resistance rather than the commit body. Batching
-store writes to one commit per phase (triage → closures → `spec done` were four commits here and are
-one state change per pass) is discipline rather than a tool change.
-
-## droptables audit, 2026-08-04
-
-### A full `tasks audit` pass does not fit on a Windows command line
-
-The first attempt at recording twelve clause verdicts with evidence a next pass can re-run died on
-`The command line is too long.` — Windows caps a process command line at 8191 characters, and twelve
-`--proof N=... --evidence N="..."` pairs carrying test names, mutation verdicts and probe output ran
-well past it. The evidence had to be compressed to fit, which is the wrong pressure: the tool asks
-for evidence specific enough to re-run and then rations how much of it there is room for.
-
-Splitting is not a way out. `--proof` flags record a *pass*, and a clause left ungraded in a pass is
-recorded `unknown` — so two calls covering six clauses each would leave the first six reading
-`unknown` in the next `audit-prompt`. Findings split cleanly (three calls, no pass appended, verdicts
-stood), so the seam already exists for the half that does not need it.
-
-Worth considering: `tasks audit <spec> --from <file>` taking the same flags as lines, or JSON. The
-store write is one operation; only the transport is the problem.
-
-### `npm run mutate` cannot tell a line-ending mismatch from a wrong find
-
-This repo has mixed line endings — `src/**/*.ts` is CRLF on disk, `content/tutorial-island.dsl` is
-LF. A manifest whose multi-line `find` used `\n` was refused with `src/runtime/effects.ts does not
-contain the find text`, and the same manifest rewritten with `\r\n` was then refused for
-`content/tutorial-island.dsl`. Both messages are correct and neither is a clue; `cat -A` through
-git-bash shows LF for both, so the usual way of checking makes it worse. Two rounds went to this
-before a node one-liner comparing the raw bytes found it.
-
-Worth considering: when a `find` misses, retry once with the other line ending and, if that hits, say
-so in the refusal — `the find text matches with CRLF line endings; this file is CRLF`. The refusal
-already reads the whole file, so the check is free.
-
-## droptables audit pass 2, 2026-08-04
-
-### `npm run probe -- - --each` reports every document that loads as a broken module
-
-The usage text advertises stdin plus `--each` as the way to survey a table of variants, and it works
-for every variant that fails to load. A variant that loads *clean* reports `stdin[3] is not a usable
-module id` — `splitDocuments` names each document `${name}[${index + 1}]` (probe.ts:204) and the
-brackets are not legal in a module id, so the loader refuses the name rather than the content. The
-survey therefore cannot distinguish "loads" from "rejected", which is the one distinction a table of
-variants is asked for; every probe of an accepted shape had to be re-run as a temp file.
-
-Worth considering: name them `stdin-3`. One character, and the advertised path starts answering the
-question it exists for.
-
-### The CRLF trap in `npm run mutate` cost this pass two rounds as well
-
-Already logged from pass 1 below, and hit again immediately: two of ten mutations in the first
-manifest were refused with `does not contain the find text` purely because `\n` should have been
-`\r\n`. Recording the second occurrence because the fix suggested there — retry with the other line
-ending and say so — is now paid for twice.
-
-## droptables implementation, 2026-08-04
-
-Filed by the implementing session rather than an auditor, so the friction is in the verbs a worker
-touches on the way through the workflow rather than in `tasks audit`.
-
-### `merge-ready` prints "every leg passed" over a warning class that is about losing work
-
-Closing the spec left five `doctor` warnings — four findings closed only in the working tree, and
-`docs/tasks.jsonl` uncommitted — each saying a cleanup or reset would discard the close silently.
-`merge-ready` ran `doctor`, printed all five, marked the leg `ok pass`, and ended on
-`merge-ready: every leg passed`. That is correct by the documented rule (`doctor` fails on exactly
-one condition, an unparseable line) and it is still the wrong last line to read: the summary is what
-a session acts on, and these particular warnings exist because the state they describe is about to be
-thrown away. Caught here only by reading back through the scrollback for an unrelated reason.
-
-Worth considering: let the summary carry a count — `doctor ok pass (5 warning(s))` — without changing
-what fails. The gate keeps its one failure condition and stops swallowing the one warning class whose
-whole point is that nobody will notice.
-
-### Three flag shapes for "an id", and the workflow's own examples use the one that is wrong here
-
-`tasks spec add droptables --id droptables` is refused; the verb takes positionals
-(`spec add <slug> <id>...`). `--id` is right for `note`, `log` and `add`, and `docs/workflow.md`
-spells `--id` in the sentence directly above the one describing `spec add`. Separately,
-`tasks add "<title>" --note "..."` is refused — the field is `--evidence`, while `note` exists as its
-own verb, so the guess is not unreasonable. Each cost one round trip and both are the same shape of
-mistake: the CLI's own vocabulary predicts a flag the verb does not take.
-
-Worth considering: accept `--id` on `spec add` as a synonym for the positionals, and either accept
-`--note` on `add` or say `did you mean --evidence?` in the refusal. The refusals already print usage;
-naming the near-miss field is a line.
-
-### `audit-status` is an npm script, not a tasks verb, and everything around it is a tasks verb
-
-`npm run tasks -- audit-status` is refused as an unknown command; it is `npm run audit-status`.
-CLAUDE.md lists it beside `npm run tasks -- doctor`, `merge-ready` runs it as a leg alongside four
-tasks verbs, and `tasks` owns every other question about systems and concepts (`system`, `where`,
-`produces`, `concept`). Nothing about the surface suggests this one lives elsewhere.
-
-Worth considering: a `tasks audit-status` that shells to the same code, or a line in the unknown-command
-refusal pointing at `npm run audit-status`. The refusal already prints the verb list, so it knows the
-name is not one of them.
-
-### The mutate `find` refusal, a third time, on escaping rather than line endings
-
-Logged twice below for CRLF. The same refusal with the same wording also covers a manifest written
-through a shell heredoc, where a regex `find` containing `\t` reaches the JSON as a literal tab and
-stops matching source that holds backslash-t. Two rounds again, and the fix in the end was to stop
-hand-writing the `find` and read the line out of the file instead.
-
-Worth considering: the suggestion already recorded below — retry and say what matched — generalises
-if the refusal simply prints the nearest line in the file by edit distance. That covers line endings,
-escaping, and whitespace drift with one message, and the refusal already has the file in hand.
-
-### Working well, recorded so it does not get optimised away
-
-`tasks done` on a member whose clause is unmet prints `clause standing at close: proof clause 9 is
-unmet in the latest audit pass (pass 1)`, and `tasks promote` on a pass-2 finding prints
-`promoting a pass 2 finding, which extends what droptables owes`. Both are the tool declining to let
-a close look tidier than it is, at the moment the judgement is being made. They are the reason this
-branch did not quietly close a clause an auditor had graded `unmet`.
-
-### `npx tsx -e` with an import prints nothing, so probing one `scripts/` export needs a temp file
-
-Auditing the wrapping helpers meant calling `wrapText`/`wrapUnder`/`packGreedy` on six inputs.
-`npx tsx -e "import { wrapText } from './scripts/tasks/render'; console.log(...)"` exited quietly
-with no output and no error — the same command written to a `.mts` file inside the worktree and run
-as `npx tsx wrapProbe.mts` printed all six lines. The file had to live inside the repo, because a
-path into the session scratchpad cannot resolve the relative import.
-
-This is the small form of the backlog item "no cheap way to render a `scripts/` view over a synthetic
-store": here it was no cheap way to *call one function*. `npm run probe` answers this for the DSL load
-path and has no counterpart for `scripts/`.
-
-Worth considering: whichever way it is spelled, the thing that was missing is one command that
-evaluates an expression with the repo's own module resolution, prints the value, and leaves no file
-behind to remember to delete.
-
-### Working well: splitting an audit into a verdict call and one call per finding
-
-The Windows 8191-char argv limit is recorded below as forcing a split that recorded clauses `unknown`.
-That is fixed and the fix holds: twelve `--proof`/`--evidence` pairs went in one call, then four
-findings went in four further calls, and each answered `no pass appended, so recorded clause verdicts
-stand`. Filing a long finding is no longer in tension with grading the clauses.
+## `tool-friction-backlog` planning, 2026-08-04
+
+Decomposing a sixteen-clause spec into seven slices, and the friction was in the two places the
+tool could not answer a planner's question at all.
+
+### A task cannot name which proof clauses it discharges
+
+The whole output of a decomposition session is a map from clauses to the tasks that owe them, and
+there is nowhere to put it. `Task` has a `clause` field, but `tasks add` hardcodes `clause: null`
+(`records.ts:107`) and no verb offers a `--clause` flag; the only writer is `audit`, which sets it
+on the `undelivered` records an `unmet` verdict creates (`audit.ts:538`). So the mapping went into
+each task's `deliverable` prose as "Clauses 3, 6, 12, 15, 16", where nothing can read it back.
+
+The cost is not this session's — it is the next one's. `tasks spec show` prints sixteen clause
+standings and twelve members and cannot join them, so "who is delivering clause 9" is a prose
+search across twelve deliverables, and "which clauses has this branch not assigned to anyone" is
+not answerable at all. The audit then grades clauses against a diff without knowing which slice
+promised each one.
+
+Worth considering: `--clause` on `add` and `edit`, accepting several, and `spec show` printing the
+owing task beside each standing. The field, the parse and the display all exist; only the planner's
+half of the write is missing. Whether an unassigned clause should be a `plan` note is the open
+question — it is the one shape of decomposition defect `plan` cannot currently see.
+
+### `spec show` answers "no proof clauses" when the list is numbered instead of bulleted
+
+Rewriting the spec's `## Deliverable` with `1.`-style numbered clauses — the natural markdown for a
+list whose items are referred to by number — silently produced `(no proof clauses — --full prints
+the whole ## Deliverable)` and a clause standing of `no clause to grade`. All sixteen clauses were
+present under a `Proof:` line; `scanProofClauses` matches `/^- (.*)$/` (`specDoc.ts:97`) and nothing
+else, so the whole set read as prose.
+
+The failure is quiet in the direction that matters: the spec file still looked right, `tasks spec
+show` still exited zero, and had the edit been made without checking, the branch would have carried
+a contract of zero clauses into its audit. It was caught only because the read immediately after
+the write was for a different purpose.
+
+Worth considering: `scanProofClauses` already knows it found a `Proof:` heading. When the lines
+under it are non-empty and none of them matched, say so — `Proof: found, but no line under it
+begins with "- "` — rather than reporting the same thing an absent `Proof:` heading reports. Same
+shape as the near-miss refusals in clause 7: the reader has the evidence in hand and prints a bare
+negative.
+
+### `roadmap` reports a spec as waiting on its own members
+
+After the decomposition, `tool-friction-backlog`'s row reads `waits on record-verbs-say-back (spec
+tool-friction-backlog), roadmap-shows-settled-work-pass1-wrapunder-computes-its-wrap (spec
+tool-friction-backlog), …` — four ids over five wrapped lines, every one of them a member of the
+spec doing the waiting. The state cell is correct (`ready`), and the annotation does say which spec
+each blocker belongs to, so nothing is wrong; it is just that the line a reader scans to learn what
+blocks a spec is spending five lines saying "some of its members are ordered behind others", which
+is what `requires` is for and what step 4 of `docs/workflow.md` asks every planner to produce.
+
+Every other spec on the roadmap names external work there. This is not a regression — it is the
+first row rendered for a spec that has actually been decomposed, so the case had not arisen. It
+also sharpens `roadmap-shows-settled-work-pass1-the-record-caps-bound-how-m`, already promoted into
+this branch: that finding measured an uncapped row on a synthetic store, and this is the same
+uncapped list on the real one.
+
+Worth considering: `blockerText` filters blockers whose `spec` equals the row's own spec, and says
+`N member(s) ordered behind others` if it wants to say anything at all. The annotation it already
+prints is the evidence that it knows which ones they are.
