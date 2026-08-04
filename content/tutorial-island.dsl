@@ -53,6 +53,11 @@ base: 30
 # stat cooking-rate
 base: 15
 
+// The drop channel. Contested like any other roll, so a charm that reads
+// `+20 luck` moves a rare find without any table knowing the charm exists.
+# stat luck
+base: 60
+
 // --- resources ---
 
 // Health falls to the rats' bites and recovers from the regeneration a meal
@@ -141,6 +146,37 @@ eat:
 
 # item roasted-chestnut
 examine: A chestnut roasted soft and sweet in the oven's embers.
+
+# item rat-bone
+examine: A thin bone, picked clean.
+
+# item rat-tail
+examine: Still twitching, faintly.
+
+# item bent-coin
+examine: A copper coin someone stepped on.
+
+# item rats-eye-gem
+examine: A red stone the size of a thumbnail. It does not warm in your hand.
+
+// --- drop tables ---
+
+// A table is a named result list, so what a rat leaves behind reads as two
+// facts: bones always, a tail sometimes.
+# droptable rat-remains
+give: 1-3 rat-bone
+1 in 4: give: 1 rat-tail
+
+// Named rather than written inline because two different things reach it: the
+// rat's corpse and the dresser's drawer. That is the whole reason a table has an
+// id — composition already layers a chance, but it cannot share one.
+# droptable trinket
+one of:
+  8x: nothing
+  3x: give: 2-5 bent-coin
+  1x:
+    give: 1 rats-eye-gem
+    say: Something glints in the dust, and it is looking back at you.
 
 // --- locations ---
 
@@ -245,6 +281,8 @@ search drawer:
   give: lockpick
   say: Tucked beneath old linens, a set of worn lockpicks.
   set: searched
+  luck vs 60:
+    roll: trinket
 
 // The shape every combattable thing in the game shares, written once: a swing
 // of its own on its own clock, and a pool that runs out. The two actions are
@@ -280,10 +318,13 @@ examine: A hunched rat claws at an overturned crate, eyes red in the dark.
 stats: attack 8, defense 0, max-health 20, attack-rate 16, accuracy 60, evasion 40
 fight:
   hidden if: rats-killed >= 3
-  xp: melee 5
+  xp: melee 4-6
   on success:
     add: rats-killed 1
     say: You put down another rat.
+    roll: rat-remains
+    1 in 3:
+      roll: trinket
 
 // --- recipes ---
 
@@ -413,10 +454,22 @@ expect: miki-route-end
 // --- saves ---
 
 # save miki-route-end
-{"version":6,"inventory":{"tutorial-island.jug-of-water":0,"tutorial-island.pot-of-flour":0,"tutorial-island.dough":0,"tutorial-island.bread":1},"flags":{"tutorial-island.quest-given":true,"tutorial-island.mirror-done":true,"tutorial-island.made-bread":true,"tutorial-island.rats-killed":3,"tutorial-island.miki-complete":true,"tutorial-island.front-door.unlocked":true},"visits":{"tutorial-island.miki.greeting":1,"tutorial-island.miki.buffs":1,"tutorial-island.miki.baked":1,"tutorial-island.miki.sendoff":1},"xp":{"tutorial-island.cooking":6,"tutorial-island.melee":15},"resources":{"tutorial-island.health":0},"location":"tutorial-island.beach","time":107200,"rng":1288631604,"pendingModal":"character-creation"}
+{"version":6,"inventory":{"tutorial-island.jug-of-water":0,"tutorial-island.pot-of-flour":0,"tutorial-island.dough":0,"tutorial-island.bread":1,"tutorial-island.rat-bone":7},"flags":{"tutorial-island.quest-given":true,"tutorial-island.mirror-done":true,"tutorial-island.made-bread":true,"tutorial-island.rats-killed":3,"tutorial-island.miki-complete":true,"tutorial-island.front-door.unlocked":true},"visits":{"tutorial-island.miki.greeting":1,"tutorial-island.miki.buffs":1,"tutorial-island.miki.baked":1,"tutorial-island.miki.sendoff":1},"xp":{"tutorial-island.cooking":6,"tutorial-island.melee":16},"resources":{"tutorial-island.health":0},"location":"tutorial-island.beach","time":107200,"rng":2776008081,"pendingModal":"character-creation"}
 
 # save explored-and-unlocked
 {"version":6,"flags":{"tutorial-island.front-door.unlocked":true,"tutorial-island.beach.discovered":true}}
+
+// The drawer's contested roll over shipped content. On the default seed this
+// search comes up empty behind the lockpick, and that is the assertion: the
+// contest is drawn, the shared table is reached, and this is where it landed.
+// Move `luck`, the difficulty or the draw order and these four part company.
+# test dresser-trinket
+travel: guide-house-upstairs
+use: entity.dresser.search drawer
+assert: has lockpick
+assert: searched
+assert: not has bent-coin
+assert: not has rats-eye-gem
 
 # test save-restores-object-owned-flags
 load: explored-and-unlocked
