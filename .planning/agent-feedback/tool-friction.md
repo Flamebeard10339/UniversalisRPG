@@ -76,3 +76,22 @@ uncapped list on the real one.
 Worth considering: `blockerText` filters blockers whose `spec` equals the row's own spec, and says
 `N member(s) ordered behind others` if it wants to say anything at all. The annotation it already
 prints is the evidence that it knows which ones they are.
+
+### `npm run mutate` cannot find vitest from a git worktree
+
+Every one of twelve mutations came back `ERROR — could not read a test tally out of the run`, with
+a `MODULE_NOT_FOUND` stack under each. `mutate.ts:481` spawns
+`path.join(repoRoot, 'node_modules/vitest/vitest.mjs')`, and a worktree cut under
+`.claude/worktrees/` has no `node_modules` of its own — only an empty directory left by the spawn.
+`npx vitest` and `npm test` both work there, because node's resolution walks up to the main
+checkout's `node_modules`; the hardcoded join is the one path that does not.
+
+The report is honest — `errored`, not `survived`, so nothing was falsely certified — but the twelve
+stack traces bury the one fact that would fix it, which is that the file it tried to run is not
+there. The cost was one full mutation run plus the archaeology; the fix was a junction, and the
+tool never suggested one.
+
+Worth considering: resolve vitest the way node would rather than by joining to `repoRoot` — or,
+when that join misses, say `no vitest at <path> — this looks like a worktree without its own
+node_modules` once, before running anything, instead of once per mutation as a stack trace. Same
+shape as clause 8: a refusal that holds the information the caller needs and prints something else.
