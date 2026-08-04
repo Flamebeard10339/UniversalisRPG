@@ -29,7 +29,18 @@ const SPEC_CAP = 12;
 const TOPIC_CAP = 6;
 const BLOCKED_CAP = 6;
 const FINDING_CAP = 10;
-const WAITER_CAP = 3;
+
+// The same decision, one level down. The caps above bound how many records
+// the view prints; this bounds how many ids one record's row prints, which
+// is what made a row's height unbounded while the row count was not — a spec
+// holding forty members rendered sixty-two lines on its own.
+const LIST_CAP = 3;
+
+// The one way a row shortens a list of ids: the first few, then how many were
+// left out. Never a cut sentence — a count is a thing a reader can act on.
+function idList(ids: readonly string[]): string {
+  return ids.length <= LIST_CAP ? ids.join(', ') : `${ids.slice(0, LIST_CAP).join(', ')}, and ${ids.length - LIST_CAP} more`;
+}
 
 // Pads to the column, and leaves anything wider alone. Callers reserve the
 // last character of every column for the gap, so two long values never run
@@ -53,17 +64,17 @@ function edgeNote(id: string, spec: string | null, missing = false): string {
 
 function blockerText(blockers: Blocker[]): string {
   if (blockers.length === 0) return 'nothing blocks it';
-  return `waits on ${blockers.map((blocker) => `${blocker.id}${edgeNote(blocker.id, blocker.spec, blocker.status === 'missing')}`).join(', ')}`;
+  return `waits on ${idList(blockers.map((blocker) => `${blocker.id}${edgeNote(blocker.id, blocker.spec, blocker.status === 'missing')}`))}`;
 }
 
 function waiterText(waiter: Waiter): string {
-  const also = waiter.alsoWaitsOn.length > 0 ? ` (also waits on ${waiter.alsoWaitsOn.join(', ')})` : '';
+  const also = waiter.alsoWaitsOn.length > 0 ? ` (also waits on ${idList(waiter.alsoWaitsOn)})` : '';
   return `unblocks ${waiter.id}${edgeNote(waiter.id, waiter.spec)}${also}`;
 }
 
 function waiterNotes(unblocks: Waiter[]): string[] {
-  const notes = unblocks.slice(0, WAITER_CAP).map(waiterText);
-  if (unblocks.length > WAITER_CAP) notes.push(`unblocks ${unblocks.length - WAITER_CAP} more`);
+  const notes = unblocks.slice(0, LIST_CAP).map(waiterText);
+  if (unblocks.length > LIST_CAP) notes.push(`unblocks ${unblocks.length - LIST_CAP} more`);
   return notes;
 }
 
@@ -91,7 +102,7 @@ function specLines(spec: DecidedSpec): string[] {
   // over its members: with more than one, "blocked" reads as the whole spec
   // until the reader knows how many records that union covers.
   const notes: string[] = [];
-  if (spec.members.length > 1) notes.push(`holds ${spec.members.length}: ${spec.members.map((member) => member.id).join(', ')}`);
+  if (spec.members.length > 1) notes.push(`holds ${spec.members.length}: ${idList(spec.members.map((member) => member.id))}`);
   if (spec.standing?.latestPass != null) notes.push(spec.standing.outstanding);
   notes.push(blockerText(spec.waitsOn));
   notes.push(...waiterNotes(spec.unblocks));

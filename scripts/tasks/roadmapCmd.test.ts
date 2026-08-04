@@ -239,6 +239,43 @@ describe('renderRoadmap', () => {
     expect(body).toContain('unblocks 2 more');
   });
 
+  // The record caps bound how many rows the view prints; these bound how tall
+  // one row can be. Measured before the fix: a spec of forty members, each
+  // waiting on the same forty unspecced records, rendered a 62-line DECIDED
+  // section and 476 lines in total from a store one sixth the size of the
+  // real one.
+  // A note wider than the report continues on the next line, broken at a
+  // space, so rejoining the trimmed lines with one space puts every note back
+  // the way it was written. The phrases asserted below cannot span two notes.
+  const unwrapped = (lines: string[]): string => lines.map((line) => line.trimStart()).join(' ');
+
+  it('caps the members a spec row names, the blockers it waits on, and what a waiter also waits on', () => {
+    const gates = Array.from({ length: 8 }, (_, index) => task({ id: `gate-${index}` }));
+    const members = Array.from({ length: 8 }, (_, index) => task({ id: `member-${index}`, spec: 'a-branch', requires: gates.map((gate) => gate.id) }));
+    const body = unwrapped(render([...members, ...gates]));
+
+    expect(body).toContain('holds 8: member-0, member-1, member-2, and 5 more');
+    expect(body).toContain('waits on gate-0 (unspecced), gate-1 (unspecced), gate-2 (unspecced), and 5 more');
+    // Every member waits on all eight gates, so each gate's one named waiter
+    // carries the other seven under `also waits on`.
+    expect(body).toContain('(also waits on gate-1, gate-2, gate-3, and 4 more)');
+  });
+
+  it('leaves a list the cap does not reach spelled out in full', () => {
+    const body = unwrapped(render([task({ id: 'gate-0' }), task({ id: 'gate-1' }), task({ id: 'held', spec: 'a-branch', requires: ['gate-0', 'gate-1'] })]));
+    expect(body).toContain('waits on gate-0 (unspecced), gate-1 (unspecced)');
+    expect(body).not.toContain('more');
+  });
+
+  it('keeps a single row inside a handful of lines however many ids it carries', () => {
+    const gates = Array.from({ length: 40 }, (_, index) => task({ id: `a-prerequisite-record-number-${index}` }));
+    const members = Array.from({ length: 40 }, (_, index) => task({ id: `a-member-record-number-${index}`, spec: 'a-branch', requires: gates.map((gate) => gate.id) }));
+    const lines = render([...members, ...gates]);
+    const decided = lines.indexOf('DECIDED — 1 spec(s), each printed under the decided work it waits on');
+    const next = lines.findIndex((line, index) => index > decided && line.startsWith('UNSPECCED'));
+    expect(next - decided).toBeLessThan(12);
+  });
+
   it('says so plainly when nothing has been decided and nothing is unspecced', () => {
     const body = text([task({ id: 'gate', state: 'in-progress' }), task({ id: 'waiting', requires: ['gate'] })]);
     expect(body).toContain('DECIDED — nothing: no live record names a spec');
