@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { roadmapView, type ReadSpec } from '../lib/roadmap';
 import type { Task } from '../lib/taskStore';
 import { TERMINAL_WIDTH } from './render';
-import { fit, renderRoadmap } from './roadmapCmd';
+import { column, renderRoadmap } from './roadmapCmd';
 
 function task(overrides: Partial<Task> & { id: string }): Task {
   return {
@@ -69,28 +69,61 @@ const render = (tasks: Task[], readSpec: ReadSpec = noSpecFiles): string[] => re
 const text = (tasks: Task[], readSpec: ReadSpec = noSpecFiles): string => render(tasks, readSpec).join('\n');
 const rowFor = (lines: string[], id: string): string => lines.find((line) => line.includes(id))!;
 
-describe('fit', () => {
+describe('column', () => {
   it('pads a short value to the column so the next column starts where it should', () => {
-    expect(fit('abc', 6)).toBe('abc   ');
+    expect(column('abc', 6)).toBe('abc   ');
   });
 
-  it('cuts an overlong value to exactly the column, ellipsis included', () => {
-    expect(fit('abcdefgh', 6)).toBe('abcde…');
+  it('leaves an overlong value whole and keeps the gap after it', () => {
+    expect(column('abcdefgh', 6)).toBe('abcdefgh ');
   });
 });
 
+const LONG = 'a-name-far-longer-than-any-column-this-view-reserves-for-one-of-them';
+
+const pathological = (): string[] =>
+  render(
+    [
+      task({ id: `${LONG}-head`, spec: `${LONG}-spec`, system: 'A system name that is itself much too long to fit' }),
+      task({ id: `${LONG}-next`, spec: `${LONG}-later`, requires: [`${LONG}-head`] }),
+      task({ id: LONG, severity: 'medium', system: 'A system name that is itself much too long to fit' }),
+      task({ id: `${LONG}-waiter`, requires: [LONG, 'other'] }),
+      task({ id: `${LONG}-defect`, kind: 'finding', severity: 'high', system: 'A system with a very long name indeed for a footer' }),
+    ],
+    specFiles({ [`${LONG}-spec`]: GRADED }),
+  );
+
 describe('renderRoadmap', () => {
-  it('keeps every line inside the fixed width, whatever the records are called', () => {
-    const long = 'a-name-far-longer-than-any-column-this-view-reserves-for-one-of-them';
+  it('never cuts a value to fit, whatever the records are called', () => {
+    const body = pathological().join('\n');
+    for (const id of [`${LONG}-head`, `${LONG}-spec`, `${LONG}-next`, LONG, `${LONG}-waiter`, `${LONG}-defect`]) expect(body).toContain(id);
+    expect(body).toContain('A system name that is itself much too long to fit');
+  });
+
+  it('leaves an ellipsis only where a cap says how many records it left out', () => {
+    const topics = Array.from({ length: 9 }, (_, index) => task({ id: `topic-${index}` }));
+    for (const line of [...pathological(), ...render(topics)]) {
+      if (line.includes('…')) expect(line).toMatch(/^\s+… \d+ more — /);
+    }
+  });
+
+  it('continues a long note under its own branch instead of beside the next one', () => {
+    const lines = render([task({ id: 'gate', spec: 'a-branch' }), task({ id: 'a-waiter-with-a-name-of-its-own', requires: ['gate', 'a-second-prerequisite', 'a-third-prerequisite'] }), task({ id: 'a-second-prerequisite' }), task({ id: 'a-third-prerequisite' })]);
+    const start = lines.findIndex((line) => line.includes('unblocks'));
+    const branchIndent = lines[start].indexOf('└');
+    expect(lines[start + 1]).toMatch(new RegExp(`^ {${branchIndent + 3}}\\S`));
+    expect(`${lines[start]}${lines[start + 1].trimStart()}`).toContain('a-third-prerequisite)');
+  });
+
+  it('fits the report width whenever the words in it can be broken at a space', () => {
     const lines = render(
       [
-        task({ id: `${long}-head`, spec: `${long}-spec`, system: 'A system name that is itself much too long to fit' }),
-        task({ id: `${long}-next`, spec: `${long}-later`, requires: [`${long}-head`] }),
-        task({ id: long, severity: 'medium', system: 'A system name that is itself much too long to fit' }),
-        task({ id: `${long}-waiter`, requires: [long, 'other'] }),
-        task({ id: `${long}-defect`, kind: 'finding', severity: 'high', system: 'A system with a very long name indeed for a footer' }),
+        task({ id: 'a-decided-branch-with-a-long-name', spec: 'a-spec-slug-of-realistic-length', system: 'Contribution system' }),
+        task({ id: 'a-topic-with-a-fairly-long-name', severity: 'medium', system: 'Testing procedure' }),
+        task({ id: 'a-waiter', requires: ['a-topic-with-a-fairly-long-name', 'a-decided-branch-with-a-long-name'] }),
+        task({ id: 'a-defect-filed-on-2026-08-04-h1', kind: 'finding', severity: 'high', system: 'Build & deployment', title: 'the pipeline has no gate against publishing a non-functional placeholder, and today’s build is exactly that' }),
       ],
-      specFiles({ [`${long}-spec`]: GRADED }),
+      specFiles({ 'a-spec-slug-of-realistic-length': GRADED }),
     );
     for (const line of lines) expect(line.length).toBeLessThanOrEqual(TERMINAL_WIDTH);
   });

@@ -2,15 +2,18 @@ import { readFileSync } from 'node:fs';
 import { roadmapView, type Blocker, type DecidedSpec, type ReadSpec, type RoadmapEntry, type RoadmapView, type SpecStanding, type Waiter } from '../lib/roadmap';
 import type { Flags } from './cli';
 import { readStore, resolveConfig, specFile, type Config } from './context';
-import { packGreedy, TERMINAL_WIDTH, truncateLine } from './render';
+import { packGreedy, TERMINAL_WIDTH, wrapUnder } from './render';
 
+// Every column here is a minimum, never a maximum: it says where the next
+// column starts when the value is short, and gets out of the way when the
+// value is long. A record whose name is wider than its column pushes the
+// row right; it never loses the end of its name to make the grid tidy.
 const SEVERITY_COLUMN = 8;
 const ID_COLUMN = 40;
-// Wide enough for `in-progress` plus a gap: a state column that truncates
-// its own longest value is a column that renames a state.
 const STATE_COLUMN = 12;
 const STANDING_COLUMN = 23;
 const COUNT_LABEL_COLUMN = 14;
+const BLOCKED_ID_COLUMN = 32;
 const SYSTEM_COUNT_SEPARATOR = ' · ';
 
 // A depth deeper than this keeps its place in the order but stops indenting:
@@ -19,21 +22,24 @@ const SYSTEM_COUNT_SEPARATOR = ' · ';
 const MAX_INDENTED_DEPTH = 6;
 const DEPTH_INDENT = 2;
 
-// Every list here is capped and every cap says what it hid, because a
-// roadmap that prints the whole store and one that silently prints fifteen
-// records fail a planner the same way.
+// The bounds that remain, and they are all counts of records: each says what
+// it left out and the command that shows the rest, which is a thing a reader
+// can act on. Cutting a sentence in half is not.
 const SPEC_CAP = 12;
 const TOPIC_CAP = 6;
 const BLOCKED_CAP = 6;
 const FINDING_CAP = 10;
 const WAITER_CAP = 3;
 
-export function fit(text: string, width: number): string {
-  return truncateLine(text, width).padEnd(width);
+// Pads to the column, and leaves anything wider alone. Callers reserve the
+// last character of every column for the gap, so two long values never run
+// into each other.
+export function column(text: string, width: number): string {
+  return text.padEnd(width - 1) + ' ';
 }
 
 function countLine(label: string, value: number, gloss: string): string {
-  return truncateLine(`  ${label.padEnd(COUNT_LABEL_COLUMN)}${String(value).padStart(5)}   ${gloss}`, TERMINAL_WIDTH);
+  return `  ${label.padEnd(COUNT_LABEL_COLUMN)}${String(value).padStart(5)}   ${gloss}`;
 }
 
 // A dependency edge names the spec at its far end, so a reader can tell a
@@ -61,8 +67,10 @@ function waiterNotes(unblocks: Waiter[]): string[] {
   return notes;
 }
 
+// The glyph is part of the structure, so a note that outgrows the report
+// continues under the glyph rather than beside the next branch.
 function tree(indent: string, notes: string[]): string[] {
-  return notes.map((note, index) => truncateLine(`${indent}${index === notes.length - 1 ? '└─' : '├─'} ${note}`, TERMINAL_WIDTH));
+  return notes.flatMap((note, index) => wrapUnder(note, `${indent}${index === notes.length - 1 ? '└─' : '├─'} `, `${indent}   `));
 }
 
 // With no pass recorded every clause stands `unknown`, so the count and
@@ -77,7 +85,7 @@ function standingText(standing: SpecStanding | null): string {
 function specLines(spec: DecidedSpec): string[] {
   const indent = ' '.repeat(Math.min(spec.depth, MAX_INDENTED_DEPTH) * DEPTH_INDENT);
   const idWidth = TERMINAL_WIDTH - 2 - STATE_COLUMN - STANDING_COLUMN - indent.length;
-  const row = `  ${fit(spec.state, STATE_COLUMN)}${indent}${fit(spec.spec, idWidth)}${standingText(spec.standing)}`;
+  const branchIndent = `  ${' '.repeat(STATE_COLUMN)}${indent}`;
 
   // Membership before the edges, because a spec's blockers are the union
   // over its members: with more than one, "blocked" reads as the whole spec
@@ -87,17 +95,16 @@ function specLines(spec: DecidedSpec): string[] {
   if (spec.standing?.latestPass != null) notes.push(spec.standing.outstanding);
   notes.push(blockerText(spec.waitsOn));
   notes.push(...waiterNotes(spec.unblocks));
-  return [truncateLine(row, TERMINAL_WIDTH), ...tree(`  ${' '.repeat(STATE_COLUMN)}${indent}`, notes)];
-}
 
-function entryRow(entry: RoadmapEntry): string {
-  const severity = fit(entry.task.severity ?? '-', SEVERITY_COLUMN);
-  const id = `${fit(entry.task.id, ID_COLUMN - 1)} `;
-  const system = entry.task.system ?? '(no system)';
-  return `  ${severity}${id}${fit(system, TERMINAL_WIDTH - 2 - SEVERITY_COLUMN - ID_COLUMN).trimEnd()}`;
+  return [...wrapUnder(`${column(spec.spec, idWidth)}${standingText(spec.standing)}`, `  ${column(spec.state, STATE_COLUMN)}${indent}`, branchIndent), ...tree(branchIndent, notes)];
 }
 
 const ENTRY_INDENT = ' '.repeat(2 + SEVERITY_COLUMN);
+
+function entryRow(entry: RoadmapEntry): string[] {
+  const severity = column(entry.task.severity ?? '-', SEVERITY_COLUMN);
+  return wrapUnder(`${column(entry.task.id, ID_COLUMN)}${entry.task.system ?? '(no system)'}`, `  ${severity}`, ENTRY_INDENT);
+}
 
 function truncationNote(total: number, shown: number, command: string): string[] {
   return total > shown ? [`  … ${total - shown} more — ${command}`] : [];
@@ -139,7 +146,7 @@ function topicLines(view: RoadmapView): string[] {
   return [
     `UNSPECCED — ${view.topics.length} topic(s) no spec has decided; each wants a planner`,
     '',
-    ...shown.flatMap((entry) => [entryRow(entry), ...tree(ENTRY_INDENT, [blockerText(entry.waitsOn), ...waiterNotes(entry.unblocks)])]),
+    ...shown.flatMap((entry) => [...entryRow(entry), ...tree(ENTRY_INDENT, [blockerText(entry.waitsOn), ...waiterNotes(entry.unblocks)])]),
     ...truncationNote(view.topics.length, shown.length, '`tasks list --deferred --kind task`'),
   ];
 }
@@ -151,7 +158,7 @@ function blockedLines(view: RoadmapView): string[] {
   return [
     `BLOCKED — ${view.blocked.length} unspecced task(s)${inSpec > 0 ? `; the other ${inSpec} sit in a spec above` : ''}`,
     '',
-    ...shown.map((entry) => truncateLine(`  ${fit(entry.task.id, ID_COLUMN - 8)} ${blockerText(entry.waitsOn)}`, TERMINAL_WIDTH)),
+    ...shown.flatMap((entry) => wrapUnder(blockerText(entry.waitsOn), `  ${column(entry.task.id, BLOCKED_ID_COLUMN)}`, ' '.repeat(2 + BLOCKED_ID_COLUMN))),
     ...truncationNote(view.blocked.length, shown.length, '`tasks list --deferred --kind task`'),
   ];
 }
@@ -161,7 +168,7 @@ function findingLines(view: RoadmapView): string[] {
   const shown = view.namedFindings.slice(0, FINDING_CAP);
   const lines = [`FINDINGS — ${counts.findings} open, ${counts.highFindings} could redden an audit`, ''];
   for (const entry of shown) {
-    lines.push(entryRow(entry));
+    lines.push(...entryRow(entry));
     lines.push(...tree(ENTRY_INDENT, [`${blockerText(entry.waitsOn)} · ${entry.task.title}`]));
   }
   lines.push(...truncationNote(view.namedFindings.length, shown.length, '`tasks list --state open --kind finding --severity high`'));
@@ -177,7 +184,11 @@ function findingLines(view: RoadmapView): string[] {
 }
 
 export function renderRoadmap(view: RoadmapView): string[] {
-  return [headerLines(view), decidedLines(view), topicLines(view), blockedLines(view), findingLines(view)].filter((section) => section.length > 0).flatMap((section) => ['', ...section]).slice(1);
+  return [headerLines(view), decidedLines(view), topicLines(view), blockedLines(view), findingLines(view)]
+    .filter((section) => section.length > 0)
+    .flatMap((section) => ['', ...section])
+    .slice(1)
+    .map((line) => line.trimEnd());
 }
 
 // The spec text is the one thing this view cannot derive from the store, and

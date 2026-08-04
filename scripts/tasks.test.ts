@@ -719,21 +719,22 @@ describe('tasks CLI', () => {
   });
 
   // The evidence here is one unbroken line, which is the only shape `add`
-  // can write: a concise form that shortened by line rather than by
-  // character shortened nothing on a real record, and passed only against a
-  // fixture that injected newlines.
-  it('next summarizes prose by character and prints it whole only with --full', () => {
+  // can write. `next` used to shorten it by character, on the argument that
+  // shortening by line shortens nothing on a real record — both halves of
+  // that are now gone: the queue prints the sentence its author wrote, and
+  // what `--full` still adds is the line breaks, which only an imported
+  // record has.
+  it('next prints the evidence a record carries whole, tail included', () => {
     fixture(({ tasks }) => {
-      const tail = 'and this tail is what a form that shortens by line would still print in full';
+      const tail = 'and this tail is the half a reader used to lose to the character budget';
       const longEvidence = `evidence that runs well past any single line a queue entry should occupy, ${tail}`;
       tasks('add', 'verbose task', '--id', 'verbose-task', '--severity', 'high', '--system', 'Runtime', '--spec', 'demo-spec', '--files', 'src/runtime/save.ts:1', '--deliverable', 'the fix exists', '--evidence', longEvidence);
 
       const concise = tasks('next');
       expect(concise.stdout).toContain('verbose-task  [task/open/high]');
       expect(concise.stdout).toContain('files: src/runtime/save.ts:1');
-      expect(concise.stdout).toContain('evidence: evidence that runs well past');
-      expect(concise.stdout).toContain('…');
-      expect(concise.stdout).not.toContain(tail);
+      expect(concise.stdout).toContain(`evidence: ${longEvidence}`);
+      expect(concise.stdout).toContain(tail);
 
       const full = tasks('next', '--full');
       expect(full.stdout).toContain(longEvidence);
@@ -2827,15 +2828,18 @@ describe('tasks CLI', () => {
     });
   });
 
-  it('handoff prints proof clauses numbered and truncated, not the whole ## Deliverable prose', () => {
+  it('handoff prints proof clauses numbered and whole, not the ## Deliverable prose', () => {
     fixture(({ tasks, dir }) => {
-      const longClause = 'x'.repeat(150);
+      const longClause = `a clause with ${'many words in it, '.repeat(12)}and a final phrase`;
       writeFileSync(path.join(dir, 'specs', 'demo-spec.md'), `# Demo spec\n\n## Deliverable\n\nProse that should not appear in handoff's output at all.\n\nProof:\n\n- ${longClause}\n\n## Decisions\n\n## Open questions\n\nNone.\n`, 'utf8');
       const result = tasks('handoff');
       expect(result.status).toBe(0);
       expect(result.stdout).not.toContain('Prose that should not appear');
-      expect(result.stdout).toContain('1. [unknown] ' + 'x'.repeat(99) + '…');
-      expect(result.stdout).not.toContain(longClause);
+      expect(result.stdout).toContain('1. [unknown] a clause with many words');
+      expect(result.stdout).not.toContain('…');
+      // Wrapped across lines under its own number, but every word survives.
+      const printed = result.stdout.split('\n').filter((line) => /^\s{2,}\S/.test(line)).join(' ');
+      expect(printed.replace(/\s+/g, ' ')).toContain(longClause.replace(/\s+/g, ' '));
     });
   });
 

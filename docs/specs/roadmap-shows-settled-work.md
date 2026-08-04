@@ -54,6 +54,14 @@ Proof:
   rest — and a store with hundreds of records still produces a page a reader can hold.
 - It remains a read that cannot fail. `roadmap` exits zero on every store it can parse, reports
   rather than refuses, and stays outside the merge gate.
+- [c12] No display path cuts text to make it fit. A column pads to its width and never trims to it,
+  and a line longer than the report width wraps under its own structure instead of ending in an
+  ellipsis — in `roadmap`, and in every other read that was cutting prose to a character budget.
+  The first draft of this branch hid text on 28 of its 106 lines and `spec show` hid the tail of
+  five clauses out of eleven, which is a view that answers a planner's question and then declines
+  to finish the sentence. The bounds that remain are counts of *records*, each naming what it left
+  out and the command that shows the rest: a reader can act on "8 more, run this", and cannot act
+  on a word that stops mid-syllable.
 
 ## Decisions
 
