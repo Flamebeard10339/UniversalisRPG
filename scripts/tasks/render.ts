@@ -58,7 +58,9 @@ export function renderTask(task: Task, byId: Map<string, Task>, detail: Detail, 
   lines.push(`spec: ${task.spec ?? '(deferred)'}`);
   if (task.requires.length > 0) lines.push(requiresLine(task, byId));
   if (task.files.length > 0) lines.push(`files: ${task.files.join(', ')}`);
-  if (task.writes.length > 0) lines.push(`writes: ${task.writes.join(', ')}`);
+  // The kind rides with the grant, never on its own line: a reader deciding
+  // whether these paths are a promise or a guess is looking at the paths.
+  if (task.writes.length > 0) lines.push(`writes (${task.grant ?? 'kind unstated'}): ${task.writes.join(', ')}`);
   if (task.produces.length > 0) lines.push(`produces: ${task.produces.join(', ')}`);
   if (task.deliverable || task.evidence) lines.push('');
   if (task.deliverable) lines.push(`deliverable: ${prose(task.deliverable)}`);

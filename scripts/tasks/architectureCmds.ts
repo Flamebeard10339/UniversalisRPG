@@ -8,19 +8,25 @@ import type { Flags } from './cli';
 import { readStore, recordEvents, resolveActiveSpec, resolveConfig, splitList, systemNames, type Config } from './context';
 import { printRow, reportUnknownIds, wrapUnder } from './render';
 
-// Grading a plan needs the store; the registry only widens what it can say.
-// So an unreadable manifest costs the concept half of the answer and nothing
-// else, and the report says which half it lost rather than refusing the
-// whole grade over it. `tasks plan` is a CI step held to answering.
-function knownProducers(config: Config, tasks: Task[]): Producer[] {
+// The store is what these answers rest on; the registry only widens them. So
+// an unreadable manifest costs the concept half of an answer and nothing
+// else, and the caller says which half it lost rather than refusing the whole
+// question over it. `tasks plan` is a CI step held to answering, and the
+// checks that fire from `add`/`edit` must not turn a malformed manifest into
+// a failed write.
+function manifestOrEmpty(config: Config, lost: string): Manifest {
   try {
-    return producerIndex(loadManifest(config.systemsPath), tasks);
+    return loadManifest(config.systemsPath);
   } catch (error) {
     if (!(error instanceof ManifestError)) throw error;
     console.log(`note: ${error.message}`);
-    console.log('grading against recorded `produces` claims only — registered concepts could not be read');
-    return producerIndex({ unowned: { note: '', paths: [] }, systems: [] }, tasks);
+    console.log(lost);
+    return { unowned: { note: '', paths: [] }, systems: [] };
   }
+}
+
+function knownProducers(config: Config, tasks: Task[]): Producer[] {
+  return producerIndex(manifestOrEmpty(config, 'grading against recorded `produces` claims only — registered concepts could not be read'), tasks);
 }
 
 // Grades a dispatch set before anyone works it. Everything it reports is
@@ -64,13 +70,15 @@ export function cmdPlan(args: Flags): void {
   }
 
   const report = checkPlan(plan, tasks, knownProducers(config, tasks));
-  console.log(`plan: ${plan.length} task(s), ${plan.length - report.ungranted} with a write grant this check can read`);
+  const readable = plan.length - report.ungranted;
+  console.log(`plan: ${plan.length} task(s), ${readable} with a write grant this check can read, ${report.commitments} of those a commitment`);
   for (const task of plan) printRow(task, byId, { indent: '  ' });
   console.log('');
 
   if (report.findings.length === 0) {
     console.log('no overlap, no unstated dependency, no duplicated interface.');
     if (report.ungranted > 0) console.log(`${report.ungranted} task(s) have no grant this check could read, so that answer covers less than it looks like it does.`);
+    if (readable > report.commitments) console.log(`${readable - report.commitments} readable grant(s) are a forecast or unstated, and an overlap between those is reported as a note rather than a defect.`);
     return;
   }
 
@@ -191,6 +199,19 @@ export function printPriorArt(art: PriorArt): void {
     if (task.produces.length > 0) console.log(`            produces ${task.produces.join(', ')}`);
   }
   console.log('\nA claim in any state is prior art: a closed one is a decision already made, and an open one is a collision.');
+}
+
+// The same query `tasks where` answers when asked, fired by the act of
+// declaring a write grant. A check that has to be remembered is skipped
+// exactly when a session is deep in something else: this one was run once in
+// a whole planning session, and that once is the one duplication it caught.
+// The record's own claim is excluded — a task always claims what it just
+// granted, and reporting that would bury the answer under itself.
+export function reportPriorArtOnWrites(config: Config, tasks: Task[], task: Task): void {
+  if (task.writes.length === 0) return;
+  const manifest = manifestOrEmpty(config, 'answering from recorded claims only — registered concepts could not be read');
+  console.log('');
+  printPriorArt(priorArt(manifest, tasks.filter((candidate) => candidate.id !== task.id), task.writes));
 }
 
 export function cmdWhere(args: Flags, usage: string): void {

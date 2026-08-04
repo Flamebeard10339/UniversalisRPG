@@ -50,7 +50,7 @@ function trackedOrNull(): string[] | null {
 // against: a path matching no tracked file was forecast rather than opened,
 // and a directory covering forty of them is a region nobody has narrowed.
 function printGrant(task: Task): void {
-  console.log('Write grant, and the files it resolves to:');
+  console.log(`Write grant (${task.grant ?? 'kind unstated'}), and the files it resolves to:`);
   if (task.writes.length === 0) {
     console.log('- none declared — decide what you will touch and record it before you write code');
     return;
@@ -102,7 +102,7 @@ function printClauses(task: Task, doc: SpecDoc | null): void {
 function printObligations(task: Task): void {
   console.log('Three things the workflow puts on you before you write code:');
   console.log(`1. Claim the record: npm run tasks -- start ${task.id} --actor <you>`);
-  console.log(`2. Correct the grant: npm run tasks -- edit ${task.id} --writes <what you will actually touch>. You have read the region and the planner had not, so the grant above is a forecast until you say otherwise. A diff that diverges from it later is information, not a violation — correct the record and say so in the commit body.`);
+  console.log(`2. Correct the grant: npm run tasks -- edit ${task.id} --writes <what you will actually touch> --grant commitment. You have read the region and the planner had not, so the grant above is a forecast until you say otherwise — and \`tasks plan\` grades an overlap between two commitments as a defect and one resting on a forecast as a note, so the word is what makes the check mean anything. A diff that diverges from it later is information, not a violation — correct the record and say so in the commit body.`);
   console.log(`3. Register any durable capability this produces: npm run tasks -- concept "<system>" "<name>" --paths <paths> --note "produced by ${task.id}". A \`produces\` claim is a forecast, not a registration, and making that judgement is the point of the step.`);
   console.log('');
   console.log('You may refuse this grant, and the planner is expected to believe you. If reading the region says the work belongs somewhere else, is already done, is more than one task, or rests on something that does not exist, say so and stop rather than building around it.');

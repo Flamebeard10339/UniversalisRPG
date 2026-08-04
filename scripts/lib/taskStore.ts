@@ -3,6 +3,7 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 export type Kind = 'task' | 'finding' | 'undelivered' | 'question';
 export type State = 'unreviewed' | 'open' | 'in-progress' | 'done' | 'declined';
 export type Severity = 'high' | 'medium' | 'low';
+export type Grant = 'forecast' | 'commitment';
 
 export interface Source {
   spec: string;
@@ -25,6 +26,12 @@ export interface Task {
   // expected to touch; `produces` names what nothing owns until it lands.
   // What reads them is planCheck.
   writes: string[];
+  // Which side of the workflow's correction point `writes` is on. A grant
+  // declared before anyone read the code is a forecast, and the honest
+  // forecast is a directory; a worker that has read the region narrows it and
+  // says `commitment`. Null is a record that has not said. planCheck weighs
+  // the three differently, which is the whole reason the field exists.
+  grant: Grant | null;
   produces: string[];
   deliverable: string | null;
   evidence: string | null;
@@ -48,6 +55,7 @@ export const DEFAULT_STORE_PATH = 'docs/tasks.jsonl';
 
 export const KINDS: Kind[] = ['task', 'finding', 'undelivered', 'question'];
 export const STATES: State[] = ['unreviewed', 'open', 'in-progress', 'done', 'declined'];
+export const GRANTS: Grant[] = ['forecast', 'commitment'];
 const SEVERITIES: Severity[] = ['high', 'medium', 'low'];
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -106,6 +114,7 @@ const KNOWN_KEYS: ReadonlyArray<keyof KnownFields> = Object.keys({
   requires: true,
   files: true,
   writes: true,
+  grant: true,
   produces: true,
   deliverable: true,
   evidence: true,
@@ -142,6 +151,11 @@ function normalizeTask(value: unknown, where: string): Task {
   const clause = value.clause ?? null;
   if (clause !== null && typeof clause !== 'number') throw new StoreError(`${where}: task ${JSON.stringify(id)} has non-numeric clause`);
 
+  // Absent means the record has not said which side of the correction point
+  // its grant is on, which is a third answer and not a default to either.
+  const grant = value.grant ?? null;
+  if (grant !== null && (typeof grant !== 'string' || !GRANTS.includes(grant as Grant))) throw new StoreError(`${where}: task ${JSON.stringify(id)} has invalid grant: ${String(grant)}`);
+
   return {
     id,
     title: requireString(value, 'title', where),
@@ -154,6 +168,7 @@ function normalizeTask(value: unknown, where: string): Task {
     requires: stringArray(value, 'requires', where),
     files: stringArray(value, 'files', where),
     writes: optionalStringArray(value, 'writes', where),
+    grant: grant as Grant | null,
     produces: optionalStringArray(value, 'produces', where),
     deliverable: nullableString(value, 'deliverable', where),
     evidence: nullableString(value, 'evidence', where),
@@ -185,6 +200,7 @@ function renderTask(task: Task): string {
     requires: task.requires,
     files: task.files,
     writes: task.writes,
+    grant: task.grant,
     produces: task.produces,
     deliverable: task.deliverable,
     evidence: task.evidence,
@@ -506,6 +522,7 @@ export function checkStore(tasks: Task[], systems: string[], specExists: (spec: 
     if (task.state !== 'declined' && task.reason) issues.push({ level: 'warning', message: `${task.id} is ${task.state} and carries a decline reason, which reads as a decline that was reopened: ${task.reason}` });
     if (task.state !== 'done' && task.state !== 'declined' && task.closed) issues.push({ level: 'warning', message: `${task.id} is ${task.state} but still carries a closed date: ${task.closed}` });
     if (task.state !== 'in-progress' && task.claimed) issues.push({ level: 'warning', message: `${task.id} is ${task.state} and still carries a claim by ${task.claimedBy ?? '(unnamed)'} from ${task.claimed}, which reads as a claim that was released` });
+    if (task.grant !== null && task.writes.length === 0) issues.push({ level: 'warning', message: `${task.id} calls its write grant a ${task.grant} and grants nothing — the kind describes \`writes\`, which is empty` });
     if (task.kind === 'undelivered' && task.clause === null) issues.push({ level: 'error', message: `${task.id} is undelivered but names no proof clause` });
     if (task.kind !== 'undelivered' && task.clause !== null) issues.push({ level: 'error', message: `${task.id} names a proof clause but is not undelivered` });
     if (task.system !== null && !systems.includes(task.system)) issues.push({ level: 'error', message: `${task.id} has a system not in systems.json: ${task.system}` });

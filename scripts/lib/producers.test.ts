@@ -16,6 +16,7 @@ function task(id: string, produces: string[], state: Task['state'] = 'done', pat
     requires: [],
     files: paths.files ?? [],
     writes: paths.writes ?? [],
+    grant: null,
     produces,
     deliverable: null,
     evidence: null,

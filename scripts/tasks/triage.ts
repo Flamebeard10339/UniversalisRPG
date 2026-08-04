@@ -1,6 +1,7 @@
 import { loadStore, unreviewedQueue } from '../lib/taskStore';
 import type { Flags } from './cli';
 import { recordEvents, resolveActiveSpec, resolveConfig, saveStoreAndWarn, subjectOf, today } from './context';
+import { pass2Promotion, printDecisionPrompt } from './records';
 import { stdinPrompter } from './prompt';
 import { printEvidence, printRow, truncateLine } from './render';
 
@@ -57,7 +58,8 @@ export async function cmdTriage(args: Flags): Promise<void> {
           console.log('no active spec to promote into — pass --spec, skipping');
           break;
         }
-        if ((task.source?.pass ?? 0) >= 2) console.log(`promoting a pass ${task.source!.pass} finding, which extends what ${spec} owes`);
+        const widening = pass2Promotion(task, spec);
+        if (widening) console.log(widening);
         task.state = 'open';
         task.spec = spec;
         decision = `promoted into spec ${spec}`;
@@ -106,6 +108,7 @@ export async function cmdTriage(args: Flags): Promise<void> {
       }
       saveStoreAndWarn(tasks, config);
       recordEvents(config, 'triage', [subjectOf(task, decision)]);
+      printDecisionPrompt(task);
       break;
     }
   }

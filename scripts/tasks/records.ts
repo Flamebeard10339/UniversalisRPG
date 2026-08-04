@@ -4,11 +4,13 @@ import * as git from '../lib/git';
 import { parseSpecDoc } from '../lib/specDoc';
 import { findProducers, producerIndex } from '../lib/producers';
 import { loadManifest } from '../lib/systems';
+import { filterEvents, loadEvents } from '../lib/eventLog';
 import {
   claimSummary,
   coldClaims,
   dependencyCycles,
   fixNowQueue,
+  GRANTS,
   isBlocked,
   KINDS,
   listQueue,
@@ -19,6 +21,7 @@ import {
   STATES,
   unreviewedFiledBy,
   waitingOn,
+  type Grant,
   type Kind,
   type Severity,
   type State,
@@ -43,7 +46,8 @@ import {
   validateContentFields,
   type Config,
 } from './context';
-import { printRow, printTask, truncateLine } from './render';
+import { reportPriorArtOnWrites } from './architectureCmds';
+import { printRow, printTask, truncateLine, wrapUnder } from './render';
 import { resolveTaskIds } from './resolveIds';
 
 export function reportUnresolvedRequires(task: Task, tasks: Task[]): void {
@@ -51,6 +55,24 @@ export function reportUnresolvedRequires(task: Task, tasks: Task[]): void {
   const unresolved = task.requires.filter((id) => !known.has(id));
   if (unresolved.length === 0) return;
   console.log(`recorded ${unresolved.length} requirement(s) no record answers to: ${unresolved.join(', ')} — they hold the task until the record exists, and \`tasks doctor\` reports them until it does`);
+}
+
+// A grant nobody has read the code for is a forecast, so that is what a
+// grant declared here is unless its author says otherwise: `add` and a
+// planner's `edit` both run before the region has been read, and the
+// workflow's correction point is a worker narrowing its own grant at
+// dispatch. Returning the previous kind for an edit that touches nothing
+// else keeps a worker's commitment from being demoted by a later title fix.
+function resolveGrant(flags: Record<string, string>, current: Grant | null): { grant: Grant | null } | { error: string } {
+  const given = flags.grant;
+  if (given !== undefined) return GRANTS.includes(given as Grant) ? { grant: given as Grant } : { error: `error: --grant must be one of ${GRANTS.join(', ')}` };
+  if (flags.writes === undefined) return { grant: current };
+  return { grant: current ?? 'forecast' };
+}
+
+function reportGrant(task: Task): void {
+  if (task.grant !== 'forecast') return;
+  console.log(`its write grant is recorded as a forecast — \`tasks edit ${task.id} --writes <paths> --grant commitment\` is what a worker that has read the region says, and \`tasks plan\` grades an overlap between commitments as a defect and one resting on a forecast as a note`);
 }
 
 export function cmdAdd(args: Flags, usage: string): void {
@@ -82,6 +104,13 @@ export function cmdAdd(args: Flags, usage: string): void {
     return;
   }
 
+  const grant = resolveGrant(args.flags, null);
+  if ('error' in grant) {
+    console.error(grant.error);
+    process.exitCode = 1;
+    return;
+  }
+
   const taken = new Set(tasks.map((task) => task.id));
   const id = args.flags.id ?? uniqueId(slugify(title), taken);
   if (taken.has(id)) {
@@ -107,6 +136,7 @@ export function cmdAdd(args: Flags, usage: string): void {
     clause: null,
     requires: splitList(args.flags.requires),
     writes: splitList(args.flags.writes),
+    grant: grant.grant,
     produces: splitList(args.flags.produces),
     files: splitList(args.flags.files),
     deliverable: args.flags.deliverable ?? null,
@@ -125,6 +155,8 @@ export function cmdAdd(args: Flags, usage: string): void {
   console.log(`added ${id} [${task.kind}/${task.state}]`);
   if (kind === 'finding' && args.flags.spec !== undefined) console.log(`--spec is not recorded on a finding — it starts unreviewed outside every spec, and triage or \`tasks promote\` moves it in`);
   reportUnresolvedRequires(task, tasks);
+  reportGrant(task);
+  if (args.flags.writes !== undefined) reportPriorArtOnWrites(config, tasks, task);
 }
 
 export function cmdEdit(args: Flags, usage: string): void {
@@ -144,6 +176,13 @@ export function cmdEdit(args: Flags, usage: string): void {
   const validationError = validateContentFields(config, args.flags);
   if (validationError) {
     console.error(validationError);
+    process.exitCode = 1;
+    return;
+  }
+
+  const grant = resolveGrant(args.flags, task.grant);
+  if ('error' in grant) {
+    console.error(grant.error);
     process.exitCode = 1;
     return;
   }
@@ -183,6 +222,10 @@ export function cmdEdit(args: Flags, usage: string): void {
     task.writes = splitList(args.flags.writes);
     changes.push('writes');
   }
+  if (grant.grant !== task.grant) {
+    task.grant = grant.grant;
+    changes.push('grant');
+  }
   if (args.flags.produces !== undefined) {
     task.produces = splitList(args.flags.produces);
     changes.push('produces');
@@ -197,6 +240,8 @@ export function cmdEdit(args: Flags, usage: string): void {
   recordEvents(config, 'edit', [subjectOf(task, `edited ${changes.join(', ')}`)]);
   console.log(`edited ${task.id}: ${changes.join(', ')}`);
   reportUnresolvedRequires(task, tasks);
+  if (changes.includes('grant')) reportGrant(task);
+  if (args.flags.writes !== undefined) reportPriorArtOnWrites(config, tasks, task);
 }
 
 function storeStateAt(config: Config, commit: string, id: string): State | null {
@@ -229,6 +274,20 @@ function deriveClosingCommit(config: Config, id: string): string | null {
   return null;
 }
 
+// A close carries why it closed, and where a closer puts that is `tasks
+// note` — which lands in the event log, reachable only by someone who
+// already knows it is there. `show` is where a reader arrives, so the
+// judgements come with the record. `note` and `decision` and nothing else:
+// the state verbs already wrote what they did into the fields above.
+function printJudgements(config: Config, task: Task): void {
+  const judgements = filterEvents(loadEvents(config.eventsPath).events, { id: task.id }).filter((event) => event.op === 'note' || event.op === 'decision');
+  if (judgements.length === 0) return;
+  console.log(`\n${judgements.length} judgement(s) recorded against this record:`);
+  for (const event of judgements) {
+    for (const line of wrapUnder(event.note, `  [${event.op}] ${event.t.slice(0, 10)} ${event.by ?? '(unnamed)'} — `, '    ')) console.log(line);
+  }
+}
+
 export function cmdShow(args: Flags, usage: string): void {
   const config = resolveConfig(args.flags);
   const id = args.positional[0];
@@ -245,6 +304,7 @@ export function cmdShow(args: Flags, usage: string): void {
     const derived = deriveClosingCommit(config, task.id);
     console.log(derived ? `closedCommit (derived): ${derived}` : 'closedCommit: (none recorded, and none could be derived from git history)');
   }
+  printJudgements(config, task);
 }
 
 // The only verb that reads the whole store rather than one spec's fix-now
@@ -497,12 +557,26 @@ export function cmdStop(args: Flags, usage: string): void {
 // reported beside the close instead of preventing it, so a clause closed
 // against an unmet verdict leaves a record of what its spec's latest pass
 // actually said at the moment it closed.
-function clauseStanding(config: Config, task: Task): string {
+export interface SpecSource {
+  path: string;
+  // Null when nothing is there to read, which the caller reports as a
+  // missing spec file rather than as an ungraded clause.
+  text: string | null;
+}
+
+// The spec document as a value, so the determination below is decided from
+// what it says and not from what is on disk when it runs.
+function specSource(config: Config, spec: string): SpecSource {
+  const path = specFile(config, spec);
+  return { path, text: existsSync(path) ? readFileSync(path, 'utf8') : null };
+}
+
+export function clauseStanding(task: Task, load: (spec: string) => SpecSource): string {
   if (!task.spec) return 'it names no spec, so no audit pass can speak to it';
   if (task.clause === null) return 'it names no proof clause';
-  const path_ = specFile(config, task.spec);
-  if (!existsSync(path_)) return `its spec file is missing: ${path_}`;
-  const doc = parseSpecDoc(readFileSync(path_, 'utf8'));
+  const { path: path_, text } = load(task.spec);
+  if (text === null) return `its spec file is missing: ${path_}`;
+  const doc = parseSpecDoc(text);
   if (!doc.proofClauses.some((candidate) => candidate.id === task.clause)) return `proof clause ${task.clause} is no longer in ${path_}`;
   const latest = doc.auditPasses[doc.auditPasses.length - 1];
   if (!latest) return `${task.spec} has no recorded audit pass`;
@@ -524,6 +598,24 @@ function reportUnregisteredProduces(config: Config, task: Task): void {
   console.log(`\n${unregistered.length} of this task's produces claim(s) are not registered concepts, so \`tasks produces\` will only find them as a closed task's claim:`);
   for (const name of unregistered) console.log(`  tasks concept ${JSON.stringify(task.system ?? '<system>')} ${JSON.stringify(name)} --paths <paths> --note "produced by ${task.id}"`);
   console.log('Register the ones that are durable capabilities. A branch\'s output is not one.');
+}
+
+// The store is only the path of least resistance for a judgement if it asks
+// for one. `tasks decision` went unrun across a whole branch while twelve
+// commit bodies carried the reasoning, because the commit had a writing
+// prompt attached and the store did not. Printed, never written, exactly as
+// the `tasks concept` nudge above is — and it names `show` because that is
+// where the next reader will now find the answer.
+export function printDecisionPrompt(task: Task): void {
+  console.log(`if this rested on a judgement worth reading later, \`tasks decision "<one line>" --id ${task.id}\` records it where \`tasks show ${task.id}\` surfaces it`);
+}
+
+// The line clause 16 pins. A pass-2 finding was not part of what the spec
+// promised, so promoting it widens the promise, and both the batch form and
+// the interactive walk say so from here.
+export function pass2Promotion(task: Task, spec: string): string | null {
+  const pass = task.source?.pass ?? 0;
+  return pass >= 2 ? `promoting a pass ${pass} finding, which extends what ${spec} owes` : null;
 }
 
 export function cmdDone(args: Flags, usage: string): void {
@@ -564,9 +656,10 @@ export function cmdDone(args: Flags, usage: string): void {
     closes.push({ task, note: ['done', ...notes, ...(task.closedCommit ? [`closing commit ${task.closedCommit}`] : []), ...(waiting.length > 0 ? [`${waiting.length} requirement(s) still open: ${waiting.join(', ')}`] : [])].join('; ') });
     console.log(`done ${task.id}`);
     for (const note of notes) console.log(note);
-    if (task.kind === 'undelivered') console.log(`clause standing at close: ${clauseStanding(config, task)}`);
+    if (task.kind === 'undelivered') console.log(`clause standing at close: ${clauseStanding(task, (spec) => specSource(config, spec))}`);
     if (alreadyDone) console.log(`the recorded close date stands: ${task.closed ?? 'undated'}`);
     if (waiting.length > 0) console.log(`closed with ${waiting.length} requirement(s) still open: ${waiting.join(', ')}`);
+    printDecisionPrompt(task);
   }
   saveStoreAndWarn(tasks, config);
   recordEvents(config, 'done', closes.map((close) => subjectOf(close.task, close.note)));
@@ -594,6 +687,7 @@ export function cmdDecline(args: Flags, usage: string): void {
     console.log(`declined ${task.id}`);
     for (const note of notes) console.log(note);
     if (task.kind === 'undelivered') console.log(`this was ${task.spec ?? 'a spec'}'s outstanding promise on clause ${task.clause ?? '(none named)'} — declining it abandons the clause, it does not discharge it`);
+    printDecisionPrompt(task);
   }
   saveStoreAndWarn(tasks, config);
   recordEvents(config, 'decline', declines.map((decline) => subjectOf(decline.task, decline.note)));
@@ -639,7 +733,8 @@ export function cmdPromote(args: Flags, usage: string): void {
   const promotions: Array<{ task: Task; note: string }> = [];
   for (const task of resolved) {
     const from = task.state;
-    if ((task.source?.pass ?? 0) >= 2) console.log(`promoting a pass ${task.source!.pass} finding, which extends what ${spec} owes: ${task.id}`);
+    const widening = pass2Promotion(task, spec);
+    if (widening) console.log(`${widening}: ${task.id}`);
     task.state = 'open';
     task.spec = spec;
     promotions.push({ task, note: `promoted into spec ${spec} (was ${from})` });

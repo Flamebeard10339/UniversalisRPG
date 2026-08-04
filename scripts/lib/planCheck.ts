@@ -26,6 +26,21 @@ export function isReadableGrant(path: string): boolean {
   return !normalized.includes('*') || /^\*\.[a-z0-9]+$/.test(normalized);
 }
 
+// Only a pair of commitments is evidence of a collision. A grant declared
+// before anyone read the code is a forecast, and the honest forecast is a
+// directory, which overlaps everything beneath it — that is what made four
+// genuinely independent roadmap tasks report five collisions, and narrowing
+// those grants to invented file paths bought the silence with a false
+// record. So the weighing moves, not the record: an overlap resting on a
+// forecast, or on a record that has not said, is reported and not called a
+// defect.
+function weigh(tasks: Task[]): { level: PlanLevel; caveat: string } {
+  const soft = tasks.filter((task) => task.grant !== 'commitment');
+  if (soft.length === 0) return { level: 'defect', caveat: '' };
+  const named = soft.map((task) => `${task.id}'s grant is ${task.grant ?? 'unstated'}`).join(', ');
+  return { level: 'note', caveat: ` — weighed as a note because ${named}, and only a commitment is a promise about where the work lands` };
+}
+
 function overlappingPaths(a: Task, b: Task): string[] {
   const shared = readableWrites(a).filter((left) => readableWrites(b).some((right) => pathsOverlap(left, right)));
   return [...new Set(shared.map(normalize))].sort();
@@ -75,6 +90,10 @@ export interface PlanReport {
   // counting a wildcard as read is what let a plan answer "clean" over
   // tasks nobody had compared.
   ungranted: number;
+  // How many readable grants are commitments — the only grants an overlap
+  // between them is graded on. A plan of forecasts can report no defect and
+  // still be a plan nobody has compared.
+  commitments: number;
   tasks: Task[];
 }
 
@@ -97,6 +116,8 @@ export function checkPlan(plan: Task[], all: Task[], known: Producer[] = []): Pl
     if (shared.length === 0) continue;
     if (ordered(a, b, byId)) continue;
 
+    const { level, caveat } = weigh([a, b]);
+
     // The overlap is worse when one side is inventing something: the other
     // will be writing against an interface that does not exist yet and is
     // still moving. The remedy differs — an ordinary overlap wants the two
@@ -105,16 +126,16 @@ export function checkPlan(plan: Task[], all: Task[], known: Producer[] = []): Pl
     if (inventor !== null) {
       const other = inventor === a ? b : a;
       findings.push({
-        level: 'defect',
+        level,
         kind: 'unstated-dependency',
-        message: `${other.id} writes ${shared.join(', ')}, where ${inventor.id} is producing ${inventor.produces.join(', ')} — and ${other.id} does not require ${inventor.id}`,
+        message: `${other.id} writes ${shared.join(', ')}, where ${inventor.id} is producing ${inventor.produces.join(', ')} — and ${other.id} does not require ${inventor.id}${caveat}`,
       });
       continue;
     }
     findings.push({
-      level: 'defect',
+      level,
       kind: 'overlapping-writes',
-      message: `${a.id} and ${b.id} both write ${shared.join(', ')}, and neither requires the other — this is one change, split across two workers`,
+      message: `${a.id} and ${b.id} both write ${shared.join(', ')}, and neither requires the other — this is one change, split across two workers${caveat}`,
     });
   }
 
@@ -169,7 +190,8 @@ export function checkPlan(plan: Task[], all: Task[], known: Producer[] = []): Pl
   const cohesion = cohesionFinding(plan);
   if (cohesion) findings.push(cohesion);
 
-  return { findings, ungranted: ungranted.length, tasks: plan };
+  const commitments = plan.filter((task) => task.grant === 'commitment' && readableWrites(task).length > 0).length;
+  return { findings, ungranted: ungranted.length, commitments, tasks: plan };
 }
 
 // Parallelism pays when the work is genuinely separable, and the cheapest
@@ -191,9 +213,11 @@ function cohesionFinding(plan: Task[]): PlanFinding | null {
   }
   if (worst === null || worst[1] < granted.length - 1 || worst[1] < 3) return null;
 
+  const path = worst[0];
+  const { level, caveat } = weigh(granted.filter((task) => readableWrites(task).some((entry) => pathsOverlap(normalize(entry), path))));
   return {
-    level: 'defect',
+    level,
     kind: 'cohesion',
-    message: `${worst[1]} of ${granted.length} granted task(s) write ${worst[0]} — a plan concentrated in one place is one task, and more workers on it buy nothing`,
+    message: `${worst[1]} of ${granted.length} granted task(s) write ${path} — a plan concentrated in one place is one task, and more workers on it buy nothing${caveat}`,
   };
 }

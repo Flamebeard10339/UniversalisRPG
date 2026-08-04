@@ -14,6 +14,7 @@ function task(overrides: Partial<Task> & { id: string }): Task {
     requires: [],
     files: [],
     writes: [],
+    grant: null,
     produces: [],
     deliverable: null,
     evidence: null,

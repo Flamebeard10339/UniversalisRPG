@@ -663,12 +663,12 @@ describe('tasks CLI', () => {
       expect(added.status).toBe(0);
 
       const shown = tasks('show', 'seam').stdout;
-      expect(shown).toContain('writes: scripts/lib/policy.ts, scripts/lib/policy.test.ts');
+      expect(shown).toContain('writes (forecast): scripts/lib/policy.ts, scripts/lib/policy.test.ts');
       expect(shown).toContain('produces: policy module, PolicyDecision type');
 
       const edited = tasks('edit', 'seam', '--writes', 'scripts/lib/policy.ts');
       expect(edited.stdout).toContain('edited seam: writes');
-      expect(tasks('show', 'seam').stdout).toContain('writes: scripts/lib/policy.ts\n');
+      expect(tasks('show', 'seam').stdout).toContain('writes (forecast): scripts/lib/policy.ts\n');
     });
   });
 
