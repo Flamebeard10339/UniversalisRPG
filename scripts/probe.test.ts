@@ -4,6 +4,7 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { CONTENT_SECTION_MAPS } from '../src/content/registry';
 import type { ModuleSource } from '../src/content/universe';
+import { tsxCli } from './lib/tsxCli';
 import { parseProbeArgs, probe, splitDocuments, type ProbeOptions } from './probe';
 
 const BASE: ModuleSource = {
@@ -296,12 +297,11 @@ describe('probe: arguments', () => {
 
 describe('probe: the command seam', () => {
   const repoRoot = path.join(import.meta.dirname, '..');
-  const tsx = path.join(repoRoot, 'node_modules/tsx/dist/cli.mjs');
   const script = path.join(repoRoot, 'scripts/probe.ts');
 
   const run = (args: string[], input?: string) => {
     try {
-      const stdout = execFileSync(process.execPath, [tsx, script, ...args], { cwd: repoRoot, encoding: 'utf8', input: input ?? '', stdio: ['pipe', 'pipe', 'pipe'] });
+      const stdout = execFileSync(process.execPath, [tsxCli, script, ...args], { cwd: repoRoot, encoding: 'utf8', input: input ?? '', stdio: ['pipe', 'pipe', 'pipe'] });
       return { status: 0, out: stdout };
     } catch (error) {
       const failure = error as { status: number; stdout: string; stderr: string };

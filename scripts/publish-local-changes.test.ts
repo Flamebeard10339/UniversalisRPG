@@ -3,9 +3,9 @@ import { mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { tsxCli } from './lib/tsxCli';
 
 const repoRoot = path.join(import.meta.dirname, '..');
-const tsx = path.join(repoRoot, 'node_modules/tsx/dist/cli.mjs');
 const script = path.join(repoRoot, 'scripts/publish-local-changes.ts');
 
 interface Run {
@@ -15,7 +15,7 @@ interface Run {
 }
 
 function runPublish(args: string[], env: NodeJS.ProcessEnv = process.env): Run {
-  const result = spawnSync(process.execPath, [tsx, script, ...args], { cwd: repoRoot, encoding: 'utf8', env });
+  const result = spawnSync(process.execPath, [tsxCli, script, ...args], { cwd: repoRoot, encoding: 'utf8', env });
   return { status: result.status ?? 1, stdout: result.stdout, stderr: result.stderr };
 }
 
