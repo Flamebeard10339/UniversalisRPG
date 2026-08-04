@@ -11,8 +11,9 @@ import { cmdAdd, cmdDecline, cmdDone, cmdEdit, cmdList, cmdNext, cmdPromote, cmd
 import { cmdRoadmap } from './roadmapCmd';
 import { cmdSpecAdd, cmdSpecDone, cmdSpecNew, cmdSpecRemove, cmdSpecShow } from './specCmds';
 import { cmdTriage } from './triage';
+import { cmdWorkPrompt } from './workPrompt';
 
-const USAGE = 'usage: npm run tasks -- <doctor|add|edit|show|list|search|next|roadmap|plan|system|where|produces|concept|start|stop|done|decline|promote|import|triage|note|decision|log|spec|audit|audit-prompt|handoff|merge-ready> ...';
+const USAGE = 'usage: npm run tasks -- <doctor|add|edit|show|list|search|next|roadmap|plan|system|where|produces|concept|start|stop|done|decline|promote|import|triage|note|decision|log|spec|audit|audit-prompt|work-prompt|handoff|merge-ready> ...';
 
 interface Command {
   usage: string;
@@ -78,6 +79,7 @@ const COMMANDS: Record<string, Command> = {
   spec: { usage: SPEC_USAGE, run: refuseBareSpec },
   audit: { usage: AUDIT_USAGE, run: cmdAudit },
   'audit-prompt': { usage: 'usage: tasks audit-prompt <spec> [--base-branch main]  (the auditor\'s brief, generated — do not hand-write one)', run: cmdAuditPrompt },
+  'work-prompt': { usage: 'usage: tasks work-prompt <id>  (the worker\'s brief, generated — do not hand-write one)', run: cmdWorkPrompt },
   handoff: { usage: 'usage: tasks handoff [--spec <slug>] [--base-branch main] [--scan-cap <commits>]', run: cmdHandoff },
   'merge-ready': { usage: 'usage: tasks merge-ready  (runs the merge gate: tsc, npm test, layer-check, audit-status, doctor, and the tracked-text byte check; exits non-zero when a leg fails)', run: cmdMergeReady },
   'check-commit-msg': { usage: 'usage: tasks check-commit-msg <msg-file> [--merge-or-revert] [--files a,b,c]', run: cmdCheckCommitMessage },

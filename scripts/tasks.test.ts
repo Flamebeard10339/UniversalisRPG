@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
+import { appendFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -63,6 +63,15 @@ function ageClaim(dir: string, id: string, days: number): void {
       return JSON.stringify(record);
     });
   writeFileSync(file, `${lines.join('\n')}\n`, 'utf8');
+}
+
+// A store write no fixture command can make: `fixture` pins `--branch`, and
+// what the provenance line reads off the log is the branch an event was
+// written from, which is a different branch from the one reading it exactly
+// when the line is worth having.
+function appendEvent(dir: string, event: { branch: string; spec: string; id?: string }): void {
+  const line = { t: new Date().toISOString(), by: null, branch: event.branch, head: null, op: 'edit', id: event.id ?? null, system: null, spec: event.spec, note: 'edited' };
+  appendFileSync(path.join(dir, 'events.jsonl'), `${JSON.stringify(line)}\n`, 'utf8');
 }
 
 function fixture(run: (context: { dir: string; args: (extra?: string[]) => string[]; tasks: (...args: string[]) => Run; triage: (input: string, extra?: string[]) => Run }) => void): void {
@@ -299,7 +308,7 @@ describe('tasks CLI', () => {
   it('refuses five junk arguments on every bounded command surface', () => {
     fixture(({ tasks }) => {
       const unbounded = new Set(['spec add', 'spec remove', 'plan', 'done', 'decline', 'promote']);
-      const surfaces = [['doctor'], ['add'], ['edit'], ['show'], ['list'], ['search'], ['next'], ['start'], ['stop'], ['done'], ['decline'], ['promote'], ['import'], ['triage'], ['audit'], ['audit-prompt'], ['handoff'], ['check-commit-msg'], ['plan'], ['spec'], ['spec', 'new'], ['spec', 'add'], ['spec', 'remove'], ['spec', 'show'], ['spec', 'done'], ['note'], ['decision'], ['log'], ['merge-ready']];
+      const surfaces = [['doctor'], ['add'], ['edit'], ['show'], ['list'], ['search'], ['next'], ['start'], ['stop'], ['done'], ['decline'], ['promote'], ['import'], ['triage'], ['audit'], ['audit-prompt'], ['work-prompt'], ['handoff'], ['check-commit-msg'], ['plan'], ['spec'], ['spec', 'new'], ['spec', 'add'], ['spec', 'remove'], ['spec', 'show'], ['spec', 'done'], ['note'], ['decision'], ['log'], ['merge-ready']];
       for (const surface of surfaces) {
         const name = surface.join(' ');
         const result = tasks(...surface, 'j1', 'j2', 'j3', 'j4', 'j5');
@@ -355,7 +364,7 @@ describe('tasks CLI', () => {
 
   it('answers --help on every command and subcommand, and names the flags it will accept', () => {
     fixture(({ tasks }) => {
-      const commands = [['doctor'], ['add'], ['edit'], ['show'], ['list'], ['search'], ['next'], ['start'], ['stop'], ['done'], ['decline'], ['promote'], ['import'], ['triage'], ['audit'], ['audit-prompt'], ['handoff'], ['check-commit-msg'], ['plan'], ['spec'], ['spec', 'new'], ['spec', 'add'], ['spec', 'remove'], ['spec', 'show'], ['spec', 'done'], ['note'], ['decision'], ['log'], ['merge-ready']];
+      const commands = [['doctor'], ['add'], ['edit'], ['show'], ['list'], ['search'], ['next'], ['start'], ['stop'], ['done'], ['decline'], ['promote'], ['import'], ['triage'], ['audit'], ['audit-prompt'], ['work-prompt'], ['handoff'], ['check-commit-msg'], ['plan'], ['spec'], ['spec', 'new'], ['spec', 'add'], ['spec', 'remove'], ['spec', 'show'], ['spec', 'done'], ['note'], ['decision'], ['log'], ['merge-ready']];
       for (const command of commands) {
         const result = tasks(...command, '--help');
         expect(result.status, command.join(' ')).toBe(0);
@@ -2678,6 +2687,109 @@ describe('tasks CLI', () => {
       // that `- none` is absent passed with the print loop dropped, which
       // leaves the header with nothing under it at all.
       expect(relevantFilesBlock(result.stdout)).toMatch(/- file-[^\n]+\.txt\n/);
+    });
+  });
+
+  // c19. The worker's half of the generated-brief rule the auditor's half
+  // has had all along: what a dispatcher hand-writes is a copy of the record
+  // that drifts from it, so the record renders itself.
+  it('work-prompt names the task\'s deliverable, grant, requirements and clause standings', () => {
+    fixture(({ tasks }) => {
+      tasks('add', 'the dependency', '--id', 'dep', '--spec', 'demo-spec');
+      tasks('done', 'dep');
+      tasks('audit', 'demo-spec', '--proof', '1=unmet', '--evidence', '1=it does not actually hold', '--proof', '2=met', '--evidence', '2=clause 2 checked');
+      tasks('edit', 'demo-spec-clause-1', '--writes', 'src/runtime/save.ts,src/runtime/invented-by-a-planner.ts', '--requires', 'dep', '--deliverable', 'the first clause is delivered', '--evidence', 'the audit graded it unmet');
+
+      const result = tasks('work-prompt', 'demo-spec-clause-1');
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('You are implementing demo-spec-clause-1 on branch demo-spec.');
+      expect(result.stdout).toContain('deliverable: the first clause is delivered');
+      expect(result.stdout).toContain('evidence: the audit graded it unmet');
+      // Every requirement with why it does or does not hold the task up —
+      // "requirements and whether they are closed" is the whole point of
+      // printing them rather than the ids alone.
+      expect(result.stdout).toContain('requires: dep (done)');
+
+      // The grant resolved against the tree is what a worker checks a
+      // forecast against: a path nobody opened matches nothing, and saying
+      // so is what makes the invitation to refuse actionable rather than
+      // polite.
+      expect(result.stdout).toContain('- src/runtime/save.ts\n');
+      expect(result.stdout).toContain('- src/runtime/invented-by-a-planner.ts — matches no tracked file');
+
+      // The clause this record discharges, at its latest standing — and not
+      // the spec's other clause, which is somebody else's brief.
+      expect(result.stdout).toContain('1. [unmet] The first clause holds.');
+      expect(result.stdout).not.toContain('The second clause holds.');
+    });
+  });
+
+  it('work-prompt names the claim, grant-correction and concept-registration steps a worker owes before writing code', () => {
+    fixture(({ tasks }) => {
+      tasks('add', 'a member', '--id', 'a-member', '--spec', 'demo-spec', '--system', 'Runtime', '--produces', 'a policy module');
+
+      const result = tasks('work-prompt', 'a-member');
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('npm run tasks -- start a-member --actor <you>');
+      expect(result.stdout).toContain('npm run tasks -- edit a-member --writes');
+      expect(result.stdout).toContain('npm run tasks -- concept');
+      expect(result.stdout).toContain('produced by a-member');
+      // The registration step is the one a `produces` claim looks like it
+      // already discharged and does not — workflow.md step 6 puts the
+      // judgement on the worker, so the brief has to name both.
+      expect(result.stdout).toContain('produces: a policy module');
+      expect(result.stdout).toContain('a forecast, not a registration');
+    });
+  });
+
+  it('work-prompt invites refusal of the grant it prints', () => {
+    fixture(({ tasks }) => {
+      tasks('add', 'a member', '--id', 'a-member', '--spec', 'demo-spec', '--writes', 'src/runtime/save.ts');
+
+      const result = tasks('work-prompt', 'a-member');
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('You may refuse this grant');
+      // An invitation with no verb behind it is a courtesy. Both exits are
+      // named, because "stop, it is not mine" and "decline, it should not be
+      // done" are different answers.
+      expect(result.stdout).toContain('npm run tasks -- stop a-member');
+      expect(result.stdout).toContain('npm run tasks -- decline a-member --reason');
+    });
+  });
+
+  it('work-prompt refuses an id the store does not hold, without inventing a brief', () => {
+    fixture(({ tasks }) => {
+      tasks('add', 'a member', '--id', 'a-member', '--spec', 'demo-spec');
+
+      const result = tasks('work-prompt', 'no-such-record');
+      // A read answers, the way audit-prompt answers an unknown spec. What
+      // it must not do is print a brief anyway: a dispatch instruction for a
+      // record nobody holds is the one output here that would be invented.
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('no such task: no-such-record');
+      expect(result.stdout).not.toContain('You are implementing');
+      expect(result.stdout).not.toContain('Write grant');
+      expect(result.stdout).not.toContain('Three things the workflow puts on you');
+    });
+  });
+
+  it('work-prompt names the branch this spec was last written from', () => {
+    fixture(({ tasks, dir }) => {
+      tasks('add', 'a member', '--id', 'a-member', '--spec', 'demo-spec');
+      appendEvent(dir, { branch: 'claude/earlier-4f21a0', spec: 'demo-spec', id: 'a-member' });
+      appendEvent(dir, { branch: 'claude/later-9c1d3e', spec: 'demo-spec', id: 'a-member' });
+      appendEvent(dir, { branch: 'claude/another-spec-7b02', spec: 'some-other-spec' });
+
+      const result = tasks('work-prompt', 'a-member');
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('demo-spec was last written from branch claude/later-9c1d3e.');
+      expect(result.stdout).not.toContain('claude/earlier-4f21a0');
+      expect(result.stdout).not.toContain('claude/another-spec-7b02');
+      // It states the fact and stops. A worktree's environment belongs to
+      // whoever spawned it, and a brief that starts repairing one is a
+      // second, unowned copy of that job.
+      expect(result.stdout).not.toContain('git reset');
+      expect(result.stdout).not.toContain('node_modules');
     });
   });
 
