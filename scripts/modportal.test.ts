@@ -3,9 +3,9 @@ import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSy
 import os from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { tsxCli } from './lib/tsxCli';
 
 const repoRoot = path.join(import.meta.dirname, '..');
-const tsx = path.join(repoRoot, 'node_modules/tsx/dist/cli.mjs');
 const script = path.join(repoRoot, 'scripts/modportal.ts');
 
 interface Run {
@@ -15,7 +15,7 @@ interface Run {
 }
 
 function runModportal(args: string[]): Run {
-  const result = spawnSync(process.execPath, [tsx, script, ...args], { cwd: repoRoot, encoding: 'utf8' });
+  const result = spawnSync(process.execPath, [tsxCli, script, ...args], { cwd: repoRoot, encoding: 'utf8' });
   return { status: result.status ?? 1, stdout: result.stdout, stderr: result.stderr };
 }
 

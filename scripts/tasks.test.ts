@@ -3,6 +3,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, utimesSync, w
 import os from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { tsxCli } from './lib/tsxCli';
 import { run as runTasks } from './tasks';
 import { parseAuditArgs } from './tasks/audit';
 import { flagArities } from './tasks/cli';
@@ -10,7 +11,6 @@ import { allUsages } from './tasks/commands';
 
 const repoRoot = path.join(import.meta.dirname, '..');
 const today = new Date().toISOString().slice(0, 10);
-const tsx = path.join(repoRoot, 'node_modules/tsx/dist/cli.mjs');
 const script = path.join(repoRoot, 'scripts/tasks.ts');
 
 interface Run {
@@ -97,11 +97,11 @@ function fixture(run: (context: { dir: string; args: (extra?: string[]) => strin
       args: (extra = []) => [...globals, ...extra],
       tasks: (...args: string[]) => {
         if (args[0] !== 'audit') return runInProcess(withGlobals(args));
-        const result = spawnSync(process.execPath, [tsx, script, ...withGlobals(args)], { cwd: repoRoot, encoding: 'utf8' });
+        const result = spawnSync(process.execPath, [tsxCli, script, ...withGlobals(args)], { cwd: repoRoot, encoding: 'utf8' });
         return { status: result.status ?? 1, stdout: result.stdout, stderr: result.stderr };
       },
       triage: (input: string, extra: string[] = []) => {
-        const result = spawnSync(process.execPath, [tsx, script, 'triage', ...extra, ...globals], { cwd: repoRoot, encoding: 'utf8', input });
+        const result = spawnSync(process.execPath, [tsxCli, script, 'triage', ...extra, ...globals], { cwd: repoRoot, encoding: 'utf8', input });
         return { status: result.status ?? 1, stdout: result.stdout, stderr: result.stderr };
       },
     });
@@ -142,7 +142,7 @@ function gitFixture(run: (context: { dir: string; commit: (message: string) => s
         return spawnSync('git', ['rev-parse', 'HEAD'], { cwd: dir, encoding: 'utf8' }).stdout.trim();
       },
       tasks: (...args: string[]) => {
-        const result = spawnSync(process.execPath, [tsx, script, ...args, ...globals], { cwd: dir, encoding: 'utf8' });
+        const result = spawnSync(process.execPath, [tsxCli, script, ...args, ...globals], { cwd: dir, encoding: 'utf8' });
         return { status: result.status ?? 1, stdout: result.stdout, stderr: result.stderr };
       },
     });
@@ -169,7 +169,7 @@ function defaultStoreGitFixture(run: (context: { dir: string; tasks: (...args: s
     run({
       dir,
       tasks: (...args: string[]) => {
-        const result = spawnSync(process.execPath, [tsx, script, ...args, '--branch', 'demo-spec'], { cwd: dir, encoding: 'utf8' });
+        const result = spawnSync(process.execPath, [tsxCli, script, ...args, '--branch', 'demo-spec'], { cwd: dir, encoding: 'utf8' });
         return { status: result.status ?? 1, stdout: result.stdout, stderr: result.stderr };
       },
     });
@@ -748,7 +748,7 @@ describe('tasks CLI', () => {
       const systemsPath = path.join(dir, 'systems.json');
       const specsDir = path.join(dir, 'specs');
       writeFileSync(storePath, `${JSON.stringify({ id: 'deferred-task', title: 'deferred', kind: 'task', state: 'open', severity: 'high', system: null, spec: null, requires: [], files: [], deliverable: null, evidence: null, source: null, reason: null, closed: null })}\n`, 'utf8');
-      const result = spawnSync(process.execPath, [tsx, script, 'next', '--store', storePath, '--systems', systemsPath, '--specs-dir', specsDir, '--branch', 'no-such-spec'], { cwd: repoRoot, encoding: 'utf8' });
+      const result = spawnSync(process.execPath, [tsxCli, script, 'next', '--store', storePath, '--systems', systemsPath, '--specs-dir', specsDir, '--branch', 'no-such-spec'], { cwd: repoRoot, encoding: 'utf8' });
       expect(result.stdout).toContain('no active spec for this branch');
       expect(result.stdout).not.toContain('deferred');
     });
@@ -1546,7 +1546,7 @@ describe('tasks CLI', () => {
       writeFileSync(path.join(dir, 'docs', 'audits', 'systems.json'), JSON.stringify({ unowned: { note: '', paths: ['docs', '*.md'] }, systems: [] }), 'utf8');
       writeFileSync(path.join(dir, 'docs', 'tasks.jsonl'), `${JSON.stringify({ id: 'a', title: 'a', kind: 'task', state: 'done', severity: null, system: null, spec: null, clause: null, requires: [], files: [], deliverable: null, evidence: null, source: null, reason: null, closed: '2026-08-01', closedCommit: null })}\n`, 'utf8');
       // No commit at all — HEAD does not exist yet on this branch.
-      const result = spawnSync(process.execPath, [tsx, script, 'doctor', '--branch', 'demo-spec'], { cwd: dir, encoding: 'utf8' });
+      const result = spawnSync(process.execPath, [tsxCli, script, 'doctor', '--branch', 'demo-spec'], { cwd: dir, encoding: 'utf8' });
       expect(result.status).toBe(0);
       expect(result.stdout).not.toContain('only in the working tree');
     } finally {
@@ -2344,7 +2344,7 @@ describe('tasks CLI', () => {
 
   function walkClauses(dir: string, input: string): Run {
     const globals = ['--store', path.join(dir, 'tasks.jsonl'), '--systems', path.join(dir, 'systems.json'), '--specs-dir', path.join(dir, 'specs'), '--branch', 'demo-spec'];
-    const result = spawnSync(process.execPath, [tsx, script, 'audit', 'demo-spec', ...globals], { cwd: repoRoot, encoding: 'utf8', input });
+    const result = spawnSync(process.execPath, [tsxCli, script, 'audit', 'demo-spec', ...globals], { cwd: repoRoot, encoding: 'utf8', input });
     return { status: result.status ?? 1, stdout: result.stdout, stderr: result.stderr };
   }
 
@@ -2898,7 +2898,7 @@ describe('tasks CLI', () => {
       const storePath = path.join(dir, 'tasks.jsonl');
       const systemsPath = path.join(dir, 'systems.json');
       const specsDir = path.join(dir, 'specs');
-      const result = spawnSync(process.execPath, [tsx, script, 'handoff', '--store', storePath, '--systems', systemsPath, '--specs-dir', specsDir, '--branch', 'no-such-spec-branch'], { cwd: repoRoot, encoding: 'utf8' });
+      const result = spawnSync(process.execPath, [tsxCli, script, 'handoff', '--store', storePath, '--systems', systemsPath, '--specs-dir', specsDir, '--branch', 'no-such-spec-branch'], { cwd: repoRoot, encoding: 'utf8' });
       expect(result.stdout).toContain('branch: no-such-spec-branch');
       expect(result.stdout).toContain('no-such-spec-branch.md');
     });
@@ -2999,7 +2999,7 @@ describe('tasks CLI', () => {
       const storePath = path.join(dir, 'tasks.jsonl');
       const systemsPath = path.join(dir, 'systems.json');
       const specsDir = path.join(dir, 'specs');
-      const result = spawnSync(process.execPath, [tsx, script, 'next', '--store', storePath, '--systems', systemsPath, '--specs-dir', specsDir, '--branch', 'orphaned-branch'], { cwd: repoRoot, encoding: 'utf8' });
+      const result = spawnSync(process.execPath, [tsxCli, script, 'next', '--store', storePath, '--systems', systemsPath, '--specs-dir', specsDir, '--branch', 'orphaned-branch'], { cwd: repoRoot, encoding: 'utf8' });
       expect(result.stdout).toContain('spec inferred from the store: demo-spec');
       expect(result.stdout).toContain('open task');
     });
@@ -3016,7 +3016,7 @@ describe('tasks CLI', () => {
     fixture(({ tasks, dir }) => {
       tasks('add', 'open task', '--id', 'open-task', '--spec', 'demo-spec', '--severity', 'high');
       const globals = ['--store', path.join(dir, 'tasks.jsonl'), '--systems', path.join(dir, 'systems.json'), '--specs-dir', path.join(dir, 'specs')];
-      const on = (branch: string, command: string): { stdout: string } => spawnSync(process.execPath, [tsx, script, command, ...globals, '--branch', branch], { cwd: repoRoot, encoding: 'utf8' });
+      const on = (branch: string, command: string): { stdout: string } => spawnSync(process.execPath, [tsxCli, script, command, ...globals, '--branch', branch], { cwd: repoRoot, encoding: 'utf8' });
 
       for (const command of ['next', 'handoff']) {
         const onMain = on('main', command);
@@ -3034,7 +3034,7 @@ describe('tasks CLI', () => {
     fixture(({ tasks, dir }) => {
       tasks('add', 'open task', '--id', 'open-task', '--spec', 'demo-spec', '--severity', 'high');
       const globals = ['--store', path.join(dir, 'tasks.jsonl'), '--systems', path.join(dir, 'systems.json'), '--specs-dir', path.join(dir, 'specs')];
-      const result = spawnSync(process.execPath, [tsx, script, 'next', ...globals, '--branch', 'main', '--spec', 'demo-spec'], { cwd: repoRoot, encoding: 'utf8' });
+      const result = spawnSync(process.execPath, [tsxCli, script, 'next', ...globals, '--branch', 'main', '--spec', 'demo-spec'], { cwd: repoRoot, encoding: 'utf8' });
       expect(result.stdout).toContain('open task');
     });
   });
@@ -3047,7 +3047,7 @@ describe('tasks CLI', () => {
       tasks('add', 'b', '--id', 'b-task', '--spec', 'other-spec');
       const storePath = path.join(dir, 'tasks.jsonl');
       const systemsPath = path.join(dir, 'systems.json');
-      const result = spawnSync(process.execPath, [tsx, script, 'next', '--store', storePath, '--systems', systemsPath, '--specs-dir', specsDir, '--branch', 'orphaned-branch'], { cwd: repoRoot, encoding: 'utf8' });
+      const result = spawnSync(process.execPath, [tsxCli, script, 'next', '--store', storePath, '--systems', systemsPath, '--specs-dir', specsDir, '--branch', 'orphaned-branch'], { cwd: repoRoot, encoding: 'utf8' });
       expect(result.stdout).toContain('no active spec for this branch');
       expect(result.stdout).toContain('spec contested:');
       expect(result.stdout).toContain('demo-spec, other-spec');
@@ -3081,7 +3081,7 @@ describe('tasks CLI', () => {
       const storePath = path.join(dir, 'tasks.jsonl');
       const systemsPath = path.join(dir, 'systems.json');
       const specsDir = path.join(dir, 'specs');
-      const result = spawnSync(process.execPath, [tsx, script, 'handoff', '--store', storePath, '--systems', systemsPath, '--specs-dir', specsDir, '--branch', 'orphaned-branch'], { cwd: repoRoot, encoding: 'utf8' });
+      const result = spawnSync(process.execPath, [tsxCli, script, 'handoff', '--store', storePath, '--systems', systemsPath, '--specs-dir', specsDir, '--branch', 'orphaned-branch'], { cwd: repoRoot, encoding: 'utf8' });
       expect(result.stdout).toContain('spec inferred from the store: demo-spec');
       expect(result.stdout).toContain('spec: demo-spec');
     });
@@ -3094,7 +3094,7 @@ describe('tasks CLI', () => {
       const storePath = path.join(dir, 'tasks.jsonl');
       const systemsPath = path.join(dir, 'systems.json');
       const specsDir = path.join(dir, 'specs');
-      const result = spawnSync(process.execPath, [tsx, script, 'list', '--store', storePath, '--systems', systemsPath, '--specs-dir', specsDir, '--branch', 'orphaned-branch'], { cwd: repoRoot, encoding: 'utf8' });
+      const result = spawnSync(process.execPath, [tsxCli, script, 'list', '--store', storePath, '--systems', systemsPath, '--specs-dir', specsDir, '--branch', 'orphaned-branch'], { cwd: repoRoot, encoding: 'utf8' });
       expect(result.stdout).toContain('spec inferred from the store: demo-spec');
       expect(result.stdout).toContain('a-task');
       expect(result.stdout).toContain('deferred-task');
@@ -3109,9 +3109,9 @@ describe('tasks CLI', () => {
       const systemsPath = path.join(dir, 'systems.json');
       const specsDir = path.join(dir, 'specs');
       const globals = ['--store', storePath, '--systems', systemsPath, '--specs-dir', specsDir, '--branch', 'orphaned-branch'];
-      const result = spawnSync(process.execPath, [tsx, script, 'triage', ...globals], { cwd: repoRoot, encoding: 'utf8', input: '1\n' });
+      const result = spawnSync(process.execPath, [tsxCli, script, 'triage', ...globals], { cwd: repoRoot, encoding: 'utf8', input: '1\n' });
       expect(result.stdout).toContain('spec inferred from the store: demo-spec');
-      const shown = spawnSync(process.execPath, [tsx, script, 'show', 'a-finding', ...globals], { cwd: repoRoot, encoding: 'utf8' });
+      const shown = spawnSync(process.execPath, [tsxCli, script, 'show', 'a-finding', ...globals], { cwd: repoRoot, encoding: 'utf8' });
       expect(shown.stdout).toContain('spec: demo-spec');
     });
   });

@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { checkBytes, type ByteFinding } from '../lib/bytes';
 import { trackedFiles } from '../lib/sourceFiles';
 import type { Flags } from './cli';
@@ -63,17 +63,8 @@ export function runMergeReady(deps: MergeReadyDeps): boolean {
   return failed.length === 0;
 }
 
-function readsLocalTsx(): boolean {
-  return existsSync('node_modules/tsx/dist/cli.mjs');
-}
-
 export function cmdMergeReady(args: Flags): void {
   resolveConfig(args.flags);
-  // A fresh worktree has no node_modules; npx resolves upward so every
-  // command works until the suite's subprocess tests resolve tsx locally
-  // and fail by the hundred. Two sessions lost a full red run to this
-  // before anything named it.
-  if (!readsLocalTsx()) console.log('note: this checkout has no node_modules/tsx — subprocess tests will fail wholesale. Run `npm ci` first (a fresh worktree starts without one).');
   console.log('running the merge gate — the same legs CI runs, in order (several minutes):');
   const ok = runMergeReady({
     // shell: npm and npx are .cmd shims on Windows, unreachable without one.
