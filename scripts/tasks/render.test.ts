@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { clauseStandingLines, MIN_WRAP_WIDTH, packGreedy, summarize, TERMINAL_WIDTH, truncateLine, wrapText, wrapUnder } from './render';
+import { clauseStandingLines, MIN_WRAP_WIDTH, printEvidence, packGreedy, summarize, TERMINAL_WIDTH, truncateLine, wrapText, wrapUnder } from './render';
 
 describe('packGreedy', () => {
   it('fills each line to the width before starting the next', () => {
@@ -93,5 +93,42 @@ describe('clauseStandingLines', () => {
     for (const line of lines) expect(line.length).toBeLessThanOrEqual(TERMINAL_WIDTH);
     for (const line of lines.slice(1)) expect(line.startsWith('             ')).toBe(true);
     expect(lines.join(' ').replace(/\s+/g, ' ').trim()).toBe(`3. [unmet] ${text}`);
+  });
+});
+
+// printEvidence was the one wrap-and-indent loop in this file still written
+// out by hand, against a width constant that had to be re-derived whenever
+// TERMINAL_WIDTH or the indent moved. It goes through wrapUnder now, so
+// there is one wrap in the file rather than two.
+describe('printEvidence', () => {
+  const captured = (evidence: string | null, maxLines?: number): string[] => {
+    const lines: string[] = [];
+    const original = console.log;
+    console.log = (value: unknown) => void lines.push(String(value));
+    try {
+      printEvidence(evidence, maxLines);
+    } finally {
+      console.log = original;
+    }
+    return lines;
+  };
+
+  it('indents and wraps every line inside the report width', () => {
+    const lines = captured('word '.repeat(40).trim());
+    expect(lines.length).toBeGreaterThan(1);
+    for (const line of lines) {
+      expect(line.startsWith('          ')).toBe(true);
+      expect(line.length).toBeLessThanOrEqual(TERMINAL_WIDTH);
+    }
+  });
+
+  it('keeps its cap, and says how many lines it left out', () => {
+    const lines = captured('word '.repeat(200).trim(), 3);
+    expect(lines).toHaveLength(4);
+    expect(lines[3]).toContain('more line(s), see `tasks show`');
+  });
+
+  it('prints nothing at all for no evidence', () => {
+    expect(captured(null)).toEqual([]);
   });
 });

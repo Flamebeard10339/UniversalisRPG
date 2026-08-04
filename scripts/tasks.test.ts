@@ -7,6 +7,7 @@ import { tsxCli } from './lib/tsxCli';
 import { run as runTasks } from './tasks';
 import { parseAuditArgs, parseAuditFile } from './tasks/audit';
 import { flagArities } from './tasks/cli';
+import { TERMINAL_WIDTH } from './tasks/render';
 import { allUsages } from './tasks/commands';
 
 const repoRoot = path.join(import.meta.dirname, '..');
@@ -739,14 +740,24 @@ describe('tasks CLI', () => {
       const longEvidence = `evidence that runs well past any single line a queue entry should occupy, ${tail}`;
       tasks('add', 'verbose task', '--id', 'verbose-task', '--severity', 'high', '--system', 'Runtime', '--spec', 'demo-spec', '--files', 'src/runtime/save.ts:1', '--deliverable', 'the fix exists', '--evidence', longEvidence);
 
+      // The field wraps under its own label now, so nothing is cut and no
+      // continuation lands flush at column zero against the next label.
+      // Collapsing the run of whitespace is what puts the value back.
+      const flat = (output: string): string => output.replace(/\s+/g, ' ');
+
       const concise = tasks('next');
       expect(concise.stdout).toContain('verbose-task  [task/open/high]');
       expect(concise.stdout).toContain('files: src/runtime/save.ts:1');
-      expect(concise.stdout).toContain(`evidence: ${longEvidence}`);
-      expect(concise.stdout).toContain(tail);
+      expect(flat(concise.stdout)).toContain(`evidence: ${longEvidence}`);
+      expect(flat(concise.stdout)).toContain(tail);
+      // The prose field and its continuations fit the report. A record's id,
+      // title and file list are single values and are never cut.
+      const wrapped = concise.stdout.split('\n').filter((line) => line.startsWith('evidence:') || line.startsWith('          '));
+      expect(wrapped.length).toBeGreaterThan(1);
+      for (const line of wrapped) expect(line.length).toBeLessThanOrEqual(TERMINAL_WIDTH);
 
       const full = tasks('next', '--full');
-      expect(full.stdout).toContain(longEvidence);
+      expect(flat(full.stdout)).toContain(longEvidence);
       expect(full.stdout).toContain('deliverable: the fix exists');
     });
   });
