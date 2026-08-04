@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { roadmapView } from '../lib/roadmap';
 import type { Task } from '../lib/taskStore';
-import { fit, packed, renderRoadmap, WIDTH } from './roadmapCmd';
+import { TERMINAL_WIDTH } from './render';
+import { fit, renderRoadmap } from './roadmapCmd';
 
 function task(overrides: Partial<Task> & { id: string }): Task {
   return {
@@ -49,7 +50,7 @@ describe('renderRoadmap', () => {
       task({ id: 'waiter-with-an-extremely-long-identifier-of-its-own', requires: [long, 'other'] }),
       task({ id: 'a-finding', kind: 'finding', system: 'A system with a very long name indeed for a footer' }),
     ]);
-    for (const line of lines) expect(line.length).toBeLessThanOrEqual(WIDTH);
+    for (const line of lines) expect(line.length).toBeLessThanOrEqual(TERMINAL_WIDTH);
   });
 
   it('leaves a gap between a truncated id and its system', () => {
@@ -75,14 +76,26 @@ describe('renderRoadmap', () => {
     expect(text).toContain('tasks list --deferred --kind finding');
   });
 
-  // The row counts what it is about; the parenthetical warns that its
-  // command returns the ready tasks too. Both numbers have to be printed or
-  // the row promises a list it does not produce.
   it('states what its command returns alongside what the row counts', () => {
     const tasks = [task({ id: 'gate' }), task({ id: 'also-ready' }), task({ id: 'waiting', requires: ['gate'] })];
     const row = render(tasks).find((line) => line.includes('listed'));
     expect(row).toContain('1 blocked (3 listed)');
     expect(row).toContain('tasks list --deferred --kind task');
+  });
+
+  it('says how much wider than its own count every footer command reaches', () => {
+    const tasks = [
+      task({ id: 'gate' }),
+      task({ id: 'waiting', requires: ['gate'] }),
+      task({ id: 'debt', kind: 'finding' }),
+      task({ id: 'asked', kind: 'question' }),
+    ];
+    const rows = render(tasks).filter((line) => line.includes('tasks list --deferred'));
+    expect(rows).toEqual([
+      expect.stringMatching(/^\s+1 blocked \(2 listed\)\s+tasks list --deferred --kind task$/),
+      expect.stringMatching(/^\s+1 findings\s+tasks list --deferred --kind finding$/),
+      expect.stringMatching(/^\s+1 other kinds \(4 listed\)\s+tasks list --deferred$/),
+    ]);
   });
 
   it('shows a blocked finding in the footer instead of losing it between the rows', () => {
@@ -105,15 +118,5 @@ describe('renderRoadmap', () => {
   it('says so plainly when nothing is ready rather than printing an empty body', () => {
     const text = render([task({ id: 'a', state: 'in-progress' }), task({ id: 'b', requires: ['a'] })]).join('\n');
     expect(text).toContain('NO TOPICS READY');
-  });
-});
-
-describe('packed', () => {
-  it('wraps to as many lines as the parts need rather than dropping any', () => {
-    expect(packed(['aaaa 1', 'bbbb 2', 'cccc 3'], 15)).toEqual(['aaaa 1 · bbbb 2', 'cccc 3']);
-  });
-
-  it('keeps a single part too wide for the line rather than losing it', () => {
-    expect(packed(['a-very-long-single-entry 9'], 5)).toEqual(['a-very-long-single-entry 9']);
   });
 });

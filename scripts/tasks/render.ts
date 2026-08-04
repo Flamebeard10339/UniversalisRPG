@@ -98,27 +98,33 @@ export function refuseUnknownIds(ids: string[], tasks: Task[]): void {
   process.exitCode = 1;
 }
 
+export const TERMINAL_WIDTH = 78;
+
 const EVIDENCE_INDENT = '          ';
-const EVIDENCE_WRAP_WIDTH = 78 - EVIDENCE_INDENT.length;
+const EVIDENCE_WRAP_WIDTH = TERMINAL_WIDTH - EVIDENCE_INDENT.length;
+
+export function packGreedy(parts: string[], separator: string, width: number): string[] {
+  const lines: string[] = [];
+  let current = '';
+  for (const part of parts) {
+    const candidate = current === '' ? part : `${current}${separator}${part}`;
+    if (candidate.length > width && current !== '') {
+      lines.push(current);
+      current = part;
+    } else {
+      current = candidate;
+    }
+  }
+  if (current !== '') lines.push(current);
+  return lines;
+}
 
 // Greedy word wrap: text written through `add`/`edit` carries no line
 // breaks of its own, so without this every finding's evidence or
 // deliverable prints as one unbroken line.
 export function wrapText(text: string, width: number): string[] {
   if (text.length <= width) return [text];
-  const wrapped: string[] = [];
-  let current = '';
-  for (const word of text.split(' ')) {
-    const candidate = current === '' ? word : `${current} ${word}`;
-    if (candidate.length > width && current !== '') {
-      wrapped.push(current);
-      current = word;
-    } else {
-      current = candidate;
-    }
-  }
-  wrapped.push(current);
-  return wrapped;
+  return packGreedy(text.split(' '), ' ', width);
 }
 
 export function truncateLine(text: string, max = 100): string {

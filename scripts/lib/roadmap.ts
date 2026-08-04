@@ -35,12 +35,7 @@ export interface RoadmapView {
 
 const LIVE_STATES = new Set(['open', 'in-progress']);
 
-// What "unblocks" counts: only records still live can be waiting on
-// anything, so a done or declined dependent proves nothing about a topic's
-// leverage. This is the whole ordering signal, and it is derived from
-// `requires` edges rather than a priority field, so there is nothing to keep
-// in sync.
-function waiterIndex(tasks: Task[]): Map<string, Task[]> {
+function liveWaiterIndex(tasks: Task[]): Map<string, Task[]> {
   const index = new Map<string, Task[]>();
   for (const task of tasks) {
     if (!LIVE_STATES.has(task.state)) continue;
@@ -53,13 +48,8 @@ export function roadmapView(tasks: Task[]): RoadmapView {
   const byId = new Map(tasks.map((task) => [task.id, task]));
   const order = new Map(tasks.map((task, index) => [task.id, index]));
   const deferred = listQueue(tasks, { deferred: true });
-  const waiters = waiterIndex(tasks);
+  const waiters = liveWaiterIndex(tasks);
 
-  // Three groups partitioning the deferred backlog, so every record lands in
-  // the body or in exactly one footer row. Splitting on kind first and on
-  // blockedness second is what makes that true: grouping the other way put a
-  // blocked finding in neither, which is the shape of hole this view exists
-  // to not have.
   const deferredTasks = deferred.filter((task) => task.kind === 'task');
   const findings = deferred.filter((task) => task.kind === 'finding');
   const other = deferred.filter((task) => task.kind !== 'task' && task.kind !== 'finding');
