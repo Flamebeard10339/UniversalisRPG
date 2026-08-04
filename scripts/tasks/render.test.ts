@@ -23,6 +23,10 @@ describe('wrapText', () => {
   it('leaves text already inside the width as one line', () => {
     expect(wrapText('short enough', 20)).toEqual(['short enough']);
   });
+
+  it('keeps a blank line blank rather than dropping it, so a paragraph break survives', () => {
+    expect(wrapText('', 20)).toEqual(['']);
+  });
 });
 
 describe('truncateLine', () => {
