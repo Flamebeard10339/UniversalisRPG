@@ -50,7 +50,7 @@ examine: A moment of grace.
 # location den
 x: 0, y: 0
 starting
-entities: giant-rat, shrine, beacon, training-post, treadmill, altar, straw-man
+entities: giant-rat, shrine, beacon, training-post, treadmill, altar, cloister, straw-man
 
 # entity giant-rat
 stats: attack 10, dr 0, max-health 1000, attack-rate 16
@@ -118,6 +118,21 @@ chant:
   on success:
     say: You have had enough.
     stop
+
+# entity cloister
+// The same batched shape as the altar, with the stop one wrapper deep. Nothing
+// about the request changes; the only question is whether the batch planner can
+// see a stop it has to look inside a selector to find.
+chant:
+  continuous
+  time: 1
+  give: 1 blessing
+  on success:
+    one of:
+      3x: nothing
+      1x:
+        say: You have had enough.
+        stop
 
 # entity straw-man
 // The same request on the per-attempt path, and with stop inline among the
@@ -256,6 +271,22 @@ describe('`stop` among an action’s own results', () => {
     expect(state.log.filter((line) => line === 'You have had enough.')).toHaveLength(1);
     expect(state.activeAction).toBeNull();
     expect(state.time).toBe(secondsToMs(100));
+  });
+
+  it('sees a stop behind a selector, so the batch is still capped at one completion', () => {
+    // The stop is 1-in-4, so a planner blind to it batches the whole 100s span
+    // and settles four completions' worth of blessings inside one segment. Seeing
+    // it lands the boundary on each completion instead, so the span is walked one
+    // blessing at a time and the two readings part on the count.
+    const { registry, state } = stopping('cloister', 'chant');
+    resolve(state, registry, secondsToMs(100));
+    expect(state.activeAction).toBeNull();
+    expect(state.log.filter((line) => line === 'You have had enough.')).toHaveLength(1);
+
+    const stepped = stopping('cloister', 'chant');
+    for (let t = 1; t <= 100; t++) resolve(stepped.state, stepped.registry, secondsToMs(t));
+    expect(stepped.state.inventory).toEqual(state.inventory);
+    expect(stepped.state.log).toEqual(state.log);
   });
 
   it('gives the same answer jumped as stepped, which is the invariant it used to break', () => {

@@ -38,7 +38,9 @@ export function clearActorDeltas(deltas: PoolDeltas, actorId: string): void {
 
 // Whether applying this group `count` times is the same as applying it once and
 // scaling. A draw is not, and neither is a range: both would collapse `count`
-// independent outcomes into one outcome repeated.
+// independent outcomes into one outcome repeated. Every wrapper answers yes,
+// which is also what puts a nested `stop` on the repetition that rolled it —
+// `stopsOnOutcome` stays shallow on the strength of that.
 export function samplesPerApplication(results: readonly ActionResult[]): boolean {
   return results.some((result) => {
     if (nestedResults(result).length > 0 || result.kind === 'roll') return true;

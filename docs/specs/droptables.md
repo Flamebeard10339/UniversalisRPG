@@ -66,10 +66,10 @@ Proof:
   runs from one seed produce one sequence, and a segment split in two produces the same sequence as
   the whole.
 - [c6] Applying a result group `count` times no longer multiplies amounts when the group is
-  stochastic — it applies the group `count` times, in order. Batched repeating actions
-  (`resolveDeterministicSegment` → `fightBatch`) therefore roll each repetition separately instead
-  of rolling once and scaling, and `stopsOnOutcome` sees a `stop` nested inside a wrapper so a
-  batch that might stop is still capped at one.
+  stochastic — it applies the group `count` times, in order, and stops on the repetition that rolled
+  a `stop`. Batched repeating actions (`resolveDeterministicSegment` → `fightBatch`) therefore roll
+  each repetition separately instead of rolling once and scaling. A `stop` behind a selector ends
+  the action exactly once and gives the same answer jumped as stepped.
 - [c7] `# droptable <id>` is a section whose body is a result list. `roll: <id>` applies it. It
   resolves, validates, prunes with a missing optional dependency, `# remove droptable <id>` works,
   and it round-trips through `serialize` — all through the existing machinery, with `droptable`
@@ -144,6 +144,14 @@ Proof:
   Rather than teaching the resolver which actions are batchable, `applyResults` asks the group and
   loops when the answer is yes — the same conclusion the combat log reached ("combat does not
   batch") applied at the one seam that already had a `count`.
+- **`stopsOnOutcome` stays shallow, on measurement rather than instinct.** It was first made to see
+  a `stop` nested inside a selector, so a batch that might stop would still be capped at one
+  completion. Mutation testing found that unobservable and it was reverted: a nested `stop` implies
+  a wrapper, a wrapper implies `samplesPerApplication`, and that loop already breaks on the
+  repetition that stopped. Two guards over one case, and no test could tell them apart. What is kept
+  instead is the coupling written down where it holds — every wrapper answers yes to
+  `samplesPerApplication` — and a stopping test whose action hides its `stop` behind a `one of:`,
+  which dies when the loop's break is removed.
 
 ## Corrections to the task store
 

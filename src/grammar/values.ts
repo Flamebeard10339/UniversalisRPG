@@ -111,10 +111,20 @@ export function decimalRange(cursor: Cursor, what: string): Range {
   return refuseZero(range, span, `${what} of 0 does nothing`);
 }
 
+// A range where only a count belongs reads as an id that will not parse, which
+// says nothing about why. Each site that refuses one says which it is.
+export function refuseRange(cursor: Cursor, complaint: string): void {
+  const start = cursor.pos;
+  if (cursor.peek(/-\d/) === null) return;
+  cursor.take(/-\d+(?:\.\d+)?/);
+  throw new DslError(complaint, { start: cursor.abs(start), end: cursor.abs(cursor.pos) });
+}
+
 export const quantified: Parser<Quantified> = {
   parse(cursor) {
     const start = cursor.pos;
     const raw = cursor.take(COUNT);
+    if (raw !== null) refuseRange(cursor, 'this count is consumed, so it takes one number rather than a range — a craft has to know how many completions an inventory affords');
     if (raw !== null) cursor.take(/[ \t]+/);
     const item = id.parse(cursor);
     if (raw === null) return { item };

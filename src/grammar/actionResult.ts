@@ -3,7 +3,7 @@ import { ListParser } from './list';
 import { Cursor, DslError, Parser, Span, requireEnd } from './parser';
 import { Range, scaleRange } from './range';
 import { RawLine } from './structure';
-import { countRange, decimalRange, id, numberOrStat, produced, Produced, quantified, REFERENCE } from './values';
+import { countRange, decimalRange, id, numberOrStat, produced, Produced, quantified, refuseRange, REFERENCE } from './values';
 
 export type ActionResult =
   | { kind: 'say'; text: string }
@@ -59,6 +59,7 @@ function parseAdd(cursor: Cursor): ActionResult {
   // signed is why this one produced count is not a range: `-3--1` cannot be told
   // from the hyphen that separates a range's bounds.
   const amount = cursor.take(/-?\d+/);
+  if (amount !== null) refuseRange(cursor, 'add: takes one signed count rather than a range: `-3--1` cannot be told from the hyphen that separates a range');
   return { kind: 'add', variable, amount: amount !== null ? Number(amount) : 1 };
 }
 
@@ -113,6 +114,7 @@ function parseRow(line: RawLine): DropRow {
 }
 
 function parseOneOf(cursor: Cursor, line: RawLine | null, span: Span): ActionResult {
+  cursor.take(ONE_OF);
   requireEnd(cursor, 'one of:');
   if (line === null || line.children.length === 0) throw new DslError('one of: needs indented rows, as in `5x: give: 20 coins`', span);
   return { kind: 'one-of', rows: line.children.map(parseRow) };
