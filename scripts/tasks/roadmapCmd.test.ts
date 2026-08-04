@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { roadmapView } from '../lib/roadmap';
+import { roadmapView, type ReadSpec } from '../lib/roadmap';
 import type { Task } from '../lib/taskStore';
 import { TERMINAL_WIDTH } from './render';
-import { fit, renderRoadmap } from './roadmapCmd';
+import { column, renderRoadmap } from './roadmapCmd';
 
 function task(overrides: Partial<Task> & { id: string }): Task {
   return {
@@ -30,93 +30,223 @@ function task(overrides: Partial<Task> & { id: string }): Task {
   };
 }
 
-const render = (tasks: Task[]): string[] => renderRoadmap(roadmapView(tasks));
+const noSpecFiles: ReadSpec = () => null;
+const specFiles =
+  (docs: Record<string, string>): ReadSpec =>
+  (slug) =>
+    docs[slug] ?? null;
 
-describe('fit', () => {
+const GRADED = `# demo
+
+## Deliverable
+
+Proof:
+
+- [c1] the first promise
+- [c2] the second promise
+
+## Audit passes
+
+### Pass 2 — 2026-08-04
+
+- base: \`aaa\`
+- head: \`bbb\`
+- proof 1: met
+- proof 2: unmet — the seam is still open
+`;
+
+const UNGRADED = `# demo
+
+## Deliverable
+
+Proof:
+
+- [c1] the first promise
+- [c2] the second promise
+`;
+
+const render = (tasks: Task[], readSpec: ReadSpec = noSpecFiles): string[] => renderRoadmap(roadmapView(tasks, readSpec));
+const text = (tasks: Task[], readSpec: ReadSpec = noSpecFiles): string => render(tasks, readSpec).join('\n');
+const rowFor = (lines: string[], id: string): string => lines.find((line) => line.includes(id))!;
+
+describe('column', () => {
   it('pads a short value to the column so the next column starts where it should', () => {
-    expect(fit('abc', 6)).toBe('abc   ');
+    expect(column('abc', 6)).toBe('abc   ');
   });
 
-  it('cuts an overlong value to exactly the column, ellipsis included', () => {
-    expect(fit('abcdefgh', 6)).toBe('abcde…');
+  it('leaves an overlong value whole and keeps the gap after it', () => {
+    expect(column('abcdefgh', 6)).toBe('abcdefgh ');
   });
 });
 
+const LONG = 'a-name-far-longer-than-any-column-this-view-reserves-for-one-of-them';
+
+const pathological = (): string[] =>
+  render(
+    [
+      task({ id: `${LONG}-head`, spec: `${LONG}-spec`, system: 'A system name that is itself much too long to fit' }),
+      task({ id: `${LONG}-next`, spec: `${LONG}-later`, requires: [`${LONG}-head`] }),
+      task({ id: LONG, severity: 'medium', system: 'A system name that is itself much too long to fit' }),
+      task({ id: `${LONG}-waiter`, requires: [LONG, 'other'] }),
+      task({ id: `${LONG}-defect`, kind: 'finding', severity: 'high', system: 'A system with a very long name indeed for a footer' }),
+    ],
+    specFiles({ [`${LONG}-spec`]: GRADED }),
+  );
+
 describe('renderRoadmap', () => {
-  it('keeps every line inside the fixed width, whatever the record is called', () => {
-    const long = 'a-task-id-far-longer-than-any-column-this-view-reserves-for-one';
-    const lines = render([
-      task({ id: long, severity: 'medium', system: 'A system name that is itself much too long to fit' }),
-      task({ id: 'waiter-with-an-extremely-long-identifier-of-its-own', requires: [long, 'other'] }),
-      task({ id: 'a-finding', kind: 'finding', system: 'A system with a very long name indeed for a footer' }),
-    ]);
+  it('never cuts a value to fit, whatever the records are called', () => {
+    const body = pathological().join('\n');
+    for (const id of [`${LONG}-head`, `${LONG}-spec`, `${LONG}-next`, LONG, `${LONG}-waiter`, `${LONG}-defect`]) expect(body).toContain(id);
+    expect(body).toContain('A system name that is itself much too long to fit');
+  });
+
+  it('leaves an ellipsis only where a cap says how many records it left out', () => {
+    const topics = Array.from({ length: 9 }, (_, index) => task({ id: `topic-${index}` }));
+    for (const line of [...pathological(), ...render(topics)]) {
+      if (line.includes('…')) expect(line).toMatch(/^\s+… \d+ more — /);
+    }
+  });
+
+  it('continues a long note under its own branch instead of beside the next one', () => {
+    const lines = render([task({ id: 'gate', spec: 'a-branch' }), task({ id: 'a-waiter-with-a-name-of-its-own', requires: ['gate', 'a-second-prerequisite', 'a-third-prerequisite'] }), task({ id: 'a-second-prerequisite' }), task({ id: 'a-third-prerequisite' })]);
+    const start = lines.findIndex((line) => line.includes('unblocks'));
+    const branchIndent = lines[start].indexOf('└');
+    expect(lines[start + 1]).toMatch(new RegExp(`^ {${branchIndent + 3}}\\S`));
+    expect(`${lines[start]}${lines[start + 1].trimStart()}`).toContain('a-third-prerequisite)');
+  });
+
+  it('fits the report width whenever the words in it can be broken at a space', () => {
+    const lines = render(
+      [
+        task({ id: 'a-decided-branch-with-a-long-name', spec: 'a-spec-slug-of-realistic-length', system: 'Contribution system' }),
+        task({ id: 'a-topic-with-a-fairly-long-name', severity: 'medium', system: 'Testing procedure' }),
+        task({ id: 'a-waiter', requires: ['a-topic-with-a-fairly-long-name', 'a-decided-branch-with-a-long-name'] }),
+        task({ id: 'a-defect-filed-on-2026-08-04-h1', kind: 'finding', severity: 'high', system: 'Build & deployment', title: 'the pipeline has no gate against publishing a non-functional placeholder, and today’s build is exactly that' }),
+      ],
+      specFiles({ 'a-spec-slug-of-realistic-length': GRADED }),
+    );
     for (const line of lines) expect(line.length).toBeLessThanOrEqual(TERMINAL_WIDTH);
   });
 
-  it('leaves a gap between a truncated id and its system', () => {
-    const lines = render([task({ id: 'x'.repeat(60), severity: 'low', system: 'Runtime' })]);
-    const row = lines.find((line) => line.includes('Runtime'));
-    expect(row).toMatch(/… Runtime$/);
+  it('shows the work that has been decided instead of collapsing it to a header count', () => {
+    const lines = render([task({ id: 'implement-the-seam', spec: 'a-decided-branch' })], specFiles({ 'a-decided-branch': UNGRADED }));
+    expect(lines.join('\n')).toContain('DECIDED — 1 spec(s)');
+    expect(rowFor(lines, 'a-decided-branch')).toMatch(/^ {2}ready\s+a-decided-branch\s+2 clauses, no pass$/);
   });
 
-  it('prints the counts, the topics and the footer in one call, none behind a flag', () => {
-    const text = render([task({ id: 'ready', severity: 'high', system: 'Runtime' }), task({ id: 'debt', kind: 'finding', system: 'Runtime' })]).join('\n');
-    expect(text).toContain('open, deferred backlog');
-    expect(text).toContain('1 TOPICS READY TO BRANCH ON');
-    expect(text).toContain('ready');
-    expect(text).toContain('EXCLUDED FROM THE LIST ABOVE');
-    expect(text).toContain('Runtime 1');
+  it('carries the clause standing spec show would print, once a pass has graded them apart', () => {
+    const lines = render([task({ id: 'a', spec: 'demo' })], specFiles({ demo: GRADED }));
+    expect(rowFor(lines, 'demo')).toContain('2 clauses, pass 2');
+    expect(lines.join('\n')).toContain('outstanding: c2 (unmet)');
   });
 
-  it('gives every excluded group a count and a command that expands it', () => {
-    const text = render([task({ id: 'a' }), task({ id: 'blocked-one', requires: ['a'] }), task({ id: 'debt', kind: 'finding' })]).join('\n');
-    expect(text).toContain('1 blocked (2 listed)');
-    expect(text).toContain('tasks list --deferred --kind task');
-    expect(text).toContain('1 findings');
-    expect(text).toContain('tasks list --deferred --kind finding');
+  it('says a decided branch has no readable spec rather than leaving the column blank', () => {
+    expect(text([task({ id: 'a', spec: 'vanished' })])).toContain('spec file not found');
   });
 
-  it('states what its command returns alongside what the row counts', () => {
-    const tasks = [task({ id: 'gate' }), task({ id: 'also-ready' }), task({ id: 'waiting', requires: ['gate'] })];
-    const row = render(tasks).find((line) => line.includes('listed'));
-    expect(row).toContain('1 blocked (3 listed)');
-    expect(row).toContain('tasks list --deferred --kind task');
+  it('indents a chain by its depth, so six decided branches read as a sequence', () => {
+    const lines = render([task({ id: 'a', spec: 'first' }), task({ id: 'b', spec: 'second', requires: ['a'] }), task({ id: 'c', spec: 'third', requires: ['b'] })]);
+    const indent = (id: string): number => rowFor(lines, id).indexOf(id);
+    expect(indent('first')).toBeLessThan(indent('second'));
+    expect(indent('second')).toBeLessThan(indent('third'));
   });
 
-  it('says how much wider than its own count every footer command reaches', () => {
-    const tasks = [
-      task({ id: 'gate' }),
-      task({ id: 'waiting', requires: ['gate'] }),
-      task({ id: 'debt', kind: 'finding' }),
-      task({ id: 'asked', kind: 'question' }),
-    ];
-    const rows = render(tasks).filter((line) => line.includes('tasks list --deferred'));
-    expect(rows).toEqual([
-      expect.stringMatching(/^\s+1 blocked \(2 listed\)\s+tasks list --deferred --kind task$/),
-      expect.stringMatching(/^\s+1 findings\s+tasks list --deferred --kind finding$/),
-      expect.stringMatching(/^\s+1 other kinds \(4 listed\)\s+tasks list --deferred$/),
+  it('states what every decided spec is waiting on, or that nothing blocks it', () => {
+    const body = text([task({ id: 'free', spec: 'earlier' }), task({ id: 'held', spec: 'later', requires: ['free', 'never-filed'] })]);
+    expect(body).toContain('─ nothing blocks it');
+    expect(body).toContain('waits on free (spec earlier), never-filed (no record)');
+  });
+
+  it('marks the edge that leaves the decided set for work nobody has specced', () => {
+    const body = text([task({ id: 'undecided' }), task({ id: 'held', spec: 'a-branch', requires: ['undecided'] })]);
+    expect(body).toContain('waits on undecided (unspecced)');
+  });
+
+  it('names the other members when a spec holds more than the one record', () => {
+    const body = text([task({ id: 'head', spec: 'a-branch' }), task({ id: 'a-defect', kind: 'finding', spec: 'a-branch' })]);
+    expect(body).toContain('holds 2: head, a-defect');
+  });
+
+  it('opens with the counts of work still to do and gives the archive one number', () => {
+    const lines = render([task({ id: 'ready', spec: 'a-branch' }), task({ id: 'a-topic' }), task({ id: 'shipped', state: 'done' }), task({ id: 'dropped', state: 'declined' })]);
+    expect(lines[0]).toContain('2 live records');
+    expect(lines.indexOf(rowFor(lines, 'ready '))).toBeLessThan(lines.indexOf(rowFor(lines, 'archived')));
+    expect(rowFor(lines, 'archived')).toMatch(/archived\s+2\s+done or declined/);
+  });
+
+  it('calls undecided work unspecced, because it needs a planning session and not an implementer', () => {
+    const body = text([task({ id: 'a-topic' })]);
+    expect(body).toContain('UNSPECCED — 1 topic(s) no spec has decided; each wants a planner');
+    expect(body).not.toContain('READY TO BRANCH ON');
+  });
+
+  it('states the blocking status of every record it lists, in every section that lists one', () => {
+    const lines = render(
+      [task({ id: 'gate' }), task({ id: 'decided', spec: 'a-branch' }), task({ id: 'held', requires: ['gate'] }), task({ id: 'a-defect', kind: 'finding', severity: 'high' })],
+      specFiles({ 'a-branch': UNGRADED }),
+    );
+    const sectionOf = (heading: string): string => {
+      const rest = lines.slice(lines.findIndex((line) => line.startsWith(heading)) + 1);
+      const end = rest.findIndex((line) => /^[A-Z]/.test(line));
+      return rest.slice(0, end === -1 ? rest.length : end).join('\n');
+    };
+    const stated = (body: string): number => (body.match(/nothing blocks it|waits on /g) ?? []).length;
+    // One record listed under each heading, so one statement under each.
+    expect(['DECIDED', 'UNSPECCED', 'BLOCKED', 'FINDINGS'].map((heading) => stated(sectionOf(heading)))).toEqual([1, 1, 1, 1]);
+  });
+
+  it('prints every section in one call, none of them behind a flag', () => {
+    const body = text(
+      [task({ id: 'decided-work', spec: 'a-branch' }), task({ id: 'a-topic' }), task({ id: 'held', requires: ['a-topic'] }), task({ id: 'a-defect', kind: 'finding', severity: 'high', system: 'Runtime' })],
+      specFiles({ 'a-branch': UNGRADED }),
+    );
+    for (const section of ['ROADMAP', 'DECIDED —', 'UNSPECCED —', 'BLOCKED —', 'FINDINGS —']) expect(body).toContain(section);
+  });
+
+  it('names a high finding and states whether anything blocks it', () => {
+    const body = text([task({ id: 'gate' }), task({ id: 'urgent', kind: 'finding', severity: 'high', system: 'Runtime', title: 'the pipeline publishes a placeholder' })]);
+    expect(body).toContain('urgent');
+    expect(body).toContain('nothing blocks it · the pipeline publishes a placeholder');
+  });
+
+  it('aggregates only the findings it did not name, so nothing is counted in both places', () => {
+    const body = text([
+      task({ id: 'urgent', kind: 'finding', severity: 'high', system: 'Runtime' }),
+      task({ id: 'minor', kind: 'finding', severity: 'low', system: 'Runtime' }),
+      task({ id: 'middling', kind: 'finding', severity: 'medium', system: 'Runtime' }),
     ]);
+    expect(body).toContain('FINDINGS — 3 open, 1 could redden an audit');
+    expect(body).toContain('the other 2, by system:');
+    expect(body).toContain('Runtime 2');
   });
 
-  it('shows a blocked finding in the footer instead of losing it between the rows', () => {
-    const text = render([task({ id: 'gate' }), task({ id: 'held-defect', kind: 'finding', system: 'Runtime', requires: ['gate'] })]).join('\n');
-    expect(text).toContain('1 findings');
-    expect(text).toContain('Runtime 1');
-    expect(text).toContain('0 blocked');
+  it('says how many blocked tasks a spec above already accounts for', () => {
+    const body = text([task({ id: 'gate' }), task({ id: 'unspecced-waiter', requires: ['gate'] }), task({ id: 'specced-waiter', spec: 'a-branch', requires: ['gate'] })]);
+    expect(body).toContain('BLOCKED — 1 unspecced task(s); the other 1 sit in a spec above');
+    expect(body).toContain('waits on gate (unspecced)');
   });
 
-  it('gives a kind that is neither task nor finding its own footer row', () => {
-    const text = render([task({ id: 'q', kind: 'question' }), task({ id: 'u', kind: 'undelivered' })]).join('\n');
-    expect(text).toContain('2 other kinds');
-    expect(text).toMatch(/other kinds\s+2$/m);
+  it('states what each cap left out and the command that shows the rest', () => {
+    const topics = Array.from({ length: 9 }, (_, index) => task({ id: `topic-${index}` }));
+    const body = text(topics);
+    expect(body).toContain('… 3 more — `tasks list --deferred --kind task`');
   });
 
-  it('leaves the other-kinds row out entirely when there are none', () => {
-    expect(render([task({ id: 'a' })]).join('\n')).not.toContain('other kinds');
+  it('caps how many records one spec claims to unblock rather than printing them all', () => {
+    const waiters = Array.from({ length: 5 }, (_, index) => task({ id: `waiter-${index}`, requires: ['gate'] }));
+    const body = text([task({ id: 'gate', spec: 'a-branch' }), ...waiters]);
+    expect(body).toContain('unblocks 2 more');
   });
 
-  it('says so plainly when nothing is ready rather than printing an empty body', () => {
-    const text = render([task({ id: 'a', state: 'in-progress' }), task({ id: 'b', requires: ['a'] })]).join('\n');
-    expect(text).toContain('NO TOPICS READY');
+  it('says so plainly when nothing has been decided and nothing is unspecced', () => {
+    const body = text([task({ id: 'gate', state: 'in-progress' }), task({ id: 'waiting', requires: ['gate'] })]);
+    expect(body).toContain('DECIDED — nothing: no live record names a spec');
+    expect(body).toContain('UNSPECCED — none: every unspecced task is blocked, or the backlog is empty');
+  });
+
+  it('answers on an empty store rather than printing an empty page', () => {
+    const body = text([]);
+    expect(body).toContain('0 live records');
+    expect(body).toContain('FINDINGS — 0 open, 0 could redden an audit');
   });
 });

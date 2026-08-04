@@ -1,3 +1,4 @@
+import type { AuditVerdict, ProofClause } from '../lib/specDoc';
 import { claimSummary, isBlocked, nearMatches, requirementStates, type Task } from '../lib/taskStore';
 import { today } from './context';
 
@@ -24,11 +25,13 @@ export function taskTag(task: Task): string {
   return [task.kind, task.state, task.severity].filter(Boolean).join('/');
 }
 
-// The whole prose field on one line, cut at a character budget: store text
-// carries no line breaks of its own, so a summary that shortens by line
-// shortens nothing.
+// The whole prose field on one line. What separates this from `full` is the
+// line breaks, not the words: a stored field carries newlines only where its
+// author put them, and a row wants none of them. Every word survives, and the
+// terminal soft-wraps what is left — a prose line has no structure under it
+// for that wrap to destroy.
 export function summarize(text: string): string {
-  return truncateLine(text.split('\n').map((line) => line.trim()).filter((line) => line.length > 0).join(' '));
+  return text.split('\n').map((line) => line.trim()).filter((line) => line.length > 0).join(' ');
 }
 
 // The one rendering of a task, at the three verbosities anything asking for
@@ -127,8 +130,30 @@ export function wrapText(text: string, width: number): string[] {
   return packGreedy(text.split(' '), ' ', width);
 }
 
-export function truncateLine(text: string, max = 100): string {
+// No default: every caller left is writing a stored event note, where the
+// bound is the log's own format — one event, one line — and not a guess about
+// a terminal. Nothing a reader is shown goes through here.
+export function truncateLine(text: string, max: number): string {
   return text.length > max ? `${text.slice(0, max - 1)}…` : text;
+}
+
+// A structured line — a tree branch, a numbered clause, a column row — is
+// destroyed by the terminal's own soft wrap, which restarts at column 0 and
+// makes a continuation look like a new entry. So a line too long for the
+// report continues under its own structure instead. Nothing is cut: a word
+// wider than the budget keeps its line whole rather than losing its tail.
+const MIN_WRAP_WIDTH = 24;
+
+export function wrapUnder(text: string, first: string, hanging = ' '.repeat(first.length)): string[] {
+  const [head, ...rest] = wrapText(text, Math.max(TERMINAL_WIDTH - first.length, MIN_WRAP_WIDTH));
+  return [`${first}${head}`, ...rest.map((line) => `${hanging}${line}`)];
+}
+
+// One rendering of "this clause stands like this", so `spec show` and
+// `handoff` quote a clause identically. The number and the verdict are the
+// structure a wrapped tail must not sit under, or the list stops being one.
+export function clauseStandingLines(standing: AuditVerdict, clauses: ProofClause[]): string[] {
+  return wrapUnder(clauses.find((clause) => clause.id === standing.clause)!.text, `  ${standing.clause}. [${standing.status}] `);
 }
 
 export function printEvidence(evidence: string | null, maxLines = 12): void {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { roadmapView } from './roadmap';
-import type { Task } from './taskStore';
+import { liveStateOf, roadmapView, type ReadSpec } from './roadmap';
+import { listQueue, type Task } from './taskStore';
 
 function task(overrides: Partial<Task> & { id: string }): Task {
   return {
@@ -28,115 +28,229 @@ function task(overrides: Partial<Task> & { id: string }): Task {
   };
 }
 
-const ids = (tasks: Array<{ task: Task }>): string[] => tasks.map((entry) => entry.task.id);
+const noSpecFiles: ReadSpec = () => null;
+const specFiles =
+  (docs: Record<string, string>): ReadSpec =>
+  (slug) =>
+    docs[slug] ?? null;
+
+const TWO_CLAUSES_ONE_MET = `# demo
+
+## Deliverable
+
+Proof:
+
+- [c1] the first promise
+- [c2] the second promise
+
+## Audit passes
+
+### Pass 1 — 2026-08-04
+
+- base: \`aaa\`
+- head: \`bbb\`
+- proof 1: met
+`;
+
+const ids = (entries: Array<{ task: Task }>): string[] => entries.map((entry) => entry.task.id);
+const slugs = (specs: Array<{ spec: string }>): string[] => specs.map((entry) => entry.spec);
+
+describe('liveStateOf', () => {
+  it('names the four states a live record can be in, by what each one needs next', () => {
+    const gate = task({ id: 'gate' });
+    const tasks = [gate, task({ id: 'specced', spec: 'branch' }), task({ id: 'unspecced' }), task({ id: 'waiting', spec: 'branch', requires: ['gate'] }), task({ id: 'claimed', spec: 'branch', state: 'in-progress' })];
+    const byId = new Map(tasks.map((entry) => [entry.id, entry]));
+    expect(tasks.map((entry) => liveStateOf(entry, byId))).toEqual(['unspecced', 'ready', 'unspecced', 'blocked', 'in-progress']);
+  });
+});
 
 describe('roadmapView', () => {
-  it('offers only deferred, open, unblocked tasks as topics', () => {
-    const view = roadmapView([
-      task({ id: 'ready' }),
-      task({ id: 'claimed-by-a-spec', spec: 'some-branch' }),
-      task({ id: 'closed', state: 'done' }),
-      task({ id: 'held', state: 'in-progress' }),
-      task({ id: 'waiting', requires: ['ready'] }),
+  it('shows a task that has a spec, instead of hiding it behind a count', () => {
+    const view = roadmapView([task({ id: 'decided', spec: 'a-branch' })], noSpecFiles);
+    expect(slugs(view.decided)).toEqual(['a-branch']);
+    expect(view.decided[0].members.map((member) => member.id)).toEqual(['decided']);
+    expect(view.counts.ready).toBe(1);
+  });
+
+  it('leaves the deferred filter meaning what its other callers mean by it', () => {
+    const tasks = [task({ id: 'specced', spec: 'a-branch' }), task({ id: 'unspecced' })];
+    expect(listQueue(tasks, { deferred: true }).map((entry) => entry.id)).toEqual(['unspecced']);
+    expect(ids(roadmapView(tasks, noSpecFiles).topics)).toEqual(['unspecced']);
+  });
+
+  it('sorts live work into named states rather than calling undecided work ready', () => {
+    const view = roadmapView(
+      [task({ id: 'gate' }), task({ id: 'implement-me', spec: 'a-branch' }), task({ id: 'decide-me' }), task({ id: 'held-up', spec: 'a-branch', requires: ['gate'] })],
+      noSpecFiles,
+    );
+    expect(view.counts.ready).toBe(1);
+    expect(view.counts.unspecced).toBe(2);
+    expect(view.counts.blocked).toBe(1);
+    expect(ids(view.topics)).toEqual(['gate', 'decide-me']);
+  });
+
+  it('counts every record exactly once, so no record falls between the sections', () => {
+    const { counts } = roadmapView(
+      [
+        task({ id: 'gate' }),
+        task({ id: 'ready', spec: 'a-branch' }),
+        task({ id: 'blocked', requires: ['gate'] }),
+        task({ id: 'claimed', state: 'in-progress' }),
+        task({ id: 'defect', kind: 'finding' }),
+        task({ id: 'asked', kind: 'question' }),
+        task({ id: 'raw', state: 'unreviewed' }),
+        task({ id: 'shipped', state: 'done' }),
+        task({ id: 'dropped', state: 'declined' }),
+      ],
+      noSpecFiles,
+    );
+    expect(counts.ready + counts.inProgress + counts.blocked + counts.unspecced + counts.findings + counts.otherKinds + counts.unreviewed + counts.archived).toBe(counts.total);
+    expect(counts.archived).toBe(2);
+  });
+
+  it('orders a chain so each spec follows what it waits on, and depth counts the links', () => {
+    const view = roadmapView(
+      [task({ id: 'c', spec: 'third', requires: ['b'] }), task({ id: 'a', spec: 'first' }), task({ id: 'b', spec: 'second', requires: ['a'] })],
+      noSpecFiles,
+    );
+    expect(view.decided.map((spec) => [spec.spec, spec.depth])).toEqual([
+      ['first', 0],
+      ['second', 1],
+      ['third', 2],
     ]);
-    expect(ids(view.topics)).toEqual(['ready']);
   });
 
-  it('never offers a finding as a topic, and counts it instead', () => {
-    const view = roadmapView([task({ id: 'a-defect', kind: 'finding', system: 'Runtime' })]);
-    expect(view.topics).toEqual([]);
-    expect(view.counts.deferredFindings).toBe(1);
-    expect(view.findingsBySystem).toEqual([['Runtime', 1]]);
+  it('prints a spec directly under the last decided spec it was waiting for', () => {
+    const view = roadmapView(
+      [task({ id: 'a', spec: 'chain-a' }), task({ id: 'b', spec: 'chain-b' }), task({ id: 'a2', spec: 'chain-a-next', requires: ['a'] }), task({ id: 'b2', spec: 'chain-b-next', requires: ['b'] })],
+      noSpecFiles,
+    );
+    expect(slugs(view.decided)).toEqual(['chain-a', 'chain-a-next', 'chain-b', 'chain-b-next']);
   });
 
-  it('counts a blocked finding with the findings, not out of the view entirely', () => {
-    const view = roadmapView([task({ id: 'gate' }), task({ id: 'held-defect', kind: 'finding', system: 'Runtime', requires: ['gate'] })]);
-    expect(view.counts.deferredFindings).toBe(1);
-    expect(view.findingsBySystem).toEqual([['Runtime', 1]]);
-    expect(view.counts.blockedTasks).toBe(0);
+  it('still answers when a dependency cycle leaves the order undefined', () => {
+    const view = roadmapView([task({ id: 'x', spec: 'loop-a', requires: ['y'] }), task({ id: 'y', spec: 'loop-b', requires: ['x'] })], noSpecFiles);
+    expect(slugs(view.decided).sort()).toEqual(['loop-a', 'loop-b']);
   });
 
-  it('partitions the deferred backlog, so no record falls between the body and the footer', () => {
-    const tasks = [
-      task({ id: 'ready' }),
-      task({ id: 'blocked-task', requires: ['ready'] }),
-      task({ id: 'finding', kind: 'finding' }),
-      task({ id: 'blocked-finding', kind: 'finding', requires: ['ready'] }),
-      task({ id: 'a-question', kind: 'question' }),
-      task({ id: 'undelivered-clause', kind: 'undelivered' }),
-    ];
-    const { counts } = roadmapView(tasks);
-    expect(counts.readyTasks + counts.blockedTasks + counts.deferredFindings + counts.deferredOther).toBe(counts.deferred);
-    expect(counts.deferredOther).toBe(2);
+  it('reads each clause standing out of the spec file, through the same summary spec show prints', () => {
+    const view = roadmapView([task({ id: 'a', spec: 'demo' })], specFiles({ demo: TWO_CLAUSES_ONE_MET }));
+    expect(view.decided[0].standing).toEqual({ clauses: 2, latestPass: 1, outstanding: 'outstanding: c2 (unknown)' });
   });
 
-  it('orders by how many live records the topic unblocks, before severity', () => {
-    const view = roadmapView([
-      task({ id: 'urgent-leaf', severity: 'high' }),
-      task({ id: 'load-bearing', severity: 'low' }),
-      task({ id: 'waiter-one', requires: ['load-bearing'] }),
-      task({ id: 'waiter-two', requires: ['load-bearing'] }),
+  it('states that a decided branch has no readable spec rather than dropping its row', () => {
+    const view = roadmapView([task({ id: 'a', spec: 'vanished' })], noSpecFiles);
+    expect(slugs(view.decided)).toEqual(['vanished']);
+    expect(view.decided[0].standing).toBeNull();
+  });
+
+  it('names what a spec waits on, and which spec owns the far end of that edge', () => {
+    const view = roadmapView(
+      [task({ id: 'upstream', spec: 'earlier' }), task({ id: 'downstream', spec: 'later', requires: ['upstream', 'undecided', 'never-filed'] }), task({ id: 'undecided' })],
+      noSpecFiles,
+    );
+    const later = view.decided.find((spec) => spec.spec === 'later')!;
+    expect(later.waitsOn).toEqual([
+      { id: 'upstream', spec: 'earlier', status: 'waiting' },
+      { id: 'undecided', spec: null, status: 'waiting' },
+      { id: 'never-filed', spec: null, status: 'missing' },
     ]);
+  });
+
+  it('says a spec is waiting on nothing when nothing holds any member up', () => {
+    const view = roadmapView([task({ id: 'a', spec: 'free' })], noSpecFiles);
+    expect(view.decided[0].waitsOn).toEqual([]);
+  });
+
+  it('draws a spec edge only where it leaves the spec, so internal ordering is not a chain link', () => {
+    const view = roadmapView([task({ id: 'first-half', spec: 'one-branch' }), task({ id: 'second-half', spec: 'one-branch', requires: ['first-half'] }), task({ id: 'elsewhere', requires: ['first-half'] })], noSpecFiles);
+    expect(view.decided[0].unblocks).toEqual([{ id: 'elsewhere', spec: null, alsoWaitsOn: [] }]);
+    expect(view.decided[0].depth).toBe(0);
+  });
+
+  it('calls a spec ready while any member can be picked up, and blocked only when none can', () => {
+    const view = roadmapView(
+      [task({ id: 'gate' }), task({ id: 'part-one', spec: 'mixed', requires: ['gate'] }), task({ id: 'part-two', spec: 'mixed' }), task({ id: 'stalled', spec: 'stuck', requires: ['gate'] }), task({ id: 'claimed', spec: 'busy', state: 'in-progress' })],
+      noSpecFiles,
+    );
+    expect(view.decided.map((spec) => [spec.spec, spec.state])).toEqual([
+      ['mixed', 'ready'],
+      ['busy', 'in-progress'],
+      ['stuck', 'blocked'],
+    ]);
+  });
+
+  it('keeps a done member out of the spec section once nothing of it is live', () => {
+    const view = roadmapView([task({ id: 'shipped', spec: 'closed-branch', state: 'done' })], noSpecFiles);
+    expect(view.decided).toEqual([]);
+  });
+
+  it('names the findings that could redden an audit and aggregates only the rest', () => {
+    const view = roadmapView(
+      [
+        task({ id: 'urgent', kind: 'finding', severity: 'high', system: 'Runtime' }),
+        task({ id: 'minor', kind: 'finding', severity: 'low', system: 'Runtime' }),
+        task({ id: 'middling', kind: 'finding', severity: 'medium', system: 'Task system' }),
+      ],
+      noSpecFiles,
+    );
+    expect(ids(view.namedFindings)).toEqual(['urgent']);
+    expect(view.findingsBySystem).toEqual([
+      ['Runtime', 1],
+      ['Task system', 1],
+    ]);
+    expect(view.counts.findings).toBe(3);
+    expect(view.counts.highFindings).toBe(1);
+  });
+
+  it('names a finding a spec has already taken on, because severity is what reddens an audit', () => {
+    const view = roadmapView([task({ id: 'owned', kind: 'finding', severity: 'high', spec: 'a-branch' })], noSpecFiles);
+    expect(ids(view.namedFindings)).toEqual(['owned']);
+  });
+
+  it('lists the blocked unspecced tasks with what each is waiting on', () => {
+    const view = roadmapView([task({ id: 'gate' }), task({ id: 'waiting', requires: ['gate', 'never-filed'] })], noSpecFiles);
+    expect(ids(view.blocked)).toEqual(['waiting']);
+    expect(view.blocked[0].waitsOn.map((blocker) => blocker.status)).toEqual(['waiting', 'missing']);
+  });
+
+  it('orders topics by how many live records each unblocks, before severity', () => {
+    const view = roadmapView(
+      [task({ id: 'urgent-leaf', severity: 'high' }), task({ id: 'load-bearing', severity: 'low' }), task({ id: 'waiter-one', requires: ['load-bearing'] }), task({ id: 'waiter-two', requires: ['load-bearing'] })],
+      noSpecFiles,
+    );
     expect(ids(view.topics)).toEqual(['load-bearing', 'urgent-leaf']);
   });
 
   it('breaks a fan-out tie by severity, then by store order', () => {
-    const view = roadmapView([
-      task({ id: 'second-medium', severity: 'medium' }),
-      task({ id: 'the-high', severity: 'high' }),
-      task({ id: 'first-medium', severity: 'medium' }),
-    ]);
+    const view = roadmapView([task({ id: 'second-medium', severity: 'medium' }), task({ id: 'the-high', severity: 'high' }), task({ id: 'first-medium', severity: 'medium' })], noSpecFiles);
     expect(ids(view.topics)).toEqual(['the-high', 'second-medium', 'first-medium']);
   });
 
-  it('does not count a closed record as something the topic unblocks', () => {
-    const view = roadmapView([task({ id: 'a' }), task({ id: 'shipped', state: 'done', requires: ['a'] })]);
+  it('does not count a closed record as something a topic unblocks', () => {
+    const view = roadmapView([task({ id: 'a' }), task({ id: 'shipped', state: 'done', requires: ['a'] })], noSpecFiles);
     expect(view.topics[0].unblocks).toEqual([]);
   });
 
   it('names what a waiter is still short of besides this topic', () => {
-    const view = roadmapView([
-      task({ id: 'a' }),
-      task({ id: 'b' }),
-      task({ id: 'c', state: 'done' }),
-      task({ id: 'waiter', requires: ['a', 'b', 'c'] }),
-    ]);
-    expect(view.topics[0].unblocks).toEqual([{ id: 'waiter', alsoWaitsOn: ['b'] }]);
-  });
-
-  it('counts the whole store, so the body reads as a fraction of it', () => {
-    const view = roadmapView([
-      task({ id: 'ready' }),
-      task({ id: 'a-finding', kind: 'finding' }),
-      task({ id: 'blocked', requires: ['ready'] }),
-      task({ id: 'in-a-spec', spec: 'branch' }),
-      task({ id: 'raw', state: 'unreviewed' }),
-      task({ id: 'held', state: 'in-progress' }),
-      task({ id: 'shipped', state: 'done' }),
-    ]);
-    expect(view.counts).toEqual({
-      total: 7,
-      unreviewed: 1,
-      inProgress: 1,
-      open: 4,
-      heldBySpec: 1,
-      deferred: 3,
-      deferredTasks: 2,
-      readyTasks: 1,
-      blockedTasks: 1,
-      deferredFindings: 1,
-      deferredOther: 0,
-    });
+    const view = roadmapView([task({ id: 'a' }), task({ id: 'b' }), task({ id: 'c', state: 'done' }), task({ id: 'waiter', requires: ['a', 'b', 'c'] })], noSpecFiles);
+    expect(view.topics[0].unblocks).toEqual([{ id: 'waiter', spec: null, alsoWaitsOn: ['b'] }]);
   });
 
   it('reads a requirement nothing in the store answers as still blocking', () => {
-    const view = roadmapView([task({ id: 'orphan', requires: ['never-filed'] })]);
+    const view = roadmapView([task({ id: 'orphan', requires: ['never-filed'] })], noSpecFiles);
     expect(view.topics).toEqual([]);
-    expect(view.counts.blockedTasks).toBe(1);
+    expect(view.counts.blocked).toBe(1);
   });
 
   it('releases a topic whose only requirement was declined', () => {
-    const view = roadmapView([task({ id: 'dropped', state: 'declined' }), task({ id: 'freed', requires: ['dropped'] })]);
+    const view = roadmapView([task({ id: 'dropped', state: 'declined' }), task({ id: 'freed', requires: ['dropped'] })], noSpecFiles);
     expect(ids(view.topics)).toEqual(['freed']);
+  });
+
+  it('never offers a finding as a topic', () => {
+    const view = roadmapView([task({ id: 'a-defect', kind: 'finding', system: 'Runtime' })], noSpecFiles);
+    expect(view.topics).toEqual([]);
+    expect(view.blocked).toEqual([]);
   });
 });

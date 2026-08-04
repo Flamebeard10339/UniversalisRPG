@@ -8,7 +8,7 @@ import { loadManifest } from '../lib/systems';
 import { fixNowQueue } from '../lib/taskStore';
 import type { Flags } from './cli';
 import { readStore, recordEvents, resolveActiveSpec, resolveConfig, specFile, splitList, validateContentFields, type EventSubject } from './context';
-import { printRow, truncateLine } from './render';
+import { clauseStandingLines, printRow } from './render';
 
 const COMMIT_SEP = '\x1e';
 const FIELD_SEP = '\x1f';
@@ -120,7 +120,9 @@ export function cmdHandoff(args: Flags, usage: string): void {
   // prose never changes between runs, and what a cold session needs from
   // it — what the branch still owes — is exactly what the clauses are.
   const standings = clauseStandings(doc.proofClauses, doc.auditPasses[doc.auditPasses.length - 1]?.verdicts);
-  for (const standing of standings) console.log(`  ${standing.clause}. [${standing.status}] ${truncateLine(doc.proofClauses.find((clause) => clause.id === standing.clause)!.text)}`);
+  for (const standing of standings) {
+    for (const line of clauseStandingLines(standing, doc.proofClauses)) console.log(line);
+  }
   console.log('');
 
   const byId = new Map(tasks.map((task) => [task.id, task]));

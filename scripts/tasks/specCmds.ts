@@ -3,7 +3,7 @@ import { clauseStandings, outstandingSummary, parseSpecDoc } from '../lib/specDo
 import { loadStore, unreviewedFiledBy, type Task } from '../lib/taskStore';
 import type { Flags } from './cli';
 import { readStore, recordEvents, refuseUnknownSpec, reportUnknownSpec, resolveConfig, saveStoreAndWarn, specFile, subjectOf } from './context';
-import { printRow, refuseUnknownIds, truncateLine } from './render';
+import { clauseStandingLines, printRow, refuseUnknownIds } from './render';
 
 const SPEC_SCAFFOLD = (slug: string): string => `# ${slug}
 
@@ -96,7 +96,9 @@ export function cmdSpecShow(args: Flags, usage: string): void {
     console.log(doc.deliverableSection);
   } else {
     const standings = clauseStandings(doc.proofClauses, latest?.verdicts);
-    for (const standing of standings) console.log(`  ${standing.clause}. [${standing.status}] ${truncateLine(doc.proofClauses.find((clause) => clause.id === standing.clause)!.text)}`);
+    for (const standing of standings) {
+      for (const line of clauseStandingLines(standing, doc.proofClauses)) console.log(line);
+    }
     if (standings.length === 0) console.log('  (no proof clauses — `--full` prints the whole ## Deliverable)');
   }
   console.log('');

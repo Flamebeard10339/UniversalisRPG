@@ -64,7 +64,7 @@ const COMMANDS: Record<string, Command> = {
   produces: { usage: 'usage: tasks produces <term>  (does anything already do this — searched over registered concepts and every `produces` claim any task ever made, closed ones included)', run: cmdProduces },
   concept: { usage: 'usage: tasks concept "<system>" "<name>" --paths a.ts,b/ [--note "where the name came from"]  (registers a capability so `tasks produces` can find it)', run: cmdConcept },
   next: { usage: 'usage: tasks next [--spec <slug>] [--system "<name>"] [--severity high|medium|low] [--full]', run: cmdNext },
-  roadmap: { usage: 'usage: tasks roadmap  (the deferred backlog from main: store counts, the unblocked topics ordered by what they unblock, and a counted footer for everything left out)', run: cmdRoadmap },
+  roadmap: { usage: 'usage: tasks roadmap  (the same answer from any branch: what has been decided — every spec with live members, in dependency order, with its clause standing — then the unspecced topics, what is blocked and on what, and the findings that could redden an audit)', run: cmdRoadmap },
   start: { usage: `usage: tasks start <id> ${ACTOR_USAGE}`, run: cmdStart },
   stop: { usage: `usage: tasks stop <id> ${ACTOR_USAGE}`, run: cmdStop },
   done: { usage: `usage: tasks done <id>... [--commit <revspec>] ${ACTOR_USAGE}  (default: none — the closing commit does not exist yet when \`done\` runs; see \`tasks show\` for a derived one)`, run: cmdDone },

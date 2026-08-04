@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { packGreedy, truncateLine, wrapText } from './render';
+import { clauseStandingLines, packGreedy, summarize, TERMINAL_WIDTH, truncateLine, wrapText, wrapUnder } from './render';
 
 describe('packGreedy', () => {
   it('fills each line to the width before starting the next', () => {
@@ -36,5 +36,43 @@ describe('truncateLine', () => {
 
   it('returns text at the maximum unchanged', () => {
     expect(truncateLine('abcdef', 6)).toBe('abcdef');
+  });
+});
+
+describe('summarize', () => {
+  it('joins the lines a stored field carries without shortening what they say', () => {
+    const prose = `${'word '.repeat(60)}\n\n  and a second paragraph  `;
+    expect(summarize(prose)).toBe(`${'word '.repeat(60).trim()} and a second paragraph`);
+  });
+});
+
+describe('wrapUnder', () => {
+  it('leaves text that already fits on the one line', () => {
+    expect(wrapUnder('short', '  - ')).toEqual(['  - short']);
+  });
+
+  it('continues past the width under an indent the caller chooses, not at column zero', () => {
+    const lines = wrapUnder('one two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen', '  ├─ ', '  │  ');
+    expect(lines.length).toBeGreaterThan(1);
+    expect(lines[0].startsWith('  ├─ ')).toBe(true);
+    for (const line of lines.slice(1)) expect(line.startsWith('  │  ')).toBe(true);
+    expect(lines.map((line) => line.slice(5)).join(' ')).toBe('one two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen');
+  });
+
+  it('keeps a word wider than the whole report rather than losing its tail', () => {
+    const word = 'x'.repeat(TERMINAL_WIDTH + 20);
+    expect(wrapUnder(word, '  - ')).toEqual([`  - ${word}`]);
+  });
+});
+
+describe('clauseStandingLines', () => {
+  it('prints the whole clause, continuing under its own number', () => {
+    const text = 'a clause long enough that no terminal of a reasonable width could hold all of it on one single line without help';
+    const lines = clauseStandingLines({ clause: 3, status: 'unmet', evidence: null }, [{ id: 3, text }]);
+    expect(lines[0].startsWith('  3. [unmet] a clause long enough')).toBe(true);
+    expect(lines.length).toBeGreaterThan(1);
+    for (const line of lines) expect(line.length).toBeLessThanOrEqual(TERMINAL_WIDTH);
+    for (const line of lines.slice(1)) expect(line.startsWith('             ')).toBe(true);
+    expect(lines.join(' ').replace(/\s+/g, ' ').trim()).toBe(`3. [unmet] ${text}`);
   });
 });
