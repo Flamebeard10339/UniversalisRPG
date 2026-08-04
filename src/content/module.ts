@@ -1,4 +1,5 @@
 import { parseDialogue } from './dialogue';
+import { parseDropTable } from './dropTable';
 import { entitySchema } from './entity';
 import { entityTypeSchema } from './entityType';
 import { flagSchema } from './flag';
@@ -35,6 +36,7 @@ export const SCHEMAS: Record<string, AnySchema> = {
 // and bring their own parser. They merge on their own terms too — see mergeSection.
 const BESPOKE: Record<string, (section: RawSection) => object> = {
   dialogue: parseDialogue,
+  droptable: parseDropTable,
   test: parseTest,
   save: parseSaveSection,
   remove: parseRemoval,

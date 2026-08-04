@@ -1,4 +1,4 @@
-import { ActionResult } from '../grammar/actionResult';
+import { ActionResult, nestedResults } from '../grammar/actionResult';
 import { evaluateCondition } from './conditions';
 import { Action } from '../content/entity';
 import { Location } from '../content/location';
@@ -118,8 +118,15 @@ export function outcomeResults(action: Action, outcome: FightOutcome): ActionRes
   return outcome === 'completion' ? [...action.results, ...(action.onSuccess ?? [])] : (action.onEscape ?? []);
 }
 
+// Nested, and asked as "might stop" rather than "does": a `stop` behind a chance
+// still has to cap the batch at one completion, or a span that would have ended
+// mid-way runs to its end before anyone notices.
+function mightStop(results: readonly ActionResult[]): boolean {
+  return results.some((result) => result.kind === 'stop' || nestedResults(result).some(mightStop));
+}
+
 export function stopsOnOutcome(action: Action, outcome: FightOutcome): boolean {
-  return outcomeResults(action, outcome).some((result) => result.kind === 'stop');
+  return mightStop(outcomeResults(action, outcome));
 }
 
 // A `stop` caps the batch at one completion, or a batched span stops nothing.

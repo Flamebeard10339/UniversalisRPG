@@ -11,17 +11,23 @@ is an ordinary result list, so layering is nesting and needs no rule of its own.
 sugar for a table and no table engine sits beside it: one grant path serves both because a
 100%-certain single grant *is* the degenerate wrapper.
 
-Three selectors, and the difference between them is the difference the task's evidence says a
-droptable system must not blur:
+Four selectors, and the difference between the first three is the difference the task's evidence
+says a droptable system must not blur:
 
 | written | semantics | draws |
 | --- | --- | --- |
 | `<n> in <m>:` | authored odds, rolled independently of every sibling | 1 |
 | `<stat> vs <stat\|number>:` | contested odds through the existing `hitChance`, so gear and buffs move a drop rate | 1 |
 | `one of:` with `<n>x:` / `<stat>:` rows | exactly one row, selected by weight | 1 |
+| `if <condition>:` | a certainty gated on state | 0 |
 
 `one of:` is *pick-one*; sibling `<n> in <m>:` lines are *every-entry*. The classic droptable bug is
 writing one and getting the other, and here they are different words.
+
+A row carries its gate in its selector — `2x if melee >= 40:` — because a gated row must leave the
+pool **before** the draw and let the survivors renormalize. Writing the gate inside the row's body
+instead would select a dead row and then void it, which is a different distribution and the exact
+trap the wrapper design exists to avoid.
 
 A named, reusable table is `# droptable <id>`, whose body is that same result list, invoked with
 `roll: <id>`. It is a section like any other: namespaced, referenced, removable, round-tripped —
@@ -30,7 +36,8 @@ nothing about references, resolution or merging is recreated for it.
 Produced quantities become ranges, sampled like every other range, wherever a quantity is *produced*
 and nowhere a number is a *threshold*: `give:`, a recipe's `out:`/`burnt:`, `xp:`, `drain:`/
 `restore:` take `4-7`; `take:`, a recipe's `in:`, `has 5 potion`, `escape after 3`, `skill: cooking
-15`, a comparison's right side, `<n> in <m>` and `<n>x` do not.
+15`, a comparison's right side, `<n> in <m>` and `<n>x` do not. `add:` is produced and still does
+not, because it is the one signed count and `-3--1` cannot be told from a hyphen separator.
 
 Proof:
 
@@ -44,38 +51,47 @@ Proof:
   results — the one spelling for the empty case, which is why it exists and why it is not accepted
   anywhere the empty case is already writable. `one of:` with no rows, a row with an empty body, a
   zero or negative literal weight, and a `vs` selector used as a row are each load errors.
-- [c3] `<stat> vs <stat|number>:` fires its body with `hitChance(left, right)` — the same function
+- [c3] `if <condition>:` applies its body when the condition holds and draws nothing either way,
+  taking the whole condition grammar — `and`, `or`, `not`, `has`, comparisons — unchanged. A row
+  spells its gate in its selector, `<n>x if <condition>:` / `<stat> if <condition>:`, and a row whose
+  gate is false is removed from the pool before the weighted draw, so the survivors' shares grow. A
+  test pins that against the wrong reading, where the row is selected and then produces nothing.
+- [c4] `<stat> vs <stat|number>:` fires its body with `hitChance(left, right)` — the same function
   and the same `contest-spread` tuning variable the attack roll uses, both sides read with
   `statValue` through the namespace. A stat bonus on the left side moves the observed drop rate, and
   a test pins that it does.
-- [c4] Draw order is fixed and total: results are applied in source order; a wrapper draws once for
+- [c5] Draw order is fixed and total: results are applied in source order; a wrapper draws once for
   its own selector and then recurses into its body depth-first; a certainty draws nothing, which is
   what keeps `give: 1 bones` free of the RNG and every pre-existing seeded test byte-identical. Two
   runs from one seed produce one sequence, and a segment split in two produces the same sequence as
   the whole.
-- [c5] Applying a result group `count` times no longer multiplies amounts when the group is
+- [c6] Applying a result group `count` times no longer multiplies amounts when the group is
   stochastic — it applies the group `count` times, in order. Batched repeating actions
   (`resolveDeterministicSegment` → `fightBatch`) therefore roll each repetition separately instead
   of rolling once and scaling, and `stopsOnOutcome` sees a `stop` nested inside a wrapper so a
   batch that might stop is still capped at one.
-- [c6] `# droptable <id>` is a section whose body is a result list. `roll: <id>` applies it. It
+- [c7] `# droptable <id>` is a section whose body is a result list. `roll: <id>` applies it. It
   resolves, validates, prunes with a missing optional dependency, `# remove droptable <id>` works,
   and it round-trips through `serialize` — all through the existing machinery, with `droptable`
   added to `NAMESPACED_KINDS`, `ReferenceKind`, `CONTENT_SECTION_MAPS` and the prune loop rather
   than through anything new. An empty `# droptable` is a load error.
-- [c7] A cycle among droptables is a load error naming the tables in it, checked once over the built
+- [c8] A cycle among droptables is a load error naming the tables in it, checked once over the built
   registry beside the other whole-registry validations. `roll:` naming an unknown table is the same
   unknown-reference error every other kind gets.
-- [c8] Ranged produced quantities: `give: 5-10 arrows`, `out: 2-4 feather`, `burnt:`, `xp: melee
+- [c9] Ranged produced quantities: `give: 5-10 arrows`, `out: 2-4 feather`, `burnt:`, `xp: melee
   4-6`, `drain: 2-4 health`, `restore: 3-5 health`. Item and xp counts sample as **integers**
   uniform over the closed range; pool deltas sample as decimals, as pools already do. A point range
-  draws nothing. `take:`, `in:` and every threshold listed in the deliverable reject a range at
-  parse time, each with a message saying so.
-- [c9] The shipped giant rat drops through a table: a certain grant, an independent chance, a
+  draws nothing. `take:`, `in:`, `add:` and every threshold listed in the deliverable reject a range
+  at parse time, each with a message saying so.
+- [c10] The zero rule inverts. `values.ts` refuses a written `0` today because a line that grants
+  nothing does nothing; with a range, `give: 0-3 bones` means "sometimes nothing", which is the
+  point. What does nothing is an upper bound of zero, so that is what is refused, and `0-0` is
+  refused by the same clause rather than a second one.
+- [c11] The shipped giant rat drops through a table: a certain grant, an independent chance, a
   weighted `one of:` including a `nothing` row, and a `roll:` into a shared rare table that a second
   entity also names. A `# test` section replays it over the shipped content, and `integration.test.ts`
   runs it.
-- [c10] `npx tsc --noEmit`, `npm test`, `npm run layer-check`, `npm run audit-status` and
+- [c12] `npx tsc --noEmit`, `npm test`, `npm run layer-check`, `npm run audit-status` and
   `npm run tasks -- doctor` pass before the spec is marked done.
 
 ## Decisions
@@ -100,6 +116,15 @@ Proof:
   breaking an invariant. Percentages-summing-to-100 was considered and rejected for exactly that:
   a luck stat scaling one entry breaks the sum, so the rule would have to be suspended at the one
   moment it mattered.
+- **A gate is a selector, not a body line.** The author sketched `2x:` with `requires: melee >= 40`
+  inside the row, and pulled the whole idea back into this branch on the grounds that gating a
+  result group is generally useful rather than a droptable feature. Agreed, and that is why it is
+  `if <condition>:` beside the other three selectors: a condition in the body reads as "produce
+  nothing when false", which for a weighted row is the wrong distribution, while a condition in the
+  selector reads as "this row is not in the pool", which is the right one. `if` rather than
+  `requires` because `requires:` is already an action field meaning something adjacent but different
+  — it gates the action, not the group — and one word doing both inside one body is how that
+  distinction gets lost.
 - **`vs` is refused as a `one of:` row.** A contested check produces an independent probability, not
   a share of a total; reading one as a weight would be a category error the author named directly.
 - **Ranges are for produced quantities only.** `take: 5-10 arrows` and `in: 1-3 log` would make
@@ -107,6 +132,14 @@ Proof:
   not say how many completions it can afford. Thresholds (`has`, `escape after`, comparisons,
   `<n> in <m>`, `<n>x`) are floors and counts, and a range there is a distribution over a
   distribution.
+- **A produced quantity forks its readers, not its storage.** `Quantified.amount` becoming a `Range`
+  splits every caller the same way `statValue`/`sampleStat` already split: one wants the range
+  without a draw, one wants a sample. So the range is what is *stored* and each caller says which it
+  wants — `serialize` prints `4-7` through the `range()` helper it already has, the runtime samples
+  through a `sampleCount` that mirrors `sampleStat`'s shape including its point-range shortcut. The
+  range is never collapsed on the way in. Consumed quantities stay a plain number, a separate type
+  from a produced one, so no consuming caller is offered the choice at all — which is what keeps
+  `perCompletionCost` and `inputLimit` answerable.
 - **Batching yields to sampling.** A stochastic result group cannot be applied as `amount × count`.
   Rather than teaching the resolver which actions are batchable, `applyResults` asks the group and
   loops when the answer is yes — the same conclusion the combat log reached ("combat does not

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { point } from '../grammar/range';
 import { Condition } from '../grammar/condition';
 import {
   actionFirstUnit, applyResultsNow, armAction, armCraft, craft, craftFirstUnit, createGameState, evaluateCondition, renderSegments, travelSecondsPerUnit, useAction } from './runtime';
@@ -144,14 +145,14 @@ describe('applyResult', () => {
 
   it('gives and takes inventory counts', () => {
     const state = createGameState();
-    applyResultsNow(state, registry, [{ kind: 'give', item: 'cooked-shrimp', amount: 5 }]);
+    applyResultsNow(state, registry, [{ kind: 'give', item: 'cooked-shrimp', amount: point(5) }]);
     applyResultsNow(state, registry, [{ kind: 'take', item: 'cooked-shrimp', amount: 2 }]);
     expect(state.inventory['cooked-shrimp']).toBe(3);
   });
 
   it('floors take at 0, never driving inventory negative', () => {
     const state = createGameState();
-    applyResultsNow(state, registry, [{ kind: 'give', item: 'cooked-shrimp', amount: 2 }]);
+    applyResultsNow(state, registry, [{ kind: 'give', item: 'cooked-shrimp', amount: point(2) }]);
     applyResultsNow(state, registry, [{ kind: 'take', item: 'cooked-shrimp', amount: 5 }]);
     expect(state.inventory['cooked-shrimp']).toBe(0);
   });
@@ -181,7 +182,7 @@ describe('applyResult', () => {
 
   it('accumulates xp and moves location on relocate/discover', () => {
     const state = createGameState();
-    applyResultsNow(state, registry, [{ kind: 'xp', skill: 'thieving', amount: 4 }]);
+    applyResultsNow(state, registry, [{ kind: 'xp', skill: 'thieving', amount: point(4) }]);
     applyResultsNow(state, registry, [{ kind: 'relocate', location: 'beach' }]);
     applyResultsNow(state, registry, [{ kind: 'discover', location: 'bank' }]);
     expect(state.xp.thieving).toBe(4);

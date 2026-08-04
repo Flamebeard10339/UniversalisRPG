@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { point } from '../grammar/range';
 import { loadModule, loadUniverse, Registry } from './registry';
 import { registryDiff } from './registryDiff';
 import { serializeRegistryModule } from './serialize';
@@ -71,7 +72,7 @@ describe('an entity inheriting an action template', () => {
       rate: 'swing-rate',
       target: 'health',
       ability: 'attack',
-      results: [{ kind: 'xp', skill: 'melee', amount: 5 }],
+      results: [{ kind: 'xp', skill: 'melee', amount: point(5) }],
     });
   });
 

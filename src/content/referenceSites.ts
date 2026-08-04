@@ -1,5 +1,5 @@
 import { Action } from '../grammar/action';
-import { ActionResult } from '../grammar/actionResult';
+import { ActionResult, nestedResults } from '../grammar/actionResult';
 import { Condition, isEngineRoot, Reference, VISITS, visitedNode } from '../grammar/condition';
 import { Dialogue, TextSegment } from './dialogue';
 import { Directive } from './test';
@@ -8,7 +8,7 @@ import { isFieldEdits, listMembers } from '../grammar/section';
 import { Quantified } from '../grammar/values';
 import { TagClause } from '../grammar/tagClause';
 
-export type ReferenceKind = 'stat' | 'resource' | 'entity' | 'entitytype' | 'location' | 'item' | 'skill' | 'recipe' | 'save' | 'test' | 'capability' | 'flag' | 'node';
+export type ReferenceKind = 'stat' | 'resource' | 'entity' | 'entitytype' | 'location' | 'item' | 'skill' | 'recipe' | 'droptable' | 'save' | 'test' | 'capability' | 'flag' | 'node';
 
 // Returns what the id should become. Resolution rewrites it into a namespaced
 // key; validation hands it back and throws if it names nothing.
@@ -81,10 +81,30 @@ function condition(value: Condition | undefined, where: string, visit: Visit): v
 
 function results(list: ActionResult[] | undefined, where: string, visit: Visit): void {
   for (const result of list ?? []) {
+    // A wrapper's body is an ordinary result list, so every site inside one is
+    // reached by the same walk rather than by a second copy of it.
+    for (const nested of nestedResults(result)) results(nested, where, visit);
     switch (result.kind) {
       case 'give':
       case 'take':
         put(result, 'item', 'item', `${where} ${result.kind}:`, visit);
+        break;
+      case 'roll':
+        put(result, 'table', 'droptable', `${where} roll:`, visit);
+        break;
+      case 'contest':
+        // A side written as a name is a stat; a literal is left alone, exactly
+        // as an action's `rate:` is.
+        for (const side of ['left', 'right'] as const) put(result, side, 'stat', `${where} vs:`, visit);
+        break;
+      case 'gate':
+        condition(result.condition, `${where} if:`, visit);
+        break;
+      case 'one-of':
+        for (const row of result.rows) {
+          put(row, 'weight', 'stat', `${where} one of: row`, visit);
+          condition(row.requires, `${where} one of: row if`, visit);
+        }
         break;
       case 'xp':
         put(result, 'skill', 'skill', `${where} xp:`, visit);
@@ -94,7 +114,7 @@ function results(list: ActionResult[] | undefined, where: string, visit: Visit):
         put(result, 'location', 'location', `${where} ${result.kind}:`, visit);
         break;
       case 'pool':
-        put(result, 'resource', 'resource', `${where} ${result.delta < 0 ? 'drain' : 'restore'}:`, visit);
+        put(result, 'resource', 'resource', `${where} ${result.delta.max < 0 ? 'drain' : 'restore'}:`, visit);
         break;
       case 'set':
       case 'unset':
@@ -226,6 +246,9 @@ export function visitSection(kind: string, value: object, where: string, visit: 
       put(section, 'rate', 'stat', `${where} rate:`, visit);
       results(section.onEmpty as ActionResult[], `${where} on empty:`, visit);
       results(section.onFull as ActionResult[], `${where} on full:`, visit);
+      return;
+    case 'droptable':
+      results(section.results as ActionResult[], where, visit);
       return;
     case 'dialogue':
       dialogue(value as Dialogue, where, visit);

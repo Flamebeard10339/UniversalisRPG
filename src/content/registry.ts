@@ -1,6 +1,8 @@
-import { ActionResult } from '../grammar/actionResult';
+import { ActionResult, nestedResults } from '../grammar/actionResult';
+import { point } from '../grammar/range';
 import { Action, actionProblem, actionTableProblem } from '../grammar/action';
 import { Dialogue } from './dialogue';
+import { DropTable } from './dropTable';
 import { Entity, entitySchema } from './entity';
 import { EntityType, entityTypeSchema } from './entityType';
 import { Flag, flagSchema } from './flag';
@@ -36,6 +38,7 @@ export interface Registry {
   recipes: Map<string, Recipe>;
   recipeActions: Map<string, Action>;
   resources: Map<string, Resource>;
+  dropTables: Map<string, DropTable>;
   dialogues: Map<string, Dialogue>;
   dialoguesByOwner: Map<string, Dialogue>;
   tests: Map<string, Test>;
@@ -58,6 +61,7 @@ export const CONTENT_SECTION_MAPS: readonly (readonly [string, keyof Registry])[
   ['skill', 'skills'],
   ['recipe', 'recipes'],
   ['resource', 'resources'],
+  ['droptable', 'dropTables'],
   ['dialogue', 'dialogues'],
   ['test', 'tests'],
 ];
@@ -100,7 +104,7 @@ function recipeAction(recipe: Recipe): Action {
   const takes: ActionResult[] = recipe.in.map((q) => ({ kind: 'take', item: q.item, amount: q.amount }));
   const gives: ActionResult[] = recipe.out.map((q) => ({ kind: 'give', item: q.item, amount: q.amount }));
   const results: ActionResult[] = [...takes, ...gives];
-  if (recipe.skill) results.push({ kind: 'xp', skill: recipe.skill.skill, amount: recipe.skill.amount });
+  if (recipe.skill) results.push({ kind: 'xp', skill: recipe.skill.skill, amount: point(recipe.skill.amount) });
   if (recipe.say) results.push({ kind: 'say', text: recipe.say });
 
   // A craft with a cadence keeps going; one without is over the moment it is
@@ -139,6 +143,7 @@ function emptyRegistry(): Registry {
     recipes: new Map(),
     recipeActions: new Map(),
     resources: new Map(),
+    dropTables: new Map(),
     dialogues: new Map(),
     dialoguesByOwner: new Map(),
     tests: new Map(),
@@ -250,6 +255,11 @@ function applySection(registry: Registry, section: ModuleSection): void {
       const resource = hydrateSection(section.value as Authored<Resource>, resourceSchema);
       if (!resource.max) throw new DslError(`# resource ${resource.id} requires a max: stat`);
       registry.resources.set(resource.id, resource);
+      break;
+    }
+    case 'droptable': {
+      const table = section.value as DropTable;
+      registry.dropTables.set(table.id, table);
       break;
     }
     case 'dialogue': {
@@ -450,6 +460,12 @@ function pruneRegistryDanglingReferences(registry: Registry, danglingRoots: Read
       changed = true;
     }
 
+    for (const [id, table] of registry.dropTables) {
+      if (referencesLoaded(() => visitSection('droptable', { ...table }, `# droptable ${id}`, visit))) continue;
+      dropContent(registry, 'droptable', id, pruned, [registry.dropTables]);
+      changed = true;
+    }
+
     for (const [id, dialogue] of registry.dialogues) {
       if (referencesLoaded(() => visitSection('dialogue', { ...dialogue, nodes: dialogue.nodes.map((node) => ({ ...node })) }, `# dialogue ${id}`, visit))) continue;
       dropContent(registry, 'dialogue', id, pruned, [registry.dialogues]);
@@ -470,6 +486,47 @@ function pruneRegistryDanglingReferences(registry: Registry, danglingRoots: Read
   }
 }
 
+// A table that reaches itself would recurse forever at the first roll. Checked
+// once over the built registry, where every table that will exist is present and
+// every name has already resolved.
+function dropTableCycle(registry: Registry): string[] | null {
+  const rolls = new Map<string, string[]>();
+  const collect = (results: readonly ActionResult[], into: string[]): void => {
+    for (const result of results) {
+      if (result.kind === 'roll') into.push(result.table);
+      for (const nested of nestedResults(result)) collect(nested, into);
+    }
+  };
+  for (const [id, table] of registry.dropTables) {
+    const targets: string[] = [];
+    collect(table.results, targets);
+    rolls.set(id, targets);
+  }
+
+  const done = new Set<string>();
+  const path: string[] = [];
+  const onPath = new Set<string>();
+  const walk = (id: string): string[] | null => {
+    if (onPath.has(id)) return [...path.slice(path.indexOf(id)), id];
+    if (done.has(id)) return null;
+    path.push(id);
+    onPath.add(id);
+    for (const target of rolls.get(id) ?? []) {
+      const cycle = walk(target);
+      if (cycle) return cycle;
+    }
+    path.pop();
+    onPath.delete(id);
+    done.add(id);
+    return null;
+  };
+  for (const id of rolls.keys()) {
+    const cycle = walk(id);
+    if (cycle) return cycle;
+  }
+  return null;
+}
+
 // Two `starting` locations used to resolve by source order, which is a coin
 // toss an author cannot see. Zero is not checked here — a module set is allowed
 // to hold locations without holding the one a new game begins in, and the
@@ -487,6 +544,14 @@ function validateBuiltRegistry(registry: Registry, owners: ReadonlyMap<string, P
 
   const starting = startingLocationFailure(registry, owners);
   if (starting) return starting;
+
+  const cycle = dropTableCycle(registry);
+  if (cycle) {
+    const module = sectionOwner(owners, 'droptable', cycle[0]);
+    const error = new DslError(`# droptable ${cycle[0]} rolls itself: ${cycle.join(' -> ')}`);
+    if (!module) throw error;
+    return { module, stage: 'validate', error };
+  }
 
   try {
     recursivelyResolveRelativeCoordinates(registry.locations);

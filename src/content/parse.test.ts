@@ -196,9 +196,9 @@ describe('entity actions', () => {
     expect(parseOne(source, entitySchema).actions?.[0].results).toEqual([
       { kind: 'set', variable: 'drawers-open' },
       { kind: 'unset', variable: 'sealed' },
-      { kind: 'give', item: 'coins', amount: 12 },
+      { kind: 'give', item: 'coins', amount: point(12) },
       { kind: 'take', item: 'cooked-shrimp', amount: 5 },
-      { kind: 'xp', skill: 'thieving', amount: 4 },
+      { kind: 'xp', skill: 'thieving', amount: point(4) },
       { kind: 'open-modal', modal: 'name-editor' },
     ]);
   });
@@ -231,7 +231,7 @@ describe('entity action modifiers', () => {
         hiddenIf: ref('unlocked'),
         tags: [{ kind: 'keyword', value: 'retaliates' }],
         retaliates: true,
-        results: [{ kind: 'xp', skill: 'thieving', amount: 4 }],
+        results: [{ kind: 'xp', skill: 'thieving', amount: point(4) }],
         onSuccess: [{ kind: 'set', variable: 'unlocked' }, { kind: 'say', text: 'The lock clicks.' }],
       },
     ]);
@@ -530,7 +530,8 @@ describe('a sub-parser must consume the whole line, like the section engine does
 
   it('refuses trailing garbage after an action field', () => {
     expect(load('# item coin', '# entity gull', 'peck:', '  requires: has coin typo', '  say: hi')).toThrow(/unexpected content after an action field: "typo"/);
-    expect(load('# item coin', '# entity gull', 'peck:', '  give: coin typo')).toThrow(/unexpected content after an action field/);
+    // A results line is consumed by the result reader, which owns the demand.
+    expect(load('# item coin', '# entity gull', 'peck:', '  give: coin typo')).toThrow(/unexpected content after a result: "typo"/);
     expect(load('# stat attack', '# entity gull', 'peck:', '  accuracy: attack typo', '  say: hi')).toThrow(/unexpected content after an action field/);
     // The number parsers stop where they stop; what follows used to be dropped.
     expect(load('# entity gull', 'peck:', '  time: 1e3', '  say: hi')).toThrow(/unexpected content after an action field: "e3"/);
@@ -541,7 +542,7 @@ describe('a sub-parser must consume the whole line, like the section engine does
     const dialogue = (...body: string[]) => load('# flag lit', '# item coin', '# entity miki', '# dialogue chat', 'owner = miki', 'node a:', ...body);
     expect(dialogue('  when: lit typo', '  Hi.')).toThrow(/unexpected content after a node when/);
     expect(dialogue('  Hi.', '  -> go (when lit typo)')).toThrow(/unexpected content after a choice when/);
-    expect(dialogue('  give: 1 coin typo', '  Hi.')).toThrow(/unexpected content after a node effect/);
+    expect(dialogue('  give: 1 coin typo', '  Hi.')).toThrow(/unexpected content after a result: "typo"/);
   });
 
   it('refuses trailing garbage in a test assertion', () => {

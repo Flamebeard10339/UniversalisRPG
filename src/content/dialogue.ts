@@ -1,4 +1,4 @@
-import { ActionResult, actionResult, startsResult } from '../grammar/actionResult';
+import { ActionResult, parseResultLine, startsResult } from '../grammar/actionResult';
 import { Condition, condition, Reference } from '../grammar/condition';
 import { Cursor, DslError, parseWhole } from '../grammar/parser';
 import { RawLine, RawSection } from '../grammar/structure';
@@ -84,7 +84,7 @@ function parseChoice(source: RawLine): Choice {
   for (const line of source.children) {
     const goto = GOTO.exec(line.text)?.groups;
     if (goto) choice.goto = goto.target;
-    else choice.effects.push(parseWhole(actionResult, line.text, line.span.start, 'a choice effect'));
+    else choice.effects.push(...parseResultLine(line));
   }
   return choice;
 }
@@ -112,7 +112,7 @@ function parseNode(name: string, source: RawLine): DialogueNode {
     else if (line.text === 'once') node.once = true;
     else if (line.text === 'sticky') node.sticky = true;
     else if (goto) node.steps.push({ kind: 'goto', target: goto.target });
-    else if (startsResult(new Cursor(line.text))) node.steps.push({ kind: 'effect', result: parseWhole(actionResult, line.text, line.span.start, 'a node effect') });
+    else if (startsResult(new Cursor(line.text))) for (const result of parseResultLine(line)) node.steps.push({ kind: 'effect', result });
     else node.steps.push({ kind: 'say', segments: parseSegments(line.text, line.span.start) });
   }
   flush();

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { point } from '../grammar/range';
 import { restorePools } from './effects';
 import { applyResultsNow, createGameState, initResources } from './runtime';
 import { loadModule, Registry } from '../content/registry';
@@ -100,36 +101,36 @@ describe('drain: / restore: — the direct pool write', () => {
   it('parses to one signed kind, the verb carrying the direction', () => {
     const registry = loadModule(`${MODULE}\n# entity trap\nspring:\n  drain: 5 health\n  restore: 2.5 focus\n`);
     expect(registry.entities.get('trap')!.actions[0].results).toEqual([
-      { kind: 'pool', resource: 'health', delta: -5 },
-      { kind: 'pool', resource: 'focus', delta: 2.5 },
+      { kind: 'pool', resource: 'health', delta: point(-5) },
+      { kind: 'pool', resource: 'focus', delta: point(2.5) },
     ]);
   });
 
   it('moves the level in both directions', () => {
     const { registry, state } = started();
-    applyResultsNow(state, registry, [{ kind: 'pool', resource: 'health', delta: -7 }]);
+    applyResultsNow(state, registry, [{ kind: 'pool', resource: 'health', delta: point(-7) }]);
     expect(state.resources['health']).toBe(toMilliUnits(13));
-    applyResultsNow(state, registry, [{ kind: 'pool', resource: 'health', delta: 4 }]);
+    applyResultsNow(state, registry, [{ kind: 'pool', resource: 'health', delta: point(4) }]);
     expect(state.resources['health']).toBe(toMilliUnits(17));
   });
 
   it('clamps at 0 and at the live max rather than overshooting', () => {
     const { registry, state } = started();
-    applyResultsNow(state, registry, [{ kind: 'pool', resource: 'health', delta: -500 }]);
+    applyResultsNow(state, registry, [{ kind: 'pool', resource: 'health', delta: point(-500) }]);
     expect(state.resources['health']).toBe(0);
-    applyResultsNow(state, registry, [{ kind: 'pool', resource: 'health', delta: 500 }]);
+    applyResultsNow(state, registry, [{ kind: 'pool', resource: 'health', delta: point(500) }]);
     expect(state.resources['health']).toBe(toMilliUnits(20));
   });
 
   it('fires on empty once as the pool crosses to 0, and not again while it sits there', () => {
     const { registry, state } = started();
-    applyResultsNow(state, registry, [{ kind: 'pool', resource: 'health', delta: -25 }]);
+    applyResultsNow(state, registry, [{ kind: 'pool', resource: 'health', delta: point(-25) }]);
     expect(state.resources['health']).toBe(0);
     expect(state.flags.fainted).toBe(true);
     expect(state.log).toEqual(['You collapse.']);
 
     delete state.flags.fainted;
-    applyResultsNow(state, registry, [{ kind: 'pool', resource: 'health', delta: -5 }]);
+    applyResultsNow(state, registry, [{ kind: 'pool', resource: 'health', delta: point(-5) }]);
     expect(state.flags.fainted).toBeUndefined(); // already empty: no second crossing
     expect(state.log).toEqual(['You collapse.']);
   });
@@ -137,13 +138,13 @@ describe('drain: / restore: — the direct pool write', () => {
   it('rolls a meter over per fill, batching the handler and keeping the remainder', () => {
     const { registry, state } = started();
     // focus caps at 4 and starts at 0; +10 is two full meters with 2 left over.
-    applyResultsNow(state, registry, [{ kind: 'pool', resource: 'focus', delta: 10 }]);
+    applyResultsNow(state, registry, [{ kind: 'pool', resource: 'focus', delta: point(10) }]);
     expect(state.resources['focus']).toBe(toMilliUnits(2));
     expect(state.inventory['focus-charge']).toBe(2);
   });
 
   it('names the resource in the error when it does not exist', () => {
     const { registry, state } = started();
-    expect(() => applyResultsNow(state, registry, [{ kind: 'pool', resource: 'stamina', delta: -1 }])).toThrow(/unknown resource: stamina/);
+    expect(() => applyResultsNow(state, registry, [{ kind: 'pool', resource: 'stamina', delta: point(-1) }])).toThrow(/unknown resource: stamina/);
   });
 });

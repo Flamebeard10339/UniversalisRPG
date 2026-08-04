@@ -22,6 +22,10 @@ export const midpoint = (range: Range): number => (range.min + range.max) / 2;
 
 export const sampleRange = (range: Range, roll: number): number => range.min + (range.max - range.min) * roll;
 
+// Items and xp are whole, so `4-7` must land on one of four values rather than
+// on 5.2. Clamped because a roll of exactly 1 would otherwise reach max + 1.
+export const sampleCount = (range: Range, roll: number): number => Math.min(range.max, Math.floor(range.min + (range.max - range.min + 1) * roll));
+
 const RANGE = /(?<lo>-?\d+(?:\.\d+)?)(?:-(?<hi>-?\d+(?:\.\d+)?))?/;
 
 export const range: Parser<Range> = {
