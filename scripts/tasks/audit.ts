@@ -141,12 +141,22 @@ export function unresolvedTarget(target: string, read: (file: string) => string 
   const [, file, name] = parsed;
   const text = read(file);
   if (text === null) return `   <-- names no file in this checkout: ${file}`;
-  // Backslashes dropped from both sides before comparing: a title with an
-  // apostrophe is written `'doctor\'s warning count'` in the source and
-  // `doctor's warning count` at runtime, and a check that reported those as
-  // missing would be exactly the false alarm that teaches readers to skip it.
-  const unescaped = (value: string): string => value.replace(/\\/g, '');
-  return unescaped(text).includes(unescaped(name)) ? null : `   <-- ${file} has no test by this name, and \`vitest -t\` would skip every test and exit 0`;
+  return testTitles(text).includes(name) ? null : `   <-- ${file} has no test by this name, and \`vitest -t\` would skip every test and exit 0`;
+}
+
+// Titles only, never the whole file. Searching the text made an `expect(...)`
+// argument and a comment read as a resolved target — the pass-1 defect
+// surviving through the guard installed against it, and failing in the one
+// direction that hides recurrence.
+//
+// Backslashes are dropped from the captured title because a title with an
+// apostrophe is written `'doctor\'s name'` in the source and is
+// `doctor's name` at runtime; a check that called those missing would be the
+// false alarm that teaches readers to skip it.
+// The optional `(...)` between the name and the title is `it.each([…])`,
+// whose title sits in a second call.
+export function testTitles(text: string): string[] {
+  return [...text.matchAll(/\bit(?:\.\w+)*\s*(?:\([^()'"`]*\)\s*)?\(\s*(['"`])((?:\\.|(?!\1)[^\\])*)\1/g)].map((match) => match[2].replace(/\\/g, ''));
 }
 
 function readIfPresent(file: string): string | null {

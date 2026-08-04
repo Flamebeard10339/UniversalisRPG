@@ -113,7 +113,6 @@ Proof:
   entire subject is a close that exists only in the working tree and is about to be discarded. The
   count reaches the summary line without changing what fails.
   proof: vitest scripts/tasks/mergeReady.test.ts "carries doctor's warning count into the summary without changing what fails"
-  proof: vitest scripts/tasks/mergeReady.test.ts "carries doctor's warning count into the summary without changing what fails"
 - [c11] `merge-ready` answers this branch's standing, not only the repository's. Its legs are all repo
   health; the questions a merge actually turns on — is the tree clean, has main moved past the
   merge base, is every spec member closed, does the latest pass leave a clause outstanding — are
@@ -170,7 +169,6 @@ Proof:
   proof: vitest scripts/tasks.test.ts "records them from add, reads c3 and 3 alike, and shows them back"
   proof: vitest scripts/tasks.test.ts "adds and removes the clauses a task discharges through edit"
   proof: vitest scripts/tasks.test.ts "names the owner of every clause standing, and says plainly which clause has none"
-  proof: vitest scripts/tasks.test.ts "names the owner of every clause standing, and says plainly which clause has none"
 - [c18] A failing leg names the command that advances it, and a passing run names the merge. Clause 11
   makes `merge-ready` able to answer where the branch stands; this makes the answer actionable, and
   it is the missing half of the observed failure that sessions stop after the first audit and wait
@@ -209,6 +207,7 @@ Proof:
   proof: vitest scripts/tasks.test.ts "work-prompt invites refusal of the grant it prints"
   proof: vitest scripts/tasks.test.ts "work-prompt refuses an id the store does not hold, without inventing a brief"
   proof: vitest scripts/tasks.test.ts "work-prompt names the branch this spec was last written from"
+  proof: vitest scripts/tasks.test.ts "work-prompt reads the clauses an ordinary task discharges, not only an undelivered record's own"
 
 ## Decisions
 

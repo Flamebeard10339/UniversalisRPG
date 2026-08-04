@@ -56,7 +56,7 @@ Audits are the one gate that has repeatedly caught real defects, so they stay. R
 
 # Audits
 
-The auditor's brief is generated, never hand-written: `npm run tasks -- audit-prompt <spec>` prints the whole thing — diff range, clause standings, the full checklist, the regression question ("is anything worse than before this branch?"), and instructions to file verdicts and findings into the store via `tasks audit`/`tasks import`. Commission an auditor by telling it to run that command and do what it says. `npm run tasks -- merge-ready` runs the merge gate (tsc, tests, layer-check, audit-status, doctor, byte check) in one invocation.
+The auditor's brief is generated, never hand-written: `npm run tasks -- audit-prompt <spec>` prints the whole thing — diff range, clause standings, the full checklist, the regression question ("is anything worse than before this branch?"), and instructions to file verdicts and findings into the store via `tasks audit`/`tasks import`. Commission an auditor by telling it to run that command and do what it says. A worker is dispatched the same way: `npm run tasks -- work-prompt <id>` prints its whole brief, and the one instruction is to run it and do what it says. `npm run tasks -- merge-ready` runs the merge gate (tsc, tests, layer-check, audit-status, doctor, byte check) in one invocation.
 
 # Additional repository context (maximum 300 tokens)
 - "descriptive flavor text for an object" is **one** mechanism

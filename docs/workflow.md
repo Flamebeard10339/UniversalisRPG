@@ -41,11 +41,14 @@ Every command is `npm run tasks -- <verb>`. The record verbs (`show`, `edit`, `s
    the architecture.
 5. **`tasks plan`** — grades the set for overlap, unstated dependencies and duplicated
    interfaces before anyone works it. It reports and refuses nothing.
-6. **The worker proposes before it implements**: `tasks start <id> --actor <name>`, then
+6. **Dispatch a worker with one instruction**: "run `npm run tasks -- work-prompt <id>` and do what
+   it says" — symmetric with the auditor's in step 8, and for the same reason: a hand-written brief
+   is a copy of the record that drifts from it, and composing one is where a planner smuggles in
+   detail nobody asked it to hold. The brief invites refusal, and a planner must believe it.
+   **The worker proposes before it implements**: `tasks start <id> --actor <name>`, then
    `tasks edit <id> --writes <what it will actually touch> --grant commitment` — the worker has
    just read the region and the planner has not, and `--grant commitment` is the word that turns
-   the forecast into a promise. Briefs must invite refusal, and a planner must believe it. This is
-   also the only place a durable capability gets registered:
+   the forecast into a promise. This is also the only place a durable capability gets registered:
    `tasks concept "<system>" "<name>" --paths <paths> --note "produced by <id>"`.
 7. **Work.** `tasks next` for what to pick up; commit after each logical chunk;
    `tasks done <id>... --commit HEAD` closes against the commit (several ids in one call). If the

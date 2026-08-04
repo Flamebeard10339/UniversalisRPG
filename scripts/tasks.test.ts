@@ -4413,7 +4413,18 @@ describe('the commit-msg hook launcher', () => {
 // of 49 on this spec's own first pass, and unobservable until someone tried
 // to run one.
 describe('a proof target that names no test', () => {
-  const file = ["it('a test that exists', () => {});", "it('one with an apostrophe in doctor\\'s name', () => {});"].join('\n');
+  // A real test file: titles, but also an assertion argument and a comment
+  // carrying strings that are not titles. The first fixture here made every
+  // string a title, which is exactly why none of these tests could see the
+  // checker matching the whole file rather than the titles in it.
+  const file = [
+    '// a comment mentioning a phrase nobody named a test after',
+    "it('a test that exists', () => {",
+    "  expect(report).toContain('a phrase asserted but never named');",
+    '});',
+    "it('one with an apostrophe in doctor\\'s name', () => {});",
+    "it.each([1])('a parameterised title', () => {});",
+  ].join('\n');
   const read = (): string => file;
 
   it('says so, and says why a green run would not have caught it', () => {
@@ -4424,6 +4435,16 @@ describe('a proof target that names no test', () => {
 
   it('stays quiet on a target that resolves', () => {
     expect(unresolvedTarget('vitest a.test.ts "a test that exists"', read)).toBeNull();
+    expect(unresolvedTarget('vitest a.test.ts "a parameterised title"', read)).toBeNull();
+  });
+
+  // The hole this checker was installed to close, reopened one level up: a
+  // target naming an assertion argument or a comment read as resolved, and
+  // `vitest -t` on it still skips every test and exits 0. A guard that fails
+  // in the direction that hides recurrence is worse than none.
+  it('reads titles only, so an assertion argument or a comment is not a resolved target', () => {
+    expect(unresolvedTarget('vitest a.test.ts "a phrase asserted but never named"', read)).toContain('has no test by this name');
+    expect(unresolvedTarget('vitest a.test.ts "a phrase nobody named a test after"', read)).toContain('has no test by this name');
   });
 
   // The subtlety that would make the check lie: a title carrying an
@@ -4480,6 +4501,23 @@ describe('an audit pass read from a file', () => {
       const shown = tasks('spec', 'show', 'demo-spec').stdout;
       expect(shown).toContain('1 audit pass(es) recorded');
       expect(shown).toContain('c2 (unmet)');
+      expect(tasks('show', 'demo-spec-clause-2').stdout).toContain('[undelivered/open/high]');
+    });
+  });
+
+  // The second half of the name above, which nothing asserted: the file's
+  // flags are parsed first and the command line's after, so a flag given in
+  // both places resolves to what was typed. The transport moved; which
+  // argument is the more specific one did not.
+  it('lets a flag typed beside --args-from override the same flag inside it', () => {
+    fixture(({ tasks, dir }) => {
+      const passFile = path.join(dir, 'pass.txt');
+      writeFileSync(passFile, '--proof 1=met\n--evidence 1=from the file\n--proof 2=met\n--evidence 2=from the file\n', 'utf8');
+      expect(tasks('audit', 'demo-spec', '--args-from', passFile, '--proof', '2=unmet', '--evidence', '2=typed beside it').status).toBe(0);
+
+      const shown = tasks('spec', 'show', 'demo-spec').stdout;
+      expect(shown).toContain('c2 (unmet)');
+      expect(shown).not.toContain('c2 (met)');
       expect(tasks('show', 'demo-spec-clause-2').stdout).toContain('[undelivered/open/high]');
     });
   });

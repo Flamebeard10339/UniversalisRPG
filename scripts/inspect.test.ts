@@ -1,6 +1,7 @@
-import { readdirSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { tsxCli } from './lib/tsxCli';
 import { compile, format, loaderFor } from './inspect';
 
 const repoRoot = path.join(import.meta.dirname, '..');
@@ -49,11 +50,23 @@ describe('inspect', () => {
     expect(lines.join('\n')).toContain('DECIDED — 1 spec(s)');
   });
 
-  // The whole point of the command over a scratch `.ts` in the worktree.
-  it('leaves no file behind', async () => {
-    const before = readdirSync(repoRoot).sort();
-    await run("(await load('scripts/tasks/render.ts')).wrapText('a b', 3)");
-    expect(readdirSync(repoRoot).sort()).toEqual(before);
+  // The whole point of the command over a scratch `.ts` in the worktree, and
+  // it has to be asked of the command rather than of the two pure functions
+  // under it: `compile` and `loaderFor` contain no filesystem write, so no
+  // implementation of them could fail an in-process version of this. Spawned,
+  // and answered by git over the whole tree rather than by one directory
+  // listing, so a file written into any subdirectory is caught.
+  it('leaves no file behind', () => {
+    const dirty = (): string =>
+      spawnSync('git', ['status', '--porcelain'], { cwd: repoRoot, encoding: 'utf8' }).stdout;
+    const before = dirty();
+    const result = spawnSync(process.execPath, [tsxCli, path.join(repoRoot, 'scripts/inspect.ts'), "(await load('scripts/tasks/render.ts')).wrapText('a b c d', 3)"], {
+      cwd: repoRoot,
+      encoding: 'utf8',
+    });
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain("[ 'a b', 'c d' ]");
+    expect(dirty()).toBe(before);
   });
 
   it('prints a string as itself and a structure in full, with no depth limit', () => {
