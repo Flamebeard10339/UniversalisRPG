@@ -159,3 +159,24 @@ before a node one-liner comparing the raw bytes found it.
 Worth considering: when a `find` misses, retry once with the other line ending and, if that hits, say
 so in the refusal — `the find text matches with CRLF line endings; this file is CRLF`. The refusal
 already reads the whole file, so the check is free.
+
+## droptables audit pass 2, 2026-08-04
+
+### `npm run probe -- - --each` reports every document that loads as a broken module
+
+The usage text advertises stdin plus `--each` as the way to survey a table of variants, and it works
+for every variant that fails to load. A variant that loads *clean* reports `stdin[3] is not a usable
+module id` — `splitDocuments` names each document `${name}[${index + 1}]` (probe.ts:204) and the
+brackets are not legal in a module id, so the loader refuses the name rather than the content. The
+survey therefore cannot distinguish "loads" from "rejected", which is the one distinction a table of
+variants is asked for; every probe of an accepted shape had to be re-run as a temp file.
+
+Worth considering: name them `stdin-3`. One character, and the advertised path starts answering the
+question it exists for.
+
+### The CRLF trap in `npm run mutate` cost this pass two rounds as well
+
+Already logged from pass 1 below, and hit again immediately: two of ten mutations in the first
+manifest were refused with `does not contain the find text` purely because `\n` should have been
+`\r\n`. Recording the second occurrence because the fix suggested there — retry with the other line
+ending and say so — is now paid for twice.
