@@ -30,13 +30,18 @@ Every command is `npm run tasks -- <verb>`. The record verbs (`show`, `edit`, `s
 4. **Decompose** into tasks whose `--writes` regions are disjoint:
    `tasks add "<title>" --writes <paths> --produces "<capability>" --requires <ids>`.
    A `--produces` here is a **forecast** of a capability, answerable to the survey in step 2; the
-   registration that makes it durable happens later, once someone has read the region.
-   `tasks system` / `tasks system "<name>"` / `tasks where <path>` answer the architecture.
+   registration that makes it durable happens later, once someone has read the region. The grant
+   is a forecast too, and is recorded as one — declare the region you honestly mean, a directory
+   included, rather than inventing file paths to make step 5 quiet. Setting `--writes` prints
+   everything that has ever claimed those paths, so step 2's survey happens again whether or not
+   anyone asked for it. `tasks system` / `tasks system "<name>"` / `tasks where <path>` answer
+   the architecture.
 5. **`tasks plan`** — grades the set for overlap, unstated dependencies and duplicated
    interfaces before anyone works it. It reports and refuses nothing.
 6. **The worker proposes before it implements**: `tasks start <id> --actor <name>`, then
-   `tasks edit <id> --writes <what it will actually touch>` — the worker has just read the region
-   and the planner has not. Briefs must invite refusal, and a planner must believe it. This is
+   `tasks edit <id> --writes <what it will actually touch> --grant commitment` — the worker has
+   just read the region and the planner has not, and `--grant commitment` is the word that turns
+   the forecast into a promise. Briefs must invite refusal, and a planner must believe it. This is
    also the only place a durable capability gets registered:
    `tasks concept "<system>" "<name>" --paths <paths> --note "produced by <id>"`.
 7. **Work.** `tasks next` for what to pick up; commit after each logical chunk;
@@ -61,8 +66,10 @@ Every command is `npm run tasks -- <verb>`. The record verbs (`show`, `edit`, `s
     byte check — one line per leg, non-zero when a leg fails.
 11. **Record the reasoning**: `tasks note "<one line>" --id <id>` and
     `tasks decision "<one line>" --spec <slug>` as they happen; `tasks log --id <id>` /
-    `--op decision` answers later, from the log alone. A decision made in a session and not
-    recorded here is a decision the next planner will re-litigate.
+    `--op decision` answers later, from the log alone, and `tasks show <id>` prints both back
+    against the record they name. A decision made in a session and not recorded here is a
+    decision the next planner will re-litigate — which is why `done`, `decline` and `triage`
+    each print the command rather than leaving you to remember it.
 
 ## Advice that is known good
 
@@ -102,6 +109,14 @@ interface for, two claims on one interface, a claim the repository already answe
 concentrated in one path, a grant it cannot read, a wildcard it cannot resolve, and a task that
 starts blocked. Dispatching against a reported defect is a call a planner may make; making it
 unknowingly is not.
+
+**Forecast and commitment.** A grant also records which side of step 6 it is on, and `plan`
+grades an overlap as a **defect** only between two commitments. Anything else is a note naming
+the soft side. The reason is measured: four independent roadmap tasks reported five collisions
+because the honest grant on unread code is a directory and a directory overlaps everything
+beneath it, and narrowing them to invented file paths took the count to zero by making the
+record false. So the check moved rather than the record. A grant that has said nothing is a
+third answer and is weighed like a forecast — it has no more read the code than one.
 
 **Concepts.** A concept is one thing a system knows how to do, declared in
 `docs/audits/systems.json` inside its owning system. Register durable capabilities only — a
