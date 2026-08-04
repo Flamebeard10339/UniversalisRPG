@@ -50,6 +50,10 @@ export function positionalArity(usage: string): number | null {
 export interface ParsedArgs {
   parsed: Flags;
   errors: string[];
+  // The names behind the `unknown flag` errors, so a caller that knows the
+  // whole vocabulary can say where each one does belong. Deriving them from
+  // the messages instead would make the wording of a refusal load-bearing.
+  unknown: string[];
 }
 
 // Knowing a flag's arity is what lets the parser refuse rather than guess.
@@ -60,6 +64,7 @@ export function parseArgs(args: string[], arities: Map<string, FlagArity>, maxPo
   const positional: string[] = [];
   const flags: Record<string, string> = {};
   const errors: string[] = [];
+  const unknown: string[] = [];
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
     if (!arg.startsWith('--')) {
@@ -70,6 +75,7 @@ export function parseArgs(args: string[], arities: Map<string, FlagArity>, maxPo
     const arity = arities.get(key);
     if (arity === undefined) {
       errors.push(`unknown flag: ${arg}`);
+      unknown.push(key);
       continue;
     }
     if (arity === 'boolean') {
@@ -87,5 +93,5 @@ export function parseArgs(args: string[], arities: Map<string, FlagArity>, maxPo
   if (maxPositional !== null) {
     for (const extra of positional.slice(maxPositional)) errors.push(`unexpected argument: ${JSON.stringify(extra)}`);
   }
-  return { parsed: { positional, flags, raw: args }, errors };
+  return { parsed: { positional, flags, raw: args }, errors, unknown };
 }

@@ -56,6 +56,7 @@ export function renderTask(task: Task, byId: Map<string, Task>, detail: Detail, 
   const lines = [`${task.id}  [${taskTag(task)}]${blocked}`, task.title];
   if (task.system) lines.push(`system: ${task.system}`);
   lines.push(`spec: ${task.spec ?? '(deferred)'}`);
+  if (task.discharges.length > 0) lines.push(`discharges: ${task.discharges.map((clause) => `c${clause}`).join(', ')}`);
   if (task.requires.length > 0) lines.push(requiresLine(task, byId));
   if (task.files.length > 0) lines.push(`files: ${task.files.join(', ')}`);
   // The kind rides with the grant, never on its own line: a reader deciding

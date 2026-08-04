@@ -33,6 +33,7 @@ import {
   readStore,
   recordEvents,
   refuseUnknownSpec,
+  reportStoreScope,
   resolveActiveSpec,
   resolveCommit,
   resolveConfig,
@@ -68,6 +69,19 @@ function resolveGrant(flags: Record<string, string>, current: Grant | null): { g
   if (given !== undefined) return GRANTS.includes(given as Grant) ? { grant: given as Grant } : { error: `error: --grant must be one of ${GRANTS.join(', ')}` };
   if (flags.writes === undefined) return { grant: current };
   return { grant: current ?? 'forecast' };
+}
+
+// `c3` and `3` both name clause 3, because a spec writes `[c3]` and a
+// planner types what the spec writes.
+function parseDischarges(given: string | undefined, current: number[]): { numbers: number[] } | { error: string } {
+  if (given === undefined) return { numbers: current };
+  const numbers: number[] = [];
+  for (const entry of splitList(given)) {
+    const parsed = Number(/^c?(\d+)$/.exec(entry)?.[1]);
+    if (Number.isNaN(parsed)) return { error: `error: --discharges takes clause numbers, as 3 or c3: ${entry}` };
+    numbers.push(parsed);
+  }
+  return { numbers: [...new Set(numbers)].sort((a, b) => a - b) };
 }
 
 function reportGrant(task: Task): void {
@@ -111,6 +125,13 @@ export function cmdAdd(args: Flags, usage: string): void {
     return;
   }
 
+  const clauses = parseDischarges(args.flags.discharges, []);
+  if ('error' in clauses) {
+    console.error(clauses.error);
+    process.exitCode = 1;
+    return;
+  }
+
   const taken = new Set(tasks.map((task) => task.id));
   const id = args.flags.id ?? uniqueId(slugify(title), taken);
   if (taken.has(id)) {
@@ -134,6 +155,7 @@ export function cmdAdd(args: Flags, usage: string): void {
     system: args.flags.system ?? null,
     spec,
     clause: null,
+    discharges: clauses.numbers,
     requires: splitList(args.flags.requires),
     writes: splitList(args.flags.writes),
     grant: grant.grant,
@@ -187,6 +209,13 @@ export function cmdEdit(args: Flags, usage: string): void {
     return;
   }
 
+  const clauses = parseDischarges(args.flags.discharges, task.discharges);
+  if ('error' in clauses) {
+    console.error(clauses.error);
+    process.exitCode = 1;
+    return;
+  }
+
   const title = args.flags.title ?? args.positional[1];
   const changes: string[] = [];
 
@@ -221,6 +250,10 @@ export function cmdEdit(args: Flags, usage: string): void {
   if (args.flags.writes !== undefined) {
     task.writes = splitList(args.flags.writes);
     changes.push('writes');
+  }
+  if (args.flags.discharges !== undefined) {
+    task.discharges = clauses.numbers;
+    changes.push('discharges');
   }
   if (grant.grant !== task.grant) {
     task.grant = grant.grant;
@@ -352,8 +385,6 @@ function runList(args: Flags, text: string | undefined): void {
   }
 
   const tasks = readStore(config);
-  const activeSpec = resolveActiveSpec(config, tasks, flags.spec);
-  if (activeSpec.note) console.log(activeSpec.note);
 
   const queue = listQueue(tasks, {
     state,
@@ -382,6 +413,7 @@ function runList(args: Flags, text: string | undefined): void {
   const counts: Record<State, number> = { unreviewed: 0, open: 0, 'in-progress': 0, done: 0, declined: 0 };
   for (const task of queue) counts[task.state]++;
   console.log(`${queue.length} task(s) — unreviewed: ${counts.unreviewed}, open: ${counts.open}, in-progress: ${counts['in-progress']}, done: ${counts.done}, declined: ${counts.declined}`);
+  if (queue.length === 0) reportStoreScope(config, tasks.length);
 }
 
 // An empty queue has causes that look identical from outside — no members,

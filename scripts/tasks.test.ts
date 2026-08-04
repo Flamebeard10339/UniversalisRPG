@@ -2923,9 +2923,12 @@ describe('tasks CLI', () => {
     fixture(({ tasks }) => {
       tasks('audit', 'demo-spec', '--proof', '1=unmet', '--evidence', '1=first', '--proof', '2=met', '--evidence', '2=clause 2 checked');
       tasks('audit', 'demo-spec', '--proof', '1=unmet', '--evidence', '1=still not', '--proof', '2=met', '--evidence', '2=clause 2 checked');
-      const spec = tasks('spec', 'show', 'demo-spec');
-      const occurrences = (spec.stdout.match(/demo-spec-clause-1/g) ?? []).length;
-      expect(occurrences).toBe(1);
+      // Counted over the records, not over the report: `spec show` now names
+      // the owner of every clause standing as well as listing the members, so
+      // one record legitimately appears in two places.
+      const undelivered = tasks('list', '--kind', 'undelivered', '--spec', 'demo-spec');
+      expect((undelivered.stdout.match(/demo-spec-clause-1/g) ?? []).length).toBe(1);
+      expect(undelivered.stdout).toContain('1 task(s)');
     });
   });
 
@@ -3176,7 +3179,7 @@ describe('tasks CLI', () => {
   it('the branch-name spec binding says it was inferred and what from, the condition c8 permits it on', () => {
     fixture(({ tasks }) => {
       tasks('add', 'a task', '--id', 'a-task', '--spec', 'demo-spec');
-      for (const command of [['next'], ['list'], ['handoff']]) {
+      for (const command of [['next'], ['handoff'], ['spec', 'show']]) {
         const result = tasks(...command);
         expect(result.stdout, command[0]).toContain('spec inferred from the branch name: demo-spec');
         expect(result.stdout, command[0]).toMatch(/demo-spec\.md exists/);
@@ -3205,7 +3208,10 @@ describe('tasks CLI', () => {
     });
   });
 
-  it('list infers the active spec and announces it, without narrowing which tasks it lists', () => {
+  // `list` filters on no spec unless one is given, so resolving one was
+  // three lines contesting an answer the query never read. A read infers a
+  // spec only where it uses one.
+  it('list neither infers a spec nor mentions one, because it does not filter on one', () => {
     fixture(({ tasks, dir }) => {
       tasks('add', 'a task', '--id', 'a-task', '--spec', 'demo-spec');
       tasks('add', 'deferred task', '--id', 'deferred-task');
@@ -3213,7 +3219,8 @@ describe('tasks CLI', () => {
       const systemsPath = path.join(dir, 'systems.json');
       const specsDir = path.join(dir, 'specs');
       const result = spawnSync(process.execPath, [tsxCli, script, 'list', '--store', storePath, '--systems', systemsPath, '--specs-dir', specsDir, '--branch', 'orphaned-branch'], { cwd: repoRoot, encoding: 'utf8' });
-      expect(result.stdout).toContain('spec inferred from the store: demo-spec');
+      expect(result.stdout).not.toContain('spec inferred');
+      expect(result.stdout).not.toContain('spec contested');
       expect(result.stdout).toContain('a-task');
       expect(result.stdout).toContain('deferred-task');
     });
@@ -4093,6 +4100,144 @@ describe('what already worked, after the record verbs changed around it', () => 
       const result = tasks('promote', 'demo-spec-pass2-late-finding');
       expect(result.stdout).toContain('promoting a pass 2 finding, which extends what demo-spec owes: demo-spec-pass2-late-finding');
     }));
+});
+
+describe('a read that resolves a spec only where it uses one', () => {
+  // `claude/<topic>-<hash>` looks for a nested spec path that cannot exist,
+  // and the open-members route contests whenever more than one spec is live.
+  // The log already records the branch of every store write, so which spec a
+  // branch is working is derivable rather than declared.
+  it('infers the spec this branch last wrote to, which the branch name cannot answer for a worktree', () => {
+    fixture(({ tasks, dir, args }) => {
+      tasks('add', 'a member', '--id', 'a-member', '--spec', 'demo-spec');
+      tasks('add', 'elsewhere', '--id', 'elsewhere');
+      appendEvent(dir, { branch: 'claude/generated-2f9a11', spec: 'demo-spec', id: 'a-member' });
+      const result = runInProcess(['next', ...args(), '--branch', 'claude/generated-2f9a11']);
+      expect(result.stdout).toContain('spec inferred from the event log: demo-spec');
+      expect(result.stdout).toContain('the most recent spec written from claude/generated-2f9a11');
+    });
+  });
+
+  it('leaves the default branch inferring nothing, whatever the log holds', () => {
+    fixture(({ tasks, dir, args }) => {
+      tasks('add', 'a member', '--id', 'a-member', '--spec', 'demo-spec');
+      appendEvent(dir, { branch: 'main', spec: 'demo-spec', id: 'a-member' });
+      expect(runInProcess(['next', ...args(), '--branch', 'main']).stdout).toContain('no active spec for this branch');
+    });
+  });
+
+  it('answers `spec show` with no slug the way `next` answers with no --spec', () => {
+    fixture(({ tasks }) => {
+      tasks('add', 'a member', '--id', 'a-member', '--spec', 'demo-spec');
+      const result = tasks('spec', 'show');
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('spec inferred from the branch name: demo-spec');
+      expect(result.stdout).toContain('a-member');
+    });
+  });
+});
+
+// The store is versioned with the code, so a checkout that predates a
+// branch's writes answers `0 task(s)` — indistinguishable from "those
+// records are gone", which is what sent a session to `git show` piped
+// through `node -e` to recover them.
+describe('a query that cannot see a record', () => {
+  it('says the read is scoped to this checkout, and how much the file holds', () => {
+    fixture(({ tasks }) => {
+      tasks('add', 'a task', '--id', 'a-task');
+      const result = tasks('search', 'a-word-no-record-carries');
+      expect(result.stdout).toContain('0 task(s)');
+      expect(result.stdout).toContain('1 record(s) in the whole file');
+      expect(result.stdout).toContain('A record written on another branch is not in this one until that branch merges');
+    });
+  });
+
+  it('says nothing of the sort when the query did match', () => {
+    fixture(({ tasks }) => {
+      tasks('add', 'a task', '--id', 'a-task');
+      expect(tasks('search', 'a-task').stdout).not.toContain('in the whole file');
+    });
+  });
+});
+
+// Both misses measured came from the CLI's own vocabulary, so the refusal
+// can answer them out of the same usage strings the parser enforces.
+describe('a refusal that names the near miss', () => {
+  it('tells `spec add --id` that ids go here as positionals', () => {
+    fixture(({ tasks }) => {
+      const result = tasks('spec', 'add', 'demo-spec', '--id', 'a-task');
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain('`spec add` takes <id> as a positional, not as a flag');
+    });
+  });
+
+  it('tells `add --note` which verb owns that flag and which flags this one takes', () => {
+    fixture(({ tasks }) => {
+      const result = tasks('add', 'a title', '--note', 'some prose');
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain('--note: not a flag of `add` — it belongs to `concept`');
+      expect(result.stderr).toContain('--evidence');
+    });
+  });
+
+  it('points an npm script refused as a verb at npm run', () => {
+    fixture(({ tasks }) => {
+      const result = tasks('audit-status');
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain('`audit-status` is an npm script of this repository, not a tasks verb — run `npm run audit-status`');
+    });
+  });
+});
+
+// The map from clauses to owners is a decomposition session's whole output,
+// and it had nowhere to go but prose: seventeen clauses and twelve members,
+// with the mapping in twelve deliverable strings no reader can join.
+describe('a task that records which clauses it discharges', () => {
+  it('records them from add, reads c3 and 3 alike, and shows them back', () => {
+    fixture(({ tasks }) => {
+      const added = tasks('add', 'a slice', '--id', 'slice', '--spec', 'demo-spec', '--discharges', 'c2,1,c1');
+      expect(added.status).toBe(0);
+      expect(tasks('show', 'slice').stdout).toContain('discharges: c1, c2');
+    });
+  });
+
+  it('refuses something that is not a clause number rather than recording it', () => {
+    fixture(({ tasks }) => {
+      const result = tasks('add', 'a slice', '--id', 'slice', '--spec', 'demo-spec', '--discharges', 'the second one');
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain('--discharges takes clause numbers, as 3 or c3');
+    });
+  });
+
+  it('names the owner of every clause standing, and says plainly which clause has none', () => {
+    fixture(({ tasks }) => {
+      tasks('add', 'a slice', '--id', 'slice', '--spec', 'demo-spec', '--discharges', 'c1');
+      const shown = tasks('spec', 'show', 'demo-spec').stdout;
+      expect(shown).toContain('owed by: slice (open)');
+      expect(shown).toContain('owed by: nobody — `tasks edit <id> --discharges c2` names the slice that does');
+    });
+  });
+
+  it('reports a claim on a clause when no spec says what the number means', () => {
+    fixture(({ tasks }) => {
+      tasks('add', 'a slice', '--id', 'slice', '--discharges', 'c1');
+      expect(tasks('doctor').stdout).toContain('slice claims to discharge clause(s) 1 and names no spec');
+    });
+  });
+});
+
+// The one moment the whole capability landscape is in view, and the moment a
+// planner is least likely to stop and ask.
+describe('tasks spec new', () => {
+  it('prints the capability survey and the reminder that the judgement belongs in ## Decisions', () => {
+    fixture(({ tasks }) => {
+      const result = tasks('spec', 'new', 'a-fresh-spec');
+      expect(result.stdout).toContain('tasks where <path>');
+      expect(result.stdout).toContain('tasks produces "<name>"');
+      expect(result.stdout).toContain('## Decisions');
+      expect(result.stdout).toContain('adds, extends');
+    });
+  });
 });
 
 describe('tasks plan, against producers that already exist', () => {

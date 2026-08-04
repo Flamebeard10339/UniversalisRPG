@@ -26,11 +26,14 @@ Every command is `npm run tasks -- <verb>`. The record verbs (`show`, `edit`, `s
    planner would otherwise re-litigate. A survey that finds an owner is a success: reuse it, or
    write down why a second one is right.
 3. **`tasks spec new <slug>`**, then write `docs/specs/<slug>.md` — one spec per branch, numbered
-   proof clauses under `## Deliverable`. The spec is the contract, never the test plan.
+   proof clauses under `## Deliverable`. The spec is the contract, never the test plan. `spec new`
+   prints step 2's survey rather than trusting anyone to remember it, and never writes a thing.
 4. **Decompose** into tasks whose `--writes` regions are disjoint:
    `tasks add "<title>" --writes <paths> --produces "<capability>" --requires <ids>`.
    A `--produces` here is a **forecast** of a capability, answerable to the survey in step 2; the
-   registration that makes it durable happens later, once someone has read the region. The grant
+   registration that makes it durable happens later, once someone has read the region. `--discharges
+   c3,c6` records which proof clauses a slice would settle, so `tasks spec show` can name the owner
+   of every clause standing and say which clause has none. The grant
    is a forecast too, and is recorded as one — declare the region you honestly mean, a directory
    included, rather than inventing file paths to make step 5 quiet. Setting `--writes` prints
    everything that has ever claimed those paths, so step 2's survey happens again whether or not

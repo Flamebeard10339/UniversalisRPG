@@ -18,7 +18,14 @@ export interface Task {
   severity: Severity | null;
   system: string | null;
   spec: string | null;
+  // The clause this record *is*: an `undelivered` member is a spec's own
+  // outstanding promise on one clause, and nothing else carries it.
   clause: number | null;
+  // The clauses this record's delivery would settle — a different relation
+  // from `clause`, which is why it is a different field. A decomposition
+  // session's whole output is this map, and without it "who owes clause 9"
+  // is a text search and "which clause has no owner" is unanswerable.
+  discharges: number[];
   requires: string[];
   files: string[];
   // Forward-looking, unlike `files`, which is evidence about where
@@ -91,6 +98,15 @@ function optionalStringArray(record: Record<string, unknown>, key: string, where
   return stringArray(record, key, where);
 }
 
+// The numeric twin of optionalStringArray, with the same absent-means-empty
+// contract and the same refusal of a present-but-wrong shape.
+function optionalNumberArray(record: Record<string, unknown>, key: string, where: string): number[] {
+  const value = record[key];
+  if (value === undefined) return [];
+  if (!Array.isArray(value) || value.some((entry) => typeof entry !== 'number')) throw new StoreError(`${where}: task ${JSON.stringify(record.id ?? '(unknown)')} requires ${key} as a number array`);
+  return value as number[];
+}
+
 function nullableSource(record: Record<string, unknown>, where: string): Source | null {
   const value = record.source ?? null;
   if (value === null) return null;
@@ -111,6 +127,7 @@ const KNOWN_KEYS: ReadonlyArray<keyof KnownFields> = Object.keys({
   system: true,
   spec: true,
   clause: true,
+  discharges: true,
   requires: true,
   files: true,
   writes: true,
@@ -165,6 +182,7 @@ function normalizeTask(value: unknown, where: string): Task {
     system: nullableString(value, 'system', where),
     spec: nullableString(value, 'spec', where),
     clause,
+    discharges: optionalNumberArray(value, 'discharges', where),
     requires: stringArray(value, 'requires', where),
     files: stringArray(value, 'files', where),
     writes: optionalStringArray(value, 'writes', where),
@@ -197,6 +215,7 @@ function renderTask(task: Task): string {
     system: task.system,
     spec: task.spec,
     clause: task.clause,
+    discharges: task.discharges,
     requires: task.requires,
     files: task.files,
     writes: task.writes,
@@ -525,6 +544,7 @@ export function checkStore(tasks: Task[], systems: string[], specExists: (spec: 
     if (task.grant !== null && task.writes.length === 0) issues.push({ level: 'warning', message: `${task.id} calls its write grant a ${task.grant} and grants nothing — the kind describes \`writes\`, which is empty` });
     if (task.kind === 'undelivered' && task.clause === null) issues.push({ level: 'error', message: `${task.id} is undelivered but names no proof clause` });
     if (task.kind !== 'undelivered' && task.clause !== null) issues.push({ level: 'error', message: `${task.id} names a proof clause but is not undelivered` });
+    if (task.discharges.length > 0 && task.spec === null) issues.push({ level: 'error', message: `${task.id} claims to discharge clause(s) ${task.discharges.join(', ')} and names no spec, so there is no document those numbers refer to` });
     if (task.system !== null && !systems.includes(task.system)) issues.push({ level: 'error', message: `${task.id} has a system not in systems.json: ${task.system}` });
     if (task.spec !== null && !specExists(task.spec)) issues.push({ level: 'error', message: `${task.id} references a spec with no file: ${task.spec}` });
     for (const file of task.files) {
