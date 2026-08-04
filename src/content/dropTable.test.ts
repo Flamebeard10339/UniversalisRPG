@@ -72,9 +72,30 @@ describe('the four selectors', () => {
     expect((rows[0] as { rows: { requires?: unknown }[] }).rows[0].requires).toBeUndefined();
   });
 
+  it('refuses a range on either side of the odds, not just the numerator', () => {
+    const odds = /is odds, not a quantity, so it takes one number rather than a range/;
+    expect(load(rat('1 in 5-10: give: 1 bones'))).toThrow(odds);
+    expect(load(rat('1-2 in 5: give: 1 bones'))).toThrow(odds);
+  });
+
   it('leaves prose that merely begins with a selector word alone', () => {
-    const dialogue = loadModule(['# entity miki', '# dialogue chat', 'owner = miki', 'node a:', '  if only it were so simple', '  luck vs skill is the old question'].join('\n'));
-    expect(dialogue.dialogues.get('chat')!.nodes[0].steps.map((step) => step.kind)).toEqual(['say', 'say']);
+    // A colon is not enough to claim a line: `you must` is not a condition, and
+    // a selector is only matched in its whole shape. Every line here was prose
+    // before this branch and has to stay prose after it.
+    const prose = ['  if only it were so simple', '  if you must: leave now', '  one of us is lying:', '  3-4 in every ten make it back.', '  1 in 5 never do.'];
+    const dialogue = loadModule(['# entity miki', '# dialogue chat', 'owner = miki', 'node a:', ...prose].join('\n'));
+    expect(dialogue.dialogues.get('chat')!.nodes[0].steps.map((step) => step.kind)).toEqual(prose.map(() => 'say'));
+  });
+
+  // The one collision left, kept as a load error rather than guessed at. `luck
+  // vs fighting:` is a grammatically complete contest — both sides are ids, and
+  // whether `fighting` is a stat is not knowable while parsing — so narrowing it
+  // would mean reading the body and falling back to prose when it fails, which
+  // turns a typo inside a real drop into a spoken line. Loud beats silent.
+  it('reads a complete vs contest as one, even where a narrator meant prose', () => {
+    expect(load('# stat luck', '# entity miki', '# dialogue chat', 'owner = miki', 'node a:', '  luck vs fighting: the old question.')).toThrow(/unrecognized action result/);
+    // Without the colon it is prose again, which is the escape.
+    expect(load('# stat luck', '# entity miki', '# dialogue chat', 'owner = miki', 'node a:', '  luck vs fighting is the old question.')).not.toThrow();
   });
 });
 
@@ -137,7 +158,11 @@ describe('# droptable', () => {
       'version: 1.0.0',
       ...ITEMS,
       '# stat luck',
+      '# stat cap',
+      '# skill prospecting',
       '# flag lit',
+      '# resource health',
+      'max: cap',
       '# droptable hoard',
       'one of:',
       '  12x: nothing',
@@ -145,6 +170,11 @@ describe('# droptable', () => {
       '  luck: give: 1 gem',
       '# droptable layered',
       'give: 1 bones',
+      'xp: prospecting 4-6',
+      // Both signs of a ranged pool write. A drain and a restore print through
+      // one line of code, and only the restore's bounds come back out of order.
+      'drain: 2-4 health',
+      'restore: 3-5 health',
       '1 in 3:',
       '  luck vs 60:',
       '    roll: hoard',

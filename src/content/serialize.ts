@@ -2,7 +2,7 @@ import { Action } from '../grammar/action';
 import { ActionResult, DropRow, nestedResults } from '../grammar/actionResult';
 import { Condition, Reference } from '../grammar/condition';
 import { formatDependency, formatVersion, Version } from '../grammar/dependency';
-import { isPoint, Range } from '../grammar/range';
+import { isPoint, Range, scaleRange } from '../grammar/range';
 import { TagClause } from '../grammar/tagClause';
 import { Produced, Quantified } from '../grammar/values';
 import { Dialogue, TextSegment } from './dialogue';
@@ -85,7 +85,11 @@ function result(value: ActionResult): string {
     case 'open-modal':
       return `open modal: ${value.modal}`;
     case 'pool': {
-      const magnitude = { min: Math.abs(value.delta.max), max: Math.abs(value.delta.min) };
+      // The exact inverse of what `parsePool` did: it scaled the written
+      // magnitude by the verb's sign, so undoing it is the same scale again.
+      // Taking abs of each bound instead inverted a restore's range — a
+      // symmetric operation on a point, which is why nothing saw it.
+      const magnitude = value.delta.max < 0 ? scaleRange(value.delta, -1) : value.delta;
       return `${value.delta.max < 0 ? 'drain' : 'restore'}: ${range(magnitude)} ${value.resource}`;
     }
     case 'roll':

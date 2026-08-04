@@ -90,14 +90,16 @@ function wrapperBody(cursor: Cursor, line: RawLine | null, what: string, span: S
 
 const WEIGHT = /\d+x(?![\w-])/;
 
-// The two selector numbers, which are the last places a range reads as one and
-// is not. Both would otherwise fall through to a message about ids or tags.
-const RANGED_SELECTOR = /\d+-\d+(?=x(?![\w-])|[ \t]+in[ \t])/;
+// The selector numbers, which are the last places a range reads as a quantity
+// and is not. Matched only in the whole shape of a selector, colon included:
+// half a match would claim `3-4 in every ten make it back.`, which is a line of
+// dialogue, and the odds a range cannot express are on both sides of `in`.
+const RANGED_SELECTOR = /\d+-\d+x(?![\w-])|\d+(?:-\d+)?[ \t]+in[ \t]+\d+(?:-\d+)?[ \t]*:/;
 
 function refuseRangedSelector(cursor: Cursor, span: Span): void {
   const raw = cursor.peek(RANGED_SELECTOR);
-  if (raw === null) return;
-  throw new DslError(`${raw[0]} is odds, not a quantity, so it takes one number rather than a range`, span);
+  if (raw === null || !/\d-\d/.test(raw[0])) return;
+  throw new DslError(`${raw[0].replace(/[ \t]*:$/, '')} is odds, not a quantity, so it takes one number rather than a range`, span);
 }
 
 function parseRow(line: RawLine): DropRow {
