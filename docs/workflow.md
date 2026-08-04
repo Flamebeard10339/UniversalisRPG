@@ -54,8 +54,10 @@ Every command is `npm run tasks -- <verb>`. The record verbs (`show`, `edit`, `s
 8. **Audit.** Commission an auditor with the one instruction "run
    `npm run tasks -- audit-prompt <slug>` and do what it says" — the brief is generated and
    carries the checklist, the regression question, and how to file. The auditor records verdicts
-   and findings with `tasks audit` (or archives a report under `docs/audits/` and
-   `tasks import`s it). Filing findings without `--proof` flags appends no pass, so late findings
+   and findings with `tasks audit`, whose flags also read from a file with `--args-from <file>`
+   — one flag per line, any unprefixed line continuing the value above it — because a full pass
+   carrying evidence a next pass can re-run does not fit on a command line (or archives a report
+   under `docs/audits/` and `tasks import`s it). Filing findings without `--proof` flags appends no pass, so late findings
    never reset verdicts.
 9. **Triage.** A separate step with a separate actor: the auditor files findings and never promotes
    one, and `audit-prompt` tells it so. Findings from the branch's **own first pass** skip the walk:

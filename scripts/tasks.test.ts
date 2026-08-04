@@ -5,7 +5,7 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { tsxCli } from './lib/tsxCli';
 import { run as runTasks } from './tasks';
-import { parseAuditArgs } from './tasks/audit';
+import { parseAuditArgs, parseAuditFile } from './tasks/audit';
 import { flagArities } from './tasks/cli';
 import { allUsages } from './tasks/commands';
 
@@ -4342,5 +4342,60 @@ describe('the commit-msg hook launcher', () => {
     const fallback = hook.indexOf('npx tsx scripts/tasks.ts check-commit-msg');
     expect(local).toBeGreaterThan(-1);
     expect(fallback).toBeGreaterThan(local);
+  });
+});
+
+// Twelve --proof/--evidence pairs carrying test names, mutation verdicts and
+// probe output ran past the Windows 8191-character command line in two
+// separate sessions, and the pass after them compressed its evidence to fit.
+// Only the transport moves: the same parser, the same one store write.
+describe('an audit pass read from a file', () => {
+  it('reads the same flags, and lets a clause\'s evidence be a paragraph', () => {
+    const { argv } = parseAuditFile(
+      ['--proof 1=met', '--evidence 1=ran npm test: 914 passed.', '  and `npm run mutate` killed all six.', '--proof 2=unmet', '--evidence 2=the seam is still open'].join('\n'),
+      'pass.txt',
+    );
+    expect(argv).toEqual([
+      '--proof',
+      '1=met',
+      '--evidence',
+      '1=ran npm test: 914 passed.\n  and `npm run mutate` killed all six.',
+      '--proof',
+      '2=unmet',
+      '--evidence',
+      '2=the seam is still open',
+    ]);
+  });
+
+  it('skips blank lines and comments, so a file can be annotated', () => {
+    const { argv } = parseAuditFile('# the pass for 2026-08-04\n\n--proof 1=met\n\n--evidence 1=checked\n', 'pass.txt');
+    expect(argv).toEqual(['--proof', '1=met', '--evidence', '1=checked']);
+  });
+
+  it('refuses a value line that continues nothing', () => {
+    const { errors } = parseAuditFile('evidence with no flag above it\n', 'pass.txt');
+    expect(errors[0]).toContain('pass.txt:1: a value line before any flag');
+  });
+
+  it('records a whole pass from a file, and a flag typed beside it still wins', () => {
+    fixture(({ tasks, dir }) => {
+      const passFile = path.join(dir, 'pass.txt');
+      writeFileSync(passFile, '--proof 1=met\n--evidence 1=clause 1 checked against the suite\n--proof 2=unmet\n--evidence 2=the seam is still open\n', 'utf8');
+      const result = tasks('audit', 'demo-spec', '--args-from', passFile);
+      expect(result.status).toBe(0);
+
+      const shown = tasks('spec', 'show', 'demo-spec').stdout;
+      expect(shown).toContain('1 audit pass(es) recorded');
+      expect(shown).toContain('c2 (unmet)');
+      expect(tasks('show', 'demo-spec-clause-2').stdout).toContain('[undelivered/open/high]');
+    });
+  });
+
+  it('says which file it could not read rather than recording an empty pass', () => {
+    fixture(({ tasks, dir }) => {
+      const result = tasks('audit', 'demo-spec', '--args-from', path.join(dir, 'absent.txt'));
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain('--args-from could not read');
+    });
   });
 });

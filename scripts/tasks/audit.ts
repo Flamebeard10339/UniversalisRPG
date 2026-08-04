@@ -322,8 +322,59 @@ export function parseAuditArgs(args: string[]): AuditArgs {
   return { slug, configFlags, baseBranch, proofs, evidence, errors, clauseFiles, findings };
 }
 
+// The same flags, off a file, because a full pass does not fit on a command
+// line. Twelve --proof/--evidence pairs carrying test names, mutation
+// verdicts and probe output ran past the Windows 8191-character limit in two
+// separate sessions — roughly 13k characters over nine clauses and five
+// findings, refused as "The command line is too long", nothing run — and the
+// pass after it compressed its evidence to fit. The command asks for
+// evidence a next pass can re-run and then rationed how much of it there was
+// room for; only the transport moves, and the parser below is the same one.
+//
+// A line opening with `--` is a flag and everything after the first space is
+// its value; any other line continues the value above it, which is what lets
+// a clause's evidence be a paragraph. Blank lines and `#` at column zero are
+// skipped, so a file can be annotated.
+export function parseAuditFile(text: string, label: string): { argv: string[]; errors: string[] } {
+  const argv: string[] = [];
+  const errors: string[] = [];
+  text.split('\n').forEach((raw, index) => {
+    const line = raw.replace(/\r$/, '').trimEnd();
+    if (line.trim() === '' || line.startsWith('#')) return;
+    if (line.startsWith('--')) {
+      const space = line.indexOf(' ');
+      argv.push(space === -1 ? line : line.slice(0, space), space === -1 ? '' : line.slice(space + 1));
+      return;
+    }
+    if (argv.length === 0) {
+      errors.push(`${label}:${index + 1}: a value line before any flag — every line here either opens a flag with -- or continues the one above it`);
+      return;
+    }
+    argv[argv.length - 1] = `${argv[argv.length - 1]}\n${line}`;
+  });
+  return { argv, errors };
+}
+
+// `--args-from` is consumed here rather than by parseAuditArgs, which would
+// have to know about a flag that is not part of a pass.
+function readAuditFile(raw: string[]): { argv: string[]; rest: string[]; errors: string[] } {
+  const at = raw.indexOf('--args-from');
+  if (at === -1) return { argv: [], rest: raw, errors: [] };
+  const path_ = raw[at + 1];
+  const rest = [...raw.slice(0, at), ...raw.slice(at + 2)];
+  if (path_ === undefined || path_.startsWith('--')) return { argv: [], rest, errors: ['--args-from needs a path to a file of audit flags'] };
+  let text: string;
+  try {
+    text = readFileSync(path_, 'utf8');
+  } catch (error) {
+    return { argv: [], rest, errors: [`--args-from could not read ${path_}: ${error instanceof Error ? error.message : String(error)}`] };
+  }
+  const parsed = parseAuditFile(text, path_);
+  return { argv: parsed.argv, rest, errors: parsed.errors };
+}
+
 export const AUDIT_USAGE =
-  `usage: tasks audit <spec> [--base-branch main] [--actor <name>] [--proof N=met|unmet|unknown ...] [--evidence N="..." ... (required for every met clause)] [--file N=path:line ...] [--finding "..." --severity high|medium|low --system "<name>" --deliverable "..." --evidence "..." [--file path:line ...]]...  (with no --proof flags and no findings, walks the clauses interactively; findings with no --proof flags are filed without recording a pass, so late findings never reset verdicts; a clause left ungraded is recorded unknown, never unmet)`;
+  `usage: tasks audit <spec> [--args-from <file>] [--base-branch main] [--actor <name>] [--proof N=met|unmet|unknown ...] [--evidence N="..." ... (required for every met clause)] [--file N=path:line ...] [--finding "..." --severity high|medium|low --system "<name>" --deliverable "..." --evidence "..." [--file path:line ...]]...  (a file of the same flags, one per line, with any unprefixed line continuing the value above it — which is how a pass carrying evidence specific enough to re-run gets past the command-line length limit. With no --proof flags and no findings, walks the clauses interactively; findings with no --proof flags are filed without recording a pass, so late findings never reset verdicts; a clause left ungraded is recorded unknown, never unmet)`;
 
 // Stops at the first clause the answerer walks away from rather than
 // looping on an exhausted stdin, and the caller grades the rest `unknown` —
@@ -411,7 +462,16 @@ function refuseInvalidFindings(findings: AuditFinding[]): boolean {
 
 // The only way a finding enters the store.
 export async function cmdAudit(args: Flags, usage: string): Promise<void> {
-  const parsed = parseAuditArgs(args.raw);
+  const fromFile = readAuditFile(args.raw);
+  if (fromFile.errors.length > 0) {
+    console.error(`error: ${fromFile.errors[0]}`);
+    process.exitCode = 1;
+    return;
+  }
+  // The file's flags first and the command line's after, so a `--base-branch`
+  // typed beside `--args-from` still wins: the transport did not change
+  // which argument is the more specific one.
+  const parsed = parseAuditArgs([...fromFile.argv, ...fromFile.rest]);
   if (!parsed.slug) {
     console.error(usage);
     process.exitCode = 1;
