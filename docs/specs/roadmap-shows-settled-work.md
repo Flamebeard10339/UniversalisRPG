@@ -83,10 +83,18 @@ Proof:
 - **Clause standing is read, never cached.** The summary comes from the spec file through `specDoc`
   at call time. A roadmap that stored clause counts in the task record would be a second copy of a
   fact the spec owns, kept in sync by hand — which is the thing this repository does not build.
+- **A finding is placed by its severity, not by its membership.** What reddens an audit is a high
+  severity, and that is true of a finding whether or not some spec has taken it on — so the findings
+  section reads every open finding and the decided section names a spec's other members on one
+  `holds N:` line rather than expanding them. This is the open question below, and the bound decided
+  it: findings are the store's dominant record kind, so listing each spec's inline would have made
+  the one section this branch exists to add the one section that cannot stay bounded.
+- **A status constant across a section is still printed per record.** Unspecced topics are unblocked
+  by construction, so `nothing blocks it` under each of them is strictly redundant with the heading.
+  It is printed anyway, because the two sections either side of it carry a status that *does* vary,
+  and a reader who learns "each row states what holds it up" and then meets a section where the line
+  is missing has to work out why. The cap absorbed the cost.
 
 ## Open questions
 
-- Whether a spec's *findings* — the ones filed against it by an audit — belong in the decided
-  section beside its clauses, or stay with the other findings. They are a branch's remaining debt,
-  which argues for the first; they are also the bulk of the record count, which argues for the
-  second. The answer probably falls out of the bound the output has to respect.
+None.

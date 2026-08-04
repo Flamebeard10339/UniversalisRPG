@@ -143,8 +143,23 @@ describe('renderRoadmap', () => {
 
   it('calls undecided work unspecced, because it needs a planning session and not an implementer', () => {
     const body = text([task({ id: 'a-topic' })]);
-    expect(body).toContain('UNSPECCED — 1 topic(s), nothing blocking any of them, none decided');
+    expect(body).toContain('UNSPECCED — 1 topic(s) no spec has decided; each wants a planner');
     expect(body).not.toContain('READY TO BRANCH ON');
+  });
+
+  it('states the blocking status of every record it lists, in every section that lists one', () => {
+    const lines = render(
+      [task({ id: 'gate' }), task({ id: 'decided', spec: 'a-branch' }), task({ id: 'held', requires: ['gate'] }), task({ id: 'a-defect', kind: 'finding', severity: 'high' })],
+      specFiles({ 'a-branch': UNGRADED }),
+    );
+    const sectionOf = (heading: string): string => {
+      const rest = lines.slice(lines.findIndex((line) => line.startsWith(heading)) + 1);
+      const end = rest.findIndex((line) => /^[A-Z]/.test(line));
+      return rest.slice(0, end === -1 ? rest.length : end).join('\n');
+    };
+    const stated = (body: string): number => (body.match(/nothing blocks it|waits on /g) ?? []).length;
+    // One record listed under each heading, so one statement under each.
+    expect(['DECIDED', 'UNSPECCED', 'BLOCKED', 'FINDINGS'].map((heading) => stated(sectionOf(heading)))).toEqual([1, 1, 1, 1]);
   });
 
   it('prints every section in one call, none of them behind a flag', () => {
@@ -181,7 +196,7 @@ describe('renderRoadmap', () => {
   it('states what each cap left out and the command that shows the rest', () => {
     const topics = Array.from({ length: 9 }, (_, index) => task({ id: `topic-${index}` }));
     const body = text(topics);
-    expect(body).toContain('… 1 more — `tasks list --deferred --kind task`');
+    expect(body).toContain('… 3 more — `tasks list --deferred --kind task`');
   });
 
   it('caps how many records one spec claims to unblock rather than printing them all', () => {

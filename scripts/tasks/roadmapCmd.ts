@@ -23,7 +23,7 @@ const DEPTH_INDENT = 2;
 // roadmap that prints the whole store and one that silently prints fifteen
 // records fail a planner the same way.
 const SPEC_CAP = 12;
-const TOPIC_CAP = 8;
+const TOPIC_CAP = 6;
 const BLOCKED_CAP = 6;
 const FINDING_CAP = 10;
 const WAITER_CAP = 3;
@@ -137,9 +137,9 @@ function topicLines(view: RoadmapView): string[] {
   if (view.topics.length === 0) return ['UNSPECCED — none: every unspecced task is blocked, or the backlog is empty'];
   const shown = view.topics.slice(0, TOPIC_CAP);
   return [
-    `UNSPECCED — ${view.topics.length} topic(s), nothing blocking any of them, none decided`,
+    `UNSPECCED — ${view.topics.length} topic(s) no spec has decided; each wants a planner`,
     '',
-    ...shown.flatMap((entry) => [entryRow(entry), ...tree(ENTRY_INDENT, waiterNotes(entry.unblocks))]),
+    ...shown.flatMap((entry) => [entryRow(entry), ...tree(ENTRY_INDENT, [blockerText(entry.waitsOn), ...waiterNotes(entry.unblocks)])]),
     ...truncationNote(view.topics.length, shown.length, '`tasks list --deferred --kind task`'),
   ];
 }
