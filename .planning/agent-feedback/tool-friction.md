@@ -180,3 +180,65 @@ Already logged from pass 1 below, and hit again immediately: two of ten mutation
 manifest were refused with `does not contain the find text` purely because `\n` should have been
 `\r\n`. Recording the second occurrence because the fix suggested there — retry with the other line
 ending and say so — is now paid for twice.
+
+## droptables implementation, 2026-08-04
+
+Filed by the implementing session rather than an auditor, so the friction is in the verbs a worker
+touches on the way through the workflow rather than in `tasks audit`.
+
+### `merge-ready` prints "every leg passed" over a warning class that is about losing work
+
+Closing the spec left five `doctor` warnings — four findings closed only in the working tree, and
+`docs/tasks.jsonl` uncommitted — each saying a cleanup or reset would discard the close silently.
+`merge-ready` ran `doctor`, printed all five, marked the leg `ok pass`, and ended on
+`merge-ready: every leg passed`. That is correct by the documented rule (`doctor` fails on exactly
+one condition, an unparseable line) and it is still the wrong last line to read: the summary is what
+a session acts on, and these particular warnings exist because the state they describe is about to be
+thrown away. Caught here only by reading back through the scrollback for an unrelated reason.
+
+Worth considering: let the summary carry a count — `doctor ok pass (5 warning(s))` — without changing
+what fails. The gate keeps its one failure condition and stops swallowing the one warning class whose
+whole point is that nobody will notice.
+
+### Three flag shapes for "an id", and the workflow's own examples use the one that is wrong here
+
+`tasks spec add droptables --id droptables` is refused; the verb takes positionals
+(`spec add <slug> <id>...`). `--id` is right for `note`, `log` and `add`, and `docs/workflow.md`
+spells `--id` in the sentence directly above the one describing `spec add`. Separately,
+`tasks add "<title>" --note "..."` is refused — the field is `--evidence`, while `note` exists as its
+own verb, so the guess is not unreasonable. Each cost one round trip and both are the same shape of
+mistake: the CLI's own vocabulary predicts a flag the verb does not take.
+
+Worth considering: accept `--id` on `spec add` as a synonym for the positionals, and either accept
+`--note` on `add` or say `did you mean --evidence?` in the refusal. The refusals already print usage;
+naming the near-miss field is a line.
+
+### `audit-status` is an npm script, not a tasks verb, and everything around it is a tasks verb
+
+`npm run tasks -- audit-status` is refused as an unknown command; it is `npm run audit-status`.
+CLAUDE.md lists it beside `npm run tasks -- doctor`, `merge-ready` runs it as a leg alongside four
+tasks verbs, and `tasks` owns every other question about systems and concepts (`system`, `where`,
+`produces`, `concept`). Nothing about the surface suggests this one lives elsewhere.
+
+Worth considering: a `tasks audit-status` that shells to the same code, or a line in the unknown-command
+refusal pointing at `npm run audit-status`. The refusal already prints the verb list, so it knows the
+name is not one of them.
+
+### The mutate `find` refusal, a third time, on escaping rather than line endings
+
+Logged twice below for CRLF. The same refusal with the same wording also covers a manifest written
+through a shell heredoc, where a regex `find` containing `\t` reaches the JSON as a literal tab and
+stops matching source that holds backslash-t. Two rounds again, and the fix in the end was to stop
+hand-writing the `find` and read the line out of the file instead.
+
+Worth considering: the suggestion already recorded below — retry and say what matched — generalises
+if the refusal simply prints the nearest line in the file by edit distance. That covers line endings,
+escaping, and whitespace drift with one message, and the refusal already has the file in hand.
+
+### Working well, recorded so it does not get optimised away
+
+`tasks done` on a member whose clause is unmet prints `clause standing at close: proof clause 9 is
+unmet in the latest audit pass (pass 1)`, and `tasks promote` on a pass-2 finding prints
+`promoting a pass 2 finding, which extends what droptables owes`. Both are the tool declining to let
+a close look tidier than it is, at the moment the judgement is being made. They are the reason this
+branch did not quietly close a clause an auditor had graded `unmet`.
