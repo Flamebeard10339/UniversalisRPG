@@ -16,38 +16,48 @@ Every command is `npm run tasks -- <verb>`. The record verbs (`show`, `edit`, `s
 
 1. **`tasks handoff`** — the first command of a cold session: branch, active spec, clause
    standings, open queue.
-2. **`tasks spec new <slug>`**, then write `docs/specs/<slug>.md` — one spec per branch, numbered
+2. **Survey the capabilities before writing the contract.** For every region the work will touch,
+   ask what is already there: `tasks where <path>` for the owning system, `tasks produces "<name>"`
+   for an existing claim, `tasks system "<name>"` for its registered concepts. Ask by **path** as
+   well as by name — a capability name is authored prose and two authors will not choose the same
+   words, while a path is the same string for everyone. Then decide, deliberately, which
+   capabilities this branch **adds**, which it **extends**, which it **takes over**, and which it
+   **retires** — and record that in the spec's `## Decisions`, because it is the reasoning a later
+   planner would otherwise re-litigate. A survey that finds an owner is a success: reuse it, or
+   write down why a second one is right.
+3. **`tasks spec new <slug>`**, then write `docs/specs/<slug>.md` — one spec per branch, numbered
    proof clauses under `## Deliverable`. The spec is the contract, never the test plan.
-3. **Decompose** into tasks whose `--writes` regions are disjoint:
+4. **Decompose** into tasks whose `--writes` regions are disjoint:
    `tasks add "<title>" --writes <paths> --produces "<capability>" --requires <ids>`.
-   Before granting `produces`, ask `tasks produces "<name>"` — a hit names an owner to reuse.
+   A `--produces` here is a **forecast** of a capability, answerable to the survey in step 2; the
+   registration that makes it durable happens later, once someone has read the region.
    `tasks system` / `tasks system "<name>"` / `tasks where <path>` answer the architecture.
-4. **`tasks plan`** — grades the set for overlap, unstated dependencies and duplicated
+5. **`tasks plan`** — grades the set for overlap, unstated dependencies and duplicated
    interfaces before anyone works it. It reports and refuses nothing.
-5. **The worker proposes before it implements**: `tasks start <id> --actor <name>`, then
+6. **The worker proposes before it implements**: `tasks start <id> --actor <name>`, then
    `tasks edit <id> --writes <what it will actually touch>` — the worker has just read the region
    and the planner has not. Briefs must invite refusal, and a planner must believe it. This is
    also the only place a durable capability gets registered:
    `tasks concept "<system>" "<name>" --paths <paths> --note "produced by <id>"`.
-6. **Work.** `tasks next` for what to pick up; commit after each logical chunk;
+7. **Work.** `tasks next` for what to pick up; commit after each logical chunk;
    `tasks done <id>... --commit HEAD` closes against the commit (several ids in one call). If the
    diff diverges from the grant, correct the record and say so in the commit body — that is
    information, not a violation.
-7. **Audit.** Commission an auditor with the one instruction "run
+8. **Audit.** Commission an auditor with the one instruction "run
    `npm run tasks -- audit-prompt <slug>` and do what it says" — the brief is generated and
    carries the checklist, the regression question, and how to file. The auditor records verdicts
    and findings with `tasks audit` (or archives a report under `docs/audits/` and
    `tasks import`s it). Filing findings without `--proof` flags appends no pass, so late findings
    never reset verdicts.
-8. **Triage.** Findings from the branch's **own first pass** skip the walk: promote HIGHs and
+9. **Triage.** Findings from the branch's **own first pass** skip the walk: promote HIGHs and
    anything judged fix-now with `tasks promote <id>... ` — they are always promoted anyway, and a
    human can interrupt. From pass 2 on, promotion extends what the spec owes, so it waits for the
    human: `tasks triage` walks the queue (`[1] promote [2] defer [3] decline [4] redirect
    [a] ask [s] skip [q] quit`; `[a]` records a question on the finding and leaves it unreviewed).
-9. **Close and merge.** `tasks spec done <slug>` when every member is done or declined.
-   `tasks merge-ready` runs the whole merge gate — tsc, tests, layer-check, audit-status, doctor,
-   byte check — one line per leg, non-zero when a leg fails.
-10. **Record the reasoning**: `tasks note "<one line>" --id <id>` and
+10. **Close and merge.** `tasks spec done <slug>` when every member is done or declined.
+    `tasks merge-ready` runs the whole merge gate — tsc, tests, layer-check, audit-status, doctor,
+    byte check — one line per leg, non-zero when a leg fails.
+11. **Record the reasoning**: `tasks note "<one line>" --id <id>` and
     `tasks decision "<one line>" --spec <slug>` as they happen; `tasks log --id <id>` /
     `--op decision` answers later, from the log alone. A decision made in a session and not
     recorded here is a decision the next planner will re-litigate.
@@ -70,6 +80,13 @@ Every command is `npm run tasks -- <verb>`. The record verbs (`show`, `edit`, `s
   diagnosis; ask what single change retires the most of the list, and build that seam first.
 - **Persisting evidence is planner work.** Archive audit reports into `docs/audits/` before the
   session ends; the store is the record of note.
+- **A commit body scales with what the commit touches.** The contract asks for one line past the
+  subject, and a diff that changes code earns much more than that — it is the only place the shape
+  of *that* diff is explained, and it is where `git blame` lands. A commit that changes only the
+  store or a spec has already been recorded: `events.jsonl` holds who, when, branch and head for
+  every store write, and the spec's `## Decisions` holds the reasoning. There, say what changed and
+  point at where the reasoning lives rather than restating it — a judgement written in three places
+  is three places to drift.
 
 ## Why it is shaped this way
 
