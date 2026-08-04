@@ -164,3 +164,22 @@ Proof:
 ## Open questions
 
 None.
+
+## Audit passes
+
+### Pass 1 — 2026-08-04
+
+- base: `605b8688ae194ecb24c08ea9c03f18e7c3cbc420`
+- head: `59a4a928571620bbe064604f8bd9e6912b767d00`
+- proof 1: met — src/content/dropTable.test.ts 'reads authored odds, and refuses the three that are not odds' + 'reads a body inline or as a block' + 'nests a wrapper inside a wrapper'; rate in src/runtime/dropTable.test.ts 'fires authored odds at the rate it authored' and 'rolls each sibling independently'. Mutation 'chance comparison < -> >=' in effects.ts KILLED (1 of 16, src/runtime/dropTable.test.ts).
+- proof 2: met — src/content/dropTable.test.ts 'reads a weighted pick-one, with nothing as the empty row' and 'refuses a one of: that can select nothing, and a vs read as a weight'; src/runtime/dropTable.test.ts 'selects exactly one row of a one of:, in proportion to weight' (asserts coins+gem <= 1 over 200 seeds) and 'reads a row weight from a stat'. probe: '1 in 2: nothing' -> 'unrecognized action result'. Caveat: a negative literal weight is a load error but reports 'expected an id'.
+- proof 3: met — Mutation 'a gated-off row stays in the pool, selected and then voided' (selectRow filter -> map emptying results, the exact wrong reading) KILLED, 1 of 16 in src/runtime/dropTable.test.ts ('gives the survivors the failed row s share', which asserts rate == 1 where the wrong reading gives 0.5). probe: 'if not lit or n >= 3:' loads.
+- proof 4: met — effects.ts:151 uses the same hitChance from ./stats as runtime.ts:191, both sides via statSide -> statValue. Mutation 'hitChance(...) -> 0.5' KILLED, 1 of 16 in src/runtime/dropTable.test.ts ('fires a contest at hitChance, and a bonus on the left side moves it').
+- proof 5: met — src/runtime/dropTable.test.ts 'gives one sequence from one seed', 'leaves a certainty free of the rng', 'spends one draw on a range and none on a point'. Split-vs-whole over a stochastic group: src/runtime/stopping.test.ts 'sees a stop behind a selector' compares the 100s span jumped and stepped.
+- proof 6: met — src/runtime/dropTable.test.ts 'rolls a chance per repetition', 'rolls a range per repetition', 'still scales a certainty'. Mutation 'samplesPerApplication branch disabled' KILLED 3 of 31 (dropTable+stopping); mutation 'repetition loop ignores a stop' KILLED 1 of 1385 whole-suite.
+- proof 7: met — probe --round-trip over a wrapper as an action's sole result, a dialogue node effect, a choice effect and a resource on empty: -> 'round-trips clean'. probe of 'dependencies: ?base' with the rare table giving an absent item -> rare pruned, droptable 1 left. Mutations 'nestedResults recursion removed from referenceSites' and 'droptable removed from NAMESPACED_KINDS' each KILLED 5 of 1385. Two branches in this clause have no test — see the prune-loop and spansLines findings.
+- proof 8: met — src/content/dropTable.test.ts 'refuses an empty table, an unknown roll, and a table that reaches itself'. Mutation 'dropTableCycle(registry) -> null' KILLED 1 of 1385 whole-suite.
+- proof 9: unmet — Ranges themselves are met (src/content/dropTable.test.ts 'takes a range where a quantity is produced', 'takes a range on a recipe out: and burnt:', src/runtime/dropTable.test.ts 'samples a produced count as an integer covering both ends'). The clause also promises each refusing site rejects a range 'with a message saying so'; only take:/in:/add: do. Probed: 'has 5-10 potion' -> 'expected an id'; 'escape after 3-5' -> 'unexpected content after an action field: -5'; 'skill: fletching 15-20' -> 'unexpected content: -20'; 'counter >= 1-3' -> same shape; '1-2 in 5:' -> 'unrecognized tag clause'; '1-2x:' -> 'expected an id'.
+- proof 10: met — src/content/dropTable.test.ts 'inverts the zero rule: a floor of zero is the point, a ceiling of zero is not' — 0-3 loads, 0 and 0-0 both throw 'a count of 0 does nothing', drain: 0 throws the same shape.
+- proof 11: met — Mutation 'the rat stops rolling its remains and the shared table' (both roll lines deleted from giant-rat on success: in content/tutorial-island.dsl) KILLED, 1 of 9 in src/runtime/integration.test.ts — # test miki-route-full's expect: miki-route-end pins rat-bone 7, melee 16 and the rng cursor. The second-entity half is held by nothing — see the dresser-trinket finding.
+- proof 12: met — npm run tasks -- merge-ready on 59a4a92: tsc, npm test, layer-check, audit-status, doctor (430 tasks, 0 errors) and bytes all pass — 'merge-ready: every leg passed'.

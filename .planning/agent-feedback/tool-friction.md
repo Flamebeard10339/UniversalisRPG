@@ -128,3 +128,34 @@ Worth considering: have `done`, `decline` and `triage` print the `tasks decision
 the point, so the store should be the path of least resistance rather than the commit body. Batching
 store writes to one commit per phase (triage → closures → `spec done` were four commits here and are
 one state change per pass) is discipline rather than a tool change.
+
+## droptables audit, 2026-08-04
+
+### A full `tasks audit` pass does not fit on a Windows command line
+
+The first attempt at recording twelve clause verdicts with evidence a next pass can re-run died on
+`The command line is too long.` — Windows caps a process command line at 8191 characters, and twelve
+`--proof N=... --evidence N="..."` pairs carrying test names, mutation verdicts and probe output ran
+well past it. The evidence had to be compressed to fit, which is the wrong pressure: the tool asks
+for evidence specific enough to re-run and then rations how much of it there is room for.
+
+Splitting is not a way out. `--proof` flags record a *pass*, and a clause left ungraded in a pass is
+recorded `unknown` — so two calls covering six clauses each would leave the first six reading
+`unknown` in the next `audit-prompt`. Findings split cleanly (three calls, no pass appended, verdicts
+stood), so the seam already exists for the half that does not need it.
+
+Worth considering: `tasks audit <spec> --from <file>` taking the same flags as lines, or JSON. The
+store write is one operation; only the transport is the problem.
+
+### `npm run mutate` cannot tell a line-ending mismatch from a wrong find
+
+This repo has mixed line endings — `src/**/*.ts` is CRLF on disk, `content/tutorial-island.dsl` is
+LF. A manifest whose multi-line `find` used `\n` was refused with `src/runtime/effects.ts does not
+contain the find text`, and the same manifest rewritten with `\r\n` was then refused for
+`content/tutorial-island.dsl`. Both messages are correct and neither is a clue; `cat -A` through
+git-bash shows LF for both, so the usual way of checking makes it worse. Two rounds went to this
+before a node one-liner comparing the raw bytes found it.
+
+Worth considering: when a `find` misses, retry once with the other line ending and, if that hits, say
+so in the refusal — `the find text matches with CRLF line endings; this file is CRLF`. The refusal
+already reads the whole file, so the check is free.
