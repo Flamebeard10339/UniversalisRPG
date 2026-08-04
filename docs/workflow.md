@@ -64,9 +64,15 @@ Every command is `npm run tasks -- <verb>`. The record verbs (`show`, `edit`, `s
    so it waits for the human: `tasks triage` walks the queue (`[1] promote [2] defer [3] decline
    [4] redirect [a] ask [s] skip [q] quit`; `[a]` records a question on the finding and leaves it
    unreviewed).
-10. **Close and merge.** `tasks spec done <slug>` when every member is done or declined.
-    `tasks merge-ready` runs the whole merge gate — tsc, tests, layer-check, audit-status, doctor,
-    byte check — one line per leg, non-zero when a leg fails.
+10. **Close and merge.** `tasks merge-ready` runs the whole merge gate — tsc, tests, layer-check,
+    audit-status, doctor, byte check — plus this branch's standing: is the tree clean, has the base
+    branch moved past the merge base, is every spec member closed, does the latest pass leave a
+    clause outstanding. One line per leg, non-zero when a leg fails, and **every failing leg names
+    the command that advances it** — an outstanding clause names `tasks next`, an unreviewed finding
+    names `tasks triage`, a moved base names the merge of it into this branch. A fully green run
+    names `tasks spec done <slug>` and then the merge, so "work until `merge-ready` is green" is an
+    instruction rather than a judgement. It stops short of merging: the merge body is the one
+    artifact whoever did the work has to write.
 11. **Record the reasoning**: `tasks note "<one line>" --id <id>` and
     `tasks decision "<one line>" --spec <slug>` as they happen; `tasks log --id <id>` /
     `--op decision` answers later, from the log alone, and `tasks show <id>` prints both back
