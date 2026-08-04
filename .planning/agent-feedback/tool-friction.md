@@ -242,3 +242,26 @@ unmet in the latest audit pass (pass 1)`, and `tasks promote` on a pass-2 findin
 `promoting a pass 2 finding, which extends what droptables owes`. Both are the tool declining to let
 a close look tidier than it is, at the moment the judgement is being made. They are the reason this
 branch did not quietly close a clause an auditor had graded `unmet`.
+
+### `npx tsx -e` with an import prints nothing, so probing one `scripts/` export needs a temp file
+
+Auditing the wrapping helpers meant calling `wrapText`/`wrapUnder`/`packGreedy` on six inputs.
+`npx tsx -e "import { wrapText } from './scripts/tasks/render'; console.log(...)"` exited quietly
+with no output and no error — the same command written to a `.mts` file inside the worktree and run
+as `npx tsx wrapProbe.mts` printed all six lines. The file had to live inside the repo, because a
+path into the session scratchpad cannot resolve the relative import.
+
+This is the small form of the backlog item "no cheap way to render a `scripts/` view over a synthetic
+store": here it was no cheap way to *call one function*. `npm run probe` answers this for the DSL load
+path and has no counterpart for `scripts/`.
+
+Worth considering: whichever way it is spelled, the thing that was missing is one command that
+evaluates an expression with the repo's own module resolution, prints the value, and leaves no file
+behind to remember to delete.
+
+### Working well: splitting an audit into a verdict call and one call per finding
+
+The Windows 8191-char argv limit is recorded below as forcing a split that recorded clauses `unknown`.
+That is fixed and the fix holds: twelve `--proof`/`--evidence` pairs went in one call, then four
+findings went in four further calls, and each answered `no pass appended, so recorded clause verdicts
+stand`. Filing a long finding is no longer in tension with grading the clauses.
