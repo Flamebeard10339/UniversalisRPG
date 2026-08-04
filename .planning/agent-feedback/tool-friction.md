@@ -95,3 +95,47 @@ Worth considering: resolve vitest the way node would rather than by joining to `
 when that join misses, say `no vitest at <path> — this looks like a worktree without its own
 node_modules` once, before running anything, instead of once per mutation as a stack trace. Same
 shape as clause 8: a refusal that holds the information the caller needs and prints something else.
+
+## `prior-art-by-path` worker, 2026-08-04
+
+### `git worktree remove` follows a junction and deletes the main checkout's `node_modules`
+
+On Windows, never `git worktree remove` a worktree that contains a junction. Unlink the junction
+first — `rmdir` on a junction removes the link and leaves the target alone:
+
+    cmd //c "rmdir .claude\worktrees\<name>\node_modules"
+
+then remove the worktree.
+
+The part worth noticing: that junction only ever existed because of the `mutate.ts` bug —
+`path.join(repoRoot, 'node_modules/vitest/vitest.mjs')` instead of resolving the way node does.
+The first worker measured that `npm test` and `npx vitest` work fine from a worktree with no
+junction at all; the junction was a workaround for one hardcoded path, and the workaround is what
+wiped the dependencies.
+
+So the fix already folded into `load-path-tool-refusals` retires this whole failure class, not just
+twelve errored mutations. That raises its priority: it is cheap, `scripts/lib/tsxCli.ts` is the
+in-repo pattern for it, and until it lands every worker that reaches for mutation testing recreates
+the hazard.
+
+### `npx tsx -e`'s silent exit is not an inconvenience, it erases a stored field
+
+Appending one sentence to `load-path-tool-refusals`' `evidence` meant reading the current value
+first, and the obvious read was `EV=$(npx tsx -e "import { loadStore } … process.stdout.write(…)")`.
+That is the exact call clause 14 already describes: it exits 0 with no output and no error. So `$EV`
+was the empty string, `tasks edit --evidence "$EV <new sentence>"` was a well-formed command, and
+`edit` correctly reported `edited load-path-tool-refusals: evidence` while replacing 1011 characters
+of measured evidence with 350. It was caught by reading the record back; nothing in the chain said
+anything was wrong, because nothing in the chain was wrong.
+
+Recovery was `git show HEAD:docs/tasks.jsonl` and a `node -e` over plain JSON — no repo imports, so
+it worked. The store being versioned with the code is what made this a two-minute repair rather than
+a loss, which is the argument for that design and not a reason to leave the hazard.
+
+The clause already asks for repo-resolved evaluation and is owned by `expression-inspector`. What
+this adds is the severity: a silent empty result feeding a write command is a data-loss shape, not a
+convenience gap, and it is reachable by any session that composes a read into an `edit`. Worth
+considering alongside it: `edit` refusing an `--evidence` that would shrink a non-empty field by an
+order of magnitude, the way a diff tool asks before discarding. That is a guess at a rule and the
+repo is right to resist new gates — but the failure it would have caught is recorded here now, which
+is the evidence a gate is supposed to earn its place with.

@@ -21,11 +21,17 @@ Proof:
   rather than a new one. A query takes the paths a piece of work will touch and returns everything
   that has ever claimed them, drawn from `writes` and `files`, resolving directory grants, across
   **every state including `done` and `declined`** — alongside the system that owns them, the
-  concepts registered against them, and the capability claims that name them. Measured against the
-  planning session: the two paths already known to be in scope for `combat-events` return
-  `per-grammar-dependent-stats`, `buffs-generalized` and the closed
-  `droptables-pass1-adding-any-chance-to-a-batched-action-multi` — three of the four duplications,
-  including the one whose rule was rewritten as a clause.
+  concepts registered against them, and the capability claims that name them. Measured on the real
+  store once built, which corrects the planning session's own claim: `combat-events`' granted paths
+  return `per-grammar-dependent-stats` and `buffs-generalized`, two of the four duplications and
+  both of the live ones. The closed
+  `droptables-pass1-adding-any-chance-to-a-batched-action-multi` is not among them — it is recorded
+  against `src/runtime/effects.ts:97`, a path `combat-events` does not grant, and it returns from a
+  query on `src/runtime/effects.ts` instead. The planning session attributed all three to
+  `combat-events`' own paths without checking which path each was filed against; the attribution
+  was wrong and the mechanism it was offered as evidence for is not. A closed finding filed with a
+  `:line` suffix being reachable at all is the half that matters, and that is what the third record
+  demonstrates.
   proof: vitest scripts/tasks.test.ts "where names every task that has ever claimed the path, closed and declined ones included"
   proof: vitest scripts/tasks.test.ts "where resolves a directory grant against a path beneath it"
   proof: vitest scripts/tasks.test.ts "where answers with the owning system, the concepts on the path and the produces claims naming them"
