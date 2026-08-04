@@ -198,10 +198,16 @@ export function probe(sources: readonly ModuleSource[], options: ProbeOptions): 
   return { lines, ok };
 }
 
+// A source's name is its module id when the document declares no `# info`, so
+// the separator this puts between the name and the ordinal has to be one an id
+// may contain. `stdin[3]` was not: every document without an `# info` was
+// refused as "stdin[3] is not a usable module id", which made a survey unable
+// to tell a variant that loads from one the loader rejected — the whole point
+// of `--each`.
 export function splitDocuments(name: string, text: string): ModuleSource[] {
   const documents = text.split(new RegExp(`^${DOCUMENT_SEPARATOR}[ \\t]*$`, 'm'));
   if (documents.length === 1) return [{ name, text }];
-  return documents.map((document, index) => ({ name: `${name}[${index + 1}]`, text: document })).filter((source) => source.text.trim() !== '');
+  return documents.map((document, index) => ({ name: `${name}-${index + 1}`, text: document })).filter((source) => source.text.trim() !== '');
 }
 
 function readSources(files: readonly string[]): ModuleSource[] {

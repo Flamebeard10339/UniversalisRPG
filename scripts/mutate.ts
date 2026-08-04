@@ -1,6 +1,7 @@
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import os from 'node:os';
 import path from 'node:path';
 
@@ -139,6 +140,65 @@ export const scopeOf = (mutation: Pick<Mutation, 'tests'>): string => (mutation.
 
 const occurrences = (text: string, find: string): number => text.split(find).length - 1;
 
+// The refusal a find miss is worth. "does not contain the find text" is true
+// and useless: it cost three separate sessions two rounds each, twice on line
+// endings — one file CRLF on disk, one LF, both messages identical and `cat
+// -A` through git-bash showing LF for both — and once on escaping, a heredoc
+// turning `\t` into a literal tab before it reached the JSON. All three are
+// invisible in the manifest and obvious the moment the nearest line is put
+// beside what was asked for, which the checker already has open. Scored on
+// the longest shared run of characters rather than on words, because the
+// drift that causes this is inside a line, not between lines.
+function nearestLine(text: string, find: string): { line: string; number: number } | null {
+  const needle = find.split('\n')[0].trim();
+  if (needle === '') return null;
+  const lines = text.split('\n');
+  let best: { line: string; number: number; score: number } | null = null;
+  for (let i = 0; i < lines.length; i++) {
+    const score = sharedRun(lines[i], needle);
+    if (best === null || score > best.score) best = { line: lines[i], number: i + 1, score };
+  }
+  // Half the needle is the floor: below it the "nearest" line is a coincidence
+  // of punctuation, and printing one would send a reader to the wrong place.
+  return best === null || best.score * 2 < needle.length ? null : { line: best.line, number: best.number };
+}
+
+// The longest substring the two share, computed over the shorter one's
+// windows. Both sides here are one line of source, so the quadratic walk is
+// bounded by a line length and runs once per refused mutation.
+function sharedRun(a: string, b: string): number {
+  const [short, long] = a.length <= b.length ? [a, b] : [b, a];
+  for (let size = short.length; size > 0; size--) {
+    for (let start = 0; start + size <= short.length; start++) {
+      if (long.includes(short.slice(start, start + size))) return size;
+    }
+  }
+  return 0;
+}
+
+// Whitespace and line endings are what the eye cannot see and what the miss is
+// usually made of, so they are spelled out rather than printed as themselves.
+// Leading runs as well as trailing: a find text copied without its indentation
+// misses for a reason that is invisible until the two lines are put one above
+// the other and the margin is drawn.
+export function visibleWhitespace(text: string): string {
+  return text
+    .replace(/\r/g, '\\r')
+    .replace(/\t/g, '\\t')
+    .replace(/^ +| +$/g, (run) => '·'.repeat(run.length));
+}
+
+export function findMissRefusal(name: string, file: string, text: string, find: string): string {
+  const near = nearestLine(text, find);
+  if (near === null) return `${name}: ${file} does not contain the find text, and no line in it comes close — check the file, not the text`;
+  return [
+    `${name}: ${file} does not contain the find text. The nearest line is ${file}:${near.number} —`,
+    `  asked for: ${visibleWhitespace(find.split('\n')[0])}`,
+    `  file has:  ${visibleWhitespace(near.line)}`,
+    '  A difference you cannot see here is a line ending or a tab your shell rewrote before the manifest was written.',
+  ].join('\n');
+}
+
 export const applyTo = (text: string, mutation: Pick<Mutation, 'find' | 'replace'>): string => text.split(mutation.find).join(mutation.replace);
 
 export function refusalsFor(mutations: readonly Mutation[], files: FileStore, originals = new Map<string, string>()): string[] {
@@ -158,7 +218,7 @@ export function refusalsFor(mutations: readonly Mutation[], files: FileStore, or
       continue;
     }
     const found = occurrences(text, mutation.find);
-    if (found === 0) refusals.push(`${mutation.name}: ${mutation.file} does not contain the find text`);
+    if (found === 0) refusals.push(findMissRefusal(mutation.name, mutation.file, text, mutation.find));
     else if (found > 1 && !mutation.all) refusals.push(`${mutation.name}: the find text appears ${found} times in ${mutation.file} — narrow it, or set "all": true to mutate every one`);
   }
   return refusals;
@@ -250,7 +310,9 @@ export function runMutations(mutations: readonly Mutation[], files: FileStore, r
 const ORDER: Record<Verdict, number> = { SURVIVED: 0, ERROR: 1, KILLED: 2 };
 
 export function formatReport(report: MutationReport): string {
-  if (report.refusals.length > 0) return ['applied nothing — the manifest was refused:', ...report.refusals.map((refusal) => `  ${refusal}`)].join('\n');
+  // Indented per line, not per refusal: a refusal that quotes the file spans
+  // several lines, and only the first would otherwise sit under the heading.
+  if (report.refusals.length > 0) return ['applied nothing — the manifest was refused:', ...report.refusals.flatMap((refusal) => refusal.split('\n').map((line) => `  ${line}`))].join('\n');
 
   const sorted = [...report.results].sort((a, b) => ORDER[a.verdict] - ORDER[b.verdict]);
   const width = Math.max(0, ...sorted.map((result) => result.name.length));
@@ -382,10 +444,43 @@ export function recoverFrom(entries: Record<string, string>, files: FileStore, a
   return { restored, refused };
 }
 
+// Resolved the way node resolves it, not by joining a path onto the repo root.
+// A worktree under `.claude/worktrees/` has no `node_modules` of its own, so
+// the join named a file that does not exist while `npx vitest` and `npm test`
+// in the same tree worked — node's own resolution walks up to the main
+// checkout. Every mutation in that worktree returned "could not read a test
+// tally out of the run", twelve of twelve, and the run said nothing about why.
+// scripts/lib/tsxCli.ts is the in-repo pattern, written for this exact reason.
+// Asked of the package rather than assumed: `vitest/vitest.mjs` is not an
+// exported subpath, so the CLI's location comes from the `bin` field of the
+// package.json that resolution found.
+export function resolveVitest(): { cli: string } | { missing: string } {
+  try {
+    const manifest = createRequire(import.meta.url).resolve('vitest/package.json');
+    const bin = (JSON.parse(readFileSync(manifest, 'utf8')) as { bin?: string | Record<string, string> }).bin;
+    const entry = typeof bin === 'string' ? bin : bin?.vitest;
+    if (entry === undefined) return { missing: `${manifest} declares no vitest bin` };
+    const cli = path.resolve(path.dirname(manifest), entry);
+    return existsSync(cli) ? { cli } : { missing: `${manifest} names ${entry} as its bin, and ${cli} is not there` };
+  } catch (error) {
+    return { missing: (error as Error).message };
+  }
+}
+
 function main(): void {
   const manifestPath = process.argv[2];
   if (manifestPath === undefined || manifestPath === '--help' || manifestPath === '-h') {
     console.error(usage);
+    process.exit(2);
+  }
+
+  // Before the manifest, the journal and the baselines: a run that cannot
+  // start the test command can only report every mutation as an error, and
+  // saying so once beats saying it once per mutation with a stack attached.
+  const vitest = resolveVitest();
+  if ('missing' in vitest) {
+    console.error(`vitest could not be resolved from ${import.meta.filename}, so no mutation could be measured — ${vitest.missing}`);
+    console.error('Run `npm install` in the checkout this tree resolves against. Nothing was mutated.');
     process.exit(2);
   }
 
@@ -479,7 +574,7 @@ function main(): void {
   process.on('SIGTERM', () => process.exit(143));
 
   const runTests: RunTests = (tests) => {
-    const result = spawnSync(process.execPath, [path.join(repoRoot, 'node_modules/vitest/vitest.mjs'), 'run', '--configLoader', 'runner', ...(tests ?? [])], { cwd: repoRoot, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+    const result = spawnSync(process.execPath, [vitest.cli, 'run', '--configLoader', 'runner', ...(tests ?? [])], { cwd: repoRoot, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
     if (result.error) throw new Error(`the test command did not run: ${result.error.message}`);
     return tallyOf({ stdout: result.stdout ?? '', stderr: result.stderr ?? '' });
   };

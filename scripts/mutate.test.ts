@@ -1,6 +1,7 @@
+import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { applyTo, escapesRoot, formatReport, journalVerdict, outputTail, parseManifest, parseVitestTally, journalPathFor, pidIsAlive, readJournal, scopeOf, type BaselineFor, type RunTests, recoverFrom, refusalsFor, runMutations, tallyOf, type FileStore, type Mutation, type TestRun } from './mutate';
+import { applyTo, escapesRoot, findMissRefusal, formatReport, journalVerdict, outputTail, parseManifest, parseVitestTally, journalPathFor, pidIsAlive, readJournal, scopeOf, type BaselineFor, type RunTests, recoverFrom, refusalsFor, resolveVitest, runMutations, tallyOf, visibleWhitespace, type FileStore, type Mutation, type TestRun } from './mutate';
 
 const ORIGINAL = 'const base = entityTypeBase(merged, section);\nconst other = 1;\n';
 
@@ -641,6 +642,62 @@ describe('mutate: the baseline', () => {
     const files = store({ 'a.ts': ORIGINAL });
     expect(refusalsFor([mutation({ name: 'bad', find: 'absent' })], files)).toHaveLength(1);
     expect(files.writes).toEqual([]);
+  });
+});
+
+// The refusal that cost three separate sessions two rounds each. All three
+// misses were invisible in the manifest and obvious beside the file's own
+// line, which the checker already had open.
+describe('mutate: a find that missed', () => {
+  const file = "export const SEPARATOR = '---';\nconst indented = value;\n";
+
+  it('quotes the nearest line beside what was asked for', () => {
+    const refusal = findMissRefusal('m1', 'a.ts', file, "export const SEPARATOR = '--';");
+    expect(refusal).toContain('The nearest line is a.ts:1');
+    expect(refusal).toContain("asked for: export const SEPARATOR = '--';");
+    expect(refusal).toContain("file has:  export const SEPARATOR = '---';");
+  });
+
+  it('spells out the whitespace the eye cannot see, at both margins', () => {
+    expect(visibleWhitespace('a\tb \r')).toBe('a\\tb \\r');
+    expect(visibleWhitespace('trailing   ')).toBe('trailing···');
+    expect(visibleWhitespace('    leading')).toBe('····leading');
+    expect(findMissRefusal('m1', 'a.ts', 'const x = 1;\n', 'const\tx = 1;')).toContain('asked for: const\\tx = 1;');
+  });
+
+  it('draws the margin, so a find text copied without its indentation says why it missed', () => {
+    const refusal = findMissRefusal('m1', 'a.ts', '  const indented = value;\n', 'const indented = value;');
+    expect(refusal).toContain('asked for: const indented = value;');
+    expect(refusal).toContain('file has:  ··const indented = value;');
+  });
+
+  it('names a CRLF miss by showing the line ending the file carries', () => {
+    const refusal = findMissRefusal('m1', 'a.ts', 'const x = 1;\r\nconst y = 2;\r\n', 'const x = 1;\n');
+    expect(refusal).toContain('file has:  const x = 1;\\r');
+  });
+
+  it('says the text is simply absent rather than pointing at a coincidence', () => {
+    const refusal = findMissRefusal('m1', 'a.ts', file, 'zzzzzzzzzzzzzzzz');
+    expect(refusal).toContain('no line in it comes close');
+    expect(refusal).not.toContain('nearest line');
+  });
+
+  it('is what refusalsFor reports, so the manifest check and the message cannot drift', () => {
+    const refusals = refusalsFor([mutation({ name: 'bad', find: 'const iindented = value;' })], store({ 'a.ts': file }));
+    expect(refusals).toHaveLength(1);
+    expect(refusals[0]).toContain('file has:  const indented = value;');
+  });
+});
+
+// Resolved the way node resolves it. The join onto the repo root named a file
+// a worktree does not have, and every mutation there errored with a stack
+// instead of the run saying once that it could not start.
+describe('mutate: finding the test runner', () => {
+  it('resolves the vitest CLI this checkout would actually run', () => {
+    const resolved = resolveVitest();
+    expect(resolved).not.toHaveProperty('missing');
+    expect((resolved as { cli: string }).cli).toMatch(/vitest\.mjs$/);
+    expect(existsSync((resolved as { cli: string }).cli)).toBe(true);
   });
 });
 
