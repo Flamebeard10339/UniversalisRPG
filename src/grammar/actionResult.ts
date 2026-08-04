@@ -90,8 +90,19 @@ function wrapperBody(cursor: Cursor, line: RawLine | null, what: string, span: S
 
 const WEIGHT = /\d+x(?![\w-])/;
 
+// The two selector numbers, which are the last places a range reads as one and
+// is not. Both would otherwise fall through to a message about ids or tags.
+const RANGED_SELECTOR = /\d+-\d+(?=x(?![\w-])|[ \t]+in[ \t])/;
+
+function refuseRangedSelector(cursor: Cursor, span: Span): void {
+  const raw = cursor.peek(RANGED_SELECTOR);
+  if (raw === null) return;
+  throw new DslError(`${raw[0]} is odds, not a quantity, so it takes one number rather than a range`, span);
+}
+
 function parseRow(line: RawLine): DropRow {
   const cursor = new Cursor(line.text, 0, line.span.start);
+  refuseRangedSelector(cursor, line.span);
   const literal = cursor.take(WEIGHT);
   const weight = literal !== null ? Number(literal.slice(0, -1)) : id.parse(cursor);
   const where = `one of: row ${JSON.stringify(literal ?? weight)}`;
@@ -154,7 +165,20 @@ const SELECTOR = `(?:${REFERENCE.source}|\\d+(?:\\.\\d+)?)`;
 const ONE_OF = /one of[ \t]*:/;
 const CHANCE = /\d+[ \t]+in[ \t]+\d+[ \t]*:/;
 const CONTEST = new RegExp(`${SELECTOR}[ \\t]+vs[ \\t]+${SELECTOR}[ \\t]*:`);
-const GATE = /if[ \t]+[^:\n]+:/;
+// `if` leads more prose than it leads conditions, and a dialogue line chooses
+// between an effect and spoken text on this table. A regex over "if … :" claims
+// "if you must: leave now"; a trial parse does not, because `you must` is not a
+// condition. So the reader itself is the test, run on a throwaway cursor.
+function opensGate(cursor: Cursor): boolean {
+  const trial = new Cursor(cursor.src, cursor.pos, cursor.base);
+  if (trial.take(/if[ \t]+/) === null) return false;
+  try {
+    condition.parse(trial);
+  } catch {
+    return false;
+  }
+  return trial.take(/[ \t]*:/) !== null;
+}
 
 // Which wrapper a line opens, or null for a plain result list. Peeked rather
 // than consumed so the one table below is what both the reader and
@@ -162,7 +186,7 @@ const GATE = /if[ \t]+[^:\n]+:/;
 function wrapperAt(cursor: Cursor): ((cursor: Cursor, line: RawLine | null, span: Span) => ActionResult) | null {
   if (cursor.peek(ONE_OF)) return parseOneOf;
   if (cursor.peek(CHANCE)) return parseChance;
-  if (cursor.peek(GATE)) return parseGate;
+  if (opensGate(cursor)) return parseGate;
   if (cursor.peek(CONTEST)) return parseContest;
   return null;
 }
@@ -195,6 +219,7 @@ function parseResults(cursor: Cursor, line: RawLine | null): ActionResult[] {
   const results: ActionResult[] = [];
   do {
     cursor.take(/[ \t]*/);
+    refuseRangedSelector(cursor, { start: cursor.abs(cursor.pos), end: cursor.abs(cursor.src.length) });
     const wrapper = wrapperAt(cursor);
     if (wrapper === null) {
       results.push(parseResult(cursor));
@@ -210,7 +235,10 @@ function parseResults(cursor: Cursor, line: RawLine | null): ActionResult[] {
 const LEAF_RESULT = /(?:say|add|give|take|xp|roll|drain|restore|relocate|discover|open modal):|(?:set|unset)[: \t]|stop(?![\w-])/;
 
 export function startsResult(cursor: Cursor): boolean {
-  return cursor.peek(LEAF_RESULT) !== null || wrapperAt(cursor) !== null;
+  // A ranged selector is claimed here so the result reader is what explains it.
+  // Left out, the line falls through to the tag parser and is reported as an
+  // unrecognized tag clause, which says nothing about the range.
+  return cursor.peek(LEAF_RESULT) !== null || cursor.peek(RANGED_SELECTOR) !== null || wrapperAt(cursor) !== null;
 }
 
 export function parseResultLine(line: RawLine): ActionResult[] {

@@ -1,14 +1,28 @@
 import { Cursor, DslError, Parser, Span } from './parser';
 import { Range } from './range';
 
+// A range where only a count belongs reads as an id that will not parse, which
+// says nothing about why. Each site that refuses one says which it is.
+export function refuseRange(cursor: Cursor, complaint: string): void {
+  const start = cursor.pos;
+  if (cursor.peek(/-\d/) === null) return;
+  cursor.take(/-\d+(?:\.\d+)?/);
+  throw new DslError(complaint, { start: cursor.abs(start), end: cursor.abs(cursor.pos) });
+}
+
 export const text: Parser<string> = {
   parse: (cursor) => cursor.take(/[^\n]*/) ?? '',
 };
 
+// Every remaining caller reads a THRESHOLD — `has 5`, a comparison's right side,
+// a recipe's required skill level, a coordinate. None of them can take a range,
+// and enforcing that here rather than at each site is the difference between one
+// rule and four copies of it.
 export const number: Parser<number> = {
   parse: (cursor) => {
     const raw = cursor.take(/-?\d+/);
     if (raw === null) throw new DslError('expected a number', { start: cursor.abs(cursor.pos), end: cursor.abs(cursor.pos) });
+    refuseRange(cursor, 'this number is a threshold, not a quantity, so it takes one value rather than a range');
     return Number(raw);
   },
 };
@@ -109,15 +123,6 @@ export function countRange(cursor: Cursor, what: string): Range {
 export function decimalRange(cursor: Cursor, what: string): Range {
   const { range, span } = bounds(cursor, DECIMAL_RANGE, what);
   return refuseZero(range, span, `${what} of 0 does nothing`);
-}
-
-// A range where only a count belongs reads as an id that will not parse, which
-// says nothing about why. Each site that refuses one says which it is.
-export function refuseRange(cursor: Cursor, complaint: string): void {
-  const start = cursor.pos;
-  if (cursor.peek(/-\d/) === null) return;
-  cursor.take(/-\d+(?:\.\d+)?/);
-  throw new DslError(complaint, { start: cursor.abs(start), end: cursor.abs(cursor.pos) });
 }
 
 export const quantified: Parser<Quantified> = {

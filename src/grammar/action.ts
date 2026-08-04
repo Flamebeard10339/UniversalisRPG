@@ -5,7 +5,7 @@ import { Cursor, DslError, requireEnd } from './parser';
 import { EntryBody } from './section';
 import { RawLine } from './structure';
 import { TagClause, tagClause } from './tagClause';
-import { decimal, id, numberOrStat } from './values';
+import { decimal, id, numberOrStat, refuseRange } from './values';
 
 // What ends the action, which is a different question from how fast it attempts.
 export type ActionKind = 'instant' | 'duration' | 'continuous';
@@ -102,6 +102,7 @@ const positiveCount =
   (cursor, line, label) => {
     const raw = cursor.take(/\d+/);
     if (raw === null || Number(raw) <= 0) throw new DslError(actionProblem(label, `${written} requires a positive integer`), line.span);
+    named(written, label, line, () => refuseRange(cursor, 'this number is a threshold, not a quantity, so it takes one value rather than a range'));
     return Number(raw);
   };
 

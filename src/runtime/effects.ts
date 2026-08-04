@@ -89,20 +89,25 @@ function requireDropTable(registry: Registry, id: string): DropTable {
   return table;
 }
 
-export function applyResults(segment: Segment, results: readonly ActionResult[], count = 1): void {
+// `lead` is false for every repetition after a batch's first. A result that
+// ignores `count` speaks once for the whole batch — 100 crafted loaves are one
+// line — and that has to stay true of an action whether or not one of its
+// results happens to draw. A `say:` INSIDE a wrapper is a different sentence: it
+// leads its own group, and speaks on each repetition that reaches it.
+export function applyResults(segment: Segment, results: readonly ActionResult[], count = 1, lead = true): void {
   if (count <= 0) return;
   const { state, registry } = segment;
   // A group that draws is applied once per repetition, in order, rather than
   // once and scaled — a batched craft rolls its table for every completion.
   if (count > 1 && samplesPerApplication(results)) {
-    for (let i = 0; i < count && !segment.stopped; i++) applyResults(segment, results);
+    for (let i = 0; i < count && !segment.stopped; i++) applyResults(segment, results, 1, lead && i === 0);
     return;
   }
 
   for (const result of results) {
     switch (result.kind) {
       case 'say':
-        state.log.push(result.text);
+        if (lead) state.log.push(result.text);
         break;
       case 'set':
         state.flags[result.variable] = true;
@@ -132,7 +137,7 @@ export function applyResults(segment: Segment, results: readonly ActionResult[],
         state.flags[`${result.location}.${DISCOVERED}`] = true;
         break;
       case 'open-modal':
-        state.log.push(`modal:${result.modal}`);
+        if (lead) state.log.push(`modal:${result.modal}`);
         state.pendingModal = result.modal;
         break;
       case 'pool':

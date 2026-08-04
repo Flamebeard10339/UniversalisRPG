@@ -110,6 +110,27 @@ describe('# droptable', () => {
     expect([...removed.dropTables.keys()]).toEqual(['rat-common']);
   });
 
+  it('goes with a missing optional dependency, like every other kind', () => {
+    const base = { name: 'base', text: ['# info base', 'version: 1.0.0', '# item gem'].join('\n') };
+    // `?extra` never loads, so the table naming it is dropped rather than failing
+    // the module — and the entity rolling that table goes with it.
+    const pack = {
+      name: 'pack',
+      text: ['# info pack', 'version: 1.0.0', 'dependencies:', '  base', '  ?extra', '# droptable loot', 'give: 1 extra.relic', '# entity g', 'p:', '  roll: self.loot'].join('\n'),
+    };
+    const registry = loadUniverse([base, pack]);
+    expect([...registry.dropTables.keys()]).toEqual([]);
+    expect(registry.entities.get('pack.g')!.actions).toEqual([]);
+  });
+
+  it('prints an action whose only result is a wrapper as a block, not as one line', () => {
+    const source = ['# info pack', 'version: 1.0.0', '# item gem', '# entity g', 'p:', '  1 in 5: give: 1 gem'].join('\n');
+    const registry = loadUniverse([{ name: 'pack', text: source }]);
+    const printed = serializeRegistryModule(registry, { info: { id: 'pack', version: [1, 0, 0] } });
+    expect(printed).toContain('1 in 5:');
+    expect(registryDiff(registry, loadUniverse([{ name: 'again', text: printed }]))).toEqual([]);
+  });
+
   it('round-trips through serialize, wrappers and all', () => {
     const source = [
       '# info pack',
@@ -154,10 +175,24 @@ describe('produced quantities carry the range they were written as', () => {
     expect(recipe.in).toEqual([{ item: 'log', amount: 1 }]);
   });
 
-  it('refuses a range where the number is consumed or a threshold', () => {
+  it('refuses a range where the number is consumed, and says which it is', () => {
     expect(load('# item x', '# entity g', 'p:', '  take: 5-10 x')).toThrow(/consumed, so it takes one number rather than a range/);
     expect(load('# item x', '# item y', '# recipe r', 'in: 2-4 x', 'out: 1 y')).toThrow(/consumed, so it takes one number rather than a range/);
     expect(load('# flag c', '# entity g', 'p:', '  add: c 1-3')).toThrow(/add: takes one signed count rather than a range/);
+  });
+
+  it('refuses a range at every threshold, and says which it is', () => {
+    const threshold = /this number is a threshold, not a quantity/;
+    expect(load('# item potion', '# entity g', 'p:', '  requires: has 5-10 potion', '  say: hi')).toThrow(threshold);
+    expect(load('# flag c', '# entity g', 'p:', '  requires: c >= 1-3', '  say: hi')).toThrow(threshold);
+    expect(load('# item x', '# item y', '# skill c', '# recipe r', 'in: 1 x', 'out: 1 y', 'skill: c 15-20')).toThrow(threshold);
+    expect(load('# item x', '# entity g', 'p:', '  escape after 3-5', '  give: 1 x')).toThrow(threshold);
+  });
+
+  it('refuses a range in a selector, where odds are not a quantity at all', () => {
+    const odds = /is odds, not a quantity, so it takes one number rather than a range/;
+    expect(load('# item x', '# entity g', 'p:', '  1-2 in 5: give: 1 x')).toThrow(odds);
+    expect(load('# item x', '# entity g', 'p:', '  one of:', '    1-2x: give: 1 x', '    1x: give: 1 x')).toThrow(odds);
   });
 
   it('inverts the zero rule: a floor of zero is the point, a ceiling of zero is not', () => {

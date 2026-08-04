@@ -456,20 +456,25 @@ expect: miki-route-end
 # save miki-route-end
 {"version":6,"inventory":{"tutorial-island.jug-of-water":0,"tutorial-island.pot-of-flour":0,"tutorial-island.dough":0,"tutorial-island.bread":1,"tutorial-island.rat-bone":7},"flags":{"tutorial-island.quest-given":true,"tutorial-island.mirror-done":true,"tutorial-island.made-bread":true,"tutorial-island.rats-killed":3,"tutorial-island.miki-complete":true,"tutorial-island.front-door.unlocked":true},"visits":{"tutorial-island.miki.greeting":1,"tutorial-island.miki.buffs":1,"tutorial-island.miki.baked":1,"tutorial-island.miki.sendoff":1},"xp":{"tutorial-island.cooking":6,"tutorial-island.melee":16},"resources":{"tutorial-island.health":0},"location":"tutorial-island.beach","time":107200,"rng":2776008081,"pendingModal":"character-creation"}
 
+# save dresser-trinket-end
+{"version":6,"inventory":{"tutorial-island.lockpick":1},"flags":{"tutorial-island.dresser.searched":true},"resources":{},"location":"tutorial-island.guide-house-upstairs","rng":2617077404}
+
 # save explored-and-unlocked
 {"version":6,"flags":{"tutorial-island.front-door.unlocked":true,"tutorial-island.beach.discovered":true}}
 
 // The drawer's contested roll over shipped content. On the default seed this
-// search comes up empty behind the lockpick, and that is the assertion: the
-// contest is drawn, the shared table is reached, and this is where it landed.
-// Move `luck`, the difficulty or the draw order and these four part company.
+// search comes up empty behind the lockpick, so an assertion over inventory
+// alone would also hold in a world where the drawer never rolls at all — which
+// is the shape of test this branch's audit caught. The whole sheet is what tells
+// the two apart: `luck vs 60` and the table behind it move the rng cursor
+// whether or not they yield anything, and `expect:` is what pins that.
+// Regenerate with /create-valid-test when the drawer's odds change on purpose.
 # test dresser-trinket
 travel: guide-house-upstairs
 use: entity.dresser.search drawer
 assert: has lockpick
 assert: searched
-assert: not has bent-coin
-assert: not has rats-eye-gem
+expect: dresser-trinket-end
 
 # test save-restores-object-owned-flags
 load: explored-and-unlocked

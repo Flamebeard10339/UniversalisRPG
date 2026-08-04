@@ -156,6 +156,26 @@ describe('a stochastic group is applied count times, not scaled once', () => {
     expect([...totals].some((total) => total > 4 && total < 8)).toBe(true);
   });
 
+  it('leaves what a batch says alone, so adding a chance does not multiply the line', () => {
+    const speaks = (body: string[]): number => {
+      const { registry, results } = fight(...body);
+      const state = createGameState();
+      applyResultsNow(state, registry, results, 5);
+      return state.log.filter((line) => line === 'hi').length;
+    };
+    // The same action, once without a draw in it and once with. A result that
+    // ignores count speaks once for the batch either way.
+    expect(speaks(['say: hi', 'give: 1 bones'])).toBe(1);
+    expect(speaks(['say: hi', '1 in 1000000: give: 1 gem'])).toBe(1);
+  });
+
+  it('lets a say inside a wrapper speak on every repetition that reaches it', () => {
+    const { registry, results } = fight('1 in 1: say: hi');
+    const state = createGameState();
+    applyResultsNow(state, registry, results, 5);
+    expect(state.log.filter((line) => line === 'hi')).toHaveLength(5);
+  });
+
   it('still scales a certainty, which is what keeps a batched craft cheap', () => {
     const { registry } = fight('give: 1 bones');
     const state = createGameState();
