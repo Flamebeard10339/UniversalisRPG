@@ -275,6 +275,13 @@
             "scripts/lib/roadmap.ts"
           ],
           "note": "produced by roadmap-view; the deferred-backlog frontier tasks next cannot answer"
+        },
+        {
+          "name": "prior art by path",
+          "paths": [
+            "scripts/lib/producers.ts"
+          ],
+          "note": "produced by prior-art-by-path; the path-keyed index, distinct from the name-keyed produces query sharing this file"
         }
       ]
     },
