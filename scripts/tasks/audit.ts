@@ -129,6 +129,34 @@ const AUDIT_CHECKLIST = [
   'comments that restate self-documenting code;',
 ];
 
+// A `proof: vitest <file> "<name>"` target naming a test that does not exist
+// is worse than no target: `vitest -t "<no such name>"` skips every test and
+// exits 0, so an auditor following the brief gets a green run that asserted
+// nothing. Measured at 40 of 49 targets on this spec's own first pass. The
+// title is a string literal in the file, so a text search answers without
+// running the suite — this is a read printed beside the target, not a gate.
+export function unresolvedTarget(target: string, read: (file: string) => string | null = readIfPresent): string | null {
+  const parsed = /^vitest\s+(\S+)\s+"(.*)"\s*$/.exec(target);
+  if (parsed === null) return null;
+  const [, file, name] = parsed;
+  const text = read(file);
+  if (text === null) return `   <-- names no file in this checkout: ${file}`;
+  // Backslashes dropped from both sides before comparing: a title with an
+  // apostrophe is written `'doctor\'s warning count'` in the source and
+  // `doctor's warning count` at runtime, and a check that reported those as
+  // missing would be exactly the false alarm that teaches readers to skip it.
+  const unescaped = (value: string): string => value.replace(/\\/g, '');
+  return unescaped(text).includes(unescaped(name)) ? null : `   <-- ${file} has no test by this name, and \`vitest -t\` would skip every test and exit 0`;
+}
+
+function readIfPresent(file: string): string | null {
+  try {
+    return readFileSync(file, 'utf8');
+  } catch {
+    return null;
+  }
+}
+
 export function cmdAuditPrompt(args: Flags, usage: string): void {
   const config = resolveConfig(args.flags);
   const slug = args.positional[0];
@@ -194,7 +222,7 @@ export function cmdAuditPrompt(args: Flags, usage: string): void {
       console.log('  no proof target — requires human verification: inspect the behavior directly.');
       console.log('  If this is pure domain logic or an API layer, prefer naming a `proof: vitest <file> "<test>"` or `proof: command <cmd>` target so a future pass can mutation-test it. If this is UI work, add or run smoke coverage once the implementation has settled.');
     } else {
-      for (const target of targets) console.log(`  proof: ${target}`);
+      for (const target of targets) console.log(`  proof: ${target}${unresolvedTarget(target) ?? ''}`);
       console.log('  has a proof target — if it names pure logic or an API, temporarily remove, invert, or scale the behavior it proves and confirm it fails for the right reason before accepting it; a UI or smoke target is inspected, not mutation-tested.');
     }
   }

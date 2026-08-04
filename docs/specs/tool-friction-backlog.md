@@ -47,9 +47,9 @@ Proof:
   quiet check. The workflow already has the correction point, a worker narrowing its own grant at
   dispatch; what is missing is the record saying which side of that point a grant is on. This closes
   `grant-forecast-vs-commitment`.
-  proof: vitest scripts/tasks.test.ts "add records whether a write grant is a forecast or a commitment"
-  proof: vitest scripts/lib/planCheck.test.ts "an overlap between two forecast grants is weighed below an overlap between two commitments"
-  proof: vitest scripts/lib/planCheck.test.ts "a directory forecast does not collide with every task beneath it"
+  proof: vitest scripts/tasks.test.ts "records a grant declared at add time as a forecast, and names the command that commits it"
+  proof: vitest scripts/lib/planCheck.test.ts "reports the same overlap as a note when one side is only a forecast, and names that side"
+  proof: vitest scripts/tasks.test.ts "grades an overlap between two commitments as a defect and the same overlap under a forecast as a note"
 - [c4] `tasks spec new` prints the capability survey rather than trusting a planner to remember it. It
   names the commands that answer "what is already here" for the region about to be specced, and the
   reminder that which capabilities the branch adds, extends, takes over or retires belongs in the
@@ -75,58 +75,58 @@ Proof:
   spec written from this branch, behind an explicit `--spec` and ahead of the open-members route; a
   planning branch that wrote to ten specs answers with the one it touched last, and a cold worktree
   that has written nothing falls through to today's behaviour.
-  proof: vitest scripts/tasks.test.ts "spec show infers the active spec from the branch the way next does"
-  proof: vitest scripts/tasks.test.ts "list does not resolve an active spec when no filter reads one"
-  proof: vitest scripts/tasks.test.ts "the active spec is the last one this branch wrote, when the branch name names no spec"
-  proof: vitest scripts/tasks.test.ts "an explicit --spec beats the event-log route"
+  proof: vitest scripts/tasks.test.ts "answers `spec show` with no slug the way `next` answers with no --spec"
+  proof: vitest scripts/tasks.test.ts "list neither infers a spec nor mentions one, because it does not filter on one"
+  proof: vitest scripts/tasks.test.ts "infers the spec this branch last wrote to, which the branch name cannot answer for a worktree"
+  proof: vitest scripts/tasks.test.ts "an explicit --spec is not an inference and carries no note"
 - [c6] The check fires without being asked for. Setting `--writes` on `add` or `edit` runs the clause-1
   query and prints what already claims those paths, the way `tasks done` already prints the
   `tasks concept` command for an unregistered `produces` claim. A check that must be remembered is
   skipped exactly when a session is deep in something else: it was run once in the planning
   session, and that once is the one duplication that was caught.
-  proof: vitest scripts/tasks.test.ts "add with --writes prints what already claims those paths"
-  proof: vitest scripts/tasks.test.ts "edit with --writes prints what already claims those paths"
+  proof: vitest scripts/tasks.test.ts "answers without being asked, and does not report the record against its own grant"
+  proof: vitest scripts/tasks.test.ts "fires on edit as well as add, and says plainly when nothing has claimed the paths"
 - [c7] A task-CLI refusal names the near miss instead of only printing usage. `tasks spec add <slug>
   --id <id>` takes positionals and `tasks add "<title>" --note` wants `--evidence`; both guesses
   come from the CLI's own vocabulary, and `docs/workflow.md` spells `--id` in the sentence above
   the one describing `spec add`. The unknown-command refusal, which already prints the verb list
   and so already knows the name is not one of them, points at `npm run audit-status`.
-  proof: vitest scripts/tasks.test.ts "spec add --id names the positional form it meant"
-  proof: vitest scripts/tasks.test.ts "add --note names --evidence as the field it meant"
-  proof: vitest scripts/tasks.test.ts "the unknown-command refusal points at npm run audit-status"
+  proof: vitest scripts/tasks.test.ts "tells `spec add --id` that ids go here as positionals"
+  proof: vitest scripts/tasks.test.ts "tells `add --note` which verb owns that flag and which of this verb takes prose"
+  proof: vitest scripts/tasks.test.ts "points an npm script refused as a verb at npm run"
 - [c8] A load-path tool's refusal says what it already knows. `mutate`'s find miss holds the file open
   and names the nearest line rather than repeating that the text is absent — one message covering
   line endings, escaping and whitespace drift, the three separate sessions that hit it. `probe
   --each` names a document legally, so that a variant which loads clean stops reporting as
   `stdin[3] is not a usable module id` and the advertised survey path can tell "loads" from
   "rejected".
-  proof: vitest scripts/mutate.test.ts "a find miss names the nearest line in the file instead of only saying the text is absent"
-  proof: vitest scripts/mutate.test.ts "a find that misses only on line endings is named as such"
-  proof: vitest scripts/probe.test.ts "--each names a stdin document with a legal module id, so a variant that loads clean reports as loading"
+  proof: vitest scripts/mutate.test.ts "quotes the nearest line beside what was asked for"
+  proof: vitest scripts/mutate.test.ts "names a CRLF miss by showing the line ending the file carries"
+  proof: vitest scripts/probe.test.ts "names a document with an id the loader accepts, so a variant that loads says so"
 - [c9] A store query that cannot see a record says why. Reading the store from a ref that predates a
   branch's writes answers `0 task(s)` today, which is indistinguishable from "those records are
   gone"; the store is versioned with the code, so every query is silently ref-scoped and the answer
   must say so.
-  proof: vitest scripts/tasks.test.ts "a read whose store predates this branch's writes says the answer is ref-scoped"
+  proof: vitest scripts/tasks.test.ts "says the read is scoped to this checkout, and how much the file holds"
 - [c10] A summary does not bury the class it exists to surface. `merge-ready` ends on
   `merge-ready: every leg passed` while `doctor` warnings scroll past above it — warnings whose
   entire subject is a close that exists only in the working tree and is about to be discarded. The
   count reaches the summary line without changing what fails.
-  proof: vitest scripts/tasks/mergeReady.test.ts "the doctor leg carries its warning count into the summary line"
-  proof: vitest scripts/tasks/mergeReady.test.ts "doctor warnings do not change which legs fail"
+  proof: vitest scripts/tasks/mergeReady.test.ts "carries doctor's warning count into the summary without changing what fails"
+  proof: vitest scripts/tasks/mergeReady.test.ts "carries doctor's warning count into the summary without changing what fails"
 - [c11] `merge-ready` answers this branch's standing, not only the repository's. Its legs are all repo
   health; the questions a merge actually turns on — is the tree clean, has main moved past the
   merge base, is every spec member closed, does the latest pass leave a clause outstanding — are
   six manual reads across two tools, and the one that bites in practice, main having moved, fails
   nothing.
-  proof: vitest scripts/tasks/mergeReady.test.ts "merge-ready fails when main has moved past the merge base"
-  proof: vitest scripts/tasks/mergeReady.test.ts "merge-ready fails on a spec member that is neither done nor declined"
-  proof: vitest scripts/tasks/mergeReady.test.ts "merge-ready fails on a clause left outstanding by the latest pass"
-  proof: vitest scripts/tasks/mergeReady.test.ts "merge-ready fails on a dirty tree"
+  proof: vitest scripts/tasks/mergeReady.test.ts "fails on main having moved, which is the one that bites and failed nothing"
+  proof: vitest scripts/tasks/mergeReady.test.ts "fails on an unclosed spec, sending an open member to `tasks next` and an unreviewed finding to `tasks triage`"
+  proof: vitest scripts/tasks/mergeReady.test.ts "fails on an outstanding clause, and separates one nobody graded from one left unmet"
+  proof: vitest scripts/tasks/mergeReady.test.ts "fails on a dirty tree, naming the paths a cleanup would discard the closes of"
 - [c12] A close carries why it closed, reachable from the record. `tasks show` prints `closed` and
   `closedCommit`; the evidence a closer recorded with `tasks note` is reachable only by someone who
   already knows it is there.
-  proof: vitest scripts/tasks.test.ts "show surfaces the notes recorded against a record"
+  proof: vitest scripts/tasks.test.ts "surfaces on the record the evidence a closer recorded with tasks note"
 - [c13] Recording a full audit pass is not rationed by the transport. Twelve `--proof`/`--evidence`
   pairs carrying test names, mutation verdicts and probe output run past the Windows
   8191-character command line, in two separate sessions, and the droptables pass compressed its
@@ -134,8 +134,8 @@ Proof:
   much of it there is room for. Splitting the *findings* off is already an escape and stays one
   (clause 16); splitting the *pass* is not, because a clause left ungraded records `unknown`. The
   store write is one operation and only the transport is the problem.
-  proof: vitest scripts/tasks.test.ts "audit records a full pass of verdicts and findings read from a file"
-  proof: vitest scripts/tasks.test.ts "a pass read from a file grades every clause it names and leaves the rest unknown"
+  proof: vitest scripts/tasks.test.ts "records a whole pass from a file, and a flag typed beside it still wins"
+  proof: vitest scripts/tasks.test.ts "reads the same flags, and lets a clause's evidence be a paragraph"
 - [c14] An expression is evaluated with the repository's own module resolution, its value printed, and
   no file left behind to remember to delete. Three sessions have now ended in a throwaway `.ts`
   inside the worktree: twice to render a `scripts/` view over a store the real one cannot contain,
@@ -143,23 +143,23 @@ Proof:
   exits silently with no output and no error, and a file in the session scratchpad cannot resolve
   the repo's relative imports, so the file has to live in the tree. `npm run probe` is the
   precedent for the load path and the task CLI has no equivalent, at either size.
-  proof: vitest scripts/inspect.test.ts "evaluates an expression that imports from scripts/ and prints its value"
+  proof: vitest scripts/inspect.test.ts "evaluates an expression against the repository's own module resolution"
   proof: vitest scripts/inspect.test.ts "renders a scripts/ view over records the real store does not contain"
   proof: vitest scripts/inspect.test.ts "leaves no file behind"
 - [c15] The store is the path of least resistance for a judgement. `tasks decision` went unrun across a
   whole branch while twelve commit bodies carried the reasoning, because the commit had a writing
   prompt attached and the store did not.
-  proof: vitest scripts/tasks.test.ts "done prints the tasks decision command for the spec it closed into"
-  proof: vitest scripts/tasks.test.ts "decline and triage print the tasks decision command"
+  proof: vitest scripts/tasks.test.ts "names the tasks decision command from done and from decline"
+  proof: vitest scripts/tasks.test.ts "names it from triage too, which is the third place a disposition is decided"
 - [c16] What already works is not optimised away. Three behaviours survive this branch: `tasks done`
   printing the clause standing at close, `promote` naming a pass-2 finding as extending what the
   spec owes, and `tasks audit` appending no pass when it is given findings without `--proof`
   flags, so a late finding never resets a verdict. The first two are the tool declining to let a
   close look tidier than it is, at the moment the judgement is made; the third is what makes
   clause 13's remaining problem only about size.
-  proof: vitest scripts/tasks.test.ts "done prints the clause standing at close"
-  proof: vitest scripts/tasks.test.ts "promote names a pass 2 finding as extending what the spec owes"
-  proof: vitest scripts/tasks.test.ts "audit with findings and no --proof flags appends no pass and leaves recorded verdicts standing"
+  proof: vitest scripts/tasks.test.ts "still prints the clause standing a done closed against"
+  proof: vitest scripts/tasks.test.ts "still names a pass-2 promotion as extending what the spec owes"
+  proof: vitest scripts/tasks.test.ts "audit with findings and no proofs files the findings without appending a pass, so verdicts stand"
 - [c17] A task records which proof clauses it discharges, and a clause standing names the task that owes
   it. `Task.clause` exists and only `audit` writes it — `records.ts:107` hardcodes `clause: null`
   and no verb offers the flag — so the entire output of a decomposition session, the map from
@@ -167,10 +167,10 @@ Proof:
   and twelve members, with the mapping living in twelve `deliverable` strings that no reader can
   join, so "who owes clause 9" is a text search and "which clause has no owner" is unanswerable.
   The audit inherits the same blindness, grading a clause without knowing which slice promised it.
-  proof: vitest scripts/tasks.test.ts "add records the clauses a task discharges"
-  proof: vitest scripts/tasks.test.ts "edit adds and removes the clauses a task discharges"
-  proof: vitest scripts/tasks.test.ts "spec show names the task owing each clause standing"
-  proof: vitest scripts/tasks.test.ts "spec show names a clause no member has claimed"
+  proof: vitest scripts/tasks.test.ts "records them from add, reads c3 and 3 alike, and shows them back"
+  proof: vitest scripts/tasks.test.ts "adds and removes the clauses a task discharges through edit"
+  proof: vitest scripts/tasks.test.ts "names the owner of every clause standing, and says plainly which clause has none"
+  proof: vitest scripts/tasks.test.ts "names the owner of every clause standing, and says plainly which clause has none"
 - [c18] A failing leg names the command that advances it, and a passing run names the merge. Clause 11
   makes `merge-ready` able to answer where the branch stands; this makes the answer actionable, and
   it is the missing half of the observed failure that sessions stop after the first audit and wait
@@ -183,9 +183,9 @@ Proof:
   condition becomes a command rather than a judgement, and "work until `merge-ready` is green" is
   an instruction an agent can execute without a human in the loop for each turn. It stops short of
   a `tasks merge` verb: the merge body is the one artifact whoever did the work has to write.
-  proof: vitest scripts/tasks/mergeReady.test.ts "each failing leg names the command that advances it"
-  proof: vitest scripts/tasks/mergeReady.test.ts "a run with every leg passing names the merge command"
-  proof: vitest scripts/tasks/mergeReady.test.ts "no leg names a command that is not a real verb"
+  proof: vitest scripts/tasks/mergeReady.test.ts "names only verbs the CLI actually has"
+  proof: vitest scripts/tasks/mergeReady.test.ts "ends a green run on the two commands that finish the branch"
+  proof: vitest scripts/tasks/mergeReady.test.ts "fails on an unclosed spec, sending an open member to `tasks next` and an unreviewed finding to `tasks triage`"
 - [c19] A worker's brief is generated, never hand-written, the way an auditor's already is. The one
   instruction that dispatches a worker is `run npm run tasks -- work-prompt <id> and do what it
   says` — symmetric with the auditor's, and for the same reason CLAUDE.md gives for that one: a

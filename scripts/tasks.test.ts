@@ -5,7 +5,7 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { tsxCli } from './lib/tsxCli';
 import { run as runTasks } from './tasks';
-import { parseAuditArgs, parseAuditFile } from './tasks/audit';
+import { parseAuditArgs, parseAuditFile, unresolvedTarget } from './tasks/audit';
 import { flagArities } from './tasks/cli';
 import { TERMINAL_WIDTH } from './tasks/render';
 import { allUsages } from './tasks/commands';
@@ -2735,6 +2735,26 @@ describe('tasks CLI', () => {
     });
   });
 
+  // The record kind the brief is actually generated for. `doctor` errors on
+  // a `clause` outside an `undelivered` record, so reading `clause` alone
+  // made this unreachable for every ordinary task: the record block printed
+  // the clauses and the clause block, eight lines later, said none were
+  // recorded. The test above uses an `undelivered` fixture and so only ever
+  // exercised the path that already worked.
+  it('work-prompt reads the clauses an ordinary task discharges, not only an undelivered record\'s own', () => {
+    fixture(({ tasks }) => {
+      tasks('audit', 'demo-spec', '--proof', '1=unmet', '--evidence', '1=it does not actually hold', '--proof', '2=met', '--evidence', '2=clause 2 checked');
+      tasks('add', 'a slice', '--id', 'slice', '--spec', 'demo-spec', '--discharges', 'c2,c1');
+
+      const result = tasks('work-prompt', 'slice');
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('discharges: c1, c2');
+      expect(result.stdout).not.toContain('none recorded on this record');
+      expect(result.stdout).toContain('1. [unmet] The first clause holds.');
+      expect(result.stdout).toContain('2. [met] The second clause holds.');
+    });
+  });
+
   it('work-prompt names the claim, grant-correction and concept-registration steps a worker owes before writing code', () => {
     fixture(({ tasks }) => {
       tasks('add', 'a member', '--id', 'a-member', '--spec', 'demo-spec', '--system', 'Runtime', '--produces', 'a policy module');
@@ -4092,6 +4112,12 @@ describe('a close that says back what it knows', () => {
       tasks('add', 'refused work', '--id', 'refusing');
       expect(tasks('decline', 'refusing', '--reason', 'not worth it').stdout).toContain('tasks decision "<one line>" --id refusing');
     }));
+
+  it('names it from triage too, which is the third place a disposition is decided', () =>
+    fixture(({ tasks, triage }) => {
+      tasks('add', 'a finding', '--id', 'a-finding', '--kind', 'finding', '--severity', 'high', '--deliverable', 'fix it', '--evidence', 'seen');
+      expect(triage('1\n').stdout).toContain('tasks decision "<one line>" --id a-finding');
+    }));
 });
 
 // The two behaviours this branch had to leave alone. Both are the tool
@@ -4182,12 +4208,20 @@ describe('a refusal that names the near miss', () => {
     });
   });
 
-  it('tells `add --note` which verb owns that flag and which flags this one takes', () => {
+  // Naming the owning verb and then fourteen undifferentiated flags still
+  // left a caller to pick, and the clause's own text is that `--note` wants
+  // `--evidence`. The near miss is derived from the shape of the value the
+  // flag wants where it does exist: prose misses prose.
+  it('tells `add --note` which verb owns that flag and which of this verb takes prose', () => {
     fixture(({ tasks }) => {
       const result = tasks('add', 'a title', '--note', 'some prose');
       expect(result.status).toBe(1);
       expect(result.stderr).toContain('--note: not a flag of `add` — it belongs to `concept`');
-      expect(result.stderr).toContain('--evidence');
+      // The list flags, the choices and the identifiers are not the near
+      // miss and are not offered as one — checked on the near-miss line
+      // itself, since the usage printed below it names every flag.
+      const nearMiss = result.stderr.split('\n').find((line) => line.includes('takes prose in'));
+      expect(nearMiss).toBe('  `add` takes prose in: --produces, --deliverable, --evidence');
     });
   });
 
@@ -4209,6 +4243,19 @@ describe('a task that records which clauses it discharges', () => {
       const added = tasks('add', 'a slice', '--id', 'slice', '--spec', 'demo-spec', '--discharges', 'c2,1,c1');
       expect(added.status).toBe(0);
       expect(tasks('show', 'slice').stdout).toContain('discharges: c1, c2');
+    });
+  });
+
+  it('adds and removes the clauses a task discharges through edit', () => {
+    fixture(({ tasks }) => {
+      tasks('add', 'a slice', '--id', 'slice', '--spec', 'demo-spec', '--discharges', 'c1');
+      expect(tasks('edit', 'slice', '--discharges', 'c1,c2').stdout).toContain('edited slice: discharges');
+      expect(tasks('show', 'slice').stdout).toContain('discharges: c1, c2');
+
+      // An empty value clears them, so a slice that turns out to owe nothing
+      // can say so without the record keeping a claim it no longer makes.
+      tasks('edit', 'slice', '--discharges', '');
+      expect(tasks('show', 'slice').stdout).not.toContain('discharges:');
     });
   });
 
@@ -4360,6 +4407,41 @@ describe('the commit-msg hook launcher', () => {
 // probe output ran past the Windows 8191-character command line in two
 // separate sessions, and the pass after them compressed its evidence to fit.
 // Only the transport moves: the same parser, the same one store write.
+// A target naming a test that does not exist is worse than no target:
+// `vitest -t "<no such name>"` skips every test and exits 0, so an auditor
+// following the brief gets a green run that asserted nothing. Measured at 40
+// of 49 on this spec's own first pass, and unobservable until someone tried
+// to run one.
+describe('a proof target that names no test', () => {
+  const file = ["it('a test that exists', () => {});", "it('one with an apostrophe in doctor\\'s name', () => {});"].join('\n');
+  const read = (): string => file;
+
+  it('says so, and says why a green run would not have caught it', () => {
+    const note = unresolvedTarget('vitest a.test.ts "a test nobody wrote"', read);
+    expect(note).toContain('a.test.ts has no test by this name');
+    expect(note).toContain('exit 0');
+  });
+
+  it('stays quiet on a target that resolves', () => {
+    expect(unresolvedTarget('vitest a.test.ts "a test that exists"', read)).toBeNull();
+  });
+
+  // The subtlety that would make the check lie: a title carrying an
+  // apostrophe is escaped in the source and is not at runtime, and a check
+  // that cried wolf over those would be one readers learn to skip.
+  it('does not cry wolf over a title whose apostrophe is escaped in the source', () => {
+    expect(unresolvedTarget(`vitest a.test.ts "one with an apostrophe in doctor's name"`, read)).toBeNull();
+  });
+
+  it('names a file that is not in this checkout as that, rather than as a missing test', () => {
+    expect(unresolvedTarget('vitest gone.test.ts "anything"', () => null)).toContain('names no file in this checkout');
+  });
+
+  it('has nothing to say about a target that is not a vitest one', () => {
+    expect(unresolvedTarget('command npm run layer-check', read)).toBeNull();
+  });
+});
+
 describe('an audit pass read from a file', () => {
   it('reads the same flags, and lets a clause\'s evidence be a paragraph', () => {
     const { argv } = parseAuditFile(

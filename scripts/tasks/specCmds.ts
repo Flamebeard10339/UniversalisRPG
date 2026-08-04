@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { clauseStandings, outstandingSummary, parseSpecDoc } from '../lib/specDoc';
-import { loadStore, unreviewedFiledBy, type Task } from '../lib/taskStore';
+import { clausesOf, loadStore, unreviewedFiledBy, type Task } from '../lib/taskStore';
 import type { Flags } from './cli';
 import { readStore, recordEvents, refuseUnknownSpec, reportUnknownSpec, resolveActiveSpec, resolveConfig, saveStoreAndWarn, specFile, subjectOf } from './context';
 import { clauseStandingLines, printRow, refuseUnknownIds } from './render';
@@ -166,7 +166,7 @@ export function clauseOwners(tasks: Task[], spec: string): Map<number, Task[]> {
   const owners = new Map<number, Task[]>();
   for (const task of tasks) {
     if (task.spec !== spec) continue;
-    for (const clause of [...task.discharges, ...(task.clause === null ? [] : [task.clause])]) {
+    for (const clause of clausesOf(task)) {
       owners.set(clause, [...(owners.get(clause) ?? []), task]);
     }
   }

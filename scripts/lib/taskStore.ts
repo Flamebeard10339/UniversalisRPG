@@ -313,6 +313,15 @@ export interface RequirementState {
   status: RequirementStatus;
 }
 
+// Every proof clause a record answers for, from both fields that can carry
+// one: `discharges` is what a slice promises to settle, and an `undelivered`
+// record's `clause` is the promise it *is*. Two relations, one question —
+// and asking it in two places is what let `work-prompt` read only the field
+// that `doctor` guarantees is null for an ordinary task.
+export function clausesOf(task: Task): number[] {
+  return [...new Set([...task.discharges, ...(task.clause === null ? [] : [task.clause])])].sort((a, b) => a - b);
+}
+
 export function requirementStates(task: Task, byId: Map<string, Task>): RequirementState[] {
   return task.requires.map((id) => {
     const dep = byId.get(id);

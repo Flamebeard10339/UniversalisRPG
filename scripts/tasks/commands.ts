@@ -107,6 +107,28 @@ function everyVerb(): Array<[name: string, usage: string]> {
 // belongs to `concept`. So the answer is the placeholder this flag matches,
 // the verbs that do take it, and the flags this verb does — all read off the
 // usage strings rather than a hand-kept map of likely mistakes.
+// The token a usage string writes after a flag, which is the only thing here
+// that says what kind of value the flag wants.
+function placeholderOf(usage: string, flag: string): string | null {
+  const tokens = usage.split(/\s+/);
+  const at = tokens.findIndex((token) => /^\[?--([a-z][a-z0-9-]*)\]?$/.exec(token)?.[1] === flag);
+  const next = at === -1 ? undefined : tokens[at + 1];
+  return next === undefined || next.startsWith('--') || next.startsWith('[--') || next.startsWith(']') || next.startsWith('(') ? null : next;
+}
+
+type ValueShape = 'prose' | 'list' | 'choice' | 'name' | 'none';
+
+// `"..."` is free prose, `"<name>"` is an identifier that happens to need
+// quoting, `a,b` is a list and `x|y` is a choice. Derived from the
+// placeholder rather than declared, so a flag added to a usage string is
+// classified by the same text that documents it.
+function shapeOf(placeholder: string | null): ValueShape {
+  if (placeholder === null) return 'none';
+  if (placeholder.includes('|')) return 'choice';
+  if (placeholder.includes(',')) return 'list';
+  return placeholder.startsWith('"') && !placeholder.includes('<') ? 'prose' : 'name';
+}
+
 function reportUnknownFlags(name: string, usage: string, unknown: string[]): void {
   const head = usage.split('\n')[0];
   for (const flag of unknown) {
@@ -114,12 +136,18 @@ function reportUnknownFlags(name: string, usage: string, unknown: string[]): voi
       console.error(`  --${flag}: \`${name}\` takes <${flag}> as a positional, not as a flag`);
       continue;
     }
-    const owners = everyVerb()
-      .filter(([verb, other]) => verb !== name && flagArities(other).has(flag))
-      .map(([verb]) => verb);
-    if (owners.length > 0) console.error(`  --${flag}: not a flag of \`${name}\` — it belongs to ${owners.map((verb) => `\`${verb}\``).join(', ')}`);
-    const takes = [...flagArities(usage).keys()].filter((known) => known !== 'help');
-    if (takes.length > 0) console.error(`  \`${name}\` takes: ${takes.map((known) => `--${known}`).join(', ')}`);
+    const owners = everyVerb().filter(([verb, other]) => verb !== name && flagArities(other).has(flag));
+    if (owners.length > 0) console.error(`  --${flag}: not a flag of \`${name}\` — it belongs to ${owners.map(([verb]) => `\`${verb}\``).join(', ')}`);
+
+    // The near miss inside the verb that was called, by the shape of the
+    // value this flag wants where it does exist: a prose flag misses a prose
+    // flag. Naming the owning verb and then fourteen undifferentiated flags
+    // still left a caller to pick.
+    const wanted = shapeOf(owners.map(([, other]) => placeholderOf(other, flag)).find((placeholder) => placeholder !== null) ?? null);
+    const known = [...flagArities(usage).keys()].filter((candidate) => candidate !== 'help');
+    const alike = wanted === 'none' ? [] : known.filter((candidate) => shapeOf(placeholderOf(usage, candidate)) === wanted);
+    if (alike.length > 0) console.error(`  \`${name}\` takes ${wanted === 'prose' ? 'prose' : `a ${wanted}`} in: ${alike.map((candidate) => `--${candidate}`).join(', ')}`);
+    else if (known.length > 0) console.error(`  \`${name}\` takes: ${known.map((candidate) => `--${candidate}`).join(', ')}`);
   }
 }
 

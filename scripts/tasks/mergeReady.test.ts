@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { allUsages } from './commands';
 import { LEGS, runMergeReady, type BranchStanding, type MergeReadyDeps } from './mergeReady';
 
 const utf8 = (text: string): Uint8Array => new TextEncoder().encode(text);
@@ -91,11 +92,17 @@ describe('runMergeReady', () => {
 // The questions a merge turns on, which cost six manual reads across two
 // tools while the gate passed every leg without answering one of them.
 describe('runMergeReady, on this branch\'s standing', () => {
-  const body = (overrides: Partial<BranchStanding>): string => {
+  // The verdict as well as the text. Asserting only on the detail string let
+  // a leg stop failing while the suite stayed green — the very failure clause
+  // 11 exists to fix ("the one that bites in practice fails nothing"),
+  // reintroduced one level up. Mutation-verified: `ok: standing.dirty.length
+  // === 0` and `ok: clausesOk` both survived at whole-suite scope before this.
+  const graded = (overrides: Partial<BranchStanding>): { ok: boolean; body: string } => {
     const { deps: d, recorded } = deps({ standing: () => ready(overrides) });
-    runMergeReady(d);
-    return recorded.lines.join('\n');
+    const ok = runMergeReady(d);
+    return { ok, body: recorded.lines.join('\n') };
   };
+  const body = (overrides: Partial<BranchStanding>): string => graded(overrides).body;
 
   it('fails on main having moved, which is the one that bites and failed nothing', () => {
     const { deps: d, recorded } = deps({ standing: () => ready({ baseMoved: true }) });
@@ -104,18 +111,30 @@ describe('runMergeReady, on this branch\'s standing', () => {
     expect(recorded.lines.join('\n')).toContain('base           git merge main');
   });
 
-  it('names the uncommitted paths a cleanup would discard the closes of', () => {
-    expect(body({ dirty: ['docs/tasks.jsonl', 'src/a.ts'] })).toContain('2 uncommitted path(s): docs/tasks.jsonl, src/a.ts');
+  it('fails on a dirty tree, naming the paths a cleanup would discard the closes of', () => {
+    const { ok, body: lines } = graded({ dirty: ['docs/tasks.jsonl', 'src/a.ts'] });
+    expect(ok).toBe(false);
+    expect(lines).toContain('2 uncommitted path(s): docs/tasks.jsonl, src/a.ts');
   });
 
-  it('sends an open member to `tasks next` and an unreviewed finding to `tasks triage`', () => {
-    expect(body({ openMembers: ['a-slice'] })).toContain('spec           npm run tasks -- next');
-    expect(body({ unreviewedFindings: 2 })).toContain('spec           npm run tasks -- triage');
+  it('fails on an unclosed spec, sending an open member to `tasks next` and an unreviewed finding to `tasks triage`', () => {
+    const open = graded({ openMembers: ['a-slice'] });
+    expect(open.ok).toBe(false);
+    expect(open.body).toContain('spec           npm run tasks -- next');
+
+    const untriaged = graded({ unreviewedFindings: 2 });
+    expect(untriaged.ok).toBe(false);
+    expect(untriaged.body).toContain('spec           npm run tasks -- triage');
   });
 
-  it('separates a clause nobody graded from a clause left outstanding', () => {
-    expect(body({ auditPasses: 0 })).toContain('a-spec has no recorded audit pass');
-    expect(body({ outstandingClauses: ['c2', 'c7'] })).toContain('2 outstanding after pass 1: c2, c7');
+  it('fails on an outstanding clause, and separates one nobody graded from one left unmet', () => {
+    const ungraded = graded({ auditPasses: 0 });
+    expect(ungraded.ok).toBe(false);
+    expect(ungraded.body).toContain('a-spec has no recorded audit pass');
+
+    const outstanding = graded({ outstandingClauses: ['c2', 'c7'] });
+    expect(outstanding.ok).toBe(false);
+    expect(outstanding.body).toContain('2 outstanding after pass 1: c2, c7');
   });
 
   it('carries doctor\'s warning count into the summary without changing what fails', () => {
@@ -135,5 +154,25 @@ describe('runMergeReady, on this branch\'s standing', () => {
     const none = body({ spec: null });
     expect(none).toContain('this branch is working no spec, so it owes no clause');
     expect(none).not.toContain('clauses  ');
+  });
+});
+
+// A leg that names its next move is only useful if the move is real, and a
+// verb renamed out from under one of these strings would be invisible: the
+// leg still prints, the caller still runs it, and the CLI answers "unknown
+// command". Checked against the verb list the CLI itself resolves against.
+describe('the commands the legs name', () => {
+  const verbs = new Set(allUsages().map((usage) => /^usage: tasks (?:spec )?([a-z-]+)/.exec(usage)?.[1]).filter((verb): verb is string => verb !== undefined));
+
+  it('names only verbs the CLI actually has', () => {
+    const nexts: string[] = [];
+    for (const overrides of [{ dirty: ['a.ts'] }, { baseMoved: true }, { openMembers: ['x'] }, { unreviewedFindings: 1 }, { auditPasses: 0 }, { outstandingClauses: ['c1'] }, {}]) {
+      const { deps: d, recorded } = deps({ standing: () => ready(overrides) });
+      runMergeReady(d);
+      nexts.push(...recorded.lines);
+    }
+    const named = [...new Set(nexts.flatMap((line) => [...line.matchAll(/npm run tasks -- ([a-z-]+)( [a-z-]+)?/g)].map((match) => match[1])))];
+    expect(named.length).toBeGreaterThan(0);
+    for (const verb of named) expect(verbs).toContain(verb);
   });
 });

@@ -98,9 +98,15 @@ function architecture(config: Config): { manifest: Manifest; tree: SourceTree; m
   return { manifest, tree, modules: deriveModules(manifest, tree) };
 }
 
+// A count here, names in the single-system view. Clause 2 asked for names at
+// the point a planner asks about one region, and this is a different reader
+// with a different question — printing every export of every system would
+// answer neither. Dropping the count without replacing it left the overview
+// with no measure of surface at all.
 function printSystemSummary(view: SystemView): void {
   const out = view.dependsOn.map((edge) => edge.to).join(', ') || 'nothing';
-  console.log(`  ${view.system.name.padEnd(22)} ${String(view.files.length).padStart(3)} file(s), ${view.system.concepts.length} concept(s), depends on ${out}`);
+  const exports = view.surface.reduce((total, module) => total + module.exports.length, 0);
+  console.log(`  ${view.system.name.padEnd(22)} ${String(view.files.length).padStart(3)} file(s), ${String(exports).padStart(3)} export(s), ${view.system.concepts.length} concept(s), depends on ${out}`);
 }
 
 // A surface is names. One line per module, the module's own path as the

@@ -4,7 +4,7 @@ import { isReadableGrant } from '../lib/planCheck';
 import { clauseStandings, parseSpecDoc, type SpecDoc } from '../lib/specDoc';
 import { trackedFiles } from '../lib/sourceFiles';
 import { covers, normalizePath } from '../lib/systems';
-import type { Task } from '../lib/taskStore';
+import { clausesOf, type Task } from '../lib/taskStore';
 import type { Flags } from './cli';
 import { readStore, resolveConfig, specFile, type Config } from './context';
 import { clauseStandingLines, renderTask } from './render';
@@ -82,7 +82,12 @@ function printGrant(task: Task): void {
 
 function printClauses(task: Task, doc: SpecDoc | null): void {
   console.log('Proof clauses this task discharges:');
-  const clauses = task.clause === null ? [] : [task.clause];
+  // `discharges` first, because that is where an ordinary record keeps this:
+  // `doctor` errors on a `clause` outside an `undelivered` record, so reading
+  // `clause` alone made this branch unreachable for every task the brief is
+  // actually generated for — the record block printed `discharges: c1, c2`
+  // and eight lines later this printed "none recorded".
+  const clauses = clausesOf(task);
   if (clauses.length === 0) {
     console.log(`- none recorded on this record${task.spec === null ? '' : `; \`npm run tasks -- spec show ${task.spec}\` lists every clause and where it stands`}`);
     return;
