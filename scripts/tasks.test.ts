@@ -3967,6 +3967,134 @@ describe('tasks done, on a task that claimed to produce something', () => {
     }));
 });
 
+// Six clauses meeting on one surface: what a grant declares, what setting
+// one asks, what a close says back, and the two behaviours that had to
+// survive all of it.
+describe('a record that declares its grant kind', () => {
+  it('records a grant declared at add time as a forecast, and names the command that commits it', () =>
+    fixture(({ tasks }) => {
+      const added = tasks('add', 'unread work', '--id', 'unread', '--writes', 'src/runtime/');
+      expect(added.stdout).toContain('recorded as a forecast');
+      expect(added.stdout).toContain('--grant commitment');
+      expect(tasks('show', 'unread').stdout).toContain('writes (forecast): src/runtime/');
+    }));
+
+  it('keeps a commitment through an edit that changes something else', () =>
+    fixture(({ tasks }) => {
+      tasks('add', 'read work', '--id', 'read', '--writes', 'src/runtime/combat.ts', '--grant', 'commitment');
+      tasks('edit', 'read', '--title', 'read work, retitled');
+      expect(tasks('show', 'read').stdout).toContain('writes (commitment):');
+    }));
+
+  it('leaves a record that has said nothing saying nothing, rather than defaulting it', () =>
+    fixture(({ tasks }) => {
+      tasks('add', 'no grant', '--id', 'silent');
+      expect(tasks('show', 'silent').stdout).not.toContain('writes');
+      expect(tasks('edit', 'silent', '--severity', 'low').stdout).toBe('edited silent: severity\n');
+    }));
+
+  it('refuses a grant kind it does not know, rather than recording it', () =>
+    fixture(({ tasks }) => {
+      const result = tasks('add', 'bad grant', '--id', 'bad', '--writes', 'src/runtime/', '--grant', 'maybe');
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain('--grant must be one of forecast, commitment');
+    }));
+
+  it('grades an overlap between two commitments as a defect and the same overlap under a forecast as a note', () =>
+    fixture(({ tasks }) => {
+      tasks('add', 'left', '--id', 'left', '--spec', 'demo-spec', '--writes', 'src/runtime/combat.ts', '--grant', 'commitment');
+      tasks('add', 'right', '--id', 'right', '--spec', 'demo-spec', '--writes', 'src/runtime/combat.ts', '--grant', 'commitment');
+      const committed = tasks('plan', 'left', 'right').stdout;
+      expect(committed).toContain('2 of those a commitment');
+      expect(committed).toContain('[defect] left and right both write');
+
+      tasks('edit', 'right', '--grant', 'forecast');
+      const forecast = tasks('plan', 'left', 'right').stdout;
+      expect(forecast).toContain("[note] left and right both write");
+      expect(forecast).toContain("right's grant is forecast");
+    }));
+});
+
+describe('setting a write grant, which asks what already claims those paths', () => {
+  it('answers without being asked, and does not report the record against its own grant', () =>
+    fixture(({ tasks }) => {
+      tasks('add', 'the first claim', '--id', 'first', '--writes', 'src/runtime/combat.ts');
+      const second = tasks('add', 'the second claim', '--id', 'second', '--writes', 'src/runtime/combat.ts');
+      expect(second.stdout).toContain('prior art on src/runtime/combat.ts');
+      expect(second.stdout).toContain('first — the first claim');
+      expect(second.stdout).not.toContain('second — the second claim');
+    }));
+
+  it('reaches a claim that closed, which is what a dispatch-set check cannot see', () =>
+    fixture(({ tasks }) => {
+      tasks('add', 'settled long ago', '--id', 'settled', '--writes', 'src/runtime/save.ts');
+      tasks('done', 'settled');
+      expect(tasks('add', 'the same region again', '--id', 'again', '--writes', 'src/runtime/save.ts').stdout).toContain('[done] settled');
+    }));
+
+  it('fires on edit as well as add, and says plainly when nothing has claimed the paths', () =>
+    fixture(({ tasks }) => {
+      tasks('add', 'a task', '--id', 'lonely');
+      expect(tasks('edit', 'lonely', '--writes', 'src/ui/untouched.ts').stdout).toContain('nothing has claimed src/ui/untouched.ts');
+    }));
+
+  it('stays quiet on an edit that sets no grant', () =>
+    fixture(({ tasks }) => {
+      tasks('add', 'a task', '--id', 'quiet', '--writes', 'src/runtime/combat.ts');
+      expect(tasks('edit', 'quiet', '--severity', 'low').stdout).not.toContain('prior art');
+    }));
+});
+
+describe('a close that says back what it knows', () => {
+  it('surfaces on the record the evidence a closer recorded with tasks note', () =>
+    fixture(({ tasks }) => {
+      tasks('add', 'the renaming', '--id', 'renames', '--spec', 'demo-spec');
+      tasks('done', 'renames');
+      tasks('note', 'checked all 28 renamed titles against the store; none had dropped', '--id', 'renames', '--actor', 'worker');
+      tasks('decision', 'the rewrite is one change, so one commit', '--id', 'renames', '--actor', 'worker');
+
+      const shown = tasks('show', 'renames').stdout;
+      expect(shown).toContain('2 judgement(s) recorded against this record');
+      expect(shown).toContain('checked all 28 renamed titles');
+      expect(shown).toContain('[decision]');
+      expect(shown).toContain('worker');
+    }));
+
+  it('says nothing about judgements on a record that carries none', () =>
+    fixture(({ tasks }) => {
+      tasks('add', 'plain work', '--id', 'plain');
+      expect(tasks('show', 'plain').stdout).not.toContain('judgement(s)');
+    }));
+
+  it('names the tasks decision command from done and from decline', () =>
+    fixture(({ tasks }) => {
+      tasks('add', 'closed work', '--id', 'closing');
+      expect(tasks('done', 'closing').stdout).toContain('tasks decision "<one line>" --id closing');
+
+      tasks('add', 'refused work', '--id', 'refusing');
+      expect(tasks('decline', 'refusing', '--reason', 'not worth it').stdout).toContain('tasks decision "<one line>" --id refusing');
+    }));
+});
+
+// The two behaviours this branch had to leave alone. Both are the tool
+// declining to let a close look tidier than it is, at the moment the
+// judgement is made.
+describe('what already worked, after the record verbs changed around it', () => {
+  it('still prints the clause standing a done closed against', () =>
+    fixture(({ tasks }) => {
+      tasks('audit', 'demo-spec', '--proof', '1=unmet', '--evidence', '1=the seam is still open', '--proof', '2=met', '--evidence', '2=clause 2 checked');
+      expect(tasks('done', 'demo-spec-clause-1').stdout).toContain('clause standing at close: proof clause 1 is unmet in the latest audit pass (pass 1)');
+    }));
+
+  it('still names a pass-2 promotion as extending what the spec owes', () =>
+    fixture(({ tasks }) => {
+      tasks('audit', 'demo-spec', '--proof', '1=met', '--evidence', '1=clause 1 checked', '--proof', '2=met', '--evidence', '2=clause 2 checked');
+      tasks('audit', 'demo-spec', '--proof', '1=met', '--evidence', '1=clause 1 checked', '--proof', '2=met', '--evidence', '2=clause 2 checked', '--finding', 'late finding', '--severity', 'low', '--deliverable', 'fix it', '--evidence', 'seen late');
+      const result = tasks('promote', 'demo-spec-pass2-late-finding');
+      expect(result.stdout).toContain('promoting a pass 2 finding, which extends what demo-spec owes: demo-spec-pass2-late-finding');
+    }));
+});
+
 describe('tasks plan, against producers that already exist', () => {
   it('reports a plan member claiming what a closed task already produced', () =>
     fixture(({ tasks }) => {
