@@ -27,9 +27,6 @@ export interface RoadmapTopic {
 export interface RoadmapView {
   counts: RoadmapCounts;
   topics: RoadmapTopic[];
-  blockedTasks: Task[];
-  findings: Task[];
-  other: Task[];
   findingsBySystem: Array<[system: string, count: number]>;
 }
 
@@ -93,9 +90,6 @@ export function roadmapView(tasks: Task[]): RoadmapView {
       deferredOther: other.length,
     },
     topics,
-    blockedTasks,
-    findings,
-    other,
     findingsBySystem: [...perSystem].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])),
   };
 }

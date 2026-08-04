@@ -53,7 +53,7 @@ describe('roadmapView', () => {
     const view = roadmapView([task({ id: 'gate' }), task({ id: 'held-defect', kind: 'finding', system: 'Runtime', requires: ['gate'] })]);
     expect(view.counts.deferredFindings).toBe(1);
     expect(view.findingsBySystem).toEqual([['Runtime', 1]]);
-    expect(view.blockedTasks).toEqual([]);
+    expect(view.counts.blockedTasks).toBe(0);
   });
 
   it('partitions the deferred backlog, so no record falls between the body and the footer', () => {
