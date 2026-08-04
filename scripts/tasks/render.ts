@@ -145,10 +145,16 @@ export function truncateLine(text: string, max: number): string {
 // makes a continuation look like a new entry. So a line too long for the
 // report continues under its own structure instead. Nothing is cut: a word
 // wider than the budget keeps its line whole rather than losing its tail.
-const MIN_WRAP_WIDTH = 24;
+export const MIN_WRAP_WIDTH = 24;
 
 export function wrapUnder(text: string, first: string, hanging = ' '.repeat(first.length)): string[] {
-  const [head, ...rest] = wrapText(text, Math.max(TERMINAL_WIDTH - first.length, MIN_WRAP_WIDTH));
+  // Budgeted against whichever prefix is wider, because every line but the
+  // first carries the hanging one: budgeting from `first` alone put a
+  // 60-character hanging indent on top of a full-width line and returned a
+  // 134-character line. No caller trips it today — five of them pass a
+  // hanging indent no wider than their first — so the invariant this
+  // function's shape implies held by coincidence.
+  const [head, ...rest] = wrapText(text, Math.max(TERMINAL_WIDTH - Math.max(first.length, hanging.length), MIN_WRAP_WIDTH));
   return [`${first}${head}`, ...rest.map((line) => `${hanging}${line}`)];
 }
 

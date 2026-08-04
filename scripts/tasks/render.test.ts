@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { clauseStandingLines, packGreedy, summarize, TERMINAL_WIDTH, truncateLine, wrapText, wrapUnder } from './render';
+import { clauseStandingLines, MIN_WRAP_WIDTH, packGreedy, summarize, TERMINAL_WIDTH, truncateLine, wrapText, wrapUnder } from './render';
 
 describe('packGreedy', () => {
   it('fills each line to the width before starting the next', () => {
@@ -62,6 +62,25 @@ describe('wrapUnder', () => {
   it('keeps a word wider than the whole report rather than losing its tail', () => {
     const word = 'x'.repeat(TERMINAL_WIDTH + 20);
     expect(wrapUnder(word, '  - ')).toEqual([`  - ${word}`]);
+  });
+
+  // Every line but the first carries the hanging indent, so budgeting from
+  // the first prefix alone put a 60-character indent on top of a full-width
+  // line: [76, 134] against a report of 78. No caller passes a hanging
+  // indent wider than its first prefix, so the invariant this function's own
+  // shape implies held only by coincidence across five call sites.
+  it('budgets against a hanging indent wider than its first prefix', () => {
+    const lines = wrapUnder('word '.repeat(30).trim(), '  ', ' '.repeat(40));
+    expect(lines.length).toBeGreaterThan(1);
+    for (const line of lines) expect(line.length).toBeLessThanOrEqual(TERMINAL_WIDTH);
+  });
+
+  // The one case that still overflows, and it is the floor doing it on
+  // purpose: a prefix leaving less than MIN_WRAP_WIDTH would otherwise wrap
+  // every line to a few characters, and nothing here ever cuts.
+  it('overflows only by the wrap floor when the indent leaves less than it', () => {
+    const lines = wrapUnder('word '.repeat(30).trim(), '  ', ' '.repeat(60));
+    for (const line of lines.slice(1)) expect(line.length).toBeLessThanOrEqual(60 + MIN_WRAP_WIDTH);
   });
 });
 
