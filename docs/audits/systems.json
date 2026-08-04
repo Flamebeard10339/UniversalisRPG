@@ -294,6 +294,8 @@
         "scripts/probe.test.ts",
         "scripts/mutate.ts",
         "scripts/mutate.test.ts",
+        "scripts/inspect.ts",
+        "scripts/inspect.test.ts",
         "scripts/audit-status.ts",
         "scripts/layer-check.ts",
         "scripts/lib",
@@ -326,6 +328,13 @@
             "scripts/play-cli.ts"
           ],
           "note": "testing-procedure-2026-07-30-h1 is about /test running against live session state in this file."
+        },
+        {
+          "name": "repo-resolved expression evaluation",
+          "paths": [
+            "scripts/inspect.ts"
+          ],
+          "note": "produced by repo-resolved-evaluation; what npm run probe is for the DSL load path, for everything else"
         }
       ]
     },
