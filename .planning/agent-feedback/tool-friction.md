@@ -139,3 +139,30 @@ considering alongside it: `edit` refusing an `--evidence` that would shrink a no
 order of magnitude, the way a diff tool asks before discarding. That is a guess at a rule and the
 repo is right to resist new gates — but the failure it would have caught is recorded here now, which
 is the evidence a gate is supposed to earn its place with.
+
+### A `proof:` target naming no test is green, not red
+
+Verifying `tool-friction-backlog`'s clauses meant running each `proof: vitest <file> "<name>"` the
+brief points at. `npx vitest run scripts/tasks/mergeReady.test.ts -t "merge-ready fails on a dirty
+tree"` reports `Test Files 1 skipped (1) / Tests 12 skipped (12)` and exits 0. Nothing distinguishes
+that from a target that ran and passed, so an auditor doing exactly what the brief says can record
+`met` on the strength of a command that asserted nothing. Forty of that spec's forty-nine targets are
+in this state, which is how it was noticed at all: the count was too high to be coincidence.
+
+The audit's own findings cover the drifted names. What belongs here is the harness half — a filter
+that matches nothing is indistinguishable from a filter that matches and passes, so the drift is
+undetectable at the moment it matters. Whether the answer is `--allowOnly`-style strictness, a
+`doctor` read over `proofTargets` (which today only `audit.ts` reads, and only to print), or nothing
+at all, the fact is that the one mechanism the spec's `## Decisions` defends as "a declaration to the
+auditor" has no way to say it has gone stale.
+
+### `npm run mutate` escalating survivors past the tool timeout
+
+A nine-mutation manifest over `scripts/tasks.test.ts` and `scripts/tasks/mergeReady.test.ts` ran past
+the 600-second harness timeout and had to be backgrounded. The cost is correct and by design — two
+survivors each escalate to the whole suite, and the whole-suite baseline is measured once — but it
+means a mutation-testing pass is not a foreground command at this size, and an auditor budgeting
+against the repo's five-minutes rule will guess wrong. Splitting the manifest by scope, so survivors
+in one file escalate without dragging the rest, was the workaround. Worth a line in the tool's own
+usage that a survivor costs a whole-suite run, since the manifest is written before anyone knows
+which mutations will survive.
