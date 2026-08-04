@@ -3780,7 +3780,7 @@ describe('tasks system', () => {
   // The names are already in `Module.exports` at the point a total was taken
   // over them, and the total is what a planner then had to go and look up by
   // hand before it could import anything.
-  it('names its exported surface instead of counting it', () =>
+  it('system names its exported surface instead of counting it', () =>
     fixture(({ tasks }) => {
       const result = tasks('system', 'Runtime');
       expect(result.status).toBe(0);
@@ -3821,7 +3821,7 @@ describe('tasks where', () => {
   // The prior art that bit was in finished work: `droptables` was done and
   // merged when its batched-chance rule was re-derived from scratch. So a
   // query that stops at live records answers the easy half.
-  it('names every task that has ever claimed the path, closed and declined ones included', () =>
+  it('where names every task that has ever claimed the path, closed and declined ones included', () =>
     fixture(({ tasks }) => {
       tasks('add', 'the save format pass', '--id', 'saves-v2', '--writes', 'src/runtime/save.ts');
       tasks('done', 'saves-v2');
@@ -3834,7 +3834,7 @@ describe('tasks where', () => {
       expect(result.stdout).toContain('[declined] save-rewrite');
     }));
 
-  it('resolves a directory grant against a path beneath it', () =>
+  it('where resolves a directory grant against a path beneath it', () =>
     fixture(({ tasks }) => {
       tasks('add', 'the travel pass', '--id', 'travel', '--writes', 'src/runtime');
       const result = tasks('where', 'src/runtime/save.ts');
@@ -3843,7 +3843,7 @@ describe('tasks where', () => {
       expect(result.stdout).toContain('writes src/runtime');
     }));
 
-  it('answers with the owning system, the concepts on the path and the produces claims naming them', () =>
+  it('where answers with the owning system, the concepts on the path and the produces claims naming them', () =>
     fixture(({ tasks }) => {
       tasks('concept', 'Runtime', 'saves', '--paths', 'src/runtime/save.ts', '--note', 'from a produces claim');
       tasks('add', 'build the save migrator', '--id', 'migrator', '--writes', 'src/runtime/save.ts', '--produces', 'save migrator');
@@ -3855,12 +3855,12 @@ describe('tasks where', () => {
       expect(result.stdout).toContain('produces save migrator');
     }));
 
-  it('says outright that nothing has claimed a path, rather than printing an empty section', () =>
+  it('where says outright that nothing has claimed a path, rather than printing an empty section', () =>
     fixture(({ tasks }) => {
       expect(tasks('where', 'src/runtime/save.ts').stdout).toContain('nothing has claimed src/runtime/save.ts');
     }));
 
-  it('answers for a directory with the files under it and the whole surface they export', () =>
+  it('where answers for a directory with the files under it and the whole surface they export', () =>
     fixture(({ tasks }) => {
       const result = tasks('where', 'src/runtime');
       expect(result.status).toBe(0);
