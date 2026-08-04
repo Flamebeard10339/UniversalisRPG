@@ -61,6 +61,14 @@
             "src/content/universe.ts"
           ],
           "note": "CLAUDE.md defines this system's second half as syntax to registry, including load-time reference resolution."
+        },
+        {
+          "name": "droptable system",
+          "paths": [
+            "src/content/dropTable.ts",
+            "src/grammar/actionResult.ts"
+          ],
+          "note": "produced by droptables"
         }
       ]
     },

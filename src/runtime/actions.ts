@@ -118,6 +118,10 @@ export function outcomeResults(action: Action, outcome: FightOutcome): ActionRes
   return outcome === 'completion' ? [...action.results, ...(action.onSuccess ?? [])] : (action.onEscape ?? []);
 }
 
+// Deliberately shallow. A `stop` nested inside a selector is reached by
+// `samplesPerApplication`, which applies such a group one repetition at a time
+// and breaks the moment one stops — so the cap here would be a second guard over
+// the same case, and no test can tell the two readings apart.
 export function stopsOnOutcome(action: Action, outcome: FightOutcome): boolean {
   return outcomeResults(action, outcome).some((result) => result.kind === 'stop');
 }

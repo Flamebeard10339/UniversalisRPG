@@ -128,3 +128,117 @@ Worth considering: have `done`, `decline` and `triage` print the `tasks decision
 the point, so the store should be the path of least resistance rather than the commit body. Batching
 store writes to one commit per phase (triage → closures → `spec done` were four commits here and are
 one state change per pass) is discipline rather than a tool change.
+
+## droptables audit, 2026-08-04
+
+### A full `tasks audit` pass does not fit on a Windows command line
+
+The first attempt at recording twelve clause verdicts with evidence a next pass can re-run died on
+`The command line is too long.` — Windows caps a process command line at 8191 characters, and twelve
+`--proof N=... --evidence N="..."` pairs carrying test names, mutation verdicts and probe output ran
+well past it. The evidence had to be compressed to fit, which is the wrong pressure: the tool asks
+for evidence specific enough to re-run and then rations how much of it there is room for.
+
+Splitting is not a way out. `--proof` flags record a *pass*, and a clause left ungraded in a pass is
+recorded `unknown` — so two calls covering six clauses each would leave the first six reading
+`unknown` in the next `audit-prompt`. Findings split cleanly (three calls, no pass appended, verdicts
+stood), so the seam already exists for the half that does not need it.
+
+Worth considering: `tasks audit <spec> --from <file>` taking the same flags as lines, or JSON. The
+store write is one operation; only the transport is the problem.
+
+### `npm run mutate` cannot tell a line-ending mismatch from a wrong find
+
+This repo has mixed line endings — `src/**/*.ts` is CRLF on disk, `content/tutorial-island.dsl` is
+LF. A manifest whose multi-line `find` used `\n` was refused with `src/runtime/effects.ts does not
+contain the find text`, and the same manifest rewritten with `\r\n` was then refused for
+`content/tutorial-island.dsl`. Both messages are correct and neither is a clue; `cat -A` through
+git-bash shows LF for both, so the usual way of checking makes it worse. Two rounds went to this
+before a node one-liner comparing the raw bytes found it.
+
+Worth considering: when a `find` misses, retry once with the other line ending and, if that hits, say
+so in the refusal — `the find text matches with CRLF line endings; this file is CRLF`. The refusal
+already reads the whole file, so the check is free.
+
+## droptables audit pass 2, 2026-08-04
+
+### `npm run probe -- - --each` reports every document that loads as a broken module
+
+The usage text advertises stdin plus `--each` as the way to survey a table of variants, and it works
+for every variant that fails to load. A variant that loads *clean* reports `stdin[3] is not a usable
+module id` — `splitDocuments` names each document `${name}[${index + 1}]` (probe.ts:204) and the
+brackets are not legal in a module id, so the loader refuses the name rather than the content. The
+survey therefore cannot distinguish "loads" from "rejected", which is the one distinction a table of
+variants is asked for; every probe of an accepted shape had to be re-run as a temp file.
+
+Worth considering: name them `stdin-3`. One character, and the advertised path starts answering the
+question it exists for.
+
+### The CRLF trap in `npm run mutate` cost this pass two rounds as well
+
+Already logged from pass 1 below, and hit again immediately: two of ten mutations in the first
+manifest were refused with `does not contain the find text` purely because `\n` should have been
+`\r\n`. Recording the second occurrence because the fix suggested there — retry with the other line
+ending and say so — is now paid for twice.
+
+## droptables implementation, 2026-08-04
+
+Filed by the implementing session rather than an auditor, so the friction is in the verbs a worker
+touches on the way through the workflow rather than in `tasks audit`.
+
+### `merge-ready` prints "every leg passed" over a warning class that is about losing work
+
+Closing the spec left five `doctor` warnings — four findings closed only in the working tree, and
+`docs/tasks.jsonl` uncommitted — each saying a cleanup or reset would discard the close silently.
+`merge-ready` ran `doctor`, printed all five, marked the leg `ok pass`, and ended on
+`merge-ready: every leg passed`. That is correct by the documented rule (`doctor` fails on exactly
+one condition, an unparseable line) and it is still the wrong last line to read: the summary is what
+a session acts on, and these particular warnings exist because the state they describe is about to be
+thrown away. Caught here only by reading back through the scrollback for an unrelated reason.
+
+Worth considering: let the summary carry a count — `doctor ok pass (5 warning(s))` — without changing
+what fails. The gate keeps its one failure condition and stops swallowing the one warning class whose
+whole point is that nobody will notice.
+
+### Three flag shapes for "an id", and the workflow's own examples use the one that is wrong here
+
+`tasks spec add droptables --id droptables` is refused; the verb takes positionals
+(`spec add <slug> <id>...`). `--id` is right for `note`, `log` and `add`, and `docs/workflow.md`
+spells `--id` in the sentence directly above the one describing `spec add`. Separately,
+`tasks add "<title>" --note "..."` is refused — the field is `--evidence`, while `note` exists as its
+own verb, so the guess is not unreasonable. Each cost one round trip and both are the same shape of
+mistake: the CLI's own vocabulary predicts a flag the verb does not take.
+
+Worth considering: accept `--id` on `spec add` as a synonym for the positionals, and either accept
+`--note` on `add` or say `did you mean --evidence?` in the refusal. The refusals already print usage;
+naming the near-miss field is a line.
+
+### `audit-status` is an npm script, not a tasks verb, and everything around it is a tasks verb
+
+`npm run tasks -- audit-status` is refused as an unknown command; it is `npm run audit-status`.
+CLAUDE.md lists it beside `npm run tasks -- doctor`, `merge-ready` runs it as a leg alongside four
+tasks verbs, and `tasks` owns every other question about systems and concepts (`system`, `where`,
+`produces`, `concept`). Nothing about the surface suggests this one lives elsewhere.
+
+Worth considering: a `tasks audit-status` that shells to the same code, or a line in the unknown-command
+refusal pointing at `npm run audit-status`. The refusal already prints the verb list, so it knows the
+name is not one of them.
+
+### The mutate `find` refusal, a third time, on escaping rather than line endings
+
+Logged twice below for CRLF. The same refusal with the same wording also covers a manifest written
+through a shell heredoc, where a regex `find` containing `\t` reaches the JSON as a literal tab and
+stops matching source that holds backslash-t. Two rounds again, and the fix in the end was to stop
+hand-writing the `find` and read the line out of the file instead.
+
+Worth considering: the suggestion already recorded below — retry and say what matched — generalises
+if the refusal simply prints the nearest line in the file by edit distance. That covers line endings,
+escaping, and whitespace drift with one message, and the refusal already has the file in hand.
+
+### Working well, recorded so it does not get optimised away
+
+`tasks done` on a member whose clause is unmet prints `clause standing at close: proof clause 9 is
+unmet in the latest audit pass (pass 1)`, and `tasks promote` on a pass-2 finding prints
+`promoting a pass 2 finding, which extends what droptables owes`. Both are the tool declining to let
+a close look tidier than it is, at the moment the judgement is being made. They are the reason this
+branch did not quietly close a clause an auditor had graded `unmet`.

@@ -1,5 +1,4 @@
-import { ActionResult, actionResult } from '../grammar/actionResult';
-import { list } from '../grammar/list';
+import { ActionResult, resultList } from '../grammar/actionResult';
 import { DslError, Parser } from '../grammar/parser';
 import { SectionSchema } from '../grammar/section';
 import { humanize, id, decimal, text } from '../grammar/values';
@@ -40,7 +39,7 @@ export const resourceSchema: SectionSchema<Resource> = {
     max: { parser: id },
     start: { parser: decimal },
     display: { parser: displayValue, default: () => 'full' },
-    onEmpty: { parser: list(actionResult), keyword: 'on empty', default: () => [] },
-    onFull: { parser: list(actionResult), keyword: 'on full', default: () => [] },
+    onEmpty: { parser: resultList, keyword: 'on empty', default: () => [] },
+    onFull: { parser: resultList, keyword: 'on full', default: () => [] },
   },
 };

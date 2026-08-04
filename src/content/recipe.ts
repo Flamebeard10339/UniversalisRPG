@@ -1,13 +1,15 @@
 import { list } from '../grammar/list';
 import { Parser } from '../grammar/parser';
 import { SectionSchema } from '../grammar/section';
-import { decimal, id, number, numberOrStat, Quantified, quantified, text } from '../grammar/values';
+import { decimal, id, number, numberOrStat, produced, Produced, Quantified, quantified, text } from '../grammar/values';
 
 export interface Recipe {
   id: string;
   requiresCapability?: string; // absent means craftable anywhere
   in: Quantified[];
-  out: Quantified[];
+  // Produced, so a fletching craft can yield 5-10 arrows; `in` is consumed and
+  // stays a count, because `inputLimit` must be able to divide by it.
+  out: Produced[];
   skill?: { skill: string; amount: number };
   say?: string;
   // The compiled craft's cadence, the same one axis an action carries: absent
@@ -17,7 +19,7 @@ export interface Recipe {
   accuracy?: string;
   // Contested against `accuracy:`, the same field a rat's dodge uses.
   evasion?: string;
-  burnt: Quantified[];
+  burnt: Produced[];
 }
 
 const recipeSkill: Parser<{ skill: string; amount: number }> = {
@@ -33,13 +35,13 @@ export const recipeSchema: SectionSchema<Recipe> = {
   fields: {
     requiresCapability: { parser: id, keyword: 'station' },
     in: { parser: list(quantified), default: () => [] },
-    out: { parser: list(quantified), default: () => [] },
+    out: { parser: list(produced), default: () => [] },
     skill: { parser: recipeSkill },
     say: { parser: text },
     time: { parser: decimal },
     rate: { parser: numberOrStat },
     accuracy: { parser: id },
     evasion: { parser: id },
-    burnt: { parser: list(quantified), default: () => [] },
+    burnt: { parser: list(produced), default: () => [] },
   },
 };

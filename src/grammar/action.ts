@@ -1,11 +1,11 @@
-import { ActionResult, actionResult, startsResult } from './actionResult';
+import { ActionResult, parseResultLine, resultList, startsResult } from './actionResult';
 import { Condition, condition } from './condition';
 import { list } from './list';
 import { Cursor, DslError, requireEnd } from './parser';
 import { EntryBody } from './section';
 import { RawLine } from './structure';
 import { TagClause, tagClause } from './tagClause';
-import { decimal, id, numberOrStat } from './values';
+import { decimal, id, numberOrStat, refuseRange } from './values';
 
 // What ends the action, which is a different question from how fast it attempts.
 export type ActionKind = 'instant' | 'duration' | 'continuous';
@@ -39,7 +39,7 @@ export interface Action {
   retaliates?: boolean;
 }
 
-const results = list(actionResult);
+const results = resultList;
 const tagClauses = list(tagClause);
 
 // Bare tags lifted onto the field they name; extending this list adds another.
@@ -71,7 +71,12 @@ type ActionValue = (cursor: Cursor, line: RawLine, label: string) => unknown;
 
 const conditionValue: ActionValue = (cursor) => (cursor.done ? undefined : condition.parse(cursor));
 const statValue = (written: string): ActionValue => (cursor, line, label) => named(written, label, line, () => id.parse(cursor));
-const resultsValue: ActionValue = (cursor, line) => (!cursor.done ? results.parse(cursor) : line.children.length > 0 ? results.parseBlock(line.children) : undefined);
+const resultsValue: ActionValue = (cursor, line, label) => {
+  if (cursor.done) return line.children.length > 0 ? results.parseBlock(line.children) : undefined;
+  const inline = results.parse(cursor);
+  if (line.children.length > 0) throw new DslError(actionProblem(label, 'a result group is written inline and as a block; give it one'), line.span);
+  return inline;
+};
 
 // A shared value parser reports what it expected but not what it was reading,
 // and pins the span to the cursor rather than the line. Every reader below is
@@ -97,6 +102,7 @@ const positiveCount =
   (cursor, line, label) => {
     const raw = cursor.take(/\d+/);
     if (raw === null || Number(raw) <= 0) throw new DslError(actionProblem(label, `${written} requires a positive integer`), line.span);
+    named(written, label, line, () => refuseRange(cursor, 'this number is a threshold, not a quantity, so it takes one value rather than a range'));
     return Number(raw);
   };
 
@@ -149,7 +155,10 @@ function parseActionField(line: RawLine, cursor: Cursor, action: Omit<Action, 'l
   }
 
   if (startsResult(cursor)) {
-    action.results.push(...results.parse(cursor));
+    // The whole line, because a wrapper's body may be the block hanging off it,
+    // and a cursor over the line's text alone cannot see one.
+    action.results.push(...parseResultLine(line));
+    cursor.pos = line.text.length;
   } else {
     action.tags = (action.tags ?? []).concat(tagClauses.parse(cursor));
   }

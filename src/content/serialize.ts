@@ -1,11 +1,12 @@
 import { Action } from '../grammar/action';
-import { ActionResult } from '../grammar/actionResult';
+import { ActionResult, DropRow, nestedResults } from '../grammar/actionResult';
 import { Condition, Reference } from '../grammar/condition';
 import { formatDependency, formatVersion, Version } from '../grammar/dependency';
-import { isPoint, Range } from '../grammar/range';
+import { isPoint, Range, scaleRange } from '../grammar/range';
 import { TagClause } from '../grammar/tagClause';
-import { Quantified } from '../grammar/values';
+import { Produced, Quantified } from '../grammar/values';
 import { Dialogue, TextSegment } from './dialogue';
+import { DropTable } from './dropTable';
 import { Entity } from './entity';
 import { EntityType } from './entityType';
 import { Item } from './item';
@@ -55,6 +56,12 @@ function quantified(value: Quantified): string {
   return value.amount === undefined ? value.item : `${n(value.amount)} ${value.item}`;
 }
 
+// The no-draw reader of a produced amount: the range as written, not a sample of
+// it. `sampleCount` is the other half of the same fork.
+function producedQuantity(value: Produced): string {
+  return value.amount === undefined ? value.item : `${range(value.amount)} ${value.item}`;
+}
+
 function result(value: ActionResult): string {
   switch (value.kind) {
     case 'say':
@@ -66,23 +73,66 @@ function result(value: ActionResult): string {
     case 'add':
       return `add: ${value.variable} ${n(value.amount)}`;
     case 'give':
-      return `give: ${quantified({ item: value.item, amount: value.amount })}`;
+      return `give: ${producedQuantity(value)}`;
     case 'take':
       return `take: ${quantified({ item: value.item, amount: value.amount })}`;
     case 'xp':
-      return `xp: ${value.skill} ${n(value.amount)}`;
+      return `xp: ${value.skill} ${range(value.amount)}`;
     case 'relocate':
       return `relocate: ${value.location}`;
     case 'discover':
       return `discover: ${value.location}`;
     case 'open-modal':
       return `open modal: ${value.modal}`;
-    case 'pool':
-      return `${value.delta < 0 ? 'drain' : 'restore'}: ${n(Math.abs(value.delta))} ${value.resource}`;
+    case 'pool': {
+      // The exact inverse of what `parsePool` did: it scaled the written
+      // magnitude by the verb's sign, so undoing it is the same scale again.
+      // Taking abs of each bound instead inverted a restore's range — a
+      // symmetric operation on a point, which is why nothing saw it.
+      const magnitude = value.delta.max < 0 ? scaleRange(value.delta, -1) : value.delta;
+      return `${value.delta.max < 0 ? 'drain' : 'restore'}: ${range(magnitude)} ${value.resource}`;
+    }
+    case 'roll':
+      return `roll: ${value.table}`;
     case 'stop':
       return 'stop';
+    // A wrapper is never one line, so it has no spelling here; resultLines owns
+    // it and the guard below is what stops a caller reaching this arm.
+    case 'chance':
+    case 'contest':
+    case 'gate':
+    case 'one-of':
+      throw new Error(`a ${value.kind} result spans lines and cannot be inlined`);
   }
 }
+
+const side = (value: number | string): string => (typeof value === 'string' ? value : n(value));
+
+function rowLines(row: DropRow): Lines {
+  const gate = row.requires ? ` if ${condition(row.requires)}` : '';
+  const label = `${typeof row.weight === 'string' ? row.weight : `${n(row.weight)}x`}${gate}:`;
+  if (row.results.length === 0) return [`${label} nothing`];
+  return [label, ...indented(row.results.flatMap(resultLines))];
+}
+
+// A wrapper prints as its selector over an indented body, which is the one form
+// that reloads: the inline form cannot carry a nested block.
+function resultLines(value: ActionResult): Lines {
+  switch (value.kind) {
+    case 'chance':
+      return [`${n(value.numerator)} in ${n(value.denominator)}:`, ...indented(value.results.flatMap(resultLines))];
+    case 'contest':
+      return [`${side(value.left)} vs ${side(value.right)}:`, ...indented(value.results.flatMap(resultLines))];
+    case 'gate':
+      return [`if ${condition(value.condition)}:`, ...indented(value.results.flatMap(resultLines))];
+    case 'one-of':
+      return ['one of:', ...indented(value.rows.flatMap(rowLines))];
+    default:
+      return [result(value)];
+  }
+}
+
+const spansLines = (values: readonly ActionResult[] | undefined): boolean => (values ?? []).some((value) => nestedResults(value).length > 0);
 
 function results(values: readonly ActionResult[] | undefined): string {
   return (values ?? []).map(result).join(', ');
@@ -129,7 +179,7 @@ function block(lines: Lines, label: string, values: readonly string[]): void {
 
 function resultBlock(lines: Lines, label: string, values: readonly ActionResult[] | undefined, childSpaces = 2): void {
   if (!values || values.length === 0) return;
-  lines.push(`${label}:`, ...indented(values.map(result), childSpaces));
+  lines.push(`${label}:`, ...indented(values.flatMap(resultLines), childSpaces));
 }
 
 function actionLines(action: Action): Lines {
@@ -151,7 +201,7 @@ function actionLines(action: Action): Lines {
     action.escapeAfter !== undefined ||
     action.retaliates;
 
-  if (!modifiers && action.results.length === 1) return [`${action.label}: ${results(action.results)}`];
+  if (!modifiers && action.results.length === 1 && !spansLines(action.results)) return [`${action.label}: ${results(action.results)}`];
 
   const lines = [`${action.label}:`];
   if (action.requires) lines.push(`  requires: ${condition(action.requires)}`);
@@ -171,7 +221,7 @@ function actionLines(action: Action): Lines {
   if (action.target) lines.push(`  target: ${action.target}`);
   if (action.dr) lines.push(`  dr: ${action.dr}`);
   if (action.escapeAfter !== undefined) lines.push(`  escape after ${n(action.escapeAfter)}`);
-  lines.push(...indented(action.results.map(result)));
+  lines.push(...indented(action.results.flatMap(resultLines)));
   resultBlock(lines, '  on success', action.onSuccess, 4);
   resultBlock(lines, '  on failure', action.onFailure, 4);
   resultBlock(lines, '  on escape', action.onEscape, 4);
@@ -302,14 +352,14 @@ function recipeSection(moduleId: string, recipe: Recipe): string {
   const lines = [`# recipe ${moduleLocalId(moduleId, recipe.id)}`];
   if (recipe.requiresCapability) lines.push(`station: ${recipe.requiresCapability}`);
   block(lines, 'in', recipe.in.map(quantified));
-  block(lines, 'out', recipe.out.map(quantified));
+  block(lines, 'out', recipe.out.map(producedQuantity));
   if (recipe.skill) lines.push(`skill: ${recipe.skill.skill} ${n(recipe.skill.amount)}`);
   if (recipe.say) lines.push(`say: ${recipe.say}`);
   if (recipe.time !== undefined) lines.push(`time: ${n(recipe.time)}`);
   if (recipe.rate !== undefined) lines.push(`rate: ${typeof recipe.rate === 'string' ? recipe.rate : n(recipe.rate)}`);
   if (recipe.accuracy) lines.push(`accuracy: ${recipe.accuracy}`);
   if (recipe.evasion) lines.push(`evasion: ${recipe.evasion}`);
-  block(lines, 'burnt', recipe.burnt.map(quantified));
+  block(lines, 'burnt', recipe.burnt.map(producedQuantity));
   return lines.join('\n');
 }
 
@@ -325,6 +375,10 @@ function resourceSection(moduleId: string, resource: Resource): string {
   return lines.join('\n');
 }
 
+function dropTableSection(moduleId: string, table: DropTable): string {
+  return [`# droptable ${moduleLocalId(moduleId, table.id)}`, ...table.results.flatMap(resultLines)].join('\n');
+}
+
 function dialogueSection(moduleId: string, dialogue: Dialogue): string {
   const lines = [`# dialogue ${moduleLocalId(moduleId, dialogue.id)}`];
   if (dialogue.owner) lines.push(`owner = ${dialogue.owner}`);
@@ -337,13 +391,13 @@ function dialogueSection(moduleId: string, dialogue: Dialogue): string {
     if (node.again) lines.push(`  again: ${textSegments(node.again)}`);
     for (const step of node.steps) {
       if (step.kind === 'say') lines.push(`  ${textSegments(step.segments)}`);
-      else if (step.kind === 'effect') lines.push(`  ${result(step.result)}`);
+      else if (step.kind === 'effect') lines.push(...indented(resultLines(step.result)));
       else if (step.kind === 'goto') lines.push(`  goto ${step.target}`);
       else {
         for (const choice of step.choices) {
           lines.push(`  -> ${textSegments(choice.segments)}${choice.when ? ` (when ${condition(choice.when)})` : ''}`);
           if (choice.goto) lines.push(`    goto ${choice.goto}`);
-          for (const effect of choice.effects) lines.push(`    ${result(effect)}`);
+          for (const effect of choice.effects) lines.push(...indented(resultLines(effect), 4));
         }
       }
     }
@@ -383,6 +437,7 @@ export function serializeRegistryModule(registry: Registry, options: SerializeMo
   for (const location of registry.locations.values()) if (inModule(moduleId, location.id)) sections.push(locationSection(moduleId, location));
   for (const recipe of registry.recipes.values()) if (inModule(moduleId, recipe.id)) sections.push(recipeSection(moduleId, recipe));
   for (const resource of registry.resources.values()) if (inModule(moduleId, resource.id)) sections.push(resourceSection(moduleId, resource));
+  for (const table of registry.dropTables.values()) if (inModule(moduleId, table.id)) sections.push(dropTableSection(moduleId, table));
   for (const dialogue of registry.dialogues.values()) if (inModule(moduleId, dialogue.id)) sections.push(dialogueSection(moduleId, dialogue));
   for (const flag of registry.flags.values()) if (inModule(moduleId, flag.id)) sections.push(`# flag ${moduleLocalId(moduleId, flag.id)}`);
   for (const variableId of options.globalVariables ?? []) {

@@ -1,9 +1,13 @@
-import { ActionResult } from '../grammar/actionResult';
+import { ActionResult, DropRow, nestedResults } from '../grammar/actionResult';
 import { DISCOVERED } from '../content/location';
+import { DropTable } from '../content/dropTable';
+import { isPoint, Range, sampleCount, sampleRange } from '../grammar/range';
 import { Registry } from '../content/registry';
 import { Resource } from '../content/resource';
+import { evaluateCondition } from './conditions';
+import { nextRandom } from './rng';
 import { endAction, GameState, PLAYER, RuntimeError } from './state';
-import { statValue } from './stats';
+import { hitChance, statValue } from './stats';
 import { divideRateRemainder, toMilliUnits } from './units';
 
 export interface Segment {
@@ -32,14 +36,78 @@ export function clearActorDeltas(deltas: PoolDeltas, actorId: string): void {
   deltas.delete(actorId);
 }
 
-export function applyResults(segment: Segment, results: readonly ActionResult[], count = 1): void {
+// Whether applying this group `count` times is the same as applying it once and
+// scaling. A draw is not, and neither is a range: both would collapse `count`
+// independent outcomes into one outcome repeated. Every wrapper answers yes,
+// which is also what puts a nested `stop` on the repetition that rolled it —
+// `stopsOnOutcome` stays shallow on the strength of that.
+export function samplesPerApplication(results: readonly ActionResult[]): boolean {
+  return results.some((result) => {
+    if (nestedResults(result).length > 0 || result.kind === 'roll') return true;
+    if (result.kind === 'give') return result.amount !== undefined && !isPoint(result.amount);
+    if (result.kind === 'xp') return !isPoint(result.amount);
+    if (result.kind === 'pool') return !isPoint(result.delta);
+    return false;
+  });
+}
+
+// The one place a produced amount meets the rng, shaped like `sampleStat`: a
+// point range is a certainty and draws nothing, which is what keeps every
+// pre-existing seeded expectation where it was.
+function drawCount(state: GameState, amount: Range | undefined): number {
+  if (amount === undefined) return 1;
+  return isPoint(amount) ? amount.min : sampleCount(amount, nextRandom(state));
+}
+
+function drawAmount(state: GameState, amount: Range): number {
+  return isPoint(amount) ? amount.min : sampleRange(amount, nextRandom(state));
+}
+
+function statSide(value: number | string, state: GameState, registry: Registry): number {
+  return typeof value === 'number' ? value : statValue(value, state, registry);
+}
+
+// Rows whose gate is false leave the pool BEFORE the draw, so the survivors'
+// shares grow. Selecting a gated-off row and then producing nothing would be a
+// different distribution.
+function selectRow(rows: readonly DropRow[], state: GameState, registry: Registry): DropRow | undefined {
+  const live = rows.filter((row) => row.requires === undefined || evaluateCondition(row.requires, state));
+  const weights = live.map((row) => Math.max(0, statSide(row.weight, state, registry)));
+  const total = weights.reduce((sum, weight) => sum + weight, 0);
+  if (total <= 0) return undefined;
+  let picked = nextRandom(state) * total;
+  for (let i = 0; i < live.length; i++) {
+    picked -= weights[i];
+    if (picked < 0) return live[i];
+  }
+  return live[live.length - 1];
+}
+
+function requireDropTable(registry: Registry, id: string): DropTable {
+  const table = registry.dropTables.get(id);
+  if (!table) throw new RuntimeError(`unknown droptable: ${id}`);
+  return table;
+}
+
+// `lead` is false for every repetition after a batch's first. A result that
+// ignores `count` speaks once for the whole batch — 100 crafted loaves are one
+// line — and that has to stay true of an action whether or not one of its
+// results happens to draw. A `say:` INSIDE a wrapper is a different sentence: it
+// leads its own group, and speaks on each repetition that reaches it.
+export function applyResults(segment: Segment, results: readonly ActionResult[], count = 1, lead = true): void {
   if (count <= 0) return;
   const { state, registry } = segment;
+  // A group that draws is applied once per repetition, in order, rather than
+  // once and scaled — a batched craft rolls its table for every completion.
+  if (count > 1 && samplesPerApplication(results)) {
+    for (let i = 0; i < count && !segment.stopped; i++) applyResults(segment, results, 1, lead && i === 0);
+    return;
+  }
 
   for (const result of results) {
     switch (result.kind) {
       case 'say':
-        state.log.push(result.text);
+        if (lead) state.log.push(result.text);
         break;
       case 'set':
         state.flags[result.variable] = true;
@@ -54,13 +122,13 @@ export function applyResults(segment: Segment, results: readonly ActionResult[],
         break;
       }
       case 'give':
-        state.inventory[result.item] = (state.inventory[result.item] ?? 0) + (result.amount ?? 1) * count;
+        state.inventory[result.item] = (state.inventory[result.item] ?? 0) + drawCount(state, result.amount) * count;
         break;
       case 'take':
         state.inventory[result.item] = Math.max(0, (state.inventory[result.item] ?? 0) - (result.amount ?? 1) * count);
         break;
       case 'xp':
-        state.xp[result.skill] = (state.xp[result.skill] ?? 0) + result.amount * count;
+        state.xp[result.skill] = (state.xp[result.skill] ?? 0) + drawCount(state, result.amount) * count;
         break;
       case 'relocate':
         state.location = result.location;
@@ -69,15 +137,36 @@ export function applyResults(segment: Segment, results: readonly ActionResult[],
         state.flags[`${result.location}.${DISCOVERED}`] = true;
         break;
       case 'open-modal':
-        state.log.push(`modal:${result.modal}`);
+        if (lead) state.log.push(`modal:${result.modal}`);
         state.pendingModal = result.modal;
         break;
       case 'pool':
         requireResource(registry, result.resource);
-        addDelta(segment.deltas, PLAYER, result.resource, toMilliUnits(result.delta) * count);
+        addDelta(segment.deltas, PLAYER, result.resource, toMilliUnits(drawAmount(state, result.delta)) * count);
         break;
       case 'stop':
         segment.stopped = true;
+        break;
+      // Depth-first in source order: a wrapper draws for its own selector, then
+      // its body draws for whatever is inside it.
+      case 'chance':
+        if (nextRandom(state) * result.denominator < result.numerator) applyResults(segment, result.results, count);
+        break;
+      case 'contest':
+        if (nextRandom(state) < hitChance(statSide(result.left, state, registry), statSide(result.right, state, registry), registry)) {
+          applyResults(segment, result.results, count);
+        }
+        break;
+      case 'gate':
+        if (evaluateCondition(result.condition, state)) applyResults(segment, result.results, count);
+        break;
+      case 'one-of': {
+        const row = selectRow(result.rows, state, registry);
+        if (row) applyResults(segment, row.results, count);
+        break;
+      }
+      case 'roll':
+        applyResults(segment, requireDropTable(registry, result.table).results, count);
         break;
     }
   }
