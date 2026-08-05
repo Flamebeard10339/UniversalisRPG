@@ -1234,8 +1234,23 @@ describe('the brief arriving with the answers rather than the instructions', () 
   // Both artifacts are the auditor's working copy the moment they touch one,
   // and re-reading the brief mid-pass is ordinary. Overwriting threw away an
   // aimed manifest and a part-filled pass file with nothing said.
+  // A manifest is only emitted for a `proof:` target that resolves, so these
+  // two need a spec whose target names a test that exists. The file is the
+  // fixture's own, written beside its spec, so nothing here depends on a
+  // title in the real suite staying put.
+  const withResolvableTarget = (dir: string): void => {
+    const testFile = path.join(dir, 'fixture.test.ts');
+    writeFileSync(testFile, "it('a title the fixture owns', () => {});\n", 'utf8');
+    writeFileSync(
+      path.join(dir, 'specs', 'demo-spec.md'),
+      `# Demo spec\n\n## Deliverable\n\nSomething this branch promises.\n\nProof:\n\n- [c1] The first clause holds.\n  proof: vitest ${testFile} "a title the fixture owns"\n- [c2] The second clause holds.\n\n## Decisions\n\n## Open questions\n\nNone.\n`,
+      'utf8',
+    );
+  };
+
   it('keeps an artifact the auditor has already worked on rather than overwriting it', () => {
-    fixture(({ tasks }) => {
+    fixture(({ dir, tasks }) => {
+      withResolvableTarget(dir);
       const first = tasks('audit-prompt', 'demo-spec');
       const passPath = /\n {5}(\S*audit-demo-spec-pass1\.txt)\n/.exec(first.stdout)![1];
       writeFileSync(passPath, '--proof 1=met\n--evidence 1=half a pass, typed by hand\n', 'utf8');
@@ -1244,6 +1259,28 @@ describe('the brief arriving with the answers rather than the instructions', () 
       expect(readFileSync(passPath, 'utf8')).toContain('half a pass, typed by hand');
       expect(second.stdout).toContain('was left alone');
       expect(second.stdout).toContain('Delete it to regenerate against the current diff');
+      // What the fields mean does not depend on who wrote the file. The kept
+      // path used to suppress all four, so an auditor resuming mid-pass lost
+      // the sentence that says an escalated kill is not a clause's own proof.
+      expect(second.stdout).toContain('A kill by any other line is the suite noticing something');
+    });
+  });
+
+  // One manifest path for every pass handed pass N+1 the manifest pass N had
+  // already aimed, under a step that says to aim it — last pass's judgement
+  // measured against this pass's diff, read as this pass's kills. The pass
+  // file was keyed to the pass from the start; the manifest was not.
+  it('gives each pass its own manifest, so no pass inherits the one before it aimed', async () => {
+    await fixture(async ({ dir, tasks, audit }) => {
+      withResolvableTarget(dir);
+      const first = tasks('audit-prompt', 'demo-spec').stdout;
+      expect(first).toContain('mutations-demo-spec-pass1.json');
+
+      await audit('demo-spec', '--proof', '1=met', '--evidence', '1=checked', '--proof', '2=met', '--evidence', '2=checked');
+
+      const second = tasks('audit-prompt', 'demo-spec').stdout;
+      expect(second).toContain('mutations-demo-spec-pass2.json');
+      expect(second).not.toContain('mutations-demo-spec-pass1.json');
     });
   });
 

@@ -521,7 +521,7 @@ function keptNote(path_: string, what: string): string {
 // and a generated file left in it would show up as the branch's own work.
 // Returned rather than printed: the procedure at the top of the brief names
 // this path, and it is printed before any of the data below it.
-function writeMutationManifest(slug: string, clauses: ProofClause[], diffIsForeign: boolean): { lines: string[]; path: string | null } {
+function writeMutationManifest(slug: string, clauses: ProofClause[], pass: number, diffIsForeign: boolean): { lines: string[]; path: string | null } {
   if (diffIsForeign) {
     return { lines: [`No mutation manifest: the diff above is not ${slug}'s, so every line it could break belongs to work these clauses do not describe.`], path: null };
   }
@@ -534,10 +534,19 @@ function writeMutationManifest(slug: string, clauses: ProofClause[], diffIsForei
   if (entries.length === 0) {
     lines.push('- none — no proof target on this spec resolved to a test this brief could name');
   } else {
-    manifestPath = path.join(os.tmpdir(), `mutations-${slug}.json`);
+    // Keyed to the pass, as the pass file already was. One path for every pass
+    // handed pass N+1 the *aimed* manifest pass N left behind, under a step
+    // that says to aim it — an auditor who ran it as found would be measuring
+    // last pass's judgement against this pass's diff and reading the kills as
+    // their own.
+    manifestPath = path.join(os.tmpdir(), `mutations-${slug}-pass${pass}.json`);
     const { kept } = writeArtifact(manifestPath, `${JSON.stringify(entries, null, 2)}\n`);
+    // On both paths, because what the fields mean does not depend on who
+    // wrote the file. The kept path used to suppress all four lines, so an
+    // auditor resuming mid-pass lost the one sentence that says an escalated
+    // kill is not the clause proving itself.
+    for (const note of manifestNotes(entries.length, manifestPath)) lines.push(`  ${note}`);
     if (kept) lines.push(`  ${keptNote(manifestPath, 'mutation manifest')}`);
-    else for (const note of manifestNotes(entries.length, manifestPath)) lines.push(`  ${note}`);
   }
   for (const line of omitted) lines.push(`- omitted: ${line}`);
   return { lines, path: manifestPath };
@@ -597,8 +606,8 @@ export function cmdAuditPrompt(args: Flags, usage: string): void {
   // against a diff these clauses do not describe is the c7 defect one layer
   // down, and the manifest was gated while the pass file — which writes
   // tracked repo state — was not.
-  const manifest = writeMutationManifest(slug, doc.proofClauses, !standing.rangeIsThisSlugs);
   const pass = doc.auditPasses.length + 1;
+  const manifest = writeMutationManifest(slug, doc.proofClauses, pass, !standing.rangeIsThisSlugs);
   const argsPath = standing.rangeIsThisSlugs ? path.join(os.tmpdir(), `audit-${slug}-pass${pass}.txt`) : null;
   const argsKept = argsPath !== null && writeArtifact(argsPath, auditArgsSkeleton(slug, doc.proofClauses, pass)).kept;
 
