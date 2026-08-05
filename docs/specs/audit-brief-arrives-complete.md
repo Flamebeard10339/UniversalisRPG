@@ -42,22 +42,24 @@ Proof:
   proof: vitest scripts/tasks/audit.test.ts "a title that exists nowhere is reported differently from one that merely moved"
   proof: vitest scripts/tasks/audit.test.ts "a target naming a file absent from the checkout is reported as a missing file"
 
-- [c3] The brief emits a mutation manifest built from the targets it resolved. `name`, `file`,
-  `tests` and `test` are derived and right; `find` ships unfilled, in a form `mutate` already
-  refuses, so an entry nobody has aimed stops the run instead of coming back green. Each entry
-  carries the lines this branch added under its clause, so aiming one is a paste. A target that did
-  not resolve is omitted and named as omitted, because `parseManifest` refuses a manifest as a whole
-  and one bad entry would cost the auditor the entire run.
-  proof: vitest scripts/tasks/audit.test.ts "audit-prompt emits a mutation manifest whose derived fields are right and whose find is the auditors"
+- [c3] The brief emits a mutation manifest wired to the targets it resolved. `name`, `tests` and
+  `test` are derived, so each entry runs the test its clause names in the file that test actually
+  lives in. `file` and `find` are the auditor's — which line a clause is about is judgement, and
+  three passes measured what happens when this supplies it anyway — and `find` ships in a form
+  `mutate` already refuses, so an entry nobody has aimed stops the run instead of coming back green.
+  The lines this branch added are carried in `note` as candidates, grouped under the file each came
+  from, because `file` is a single field and a line offered without its file is a paste that cannot
+  be completed. A target that did not resolve is omitted and named as omitted, because
+  `parseManifest` refuses a manifest as a whole and one bad entry would cost the auditor the entire
+  run.
+  proof: vitest scripts/tasks/audit.test.ts "a manifest entry runs the test its clause names, in the file that test lives in"
+  proof: vitest scripts/tasks/audit.test.ts "offers candidate lines grouped under the file each came from"
   proof: vitest scripts/tasks/audit.test.ts "a manifest entry nobody has aimed is refused by mutate rather than run green"
   proof: vitest scripts/tasks/audit.test.ts "an unresolved target is named as omitted rather than emitted into the manifest"
 
-- [c4] The brief carries the diff stat, the commit list over its range, and the spec's own `## Decisions`
-  section. Each was fetched by hand in pass 1 and again in pass 2; the decisions in particular exist
-  to stop an auditor reopening a settled argument, and a brief that parses the spec and then omits
-  them is why pass 1 opened the file anyway.
+- [c4] The brief carries the diff stat and the commit list over its range. Each was fetched by hand
+  in pass 1 and again in pass 2.
   proof: vitest scripts/tasks/audit.test.ts "the brief names the commits in its diff range and what each touched"
-  proof: vitest scripts/tasks/audit.test.ts "the brief carries the specs decisions so an auditor does not reopen them"
 
 - [c5] The brief answers ownership for the changed paths in one place: what system owns each, what
   concept claims it, and what has claimed it before. This is `tasks where` run once per path, which
@@ -76,8 +78,52 @@ Proof:
   detect this from the brief, which is what makes it worse than a missing feature.
   proof: vitest scripts/tasks/audit.test.ts "a slug whose spec this branch does not own is reported rather than ranged silently against HEAD"
 
+- [c8] The steps an auditor takes are printed as a numbered procedure above the data they act on,
+  one line per step, in the order taken — and the last artifact the procedure names is written by
+  the brief rather than described to it. Three passes read the steps out of prose scattered through
+  366 lines, and two of the three still spent a call learning the `--args-from` format from the
+  tool's source. The generated pass file carries one line per clause with every value empty, and an
+  empty `--proof` is refused by name, so an unfilled file stops before it records anything — the
+  same bargain the manifest's unaimed `find` strikes.
+  proof: vitest scripts/tasks/audit.test.ts "writes the pass file the auditor fills in, rather than describing its format"
+  proof: vitest scripts/tasks/audit.test.ts "the generated pass file names every clause and is refused until its values are filled in"
+  proof: vitest scripts/tasks/audit.test.ts "makes logging tool friction a numbered step rather than a line to skip"
+  proof: vitest scripts/tasks/audit.test.ts "tasks audit names the step that follows recording a pass"
+
+- [c9] The brief prints what an auditor can act on and counts what it cannot. It carries neither the
+  spec's own prose nor a list of every spec in the checkout nor a lesson in git — all three were
+  measured as read-past — and closed prior-art claims are a count rather than 42 lines of decisions
+  already made. Nothing is lost: step 1 names the spec file, and `tasks where <path>` still lists
+  every claim in every state for a single path, which is the reader those lines were written for.
+  proof: vitest scripts/tasks/audit.test.ts "sends the auditor to the spec file rather than reprinting its sections"
+  proof: vitest scripts/tasks/audit.test.ts "does not teach git, having already printed the range"
+  proof: vitest scripts/tasks/audit.test.ts "names one other spec to check the standing against, not every spec in the checkout"
+  proof: vitest scripts/tasks/audit.test.ts "counts the closed claims in the brief rather than listing them, and still lists them for one path"
+
 ## Decisions
 
+- Printing an answer fixes a lookup and does nothing for a judgement, and the difference is what
+  three passes cost to learn. Every item the brief eliminated was a lookup — the spec list, the test
+  names, the `--args-from` format. Every item that persisted needed a decision the tool does not
+  make. c3 was judgement the whole time: pass 1 called it a caption problem, pass 2 a `find`
+  problem, pass 3 aimed each entry exactly as instructed and got the same escalated kills. The rule
+  this spec now holds to is that the brief supplies answers it can derive and says plainly which
+  fields it cannot.
+- c3 shrinks to wiring rather than deriving the aim. Making `file` and `find` derivable means
+  running each named test under coverage and intersecting what it executes with the lines the branch
+  added; that is genuinely computable and is a research task with an unmeasured cost, not a clause
+  on this spec. The defect c3 existed to close — a generated manifest coming back green having
+  proved nothing — is closed by the sentinel, which pass 3 confirmed. The remaining half is an
+  unaimed field the brief says is unaimed.
+- The brief prints no prose it did not compute. The deliverable and `## Decisions` sections were
+  added on the theory that a pass which had them printed would not open the spec; all three passes
+  opened it anyway, because a clause is graded against its own spec. Forty-one lines that changed no
+  behaviour. The same test applies to the three git commands and the spec inventory, and both fail
+  it.
+- Closed prior-art claims are collapsed in the brief and left in full in `tasks where`. Ownership is
+  one relation with two readers: a reader asking about one path wants every claim, closed ones
+  included, and a reader handed a whole branch's diff wants the collisions. One query, one flag,
+  rather than two answers to keep in sync.
 - This branch extends `unresolvedTarget` and `testTitles` rather than adding a resolver beside
   them. The capability survey found them on `scripts/tasks/audit.ts`, already doing two thirds of
   the job; a second implementation would be the duplication `tasks produces` exists to prevent.
