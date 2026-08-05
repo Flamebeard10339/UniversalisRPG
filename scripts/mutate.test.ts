@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { applyTo, escapesRoot, findMissRefusal, formatReport, journalVerdict, outputTail, parseManifest, parseVitestTally, journalPathFor, pidIsAlive, readJournal, scopeOf, type BaselineFor, type RunTests, recoverFrom, refusalsFor, resolveVitest, runMutations, tallyOf, visibleWhitespace, type FileStore, type Mutation, type TestRun } from './mutate';
+import { applyTo, escapesRoot, findMissRefusal, formatReport, journalVerdict, outputTail, parseManifest, parseVitestTally, journalPathFor, pidIsAlive, putBackAll, readJournal, recoveryStanding, scopeOf, type BaselineFor, type RunTests, recoverFrom, refusalsFor, resolveVitest, runMutations, tallyOf, visibleWhitespace, type FileStore, type Mutation, type TestRun } from './mutate';
 
 const ORIGINAL = 'const base = entityTypeBase(merged, section);\nconst other = 1;\n';
 
@@ -414,7 +414,7 @@ describe('mutate: reading a journal off disk', () => {
   const whole = JSON.stringify({ root: '/repo', pid: 7, startedAt: 'now', files: { 'a.ts': 'x' } });
 
   it('reads a whole one', () => {
-    expect(readJournal(whole)).toEqual({ root: '/repo', pid: 7, startedAt: 'now', files: { 'a.ts': 'x' } });
+    expect(readJournal(whole)).toEqual({ root: '/repo', pid: 7, startedAt: 'now', head: null, files: { 'a.ts': 'x' } });
   });
 
   // The wedge: a run killed mid-write left a half journal, and every later run
@@ -480,6 +480,57 @@ describe('mutate: recovering an interrupted run', () => {
     expect(recovery.refused).toEqual(['../outside.ts']);
     expect(files.writes.map((each) => each.file)).toEqual(['a.ts']);
     expect(files.read('../outside.ts')).toBe('SOMEONE ELSE\'S FILE');
+  });
+
+  // A refused manifest is now the ordinary first outcome of the manifest
+  // `audit-prompt` generates, and it leaves a journal holding bytes nothing
+  // mutated. Restoring those over a tree that has since moved reverted 89
+  // lines of a committed file in a clean tree, twice, with one stderr line to
+  // say so.
+  it('refuses to restore a journal captured at another commit, and says what it holds instead', () => {
+    expect(recoveryStanding({ head: 'a'.repeat(40) }, 'a'.repeat(40))).toEqual({ kind: 'recover' });
+
+    const moved = recoveryStanding({ head: 'a'.repeat(40) }, 'b'.repeat(40));
+    expect(moved.kind).toBe('stale');
+    expect(moved.kind === 'stale' && moved.reason).toContain('would revert whatever landed in between');
+  });
+
+  it('treats a journal that records no commit, and a checkout git cannot answer for, as stale', () => {
+    // A journal written before the field existed says nothing about the tree
+    // it came from, which is the same standing as not being able to ask.
+    expect(recoveryStanding({ head: null }, 'a'.repeat(40)).kind).toBe('stale');
+    expect(recoveryStanding({ head: 'a'.repeat(40) }, null).kind).toBe('stale');
+    expect(readJournal(JSON.stringify({ root: '/repo', pid: 7, startedAt: 'now', files: {} }))?.head).toBeNull();
+  });
+});
+
+// The journal existed only while the tree might be mutated, and was removed on
+// the success path alone. Restoring and forgetting are one act now, so every
+// exit between taking the lock and the report does both.
+describe('mutate: putting the tree back on the way out', () => {
+  it('puts every captured file back and reports nothing left to keep a journal for', () => {
+    const disk = new Map([['a.ts', 'MUTATED'], ['b.ts', ORIGINAL]]);
+    const failed = putBackAll(new Map([['a.ts', ORIGINAL], ['b.ts', ORIGINAL]]), (file) => disk.get(file)!, (file, text) => disk.set(file, text));
+
+    expect(failed).toEqual([]);
+    expect(disk.get('a.ts')).toBe(ORIGINAL);
+  });
+
+  it('names a file it could not put back, which is the one reason to keep a journal', () => {
+    const failed = putBackAll(new Map([['a.ts', ORIGINAL], ['gone.ts', ORIGINAL]]), (file) => {
+      if (file === 'gone.ts') throw new Error('ENOENT');
+      return 'MUTATED';
+    }, () => undefined);
+
+    expect(failed).toEqual(['gone.ts']);
+  });
+
+  // A refused manifest mutates nothing, so every captured file already matches
+  // and there is nothing for a journal to hold.
+  it('writes nothing and keeps nothing when no file was mutated, which is what a refused run leaves', () => {
+    const writes: string[] = [];
+    expect(putBackAll(new Map([['a.ts', ORIGINAL]]), () => ORIGINAL, (file) => writes.push(file))).toEqual([]);
+    expect(writes).toEqual([]);
   });
 });
 

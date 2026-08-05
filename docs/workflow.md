@@ -65,12 +65,14 @@ Every command is `npm run tasks -- <verb>`. The record verbs (`show`, `edit`, `s
    information, not a violation.
 7. **Audit.** Commission an auditor with the one instruction "run
    `npm run tasks -- audit-prompt <slug>` and do what it says" — the brief is generated and
-   carries the checklist, the regression question, and how to file. The auditor records verdicts
-   and findings with `tasks audit`, whose flags also read from a file with `--args-from <file>`
-   — one flag per line, any unprefixed line continuing the value above it — because a full pass
-   carrying evidence a next pass can re-run does not fit on a command line (or archives a report
-   under `docs/audits/` and `tasks import`s it). Filing findings without `--proof` flags appends no pass, so late findings
-   never reset verdicts.
+   prints the eight steps an auditor takes, in order, above the data they act on. It writes two
+   files: a mutation manifest wired to the clauses' own tests and refusing to run until the
+   auditor has aimed it, and the pass file, one line per clause, which the auditor fills in and
+   hands back with `tasks audit <slug> --args-from <it>`. That is the one filing route for a
+   branch audit — a full pass carrying evidence a next pass can re-run does not fit on a command
+   line. `tasks import <doc>` reads findings out of a written report and belongs to the
+   whole-system sweeps under `docs/audits/`, which are a different thing from one branch's audit.
+   Filing findings without `--proof` flags appends no pass, so late findings never reset verdicts.
 8. **Triage.** A separate step with a separate actor: the auditor files findings and never promotes
    one, and `audit-prompt` tells it so. Findings from the branch's **own first pass** skip the walk:
    promote HIGHs and anything judged fix-now with `tasks promote <id>... ` — they are always

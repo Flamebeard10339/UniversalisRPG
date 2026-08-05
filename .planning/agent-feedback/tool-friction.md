@@ -224,3 +224,116 @@ thing that would otherwise have forced a report document.
 --store <path> add ...` fails with `unknown command: --store` even though `GLOBAL_USAGE` prints it
 as a global. Reaching a proof command that writes (c11's `add`) without touching the real store took
 two attempts to discover that.
+
+## 2026-08-05, auditing `audit-brief-arrives-complete` (pass 2)
+
+### `inspect` resolves a relative import from `scripts/`, not from the repo root
+
+`npm run inspect -- "await import('./scripts/tasks/audit.ts')"` fails with
+`Cannot find module .../scripts/scripts/tasks/audit.ts`. The expression is evaluated inside
+`scripts/inspect.ts`, so a path an auditor copies out of the brief — which prints every path
+repo-relative — has to have its `scripts/` prefix stripped by hand. `require` is also undefined,
+which is the friction already logged above one release earlier. The suggestion the error prints
+("Did you mean `./tasks/audit.ts`?") is what saved it, so the cost was one round trip rather than
+three, but a repo-root-relative resolution would have cost none.
+
+Positive: `mutate`'s escalation chain in the scope column is what made this pass's headline
+measurable. Nine kills that each read `[... "<the clause's test>" -> scripts/tasks/audit.test.ts]`
+say plainly that no clause's own test noticed its own mutation, and no other tool in the repo
+reports that. Twelve hand-retargeted mutations cost 70 seconds end to end.
+
+## 2026-08-05, auditing `audit-brief-arrives-complete` (pass 3)
+
+### `mutate` leaves its journal behind when it refuses, and the next run reverts the tree to it
+
+Measured, twice, in a clean tree. The first `npm run mutate` of this pass printed
+`recovered 2 file(s) left mutated by an interrupted run: scripts/tasks/audit.ts,
+scripts/lib/specDoc.ts` and exited on a find-miss refusal. `git diff --stat` then showed
+89 lines gone from `audit.ts` and 5 from `specDoc.ts` — commit 8cbd399, reverted, in a tree
+that was clean a second earlier. `git checkout` restored it; the *next* run reverted it again,
+because the refused run had written a fresh journal from the already-reverted bytes.
+Two `git checkout` cycles plus a manual `rm` of `%TEMP%\universalis-mutate-*.json` to get out.
+
+`main()` takes the journal as a lock before reading anything (mutate.ts:615-636) but the refusal
+exit at mutate.ts:664-668 returns without the `rmSync(JOURNAL)` the success path does at :700.
+Cost: ~12 minutes and two near-misses on committed work. It is invisible — the recovery line is
+one stderr line above the refusal, and nothing says a *tracked* file was overwritten.
+
+### The generated manifest cost a hand-written one, for the third pass running
+
+12 of 12 entries had to be rewritten to grade anything: `file` names `scripts/lib/specDoc.ts` for
+c3, c5 and c6, whose implementation is in `audit.ts`, so no offered `note` line could be pasted
+without editing `file` too — which `manifestNotes` says is already right. Hand-writing the 12
+correct entries with `node` took 4 minutes; the run was 45 seconds, 12 killed, 0 escalations.
+Pass 1 and pass 2 each wrote their own manifest as well, and the finding filed for that is
+recorded done.
+
+Positive: the sentinel `find` works exactly as promised. The generated manifest, run unedited,
+was refused by name before a single test ran — the "green run that proves nothing" route is
+genuinely closed. And `mutate`'s scope column remains the only thing in the repo that can tell
+a real clause proof from an escalated one; it is what made this pass's headline measurable in
+50 seconds.
+
+## 2026-08-05, auditing `audit-brief-arrives-complete` (pass 4)
+
+### The generated manifest cost a hand-written one, for the fourth pass running
+
+Same shape as pass 3, different wrong answer. All 20 entries had to be rewritten: `file` ships
+`scripts/lib/specDoc.ts` for every c3-c6 entry and `scripts/tasks/cliFixtures.ts` for every c8-c9
+entry, and both are wrong — those clauses are implemented in `audit.ts`. Building the 20 correct
+entries with `node` off line numbers took 4 minutes; the run was 20 entries in about 6 minutes
+wall (20 named-test baselines plus a file and a whole-suite baseline the two survivors forced),
+18 killed narrow, 2 survived. The survivors are the pass's two medium findings, so the escalation
+cost bought something.
+
+The 48KB manifest is the other half of the cost. 20 entries carry 3 distinct `note` values of
+~2KB each, because candidates are per-clause and most clauses share an ordering — so 17 of the
+20 notes are a byte-for-byte repeat of one of the other three. Reading the manifest to aim it
+means scrolling past the same 2KB paragraph seventeen times.
+
+### `Write` refuses a file this session created through `Bash`
+
+The brief's step 7 hands over a generated pass file and says fill it in. `Write` on that path
+failed with "File has not been read yet" even though the same session had just `cat`ed it — the
+harness tracks reads per tool, not per session. One wasted round trip, fixed by a 5-line `Read`.
+
+Positive: `mutate`'s escalation chain is still the only thing in the repo that separates a real
+clause proof from an accident, and this pass leaned on it twice. Both survivors read
+`"<the clause's test>" -> <file> -> whole suite`, which is what turned "the test looks fine" into
+two filed findings. But it is not sufficient any more: the HIGH this pass files is three kills
+that came back at *narrow* scope off a test-fixture line, with a clean scope column. The tell
+that caught pass 2 and pass 3 does not fire on it.
+
+## 2026-08-05, auditing `audit-brief-arrives-complete` (pass 5)
+
+### The manifest cost 4 minutes of judgement and nothing else, for the first time in five passes
+
+26 entries, all sentinels, nothing to undo. Deciding which line each clause is about took about
+4 minutes across two source files; the `node` script that stamped those 26 decisions into the
+manifest was 40 lines and ran once. Passes 1-4 each spent that same 4 minutes *plus* the work of
+detecting and unpicking a wrong pre-filled `file`. Removing the guess did not move the cost, it
+removed a second cost that was sitting on top of it. The run was 28 entries in 5m40s wall — 26
+named-test baselines and no escalation — 28 killed, 0 survived.
+
+The 48KB manifest of pass 4 is now 6KB. Aiming it meant reading 26 four-line entries instead of
+scrolling past the same 2KB `note` paragraph seventeen times.
+
+### A brief that keeps its artifacts drops the paragraph explaining them
+
+Re-reading the brief mid-pass is what c10 was written for, and it works. But on the kept path the
+four `manifestNotes` lines are replaced by the kept sentence, so the second read of the brief no
+longer says what `file` and `find` are for or that a kill by another line proves nothing. Measured
+here by running `audit-prompt` twice with the manifest aimed in between. Filed as a medium.
+
+### Two probes outside the clause's targets cost 40 seconds and closed a doubt
+
+`recoveryStanding`'s three arms looked individually redundant on reading — the moved-HEAD arm
+appeared to catch everything the other two name — so two extra manifest entries were added beside
+the 26. Both came back KILLED. That is the cheapest form this tool takes: an entry costs one
+baseline and answers a question reading the code could not.
+
+Positive: `npm run mutate` on the unaimed generated manifest was refused for all 26 entries and
+left no journal behind — `ls %TEMP%\universalis-mutate-*` found nothing afterwards. That is c11's
+whole promise, measured in one command, and it is the first pass where running the generated
+artifact as-is was safe to do.
+

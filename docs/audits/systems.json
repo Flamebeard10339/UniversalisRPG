@@ -296,7 +296,7 @@
           "paths": [
             "scripts/tasks/planPrompt.ts"
           ],
-          "note": "produced by plan-prompt-brief: symmetric with the generated worker brief and auditor brief, tasks plan-prompt runs step 2's survey (tasks where) over named paths instead of listing commands"
+          "note": "produced by plan-prompt-brief: symmetric with the generated worker brief and auditor brief, tasks plan-prompt runs step 1's survey (tasks where) over named paths instead of listing commands"
         },
         {
           "name": "decline trigger",
@@ -305,6 +305,21 @@
             "scripts/tasks/records.ts"
           ],
           "note": "produced by decline-trigger-is-write-only: Task.trigger plus tasks list --triggered, a queue for a decline's revisit condition"
+        },
+        {
+          "name": "proof target resolution",
+          "paths": [
+            "scripts/tasks/audit.ts"
+          ],
+          "note": "produced by targets-resolve-across-files"
+        },
+        {
+          "name": "generated auditor brief",
+          "paths": [
+            "scripts/tasks/audit.ts"
+          ],
+          "note": "produced by brief-arrives-with-answers"
+
         }
       ]
     },

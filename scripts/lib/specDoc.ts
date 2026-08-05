@@ -204,7 +204,8 @@ function parseAuditPasses(text: string): AuditPass[] {
 
 export function parseSpecDoc(rawText: string): SpecDoc {
   const text = lfOnly(rawText);
-  const deliverable = sectionText(text.split('\n'), '## Deliverable');
+  const lines = text.split('\n');
+  const deliverable = sectionText(lines, '## Deliverable');
   const deliverableSection = deliverable ? deliverable.text : '';
   return {
     deliverableSection,

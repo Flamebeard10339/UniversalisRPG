@@ -1,10 +1,11 @@
 import { spawnSync } from 'node:child_process';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { tsxCli } from '../lib/tsxCli';
-import { parseAuditArgs, parseAuditFile, unresolvedTarget } from './audit';
-import { appendEvent, firstListedId, fixture, gitFixture, relevantFilesBlock, repoRoot, script, type Run } from './cliFixtures';
+import { parseManifest, refusalsFor } from '../mutate';
+import { auditArgsSkeleton, indexSuiteTitles, manifestNotes, mutationManifest, nextAfterPass, UNAIMED_FILE, UNRETARGETED, parseAuditArgs, parseAuditFile, parseCommitLog, slugStanding, slugStandingLines, toolLines, unresolvedTarget, type SlugStanding, type TargetResolution } from './audit';
+import { appendEvent, firstListedId, fixture, gitFixture, relevantFilesBlock, repoRoot, script, stepsBlock, type Run } from './cliFixtures';
 
 describe('tasks CLI', () => {
   it('import parses H/M/L findings out of an audit doc into unreviewed tasks, and is idempotent on re-run', () => {
@@ -354,18 +355,28 @@ describe('tasks CLI', () => {
       expect(result.status).toBe(0);
       expect(result.stdout).toContain('You are auditing demo-spec on branch demo-spec.');
 
-      expect(result.stdout).toContain('Required commands (all must pass; `npm run tasks -- merge-ready` runs them together):');
-      expect(result.stdout).toContain('- npm run tasks -- merge-ready');
+      // Every step an auditor takes is one numbered line, in the order it is
+      // taken, above the data the steps act on. Three recorded passes read a
+      // brief whose filing instructions were three prose blocks at the bottom
+      // and whose ordering had to be inferred.
+      expect(result.stdout).toContain('Steps, in order.');
+      expect(stepsBlock(result.stdout)).toMatch(/1\. Read [^\n]*demo-spec\.md in full\./);
+      expect(stepsBlock(result.stdout)).toContain('6. Run `npm run tasks -- merge-ready`');
+      // Step 7 is asserted where the standing is controlled. This fixture
+      // takes its diff range from whichever repository the suite is running
+      // in, so the pass recorded above is its own ancestor whenever base and
+      // head are one commit — every run on the branch this work merges into —
+      // and the brief then correctly refuses to offer a pass file.
+      expect(stepsBlock(result.stdout)).toMatch(/7\. (File the pass\.|Do not file a pass\.)/);
 
       // The checklist and the regression question live in the generated
       // prompt, not in CLAUDE.md — a hand-copied brief is what trained
       // agents to fabricate their own.
-      expect(result.stdout).toContain('Is anything worse than before this branch?');
+      expect(stepsBlock(result.stdout)).toContain('is anything worse than before this branch?');
       expect(result.stdout).toContain('scope drift;');
       expect(result.stdout).toContain('tests that repeat the implementation\'s assumptions;');
       expect(result.stdout).toContain('comments that restate self-documenting code;');
-      expect(result.stdout).toContain('Deliver your results into the store');
-      expect(result.stdout).toContain('files the findings without recording a pass');
+      expect(result.stdout).toContain('appends no pass, so a late finding never erases a recorded verdict');
 
       // Under the header, not merely somewhere in the output: this path
       // also prints under `Member tasks:`, so a `toContain` on the path
@@ -417,7 +428,7 @@ describe('tasks CLI', () => {
       expect(result.stdout).toContain('latest verdict: unknown — nobody has graded this clause');
       expect(result.stdout).toContain('Latest audit pass: pass 1');
       expect(result.stdout).toContain('outstanding: c2 (unknown)');
-      expect(result.stdout).toContain('`unknown` means nobody looked');
+      expect(stepsBlock(result.stdout)).toContain('unknown — nobody looked. Recording unmet instead hides that nothing was verified.');
       expect(result.stdout).not.toMatch(/\d+\/\d+ met/);
     });
   });
@@ -875,10 +886,13 @@ describe('a proof target that names no test', () => {
     "it.each([1])('a parameterised title', () => {});",
   ].join('\n');
   const read = (): string => file;
+  // The wide search is a vitest run. Every case here is about the narrow
+  // read, so it is answered from a stub — a suite that holds nothing.
+  const searchesNothing = (): string[] => [];
 
   it('says so, and says why a green run would not have caught it', () => {
-    const note = unresolvedTarget('vitest a.test.ts "a test nobody wrote"', read);
-    expect(note).toContain('a.test.ts has no test by this name');
+    const note = unresolvedTarget('vitest a.test.ts "a test nobody wrote"', read, searchesNothing);
+    expect(note).toContain('no test by this name exists anywhere');
     expect(note).toContain('exit 0');
   });
 
@@ -892,8 +906,8 @@ describe('a proof target that names no test', () => {
   // `vitest -t` on it still skips every test and exits 0. A guard that fails
   // in the direction that hides recurrence is worse than none.
   it('reads titles only, so an assertion argument or a comment is not a resolved target', () => {
-    expect(unresolvedTarget('vitest a.test.ts "a phrase asserted but never named"', read)).toContain('has no test by this name');
-    expect(unresolvedTarget('vitest a.test.ts "a phrase nobody named a test after"', read)).toContain('has no test by this name');
+    expect(unresolvedTarget('vitest a.test.ts "a phrase asserted but never named"', read, searchesNothing)).toContain('no test by this name exists anywhere');
+    expect(unresolvedTarget('vitest a.test.ts "a phrase nobody named a test after"', read, searchesNothing)).toContain('no test by this name exists anywhere');
   });
 
   // The subtlety that would make the check lie: a title carrying an
@@ -903,12 +917,496 @@ describe('a proof target that names no test', () => {
     expect(unresolvedTarget(`vitest a.test.ts "one with an apostrophe in doctor's name"`, read)).toBeNull();
   });
 
-  it('names a file that is not in this checkout as that, rather than as a missing test', () => {
+  it('a target naming a file absent from the checkout is reported as a missing file', () => {
     expect(unresolvedTarget('vitest gone.test.ts "anything"', () => null)).toContain('names no file in this checkout');
   });
 
   it('has nothing to say about a target that is not a vitest one', () => {
     expect(unresolvedTarget('command npm run layer-check', read)).toBeNull();
+  });
+
+  // The suite split moved tests between files and renamed none of them, so
+  // the title a stale target names is far more often somewhere else than
+  // gone. Reported as an absence, that split reads as a wall of false
+  // alarms, which is what teaches an auditor to stop reading the check.
+  it('a target whose title lives in another file is told where it actually is', () => {
+    const note = unresolvedTarget('vitest a.test.ts "a test nobody wrote"', read, () => ['scripts/tasks/records.test.ts']);
+    expect(note).toContain('scripts/tasks/records.test.ts');
+    expect(note).toContain('not in a.test.ts');
+  });
+
+  it('a title that exists nowhere is reported differently from one that merely moved', () => {
+    const moved = unresolvedTarget('vitest a.test.ts "a test nobody wrote"', read, () => ['b.test.ts']);
+    const nowhere = unresolvedTarget('vitest a.test.ts "a test nobody wrote"', read, () => []);
+    expect(nowhere).toContain('no test by this name exists anywhere');
+    expect(nowhere).toContain('exit 0');
+    expect(nowhere).not.toEqual(moved);
+  });
+
+  it('a target that resolves in the file it names never pays for a wider search', () => {
+    let searches = 0;
+    const search = (): string[] => {
+      searches++;
+      return [];
+    };
+    expect(unresolvedTarget('vitest a.test.ts "a test that exists"', read, search)).toBeNull();
+    expect(searches).toBe(0);
+    expect(unresolvedTarget('vitest gone.test.ts "anything"', () => null, search)).toContain('names no file in this checkout');
+    expect(searches).toBe(0);
+    expect(unresolvedTarget('vitest a.test.ts "a test nobody wrote"', read, search)).not.toBeNull();
+    expect(searches).toBe(1);
+  });
+
+  // A checkout that cannot list its own suite knows less than one that can,
+  // and saying "nowhere" on its behalf would be the false absence this
+  // whole escalation exists to remove.
+  it('says the suite could not be listed rather than calling a title absent on a failed search', () => {
+    expect(unresolvedTarget('vitest a.test.ts "a test nobody wrote"', read, () => null)).toContain('could not be listed');
+  });
+
+  it('indexes a vitest listing by the leaf title, under a path relative to the repo', () => {
+    const listing = JSON.stringify([
+      { name: 'tasks CLI > work-prompt briefs a member', file: path.join(repoRoot, 'scripts', 'tasks', 'records.test.ts') },
+      { name: 'an outer > an inner > work-prompt briefs a member', file: path.join(repoRoot, 'scripts', 'tasks', 'workPrompt.test.ts') },
+    ]);
+    expect(indexSuiteTitles(listing)?.get('work-prompt briefs a member')).toEqual(['scripts/tasks/records.test.ts', 'scripts/tasks/workPrompt.test.ts']);
+    expect(indexSuiteTitles('not json at all')).toBeNull();
+    expect(indexSuiteTitles(null)).toBeNull();
+  });
+});
+
+// What the brief left an auditor to find out alone, measured over two passes:
+// 191 seconds running six test files to learn their names, the mutate manifest
+// format hunted across three commands and hand-written 74 lines at a time, and
+// the diff stat, commit list, decisions and `tasks where` all fetched by hand,
+// twice. None of it is judgment; all of it is derivable from what the brief
+// has already read.
+describe('the brief arriving with the answers rather than the instructions', () => {
+  const resolves = (name: string, file = 'scripts/tasks/audit.test.ts'): TargetResolution => ({ state: 'found', file, name });
+
+  it('a manifest entry runs the test its clause names, in the file that test lives in', () => {
+    const { entries } = mutationManifest(
+      [
+        { id: 1, targets: ['vitest scripts/tasks/audit.test.ts "the first test"'] },
+        { id: 2, targets: ['vitest scripts/tasks.test.ts "a test that moved"'] },
+      ],
+      (target) => (target.includes('moved') ? { state: 'moved', file: 'scripts/tasks.test.ts', name: 'a test that moved', foundIn: ['scripts/tasks/records.test.ts'] } : resolves('the first test')),
+    );
+
+    expect(() => parseManifest(JSON.stringify(entries))).not.toThrow();
+    expect(entries[0]).toMatchObject({ name: 'c1 the first test', tests: ['scripts/tasks/audit.test.ts'], test: 'the first test', replace: '' });
+    // A moved target runs against the file it actually lives in, which is
+    // the whole reason the wide search exists.
+    expect(entries[1].tests).toEqual(['scripts/tasks/records.test.ts']);
+  });
+
+  it('the manifest offers no guess at which line a clause is about', () => {
+    const { entries } = mutationManifest([{ id: 1, targets: ['vitest scripts/tasks/audit.test.ts "the first test"'] }], () => resolves('the first test'));
+
+    expect(entries[0].file).toBe(UNAIMED_FILE);
+    expect(entries[0].find).toBe(UNRETARGETED);
+    expect(Object.keys(entries[0])).not.toContain('note');
+    // Both sentinels are refused, and the unreadable file is refused first —
+    // so an entry aimed at a line but not at a file cannot run either.
+    const refusals = refusalsFor(entries, { read: (file) => { throw new Error(`ENOENT: ${file}`); }, write: () => undefined });
+    expect(refusals[0]).toContain('c1 the first test');
+    expect(refusals[0]).toContain(UNAIMED_FILE);
+  });
+
+  // A caption saying "aim this first" cannot stop a run; the artifact can.
+  it('a manifest entry nobody has aimed is refused by mutate rather than run green', () => {
+    const { entries } = mutationManifest([{ id: 1, targets: ['vitest scripts/tasks/audit.test.ts "the first test"'] }], () => resolves('the first test'));
+
+    // Aimed at a real file and still not at a line: the `find` sentinel is
+    // what refuses, so aiming half an entry cannot run either.
+    const halfAimed = [{ ...entries[0], file: 'scripts/tasks/audit.ts' }];
+    const refusals = refusalsFor(halfAimed, {
+      read: () => 'const answered = derive(brief);\nconst second = alsoDerived(brief);\n',
+      write: () => undefined,
+    });
+    expect(refusals).toHaveLength(1);
+    expect(refusals[0]).toContain('does not contain the find text');
+    expect(refusals[0]).toContain('c1 the first test');
+
+    // And the same entry, aimed, is accepted — so the refusal is the unaimed
+    // field and not something else about the shape.
+    expect(refusalsFor([{ ...halfAimed[0], find: 'const answered = derive(brief);' }], { read: () => 'const answered = derive(brief);\n', write: () => undefined })).toEqual([]);
+  });
+
+  it('an unresolved target is named as omitted rather than emitted into the manifest', () => {
+    const { entries, omitted } = mutationManifest(
+      [{ id: 1, targets: ['vitest a.test.ts "gone"', 'vitest scripts/tasks/audit.test.ts "here"'] }],
+      (target) => (target.includes('gone') ? { state: 'nowhere', file: 'a.test.ts', name: 'gone' } : resolves('here')),
+    );
+
+    // parseManifest refuses a manifest as a whole, so one entry the brief
+    // could not complete would cost the auditor every entry beside it.
+    expect(entries).toHaveLength(1);
+    expect(omitted).toEqual(['c1: vitest a.test.ts "gone" — no test by this name exists anywhere']);
+    expect(() => parseManifest(JSON.stringify(entries))).not.toThrow();
+  });
+
+  it('says which fields of the manifest are derived and which the auditor still owes', () => {
+    const notes = manifestNotes(11, '/tmp/mutations-demo.json').join('\n');
+    expect(notes).toContain('`name`, `tests` and `test` are derived');
+    // Four passes aimed an entry as the tool suggested and four got a kill
+    // that was not the clause proving itself. The notes offer no suggestion
+    // to aim by, and say which judgement is the auditor's.
+    expect(notes).toContain('`file` and `find` are yours, and are the whole judgement');
+    expect(notes).not.toContain('candidate');
+    expect(notes).toContain('A kill by any other line is the suite noticing something, not this clause proving itself.');
+  });
+
+  // The guard used to read `startsWith('WARNING:')` over prose owned by
+  // another function, so the one standing that makes the same claim without
+  // the word still shipped a full manifest — and rewording either warning
+  // would have re-enabled it with nothing failing.
+  it('decides the range belongs to this slug from the standing itself, not from how it is worded', () => {
+    const of = (over: Partial<SlugStanding>): boolean =>
+      slugStanding({ slug: 'demo-spec', branch: 'demo-spec', branchSpec: 'demo-spec', base: 'abc1234', lastPassHead: null, lastPassMerged: false, ...over }).rangeIsThisSlugs;
+
+    expect(of({})).toBe(true);
+    expect(of({ branchSpec: 'another-spec' })).toBe(false);
+    // Nothing relates the slug to the branch — the standing pass 2 found
+    // shipping a manifest, because its line carries no WARNING prefix.
+    expect(of({ branchSpec: null })).toBe(false);
+    expect(of({ lastPassHead: 'def5678', lastPassMerged: true })).toBe(false);
+  });
+
+  it('offers no manifest at all in a brief that has just warned the diff is not this slugs', () => {
+    fixture(({ dir, tasks }) => {
+      writeFileSync(path.join(dir, 'specs', 'another-spec.md'), '# Another spec\n\n## Deliverable\n\nA promise made on some other branch.\n\nProof:\n\n- The other clause holds.\n\n## Decisions\n\n## Open questions\n\nNone.\n', 'utf8');
+
+      const { stdout } = tasks('audit-prompt', 'another-spec');
+      expect(stdout).toContain('WARNING: this branch is working demo-spec');
+      // Every line it could break belongs to work these clauses do not
+      // describe, so offering it as runnable is the c7 defect one layer down.
+      expect(stdout).toContain('No mutation manifest: the diff above is not another-spec\'s');
+      expect(stdout).not.toContain('mutations-another-spec.json');
+    });
+  });
+
+  it('the brief names the commits in its diff range and what each touched', () => {
+    gitFixture(({ commit, tasks }) => {
+      commit('A commit on demo-spec, after branching from main.');
+
+      const result = tasks('audit-prompt', 'demo-spec');
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('Commits in this range:');
+      expect(result.stdout).toMatch(/- [0-9a-f]{7,} A commit on demo-spec, after branching from main\.\n {4}file-[^\n]+\.txt/);
+      expect(result.stdout).toContain('Diff stat:');
+    });
+  });
+
+  // A subject carrying a newline used to be indistinguishable from the file
+  // list under it, which would have attributed one commit's files to another.
+  it('reads a commit log whose subject spans lines without losing the files under it', () => {
+    expect(parseCommitLog('\0abc1234 a subject\nwith a second line\nsrc/one.ts\n\0def5678 another\nsrc/two.ts\n')).toEqual([
+      { sha: 'abc1234', subject: 'a subject', files: ['with a second line', 'src/one.ts'] },
+      { sha: 'def5678', subject: 'another', files: ['src/two.ts'] },
+    ]);
+  });
+
+  // The brief carried the deliverable prose and the `## Decisions` section
+  // inline for two passes, on the theory that a pass which had them printed
+  // would not open the spec. All three passes opened it anyway — it is the
+  // first thing a clause is graded against — so the sections bought 41 lines
+  // and changed no behaviour. Step 1 names the file and what is in it.
+  it('sends the auditor to the spec file rather than reprinting its sections', () => {
+    fixture(({ dir, tasks }) => {
+      const specPath = path.join(dir, 'specs', 'demo-spec.md');
+      writeFileSync(specPath, readFileSync(specPath, 'utf8').replace('## Decisions\n', '## Decisions\n\n- The seam stays where it is; moving it was measured and cost more.\n'), 'utf8');
+
+      const result = tasks('audit-prompt', 'demo-spec');
+      expect(result.status).toBe(0);
+      expect(stepsBlock(result.stdout)).toMatch(/1\. Read \S*[/\\]specs[/\\]demo-spec\.md in full\./);
+      expect(stepsBlock(result.stdout)).toContain('`## Decisions` are settled and not to be reopened');
+      expect(result.stdout).not.toContain('The seam stays where it is; moving it was measured and cost more.');
+      expect(result.stdout).not.toContain('Something this branch promises.');
+    });
+  });
+
+  // The brief printed three git commands with the range substituted into
+  // them. An auditor holds the range from the header four lines above and
+  // needs no instruction in git.
+  it('does not teach git, having already printed the range', () => {
+    gitFixture(({ commit, tasks }) => {
+      commit('A commit on demo-spec, after branching from main.');
+
+      const { stdout } = tasks('audit-prompt', 'demo-spec');
+      expect(stdout).toMatch(/Diff range: [0-9a-f]{40}\.\.[0-9a-f]{40}/);
+      expect(stdout).not.toContain('- git diff ');
+      expect(stdout).not.toContain('- git log -p ');
+      // A command, not the diff: an auditor wants it more than once, and a
+      // printed one is a snapshot taken before they had read anything.
+      expect(stdout).not.toContain('@@ ');
+    });
+  });
+
+  it('the brief answers ownership and prior art for every path in its diff', () => {
+    fixture(({ tasks }) => {
+      tasks('add', 'An earlier claim on the save file', '--system', 'Runtime', '--files', 'src/runtime/save.ts:88');
+      tasks('add', 'The task under audit', '--spec', 'demo-spec', '--files', 'src/runtime/save.ts');
+
+      const result = tasks('audit-prompt', 'demo-spec');
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('Who owns each changed path:');
+      expect(result.stdout).toContain('- src/runtime/save.ts — Runtime');
+      expect(result.stdout).toContain('prior art on src/runtime/save.ts');
+      expect(result.stdout).toContain('An earlier claim on the save file');
+      // The two queries this section is a batched answer to, so an auditor
+      // who wants one path in full knows what to run.
+      expect(result.stdout).toContain('npm run tasks -- where <path>');
+      expect(result.stdout).toContain('npm run tasks -- produces "<name>"');
+    });
+  });
+
+  // 56 claims over 118 lines was the largest block in the brief and the one
+  // an auditor cannot act on: 42 of them closed. `tasks where` still lists
+  // every one for a single path, which is the reader that wants them.
+  it('counts the closed claims in the brief rather than listing them, and still lists them for one path', () => {
+    fixture(({ tasks }) => {
+      tasks('add', 'A settled claim on the save file', '--id', 'settled-claim', '--system', 'Runtime', '--files', 'src/runtime/save.ts');
+      tasks('done', 'settled-claim');
+      tasks('add', 'An open claim on the save file', '--system', 'Runtime', '--files', 'src/runtime/save.ts');
+      tasks('add', 'The task under audit', '--spec', 'demo-spec', '--files', 'src/runtime/save.ts');
+
+      const brief = tasks('audit-prompt', 'demo-spec').stdout;
+      expect(brief).toContain('An open claim on the save file');
+      expect(brief).not.toContain('A settled claim on the save file');
+      expect(brief).toContain('1 closed claim(s) not listed');
+
+      const where = tasks('where', 'src/runtime/save.ts').stdout;
+      expect(where).toContain('A settled claim on the save file');
+      expect(where).not.toContain('closed claim(s) not listed');
+    });
+  });
+
+  it('says how to read what mutate prints back, beside the manifest rather than in its source', () => {
+    fixture(({ tasks }) => {
+      const { stdout } = tasks('audit-prompt', 'demo-spec');
+      expect(stdout).toContain('KILLED — the tests failed with the line broken');
+      expect(stdout).toContain('SURVIVED — the tests passed with the line broken');
+      expect(stdout).toContain('ERROR — the mutation did not build');
+      // The column pass 2 called what made its headline measurable, and had
+      // to reverse-engineer from scripts/mutate.ts to trust.
+      expect(stdout).toContain('the scope column reports the chain it walked');
+    });
+  });
+
+  // The format used to be prose in the brief, and two of three passes each
+  // spent a call learning it anyway — one running `tasks audit` bare to read
+  // its usage, one grepping `parseAuditFile`. The file removes the format
+  // from the brief: the auditor opens it and fills in values.
+  it('writes the pass file the auditor fills in, rather than describing its format', () => {
+    fixture(({ tasks }) => {
+      const { stdout } = tasks('audit-prompt', 'demo-spec');
+      const written = /\n {5}(\S*audit-demo-spec-pass1\.txt)\n/.exec(stdout);
+      expect(written).not.toBeNull();
+      expect(readFileSync(written![1], 'utf8')).toContain('--proof 1=');
+      expect(stepsBlock(stdout)).toContain(`npm run tasks -- audit demo-spec --args-from ${written![1]}`);
+      // The format itself is in the file's own header, not here.
+      expect(stdout).not.toContain('8191');
+    });
+  });
+
+  it('names one other spec to check the standing against, not every spec in the checkout', () => {
+    fixture(({ dir, tasks }) => {
+      for (const slug of ['another-spec', 'a-third-spec', 'a-fourth-spec']) {
+        writeFileSync(path.join(dir, 'specs', `${slug}.md`), '# A spec\n\n## Deliverable\n\nElsewhere.\n\nProof:\n\n- It holds.\n', 'utf8');
+      }
+
+      const { stdout } = tasks('audit-prompt', 'demo-spec');
+      const line = stdout.split('\n').find((candidate) => candidate.startsWith('To check the standing above'))!;
+      // Exactly the slugs between `one of: ` and the parenthesised fallback,
+      // counted. A `<= 4` over the word "spec" passed with the cap removed,
+      // which is the regression this test exists to catch admitting itself.
+      const named = /one of: (.+?) \(`ls/.exec(line)![1].split(', ');
+      expect(named).toHaveLength(2);
+      expect(named).not.toContain('another-spec');
+      expect(line).toContain('for the rest');
+    });
+  });
+
+  // Both artifacts are the auditor's working copy the moment they touch one,
+  // and re-reading the brief mid-pass is ordinary. Overwriting threw away an
+  // aimed manifest and a part-filled pass file with nothing said.
+  // A manifest is only emitted for a `proof:` target that resolves, so these
+  // two need a spec whose target names a test that exists. The file is the
+  // fixture's own, written beside its spec, so nothing here depends on a
+  // title in the real suite staying put.
+  // `passes` writes the `## Audit passes` section rather than recording one
+  // through `audit`, because a recorded pass takes its head from whatever
+  // repository the suite is running in — and a head equal to the range's base
+  // is its own ancestor, which the brief reads as "this spec merged before
+  // this branch began" and correctly answers with no manifest at all. That is
+  // true on every run on the base branch, so a test that records a pass and
+  // then expects a manifest passes only on a branch that is ahead. The head
+  // below is a commit no repository has, so it is nobody's ancestor.
+  const UNMERGED_HEAD = 'f'.repeat(40);
+
+  const withResolvableTarget = (dir: string, passes = 0): void => {
+    const testFile = path.join(dir, 'fixture.test.ts');
+    writeFileSync(testFile, "it('a title the fixture owns', () => {});\n", 'utf8');
+    const recorded = Array.from({ length: passes }, (_, index) =>
+      `### Pass ${index + 1} — 2026-08-05\n\n- base: \`${'a'.repeat(40)}\`\n- head: \`${UNMERGED_HEAD}\`\n- proof 1: met — checked\n`).join('\n');
+    writeFileSync(
+      path.join(dir, 'specs', 'demo-spec.md'),
+      `# Demo spec\n\n## Deliverable\n\nSomething this branch promises.\n\nProof:\n\n- [c1] The first clause holds.\n  proof: vitest ${testFile} "a title the fixture owns"\n- [c2] The second clause holds.\n\n## Decisions\n\n## Open questions\n\nNone.\n${passes > 0 ? `\n## Audit passes\n\n${recorded}` : ''}`,
+      'utf8',
+    );
+  };
+
+  it('keeps an artifact the auditor has already worked on rather than overwriting it', () => {
+    fixture(({ dir, tasks }) => {
+      withResolvableTarget(dir);
+      const first = tasks('audit-prompt', 'demo-spec');
+      const passPath = /\n {5}(\S*audit-demo-spec-pass1\.txt)\n/.exec(first.stdout)![1];
+      writeFileSync(passPath, '--proof 1=met\n--evidence 1=half a pass, typed by hand\n', 'utf8');
+
+      const second = tasks('audit-prompt', 'demo-spec');
+      expect(readFileSync(passPath, 'utf8')).toContain('half a pass, typed by hand');
+      expect(second.stdout).toContain('was left alone');
+      expect(second.stdout).toContain('Delete it to regenerate against the current diff');
+      // What the fields mean does not depend on who wrote the file. The kept
+      // path used to suppress all four, so an auditor resuming mid-pass lost
+      // the sentence that says an escalated kill is not a clause's own proof.
+      expect(second.stdout).toContain('A kill by any other line is the suite noticing something');
+    });
+  });
+
+  // One manifest path for every pass handed pass N+1 the manifest pass N had
+  // already aimed, under a step that says to aim it — last pass's judgement
+  // measured against this pass's diff, read as this pass's kills. The pass
+  // file was keyed to the pass from the start; the manifest was not.
+  it('gives each pass its own manifest, so no pass inherits the one before it aimed', () => {
+    fixture(({ dir, tasks }) => {
+      withResolvableTarget(dir);
+      const first = tasks('audit-prompt', 'demo-spec').stdout;
+      expect(first).toContain('mutations-demo-spec-pass1.json');
+
+      withResolvableTarget(dir, 1);
+
+      const second = tasks('audit-prompt', 'demo-spec').stdout;
+      expect(second).toContain('mutations-demo-spec-pass2.json');
+      expect(second).not.toContain('mutations-demo-spec-pass1.json');
+    });
+  });
+
+  // The manifest was gated on the standing and the pass file was not, so a
+  // brief that had just refused to offer a manifest still handed over the
+  // file for recording a pass — against a diff whose clauses it had just
+  // said these are not. That half writes tracked repo state.
+  it('offers no pass file either, in a brief that has just warned the diff is not this slugs', () => {
+    fixture(({ dir, tasks }) => {
+      writeFileSync(path.join(dir, 'specs', 'another-spec.md'), '# Another spec\n\n## Deliverable\n\nElsewhere.\n\nProof:\n\n- [c1] It holds.\n', 'utf8');
+
+      const { stdout } = tasks('audit-prompt', 'another-spec');
+      expect(stdout).toContain('WARNING: this branch is working demo-spec');
+      expect(stdout).toContain('7. Do not file a pass.');
+      expect(stdout).toContain('The diff above is not another-spec\'s');
+      expect(stdout).not.toContain('--args-from');
+      expect(existsSync(path.join(dir, 'tmp', 'audit-another-spec-pass1.txt'))).toBe(false);
+    });
+  });
+
+  // Three standings refuse a pass and they do not all say the same thing. A
+  // branch nothing relates to the slug has a diff nobody can place, not one
+  // known to be somebody else's — and step 7 asserting the stronger claim
+  // contradicts the warning printed above it.
+  it('says only what the standing says when nothing relates the slug to the branch', () => {
+    const unrelated = (over: Partial<SlugStanding>): boolean =>
+      slugStanding({ slug: 'demo-spec', branch: 'demo-spec', branchSpec: 'demo-spec', base: 'abc1234', lastPassHead: null, lastPassMerged: false, ...over }).rangeIsUnrelated;
+
+    expect(unrelated({ branchSpec: 'another-spec' })).toBe(true);
+    expect(unrelated({ lastPassHead: 'def5678', lastPassMerged: true })).toBe(true);
+    // Nothing relates the two: refused, but not on the grounds that the diff
+    // belongs to somebody else.
+    expect(unrelated({ branchSpec: null })).toBe(false);
+    expect(unrelated({})).toBe(false);
+  });
+
+  // Both auditors checked this list against package.json rather than trust
+  // it. A derived list has nothing left to check.
+  it('marks a tool whose npm script no longer exists rather than naming it as if it did', () => {
+    expect(toolLines({ tasks: 'x', mutate: 'x', probe: 'x', inspect: 'x', play: 'x', 'session-timing': 'x' }).join('\n')).not.toContain('stale');
+    const withoutProbe = toolLines({ tasks: 'x', mutate: 'x', inspect: 'x', play: 'x', 'session-timing': 'x' }).join('\n');
+    expect(withoutProbe).toContain('package.json has no "probe" script; this entry is stale');
+    // An unreadable package.json costs the check, not the list.
+    expect(toolLines(null).join('\n')).not.toContain('stale');
+  });
+
+  it('makes logging tool friction a numbered step rather than a line to skip', () => {
+    fixture(({ tasks }) => {
+      const { stdout } = tasks('audit-prompt', 'demo-spec');
+      // Of the two passes that had it as prose elsewhere in the brief, one
+      // wrote nothing at all; the pass that had it as a step wrote it.
+      expect(stepsBlock(stdout)).toContain('8. Log what this audit cost you');
+      expect(stepsBlock(stdout)).toContain('.planning/agent-feedback/tool-friction.md');
+    });
+  });
+
+  // The step after the last one the brief can print, said by the command
+  // that completes it.
+  it('tasks audit names the step that follows recording a pass', async () => {
+    await fixture(async ({ audit }) => {
+      const met = await audit('demo-spec', '--proof', '1=met', '--evidence', '1=measured', '--proof', '2=met', '--evidence', '2=measured');
+      expect(met.stdout).toContain('Next: log what this audit cost you in .planning/agent-feedback/tool-friction.md');
+      // A clause left outstanding is a different next move, and `tasks next`
+      // is what picks it up.
+      expect(met.stdout).not.toContain('tasks -- next');
+      expect(nextAfterPass(true)).toContain('npm run tasks -- next');
+    });
+  });
+
+  it('the brief names each tool an auditor may reach for, with the command that runs it', () => {
+    fixture(({ tasks }) => {
+      const { stdout } = tasks('audit-prompt', 'demo-spec');
+      // Pass 1 grepped package.json to find out what existed. Each of these
+      // is the answer to a question an auditor asks, and a name with no
+      // invocation beside it is a fifth thing to go and look up.
+      for (const command of ['npm run mutate -- <manifest.json>', 'npm run probe --', 'npm run inspect --', 'npm run play', 'npm run session-timing', 'npm run tasks -- where <path>']) {
+        expect(stdout).toContain(command);
+      }
+    });
+  });
+});
+
+// The range is the branch's and the clause list is the slug's, and nothing
+// related the two: on `tasks-roadmap` all eleven slugs in docs/specs/ printed
+// the identical range. A brief that describes the wrong diff confidently is
+// worse than one that is missing a feature, because the auditor cannot tell.
+describe('the slug audit-prompt is given and the branch it is run on', () => {
+  it('a slug whose spec this branch does not own is reported rather than ranged silently against HEAD', () => {
+    fixture(({ dir, tasks }) => {
+      writeFileSync(path.join(dir, 'specs', 'another-spec.md'), '# Another spec\n\n## Deliverable\n\nA promise made on some other branch.\n\nProof:\n\n- The other clause holds.\n\n## Decisions\n\n## Open questions\n\nNone.\n', 'utf8');
+
+      const result = tasks('audit-prompt', 'another-spec');
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('WARNING: this branch is working demo-spec, not another-spec');
+      expect(result.stdout).toContain('does not contain their implementation');
+
+      // The slug the branch does own says nothing, or the warning is noise
+      // on every correct run and stops being read.
+      expect(tasks('audit-prompt', 'demo-spec').stdout).not.toContain('WARNING: this branch is working');
+    });
+  });
+
+  it('says a spec whose passes predate the branch point has none of its work in the diff', () => {
+    const merged = slugStandingLines({ slug: 'merged-spec', branch: 'tasks-roadmap', branchSpec: 'tasks-roadmap', base: 'dcc8574001b06b5c89516f8a9afcefa8ce64163b', lastPassHead: 'c38657c001b06b5c89516f8a9afcefa8ce64163b', lastPassMerged: true });
+    expect(merged.join('\n')).toContain('merged before this branch began');
+    expect(merged.join('\n')).toContain('none of the work its clauses describe is in the diff');
+  });
+
+  // Silence here would be the original defect wearing a passing test: the
+  // brief would still range an unrelated slug against HEAD and say nothing.
+  it('says plainly when nothing relates the slug to the branch at all', () => {
+    const lines = slugStandingLines({ slug: 'some-spec', branch: 'claude/cold-worktree', branchSpec: null, base: 'abc1234', lastPassHead: null, lastPassMerged: false });
+    expect(lines.join('\n')).toContain('Nothing relates some-spec to claude/cold-worktree');
+  });
+
+  it('stays silent when the branch owns the slug and its passes are on this branch', () => {
+    expect(slugStandingLines({ slug: 'demo-spec', branch: 'demo-spec', branchSpec: 'demo-spec', base: 'abc1234', lastPassHead: 'def5678', lastPassMerged: false })).toEqual([]);
   });
 });
 
@@ -968,6 +1466,28 @@ describe('an audit pass read from a file', () => {
       expect(shown).toContain('c2 (unmet)');
       expect(shown).not.toContain('c2 (met)');
       expect(tasks('show', 'demo-spec-clause-2').stdout).toContain('[undelivered/open/high]');
+    });
+  });
+
+  // The skeleton carries one line per clause and every value empty. It stops
+  // the same way an unaimed manifest does — by name, before anything is
+  // recorded — rather than filing a pass that graded a clause with nothing.
+  it('the generated pass file names every clause and is refused until its values are filled in', async () => {
+    await fixture(async ({ dir, audit }) => {
+      const passFile = path.join(dir, 'pass.txt');
+      writeFileSync(passFile, auditArgsSkeleton('demo-spec', [{ id: 1, text: 'The first clause holds.', proofTargets: [] }, { id: 2, text: 'The second clause holds.', proofTargets: [] }], 4), 'utf8');
+      const text = readFileSync(passFile, 'utf8');
+      expect(text).toContain('npm run tasks -- audit demo-spec --args-from');
+      expect(text).toContain('# Pass 4 on demo-spec');
+      expect(text).toContain('# [c1] The first clause holds.');
+      expect(text.match(/^--proof \d+=$/gm)).toHaveLength(2);
+      // The finding block is commented, so an unfilled file files no finding.
+      expect(text).toContain('# --severity high|medium|low');
+
+      const result = await audit('demo-spec', '--args-from', passFile);
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain('names no verdict');
+      expect(readFileSync(path.join(dir, 'specs', 'demo-spec.md'), 'utf8')).not.toContain('## Audit passes');
     });
   });
 

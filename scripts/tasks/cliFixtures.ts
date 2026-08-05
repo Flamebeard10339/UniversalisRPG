@@ -134,9 +134,35 @@ export interface FixtureContext {
 // An async run keeps the temp directory alive until it settles; a sync run
 // is cleaned up on return, exactly as before. A test handing in an async
 // callback must return fixture's promise so the runner waits on it.
+// `audit-prompt` writes its manifest and its pass file under `os.tmpdir()`,
+// which every test on this machine shares and nothing cleans up. A test that
+// read one back was reading whatever an earlier run had left there: the c8
+// proof target survived a whole-suite mutation because the file it asserted
+// on was written by a previous suite run, so the assertion held with the
+// writing code deleted. `os.tmpdir()` answers from the environment on every
+// call, so pointing it at the fixture's own directory scopes the artifacts to
+// the test that generated them — in-process and spawned alike.
+function isolateTmp(dir: string): () => void {
+  const names = ['TMPDIR', 'TEMP', 'TMP'] as const;
+  const previous = names.map((name) => [name, process.env[name]] as const);
+  const inside = path.join(dir, 'tmp');
+  mkdirSync(inside, { recursive: true });
+  for (const name of names) process.env[name] = inside;
+  return () => {
+    for (const [name, value] of previous) {
+      if (value === undefined) delete process.env[name];
+      else process.env[name] = value;
+    }
+  };
+}
+
 export function fixture(run: (context: FixtureContext) => void | Promise<void>): void | Promise<void> {
   const dir = mkdtempSync(path.join(os.tmpdir(), 'universalis-tasks-'));
-  const cleanup = (): void => rmSync(dir, { recursive: true, force: true });
+  const restoreTmp = isolateTmp(dir);
+  const cleanup = (): void => {
+    restoreTmp();
+    rmSync(dir, { recursive: true, force: true });
+  };
   try {
     const specsDir = path.join(dir, 'specs');
     mkdirSync(specsDir);
@@ -184,6 +210,7 @@ export function fixture(run: (context: FixtureContext) => void | Promise<void>):
 // commit-message trailers need commits with exact, controlled content.
 export function gitFixture(run: (context: { dir: string; commit: (message: string) => string; tasks: (...args: string[]) => Run }) => void): void {
   const dir = mkdtempSync(path.join(os.tmpdir(), 'universalis-git-fixture-'));
+  const restoreTmp = isolateTmp(dir);
   try {
     spawnSync('git', ['init', '-q'], { cwd: dir });
     spawnSync('git', ['config', 'user.email', 'test@example.com'], { cwd: dir });
@@ -212,6 +239,7 @@ export function gitFixture(run: (context: { dir: string; commit: (message: strin
       tasks: (...args: string[]) => runInProcessAt(dir, [...args, ...globals]),
     });
   } finally {
+    restoreTmp();
     rmSync(dir, { recursive: true, force: true });
   }
 }
@@ -254,6 +282,15 @@ export function spawnTasks(cwd: string, args: string[], input?: string): Run {
 export function relevantFilesBlock(stdout: string): string {
   const block = /Relevant files:\n((?:- .*\n)+)/.exec(stdout);
   if (block === null) throw new Error(`no relevant-files block in audit-prompt output:\n${stdout}`);
+  return block[1];
+}
+
+// Only the numbered procedure, so a step asserted here is a step in the
+// ordered list rather than the same words loose somewhere in 231 lines of
+// brief — which is where three recorded passes had to find them.
+export function stepsBlock(stdout: string): string {
+  const block = /Steps, in order\.[^\n]*\n\n((?:.*\n)+?)\nLook specifically for:/.exec(stdout);
+  if (block === null) throw new Error(`no steps block in audit-prompt output:\n${stdout}`);
   return block[1];
 }
 
