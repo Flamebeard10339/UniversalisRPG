@@ -235,13 +235,17 @@ export function printRulings(rulings: Rulings): void {
 // declaring a write grant. A check that has to be remembered is skipped
 // exactly when a session is deep in something else: this one was run once in
 // a whole planning session, and that once is the one duplication it caught.
-// The record's own claim is excluded — a task always claims what it just
-// granted, and reporting that would bury the answer under itself.
+// The record's own claim is excluded from both sections — a task always
+// claims what it just granted, and reporting that would bury the answer
+// under itself.
 export function reportPriorArtOnWrites(config: Config, tasks: Task[], task: Task): void {
   if (task.writes.length === 0) return;
   const manifest = manifestOrEmpty(config, 'answering from recorded claims only — registered concepts could not be read');
+  const others = tasks.filter((candidate) => candidate.id !== task.id);
   console.log('');
-  printPriorArt(priorArt(manifest, tasks.filter((candidate) => candidate.id !== task.id), task.writes));
+  printPriorArt(priorArt(manifest, others, task.writes));
+  console.log('');
+  printRulings(rulingsOn(others, loadEvents(config.eventsPath).events, task.writes));
 }
 
 // The body of `tasks where`, factored out so `plan-prompt` can run the same

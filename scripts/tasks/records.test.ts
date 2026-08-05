@@ -1201,6 +1201,31 @@ describe('setting a write grant, which asks what already claims those paths', ()
       tasks('add', 'a task', '--id', 'quiet', '--writes', 'src/runtime/combat.ts');
       expect(tasks('edit', 'quiet', '--severity', 'low').stdout).not.toContain('prior art');
     }));
+
+  // The re-survey a write grant fires by itself is the one nobody has to
+  // remember to run, and until now it could only see a claim, not a
+  // decision — the same defect `where` had before rulingsOn existed, alive
+  // at this second call site.
+  it('prints rulings beside prior art when a write grant lands on a path something has already been ruled on', () =>
+    fixture(({ tasks }) => {
+      tasks('add', 'shrink the handoff test', '--id', 'shrink-handoff', '--writes', 'scripts/tasks/handoff.test.ts');
+      tasks('decline', 'shrink-handoff', '--reason', 'handoff.test.ts is 16s of a 25s wall, and shrinking it further means faking the subprocess it tests');
+
+      const result = tasks('add', 'touch the handoff test', '--id', 'touch-handoff', '--writes', 'scripts/tasks/handoff.test.ts');
+      expect(result.stdout).toContain('prior art on scripts/tasks/handoff.test.ts');
+      expect(result.stdout).toContain('rulings on scripts/tasks/handoff.test.ts:');
+      expect(result.stdout).toContain('[ruling] shrink-handoff (declined) reason —');
+    }));
+
+  it('excludes the record\'s own claim from rulings, the same way it excludes it from prior art', () =>
+    fixture(({ tasks }) => {
+      tasks('add', 'shrink the save test', '--id', 'self-ruling', '--writes', 'src/runtime/save.test.ts');
+      tasks('decline', 'self-ruling', '--reason', 'save.test.ts is not worth shrinking further');
+
+      const result = tasks('edit', 'self-ruling', '--writes', 'src/runtime/save.test.ts');
+      expect(result.stdout).not.toContain('[ruling] self-ruling');
+      expect(result.stdout).toContain('no ruling names src/runtime/save.test.ts or its basename');
+    }));
 });
 
 describe('a close that says back what it knows', () => {
