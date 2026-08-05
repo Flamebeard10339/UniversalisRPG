@@ -60,6 +60,19 @@ Proof:
 - **The 5-minute budget is not breached.** At 22.2s the suite is well inside `CLAUDE.md`'s limit, so
   this is drift prevention rather than a fire. The value is that a spawn-per-case habit is what took
   `scripts/tasks.test.ts` to 84s of an 89s suite before `audit-loop-costs-less` split it.
+- **This branch overturns a ruling made 45 minutes earlier, and says so.**
+  `audit-loop-costs-less-clause-5` was declined on 2026-08-05 as "consciously abandoned under the
+  strict reading", with the reason "shrinking it further means faking the git subprocesses that are
+  the thing it tests", and the trigger "we will reevaluate handoff and its tests if npm test becomes
+  an issue in the future". Two honest caveats. First, **the trigger has not fired on the numbers**:
+  npm test is 22.2s here against the 25.8s at which it was declined, so it is being reevaluated
+  because a human asked, not because the suite regressed. Second, the decline's objection is about
+  correctness, not cost, and c5 is this spec's answer to it: the walk-back cases assert how
+  `handoff.ts` reads a trailer out of commit messages, which is this repository's logic, while
+  git's own behaviour — that `log -N` returns those commits, that `merge=union` merges the store —
+  is what the real-git set continues to prove. If an auditor finds a walk-back case that is really
+  asserting git's behaviour rather than handoff's, that case belongs in the c5 set and not in the
+  converted one.
 
 ## Open questions
 
