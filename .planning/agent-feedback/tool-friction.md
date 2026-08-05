@@ -207,3 +207,20 @@ Positive: the new named-test mutation scope did what it promised. Eight targeted
 scoped to one named test, ran in 34 seconds total (16 vitest invocations including baselines), and
 the manifest refusal caught nothing this pass but the `ran === 0` seam was mutation-verified. The
 same manifest against file scopes would have cost ~15 minutes on the old tool.
+
+## 2026-08-05, auditing `audit-brief-arrives-complete` (pass 2)
+
+### `inspect` resolves a relative import from `scripts/`, not from the repo root
+
+`npm run inspect -- "await import('./scripts/tasks/audit.ts')"` fails with
+`Cannot find module .../scripts/scripts/tasks/audit.ts`. The expression is evaluated inside
+`scripts/inspect.ts`, so a path an auditor copies out of the brief — which prints every path
+repo-relative — has to have its `scripts/` prefix stripped by hand. `require` is also undefined,
+which is the friction already logged above one release earlier. The suggestion the error prints
+("Did you mean `./tasks/audit.ts`?") is what saved it, so the cost was one round trip rather than
+three, but a repo-root-relative resolution would have cost none.
+
+Positive: `mutate`'s escalation chain in the scope column is what made this pass's headline
+measurable. Nine kills that each read `[... "<the clause's test>" -> scripts/tasks/audit.test.ts]`
+say plainly that no clause's own test noticed its own mutation, and no other tool in the repo
+reports that. Twelve hand-retargeted mutations cost 70 seconds end to end.
