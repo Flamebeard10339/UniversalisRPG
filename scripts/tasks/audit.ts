@@ -449,7 +449,7 @@ export function mutationManifest(
 export function candidateNote(suggestions: Array<{ file: string; find: string }>): string {
   const byFile = new Map<string, string[]>();
   for (const { file, find } of suggestions) byFile.set(file, [...(byFile.get(file) ?? []), find]);
-  return [...byFile].map(([file, finds]) => `${file}: ${finds.slice(0, 4).map((find) => JSON.stringify(find)).join(' | ')}`).join('; ');
+  return [...byFile].slice(0, 4).map(([file, finds]) => `${file}: ${finds.slice(0, 3).map((find) => JSON.stringify(find)).join(' | ')}`).join('; ');
 }
 
 // The pass file, written for the same reason the manifest is: two recorded
