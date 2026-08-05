@@ -297,6 +297,14 @@
             "scripts/tasks/planPrompt.ts"
           ],
           "note": "produced by plan-prompt-brief: symmetric with the generated worker brief and auditor brief, tasks plan-prompt runs step 2's survey (tasks where) over named paths instead of listing commands"
+        },
+        {
+          "name": "decline trigger",
+          "paths": [
+            "scripts/lib/taskStore.ts",
+            "scripts/tasks/records.ts"
+          ],
+          "note": "produced by decline-trigger-is-write-only: Task.trigger plus tasks list --triggered, a queue for a decline's revisit condition"
         }
       ]
     },
