@@ -101,6 +101,19 @@ Proof:
   proof: vitest scripts/tasks/audit.test.ts "keeps an artifact the auditor has already worked on rather than overwriting it"
   proof: vitest scripts/tasks/audit.test.ts "offers no pass file either, in a brief that has just warned the diff is not this slugs"
 
+- [c11] `mutate` gives the tree back on every exit, and never writes a journal's bytes into a tree
+  that has moved since they were read. The journal was removed on the success path alone, so a
+  refused manifest left one behind holding the bytes that run had captured — and c3 makes a refusal
+  the guaranteed first outcome of the manifest this brief generates, which armed the trap on every
+  audit. Restoring and forgetting are one act now, and a journal records the commit it was captured
+  at: a HEAD that has moved, or a checkout that cannot be asked, is reported with what the journal
+  holds and nothing is written. This is `scripts/mutate.ts`, which Testing procedure owns; it is
+  here because this branch is what made the refusal path universal.
+  proof: vitest scripts/mutate.test.ts "refuses to restore a journal captured at another commit, and says what it holds instead"
+  proof: vitest scripts/mutate.test.ts "treats a journal that records no commit, and a checkout git cannot answer for, as stale"
+  proof: vitest scripts/mutate.test.ts "writes nothing and keeps nothing when no file was mutated, which is what a refused run leaves"
+  proof: vitest scripts/mutate.test.ts "names a file it could not put back, which is the one reason to keep a journal"
+
 - [c9] The brief prints what an auditor can act on and counts what it cannot. It carries neither the
   spec's own prose nor a list of every spec in the checkout nor a lesson in git — all three were
   measured as read-past — and closed prior-art claims are a count rather than 42 lines of decisions
@@ -133,6 +146,17 @@ Proof:
 - A generated artifact is the auditor's the moment they edit it. Both are written once and then
   left alone, which costs a stale manifest surviving until someone deletes it — recoverable — and
   buys back an aimed manifest that re-reading the brief used to destroy silently.
+- The `mutate` journal fix lands here rather than on its own branch, against the earlier judgement
+  that it should be split out. The reason it is this spec's business: c3 makes a refused manifest
+  the guaranteed first outcome of reading this brief, so this branch is what turns a rare path into
+  the common one. Splitting it would ship the arming and not the disarming. It stays a Testing
+  procedure change and is recorded as one — `mutate.ts`'s owner does not move because a Task system
+  branch found the defect.
+- A stale journal is reported and never restored, which is a deliberate refusal to guess. The bytes
+  might be a tree interrupted mid-write and worth rescuing, or they might be a month old; nothing
+  in the journal distinguishes those, and the wrong choice silently reverts committed work. The
+  same rule as the manifest's `find`: where the tool cannot decide, it hands over the decision with
+  the facts beside it.
 - The brief prints no prose it did not compute. The deliverable and `## Decisions` sections were
   added on the theory that a pass which had them printed would not open the spec; all three passes
   opened it anyway, because a clause is graded against its own spec. Forty-one lines that changed no

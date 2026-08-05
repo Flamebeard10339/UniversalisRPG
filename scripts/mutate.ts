@@ -446,7 +446,21 @@ export interface Journal {
   root: string;
   pid: number;
   startedAt: string;
+  // The commit the captured bytes were read at. A journal is only a safe thing
+  // to write back while the tree is still on it: recovery restores what a run
+  // was interrupted mid-write, and a tree that has moved on has content the
+  // journal never saw. Absent on a journal written before this field existed,
+  // which reads as unknown and is reported rather than restored.
+  head: string | null;
   files: Record<string, string>;
+}
+
+// null when this is not a git checkout, or git cannot answer. Both read as
+// "nothing says the tree has not moved", which `recoveryStanding` treats as a
+// reason to report rather than restore.
+export function headOf(root: string): string | null {
+  const result = spawnSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' });
+  return result.status === 0 && typeof result.stdout === 'string' && result.stdout.trim() !== '' ? result.stdout.trim() : null;
 }
 
 // Keyed by the tree it was captured from. One journal per machine would let a
@@ -466,7 +480,13 @@ export function readJournal(text: string): Journal | null {
   const journal = parsed as Partial<Journal>;
   if (typeof journal.root !== 'string' || typeof journal.pid !== 'number' || journal.files === null || typeof journal.files !== 'object' || Array.isArray(journal.files)) return null;
   if (Object.values(journal.files).some((each) => typeof each !== 'string')) return null;
-  return { root: journal.root, pid: journal.pid, startedAt: typeof journal.startedAt === 'string' ? journal.startedAt : '', files: journal.files as Record<string, string> };
+  return {
+    root: journal.root,
+    pid: journal.pid,
+    startedAt: typeof journal.startedAt === 'string' ? journal.startedAt : '',
+    head: typeof journal.head === 'string' && journal.head !== '' ? journal.head : null,
+    files: journal.files as Record<string, string>,
+  };
 }
 
 // A run that has been going this long is not a run, it is a pid that got reused.
@@ -497,6 +517,39 @@ export function journalVerdict(journal: Pick<Journal, 'pid' | 'startedAt'>, self
 export interface Recovery {
   restored: string[];
   refused: string[];
+}
+
+// Recovery writes bytes over files nobody asked it to touch, which is only
+// ever right while the tree is still the one they were read from. A journal
+// captured at another commit holds content this tree has moved past, and
+// restoring it reverts whatever landed in between — measured once at 89 lines
+// of a committed file, in a clean tree, with one stderr line to say so.
+//
+// So a moved HEAD is reported and not acted on. `stale` names what a reader
+// has to decide instead, because the bytes may still be a mid-write tree worth
+// rescuing and only a human can tell that from a stale journal.
+export type RecoveryStanding = { kind: 'recover' } | { kind: 'stale'; reason: string };
+
+export function recoveryStanding(journal: Pick<Journal, 'head'>, head: string | null): RecoveryStanding {
+  if (journal.head === null) return { kind: 'stale', reason: 'it records no commit, so nothing says the tree is still the one its bytes were read from' };
+  if (head === null) return { kind: 'stale', reason: `it was captured at ${journal.head.slice(0, 7)} and this checkout could not be asked what it is on now` };
+  if (journal.head !== head) return { kind: 'stale', reason: `it was captured at ${journal.head.slice(0, 7)} and this tree is on ${head.slice(0, 7)} — restoring it would revert whatever landed in between` };
+  return { kind: 'recover' };
+}
+
+// What a run owes its tree on the way out, whichever exit it takes: every file
+// it captured back as it found it. Returns the ones it could not put back,
+// which are the only reason to keep a journal.
+export function putBackAll(captured: ReadonlyMap<string, string>, read: (file: string) => string, write: (file: string, text: string) => void): string[] {
+  const failed: string[] = [];
+  for (const [file, text] of captured) {
+    try {
+      if (read(file) !== text) write(file, text);
+    } catch {
+      failed.push(file);
+    }
+  }
+  return failed;
 }
 
 // `allowed` is the same containment the manifest goes through. Journal keys are
@@ -602,8 +655,19 @@ function main(): void {
       console.error(`the journal at ${JOURNAL} was captured from ${journal.root}, not ${repoRoot}. Leaving it alone.`);
       process.exit(2);
     } else {
+      const standing = recoveryStanding(journal, headOf(repoRoot));
+      if (standing.kind === 'stale') {
+        console.error(`the journal at ${JOURNAL} is not this tree's to restore: ${standing.reason}.`);
+        console.error(`  Nothing was written. It holds ${Object.keys(journal.files).length} file(s): ${Object.keys(journal.files).join(', ')}. Compare them against \`git diff\` and delete the journal when you have decided.`);
+        process.exit(2);
+      }
       const recovery = recoverFrom(journal.files, files, (file) => !escapesRoot(repoRoot, file));
-      console.error(recovery.restored.length > 0 ? `recovered ${recovery.restored.length} file(s) left mutated by an interrupted run: ${recovery.restored.join(', ')}` : 'a journal from an interrupted run was found; every file in it was already correct');
+      if (recovery.restored.length > 0) {
+        console.error(`recovered ${recovery.restored.length} file(s) left mutated by an interrupted run at this same commit: ${recovery.restored.join(', ')}`);
+        console.error('  These were overwritten with the bytes that run captured. Check `git diff` before trusting the tree.');
+      } else {
+        console.error('a journal from an interrupted run was found; every file in it was already correct');
+      }
       if (recovery.refused.length > 0) console.error(`  refused to write outside this tree, or could not: ${recovery.refused.join(', ')}`);
       rmSync(JOURNAL, { force: true });
     }
@@ -612,7 +676,7 @@ function main(): void {
 
   // Take the journal as a lock before reading anything, so two runs cannot both
   // decide the tree is theirs. It starts empty because nothing is mutated yet.
-  const stamp = { root: repoRoot, pid: process.pid, startedAt: new Date().toISOString() };
+  const stamp = { root: repoRoot, pid: process.pid, startedAt: new Date().toISOString(), head: headOf(repoRoot) };
   try {
     writeFileSync(JOURNAL, JSON.stringify({ ...stamp, files: {} } satisfies Journal), { encoding: 'utf8', mode: 0o600, flag: 'wx' });
   } catch (error) {
@@ -635,14 +699,19 @@ function main(): void {
   writeFileSync(pending, JSON.stringify({ ...stamp, files: Object.fromEntries(captured) } satisfies Journal), { encoding: 'utf8', mode: 0o600 });
   renameSync(pending, JOURNAL);
 
+  // Restoring the tree and forgetting the journal are one act, done in one
+  // place, because every exit between here and the report has to do both. The
+  // journal used to be removed on the success path alone, so a refused
+  // manifest left one behind holding the bytes this run had read — and a
+  // refusal is now the ordinary first outcome of the manifest `audit-prompt`
+  // generates, which armed this on every audit. The next run then recovered
+  // from it, writing those bytes over whatever the files had become.
+  //
+  // A file that cannot be put back keeps the journal, which is the one thing
+  // it is for.
   const putBack = (): void => {
-    for (const [file, text] of captured) {
-      try {
-        if (readFileSync(path.resolve(repoRoot, file), 'utf8') !== text) writeFileSync(path.resolve(repoRoot, file), text, 'utf8');
-      } catch {
-        // Nothing useful to do from an exit handler; the report says which
-        // files were touched.
-      }
+    if (putBackAll(captured, (file) => readFileSync(path.resolve(repoRoot, file), 'utf8'), (file, text) => writeFileSync(path.resolve(repoRoot, file), text, 'utf8')).length === 0) {
+      rmSync(JOURNAL, { force: true });
     }
   };
   process.on('exit', putBack);
@@ -697,7 +766,8 @@ function main(): void {
 
   const report = runMutations(mutations, files, runTests, baselineFor, tree);
   console.log(formatReport(report));
-  if (report.unrestored.length === 0) rmSync(JOURNAL, { force: true });
+  // The journal goes in `putBack`, which this exit runs — one place, so the
+  // success path cannot be the only one that cleans up.
   process.exit(report.ok ? 0 : 1);
 }
 
