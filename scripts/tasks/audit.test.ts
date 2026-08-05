@@ -3,8 +3,8 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { tsxCli } from '../lib/tsxCli';
-import { parseManifest } from '../mutate';
-import { indexSuiteTitles, manifestNotes, mutationManifest, parseAuditArgs, parseAuditFile, parseCommitLog, slugStandingLines, unresolvedTarget, type TargetResolution } from './audit';
+import { parseManifest, refusalsFor } from '../mutate';
+import { indexSuiteTitles, manifestNotes, mutationManifest, UNRETARGETED, parseAuditArgs, parseAuditFile, parseCommitLog, slugStanding, slugStandingLines, unresolvedTarget, type SlugStanding, type TargetResolution } from './audit';
 import { appendEvent, firstListedId, fixture, gitFixture, relevantFilesBlock, repoRoot, script, type Run } from './cliFixtures';
 
 describe('tasks CLI', () => {
@@ -974,30 +974,58 @@ describe('a proof target that names no test', () => {
 describe('the brief arriving with the answers rather than the instructions', () => {
   const resolves = (name: string, file = 'scripts/tasks/audit.test.ts'): TargetResolution => ({ state: 'found', file, name });
 
-  it('audit-prompt emits a runnable mutation manifest built from the resolved proof targets', () => {
+  const suggests = () => [
+    { file: 'scripts/tasks/audit.ts', find: 'const answered = derive(brief);' },
+    { file: 'scripts/tasks/audit.ts', find: 'const second = alsoDerived(brief);' },
+  ];
+
+  it('audit-prompt emits a mutation manifest whose derived fields are right and whose find is the auditors', () => {
     const { entries } = mutationManifest(
       [
         { id: 1, targets: ['vitest scripts/tasks/audit.test.ts "the first test"'] },
         { id: 2, targets: ['vitest scripts/tasks.test.ts "a test that moved"'] },
       ],
       (target) => (target.includes('moved') ? { state: 'moved', file: 'scripts/tasks.test.ts', name: 'a test that moved', foundIn: ['scripts/tasks/records.test.ts'] } : resolves('the first test')),
-      () => ({ file: 'scripts/tasks/audit.ts', find: 'const answered = derive(brief);' }),
+      suggests,
     );
 
-    // The whole point of generating it: `mutate` takes it as it stands. A
-    // manifest the auditor has to repair is the 74 hand-written lines back.
     expect(() => parseManifest(JSON.stringify(entries))).not.toThrow();
-    expect(entries[0]).toMatchObject({ tests: ['scripts/tasks/audit.test.ts'], test: 'the first test', replace: '' });
+    expect(entries[0]).toMatchObject({ tests: ['scripts/tasks/audit.test.ts'], test: 'the first test', replace: '', find: UNRETARGETED });
+    // The lines that used to be guessed from are carried instead, which is
+    // what makes aiming an entry a paste rather than a rewrite — both
+    // auditors wrote a script to rebuild this file rather than edit it.
+    expect(entries[0].note).toContain('const answered = derive(brief);');
+    expect(entries[0].note).toContain('const second = alsoDerived(brief);');
     // A moved target runs against the file it actually lives in, which is
     // the whole reason the wide search exists.
     expect(entries[1].tests).toEqual(['scripts/tasks/records.test.ts']);
+  });
+
+  // Pass 1 read eight escalated kills as eight proofs; pass 2 measured nine
+  // kills of which nine escalated past the test whose clause they claimed to
+  // prove. A green run that proves nothing is the failure the caption alone
+  // could not stop, so the artifact stops it instead.
+  it('a manifest entry nobody has aimed is refused by mutate rather than run green', () => {
+    const { entries } = mutationManifest([{ id: 1, targets: ['vitest scripts/tasks/audit.test.ts "the first test"'] }], () => resolves('the first test'), suggests);
+
+    const refusals = refusalsFor(entries, {
+      read: () => 'const answered = derive(brief);\nconst second = alsoDerived(brief);\n',
+      write: () => undefined,
+    });
+    expect(refusals).toHaveLength(1);
+    expect(refusals[0]).toContain('does not contain the find text');
+    expect(refusals[0]).toContain('c1 the first test');
+
+    // And the same entry, aimed, is accepted — so the refusal is the unaimed
+    // field and not something else about the shape.
+    expect(refusalsFor([{ ...entries[0], find: 'const answered = derive(brief);' }], { read: () => 'const answered = derive(brief);\n', write: () => undefined })).toEqual([]);
   });
 
   it('an unresolved target is named as omitted rather than emitted into the manifest', () => {
     const { entries, omitted } = mutationManifest(
       [{ id: 1, targets: ['vitest a.test.ts "gone"', 'vitest scripts/tasks/audit.test.ts "here"'] }],
       (target) => (target.includes('gone') ? { state: 'nowhere', file: 'a.test.ts', name: 'gone' } : resolves('here')),
-      () => ({ file: 'scripts/tasks/audit.ts', find: 'const answered = derive(brief);' }),
+      suggests,
     );
 
     // parseManifest refuses a manifest as a whole, so one entry the brief
@@ -1007,17 +1035,28 @@ describe('the brief arriving with the answers rather than the instructions', () 
     expect(() => parseManifest(JSON.stringify(entries))).not.toThrow();
   });
 
-  // Pass 1 ran the manifest as it stood, read eight escalated kills as eight
-  // proofs and three survivals as three findings, and filed a HIGH saying so.
-  // Which test to run is derived; which line to break is not, and the brief
-  // saying otherwise is worse than the brief not generating one at all.
   it('says which fields of the manifest are derived and which the auditor still owes', () => {
     const notes = manifestNotes(11, '/tmp/mutations-demo.json').join('\n');
-    expect(notes).toContain('`name`, `tests` and `test` are derived and correct');
-    expect(notes).toContain('`find` is NOT derived');
-    expect(notes).toContain('Retarget `find` per entry before you run it');
-    expect(notes).toContain('escalation to file scope');
+    expect(notes).toContain('`name`, `file`, `tests` and `test` are derived');
+    expect(notes).toContain('`find` is yours, one paste per entry');
+    expect(notes).toContain('cannot come back green until you have');
     expect(notes).not.toContain('KILLED is the clause proving itself');
+  });
+
+  // The guard used to read `startsWith('WARNING:')` over prose owned by
+  // another function, so the one standing that makes the same claim without
+  // the word still shipped a full manifest — and rewording either warning
+  // would have re-enabled it with nothing failing.
+  it('decides the range belongs to this slug from the standing itself, not from how it is worded', () => {
+    const of = (over: Partial<SlugStanding>): boolean =>
+      slugStanding({ slug: 'demo-spec', branch: 'demo-spec', branchSpec: 'demo-spec', base: 'abc1234', lastPassHead: null, lastPassMerged: false, ...over }).rangeIsThisSlugs;
+
+    expect(of({})).toBe(true);
+    expect(of({ branchSpec: 'another-spec' })).toBe(false);
+    // Nothing relates the slug to the branch — the standing pass 2 found
+    // shipping a manifest, because its line carries no WARNING prefix.
+    expect(of({ branchSpec: null })).toBe(false);
+    expect(of({ lastPassHead: 'def5678', lastPassMerged: true })).toBe(false);
   });
 
   it('offers no manifest at all in a brief that has just warned the diff is not this slugs', () => {

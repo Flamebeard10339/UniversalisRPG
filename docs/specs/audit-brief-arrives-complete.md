@@ -42,10 +42,14 @@ Proof:
   proof: vitest scripts/tasks/audit.test.ts "a title that exists nowhere is reported differently from one that merely moved"
   proof: vitest scripts/tasks/audit.test.ts "a target naming a file absent from the checkout is reported as a missing file"
 
-- [c3] The brief emits a mutation manifest built from the targets it resolved, runnable without editing.
-  A target that did not resolve is omitted and named as omitted, because `parseManifest` refuses a
-  manifest as a whole and one bad entry would cost the auditor the entire run.
-  proof: vitest scripts/tasks/audit.test.ts "audit-prompt emits a runnable mutation manifest built from the resolved proof targets"
+- [c3] The brief emits a mutation manifest built from the targets it resolved. `name`, `file`,
+  `tests` and `test` are derived and right; `find` ships unfilled, in a form `mutate` already
+  refuses, so an entry nobody has aimed stops the run instead of coming back green. Each entry
+  carries the lines this branch added under its clause, so aiming one is a paste. A target that did
+  not resolve is omitted and named as omitted, because `parseManifest` refuses a manifest as a whole
+  and one bad entry would cost the auditor the entire run.
+  proof: vitest scripts/tasks/audit.test.ts "audit-prompt emits a mutation manifest whose derived fields are right and whose find is the auditors"
+  proof: vitest scripts/tasks/audit.test.ts "a manifest entry nobody has aimed is refused by mutate rather than run green"
   proof: vitest scripts/tasks/audit.test.ts "an unresolved target is named as omitted rather than emitted into the manifest"
 
 - [c4] The brief carries the diff stat, the commit list over its range, and the spec's own `## Decisions`

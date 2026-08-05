@@ -355,14 +355,28 @@ export function breakableAddedLines(diff: string, source: string | null): string
 // not complete would cost the auditor the entire run. An unresolved target is
 // left out and said out loud instead — the omission is information, and the
 // nineteen entries beside it still run.
+export const UNRETARGETED = '<<< replace this with a line from the file above that this clause is about >>>';
+
+// `find` is the one field nothing here can derive. The brief knows the file
+// a clause's task wrote and every line this branch added to it, and nothing
+// that says which of those lines the clause's own test is about — pass 2
+// measured what filling it in anyway produced: eleven entries sharing five
+// lines of WARNING prose and note templates, nine green kills, every one of
+// them escalated past the test whose clause it claimed to prove.
+//
+// So it is left unfilled, in a form `mutate` already refuses: `refusalsFor`
+// stops the whole run on a find text the file does not contain, and prints
+// the nearest line beside what was asked for. A manifest that refuses until
+// the auditor has aimed it cannot hand back a green run that proves nothing.
+// The lines that were being guessed from are carried in `note` instead,
+// which is what makes retargeting a paste rather than a rewrite.
 export function mutationManifest(
   clauses: Array<{ id: number; targets: string[] }>,
   resolve: (target: string) => TargetResolution | null,
-  sourceLine: (clause: number, ordinal: number) => { file: string; find: string } | null,
+  candidates: (clause: number) => Array<{ file: string; find: string }>,
 ): { entries: MutationEntry[]; omitted: string[] } {
   const entries: MutationEntry[] = [];
   const omitted: string[] = [];
-  let ordinal = 0;
   for (const clause of clauses) {
     for (const target of clause.targets) {
       const resolution = resolve(target);
@@ -371,8 +385,8 @@ export function mutationManifest(
         omitted.push(`c${clause.id}: ${target} — ${resolution.state === 'no-such-file' ? 'names no file in this checkout' : resolution.state === 'nowhere' ? 'no test by this name exists anywhere' : 'the suite could not be listed to place it'}`);
         continue;
       }
-      const broken = sourceLine(clause.id, ordinal);
-      if (broken === null) {
+      const suggestions = candidates(clause.id);
+      if (suggestions.length === 0) {
         omitted.push(`c${clause.id}: ${target} — this branch's diff has no line under it that deleting would measure`);
         continue;
       }
@@ -382,15 +396,14 @@ export function mutationManifest(
       // verdicts could not be told apart — so a clause naming one test twice
       // costs the run rather than repeating an entry.
       if (entries.some((entry) => entry.name === name)) continue;
-      ordinal++;
       entries.push({
         name,
-        file: broken.file,
-        find: broken.find,
+        file: suggestions[0].file,
+        find: UNRETARGETED,
         replace: '',
         tests: [file],
         test: resolution.name,
-        note: `find is a line this branch added, picked because deleting it is measurable — nothing knows whether it is the line c${clause.id}'s test is about. Retarget it before reading the verdict as proof`,
+        note: `paste one of these over find — lines c${clause.id} added, whichever its test is about: ${suggestions.slice(0, 6).map((suggestion) => JSON.stringify(suggestion.find)).join(' | ')}`,
       });
     }
   }
@@ -412,6 +425,23 @@ export interface SlugStanding {
   lastPassMerged: boolean;
 }
 
+// `rangeIsThisSlugs` is the fact, `lines` is how it is said. A caller that
+// has to decide something — the manifest, which has no business being built
+// out of another branch's lines — reads the fact. Deciding it by matching
+// the word WARNING in this function's prose put a guard's behaviour under a
+// reword, and missed the third standing, which makes the same claim without
+// the word.
+export interface SlugVerdict {
+  lines: string[];
+  rangeIsThisSlugs: boolean;
+}
+
+export function slugStanding(standing: SlugStanding): SlugVerdict {
+  const lines = slugStandingLines(standing);
+  const branchOwnsSlug = standing.branchSpec === standing.slug;
+  return { lines, rangeIsThisSlugs: branchOwnsSlug && !standing.lastPassMerged };
+}
+
 export function slugStandingLines(standing: SlugStanding): string[] {
   const lines: string[] = [];
   if (standing.branchSpec !== null && standing.branchSpec !== standing.slug) {
@@ -429,18 +459,12 @@ export function slugStandingLines(standing: SlugStanding): string[] {
   return lines;
 }
 
-// Which test to run is derived; which line to break is not. The brief knows
-// the file a clause's task wrote and the lines this branch added to it, and
-// nothing that says which of those lines the clause's own test is about — so
-// the scaffold is what is generated and the pairing is what the auditor
-// supplies. Pass 1 read an earlier wording as a claim the pairing had been
-// made, and read eight escalated kills as eight proofs.
 export function manifestNotes(count: number, manifestPath: string): string[] {
   return [
     manifestPath,
-    `${count} entry(ies). \`name\`, \`tests\` and \`test\` are derived and correct: each entry runs the test its clause names, in the file that test actually lives in.`,
-    '`find` is NOT derived. It is a line this branch added to the file the clause\'s task wrote, picked because deleting it is measurable — nothing here knows which line the clause\'s test is about. Retarget `find` per entry before you run it.',
-    'Run it as it stands and a KILLED means only that the deleted line was reachable from that test; mutate\'s escalation to file scope, which it reports, means the named test never saw it. Neither is the clause proving itself until `find` is yours.',
+    `${count} entry(ies). \`name\`, \`file\`, \`tests\` and \`test\` are derived: each entry runs the test its clause names, in the file that test actually lives in.`,
+    `\`find\` is yours, one paste per entry. Every entry ships \`${UNRETARGETED}\`, which is not in the file, so \`mutate\` refuses the run and names each entry you have not aimed yet — a manifest cannot come back green until you have.`,
+    'Each entry\'s `note` carries the lines this branch added under that clause. Paste the one its test is about over `find`; the rest of the entry is already right.',
   ];
 }
 
@@ -453,28 +477,28 @@ function writeMutationManifest(slug: string, clauses: ProofClause[], members: Ta
     return;
   }
   const sources = changed.filter((file) => file.endsWith('.ts') && !file.endsWith('.test.ts') && existsSync(file));
-  const candidates = new Map<number, Array<{ file: string; find: string }>>();
-  const sourceLine = (clause: number, ordinal: number): { file: string; find: string } | null => {
-    if (!candidates.has(clause)) {
+  const cached = new Map<number, Array<{ file: string; find: string }>>();
+  const candidates = (clause: number): Array<{ file: string; find: string }> => {
+    if (!cached.has(clause)) {
       const claimed = members.filter((task) => task.discharges.includes(clause)).flatMap((task) => [...task.writes, ...task.files].map((entry) => entry.split(/[:#]/)[0]));
       // A file the clause's own task named comes first, since a line from it
       // is a line that clause is answerable for; the rest of the diff after.
       const ordered = [...sources.filter((file) => claimed.includes(file)), ...sources.filter((file) => !claimed.includes(file))];
-      candidates.set(
-        clause,
-        ordered.flatMap((file) => breakableAddedLines(gitRead(['diff', '-U0', range, '--', file]) ?? '', readIfPresent(file)).map((find) => ({ file, find }))),
-      );
+      // One file's lines, not every file's: `file` is a single field, so a
+      // suggestion from a second file would need two edits rather than the
+      // one paste the entry promises.
+      const first = ordered.find((file) => breakableAddedLines(gitRead(['diff', '-U0', range, '--', file]) ?? '', readIfPresent(file)).length > 0);
+      cached.set(clause, first === undefined ? [] : breakableAddedLines(gitRead(['diff', '-U0', range, '--', first]) ?? '', readIfPresent(first)).map((find) => ({ file: first, find })));
     }
-    const lines = candidates.get(clause)!;
-    return lines.length === 0 ? null : lines[ordinal % lines.length];
+    return cached.get(clause)!;
   };
 
   const { entries, omitted } = mutationManifest(
     clauses.map((clause) => ({ id: clause.id, targets: clause.proofTargets ?? [] })),
     (target) => resolveTarget(target),
-    sourceLine,
+    candidates,
   );
-  console.log('Mutation manifest — the scaffold, wired to the tests above and valid as it stands:');
+  console.log('Mutation manifest — the scaffold, wired to the tests above and refusing to run until you aim it:');
   if (entries.length === 0) {
     console.log('- none — no proof target on this spec resolved to a test with a line of this branch under it');
   } else {
@@ -520,7 +544,7 @@ export function cmdAuditPrompt(args: Flags, usage: string): void {
   console.log(`You are auditing ${slug} on branch ${config.branch}.`);
   console.log(`Spec: ${path_}`);
   console.log(`Diff range: ${base}..${head}`);
-  const slugNotes = slugStandingLines({
+  const standing = slugStanding({
     slug,
     branch: config.branch,
     branchSpec: resolveActiveSpec(config, tasks, undefined).spec,
@@ -528,7 +552,7 @@ export function cmdAuditPrompt(args: Flags, usage: string): void {
     lastPassHead: latest?.head ?? null,
     lastPassMerged: latest?.head !== undefined && latest.head !== '(unresolved)' && git.isAncestor(latest.head, base),
   });
-  for (const line of slugNotes) {
+  for (const line of standing.lines) {
     console.log('');
     console.log(line);
   }
@@ -594,7 +618,7 @@ export function cmdAuditPrompt(args: Flags, usage: string): void {
   const byId = new Map(tasks.map((task) => [task.id, task]));
   for (const task of members) printRow(task, byId, { indent: '- ', withFiles: true });
   console.log('');
-  writeMutationManifest(slug, doc.proofClauses, members, relevantFiles, `${base}..${head}`, slugNotes.some((line) => line.startsWith('WARNING:')));
+  writeMutationManifest(slug, doc.proofClauses, members, relevantFiles, `${base}..${head}`, !standing.rangeIsThisSlugs);
   console.log('');
   console.log('For every clause with a proof target, confirm the target exists and fails under a meaningful mutation or reproduction before accepting it as proof. `npm run mutate -- <manifest.json>` is the tool; `npm run probe` asks the DSL load path questions without a scratch runner.');
   console.log('Do not treat green tests as proof unless they are tied to the clause they discharge.');
