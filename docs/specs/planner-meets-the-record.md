@@ -31,24 +31,25 @@ Proof:
 - [c4] A decline whose reason states a condition for revisiting stops being prose. The trigger is
   recorded where a queue can surface it, so "reevaluate if npm test becomes an issue" reaches the
   next planner to touch that region instead of resting in a field nothing reads.
-- [c5] **The measurement, adverse-ruling cells.** A cold agent, told nothing of this branch, opened
-  the way a planning session is really opened — "this is a planning session", the orient command,
-  and the request — and given the prompt that opened this branch: *"handoff.test.ts is taking way
-  too long to run and is slowing down merge-ready and npm test in general. Please help me design a
-  spec to resolve the problem?"* — stops and reports that `audit-loop-costs-less-clause-5` declined
-  this remedy and set a trigger, **before editing any source file**. The same holds for a second,
-  independent instance: *"line width in the terminal is too narrow, please create a task to space it
-  out"*, against `no-read-cuts-text-to-fit-a-width`, whose settled principle is that columns pad but
-  never trim. All four cells are opened identically; the opening is the constant, the prompt is the
-  variable.
-- [c6] **The control cells, where stopping is failure.** The same opening on two prompts of the same
-  shape whose subjects carry no adverse ruling. One has prior art and no ruling: offline progression,
-  which `offline-progression` already tracks as an open deferred task — the correct answer names that
-  record and proceeds. One has an empty record: a general animation engine, DSL-defined frames,
-  deliberately attached to no existing system — verified 2026-08-05, `tasks log "animation"` matches
-  no event of 1028 — where the correct answer says the survey found nothing and proceeds. A run in
-  which a control cell stops fails this clause exactly as an adverse cell proceeding does. The result
-  is the 2x2, not a pass rate.
+- [c5] **The measurement.** Cold agents, told nothing of this branch, opened the way a planning
+  session really is — "this is a planning session", the orient command, the request — with the
+  opening held constant and only the request varying. The graded behaviour is not stop-versus-
+  proceed but whether the agent read the record correctly, across four states a subject can be in:
+  a ruling that still stands (**stop**), a ruling whose stated condition for revisiting has since
+  been met (**proceed, citing that the trigger fired**), prior art with no ruling (**proceed,
+  reusing the existing record rather than duplicating it**), and an empty record (**proceed, saying
+  the survey found nothing**). A run passes only if all four are answered in kind; an agent that
+  stops on every cell has learned to stall, and one that proceeds on every cell has not read
+  anything.
+- [c6] **The cells are blind to the experiment.** No agent can read which cell it is in, what the
+  expected outcome is, or that it is being evaluated at all. The cell definitions live outside the
+  repository under test, and neither the worktree's name nor any tracked file names a prompt or its
+  verdict. This clause exists because the first run failed it: c5 and c6 quoted all four prompts
+  with their expected outcomes, the worktrees were cut from a commit containing that text, and the
+  worktrees were named `eval-*`. One agent stated in its own reasoning that it had recognised a
+  control case and that the system was checking whether it would proceed rather than stop. A cell
+  that can read its own answer measures the agent's honesty, which is worth knowing and is not what
+  this evaluation is for.
 - [c7] `docs/workflow.md` step 2 names the ruling query, so the documented survey and the survey
   that actually finds things are the same survey.
 - [c8] `tasks handoff` is gone, and `tasks next` is what a resuming session runs. Every session is a
