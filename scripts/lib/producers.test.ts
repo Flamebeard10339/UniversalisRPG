@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { findProducers, matchStrength, priorArt, producerIndex, type Producer } from './producers';
+import type { TaskEvent } from './eventLog';
+import { findProducers, matchStrength, priorArt, producerIndex, rulingsOn, type Producer } from './producers';
 import type { Manifest } from './systems';
 import type { Task } from './taskStore';
 
@@ -174,6 +175,48 @@ describe('priorArt', () => {
 
   it('answers with nothing for a path nothing has ever named', () => {
     expect(priorArt(manifest, tasks, ['src/grammar/parser.ts'])).toMatchObject({ concepts: [], claims: [] });
+  });
+});
+
+function event(overrides: Partial<TaskEvent> = {}): TaskEvent {
+  return { t: '2026-08-05T04:32:31.000Z', by: 'claude', branch: 'main', head: 'abc123', op: 'decision', id: null, system: null, spec: 'audit-loop-costs-less', note: 'the reason lives here', ...overrides };
+}
+
+// The motivating failure: `audit-loop-costs-less-clause-5` writes nothing —
+// `writes` and `files` are both empty — so `priorArt` above is silent on it.
+// The whole argument lives in `reason`, and `rulingsOn` is the index that
+// reaches it.
+describe('rulingsOn', () => {
+  const declined = { ...task('audit-loop-costs-less-clause-5', [], 'declined'), reason: 'handoff.test.ts is 16.2s of a 25.2s wall, and shrinking it further means faking the git subprocesses that are the thing it tests.' };
+  const unrelated = { ...task('other-decline', [], 'declined'), reason: 'the format is fine as it stands' };
+  const noReason = task('open-task', [], 'open');
+
+  it('finds a closed record whose reason names the queried path by its basename', () => {
+    const found = rulingsOn([declined, unrelated, noReason], [], ['scripts/tasks/handoff.test.ts']);
+    expect(found.reasons.map((entry) => entry.task.id)).toEqual(['audit-loop-costs-less-clause-5']);
+    expect(found.decisions).toEqual([]);
+  });
+
+  it('finds a decision event that names the path, and ignores other ops that mention it', () => {
+    const ruling = event({ id: null, spec: 'audit-loop-costs-less', note: 'c5 ruled on handoff.test.ts: not worth faking git over' });
+    const decline = event({ op: 'decline', note: 'declined: handoff.test.ts is 16.2s of a 25.2s wall' });
+    const found = rulingsOn([], [ruling, decline], ['scripts/tasks/handoff.test.ts']);
+    expect(found.decisions.map((entry) => entry.event.note)).toEqual([ruling.note]);
+  });
+
+  it('answers with nothing for a path no reason or decision has ever named', () => {
+    const found = rulingsOn([declined], [event({ note: 'unrelated to any path' })], ['src/runtime/save.ts']);
+    expect(found).toMatchObject({ reasons: [], decisions: [] });
+  });
+
+  it('matches a reason naming the full path even without the basename in isolation', () => {
+    const full = { ...task('full-path-reason', [], 'declined'), reason: 'src/runtime/save.ts was ruled out for this' };
+    const found = rulingsOn([full], [], ['src/runtime/save.ts']);
+    expect(found.reasons).toHaveLength(1);
+  });
+
+  it('is silent on a task carrying no reason at all', () => {
+    expect(rulingsOn([noReason], [], ['scripts/tasks/handoff.test.ts']).reasons).toEqual([]);
   });
 });
 

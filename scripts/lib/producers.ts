@@ -1,3 +1,4 @@
+import type { TaskEvent } from './eventLog';
 import { allConcepts, canonicalPath, pathsOverlap, type Concept, type Manifest } from './systems';
 import type { State, Task } from './taskStore';
 
@@ -161,4 +162,69 @@ export function priorArt(manifest: Manifest, tasks: Task[], paths: string[]): Pr
     .filter((entry) => entry.on.length > 0);
 
   return { paths: queries, concepts, claims };
+}
+
+// A claim is "someone has written here"; a ruling is "someone has decided
+// something about this", and the two live in different fields. `priorArt`
+// above answers the first from `writes`/`files`, which is silent on a record
+// like `audit-loop-costs-less-clause-5`: empty `writes`, empty `files`, and
+// the whole argument sitting in `reason` and in a `decision` event that names
+// no path at all. So a ruling is found by reading text, not by matching a
+// grant — the only index that reaches it.
+
+// The last path segment, so a query for the file matches prose that names it
+// without the directories in front — "handoff.test.ts is 16.2s of a 25.2s
+// wall" names the file the query asked about even though it never writes out
+// `scripts/tasks/`.
+function basename(path: string): string {
+  const parts = path.split(/[\\/]/);
+  return parts[parts.length - 1] ?? path;
+}
+
+// Which of the queried paths a piece of text names, by the full path or by
+// its basename. Substring, case-insensitive: this reads prose a human wrote
+// for a human, not a declared grant, so there is no containment relation to
+// lean on the way `pathsOverlap` has for `writes`/`files`.
+function namesAny(text: string, queries: string[]): string[] {
+  const lower = text.toLowerCase();
+  return queries.filter((query) => lower.includes(query.toLowerCase()) || lower.includes(basename(query).toLowerCase()));
+}
+
+export interface ReasonRuling {
+  task: Task;
+  on: string[];
+}
+
+export interface DecisionRuling {
+  event: TaskEvent;
+  on: string[];
+}
+
+export interface Rulings {
+  paths: string[];
+  // A closed record's own account of itself. Not filtered to `declined`:
+  // `reason` is a field any record may carry, and reading the field is
+  // cheaper than trusting a state to predict it.
+  reasons: ReasonRuling[];
+  // `decision`-op events only. `note`/`add`/`decline` events carry text too,
+  // but a decision is the event log's own label for "this was ruled on" —
+  // reading every op would report an addition or a note as a ruling, which
+  // is the distinction this function exists to keep.
+  decisions: DecisionRuling[];
+}
+
+export function rulingsOn(tasks: Task[], events: TaskEvent[], paths: string[]): Rulings {
+  const queries = paths.map(canonicalPath).filter((path) => path !== '');
+
+  const reasons = tasks
+    .filter((task) => task.reason !== null)
+    .map((task) => ({ task, on: namesAny(task.reason as string, queries) }))
+    .filter((entry) => entry.on.length > 0);
+
+  const decisions = events
+    .filter((event) => event.op === 'decision')
+    .map((event) => ({ event, on: namesAny(event.note, queries) }))
+    .filter((entry) => entry.on.length > 0);
+
+  return { paths: queries, reasons, decisions };
 }

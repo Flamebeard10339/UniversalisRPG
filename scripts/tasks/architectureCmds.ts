@@ -1,7 +1,8 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { deriveModules, regionView, repoSourceTree, systemView, type Module, type ModuleSurface, type RegionView, type SourceTree, type SystemEdge, type SystemView } from '../lib/architecture';
+import { loadEvents } from '../lib/eventLog';
 import { checkPlan } from '../lib/planCheck';
-import { findProducers, priorArt, producerIndex, type PriorArt, type Producer } from '../lib/producers';
+import { findProducers, priorArt, producerIndex, rulingsOn, type PriorArt, type Producer, type Rulings } from '../lib/producers';
 import { canonicalPath, checkManifest, isUnowned, loadManifest, ManifestError, overlappingConcepts, parseManifest, type Manifest } from '../lib/systems';
 import type { Task } from '../lib/taskStore';
 import type { Flags } from './cli';
@@ -207,6 +208,29 @@ export function printPriorArt(art: PriorArt): void {
   console.log('\nA claim in any state is prior art: a closed one is a decision already made, and an open one is a collision.');
 }
 
+// "Someone has written here" and "someone has ruled on this" are different
+// facts, so this prints under its own header with its own `[ruling]` tag
+// rather than folding into `printPriorArt`'s `[state] id` lines — a reader
+// scanning the left column tells the two apart without reading the prose.
+export function printRulings(rulings: Rulings): void {
+  const where = rulings.paths.join(', ');
+  if (rulings.reasons.length === 0 && rulings.decisions.length === 0) {
+    console.log(`no ruling names ${where} or its basename: no closed record's reason and no event-log decision mentions it. Only those two fields are searched — \`tasks log "<term>"\` reads the whole log.`);
+    return;
+  }
+
+  console.log(`rulings on ${where}:`);
+  for (const { task, on } of rulings.reasons) {
+    console.log(`  [ruling] ${task.id} (${task.state}) reason — ${task.reason}`);
+    if (on.length > 1 || on[0] !== where) console.log(`            names ${on.join(', ')}`);
+  }
+  for (const { event, on } of rulings.decisions) {
+    console.log(`  [ruling] decision ${event.t.slice(0, 19)}Z (${event.id ?? `${event.system ?? 'no system'}/${event.spec ?? 'no spec'}`}) — ${event.note}`);
+    if (on.length > 1 || on[0] !== where) console.log(`            names ${on.join(', ')}`);
+  }
+  console.log('\nA ruling is a decision already made about this path, not a claim on it — read it before proposing the same remedy again.');
+}
+
 // The same query `tasks where` answers when asked, fired by the act of
 // declaring a write grant. A check that has to be remembered is skipped
 // exactly when a session is deep in something else: this one was run once in
@@ -248,8 +272,12 @@ export function cmdWhere(args: Flags, usage: string): void {
     for (const entry of view.importedBy) console.log(`    ${entry.path} (${entry.system})`);
   }
 
+  const tasks = readStore(config);
   console.log('');
-  printPriorArt(priorArt(manifest, readStore(config), [view.path]));
+  printPriorArt(priorArt(manifest, tasks, [view.path]));
+
+  console.log('');
+  printRulings(rulingsOn(tasks, loadEvents(config.eventsPath).events, [view.path]));
 }
 
 // The check a worker runs before building: is this already somebody's job?

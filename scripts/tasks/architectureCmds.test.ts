@@ -174,6 +174,43 @@ describe('tasks where', () => {
       expect(result.stdout).toMatch(/\d+ tracked file\(s\) under it/);
       expect(result.stdout).toMatch(/src\/runtime\/save\.ts — \w/);
     }));
+
+  // The motivating failure this branch fixes: a declined record whose
+  // `writes`/`files` are both empty and whose whole argument sits in
+  // `reason` was invisible to `where` before rulingsOn existed. The claim
+  // section above and the ruling section below must both be present, and
+  // under labels a reader tells apart without reading the prose.
+  describe('where surfaces rulings distinctly from claims', () => {
+    it('finds a declined record by its reason text, naming the path or its basename, when writes/files name nothing', () =>
+      fixture(({ tasks }) => {
+        tasks('add', 'shrink the save test', '--id', 'save-test-shrink', '--spec', 'perf-spec');
+        tasks('decline', 'save-test-shrink', '--reason', 'save.test.ts is 16s of a 25s wall, and shrinking it further means faking the subprocess it tests');
+
+        const result = tasks('where', 'src/runtime/save.test.ts');
+        expect(result.status).toBe(0);
+        expect(result.stdout).toContain('rulings on src/runtime/save.test.ts:');
+        expect(result.stdout).toContain('[ruling] save-test-shrink (declined) reason —');
+        expect(result.stdout).not.toContain('prior art on src/runtime/save.test.ts:\n  [declined] save-test-shrink');
+      }));
+
+    it('finds a decision event naming the path, distinct from a claim on writes/files', () =>
+      fixture(({ tasks }) => {
+        tasks('decision', 'c5 ruled that src/runtime/save.test.ts stays as it is', '--spec', 'perf-spec');
+
+        const result = tasks('where', 'src/runtime/save.test.ts');
+        expect(result.status).toBe(0);
+        expect(result.stdout).toContain('rulings on src/runtime/save.test.ts:');
+        expect(result.stdout).toContain('[ruling] decision');
+        expect(result.stdout).toContain('c5 ruled that src/runtime/save.test.ts stays as it is');
+      }));
+
+    it('says outright that no ruling names the path, rather than an empty section', () =>
+      fixture(({ tasks }) => {
+        const result = tasks('where', 'src/runtime/save.ts');
+        expect(result.status).toBe(0);
+        expect(result.stdout).toContain('no ruling names src/runtime/save.ts or its basename');
+      }));
+  });
 });
 
 describe('tasks produces', () => {
