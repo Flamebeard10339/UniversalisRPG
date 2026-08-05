@@ -257,6 +257,15 @@ export function relevantFilesBlock(stdout: string): string {
   return block[1];
 }
 
+// Only the numbered procedure, so a step asserted here is a step in the
+// ordered list rather than the same words loose somewhere in 231 lines of
+// brief — which is where three recorded passes had to find them.
+export function stepsBlock(stdout: string): string {
+  const block = /Steps, in order\.[^\n]*\n\n((?:.*\n)+?)\nLook specifically for:/.exec(stdout);
+  if (block === null) throw new Error(`no steps block in audit-prompt output:\n${stdout}`);
+  return block[1];
+}
+
 // `list` prefixes its rows with whatever it had to infer to answer, so the
 // id of the first row is the first row that looks like one, not line zero.
 export function firstListedId(stdout: string): string {

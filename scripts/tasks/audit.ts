@@ -147,7 +147,7 @@ function printOwnership(config: Config, tasks: Task[], paths: string[]): void {
   // the event log, so asking what has claimed those returns most of the
   // store — an answer whose length is the reason nobody reads it.
   if (owned.length === 0) console.log('No prior art to answer: no changed path is owned by a system.');
-  else printPriorArt(priorArt(arch.manifest, tasks, owned));
+  else printPriorArt(priorArt(arch.manifest, tasks, owned), { collapseClosed: true });
 }
 
 // What the auditor is told to look for. Lives here, not in CLAUDE.md:
@@ -391,19 +391,18 @@ export function breakableAddedLines(diff: string, source: string | null): string
 // nineteen entries beside it still run.
 export const UNRETARGETED = '<<< replace this with a line from the file above that this clause is about >>>';
 
-// `find` is the one field nothing here can derive. The brief knows the file
-// a clause's task wrote and every line this branch added to it, and nothing
-// that says which of those lines the clause's own test is about — pass 2
-// measured what filling it in anyway produced: eleven entries sharing five
-// lines of WARNING prose and note templates, nine green kills, every one of
-// them escalated past the test whose clause it claimed to prove.
+// Which line a clause is about is judgement, and three recorded passes each
+// measured what happens when the tool supplies it anyway. Pass 1 read eight
+// escalated kills as eight proofs. Pass 2 got nine, all escalated past the
+// test whose clause they claimed to prove. Pass 3 aimed each entry exactly as
+// instructed and got the same escalation, because the offered lines came from
+// whichever changed file sorted first rather than from the clause's own.
 //
-// So it is left unfilled, in a form `mutate` already refuses: `refusalsFor`
-// stops the whole run on a find text the file does not contain, and prints
-// the nearest line beside what was asked for. A manifest that refuses until
-// the auditor has aimed it cannot hand back a green run that proves nothing.
-// The lines that were being guessed from are carried in `note` instead,
-// which is what makes retargeting a paste rather than a rewrite.
+// So `file` and `find` are the auditor's. `find` ships in a form `mutate`
+// already refuses — `refusalsFor` stops the whole run on a find text the file
+// does not contain — so a manifest nobody has aimed cannot come back green.
+// The diff's own lines are carried in `note` as candidates, named by the file
+// they came from, which is a starting point rather than an answer.
 export function mutationManifest(
   clauses: Array<{ id: number; targets: string[] }>,
   resolve: (target: string) => TargetResolution | null,
@@ -437,11 +436,56 @@ export function mutationManifest(
         replace: '',
         tests: [file],
         test: resolution.name,
-        note: `paste one of these over find — lines c${clause.id} added, whichever its test is about: ${suggestions.slice(0, 6).map((suggestion) => JSON.stringify(suggestion.find)).join(' | ')}`,
+        note: `set file and find to the line c${clause.id}'s test is about. Candidates this branch added, by file — ${candidateNote(suggestions)}`,
       });
     }
   }
   return { entries, omitted };
+}
+
+// Grouped by file rather than flattened, because `file` is a single field: a
+// line offered without the file it came from is what made pass 3's paste
+// wrong in four of twelve entries.
+export function candidateNote(suggestions: Array<{ file: string; find: string }>): string {
+  const byFile = new Map<string, string[]>();
+  for (const { file, find } of suggestions) byFile.set(file, [...(byFile.get(file) ?? []), find]);
+  return [...byFile].map(([file, finds]) => `${file}: ${finds.slice(0, 4).map((find) => JSON.stringify(find)).join(' | ')}`).join('; ');
+}
+
+// The pass file, written for the same reason the manifest is: two recorded
+// passes each spent a call learning this format — one running `tasks audit`
+// bare to read its usage, one grepping `parseAuditFile` — and the third did
+// not, because the brief had started naming `--args-from` inline. A skeleton
+// carrying one line per clause removes the format from the brief entirely.
+//
+// Every value ships empty, and an empty `--proof` is refused by name, so an
+// unfilled file stops the same way an unaimed manifest does.
+export function auditArgsSkeleton(slug: string, clauses: ProofClause[], pass: number): string {
+  const lines = [
+    `# Pass ${pass} on ${slug}. Fill in every value, then run:`,
+    `#   npm run tasks -- audit ${slug} --args-from <this file>`,
+    '# One flag per line. A line that does not open with -- continues the value above it,',
+    '# which is how a clause\'s evidence can be a paragraph. `#` at column zero is a comment.',
+    '',
+    '# met | unmet | unknown. `met` needs evidence the next pass can re-run and is refused',
+    '# without one; `unmet` means you checked and it fails; `unknown` means nobody looked.',
+    '',
+  ];
+  for (const clause of clauses) {
+    lines.push(`# [c${clause.id}] ${truncateLine(clause.text.replace(/\s+/g, ' '), 100)}`);
+    lines.push(`--proof ${clause.id}=`);
+    lines.push(`--evidence ${clause.id}=`);
+    lines.push('');
+  }
+  lines.push('# One block per finding, uncommented. A finding needs both halves: what is broken');
+  lines.push('# (--evidence) and what fixing it would mean (--deliverable).');
+  lines.push('# --finding ');
+  lines.push('# --severity high|medium|low');
+  lines.push('# --system ');
+  lines.push('# --file ');
+  lines.push('# --deliverable ');
+  lines.push('# --evidence ');
+  return `${lines.join('\n')}\n`;
 }
 
 // The diff range is the branch's and the clause list is the slug's, and
@@ -496,33 +540,40 @@ export function slugStandingLines(standing: SlugStanding): string[] {
 export function manifestNotes(count: number, manifestPath: string): string[] {
   return [
     manifestPath,
-    `${count} entry(ies). \`name\`, \`file\`, \`tests\` and \`test\` are derived: each entry runs the test its clause names, in the file that test actually lives in.`,
-    `\`find\` is yours, one paste per entry. Every entry ships \`${UNRETARGETED}\`, which is not in the file, so \`mutate\` refuses the run and names each entry you have not aimed yet — a manifest cannot come back green until you have.`,
-    'Each entry\'s `note` carries the lines this branch added under that clause. Paste the one its test is about over `find`; the rest of the entry is already right.',
+    `${count} entry(ies). \`name\`, \`tests\` and \`test\` are derived: each entry runs the test its clause names, in the file that test actually lives in.`,
+    `\`file\` and \`find\` are yours — nothing here knows which line a clause is about. Every entry ships \`${UNRETARGETED}\`, which is in no file, so \`mutate\` refuses the run and names each entry you have not aimed yet.`,
+    'Each entry\'s `note` lists lines this branch added, by file, as candidates. Three recorded passes each rejected the offered line, so read them as a starting point rather than an answer.',
   ];
 }
 
 // Written outside the worktree, because the brief is a read of the
 // repository and a generated file left in it would show up as the branch's
 // own work. The path is named so `npm run mutate -- <it>` is a copy away.
-function writeMutationManifest(slug: string, clauses: ProofClause[], members: Task[], changed: string[], range: string, diffIsForeign: boolean): void {
+// Written outside the worktree for the same reason the manifest is, and
+// returned rather than printed: the procedure at the top of the brief names
+// both paths, and it is printed before any of the data below it.
+function writeMutationManifest(slug: string, clauses: ProofClause[], members: Task[], changed: string[], range: string, diffIsForeign: boolean): { lines: string[]; path: string | null } {
   if (diffIsForeign) {
-    console.log(`No mutation manifest: the diff above is not ${slug}'s, so every line it could break belongs to work these clauses do not describe.`);
-    return;
+    return { lines: [`No mutation manifest: the diff above is not ${slug}'s, so every line it could break belongs to work these clauses do not describe.`], path: null };
   }
   const sources = changed.filter((file) => file.endsWith('.ts') && !file.endsWith('.test.ts') && existsSync(file));
+  const linesIn = new Map<string, string[]>();
+  const addedIn = (file: string): string[] => {
+    if (!linesIn.has(file)) linesIn.set(file, breakableAddedLines(gitRead(['diff', '-U0', range, '--', file]) ?? '', readIfPresent(file)));
+    return linesIn.get(file)!;
+  };
   const cached = new Map<number, Array<{ file: string; find: string }>>();
   const candidates = (clause: number): Array<{ file: string; find: string }> => {
     if (!cached.has(clause)) {
       const claimed = members.filter((task) => task.discharges.includes(clause)).flatMap((task) => [...task.writes, ...task.files].map((entry) => entry.split(/[:#]/)[0]));
       // A file the clause's own task named comes first, since a line from it
       // is a line that clause is answerable for; the rest of the diff after.
+      // Every file is offered, not only the first with lines in it — one
+      // file's lines were what sent pass 3 at specDoc.ts for three clauses
+      // implemented in audit.ts, because nothing claimed them and the fallback
+      // was alphabetical.
       const ordered = [...sources.filter((file) => claimed.includes(file)), ...sources.filter((file) => !claimed.includes(file))];
-      // One file's lines, not every file's: `file` is a single field, so a
-      // suggestion from a second file would need two edits rather than the
-      // one paste the entry promises.
-      const first = ordered.find((file) => breakableAddedLines(gitRead(['diff', '-U0', range, '--', file]) ?? '', readIfPresent(file)).length > 0);
-      cached.set(clause, first === undefined ? [] : breakableAddedLines(gitRead(['diff', '-U0', range, '--', first]) ?? '', readIfPresent(first)).map((find) => ({ file: first, find })));
+      cached.set(clause, ordered.flatMap((file) => addedIn(file).map((find) => ({ file, find }))));
     }
     return cached.get(clause)!;
   };
@@ -532,15 +583,17 @@ function writeMutationManifest(slug: string, clauses: ProofClause[], members: Ta
     (target) => resolveTarget(target),
     candidates,
   );
-  console.log('Mutation manifest — the scaffold, wired to the tests above and refusing to run until you aim it:');
+  const lines = ['Mutation manifest — wired to the tests above, and refusing to run until you aim it:'];
+  let manifestPath: string | null = null;
   if (entries.length === 0) {
-    console.log('- none — no proof target on this spec resolved to a test with a line of this branch under it');
+    lines.push('- none — no proof target on this spec resolved to a test with a line of this branch under it');
   } else {
-    const manifestPath = path.join(os.tmpdir(), `mutations-${slug}.json`);
+    manifestPath = path.join(os.tmpdir(), `mutations-${slug}.json`);
     writeFileSync(manifestPath, `${JSON.stringify(entries, null, 2)}\n`, 'utf8');
-    for (const line of manifestNotes(entries.length, manifestPath)) console.log(`  ${line}`);
+    for (const note of manifestNotes(entries.length, manifestPath)) lines.push(`  ${note}`);
   }
-  for (const line of omitted) console.log(`- omitted: ${line}`);
+  for (const line of omitted) lines.push(`- omitted: ${line}`);
+  return { lines, path: manifestPath };
 }
 
 export function cmdAuditPrompt(args: Flags, usage: string): void {
@@ -590,33 +643,41 @@ export function cmdAuditPrompt(args: Flags, usage: string): void {
     console.log('');
     console.log(line);
   }
+
+  // Both artifacts the procedure names are built before it is printed, so a
+  // step can name the path it acts on rather than a heading further down.
+  const manifest = writeMutationManifest(slug, doc.proofClauses, members, relevantFiles, `${base}..${head}`, !standing.rangeIsThisSlugs);
+  const argsPath = path.join(os.tmpdir(), `audit-${slug}-pass${doc.auditPasses.length + 1}.txt`);
+  writeFileSync(argsPath, auditArgsSkeleton(slug, doc.proofClauses, doc.auditPasses.length + 1), 'utf8');
+
   console.log('');
-  console.log('Do not assume the implementation approach is correct. Read the spec deliverable, the latest audit pass if any, and the diff above. Verify each proof clause independently.');
+  console.log('Steps, in order. Each command names the next one when it finishes.');
   console.log('');
-  console.log('The audit answers two questions, and the second cannot be reached clause by clause:');
-  console.log('1. Is every promised clause delivered, with evidence that runs?');
-  console.log('2. Is anything worse than before this branch? Clause-by-clause verification cannot see a regression, because each clause looks fine in isolation — diff the behavior, not the promise.');
+  console.log(`1. Read ${path_} in full. \`## Deliverable\` is the argument the clauses promise about, \`## Decisions\` are settled and not to be reopened, \`## Audit passes\` is what earlier passes found.`);
+  console.log('2. Read the diff over the range above. Do not assume the implementation approach is correct; verify each clause independently.');
+  console.log('3. Grade every clause under `Proof clauses:` below.');
+  console.log('     met     — you have evidence the next pass can re-run. The tool refuses met without one.');
+  console.log('     unmet   — you checked and it fails.');
+  console.log('     unknown — nobody looked. Recording unmet instead hides that nothing was verified.');
+  console.log(`4. Mutation-test every clause carrying a proof target. Aim ${manifest.path ?? 'the manifest named under `Mutation manifest:` below'}, then \`npm run mutate -- <it>\`.`);
+  console.log('5. Answer the regression question: is anything worse than before this branch? Clause-by-clause verification cannot see this — each clause looks fine in isolation. Diff the behavior, not the promise.');
+  console.log('6. Run `npm run tasks -- merge-ready` — tsc, tests, layer-check, audit-status, doctor and the byte check, in one invocation.');
+  console.log('7. File the pass. This file is written with one line per clause; fill in the values and run the command in its header:');
+  console.log(`     ${argsPath}`);
+  console.log(`     npm run tasks -- audit ${slug} --args-from ${argsPath}`);
+  console.log('8. Log what this audit cost you — task tool, audit tool, harness — in .planning/agent-feedback/tool-friction.md, dated, with what you measured.');
   console.log('');
   console.log('Look specifically for:');
   for (const item of AUDIT_CHECKLIST) console.log(`- ${item}`);
   console.log('');
-  console.log('Required commands (all must pass; `npm run tasks -- merge-ready` runs them together):');
-  console.log('- npm run tasks -- merge-ready');
+  console.log('You file findings; you never promote them. Triage is a separate step with a separate actor, and its rule differs by pass: a branch\'s own first-pass findings are promoted without a walk, so a HIGH you file here will be scheduled without anyone asking you again; from pass 2 on, promotion extends what the spec already owes and waits for a human. Say plainly which of yours you believe this branch must not merge without.');
+  console.log('Every finding needs both halves: what is broken, and what fixing it would mean.');
   console.log('');
   console.log('Tools an auditor may reach for:');
   for (const line of toolLines(packageScripts())) console.log(line);
   console.log('');
   console.log('How to read what `mutate` prints back:');
   for (const line of MUTATE_VERDICTS) console.log(`- ${line}`);
-  console.log('');
-  // The range substituted, because both measured passes retyped these SHAs
-  // out of the four lines above. One command per line and never chained: an
-  // auditor wants the diff more than once, and a chain would make one
-  // failing read eat the others.
-  console.log('Reads this brief has not made for you — the range is already substituted:');
-  console.log(`- git diff ${base}..${head} -- ${relevantFiles.filter((file) => file.endsWith('.ts')).join(' ') || '.'}`);
-  console.log(`- git log -p ${base}..${head} -- <one file>   (the same change, commit by commit)`);
-  console.log(`- git diff ${base}..${head} -- . ':(exclude)*.test.ts'   (implementation without its tests)`);
   console.log('');
   console.log('Commits in this range:');
   const commits = parseCommitLog(gitRead(['log', '--format=%x00%h %s', '--name-only', `${base}..${head}`]) ?? '');
@@ -631,20 +692,14 @@ export function cmdAuditPrompt(args: Flags, usage: string): void {
   for (const file of relevantFiles) console.log(`- ${file}`);
   console.log('');
   printOwnership(config, tasks, relevantFiles);
+  console.log('`npm run tasks -- where <path>` answers this in full for one path — owning system, audit coverage, exports, imports across a system boundary, and every claim including the closed ones. `npm run tasks -- produces "<name>"` asks the same question by capability name rather than by path.');
   console.log('');
-  if (doc.deliverableProse !== '') {
-    console.log(`What ${slug} says it is for — the argument the clauses below promise about:`);
-    console.log(doc.deliverableProse);
-    console.log('');
-  }
-  if (doc.decisionsSection !== '') {
-    console.log(`${slug}'s own decisions — settled arguments, not open ones:`);
-    console.log(doc.decisionsSection.split('\n').slice(1).join('\n').trim());
-    console.log('');
-  }
+  // Two names, not the list: this exists so the standing above can be checked
+  // against a slug this branch does not own, and one other slug proves it.
+  // The full list grows with the repository and was read as inventory.
   const otherSpecs = knownSpecs(config).filter((known) => known !== slug);
   if (otherSpecs.length > 0) {
-    console.log(`Other specs in this checkout, for checking the standing above against a slug this branch does not own: ${otherSpecs.join(', ')}`);
+    console.log(`To check the standing above against a slug this branch does not own, run audit-prompt on one of: ${otherSpecs.slice(0, 2).join(', ')} (\`ls ${config.specsDir}\` for the rest).`);
     console.log('');
   }
   const standings = clauseStandings(doc.proofClauses, latest?.verdicts);
@@ -672,21 +727,10 @@ export function cmdAuditPrompt(args: Flags, usage: string): void {
   const byId = new Map(tasks.map((task) => [task.id, task]));
   for (const task of members) printRow(task, byId, { indent: '- ', withFiles: true });
   console.log('');
-  writeMutationManifest(slug, doc.proofClauses, members, relevantFiles, `${base}..${head}`, !standing.rangeIsThisSlugs);
+  for (const line of manifest.lines) console.log(line);
   console.log('');
-  console.log('For every clause with a proof target, confirm the target exists and fails under a meaningful mutation or reproduction before accepting it as proof. `npm run mutate -- <manifest.json>` is the tool; `npm run probe` asks the DSL load path questions without a scratch runner.');
   console.log('Do not treat green tests as proof unless they are tied to the clause they discharge.');
-  console.log('');
-  console.log('Deliver your results into the store, not into a report nobody reads:');
-  console.log(`- verdicts: \`tasks audit ${slug} --proof N=met|unmet|unknown --evidence N="..." ...\` — met requires evidence the next pass can re-run; unmet means you checked and it fails; ungraded clauses are recorded unknown.`);
-  console.log(`- findings: file them in the same \`tasks audit\` call (--finding "..." --severity ... --system "..." --deliverable "..." --evidence "..."), or write the report under docs/audits/ and \`tasks import <doc>\`. Every finding needs both halves: what is broken, and what fixing it would mean.`);
-  console.log(`- write the whole pass to a file and run \`tasks audit ${slug} --args-from <file>\` — one flag per line, any unprefixed line continuing the value above it, \`#\` at column zero for a comment. A pass carrying evidence specific enough to re-run does not fit on a command line: two sessions hit the 8191-character limit at around twelve clauses and rationed their evidence to fit.`);
-  console.log('- log the friction this audit cost you — task tool, audit tool, harness — in .planning/agent-feedback/tool-friction.md, dated, with what you measured. This is a step in this list, not an afterthought: of the two passes that had this instruction as a line elsewhere in the brief, one wrote nothing.');
-  console.log(`- \`tasks audit ${slug}\` with findings and no --proof flags files the findings without recording a pass, so filing late findings never erases recorded verdicts.`);
-  console.log('If you write a report document, archive it under docs/audits/ before the session ends — but the store is the record of note.');
-  console.log('');
-  console.log('Report each clause as met, unmet or unknown. `met` carries the evidence that backs it and the tool refuses it without one; `unmet` means you checked and it fails; `unknown` means nobody looked, and reporting it as unmet instead hides that nothing was verified.');
-  console.log('You file findings; you never promote them. Triage is a separate step with a separate actor, and its rule differs by pass: a branch\'s own first-pass findings are promoted without a walk, so a HIGH you file here will be scheduled without anyone asking you again; from pass 2 on, promotion extends what the spec already owes and waits for a human. Say plainly which of yours you believe this branch must not merge without.');
+  console.log(`Findings filed after this pass is recorded go in on their own: \`npm run tasks -- audit ${slug}\` with findings and no --proof flags appends no pass, so a late finding never erases a recorded verdict.`);
 }
 
 interface AuditFinding {
@@ -978,6 +1022,7 @@ export async function cmdAudit(args: Flags, usage: string): Promise<void> {
     saveStoreAndWarn(tasks, config);
     recordEvents(config, 'audit', created.map((task) => subjectOf(task, `recorded unreviewed by ${slug} against pass ${against}: ${truncateLine(task.title, 60)}`)));
     console.log(`${created.length} finding(s) recorded, unreviewed, against pass ${against} — no pass appended, so recorded clause verdicts stand`);
+    console.log('Next: `npm run tasks -- triage` walks them, with a separate actor. You file findings; you never promote them');
     return;
   }
 
@@ -1114,4 +1159,13 @@ export async function cmdAudit(args: Flags, usage: string): Promise<void> {
   if (undeliveredCreated > 0) console.log(`${undeliveredCreated} undelivered task(s) created for unmet clauses`);
   if (ungraded.length > 0) console.log(`${ungraded.length} clause(s) recorded unknown — nobody graded them: ${ungraded.join(', ')}. No undelivered task was created, because an ungraded clause is not a broken promise`);
   if (findingsCreated > 0) console.log(`${findingsCreated} finding(s) recorded, unreviewed`);
+  console.log(nextAfterPass(undeliveredCreated > 0 || ungraded.length > 0));
+}
+
+// The last step of the auditor's brief, said by the command that completes
+// the step before it. Of the two passes carrying the friction log as prose
+// somewhere in the brief, one wrote nothing; the pass that had it as a
+// numbered step wrote it.
+export function nextAfterPass(outstanding: boolean): string {
+  return `Next: log what this audit cost you in .planning/agent-feedback/tool-friction.md, dated, then commit${outstanding ? '. This pass leaves a clause outstanding — `npm run tasks -- next` is what picks it up' : ''}`;
 }

@@ -3,7 +3,7 @@ import { deriveModules, regionView, repoSourceTree, systemView, type Module, typ
 import { checkPlan } from '../lib/planCheck';
 import { findProducers, priorArt, producerIndex, type PriorArt, type Producer } from '../lib/producers';
 import { canonicalPath, checkManifest, isUnowned, loadManifest, ManifestError, overlappingConcepts, parseManifest, type Manifest } from '../lib/systems';
-import type { Task } from '../lib/taskStore';
+import type { State, Task } from '../lib/taskStore';
 import type { Flags } from './cli';
 import { readStore, recordEvents, resolveActiveSpec, resolveConfig, splitList, systemNames, type Config } from './context';
 import { printRow, reportUnknownIds, wrapUnder } from './render';
@@ -187,7 +187,15 @@ export function ownership(manifest: Manifest, view: RegionView): string {
 // The one rendering of "what has already claimed these paths", so a caller
 // asking by hand and a check that fires on `--writes` cannot answer the same
 // question in two shapes.
-export function printPriorArt(art: PriorArt): void {
+const CLOSED: State[] = ['done', 'declined'];
+
+// A reader asking about one path wants every claim, closed ones included — a
+// closed claim is a decision already made. A reader handed a whole branch's
+// diff wants the collisions: on `audit-brief-arrives-complete` the four paths
+// carried 56 claims over 118 lines, 42 of them closed, which is the largest
+// block in the auditor's brief and the one nobody can act on. `collapseClosed`
+// is that second reader, and the count still says the history is there.
+export function printPriorArt(art: PriorArt, { collapseClosed = false } = {}): void {
   const where = art.paths.join(', ');
   if (art.concepts.length === 0 && art.claims.length === 0) {
     console.log(`nothing has claimed ${where}: no registered concept covers it, and no task's writes or files name it in any state.`);
@@ -199,11 +207,14 @@ export function printPriorArt(art: PriorArt): void {
     console.log(`  [concept] ${concept.name} — registered to ${system} over ${on.join(', ')}`);
     if (concept.note) console.log(`            ${concept.note}`);
   }
-  for (const { task, on } of art.claims) {
+  const shown = collapseClosed ? art.claims.filter(({ task }) => !CLOSED.includes(task.state)) : art.claims;
+  for (const { task, on } of shown) {
     console.log(`  [${task.state}] ${task.id} — ${task.title}`);
     console.log(`            ${[...new Set(on.map((match) => `${match.field} ${match.declared}`))].join(', ')}`);
     if (task.produces.length > 0) console.log(`            produces ${task.produces.join(', ')}`);
   }
+  const closed = art.claims.length - shown.length;
+  if (closed > 0) console.log(`  ${closed} closed claim(s) not listed — each is a decision already made rather than a collision.`);
   console.log('\nA claim in any state is prior art: a closed one is a decision already made, and an open one is a collision.');
 }
 
