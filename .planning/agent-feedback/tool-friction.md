@@ -256,3 +256,33 @@ was refused by name before a single test ran — the "green run that proves noth
 genuinely closed. And `mutate`'s scope column remains the only thing in the repo that can tell
 a real clause proof from an escalated one; it is what made this pass's headline measurable in
 50 seconds.
+
+## 2026-08-05, auditing `audit-brief-arrives-complete` (pass 4)
+
+### The generated manifest cost a hand-written one, for the fourth pass running
+
+Same shape as pass 3, different wrong answer. All 20 entries had to be rewritten: `file` ships
+`scripts/lib/specDoc.ts` for every c3-c6 entry and `scripts/tasks/cliFixtures.ts` for every c8-c9
+entry, and both are wrong — those clauses are implemented in `audit.ts`. Building the 20 correct
+entries with `node` off line numbers took 4 minutes; the run was 20 entries in about 6 minutes
+wall (20 named-test baselines plus a file and a whole-suite baseline the two survivors forced),
+18 killed narrow, 2 survived. The survivors are the pass's two medium findings, so the escalation
+cost bought something.
+
+The 48KB manifest is the other half of the cost. 20 entries carry 3 distinct `note` values of
+~2KB each, because candidates are per-clause and most clauses share an ordering — so 17 of the
+20 notes are a byte-for-byte repeat of one of the other three. Reading the manifest to aim it
+means scrolling past the same 2KB paragraph seventeen times.
+
+### `Write` refuses a file this session created through `Bash`
+
+The brief's step 7 hands over a generated pass file and says fill it in. `Write` on that path
+failed with "File has not been read yet" even though the same session had just `cat`ed it — the
+harness tracks reads per tool, not per session. One wasted round trip, fixed by a 5-line `Read`.
+
+Positive: `mutate`'s escalation chain is still the only thing in the repo that separates a real
+clause proof from an accident, and this pass leaned on it twice. Both survivors read
+`"<the clause's test>" -> <file> -> whole suite`, which is what turned "the test looks fine" into
+two filed findings. But it is not sufficient any more: the HIGH this pass files is three kills
+that came back at *narrow* scope off a test-fixture line, with a clean scope column. The tell
+that caught pass 2 and pass 3 does not fire on it.
