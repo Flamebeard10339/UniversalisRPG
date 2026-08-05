@@ -448,11 +448,14 @@ describe('a task that records which clauses it discharges', () => {
 // The one moment the whole capability landscape is in view, and the moment a
 // planner is least likely to stop and ask.
 describe('tasks spec new', () => {
-  it('prints the capability survey and the reminder that the judgement belongs in ## Decisions', () => {
+  it('points at `tasks plan-prompt`, not a re-listed survey, and reminds that the judgement belongs in ## Decisions', () => {
     fixture(({ tasks }) => {
       const result = tasks('spec', 'new', 'a-fresh-spec');
-      expect(result.stdout).toContain('tasks where <path>');
-      expect(result.stdout).toContain('tasks produces "<name>"');
+      expect(result.stdout).toContain('tasks plan-prompt a-fresh-spec <path>');
+      expect(result.stdout).toContain('prior art');
+      expect(result.stdout).toContain('rulings');
+      expect(result.stdout).not.toContain('tasks where <path>');
+      expect(result.stdout).not.toContain('tasks system "<name>"');
       expect(result.stdout).toContain('## Decisions');
       expect(result.stdout).toContain('adds, extends');
     });
