@@ -6,7 +6,7 @@ import * as git from '../lib/git';
 import { appendAuditPass, clauseStandings, duplicateClauseIds, outstandingSummary, parseSpecDoc, stampClauseIds, VERDICTS, type AuditVerdict, type ProofClause, type Verdict } from '../lib/specDoc';
 import { loadStore, type Severity, type Task } from '../lib/taskStore';
 import type { Flags } from './cli';
-import { readStore, recordEvents, refuseUnknownSpec, reportUnknownSpec, resolveConfig, saveStoreAndWarn, slugify, specFile, subjectOf, today, uniqueId } from './context';
+import { readStore, recordEvents, refuseUnknownSpec, reportUnknownSpec, resolveActiveSpec, resolveConfig, saveStoreAndWarn, slugify, specFile, subjectOf, today, uniqueId } from './context';
 import { activePrompter } from './prompt';
 import { printRow, truncateLine } from './render';
 
@@ -241,6 +241,38 @@ function readIfPresent(file: string): string | null {
   }
 }
 
+// The diff range is the branch's and the clause list is the slug's, and
+// nothing used to relate the two. On `tasks-roadmap` all eleven slugs in
+// `docs/specs/` printed the identical range, so the slug chose only which
+// promises were printed beside an unrelated diff — a brief an auditor cannot
+// tell apart from a correct one, which is what makes it worse than a missing
+// feature. Both facts it needs were already in hand.
+export interface SlugStanding {
+  slug: string;
+  branch: string;
+  branchSpec: string | null;
+  base: string;
+  lastPassHead: string | null;
+  lastPassMerged: boolean;
+}
+
+export function slugStandingLines(standing: SlugStanding): string[] {
+  const lines: string[] = [];
+  if (standing.branchSpec !== null && standing.branchSpec !== standing.slug) {
+    lines.push(
+      `WARNING: this branch is working ${standing.branchSpec}, not ${standing.slug}. The diff range above is ${standing.branch}'s, so ${standing.slug}'s clauses below would be graded against a diff that does not contain their implementation. Audit ${standing.branchSpec}, or run this on the branch that owns ${standing.slug}.`,
+    );
+  } else if (standing.branchSpec === null) {
+    lines.push(`Nothing relates ${standing.slug} to ${standing.branch}: no spec file named for the branch, and no store or event-log record of this branch working a spec. The range above is this branch's whatever ${standing.slug} promised.`);
+  }
+  if (standing.lastPassMerged && standing.lastPassHead !== null) {
+    lines.push(
+      `WARNING: ${standing.slug}'s last recorded audit pass was taken at ${standing.lastPassHead.slice(0, 7)}, which is already an ancestor of this range's base ${standing.base.slice(0, 7)} — ${standing.slug} merged before this branch began, so none of the work its clauses describe is in the diff above.`,
+    );
+  }
+  return lines;
+}
+
 export function cmdAuditPrompt(args: Flags, usage: string): void {
   const config = resolveConfig(args.flags);
   const slug = args.positional[0];
@@ -276,6 +308,18 @@ export function cmdAuditPrompt(args: Flags, usage: string): void {
   console.log(`You are auditing ${slug} on branch ${config.branch}.`);
   console.log(`Spec: ${path_}`);
   console.log(`Diff range: ${base}..${head}`);
+  const slugNotes = slugStandingLines({
+    slug,
+    branch: config.branch,
+    branchSpec: resolveActiveSpec(config, tasks, undefined).spec,
+    base,
+    lastPassHead: latest?.head ?? null,
+    lastPassMerged: latest?.head !== undefined && latest.head !== '(unresolved)' && git.isAncestor(latest.head, base),
+  });
+  for (const line of slugNotes) {
+    console.log('');
+    console.log(line);
+  }
   console.log('');
   console.log('Do not assume the implementation approach is correct. Read the spec deliverable, the latest audit pass if any, and the diff above. Verify each proof clause independently.');
   console.log('');

@@ -3,7 +3,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { tsxCli } from '../lib/tsxCli';
-import { indexSuiteTitles, parseAuditArgs, parseAuditFile, unresolvedTarget } from './audit';
+import { indexSuiteTitles, parseAuditArgs, parseAuditFile, slugStandingLines, unresolvedTarget } from './audit';
 import { appendEvent, firstListedId, fixture, gitFixture, relevantFilesBlock, repoRoot, script, type Run } from './cliFixtures';
 
 describe('tasks CLI', () => {
@@ -961,6 +961,44 @@ describe('a proof target that names no test', () => {
     expect(indexSuiteTitles(listing)?.get('work-prompt briefs a member')).toEqual(['scripts/tasks/records.test.ts', 'scripts/tasks/workPrompt.test.ts']);
     expect(indexSuiteTitles('not json at all')).toBeNull();
     expect(indexSuiteTitles(null)).toBeNull();
+  });
+});
+
+// The range is the branch's and the clause list is the slug's, and nothing
+// related the two: on `tasks-roadmap` all eleven slugs in docs/specs/ printed
+// the identical range. A brief that describes the wrong diff confidently is
+// worse than one that is missing a feature, because the auditor cannot tell.
+describe('the slug audit-prompt is given and the branch it is run on', () => {
+  it('a slug whose spec this branch does not own is reported rather than ranged silently against HEAD', () => {
+    fixture(({ dir, tasks }) => {
+      writeFileSync(path.join(dir, 'specs', 'another-spec.md'), '# Another spec\n\n## Deliverable\n\nA promise made on some other branch.\n\nProof:\n\n- The other clause holds.\n\n## Decisions\n\n## Open questions\n\nNone.\n', 'utf8');
+
+      const result = tasks('audit-prompt', 'another-spec');
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('WARNING: this branch is working demo-spec, not another-spec');
+      expect(result.stdout).toContain('does not contain their implementation');
+
+      // The slug the branch does own says nothing, or the warning is noise
+      // on every correct run and stops being read.
+      expect(tasks('audit-prompt', 'demo-spec').stdout).not.toContain('WARNING: this branch is working');
+    });
+  });
+
+  it('says a spec whose passes predate the branch point has none of its work in the diff', () => {
+    const merged = slugStandingLines({ slug: 'merged-spec', branch: 'tasks-roadmap', branchSpec: 'tasks-roadmap', base: 'dcc8574001b06b5c89516f8a9afcefa8ce64163b', lastPassHead: 'c38657c001b06b5c89516f8a9afcefa8ce64163b', lastPassMerged: true });
+    expect(merged.join('\n')).toContain('merged before this branch began');
+    expect(merged.join('\n')).toContain('none of the work its clauses describe is in the diff');
+  });
+
+  // Silence here would be the original defect wearing a passing test: the
+  // brief would still range an unrelated slug against HEAD and say nothing.
+  it('says plainly when nothing relates the slug to the branch at all', () => {
+    const lines = slugStandingLines({ slug: 'some-spec', branch: 'claude/cold-worktree', branchSpec: null, base: 'abc1234', lastPassHead: null, lastPassMerged: false });
+    expect(lines.join('\n')).toContain('Nothing relates some-spec to claude/cold-worktree');
+  });
+
+  it('stays silent when the branch owns the slug and its passes are on this branch', () => {
+    expect(slugStandingLines({ slug: 'demo-spec', branch: 'demo-spec', branchSpec: 'demo-spec', base: 'abc1234', lastPassHead: 'def5678', lastPassMerged: false })).toEqual([]);
   });
 });
 
