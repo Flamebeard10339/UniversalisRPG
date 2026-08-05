@@ -286,3 +286,36 @@ clause proof from an accident, and this pass leaned on it twice. Both survivors 
 two filed findings. But it is not sufficient any more: the HIGH this pass files is three kills
 that came back at *narrow* scope off a test-fixture line, with a clean scope column. The tell
 that caught pass 2 and pass 3 does not fire on it.
+
+## 2026-08-05, auditing `audit-brief-arrives-complete` (pass 5)
+
+### The manifest cost 4 minutes of judgement and nothing else, for the first time in five passes
+
+26 entries, all sentinels, nothing to undo. Deciding which line each clause is about took about
+4 minutes across two source files; the `node` script that stamped those 26 decisions into the
+manifest was 40 lines and ran once. Passes 1-4 each spent that same 4 minutes *plus* the work of
+detecting and unpicking a wrong pre-filled `file`. Removing the guess did not move the cost, it
+removed a second cost that was sitting on top of it. The run was 28 entries in 5m40s wall — 26
+named-test baselines and no escalation — 28 killed, 0 survived.
+
+The 48KB manifest of pass 4 is now 6KB. Aiming it meant reading 26 four-line entries instead of
+scrolling past the same 2KB `note` paragraph seventeen times.
+
+### A brief that keeps its artifacts drops the paragraph explaining them
+
+Re-reading the brief mid-pass is what c10 was written for, and it works. But on the kept path the
+four `manifestNotes` lines are replaced by the kept sentence, so the second read of the brief no
+longer says what `file` and `find` are for or that a kill by another line proves nothing. Measured
+here by running `audit-prompt` twice with the manifest aimed in between. Filed as a medium.
+
+### Two probes outside the clause's targets cost 40 seconds and closed a doubt
+
+`recoveryStanding`'s three arms looked individually redundant on reading — the moved-HEAD arm
+appeared to catch everything the other two name — so two extra manifest entries were added beside
+the 26. Both came back KILLED. That is the cheapest form this tool takes: an entry costs one
+baseline and answers a question reading the code could not.
+
+Positive: `npm run mutate` on the unaimed generated manifest was refused for all 26 entries and
+left no journal behind — `ls %TEMP%\universalis-mutate-*` found nothing afterwards. That is c11's
+whole promise, measured in one command, and it is the first pass where running the generated
+artifact as-is was safe to do.
