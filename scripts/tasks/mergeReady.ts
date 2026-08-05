@@ -4,7 +4,7 @@ import { checkBytes, type ByteFinding } from '../lib/bytes';
 import * as git from '../lib/git';
 import { trackedFiles } from '../lib/sourceFiles';
 import { clauseStandings, parseSpecDoc, type SpecDoc } from '../lib/specDoc';
-import { unreviewedFiledBy } from '../lib/taskStore';
+import { unreviewedFiledBy, type Task } from '../lib/taskStore';
 import type { Flags } from './cli';
 import { DEFAULT_BRANCH, readStore, resolveActiveSpec, resolveConfig, specFile, type Config } from './context';
 import { doctorIssues } from './doctor';
@@ -51,6 +51,9 @@ export interface BranchStanding {
   baseMoved: boolean;
   baseBranch: string;
   spec: string | null;
+  // True when the spec is a plan this branch wrote for a later branch rather
+  // than a contract this branch owes. See `authoredAsPlan`.
+  specAuthoredHere: boolean;
   openMembers: string[];
   unreviewedFindings: number;
   // Clause ids the spec's latest pass leaves outstanding, and whether a pass
@@ -94,6 +97,11 @@ function standingLegs(standing: BranchStanding): LegResult[] {
 
   if (standing.spec === null) {
     legs.push({ name: 'spec', ok: true, detail: 'pass — this branch is working no spec, so it owes no clause' });
+    return legs;
+  }
+
+  if (standing.specAuthoredHere) {
+    legs.push({ name: 'spec', ok: true, detail: `pass — this branch wrote ${standing.spec} as a plan for a later branch and worked none of its ${standing.openMembers.length} member(s), so it owes neither them nor a clause` });
     return legs;
   }
 
@@ -167,6 +175,18 @@ export function runMergeReady(deps: MergeReadyDeps): boolean {
   return false;
 }
 
+// A planning branch's output is a spec for a later branch, and the gate read
+// that spec as a debt: three members open because nobody had implemented them
+// and no audit pass because there was nothing yet to audit, both true and
+// neither a defect. Told apart from a contract by two facts nobody has to
+// declare — the file is absent from the base branch, so this branch wrote it,
+// and every member is still open, so nothing here was ever worked against it.
+// A spec authored and never decomposed is not a plan: nothing was promised to
+// a later branch until the work was named.
+export function authoredAsPlan(members: Task[], onBaseBranch: boolean): boolean {
+  return !onBaseBranch && members.length > 0 && members.every((member) => member.state === 'open');
+}
+
 // The reads a session was making by hand — `git status`, `git rev-parse`
 // plus `git merge-base`, `tasks spec show` twice — collected once so the
 // answer is a leg rather than a research task.
@@ -185,6 +205,7 @@ function branchStanding(config: Config, baseBranch: string): BranchStanding {
 
   const doc = spec === null ? null : readSpecDoc(config, spec);
   const latest = doc?.auditPasses[doc.auditPasses.length - 1];
+  const members = spec === null ? [] : tasks.filter((task) => task.spec === spec);
 
   return {
     branch: config.branch,
@@ -194,7 +215,8 @@ function branchStanding(config: Config, baseBranch: string): BranchStanding {
     baseMoved: base !== null && baseHead !== null && base !== baseHead,
     baseBranch,
     spec,
-    openMembers: spec === null ? [] : tasks.filter((task) => task.spec === spec && task.state !== 'done' && task.state !== 'declined').map((task) => task.id),
+    specAuthoredHere: spec !== null && authoredAsPlan(members, git.fileAt(baseBranch, specFile(config, spec)) !== null),
+    openMembers: members.filter((task) => task.state !== 'done' && task.state !== 'declined').map((task) => task.id),
     unreviewedFindings: spec === null ? 0 : unreviewedFiledBy(tasks, spec).length,
     outstandingClauses: doc === null ? [] : clauseStandings(doc.proofClauses, latest?.verdicts).filter((standing) => standing.status !== 'met').map((standing) => `c${standing.clause}`),
     auditPasses: doc?.auditPasses.length ?? 0,

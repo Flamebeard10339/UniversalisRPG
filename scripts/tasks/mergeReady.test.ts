@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import type { State, Task } from '../lib/taskStore';
 import { allUsages } from './commands';
-import { LEGS, runMergeReady, type BranchStanding, type MergeReadyDeps } from './mergeReady';
+import { authoredAsPlan, LEGS, runMergeReady, type BranchStanding, type MergeReadyDeps } from './mergeReady';
 
 const utf8 = (text: string): Uint8Array => new TextEncoder().encode(text);
 
@@ -12,6 +13,7 @@ const ready = (overrides: Partial<BranchStanding> = {}): BranchStanding => ({
   baseMoved: false,
   baseBranch: 'main',
   spec: 'a-spec',
+  specAuthoredHere: false,
   openMembers: [],
   unreviewedFindings: 0,
   outstandingClauses: [],
@@ -154,6 +156,44 @@ describe('runMergeReady, on this branch\'s standing', () => {
     const none = body({ spec: null });
     expect(none).toContain('this branch is working no spec, so it owes no clause');
     expect(none).not.toContain('clauses  ');
+  });
+
+  // The planning branch: `audit-session-timing` shipped its own deliverable
+  // and wrote two specs for branches that had not started, and the gate read
+  // both as debts — "3 open members" and "no recorded audit pass", each true
+  // and neither a defect.
+  it('passes the spec and clauses legs for a branch that wrote its spec as a plan for a later branch', () => {
+    const { ok, body: lines } = graded({ specAuthoredHere: true, openMembers: ['m1', 'm2', 'm3'], auditPasses: 0 });
+    expect(ok).toBe(true);
+    expect(lines).toContain('wrote a-spec as a plan for a later branch and worked none of its 3 member(s)');
+    // The clauses leg is gone rather than passing quietly, the way it is for
+    // a branch working no spec at all.
+    expect(lines).not.toContain('has no recorded audit pass');
+    // And no `spec done`: closing a plan the moment it is written is the one
+    // move a green run must not name here.
+    expect(lines).not.toContain('spec done a-spec');
+  });
+});
+
+describe('authoredAsPlan', () => {
+  const member = (state: State): Task => ({ state }) as Task;
+
+  it('reads a spec as a plan only when this branch wrote it and worked none of its members', () => {
+    expect(authoredAsPlan([member('open'), member('open')], false)).toBe(true);
+
+    // A spec the base branch already carries is somebody else's plan, picked
+    // up rather than written — this branch owes it.
+    expect(authoredAsPlan([member('open'), member('open')], true)).toBe(false);
+
+    // One member worked here is work done against the spec, and every other
+    // state says the same: the branch is implementing, not planning.
+    for (const state of ['in-progress', 'done', 'declined', 'unreviewed'] as State[]) {
+      expect(authoredAsPlan([member('open'), member(state)], false)).toBe(false);
+    }
+
+    // A spec file authored and never decomposed promised a later branch
+    // nothing, so it keeps owing its clauses.
+    expect(authoredAsPlan([], false)).toBe(false);
   });
 });
 

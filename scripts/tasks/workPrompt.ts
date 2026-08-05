@@ -4,9 +4,10 @@ import { isReadableGrant } from '../lib/planCheck';
 import { clauseStandings, parseSpecDoc, type SpecDoc } from '../lib/specDoc';
 import { trackedFiles } from '../lib/sourceFiles';
 import { covers, normalizePath } from '../lib/systems';
-import { clausesOf, type Task } from '../lib/taskStore';
+import { clausesOf, fixNowQueue, type Task } from '../lib/taskStore';
 import type { Flags } from './cli';
 import { readStore, resolveConfig, specFile, type Config } from './context';
+import { explainEmptyQueue } from './records';
 import { clauseStandingLines, renderTask } from './render';
 import { resolveTaskIds } from './resolveIds';
 
@@ -116,20 +117,51 @@ function printObligations(task: Task): void {
   console.log(`Then work: commit after each logical chunk, and close with \`npm run tasks -- done ${task.id} --commit HEAD\`.`);
 }
 
+// The queue `tasks next --spec <slug>` reads, asked here rather than answered
+// again: a second opinion on which member comes next is a second thing to
+// keep in sync. An empty one is explained by the same function `next` prints,
+// because "no member tasks", "every member closed" and "every member blocked"
+// are different next moves and a dispatcher gets none of them from silence.
+function nextMemberOf(tasks: Task[], spec: string): Task | undefined {
+  const queue = fixNowQueue(tasks, spec);
+  if (queue.length === 0) {
+    console.log(`${spec} is a spec, and it has no open, unblocked member to brief`);
+    explainEmptyQueue(tasks, spec, {});
+    return undefined;
+  }
+  const [next, ...rest] = queue;
+  console.log(`resolved the spec ${spec} -> ${next.id}, its next open, unblocked member${rest.length > 0 ? ` (${rest.length} more behind it: ${rest.map((task) => task.id).join(', ')})` : ''}`);
+  return next;
+}
+
+// A dispatcher holds the name of the work — the spec slug, which on a
+// planning branch is the only name that exists yet — and not the id of
+// whichever member happens to be unblocked. An exact task id still wins
+// outright, so the eleven specs carrying a root task of the same slug brief
+// that record unchanged; the fuzzy match comes last because fuzzy-first is
+// what answered `work-prompt audit-loop-costs-less` with five records matched
+// on substrings of their titles and never looked in docs/specs at all.
+function resolveWorkTarget(config: Config, tasks: Task[], name: string): Task | undefined {
+  const exact = tasks.find((task) => task.id === name);
+  if (exact) return exact;
+  if (existsSync(specFile(config, name))) return nextMemberOf(tasks, name);
+  // A read answers, and "no such task" with the nearest ids is the answer.
+  // What it must never do is print a brief anyway: a dispatch instruction
+  // for a record nobody holds is the one output here that would be invented.
+  return resolveTaskIds([name], tasks, { report: (line) => console.log(line) })?.[0];
+}
+
 export function cmdWorkPrompt(args: Flags, usage: string): void {
   const config = resolveConfig(args.flags);
-  const id = args.positional[0];
-  if (!id) {
+  const name = args.positional[0];
+  if (!name) {
     console.error(usage);
     process.exitCode = 1;
     return;
   }
 
   const tasks = readStore(config);
-  // A read answers, and "no such task" with the nearest ids is the answer.
-  // What it must never do is print a brief anyway: a dispatch instruction
-  // for a record nobody holds is the one output here that would be invented.
-  const task = resolveTaskIds([id], tasks, { report: (line) => console.log(line) })?.[0];
+  const task = resolveWorkTarget(config, tasks, name);
   if (task === undefined) return;
 
   console.log(`You are implementing ${task.id} on branch ${config.branch}.`);
