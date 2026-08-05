@@ -28,6 +28,10 @@ export interface AuditPass {
 
 export interface SpecDoc {
   deliverableSection: string;
+  // The settled arguments. Parsed here because the auditor's brief is what
+  // reads them: a brief that parses the spec and then omits its decisions is
+  // why an auditor opens the file anyway and reopens what it says.
+  decisionsSection: string;
   proofClauses: ProofClause[];
   auditPasses: AuditPass[];
 }
@@ -204,10 +208,12 @@ function parseAuditPasses(text: string): AuditPass[] {
 
 export function parseSpecDoc(rawText: string): SpecDoc {
   const text = lfOnly(rawText);
-  const deliverable = sectionText(text.split('\n'), '## Deliverable');
+  const lines = text.split('\n');
+  const deliverable = sectionText(lines, '## Deliverable');
   const deliverableSection = deliverable ? deliverable.text : '';
   return {
     deliverableSection,
+    decisionsSection: sectionText(lines, '## Decisions')?.text ?? '',
     proofClauses: parseProofClauses(deliverableSection, auditedClauseIds(text)),
     auditPasses: parseAuditPasses(text),
   };

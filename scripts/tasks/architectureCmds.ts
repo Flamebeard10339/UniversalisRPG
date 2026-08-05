@@ -92,7 +92,7 @@ export function cmdPlan(args: Flags): void {
 // time from the manifest and the tree; none of them writes anything, and
 // nothing downstream of them can fail a build.
 
-function architecture(config: Config): { manifest: Manifest; tree: SourceTree; modules: Module[] } {
+export function architecture(config: Config): { manifest: Manifest; tree: SourceTree; modules: Module[] } {
   const manifest = loadManifest(config.systemsPath);
   const tree = repoSourceTree();
   return { manifest, tree, modules: deriveModules(manifest, tree) };
@@ -179,7 +179,7 @@ const describeEdge = (edge: SystemEdge): string => {
 // Ownership is single-valued per file, so more than one name here means the
 // query named a region rather than a file, and every diff under it is
 // charged to whichever system owns the file it touched.
-function ownership(manifest: Manifest, view: RegionView): string {
+export function ownership(manifest: Manifest, view: RegionView): string {
   if (view.owners.length === 0) return `none — it is ${isUnowned(manifest, view.path) ? 'declared unowned' : 'owned by nobody, which `npm run audit-status` fails on'}`;
   return view.owners.length === 1 ? view.owners[0] : `${view.owners.join(', ')} — this region spans ${view.owners.length} systems, and a diff under it is charged to each`;
 }

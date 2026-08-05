@@ -1,12 +1,16 @@
 import { execFileSync, spawnSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
+import { regionView } from '../lib/architecture';
 import { harvestFiles, parseAuditDoc, systemForDoc } from '../lib/auditImport';
 import * as git from '../lib/git';
 import { appendAuditPass, clauseStandings, duplicateClauseIds, outstandingSummary, parseSpecDoc, stampClauseIds, VERDICTS, type AuditVerdict, type ProofClause, type Verdict } from '../lib/specDoc';
+import { priorArt } from '../lib/producers';
 import { loadStore, type Severity, type Task } from '../lib/taskStore';
+import { architecture, ownership, printPriorArt } from './architectureCmds';
 import type { Flags } from './cli';
-import { readStore, recordEvents, refuseUnknownSpec, reportUnknownSpec, resolveActiveSpec, resolveConfig, saveStoreAndWarn, slugify, specFile, subjectOf, today, uniqueId } from './context';
+import { readStore, recordEvents, type Config, refuseUnknownSpec, reportUnknownSpec, resolveActiveSpec, resolveConfig, saveStoreAndWarn, slugify, specFile, subjectOf, today, uniqueId } from './context';
 import { activePrompter } from './prompt';
 import { printRow, truncateLine } from './render';
 
@@ -103,13 +107,47 @@ export function resolveDiffRange(baseBranch: string, emit: (line: string) => voi
   return { base, head };
 }
 
-function diffChangedFiles(range: string): string[] {
+// A read of the repository the brief is being generated in. Null is "this
+// checkout could not answer", which every caller here renders rather than
+// throwing over — a brief missing its diff stat is worth more than no brief.
+function gitRead(args: string[]): string | null {
   try {
-    const output = execFileSync('git', ['diff', '--name-only', range], { encoding: 'utf8' }).trim();
-    return output === '' ? [] : output.split('\n');
+    return execFileSync('git', args, { encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 });
   } catch {
-    return [];
+    return null;
   }
+}
+
+function diffChangedFiles(range: string): string[] {
+  const output = gitRead(['diff', '--name-only', range])?.trim() ?? '';
+  return output === '' ? [] : output.split('\n');
+}
+
+// `tasks where`, run once over the whole path list rather than once per path
+// — which is what both measured auditors did by hand. The manifest is the
+// only thing that can fail here, and it costs this answer and nothing else.
+function printOwnership(config: Config, tasks: Task[], paths: string[]): void {
+  let arch: ReturnType<typeof architecture>;
+  try {
+    arch = architecture(config);
+  } catch (error) {
+    console.log(`Ownership unanswered: ${config.systemsPath} — ${error instanceof Error ? error.message : String(error)}`);
+    return;
+  }
+  console.log('Who owns each changed path:');
+  if (paths.length === 0) console.log('- none');
+  const owned: string[] = [];
+  for (const file of paths) {
+    const view = regionView(arch.manifest, arch.tree, arch.modules, file);
+    if (view.owners.length > 0) owned.push(file);
+    console.log(`- ${file} — ${ownership(arch.manifest, view)}`);
+  }
+  console.log('');
+  // Prior art over the owned paths only. Every branch writes the store and
+  // the event log, so asking what has claimed those returns most of the
+  // store — an answer whose length is the reason nobody reads it.
+  if (owned.length === 0) console.log('No prior art to answer: no changed path is owned by a system.');
+  else printPriorArt(priorArt(arch.manifest, tasks, owned));
 }
 
 // What the auditor is told to look for. Lives here, not in CLAUDE.md:
@@ -241,6 +279,124 @@ function readIfPresent(file: string): string | null {
   }
 }
 
+// Each of these is the answer to a question an auditor asks, and none was
+// discoverable from a brief that expects them to be used — pass 1 grepped
+// package.json to find out what existed.
+const AUDIT_TOOLS: Array<[string, string]> = [
+  ['npm run tasks -- merge-ready', 'the whole merge gate — tsc, tests, layer-check, audit-status, doctor, byte check — in one run'],
+  ['npm run mutate -- <manifest.json>', 'breaks a named line, runs the tests it names, restores from bytes it captured, and reports what the suite failed to notice'],
+  ['npm run probe -- <source>... [--show <kind>.<id>] [--round-trip] [--each]', 'asks the DSL load path a question without building a runner for it; --each surveys a table of variants split on ---'],
+  ['npm run inspect -- "<expression>"', 'evaluates against the repo\'s own module resolution and leaves no file behind, which is what a scratch .ts was for'],
+  ['npm run play', 'interactive REPL over startSession/view/apply; # test sections authored from it are the regression format'],
+  ['npm run session-timing', 'where a session\'s wall clock actually went'],
+  ['npm run tasks -- where <path>', 'what system owns a path, what concept claims it, and every task that ever named it'],
+];
+
+export interface Commit {
+  sha: string;
+  subject: string;
+  files: string[];
+}
+
+// `%x00` opens each record, so a subject containing a newline cannot be read
+// as the start of the file list under it.
+export function parseCommitLog(raw: string): Commit[] {
+  return raw
+    .split('\0')
+    .map((record) => record.replace(/^\n+/, '').trimEnd())
+    .filter((record) => record !== '')
+    .map((record) => {
+      const [header, ...files] = record.split('\n');
+      const space = header.indexOf(' ');
+      return {
+        sha: space === -1 ? header : header.slice(0, space),
+        subject: space === -1 ? '' : header.slice(space + 1),
+        files: files.map((file) => file.trim()).filter((file) => file !== ''),
+      };
+    });
+}
+
+export interface MutationEntry {
+  name: string;
+  file: string;
+  find: string;
+  replace: string;
+  tests: string[];
+  test: string;
+  note: string;
+}
+
+// A comment, an import or a declaration measures the compiler when deleted,
+// and a line that opens a block takes its closing brace with it. Both come
+// back as ERROR — a verdict that says the mutation did not build, not that
+// the suite missed it, which is the one verdict a generated entry can afford
+// least.
+const SKIP_MUTATING = /^(\/\/|\*|import |export (type|interface|function|const)|function |interface |type |\})|[{([]$/;
+
+// The lines this branch added that deleting would be felt, longest first.
+// Comments, imports and punctuation are excluded because deleting one
+// measures the compiler rather than the suite, and a line the file carries
+// twice is excluded because `mutate` refuses an ambiguous find rather than
+// guessing which one it meant. Several are returned rather than one, so a
+// spec with twelve targets mutates twelve different lines instead of the
+// same line twelve times.
+export function breakableAddedLines(diff: string, source: string | null): string[] {
+  if (source === null) return [];
+  const added = diff
+    .split('\n')
+    .filter((line) => line.startsWith('+') && !line.startsWith('+++'))
+    .map((line) => line.slice(1).trim());
+  return [...new Set(added)]
+    .filter((line) => line.length > 12 && /[a-z]/i.test(line) && !SKIP_MUTATING.test(line) && source.split(line).length === 2)
+    .sort((a, b) => b.length - a.length);
+}
+
+// `parseManifest` refuses a manifest as a whole, so one entry the brief could
+// not complete would cost the auditor the entire run. An unresolved target is
+// left out and said out loud instead — the omission is information, and the
+// nineteen entries beside it still run.
+export function mutationManifest(
+  clauses: Array<{ id: number; targets: string[] }>,
+  resolve: (target: string) => TargetResolution | null,
+  sourceLine: (clause: number, ordinal: number) => { file: string; find: string } | null,
+): { entries: MutationEntry[]; omitted: string[] } {
+  const entries: MutationEntry[] = [];
+  const omitted: string[] = [];
+  let ordinal = 0;
+  for (const clause of clauses) {
+    for (const target of clause.targets) {
+      const resolution = resolve(target);
+      if (resolution === null) continue;
+      if (resolution.state !== 'found' && resolution.state !== 'moved') {
+        omitted.push(`c${clause.id}: ${target} — ${resolution.state === 'no-such-file' ? 'names no file in this checkout' : resolution.state === 'nowhere' ? 'no test by this name exists anywhere' : 'the suite could not be listed to place it'}`);
+        continue;
+      }
+      const broken = sourceLine(clause.id, ordinal);
+      if (broken === null) {
+        omitted.push(`c${clause.id}: ${target} — this branch's diff has no line under it that deleting would measure`);
+        continue;
+      }
+      const file = resolution.state === 'moved' ? resolution.foundIn[0] : resolution.file;
+      const name = `c${clause.id} ${resolution.name}`;
+      // `parseManifest` refuses two mutations sharing a name, since their
+      // verdicts could not be told apart — so a clause naming one test twice
+      // costs the run rather than repeating an entry.
+      if (entries.some((entry) => entry.name === name)) continue;
+      ordinal++;
+      entries.push({
+        name,
+        file: broken.file,
+        find: broken.find,
+        replace: '',
+        tests: [file],
+        test: resolution.name,
+        note: `find is a line c${clause.id} added, picked because deleting it is measurable; retarget it if it is not the behaviour this clause claims`,
+      });
+    }
+  }
+  return { entries, omitted };
+}
+
 // The diff range is the branch's and the clause list is the slug's, and
 // nothing used to relate the two. On `tasks-roadmap` all eleven slugs in
 // `docs/specs/` printed the identical range, so the slug chose only which
@@ -271,6 +427,44 @@ export function slugStandingLines(standing: SlugStanding): string[] {
     );
   }
   return lines;
+}
+
+// Written outside the worktree, because the brief is a read of the
+// repository and a generated file left in it would show up as the branch's
+// own work. The path is named so `npm run mutate -- <it>` is a copy away.
+function writeMutationManifest(slug: string, clauses: ProofClause[], members: Task[], changed: string[], range: string): void {
+  const sources = changed.filter((file) => file.endsWith('.ts') && !file.endsWith('.test.ts') && existsSync(file));
+  const candidates = new Map<number, Array<{ file: string; find: string }>>();
+  const sourceLine = (clause: number, ordinal: number): { file: string; find: string } | null => {
+    if (!candidates.has(clause)) {
+      const claimed = members.filter((task) => task.discharges.includes(clause)).flatMap((task) => [...task.writes, ...task.files].map((entry) => entry.split(/[:#]/)[0]));
+      // A file the clause's own task named comes first, since a line from it
+      // is a line that clause is answerable for; the rest of the diff after.
+      const ordered = [...sources.filter((file) => claimed.includes(file)), ...sources.filter((file) => !claimed.includes(file))];
+      candidates.set(
+        clause,
+        ordered.flatMap((file) => breakableAddedLines(gitRead(['diff', '-U0', range, '--', file]) ?? '', readIfPresent(file)).map((find) => ({ file, find }))),
+      );
+    }
+    const lines = candidates.get(clause)!;
+    return lines.length === 0 ? null : lines[ordinal % lines.length];
+  };
+
+  const { entries, omitted } = mutationManifest(
+    clauses.map((clause) => ({ id: clause.id, targets: clause.proofTargets ?? [] })),
+    (target) => resolveTarget(target),
+    sourceLine,
+  );
+  console.log('Mutation manifest, built from the targets above and runnable as it stands:');
+  if (entries.length === 0) {
+    console.log('- none — no proof target on this spec resolved to a test with a line of this branch under it');
+  } else {
+    const manifestPath = path.join(os.tmpdir(), `mutations-${slug}.json`);
+    writeFileSync(manifestPath, `${JSON.stringify(entries, null, 2)}\n`, 'utf8');
+    console.log(`  npm run mutate -- ${manifestPath}`);
+    console.log(`  ${entries.length} entry(ies). Each deletes a line this branch added and runs only the test its clause names; KILLED is the clause proving itself, SURVIVED is the finding.`);
+  }
+  for (const line of omitted) console.log(`- omitted: ${line}`);
 }
 
 export function cmdAuditPrompt(args: Flags, usage: string): void {
@@ -335,10 +529,28 @@ export function cmdAuditPrompt(args: Flags, usage: string): void {
   console.log('');
   console.log('Log any tool friction — task tool, audit tool, harness — in .planning/agent-feedback/tool-friction.md');
   console.log('');
+  console.log('Tools an auditor may reach for:');
+  for (const [command, does] of AUDIT_TOOLS) console.log(`- ${command}\n    ${does}`);
+  console.log('');
+  console.log('Commits in this range:');
+  const commits = parseCommitLog(gitRead(['log', '--format=%x00%h %s', '--name-only', `${base}..${head}`]) ?? '');
+  if (commits.length === 0) console.log('- none');
+  for (const commit of commits) console.log(`- ${commit.sha} ${commit.subject}\n    ${commit.files.join(', ') || 'no files'}`);
+  console.log('');
+  console.log('Diff stat:');
+  console.log(gitRead(['diff', '--stat', `${base}..${head}`])?.trimEnd() || '(none)');
+  console.log('');
   console.log('Relevant files:');
   if (relevantFiles.length === 0) console.log('- none');
   for (const file of relevantFiles) console.log(`- ${file}`);
   console.log('');
+  printOwnership(config, tasks, relevantFiles);
+  console.log('');
+  if (doc.decisionsSection !== '') {
+    console.log(`${slug}'s own decisions — settled arguments, not open ones:`);
+    console.log(doc.decisionsSection.split('\n').slice(1).join('\n').trim());
+    console.log('');
+  }
   const standings = clauseStandings(doc.proofClauses, latest?.verdicts);
   console.log('Proof clauses:');
   for (const clause of doc.proofClauses) {
@@ -363,6 +575,8 @@ export function cmdAuditPrompt(args: Flags, usage: string): void {
   if (members.length === 0) console.log('- none');
   const byId = new Map(tasks.map((task) => [task.id, task]));
   for (const task of members) printRow(task, byId, { indent: '- ', withFiles: true });
+  console.log('');
+  writeMutationManifest(slug, doc.proofClauses, members, relevantFiles, `${base}..${head}`);
   console.log('');
   console.log('For every clause with a proof target, confirm the target exists and fails under a meaningful mutation or reproduction before accepting it as proof. `npm run mutate -- <manifest.json>` is the tool; `npm run probe` asks the DSL load path questions without a scratch runner.');
   console.log('Do not treat green tests as proof unless they are tied to the clause they discharge.');

@@ -3,7 +3,8 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { tsxCli } from '../lib/tsxCli';
-import { indexSuiteTitles, parseAuditArgs, parseAuditFile, slugStandingLines, unresolvedTarget } from './audit';
+import { parseManifest } from '../mutate';
+import { indexSuiteTitles, mutationManifest, parseAuditArgs, parseAuditFile, parseCommitLog, slugStandingLines, unresolvedTarget, type TargetResolution } from './audit';
 import { appendEvent, firstListedId, fixture, gitFixture, relevantFilesBlock, repoRoot, script, type Run } from './cliFixtures';
 
 describe('tasks CLI', () => {
@@ -961,6 +962,110 @@ describe('a proof target that names no test', () => {
     expect(indexSuiteTitles(listing)?.get('work-prompt briefs a member')).toEqual(['scripts/tasks/records.test.ts', 'scripts/tasks/workPrompt.test.ts']);
     expect(indexSuiteTitles('not json at all')).toBeNull();
     expect(indexSuiteTitles(null)).toBeNull();
+  });
+});
+
+// What the brief left an auditor to find out alone, measured over two passes:
+// 191 seconds running six test files to learn their names, the mutate manifest
+// format hunted across three commands and hand-written 74 lines at a time, and
+// the diff stat, commit list, decisions and `tasks where` all fetched by hand,
+// twice. None of it is judgment; all of it is derivable from what the brief
+// has already read.
+describe('the brief arriving with the answers rather than the instructions', () => {
+  const resolves = (name: string, file = 'scripts/tasks/audit.test.ts'): TargetResolution => ({ state: 'found', file, name });
+
+  it('audit-prompt emits a runnable mutation manifest built from the resolved proof targets', () => {
+    const { entries } = mutationManifest(
+      [
+        { id: 1, targets: ['vitest scripts/tasks/audit.test.ts "the first test"'] },
+        { id: 2, targets: ['vitest scripts/tasks.test.ts "a test that moved"'] },
+      ],
+      (target) => (target.includes('moved') ? { state: 'moved', file: 'scripts/tasks.test.ts', name: 'a test that moved', foundIn: ['scripts/tasks/records.test.ts'] } : resolves('the first test')),
+      () => ({ file: 'scripts/tasks/audit.ts', find: 'const answered = derive(brief);' }),
+    );
+
+    // The whole point of generating it: `mutate` takes it as it stands. A
+    // manifest the auditor has to repair is the 74 hand-written lines back.
+    expect(() => parseManifest(JSON.stringify(entries))).not.toThrow();
+    expect(entries[0]).toMatchObject({ tests: ['scripts/tasks/audit.test.ts'], test: 'the first test', replace: '' });
+    // A moved target runs against the file it actually lives in, which is
+    // the whole reason the wide search exists.
+    expect(entries[1].tests).toEqual(['scripts/tasks/records.test.ts']);
+  });
+
+  it('an unresolved target is named as omitted rather than emitted into the manifest', () => {
+    const { entries, omitted } = mutationManifest(
+      [{ id: 1, targets: ['vitest a.test.ts "gone"', 'vitest scripts/tasks/audit.test.ts "here"'] }],
+      (target) => (target.includes('gone') ? { state: 'nowhere', file: 'a.test.ts', name: 'gone' } : resolves('here')),
+      () => ({ file: 'scripts/tasks/audit.ts', find: 'const answered = derive(brief);' }),
+    );
+
+    // parseManifest refuses a manifest as a whole, so one entry the brief
+    // could not complete would cost the auditor every entry beside it.
+    expect(entries).toHaveLength(1);
+    expect(omitted).toEqual(['c1: vitest a.test.ts "gone" — no test by this name exists anywhere']);
+    expect(() => parseManifest(JSON.stringify(entries))).not.toThrow();
+  });
+
+  it('the brief names the commits in its diff range and what each touched', () => {
+    gitFixture(({ commit, tasks }) => {
+      commit('A commit on demo-spec, after branching from main.');
+
+      const result = tasks('audit-prompt', 'demo-spec');
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('Commits in this range:');
+      expect(result.stdout).toMatch(/- [0-9a-f]{7,} A commit on demo-spec, after branching from main\.\n {4}file-[^\n]+\.txt/);
+      expect(result.stdout).toContain('Diff stat:');
+    });
+  });
+
+  // A subject carrying a newline used to be indistinguishable from the file
+  // list under it, which would have attributed one commit's files to another.
+  it('reads a commit log whose subject spans lines without losing the files under it', () => {
+    expect(parseCommitLog('\0abc1234 a subject\nwith a second line\nsrc/one.ts\n\0def5678 another\nsrc/two.ts\n')).toEqual([
+      { sha: 'abc1234', subject: 'a subject', files: ['with a second line', 'src/one.ts'] },
+      { sha: 'def5678', subject: 'another', files: ['src/two.ts'] },
+    ]);
+  });
+
+  it('the brief carries the specs decisions so an auditor does not reopen them', () => {
+    fixture(({ dir, tasks }) => {
+      const specPath = path.join(dir, 'specs', 'demo-spec.md');
+      writeFileSync(specPath, readFileSync(specPath, 'utf8').replace('## Decisions\n', '## Decisions\n\n- The seam stays where it is; moving it was measured and cost more.\n'), 'utf8');
+
+      const result = tasks('audit-prompt', 'demo-spec');
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('The seam stays where it is; moving it was measured and cost more.');
+      // The heading itself is not the answer, and a brief that reprinted it
+      // verbatim would be one an auditor still has to open the spec to read.
+      expect(result.stdout).not.toContain('\n## Decisions');
+    });
+  });
+
+  it('the brief answers ownership and prior art for every path in its diff', () => {
+    fixture(({ tasks }) => {
+      tasks('add', 'An earlier claim on the save file', '--system', 'Runtime', '--files', 'src/runtime/save.ts:88');
+      tasks('add', 'The task under audit', '--spec', 'demo-spec', '--files', 'src/runtime/save.ts');
+
+      const result = tasks('audit-prompt', 'demo-spec');
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('Who owns each changed path:');
+      expect(result.stdout).toContain('- src/runtime/save.ts — Runtime');
+      expect(result.stdout).toContain('prior art on src/runtime/save.ts');
+      expect(result.stdout).toContain('An earlier claim on the save file');
+    });
+  });
+
+  it('the brief names each tool an auditor may reach for, with the command that runs it', () => {
+    fixture(({ tasks }) => {
+      const { stdout } = tasks('audit-prompt', 'demo-spec');
+      // Pass 1 grepped package.json to find out what existed. Each of these
+      // is the answer to a question an auditor asks, and a name with no
+      // invocation beside it is a fifth thing to go and look up.
+      for (const command of ['npm run mutate -- <manifest.json>', 'npm run probe --', 'npm run inspect --', 'npm run play', 'npm run session-timing', 'npm run tasks -- where <path>']) {
+        expect(stdout).toContain(command);
+      }
+    });
   });
 });
 
