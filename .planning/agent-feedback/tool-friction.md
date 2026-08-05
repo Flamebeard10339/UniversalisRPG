@@ -208,6 +208,23 @@ scoped to one named test, ran in 34 seconds total (16 vitest invocations includi
 the manifest refusal caught nothing this pass but the `ran === 0` seam was mutation-verified. The
 same manifest against file scopes would have cost ~15 minutes on the old tool.
 
+## planner-meets-the-record pass 1 (2026-08-05)
+
+`npm run mutate` reported "(1 test(s) were already failing before this mutation)" against its
+whole-suite baseline, while `npx vitest run` immediately before and after gave 1600 passed of 1600
+in 69 files. Either the baseline scope is measured under a condition the direct run is not, or one
+test is flaky only under the mutate harness. Either way the note reads as a real pre-existing
+failure to an auditor and cost a full extra suite run to disbelieve. It should name the test.
+
+`tasks audit --args-from` handled seven findings and eleven verdicts with long evidence in one call
+with no trouble — the continuation-line rule made multi-sentence evidence practical, which is the
+thing that would otherwise have forced a report document.
+
+`tasks add --store <path>` only parses `--store` after the verb, not before it. `npm run tasks --
+--store <path> add ...` fails with `unknown command: --store` even though `GLOBAL_USAGE` prints it
+as a global. Reaching a proof command that writes (c11's `add`) without touching the real store took
+two attempts to discover that.
+
 ## 2026-08-05, auditing `audit-brief-arrives-complete` (pass 2)
 
 ### `inspect` resolves a relative import from `scripts/`, not from the repo root
@@ -319,3 +336,4 @@ Positive: `npm run mutate` on the unaimed generated manifest was refused for all
 left no journal behind — `ls %TEMP%\universalis-mutate-*` found nothing afterwards. That is c11's
 whole promise, measured in one command, and it is the first pass where running the generated
 artifact as-is was safe to do.
+

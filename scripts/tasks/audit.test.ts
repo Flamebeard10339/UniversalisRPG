@@ -408,7 +408,7 @@ describe('tasks CLI', () => {
       // have. Promotion at pass 2+ was removed from the tool; the prompt
       // asked for it anyway, on every invocation, for every future auditor.
       expect(result.stdout).not.toContain('Do not promote pass-2+ findings.');
-      // The brief and workflow.md step 9 describe one rule from two sides, so
+      // The brief and workflow.md step 8 describe one rule from two sides, so
       // they have to agree on the pass asymmetry: an auditor never promotes,
       // and the triage step that does treats pass 1 differently from pass 2+.
       expect(result.stdout).toContain('You file findings; you never promote them');
@@ -554,7 +554,7 @@ describe('tasks CLI', () => {
       expect(result.stdout).toContain('npm run tasks -- concept');
       expect(result.stdout).toContain('produced by a-member');
       // The registration step is the one a `produces` claim looks like it
-      // already discharged and does not — workflow.md step 6 puts the
+      // already discharged and does not — workflow.md step 5 puts the
       // judgement on the worker, so the brief has to name both.
       expect(result.stdout).toContain('produces: a policy module');
       expect(result.stdout).toContain('a forecast, not a registration');

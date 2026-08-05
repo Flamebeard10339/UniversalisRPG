@@ -6,15 +6,16 @@ import { flagArities, parseArgs, positionalArity, type Flags } from './cli';
 import { ACTOR_USAGE, flushSkippedStoreLines, GLOBAL_USAGE } from './context';
 import { cmdPlan, cmdConcept, cmdProduces, cmdSystem, cmdWhere } from './architectureCmds';
 import { cmdDoctor } from './doctor';
-import { cmdCheckCommitMessage, cmdHandoff, cmdLog, recordStandaloneEvent } from './handoff';
+import { cmdCheckCommitMessage, cmdLog, recordStandaloneEvent } from './handoff';
 import { cmdMergeReady } from './mergeReady';
 import { cmdAdd, cmdDecline, cmdDone, cmdEdit, cmdList, cmdNext, cmdPromote, cmdSearch, cmdShow, cmdStart, cmdStop } from './records';
 import { cmdRoadmap } from './roadmapCmd';
+import { cmdPlanPrompt } from './planPrompt';
 import { cmdSpecAdd, cmdSpecDone, cmdSpecNew, cmdSpecRemove, cmdSpecShow } from './specCmds';
 import { cmdTriage } from './triage';
 import { cmdWorkPrompt } from './workPrompt';
 
-const USAGE = 'usage: npm run tasks -- <doctor|add|edit|show|list|search|next|roadmap|plan|system|where|produces|concept|start|stop|done|decline|promote|import|triage|note|decision|log|spec|audit|audit-prompt|work-prompt|handoff|merge-ready> ...';
+const USAGE = 'usage: npm run tasks -- <doctor|add|edit|show|list|search|next|roadmap|plan|system|where|produces|concept|start|stop|done|decline|promote|import|triage|note|decision|log|spec|audit|audit-prompt|work-prompt|plan-prompt|merge-ready> ...';
 
 interface Command {
   usage: string;
@@ -53,11 +54,11 @@ const COMMANDS: Record<string, Command> = {
   },
   show: { usage: 'usage: tasks show <id>', run: cmdShow },
   list: {
-    usage: 'usage: tasks list [--state unreviewed|open|in-progress|done|declined] [--severity high|medium|low] [--system "<name>"] [--spec <slug>] [--kind task|finding|undelivered|question] [--deferred]',
+    usage: 'usage: tasks list [--state unreviewed|open|in-progress|done|declined] [--severity high|medium|low] [--system "<name>"] [--spec <slug>] [--kind task|finding|undelivered|question] [--deferred] [--triggered]  (--triggered reaches past the not-closed default to every declined record carrying a --trigger condition)',
     run: cmdList,
   },
   search: {
-    usage: 'usage: tasks search <term> [--state unreviewed|open|in-progress|done|declined] [--severity high|medium|low] [--system "<name>"] [--spec <slug>] [--kind task|finding|undelivered|question] [--deferred]',
+    usage: 'usage: tasks search <term> [--state unreviewed|open|in-progress|done|declined] [--severity high|medium|low] [--system "<name>"] [--spec <slug>] [--kind task|finding|undelivered|question] [--deferred] [--triggered]',
     run: cmdSearch,
   },
   plan: { usage: 'usage: tasks plan [<id>...] [--spec <slug>]  (grades a dispatch set for overlap, unstated dependencies and duplicated interfaces; runs no workers and refuses nothing)', run: cmdPlan },
@@ -70,7 +71,7 @@ const COMMANDS: Record<string, Command> = {
   start: { usage: `usage: tasks start <id> ${ACTOR_USAGE}`, run: cmdStart },
   stop: { usage: `usage: tasks stop <id> ${ACTOR_USAGE}`, run: cmdStop },
   done: { usage: `usage: tasks done <id>... [--commit <revspec>] ${ACTOR_USAGE}  (default: none — the closing commit does not exist yet when \`done\` runs; see \`tasks show\` for a derived one)`, run: cmdDone },
-  decline: { usage: `usage: tasks decline <id>... --reason "..." ${ACTOR_USAGE}  (several ids share the one reason)`, run: cmdDecline },
+  decline: { usage: `usage: tasks decline <id>... --reason "..." [--trigger "..."] ${ACTOR_USAGE}  (several ids share the one reason and trigger; --trigger states a condition for revisiting, filed where \`tasks list --triggered\` finds it)`, run: cmdDecline },
   promote: { usage: `usage: tasks promote <id>... [--spec <slug>] ${ACTOR_USAGE}  (the non-interactive form of triage's promote: moves unreviewed or deferred records into the spec as open members)`, run: cmdPromote },
   import: { usage: `usage: tasks import <audit-doc> ${ACTOR_USAGE}`, run: cmdImport },
   triage: { usage: `usage: tasks triage [--spec <slug>] ${ACTOR_USAGE}`, run: cmdTriage },
@@ -81,7 +82,7 @@ const COMMANDS: Record<string, Command> = {
   audit: { usage: AUDIT_USAGE, run: cmdAudit },
   'audit-prompt': { usage: 'usage: tasks audit-prompt <spec> [--base-branch main]  (the auditor\'s brief, generated — do not hand-write one)', run: cmdAuditPrompt },
   'work-prompt': { usage: 'usage: tasks work-prompt <id-or-spec>  (the worker\'s brief, generated — do not hand-write one. A spec slug briefs that spec\'s next open, unblocked member; an exact task id always wins over a spec of the same name)', run: cmdWorkPrompt },
-  handoff: { usage: 'usage: tasks handoff [--spec <slug>] [--base-branch main] [--scan-cap <commits>]', run: cmdHandoff },
+  'plan-prompt': { usage: 'usage: tasks plan-prompt <slug> [<path>...]  (the planner\'s brief, generated — do not remember the survey by hand. Runs `tasks where` over every named path, prints the clause format literally, and ends with the decompose/plan/dispatch sequence)', run: cmdPlanPrompt },
   'merge-ready': { usage: 'usage: tasks merge-ready [--base-branch main]  (runs the merge gate: tsc, npm test, layer-check, audit-status, doctor, and the tracked-text byte check; exits non-zero when a leg fails)', run: cmdMergeReady },
   'check-commit-msg': { usage: 'usage: tasks check-commit-msg <msg-file> [--merge-or-revert] [--files a,b,c]', run: cmdCheckCommitMessage },
 };

@@ -1,7 +1,8 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { deriveModules, regionView, repoSourceTree, systemView, type Module, type ModuleSurface, type RegionView, type SourceTree, type SystemEdge, type SystemView } from '../lib/architecture';
+import { loadEvents } from '../lib/eventLog';
 import { checkPlan } from '../lib/planCheck';
-import { findProducers, priorArt, producerIndex, type PriorArt, type Producer } from '../lib/producers';
+import { findProducers, priorArt, producerIndex, rulingsOn, type PriorArt, type Producer, type Rulings } from '../lib/producers';
 import { canonicalPath, checkManifest, isUnowned, loadManifest, ManifestError, overlappingConcepts, parseManifest, type Manifest } from '../lib/systems';
 import type { Task } from '../lib/taskStore';
 import type { Flags } from './cli';
@@ -215,27 +216,52 @@ export function printPriorArt(art: PriorArt, { collapseClosed = false } = {}): v
   console.log('\nA claim in any state is prior art: a closed one is a decision already made, and an open one is a collision.');
 }
 
+// "Someone has written here" and "someone has ruled on this" are different
+// facts, so this prints under its own header with its own `[ruling]` tag
+// rather than folding into `printPriorArt`'s `[state] id` lines — a reader
+// scanning the left column tells the two apart without reading the prose.
+export function printRulings(rulings: Rulings): void {
+  const where = rulings.paths.join(', ');
+  if (rulings.reasons.length === 0 && rulings.decisions.length === 0) {
+    console.log(`no ruling names ${where} or its basename: no closed record's reason and no event-log decision mentions it. Only those two fields are searched — \`tasks log "<term>"\` reads the whole log.`);
+    return;
+  }
+
+  console.log(`rulings on ${where}:`);
+  for (const { task, on } of rulings.reasons) {
+    console.log(`  [ruling] ${task.id} (${task.state}) reason — ${task.reason}`);
+    if (on.length > 1 || on[0] !== where) console.log(`            names ${on.join(', ')}`);
+  }
+  for (const { event, on } of rulings.decisions) {
+    console.log(`  [ruling] decision ${event.t.slice(0, 19)}Z (${event.id ?? `${event.system ?? 'no system'}/${event.spec ?? 'no spec'}`}) — ${event.note}`);
+    if (on.length > 1 || on[0] !== where) console.log(`            names ${on.join(', ')}`);
+  }
+  console.log('\nA ruling is a decision already made about this path, not a claim on it — read it before proposing the same remedy again.');
+}
+
 // The same query `tasks where` answers when asked, fired by the act of
 // declaring a write grant. A check that has to be remembered is skipped
 // exactly when a session is deep in something else: this one was run once in
 // a whole planning session, and that once is the one duplication it caught.
-// The record's own claim is excluded — a task always claims what it just
-// granted, and reporting that would bury the answer under itself.
+// The record's own claim is excluded from both sections — a task always
+// claims what it just granted, and reporting that would bury the answer
+// under itself.
 export function reportPriorArtOnWrites(config: Config, tasks: Task[], task: Task): void {
   if (task.writes.length === 0) return;
   const manifest = manifestOrEmpty(config, 'answering from recorded claims only — registered concepts could not be read');
+  const others = tasks.filter((candidate) => candidate.id !== task.id);
   console.log('');
-  printPriorArt(priorArt(manifest, tasks.filter((candidate) => candidate.id !== task.id), task.writes));
+  printPriorArt(priorArt(manifest, others, task.writes));
+  console.log('');
+  printRulings(rulingsOn(others, loadEvents(config.eventsPath).events, task.writes));
 }
 
-export function cmdWhere(args: Flags, usage: string): void {
-  const config = resolveConfig(args.flags);
-  const target = args.positional[0];
-  if (!target) {
-    console.error(usage);
-    process.exitCode = 1;
-    return;
-  }
+// The body of `tasks where`, factored out so `plan-prompt` can run the same
+// survey over paths named on its own command line — the deliverable it
+// exists for is running step 1's survey rather than trusting a planner to
+// remember the command, so it reaches this the way `cmdWhere` does rather
+// than printing advice about it.
+export function printWhere(config: Config, target: string): void {
   const { manifest, tree, modules } = architecture(config);
   const view = regionView(manifest, tree, modules, target);
 
@@ -256,8 +282,23 @@ export function cmdWhere(args: Flags, usage: string): void {
     for (const entry of view.importedBy) console.log(`    ${entry.path} (${entry.system})`);
   }
 
+  const tasks = readStore(config);
   console.log('');
-  printPriorArt(priorArt(manifest, readStore(config), [view.path]));
+  printPriorArt(priorArt(manifest, tasks, [view.path]));
+
+  console.log('');
+  printRulings(rulingsOn(tasks, loadEvents(config.eventsPath).events, [view.path]));
+}
+
+export function cmdWhere(args: Flags, usage: string): void {
+  const config = resolveConfig(args.flags);
+  const target = args.positional[0];
+  if (!target) {
+    console.error(usage);
+    process.exitCode = 1;
+    return;
+  }
+  printWhere(config, target);
 }
 
 // The check a worker runs before building: is this already somebody's job?

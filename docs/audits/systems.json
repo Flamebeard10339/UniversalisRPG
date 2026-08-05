@@ -284,6 +284,29 @@
           "note": "produced by prior-art-by-path; the path-keyed index, distinct from the name-keyed produces query sharing this file"
         },
         {
+          "name": "ruling query",
+          "paths": [
+            "scripts/lib/producers.ts",
+            "scripts/tasks/architectureCmds.ts"
+          ],
+          "note": "produced by survey-cannot-see-rulings: reads a closed record's reason and event-log decisions for the queried path or its basename, distinct from the writes/files claim query"
+        },
+        {
+          "name": "generated planner brief",
+          "paths": [
+            "scripts/tasks/planPrompt.ts"
+          ],
+          "note": "produced by plan-prompt-brief: symmetric with the generated worker brief and auditor brief, tasks plan-prompt runs step 1's survey (tasks where) over named paths instead of listing commands"
+        },
+        {
+          "name": "decline trigger",
+          "paths": [
+            "scripts/lib/taskStore.ts",
+            "scripts/tasks/records.ts"
+          ],
+          "note": "produced by decline-trigger-is-write-only: Task.trigger plus tasks list --triggered, a queue for a decline's revisit condition"
+        },
+        {
           "name": "proof target resolution",
           "paths": [
             "scripts/tasks/audit.ts"
@@ -296,6 +319,7 @@
             "scripts/tasks/audit.ts"
           ],
           "note": "produced by brief-arrives-with-answers"
+
         }
       ]
     },

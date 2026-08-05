@@ -39,22 +39,21 @@ export function cmdSpecNew(args: Flags, usage: string): void {
   mkdirSync(config.specsDir, { recursive: true });
   writeFileSync(path_, SPEC_SCAFFOLD(slug), 'utf8');
   console.log(`created ${path_} — fill in ## Deliverable before opening the branch's first audit`);
-  printCapabilitySurvey();
+  printSurveyReminder(slug);
 }
 
 // The one moment the whole capability landscape is in view, and the moment a
-// planner is least likely to stop and ask. Printed, never written: which
-// capabilities the branch adds, extends, takes over or retires is the
-// judgement, and making it is the point of the step. Same shape as the
-// `tasks concept` nudge `done` prints for an unregistered claim.
-function printCapabilitySurvey(): void {
+// planner is least likely to stop and ask. `tasks plan-prompt` is what runs
+// the survey now — prior art and rulings both, not just a list of commands
+// to remember — so this points back at it rather than repeating a shorter,
+// claims-only version of the same list. Which capabilities the branch adds,
+// extends, takes over or retires is the judgement, and making it is the
+// point of the step, same shape as the `tasks concept` nudge `done` prints
+// for an unregistered claim.
+function printSurveyReminder(slug: string): void {
   console.log('');
-  console.log('Before writing the contract, ask what is already here — by path as well as by name,');
-  console.log('because a capability name is authored prose and two authors will not choose the same words:');
-  console.log('  tasks where <path>            what owns this region, what it exports, and everything that has ever claimed it');
-  console.log('  tasks produces "<name>"       whether a capability already exists, over concepts and every claim any task made');
-  console.log('  tasks system "<name>"         a system\'s files, surface, dependencies and registered concepts');
-  console.log('Then record in this spec\'s `## Decisions` which capabilities the branch adds, extends,');
+  console.log(`The scaffold is not the survey. If \`tasks plan-prompt ${slug} <path>...\` has not already been run for this branch, run it now — it prints prior art (writes, files, produces) and rulings (event-log decisions and closed-record reasons) for every region named, by path rather than by name, because a capability name is authored prose and two authors will not choose the same words.`);
+  console.log("Then record in this spec's `## Decisions` which capabilities the branch adds, extends,");
   console.log('takes over and retires. A survey that finds an owner is a success: reuse it, or write down');
   console.log('why a second one is right.');
 }

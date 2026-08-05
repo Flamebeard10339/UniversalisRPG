@@ -14,35 +14,41 @@ Every command is `npm run tasks -- <verb>`. The record verbs (`show`, `edit`, `s
 `done`, `decline`, `promote`) accept a unique prefix or substring of an id; everywhere else —
 `spec add`/`remove`, `plan`, `--id`, `--requires` — an id is exact.
 
-1. **`tasks handoff`** — the first command of a cold session: branch, active spec, clause
-   standings, open queue.
-2. **Survey the capabilities before writing the contract.** For every region the work will touch,
-   ask what is already there: `tasks where <path>` for the owning system, `tasks produces "<name>"`
-   for an existing claim, `tasks system "<name>"` for its registered concepts. Ask by **path** as
-   well as by name — a capability name is authored prose and two authors will not choose the same
-   words, while a path is the same string for everyone. Then decide, deliberately, which
-   capabilities this branch **adds**, which it **extends**, which it **takes over**, and which it
-   **retires** — and record that in the spec's `## Decisions`, because it is the reasoning a later
-   planner would otherwise re-litigate. A survey that finds an owner is a success: reuse it, or
-   write down why a second one is right.
-3. **`tasks spec new <slug>`**, then write `docs/specs/<slug>.md` — one spec per branch, numbered
-   proof clauses under `## Deliverable`. The spec is the contract, never the test plan. `spec new`
-   prints step 2's survey rather than trusting anyone to remember it, and never writes a thing.
-4. **Decompose** into tasks whose `--writes` regions are disjoint:
+1. **`tasks plan-prompt <slug> <path>...`** — the planner's brief, generated rather than
+   remembered: it runs `tasks where <path>` over every region the work will touch and prints both
+   halves of what comes back — prior art (everything, open or closed, that has ever claimed the
+   region: `writes`, `files`, `produces`) and **rulings** (event-log decisions and closed-record
+   `reason`s whose text names that path or its basename). A claim says someone has written here; a
+   ruling says someone has already decided something about it, and the two are printed under
+   separate headings because a planner acts on them differently — a ruling against the approach
+   about to be taken is a stop, not a data point to work around. Ask by **path** as well as by
+   name — a capability name is authored prose and two authors will not choose the same words,
+   while a path is the same string for everyone. Then decide, deliberately, which capabilities
+   this branch **adds**, which it **extends**, which it **takes over**, and which it **retires**
+   — and record that in the spec's `## Decisions`, because it is the reasoning a later planner
+   would otherwise re-litigate. A survey that finds an owner is a success: reuse it, or write down
+   why a second one is right. Naming no paths still prints the clause format and the
+   decompose/`plan`/dispatch sequence below, so the brief is worth running even at the first guess.
+2. **`tasks spec new <slug>`**, then write `docs/specs/<slug>.md` — one spec per branch, numbered
+   proof clauses under `## Deliverable`, in the literal `- [cN] text` form `plan-prompt` prints,
+   because that number is what `--discharges` in step 3 references. The spec is the contract,
+   never the test plan. Run `spec new` after the survey above, not before — it writes only the
+   scaffold, never a planner's capability decisions.
+3. **Decompose** into tasks whose `--writes` regions are disjoint:
    `tasks add "<title>" --writes <paths> --produces "<capability>" --requires <ids>`.
-   A `--produces` here is a **forecast** of a capability, answerable to the survey in step 2; the
+   A `--produces` here is a **forecast** of a capability, answerable to the survey in step 1; the
    registration that makes it durable happens later, once someone has read the region. `--discharges
    c3,c6` records which proof clauses a slice would settle, so `tasks spec show` can name the owner
    of every clause standing and say which clause has none. The grant
    is a forecast too, and is recorded as one — declare the region you honestly mean, a directory
-   included, rather than inventing file paths to make step 5 quiet. Setting `--writes` prints
-   everything that has ever claimed those paths, so step 2's survey happens again whether or not
+   included, rather than inventing file paths to make step 4 quiet. Setting `--writes` prints
+   everything that has ever claimed those paths, so step 1's survey happens again whether or not
    anyone asked for it. `tasks system` / `tasks system "<name>"` / `tasks where <path>` answer
    the architecture.
-5. **`tasks plan`** — grades the set for overlap, unstated dependencies and duplicated
+4. **`tasks plan`** — grades the set for overlap, unstated dependencies and duplicated
    interfaces before anyone works it. It reports and refuses nothing.
-6. **Dispatch a worker with one instruction**: "run `npm run tasks -- work-prompt <id>` and do what
-   it says" — symmetric with the auditor's in step 8, and for the same reason: a hand-written brief
+5. **Dispatch a worker with one instruction**: "run `npm run tasks -- work-prompt <id>` and do what
+   it says" — symmetric with the auditor's in step 7, and for the same reason: a hand-written brief
    is a copy of the record that drifts from it, and composing one is where a planner smuggles in
    detail nobody asked it to hold. The brief invites refusal, and a planner must believe it. The
    argument may also be a **spec slug**, which briefs that spec's next open, unblocked member — a
@@ -53,11 +59,11 @@ Every command is `npm run tasks -- <verb>`. The record verbs (`show`, `edit`, `s
    just read the region and the planner has not, and `--grant commitment` is the word that turns
    the forecast into a promise. This is also the only place a durable capability gets registered:
    `tasks concept "<system>" "<name>" --paths <paths> --note "produced by <id>"`.
-7. **Work.** `tasks next` for what to pick up; commit after each logical chunk;
+6. **Work.** `tasks next` for what to pick up; commit after each logical chunk;
    `tasks done <id>... --commit HEAD` closes against the commit (several ids in one call). If the
    diff diverges from the grant, correct the record and say so in the commit body — that is
    information, not a violation.
-8. **Audit.** Commission an auditor with the one instruction "run
+7. **Audit.** Commission an auditor with the one instruction "run
    `npm run tasks -- audit-prompt <slug>` and do what it says" — the brief is generated and
    prints the eight steps an auditor takes, in order, above the data they act on. It writes two
    files: a mutation manifest wired to the clauses' own tests and refusing to run until the
@@ -67,14 +73,14 @@ Every command is `npm run tasks -- <verb>`. The record verbs (`show`, `edit`, `s
    line. `tasks import <doc>` reads findings out of a written report and belongs to the
    whole-system sweeps under `docs/audits/`, which are a different thing from one branch's audit.
    Filing findings without `--proof` flags appends no pass, so late findings never reset verdicts.
-9. **Triage.** A separate step with a separate actor: the auditor files findings and never promotes
+8. **Triage.** A separate step with a separate actor: the auditor files findings and never promotes
    one, and `audit-prompt` tells it so. Findings from the branch's **own first pass** skip the walk:
    promote HIGHs and anything judged fix-now with `tasks promote <id>... ` — they are always
    promoted anyway, and a human can interrupt. From pass 2 on, promotion extends what the spec owes,
    so it waits for the human: `tasks triage` walks the queue (`[1] promote [2] defer [3] decline
    [4] redirect [a] ask [s] skip [q] quit`; `[a]` records a question on the finding and leaves it
    unreviewed).
-10. **Close and merge.** `tasks merge-ready` runs the whole merge gate — tsc, tests, layer-check,
+9. **Close and merge.** `tasks merge-ready` runs the whole merge gate — tsc, tests, layer-check,
     audit-status, doctor, byte check — plus this branch's standing: is the tree clean, has the base
     branch moved past the merge base, is every spec member closed, does the latest pass leave a
     clause outstanding. A **planning branch** carries no spec of its own — planning is informal —
@@ -91,7 +97,7 @@ Every command is `npm run tasks -- <verb>`. The record verbs (`show`, `edit`, `s
     names `tasks spec done <slug>` and then the merge, so "work until `merge-ready` is green" is an
     instruction rather than a judgement. It stops short of merging: the merge body is the one
     artifact whoever did the work has to write.
-11. **Record the reasoning**: `tasks note "<one line>" --id <id>` and
+10. **Record the reasoning**: `tasks note "<one line>" --id <id>` and
     `tasks decision "<one line>" --spec <slug>` as they happen; `tasks log --id <id>` /
     `--op decision` answers later, from the log alone, and `tasks show <id>` prints both back
     against the record they name. A decision made in a session and not recorded here is a
@@ -137,7 +143,7 @@ concentrated in one path, a grant it cannot read, a wildcard it cannot resolve, 
 starts blocked. Dispatching against a reported defect is a call a planner may make; making it
 unknowingly is not.
 
-**Forecast and commitment.** A grant also records which side of step 6 it is on, and `plan`
+**Forecast and commitment.** A grant also records which side of step 5 it is on, and `plan`
 grades an overlap as a **defect** only between two commitments. Anything else is a note naming
 the soft side. The reason is measured: four independent roadmap tasks reported five collisions
 because the honest grant on unread code is a directory and a directory overlaps everything

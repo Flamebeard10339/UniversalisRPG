@@ -15,6 +15,7 @@ import {
   KINDS,
   listQueue,
   loadStore,
+  matchesSearchTerm,
   parseStore,
   requirementStates,
   SEARCH_FIELDS,
@@ -165,6 +166,7 @@ export function cmdAdd(args: Flags, usage: string): void {
     evidence: args.flags.evidence ?? null,
     source: null,
     reason: null,
+    trigger: null,
     closed: null,
     closedCommit: null,
     claimed: null,
@@ -356,9 +358,13 @@ export function cmdList(args: Flags): void {
   runList(args, undefined);
 }
 
+// The same rule `listQueue` filters by, applied per field rather than to the
+// whole record, so the two cannot report a match by one rule and a reason by
+// another. A query whose words spread across two fields (one in `title`, one
+// in `reason`) matches the record but no single field, which is the honest
+// answer to "which field" when the true answer is "more than one, together".
 function matchingFields(task: Task, text: string): string[] {
-  const term = text.toLowerCase();
-  return SEARCH_FIELDS.filter(([, read]) => (read(task) ?? '').toLowerCase().includes(term)).map(([label]) => label);
+  return SEARCH_FIELDS.filter(([, read]) => matchesSearchTerm(read(task) ?? '', text)).map(([label]) => label);
 }
 
 function runList(args: Flags, text: string | undefined): void {
@@ -386,6 +392,7 @@ function runList(args: Flags, text: string | undefined): void {
 
   const tasks = readStore(config);
 
+  const triggered = flags.triggered === 'true';
   const queue = listQueue(tasks, {
     state,
     severity,
@@ -394,11 +401,13 @@ function runList(args: Flags, text: string | undefined): void {
     deferred: flags.deferred === 'true',
     kind,
     text,
+    triggered,
   });
 
   const byId = new Map(tasks.map((task) => [task.id, task]));
   for (const task of queue) {
-    printRow(task, byId, { note: text === undefined ? undefined : `(matches: ${matchingFields(task, text).join(', ')})` });
+    const note = text !== undefined ? `(matches: ${matchingFields(task, text).join(', ')})` : triggered && task.trigger ? `(trigger: ${task.trigger})` : undefined;
+    printRow(task, byId, { note });
   }
 
   // A finding filed by this spec's audits is part of the spec's picture even
@@ -413,7 +422,14 @@ function runList(args: Flags, text: string | undefined): void {
   const counts: Record<State, number> = { unreviewed: 0, open: 0, 'in-progress': 0, done: 0, declined: 0 };
   for (const task of queue) counts[task.state]++;
   console.log(`${queue.length} task(s) — unreviewed: ${counts.unreviewed}, open: ${counts.open}, in-progress: ${counts['in-progress']}, done: ${counts.done}, declined: ${counts.declined}`);
-  if (queue.length === 0) reportStoreScope(config, tasks.length);
+  if (queue.length === 0) {
+    reportStoreScope(config, tasks.length);
+    // A search answers from the store's own fields and nothing else. "No
+    // record names this" is not "nothing is known": a decline's trigger, a
+    // decision with no task behind it, and every other write live in the
+    // event log, which this never opens.
+    if (text !== undefined) console.log(`This searches ${SEARCH_FIELDS.map(([label]) => label).join(', ')} — not the event log, where a ruling can live with no task record behind it at all: \`tasks log ${JSON.stringify(text)}\` reads decisions, declines and every other write, in order.`);
+  }
 }
 
 // An empty queue has causes that look identical from outside — no members,
@@ -701,6 +717,7 @@ export function cmdDone(args: Flags, usage: string): void {
 export function cmdDecline(args: Flags, usage: string): void {
   const config = resolveConfig(args.flags);
   const reason = args.flags.reason;
+  const trigger = args.flags.trigger ?? null;
   if (args.positional.length === 0 || !reason) {
     console.error(usage);
     process.exitCode = 1;
@@ -713,12 +730,19 @@ export function cmdDecline(args: Flags, usage: string): void {
   for (const task of resolved) {
     const notes = transition(task, 'declined');
     task.reason = reason;
+    task.trigger = trigger;
     task.closed = today();
     task.closedCommit = null;
-    declines.push({ task, note: [`declined: ${truncateLine(reason, 120)}`, ...notes].join('; ') });
+    declines.push({ task, note: [`declined: ${truncateLine(reason, 120)}`, ...(trigger ? [`trigger: ${truncateLine(trigger, 120)}`] : []), ...notes].join('; ') });
     console.log(`declined ${task.id}`);
     for (const note of notes) console.log(note);
     if (task.kind === 'undelivered') console.log(`this was ${task.spec ?? 'a spec'}'s outstanding promise on clause ${task.clause ?? '(none named)'} — declining it abandons the clause, it does not discharge it`);
+    // Prose in `reason` alone is write-only — it appears in no queue until
+    // something reads it back out. `--trigger` is the store's field for a
+    // condition worth revisiting, and `--triggered` is the queue that reads
+    // it: naming both here is what keeps the second one from being advice
+    // nobody follows the way the step-2 survey command list was.
+    if (trigger) console.log(`trigger recorded — \`tasks list --triggered\` surfaces it until this branch's work resolves it`);
     printDecisionPrompt(task);
   }
   saveStoreAndWarn(tasks, config);

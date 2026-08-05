@@ -206,10 +206,10 @@ export function fixture(run: (context: FixtureContext) => void | Promise<void>):
 
 // A dedicated git repo per test, distinct from `fixture`'s (which runs
 // non-audit commands in-process and spawns audit
-// against this repo's own real checkout) — handoff's walk-back and
-// multi-line capture need commits with exact, controlled messages.
+// against this repo's own real checkout) — a real diff range and
+// commit-message trailers need commits with exact, controlled content.
 export function gitFixture(run: (context: { dir: string; commit: (message: string) => string; tasks: (...args: string[]) => Run }) => void): void {
-  const dir = mkdtempSync(path.join(os.tmpdir(), 'universalis-handoff-'));
+  const dir = mkdtempSync(path.join(os.tmpdir(), 'universalis-git-fixture-'));
   const restoreTmp = isolateTmp(dir);
   try {
     spawnSync('git', ['init', '-q'], { cwd: dir });

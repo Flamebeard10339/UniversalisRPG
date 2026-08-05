@@ -664,6 +664,67 @@ describe('tasks CLI', () => {
     });
   });
 
+  // The motivating gap this closes: a declined record's whole argument can
+  // live in `reason` with nothing in `writes` or `files` to be found by, the
+  // shape `audit-loop-costs-less-clause-5` actually has. `list`'s default
+  // still hides closed work — that default is for a live queue, and a
+  // declined or done record is resolved, not something to work on.
+  describe('search reaches the reason field and closed records', () => {
+    it('matches a declined record by its reason, with no --state given', () =>
+      fixture(({ tasks }) => {
+        tasks('add', 'shrink the save test', '--id', 'save-test-shrink');
+        tasks('decline', 'save-test-shrink', '--reason', 'shrinking it further means faking the git subprocesses that are the thing it tests');
+
+        const result = tasks('search', 'faking git');
+        expect(result.status).toBe(0);
+        expect(result.stdout).toContain('save-test-shrink');
+        expect(result.stdout).toContain('(matches: reason)');
+      }));
+
+    it('does not put a declined record in the default queue view — only search reaches past the not-closed default', () =>
+      fixture(({ tasks }) => {
+        tasks('add', 'shrink the save test', '--id', 'save-test-shrink');
+        tasks('decline', 'save-test-shrink', '--reason', 'faking the subprocess is not worth it');
+
+        expect(tasks('list').stdout).not.toContain('save-test-shrink');
+        expect(tasks('search', 'faking').stdout).toContain('save-test-shrink');
+      }));
+
+    it('an explicit --state still narrows a search the way it narrows a list', () =>
+      fixture(({ tasks }) => {
+        tasks('add', 'shrink the save test', '--id', 'save-test-shrink');
+        tasks('decline', 'save-test-shrink', '--reason', 'faking the subprocess is not worth it');
+        tasks('add', 'an open record about the same word', '--id', 'still-open', '--deliverable', 'faking is mentioned here too');
+
+        const declinedOnly = tasks('search', 'faking', '--state', 'declined');
+        expect(declinedOnly.stdout).toContain('save-test-shrink');
+        expect(declinedOnly.stdout).not.toContain('still-open');
+      }));
+
+    it('reports the words a query is split into as matched anywhere they land, not only as a contiguous phrase', () =>
+      fixture(({ tasks }) => {
+        tasks('add', 'the phrase is split across the sentence', '--id', 'split-match', '--deliverable', 'this reason talks about faking a subprocess and also mentions git elsewhere');
+        const result = tasks('search', 'faking git');
+        expect(result.stdout).toContain('split-match');
+      }));
+  });
+
+  it('a query naming nothing points at the event log as the index it did not read', () =>
+    fixture(({ tasks }) => {
+      tasks('add', 'unrelated record', '--id', 'unrelated');
+      const result = tasks('search', 'no-record-carries-this-term');
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('This searches id, title, system, deliverable, evidence, reason');
+      expect(result.stdout).toContain('tasks log "no-record-carries-this-term"');
+    }));
+
+  it('list, with no search term, does not print the event-log pointer on an empty result', () =>
+    fixture(({ tasks }) => {
+      const result = tasks('list', '--state', 'done');
+      expect(result.status).toBe(0);
+      expect(result.stdout).not.toContain('not the event log');
+    }));
+
   it('list filters by severity, system, spec and kind', () => {
     fixture(({ tasks }) => {
       tasks('add', 'runtime high', '--id', 'runtime-high', '--severity', 'high', '--system', 'Runtime', '--spec', 'demo-spec');
@@ -841,6 +902,49 @@ describe('tasks CLI', () => {
     });
   });
 
+  // The motivating gap this closes: `audit-loop-costs-less-clause-5` was
+  // declined with "we will reevaluate handoff and its tests if npm test
+  // becomes an issue" resting only in `reason` prose — no queue, roadmap or
+  // survey surfaced it when that reevaluation was actually asked for.
+  describe('decline --trigger and list --triggered', () => {
+    it('records a condition for revisiting, printed back by show', () =>
+      fixture(({ tasks }) => {
+        tasks('add', 'shrink the handoff test', '--id', 'handoff-shrink');
+        const declined = tasks('decline', 'handoff-shrink', '--reason', 'faking the git subprocesses is not worth it', '--trigger', 'reevaluate if npm test becomes an issue');
+        expect(declined.status).toBe(0);
+        expect(declined.stdout).toContain('trigger recorded');
+
+        const shown = tasks('show', 'handoff-shrink');
+        expect(shown.stdout).toContain('reason: faking the git subprocesses is not worth it');
+        expect(shown.stdout).toContain('trigger: reevaluate if npm test becomes an issue');
+      }));
+
+    it('a decline with no --trigger records none, and show prints no trigger line', () =>
+      fixture(({ tasks }) => {
+        tasks('add', 'no condition here', '--id', 'plain-decline');
+        tasks('decline', 'plain-decline', '--reason', 'not worth it');
+        expect(tasks('show', 'plain-decline').stdout).not.toContain('trigger:');
+      }));
+
+    it('list --triggered reaches a declined record with a trigger, past the not-closed default', () =>
+      fixture(({ tasks }) => {
+        tasks('add', 'shrink the handoff test', '--id', 'handoff-shrink');
+        tasks('decline', 'handoff-shrink', '--reason', 'not worth faking git over', '--trigger', 'reevaluate if npm test becomes an issue');
+        tasks('add', 'a plain declined record', '--id', 'plain-decline');
+        tasks('decline', 'plain-decline', '--reason', 'not worth it');
+        tasks('add', 'a live record', '--id', 'still-open');
+
+        expect(tasks('list').stdout).not.toContain('handoff-shrink');
+
+        const result = tasks('list', '--triggered');
+        expect(result.status).toBe(0);
+        expect(result.stdout).toContain('handoff-shrink');
+        expect(result.stdout).toContain('(trigger: reevaluate if npm test becomes an issue)');
+        expect(result.stdout).not.toContain('plain-decline');
+        expect(result.stdout).not.toContain('still-open');
+      }));
+  });
+
   it('promote moves several findings into the spec in one call, and refuses a closed record', () => {
     fixture(({ tasks }) => {
       tasks('add', 'first finding', '--id', 'first-finding', '--kind', 'finding', '--severity', 'high', '--deliverable', 'fix it');
@@ -921,17 +1025,15 @@ describe('tasks CLI', () => {
     fixture(({ tasks, dir }) => {
       tasks('add', 'open task', '--id', 'open-task', '--spec', 'demo-spec', '--severity', 'high');
       const globals = ['--store', path.join(dir, 'tasks.jsonl'), '--systems', path.join(dir, 'systems.json'), '--specs-dir', path.join(dir, 'specs')];
-      const on = (branch: string, command: string): { stdout: string } => spawnSync(process.execPath, [tsxCli, script, command, ...globals, '--branch', branch], { cwd: repoRoot, encoding: 'utf8' });
+      const on = (branch: string): { stdout: string } => spawnSync(process.execPath, [tsxCli, script, 'next', ...globals, '--branch', branch], { cwd: repoRoot, encoding: 'utf8' });
 
-      for (const command of ['next', 'handoff']) {
-        const onMain = on('main', command);
-        expect(onMain.stdout, command).not.toContain('spec inferred from the store');
-        expect(onMain.stdout, command).not.toContain('open task');
+      const onMain = on('main');
+      expect(onMain.stdout).not.toContain('spec inferred from the store');
+      expect(onMain.stdout).not.toContain('open task');
 
-        // The same store, one branch name different: still inferred, so what
-        // changed is the rule for main and not the inference itself.
-        expect(on('orphaned-branch', command).stdout, command).toContain('spec inferred from the store: demo-spec');
-      }
+      // The same store, one branch name different: still inferred, so what
+      // changed is the rule for main and not the inference itself.
+      expect(on('orphaned-branch').stdout).toContain('spec inferred from the store: demo-spec');
     });
   });
 
@@ -963,7 +1065,7 @@ describe('tasks CLI', () => {
   it('the branch-name spec binding says it was inferred and what from, the condition c8 permits it on', () => {
     fixture(({ tasks }) => {
       tasks('add', 'a task', '--id', 'a-task', '--spec', 'demo-spec');
-      for (const command of [['next'], ['handoff'], ['spec', 'show']]) {
+      for (const command of [['next'], ['spec', 'show']]) {
         const result = tasks(...command);
         expect(result.stdout, command[0]).toContain('spec inferred from the branch name: demo-spec');
         expect(result.stdout, command[0]).toMatch(/demo-spec\.md exists/);
@@ -1098,6 +1200,31 @@ describe('setting a write grant, which asks what already claims those paths', ()
     fixture(({ tasks }) => {
       tasks('add', 'a task', '--id', 'quiet', '--writes', 'src/runtime/combat.ts');
       expect(tasks('edit', 'quiet', '--severity', 'low').stdout).not.toContain('prior art');
+    }));
+
+  // The re-survey a write grant fires by itself is the one nobody has to
+  // remember to run, and until now it could only see a claim, not a
+  // decision — the same defect `where` had before rulingsOn existed, alive
+  // at this second call site.
+  it('prints rulings beside prior art when a write grant lands on a path something has already been ruled on', () =>
+    fixture(({ tasks }) => {
+      tasks('add', 'shrink the handoff test', '--id', 'shrink-handoff', '--writes', 'scripts/tasks/handoff.test.ts');
+      tasks('decline', 'shrink-handoff', '--reason', 'handoff.test.ts is 16s of a 25s wall, and shrinking it further means faking the subprocess it tests');
+
+      const result = tasks('add', 'touch the handoff test', '--id', 'touch-handoff', '--writes', 'scripts/tasks/handoff.test.ts');
+      expect(result.stdout).toContain('prior art on scripts/tasks/handoff.test.ts');
+      expect(result.stdout).toContain('rulings on scripts/tasks/handoff.test.ts:');
+      expect(result.stdout).toContain('[ruling] shrink-handoff (declined) reason —');
+    }));
+
+  it('excludes the record\'s own claim from rulings, the same way it excludes it from prior art', () =>
+    fixture(({ tasks }) => {
+      tasks('add', 'shrink the save test', '--id', 'self-ruling', '--writes', 'src/runtime/save.test.ts');
+      tasks('decline', 'self-ruling', '--reason', 'save.test.ts is not worth shrinking further');
+
+      const result = tasks('edit', 'self-ruling', '--writes', 'src/runtime/save.test.ts');
+      expect(result.stdout).not.toContain('[ruling] self-ruling');
+      expect(result.stdout).toContain('no ruling names src/runtime/save.test.ts or its basename');
     }));
 });
 

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { findProducers, matchStrength, priorArt, producerIndex, type Producer } from './producers';
+import type { TaskEvent } from './eventLog';
+import { findProducers, matchStrength, priorArt, producerIndex, rulingsOn, type Producer } from './producers';
 import type { Manifest } from './systems';
 import type { Task } from './taskStore';
 
@@ -23,6 +24,7 @@ function task(id: string, produces: string[], state: Task['state'] = 'done', pat
     evidence: null,
     source: null,
     reason: null,
+    trigger: null,
     closed: null,
     closedCommit: null,
     claimed: null,
@@ -174,6 +176,78 @@ describe('priorArt', () => {
 
   it('answers with nothing for a path nothing has ever named', () => {
     expect(priorArt(manifest, tasks, ['src/grammar/parser.ts'])).toMatchObject({ concepts: [], claims: [] });
+  });
+});
+
+function event(overrides: Partial<TaskEvent> = {}): TaskEvent {
+  return { t: '2026-08-05T04:32:31.000Z', by: 'claude', branch: 'main', head: 'abc123', op: 'decision', id: null, system: null, spec: 'audit-loop-costs-less', note: 'the reason lives here', ...overrides };
+}
+
+// The motivating failure: `audit-loop-costs-less-clause-5` writes nothing —
+// `writes` and `files` are both empty — so `priorArt` above is silent on it.
+// The whole argument lives in `reason`, and `rulingsOn` is the index that
+// reaches it.
+describe('rulingsOn', () => {
+  const declined = { ...task('audit-loop-costs-less-clause-5', [], 'declined'), reason: 'handoff.test.ts is 16.2s of a 25.2s wall, and shrinking it further means faking the git subprocesses that are the thing it tests.' };
+  const unrelated = { ...task('other-decline', [], 'declined'), reason: 'the format is fine as it stands' };
+  const noReason = task('open-task', [], 'open');
+
+  it('finds a closed record whose reason names the queried path by its basename', () => {
+    const found = rulingsOn([declined, unrelated, noReason], [], ['scripts/tasks/handoff.test.ts']);
+    expect(found.reasons.map((entry) => entry.task.id)).toEqual(['audit-loop-costs-less-clause-5']);
+    expect(found.decisions).toEqual([]);
+  });
+
+  it('finds a decision event that names the path, and ignores other ops that mention it', () => {
+    const ruling = event({ id: null, spec: 'audit-loop-costs-less', note: 'c5 ruled on handoff.test.ts: not worth faking git over' });
+    const decline = event({ op: 'decline', note: 'declined: handoff.test.ts is 16.2s of a 25.2s wall' });
+    const found = rulingsOn([], [ruling, decline], ['scripts/tasks/handoff.test.ts']);
+    expect(found.decisions.map((entry) => entry.event.note)).toEqual([ruling.note]);
+  });
+
+  it('answers with nothing for a path no reason or decision has ever named', () => {
+    const found = rulingsOn([declined], [event({ note: 'unrelated to any path' })], ['src/runtime/save.ts']);
+    expect(found).toMatchObject({ reasons: [], decisions: [] });
+  });
+
+  it('matches a reason naming the full path even without the basename in isolation', () => {
+    const full = { ...task('full-path-reason', [], 'declined'), reason: 'src/runtime/save.ts was ruled out for this' };
+    const found = rulingsOn([full], [], ['src/runtime/save.ts']);
+    expect(found.reasons).toHaveLength(1);
+  });
+
+  it('is silent on a task carrying no reason at all', () => {
+    expect(rulingsOn([noReason], [], ['scripts/tasks/handoff.test.ts']).reasons).toEqual([]);
+  });
+
+  // The other motivating failure: a reason as ordinary as "if it becomes a
+  // problem we can return to it" names no path in prose, but the record's own
+  // `files` already say what it was about.
+  it('finds a closed record whose files name the path even when its reason names nothing', () => {
+    const structural = { ...task('width-finding', [], 'declined', { files: ['scripts/tasks/render.ts:100', 'scripts/tasks/roadmapCmd.test.ts:53'] }), reason: 'If it becomes a problem we can return to it' };
+    const found = rulingsOn([structural], [], ['scripts/tasks/render.ts']);
+    expect(found.reasons.map((entry) => entry.task.id)).toEqual(['width-finding']);
+  });
+
+  it('resolves a directory writes grant on a closed record against a path beneath it', () => {
+    const structural = { ...task('dir-grant', [], 'declined', { writes: ['src/runtime'] }), reason: 'not worth it' };
+    const found = rulingsOn([structural], [], ['src/runtime/save.ts']);
+    expect(found.reasons.map((entry) => entry.task.id)).toEqual(['dir-grant']);
+  });
+
+  // A record can qualify by text match and by files/writes at once — the
+  // reason names the same file its `files` entry does — and must still hold
+  // one entry, not two, in `reasons`.
+  it('reports a record that qualifies by both text and files just once', () => {
+    const both = { ...task('both-ways', [], 'declined', { files: ['scripts/tasks/handoff.test.ts:12'] }), reason: 'handoff.test.ts is not worth shrinking further' };
+    const found = rulingsOn([both], [], ['scripts/tasks/handoff.test.ts']);
+    expect(found.reasons).toHaveLength(1);
+    expect(found.reasons[0].on).toEqual(['scripts/tasks/handoff.test.ts']);
+  });
+
+  it('does not report an open task\'s files as a ruling merely because it carries no reason', () => {
+    const openWithFiles = task('open-with-files', [], 'open', { files: ['scripts/tasks/render.ts:1'] });
+    expect(rulingsOn([openWithFiles], [], ['scripts/tasks/render.ts']).reasons).toEqual([]);
   });
 });
 

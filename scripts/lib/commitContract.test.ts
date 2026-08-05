@@ -1,10 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { checkCommitMessage, extractNextTrailer, isExempt } from './commitContract';
+import { checkCommitMessage, isExempt } from './commitContract';
 import type { Manifest } from './systems';
 
 describe('checkCommitMessage', () => {
-  it('passes a subject and body, with or without a Next: trailer', () => {
-    expect(checkCommitMessage('Subject line\n\nSome body explaining what was done.\n\nNext: pick up X.')).toBeNull();
+  it('passes a subject and a body', () => {
     expect(checkCommitMessage('Subject line\n\nSome body explaining what was done.')).toBeNull();
   });
 
@@ -12,52 +11,20 @@ describe('checkCommitMessage', () => {
     expect(checkCommitMessage('Just a subject')).toMatch(/no body/);
   });
 
-  it('does not count the optional Next: line itself as the body', () => {
-    expect(checkCommitMessage('Subject\n\nNext: only a trailer, no body.')).toMatch(/no body/);
+  // The Next: trailer was retired with cmdHandoff, its only reader: a line
+  // that happens to start with "Next:" is ordinary body prose now, not a
+  // distinguished field excluded from the body count.
+  it('counts a line starting with Next: as ordinary body content', () => {
+    expect(checkCommitMessage('Subject\n\nNext: pick up X.')).toBeNull();
   });
 
   it('strips git-comment lines before judging', () => {
-    const message = 'Subject\n\nReal body content.\n\nNext: next step.\n# Please enter the commit message...\n# On branch main';
+    const message = 'Subject\n\nReal body content.\n# Please enter the commit message...\n# On branch main';
     expect(checkCommitMessage(message)).toBeNull();
   });
 
   it('refuses an empty message', () => {
     expect(checkCommitMessage('\n\n# just comments\n')).toMatch(/empty/);
-  });
-
-  it('finds a Next: trailer even when it is not the very last line', () => {
-    const message = 'Subject\n\nBody text.\nNext: do the thing.\n\nA closing note.';
-    expect(checkCommitMessage(message)).toBeNull();
-  });
-});
-
-describe('extractNextTrailer', () => {
-  it('returns null when the message has no Next: line', () => {
-    expect(extractNextTrailer('Subject\n\nBody with no trailer.')).toBeNull();
-  });
-
-  it('captures a single-line trailer', () => {
-    expect(extractNextTrailer('Subject\n\nBody.\n\nNext: pick up X.')).toBe('Next: pick up X.');
-  });
-
-  it('captures a multi-line trailer through to the end of the message, preserving line breaks', () => {
-    const message = ['Subject', '', 'Body.', '', 'Next: task-system-v2-clause-1 needs either a real fix (Node version bump', 'across test.yml plus verifying every tracked script) or a deliberate call', 'that the cost is acceptable.'].join('\n');
-    expect(extractNextTrailer(message)).toBe(['Next: task-system-v2-clause-1 needs either a real fix (Node version bump', 'across test.yml plus verifying every tracked script) or a deliberate call', 'that the cost is acceptable.'].join('\n'));
-  });
-
-  it('stops at the next trailer-style line rather than swallowing it', () => {
-    const message = 'Subject\n\nBody.\n\nNext: pick up X.\nSigned-off-by: someone <someone@example.com>';
-    expect(extractNextTrailer(message)).toBe('Next: pick up X.');
-  });
-
-  it('finds a Next: trailer even when it is not the very last line, up to the next trailer line', () => {
-    const message = 'Subject\n\nBody text.\nNext: do the thing.\n\nA closing note.';
-    expect(extractNextTrailer(message)).toBe('Next: do the thing.\n\nA closing note.');
-  });
-
-  it('strips git-comment lines before extracting', () => {
-    const message = 'Subject\n\nBody.\n\nNext: next step.\n# Please enter the commit message...';
-    expect(extractNextTrailer(message)).toBe('Next: next step.');
   });
 });
 

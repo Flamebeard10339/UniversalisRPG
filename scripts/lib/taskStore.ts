@@ -44,6 +44,11 @@ export interface Task {
   evidence: string | null;
   source: Source | null;
   reason: string | null;
+  // A condition for revisiting a decline, stated once so a queue can hold
+  // it rather than a reader having to notice it inside `reason`'s prose.
+  // Optional: most declines close the question outright and name no
+  // condition under which they would be reopened.
+  trigger: string | null;
   closed: string | null;
   closedCommit: string | null;
   claimed: string | null;
@@ -137,6 +142,7 @@ const KNOWN_KEYS: ReadonlyArray<keyof KnownFields> = Object.keys({
   evidence: true,
   source: true,
   reason: true,
+  trigger: true,
   closed: true,
   closedCommit: true,
   claimed: true,
@@ -192,6 +198,7 @@ function normalizeTask(value: unknown, where: string): Task {
     evidence: nullableString(value, 'evidence', where),
     source: nullableSource(value, where),
     reason: nullableString(value, 'reason', where),
+    trigger: nullableString(value, 'trigger', where),
     closed: nullableString(value, 'closed', where),
     closedCommit: nullableString(value, 'closedCommit', where),
     claimed: nullableString(value, 'claimed', where),
@@ -225,6 +232,7 @@ function renderTask(task: Task): string {
     evidence: task.evidence,
     source: task.source,
     reason: task.reason,
+    trigger: task.trigger,
     closed: task.closed,
     closedCommit: task.closedCommit,
     claimed: task.claimed,
@@ -408,19 +416,28 @@ export interface ListFilter {
   deferred?: boolean;
   kind?: Kind;
   text?: string;
+  // A declined record carrying a trigger: the store's shape for "revisit
+  // this if a condition holds", filed as a decline rather than left as prose
+  // only `tasks log` or a lucky search would ever surface.
+  triggered?: boolean;
 }
 
 // Topic search until the store has a topic: the words a task already
 // carries are the only thing to match on, so "combat" reaches everything
 // whose id, title, system or prose mentions it. The labelled list is the
 // one definition of "searchable" — `search` reports which field matched
-// from the same list this filters by, so the two cannot disagree.
+// from the same list this filters by, so the two cannot disagree. `reason`
+// is where a decline's whole argument lives — a ruling with no `writes` or
+// `files` to be found by, the way `audit-loop-costs-less-clause-5` is found
+// by nothing else in this list.
 export const SEARCH_FIELDS: Array<[label: string, read: (task: Task) => string | null]> = [
   ['id', (task) => task.id],
   ['title', (task) => task.title],
   ['system', (task) => task.system],
   ['deliverable', (task) => task.deliverable],
   ['evidence', (task) => task.evidence],
+  ['reason', (task) => task.reason],
+  ['trigger', (task) => task.trigger],
 ];
 
 const SEARCHABLE = (task: Task): string =>
@@ -429,19 +446,44 @@ const SEARCHABLE = (task: Task): string =>
     .join('\n')
     .toLowerCase();
 
+// A query is every word it contains, each required somewhere in the
+// haystack — not the query as one contiguous phrase. "user interface" still
+// finds a system field that spells it exactly, since a phrase's own words are
+// each present; "faking git" finds a reason that reads "faking the git
+// subprocesses" without the two words touching, which a plain
+// `.includes(term)` never would. A search term is typed by a human choosing
+// their own words, not a name two authors have to agree on, so there is no
+// stopword list here the way `producers.ts` keeps one for capability names.
+export function matchesSearchTerm(haystack: string, term: string): boolean {
+  const words = term.toLowerCase().split(/\s+/).filter(Boolean);
+  const text = haystack.toLowerCase();
+  return words.length > 0 && words.every((word) => text.includes(word));
+}
+
 // The one query with no built-in state filter: with no --state, "not
-// closed" (unreviewed + open) is the useful default, since done and
-// declined are already resolved. Every filter given is ANDed together.
+// closed" (unreviewed + open) is the useful default for a queue view, since
+// done and declined are already resolved and are not what `list` is for.
+// `search` and `--triggered` share this filter and are a different
+// question — closed work is where the prior art that bites lives, the same
+// fact the 2026-08-04 prior-art ruling already settled for `tasks where`, and
+// a trigger's whole point is a declined record — so either reaches every
+// state rather than inheriting the queue's default; `--state` still narrows
+// any of them the same way. Every filter given is ANDed together.
 export function listQueue(tasks: Task[], filter: ListFilter = {}): Task[] {
   return tasks
     .map((task, index) => ({ task, index }))
-    .filter(({ task }) => (filter.state !== undefined ? task.state === filter.state : task.state === 'unreviewed' || task.state === 'open' || task.state === 'in-progress'))
+    .filter(({ task }) => {
+      if (filter.state !== undefined) return task.state === filter.state;
+      if (filter.text !== undefined || filter.triggered) return true;
+      return task.state === 'unreviewed' || task.state === 'open' || task.state === 'in-progress';
+    })
     .filter(({ task }) => filter.severity === undefined || task.severity === filter.severity)
     .filter(({ task }) => filter.system === undefined || task.system === filter.system)
     .filter(({ task }) => filter.spec === undefined || task.spec === filter.spec)
     .filter(({ task }) => !filter.deferred || (task.state === 'open' && task.spec === null))
     .filter(({ task }) => filter.kind === undefined || task.kind === filter.kind)
-    .filter(({ task }) => filter.text === undefined || SEARCHABLE(task).includes(filter.text.toLowerCase()))
+    .filter(({ task }) => filter.text === undefined || matchesSearchTerm(SEARCHABLE(task), filter.text))
+    .filter(({ task }) => !filter.triggered || (task.state === 'declined' && task.trigger !== null))
     .sort((a, b) => severityRank(a.task.severity) - severityRank(b.task.severity) || a.index - b.index)
     .map(({ task }) => task);
 }
@@ -548,6 +590,7 @@ export function checkStore(tasks: Task[], systems: string[], specExists: (spec: 
     }
     if (task.state === 'declined' && !task.reason) issues.push({ level: 'error', message: `${task.id} is declined but has no reason` });
     if (task.state !== 'declined' && task.reason) issues.push({ level: 'warning', message: `${task.id} is ${task.state} and carries a decline reason, which reads as a decline that was reopened: ${task.reason}` });
+    if (task.state !== 'declined' && task.trigger) issues.push({ level: 'warning', message: `${task.id} is ${task.state} and carries a decline trigger, which reads as a decline that was reopened: ${task.trigger}` });
     if (task.state !== 'done' && task.state !== 'declined' && task.closed) issues.push({ level: 'warning', message: `${task.id} is ${task.state} but still carries a closed date: ${task.closed}` });
     if (task.state !== 'in-progress' && task.claimed) issues.push({ level: 'warning', message: `${task.id} is ${task.state} and still carries a claim by ${task.claimedBy ?? '(unnamed)'} from ${task.claimed}, which reads as a claim that was released` });
     if (task.grant !== null && task.writes.length === 0) issues.push({ level: 'warning', message: `${task.id} calls its write grant a ${task.grant} and grants nothing — the kind describes \`writes\`, which is empty` });

@@ -80,6 +80,7 @@ export function renderTask(task: Task, byId: Map<string, Task>, detail: Detail, 
   if (task.evidence) lines.push(...proseLines('evidence', prose(task.evidence)));
   if (task.source) lines.push(`source: ${task.source.spec} pass ${task.source.pass}`);
   if (task.reason) lines.push(`reason: ${prose(task.reason)}`);
+  if (task.trigger) lines.push(`trigger: ${prose(task.trigger)}  (\`tasks list --triggered\` surfaces every standing one)`);
   if (task.closed) lines.push(`closed: ${task.closed}`);
   if (task.closedCommit) lines.push(`closedCommit: ${task.closedCommit}`);
   if (claim) lines.push(claim);
@@ -170,8 +171,8 @@ export function wrapUnder(text: string, first: string, hanging = ' '.repeat(firs
 }
 
 // One rendering of "this clause stands like this", so `spec show` and
-// `handoff` quote a clause identically. The number and the verdict are the
-// structure a wrapped tail must not sit under, or the list stops being one.
+// `work-prompt` quote a clause identically. The number and the verdict are
+// the structure a wrapped tail must not sit under, or the list stops being one.
 export function clauseStandingLines(standing: AuditVerdict, clauses: ProofClause[]): string[] {
   return wrapUnder(clauses.find((clause) => clause.id === standing.clause)!.text, `  ${standing.clause}. [${standing.status}] `);
 }
