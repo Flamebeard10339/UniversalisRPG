@@ -33,9 +33,9 @@ function deps(overrides: Partial<MergeReadyDeps> = {}): { deps: MergeReadyDeps; 
   return {
     recorded,
     deps: {
-      run: (command) => {
+      run: async (command) => {
         recorded.commands.push(command);
-        return { status: 0 };
+        return { status: 0, output: '' };
       },
       trackedFiles: () => ['a.ts'],
       read: () => utf8('clean'),
@@ -47,47 +47,83 @@ function deps(overrides: Partial<MergeReadyDeps> = {}): { deps: MergeReadyDeps; 
 }
 
 describe('runMergeReady', () => {
-  it('runs every leg and reports success when all pass and the bytes are clean', () => {
+  it('runs every leg and reports success when all pass and the bytes are clean', async () => {
     const { deps: d, recorded } = deps();
-    expect(runMergeReady(d)).toBe(true);
+    expect(await runMergeReady(d)).toBe(true);
     expect(recorded.commands).toEqual(LEGS.map((leg) => leg.command));
     expect(recorded.lines).toContain('merge-ready: every leg passed');
   });
 
-  it('keeps running after a red leg — one answer per run, not one rerun per defect — and names what failed', () => {
+  it('keeps running after a red leg — one answer per run, not one rerun per defect — and names what failed', async () => {
     const { deps: d, recorded } = deps({
-      run: (command) => {
+      run: async (command) => {
         recorded.commands.push(command);
-        return { status: command.includes('tsc') ? 2 : 0 };
+        return { status: command.includes('tsc') ? 2 : 0, output: '' };
       },
     });
-    expect(runMergeReady(d)).toBe(false);
+    expect(await runMergeReady(d)).toBe(false);
     expect(recorded.commands).toEqual(LEGS.map((leg) => leg.command));
     expect(recorded.lines.join('\n')).toContain('NOT merge-ready: tsc failed');
   });
 
-  it('fails the bytes leg on a corrupt tracked file, naming it', () => {
+  it('starts every leg before any has answered, and still reports them in declaration order', async () => {
+    // Held-open promises: nothing resolves until every leg has been started,
+    // which is the concurrency claim itself.
+    const resolvers: ((outcome: { status: number | null; output: string }) => void)[] = [];
+    const { deps: d, recorded } = deps({
+      run: (command) => {
+        recorded.commands.push(command);
+        return new Promise((resolve) => resolvers.push(resolve));
+      },
+    });
+    const verdict = runMergeReady(d);
+    expect(recorded.commands).toEqual(LEGS.map((leg) => leg.command));
+    for (const [index, resolve] of [...resolvers.entries()].reverse()) resolve({ status: 0, output: `finished ${LEGS[index].name}` });
+    expect(await verdict).toBe(true);
+    const outputs = recorded.lines.filter((line) => line.startsWith('finished '));
+    expect(outputs).toEqual(LEGS.map((leg) => `finished ${leg.name}`));
+  });
+
+  it('every leg is reported, in declaration order, whatever order they finish in', async () => {
+    const resolvers: ((outcome: { status: number | null; output: string }) => void)[] = [];
+    const { deps: d, recorded } = deps({ run: () => new Promise((resolve) => resolvers.push(resolve)) });
+    const verdict = runMergeReady(d);
+    for (const resolve of [...resolvers].reverse()) resolve({ status: 0, output: '' });
+    expect(await verdict).toBe(true);
+    const rows = recorded.lines.filter((line) => /^ {2}\S.*(?: ok {2}| FAIL {2})/.test(line));
+    expect(rows.slice(0, LEGS.length).map((row) => row.trimStart().split(/ {2,}/)[0])).toEqual(LEGS.map((leg) => leg.name));
+  });
+
+  it('one red leg among green ones still fails the gate and names only itself', async () => {
+    const { deps: d, recorded } = deps({
+      run: async (command) => ({ status: command.includes('layer-check') ? 1 : 0, output: '' }),
+    });
+    expect(await runMergeReady(d)).toBe(false);
+    expect(recorded.lines).toContain('NOT merge-ready: layer-check failed');
+  });
+
+  it('fails the bytes leg on a corrupt tracked file, naming it', async () => {
     const { deps: d, recorded } = deps({
       trackedFiles: () => ['fine.ts', 'broken.ts'],
       read: (file) => (file === 'broken.ts' ? new Uint8Array([0]) : utf8('ok')),
     });
-    expect(runMergeReady(d)).toBe(false);
+    expect(await runMergeReady(d)).toBe(false);
     expect(recorded.lines.join('\n')).toContain('broken.ts: NUL byte at offset 0');
     expect(recorded.lines.join('\n')).toContain('bytes failed');
   });
 
-  it('treats a null exit status as failure, not success', () => {
-    const { deps: d } = deps({ run: () => ({ status: null }) });
-    expect(runMergeReady(d)).toBe(false);
+  it('treats a null exit status as failure, not success', async () => {
+    const { deps: d } = deps({ run: async () => ({ status: null, output: '' }) });
+    expect(await runMergeReady(d)).toBe(false);
   });
 
-  it('reports a tracked-file enumeration failure as a bytes-leg failure rather than a crash', () => {
+  it('reports a tracked-file enumeration failure as a bytes-leg failure rather than a crash', async () => {
     const { deps: d, recorded } = deps({
       trackedFiles: () => {
         throw new Error('git ls-files failed — cannot enumerate tracked files');
       },
     });
-    expect(runMergeReady(d)).toBe(false);
+    expect(await runMergeReady(d)).toBe(false);
     expect(recorded.lines.join('\n')).toContain('git ls-files failed');
   });
 });
@@ -100,61 +136,61 @@ describe('runMergeReady, on this branch\'s standing', () => {
   // 11 exists to fix ("the one that bites in practice fails nothing"),
   // reintroduced one level up. Mutation-verified: `ok: standing.dirty.length
   // === 0` and `ok: clausesOk` both survived at whole-suite scope before this.
-  const graded = (overrides: Partial<BranchStanding>): { ok: boolean; body: string } => {
+  const graded = async (overrides: Partial<BranchStanding>): Promise<{ ok: boolean; body: string }> => {
     const { deps: d, recorded } = deps({ standing: () => ready(overrides) });
-    const ok = runMergeReady(d);
+    const ok = await runMergeReady(d);
     return { ok, body: recorded.lines.join('\n') };
   };
-  const body = (overrides: Partial<BranchStanding>): string => graded(overrides).body;
+  const body = async (overrides: Partial<BranchStanding>): Promise<string> => (await graded(overrides)).body;
 
-  it('fails on main having moved, which is the one that bites and failed nothing', () => {
+  it('fails on main having moved, which is the one that bites and failed nothing', async () => {
     const { deps: d, recorded } = deps({ standing: () => ready({ baseMoved: true }) });
-    expect(runMergeReady(d)).toBe(false);
+    expect(await runMergeReady(d)).toBe(false);
     expect(recorded.lines.join('\n')).toContain('main has moved past the merge base');
     expect(recorded.lines.join('\n')).toContain('base           git merge main');
   });
 
-  it('fails on a dirty tree, naming the paths a cleanup would discard the closes of', () => {
-    const { ok, body: lines } = graded({ dirty: ['docs/tasks.jsonl', 'src/a.ts'] });
+  it('fails on a dirty tree, naming the paths a cleanup would discard the closes of', async () => {
+    const { ok, body: lines } = await graded({ dirty: ['docs/tasks.jsonl', 'src/a.ts'] });
     expect(ok).toBe(false);
     expect(lines).toContain('2 uncommitted path(s): docs/tasks.jsonl, src/a.ts');
   });
 
-  it('fails on an unclosed spec, sending an open member to `tasks next` and an unreviewed finding to `tasks triage`', () => {
-    const open = graded({ openMembers: ['a-slice'] });
+  it('fails on an unclosed spec, sending an open member to `tasks next` and an unreviewed finding to `tasks triage`', async () => {
+    const open = await graded({ openMembers: ['a-slice'] });
     expect(open.ok).toBe(false);
     expect(open.body).toContain('spec           npm run tasks -- next');
 
-    const untriaged = graded({ unreviewedFindings: 2 });
+    const untriaged = await graded({ unreviewedFindings: 2 });
     expect(untriaged.ok).toBe(false);
     expect(untriaged.body).toContain('spec           npm run tasks -- triage');
   });
 
-  it('fails on an outstanding clause, and separates one nobody graded from one left unmet', () => {
-    const ungraded = graded({ auditPasses: 0 });
+  it('fails on an outstanding clause, and separates one nobody graded from one left unmet', async () => {
+    const ungraded = await graded({ auditPasses: 0 });
     expect(ungraded.ok).toBe(false);
     expect(ungraded.body).toContain('a-spec has no recorded audit pass');
 
-    const outstanding = graded({ outstandingClauses: ['c2', 'c7'] });
+    const outstanding = await graded({ outstandingClauses: ['c2', 'c7'] });
     expect(outstanding.ok).toBe(false);
     expect(outstanding.body).toContain('2 outstanding after pass 1: c2, c7');
   });
 
-  it('carries doctor\'s warning count into the summary without changing what fails', () => {
+  it('carries doctor\'s warning count into the summary without changing what fails', async () => {
     const { deps: d, recorded } = deps({ standing: () => ready({ doctorWarnings: 5 }) });
-    expect(runMergeReady(d)).toBe(true);
+    expect(await runMergeReady(d)).toBe(true);
     expect(recorded.lines.join('\n')).toContain('doctor         ok  pass — 5 warning(s) reported above, which do not fail this leg');
     expect(recorded.lines.join('\n')).toContain('merge-ready: every leg passed, with 5 doctor warning(s) that fail nothing');
   });
 
-  it('ends a green run on the two commands that finish the branch', () => {
-    const green = body({});
+  it('ends a green run on the two commands that finish the branch', async () => {
+    const green = await body({});
     expect(green).toContain('next: npm run tasks -- spec done a-spec');
     expect(green).toContain('then merge a-branch into main');
   });
 
-  it('has nothing to say about a spec on a branch working none', () => {
-    const none = body({ spec: null });
+  it('has nothing to say about a spec on a branch working none', async () => {
+    const none = await body({ spec: null });
     expect(none).toContain('this branch is working no spec, so it owes no clause');
     expect(none).not.toContain('clauses  ');
   });
@@ -163,8 +199,8 @@ describe('runMergeReady, on this branch\'s standing', () => {
   // and wrote two specs for branches that had not started, and the gate read
   // both as debts — "3 open members" and "no recorded audit pass", each true
   // and neither a defect.
-  it('passes the spec and clauses legs for a branch that wrote its spec as a plan for a later branch', () => {
-    const { ok, body: lines } = graded({ specAuthoredHere: true, openMembers: ['m1', 'm2', 'm3'], auditPasses: 0 });
+  it('passes the spec and clauses legs for a branch that wrote its spec as a plan for a later branch', async () => {
+    const { ok, body: lines } = await graded({ specAuthoredHere: true, openMembers: ['m1', 'm2', 'm3'], auditPasses: 0 });
     expect(ok).toBe(true);
     expect(lines).toContain('wrote a-spec as a plan for a later branch and worked none of its 3 member(s)');
     // The clauses leg is gone rather than passing quietly, the way it is for
@@ -180,19 +216,16 @@ describe('runMergeReady, on this branch\'s standing', () => {
 // cannot see the gate grading a spec they did not mean, which is how the
 // wrong-spec pass below stayed invisible.
 describe('the spec merge-ready says it graded', () => {
-  it('reports the route to the spec it is about to grade', () => {
+  it('reports the route to the spec it is about to grade', async () => {
     const { deps: d, recorded } = deps({ standing: () => ready({ specNote: 'spec inferred from the event log: a-spec' }) });
-    runMergeReady(d);
+    await runMergeReady(d);
     expect(recorded.lines.join('\n')).toContain('spec source    ok  spec inferred from the event log: a-spec');
   });
 
-  it('says a plan was the only spec graded, so a green run cannot be read as covering another', () => {
-    const { body: lines } = ((): { body: string } => {
-      const { deps: d, recorded } = deps({ standing: () => ready({ specAuthoredHere: true, openMembers: ['m1'], auditPasses: 0 }) });
-      runMergeReady(d);
-      return { body: recorded.lines.join('\n') };
-    })();
-    expect(lines).toContain('No other spec was graded');
+  it('says a plan was the only spec graded, so a green run cannot be read as covering another', async () => {
+    const { deps: d, recorded } = deps({ standing: () => ready({ specAuthoredHere: true, openMembers: ['m1'], auditPasses: 0 }) });
+    await runMergeReady(d);
+    expect(recorded.lines.join('\n')).toContain('No other spec was graded');
   });
 });
 
@@ -285,11 +318,11 @@ describe('authoredAsPlan', () => {
 describe('the commands the legs name', () => {
   const verbs = new Set(allUsages().map((usage) => /^usage: tasks (?:spec )?([a-z-]+)/.exec(usage)?.[1]).filter((verb): verb is string => verb !== undefined));
 
-  it('names only verbs the CLI actually has', () => {
+  it('names only verbs the CLI actually has', async () => {
     const nexts: string[] = [];
     for (const overrides of [{ dirty: ['a.ts'] }, { baseMoved: true }, { openMembers: ['x'] }, { unreviewedFindings: 1 }, { auditPasses: 0 }, { outstandingClauses: ['c1'] }, {}]) {
       const { deps: d, recorded } = deps({ standing: () => ready(overrides) });
-      runMergeReady(d);
+      await runMergeReady(d);
       nexts.push(...recorded.lines);
     }
     const named = [...new Set(nexts.flatMap((line) => [...line.matchAll(/npm run tasks -- ([a-z-]+)( [a-z-]+)?/g)].map((match) => match[1])))];
