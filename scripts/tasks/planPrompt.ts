@@ -63,7 +63,7 @@ export function cmdPlanPrompt(args: Flags, usage: string): void {
   console.log("Decide, deliberately, which capabilities this branch adds, extends, takes over or retires, and record that reasoning in this spec's `## Decisions` — a survey that finds an owner is a success: reuse it, or write down why a second one is right. A ruling above that argues against the approach you were about to take is a stop, not a data point to work around.");
   console.log('');
   console.log('Then:');
-  console.log('4. Decompose into tasks whose `--writes` regions are disjoint: `tasks add "<title>" --writes <paths> --produces "<capability>" --requires <ids> --discharges c1,c2` — the number after `--discharges` is the one from the `[cN]` tag above.');
-  console.log('5. `tasks plan` grades the set for overlap, unstated dependencies and duplicated interfaces before anyone works it. It reports and refuses nothing.');
-  console.log('6. Dispatch a worker with one instruction: run `npm run tasks -- work-prompt <id>` and do what it says.');
+  console.log('3. Decompose into tasks whose `--writes` regions are disjoint: `tasks add "<title>" --writes <paths> --produces "<capability>" --requires <ids> --discharges c1,c2` — the number after `--discharges` is the one from the `[cN]` tag above.');
+  console.log('4. `tasks plan` grades the set for overlap, unstated dependencies and duplicated interfaces before anyone works it. It reports and refuses nothing.');
+  console.log('5. Dispatch a worker with one instruction: run `npm run tasks -- work-prompt <id>` and do what it says.');
 }

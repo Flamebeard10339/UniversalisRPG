@@ -250,7 +250,7 @@ export function reportPriorArtOnWrites(config: Config, tasks: Task[], task: Task
 
 // The body of `tasks where`, factored out so `plan-prompt` can run the same
 // survey over paths named on its own command line — the deliverable it
-// exists for is running step 2's survey rather than trusting a planner to
+// exists for is running step 1's survey rather than trusting a planner to
 // remember the command, so it reaches this the way `cmdWhere` does rather
 // than printing advice about it.
 export function printWhere(config: Config, target: string): void {

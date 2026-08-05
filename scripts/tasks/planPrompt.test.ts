@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { fixture } from './cliFixtures';
 
 // `plan-prompt` is the planner's brief, symmetric with `work-prompt` and
-// `audit-prompt`: it runs step 2's survey rather than listing the commands
+// `audit-prompt`: it runs step 1's survey rather than listing the commands
 // and trusting anyone to remember them. What these prove is the wiring —
 // that the survey the brief runs is the same one `tasks where` answers, and
 // that the brief refuses nothing, states the clause format literally, and
@@ -80,8 +80,8 @@ describe('tasks plan-prompt', () => {
     fixture(({ tasks }) => {
       const result = tasks('plan-prompt', 'demo-spec');
       expect(result.status).toBe(0);
-      expect(result.stdout).toContain('4. Decompose into tasks whose `--writes` regions are disjoint');
-      expect(result.stdout).toContain('5. `tasks plan` grades the set');
-      expect(result.stdout).toContain('6. Dispatch a worker with one instruction: run `npm run tasks -- work-prompt <id>` and do what it says.');
+      expect(result.stdout).toContain('3. Decompose into tasks whose `--writes` regions are disjoint');
+      expect(result.stdout).toContain('4. `tasks plan` grades the set');
+      expect(result.stdout).toContain('5. Dispatch a worker with one instruction: run `npm run tasks -- work-prompt <id>` and do what it says.');
     }));
 });
