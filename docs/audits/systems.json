@@ -282,6 +282,14 @@
             "scripts/lib/producers.ts"
           ],
           "note": "produced by prior-art-by-path; the path-keyed index, distinct from the name-keyed produces query sharing this file"
+        },
+        {
+          "name": "ruling query",
+          "paths": [
+            "scripts/lib/producers.ts",
+            "scripts/tasks/architectureCmds.ts"
+          ],
+          "note": "produced by survey-cannot-see-rulings: reads a closed record's reason and event-log decisions for the queried path or its basename, distinct from the writes/files claim query"
         }
       ]
     },
