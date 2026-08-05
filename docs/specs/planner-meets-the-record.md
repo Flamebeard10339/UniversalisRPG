@@ -41,12 +41,14 @@ Proof:
   out"*, against `no-read-cuts-text-to-fit-a-width`, whose settled principle is that columns pad but
   never trim. All four cells are opened identically; the opening is the constant, the prompt is the
   variable.
-- [c6] **The control cells, where stopping is failure.** The same cold-agent setup on two prompts of
-  the same shape whose subjects carry no adverse ruling: one with prior art and no ruling
-  (`offline-progression`, an open deferred task — the correct answer names it and proceeds), and one
-  whose record is empty (`tasks log` returns no event — the correct answer says the survey was empty
-  and proceeds). A run in which a control cell stops fails this clause exactly as an adverse cell
-  proceeding does. The result is the 2x2, not a pass rate.
+- [c6] **The control cells, where stopping is failure.** The same opening on two prompts of the same
+  shape whose subjects carry no adverse ruling. One has prior art and no ruling: offline progression,
+  which `offline-progression` already tracks as an open deferred task — the correct answer names that
+  record and proceeds. One has an empty record: a general animation engine, DSL-defined frames,
+  deliberately attached to no existing system — verified 2026-08-05, `tasks log "animation"` matches
+  no event of 1028 — where the correct answer says the survey found nothing and proceeds. A run in
+  which a control cell stops fails this clause exactly as an adverse cell proceeding does. The result
+  is the 2x2, not a pass rate.
 - [c7] `docs/workflow.md` step 2 names the ruling query, so the documented survey and the survey
   that actually finds things are the same survey.
 - [c8] `tasks handoff` is gone, and `tasks next` is what a resuming session runs. Every session is a
@@ -59,6 +61,14 @@ Proof:
   writes and nothing consumes. `CLAUDE.md`, `docs/workflow.md`, the commit-msg hook's error text and
   `extractNextTrailer` agree that it is gone; a commit still owes a subject and a body.
   proof: command npm run tasks -- check-commit-msg
+- [c10] A ruling reaches the paths its own record already names. c1 matched a closed record's
+  `reason` against the path as text, which finds a ruling only when its author happened to spell the
+  filename out — so `audit-loop-costs-less-clause-5` surfaces on `handoff.test.ts` by luck, while a
+  reason as ordinary as "If it becomes a problem we can return to it" reaches nothing, though the
+  record's own `files` name the paths it was about. A closed record's reason is a ruling on every
+  path in its `files` and `writes`, and the text match stays for the rulings that name a path no
+  record claims.
+  proof: command npm run tasks -- where scripts/tasks/render.ts
 
 ## Decisions
 
