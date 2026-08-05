@@ -27,11 +27,11 @@ describe('tasks CLI', () => {
     });
   });
 
-  it('audit records a pass over a spec whose clauses carry the same tag twice, naming the ambiguity', () => {
-    fixture(({ tasks, dir }) => {
+  it('audit records a pass over a spec whose clauses carry the same tag twice, naming the ambiguity', async () => {
+    await fixture(async ({ dir, tasks, audit }) => {
       const specPath = path.join(dir, 'specs', 'demo-spec.md');
       writeFileSync(specPath, readFileSync(specPath, 'utf8').replace('- The first clause holds.\n- The second clause holds.', '- [c1] The first clause holds.\n- [c1] The second clause holds.'), 'utf8');
-      const result = tasks('audit', 'demo-spec', '--proof', '1=met', '--evidence', '1=clause 1 checked');
+      const result = await audit('demo-spec', '--proof', '1=met', '--evidence', '1=clause 1 checked');
       // A typo in a heading used to stop an auditor filing anything at all.
       // doctor reports the identical condition at exit 0, so this was one
       // fact with two polarities, refusing on the write path.
@@ -43,18 +43,18 @@ describe('tasks CLI', () => {
     });
   });
 
-  it('audit records a pass over a spec with no proof clauses, saying it graded nothing', () => {
-    fixture(({ tasks, dir }) => {
+  it('audit records a pass over a spec with no proof clauses, saying it graded nothing', async () => {
+    await fixture(async ({ dir, audit }) => {
       const specPath = path.join(dir, 'specs', 'demo-spec.md');
       writeFileSync(specPath, '# Demo spec\n\n## Deliverable\n\nSomething this branch promises.\n', 'utf8');
-      const result = tasks('audit', 'demo-spec');
+      const result = await audit('demo-spec');
       expect(result.status).toBe(0);
       expect(result.stderr).toContain('has no Proof: clauses');
       expect(readFileSync(specPath, 'utf8')).toContain('### Pass 1');
 
       // A --proof against a clauseless spec is a typo by definition, and
       // the zero-clause escape hatch above does not excuse it.
-      const typo = tasks('audit', 'demo-spec', '--proof', '1=met', '--evidence', '1=checked');
+      const typo = await audit('demo-spec', '--proof', '1=met', '--evidence', '1=checked');
       expect(typo.status).toBe(1);
       expect(typo.stderr).toContain('its clauses are (none)');
     });
@@ -64,13 +64,13 @@ describe('tasks CLI', () => {
   // that graded nothing, and the standing reads from the latest pass only —
   // so recorded verdicts were reset to unknown by the act of filing, twice,
   // on the branch that recorded the friction.
-  it('audit with findings and no proofs files the findings without appending a pass, so verdicts stand', () => {
-    fixture(({ tasks, dir }) => {
+  it('audit with findings and no proofs files the findings without appending a pass, so verdicts stand', async () => {
+    await fixture(async ({ dir, tasks, audit }) => {
       const specPath = path.join(dir, 'specs', 'demo-spec.md');
-      tasks('audit', 'demo-spec', '--proof', '1=met', '--evidence', '1=clause 1 checked', '--proof', '2=met', '--evidence', '2=clause 2 checked');
+      await audit('demo-spec', '--proof', '1=met', '--evidence', '1=clause 1 checked', '--proof', '2=met', '--evidence', '2=clause 2 checked');
       const before = readFileSync(specPath, 'utf8');
 
-      const result = tasks('audit', 'demo-spec', '--finding', 'a late finding', '--severity', 'low', '--system', 'Runtime', '--deliverable', 'fix it', '--evidence', 'observed live');
+      const result = await audit('demo-spec', '--finding', 'a late finding', '--severity', 'low', '--system', 'Runtime', '--deliverable', 'fix it', '--evidence', 'observed live');
       expect(result.status).toBe(0);
       expect(result.stdout).toContain('no pass appended, so recorded clause verdicts stand');
       expect(readFileSync(specPath, 'utf8')).toBe(before);
@@ -87,18 +87,18 @@ describe('tasks CLI', () => {
   // The two remaining doors into the verdict-wiping trap, closed: a typo'd
   // clause number and an abandoned interactive walk each used to record a
   // full all-unknown pass, and the standing reads from the latest pass only.
-  it('audit refuses a --proof naming no clause, so a typo cannot record an all-unknown pass', () => {
-    fixture(({ tasks, dir }) => {
+  it('audit refuses a --proof naming no clause, so a typo cannot record an all-unknown pass', async () => {
+    await fixture(async ({ dir, tasks, audit }) => {
       const specPath = path.join(dir, 'specs', 'demo-spec.md');
-      tasks('audit', 'demo-spec', '--proof', '1=met', '--evidence', '1=clause 1 checked', '--proof', '2=met', '--evidence', '2=clause 2 checked');
+      await audit('demo-spec', '--proof', '1=met', '--evidence', '1=clause 1 checked', '--proof', '2=met', '--evidence', '2=clause 2 checked');
       const before = readFileSync(specPath, 'utf8');
 
-      const typo = tasks('audit', 'demo-spec', '--proof', '99=met', '--evidence', '99=x');
+      const typo = await audit('demo-spec', '--proof', '99=met', '--evidence', '99=x');
       expect(typo.status).toBe(1);
       expect(typo.stderr).toContain('names no clause in demo-spec: c99');
       expect(typo.stderr).toContain('its clauses are c1, c2');
 
-      const nan = tasks('audit', 'demo-spec', '--proof', 'c1=met', '--evidence', '1=x');
+      const nan = await audit('demo-spec', '--proof', 'c1=met', '--evidence', '1=x');
       expect(nan.status).toBe(1);
       expect(nan.stderr).toContain('(not a number)');
 
@@ -107,13 +107,13 @@ describe('tasks CLI', () => {
     });
   });
 
-  it('audit on exhausted stdin refuses to record a pass that graded nothing', () => {
-    fixture(({ tasks, dir }) => {
+  it('audit on exhausted stdin refuses to record a pass that graded nothing', async () => {
+    await fixture(async ({ dir, tasks, audit }) => {
       const specPath = path.join(dir, 'specs', 'demo-spec.md');
-      tasks('audit', 'demo-spec', '--proof', '1=met', '--evidence', '1=clause 1 checked', '--proof', '2=met', '--evidence', '2=clause 2 checked');
+      await audit('demo-spec', '--proof', '1=met', '--evidence', '1=clause 1 checked', '--proof', '2=met', '--evidence', '2=clause 2 checked');
       const before = readFileSync(specPath, 'utf8');
 
-      const abandoned = tasks('audit', 'demo-spec');
+      const abandoned = await audit('demo-spec');
       expect(abandoned.status).toBe(1);
       expect(abandoned.stderr).toContain('graded no clause');
       expect(readFileSync(specPath, 'utf8')).toBe(before);
@@ -125,9 +125,9 @@ describe('tasks CLI', () => {
   // --base-branch's merge-base with a bare git call and no catch, so a
   // typo'd base name threw a raw Node stack instead of a diagnostic — the
   // exact defect Slice 1 fixed for `check` one command over.
-  it('audit records a pass whose range this checkout could not compute, as unresolved rather than invented', () => {
-    fixture(({ tasks, dir }) => {
-      const result = tasks('audit', 'demo-spec', '--proof', '1=met', '--evidence', '1=clause 1 checked', '--proof', '2=met', '--evidence', '2=clause 2 checked', '--base-branch', 'no-such-base-branch-xyz');
+  it('audit records a pass whose range this checkout could not compute, as unresolved rather than invented', async () => {
+    await fixture(async ({ dir, audit }) => {
+      const result = await audit('demo-spec', '--proof', '1=met', '--evidence', '1=clause 1 checked', '--proof', '2=met', '--evidence', '2=clause 2 checked', '--base-branch', 'no-such-base-branch-xyz');
       expect(result.status).toBe(0);
       expect(result.stderr).toContain('could not resolve a merge-base');
       expect(result.stderr).not.toContain('    at ');
@@ -187,37 +187,36 @@ describe('tasks CLI', () => {
     });
   });
 
-  it('audit refuses a --finding with no --deliverable, recording nothing', () => {
-    fixture(({ tasks }) => {
-      const result = tasks('audit', 'demo-spec', '--proof', '1=met', '--evidence', '1=clause 1 checked', '--proof', '2=met', '--evidence', '2=clause 2 checked', '--finding', 'undeliverable bug', '--severity', 'high');
+  it('audit refuses a --finding with no --deliverable, recording nothing', async () => {
+    await fixture(async ({ tasks, audit }) => {
+      const result = await audit('demo-spec', '--proof', '1=met', '--evidence', '1=clause 1 checked', '--proof', '2=met', '--evidence', '2=clause 2 checked', '--finding', 'undeliverable bug', '--severity', 'high');
       expect(result.status).toBe(1);
       expect(result.stderr).toContain('needs --deliverable');
       expect(tasks('list', '--kind', 'finding').stdout).toContain('0 task(s)');
     });
   });
 
-  it('audit refuses a --finding with no --evidence, recording nothing', () => {
-    fixture(({ tasks }) => {
-      const result = tasks('audit', 'demo-spec', '--proof', '1=met', '--evidence', '1=clause 1 checked', '--proof', '2=met', '--evidence', '2=clause 2 checked', '--finding', 'unevidenced bug', '--severity', 'high', '--deliverable', 'fix it somehow');
+  it('audit refuses a --finding with no --evidence, recording nothing', async () => {
+    await fixture(async ({ tasks, audit }) => {
+      const result = await audit('demo-spec', '--proof', '1=met', '--evidence', '1=clause 1 checked', '--proof', '2=met', '--evidence', '2=clause 2 checked', '--finding', 'unevidenced bug', '--severity', 'high', '--deliverable', 'fix it somehow');
       expect(result.status).toBe(1);
       expect(result.stderr).toContain('needs --evidence');
       expect(tasks('list', '--kind', 'finding').stdout).toContain('0 task(s)');
     });
   });
 
-  it('audit carries a --finding\'s --evidence onto the finding task, where triage reads it', () => {
-    fixture(({ tasks }) => {
-      tasks('audit', 'demo-spec', '--proof', '1=met', '--evidence', '1=clause 1 checked', '--proof', '2=met', '--evidence', '2=clause 2 checked', '--finding', 'a real bug', '--severity', 'high', '--deliverable', 'guard the null case', '--evidence', 'save.ts:88 dereferences before the null check');
+  it('audit carries a --finding\'s --evidence onto the finding task, where triage reads it', async () => {
+    await fixture(async ({ tasks, audit }) => {
+      await audit('demo-spec', '--proof', '1=met', '--evidence', '1=clause 1 checked', '--proof', '2=met', '--evidence', '2=clause 2 checked', '--finding', 'a real bug', '--severity', 'high', '--deliverable', 'guard the null case', '--evidence', 'save.ts:88 dereferences before the null check');
       const shown = tasks('list', '--kind', 'finding', '--state', 'unreviewed');
       const id = firstListedId(shown.stdout);
       expect(tasks('show', id).stdout).toContain('evidence: save.ts:88 dereferences before the null check');
     });
   });
 
-  it('--evidence stays clause-scoped before any --finding and finding-scoped after one, the way --file does', () => {
-    fixture(({ tasks }) => {
-      tasks(
-        'audit',
+  it('--evidence stays clause-scoped before any --finding and finding-scoped after one, the way --file does', async () => {
+    await fixture(async ({ tasks, audit }) => {
+      await audit(
         'demo-spec',
         '--proof',
         '1=unmet',
@@ -242,9 +241,9 @@ describe('tasks CLI', () => {
     });
   });
 
-  it('clause-shaped evidence after a finding still goes to the clause rather than overwriting the finding', () => {
-    fixture(({ tasks }) => {
-      const result = tasks('audit', 'demo-spec', '--proof', '1=met', '--evidence', '1=clause 1 checked', '--proof', '2=unmet', '--finding', 'some bug', '--severity', 'low', '--deliverable', 'fix it', '--evidence', 'broken here', '--evidence', '2=the clause did not hold');
+  it('clause-shaped evidence after a finding still goes to the clause rather than overwriting the finding', async () => {
+    await fixture(async ({ tasks, audit }) => {
+      const result = await audit('demo-spec', '--proof', '1=met', '--evidence', '1=clause 1 checked', '--proof', '2=unmet', '--finding', 'some bug', '--severity', 'low', '--deliverable', 'fix it', '--evidence', 'broken here', '--evidence', '2=the clause did not hold');
       expect(result.status).toBe(0);
       expect(tasks('show', 'demo-spec-clause-2').stdout).toContain('evidence: the clause did not hold');
       const id = firstListedId(tasks('list', '--kind', 'finding', '--state', 'unreviewed').stdout);
@@ -252,9 +251,9 @@ describe('tasks CLI', () => {
     });
   });
 
-  it('audit refuses a second bare finding evidence instead of silently replacing the first', () => {
-    fixture(({ tasks }) => {
-      const result = tasks('audit', 'demo-spec', '--proof', '1=met', '--evidence', '1=clause 1 checked', '--proof', '2=met', '--evidence', '2=clause 2 checked', '--finding', 'some bug', '--severity', 'low', '--deliverable', 'fix it', '--evidence', 'first evidence', '--evidence', 'replacement evidence');
+  it('audit refuses a second bare finding evidence instead of silently replacing the first', async () => {
+    await fixture(async ({ tasks, audit }) => {
+      const result = await audit('demo-spec', '--proof', '1=met', '--evidence', '1=clause 1 checked', '--proof', '2=met', '--evidence', '2=clause 2 checked', '--finding', 'some bug', '--severity', 'low', '--deliverable', 'fix it', '--evidence', 'first evidence', '--evidence', 'replacement evidence');
       expect(result.status).toBe(1);
       expect(result.stderr).toContain('already has evidence');
       expect(tasks('list', '--kind', 'finding').stdout).toContain('0 task(s)');
@@ -265,13 +264,13 @@ describe('tasks CLI', () => {
   // before the --finding it belongs to used to fall through every branch
   // and vanish: the pass recorded a finding with no severity, and said so
   // only later, about a value the caller did supply.
-  it('audit refuses a finding field written before the --finding it describes, and an unknown flag by name', () => {
-    fixture(({ tasks }) => {
-      const early = tasks('audit', 'demo-spec', '--severity', 'high', '--finding', 'some bug', '--deliverable', 'fix it', '--evidence', 'it is broken');
+  it('audit refuses a finding field written before the --finding it describes, and an unknown flag by name', async () => {
+    await fixture(async ({ tasks, audit }) => {
+      const early = await audit('demo-spec', '--severity', 'high', '--finding', 'some bug', '--deliverable', 'fix it', '--evidence', 'it is broken');
       expect(early.status).toBe(1);
       expect(early.stderr).toContain('--severity describes a finding, and no --finding has been opened yet');
 
-      const unknown = tasks('audit', 'demo-spec', '--totallyfakeflag', 'x');
+      const unknown = await audit('demo-spec', '--totallyfakeflag', 'x');
       expect(unknown.status).toBe(1);
       expect(unknown.stderr).toContain('unknown flag: --totallyfakeflag');
 
@@ -279,18 +278,18 @@ describe('tasks CLI', () => {
     });
   });
 
-  it('audit carries a --finding\'s --deliverable onto the finding task it creates', () => {
-    fixture(({ tasks }) => {
-      tasks('audit', 'demo-spec', '--proof', '1=met', '--evidence', '1=clause 1 checked', '--proof', '2=met', '--evidence', '2=clause 2 checked', '--finding', 'a real bug', '--severity', 'high', '--deliverable', 'guard the null case', '--evidence', 'null deref on an empty save');
+  it('audit carries a --finding\'s --deliverable onto the finding task it creates', async () => {
+    await fixture(async ({ tasks, audit }) => {
+      await audit('demo-spec', '--proof', '1=met', '--evidence', '1=clause 1 checked', '--proof', '2=met', '--evidence', '2=clause 2 checked', '--finding', 'a real bug', '--severity', 'high', '--deliverable', 'guard the null case', '--evidence', 'null deref on an empty save');
       const shown = tasks('list', '--kind', 'finding', '--state', 'unreviewed');
       const id = firstListedId(shown.stdout);
       expect(tasks('show', id).stdout).toContain('deliverable: guard the null case');
     });
   });
 
-  it('audit records a clause nobody graded as unknown instead of refusing the pass', () => {
-    fixture(({ tasks, dir }) => {
-      const result = tasks('audit', 'demo-spec', '--proof', '1=met', '--evidence', '1=clause 1 checked');
+  it('audit records a clause nobody graded as unknown instead of refusing the pass', async () => {
+    await fixture(async ({ dir, audit }) => {
+      const result = await audit('demo-spec', '--proof', '1=met', '--evidence', '1=clause 1 checked');
       expect(result.status).toBe(0);
       expect(result.stdout).toContain('recorded pass 1 for demo-spec: outstanding: c2 (unknown)');
       expect(result.stdout).toContain('1 clause(s) recorded unknown — nobody graded them: c2');
@@ -298,18 +297,18 @@ describe('tasks CLI', () => {
     });
   });
 
-  it('an unknown clause creates no undelivered task, because nobody looked is not a broken promise', () => {
-    fixture(({ tasks }) => {
-      tasks('audit', 'demo-spec', '--proof', '1=unmet', '--evidence', '1=it fails');
+  it('an unknown clause creates no undelivered task, because nobody looked is not a broken promise', async () => {
+    await fixture(async ({ tasks, audit }) => {
+      await audit('demo-spec', '--proof', '1=unmet', '--evidence', '1=it fails');
       expect(tasks('show', 'demo-spec-clause-1').stdout).toContain('[undelivered/open/high]');
       const missing = tasks('show', 'demo-spec-clause-2');
       expect(missing.stdout).toContain('no such task: demo-spec-clause-2');
     });
   });
 
-  it('audit takes unknown as an explicit verdict and never renders it as unmet', () => {
-    fixture(({ tasks, dir }) => {
-      const result = tasks('audit', 'demo-spec', '--proof', '1=unknown', '--proof', '2=unmet', '--evidence', '2=it fails');
+  it('audit takes unknown as an explicit verdict and never renders it as unmet', async () => {
+    await fixture(async ({ dir, audit }) => {
+      const result = await audit('demo-spec', '--proof', '1=unknown', '--proof', '2=unmet', '--evidence', '2=it fails');
       expect(result.status).toBe(0);
       expect(result.stdout).toContain('outstanding: c1 (unknown), c2 (unmet)');
       const specText = readFileSync(path.join(dir, 'specs', 'demo-spec.md'), 'utf8');
@@ -318,26 +317,26 @@ describe('tasks CLI', () => {
     });
   });
 
-  it('audit refuses a met verdict with no evidence, naming the clause, and records nothing', () => {
-    fixture(({ tasks, dir }) => {
-      const result = tasks('audit', 'demo-spec', '--proof', '1=met', '--proof', '2=met', '--evidence', '2=clause 2 checked');
+  it('audit refuses a met verdict with no evidence, naming the clause, and records nothing', async () => {
+    await fixture(async ({ dir, audit }) => {
+      const result = await audit('demo-spec', '--proof', '1=met', '--proof', '2=met', '--evidence', '2=clause 2 checked');
       expect(result.status).toBe(1);
       expect(result.stderr).toContain('clause 1 is met with no evidence');
       expect(readFileSync(path.join(dir, 'specs', 'demo-spec.md'), 'utf8')).not.toContain('## Audit passes');
     });
   });
 
-  it('unmet and unknown need no evidence, because neither is a completion claim', () => {
-    fixture(({ tasks }) => {
-      const result = tasks('audit', 'demo-spec', '--proof', '1=unmet', '--proof', '2=unknown');
+  it('unmet and unknown need no evidence, because neither is a completion claim', async () => {
+    await fixture(async ({ audit }) => {
+      const result = await audit('demo-spec', '--proof', '1=unmet', '--proof', '2=unknown');
       expect(result.status).toBe(0);
       expect(result.stdout).toContain('outstanding: c1 (unmet), c2 (unknown)');
     });
   });
 
-  it('audit refuses a --proof value that is not one of the three verdicts, naming what it got', () => {
-    fixture(({ tasks, dir }) => {
-      const result = tasks('audit', 'demo-spec', '--proof', '1=probably', '--proof', '2=unknown');
+  it('audit refuses a --proof value that is not one of the three verdicts, naming what it got', async () => {
+    await fixture(async ({ dir, audit }) => {
+      const result = await audit('demo-spec', '--proof', '1=probably', '--proof', '2=unknown');
       expect(result.status).toBe(1);
       expect(result.stderr).toContain('--proof 1=probably');
       expect(result.stderr).toContain('met, unmet or unknown');
@@ -345,11 +344,11 @@ describe('tasks CLI', () => {
     });
   });
 
-  it('audit-prompt prints a ready-to-use auditor prompt for a spec', () => {
-    fixture(({ tasks, dir }) => {
+  it('audit-prompt prints a ready-to-use auditor prompt for a spec', async () => {
+    await fixture(async ({ dir, tasks, audit }) => {
       writeFileSync(path.join(dir, 'specs', 'demo-spec.md'), '# Demo spec\n\n## Deliverable\n\nSomething this branch promises.\n\nProof:\n\n- [c1] The first clause holds.\n  proof: command node --version\n- [c2] The second clause holds.\n\n## Decisions\n\n## Open questions\n\nNone.\n', 'utf8');
       tasks('add', 'prove the runtime behavior', '--id', 'runtime-proof', '--spec', 'demo-spec', '--severity', 'high', '--system', 'Runtime', '--files', 'src/runtime/runtime.ts:1', '--deliverable', 'runtime behavior is proven');
-      tasks('audit', 'demo-spec', '--proof', '1=met', '--evidence', '1=measured directly', '--proof', '2=met', '--evidence', '2=clause 2 checked');
+      await audit('demo-spec', '--proof', '1=met', '--evidence', '1=measured directly', '--proof', '2=met', '--evidence', '2=clause 2 checked');
 
       const result = tasks('audit-prompt', 'demo-spec');
       expect(result.status).toBe(0);
@@ -408,9 +407,9 @@ describe('tasks CLI', () => {
     });
   });
 
-  it('audit-prompt shows each clause its latest verdict, spelling out that unknown means nobody looked', () => {
-    fixture(({ tasks }) => {
-      tasks('audit', 'demo-spec', '--proof', '1=met', '--evidence', '1=measured directly');
+  it('audit-prompt shows each clause its latest verdict, spelling out that unknown means nobody looked', async () => {
+    await fixture(async ({ tasks, audit }) => {
+      await audit('demo-spec', '--proof', '1=met', '--evidence', '1=measured directly');
 
       const result = tasks('audit-prompt', 'demo-spec');
       expect(result.status).toBe(0);
@@ -482,11 +481,11 @@ describe('tasks CLI', () => {
   // c19. The worker's half of the generated-brief rule the auditor's half
   // has had all along: what a dispatcher hand-writes is a copy of the record
   // that drifts from it, so the record renders itself.
-  it('work-prompt names the task\'s deliverable, grant, requirements and clause standings', () => {
-    fixture(({ tasks }) => {
+  it('work-prompt names the task\'s deliverable, grant, requirements and clause standings', async () => {
+    await fixture(async ({ tasks, audit }) => {
       tasks('add', 'the dependency', '--id', 'dep', '--spec', 'demo-spec');
       tasks('done', 'dep');
-      tasks('audit', 'demo-spec', '--proof', '1=unmet', '--evidence', '1=it does not actually hold', '--proof', '2=met', '--evidence', '2=clause 2 checked');
+      await audit('demo-spec', '--proof', '1=unmet', '--evidence', '1=it does not actually hold', '--proof', '2=met', '--evidence', '2=clause 2 checked');
       tasks('edit', 'demo-spec-clause-1', '--writes', 'src/runtime/save.ts,src/runtime/invented-by-a-planner.ts', '--requires', 'dep', '--deliverable', 'the first clause is delivered', '--evidence', 'the audit graded it unmet');
 
       const result = tasks('work-prompt', 'demo-spec-clause-1');
@@ -519,9 +518,9 @@ describe('tasks CLI', () => {
   // the clauses and the clause block, eight lines later, said none were
   // recorded. The test above uses an `undelivered` fixture and so only ever
   // exercised the path that already worked.
-  it('work-prompt reads the clauses an ordinary task discharges, not only an undelivered record\'s own', () => {
-    fixture(({ tasks }) => {
-      tasks('audit', 'demo-spec', '--proof', '1=unmet', '--evidence', '1=it does not actually hold', '--proof', '2=met', '--evidence', '2=clause 2 checked');
+  it('work-prompt reads the clauses an ordinary task discharges, not only an undelivered record\'s own', async () => {
+    await fixture(async ({ tasks, audit }) => {
+      await audit('demo-spec', '--proof', '1=unmet', '--evidence', '1=it does not actually hold', '--proof', '2=met', '--evidence', '2=clause 2 checked');
       tasks('add', 'a slice', '--id', 'slice', '--spec', 'demo-spec', '--discharges', 'c2,c1');
 
       const result = tasks('work-prompt', 'slice');
@@ -715,10 +714,9 @@ describe('tasks CLI', () => {
     });
   });
 
-  it('audit records a pass, creates an undelivered task for an unmet clause, and records findings unreviewed', () => {
-    fixture(({ tasks, dir }) => {
-      const result = tasks(
-        'audit',
+  it('audit records a pass, creates an undelivered task for an unmet clause, and records findings unreviewed', async () => {
+    await fixture(async ({ tasks, dir, audit }) => {
+      const result = await audit(
         'demo-spec',
         '--proof',
         '1=met',
@@ -785,10 +783,9 @@ describe('tasks CLI', () => {
     expect(parsed.findings[0].files).toEqual([]);
   });
 
-  it('--file on a proof clause carries multiple paths onto its undelivered task, and stays separate from a finding\'s own --file', () => {
-    fixture(({ tasks }) => {
-      tasks(
-        'audit',
+  it('--file on a proof clause carries multiple paths onto its undelivered task, and stays separate from a finding\'s own --file', async () => {
+    await fixture(async ({ tasks, audit }) => {
+      await audit(
         'demo-spec',
         '--proof',
         '1=unmet',
@@ -819,17 +816,17 @@ describe('tasks CLI', () => {
     });
   });
 
-  it('an unmet clause with no --file leaves the undelivered task with no files, unchanged', () => {
-    fixture(({ tasks }) => {
-      tasks('audit', 'demo-spec', '--proof', '1=unmet', '--evidence', '1=nope', '--proof', '2=met', '--evidence', '2=clause 2 checked');
+  it('an unmet clause with no --file leaves the undelivered task with no files, unchanged', async () => {
+    await fixture(async ({ tasks, audit }) => {
+      await audit('demo-spec', '--proof', '1=unmet', '--evidence', '1=nope', '--proof', '2=met', '--evidence', '2=clause 2 checked');
       const undelivered = tasks('show', 'demo-spec-clause-1');
       expect(undelivered.stdout).not.toContain('files:');
     });
   });
 
-  it("audit's undelivered task can be declined, and the decline says the clause is abandoned rather than discharged", () => {
-    fixture(({ tasks }) => {
-      tasks('audit', 'demo-spec', '--proof', '1=unmet', '--evidence', '1=nope', '--proof', '2=met', '--evidence', '2=clause 2 checked');
+  it("audit's undelivered task can be declined, and the decline says the clause is abandoned rather than discharged", async () => {
+    await fixture(async ({ tasks, audit }) => {
+      await audit('demo-spec', '--proof', '1=unmet', '--evidence', '1=nope', '--proof', '2=met', '--evidence', '2=clause 2 checked');
       const result = tasks('decline', 'demo-spec-clause-1', '--reason', 'the spec that promised it is superseded');
       expect(result.status).toBe(0);
       expect(result.stdout).toContain('declining it abandons the clause, it does not discharge it');
@@ -841,10 +838,10 @@ describe('tasks CLI', () => {
     });
   });
 
-  it('a second unmet pass for the same clause reuses the open undelivered task rather than duplicating it', () => {
-    fixture(({ tasks }) => {
-      tasks('audit', 'demo-spec', '--proof', '1=unmet', '--evidence', '1=first', '--proof', '2=met', '--evidence', '2=clause 2 checked');
-      tasks('audit', 'demo-spec', '--proof', '1=unmet', '--evidence', '1=still not', '--proof', '2=met', '--evidence', '2=clause 2 checked');
+  it('a second unmet pass for the same clause reuses the open undelivered task rather than duplicating it', async () => {
+    await fixture(async ({ tasks, audit }) => {
+      await audit('demo-spec', '--proof', '1=unmet', '--evidence', '1=first', '--proof', '2=met', '--evidence', '2=clause 2 checked');
+      await audit('demo-spec', '--proof', '1=unmet', '--evidence', '1=still not', '--proof', '2=met', '--evidence', '2=clause 2 checked');
       // Counted over the records, not over the report: `spec show` now names
       // the owner of every clause standing as well as listing the members, so
       // one record legitimately appears in two places.
@@ -943,11 +940,11 @@ describe('an audit pass read from a file', () => {
     expect(errors[0]).toContain('pass.txt:1: a value line before any flag');
   });
 
-  it('records a whole pass from a file, and a flag typed beside it still wins', () => {
-    fixture(({ tasks, dir }) => {
+  it('records a whole pass from a file, and a flag typed beside it still wins', async () => {
+    await fixture(async ({ dir, tasks, audit }) => {
       const passFile = path.join(dir, 'pass.txt');
       writeFileSync(passFile, '--proof 1=met\n--evidence 1=clause 1 checked against the suite\n--proof 2=unmet\n--evidence 2=the seam is still open\n', 'utf8');
-      const result = tasks('audit', 'demo-spec', '--args-from', passFile);
+      const result = await audit('demo-spec', '--args-from', passFile);
       expect(result.status).toBe(0);
 
       const shown = tasks('spec', 'show', 'demo-spec').stdout;
@@ -961,11 +958,11 @@ describe('an audit pass read from a file', () => {
   // flags are parsed first and the command line's after, so a flag given in
   // both places resolves to what was typed. The transport moved; which
   // argument is the more specific one did not.
-  it('lets a flag typed beside --args-from override the same flag inside it', () => {
-    fixture(({ tasks, dir }) => {
+  it('lets a flag typed beside --args-from override the same flag inside it', async () => {
+    await fixture(async ({ dir, tasks, audit }) => {
       const passFile = path.join(dir, 'pass.txt');
       writeFileSync(passFile, '--proof 1=met\n--evidence 1=from the file\n--proof 2=met\n--evidence 2=from the file\n', 'utf8');
-      expect(tasks('audit', 'demo-spec', '--args-from', passFile, '--proof', '2=unmet', '--evidence', '2=typed beside it').status).toBe(0);
+      expect((await audit('demo-spec', '--args-from', passFile, '--proof', '2=unmet', '--evidence', '2=typed beside it')).status).toBe(0);
 
       const shown = tasks('spec', 'show', 'demo-spec').stdout;
       expect(shown).toContain('c2 (unmet)');
@@ -974,9 +971,9 @@ describe('an audit pass read from a file', () => {
     });
   });
 
-  it('says which file it could not read rather than recording an empty pass', () => {
-    fixture(({ tasks, dir }) => {
-      const result = tasks('audit', 'demo-spec', '--args-from', path.join(dir, 'absent.txt'));
+  it('says which file it could not read rather than recording an empty pass', async () => {
+    await fixture(async ({ dir, audit }) => {
+      const result = await audit('demo-spec', '--args-from', path.join(dir, 'absent.txt'));
       expect(result.status).toBe(1);
       expect(result.stderr).toContain('--args-from could not read');
     });

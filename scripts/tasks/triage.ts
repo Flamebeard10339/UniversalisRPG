@@ -2,7 +2,7 @@ import { loadStore, unreviewedQueue } from '../lib/taskStore';
 import type { Flags } from './cli';
 import { recordEvents, resolveActiveSpec, resolveConfig, saveStoreAndWarn, subjectOf, today } from './context';
 import { pass2Promotion, printDecisionPrompt } from './records';
-import { stdinPrompter } from './prompt';
+import { activePrompter } from './prompt';
 import { printEvidence, printRow, truncateLine } from './render';
 
 // A human, not the auditor, assigns state — this is the only place that
@@ -23,7 +23,7 @@ export async function cmdTriage(args: Flags): Promise<void> {
   }
   const byId = new Map(tasks.map((task) => [task.id, task]));
 
-  const prompter = stdinPrompter();
+  const prompter = activePrompter();
   const ask = async (prompt: string): Promise<string> => {
     const answer = await prompter.ask(prompt);
     return prompter.exhausted() ? 'q' : answer;

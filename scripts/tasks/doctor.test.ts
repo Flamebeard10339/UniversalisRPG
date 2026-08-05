@@ -4,7 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { tsxCli } from '../lib/tsxCli';
-import { defaultStoreGitFixture, fixture, runInProcess, script } from './cliFixtures';
+import { defaultStoreGitFixture, fixture, runInProcess, script, spawnTasks, type Run } from './cliFixtures';
 
 describe('tasks CLI', () => {
   it('doctor reports an inconsistent store and still exits zero, because no disagreement may fail a build', () => {
@@ -81,8 +81,12 @@ describe('tasks CLI', () => {
   // behind, never for the session's own writes: measured six-for-six and
   // eight-for-eight across two recorded sessions, a warning on every write
   // is a warning nobody reads. Freshness is the store's pre-write mtime.
+  // Over real processes on purpose: the warning fires at most once per
+  // process, so an in-process run here would spend the flag the sibling
+  // warn-once test below depends on observing fresh.
   it('default-store writes stay silent about their own dirtiness, and warn once over stale uncommitted state', () => {
-    defaultStoreGitFixture(({ dir, tasks }) => {
+    defaultStoreGitFixture(({ dir }) => {
+      const tasks = (...args: string[]): Run => spawnTasks(dir, [...args, '--branch', 'demo-spec']);
       // A write that itself dirties a clean store is the session acting on
       // purpose — no warning.
       const own = tasks('add', 'Dirty tracked task', '--id', 'dirty-tracked');

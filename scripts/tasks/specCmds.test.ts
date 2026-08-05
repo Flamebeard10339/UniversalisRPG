@@ -48,11 +48,11 @@ describe('tasks CLI', () => {
     });
   });
 
-  it('spec add joins named tasks to a spec regardless of their state', () => {
-    fixture(({ tasks }) => {
+  it('spec add joins named tasks to a spec regardless of their state', async () => {
+    await fixture(async ({ tasks, audit }) => {
       tasks('add', 'a task', '--id', 'a-task');
       tasks('add', 'a finding', '--id', 'a-finding', '--kind', 'finding', '--severity', 'low', '--deliverable', 'fix it');
-      tasks('audit', 'demo-spec', '--proof', '1=met', '--evidence', '1=clause 1 checked', '--proof', '2=met', '--evidence', '2=clause 2 checked', '--finding', 'pass one finding', '--severity', 'low', '--deliverable', 'fix it', '--evidence', 'seen in pass one');
+      await audit('demo-spec', '--proof', '1=met', '--evidence', '1=clause 1 checked', '--proof', '2=met', '--evidence', '2=clause 2 checked', '--finding', 'pass one finding', '--severity', 'low', '--deliverable', 'fix it', '--evidence', 'seen in pass one');
       const added = tasks('spec', 'add', 'demo-spec', 'a-task', 'a-finding', 'demo-spec-pass1-pass-one-finding');
       expect(added.status).toBe(0);
       expect(tasks('show', 'a-task').stdout).toContain('spec: demo-spec');
@@ -69,11 +69,11 @@ describe('tasks CLI', () => {
     });
   });
 
-  it('spec add promotes a pass 2+ finding and records that it extends what the spec owes', () => {
-    fixture(({ tasks }) => {
+  it('spec add promotes a pass 2+ finding and records that it extends what the spec owes', async () => {
+    await fixture(async ({ tasks, audit }) => {
       tasks('add', 'a task', '--id', 'a-task');
-      tasks('audit', 'demo-spec', '--proof', '1=met', '--evidence', '1=clause 1 checked', '--proof', '2=met', '--evidence', '2=clause 2 checked');
-      tasks('audit', 'demo-spec', '--proof', '1=met', '--evidence', '1=clause 1 checked', '--proof', '2=met', '--evidence', '2=clause 2 checked', '--finding', 'late finding', '--severity', 'low', '--deliverable', 'fix it', '--evidence', 'seen late');
+      await audit('demo-spec', '--proof', '1=met', '--evidence', '1=clause 1 checked', '--proof', '2=met', '--evidence', '2=clause 2 checked');
+      await audit('demo-spec', '--proof', '1=met', '--evidence', '1=clause 1 checked', '--proof', '2=met', '--evidence', '2=clause 2 checked', '--finding', 'late finding', '--severity', 'low', '--deliverable', 'fix it', '--evidence', 'seen late');
       const result = tasks('spec', 'add', 'demo-spec', 'a-task', 'demo-spec-pass2-late-finding');
       expect(result.status).toBe(0);
       expect(result.stdout).toContain('came from a pass 2 or later audit, which extends what demo-spec owes');
@@ -124,9 +124,9 @@ describe('tasks CLI', () => {
     });
   });
 
-  it('spec remove drops an undelivered task out of its spec and records that the clause is now tracked by none', () => {
-    fixture(({ tasks }) => {
-      tasks('audit', 'demo-spec', '--proof', '1=unmet', '--evidence', '1=not yet', '--proof', '2=met', '--evidence', '2=clause 2 checked');
+  it('spec remove drops an undelivered task out of its spec and records that the clause is now tracked by none', async () => {
+    await fixture(async ({ tasks, audit }) => {
+      await audit('demo-spec', '--proof', '1=unmet', '--evidence', '1=not yet', '--proof', '2=met', '--evidence', '2=clause 2 checked');
       const result = tasks('spec', 'remove', 'demo-spec', 'demo-spec-clause-1');
       expect(result.status).toBe(0);
       expect(result.stdout).toContain("were demo-spec's outstanding promises");
@@ -184,19 +184,19 @@ describe('tasks CLI', () => {
     });
   });
 
-  it('shows a triaged finding through the same printer, id included, so it can be copied to `tasks show`', () => {
-    fixture(({ tasks, triage }) => {
+  it('shows a triaged finding through the same printer, id included, so it can be copied to `tasks show`', async () => {
+    await fixture(async ({ tasks, triage }) => {
       tasks('add', 'a finding to triage', '--id', 'triage-me', '--kind', 'finding', '--severity', 'high', '--deliverable', 'fix it', '--evidence', 'it is broken');
       // `q` on the first prompt: the pane is displayed, nothing is decided.
-      const result = triage('q\n');
+      const result = await triage('q\n');
       expect(result.status).toBe(0);
       expect(result.stdout).toContain('triage-me  [finding/unreviewed/high]');
     });
   });
 
-  it('spec show names each outstanding clause and its status rather than scoring the spec', () => {
-    fixture(({ tasks }) => {
-      tasks('audit', 'demo-spec', '--proof', '1=met', '--evidence', '1=measured directly', '--proof', '2=unmet', '--evidence', '2=it fails');
+  it('spec show names each outstanding clause and its status rather than scoring the spec', async () => {
+    await fixture(async ({ tasks, audit }) => {
+      await audit('demo-spec', '--proof', '1=met', '--evidence', '1=measured directly', '--proof', '2=unmet', '--evidence', '2=it fails');
       const shown = tasks('spec', 'show', 'demo-spec');
       expect(shown.stdout).toContain('pass 1 (');
       expect(shown.stdout).toContain('outstanding: c2 (unmet)');
@@ -205,9 +205,9 @@ describe('tasks CLI', () => {
     });
   });
 
-  it('spec show reports a clause the latest pass never graded as outstanding and unknown', () => {
-    fixture(({ tasks, dir }) => {
-      tasks('audit', 'demo-spec', '--proof', '1=met', '--evidence', '1=measured directly', '--proof', '2=met', '--evidence', '2=read the diff');
+  it('spec show reports a clause the latest pass never graded as outstanding and unknown', async () => {
+    await fixture(async ({ dir, tasks, audit }) => {
+      await audit('demo-spec', '--proof', '1=met', '--evidence', '1=measured directly', '--proof', '2=met', '--evidence', '2=read the diff');
       const specPath = path.join(dir, 'specs', 'demo-spec.md');
       writeFileSync(specPath, readFileSync(specPath, 'utf8').replace('- [c2] The second clause holds.', '- [c2] The second clause holds.\n- A clause added after the pass.'), 'utf8');
       const shown = tasks('spec', 'show', 'demo-spec');
@@ -228,10 +228,10 @@ describe('tasks CLI', () => {
     });
   });
 
-  it('recording an audit pass leaves the spec with exactly one Deliverable section and no baseline', () => {
-    fixture(({ tasks, dir }) => {
+  it('recording an audit pass leaves the spec with exactly one Deliverable section and no baseline', async () => {
+    await fixture(async ({ dir, audit }) => {
       const specPath = path.join(dir, 'specs', 'demo-spec.md');
-      const audited = tasks('audit', 'demo-spec', '--proof', '1=met', '--evidence', '1=clause 1 checked', '--proof', '2=met', '--evidence', '2=clause 2 checked');
+      const audited = await audit('demo-spec', '--proof', '1=met', '--evidence', '1=clause 1 checked', '--proof', '2=met', '--evidence', '2=clause 2 checked');
       expect(audited.status).toBe(0);
       const specText = readFileSync(specPath, 'utf8');
       expect(specText).not.toContain('## Baseline');
@@ -281,21 +281,21 @@ describe('tasks CLI', () => {
     });
   });
 
-  it('done on an undelivered task closes once the spec\'s latest audit pass grades its clause met', () => {
-    fixture(({ tasks }) => {
-      tasks('audit', 'demo-spec', '--proof', '1=unmet', '--evidence', '1=not yet', '--proof', '2=met', '--evidence', '2=clause 2 checked');
+  it('done on an undelivered task closes once the spec\'s latest audit pass grades its clause met', async () => {
+    await fixture(async ({ tasks, audit }) => {
+      await audit('demo-spec', '--proof', '1=unmet', '--evidence', '1=not yet', '--proof', '2=met', '--evidence', '2=clause 2 checked');
       expect(tasks('show', 'demo-spec-clause-1').stdout).toContain('[undelivered/open/high]');
 
-      tasks('audit', 'demo-spec', '--proof', '1=met', '--evidence', '1=clause 1 checked', '--proof', '2=met', '--evidence', '2=clause 2 checked');
+      await audit('demo-spec', '--proof', '1=met', '--evidence', '1=clause 1 checked', '--proof', '2=met', '--evidence', '2=clause 2 checked');
       const result = tasks('done', 'demo-spec-clause-1');
       expect(result.status).toBe(0);
       expect(tasks('show', 'demo-spec-clause-1').stdout).toContain('closed: ');
     });
   });
 
-  it('done on an undelivered task closes against an unmet verdict, recording the verdict it closed against', () => {
-    fixture(({ tasks }) => {
-      tasks('audit', 'demo-spec', '--proof', '1=unmet', '--evidence', '1=nope', '--proof', '2=met', '--evidence', '2=clause 2 checked');
+  it('done on an undelivered task closes against an unmet verdict, recording the verdict it closed against', async () => {
+    await fixture(async ({ tasks, audit }) => {
+      await audit('demo-spec', '--proof', '1=unmet', '--evidence', '1=nope', '--proof', '2=met', '--evidence', '2=clause 2 checked');
       const result = tasks('done', 'demo-spec-clause-1');
       expect(result.status).toBe(0);
       expect(result.stdout).toContain('clause standing at close: proof clause 1 is unmet in the latest audit pass (pass 1)');
@@ -303,10 +303,10 @@ describe('tasks CLI', () => {
     });
   });
 
-  it('done on an undelivered task reports a clause the latest pass never graded as unknown, not as unmet', () => {
-    fixture(({ tasks }) => {
-      tasks('audit', 'demo-spec', '--proof', '1=unmet', '--evidence', '1=nope', '--proof', '2=met', '--evidence', '2=clause 2 checked');
-      tasks('audit', 'demo-spec', '--proof', '2=met', '--evidence', '2=clause 2 checked');
+  it('done on an undelivered task reports a clause the latest pass never graded as unknown, not as unmet', async () => {
+    await fixture(async ({ tasks, audit }) => {
+      await audit('demo-spec', '--proof', '1=unmet', '--evidence', '1=nope', '--proof', '2=met', '--evidence', '2=clause 2 checked');
+      await audit('demo-spec', '--proof', '2=met', '--evidence', '2=clause 2 checked');
       const result = tasks('done', 'demo-spec-clause-1');
       expect(result.status).toBe(0);
       expect(result.stdout).toContain('clause standing at close: proof clause 1 is unknown in the latest audit pass (pass 2) — nobody graded it');
@@ -329,9 +329,9 @@ describe('tasks CLI', () => {
     });
   });
 
-  it('done on an undelivered task closes when its clause has been deleted from the spec outright, and says which clause is gone', () => {
-    fixture(({ tasks, dir }) => {
-      tasks('audit', 'demo-spec', '--proof', '1=met', '--evidence', '1=clause 1 checked', '--proof', '2=met', '--evidence', '2=clause 2 checked');
+  it('done on an undelivered task closes when its clause has been deleted from the spec outright, and says which clause is gone', async () => {
+    await fixture(async ({ dir, tasks, audit }) => {
+      await audit('demo-spec', '--proof', '1=met', '--evidence', '1=clause 1 checked', '--proof', '2=met', '--evidence', '2=clause 2 checked');
       const storePath = path.join(dir, 'tasks.jsonl');
       writeFileSync(
         storePath,
@@ -345,27 +345,27 @@ describe('tasks CLI', () => {
     });
   });
 
-  it('an undelivered task survives its clause being reworded, and closes on the next met verdict', () => {
-    fixture(({ tasks, dir }) => {
+  it('an undelivered task survives its clause being reworded, and closes on the next met verdict', async () => {
+    await fixture(async ({ dir, tasks, audit }) => {
       const specPath = path.join(dir, 'specs', 'demo-spec.md');
-      tasks('audit', 'demo-spec', '--proof', '1=unmet', '--evidence', '1=not yet', '--proof', '2=met', '--evidence', '2=clause 2 checked');
+      await audit('demo-spec', '--proof', '1=unmet', '--evidence', '1=not yet', '--proof', '2=met', '--evidence', '2=clause 2 checked');
       expect(tasks('show', 'demo-spec-clause-1').stdout).toContain('[undelivered/open/high]');
 
       // The first audit stamped the clause, so the tag is already sitting in
       // the line a human rewords when they narrow it.
       writeFileSync(specPath, readFileSync(specPath, 'utf8').replace('[c1] The first clause holds.', '[c1] The first clause holds, under a narrower reading.'), 'utf8');
 
-      tasks('audit', 'demo-spec', '--proof', '1=met', '--evidence', '1=clause 1 checked', '--proof', '2=met', '--evidence', '2=clause 2 checked');
+      await audit('demo-spec', '--proof', '1=met', '--evidence', '1=clause 1 checked', '--proof', '2=met', '--evidence', '2=clause 2 checked');
       const result = tasks('done', 'demo-spec-clause-1');
       expect(result.status).toBe(0);
       expect(tasks('show', 'demo-spec-clause-1').stdout).toContain('closed: ');
     });
   });
 
-  it('a clause keeps its id when the Proof: list is reordered and a new clause is inserted above it', () => {
-    fixture(({ tasks, dir }) => {
+  it('a clause keeps its id when the Proof: list is reordered and a new clause is inserted above it', async () => {
+    await fixture(async ({ dir, tasks, audit }) => {
       const specPath = path.join(dir, 'specs', 'demo-spec.md');
-      tasks('audit', 'demo-spec', '--proof', '1=unmet', '--evidence', '1=not yet', '--proof', '2=met', '--evidence', '2=clause 2 checked');
+      await audit('demo-spec', '--proof', '1=unmet', '--evidence', '1=not yet', '--proof', '2=met', '--evidence', '2=clause 2 checked');
 
       writeFileSync(
         specPath,
@@ -376,7 +376,7 @@ describe('tasks CLI', () => {
         'utf8',
       );
 
-      const audited = tasks('audit', 'demo-spec', '--proof', '1=met', '--evidence', '1=clause 1 checked', '--proof', '2=met', '--evidence', '2=clause 2 checked', '--proof', '3=met', '--evidence', '3=clause 3 checked');
+      const audited = await audit('demo-spec', '--proof', '1=met', '--evidence', '1=clause 1 checked', '--proof', '2=met', '--evidence', '2=clause 2 checked', '--proof', '3=met', '--evidence', '3=clause 3 checked');
       expect(audited.status).toBe(0);
       expect(audited.stdout).toContain("keep it when you reword or reorder");
       // The insertion took a fresh id instead of displacing clause 1's.

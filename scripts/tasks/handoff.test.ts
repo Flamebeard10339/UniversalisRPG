@@ -64,9 +64,9 @@ describe('tasks CLI', () => {
     });
   });
 
-  it('handoff tells a cold session which clauses nobody has graded', () => {
-    fixture(({ tasks }) => {
-      tasks('audit', 'demo-spec', '--proof', '1=met', '--evidence', '1=measured directly');
+  it('handoff tells a cold session which clauses nobody has graded', async () => {
+    await fixture(async ({ tasks, audit }) => {
+      await audit('demo-spec', '--proof', '1=met', '--evidence', '1=measured directly');
       const result = tasks('handoff');
       expect(result.status).toBe(0);
       expect(result.stdout).toContain('1. [met] The first clause holds.');
@@ -367,13 +367,13 @@ describe('the event log', () => {
   // doctor-fix, triage, import, decline and spec-defer to append nothing and
   // watched the whole suite stay green. This drives every write verb once, so
   // an unpaired sixteenth site fails here rather than in an audit.
-  it('records an event for every verb that writes the store, not only the well-travelled ones', () => {
-    fixture(({ tasks, dir, triage }) => {
+  it('records an event for every verb that writes the store, not only the well-travelled ones', async () => {
+    await fixture(async ({ dir, tasks, triage }) => {
       const auditDoc = path.join(dir, 'legacy-audit.md');
       writeFileSync(auditDoc, '# Runtime — 2026-01-01\n\n## H1 — an imported finding\n\n**Files:** `src/runtime/a.ts:1`\n\nEvidence prose.\n\n**Fix**: do the thing.\n', 'utf8');
 
       tasks('import', auditDoc, '--actor', 'importer');
-      triage('2\n');
+      await triage('2\n');
       tasks('add', 'a decliner', '--id', 'to-decline', '--actor', 'w');
       tasks('decline', 'to-decline', '--reason', 'not worth it', '--actor', 'w');
       tasks('add', 'a deferred member', '--id', 'to-defer', '--spec', 'demo-spec', '--actor', 'w');
@@ -458,9 +458,9 @@ describe('the event log', () => {
     });
   });
 
-  it('records the audit pass itself as an event with no task', () => {
-    fixture(({ tasks, dir }) => {
-      tasks('audit', 'demo-spec', '--proof', '1=met', '--evidence', '1=clause 1 checked', '--proof', '2=met', '--evidence', '2=clause 2 checked', '--actor', 'auditor');
+  it('records the audit pass itself as an event with no task', async () => {
+    await fixture(async ({ dir, audit }) => {
+      await audit('demo-spec', '--proof', '1=met', '--evidence', '1=clause 1 checked', '--proof', '2=met', '--evidence', '2=clause 2 checked', '--actor', 'auditor');
       const passes = readEvents(dir).filter((event) => event.op === 'audit');
       expect(passes).toHaveLength(1);
       expect(passes[0].id).toBeNull();
@@ -469,9 +469,9 @@ describe('the event log', () => {
     });
   });
 
-  it('records an undelivered task beside the pass that created it', () => {
-    fixture(({ tasks, dir }) => {
-      tasks('audit', 'demo-spec', '--proof', '1=unmet', '--evidence', '1=not yet', '--proof', '2=met', '--evidence', '2=clause 2 checked');
+  it('records an undelivered task beside the pass that created it', async () => {
+    await fixture(async ({ dir, audit }) => {
+      await audit('demo-spec', '--proof', '1=unmet', '--evidence', '1=not yet', '--proof', '2=met', '--evidence', '2=clause 2 checked');
       const events = readEvents(dir).filter((event) => event.op === 'audit');
       expect(events.map((event) => event.id)).toEqual([null, 'demo-spec-clause-1']);
     });

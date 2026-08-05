@@ -4,6 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { tsxCli } from '../lib/tsxCli';
 import { run as runTasks } from '../tasks';
+import { installPrompter, linePrompter } from './prompt';
 
 export const repoRoot = path.join(import.meta.dirname, '../..');
 export const today = new Date().toISOString().slice(0, 10);
@@ -15,7 +16,13 @@ export interface Run {
   stderr: string;
 }
 
-export function runInProcess(args: string[]): Run {
+interface CapturedConsole {
+  stdout: string[];
+  stderr: string[];
+  restore: () => void;
+}
+
+function captureConsole(): CapturedConsole {
   const stdout: string[] = [];
   const stderr: string[] = [];
   const originalLog = console.log;
@@ -23,25 +30,70 @@ export function runInProcess(args: string[]): Run {
   const originalError = console.error;
   const previousExitCode = process.exitCode;
   process.exitCode = undefined;
+  console.log = (...values: unknown[]) => {
+    stdout.push(`${values.map(String).join(' ')}\n`);
+  };
+  console.warn = (...values: unknown[]) => {
+    stderr.push(`${values.map(String).join(' ')}\n`);
+  };
+  console.error = (...values: unknown[]) => {
+    stderr.push(`${values.map(String).join(' ')}\n`);
+  };
+  return {
+    stdout,
+    stderr,
+    restore: () => {
+      console.log = originalLog;
+      console.warn = originalWarn;
+      console.error = originalError;
+      process.exitCode = previousExitCode;
+    },
+  };
+}
+
+const statusNow = (): number => (process.exitCode === undefined ? 0 : Number(process.exitCode));
+
+export function runInProcess(args: string[]): Run {
+  const captured = captureConsole();
   try {
-    console.log = (...values: unknown[]) => {
-      stdout.push(`${values.map(String).join(' ')}\n`);
-    };
-    console.warn = (...values: unknown[]) => {
-      stderr.push(`${values.map(String).join(' ')}\n`);
-    };
-    console.error = (...values: unknown[]) => {
-      stderr.push(`${values.map(String).join(' ')}\n`);
-    };
     const result = runTasks(args);
-    if (result instanceof Promise) throw new Error(`async command must run through the subprocess fixture: ${args[0] ?? '(none)'}`);
-    const status = process.exitCode === undefined ? 0 : Number(process.exitCode);
-    return { status, stdout: stdout.join(''), stderr: stderr.join('') };
+    if (result instanceof Promise) throw new Error(`async command must run through runInProcessAsync: ${args[0] ?? '(none)'}`);
+    return { status: statusNow(), stdout: captured.stdout.join(''), stderr: captured.stderr.join('') };
   } finally {
-    console.log = originalLog;
-    console.warn = originalWarn;
-    console.error = originalError;
-    process.exitCode = previousExitCode;
+    captured.restore();
+  }
+}
+
+// A final newline terminates the last line rather than opening an empty one,
+// which is how readline reads a pipe; an inner blank line is a real answer.
+const inputLines = (input: string): string[] => (input === '' ? [] : input.replace(/\n$/, '').split('\n'));
+
+// The interactive commands, run in-process: their stdin arrives as data
+// through the prompter seam, and their prompts land in the captured stdout
+// the way a pipe's would.
+export async function runInProcessAsync(args: string[], input = ''): Promise<Run> {
+  const captured = captureConsole();
+  installPrompter(() => linePrompter(inputLines(input), (prompt) => captured.stdout.push(prompt)));
+  try {
+    const result = runTasks(args);
+    if (result instanceof Promise) await result;
+    return { status: statusNow(), stdout: captured.stdout.join(''), stderr: captured.stderr.join('') };
+  } finally {
+    installPrompter(null);
+    captured.restore();
+  }
+}
+
+// In-process, from inside the fixture's own directory: the commands that ask
+// git about their surroundings read cwd, which spawning used to set. Tests
+// in a file run one at a time, so the swap cannot interleave.
+function runInProcessAt(dir: string, args: string[]): Run {
+  const cwd = process.cwd();
+  process.chdir(dir);
+  try {
+    return runInProcess(args);
+  } finally {
+    process.chdir(cwd);
   }
 }
 
@@ -70,8 +122,21 @@ export function appendEvent(dir: string, event: { branch: string; spec: string; 
   appendFileSync(path.join(dir, 'events.jsonl'), `${JSON.stringify(line)}\n`, 'utf8');
 }
 
-export function fixture(run: (context: { dir: string; args: (extra?: string[]) => string[]; tasks: (...args: string[]) => Run; triage: (input: string, extra?: string[]) => Run }) => void): void {
+export interface FixtureContext {
+  dir: string;
+  args: (extra?: string[]) => string[];
+  tasks: (...args: string[]) => Run;
+  audit: (...args: string[]) => Promise<Run>;
+  auditWith: (input: string, ...args: string[]) => Promise<Run>;
+  triage: (input: string, extra?: string[]) => Promise<Run>;
+}
+
+// An async run keeps the temp directory alive until it settles; a sync run
+// is cleaned up on return, exactly as before. A test handing in an async
+// callback must return fixture's promise so the runner waits on it.
+export function fixture(run: (context: FixtureContext) => void | Promise<void>): void | Promise<void> {
   const dir = mkdtempSync(path.join(os.tmpdir(), 'universalis-tasks-'));
+  const cleanup = (): void => rmSync(dir, { recursive: true, force: true });
   try {
     const specsDir = path.join(dir, 'specs');
     mkdirSync(specsDir);
@@ -97,22 +162,20 @@ export function fixture(run: (context: { dir: string; args: (extra?: string[]) =
       return term === -1 ? [...args, ...globals] : [...args.slice(0, term), ...globals, ...args.slice(term)];
     };
 
-    run({
+    const result = run({
       dir,
       args: (extra = []) => [...globals, ...extra],
-      tasks: (...args: string[]) => {
-        if (args[0] !== 'audit') return runInProcess(withGlobals(args));
-        const result = spawnSync(process.execPath, [tsxCli, script, ...withGlobals(args)], { cwd: repoRoot, encoding: 'utf8' });
-        return { status: result.status ?? 1, stdout: result.stdout, stderr: result.stderr };
-      },
-      triage: (input: string, extra: string[] = []) => {
-        const result = spawnSync(process.execPath, [tsxCli, script, 'triage', ...extra, ...globals], { cwd: repoRoot, encoding: 'utf8', input });
-        return { status: result.status ?? 1, stdout: result.stdout, stderr: result.stderr };
-      },
+      tasks: (...args: string[]) => runInProcess(withGlobals(args)),
+      audit: (...args: string[]) => runInProcessAsync(withGlobals(['audit', ...args])),
+      auditWith: (input: string, ...args: string[]) => runInProcessAsync(withGlobals(['audit', ...args]), input),
+      triage: (input: string, extra: string[] = []) => runInProcessAsync(['triage', ...extra, ...globals], input),
     });
-  } finally {
-    rmSync(dir, { recursive: true, force: true });
+    if (result instanceof Promise) return result.finally(cleanup);
+  } catch (error) {
+    cleanup();
+    throw error;
   }
+  cleanup();
 }
 
 // A dedicated git repo per test, distinct from `fixture`'s (which runs
@@ -146,10 +209,7 @@ export function gitFixture(run: (context: { dir: string; commit: (message: strin
         spawnSync('git', ['commit', '--no-verify', '-m', message], { cwd: dir, encoding: 'utf8' });
         return spawnSync('git', ['rev-parse', 'HEAD'], { cwd: dir, encoding: 'utf8' }).stdout.trim();
       },
-      tasks: (...args: string[]) => {
-        const result = spawnSync(process.execPath, [tsxCli, script, ...args, ...globals], { cwd: dir, encoding: 'utf8' });
-        return { status: result.status ?? 1, stdout: result.stdout, stderr: result.stderr };
-      },
+      tasks: (...args: string[]) => runInProcessAt(dir, [...args, ...globals]),
     });
   } finally {
     rmSync(dir, { recursive: true, force: true });
@@ -173,14 +233,19 @@ export function defaultStoreGitFixture(run: (context: { dir: string; tasks: (...
 
     run({
       dir,
-      tasks: (...args: string[]) => {
-        const result = spawnSync(process.execPath, [tsxCli, script, ...args, '--branch', 'demo-spec'], { cwd: dir, encoding: 'utf8' });
-        return { status: result.status ?? 1, stdout: result.stdout, stderr: result.stderr };
-      },
+      tasks: (...args: string[]) => runInProcessAt(dir, [...args, '--branch', 'demo-spec']),
     });
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+}
+
+// The real CLI entry, for the handful of tests that must observe a whole
+// process: per-process state like the warn-once flag, and the stdin pipe
+// itself. Everything else runs in-process and never pays for a spawn.
+export function spawnTasks(cwd: string, args: string[], input?: string): Run {
+  const result = spawnSync(process.execPath, [tsxCli, script, ...args], { cwd, encoding: 'utf8', input });
+  return { status: result.status ?? 1, stdout: result.stdout, stderr: result.stderr };
 }
 
 // Only the lines under `Relevant files:`. The same paths print again under

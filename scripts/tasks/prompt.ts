@@ -27,3 +27,35 @@ export function stdinPrompter(): Prompter {
     close: () => rl.close(),
   };
 }
+
+// The same contract over lines handed in as data. What an in-process test
+// run installs, so the interactive commands never touch the real stdin —
+// exhaustion means the list ran out, exactly as EOF does on a pipe.
+export function linePrompter(lines: readonly string[], echo: (prompt: string) => void = (prompt) => process.stdout.write(prompt)): Prompter {
+  let at = 0;
+  let exhausted = false;
+  return {
+    ask: async (prompt: string): Promise<string> => {
+      echo(prompt);
+      if (at >= lines.length) {
+        exhausted = true;
+        return '';
+      }
+      return lines[at++];
+    },
+    exhausted: () => exhausted,
+    close: () => {},
+  };
+}
+
+// The one place stdin enters the CLI. The interactive commands ask for
+// their prompter here, so installing a replacement is the whole seam.
+let installed: (() => Prompter) | null = null;
+
+export function installPrompter(make: (() => Prompter) | null): void {
+  installed = make;
+}
+
+export function activePrompter(): Prompter {
+  return installed === null ? stdinPrompter() : installed();
+}

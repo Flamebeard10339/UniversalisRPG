@@ -7,7 +7,7 @@ import { appendAuditPass, clauseStandings, duplicateClauseIds, outstandingSummar
 import { loadStore, type Severity, type Task } from '../lib/taskStore';
 import type { Flags } from './cli';
 import { readStore, recordEvents, refuseUnknownSpec, reportUnknownSpec, resolveConfig, saveStoreAndWarn, slugify, specFile, subjectOf, today, uniqueId } from './context';
-import { stdinPrompter } from './prompt';
+import { activePrompter } from './prompt';
 import { printRow, truncateLine } from './render';
 
 // The migration path only, for the legacy documents under docs/audits/ and
@@ -418,7 +418,7 @@ export const AUDIT_USAGE =
 // looping on an exhausted stdin, and the caller grades the rest `unknown` —
 // a half-finished walk graded nothing, which is exactly what unknown says.
 async function walkClausesInteractively(clauses: ProofClause[]): Promise<AuditVerdict[]> {
-  const prompter = stdinPrompter();
+  const prompter = activePrompter();
   const verdicts: AuditVerdict[] = [];
   for (const clause of clauses) {
     console.log(`\nclause ${clause.id}: ${clause.text}`);

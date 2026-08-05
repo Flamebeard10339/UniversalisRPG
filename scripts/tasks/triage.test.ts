@@ -6,13 +6,13 @@ import { tsxCli } from '../lib/tsxCli';
 import { fixture, repoRoot, script } from './cliFixtures';
 
 describe('tasks CLI', () => {
-  it('triage promotes, defers and declines findings, saving after every decision', () => {
-    fixture(({ tasks, triage }) => {
+  it('triage promotes, defers and declines findings, saving after every decision', async () => {
+    await fixture(async ({ tasks, triage }) => {
       tasks('add', 'promote me', '--id', 'promote-me', '--kind', 'finding', '--severity', 'high', '--system', 'Runtime', '--evidence', 'evidence text', '--deliverable', 'fix it');
       tasks('add', 'defer me', '--id', 'defer-me', '--kind', 'finding', '--severity', 'medium', '--deliverable', 'fix it');
       tasks('add', 'decline me', '--id', 'decline-me', '--kind', 'finding', '--severity', 'low', '--deliverable', 'fix it');
 
-      const result = triage('1\n2\n3\nstale, superseded by later work\n');
+      const result = await triage('1\n2\n3\nstale, superseded by later work\n');
       expect(result.status).toBe(0);
       expect(result.stdout).toContain('0 unreviewed finding(s) left');
 
@@ -23,8 +23,8 @@ describe('tasks CLI', () => {
     });
   });
 
-  it('triage displays evidence and deliverable labelled, saying so explicitly when there is no proposed fix', () => {
-    fixture(({ dir, triage }) => {
+  it('triage displays evidence and deliverable labelled, saying so explicitly when there is no proposed fix', async () => {
+    await fixture(async ({ dir, triage }) => {
       // A finding with no deliverable can no longer be created via `add`
       // (the store predates that rule — 58 open tasks do exactly this, and
       // triage still has to display them), so this one is written directly.
@@ -34,7 +34,7 @@ describe('tasks CLI', () => {
         `${JSON.stringify({ id: 'no-fix-yet', title: 'no fix yet', kind: 'finding', state: 'unreviewed', severity: 'high', system: null, spec: null, requires: [], files: [], deliverable: null, evidence: 'it breaks like this', source: null, reason: null, closed: null })}\n`,
         'utf8',
       );
-      const result = triage('s\n');
+      const result = await triage('s\n');
       expect(result.stdout).toContain('evidence — what is broken:');
       expect(result.stdout).toContain('it breaks like this');
       expect(result.stdout).toContain('deliverable — the proposed fix:');
@@ -42,20 +42,20 @@ describe('tasks CLI', () => {
     });
   });
 
-  it('triage shows a recorded deliverable next to its evidence', () => {
-    fixture(({ tasks, triage }) => {
+  it('triage shows a recorded deliverable next to its evidence', async () => {
+    await fixture(async ({ tasks, triage }) => {
       tasks('add', 'has a fix', '--id', 'has-a-fix', '--kind', 'finding', '--severity', 'high', '--evidence', 'broken thing', '--deliverable', 'the proposed repair');
-      const result = triage('s\n');
+      const result = await triage('s\n');
       expect(result.stdout).toContain('the proposed repair');
       expect(result.stdout).not.toContain('no proposed fix recorded');
     });
   });
 
-  it('printEvidence wraps long text onto multiple indented lines, instead of one unbroken line, for both evidence and deliverable', () => {
-    fixture(({ tasks, triage }) => {
+  it('printEvidence wraps long text onto multiple indented lines, instead of one unbroken line, for both evidence and deliverable', async () => {
+    await fixture(async ({ tasks, triage }) => {
       const longText = "loadSave gives activeAction, player and activeBuffs no check past isObject, so a body whose ids are all real but whose cadences is absent crashes the validator that exists to prevent it.";
       tasks('add', 'checkSave crashes', '--id', 'checksave-crashes', '--kind', 'finding', '--severity', 'high', '--evidence', longText, '--deliverable', longText);
-      const result = triage('s\n');
+      const result = await triage('s\n');
       expect(result.stdout).not.toContain(longText);
 
       const indented = result.stdout.split('\n').filter((line) => line.startsWith('          ') && line.trim().length > 0);
@@ -64,10 +64,10 @@ describe('tasks CLI', () => {
     });
   });
 
-  it('triage redirect replaces the deliverable, saves it, then re-asks for a decision on the same task', () => {
-    fixture(({ tasks, triage }) => {
+  it('triage redirect replaces the deliverable, saves it, then re-asks for a decision on the same task', async () => {
+    await fixture(async ({ tasks, triage }) => {
       tasks('add', 'wrong fix', '--id', 'wrong-fix', '--kind', 'finding', '--severity', 'high', '--deliverable', 'the wrong fix');
-      const result = triage('4\nthe right fix\n1\n');
+      const result = await triage('4\nthe right fix\n1\n');
       expect(result.status).toBe(0);
       expect(result.stdout).toContain('0 unreviewed finding(s) left');
       const shown = tasks('show', 'wrong-fix').stdout;
@@ -76,31 +76,31 @@ describe('tasks CLI', () => {
     });
   });
 
-  it('triage redirect is cancelled by an empty response, leaving the deliverable and the queue unchanged', () => {
-    fixture(({ tasks, triage }) => {
+  it('triage redirect is cancelled by an empty response, leaving the deliverable and the queue unchanged', async () => {
+    await fixture(async ({ tasks, triage }) => {
       tasks('add', 'wrong fix', '--id', 'wrong-fix', '--kind', 'finding', '--severity', 'high', '--deliverable', 'original fix');
-      const result = triage('4\n\ns\n');
+      const result = await triage('4\n\ns\n');
       expect(result.stdout).toContain('empty — redirect cancelled');
       expect(result.stdout).toContain('1 unreviewed finding(s) left');
       expect(tasks('show', 'wrong-fix').stdout).toContain('deliverable: original fix');
     });
   });
 
-  it('triage quits early and leaves the rest unreviewed', () => {
-    fixture(({ tasks, triage }) => {
+  it('triage quits early and leaves the rest unreviewed', async () => {
+    await fixture(async ({ tasks, triage }) => {
       tasks('add', 'first', '--id', 'first', '--kind', 'finding', '--severity', 'high', '--deliverable', 'fix it');
       tasks('add', 'second', '--id', 'second', '--kind', 'finding', '--severity', 'low', '--deliverable', 'fix it');
 
-      const result = triage('q\n');
+      const result = await triage('q\n');
       expect(result.stdout).toContain('2 unreviewed finding(s) left');
       expect(tasks('show', 'first').stdout).toContain('unreviewed');
     });
   });
 
-  it('triage [a] records a question on the finding and leaves it unreviewed', () => {
-    fixture(({ tasks, triage }) => {
+  it('triage [a] records a question on the finding and leaves it unreviewed', async () => {
+    await fixture(async ({ tasks, triage }) => {
       tasks('add', 'needs context', '--id', 'needs-context', '--kind', 'finding', '--severity', 'high', '--evidence', 'the original evidence', '--deliverable', 'fix it');
-      const result = triage('a\nwhich universe was this measured against?\n');
+      const result = await triage('a\nwhich universe was this measured against?\n');
       expect(result.status).toBe(0);
       expect(result.stdout).toContain('it stays unreviewed until the question is answered');
       expect(result.stdout).toContain('1 unreviewed finding(s) left');
@@ -111,10 +111,10 @@ describe('tasks CLI', () => {
     });
   });
 
-  it('triage [a] with an empty question asks nothing and re-offers the same finding', () => {
-    fixture(({ tasks, triage }) => {
+  it('triage [a] with an empty question asks nothing and re-offers the same finding', async () => {
+    await fixture(async ({ tasks, triage }) => {
       tasks('add', 'needs context', '--id', 'needs-context', '--kind', 'finding', '--severity', 'high', '--evidence', 'original', '--deliverable', 'fix it');
-      const result = triage('a\n\ns\n');
+      const result = await triage('a\n\ns\n');
       expect(result.stdout).toContain('empty — nothing asked');
       expect(tasks('show', 'needs-context').stdout).not.toContain('triage asked');
     });
@@ -135,11 +135,11 @@ describe('tasks CLI', () => {
     });
   });
 
-  it('triage promotes a finding sourced from an audit pass 2 or later, saying that it extends the spec', () => {
-    fixture(({ tasks, triage }) => {
-      tasks('audit', 'demo-spec', '--proof', '1=met', '--evidence', '1=clause 1 checked', '--proof', '2=met', '--evidence', '2=clause 2 checked');
-      tasks('audit', 'demo-spec', '--proof', '1=met', '--evidence', '1=clause 1 checked', '--proof', '2=met', '--evidence', '2=clause 2 checked', '--finding', 'late finding', '--severity', 'low', '--deliverable', 'fix it', '--evidence', 'seen late');
-      const result = triage('1\n');
+  it('triage promotes a finding sourced from an audit pass 2 or later, saying that it extends the spec', async () => {
+    await fixture(async ({ tasks, audit, triage }) => {
+      await audit('demo-spec', '--proof', '1=met', '--evidence', '1=clause 1 checked', '--proof', '2=met', '--evidence', '2=clause 2 checked');
+      await audit('demo-spec', '--proof', '1=met', '--evidence', '1=clause 1 checked', '--proof', '2=met', '--evidence', '2=clause 2 checked', '--finding', 'late finding', '--severity', 'low', '--deliverable', 'fix it', '--evidence', 'seen late');
+      const result = await triage('1\n');
       expect(result.stdout).toContain('promoting a pass 2 finding, which extends what demo-spec owes');
       const shown = tasks('show', 'demo-spec-pass2-late-finding');
       expect(shown.stdout).toContain('spec: demo-spec');

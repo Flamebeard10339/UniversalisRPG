@@ -1132,9 +1132,9 @@ describe('a close that says back what it knows', () => {
     }));
 
   it('names it from triage too, which is the third place a disposition is decided', () =>
-    fixture(({ tasks, triage }) => {
+    fixture(async ({ tasks, triage }) => {
       tasks('add', 'a finding', '--id', 'a-finding', '--kind', 'finding', '--severity', 'high', '--deliverable', 'fix it', '--evidence', 'seen');
-      expect(triage('1\n').stdout).toContain('tasks decision "<one line>" --id a-finding');
+      expect((await triage('1\n')).stdout).toContain('tasks decision "<one line>" --id a-finding');
     }));
 });
 
@@ -1143,15 +1143,15 @@ describe('a close that says back what it knows', () => {
 // judgement is made.
 describe('what already worked, after the record verbs changed around it', () => {
   it('still prints the clause standing a done closed against', () =>
-    fixture(({ tasks }) => {
-      tasks('audit', 'demo-spec', '--proof', '1=unmet', '--evidence', '1=the seam is still open', '--proof', '2=met', '--evidence', '2=clause 2 checked');
+    fixture(async ({ tasks, audit }) => {
+      await audit('demo-spec', '--proof', '1=unmet', '--evidence', '1=the seam is still open', '--proof', '2=met', '--evidence', '2=clause 2 checked');
       expect(tasks('done', 'demo-spec-clause-1').stdout).toContain('clause standing at close: proof clause 1 is unmet in the latest audit pass (pass 1)');
     }));
 
   it('still names a pass-2 promotion as extending what the spec owes', () =>
-    fixture(({ tasks }) => {
-      tasks('audit', 'demo-spec', '--proof', '1=met', '--evidence', '1=clause 1 checked', '--proof', '2=met', '--evidence', '2=clause 2 checked');
-      tasks('audit', 'demo-spec', '--proof', '1=met', '--evidence', '1=clause 1 checked', '--proof', '2=met', '--evidence', '2=clause 2 checked', '--finding', 'late finding', '--severity', 'low', '--deliverable', 'fix it', '--evidence', 'seen late');
+    fixture(async ({ tasks, audit }) => {
+      await audit('demo-spec', '--proof', '1=met', '--evidence', '1=clause 1 checked', '--proof', '2=met', '--evidence', '2=clause 2 checked');
+      await audit('demo-spec', '--proof', '1=met', '--evidence', '1=clause 1 checked', '--proof', '2=met', '--evidence', '2=clause 2 checked', '--finding', 'late finding', '--severity', 'low', '--deliverable', 'fix it', '--evidence', 'seen late');
       const result = tasks('promote', 'demo-spec-pass2-late-finding');
       expect(result.stdout).toContain('promoting a pass 2 finding, which extends what demo-spec owes: demo-spec-pass2-late-finding');
     }));
