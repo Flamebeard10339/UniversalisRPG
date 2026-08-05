@@ -79,17 +79,24 @@ Proof:
 
 ## Decisions
 
-- **The control is a cell where stopping is wrong, not a simpler case.** A second easy positive
-  measures nothing: a brief that answers "serious prior decisions have been made" to every prompt
-  passes every adverse cell and is worse than no brief, because it launders a refusal to survey as
-  diligence. Only a prompt whose correct outcome is *proceed* can tell a planner that surveys from
-  one that has learned to stall. The width prompt is therefore recorded as a **second adverse cell**
-  (c5), not as the control — its subject was ruled on twice, once by a done task establishing the
-  opposite principle and once by a finding declined "if it becomes a problem we can return to it".
-- **Two control cells, because "found nothing" and "found something harmless" fail differently.**
+- **A cell where stopping is wrong is what makes the measurement mean anything.** A brief that
+  answers "serious prior decisions have been made" to every prompt passes every stop-cell written
+  for it, and is worse than no brief, because it launders a refusal to survey as diligence. Only a
+  prompt whose correct outcome is *proceed* separates a planner that surveys from one that has
+  learned to stall.
+- **The first run replaced the axis this reasoning was built on, and c5 now records the axis rather
+  than the guess.** The design was two adverse cells and two controls, graded stop-versus-proceed.
+  The width prompt was filed as a second adverse cell on the strength of a done task establishing
+  that columns pad but never trim. Both were wrong. Widening a width does not trim anything, so that
+  principle was never adverse; and the finding declined "if it becomes a problem we can return to
+  it" had its condition met the moment a human said it was a problem. The agent proceeded, correctly,
+  against a cell that had been specified for it to stop. What the run showed is that the readable
+  fact is the **trigger state**, not the existence of a ruling — which is why c5 is four record
+  states and not a 2x2, and why c4 turns out to be load-bearing for c5 rather than incidental to it.
+- **Two proceed-cells, because "found nothing" and "found something harmless" fail differently.**
   An empty record tests whether the planner can say so and move; prior art with no ruling tests
-  whether it can tell a claim from a ruling — which is the exact discrimination c1 introduces, and
-  the one most likely to collapse into stopping on everything. Verified 2026-08-05:
+  whether it can tell a claim from a ruling — the exact discrimination c1 introduces, and the one
+  most likely to collapse into stopping on everything. Verified 2026-08-05:
   `tasks log "offline"` returns one edit and no ruling, `tasks log "encounter"` returns nothing.
 - **Extends the 2026-08-04 prior-art ruling rather than restating it.** That decision already
   established that prior art is found by path and not by name, and that it must include done and
