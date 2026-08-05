@@ -11,6 +11,7 @@ export interface Mutation {
   find: string;
   replace: string;
   tests?: string[];
+  test?: string;
   all?: boolean;
   note?: string;
 }
@@ -24,6 +25,10 @@ export interface FileStore {
 
 export interface TestRun {
   failed: number;
+  // Counted separately from total, which includes skips: a `-t` name that
+  // matches nothing skips everything, and failed + passed is the only number
+  // that says whether any test actually ran.
+  passed: number;
   total: number;
   // Files that failed as files. A file that could not be collected reports here
   // and not in `failed`, so a mutation that does not build looks like a clean
@@ -32,18 +37,19 @@ export interface TestRun {
   raw: string;
 }
 
-export type RunTests = (tests: readonly string[] | undefined) => TestRun;
+export type RunTests = (tests: readonly string[] | undefined, test?: string) => TestRun;
 
 export interface Baseline {
   failed: number;
   total: number;
+  ran: number;
 }
 
 // Looked up rather than handed over as a map, so a scope nobody reaches is never
 // measured — including the whole suite, which only an escalation needs. Every
 // call must happen while the tree is unmutated; runMutations is what guarantees
 // that, by asking before it writes.
-export type BaselineFor = (tests: readonly string[] | undefined) => Baseline | undefined;
+export type BaselineFor = (tests: readonly string[] | undefined, test?: string) => Baseline | undefined;
 
 export type Verdict = 'KILLED' | 'SURVIVED' | 'ERROR';
 
@@ -68,7 +74,7 @@ export interface MutationReport {
   ok: boolean;
 }
 
-const FIELDS = new Set(['name', 'file', 'find', 'replace', 'tests', 'all', 'note']);
+const FIELDS = new Set(['name', 'file', 'find', 'replace', 'tests', 'test', 'all', 'note']);
 
 export function parseManifest(text: string): Mutation[] {
   let parsed: unknown;
@@ -96,6 +102,8 @@ export function parseManifest(text: string): Mutation[] {
     if (entry.tests !== undefined && (!Array.isArray(entry.tests) || entry.tests.length === 0 || entry.tests.some((each) => typeof each !== 'string'))) {
       throw new Error(`${at}: tests must be a non-empty list of strings, or absent to measure against the whole suite`);
     }
+    if (entry.test !== undefined && (typeof entry.test !== 'string' || entry.test === '')) throw new Error(`${at}: test must be the name of one test, as a non-empty string`);
+    if (entry.test !== undefined && entry.tests === undefined) throw new Error(`${at}: test names a test by name, so tests must name the file it lives in`);
     if (entry.all !== undefined && typeof entry.all !== 'boolean') throw new Error(`${at}: all must be true or false`);
     if (entry.note !== undefined && typeof entry.note !== 'string') throw new Error(`${at}: note must be a string`);
     return { ...(entry as unknown as Mutation) };
@@ -104,16 +112,16 @@ export function parseManifest(text: string): Mutation[] {
 
 // The whole tally, not the exit code: a run that exits non-zero because it
 // collected nothing has not killed anything.
-export function parseVitestTally(output: string): { failed: number; total: number; filesFailed: number } | null {
+export function parseVitestTally(output: string): { failed: number; passed: number; total: number; filesFailed: number } | null {
   const files = [...output.matchAll(/^[ \t]*Test Files[ \t]+(.+)$/gm)];
   const filesFailed = files.length === 0 ? 0 : Number(/(\d+) failed/.exec(files[files.length - 1][1])?.[1] ?? 0);
   const matches = [...output.matchAll(/^[ \t]*Tests[ \t]+(.+)$/gm)];
   if (matches.length === 0) return null;
   const summary = matches[matches.length - 1][1];
-  if (/no tests/i.test(summary)) return { failed: 0, total: 0, filesFailed };
+  if (/no tests/i.test(summary)) return { failed: 0, passed: 0, total: 0, filesFailed };
   const total = /\((\d+)\)/.exec(summary);
   if (total === null) return null;
-  return { failed: Number(/(\d+) failed/.exec(summary)?.[1] ?? 0), total: Number(total[1]), filesFailed };
+  return { failed: Number(/(\d+) failed/.exec(summary)?.[1] ?? 0), passed: Number(/(\d+) passed/.exec(summary)?.[1] ?? 0), total: Number(total[1]), filesFailed };
 }
 
 // Which stream the tally is read from is a decision, so it is data here rather
@@ -136,7 +144,10 @@ export function escapesRoot(root: string, file: string): boolean {
   return relative === '' || relative.startsWith('..') || path.isAbsolute(relative);
 }
 
-export const scopeOf = (mutation: Pick<Mutation, 'tests'>): string => (mutation.tests && mutation.tests.length > 0 ? mutation.tests.join(', ') : 'whole suite');
+export const scopeOf = (mutation: Pick<Mutation, 'tests' | 'test'>): string => {
+  const files = mutation.tests && mutation.tests.length > 0 ? mutation.tests.join(', ') : 'whole suite';
+  return mutation.test === undefined ? files : `${files} "${mutation.test}"`;
+};
 
 const occurrences = (text: string, find: string): number => text.split(find).length - 1;
 
@@ -243,9 +254,37 @@ function verdictOf(mutation: Mutation, scope: string, run: TestRun, baseline: Ba
 
 const WHOLE_SUITE: readonly string[] | undefined = undefined;
 
+// The scopes a survivor still has to face, in the order it faces them: a named
+// test widens to the file it lives in, a file to the whole suite.
+const ladderAbove = (mutation: Mutation): Pick<Mutation, 'tests' | 'test'>[] => {
+  const rungs: Pick<Mutation, 'tests' | 'test'>[] = [];
+  if (mutation.test !== undefined) rungs.push({ tests: mutation.tests });
+  if (mutation.tests !== undefined && mutation.tests.length > 0) rungs.push({ tests: WHOLE_SUITE });
+  return rungs;
+};
+
 export function runMutations(mutations: readonly Mutation[], files: FileStore, runTests: RunTests, baselineFor?: BaselineFor): MutationReport {
   const originals = new Map<string, string>();
   const refusals = refusalsFor(mutations, files, originals);
+  if (refusals.length > 0) return { results: [], refusals, unrestored: [], ok: false };
+
+  // Memoized here as well as by the caller, so however many mutations share a
+  // scope or escalate into one, the run asks for its baseline once — and never
+  // asks for a scope nothing reaches.
+  const baselines = new Map<string, Baseline | undefined>();
+  const baselineAt = (scope: Pick<Mutation, 'tests' | 'test'>): Baseline | undefined => {
+    const key = scopeOf(scope);
+    if (!baselines.has(key)) baselines.set(key, baselineFor?.(scope.tests, scope.test));
+    return baselines.get(key);
+  };
+
+  // A named test its own scope never ran is a typo, not a measurement: the run
+  // would skip everything and call the mutation SURVIVED.
+  for (const mutation of mutations) {
+    if (mutation.test === undefined) continue;
+    const baseline = baselineAt(mutation);
+    if (baseline !== undefined && baseline.ran === 0) refusals.push(`${mutation.name}: no test named "${mutation.test}" ran in ${scopeOf({ tests: mutation.tests })} — the name must match a test that exists there`);
+  }
   if (refusals.length > 0) return { results: [], refusals, unrestored: [], ok: false };
 
   const touched = new Set<string>();
@@ -272,21 +311,23 @@ export function runMutations(mutations: readonly Mutation[], files: FileStore, r
   };
 
   const results = mutations.map((mutation) => {
-    const baseline = baselineFor?.(mutation.tests);
-    return around(mutation, scopeOf(mutation), () => verdictOf(mutation, scopeOf(mutation), runTests(mutation.tests), baseline));
+    const baseline = baselineAt(mutation);
+    return around(mutation, scopeOf(mutation), () => verdictOf(mutation, scopeOf(mutation), runTests(mutation.tests, mutation.test), baseline));
   });
 
-  // Escalation is a second phase rather than a nested run, so the whole-suite
+  // Escalation is a second phase rather than a nested run, so every wider
   // baseline is taken on a clean tree too — and only when something survived a
-  // narrow scope, which is what keeps a narrow scope cheap.
-  const escalating = results.map((_, index) => index).filter((index) => results[index].verdict === 'SURVIVED' && (mutations[index].tests?.length ?? 0) > 0);
-  if (escalating.length > 0) {
-    const wide = baselineFor?.(WHOLE_SUITE);
-    for (const index of escalating) {
+  // narrower rung, which is what keeps a narrow scope cheap. A verdict keeps
+  // every scope it climbed through.
+  for (let index = 0; index < results.length; index++) {
+    for (const rung of ladderAbove(mutations[index])) {
+      if (results[index].verdict !== 'SURVIVED') break;
       const mutation = mutations[index];
-      const escalatedFrom = results[index].scope;
-      const whole = scopeOf({ tests: undefined });
-      results[index] = { ...around(mutation, whole, () => verdictOf(mutation, whole, runTests(WHOLE_SUITE), wide)), escalatedFrom };
+      const baseline = baselineAt(rung);
+      const scope = scopeOf(rung);
+      const from = results[index];
+      const escalatedFrom = from.escalatedFrom === undefined ? from.scope : `${from.escalatedFrom} -> ${from.scope}`;
+      results[index] = { ...around(mutation, scope, () => verdictOf(mutation, scope, runTests(rung.tests, rung.test), baseline)), escalatedFrom };
     }
   }
 
@@ -345,12 +386,14 @@ const usage = [
   '',
   'A manifest is a list of:',
   '  { "name": "c6", "file": "src/x.ts", "find": "<exact text>", "replace": "<text>",',
-  '    "tests": ["src/x.test.ts"], "all": false, "note": "what this breaks" }',
+  '    "tests": ["src/x.test.ts"], "test": "<one test\'s name>", "all": false,',
+  '    "note": "what this breaks" }',
   '',
-  'tests is optional. Name a narrow scope: a mutation that dies there is settled,',
-  'and one that survives is re-run against the whole suite automatically, so only',
-  'the survivors pay for it. A SURVIVED verdict always names the widest scope it',
-  'was measured against.',
+  'tests is optional, and test narrows further to one named test inside it. Name',
+  'the narrowest scope you can: a mutation that dies there is settled, and one',
+  'that survives climbs automatically — a named test to its file, a file to the',
+  'whole suite — so only the survivors pay for the wider runs. A SURVIVED verdict',
+  'always names the widest scope it was measured against.',
   '',
   'The mutated file is wrong on disk for as long as its tests take to run. Nothing',
   'else should be reading the tree during a run. If a run is killed outright, the',
@@ -573,8 +616,11 @@ function main(): void {
   process.on('SIGINT', () => process.exit(130));
   process.on('SIGTERM', () => process.exit(143));
 
-  const runTests: RunTests = (tests) => {
-    const result = spawnSync(process.execPath, [vitest.cli, 'run', '--configLoader', 'runner', ...(tests ?? [])], { cwd: repoRoot, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+  // -t takes a regex and the manifest names text, so the name's own characters
+  // are escaped rather than read as a pattern.
+  const runTests: RunTests = (tests, test) => {
+    const name = test === undefined ? [] : ['-t', test.replace(/[$()*+.?[\\\]^{|}]/g, '\\$&')];
+    const result = spawnSync(process.execPath, [vitest.cli, 'run', '--configLoader', 'runner', ...(tests ?? []), ...name], { cwd: repoRoot, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
     if (result.error) throw new Error(`the test command did not run: ${result.error.message}`);
     return tallyOf({ stdout: result.stdout ?? '', stderr: result.stderr ?? '' });
   };
@@ -592,13 +638,13 @@ function main(): void {
   // actually reaches. An escalation is what asks for the whole suite, and most
   // runs never need it.
   const measured = new Map<string, Baseline | undefined>();
-  const baselineFor: BaselineFor = (tests) => {
-    const key = scopeOf({ tests: tests === undefined ? undefined : [...tests] });
+  const baselineFor: BaselineFor = (tests, test) => {
+    const key = scopeOf({ tests: tests === undefined ? undefined : [...tests], test });
     if (!measured.has(key)) {
       console.error(`measuring the unmutated baseline for ${key}...`);
       try {
-        const run = runTests(tests);
-        measured.set(key, { failed: run.failed, total: run.total });
+        const run = runTests(tests, test);
+        measured.set(key, { failed: run.failed, total: run.total, ran: run.failed + run.passed });
       } catch (error) {
         console.error(`  no baseline for ${key} — ${outputTail((error as Error).message, 1)}`);
         measured.set(key, undefined);
