@@ -1,10 +1,10 @@
 import { spawnSync } from 'node:child_process';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { tsxCli } from '../lib/tsxCli';
 import { parseManifest, refusalsFor } from '../mutate';
-import { auditArgsSkeleton, candidateNote, indexSuiteTitles, manifestNotes, mutationManifest, nextAfterPass, UNRETARGETED, parseAuditArgs, parseAuditFile, parseCommitLog, slugStanding, slugStandingLines, toolLines, unresolvedTarget, type SlugStanding, type TargetResolution } from './audit';
+import { auditArgsSkeleton, indexSuiteTitles, manifestNotes, mutationManifest, nextAfterPass, UNAIMED_FILE, UNRETARGETED, parseAuditArgs, parseAuditFile, parseCommitLog, slugStanding, slugStandingLines, toolLines, unresolvedTarget, type SlugStanding, type TargetResolution } from './audit';
 import { appendEvent, firstListedId, fixture, gitFixture, relevantFilesBlock, repoRoot, script, stepsBlock, type Run } from './cliFixtures';
 
 describe('tasks CLI', () => {
@@ -980,12 +980,6 @@ describe('a proof target that names no test', () => {
 describe('the brief arriving with the answers rather than the instructions', () => {
   const resolves = (name: string, file = 'scripts/tasks/audit.test.ts'): TargetResolution => ({ state: 'found', file, name });
 
-  const suggests = () => [
-    { file: 'scripts/tasks/audit.ts', find: 'const answered = derive(brief);' },
-    { file: 'scripts/tasks/audit.ts', find: 'const second = alsoDerived(brief);' },
-    { file: 'scripts/lib/specDoc.ts', find: 'const parsed = section(text);' },
-  ];
-
   it('a manifest entry runs the test its clause names, in the file that test lives in', () => {
     const { entries } = mutationManifest(
       [
@@ -993,19 +987,30 @@ describe('the brief arriving with the answers rather than the instructions', () 
         { id: 2, targets: ['vitest scripts/tasks.test.ts "a test that moved"'] },
       ],
       (target) => (target.includes('moved') ? { state: 'moved', file: 'scripts/tasks.test.ts', name: 'a test that moved', foundIn: ['scripts/tasks/records.test.ts'] } : resolves('the first test')),
-      suggests,
     );
 
     expect(() => parseManifest(JSON.stringify(entries))).not.toThrow();
-    expect(entries[0]).toMatchObject({ name: 'c1 the first test', tests: ['scripts/tasks/audit.test.ts'], test: 'the first test', replace: '', find: UNRETARGETED });
+    expect(entries[0]).toMatchObject({ name: 'c1 the first test', tests: ['scripts/tasks/audit.test.ts'], test: 'the first test', replace: '' });
     // A moved target runs against the file it actually lives in, which is
     // the whole reason the wide search exists.
     expect(entries[1].tests).toEqual(['scripts/tasks/records.test.ts']);
-    // The candidates are offered, and every file the diff touched is among
-    // them: one file's lines are what aimed three of pass 3's clauses at
-    // specDoc.ts when their implementation was in audit.ts.
-    expect(entries[0].note).toContain('scripts/tasks/audit.ts: "const answered = derive(brief);"');
-    expect(entries[0].note).toContain('scripts/lib/specDoc.ts: "const parsed = section(text);"');
+  });
+
+  // Four passes, four orderings, four wrong guesses — and pass 4's came back
+  // KILLED at narrow scope with a clean scope column, off a test fixture
+  // helper, which is the one shape an auditor is told to accept as proof. The
+  // manifest carries no guess at which line a clause is about.
+  it('the manifest offers no guess at which line a clause is about', () => {
+    const { entries } = mutationManifest([{ id: 1, targets: ['vitest scripts/tasks/audit.test.ts "the first test"'] }], () => resolves('the first test'));
+
+    expect(entries[0].file).toBe(UNAIMED_FILE);
+    expect(entries[0].find).toBe(UNRETARGETED);
+    expect(Object.keys(entries[0])).not.toContain('note');
+    // Both sentinels are refused, and the unreadable file is refused first —
+    // so an entry aimed at a line but not at a file cannot run either.
+    const refusals = refusalsFor(entries, { read: (file) => { throw new Error(`ENOENT: ${file}`); }, write: () => undefined });
+    expect(refusals[0]).toContain('c1 the first test');
+    expect(refusals[0]).toContain(UNAIMED_FILE);
   });
 
   // Pass 1 read eight escalated kills as eight proofs; pass 2 measured nine
@@ -1013,9 +1018,12 @@ describe('the brief arriving with the answers rather than the instructions', () 
   // prove. A green run that proves nothing is the failure the caption alone
   // could not stop, so the artifact stops it instead.
   it('a manifest entry nobody has aimed is refused by mutate rather than run green', () => {
-    const { entries } = mutationManifest([{ id: 1, targets: ['vitest scripts/tasks/audit.test.ts "the first test"'] }], () => resolves('the first test'), suggests);
+    const { entries } = mutationManifest([{ id: 1, targets: ['vitest scripts/tasks/audit.test.ts "the first test"'] }], () => resolves('the first test'));
 
-    const refusals = refusalsFor(entries, {
+    // Aimed at a real file and still not at a line: the `find` sentinel is
+    // what refuses, so aiming half an entry cannot run either.
+    const halfAimed = [{ ...entries[0], file: 'scripts/tasks/audit.ts' }];
+    const refusals = refusalsFor(halfAimed, {
       read: () => 'const answered = derive(brief);\nconst second = alsoDerived(brief);\n',
       write: () => undefined,
     });
@@ -1025,14 +1033,13 @@ describe('the brief arriving with the answers rather than the instructions', () 
 
     // And the same entry, aimed, is accepted — so the refusal is the unaimed
     // field and not something else about the shape.
-    expect(refusalsFor([{ ...entries[0], find: 'const answered = derive(brief);' }], { read: () => 'const answered = derive(brief);\n', write: () => undefined })).toEqual([]);
+    expect(refusalsFor([{ ...halfAimed[0], find: 'const answered = derive(brief);' }], { read: () => 'const answered = derive(brief);\n', write: () => undefined })).toEqual([]);
   });
 
   it('an unresolved target is named as omitted rather than emitted into the manifest', () => {
     const { entries, omitted } = mutationManifest(
       [{ id: 1, targets: ['vitest a.test.ts "gone"', 'vitest scripts/tasks/audit.test.ts "here"'] }],
       (target) => (target.includes('gone') ? { state: 'nowhere', file: 'a.test.ts', name: 'gone' } : resolves('here')),
-      suggests,
     );
 
     // parseManifest refuses a manifest as a whole, so one entry the brief
@@ -1045,23 +1052,12 @@ describe('the brief arriving with the answers rather than the instructions', () 
   it('says which fields of the manifest are derived and which the auditor still owes', () => {
     const notes = manifestNotes(11, '/tmp/mutations-demo.json').join('\n');
     expect(notes).toContain('`name`, `tests` and `test` are derived');
-    // Three passes aimed an entry as instructed and got an escalated kill,
-    // because which line a clause is about is judgement and `file` was
-    // claimed to be already right. Both fields are the auditor's now, and
-    // the notes say so rather than offering an answer.
-    expect(notes).toContain('`file` and `find` are yours');
-    expect(notes).not.toContain('the rest of the entry is already right');
-    expect(notes).toContain('a starting point rather than an answer');
-  });
-
-  // `file` is a single field, so a line offered without the file it came from
-  // is a paste that cannot be completed — four of pass 3's twelve entries.
-  it('offers candidate lines grouped under the file each came from', () => {
-    expect(candidateNote([
-      { file: 'scripts/tasks/audit.ts', find: 'const answered = derive(brief);' },
-      { file: 'scripts/lib/specDoc.ts', find: 'const parsed = section(text);' },
-      { file: 'scripts/tasks/audit.ts', find: 'const second = alsoDerived(brief);' },
-    ])).toBe('scripts/tasks/audit.ts: "const answered = derive(brief);" | "const second = alsoDerived(brief);"; scripts/lib/specDoc.ts: "const parsed = section(text);"');
+    // Four passes aimed an entry as the tool suggested and four got a kill
+    // that was not the clause proving itself. The notes offer no suggestion
+    // to aim by, and say which judgement is the auditor's.
+    expect(notes).toContain('`file` and `find` are yours, and are the whole judgement');
+    expect(notes).not.toContain('candidate');
+    expect(notes).toContain('A kill by any other line is the suite noticing something, not this clause proving itself.');
   });
 
   // The guard used to read `startsWith('WARNING:')` over prose owned by
@@ -1225,11 +1221,45 @@ describe('the brief arriving with the answers rather than the instructions', () 
 
       const { stdout } = tasks('audit-prompt', 'demo-spec');
       const line = stdout.split('\n').find((candidate) => candidate.startsWith('To check the standing above'))!;
-      expect(line).toContain('a-fourth-spec');
-      // Two names answer the question; the list grows with the repository and
-      // was read as inventory.
-      expect(line.match(/spec/g)!.length).toBeLessThanOrEqual(4);
+      // Exactly the slugs between `one of: ` and the parenthesised fallback,
+      // counted. A `<= 4` over the word "spec" passed with the cap removed,
+      // which is the regression this test exists to catch admitting itself.
+      const named = /one of: (.+?) \(`ls/.exec(line)![1].split(', ');
+      expect(named).toHaveLength(2);
+      expect(named).not.toContain('another-spec');
       expect(line).toContain('for the rest');
+    });
+  });
+
+  // Both artifacts are the auditor's working copy the moment they touch one,
+  // and re-reading the brief mid-pass is ordinary. Overwriting threw away an
+  // aimed manifest and a part-filled pass file with nothing said.
+  it('keeps an artifact the auditor has already worked on rather than overwriting it', () => {
+    fixture(({ tasks }) => {
+      const first = tasks('audit-prompt', 'demo-spec');
+      const passPath = /\n {5}(\S*audit-demo-spec-pass1\.txt)\n/.exec(first.stdout)![1];
+      writeFileSync(passPath, '--proof 1=met\n--evidence 1=half a pass, typed by hand\n', 'utf8');
+
+      const second = tasks('audit-prompt', 'demo-spec');
+      expect(readFileSync(passPath, 'utf8')).toContain('half a pass, typed by hand');
+      expect(second.stdout).toContain('was left alone');
+      expect(second.stdout).toContain('Delete it to regenerate against the current diff');
+    });
+  });
+
+  // The manifest was gated on the standing and the pass file was not, so a
+  // brief that had just refused to offer a manifest still handed over the
+  // file for recording a pass — against a diff whose clauses it had just
+  // said these are not. That half writes tracked repo state.
+  it('offers no pass file either, in a brief that has just warned the diff is not this slugs', () => {
+    fixture(({ dir, tasks }) => {
+      writeFileSync(path.join(dir, 'specs', 'another-spec.md'), '# Another spec\n\n## Deliverable\n\nElsewhere.\n\nProof:\n\n- [c1] It holds.\n', 'utf8');
+
+      const { stdout } = tasks('audit-prompt', 'another-spec');
+      expect(stdout).toContain('WARNING: this branch is working demo-spec');
+      expect(stdout).toContain('7. Do not file a pass.');
+      expect(stdout).not.toContain('--args-from');
+      expect(existsSync(path.join(dir, 'tmp', 'audit-another-spec-pass1.txt'))).toBe(false);
     });
   });
 

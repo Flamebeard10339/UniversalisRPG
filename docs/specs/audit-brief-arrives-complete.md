@@ -42,18 +42,18 @@ Proof:
   proof: vitest scripts/tasks/audit.test.ts "a title that exists nowhere is reported differently from one that merely moved"
   proof: vitest scripts/tasks/audit.test.ts "a target naming a file absent from the checkout is reported as a missing file"
 
-- [c3] The brief emits a mutation manifest wired to the targets it resolved. `name`, `tests` and
-  `test` are derived, so each entry runs the test its clause names in the file that test actually
-  lives in. `file` and `find` are the auditor's — which line a clause is about is judgement, and
-  three passes measured what happens when this supplies it anyway — and `find` ships in a form
-  `mutate` already refuses, so an entry nobody has aimed stops the run instead of coming back green.
-  The lines this branch added are carried in `note` as candidates, grouped under the file each came
-  from, because `file` is a single field and a line offered without its file is a paste that cannot
-  be completed. A target that did not resolve is omitted and named as omitted, because
-  `parseManifest` refuses a manifest as a whole and one bad entry would cost the auditor the entire
-  run.
+- [c3] The brief emits a mutation manifest wired to the targets it resolved, and offers no guess at
+  what to break. `name`, `tests` and `test` are derived, so each entry runs the test its clause
+  names in the file that test actually lives in. `file` and `find` ship as sentinels `mutate`
+  refuses — the file cannot be read and the text is in no file — so an entry nobody has aimed stops
+  the run by name before a baseline runs. Which line a clause is about is the auditor's judgement
+  and the manifest carries no candidate for it: four passes each aimed an entry as the tool
+  suggested, and pass 4's suggestion produced KILLED at narrow scope with a clean scope column off
+  a test fixture helper, which is the one shape the brief teaches an auditor to accept as proof. A
+  target that did not resolve is omitted and named as omitted, because `parseManifest` refuses a
+  manifest as a whole and one bad entry would cost the auditor the entire run.
   proof: vitest scripts/tasks/audit.test.ts "a manifest entry runs the test its clause names, in the file that test lives in"
-  proof: vitest scripts/tasks/audit.test.ts "offers candidate lines grouped under the file each came from"
+  proof: vitest scripts/tasks/audit.test.ts "the manifest offers no guess at which line a clause is about"
   proof: vitest scripts/tasks/audit.test.ts "a manifest entry nobody has aimed is refused by mutate rather than run green"
   proof: vitest scripts/tasks/audit.test.ts "an unresolved target is named as omitted rather than emitted into the manifest"
 
@@ -90,6 +90,17 @@ Proof:
   proof: vitest scripts/tasks/audit.test.ts "makes logging tool friction a numbered step rather than a line to skip"
   proof: vitest scripts/tasks/audit.test.ts "tasks audit names the step that follows recording a pass"
 
+- [c10] Neither generated artifact is written over work an auditor has already done, and neither is
+  written at all when the range is not this slug's. Both are the auditor's working copy the moment
+  they touch one, and re-reading the brief mid-pass is ordinary; an existing file is kept and named,
+  because a stale artifact is recoverable by deleting it and an aimed one destroyed is not. The
+  manifest was already gated on `rangeIsThisSlugs` and the pass file was not, so a brief that had
+  just refused to offer a manifest still handed over the file for recording a pass against a diff
+  it had just said these clauses do not describe — and that is the half that writes tracked repo
+  state.
+  proof: vitest scripts/tasks/audit.test.ts "keeps an artifact the auditor has already worked on rather than overwriting it"
+  proof: vitest scripts/tasks/audit.test.ts "offers no pass file either, in a brief that has just warned the diff is not this slugs"
+
 - [c9] The brief prints what an auditor can act on and counts what it cannot. It carries neither the
   spec's own prose nor a list of every spec in the checkout nor a lesson in git — all three were
   measured as read-past — and closed prior-art claims are a count rather than 42 lines of decisions
@@ -109,12 +120,19 @@ Proof:
   problem, pass 3 aimed each entry exactly as instructed and got the same escalated kills. The rule
   this spec now holds to is that the brief supplies answers it can derive and says plainly which
   fields it cannot.
-- c3 shrinks to wiring rather than deriving the aim. Making `file` and `find` derivable means
-  running each named test under coverage and intersecting what it executes with the lines the branch
-  added; that is genuinely computable and is a research task with an unmeasured cost, not a clause
-  on this spec. The defect c3 existed to close — a generated manifest coming back green having
-  proved nothing — is closed by the sentinel, which pass 3 confirmed. The remaining half is an
-  unaimed field the brief says is unaimed.
+- c3 carries no candidate at all, after four passes and four orderings. Pass 1 called it a caption
+  problem, pass 2 a `find` problem, pass 3 a `file` problem; the fix for pass 3 grouped the
+  candidates by file, and pass 4 measured that the leading candidate then came from whichever file
+  the clause's own task had granted itself — a test fixture helper — producing three kills at
+  *narrow* scope with a clean scope column, which disabled the escalation tell that had caught
+  passes 2 and 3. Each fix made the guess less wrong and the last one made it undetectable. A tool
+  that cannot make a judgement should hand over the judgement, not a default. Making `file` and
+  `find` derivable for real means running each named test under coverage and intersecting what it
+  executes with the lines the branch added; that is computable, unmeasured, and a research task
+  rather than a clause on this spec.
+- A generated artifact is the auditor's the moment they edit it. Both are written once and then
+  left alone, which costs a stale manifest surviving until someone deletes it — recoverable — and
+  buys back an aimed manifest that re-reading the brief used to destroy silently.
 - The brief prints no prose it did not compute. The deliverable and `## Decisions` sections were
   added on the theory that a pass which had them printed would not open the spec; all three passes
   opened it anyway, because a clause is graded against its own spec. Forty-one lines that changed no

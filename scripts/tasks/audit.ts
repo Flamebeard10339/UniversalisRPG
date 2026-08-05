@@ -357,56 +357,33 @@ export interface MutationEntry {
   replace: string;
   tests: string[];
   test: string;
-  note: string;
-}
-
-// A comment, an import or a declaration measures the compiler when deleted,
-// and a line that opens a block takes its closing brace with it. Both come
-// back as ERROR — a verdict that says the mutation did not build, not that
-// the suite missed it, which is the one verdict a generated entry can afford
-// least.
-const SKIP_MUTATING = /^(\/\/|\*|import |export (type|interface|function|const)|function |interface |type |\})|[{([]$/;
-
-// The lines this branch added that deleting would be felt, longest first.
-// Comments, imports and punctuation are excluded because deleting one
-// measures the compiler rather than the suite, and a line the file carries
-// twice is excluded because `mutate` refuses an ambiguous find rather than
-// guessing which one it meant. Several are returned rather than one, so a
-// spec with twelve targets mutates twelve different lines instead of the
-// same line twelve times.
-export function breakableAddedLines(diff: string, source: string | null): string[] {
-  if (source === null) return [];
-  const added = diff
-    .split('\n')
-    .filter((line) => line.startsWith('+') && !line.startsWith('+++'))
-    .map((line) => line.slice(1).trim());
-  return [...new Set(added)]
-    .filter((line) => line.length > 12 && /[a-z]/i.test(line) && !SKIP_MUTATING.test(line) && source.split(line).length === 2)
-    .sort((a, b) => b.length - a.length);
 }
 
 // `parseManifest` refuses a manifest as a whole, so one entry the brief could
 // not complete would cost the auditor the entire run. An unresolved target is
 // left out and said out loud instead — the omission is information, and the
 // nineteen entries beside it still run.
-export const UNRETARGETED = '<<< replace this with a line from the file above that this clause is about >>>';
+export const UNAIMED_FILE = '<<< the file this clause is implemented in >>>';
+export const UNRETARGETED = '<<< the line in that file this clause is about >>>';
 
-// Which line a clause is about is judgement, and three recorded passes each
-// measured what happens when the tool supplies it anyway. Pass 1 read eight
-// escalated kills as eight proofs. Pass 2 got nine, all escalated past the
-// test whose clause they claimed to prove. Pass 3 aimed each entry exactly as
-// instructed and got the same escalation, because the offered lines came from
-// whichever changed file sorted first rather than from the clause's own.
+// Which line a clause is about is judgement, and four recorded passes each
+// measured what happens when the tool supplies a guess at it. Pass 1 read
+// eight escalated kills as eight proofs. Pass 2 got nine, all escalated past
+// the test whose clause they claimed to prove. Pass 3 aimed each entry as
+// instructed and got the same escalation. Pass 4 got three KILLED at *narrow*
+// scope with a clean scope column — off a test fixture helper, because the
+// clause's own task had granted itself that file — which is the one shape an
+// auditor is told to accept as proof. Each fix made the guess less wrong and
+// the last one disabled the tell that had been catching it.
 //
-// So `file` and `find` are the auditor's. `find` ships in a form `mutate`
-// already refuses — `refusalsFor` stops the whole run on a find text the file
-// does not contain — so a manifest nobody has aimed cannot come back green.
-// The diff's own lines are carried in `note` as candidates, named by the file
-// they came from, which is a starting point rather than an answer.
+// So the manifest carries no guess at all. `name`, `tests` and `test` come
+// from the resolution and are facts; `file` and `find` are sentinels the
+// auditor replaces, and both are in a form `mutate` refuses — `refusalsFor`
+// cannot read the file, and would not find the text if it could — so a
+// manifest nobody has aimed stops by name before a baseline runs.
 export function mutationManifest(
   clauses: Array<{ id: number; targets: string[] }>,
   resolve: (target: string) => TargetResolution | null,
-  candidates: (clause: number) => Array<{ file: string; find: string }>,
 ): { entries: MutationEntry[]; omitted: string[] } {
   const entries: MutationEntry[] = [];
   const omitted: string[] = [];
@@ -418,38 +395,16 @@ export function mutationManifest(
         omitted.push(`c${clause.id}: ${target} — ${resolution.state === 'no-such-file' ? 'names no file in this checkout' : resolution.state === 'nowhere' ? 'no test by this name exists anywhere' : 'the suite could not be listed to place it'}`);
         continue;
       }
-      const suggestions = candidates(clause.id);
-      if (suggestions.length === 0) {
-        omitted.push(`c${clause.id}: ${target} — this branch's diff has no line under it that deleting would measure`);
-        continue;
-      }
       const file = resolution.state === 'moved' ? resolution.foundIn[0] : resolution.file;
       const name = `c${clause.id} ${resolution.name}`;
       // `parseManifest` refuses two mutations sharing a name, since their
       // verdicts could not be told apart — so a clause naming one test twice
       // costs the run rather than repeating an entry.
       if (entries.some((entry) => entry.name === name)) continue;
-      entries.push({
-        name,
-        file: suggestions[0].file,
-        find: UNRETARGETED,
-        replace: '',
-        tests: [file],
-        test: resolution.name,
-        note: `set file and find to the line c${clause.id}'s test is about. Candidates this branch added, by file — ${candidateNote(suggestions)}`,
-      });
+      entries.push({ name, file: UNAIMED_FILE, find: UNRETARGETED, replace: '', tests: [file], test: resolution.name });
     }
   }
   return { entries, omitted };
-}
-
-// Grouped by file rather than flattened, because `file` is a single field: a
-// line offered without the file it came from is what made pass 3's paste
-// wrong in four of twelve entries.
-export function candidateNote(suggestions: Array<{ file: string; find: string }>): string {
-  const byFile = new Map<string, string[]>();
-  for (const { file, find } of suggestions) byFile.set(file, [...(byFile.get(file) ?? []), find]);
-  return [...byFile].slice(0, 4).map(([file, finds]) => `${file}: ${finds.slice(0, 3).map((find) => JSON.stringify(find)).join(' | ')}`).join('; ');
 }
 
 // The pass file, written for the same reason the manifest is: two recorded
@@ -541,56 +496,48 @@ export function manifestNotes(count: number, manifestPath: string): string[] {
   return [
     manifestPath,
     `${count} entry(ies). \`name\`, \`tests\` and \`test\` are derived: each entry runs the test its clause names, in the file that test actually lives in.`,
-    `\`file\` and \`find\` are yours — nothing here knows which line a clause is about. Every entry ships \`${UNRETARGETED}\`, which is in no file, so \`mutate\` refuses the run and names each entry you have not aimed yet.`,
-    'Each entry\'s `note` lists lines this branch added, by file, as candidates. Three recorded passes each rejected the offered line, so read them as a starting point rather than an answer.',
+    '`file` and `find` are yours, and are the whole judgement — which line a clause is about is not derivable from anything this has read, and four passes measured what a guess at it costs. Both ship as sentinels `mutate` refuses, so an entry you have not aimed stops the run by name before a baseline runs.',
+    'Read the clause, find the line in the diff that makes it true, and break that. A kill by any other line is the suite noticing something, not this clause proving itself.',
   ];
 }
 
-// Written outside the worktree, because the brief is a read of the
-// repository and a generated file left in it would show up as the branch's
-// own work. The path is named so `npm run mutate -- <it>` is a copy away.
-// Written outside the worktree for the same reason the manifest is, and
-// returned rather than printed: the procedure at the top of the brief names
-// both paths, and it is printed before any of the data below it.
-function writeMutationManifest(slug: string, clauses: ProofClause[], members: Task[], changed: string[], range: string, diffIsForeign: boolean): { lines: string[]; path: string | null } {
+// Both generated artifacts are the auditor's working copy the moment they
+// touch one, and re-reading the brief is something an auditor does mid-pass.
+// Overwriting unconditionally threw away an aimed manifest and a part-filled
+// pass file, silently, with no way back. So an existing file is kept and
+// named: a stale artifact is recoverable by deleting it, and an aimed one
+// destroyed is not.
+function writeArtifact(path_: string, contents: string): { kept: boolean } {
+  if (existsSync(path_)) return { kept: true };
+  writeFileSync(path_, contents, 'utf8');
+  return { kept: false };
+}
+
+function keptNote(path_: string, what: string): string {
+  return `This file already exists and was left alone — it is the ${what} from an earlier run of this brief, and yours if you have aimed it. Delete it to regenerate against the current diff: ${path_}`;
+}
+
+// Written outside the worktree, because the brief is a read of the repository
+// and a generated file left in it would show up as the branch's own work.
+// Returned rather than printed: the procedure at the top of the brief names
+// this path, and it is printed before any of the data below it.
+function writeMutationManifest(slug: string, clauses: ProofClause[], diffIsForeign: boolean): { lines: string[]; path: string | null } {
   if (diffIsForeign) {
     return { lines: [`No mutation manifest: the diff above is not ${slug}'s, so every line it could break belongs to work these clauses do not describe.`], path: null };
   }
-  const sources = changed.filter((file) => file.endsWith('.ts') && !file.endsWith('.test.ts') && existsSync(file));
-  const linesIn = new Map<string, string[]>();
-  const addedIn = (file: string): string[] => {
-    if (!linesIn.has(file)) linesIn.set(file, breakableAddedLines(gitRead(['diff', '-U0', range, '--', file]) ?? '', readIfPresent(file)));
-    return linesIn.get(file)!;
-  };
-  const cached = new Map<number, Array<{ file: string; find: string }>>();
-  const candidates = (clause: number): Array<{ file: string; find: string }> => {
-    if (!cached.has(clause)) {
-      const claimed = members.filter((task) => task.discharges.includes(clause)).flatMap((task) => [...task.writes, ...task.files].map((entry) => entry.split(/[:#]/)[0]));
-      // A file the clause's own task named comes first, since a line from it
-      // is a line that clause is answerable for; the rest of the diff after.
-      // Every file is offered, not only the first with lines in it — one
-      // file's lines were what sent pass 3 at specDoc.ts for three clauses
-      // implemented in audit.ts, because nothing claimed them and the fallback
-      // was alphabetical.
-      const ordered = [...sources.filter((file) => claimed.includes(file)), ...sources.filter((file) => !claimed.includes(file))];
-      cached.set(clause, ordered.flatMap((file) => addedIn(file).map((find) => ({ file, find }))));
-    }
-    return cached.get(clause)!;
-  };
-
   const { entries, omitted } = mutationManifest(
     clauses.map((clause) => ({ id: clause.id, targets: clause.proofTargets ?? [] })),
     (target) => resolveTarget(target),
-    candidates,
   );
   const lines = ['Mutation manifest — wired to the tests above, and refusing to run until you aim it:'];
   let manifestPath: string | null = null;
   if (entries.length === 0) {
-    lines.push('- none — no proof target on this spec resolved to a test with a line of this branch under it');
+    lines.push('- none — no proof target on this spec resolved to a test this brief could name');
   } else {
     manifestPath = path.join(os.tmpdir(), `mutations-${slug}.json`);
-    writeFileSync(manifestPath, `${JSON.stringify(entries, null, 2)}\n`, 'utf8');
-    for (const note of manifestNotes(entries.length, manifestPath)) lines.push(`  ${note}`);
+    const { kept } = writeArtifact(manifestPath, `${JSON.stringify(entries, null, 2)}\n`);
+    if (kept) lines.push(`  ${keptNote(manifestPath, 'mutation manifest')}`);
+    else for (const note of manifestNotes(entries.length, manifestPath)) lines.push(`  ${note}`);
   }
   for (const line of omitted) lines.push(`- omitted: ${line}`);
   return { lines, path: manifestPath };
@@ -646,9 +593,14 @@ export function cmdAuditPrompt(args: Flags, usage: string): void {
 
   // Both artifacts the procedure names are built before it is printed, so a
   // step can name the path it acts on rather than a heading further down.
-  const manifest = writeMutationManifest(slug, doc.proofClauses, members, relevantFiles, `${base}..${head}`, !standing.rangeIsThisSlugs);
-  const argsPath = path.join(os.tmpdir(), `audit-${slug}-pass${doc.auditPasses.length + 1}.txt`);
-  writeFileSync(argsPath, auditArgsSkeleton(slug, doc.proofClauses, doc.auditPasses.length + 1), 'utf8');
+  // Both are gated on the same fact for the same reason: a pass recorded
+  // against a diff these clauses do not describe is the c7 defect one layer
+  // down, and the manifest was gated while the pass file — which writes
+  // tracked repo state — was not.
+  const manifest = writeMutationManifest(slug, doc.proofClauses, !standing.rangeIsThisSlugs);
+  const pass = doc.auditPasses.length + 1;
+  const argsPath = standing.rangeIsThisSlugs ? path.join(os.tmpdir(), `audit-${slug}-pass${pass}.txt`) : null;
+  const argsKept = argsPath !== null && writeArtifact(argsPath, auditArgsSkeleton(slug, doc.proofClauses, pass)).kept;
 
   console.log('');
   console.log('Steps, in order. Each command names the next one when it finishes.');
@@ -659,12 +611,18 @@ export function cmdAuditPrompt(args: Flags, usage: string): void {
   console.log('     met     — you have evidence the next pass can re-run. The tool refuses met without one.');
   console.log('     unmet   — you checked and it fails.');
   console.log('     unknown — nobody looked. Recording unmet instead hides that nothing was verified.');
-  console.log(`4. Mutation-test every clause carrying a proof target. Aim ${manifest.path ?? 'the manifest named under `Mutation manifest:` below'}, then \`npm run mutate -- <it>\`.`);
+  console.log(`4. Mutation-test every clause carrying a proof target. Set each entry's \`file\` and \`find\` to the line that clause is about — that judgement is the whole exercise and nothing here makes it for you — then \`npm run mutate -- <it>\`.`);
+  console.log(`     ${manifest.path ?? 'no manifest was written; see `Mutation manifest:` below for why'}`);
   console.log('5. Answer the regression question: is anything worse than before this branch? Clause-by-clause verification cannot see this — each clause looks fine in isolation. Diff the behavior, not the promise.');
   console.log('6. Run `npm run tasks -- merge-ready` — tsc, tests, layer-check, audit-status, doctor and the byte check, in one invocation.');
-  console.log('7. File the pass. This file is written with one line per clause; fill in the values and run the command in its header:');
-  console.log(`     ${argsPath}`);
-  console.log(`     npm run tasks -- audit ${slug} --args-from ${argsPath}`);
+  if (argsPath === null) {
+    console.log(`7. Do not file a pass. The diff above is not ${slug}'s, so no verdict taken over it would be about these clauses — which is why no pass file was written.`);
+  } else {
+    console.log(`7. File the pass. This file is written with one line per clause; fill in the values and run the command in its header:`);
+    console.log(`     ${argsPath}`);
+    console.log(`     npm run tasks -- audit ${slug} --args-from ${argsPath}`);
+    if (argsKept) console.log(`     ${keptNote(argsPath, 'pass file')}`);
+  }
   console.log('8. Log what this audit cost you — task tool, audit tool, harness — in .planning/agent-feedback/tool-friction.md, dated, with what you measured.');
   console.log('');
   console.log('Look specifically for:');
