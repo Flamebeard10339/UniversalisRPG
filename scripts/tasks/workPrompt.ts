@@ -4,9 +4,10 @@ import { isReadableGrant } from '../lib/planCheck';
 import { clauseStandings, parseSpecDoc, type SpecDoc } from '../lib/specDoc';
 import { trackedFiles } from '../lib/sourceFiles';
 import { covers, normalizePath } from '../lib/systems';
-import { clausesOf, type Task } from '../lib/taskStore';
+import { clausesOf, fixNowQueue, type Task } from '../lib/taskStore';
 import type { Flags } from './cli';
 import { readStore, resolveConfig, specFile, type Config } from './context';
+import { explainEmptyQueue } from './records';
 import { clauseStandingLines, renderTask } from './render';
 import { resolveTaskIds } from './resolveIds';
 
@@ -116,20 +117,92 @@ function printObligations(task: Task): void {
   console.log(`Then work: commit after each logical chunk, and close with \`npm run tasks -- done ${task.id} --commit HEAD\`.`);
 }
 
+// The root-record convention eleven specs carry: a task whose id is the spec
+// slug and which declares no write grant, holding the whole picture and every
+// member of the spec as a requirement. It is a container, not work, and a
+// brief for it misdirects three times over — it opens "You are implementing
+// audit-loop-costs-less" over a record whose own evidence reads "work the
+// members, not this"; it prints BLOCKED against four waiting requirements
+// that are the members ready to be picked up now, so a spec appears to be
+// waiting on itself; and it then asks for the write grant whose collision
+// with every slice beneath it is why the last root task was declined.
+function isRootRecord(task: Task): boolean {
+  return task.spec !== null && task.id === task.spec && task.writes.length === 0;
+}
+
+// The queue `tasks next --spec <slug>` reads, asked here rather than answered
+// again: a second opinion on which member comes next is a second thing to
+// keep in sync.
+function memberQueue(tasks: Task[], spec: string): Task[] {
+  return fixNowQueue(tasks, spec).filter((task) => !isRootRecord(task));
+}
+
+// A dispatcher holds the name of the work — the spec slug, which on a
+// planning branch is the only name that exists yet — and not the id of
+// whichever member happens to be unblocked. An ordinary exact id still wins
+// outright; the fuzzy match comes last, because fuzzy-first is what answered
+// `work-prompt audit-loop-costs-less` with five records matched on substrings
+// of their titles while never looking in docs/specs at all.
+function resolveWorkTarget(config: Config, tasks: Task[], name: string): Task | undefined {
+  const exact = tasks.find((task) => task.id === name);
+  if (exact !== undefined && !isRootRecord(exact)) return exact;
+
+  const fuzzy = exact === undefined && !existsSync(specFile(config, name))
+    // A read answers, and "no such task" with the nearest ids is the answer.
+    // What it must never do is print a brief anyway: a dispatch instruction
+    // for a record nobody holds is the one output here that would be invented.
+    ? resolveTaskIds([name], tasks, { report: (line) => console.log(line) })?.[0]
+    : undefined;
+  // A fragment resolves to a record, and a root record is no more work when
+  // it was reached by prefix than when it was named outright: `work-prompt
+  // audit-loop` is one keystroke from the exact id and produced every
+  // misdirection this clause exists to stop.
+  if (fuzzy !== undefined && !isRootRecord(fuzzy)) return fuzzy;
+
+  const spec = exact?.spec ?? fuzzy?.spec ?? (existsSync(specFile(config, name)) ? name : null);
+  if (spec === null) return undefined;
+  const root = exact ?? fuzzy;
+
+  const [next, ...rest] = memberQueue(tasks, spec);
+  const behind = rest.length > 0 ? ` (${rest.length} more behind it: ${rest.map((task) => task.id).join(', ')})` : '';
+  if (next !== undefined) {
+    console.log(
+      root === undefined
+        ? `resolved the spec ${spec} -> ${next.id}, its next open, unblocked member${behind}`
+        : `${root.id} is ${spec}'s root record — no write grant, and every member of the spec as a requirement, so it is blocked by its own spec and is not work. Briefing ${next.id}, its next open, unblocked member${behind}. The whole picture is \`npm run tasks -- show ${root.id}\`.`,
+    );
+    return next;
+  }
+  // The container is briefed only when there is nothing it could stand in
+  // for: a spec whose one record is its own root is a spec nobody decomposed,
+  // and a brief for it beats silence. A decomposed spec whose members are all
+  // blocked is a different answer and gets the explanation below — briefing
+  // the root there reintroduces the whole defect through the back door, which
+  // is what `audit-brief-arrives-complete` did: four members waiting behind
+  // `audit-loop-costs-less`, and a brief that dispatched the container.
+  if (root !== undefined && !tasks.some((task) => task.spec === spec && task.id !== root.id)) {
+    console.log(`${spec} has no member besides its own root record, so that is what is briefed.`);
+    return root;
+  }
+  // An empty queue is explained by the same function `next` prints, because
+  // "no member tasks", "every member closed" and "every member blocked" are
+  // different next moves and a dispatcher gets none of them from silence.
+  console.log(`${spec} is a spec, and it has no open, unblocked member to brief`);
+  explainEmptyQueue(tasks, spec, {});
+  return undefined;
+}
+
 export function cmdWorkPrompt(args: Flags, usage: string): void {
   const config = resolveConfig(args.flags);
-  const id = args.positional[0];
-  if (!id) {
+  const name = args.positional[0];
+  if (!name) {
     console.error(usage);
     process.exitCode = 1;
     return;
   }
 
   const tasks = readStore(config);
-  // A read answers, and "no such task" with the nearest ids is the answer.
-  // What it must never do is print a brief anyway: a dispatch instruction
-  // for a record nobody holds is the one output here that would be invented.
-  const task = resolveTaskIds([id], tasks, { report: (line) => console.log(line) })?.[0];
+  const task = resolveWorkTarget(config, tasks, name);
   if (task === undefined) return;
 
   console.log(`You are implementing ${task.id} on branch ${config.branch}.`);

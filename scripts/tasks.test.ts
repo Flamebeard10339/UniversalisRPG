@@ -2804,6 +2804,119 @@ describe('tasks CLI', () => {
     });
   });
 
+  // A dispatcher on a planning branch holds the spec slug and nothing else —
+  // the branch just wrote it — and `work-prompt <slug>` answered "no such
+  // task" with five records fuzzy-matched on substrings of their titles.
+  it('work-prompt takes the spec slug a dispatcher knows and briefs its next unblocked member', () => {
+    fixture(({ tasks }) => {
+      tasks('add', 'the first slice', '--id', 'first-slice', '--spec', 'demo-spec');
+      tasks('add', 'the second slice', '--id', 'second-slice', '--spec', 'demo-spec');
+
+      const result = tasks('work-prompt', 'demo-spec');
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('resolved the spec demo-spec -> first-slice, its next open, unblocked member (1 more behind it: second-slice)');
+      expect(result.stdout).toContain('You are implementing first-slice on branch demo-spec.');
+      expect(result.stdout).toContain('npm run tasks -- start first-slice --actor <you>');
+    });
+  });
+
+  it('work-prompt prefers an exact task id to a spec file of the same name', () => {
+    fixture(({ tasks }) => {
+      // A record that holds a write grant is work, whatever it is called, so
+      // sharing a name with a spec file must not redirect away from it.
+      tasks('add', 'named after its spec', '--id', 'demo-spec', '--spec', 'demo-spec', '--writes', 'src/runtime/save.ts');
+      tasks('add', 'a slice', '--id', 'a-slice', '--spec', 'demo-spec');
+
+      const result = tasks('work-prompt', 'demo-spec');
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('You are implementing demo-spec on branch demo-spec.');
+      expect(result.stdout).not.toContain('resolved the spec demo-spec');
+      expect(result.stdout).not.toContain('You are implementing a-slice');
+    });
+  });
+
+  // The shape eleven specs carry, and the one the slug fix would otherwise
+  // have walked straight into: `work-prompt audit-loop-costs-less` briefed a
+  // BLOCKED container whose four waiting requirements were the members ready
+  // to pick up, then asked for the write grant that got the last root task
+  // declined.
+  it('work-prompt briefs a member rather than the root record its own spec blocks', () => {
+    fixture(({ tasks }) => {
+      tasks('add', 'the first slice', '--id', 'first-slice', '--spec', 'demo-spec', '--writes', 'src/runtime/save.ts');
+      tasks('add', 'the second slice', '--id', 'second-slice', '--spec', 'demo-spec', '--writes', 'src/ui/app.ts');
+      tasks('add', 'the whole picture', '--id', 'demo-spec', '--spec', 'demo-spec', '--requires', 'first-slice,second-slice');
+
+      const result = tasks('work-prompt', 'demo-spec');
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('demo-spec is demo-spec\'s root record');
+      expect(result.stdout).toContain('blocked by its own spec and is not work');
+      expect(result.stdout).toContain('Briefing first-slice, its next open, unblocked member (1 more behind it: second-slice)');
+      expect(result.stdout).toContain('You are implementing first-slice on branch demo-spec.');
+      // The container's context is not thrown away, it is pointed at.
+      expect(result.stdout).toContain('npm run tasks -- show demo-spec');
+      // What the old brief said, and must not say again: the root record is
+      // never dispatched as work, and its own spec's members never read as
+      // outside blockers.
+      expect(result.stdout).not.toContain('You are implementing demo-spec on branch');
+      expect(result.stdout).not.toContain('BLOCKED');
+    });
+  });
+
+  // A prefix is one keystroke from the exact id and lands on the same record,
+  // so guarding only the exact path left `work-prompt audit-loop` reproducing
+  // all three misdirections verbatim.
+  it('work-prompt redirects away from a root record reached by a fragment, not only by its exact id', () => {
+    fixture(({ tasks }) => {
+      tasks('add', 'a slice', '--id', 'a-slice', '--spec', 'demo-spec', '--writes', 'src/runtime/save.ts');
+      tasks('add', 'the whole picture', '--id', 'demo-spec', '--spec', 'demo-spec', '--requires', 'a-slice');
+
+      // A fragment that is neither the exact id nor a spec file name, and
+      // that `resolveTaskIds` resolves to the root record by prefix.
+      const result = tasks('work-prompt', 'demo-spe');
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('demo-spec is demo-spec\'s root record');
+      expect(result.stdout).toContain('You are implementing a-slice on branch demo-spec.');
+      expect(result.stdout).not.toContain('You are implementing demo-spec on branch');
+      expect(result.stdout).not.toContain('BLOCKED');
+    });
+  });
+
+  it('work-prompt falls back to the root record only when its spec holds no other record', () => {
+    fixture(({ tasks }) => {
+      tasks('add', 'the whole picture', '--id', 'demo-spec', '--spec', 'demo-spec');
+
+      const undecomposed = tasks('work-prompt', 'demo-spec');
+      expect(undecomposed.status).toBe(0);
+      expect(undecomposed.stdout).toContain('demo-spec has no member besides its own root record');
+      expect(undecomposed.stdout).toContain('You are implementing demo-spec on branch demo-spec.');
+
+      // Decomposed but every member blocked — `audit-brief-arrives-complete`,
+      // whose four members all wait behind another spec. Standing in the
+      // container for them here would reintroduce the whole defect: what the
+      // dispatcher needs is which member waits on what.
+      tasks('add', 'a blocked slice', '--id', 'blocked-slice', '--spec', 'demo-spec', '--requires', 'lands-elsewhere-first');
+      const blocked = tasks('work-prompt', 'demo-spec');
+      expect(blocked.stdout).toContain('blocked-slice waits on lands-elsewhere-first (missing)');
+      expect(blocked.stdout).not.toContain('You are implementing');
+    });
+  });
+
+  it('work-prompt says why a spec has no member to brief rather than printing nothing', () => {
+    fixture(({ tasks }) => {
+      const empty = tasks('work-prompt', 'demo-spec');
+      expect(empty.stdout).toContain('demo-spec is a spec, and it has no open, unblocked member to brief');
+      expect(empty.stdout).toContain('demo-spec has no member tasks');
+      expect(empty.stdout).not.toContain('You are implementing');
+
+      // The other cause of the same silence, and a different next move: the
+      // member exists and is held by a requirement nothing has closed.
+      tasks('add', 'a blocked slice', '--id', 'blocked-slice', '--spec', 'demo-spec', '--requires', 'never-lands');
+      const blocked = tasks('work-prompt', 'demo-spec');
+      expect(blocked.stdout).toContain('blocked-slice waits on never-lands (missing)');
+      expect(blocked.stdout).not.toContain('You are implementing');
+    });
+  });
+
   it('work-prompt names the branch this spec was last written from', () => {
     fixture(({ tasks, dir }) => {
       tasks('add', 'a member', '--id', 'a-member', '--spec', 'demo-spec');

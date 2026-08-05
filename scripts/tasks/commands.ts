@@ -80,7 +80,7 @@ const COMMANDS: Record<string, Command> = {
   spec: { usage: SPEC_USAGE, run: refuseBareSpec },
   audit: { usage: AUDIT_USAGE, run: cmdAudit },
   'audit-prompt': { usage: 'usage: tasks audit-prompt <spec> [--base-branch main]  (the auditor\'s brief, generated — do not hand-write one)', run: cmdAuditPrompt },
-  'work-prompt': { usage: 'usage: tasks work-prompt <id>  (the worker\'s brief, generated — do not hand-write one)', run: cmdWorkPrompt },
+  'work-prompt': { usage: 'usage: tasks work-prompt <id-or-spec>  (the worker\'s brief, generated — do not hand-write one. A spec slug briefs that spec\'s next open, unblocked member; an exact task id always wins over a spec of the same name)', run: cmdWorkPrompt },
   handoff: { usage: 'usage: tasks handoff [--spec <slug>] [--base-branch main] [--scan-cap <commits>]', run: cmdHandoff },
   'merge-ready': { usage: 'usage: tasks merge-ready [--base-branch main]  (runs the merge gate: tsc, npm test, layer-check, audit-status, doctor, and the tracked-text byte check; exits non-zero when a leg fails)', run: cmdMergeReady },
   'check-commit-msg': { usage: 'usage: tasks check-commit-msg <msg-file> [--merge-or-revert] [--files a,b,c]', run: cmdCheckCommitMessage },

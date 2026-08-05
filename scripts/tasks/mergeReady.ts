@@ -4,9 +4,9 @@ import { checkBytes, type ByteFinding } from '../lib/bytes';
 import * as git from '../lib/git';
 import { trackedFiles } from '../lib/sourceFiles';
 import { clauseStandings, parseSpecDoc, type SpecDoc } from '../lib/specDoc';
-import { unreviewedFiledBy } from '../lib/taskStore';
+import { unreviewedFiledBy, type Task } from '../lib/taskStore';
 import type { Flags } from './cli';
-import { DEFAULT_BRANCH, readStore, resolveActiveSpec, resolveConfig, specFile, type Config } from './context';
+import { DEFAULT_BRANCH, readStore, resolveActiveSpec, resolveConfig, specFile, specsWrittenFromBranch, type Config } from './context';
 import { doctorIssues } from './doctor';
 
 // The merge gate, spelled once. Every leg here is already required by CI —
@@ -51,6 +51,13 @@ export interface BranchStanding {
   baseMoved: boolean;
   baseBranch: string;
   spec: string | null;
+  // How that spec was arrived at. Every route to it but an explicit one is an
+  // inference, and a gate that grades a spec without saying which it picked
+  // leaves a reader unable to see that it graded the wrong one.
+  specNote: string | null;
+  // True when the spec is a plan this branch wrote for a later branch rather
+  // than a contract this branch owes. See `authoredAsPlan`.
+  specAuthoredHere: boolean;
   openMembers: string[];
   unreviewedFindings: number;
   // Clause ids the spec's latest pass leaves outstanding, and whether a pass
@@ -94,6 +101,16 @@ function standingLegs(standing: BranchStanding): LegResult[] {
 
   if (standing.spec === null) {
     legs.push({ name: 'spec', ok: true, detail: 'pass — this branch is working no spec, so it owes no clause' });
+    return legs;
+  }
+
+  // Which spec was graded, on its own line rather than folded into a verdict:
+  // it is the one fact that makes every leg below it readable, and the only
+  // way a reader can see the gate grading a spec they did not mean.
+  if (standing.specNote !== null) legs.push({ name: 'spec source', ok: true, detail: standing.specNote });
+
+  if (standing.specAuthoredHere) {
+    legs.push({ name: 'spec', ok: true, detail: `pass — this branch wrote ${standing.spec} as a plan for a later branch and worked none of its ${standing.openMembers.length} member(s), so it owes neither them nor a clause. No other spec was graded` });
     return legs;
   }
 
@@ -167,6 +184,69 @@ export function runMergeReady(deps: MergeReadyDeps): boolean {
   return false;
 }
 
+// A planning branch's output is a spec for a later branch, and the gate read
+// that spec as a debt: three members open because nobody had implemented them
+// and no audit pass because there was nothing yet to audit, both true and
+// neither a defect. Told apart from a contract by two facts nobody has to
+// declare — the file is absent from the base branch, so this branch wrote it,
+// and every member is still open, so nothing here was ever worked against it.
+// A spec authored and never decomposed is not a plan: nothing was promised to
+// a later branch until the work was named.
+//
+// `onBaseBranch` is null when git could not be asked — an unresolvable base
+// ref, no repository — and that reads as "not shown to be a plan" rather than
+// as "this branch wrote it". A gate whose exemption widens when its evidence
+// disappears is the wrong way round.
+export function authoredAsPlan(members: Task[], onBaseBranch: boolean | null): boolean {
+  return onBaseBranch === false && members.length > 0 && members.every((member) => member.state === 'open');
+}
+
+export interface SpecCandidate {
+  spec: string;
+  authoredAsPlan: boolean;
+}
+
+// `resolveActiveSpec` answers "what am I working on" — a resume aid whose log
+// route takes the most recently written spec. Planning happens last, so a
+// branch that implemented one spec and then authored a plan for a later
+// branch resolves to the plan, and a plan owes nothing. A gate asks a
+// different question, and must not read "this plan owes nothing" as "this
+// branch owes nothing": a spec the branch owes outranks one it merely wrote,
+// however recently. Candidates arrive most recent first, so an ordinary
+// branch — one spec, not a plan — is unaffected, and a branch whose every
+// candidate is a plan still passes as the planning branch it is.
+export function specToGrade(candidates: SpecCandidate[]): SpecCandidate | null {
+  return candidates.find((candidate) => !candidate.authoredAsPlan) ?? candidates[0] ?? null;
+}
+
+export interface SpecFacts {
+  // What `resolveActiveSpec` answered, and how it says it got there.
+  activeSpec: string | null;
+  activeNote: string | null;
+  // Every spec this branch has written store records against, most recent
+  // first.
+  written: string[];
+  isPlan: (spec: string) => boolean;
+}
+
+export type SpecDecision = Pick<BranchStanding, 'spec' | 'specNote' | 'specAuthoredHere'>;
+
+// The whole spec decision, with the git and store reads passed in as data.
+// It lives here rather than inline in `branchStanding` because that function
+// cannot be called without a repository, and a decision nothing can call is a
+// decision nothing checks: inverting this flag's polarity once left the file
+// green and `tsc` clean.
+export function decideSpec(facts: SpecFacts): SpecDecision {
+  const ordered = facts.activeSpec === null ? [] : [facts.activeSpec, ...facts.written.filter((spec) => spec !== facts.activeSpec)];
+  const graded = specToGrade(ordered.map((spec) => ({ spec, authoredAsPlan: facts.isPlan(spec) })));
+  if (graded === null) return { spec: null, specNote: null, specAuthoredHere: false };
+  return {
+    spec: graded.spec,
+    specNote: graded.spec === facts.activeSpec ? facts.activeNote : `spec chosen by the gate: ${graded.spec} — ${facts.activeSpec} is a plan this branch wrote, and ${graded.spec} is a spec it owes`,
+    specAuthoredHere: graded.authoredAsPlan,
+  };
+}
+
 // The reads a session was making by hand — `git status`, `git rev-parse`
 // plus `git merge-base`, `tasks spec show` twice — collected once so the
 // answer is a leg rather than a research task.
@@ -181,10 +261,21 @@ function branchStanding(config: Config, baseBranch: string): BranchStanding {
   const baseHead = git.resolveCommit(baseBranch);
   const tasks = readStore(config);
   const active = resolveActiveSpec(config, tasks, undefined);
-  const spec = active.spec;
+  const membersOf = (spec: string): Task[] => tasks.filter((task) => task.spec === spec);
+
+  const decision = decideSpec({
+    activeSpec: active.spec,
+    activeNote: active.note,
+    written: specsWrittenFromBranch(config),
+    // Null when git cannot be asked at all, so `authoredAsPlan` can tell "the
+    // base branch does not have this file" from "there was no answer".
+    isPlan: (spec) => authoredAsPlan(membersOf(spec), baseHead === null ? null : git.fileAt(baseBranch, specFile(config, spec)) !== null),
+  });
+  const spec = decision.spec;
 
   const doc = spec === null ? null : readSpecDoc(config, spec);
   const latest = doc?.auditPasses[doc.auditPasses.length - 1];
+  const members = spec === null ? [] : membersOf(spec);
 
   return {
     branch: config.branch,
@@ -193,8 +284,8 @@ function branchStanding(config: Config, baseBranch: string): BranchStanding {
     // could not answer would be a gate nobody could get green.
     baseMoved: base !== null && baseHead !== null && base !== baseHead,
     baseBranch,
-    spec,
-    openMembers: spec === null ? [] : tasks.filter((task) => task.spec === spec && task.state !== 'done' && task.state !== 'declined').map((task) => task.id),
+    ...decision,
+    openMembers: members.filter((task) => task.state !== 'done' && task.state !== 'declined').map((task) => task.id),
     unreviewedFindings: spec === null ? 0 : unreviewedFiledBy(tasks, spec).length,
     outstandingClauses: doc === null ? [] : clauseStandings(doc.proofClauses, latest?.verdicts).filter((standing) => standing.status !== 'met').map((standing) => `c${standing.clause}`),
     auditPasses: doc?.auditPasses.length ?? 0,

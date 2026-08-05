@@ -420,7 +420,7 @@ function runList(args: Flags, text: string | undefined): void {
 // every member closed, every member held by a live requirement, a
 // requirement naming no record, or a ring of members holding each other —
 // and the caller's next move differs for each.
-function explainEmptyQueue(tasks: Task[], spec: string, filter: { system?: string; severity?: string }): void {
+export function explainEmptyQueue(tasks: Task[], spec: string, filter: { system?: string; severity?: string }): void {
   const members = tasks.filter((task) => task.spec === spec);
   if (members.length === 0) {
     console.log(`${spec} has no member tasks — \`tasks spec add ${spec} <id>...\` puts work in it`);
