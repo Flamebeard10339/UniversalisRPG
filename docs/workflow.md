@@ -16,18 +16,26 @@ Every command is `npm run tasks -- <verb>`. The record verbs (`show`, `edit`, `s
 
 1. **`tasks handoff`** — the first command of a cold session: branch, active spec, clause
    standings, open queue.
-2. **Survey the capabilities before writing the contract.** For every region the work will touch,
-   ask what is already there: `tasks where <path>` for the owning system, `tasks produces "<name>"`
-   for an existing claim, `tasks system "<name>"` for its registered concepts. Ask by **path** as
-   well as by name — a capability name is authored prose and two authors will not choose the same
-   words, while a path is the same string for everyone. Then decide, deliberately, which
-   capabilities this branch **adds**, which it **extends**, which it **takes over**, and which it
-   **retires** — and record that in the spec's `## Decisions`, because it is the reasoning a later
-   planner would otherwise re-litigate. A survey that finds an owner is a success: reuse it, or
-   write down why a second one is right.
+2. **`tasks plan-prompt <slug> <path>...`** — the planner's brief, generated rather than
+   remembered: it runs `tasks where <path>` over every region the work will touch and prints both
+   halves of what comes back — prior art (everything, open or closed, that has ever claimed the
+   region: `writes`, `files`, `produces`) and **rulings** (event-log decisions and closed-record
+   `reason`s whose text names that path or its basename). A claim says someone has written here; a
+   ruling says someone has already decided something about it, and the two are printed under
+   separate headings because a planner acts on them differently — a ruling against the approach
+   about to be taken is a stop, not a data point to work around. Ask by **path** as well as by
+   name — a capability name is authored prose and two authors will not choose the same words,
+   while a path is the same string for everyone. Then decide, deliberately, which capabilities
+   this branch **adds**, which it **extends**, which it **takes over**, and which it **retires**
+   — and record that in the spec's `## Decisions`, because it is the reasoning a later planner
+   would otherwise re-litigate. A survey that finds an owner is a success: reuse it, or write down
+   why a second one is right. Naming no paths still prints the clause format and the
+   decompose/`plan`/dispatch sequence below, so the brief is worth running even at the first guess.
 3. **`tasks spec new <slug>`**, then write `docs/specs/<slug>.md` — one spec per branch, numbered
-   proof clauses under `## Deliverable`. The spec is the contract, never the test plan. `spec new`
-   prints step 2's survey rather than trusting anyone to remember it, and never writes a thing.
+   proof clauses under `## Deliverable`, in the literal `- [cN] text` form `plan-prompt` prints,
+   because that number is what `--discharges` in step 4 references. The spec is the contract,
+   never the test plan. Run `spec new` after the survey above, not before — it writes only the
+   scaffold, never a planner's capability decisions.
 4. **Decompose** into tasks whose `--writes` regions are disjoint:
    `tasks add "<title>" --writes <paths> --produces "<capability>" --requires <ids>`.
    A `--produces` here is a **forecast** of a capability, answerable to the survey in step 2; the
