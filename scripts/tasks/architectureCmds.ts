@@ -244,14 +244,12 @@ export function reportPriorArtOnWrites(config: Config, tasks: Task[], task: Task
   printPriorArt(priorArt(manifest, tasks.filter((candidate) => candidate.id !== task.id), task.writes));
 }
 
-export function cmdWhere(args: Flags, usage: string): void {
-  const config = resolveConfig(args.flags);
-  const target = args.positional[0];
-  if (!target) {
-    console.error(usage);
-    process.exitCode = 1;
-    return;
-  }
+// The body of `tasks where`, factored out so `plan-prompt` can run the same
+// survey over paths named on its own command line — the deliverable it
+// exists for is running step 2's survey rather than trusting a planner to
+// remember the command, so it reaches this the way `cmdWhere` does rather
+// than printing advice about it.
+export function printWhere(config: Config, target: string): void {
   const { manifest, tree, modules } = architecture(config);
   const view = regionView(manifest, tree, modules, target);
 
@@ -278,6 +276,17 @@ export function cmdWhere(args: Flags, usage: string): void {
 
   console.log('');
   printRulings(rulingsOn(tasks, loadEvents(config.eventsPath).events, [view.path]));
+}
+
+export function cmdWhere(args: Flags, usage: string): void {
+  const config = resolveConfig(args.flags);
+  const target = args.positional[0];
+  if (!target) {
+    console.error(usage);
+    process.exitCode = 1;
+    return;
+  }
+  printWhere(config, target);
 }
 
 // The check a worker runs before building: is this already somebody's job?
