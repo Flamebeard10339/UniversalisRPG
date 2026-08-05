@@ -298,6 +298,8 @@
         "scripts/inspect.test.ts",
         "scripts/audit-status.ts",
         "scripts/layer-check.ts",
+        "scripts/session-timing.ts",
+        "scripts/session-timing.test.ts",
         "scripts/lib",
         ".claude/hooks",
         ".claude/settings.json",
