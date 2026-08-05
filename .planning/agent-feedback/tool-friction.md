@@ -191,3 +191,19 @@ defined`. The usage does say to reach a module with `load`, but the failure is s
 `require` is what a reader who has not read the usage will try first. Same shape as clause 8: the
 command knows the answer — there is exactly one way in and it is named in the usage two lines above —
 and prints the runtime's error instead of it.
+
+## 2026-08-05, auditing `audit-loop-costs-less` (pass 1)
+
+### The brief requires a command the honest path cannot make pass
+
+`audit-prompt` prints "Required commands (all must pass): `npm run tasks -- merge-ready`" to an
+auditor whose spec has, by construction, no recorded audit pass yet — so the spec and clauses legs
+are red before the auditor has done anything, and stay red after an honest `unmet` is filed. The
+requirement is satisfiable only on the all-met path. The brief should either scope the requirement
+to the legs an auditor can influence (tsc, tests, layer-check, audit-status, doctor, bytes) or say
+what it means: run it, and read every leg that is not about this audit's own outcome.
+
+Positive: the new named-test mutation scope did what it promised. Eight targeted mutations, each
+scoped to one named test, ran in 34 seconds total (16 vitest invocations including baselines), and
+the manifest refusal caught nothing this pass but the `ran === 0` seam was mutation-verified. The
+same manifest against file scopes would have cost ~15 minutes on the old tool.
