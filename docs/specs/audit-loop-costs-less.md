@@ -36,7 +36,7 @@ it learns to generate should name a test rather than a file.
 
 Proof:
 
-- A mutation may name a single test, not only a file, and the run it is measured against is that
+- [c1] A mutation may name a single test, not only a file, and the run it is measured against is that
   test alone. Every `proof:` target in this repo already carries the name (`proof: vitest <file>
   "<test>"`), so the manifest a brief generates and the target a spec declares are the same fact.
   Measured: the auditor's own last command, `npx vitest run scripts/tasks/mergeReady.test.ts -t
@@ -47,7 +47,7 @@ Proof:
   proof: vitest scripts/mutate.test.ts "a mutation may name one test, and is measured against that test alone"
   proof: vitest scripts/mutate.test.ts "a manifest naming a test that does not exist is refused before anything is written"
 
-- The escalation ladder gains its middle rung. A mutation that survives its named test is
+- [c2] The escalation ladder gains its middle rung. A mutation that survives its named test is
   re-measured against that test's whole file before the whole suite, and a verdict still names the
   widest scope it reached. Narrowing must not weaken the tool: the existing rule is that a mutation
   dying in a narrow scope is settled and a survivor pays for a wider one, and a new rung inherits
@@ -58,7 +58,7 @@ Proof:
   proof: vitest scripts/mutate.test.ts "a mutation surviving its named test is re-measured against the whole file before the whole suite"
   proof: vitest scripts/mutate.test.ts "a verdict names every scope an escalation climbed through"
 
-- A mutate run reports every path the working tree gained or lost while a mutant was on disk, not
+- [c3] A mutate run reports every path the working tree gained or lost while a mutant was on disk, not
   only the mutation targets it put back. The tool already ends by proving it returned what it took
   (`runMutations`, `mutate.ts:296-304`) — that proof is completed rather than replaced, because
   today it can only ever be about `touched` (`mutate.ts:251`), which is only ever `mutation.file`,
@@ -70,7 +70,7 @@ Proof:
   proof: vitest scripts/mutate.test.ts "a run that added nothing says so rather than staying silent"
   proof: vitest scripts/mutate.test.ts "a path the run gained is reported and not deleted"
 
-- `merge-ready` runs its independent legs concurrently, still reports every leg in a stable order,
+- [c4] `merge-ready` runs its independent legs concurrently, still reports every leg in a stable order,
   and reaches the same verdict it reaches in series. The legs are separate processes over shared
   read-only state, and the command already collects every result before emitting a line, so
   concurrency changes nothing a caller can observe except the clock. The serial loop is
@@ -82,13 +82,13 @@ Proof:
   proof: vitest scripts/tasks/mergeReady.test.ts "every leg is reported, in declaration order, whatever order they finish in"
   proof: vitest scripts/tasks/mergeReady.test.ts "one red leg among green ones still fails the gate and names only itself"
 
-- No single test file accounts for more than a quarter of `npm test`, and `npm test` completes in
+- [c5] No single test file accounts for more than a quarter of `npm test`, and `npm test` completes in
   at most half the 89 seconds measured on `da8ddb0`. Verified by measurement, not by an assertion:
   a wall-clock threshold pinned in a test is a flake on someone else's machine, and CLAUDE.md's own
   five-minute rule is a measured property for the same reason. The auditor re-runs it and records
   the number.
 
-- The branch reports its own audit's cost. `npm run session-timing` is run against this branch's
+- [c6] The branch reports its own audit's cost. `npm run session-timing` is run against this branch's
   own audit subagent, and the **minutes it spent waiting on tools** are recorded against the 15.1
   and 15.5 measured for the two 2026-08-04 audits of `tool-friction-backlog` — absolute time, not
   the share, because pass 2 already showed a share improving by 20 points while the waiting itself
@@ -155,3 +155,27 @@ mutate scope and every merge-ready run, so clause 5 discounts the two rows above
 ## Open questions
 
 None.
+
+## Audit passes
+
+### Pass 1 — 2026-08-05
+
+- base: `9b16a96ff28cfca863b79ffad4e3592cbf343519`
+- head: `8dd7ddcd9c2c5cec97a545724b9b46756440e877`
+- proof 1: met — Both targets exist, pass, and die for the right reason: an 8-entry manifest run through npm run mutate (itself using the new test field, so the CLI path parseManifest -> scopeOf -> -t was exercised end to end) KILLED a mutant that dropped the name on the way to the runner (runTests(mutation.tests) without mutation.test in phase 1) via "a mutation may name one test, and is measured against that test alone", and KILLED a mutant that disabled the ran===0 refusal (baseline.ran === -1) via "a manifest naming a test that does not exist is refused before anything is written" — each 1 failed of 126 at named-test scope. The whole run — 8 baselines plus 8 measured runs, 16 vitest invocations — took 34s wall, ~2s per invocation, against ~90s per file-scoped run measured on da8ddb0. Re-run: npm run mutate -- <manifest naming these two tests>.
+- proof 2: met — KILLED a mutant that skipped the ladder's middle rung (ladderAbove pushed no file rung) via "a mutation surviving its named test is re-measured against the whole file before the whole suite", and KILLED a mutant that kept only the last scope instead of chaining escalatedFrom via "a verdict names every scope an escalation climbed through" — each 1 failed of 126 at named-test scope. Baseline economy holds twice over: "pays for the baselines the ladder reached, and no others" pins it in-process, and the live mutate run measured exactly the 8 named-test baselines with no file or whole-suite baseline taken, because nothing survived. Narrow-death-settles is inherited: the escalation loop breaks on any non-SURVIVED verdict before paying for a wider rung.
+- proof 3: met — KILLED a mutant reporting gained: [] via "a file the tree gained while a mutant was on disk is named in the report", and KILLED a mutant that dropped the gained-nothing line via "a run that added nothing says so rather than staying silent". The third target, "a path the run gained is reported and not deleted", pins a deletion that would have to be written to exist — runMutations has no removal path for gained files, formatReport prints "left in place, not deleted", and the test asserts the file still reads after the run — so it was inspected rather than mutated. Live: this audit's own mutate run printed "The tree gained nothing and lost nothing while this run held it" and git status --porcelain was empty afterwards. The journal lives under os.tmpdir (journalPathFor), so the tool's own state cannot pollute the delta.
+- proof 4: unmet — The code and its targets hold at unit level: KILLED a mutant that serialized the legs (awaited each before starting the next — the held-open resolvers never all appear and the declaration-order target times out) via "every leg is reported, in declaration order, whatever order they finish in", and KILLED status === 0 || status === 1 via "one red leg among green ones still fails the gate and names only itself", each 1 failed of 26. But the clause's acceptance criterion — "reaches the same verdict it reaches in series" — fails on the machine the spec's own numbers were measured on: two consecutive npm run tasks -- merge-ready runs on a clean tree (42s and 43s wall, against ~120s serial) both went red on the npm test leg with 5000ms test timeouts (scripts/modportal.test.ts "opts an approved mod in and back out" both times, scripts/tasks/doctor.test.ts "default-store writes stay silent" once), while standalone npm test passed 1583/1583 twice the same hour. The legs are separate processes over shared read-only state, but the CPU is shared state too: npm test already saturates 24 threads, and tsc + audit-status + doctor on top push spawn-heavy 5s-budget tests over their timeout. The serial gate ran npm test uncontended and would have passed. Filed as a finding with the fix's meaning.
+- proof 5: unmet — Measured 2026-08-05, 24-thread machine. Second half holds: npm test = 33.08s vitest duration (35s wall), well under the 44.5s ceiling — a 63% cut from 89s. First half fails: by the spec's own measure (file seconds against suite seconds, the "84 of the suite's 89"), scripts/tasks/audit.test.ts ran 32.7s inside the full run (json reporter, endTime-startTime) and 22.99s solo (npx vitest run scripts/tasks/audit.test.ts: Duration 22.99s), with handoff.test.ts at 32.1s and records.test.ts at 31.7s beside it — 70-99% of npm test, not under a quarter. One file is one vitest worker, so a ~23s file is a floor the suite cannot drop below; the split moved test names, not runtime, and the runtime concentrates where the tests spawn a subprocess per CLI call. The branch measured the same fact itself and filed remediation as task-suite-spawn-costs (open): its stdin-seam part is what would discharge this half.
+- proof 6: unknown — Not gradable by this pass by design: the clause measures this audit's own subagent with npm run session-timing after the audit completes, and the spec assigns the recording to the commissioning session. Recorded unknown so that nothing reads as verified before that measurement lands against the 15.1 and 15.5 minute baselines.
+
+### Pass 2 — 2026-08-05
+
+- base: `9b16a96ff28cfca863b79ffad4e3592cbf343519`
+- head: `7c7adc66763fec28e8b046f82e971be311465a34`
+- proof 1: met — Carried from pass 1 on an unchanged implementation and re-run on head: git diff --name-only 8dd7ddc..7c7adc6 -- scripts/mutate.ts scripts/mutate.test.ts is empty, so pass 1's mutation-backed kills (the dropped -t mutant and the disabled ran===0 refusal, each 1 failed of 126 at named-test scope) grade the same bytes. On 7c7adc6 both named targets pass: npx vitest run scripts/mutate.test.ts scripts/tasks/mergeReady.test.ts = 152/152 in 660ms, and the full suite containing them passed four times this pass (two merge-ready gates, one standalone npm test, the solo file runs). Re-run: npm run mutate -- <manifest naming these two tests>.
+- proof 2: met — Same basis as c1: scripts/mutate.ts and scripts/mutate.test.ts byte-identical to the tree pass 1 mutation-verified (ladder middle-rung mutant and escalatedFrom-chain mutant both KILLED, baseline economy pinned in-process and observed live). Both named targets green on head in the 152/152 run. Nothing after 8dd7ddc touched the ladder.
+- proof 3: met — Same basis: files unchanged since pass 1's verdict (gained-file report mutant and gained-nothing-line mutant KILLED; the not-deleted target inspected because no deletion path exists to mutate). All three named targets green on head in the 152/152 run. This pass's two merge-ready runs and standalone suite left git status --porcelain empty.
+- proof 4: met — Verdict parity now holds on the machine pass 1 measured it failing. Two consecutive npm run tasks -- merge-ready on a clean tree at 7c7adc6: all five command legs pass (tsc, npm test, layer-check, audit-status, doctor), 34.5s and 34.0s wall — pass 1 measured the same command red twice on the npm test leg via 5000ms timeouts. Standalone the same hour: npm test 1583/1583 (25.2s), and tsc, layer-check, audit-status, doctor each pass alone — same verdict concurrent as standalone, leg by leg. The fix is contention headroom on the gate's npm-test leg only (--testTimeout=20000, mergeReady.ts:26); assertions unchanged, and the leg-order/red-leg proof targets pass on head (mergeReady.test.ts unchanged since pass 1's mutation checks). The spec and clauses legs stay red by construction — they grade this spec's own outstanding clauses, the friction pass 1 already logged — and are not a leg-verdict divergence. The 4x clock divergence from CI's plain npm test is filed as a LOW finding.
+- proof 5: unmet — Measured 2026-08-05 on 7c7adc6, 24-thread machine. Second half holds decisively: npm test = 25.23s vitest duration, 26.9s wall, against the 44.5s ceiling — 72% under the 89s baseline. First half fails by the measure pass 1 committed to (file seconds against suite seconds, the spec's own "84 of the suite's 89"): the largest file is now scripts/tasks/handoff.test.ts at 16.20s solo (npx vitest run scripts/tasks/handoff.test.ts: Duration 16.20s) — 64% of the 25.2s suite, where a quarter is 6.3s — and 23.94s by in-run endTime-startTime (95%), with records.test.ts at 14.16s solo beside it. By the other defensible reading — share of summed file time (152.5s across 68 files, json reporter) — the largest file is 15.7%, under a quarter, and the commissioning session read the clause that way. The two readings flip the verdict, so the measure needs a human ruling at triage; graded by pass 1's precedent, which this branch accepted and worked to. The concentration did fall — 84s at da8ddb0, ~23s at pass 1, 16.2s now — and what remains is real git spawns per commit in gitFixture (handoff's walk-back tests want real commits). Fixing under the wall reading means faking git at its seam for the walk-back cases or splitting the two ~15s files.
+- proof 6: met — The event log carries the measurement the clause demands, and it reproduces. Note of 2026-08-05T03:42:26Z (tasks log --spec audit-loop-costs-less): npm run session-timing over agent-a7d360cc, this branch's own pass-1 audit subagent — 2.4m waiting on tools out of a 12.2m span, 41 tool calls, recorded against the 15.1 and 15.5 absolute baselines from the two 2026-08-04 tool-friction-backlog audits; 84% less absolute waiting, costliest single wait 42s of merge-ready rather than mutate. Re-run this pass: npm run session-timing -- agent-a7d360cc printed 12.2m span, 41 tool calls, waiting on tools 2.4m (20%) — identical to the record. Absolute minutes, not the share, as the clause requires.

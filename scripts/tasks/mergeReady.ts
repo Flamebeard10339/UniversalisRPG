@@ -1,4 +1,4 @@
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { checkBytes, type ByteFinding } from '../lib/bytes';
 import * as git from '../lib/git';
@@ -19,7 +19,11 @@ export interface Leg {
 
 export const LEGS: Leg[] = [
   { name: 'tsc', command: 'npx tsc --noEmit' },
-  { name: 'npm test', command: 'npm test -- --reporter=dot' },
+  // The timeout headroom is for this gate's own environment, not CI's: five
+  // legs share the machine here, and a per-test budget sized for an idle box
+  // failed healthy tests under that contention — measured twice on a clean
+  // tree. The assertions are unchanged; only the clock they race is.
+  { name: 'npm test', command: 'npm test -- --reporter=dot --testTimeout=20000' },
   { name: 'layer-check', command: 'npm run layer-check' },
   { name: 'audit-status', command: 'npm run audit-status' },
   { name: 'doctor', command: 'npm run tasks -- doctor' },
@@ -37,7 +41,9 @@ export interface LegResult {
   next?: string;
 }
 
-export type RunCommand = (command: string) => { status: number | null };
+// The command's own output rides back with its status: legs that no longer
+// own the terminal while they run still get their say, replayed in order.
+export type RunCommand = (command: string) => Promise<{ status: number | null; output: string }>;
 
 // This branch's standing, as facts rather than as commands to go and get:
 // the six manual reads across two tools that preparing a merge actually took.
@@ -138,12 +144,25 @@ function standingLegs(standing: BranchStanding): LegResult[] {
 // The decision: run every leg even after one fails — a merge-readiness
 // answer that stops at the first red leg costs a rerun per defect — and
 // report one line each. Returns false when any leg is red.
-export function runMergeReady(deps: MergeReadyDeps): boolean {
+//
+// The legs are independent processes over shared read-only state, so all of
+// them are started before any is awaited: concurrency changes nothing a
+// caller can observe except the clock, because every result is collected
+// before the first line is emitted and reported in declaration order.
+export async function runMergeReady(deps: MergeReadyDeps): Promise<boolean> {
+  const launched = LEGS.map((leg) => deps.run(leg.command));
   const standing = deps.standing();
-  const results: LegResult[] = [];
+  const outcomes = await Promise.all(launched);
 
-  for (const leg of LEGS) {
-    const { status } = deps.run(leg.command);
+  // Each leg's own output, in declaration order, before any verdict row —
+  // the doctor leg's warnings are "reported above" because of this.
+  for (const outcome of outcomes) {
+    if (outcome.output.trim() === '') continue;
+    for (const line of outcome.output.replace(/\n+$/, '').split('\n')) deps.emit(line);
+  }
+
+  const results: LegResult[] = LEGS.map((leg, index) => {
+    const { status } = outcomes[index];
     const ok = status === 0;
     // The doctor leg's count reaches the summary without changing what
     // fails. Five warnings — four closes that existed only in the working
@@ -151,8 +170,8 @@ export function runMergeReady(deps: MergeReadyDeps): boolean {
     // reading "every leg passed", and were caught by rereading scrollback
     // for an unrelated reason.
     const warnings = leg.name === 'doctor' && standing.doctorWarnings > 0 ? ` — ${standing.doctorWarnings} warning(s) reported above, which do not fail this leg` : '';
-    results.push({ name: leg.name, ok, detail: `${ok ? 'pass' : `exit=${status ?? 'null'}`}${warnings}`, next: ok ? undefined : leg.command });
-  }
+    return { name: leg.name, ok, detail: `${ok ? 'pass' : `exit=${status ?? 'null'}`}${warnings}`, next: ok ? undefined : leg.command };
+  });
 
   let byteFindings: ByteFinding[];
   try {
@@ -301,14 +320,28 @@ function readSpecDoc(config: Config, spec: string): SpecDoc | null {
   }
 }
 
-export function cmdMergeReady(args: Flags): void {
+export async function cmdMergeReady(args: Flags): Promise<void> {
   const config = resolveConfig(args.flags);
   const baseBranch = args.flags['base-branch'] ?? DEFAULT_BRANCH;
-  console.log('running the merge gate — the same legs CI runs, in order (several minutes):');
-  const ok = runMergeReady({
+  console.log('running the merge gate — the same legs CI runs, together (a couple of minutes):');
+  const ok = await runMergeReady({
     standing: () => branchStanding(config, baseBranch),
     // shell: npm and npx are .cmd shims on Windows, unreachable without one.
-    run: (command) => spawnSync(command, { shell: true, stdio: ['ignore', 'inherit', 'inherit'] }),
+    // Output is captured rather than inherited: five legs share one terminal
+    // now, and each gets it back whole, in order, when all have finished.
+    // Decoded once over the concatenated bytes, not per chunk: a multibyte
+    // character split across a pipe-chunk boundary would otherwise replay
+    // as U+FFFD.
+    run: (command) =>
+      new Promise((resolve) => {
+        const child = spawn(command, { shell: true, stdio: ['ignore', 'pipe', 'pipe'] });
+        const chunks: Buffer[] = [];
+        child.stdout.on('data', (chunk: Buffer) => chunks.push(chunk));
+        child.stderr.on('data', (chunk: Buffer) => chunks.push(chunk));
+        const output = (): string => Buffer.concat(chunks).toString('utf8');
+        child.on('error', (error) => resolve({ status: null, output: `${output()}${error.message}\n` }));
+        child.on('close', (status) => resolve({ status, output: output() }));
+      }),
     trackedFiles,
     read: (file) => {
       try {
