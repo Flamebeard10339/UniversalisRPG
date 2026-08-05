@@ -1,4 +1,4 @@
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { harvestFiles, parseAuditDoc, systemForDoc } from '../lib/auditImport';
@@ -135,13 +135,87 @@ const AUDIT_CHECKLIST = [
 // nothing. Measured at 40 of 49 targets on this spec's own first pass. The
 // title is a string literal in the file, so a text search answers without
 // running the suite — this is a read printed beside the target, not a gate.
-export function unresolvedTarget(target: string, read: (file: string) => string | null = readIfPresent): string | null {
+export type TargetResolution =
+  | { state: 'found'; file: string; name: string }
+  | { state: 'moved'; file: string; name: string; foundIn: string[] }
+  | { state: 'no-such-file'; file: string; name: string }
+  | { state: 'nowhere'; file: string; name: string }
+  | { state: 'unsearchable'; file: string; name: string };
+
+// A title the named file does not carry is not yet an absence: the suite
+// split moved tests between files without renaming one of them, so the title
+// is far more often somewhere else than gone. The wide search that answers
+// that costs a vitest run, so it is an escalation — reached only once the
+// named file's own source has already failed to settle it, the same bargain
+// mutate strikes between a narrow scope and a wide one.
+//
+// A file the checkout does not have settles the target on its own: the
+// target has to be rewritten either way, and that is the more useful thing
+// to say than where the title happens to live now.
+export function resolveTarget(target: string, read: (file: string) => string | null = readIfPresent, search: (name: string) => string[] | null = suiteFilesFor): TargetResolution | null {
   const parsed = /^vitest\s+(\S+)\s+"(.*)"\s*$/.exec(target);
   if (parsed === null) return null;
   const [, file, name] = parsed;
   const text = read(file);
-  if (text === null) return `   <-- names no file in this checkout: ${file}`;
-  return testTitles(text).includes(name) ? null : `   <-- ${file} has no test by this name, and \`vitest -t\` would skip every test and exit 0`;
+  if (text === null) return { state: 'no-such-file', file, name };
+  if (testTitles(text).includes(name)) return { state: 'found', file, name };
+  const elsewhere = search(name);
+  if (elsewhere === null) return { state: 'unsearchable', file, name };
+  return elsewhere.length > 0 ? { state: 'moved', file, name, foundIn: elsewhere } : { state: 'nowhere', file, name };
+}
+
+export function unresolvedTarget(target: string, read: (file: string) => string | null = readIfPresent, search: (name: string) => string[] | null = suiteFilesFor): string | null {
+  const resolution = resolveTarget(target, read, search);
+  if (resolution === null || resolution.state === 'found') return null;
+  if (resolution.state === 'no-such-file') return `   <-- names no file in this checkout: ${resolution.file}`;
+  if (resolution.state === 'moved') return `   <-- moved: this test is in ${resolution.foundIn.join(', ')}, not in ${resolution.file}`;
+  if (resolution.state === 'unsearchable') return `   <-- ${resolution.file} has no test by this name, and the suite could not be listed to say whether it moved`;
+  return `   <-- no test by this name exists anywhere in the suite, and \`vitest -t\` would skip every test and exit 0`;
+}
+
+// `vitest list --json` is the authoritative answer to which file a title
+// lives in, and the only one that stays right when a title is built rather
+// than written out. It costs a suite load, so the whole index is read once
+// and every later target answers from memory — including the failure, which
+// is cached as a failure so a checkout that cannot list is not asked again
+// per target.
+let suiteIndex: Map<string, string[]> | null | undefined;
+
+export function suiteFilesFor(name: string, list: () => string | null = runVitestList): string[] | null {
+  if (suiteIndex === undefined) suiteIndex = indexSuiteTitles(list());
+  return suiteIndex === null ? null : (suiteIndex.get(name) ?? []);
+}
+
+// The `name` vitest reports is the whole describe chain; the leaf after the
+// last separator is what an `it` was named, which is what a `proof:` target
+// quotes.
+export function indexSuiteTitles(json: string | null): Map<string, string[]> | null {
+  if (json === null) return null;
+  let entries: Array<{ name?: string; file?: string }>;
+  try {
+    entries = JSON.parse(json);
+  } catch {
+    return null;
+  }
+  if (!Array.isArray(entries)) return null;
+  const index = new Map<string, string[]>();
+  for (const entry of entries) {
+    if (typeof entry?.name !== 'string' || typeof entry.file !== 'string') continue;
+    const leaf = entry.name.split(' > ').pop()!;
+    const file = path.relative(process.cwd(), entry.file).split(path.sep).join('/');
+    const files = index.get(leaf) ?? [];
+    if (!files.includes(file)) files.push(file);
+    index.set(leaf, files);
+  }
+  return index;
+}
+
+function runVitestList(): string | null {
+  // shell: npx is a .cmd shim on Windows, unreachable without one.
+  const result = spawnSync('npx vitest list --json', { shell: true, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
+  if (result.status !== 0 || typeof result.stdout !== 'string') return null;
+  const start = result.stdout.indexOf('[');
+  return start === -1 ? null : result.stdout.slice(start);
 }
 
 // Titles only, never the whole file. Searching the text made an `expect(...)`

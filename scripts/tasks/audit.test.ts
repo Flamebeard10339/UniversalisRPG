@@ -3,7 +3,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { tsxCli } from '../lib/tsxCli';
-import { parseAuditArgs, parseAuditFile, unresolvedTarget } from './audit';
+import { indexSuiteTitles, parseAuditArgs, parseAuditFile, unresolvedTarget } from './audit';
 import { appendEvent, firstListedId, fixture, gitFixture, relevantFilesBlock, repoRoot, script, type Run } from './cliFixtures';
 
 describe('tasks CLI', () => {
@@ -875,10 +875,13 @@ describe('a proof target that names no test', () => {
     "it.each([1])('a parameterised title', () => {});",
   ].join('\n');
   const read = (): string => file;
+  // The wide search is a vitest run. Every case here is about the narrow
+  // read, so it is answered from a stub — a suite that holds nothing.
+  const searchesNothing = (): string[] => [];
 
   it('says so, and says why a green run would not have caught it', () => {
-    const note = unresolvedTarget('vitest a.test.ts "a test nobody wrote"', read);
-    expect(note).toContain('a.test.ts has no test by this name');
+    const note = unresolvedTarget('vitest a.test.ts "a test nobody wrote"', read, searchesNothing);
+    expect(note).toContain('no test by this name exists anywhere');
     expect(note).toContain('exit 0');
   });
 
@@ -892,8 +895,8 @@ describe('a proof target that names no test', () => {
   // `vitest -t` on it still skips every test and exits 0. A guard that fails
   // in the direction that hides recurrence is worse than none.
   it('reads titles only, so an assertion argument or a comment is not a resolved target', () => {
-    expect(unresolvedTarget('vitest a.test.ts "a phrase asserted but never named"', read)).toContain('has no test by this name');
-    expect(unresolvedTarget('vitest a.test.ts "a phrase nobody named a test after"', read)).toContain('has no test by this name');
+    expect(unresolvedTarget('vitest a.test.ts "a phrase asserted but never named"', read, searchesNothing)).toContain('no test by this name exists anywhere');
+    expect(unresolvedTarget('vitest a.test.ts "a phrase nobody named a test after"', read, searchesNothing)).toContain('no test by this name exists anywhere');
   });
 
   // The subtlety that would make the check lie: a title carrying an
@@ -903,12 +906,61 @@ describe('a proof target that names no test', () => {
     expect(unresolvedTarget(`vitest a.test.ts "one with an apostrophe in doctor's name"`, read)).toBeNull();
   });
 
-  it('names a file that is not in this checkout as that, rather than as a missing test', () => {
+  it('a target naming a file absent from the checkout is reported as a missing file', () => {
     expect(unresolvedTarget('vitest gone.test.ts "anything"', () => null)).toContain('names no file in this checkout');
   });
 
   it('has nothing to say about a target that is not a vitest one', () => {
     expect(unresolvedTarget('command npm run layer-check', read)).toBeNull();
+  });
+
+  // The suite split moved tests between files and renamed none of them, so
+  // the title a stale target names is far more often somewhere else than
+  // gone. Reported as an absence, that split reads as a wall of false
+  // alarms, which is what teaches an auditor to stop reading the check.
+  it('a target whose title lives in another file is told where it actually is', () => {
+    const note = unresolvedTarget('vitest a.test.ts "a test nobody wrote"', read, () => ['scripts/tasks/records.test.ts']);
+    expect(note).toContain('scripts/tasks/records.test.ts');
+    expect(note).toContain('not in a.test.ts');
+  });
+
+  it('a title that exists nowhere is reported differently from one that merely moved', () => {
+    const moved = unresolvedTarget('vitest a.test.ts "a test nobody wrote"', read, () => ['b.test.ts']);
+    const nowhere = unresolvedTarget('vitest a.test.ts "a test nobody wrote"', read, () => []);
+    expect(nowhere).toContain('no test by this name exists anywhere');
+    expect(nowhere).toContain('exit 0');
+    expect(nowhere).not.toEqual(moved);
+  });
+
+  it('a target that resolves in the file it names never pays for a wider search', () => {
+    let searches = 0;
+    const search = (): string[] => {
+      searches++;
+      return [];
+    };
+    expect(unresolvedTarget('vitest a.test.ts "a test that exists"', read, search)).toBeNull();
+    expect(searches).toBe(0);
+    expect(unresolvedTarget('vitest gone.test.ts "anything"', () => null, search)).toContain('names no file in this checkout');
+    expect(searches).toBe(0);
+    expect(unresolvedTarget('vitest a.test.ts "a test nobody wrote"', read, search)).not.toBeNull();
+    expect(searches).toBe(1);
+  });
+
+  // A checkout that cannot list its own suite knows less than one that can,
+  // and saying "nowhere" on its behalf would be the false absence this
+  // whole escalation exists to remove.
+  it('says the suite could not be listed rather than calling a title absent on a failed search', () => {
+    expect(unresolvedTarget('vitest a.test.ts "a test nobody wrote"', read, () => null)).toContain('could not be listed');
+  });
+
+  it('indexes a vitest listing by the leaf title, under a path relative to the repo', () => {
+    const listing = JSON.stringify([
+      { name: 'tasks CLI > work-prompt briefs a member', file: path.join(repoRoot, 'scripts', 'tasks', 'records.test.ts') },
+      { name: 'an outer > an inner > work-prompt briefs a member', file: path.join(repoRoot, 'scripts', 'tasks', 'workPrompt.test.ts') },
+    ]);
+    expect(indexSuiteTitles(listing)?.get('work-prompt briefs a member')).toEqual(['scripts/tasks/records.test.ts', 'scripts/tasks/workPrompt.test.ts']);
+    expect(indexSuiteTitles('not json at all')).toBeNull();
+    expect(indexSuiteTitles(null)).toBeNull();
   });
 });
 
