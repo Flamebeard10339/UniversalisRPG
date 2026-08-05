@@ -6,13 +6,13 @@ import { describe, expect, it } from 'vitest';
 import { fixture, repoRoot, runInProcess, type Run } from './cliFixtures';
 
 describe('tasks CLI', () => {
-  it('check-commit-msg passes a subject and body, with Next: optional', () => {
+  it('check-commit-msg passes a subject and body, a trailing Next: line included as ordinary content', () => {
     fixture(({ tasks, dir }) => {
       const msgFile = path.join(dir, 'msg.txt');
       writeFileSync(msgFile, 'Subject\n\nA body explaining the change.\n', 'utf8');
       expect(tasks('check-commit-msg', msgFile).status).toBe(0);
 
-      writeFileSync(msgFile, 'Subject\n\nA body explaining the change.\n\nNext: pick up X.\n', 'utf8');
+      writeFileSync(msgFile, 'Subject\n\nNext: pick up X.\n', 'utf8');
       expect(tasks('check-commit-msg', msgFile).status).toBe(0);
     });
   });

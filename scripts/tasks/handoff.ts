@@ -111,7 +111,7 @@ export function cmdCheckCommitMessage(args: Flags, usage: string): void {
   const reason = checkCommitMessage(message);
   if (reason) {
     console.error(`commit-msg: ${reason}`);
-    console.error('every commit needs a body saying what was done. Use `tasks next` for resumability; an optional Next: trailer is only a breadcrumb. --no-verify to bypass.');
+    console.error('every commit needs a body saying what was done. Use `tasks next` for resumability. --no-verify to bypass.');
     process.exitCode = 1;
   }
 }
