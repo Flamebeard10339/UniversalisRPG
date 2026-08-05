@@ -289,6 +289,13 @@
             "scripts/tasks/audit.ts"
           ],
           "note": "produced by targets-resolve-across-files"
+        },
+        {
+          "name": "generated auditor brief",
+          "paths": [
+            "scripts/tasks/audit.ts"
+          ],
+          "note": "produced by brief-arrives-with-answers"
         }
       ]
     },
