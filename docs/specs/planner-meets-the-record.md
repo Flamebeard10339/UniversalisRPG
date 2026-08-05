@@ -70,6 +70,12 @@ Proof:
   path in its `files` and `writes`, and the text match stays for the rulings that name a path no
   record claims.
   proof: command npm run tasks -- where scripts/tasks/render.ts
+- [c11] The survey nobody has to remember to run shows rulings too. `reportPriorArtOnWrites` fires by
+  itself when a write grant is declared — which step 6 tells every worker to do, on exactly the paths
+  a ruling would be about — and printed prior art only, so a planner could see a decision where a
+  worker could not, on the same path and from the same store. It prints both, the way `where` and
+  `plan-prompt` do.
+  proof: command npm run tasks -- add "probe" --writes scripts/tasks/handoff.test.ts
 
 ## Decisions
 
