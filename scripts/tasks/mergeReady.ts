@@ -19,7 +19,11 @@ export interface Leg {
 
 export const LEGS: Leg[] = [
   { name: 'tsc', command: 'npx tsc --noEmit' },
-  { name: 'npm test', command: 'npm test -- --reporter=dot' },
+  // The timeout headroom is for this gate's own environment, not CI's: five
+  // legs share the machine here, and a per-test budget sized for an idle box
+  // failed healthy tests under that contention — measured twice on a clean
+  // tree. The assertions are unchanged; only the clock they race is.
+  { name: 'npm test', command: 'npm test -- --reporter=dot --testTimeout=20000' },
   { name: 'layer-check', command: 'npm run layer-check' },
   { name: 'audit-status', command: 'npm run audit-status' },
   { name: 'doctor', command: 'npm run tasks -- doctor' },
@@ -325,18 +329,18 @@ export async function cmdMergeReady(args: Flags): Promise<void> {
     // shell: npm and npx are .cmd shims on Windows, unreachable without one.
     // Output is captured rather than inherited: five legs share one terminal
     // now, and each gets it back whole, in order, when all have finished.
+    // Decoded once over the concatenated bytes, not per chunk: a multibyte
+    // character split across a pipe-chunk boundary would otherwise replay
+    // as U+FFFD.
     run: (command) =>
       new Promise((resolve) => {
         const child = spawn(command, { shell: true, stdio: ['ignore', 'pipe', 'pipe'] });
-        let output = '';
-        child.stdout.on('data', (chunk: Buffer) => {
-          output += chunk;
-        });
-        child.stderr.on('data', (chunk: Buffer) => {
-          output += chunk;
-        });
-        child.on('error', (error) => resolve({ status: null, output: `${output}${error.message}\n` }));
-        child.on('close', (status) => resolve({ status, output }));
+        const chunks: Buffer[] = [];
+        child.stdout.on('data', (chunk: Buffer) => chunks.push(chunk));
+        child.stderr.on('data', (chunk: Buffer) => chunks.push(chunk));
+        const output = (): string => Buffer.concat(chunks).toString('utf8');
+        child.on('error', (error) => resolve({ status: null, output: `${output()}${error.message}\n` }));
+        child.on('close', (status) => resolve({ status, output: output() }));
       }),
     trackedFiles,
     read: (file) => {
