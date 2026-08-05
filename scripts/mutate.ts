@@ -71,6 +71,10 @@ export interface MutationReport {
   results: MutationResult[];
   refusals: string[];
   unrestored: string[];
+  // Present when the run could list the tree's paths before and after. Gained
+  // paths are reported and left in place: a run that silently removed files
+  // would be a worse tool than one that silently left them.
+  treeDelta?: { gained: string[]; lost: string[] };
   ok: boolean;
 }
 
@@ -263,10 +267,19 @@ const ladderAbove = (mutation: Mutation): Pick<Mutation, 'tests' | 'test'>[] => 
   return rungs;
 };
 
-export function runMutations(mutations: readonly Mutation[], files: FileStore, runTests: RunTests, baselineFor?: BaselineFor): MutationReport {
+export function runMutations(mutations: readonly Mutation[], files: FileStore, runTests: RunTests, baselineFor?: BaselineFor, tree?: () => readonly string[]): MutationReport {
   const originals = new Map<string, string>();
   const refusals = refusalsFor(mutations, files, originals);
   if (refusals.length > 0) return { results: [], refusals, unrestored: [], ok: false };
+
+  // Before the first test runs, not merely the first write: a test can write
+  // files whether or not a mutant is on disk, and this run owns both.
+  let before: readonly string[] | undefined;
+  try {
+    before = tree?.();
+  } catch {
+    before = undefined;
+  }
 
   // Memoized here as well as by the caller, so however many mutations share a
   // scope or escalate into one, the run asks for its baseline once — and never
@@ -345,7 +358,21 @@ export function runMutations(mutations: readonly Mutation[], files: FileStore, r
     if (current !== originals.get(file) || restoreFailures.has(file)) unrestored.push(file);
   }
 
-  return { results, refusals, unrestored, ok: unrestored.length === 0 && results.every((result) => result.verdict === 'KILLED') };
+  // The mutation targets are proven byte-identical above; this is the rest of
+  // the tree, which the restore cannot reach because it never captured it.
+  let treeDelta: { gained: string[]; lost: string[] } | undefined;
+  if (before !== undefined) {
+    try {
+      const after = tree!();
+      const had = new Set(before);
+      const has = new Set(after);
+      treeDelta = { gained: after.filter((file) => !had.has(file)), lost: before.filter((file) => !has.has(file)) };
+    } catch {
+      treeDelta = undefined;
+    }
+  }
+
+  return { results, refusals, unrestored, treeDelta, ok: unrestored.length === 0 && results.every((result) => result.verdict === 'KILLED') };
 }
 
 const ORDER: Record<Verdict, number> = { SURVIVED: 0, ERROR: 1, KILLED: 2 };
@@ -371,6 +398,12 @@ export function formatReport(report: MutationReport): string {
   const errored = sorted.filter((result) => result.verdict === 'ERROR').length;
   lines.push('', `${sorted.length - survived.length - errored} killed, ${survived.length} survived, ${errored} errored`);
   if (survived.length > 0) lines.push(`A survivor is the finding: ${survived.map((result) => result.name).join(', ')} changed behaviour and its scope stayed green.`);
+  if (report.treeDelta !== undefined) {
+    const { gained, lost } = report.treeDelta;
+    if (gained.length === 0 && lost.length === 0) lines.push('The tree gained nothing and lost nothing while this run held it.');
+    if (gained.length > 0) lines.push('', `TREE GAINED: ${gained.join(', ')} — written while this run held the tree; left in place, not deleted.`);
+    if (lost.length > 0) lines.push('', `TREE LOST: ${lost.join(', ')} — present before this run and gone after.`);
+  }
   if (report.unrestored.length > 0) lines.push('', `NOT RESTORED: ${report.unrestored.join(', ')} — check the working tree before anything else.`);
   return lines.join('\n');
 }
@@ -653,7 +686,16 @@ function main(): void {
     return measured.get(key);
   };
 
-  const report = runMutations(mutations, files, runTests, baselineFor);
+  // Tracked plus untracked-unignored: the paths a test could add or remove
+  // that anyone would later notice.
+  const tree = (): readonly string[] => {
+    const listing = spawnSync('git', ['ls-files', '--cached', '--others', '--exclude-standard'], { cwd: repoRoot, encoding: 'utf8' });
+    if (listing.error) throw listing.error;
+    if (listing.status !== 0) throw new Error(listing.stderr || 'git ls-files failed');
+    return (listing.stdout ?? '').split('\n').filter((line) => line !== '');
+  };
+
+  const report = runMutations(mutations, files, runTests, baselineFor, tree);
   console.log(formatReport(report));
   if (report.unrestored.length === 0) rmSync(JOURNAL, { force: true });
   process.exit(report.ok ? 0 : 1);

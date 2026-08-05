@@ -5,7 +5,7 @@ import { applyTo, escapesRoot, findMissRefusal, formatReport, journalVerdict, ou
 
 const ORIGINAL = 'const base = entityTypeBase(merged, section);\nconst other = 1;\n';
 
-function store(files: Record<string, string>): FileStore & { writes: { file: string; text: string }[] } {
+function store(files: Record<string, string>): FileStore & { writes: { file: string; text: string }[]; paths: () => string[] } {
   const content = { ...files };
   return {
     writes: [],
@@ -18,8 +18,8 @@ function store(files: Record<string, string>): FileStore & { writes: { file: str
       content[file] = text;
       this.writes.push({ file, text });
     },
-    now: () => content,
-  } as FileStore & { writes: { file: string; text: string }[]; now: () => Record<string, string> };
+    paths: () => Object.keys(content),
+  };
 }
 
 const mutation = (over: Partial<Mutation> = {}): Mutation => ({ name: 'c1', file: 'a.ts', find: 'entityTypeBase(merged, section)', replace: 'undefined', ...over });
@@ -242,6 +242,63 @@ describe('mutate: proving the restore', () => {
     expect(report.results.map((result) => result.name)).toEqual(['first', 'second']);
     expect(report.unrestored).toContain('a.ts');
     expect(report.ok).toBe(false);
+  });
+});
+
+describe('mutate: what the run left behind', () => {
+  // The restore proof covers the mutation targets and nothing else. A file a
+  // test writes while running under a mutant is in neither `touched` nor the
+  // captured originals, so only comparing the tree's paths can see it.
+  it('a file the tree gained while a mutant was on disk is named in the report', () => {
+    const files = store({ 'a.ts': ORIGINAL });
+    const report = runMutations(
+      [mutation()],
+      files,
+      () => {
+        files.write('dropping.txt', 'left behind');
+        return killing();
+      },
+      undefined,
+      files.paths,
+    );
+    expect(report.treeDelta?.gained).toEqual(['dropping.txt']);
+    expect(formatReport(report)).toContain('dropping.txt');
+  });
+
+  it('a run that added nothing says so rather than staying silent', () => {
+    const files = store({ 'a.ts': ORIGINAL });
+    const report = runMutations([mutation()], files, killing, undefined, files.paths);
+    expect(report.treeDelta).toEqual({ gained: [], lost: [] });
+    expect(formatReport(report)).toContain('gained nothing');
+  });
+
+  it('a path the run gained is reported and not deleted', () => {
+    const files = store({ 'a.ts': ORIGINAL });
+    const report = runMutations(
+      [mutation()],
+      files,
+      () => {
+        files.write('dropping.txt', 'left behind');
+        return killing();
+      },
+      undefined,
+      files.paths,
+    );
+    expect(report.treeDelta?.gained).toEqual(['dropping.txt']);
+    expect(files.read('dropping.txt')).toBe('left behind');
+  });
+
+  it('a path the run lost is named the same way', () => {
+    const listings: string[][] = [['a.ts', 'b.txt'], ['a.ts']];
+    const report = runMutations([mutation()], store({ 'a.ts': ORIGINAL }), killing, undefined, () => listings.shift()!);
+    expect(report.treeDelta?.lost).toEqual(['b.txt']);
+    expect(formatReport(report)).toContain('b.txt');
+  });
+
+  it('claims nothing about the tree when the run had no way to look', () => {
+    const report = runMutations([mutation()], store({ 'a.ts': ORIGINAL }), killing);
+    expect(report.treeDelta).toBeUndefined();
+    expect(formatReport(report)).not.toContain('gained nothing');
   });
 });
 
