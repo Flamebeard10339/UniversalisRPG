@@ -4,7 +4,7 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { tsxCli } from '../lib/tsxCli';
 import { parseManifest, refusalsFor } from '../mutate';
-import { indexSuiteTitles, manifestNotes, mutationManifest, UNRETARGETED, parseAuditArgs, parseAuditFile, parseCommitLog, slugStanding, slugStandingLines, unresolvedTarget, type SlugStanding, type TargetResolution } from './audit';
+import { indexSuiteTitles, manifestNotes, mutationManifest, UNRETARGETED, parseAuditArgs, parseAuditFile, parseCommitLog, slugStanding, slugStandingLines, toolLines, unresolvedTarget, type SlugStanding, type TargetResolution } from './audit';
 import { appendEvent, firstListedId, fixture, gitFixture, relevantFilesBlock, repoRoot, script, type Run } from './cliFixtures';
 
 describe('tasks CLI', () => {
@@ -1118,6 +1118,90 @@ describe('the brief arriving with the answers rather than the instructions', () 
       expect(result.stdout).toContain('- src/runtime/save.ts — Runtime');
       expect(result.stdout).toContain('prior art on src/runtime/save.ts');
       expect(result.stdout).toContain('An earlier claim on the save file');
+    });
+  });
+
+  // Seven actions both recorded audits took by hand after reading the brief.
+  // The brief had already read everything each of them needed.
+  it('carries the deliverable prose the clause bullets only promise about', () => {
+    fixture(({ dir, tasks }) => {
+      const specPath = path.join(dir, 'specs', 'demo-spec.md');
+      writeFileSync(specPath, readFileSync(specPath, 'utf8').replace('Something this branch promises.', 'The argument: a measured 191 seconds went on learning test names.'), 'utf8');
+
+      const { stdout } = tasks('audit-prompt', 'demo-spec');
+      expect(stdout).toContain('The argument: a measured 191 seconds went on learning test names.');
+      // Both passes opened the spec as their third tool call, straight after
+      // reading a brief that had already parsed it.
+      expect(stdout).toContain('What demo-spec says it is for');
+    });
+  });
+
+  it('substitutes the range into the diff commands rather than making an auditor retype the SHAs', () => {
+    gitFixture(({ commit, tasks }) => {
+      commit('A commit on demo-spec, after branching from main.');
+
+      const { stdout } = tasks('audit-prompt', 'demo-spec');
+      const range = /Diff range: ([0-9a-f]{40})\.\.([0-9a-f]{40})/.exec(stdout)!;
+      expect(stdout).toContain(`- git diff ${range[1]}..${range[2]} -- `);
+      expect(stdout).toContain(`- git log -p ${range[1]}..${range[2]} -- <one file>`);
+      // A command, not the diff: an auditor wants it more than once, and a
+      // printed one is a snapshot taken before they had read anything.
+      expect(stdout).not.toContain('@@ ');
+    });
+  });
+
+  it('says how to read what mutate prints back, beside the manifest rather than in its source', () => {
+    fixture(({ tasks }) => {
+      const { stdout } = tasks('audit-prompt', 'demo-spec');
+      expect(stdout).toContain('KILLED — the tests failed with the line broken');
+      expect(stdout).toContain('SURVIVED — the tests passed with the line broken');
+      expect(stdout).toContain('ERROR — the mutation did not build');
+      // The column pass 2 called what made its headline measurable, and had
+      // to reverse-engineer from scripts/mutate.ts to trust.
+      expect(stdout).toContain('the scope column reports the chain it walked');
+    });
+  });
+
+  it('names the file form of tasks audit, which is the only one a full pass fits in', () => {
+    fixture(({ tasks }) => {
+      const { stdout } = tasks('audit-prompt', 'demo-spec');
+      expect(stdout).toContain('--args-from <file>');
+      expect(stdout).toContain('one flag per line');
+      expect(stdout).toContain('8191');
+    });
+  });
+
+  it('names the other specs in the checkout, so the standing above can be checked against one', () => {
+    fixture(({ dir, tasks }) => {
+      writeFileSync(path.join(dir, 'specs', 'another-spec.md'), '# Another spec\n\n## Deliverable\n\nElsewhere.\n\nProof:\n\n- It holds.\n', 'utf8');
+
+      const { stdout } = tasks('audit-prompt', 'demo-spec');
+      expect(stdout).toContain('Other specs in this checkout');
+      expect(stdout).toContain('another-spec');
+    });
+  });
+
+  // Both auditors checked this list against package.json rather than trust
+  // it. A derived list has nothing left to check.
+  it('marks a tool whose npm script no longer exists rather than naming it as if it did', () => {
+    expect(toolLines({ tasks: 'x', mutate: 'x', probe: 'x', inspect: 'x', play: 'x', 'session-timing': 'x' }).join('\n')).not.toContain('stale');
+    const withoutProbe = toolLines({ tasks: 'x', mutate: 'x', inspect: 'x', play: 'x', 'session-timing': 'x' }).join('\n');
+    expect(withoutProbe).toContain('package.json has no "probe" script; this entry is stale');
+    // An unreadable package.json costs the check, not the list.
+    expect(toolLines(null).join('\n')).not.toContain('stale');
+  });
+
+  it('makes logging tool friction a step in the filing block rather than a line to skip', () => {
+    fixture(({ tasks }) => {
+      const { stdout } = tasks('audit-prompt', 'demo-spec');
+      const filing = stdout.slice(stdout.indexOf('Deliver your results into the store'));
+      // Of the two passes that had it as prose elsewhere in the brief, one
+      // wrote nothing at all.
+      expect(filing).toContain('.planning/agent-feedback/tool-friction.md');
+      expect(filing).toContain('This is a step in this list, not an afterthought');
+      // The line it replaced, which sat mid-brief between the required
+      // commands and the file list.
+      expect(stdout).not.toContain('Log any tool friction — task tool, audit tool, harness —');
     });
   });
 

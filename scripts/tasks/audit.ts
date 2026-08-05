@@ -10,7 +10,7 @@ import { priorArt } from '../lib/producers';
 import { loadStore, type Severity, type Task } from '../lib/taskStore';
 import { architecture, ownership, printPriorArt } from './architectureCmds';
 import type { Flags } from './cli';
-import { readStore, recordEvents, type Config, refuseUnknownSpec, reportUnknownSpec, resolveActiveSpec, resolveConfig, saveStoreAndWarn, slugify, specFile, subjectOf, today, uniqueId } from './context';
+import { readStore, recordEvents, type Config, refuseUnknownSpec, knownSpecs, reportUnknownSpec, resolveActiveSpec, resolveConfig, saveStoreAndWarn, slugify, specFile, subjectOf, today, uniqueId } from './context';
 import { activePrompter } from './prompt';
 import { printRow, truncateLine } from './render';
 
@@ -271,6 +271,19 @@ export function testTitles(text: string): string[] {
   return [...text.matchAll(/\bit(?:\.\w+)*\s*(?:\([^()'"`]*\)\s*)?\(\s*(['"`])((?:\\.|(?!\1)[^\\])*)\1/g)].map((match) => match[2].replace(/\\/g, ''));
 }
 
+// The list of tools is checked against the file it was copied from, so it
+// cannot quietly outlive a renamed script.
+function packageScripts(): Record<string, string> | null {
+  const text = readIfPresent('package.json');
+  if (text === null) return null;
+  try {
+    const scripts = (JSON.parse(text) as { scripts?: Record<string, string> }).scripts;
+    return scripts && typeof scripts === 'object' ? scripts : null;
+  } catch {
+    return null;
+  }
+}
+
 function readIfPresent(file: string): string | null {
   try {
     return readFileSync(file, 'utf8');
@@ -282,14 +295,35 @@ function readIfPresent(file: string): string | null {
 // Each of these is the answer to a question an auditor asks, and none was
 // discoverable from a brief that expects them to be used — pass 1 grepped
 // package.json to find out what existed.
-const AUDIT_TOOLS: Array<[string, string]> = [
-  ['npm run tasks -- merge-ready', 'the whole merge gate — tsc, tests, layer-check, audit-status, doctor, byte check — in one run'],
-  ['npm run mutate -- <manifest.json>', 'breaks a named line, runs the tests it names, restores from bytes it captured, and reports what the suite failed to notice'],
-  ['npm run probe -- <source>... [--show <kind>.<id>] [--round-trip] [--each]', 'asks the DSL load path a question without building a runner for it; --each surveys a table of variants split on ---'],
-  ['npm run inspect -- "<expression>"', 'evaluates against the repo\'s own module resolution and leaves no file behind, which is what a scratch .ts was for'],
-  ['npm run play', 'interactive REPL over startSession/view/apply; # test sections authored from it are the regression format'],
-  ['npm run session-timing', 'where a session\'s wall clock actually went'],
-  ['npm run tasks -- where <path>', 'what system owns a path, what concept claims it, and every task that ever named it'],
+const AUDIT_TOOLS: Array<{ script: string; command: string; does: string }> = [
+  { script: 'tasks', command: 'npm run tasks -- merge-ready', does: 'the whole merge gate — tsc, tests, layer-check, audit-status, doctor, byte check — in one run' },
+  { script: 'mutate', command: 'npm run mutate -- <manifest.json>', does: 'breaks a named line, runs the tests it names, restores from bytes it captured, and reports what the suite failed to notice' },
+  { script: 'probe', command: 'npm run probe -- <source>... [--show <kind>.<id>] [--round-trip] [--each]', does: 'asks the DSL load path a question without building a runner for it; --each surveys a table of variants split on ---' },
+  { script: 'inspect', command: 'npm run inspect -- "<expression>"', does: 'evaluates against the repo\'s own module resolution and leaves no file behind, which is what a scratch .ts was for' },
+  { script: 'play', command: 'npm run play', does: 'interactive REPL over startSession/view/apply; # test sections authored from it are the regression format' },
+  { script: 'session-timing', command: 'npm run session-timing', does: 'where a session\'s wall clock actually went' },
+  { script: 'tasks', command: 'npm run tasks -- where <path>', does: 'what system owns a path, what concept claims it, and every task that ever named it' },
+];
+
+// Checked against package.json rather than asserted, because both measured
+// auditors read package.json themselves rather than trust this list — and a
+// list that has gone stale is worse than one an auditor has to look up, since
+// nothing announces the staleness.
+export function toolLines(scripts: Record<string, string> | null): string[] {
+  return AUDIT_TOOLS.map((tool) => {
+    const missing = scripts !== null && scripts[tool.script] === undefined;
+    return `- ${tool.command}${missing ? `   <-- package.json has no "${tool.script}" script; this entry is stale` : ''}\n    ${tool.does}`;
+  });
+}
+
+// What `mutate` prints back, said here so it is read beside the manifest
+// rather than looked up. Both passes went to scripts/mutate.ts for it; pass 2
+// read the whole file.
+const MUTATE_VERDICTS = [
+  'KILLED — the tests failed with the line broken. That is the suite noticing, and the only verdict that proves anything.',
+  'SURVIVED — the tests passed with the line broken. Nothing was watching it; that is the finding.',
+  'ERROR — the mutation did not build, or no test ran. Says nothing about the suite; retarget and run it again.',
+  'Scope escalates: the one named `test`, then its `tests` file, then the whole suite — and the scope column reports the chain it walked. `"<a test>" -> <a file>` means that named test survived and something else killed it, which is not that clause proving itself.',
 ];
 
 export interface Commit {
@@ -569,10 +603,20 @@ export function cmdAuditPrompt(args: Flags, usage: string): void {
   console.log('Required commands (all must pass; `npm run tasks -- merge-ready` runs them together):');
   console.log('- npm run tasks -- merge-ready');
   console.log('');
-  console.log('Log any tool friction — task tool, audit tool, harness — in .planning/agent-feedback/tool-friction.md');
-  console.log('');
   console.log('Tools an auditor may reach for:');
-  for (const [command, does] of AUDIT_TOOLS) console.log(`- ${command}\n    ${does}`);
+  for (const line of toolLines(packageScripts())) console.log(line);
+  console.log('');
+  console.log('How to read what `mutate` prints back:');
+  for (const line of MUTATE_VERDICTS) console.log(`- ${line}`);
+  console.log('');
+  // The range substituted, because both measured passes retyped these SHAs
+  // out of the four lines above. One command per line and never chained: an
+  // auditor wants the diff more than once, and a chain would make one
+  // failing read eat the others.
+  console.log('Reads this brief has not made for you — the range is already substituted:');
+  console.log(`- git diff ${base}..${head} -- ${relevantFiles.filter((file) => file.endsWith('.ts')).join(' ') || '.'}`);
+  console.log(`- git log -p ${base}..${head} -- <one file>   (the same change, commit by commit)`);
+  console.log(`- git diff ${base}..${head} -- . ':(exclude)*.test.ts'   (implementation without its tests)`);
   console.log('');
   console.log('Commits in this range:');
   const commits = parseCommitLog(gitRead(['log', '--format=%x00%h %s', '--name-only', `${base}..${head}`]) ?? '');
@@ -588,9 +632,19 @@ export function cmdAuditPrompt(args: Flags, usage: string): void {
   console.log('');
   printOwnership(config, tasks, relevantFiles);
   console.log('');
+  if (doc.deliverableProse !== '') {
+    console.log(`What ${slug} says it is for — the argument the clauses below promise about:`);
+    console.log(doc.deliverableProse);
+    console.log('');
+  }
   if (doc.decisionsSection !== '') {
     console.log(`${slug}'s own decisions — settled arguments, not open ones:`);
     console.log(doc.decisionsSection.split('\n').slice(1).join('\n').trim());
+    console.log('');
+  }
+  const otherSpecs = knownSpecs(config).filter((known) => known !== slug);
+  if (otherSpecs.length > 0) {
+    console.log(`Other specs in this checkout, for checking the standing above against a slug this branch does not own: ${otherSpecs.join(', ')}`);
     console.log('');
   }
   const standings = clauseStandings(doc.proofClauses, latest?.verdicts);
@@ -626,6 +680,8 @@ export function cmdAuditPrompt(args: Flags, usage: string): void {
   console.log('Deliver your results into the store, not into a report nobody reads:');
   console.log(`- verdicts: \`tasks audit ${slug} --proof N=met|unmet|unknown --evidence N="..." ...\` — met requires evidence the next pass can re-run; unmet means you checked and it fails; ungraded clauses are recorded unknown.`);
   console.log(`- findings: file them in the same \`tasks audit\` call (--finding "..." --severity ... --system "..." --deliverable "..." --evidence "..."), or write the report under docs/audits/ and \`tasks import <doc>\`. Every finding needs both halves: what is broken, and what fixing it would mean.`);
+  console.log(`- write the whole pass to a file and run \`tasks audit ${slug} --args-from <file>\` — one flag per line, any unprefixed line continuing the value above it, \`#\` at column zero for a comment. A pass carrying evidence specific enough to re-run does not fit on a command line: two sessions hit the 8191-character limit at around twelve clauses and rationed their evidence to fit.`);
+  console.log('- log the friction this audit cost you — task tool, audit tool, harness — in .planning/agent-feedback/tool-friction.md, dated, with what you measured. This is a step in this list, not an afterthought: of the two passes that had this instruction as a line elsewhere in the brief, one wrote nothing.');
   console.log(`- \`tasks audit ${slug}\` with findings and no --proof flags files the findings without recording a pass, so filing late findings never erases recorded verdicts.`);
   console.log('If you write a report document, archive it under docs/audits/ before the session ends — but the store is the record of note.');
   console.log('');
