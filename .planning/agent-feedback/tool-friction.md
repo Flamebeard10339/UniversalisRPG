@@ -224,3 +224,35 @@ Positive: `mutate`'s escalation chain in the scope column is what made this pass
 measurable. Nine kills that each read `[... "<the clause's test>" -> scripts/tasks/audit.test.ts]`
 say plainly that no clause's own test noticed its own mutation, and no other tool in the repo
 reports that. Twelve hand-retargeted mutations cost 70 seconds end to end.
+
+## 2026-08-05, auditing `audit-brief-arrives-complete` (pass 3)
+
+### `mutate` leaves its journal behind when it refuses, and the next run reverts the tree to it
+
+Measured, twice, in a clean tree. The first `npm run mutate` of this pass printed
+`recovered 2 file(s) left mutated by an interrupted run: scripts/tasks/audit.ts,
+scripts/lib/specDoc.ts` and exited on a find-miss refusal. `git diff --stat` then showed
+89 lines gone from `audit.ts` and 5 from `specDoc.ts` — commit 8cbd399, reverted, in a tree
+that was clean a second earlier. `git checkout` restored it; the *next* run reverted it again,
+because the refused run had written a fresh journal from the already-reverted bytes.
+Two `git checkout` cycles plus a manual `rm` of `%TEMP%\universalis-mutate-*.json` to get out.
+
+`main()` takes the journal as a lock before reading anything (mutate.ts:615-636) but the refusal
+exit at mutate.ts:664-668 returns without the `rmSync(JOURNAL)` the success path does at :700.
+Cost: ~12 minutes and two near-misses on committed work. It is invisible — the recovery line is
+one stderr line above the refusal, and nothing says a *tracked* file was overwritten.
+
+### The generated manifest cost a hand-written one, for the third pass running
+
+12 of 12 entries had to be rewritten to grade anything: `file` names `scripts/lib/specDoc.ts` for
+c3, c5 and c6, whose implementation is in `audit.ts`, so no offered `note` line could be pasted
+without editing `file` too — which `manifestNotes` says is already right. Hand-writing the 12
+correct entries with `node` took 4 minutes; the run was 45 seconds, 12 killed, 0 escalations.
+Pass 1 and pass 2 each wrote their own manifest as well, and the finding filed for that is
+recorded done.
+
+Positive: the sentinel `find` works exactly as promised. The generated manifest, run unedited,
+was refused by name before a single test ran — the "green run that proves nothing" route is
+genuinely closed. And `mutate`'s scope column remains the only thing in the repo that can tell
+a real clause proof from an escalated one; it is what made this pass's headline measurable in
+50 seconds.
