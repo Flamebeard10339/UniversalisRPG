@@ -996,10 +996,6 @@ describe('the brief arriving with the answers rather than the instructions', () 
     expect(entries[1].tests).toEqual(['scripts/tasks/records.test.ts']);
   });
 
-  // Four passes, four orderings, four wrong guesses — and pass 4's came back
-  // KILLED at narrow scope with a clean scope column, off a test fixture
-  // helper, which is the one shape an auditor is told to accept as proof. The
-  // manifest carries no guess at which line a clause is about.
   it('the manifest offers no guess at which line a clause is about', () => {
     const { entries } = mutationManifest([{ id: 1, targets: ['vitest scripts/tasks/audit.test.ts "the first test"'] }], () => resolves('the first test'));
 
@@ -1013,10 +1009,7 @@ describe('the brief arriving with the answers rather than the instructions', () 
     expect(refusals[0]).toContain(UNAIMED_FILE);
   });
 
-  // Pass 1 read eight escalated kills as eight proofs; pass 2 measured nine
-  // kills of which nine escalated past the test whose clause they claimed to
-  // prove. A green run that proves nothing is the failure the caption alone
-  // could not stop, so the artifact stops it instead.
+  // A caption saying "aim this first" cannot stop a run; the artifact can.
   it('a manifest entry nobody has aimed is refused by mutate rather than run green', () => {
     const { entries } = mutationManifest([{ id: 1, targets: ['vitest scripts/tasks/audit.test.ts "the first test"'] }], () => resolves('the first test'));
 
@@ -1295,9 +1288,26 @@ describe('the brief arriving with the answers rather than the instructions', () 
       const { stdout } = tasks('audit-prompt', 'another-spec');
       expect(stdout).toContain('WARNING: this branch is working demo-spec');
       expect(stdout).toContain('7. Do not file a pass.');
+      expect(stdout).toContain('The diff above is not another-spec\'s');
       expect(stdout).not.toContain('--args-from');
       expect(existsSync(path.join(dir, 'tmp', 'audit-another-spec-pass1.txt'))).toBe(false);
     });
+  });
+
+  // Three standings refuse a pass and they do not all say the same thing. A
+  // branch nothing relates to the slug has a diff nobody can place, not one
+  // known to be somebody else's — and step 7 asserting the stronger claim
+  // contradicts the warning printed above it.
+  it('says only what the standing says when nothing relates the slug to the branch', () => {
+    const unrelated = (over: Partial<SlugStanding>): boolean =>
+      slugStanding({ slug: 'demo-spec', branch: 'demo-spec', branchSpec: 'demo-spec', base: 'abc1234', lastPassHead: null, lastPassMerged: false, ...over }).rangeIsUnrelated;
+
+    expect(unrelated({ branchSpec: 'another-spec' })).toBe(true);
+    expect(unrelated({ lastPassHead: 'def5678', lastPassMerged: true })).toBe(true);
+    // Nothing relates the two: refused, but not on the grounds that the diff
+    // belongs to somebody else.
+    expect(unrelated({ branchSpec: null })).toBe(false);
+    expect(unrelated({})).toBe(false);
   });
 
   // Both auditors checked this list against package.json rather than trust

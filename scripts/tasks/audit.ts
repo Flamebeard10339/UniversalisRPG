@@ -366,21 +366,12 @@ export interface MutationEntry {
 export const UNAIMED_FILE = '<<< the file this clause is implemented in >>>';
 export const UNRETARGETED = '<<< the line in that file this clause is about >>>';
 
-// Which line a clause is about is judgement, and four recorded passes each
-// measured what happens when the tool supplies a guess at it. Pass 1 read
-// eight escalated kills as eight proofs. Pass 2 got nine, all escalated past
-// the test whose clause they claimed to prove. Pass 3 aimed each entry as
-// instructed and got the same escalation. Pass 4 got three KILLED at *narrow*
-// scope with a clean scope column — off a test fixture helper, because the
-// clause's own task had granted itself that file — which is the one shape an
-// auditor is told to accept as proof. Each fix made the guess less wrong and
-// the last one disabled the tell that had been catching it.
-//
-// So the manifest carries no guess at all. `name`, `tests` and `test` come
-// from the resolution and are facts; `file` and `find` are sentinels the
-// auditor replaces, and both are in a form `mutate` refuses — `refusalsFor`
-// cannot read the file, and would not find the text if it could — so a
-// manifest nobody has aimed stops by name before a baseline runs.
+// `name`, `tests` and `test` come from the resolution and are facts. Which
+// line a clause is about is not derivable from anything this has read, so the
+// manifest offers no guess: `file` and `find` are sentinels in a form `mutate`
+// refuses — `refusalsFor` cannot read the file, and would not find the text if
+// it could — and an entry nobody has aimed stops by name before a baseline
+// runs.
 export function mutationManifest(
   clauses: Array<{ id: number; targets: string[] }>,
   resolve: (target: string) => TargetResolution | null,
@@ -467,12 +458,22 @@ export interface SlugStanding {
 export interface SlugVerdict {
   lines: string[];
   rangeIsThisSlugs: boolean;
+  // Not the negation of the above. A branch working another spec, or a spec
+  // that merged before this branch began, is a diff known to be somebody
+  // else's; a branch nothing relates to the slug is a diff nobody can place.
+  // Both refuse a pass, and a caller that says which is which must not read
+  // the second as the first.
+  rangeIsUnrelated: boolean;
 }
 
 export function slugStanding(standing: SlugStanding): SlugVerdict {
   const lines = slugStandingLines(standing);
   const branchOwnsSlug = standing.branchSpec === standing.slug;
-  return { lines, rangeIsThisSlugs: branchOwnsSlug && !standing.lastPassMerged };
+  return {
+    lines,
+    rangeIsThisSlugs: branchOwnsSlug && !standing.lastPassMerged,
+    rangeIsUnrelated: standing.branchSpec !== null && (!branchOwnsSlug || standing.lastPassMerged),
+  };
 }
 
 export function slugStandingLines(standing: SlugStanding): string[] {
@@ -625,7 +626,11 @@ export function cmdAuditPrompt(args: Flags, usage: string): void {
   console.log('5. Answer the regression question: is anything worse than before this branch? Clause-by-clause verification cannot see this — each clause looks fine in isolation. Diff the behavior, not the promise.');
   console.log('6. Run `npm run tasks -- merge-ready` — tsc, tests, layer-check, audit-status, doctor and the byte check, in one invocation.');
   if (argsPath === null) {
-    console.log(`7. Do not file a pass. The diff above is not ${slug}'s, so no verdict taken over it would be about these clauses — which is why no pass file was written.`);
+    // Worded from the standing it was computed from. Two of the three say the
+    // diff is another branch's; the third says only that nothing relates the
+    // slug to this branch, and asserting more than the warning above it does
+    // is how a brief teaches an auditor to trust neither half.
+    console.log(`7. Do not file a pass. ${standing.rangeIsUnrelated ? `The diff above is not ${slug}'s` : `Nothing relates ${slug} to this branch, so nothing says the diff above is its`}, and a verdict taken over it would not be about these clauses — which is why no pass file was written.`);
   } else {
     console.log(`7. File the pass. This file is written with one line per clause; fill in the values and run the command in its header:`);
     console.log(`     ${argsPath}`);

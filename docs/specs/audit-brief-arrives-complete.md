@@ -103,6 +103,7 @@ Proof:
   proof: vitest scripts/tasks/audit.test.ts "keeps an artifact the auditor has already worked on rather than overwriting it"
   proof: vitest scripts/tasks/audit.test.ts "offers no pass file either, in a brief that has just warned the diff is not this slugs"
   proof: vitest scripts/tasks/audit.test.ts "gives each pass its own manifest, so no pass inherits the one before it aimed"
+  proof: vitest scripts/tasks/audit.test.ts "says only what the standing says when nothing relates the slug to the branch"
 
 - [c11] `mutate` gives the tree back on every exit, and never writes a journal's bytes into a tree
   that has moved since they were read. The journal was removed on the success path alone, so a

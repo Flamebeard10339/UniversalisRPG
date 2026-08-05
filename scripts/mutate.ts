@@ -446,11 +446,8 @@ export interface Journal {
   root: string;
   pid: number;
   startedAt: string;
-  // The commit the captured bytes were read at. A journal is only a safe thing
-  // to write back while the tree is still on it: recovery restores what a run
-  // was interrupted mid-write, and a tree that has moved on has content the
-  // journal never saw. Absent on a journal written before this field existed,
-  // which reads as unknown and is reported rather than restored.
+  // The commit the captured bytes were read at, or null on a journal written
+  // before this field existed — which reads as unknown, not as a match.
   head: string | null;
   files: Record<string, string>;
 }
@@ -520,14 +517,10 @@ export interface Recovery {
 }
 
 // Recovery writes bytes over files nobody asked it to touch, which is only
-// ever right while the tree is still the one they were read from. A journal
-// captured at another commit holds content this tree has moved past, and
-// restoring it reverts whatever landed in between — measured once at 89 lines
-// of a committed file, in a clean tree, with one stderr line to say so.
-//
-// So a moved HEAD is reported and not acted on. `stale` names what a reader
-// has to decide instead, because the bytes may still be a mid-write tree worth
-// rescuing and only a human can tell that from a stale journal.
+// right while the tree is still the one they were read from. `stale` is the
+// refusal to guess: the bytes may be a mid-write tree worth rescuing or a
+// journal nobody cleaned up, nothing here distinguishes those, and restoring
+// the wrong one reverts committed work.
 export type RecoveryStanding = { kind: 'recover' } | { kind: 'stale'; reason: string };
 
 export function recoveryStanding(journal: Pick<Journal, 'head'>, head: string | null): RecoveryStanding {
@@ -699,16 +692,9 @@ function main(): void {
   writeFileSync(pending, JSON.stringify({ ...stamp, files: Object.fromEntries(captured) } satisfies Journal), { encoding: 'utf8', mode: 0o600 });
   renameSync(pending, JOURNAL);
 
-  // Restoring the tree and forgetting the journal are one act, done in one
-  // place, because every exit between here and the report has to do both. The
-  // journal used to be removed on the success path alone, so a refused
-  // manifest left one behind holding the bytes this run had read — and a
-  // refusal is now the ordinary first outcome of the manifest `audit-prompt`
-  // generates, which armed this on every audit. The next run then recovered
-  // from it, writing those bytes over whatever the files had become.
-  //
-  // A file that cannot be put back keeps the journal, which is the one thing
-  // it is for.
+  // Restoring the tree and forgetting the journal are one act, in one place,
+  // because every exit between here and the report owes both. A file that
+  // cannot be put back keeps the journal, which is the one thing it is for.
   const putBack = (): void => {
     if (putBackAll(captured, (file) => readFileSync(path.resolve(repoRoot, file), 'utf8'), (file, text) => writeFileSync(path.resolve(repoRoot, file), text, 'utf8')).length === 0) {
       rmSync(JOURNAL, { force: true });

@@ -28,11 +28,6 @@ export interface AuditPass {
 
 export interface SpecDoc {
   deliverableSection: string;
-  // The section above `Proof:` — the argument the branch exists to settle,
-  // the measurements it rests on, and the scope it claims. The clause
-  // bullets promise; this is what they promise about.
-  deliverableProse: string;
-  decisionsSection: string;
   proofClauses: ProofClause[];
   auditPasses: AuditPass[];
 }
@@ -214,8 +209,6 @@ export function parseSpecDoc(rawText: string): SpecDoc {
   const deliverableSection = deliverable ? deliverable.text : '';
   return {
     deliverableSection,
-    deliverableProse: deliverableSection.split('\nProof:')[0].split('\n').slice(1).join('\n').trim(),
-    decisionsSection: sectionText(lines, '## Decisions')?.text ?? '',
     proofClauses: parseProofClauses(deliverableSection, auditedClauseIds(text)),
     auditPasses: parseAuditPasses(text),
   };
