@@ -5,7 +5,7 @@ import { findProducers, priorArt, producerIndex, type PriorArt, type Producer } 
 import { canonicalPath, checkManifest, isUnowned, loadManifest, ManifestError, overlappingConcepts, parseManifest, type Manifest } from '../lib/systems';
 import type { Task } from '../lib/taskStore';
 import type { Flags } from './cli';
-import { readStore, recordEvents, resolveActiveSpec, resolveConfig, splitList, systemNames, type Config } from './context';
+import { CLOSING_STATES, readStore, recordEvents, resolveActiveSpec, resolveConfig, splitList, systemNames, type Config } from './context';
 import { printRow, reportUnknownIds, wrapUnder } from './render';
 
 // The store is what these answers rest on; the registry only widens them. So
@@ -92,7 +92,7 @@ export function cmdPlan(args: Flags): void {
 // time from the manifest and the tree; none of them writes anything, and
 // nothing downstream of them can fail a build.
 
-function architecture(config: Config): { manifest: Manifest; tree: SourceTree; modules: Module[] } {
+export function architecture(config: Config): { manifest: Manifest; tree: SourceTree; modules: Module[] } {
   const manifest = loadManifest(config.systemsPath);
   const tree = repoSourceTree();
   return { manifest, tree, modules: deriveModules(manifest, tree) };
@@ -179,7 +179,7 @@ const describeEdge = (edge: SystemEdge): string => {
 // Ownership is single-valued per file, so more than one name here means the
 // query named a region rather than a file, and every diff under it is
 // charged to whichever system owns the file it touched.
-function ownership(manifest: Manifest, view: RegionView): string {
+export function ownership(manifest: Manifest, view: RegionView): string {
   if (view.owners.length === 0) return `none — it is ${isUnowned(manifest, view.path) ? 'declared unowned' : 'owned by nobody, which `npm run audit-status` fails on'}`;
   return view.owners.length === 1 ? view.owners[0] : `${view.owners.join(', ')} — this region spans ${view.owners.length} systems, and a diff under it is charged to each`;
 }
@@ -187,7 +187,12 @@ function ownership(manifest: Manifest, view: RegionView): string {
 // The one rendering of "what has already claimed these paths", so a caller
 // asking by hand and a check that fires on `--writes` cannot answer the same
 // question in two shapes.
-export function printPriorArt(art: PriorArt): void {
+// A reader asking about one path wants every claim, closed ones included — a
+// closed claim is a decision already made. A reader handed a whole branch's
+// diff wants the collisions, and would otherwise scroll past a hundred lines
+// of them. `collapseClosed` is that second reader; the count still says the
+// history is there.
+export function printPriorArt(art: PriorArt, { collapseClosed = false } = {}): void {
   const where = art.paths.join(', ');
   if (art.concepts.length === 0 && art.claims.length === 0) {
     console.log(`nothing has claimed ${where}: no registered concept covers it, and no task's writes or files name it in any state.`);
@@ -199,11 +204,14 @@ export function printPriorArt(art: PriorArt): void {
     console.log(`  [concept] ${concept.name} — registered to ${system} over ${on.join(', ')}`);
     if (concept.note) console.log(`            ${concept.note}`);
   }
-  for (const { task, on } of art.claims) {
+  const shown = collapseClosed ? art.claims.filter(({ task }) => !CLOSING_STATES.includes(task.state)) : art.claims;
+  for (const { task, on } of shown) {
     console.log(`  [${task.state}] ${task.id} — ${task.title}`);
     console.log(`            ${[...new Set(on.map((match) => `${match.field} ${match.declared}`))].join(', ')}`);
     if (task.produces.length > 0) console.log(`            produces ${task.produces.join(', ')}`);
   }
+  const closed = art.claims.length - shown.length;
+  if (closed > 0) console.log(`  ${closed} closed claim(s) not listed — each is a decision already made rather than a collision.`);
   console.log('\nA claim in any state is prior art: a closed one is a decision already made, and an open one is a collision.');
 }
 
