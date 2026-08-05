@@ -33,11 +33,22 @@ Proof:
   slug it resolved and the member it picked, and a spec with no member to brief is told why rather
   than answered with nothing. The queue is `fixNowQueue`, the same one `tasks next --spec <slug>`
   reads, and the explanation is `explainEmptyQueue`, the same one `tasks next` prints — a second
-  answer to "which member is next" would be a second thing to keep in sync. An exact task id still
-  wins outright, so the eleven specs carrying a root task of the same slug brief that record
-  unchanged.
+  answer to "which member is next" would be a second thing to keep in sync.
+
+- A **root record** — a task whose id is the spec slug and which declares no write grant, the
+  convention eleven specs carry — is never dispatched as work. It requires every member of its own
+  spec, so it is blocked by the very records that are ready to be picked up, and `work-prompt` on
+  one briefs the spec's next member instead, saying why and pointing at `tasks show` for the whole
+  picture it holds. Briefing it directly misdirects three times: "You are implementing
+  audit-loop-costs-less" over a record whose own evidence reads "work the members, not this";
+  `BLOCKED` against four waiting requirements that are this spec's own members, so a spec appears
+  to wait on itself; and an instruction to record the write grant whose collision with every slice
+  beneath it is why the last root task (`tool-friction-backlog`) was declined. An ordinary exact
+  id still wins outright, and a record holding a write grant is work whatever it is called.
   proof: vitest scripts/tasks.test.ts "work-prompt takes the spec slug a dispatcher knows and briefs its next unblocked member"
   proof: vitest scripts/tasks.test.ts "work-prompt prefers an exact task id to a spec file of the same name"
+  proof: vitest scripts/tasks.test.ts "work-prompt briefs a member rather than the root record its own spec blocks"
+  proof: vitest scripts/tasks.test.ts "work-prompt falls back to the root record only when its spec holds no other record"
   proof: vitest scripts/tasks.test.ts "work-prompt says why a spec has no member to brief rather than printing nothing"
 
 ## Decisions
@@ -54,6 +65,22 @@ Proof:
 - `work-prompt` resolves an exact task id before it looks for a spec file, and only falls back to
   the fuzzy id match after both. Fuzzy-first is what produced the finding: `audit-loop-costs-less`
   matched five records on substrings of their titles, none of which was the spec of that exact name.
+- Clause 3 is the correction of a first attempt at clause 2 that made the finding worse. "An exact
+  task id always wins" was written to protect the eleven specs carrying a root task of the slug's
+  name — and those are exactly the records that must not be briefed. The slug resolved, the root
+  record won, and the brief told a worker to implement a container its own spec blocks. A root
+  record is identified by what it is rather than by what it is called: id equal to the spec slug
+  **and** no write grant. A record that declares a grant is work whatever its name, so a single-task
+  spec named after itself is briefed unchanged.
+- The root record stands in for its spec only when the spec holds no other record at all. The first
+  version fell back whenever the *queue* was empty, which put the defect straight back through
+  `audit-brief-arrives-complete`: four members, every one waiting behind `audit-loop-costs-less`,
+  an empty queue, and a brief that dispatched the container again. A decomposed spec with nothing
+  ready is answered by `explainEmptyQueue` naming which member waits on what — the same answer
+  `tasks next --spec` gives, and the one a dispatcher can act on.
+- A record requiring a **sibling** member is not a container and is briefed normally. That was the
+  first candidate for the test — "requires a member of its own spec" — and it is wrong: ordering
+  between slices is the normal shape, and it would have redirected away from most of the queue.
 - `work-prompt` keeps exiting 0 on a name it cannot resolve. The finding names this as secondary and
   systemic, and the repository has already decided the other way: a read answers rather than
   refuses (`context.ts:300`, `resolveIds.ts:5`), and `tasks.test.ts` asserts the exit code. Changing
