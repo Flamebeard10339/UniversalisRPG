@@ -23,6 +23,7 @@ function task(overrides: Partial<Task> & { id: string }): Task {
     evidence: null,
     source: null,
     reason: null,
+    trigger: null,
     closed: null,
     closedCommit: null,
     claimed: null,
@@ -136,6 +137,7 @@ describe('loadStore / saveStore', () => {
           evidence: null,
           source: null,
           reason: null,
+          trigger: null,
           closed: null,
           closedCommit: null,
           claimed: null,
@@ -226,7 +228,7 @@ describe('loadStore / saveStore', () => {
 
       saveStore(loadStore(file), file);
       const line = readFileSync(file, 'utf8').trim();
-      const canonicalKeys = ['id', 'title', 'kind', 'state', 'severity', 'system', 'spec', 'clause', 'discharges', 'requires', 'files', 'writes', 'grant', 'produces', 'deliverable', 'evidence', 'source', 'reason', 'closed', 'closedCommit', 'claimed', 'claimedBy'];
+      const canonicalKeys = ['id', 'title', 'kind', 'state', 'severity', 'system', 'spec', 'clause', 'discharges', 'requires', 'files', 'writes', 'grant', 'produces', 'deliverable', 'evidence', 'source', 'reason', 'trigger', 'closed', 'closedCommit', 'claimed', 'claimedBy'];
       const keys = Object.keys(JSON.parse(line));
       expect(keys.slice(0, canonicalKeys.length)).toEqual(canonicalKeys);
       expect(keys.slice(canonicalKeys.length)).toEqual(['aField', 'mField', 'zField']);
@@ -593,6 +595,18 @@ describe('listQueue', () => {
     ];
     expect(listQueue(tasks, { deferred: true }).map((t) => t.id)).toEqual(['deferred']);
   });
+
+  // A trigger's whole point is a declined record, which the not-closed
+  // default hides — the same reach-past-the-default `--triggered` needs that
+  // a search term already gets.
+  it('--triggered reaches past the not-closed default to a declined record carrying a trigger, and only that shape', () => {
+    const tasks = [
+      task({ id: 'has-trigger', state: 'declined', reason: 'not worth it now', trigger: 'reevaluate if npm test becomes an issue' }),
+      task({ id: 'no-trigger', state: 'declined', reason: 'not worth it' }),
+      task({ id: 'live-task', state: 'open' }),
+    ];
+    expect(listQueue(tasks, { triggered: true }).map((t) => t.id)).toEqual(['has-trigger']);
+  });
 });
 
 describe('checkStore', () => {
@@ -625,6 +639,14 @@ describe('checkStore', () => {
       message: 'a is in-progress and carries a decline reason, which reads as a decline that was reopened: no longer relevant',
     });
     expect(checkStore([task({ id: 'a', state: 'declined', reason: 'stale' })], systems, () => true)).toEqual([]);
+  });
+
+  it('reads a trigger on any state but declined as a reopened decline, the same way reason does', () => {
+    expect(checkStore([task({ id: 'a', state: 'in-progress', trigger: 'reevaluate if npm test slows down' })], systems, () => true)).toContainEqual({
+      level: 'warning',
+      message: 'a is in-progress and carries a decline trigger, which reads as a decline that was reopened: reevaluate if npm test slows down',
+    });
+    expect(checkStore([task({ id: 'a', state: 'declined', reason: 'stale', trigger: 'reevaluate if npm test slows down' })], systems, () => true)).toEqual([]);
   });
 
   it('reads a closed date on a record that is not closed as residue worth reporting', () => {

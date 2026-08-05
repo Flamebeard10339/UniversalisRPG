@@ -902,6 +902,49 @@ describe('tasks CLI', () => {
     });
   });
 
+  // The motivating gap this closes: `audit-loop-costs-less-clause-5` was
+  // declined with "we will reevaluate handoff and its tests if npm test
+  // becomes an issue" resting only in `reason` prose — no queue, roadmap or
+  // survey surfaced it when that reevaluation was actually asked for.
+  describe('decline --trigger and list --triggered', () => {
+    it('records a condition for revisiting, printed back by show', () =>
+      fixture(({ tasks }) => {
+        tasks('add', 'shrink the handoff test', '--id', 'handoff-shrink');
+        const declined = tasks('decline', 'handoff-shrink', '--reason', 'faking the git subprocesses is not worth it', '--trigger', 'reevaluate if npm test becomes an issue');
+        expect(declined.status).toBe(0);
+        expect(declined.stdout).toContain('trigger recorded');
+
+        const shown = tasks('show', 'handoff-shrink');
+        expect(shown.stdout).toContain('reason: faking the git subprocesses is not worth it');
+        expect(shown.stdout).toContain('trigger: reevaluate if npm test becomes an issue');
+      }));
+
+    it('a decline with no --trigger records none, and show prints no trigger line', () =>
+      fixture(({ tasks }) => {
+        tasks('add', 'no condition here', '--id', 'plain-decline');
+        tasks('decline', 'plain-decline', '--reason', 'not worth it');
+        expect(tasks('show', 'plain-decline').stdout).not.toContain('trigger:');
+      }));
+
+    it('list --triggered reaches a declined record with a trigger, past the not-closed default', () =>
+      fixture(({ tasks }) => {
+        tasks('add', 'shrink the handoff test', '--id', 'handoff-shrink');
+        tasks('decline', 'handoff-shrink', '--reason', 'not worth faking git over', '--trigger', 'reevaluate if npm test becomes an issue');
+        tasks('add', 'a plain declined record', '--id', 'plain-decline');
+        tasks('decline', 'plain-decline', '--reason', 'not worth it');
+        tasks('add', 'a live record', '--id', 'still-open');
+
+        expect(tasks('list').stdout).not.toContain('handoff-shrink');
+
+        const result = tasks('list', '--triggered');
+        expect(result.status).toBe(0);
+        expect(result.stdout).toContain('handoff-shrink');
+        expect(result.stdout).toContain('(trigger: reevaluate if npm test becomes an issue)');
+        expect(result.stdout).not.toContain('plain-decline');
+        expect(result.stdout).not.toContain('still-open');
+      }));
+  });
+
   it('promote moves several findings into the spec in one call, and refuses a closed record', () => {
     fixture(({ tasks }) => {
       tasks('add', 'first finding', '--id', 'first-finding', '--kind', 'finding', '--severity', 'high', '--deliverable', 'fix it');

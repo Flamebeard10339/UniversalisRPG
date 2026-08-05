@@ -24,6 +24,7 @@ function task(id: string, produces: string[], state: Task['state'] = 'done', pat
     evidence: null,
     source: null,
     reason: null,
+    trigger: null,
     closed: null,
     closedCommit: null,
     claimed: null,

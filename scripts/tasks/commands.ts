@@ -54,11 +54,11 @@ const COMMANDS: Record<string, Command> = {
   },
   show: { usage: 'usage: tasks show <id>', run: cmdShow },
   list: {
-    usage: 'usage: tasks list [--state unreviewed|open|in-progress|done|declined] [--severity high|medium|low] [--system "<name>"] [--spec <slug>] [--kind task|finding|undelivered|question] [--deferred]',
+    usage: 'usage: tasks list [--state unreviewed|open|in-progress|done|declined] [--severity high|medium|low] [--system "<name>"] [--spec <slug>] [--kind task|finding|undelivered|question] [--deferred] [--triggered]  (--triggered reaches past the not-closed default to every declined record carrying a --trigger condition)',
     run: cmdList,
   },
   search: {
-    usage: 'usage: tasks search <term> [--state unreviewed|open|in-progress|done|declined] [--severity high|medium|low] [--system "<name>"] [--spec <slug>] [--kind task|finding|undelivered|question] [--deferred]',
+    usage: 'usage: tasks search <term> [--state unreviewed|open|in-progress|done|declined] [--severity high|medium|low] [--system "<name>"] [--spec <slug>] [--kind task|finding|undelivered|question] [--deferred] [--triggered]',
     run: cmdSearch,
   },
   plan: { usage: 'usage: tasks plan [<id>...] [--spec <slug>]  (grades a dispatch set for overlap, unstated dependencies and duplicated interfaces; runs no workers and refuses nothing)', run: cmdPlan },
@@ -71,7 +71,7 @@ const COMMANDS: Record<string, Command> = {
   start: { usage: `usage: tasks start <id> ${ACTOR_USAGE}`, run: cmdStart },
   stop: { usage: `usage: tasks stop <id> ${ACTOR_USAGE}`, run: cmdStop },
   done: { usage: `usage: tasks done <id>... [--commit <revspec>] ${ACTOR_USAGE}  (default: none — the closing commit does not exist yet when \`done\` runs; see \`tasks show\` for a derived one)`, run: cmdDone },
-  decline: { usage: `usage: tasks decline <id>... --reason "..." ${ACTOR_USAGE}  (several ids share the one reason)`, run: cmdDecline },
+  decline: { usage: `usage: tasks decline <id>... --reason "..." [--trigger "..."] ${ACTOR_USAGE}  (several ids share the one reason and trigger; --trigger states a condition for revisiting, filed where \`tasks list --triggered\` finds it)`, run: cmdDecline },
   promote: { usage: `usage: tasks promote <id>... [--spec <slug>] ${ACTOR_USAGE}  (the non-interactive form of triage's promote: moves unreviewed or deferred records into the spec as open members)`, run: cmdPromote },
   import: { usage: `usage: tasks import <audit-doc> ${ACTOR_USAGE}`, run: cmdImport },
   triage: { usage: `usage: tasks triage [--spec <slug>] ${ACTOR_USAGE}`, run: cmdTriage },

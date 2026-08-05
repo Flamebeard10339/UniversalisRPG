@@ -80,6 +80,7 @@ export function renderTask(task: Task, byId: Map<string, Task>, detail: Detail, 
   if (task.evidence) lines.push(...proseLines('evidence', prose(task.evidence)));
   if (task.source) lines.push(`source: ${task.source.spec} pass ${task.source.pass}`);
   if (task.reason) lines.push(`reason: ${prose(task.reason)}`);
+  if (task.trigger) lines.push(`trigger: ${prose(task.trigger)}  (\`tasks list --triggered\` surfaces every standing one)`);
   if (task.closed) lines.push(`closed: ${task.closed}`);
   if (task.closedCommit) lines.push(`closedCommit: ${task.closedCommit}`);
   if (claim) lines.push(claim);

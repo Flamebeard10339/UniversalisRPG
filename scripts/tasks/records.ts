@@ -166,6 +166,7 @@ export function cmdAdd(args: Flags, usage: string): void {
     evidence: args.flags.evidence ?? null,
     source: null,
     reason: null,
+    trigger: null,
     closed: null,
     closedCommit: null,
     claimed: null,
@@ -391,6 +392,7 @@ function runList(args: Flags, text: string | undefined): void {
 
   const tasks = readStore(config);
 
+  const triggered = flags.triggered === 'true';
   const queue = listQueue(tasks, {
     state,
     severity,
@@ -399,11 +401,13 @@ function runList(args: Flags, text: string | undefined): void {
     deferred: flags.deferred === 'true',
     kind,
     text,
+    triggered,
   });
 
   const byId = new Map(tasks.map((task) => [task.id, task]));
   for (const task of queue) {
-    printRow(task, byId, { note: text === undefined ? undefined : `(matches: ${matchingFields(task, text).join(', ')})` });
+    const note = text !== undefined ? `(matches: ${matchingFields(task, text).join(', ')})` : triggered && task.trigger ? `(trigger: ${task.trigger})` : undefined;
+    printRow(task, byId, { note });
   }
 
   // A finding filed by this spec's audits is part of the spec's picture even
@@ -713,6 +717,7 @@ export function cmdDone(args: Flags, usage: string): void {
 export function cmdDecline(args: Flags, usage: string): void {
   const config = resolveConfig(args.flags);
   const reason = args.flags.reason;
+  const trigger = args.flags.trigger ?? null;
   if (args.positional.length === 0 || !reason) {
     console.error(usage);
     process.exitCode = 1;
@@ -725,12 +730,19 @@ export function cmdDecline(args: Flags, usage: string): void {
   for (const task of resolved) {
     const notes = transition(task, 'declined');
     task.reason = reason;
+    task.trigger = trigger;
     task.closed = today();
     task.closedCommit = null;
-    declines.push({ task, note: [`declined: ${truncateLine(reason, 120)}`, ...notes].join('; ') });
+    declines.push({ task, note: [`declined: ${truncateLine(reason, 120)}`, ...(trigger ? [`trigger: ${truncateLine(trigger, 120)}`] : []), ...notes].join('; ') });
     console.log(`declined ${task.id}`);
     for (const note of notes) console.log(note);
     if (task.kind === 'undelivered') console.log(`this was ${task.spec ?? 'a spec'}'s outstanding promise on clause ${task.clause ?? '(none named)'} — declining it abandons the clause, it does not discharge it`);
+    // Prose in `reason` alone is write-only — it appears in no queue until
+    // something reads it back out. `--trigger` is the store's field for a
+    // condition worth revisiting, and `--triggered` is the queue that reads
+    // it: naming both here is what keeps the second one from being advice
+    // nobody follows the way the step-2 survey command list was.
+    if (trigger) console.log(`trigger recorded — \`tasks list --triggered\` surfaces it until this branch's work resolves it`);
     printDecisionPrompt(task);
   }
   saveStoreAndWarn(tasks, config);
