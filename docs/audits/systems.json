@@ -290,6 +290,13 @@
             "scripts/tasks/architectureCmds.ts"
           ],
           "note": "produced by survey-cannot-see-rulings: reads a closed record's reason and event-log decisions for the queried path or its basename, distinct from the writes/files claim query"
+        },
+        {
+          "name": "generated planner brief",
+          "paths": [
+            "scripts/tasks/planPrompt.ts"
+          ],
+          "note": "produced by plan-prompt-brief: symmetric with the generated worker brief and auditor brief, tasks plan-prompt runs step 2's survey (tasks where) over named paths instead of listing commands"
         }
       ]
     },
