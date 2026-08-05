@@ -362,8 +362,12 @@ describe('tasks CLI', () => {
       expect(result.stdout).toContain('Steps, in order.');
       expect(stepsBlock(result.stdout)).toMatch(/1\. Read [^\n]*demo-spec\.md in full\./);
       expect(stepsBlock(result.stdout)).toContain('6. Run `npm run tasks -- merge-ready`');
-      expect(stepsBlock(result.stdout)).toContain('7. File the pass.');
-      expect(stepsBlock(result.stdout)).toContain('npm run tasks -- audit demo-spec --args-from ');
+      // Step 7 is asserted where the standing is controlled. This fixture
+      // takes its diff range from whichever repository the suite is running
+      // in, so the pass recorded above is its own ancestor whenever base and
+      // head are one commit — every run on the branch this work merges into —
+      // and the brief then correctly refuses to offer a pass file.
+      expect(stepsBlock(result.stdout)).toMatch(/7\. (File the pass\.|Do not file a pass\.)/);
 
       // The checklist and the regression question live in the generated
       // prompt, not in CLAUDE.md — a hand-copied brief is what trained
@@ -1231,12 +1235,24 @@ describe('the brief arriving with the answers rather than the instructions', () 
   // two need a spec whose target names a test that exists. The file is the
   // fixture's own, written beside its spec, so nothing here depends on a
   // title in the real suite staying put.
-  const withResolvableTarget = (dir: string): void => {
+  // `passes` writes the `## Audit passes` section rather than recording one
+  // through `audit`, because a recorded pass takes its head from whatever
+  // repository the suite is running in — and a head equal to the range's base
+  // is its own ancestor, which the brief reads as "this spec merged before
+  // this branch began" and correctly answers with no manifest at all. That is
+  // true on every run on the base branch, so a test that records a pass and
+  // then expects a manifest passes only on a branch that is ahead. The head
+  // below is a commit no repository has, so it is nobody's ancestor.
+  const UNMERGED_HEAD = 'f'.repeat(40);
+
+  const withResolvableTarget = (dir: string, passes = 0): void => {
     const testFile = path.join(dir, 'fixture.test.ts');
     writeFileSync(testFile, "it('a title the fixture owns', () => {});\n", 'utf8');
+    const recorded = Array.from({ length: passes }, (_, index) =>
+      `### Pass ${index + 1} — 2026-08-05\n\n- base: \`${'a'.repeat(40)}\`\n- head: \`${UNMERGED_HEAD}\`\n- proof 1: met — checked\n`).join('\n');
     writeFileSync(
       path.join(dir, 'specs', 'demo-spec.md'),
-      `# Demo spec\n\n## Deliverable\n\nSomething this branch promises.\n\nProof:\n\n- [c1] The first clause holds.\n  proof: vitest ${testFile} "a title the fixture owns"\n- [c2] The second clause holds.\n\n## Decisions\n\n## Open questions\n\nNone.\n`,
+      `# Demo spec\n\n## Deliverable\n\nSomething this branch promises.\n\nProof:\n\n- [c1] The first clause holds.\n  proof: vitest ${testFile} "a title the fixture owns"\n- [c2] The second clause holds.\n\n## Decisions\n\n## Open questions\n\nNone.\n${passes > 0 ? `\n## Audit passes\n\n${recorded}` : ''}`,
       'utf8',
     );
   };
@@ -1263,13 +1279,13 @@ describe('the brief arriving with the answers rather than the instructions', () 
   // already aimed, under a step that says to aim it — last pass's judgement
   // measured against this pass's diff, read as this pass's kills. The pass
   // file was keyed to the pass from the start; the manifest was not.
-  it('gives each pass its own manifest, so no pass inherits the one before it aimed', async () => {
-    await fixture(async ({ dir, tasks, audit }) => {
+  it('gives each pass its own manifest, so no pass inherits the one before it aimed', () => {
+    fixture(({ dir, tasks }) => {
       withResolvableTarget(dir);
       const first = tasks('audit-prompt', 'demo-spec').stdout;
       expect(first).toContain('mutations-demo-spec-pass1.json');
 
-      await audit('demo-spec', '--proof', '1=met', '--evidence', '1=checked', '--proof', '2=met', '--evidence', '2=checked');
+      withResolvableTarget(dir, 1);
 
       const second = tasks('audit-prompt', 'demo-spec').stdout;
       expect(second).toContain('mutations-demo-spec-pass2.json');
