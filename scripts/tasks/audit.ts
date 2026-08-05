@@ -390,7 +390,7 @@ export function mutationManifest(
         replace: '',
         tests: [file],
         test: resolution.name,
-        note: `find is a line c${clause.id} added, picked because deleting it is measurable; retarget it if it is not the behaviour this clause claims`,
+        note: `find is a line this branch added, picked because deleting it is measurable — nothing knows whether it is the line c${clause.id}'s test is about. Retarget it before reading the verdict as proof`,
       });
     }
   }
@@ -429,10 +429,29 @@ export function slugStandingLines(standing: SlugStanding): string[] {
   return lines;
 }
 
+// Which test to run is derived; which line to break is not. The brief knows
+// the file a clause's task wrote and the lines this branch added to it, and
+// nothing that says which of those lines the clause's own test is about — so
+// the scaffold is what is generated and the pairing is what the auditor
+// supplies. Pass 1 read an earlier wording as a claim the pairing had been
+// made, and read eight escalated kills as eight proofs.
+export function manifestNotes(count: number, manifestPath: string): string[] {
+  return [
+    manifestPath,
+    `${count} entry(ies). \`name\`, \`tests\` and \`test\` are derived and correct: each entry runs the test its clause names, in the file that test actually lives in.`,
+    '`find` is NOT derived. It is a line this branch added to the file the clause\'s task wrote, picked because deleting it is measurable — nothing here knows which line the clause\'s test is about. Retarget `find` per entry before you run it.',
+    'Run it as it stands and a KILLED means only that the deleted line was reachable from that test; mutate\'s escalation to file scope, which it reports, means the named test never saw it. Neither is the clause proving itself until `find` is yours.',
+  ];
+}
+
 // Written outside the worktree, because the brief is a read of the
 // repository and a generated file left in it would show up as the branch's
 // own work. The path is named so `npm run mutate -- <it>` is a copy away.
-function writeMutationManifest(slug: string, clauses: ProofClause[], members: Task[], changed: string[], range: string): void {
+function writeMutationManifest(slug: string, clauses: ProofClause[], members: Task[], changed: string[], range: string, diffIsForeign: boolean): void {
+  if (diffIsForeign) {
+    console.log(`No mutation manifest: the diff above is not ${slug}'s, so every line it could break belongs to work these clauses do not describe.`);
+    return;
+  }
   const sources = changed.filter((file) => file.endsWith('.ts') && !file.endsWith('.test.ts') && existsSync(file));
   const candidates = new Map<number, Array<{ file: string; find: string }>>();
   const sourceLine = (clause: number, ordinal: number): { file: string; find: string } | null => {
@@ -455,14 +474,13 @@ function writeMutationManifest(slug: string, clauses: ProofClause[], members: Ta
     (target) => resolveTarget(target),
     sourceLine,
   );
-  console.log('Mutation manifest, built from the targets above and runnable as it stands:');
+  console.log('Mutation manifest — the scaffold, wired to the tests above and valid as it stands:');
   if (entries.length === 0) {
     console.log('- none — no proof target on this spec resolved to a test with a line of this branch under it');
   } else {
     const manifestPath = path.join(os.tmpdir(), `mutations-${slug}.json`);
     writeFileSync(manifestPath, `${JSON.stringify(entries, null, 2)}\n`, 'utf8');
-    console.log(`  npm run mutate -- ${manifestPath}`);
-    console.log(`  ${entries.length} entry(ies). Each deletes a line this branch added and runs only the test its clause names; KILLED is the clause proving itself, SURVIVED is the finding.`);
+    for (const line of manifestNotes(entries.length, manifestPath)) console.log(`  ${line}`);
   }
   for (const line of omitted) console.log(`- omitted: ${line}`);
 }
@@ -576,7 +594,7 @@ export function cmdAuditPrompt(args: Flags, usage: string): void {
   const byId = new Map(tasks.map((task) => [task.id, task]));
   for (const task of members) printRow(task, byId, { indent: '- ', withFiles: true });
   console.log('');
-  writeMutationManifest(slug, doc.proofClauses, members, relevantFiles, `${base}..${head}`);
+  writeMutationManifest(slug, doc.proofClauses, members, relevantFiles, `${base}..${head}`, slugNotes.some((line) => line.startsWith('WARNING:')));
   console.log('');
   console.log('For every clause with a proof target, confirm the target exists and fails under a meaningful mutation or reproduction before accepting it as proof. `npm run mutate -- <manifest.json>` is the tool; `npm run probe` asks the DSL load path questions without a scratch runner.');
   console.log('Do not treat green tests as proof unless they are tied to the clause they discharge.');

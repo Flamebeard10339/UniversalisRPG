@@ -28,9 +28,6 @@ export interface AuditPass {
 
 export interface SpecDoc {
   deliverableSection: string;
-  // The settled arguments. Parsed here because the auditor's brief is what
-  // reads them: a brief that parses the spec and then omits its decisions is
-  // why an auditor opens the file anyway and reopens what it says.
   decisionsSection: string;
   proofClauses: ProofClause[];
   auditPasses: AuditPass[];

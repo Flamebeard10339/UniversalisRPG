@@ -4,7 +4,7 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { tsxCli } from '../lib/tsxCli';
 import { parseManifest } from '../mutate';
-import { indexSuiteTitles, mutationManifest, parseAuditArgs, parseAuditFile, parseCommitLog, slugStandingLines, unresolvedTarget, type TargetResolution } from './audit';
+import { indexSuiteTitles, manifestNotes, mutationManifest, parseAuditArgs, parseAuditFile, parseCommitLog, slugStandingLines, unresolvedTarget, type TargetResolution } from './audit';
 import { appendEvent, firstListedId, fixture, gitFixture, relevantFilesBlock, repoRoot, script, type Run } from './cliFixtures';
 
 describe('tasks CLI', () => {
@@ -1005,6 +1005,32 @@ describe('the brief arriving with the answers rather than the instructions', () 
     expect(entries).toHaveLength(1);
     expect(omitted).toEqual(['c1: vitest a.test.ts "gone" — no test by this name exists anywhere']);
     expect(() => parseManifest(JSON.stringify(entries))).not.toThrow();
+  });
+
+  // Pass 1 ran the manifest as it stood, read eight escalated kills as eight
+  // proofs and three survivals as three findings, and filed a HIGH saying so.
+  // Which test to run is derived; which line to break is not, and the brief
+  // saying otherwise is worse than the brief not generating one at all.
+  it('says which fields of the manifest are derived and which the auditor still owes', () => {
+    const notes = manifestNotes(11, '/tmp/mutations-demo.json').join('\n');
+    expect(notes).toContain('`name`, `tests` and `test` are derived and correct');
+    expect(notes).toContain('`find` is NOT derived');
+    expect(notes).toContain('Retarget `find` per entry before you run it');
+    expect(notes).toContain('escalation to file scope');
+    expect(notes).not.toContain('KILLED is the clause proving itself');
+  });
+
+  it('offers no manifest at all in a brief that has just warned the diff is not this slugs', () => {
+    fixture(({ dir, tasks }) => {
+      writeFileSync(path.join(dir, 'specs', 'another-spec.md'), '# Another spec\n\n## Deliverable\n\nA promise made on some other branch.\n\nProof:\n\n- The other clause holds.\n\n## Decisions\n\n## Open questions\n\nNone.\n', 'utf8');
+
+      const { stdout } = tasks('audit-prompt', 'another-spec');
+      expect(stdout).toContain('WARNING: this branch is working demo-spec');
+      // Every line it could break belongs to work these clauses do not
+      // describe, so offering it as runnable is the c7 defect one layer down.
+      expect(stdout).toContain('No mutation manifest: the diff above is not another-spec\'s');
+      expect(stdout).not.toContain('mutations-another-spec.json');
+    });
   });
 
   it('the brief names the commits in its diff range and what each touched', () => {
