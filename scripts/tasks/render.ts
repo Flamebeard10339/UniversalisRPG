@@ -171,8 +171,8 @@ export function wrapUnder(text: string, first: string, hanging = ' '.repeat(firs
 }
 
 // One rendering of "this clause stands like this", so `spec show` and
-// `handoff` quote a clause identically. The number and the verdict are the
-// structure a wrapped tail must not sit under, or the list stops being one.
+// `work-prompt` quote a clause identically. The number and the verdict are
+// the structure a wrapped tail must not sit under, or the list stops being one.
 export function clauseStandingLines(standing: AuditVerdict, clauses: ProofClause[]): string[] {
   return wrapUnder(clauses.find((clause) => clause.id === standing.clause)!.text, `  ${standing.clause}. [${standing.status}] `);
 }

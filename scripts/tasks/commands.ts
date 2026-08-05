@@ -6,7 +6,7 @@ import { flagArities, parseArgs, positionalArity, type Flags } from './cli';
 import { ACTOR_USAGE, flushSkippedStoreLines, GLOBAL_USAGE } from './context';
 import { cmdPlan, cmdConcept, cmdProduces, cmdSystem, cmdWhere } from './architectureCmds';
 import { cmdDoctor } from './doctor';
-import { cmdCheckCommitMessage, cmdHandoff, cmdLog, recordStandaloneEvent } from './handoff';
+import { cmdCheckCommitMessage, cmdLog, recordStandaloneEvent } from './handoff';
 import { cmdMergeReady } from './mergeReady';
 import { cmdAdd, cmdDecline, cmdDone, cmdEdit, cmdList, cmdNext, cmdPromote, cmdSearch, cmdShow, cmdStart, cmdStop } from './records';
 import { cmdRoadmap } from './roadmapCmd';
@@ -15,7 +15,7 @@ import { cmdSpecAdd, cmdSpecDone, cmdSpecNew, cmdSpecRemove, cmdSpecShow } from 
 import { cmdTriage } from './triage';
 import { cmdWorkPrompt } from './workPrompt';
 
-const USAGE = 'usage: npm run tasks -- <doctor|add|edit|show|list|search|next|roadmap|plan|system|where|produces|concept|start|stop|done|decline|promote|import|triage|note|decision|log|spec|audit|audit-prompt|work-prompt|plan-prompt|handoff|merge-ready> ...';
+const USAGE = 'usage: npm run tasks -- <doctor|add|edit|show|list|search|next|roadmap|plan|system|where|produces|concept|start|stop|done|decline|promote|import|triage|note|decision|log|spec|audit|audit-prompt|work-prompt|plan-prompt|merge-ready> ...';
 
 interface Command {
   usage: string;
@@ -83,7 +83,6 @@ const COMMANDS: Record<string, Command> = {
   'audit-prompt': { usage: 'usage: tasks audit-prompt <spec> [--base-branch main]  (the auditor\'s brief, generated — do not hand-write one)', run: cmdAuditPrompt },
   'work-prompt': { usage: 'usage: tasks work-prompt <id-or-spec>  (the worker\'s brief, generated — do not hand-write one. A spec slug briefs that spec\'s next open, unblocked member; an exact task id always wins over a spec of the same name)', run: cmdWorkPrompt },
   'plan-prompt': { usage: 'usage: tasks plan-prompt <slug> [<path>...]  (the planner\'s brief, generated — do not remember the survey by hand. Runs `tasks where` over every named path, prints the clause format literally, and ends with the decompose/plan/dispatch sequence)', run: cmdPlanPrompt },
-  handoff: { usage: 'usage: tasks handoff [--spec <slug>] [--base-branch main] [--scan-cap <commits>]', run: cmdHandoff },
   'merge-ready': { usage: 'usage: tasks merge-ready [--base-branch main]  (runs the merge gate: tsc, npm test, layer-check, audit-status, doctor, and the tracked-text byte check; exits non-zero when a leg fails)', run: cmdMergeReady },
   'check-commit-msg': { usage: 'usage: tasks check-commit-msg <msg-file> [--merge-or-revert] [--files a,b,c]', run: cmdCheckCommitMessage },
 };

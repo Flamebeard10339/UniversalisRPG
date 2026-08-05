@@ -1025,17 +1025,15 @@ describe('tasks CLI', () => {
     fixture(({ tasks, dir }) => {
       tasks('add', 'open task', '--id', 'open-task', '--spec', 'demo-spec', '--severity', 'high');
       const globals = ['--store', path.join(dir, 'tasks.jsonl'), '--systems', path.join(dir, 'systems.json'), '--specs-dir', path.join(dir, 'specs')];
-      const on = (branch: string, command: string): { stdout: string } => spawnSync(process.execPath, [tsxCli, script, command, ...globals, '--branch', branch], { cwd: repoRoot, encoding: 'utf8' });
+      const on = (branch: string): { stdout: string } => spawnSync(process.execPath, [tsxCli, script, 'next', ...globals, '--branch', branch], { cwd: repoRoot, encoding: 'utf8' });
 
-      for (const command of ['next', 'handoff']) {
-        const onMain = on('main', command);
-        expect(onMain.stdout, command).not.toContain('spec inferred from the store');
-        expect(onMain.stdout, command).not.toContain('open task');
+      const onMain = on('main');
+      expect(onMain.stdout).not.toContain('spec inferred from the store');
+      expect(onMain.stdout).not.toContain('open task');
 
-        // The same store, one branch name different: still inferred, so what
-        // changed is the rule for main and not the inference itself.
-        expect(on('orphaned-branch', command).stdout, command).toContain('spec inferred from the store: demo-spec');
-      }
+      // The same store, one branch name different: still inferred, so what
+      // changed is the rule for main and not the inference itself.
+      expect(on('orphaned-branch').stdout).toContain('spec inferred from the store: demo-spec');
     });
   });
 
@@ -1067,7 +1065,7 @@ describe('tasks CLI', () => {
   it('the branch-name spec binding says it was inferred and what from, the condition c8 permits it on', () => {
     fixture(({ tasks }) => {
       tasks('add', 'a task', '--id', 'a-task', '--spec', 'demo-spec');
-      for (const command of [['next'], ['handoff'], ['spec', 'show']]) {
+      for (const command of [['next'], ['spec', 'show']]) {
         const result = tasks(...command);
         expect(result.stdout, command[0]).toContain('spec inferred from the branch name: demo-spec');
         expect(result.stdout, command[0]).toMatch(/demo-spec\.md exists/);

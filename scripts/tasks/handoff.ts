@@ -1,150 +1,9 @@
-import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
-import { checkCommitMessage, extractNextTrailer, isExempt } from '../lib/commitContract';
+import { checkCommitMessage, isExempt } from '../lib/commitContract';
 import { EVENT_OPS, filterEvents, loadEvents, type EventOp, type TaskEvent } from '../lib/eventLog';
-import * as git from '../lib/git';
-import { clauseStandings, parseSpecDoc } from '../lib/specDoc';
 import { loadManifest } from '../lib/systems';
-import { fixNowQueue } from '../lib/taskStore';
 import type { Flags } from './cli';
-import { readStore, recordEvents, resolveActiveSpec, resolveConfig, specFile, splitList, validateContentFields, type EventSubject } from './context';
-import { clauseStandingLines, printRow } from './render';
-
-const COMMIT_SEP = '\x1e';
-const FIELD_SEP = '\x1f';
-
-interface FoundTrailer {
-  trailer: string;
-  sha: string;
-  distance: number;
-}
-
-type BranchCommitRange =
-  | { kind: 'range'; range: string; count: number }
-  | { kind: 'empty'; range: null; count: 0 }
-  | { kind: 'unknown'; range: null; count: 0 };
-
-// The branch's own commits, or null when that range can't be built or is
-// empty — the latter being the base branch itself, where "this branch's
-// work" is the whole history and the unscoped walk is the right one.
-function branchCommitRange(baseBranch: string): BranchCommitRange {
-  const mergeBase = git.mergeBase(baseBranch);
-  if (mergeBase === null) return { kind: 'unknown', range: null, count: 0 };
-  const count = git.commitCount(`${mergeBase}..HEAD`);
-  if (count === null) return { kind: 'unknown', range: null, count: 0 };
-  return count === 0 ? { kind: 'empty', range: null, count } : { kind: 'range', range: `${mergeBase}..HEAD`, count };
-}
-
-// Only the last commit's Next: is meant to be live, but a mechanical or
-// fixup commit can carry none at all — walk back to the most recent commit
-// that actually has one.
-//
-// Stopping at the merge-base is the difference between "nothing to resume
-// yet" and a confident pointer at another branch's plan. The commit cap
-// stays as a bound on the scan, not on the reach. A git failure is its own
-// answer — 'error' — so the caller never reports a bounded scan it did not
-// perform.
-const DEFAULT_HANDOFF_SCAN_CAP = 20;
-
-function findLatestNextTrailer(range: string | null, maxCommits: number): FoundTrailer | 'error' | null {
-  let log: string;
-  try {
-    log = execFileSync('git', ['log', `-${maxCommits}`, `--format=%H${FIELD_SEP}%B${COMMIT_SEP}`, ...(range === null ? [] : [range])], { encoding: 'utf8' });
-  } catch {
-    return 'error';
-  }
-  const commits = log.split(COMMIT_SEP).filter((entry) => entry.trim().length > 0);
-  for (let distance = 0; distance < commits.length; distance++) {
-    const sepIndex = commits[distance].indexOf(FIELD_SEP);
-    const sha = commits[distance].slice(0, sepIndex).trim();
-    const message = commits[distance].slice(sepIndex + 1);
-    const trailer = extractNextTrailer(message);
-    if (trailer !== null) return { trailer, sha, distance };
-  }
-  return null;
-}
-
-// Fixed header (branch, trailer, spec, proof clauses) plus 2 lines per
-// queue member — 8 keeps the whole handoff comfortably under a 40-line
-// budget even at a full clause list.
-const HANDOFF_QUEUE_CAP = 8;
-
-// The first command of a cold session.
-export function cmdHandoff(args: Flags, usage: string): void {
-  const scanCap = args.flags['scan-cap'] === undefined ? DEFAULT_HANDOFF_SCAN_CAP : Number(args.flags['scan-cap']);
-  // `git log -<n>` takes this straight, so a non-number reaches git as NaN
-  // and a negative one reaches it as a flag: both make the walk silently
-  // scan something other than what was asked for.
-  if (!Number.isInteger(scanCap) || scanCap < 1) {
-    console.error(`error: --scan-cap must be a whole number of commits, at least 1: ${args.flags['scan-cap']}`);
-    console.error(usage);
-    process.exitCode = 1;
-    return;
-  }
-
-  const config = resolveConfig(args.flags);
-  console.log(`branch: ${config.branch}`);
-
-  const baseBranch = args.flags['base-branch'] ?? 'main';
-  const branchRange = branchCommitRange(baseBranch);
-  const found = branchRange.kind === 'range' ? findLatestNextTrailer(branchRange.range, scanCap) : null;
-  if (branchRange.kind === 'unknown') {
-    console.log(`(could not find the branch point for ${baseBranch}; Next trailer scan skipped)`);
-  } else if (found === 'error') {
-    console.log('(git log failed; Next: trailer scan skipped)');
-  } else if (found === null) {
-    console.log(branchRange.kind === 'empty' ? `(no Next: trailer yet on this branch — nothing recorded since it left ${baseBranch})` : branchRange.count > scanCap ? `(no Next: trailer found in the last ${scanCap} branch commits)` : `(no Next: trailer yet on this branch; no Next: trailer found in ${branchRange.count} branch commit${branchRange.count === 1 ? '' : 's'} since it left ${baseBranch})`);
-  } else {
-    if (found.distance > 0) console.log(`(from ${found.sha.slice(0, 7)}, ${found.distance} commit${found.distance === 1 ? '' : 's'} back)`);
-    console.log(found.trailer);
-  }
-  console.log('');
-
-  const tasks = readStore(config);
-  const activeSpec = resolveActiveSpec(config, tasks, args.flags.spec);
-  if (activeSpec.note) console.log(activeSpec.note);
-  const spec = activeSpec.spec;
-  if (spec === null) {
-    console.log(`spec: none — no ${specFile(config, config.branch)}, and no --spec given`);
-    return;
-  }
-  const path_ = specFile(config, spec);
-  console.log(`spec: ${spec} (${path_})`);
-  if (!existsSync(path_)) {
-    console.log(`spec file missing: ${path_}`);
-    return;
-  }
-  const doc = parseSpecDoc(readFileSync(path_, 'utf8'));
-  console.log('');
-  // The proof clauses, not the whole ## Deliverable section: the section's
-  // prose never changes between runs, and what a cold session needs from
-  // it — what the branch still owes — is exactly what the clauses are.
-  const standings = clauseStandings(doc.proofClauses, doc.auditPasses[doc.auditPasses.length - 1]?.verdicts);
-  for (const standing of standings) {
-    for (const line of clauseStandingLines(standing, doc.proofClauses)) console.log(line);
-  }
-  console.log('');
-
-  const byId = new Map(tasks.map((task) => [task.id, task]));
-  const inProgress = tasks.filter((task) => task.spec === spec && task.state === 'in-progress');
-  if (inProgress.length > 0) {
-    console.log(`${inProgress.length} in-progress task(s):`);
-    for (const task of inProgress.slice(0, HANDOFF_QUEUE_CAP)) printRow(task, byId, { indent: '- ' });
-    if (inProgress.length > HANDOFF_QUEUE_CAP) console.log(`… ${inProgress.length - HANDOFF_QUEUE_CAP} more in progress`);
-    console.log('');
-  }
-
-  const queue = fixNowQueue(tasks, spec);
-  console.log(`${queue.length} open fix-now task(s):`);
-  const shown = queue.slice(0, HANDOFF_QUEUE_CAP);
-  for (const task of shown) printRow(task, byId, { indent: '- ', withFiles: true });
-  // fixNowQueue is already severity-ordered, so truncating here drops the
-  // least urgent — the queue can otherwise print 2 lines per member and
-  // blow the line budget as the store grows.
-  if (queue.length > shown.length) {
-    console.log(`… ${queue.length - shown.length} more, see \`tasks list --spec ${spec}\``);
-  }
-}
+import { readStore, recordEvents, resolveConfig, specFile, splitList, validateContentFields, type EventSubject } from './context';
 
 // The two writes that touch no task state. A decision is its own op rather
 // than a note by convention, because "what was decided about this" has to be
@@ -252,7 +111,7 @@ export function cmdCheckCommitMessage(args: Flags, usage: string): void {
   const reason = checkCommitMessage(message);
   if (reason) {
     console.error(`commit-msg: ${reason}`);
-    console.error('every commit needs a body saying what was done. Use `tasks handoff` or `tasks next` for resumability; an optional Next: trailer is only a breadcrumb. --no-verify to bypass.');
+    console.error('every commit needs a body saying what was done. Use `tasks next` for resumability; an optional Next: trailer is only a breadcrumb. --no-verify to bypass.');
     process.exitCode = 1;
   }
 }
