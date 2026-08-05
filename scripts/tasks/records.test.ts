@@ -664,6 +664,67 @@ describe('tasks CLI', () => {
     });
   });
 
+  // The motivating gap this closes: a declined record's whole argument can
+  // live in `reason` with nothing in `writes` or `files` to be found by, the
+  // shape `audit-loop-costs-less-clause-5` actually has. `list`'s default
+  // still hides closed work — that default is for a live queue, and a
+  // declined or done record is resolved, not something to work on.
+  describe('search reaches the reason field and closed records', () => {
+    it('matches a declined record by its reason, with no --state given', () =>
+      fixture(({ tasks }) => {
+        tasks('add', 'shrink the save test', '--id', 'save-test-shrink');
+        tasks('decline', 'save-test-shrink', '--reason', 'shrinking it further means faking the git subprocesses that are the thing it tests');
+
+        const result = tasks('search', 'faking git');
+        expect(result.status).toBe(0);
+        expect(result.stdout).toContain('save-test-shrink');
+        expect(result.stdout).toContain('(matches: reason)');
+      }));
+
+    it('does not put a declined record in the default queue view — only search reaches past the not-closed default', () =>
+      fixture(({ tasks }) => {
+        tasks('add', 'shrink the save test', '--id', 'save-test-shrink');
+        tasks('decline', 'save-test-shrink', '--reason', 'faking the subprocess is not worth it');
+
+        expect(tasks('list').stdout).not.toContain('save-test-shrink');
+        expect(tasks('search', 'faking').stdout).toContain('save-test-shrink');
+      }));
+
+    it('an explicit --state still narrows a search the way it narrows a list', () =>
+      fixture(({ tasks }) => {
+        tasks('add', 'shrink the save test', '--id', 'save-test-shrink');
+        tasks('decline', 'save-test-shrink', '--reason', 'faking the subprocess is not worth it');
+        tasks('add', 'an open record about the same word', '--id', 'still-open', '--deliverable', 'faking is mentioned here too');
+
+        const declinedOnly = tasks('search', 'faking', '--state', 'declined');
+        expect(declinedOnly.stdout).toContain('save-test-shrink');
+        expect(declinedOnly.stdout).not.toContain('still-open');
+      }));
+
+    it('reports the words a query is split into as matched anywhere they land, not only as a contiguous phrase', () =>
+      fixture(({ tasks }) => {
+        tasks('add', 'the phrase is split across the sentence', '--id', 'split-match', '--deliverable', 'this reason talks about faking a subprocess and also mentions git elsewhere');
+        const result = tasks('search', 'faking git');
+        expect(result.stdout).toContain('split-match');
+      }));
+  });
+
+  it('a query naming nothing points at the event log as the index it did not read', () =>
+    fixture(({ tasks }) => {
+      tasks('add', 'unrelated record', '--id', 'unrelated');
+      const result = tasks('search', 'no-record-carries-this-term');
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('This searches id, title, system, deliverable, evidence, reason');
+      expect(result.stdout).toContain('tasks log "no-record-carries-this-term"');
+    }));
+
+  it('list, with no search term, does not print the event-log pointer on an empty result', () =>
+    fixture(({ tasks }) => {
+      const result = tasks('list', '--state', 'done');
+      expect(result.status).toBe(0);
+      expect(result.stdout).not.toContain('not the event log');
+    }));
+
   it('list filters by severity, system, spec and kind', () => {
     fixture(({ tasks }) => {
       tasks('add', 'runtime high', '--id', 'runtime-high', '--severity', 'high', '--system', 'Runtime', '--spec', 'demo-spec');

@@ -15,6 +15,7 @@ import {
   KINDS,
   listQueue,
   loadStore,
+  matchesSearchTerm,
   parseStore,
   requirementStates,
   SEARCH_FIELDS,
@@ -356,9 +357,13 @@ export function cmdList(args: Flags): void {
   runList(args, undefined);
 }
 
+// The same rule `listQueue` filters by, applied per field rather than to the
+// whole record, so the two cannot report a match by one rule and a reason by
+// another. A query whose words spread across two fields (one in `title`, one
+// in `reason`) matches the record but no single field, which is the honest
+// answer to "which field" when the true answer is "more than one, together".
 function matchingFields(task: Task, text: string): string[] {
-  const term = text.toLowerCase();
-  return SEARCH_FIELDS.filter(([, read]) => (read(task) ?? '').toLowerCase().includes(term)).map(([label]) => label);
+  return SEARCH_FIELDS.filter(([, read]) => matchesSearchTerm(read(task) ?? '', text)).map(([label]) => label);
 }
 
 function runList(args: Flags, text: string | undefined): void {
@@ -413,7 +418,14 @@ function runList(args: Flags, text: string | undefined): void {
   const counts: Record<State, number> = { unreviewed: 0, open: 0, 'in-progress': 0, done: 0, declined: 0 };
   for (const task of queue) counts[task.state]++;
   console.log(`${queue.length} task(s) — unreviewed: ${counts.unreviewed}, open: ${counts.open}, in-progress: ${counts['in-progress']}, done: ${counts.done}, declined: ${counts.declined}`);
-  if (queue.length === 0) reportStoreScope(config, tasks.length);
+  if (queue.length === 0) {
+    reportStoreScope(config, tasks.length);
+    // A search answers from the store's own fields and nothing else. "No
+    // record names this" is not "nothing is known": a decline's trigger, a
+    // decision with no task behind it, and every other write live in the
+    // event log, which this never opens.
+    if (text !== undefined) console.log(`This searches ${SEARCH_FIELDS.map(([label]) => label).join(', ')} — not the event log, where a ruling can live with no task record behind it at all: \`tasks log ${JSON.stringify(text)}\` reads decisions, declines and every other write, in order.`);
+  }
 }
 
 // An empty queue has causes that look identical from outside — no members,

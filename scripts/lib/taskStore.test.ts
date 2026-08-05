@@ -2,7 +2,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { checkStore, claimSummary, COLD_CLAIM_DAYS, coldClaimIssues, coldClaims, dependencyCycles, fixNowQueue, isBlocked, KINDS, listQueue, loadStore, nearMatches, parseStore, parseStoreTolerantly, requirementStates, saveStore, StoreError, unreviewedQueue, waitingOn, type Task } from './taskStore';
+import { checkStore, claimSummary, COLD_CLAIM_DAYS, coldClaimIssues, coldClaims, dependencyCycles, fixNowQueue, isBlocked, KINDS, listQueue, loadStore, matchesSearchTerm, nearMatches, parseStore, parseStoreTolerantly, requirementStates, saveStore, StoreError, unreviewedQueue, waitingOn, type Task } from './taskStore';
 
 function task(overrides: Partial<Task> & { id: string }): Task {
   return {
@@ -509,6 +509,46 @@ describe('listQueue text search', () => {
 
   it('returns nothing for a term no task carries', () => {
     expect(listQueue(corpus, { text: 'zzzznotpresent' })).toEqual([]);
+  });
+
+  it('matches a declined record\'s reason, which no other field carries', () => {
+    const declined = task({ id: 'save-test-shrink', state: 'declined', reason: 'shrinking it further means faking the git subprocesses that are the thing it tests' });
+    expect(listQueue([...corpus, declined], { text: 'faking git' }).map((t) => t.id)).toEqual(['save-test-shrink']);
+  });
+
+  // `list`'s own default (state undefined, text undefined) still hides
+  // closed work — checked by the `state defaults to not-closed` test below,
+  // which is the one this must not regress.
+  it('reaches every state by default once a search term is given, unlike the bare not-closed queue', () => {
+    const done = task({ id: 'done-record', state: 'done', title: 'a done record mentioning combat' });
+    const declined = task({ id: 'declined-record', state: 'declined', reason: 'declined for reasons mentioning combat' });
+    expect(listQueue([done, declined], { text: 'combat' }).map((t) => t.id).sort()).toEqual(['declined-record', 'done-record']);
+  });
+
+  it('an explicit --state still narrows a search the way it narrows the bare queue', () => {
+    const done = task({ id: 'done-record', state: 'done', title: 'combat' });
+    const declined = task({ id: 'declined-record', state: 'declined', title: 'combat' });
+    expect(listQueue([done, declined], { text: 'combat', state: 'done' }).map((t) => t.id)).toEqual(['done-record']);
+  });
+});
+
+describe('matchesSearchTerm', () => {
+  it('requires every word in the term, not the term as one contiguous phrase', () => {
+    expect(matchesSearchTerm('faking the git subprocesses', 'faking git')).toBe(true);
+    expect(matchesSearchTerm('user interface', 'user interface')).toBe(true);
+  });
+
+  it('fails when even one word of the term is missing', () => {
+    expect(matchesSearchTerm('faking the subprocesses', 'faking git')).toBe(false);
+  });
+
+  it('is case-insensitive', () => {
+    expect(matchesSearchTerm('FAKING THE GIT SUBPROCESSES', 'faking git')).toBe(true);
+  });
+
+  it('matches nothing against an empty term', () => {
+    expect(matchesSearchTerm('anything at all', '')).toBe(false);
+    expect(matchesSearchTerm('anything at all', '   ')).toBe(false);
   });
 });
 
