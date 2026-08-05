@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { State, Task } from '../lib/taskStore';
 import { allUsages } from './commands';
-import { authoredAsPlan, LEGS, runMergeReady, type BranchStanding, type MergeReadyDeps } from './mergeReady';
+import { authoredAsPlan, decideSpec, LEGS, runMergeReady, specToGrade, type BranchStanding, type MergeReadyDeps, type SpecCandidate, type SpecFacts } from './mergeReady';
 
 const utf8 = (text: string): Uint8Array => new TextEncoder().encode(text);
 
@@ -13,6 +13,7 @@ const ready = (overrides: Partial<BranchStanding> = {}): BranchStanding => ({
   baseMoved: false,
   baseBranch: 'main',
   spec: 'a-spec',
+  specNote: null,
   specAuthoredHere: false,
   openMembers: [],
   unreviewedFindings: 0,
@@ -175,11 +176,91 @@ describe('runMergeReady, on this branch\'s standing', () => {
   });
 });
 
+// The spec the gate graded, named on its own line — without it a reader
+// cannot see the gate grading a spec they did not mean, which is how the
+// wrong-spec pass below stayed invisible.
+describe('the spec merge-ready says it graded', () => {
+  it('reports the route to the spec it is about to grade', () => {
+    const { deps: d, recorded } = deps({ standing: () => ready({ specNote: 'spec inferred from the event log: a-spec' }) });
+    runMergeReady(d);
+    expect(recorded.lines.join('\n')).toContain('spec source    ok  spec inferred from the event log: a-spec');
+  });
+
+  it('says a plan was the only spec graded, so a green run cannot be read as covering another', () => {
+    const { body: lines } = ((): { body: string } => {
+      const { deps: d, recorded } = deps({ standing: () => ready({ specAuthoredHere: true, openMembers: ['m1'], auditPasses: 0 }) });
+      runMergeReady(d);
+      return { body: recorded.lines.join('\n') };
+    })();
+    expect(lines).toContain('No other spec was graded');
+  });
+});
+
+describe('specToGrade', () => {
+  const plan = (spec: string): SpecCandidate => ({ spec, authoredAsPlan: true });
+  const owed = (spec: string): SpecCandidate => ({ spec, authoredAsPlan: false });
+
+  // The regression this exists to stop: `resolveActiveSpec` takes the most
+  // recently written spec, planning happens last, so a branch that
+  // implemented `real-work` and then wrote `plan-for-later` resolved to the
+  // plan — which owes nothing — and the gate printed "every leg passed" with
+  // `real-work` never named and never graded.
+  it('grades a spec the branch owes ahead of a plan it merely wrote, however recent the plan', () => {
+    expect(specToGrade([plan('plan-for-later'), owed('real-work')])?.spec).toBe('real-work');
+  });
+
+  it('leaves an ordinary branch and a planning branch exactly as they were', () => {
+    // One spec, owed: the overwhelming majority, and untouched.
+    expect(specToGrade([owed('a-spec')])?.spec).toBe('a-spec');
+    // Every candidate a plan — the planning branch this spec serves, which
+    // carries no spec of its own. It still passes as a plan.
+    expect(specToGrade([plan('later-a'), plan('later-b')])).toEqual(plan('later-a'));
+    // Most recent first, so the first owed spec wins among several.
+    expect(specToGrade([plan('p'), owed('newer'), owed('older')])?.spec).toBe('newer');
+    expect(specToGrade([])).toBe(null);
+  });
+});
+
+// The glue between git, the store and the decision, which `branchStanding`
+// held inline where nothing could call it: inverting the flag's polarity left
+// the whole file green and `tsc` clean.
+describe('decideSpec', () => {
+  const facts = (overrides: Partial<SpecFacts> = {}): SpecFacts => ({ activeSpec: 'a-spec', activeNote: 'inferred from the branch name', written: ['a-spec'], isPlan: () => false, ...overrides });
+
+  it('grades what the resume aid answered, and keeps its note, when that spec is owed', () => {
+    expect(decideSpec(facts())).toEqual({ spec: 'a-spec', specNote: 'inferred from the branch name', specAuthoredHere: false });
+  });
+
+  it('passes a plan through as a plan when the branch owes nothing else', () => {
+    const decision = decideSpec(facts({ activeSpec: 'later', written: ['later'], isPlan: () => true }));
+    expect(decision).toEqual({ spec: 'later', specNote: 'inferred from the branch name', specAuthoredHere: true });
+  });
+
+  // The regression: the log route takes the most recent write and planning
+  // happens last, so `real-work` went ungraded behind `plan-for-later` and
+  // the gate printed "every leg passed".
+  it('steps past a plan to the spec the branch owes, and says it did', () => {
+    const decision = decideSpec(facts({ activeSpec: 'plan-for-later', written: ['plan-for-later', 'real-work'], isPlan: (spec) => spec === 'plan-for-later' }));
+    expect(decision.spec).toBe('real-work');
+    expect(decision.specAuthoredHere).toBe(false);
+    expect(decision.specNote).toContain('spec chosen by the gate: real-work');
+    expect(decision.specNote).toContain('plan-for-later is a plan this branch wrote');
+  });
+
+  it('has no spec to grade when the resume aid found none', () => {
+    expect(decideSpec(facts({ activeSpec: null, written: ['written-anyway'] }))).toEqual({ spec: null, specNote: null, specAuthoredHere: false });
+  });
+});
+
 describe('authoredAsPlan', () => {
   const member = (state: State): Task => ({ state }) as Task;
 
   it('reads a spec as a plan only when this branch wrote it and worked none of its members', () => {
     expect(authoredAsPlan([member('open'), member('open')], false)).toBe(true);
+
+    // Git could not be asked — an unresolvable base ref, no repository. The
+    // exemption must not widen when the evidence for it disappears.
+    expect(authoredAsPlan([member('open'), member('open')], null)).toBe(false);
 
     // A spec the base branch already carries is somebody else's plan, picked
     // up rather than written — this branch owes it.

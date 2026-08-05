@@ -147,21 +147,29 @@ function resolveWorkTarget(config: Config, tasks: Task[], name: string): Task | 
   const exact = tasks.find((task) => task.id === name);
   if (exact !== undefined && !isRootRecord(exact)) return exact;
 
-  const spec = exact?.spec ?? (existsSync(specFile(config, name)) ? name : null);
-  if (spec === null) {
+  const fuzzy = exact === undefined && !existsSync(specFile(config, name))
     // A read answers, and "no such task" with the nearest ids is the answer.
     // What it must never do is print a brief anyway: a dispatch instruction
     // for a record nobody holds is the one output here that would be invented.
-    return resolveTaskIds([name], tasks, { report: (line) => console.log(line) })?.[0];
-  }
+    ? resolveTaskIds([name], tasks, { report: (line) => console.log(line) })?.[0]
+    : undefined;
+  // A fragment resolves to a record, and a root record is no more work when
+  // it was reached by prefix than when it was named outright: `work-prompt
+  // audit-loop` is one keystroke from the exact id and produced every
+  // misdirection this clause exists to stop.
+  if (fuzzy !== undefined && !isRootRecord(fuzzy)) return fuzzy;
+
+  const spec = exact?.spec ?? fuzzy?.spec ?? (existsSync(specFile(config, name)) ? name : null);
+  if (spec === null) return undefined;
+  const root = exact ?? fuzzy;
 
   const [next, ...rest] = memberQueue(tasks, spec);
   const behind = rest.length > 0 ? ` (${rest.length} more behind it: ${rest.map((task) => task.id).join(', ')})` : '';
   if (next !== undefined) {
     console.log(
-      exact === undefined
+      root === undefined
         ? `resolved the spec ${spec} -> ${next.id}, its next open, unblocked member${behind}`
-        : `${name} is ${spec}'s root record — no write grant, and every member of the spec as a requirement, so it is blocked by its own spec and is not work. Briefing ${next.id}, its next open, unblocked member${behind}. The whole picture is \`npm run tasks -- show ${name}\`.`,
+        : `${root.id} is ${spec}'s root record — no write grant, and every member of the spec as a requirement, so it is blocked by its own spec and is not work. Briefing ${next.id}, its next open, unblocked member${behind}. The whole picture is \`npm run tasks -- show ${root.id}\`.`,
     );
     return next;
   }
@@ -172,9 +180,9 @@ function resolveWorkTarget(config: Config, tasks: Task[], name: string): Task | 
   // the root there reintroduces the whole defect through the back door, which
   // is what `audit-brief-arrives-complete` did: four members waiting behind
   // `audit-loop-costs-less`, and a brief that dispatched the container.
-  if (exact !== undefined && !tasks.some((task) => task.spec === spec && task.id !== exact.id)) {
+  if (root !== undefined && !tasks.some((task) => task.spec === spec && task.id !== root.id)) {
     console.log(`${spec} has no member besides its own root record, so that is what is briefed.`);
-    return exact;
+    return root;
   }
   // An empty queue is explained by the same function `next` prints, because
   // "no member tasks", "every member closed" and "every member blocked" are

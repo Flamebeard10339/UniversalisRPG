@@ -2862,6 +2862,25 @@ describe('tasks CLI', () => {
     });
   });
 
+  // A prefix is one keystroke from the exact id and lands on the same record,
+  // so guarding only the exact path left `work-prompt audit-loop` reproducing
+  // all three misdirections verbatim.
+  it('work-prompt redirects away from a root record reached by a fragment, not only by its exact id', () => {
+    fixture(({ tasks }) => {
+      tasks('add', 'a slice', '--id', 'a-slice', '--spec', 'demo-spec', '--writes', 'src/runtime/save.ts');
+      tasks('add', 'the whole picture', '--id', 'demo-spec', '--spec', 'demo-spec', '--requires', 'a-slice');
+
+      // A fragment that is neither the exact id nor a spec file name, and
+      // that `resolveTaskIds` resolves to the root record by prefix.
+      const result = tasks('work-prompt', 'demo-spe');
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('demo-spec is demo-spec\'s root record');
+      expect(result.stdout).toContain('You are implementing a-slice on branch demo-spec.');
+      expect(result.stdout).not.toContain('You are implementing demo-spec on branch');
+      expect(result.stdout).not.toContain('BLOCKED');
+    });
+  });
+
   it('work-prompt falls back to the root record only when its spec holds no other record', () => {
     fixture(({ tasks }) => {
       tasks('add', 'the whole picture', '--id', 'demo-spec', '--spec', 'demo-spec');

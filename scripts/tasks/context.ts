@@ -206,13 +206,22 @@ export interface ActiveSpec {
 // the branch-name route cannot answer for a generated worktree branch —
 // `claude/<topic>-<hash>` looks for a nested spec path that cannot exist —
 // nor for a branch whose name has dropped a word its spec still carries.
-export function lastSpecWrittenFromBranch(config: Config): string | null {
+// Most recent first, deduplicated, and only those with a spec file in this
+// checkout. A resume aid wants the head of this list; a gate deciding what a
+// branch owes has to see the rest of it, because the most recent write is the
+// last thing the branch did rather than the thing it is answerable for.
+export function specsWrittenFromBranch(config: Config): string[] {
   const written = loadEvents(config.eventsPath).events.filter((event) => event.branch === config.branch && event.spec !== null);
+  const specs: string[] = [];
   for (let i = written.length - 1; i >= 0; i--) {
     const spec = written[i].spec as string;
-    if (existsSync(specFile(config, spec))) return spec;
+    if (!specs.includes(spec) && existsSync(specFile(config, spec))) specs.push(spec);
   }
-  return null;
+  return specs;
+}
+
+export function lastSpecWrittenFromBranch(config: Config): string | null {
+  return specsWrittenFromBranch(config)[0] ?? null;
 }
 
 export function resolveActiveSpec(config: Config, tasks: Task[], explicit: string | undefined): ActiveSpec {

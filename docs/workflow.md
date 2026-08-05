@@ -75,10 +75,15 @@ Every command is `npm run tasks -- <verb>`. The record verbs (`show`, `edit`, `s
 10. **Close and merge.** `tasks merge-ready` runs the whole merge gate — tsc, tests, layer-check,
     audit-status, doctor, byte check — plus this branch's standing: is the tree clean, has the base
     branch moved past the merge base, is every spec member closed, does the latest pass leave a
-    clause outstanding. A **planning branch** owes neither: when the spec file is absent from the
-    base branch and every member of it is still open, the branch wrote that spec as a plan for a
-    later branch, and the spec leg passes saying so rather than reading open members and a missing
-    audit pass as debts. One line per leg, non-zero when a leg fails, and **every failing leg names
+    clause outstanding. A **planning branch** carries no spec of its own — planning is informal —
+    and owes nothing for the plans it writes: when the spec file is absent from the base branch and
+    it has **at least one member, every one of them still open**, the branch wrote that spec as a
+    plan for a later branch, and the spec leg passes saying so rather than reading open members and
+    a missing audit pass as debts. A spec authored and never decomposed has promised a later branch
+    nothing and keeps owing its clauses. The gate also names **which** spec it graded and how it got
+    there, and prefers a spec the branch owes over a plan it merely wrote — the resume-aid
+    inference takes the most recently written spec, and planning happens last.
+    One line per leg, non-zero when a leg fails, and **every failing leg names
     the command that advances it** — an outstanding clause names `tasks next`, an unreviewed finding
     names `tasks triage`, a moved base names the merge of it into this branch. A fully green run
     names `tasks spec done <slug>` and then the merge, so "work until `merge-ready` is green" is an
