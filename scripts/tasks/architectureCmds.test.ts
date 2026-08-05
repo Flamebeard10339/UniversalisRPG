@@ -210,6 +210,20 @@ describe('tasks where', () => {
         expect(result.status).toBe(0);
         expect(result.stdout).toContain('no ruling names src/runtime/save.ts or its basename');
       }));
+
+    // The other motivating failure this branch fixes: a reason as ordinary as
+    // "if it becomes a problem we can return to it" names no path in prose,
+    // but the record's own `files` already say what it was about.
+    it('finds a declined record by its files when its reason names no path', () =>
+      fixture(({ tasks }) => {
+        tasks('add', 'the width finding', '--id', 'width-finding', '--files', 'scripts/tasks/render.ts:100,scripts/tasks/roadmapCmd.test.ts:53');
+        tasks('decline', 'width-finding', '--reason', 'If it becomes a problem we can return to it');
+
+        const result = tasks('where', 'scripts/tasks/render.ts');
+        expect(result.status).toBe(0);
+        expect(result.stdout).toContain('rulings on scripts/tasks/render.ts:');
+        expect(result.stdout).toContain('[ruling] width-finding (declined) reason — If it becomes a problem we can return to it');
+      }));
   });
 });
 

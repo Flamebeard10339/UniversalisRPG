@@ -219,6 +219,36 @@ describe('rulingsOn', () => {
   it('is silent on a task carrying no reason at all', () => {
     expect(rulingsOn([noReason], [], ['scripts/tasks/handoff.test.ts']).reasons).toEqual([]);
   });
+
+  // The other motivating failure: a reason as ordinary as "if it becomes a
+  // problem we can return to it" names no path in prose, but the record's own
+  // `files` already say what it was about.
+  it('finds a closed record whose files name the path even when its reason names nothing', () => {
+    const structural = { ...task('width-finding', [], 'declined', { files: ['scripts/tasks/render.ts:100', 'scripts/tasks/roadmapCmd.test.ts:53'] }), reason: 'If it becomes a problem we can return to it' };
+    const found = rulingsOn([structural], [], ['scripts/tasks/render.ts']);
+    expect(found.reasons.map((entry) => entry.task.id)).toEqual(['width-finding']);
+  });
+
+  it('resolves a directory writes grant on a closed record against a path beneath it', () => {
+    const structural = { ...task('dir-grant', [], 'declined', { writes: ['src/runtime'] }), reason: 'not worth it' };
+    const found = rulingsOn([structural], [], ['src/runtime/save.ts']);
+    expect(found.reasons.map((entry) => entry.task.id)).toEqual(['dir-grant']);
+  });
+
+  // A record can qualify by text match and by files/writes at once — the
+  // reason names the same file its `files` entry does — and must still hold
+  // one entry, not two, in `reasons`.
+  it('reports a record that qualifies by both text and files just once', () => {
+    const both = { ...task('both-ways', [], 'declined', { files: ['scripts/tasks/handoff.test.ts:12'] }), reason: 'handoff.test.ts is not worth shrinking further' };
+    const found = rulingsOn([both], [], ['scripts/tasks/handoff.test.ts']);
+    expect(found.reasons).toHaveLength(1);
+    expect(found.reasons[0].on).toEqual(['scripts/tasks/handoff.test.ts']);
+  });
+
+  it('does not report an open task\'s files as a ruling merely because it carries no reason', () => {
+    const openWithFiles = task('open-with-files', [], 'open', { files: ['scripts/tasks/render.ts:1'] });
+    expect(rulingsOn([openWithFiles], [], ['scripts/tasks/render.ts']).reasons).toEqual([]);
+  });
 });
 
 describe('the index a plan check consumes', () => {

@@ -213,12 +213,22 @@ export interface Rulings {
   decisions: DecisionRuling[];
 }
 
+// A closed record's `reason` is a ruling on every path its own `files` and
+// `writes` already name, not only on the ones its prose happens to spell
+// out — `pathMatches` is the same containment `priorArt` runs, reused so a
+// directory grant reaches a path beneath it here exactly as it does there.
+// Folded into the text match's result rather than reported beside it, so a
+// record that qualifies both ways still holds one entry in `reasons`.
+function structuralOn(task: Task, queries: string[]): string[] {
+  return [...new Set(pathMatches(task, queries).map((match) => match.query))];
+}
+
 export function rulingsOn(tasks: Task[], events: TaskEvent[], paths: string[]): Rulings {
   const queries = paths.map(canonicalPath).filter((path) => path !== '');
 
   const reasons = tasks
     .filter((task) => task.reason !== null)
-    .map((task) => ({ task, on: namesAny(task.reason as string, queries) }))
+    .map((task) => ({ task, on: [...new Set([...namesAny(task.reason as string, queries), ...structuralOn(task, queries)])] }))
     .filter((entry) => entry.on.length > 0);
 
   const decisions = events
