@@ -77,6 +77,24 @@ describe('tasks CLI', () => {
     });
   });
 
+  // Isolated from any later decision on purpose: every other redirect test
+  // chains a subsequent promote whose own save persists the whole store,
+  // including the deliverable redirect already changed in memory — so a
+  // redirect that dropped its own save+record call would still pass every
+  // one of them. Quitting right after the redirect, with nothing else
+  // touching the store, is what actually proves redirect persists on its own.
+  it('triage redirect alone — with no later decision — persists the deliverable and files the triage event by itself', async () => {
+    await fixture(async ({ tasks, triage }) => {
+      tasks('add', 'wrong fix', '--id', 'wrong-fix-alone', '--kind', 'finding', '--severity', 'high', '--deliverable', 'the wrong fix');
+      const result = await triage('4\nthe right fix\nq\n');
+      expect(result.status).toBe(0);
+      const shown = tasks('show', 'wrong-fix-alone').stdout;
+      expect(shown).toContain('deliverable: the right fix');
+      expect(shown).toContain('unreviewed');
+      expect(tasks('log', '--op', 'triage').stdout).toContain('redirected the deliverable to: the right fix');
+    });
+  });
+
   it('triage redirect is cancelled by an empty response, leaving the deliverable and the queue unchanged', async () => {
     await fixture(async ({ tasks, triage }) => {
       tasks('add', 'wrong fix', '--id', 'wrong-fix', '--kind', 'finding', '--severity', 'high', '--deliverable', 'original fix');
@@ -204,9 +222,25 @@ describe('tasks CLI', () => {
       tasks('decline', 'closed-already', '--reason', 'closed for the refusal check');
       const refused = tasks('ask', 'closed-already', '--question', 'still relevant?');
       expect(refused.status).toBe(1);
-      expect(refused.stderr).toContain('it does not reopen a closed one');
+      expect(refused.stderr).toContain('not unreviewed');
       const shown = tasks('show', 'closed-already').stdout;
       expect(shown).toContain('declined');
+      expect(shown).not.toContain('triage asked');
+    });
+  });
+
+  // The boundary pass 2 caught: `unreviewedQueue` re-offers only the
+  // `unreviewed` state, not `open` too, so a deferred (open, spec-less)
+  // record is exactly as unreachable by the queue as a closed one is.
+  it('tasks ask refuses an open record too, not just a closed one — an already-open record is not in the review queue either', () => {
+    fixture(({ tasks }) => {
+      tasks('add', 'deferred already', '--id', 'deferred-already', '--kind', 'finding', '--severity', 'high', '--deliverable', 'fix it');
+      tasks('defer', 'deferred-already');
+      const refused = tasks('ask', 'deferred-already', '--question', 'still relevant?');
+      expect(refused.status).toBe(1);
+      expect(refused.stderr).toContain('not unreviewed');
+      const shown = tasks('show', 'deferred-already').stdout;
+      expect(shown).toContain('[finding/open/high]');
       expect(shown).not.toContain('triage asked');
     });
   });
