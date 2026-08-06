@@ -119,3 +119,17 @@ describe('plan-prompt carries the lessons a prior run paid for', () => {
       expect(result.stdout).toContain('## Open questions');
     }));
 });
+
+// c5, checked for plan-prompt: the same "instructions, not incidents" check
+// workPrompt.test.ts makes for the worker's lessons. A property proven for
+// one member of the family is not proven for the rest of it — this is what
+// would have let three of four briefs reacquire narrative text silently.
+describe('plan-prompt prints instructions, not the incidents that motivated them', () => {
+  it('never prints the narrative evidence behind a planner lesson', () =>
+    fixture(({ tasks }) => {
+      const result = tasks('plan-prompt', 'demo-spec');
+      expect(result.stdout).not.toContain('four call sites');
+      expect(result.stdout).not.toContain('a-branch-knows-which-spec-it-owes');
+      expect(result.stdout).not.toContain('HIGH findings');
+    }));
+});

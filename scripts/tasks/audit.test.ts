@@ -1846,6 +1846,20 @@ describe('audit-prompt carries the lessons a prior run paid for', () => {
     }));
 });
 
+// c5, checked for audit-prompt: the same "instructions, not incidents" check
+// workPrompt.test.ts makes for the worker's lessons. A property proven for
+// one member of the family is not proven for the rest of it — this is what
+// would have let three of four briefs reacquire narrative text silently.
+describe('audit-prompt prints instructions, not the incidents that motivated them', () => {
+  it('never prints the narrative evidence behind an auditor lesson', () =>
+    fixture(({ tasks }) => {
+      const result = tasks('audit-prompt', 'demo-spec');
+      expect(result.stdout).not.toContain('clause-deferral spec');
+      expect(result.stdout).not.toContain('consumed four passes');
+      expect(result.stdout).not.toContain('the fourth found a real defect');
+    }));
+});
+
 // c7: the briefs do not grow without bound, checked rather than felt. The
 // budget is on the four lists' combined entry count, since an instruction is
 // the unit a later editor adds or cuts — not on a character count, which

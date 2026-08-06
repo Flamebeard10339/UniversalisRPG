@@ -68,10 +68,12 @@ describe('orchestrate-prompt carries the lessons the run observed', () => {
       expect(result.stdout).toContain('Confirm a mutation actually applied before believing the test result it reports.');
     }));
 
-  it("carries the orchestrator's-records-are-invisible rule", () =>
+  it("carries the file-on-the-worker's-branch rule", () =>
     fixture(({ tasks }) => {
       const result = tasks('orchestrate-prompt');
-      expect(result.stdout).toContain("The orchestrator's own records are invisible to its workers.");
+      expect(result.stdout).toContain("File a record on the worker's branch, not the orchestrator's.");
+      expect(result.stdout).toContain('never hand a worker an id it cannot resolve in its own store');
+      expect(result.stdout).toContain('describe it in prose instead');
     }));
 
   it('carries the scratch-filename-prefix rule', () =>
@@ -84,5 +86,20 @@ describe('orchestrate-prompt carries the lessons the run observed', () => {
     fixture(({ tasks }) => {
       const result = tasks('orchestrate-prompt');
       expect(result.stdout).toContain('Do not tune the brief mid-run if the rates it produces are meant to be comparable.');
+    }));
+});
+
+// c5, checked for orchestrate-prompt: the same "instructions, not incidents"
+// check workPrompt.test.ts makes for the worker's lessons. A property proven
+// for one member of the family is not proven for the rest of it — this is
+// what would have let three of four briefs reacquire narrative text
+// silently.
+describe('orchestrate-prompt prints instructions, not the incidents that motivated them', () => {
+  it('never prints the narrative evidence behind an orchestrator lesson', () =>
+    fixture(({ tasks }) => {
+      const result = tasks('orchestrate-prompt');
+      expect(result.stdout).not.toContain('reported as verified');
+      expect(result.stdout).not.toContain('two auditors');
+      expect(result.stdout).not.toContain("overwrote each other's mutation manifests");
     }));
 });

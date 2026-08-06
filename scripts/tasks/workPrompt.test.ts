@@ -11,13 +11,13 @@ import { fixture, repoRoot } from './cliFixtures';
 // array under test would still pass with the array emptied, which is the
 // exact "test that cannot fail" shape the third lesson below warns against.
 describe('work-prompt carries the lessons a prior run paid for', () => {
-  it('carries the comment-scarcity rule', () =>
+  it('points at CLAUDE.md for the comment rule rather than re-deriving it', () =>
     fixture(({ tasks }) => {
       tasks('add', 'a member', '--id', 'a-member', '--spec', 'demo-spec');
       const result = tasks('work-prompt', 'a-member');
-      expect(result.stdout).toContain('Comments are scarce by principle.');
-      expect(result.stdout).toContain('is not derivable from reading it');
-      expect(result.stdout).toContain("Never describe another module's contract");
+      expect(result.stdout).toContain("CLAUDE.md's `# Comments` section owns the comment rule");
+      expect(result.stdout).toContain("never describe another module's contract");
+      expect(result.stdout).toContain("never write an audit finding's rationale into the source");
     }));
 
   it('carries the mutation-proof rule', () =>
@@ -51,8 +51,11 @@ describe('work-prompt carries the lessons a prior run paid for', () => {
 // "Eleven tests this run looked like proof and were not" — is what makes an
 // instruction worth having, but it belongs in the spec and the event log,
 // not in the printed brief: a brief that argues its case is longer, and
-// length is what stops a brief being read.
-describe('the brief prints instructions, not the incidents that motivated them', () => {
+// length is what stops a brief being read. Checked here for work-prompt only
+// — audit.test.ts, planPrompt.test.ts and orchestratePrompt.test.ts each
+// carry the same check for their own brief, because a property proven for
+// one member of the family is not proven for the rest of it.
+describe('work-prompt prints instructions, not the incidents that motivated them', () => {
   it('never prints the narrative evidence behind a worker lesson', () =>
     fixture(({ tasks }) => {
       tasks('add', 'a member', '--id', 'a-member', '--spec', 'demo-spec');

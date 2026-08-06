@@ -18,8 +18,8 @@ export function printLessons(heading: string, lessons: Lesson[]): void {
 
 export const WORKER_LESSONS: Lesson[] = [
   {
-    title: 'Comments are scarce by principle.',
-    body: "Keep one only if the fact is owned by this file, is not derivable from reading it, and is expressible as neither a name, a type, nor a test. Never describe another module's contract, and never write an audit finding's rationale into the source — that belongs in the commit message.",
+    title: "CLAUDE.md's `# Comments` section owns the comment rule — do not re-derive it here.",
+    body: "Two clauses out of it repeatedly catch people: never describe another module's contract, and never write an audit finding's rationale into the source — that belongs in the commit message.",
   },
   {
     title: 'A test that cannot fail is not proof.',
@@ -91,8 +91,8 @@ export const ORCHESTRATOR_LESSONS: Lesson[] = [
     body: 'Confirm a mutation actually applied before believing the test result it reports.',
   },
   {
-    title: "The orchestrator's own records are invisible to its workers.",
-    body: "The store is per-branch until merge, so anything filed on the orchestrator's branch cannot be seen, cited or verified downstream.",
+    title: "File a record on the worker's branch, not the orchestrator's.",
+    body: 'The store is per-branch until merge, so anything filed on the orchestrator\'s branch cannot be seen, cited or verified downstream — and never hand a worker an id it cannot resolve in its own store; describe it in prose instead.',
   },
   {
     title: 'Give every dispatched agent a scratch filename prefix.',
