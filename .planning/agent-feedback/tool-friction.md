@@ -832,3 +832,35 @@ false-passed. This is the same shape as the "reading nineteen instructions by ha
 that pass 1 already named — no tool here can check whether a printed sentence is an absence of
 narrative or an actionable imperative; both halves of c5 are read, not run.
 
+## 2026-08-06, auditing `run-an-orchestrator-over-three-parallel-tasks` (pass 1, retrospective)
+
+This audit's subject is a measurement, not a diff: `audit-prompt` correctly detected that
+(diff range collapses to one SHA, "nothing relates this spec to this branch") but still printed
+the full seven-step, diff-shaped procedure — step 4's mutation-manifest step and step 7's "do not
+file a pass" both had to be consciously overridden per the assignment rather than followed, since
+this audit's proof targets are `tasks log` queries and a source-inspected test file, not a diff to
+mutate. Worth carrying into a future retrospective-audit brief: a spec whose clauses point at log
+queries rather than a diff range is a distinguishable shape (no `writes`/`grant` on the member
+task, proof targets naming `tasks log` instead of a test path) and could get its own step list
+instead of inheriting the code-diff one wholesale.
+
+Separately, and more costly: roughly 40 minutes into this audit, `node_modules` at
+`C:\Users\yonat\Projects\UniversalisRPG\node_modules` — the real directory every worktree in this
+checkout junctions to, including this one — went from working (the first `npm run tasks --
+audit-prompt` call succeeded) to completely empty, confirmed independently via both `ls` and
+`cmd /c dir` and rechecked roughly every few minutes for the audit's remainder with no recovery
+and no visible `node`/`npm` process in `tasklist` to explain it. Every `npm run tasks` call after
+that point failed with `'tsx' is not recognized`. Nothing in this session touched node_modules or
+ran an install (prohibited by the task brief), so the cause is external — plausibly a concurrent
+session elsewhere in this shared checkout reinstalling dependencies mid-audit. Cost: the rest of
+this pass's clause grading (c1, c2, c3, c4, c5, c7) had to be done entirely from git history,
+direct file reads, and `docs/events.jsonl`/`docs/tasks.jsonl` read via `Grep`/`Read` rather than
+`tasks log`/`tasks show`, and c6 was graded on source inspection rather than an actual `vitest`/
+`mutate` run. The evidence gathered this way cross-checks cleanly (event-log timestamps line up to
+the second with git commit times throughout), so the verdicts are not weaker for it, but every
+`npm run mutate` verification this pass would otherwise have done did not happen. Worth recording
+as a concrete argument for whatever isolates a worktree's `node_modules` rather than sharing one
+mutable copy across concurrent agents — the risk this pass hit is exactly the shared-mutable-state
+class the run's own worktree isolation was designed to avoid for the *task store*, just one layer
+down in the toolchain.
+
