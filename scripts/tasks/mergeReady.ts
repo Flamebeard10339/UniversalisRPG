@@ -206,29 +206,30 @@ export async function runMergeReady(deps: MergeReadyDeps): Promise<boolean> {
 }
 
 // A planning branch's output is a spec for a later branch, told apart from a
-// contract by two facts nobody has to declare: this branch's parsed clause
-// list differs from the base branch's, and every member is still open, so
+// contract by two facts nobody has to declare: this branch's head carries a
+// clause id the base branch does not, and every member is still open, so
 // nothing here was ever worked against it. A spec authored and never
 // decomposed is not a plan: nothing was promised to a later branch until the
 // work was named.
 //
-// `clausesDiffer` is null when git could not answer at all — an unresolvable
-// base ref, no repository — and that reads as "not shown to differ" rather
-// than as "this branch wrote it". A gate whose exemption widens when its
-// evidence disappears is the wrong way round.
-export function authoredAsPlan(members: Task[], clausesDiffer: boolean | null): boolean {
-  return clausesDiffer === true && members.length > 0 && members.every((member) => member.state === 'open');
+// `headAddsClauseId` is null when git could not answer at all — an
+// unresolvable base ref, no repository — and that reads as "not shown to add
+// one" rather than as "this branch wrote it". A gate whose exemption widens
+// when its evidence disappears is the wrong way round.
+export function authoredAsPlan(members: Task[], headAddsClauseId: boolean | null): boolean {
+  return headAddsClauseId === true && members.length > 0 && members.every((member) => member.state === 'open');
 }
 
 // Clause identity is the id `stampClauseIds` writes into the text, not the
 // wording — rewording and reordering are exactly what stamping is for
-// leaving alone. So authorship is a change in the set of ids, not a diff of
-// the text: a spec whose clauses were merely reworded is not "authored here"
-// by this test, even though its bytes changed.
-export function clauseIdsDiffer(base: ProofClause[], head: ProofClause[]): boolean {
+// leaving alone. Directional on purpose: authorship only ever *adds* an id,
+// so only a head id absent from base is evidence of it. Corruption of any
+// shape only ever removes ids, from one bullet to the whole file, so it can
+// never satisfy this on its own — and a respec that purely deletes a clause
+// is refused the exemption along with it, which is the safe direction.
+export function headAddsClauseId(base: ProofClause[], head: ProofClause[]): boolean {
   const baseIds = new Set(base.map((clause) => clause.id));
-  const headIds = new Set(head.map((clause) => clause.id));
-  return baseIds.size !== headIds.size || [...headIds].some((id) => !baseIds.has(id));
+  return head.some((clause) => !baseIds.has(clause.id));
 }
 
 export interface SpecCandidate {
@@ -310,7 +311,7 @@ export function branchStanding(config: Config, baseBranch: string): BranchStandi
     activeSpec: active.spec,
     activeNote: active.note,
     written: specsWrittenFromBranch(config),
-    isPlan: (spec) => authoredAsPlan(membersOf(spec), specClausesDiffer(config, baseBranch, baseHead, spec)),
+    isPlan: (spec) => authoredAsPlan(membersOf(spec), specAddsClauseId(config, baseBranch, baseHead, spec)),
     // A declared `writes` grant is a forecast, and the diff is only the
     // stronger of two kinds of evidence: a `start`/`stop`/`done` event
     // against one of the spec's members is a record that work happened,
@@ -373,22 +374,19 @@ export function branchWorkedOnMembers(events: TaskEvent[], branch: string, membe
   return events.some((event) => event.branch === branch && event.id !== null && memberIds.has(event.id) && WORK_OPS.has(event.op));
 }
 
-// `clauseIdsDiffer` needs both sides parsed: the base branch's copy of the
+// `headAddsClauseId` needs both sides parsed: the base branch's copy of the
 // spec, read through git rather than the working tree, and this branch's.
-// Absent from base parses as no clauses, which differs from any real
-// deliverable — the same fact the old file-existence test captured, folded
-// into the comparison this one runs instead.
-export function specClausesDiffer(config: Config, baseBranch: string, baseHead: string | null, spec: string): boolean | null {
+// Absent from base parses as no clauses, so any head clause counts as new —
+// the same fact the old file-existence test captured, folded into the
+// comparison this one runs instead. A head that fails to parse at all — the
+// file missing, unreadable, or corrupted past recognition — reads the same
+// way: no clauses read, so nothing there can be new.
+export function specAddsClauseId(config: Config, baseBranch: string, baseHead: string | null, spec: string): boolean | null {
   if (baseHead === null) return null;
   const baseText = git.fileAt(baseBranch, specFile(config, spec));
   const baseClauses = baseText === null ? [] : parseSpecDoc(baseText).proofClauses;
   const headClauses = readSpecDoc(config, spec)?.proofClauses ?? [];
-  // Zero head clauses against a populated base reads the same whether the
-  // file was genuinely emptied or is merely unreadable — missing evidence,
-  // not authorship, refused the same direction an unresolvable base already
-  // refuses the exemption.
-  if (headClauses.length === 0 && baseClauses.length > 0) return null;
-  return clauseIdsDiffer(baseClauses, headClauses);
+  return headAddsClauseId(baseClauses, headClauses);
 }
 
 function readSpecDoc(config: Config, spec: string): SpecDoc | null {

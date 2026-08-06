@@ -14,12 +14,12 @@ import {
   branchStanding,
   branchWorkedOnMembers,
   changedFiles,
-  clauseIdsDiffer,
   decideSpec,
   diffTouchesRegion,
+  headAddsClauseId,
   LEGS,
   runMergeReady,
-  specClausesDiffer,
+  specAddsClauseId,
   specToGrade,
   type BranchStanding,
   type MergeReadyDeps,
@@ -366,15 +366,16 @@ describe('decideSpec', () => {
 describe('authoredAsPlan', () => {
   const member = (state: State): Task => ({ state }) as Task;
 
-  it('reads a spec as a plan only when its clauses differ from base and this branch worked none of its members', () => {
+  it('reads a spec as a plan only when head adds a clause id absent from base and this branch worked none of its members', () => {
     expect(authoredAsPlan([member('open'), member('open')], true)).toBe(true);
 
     // Git could not be asked — an unresolvable base ref, no repository. The
     // exemption must not widen when the evidence for it disappears.
     expect(authoredAsPlan([member('open'), member('open')], null)).toBe(false);
 
-    // Clauses identical to base: nothing was authored here, only a pass
-    // appended — this branch owes the spec, not a plan for it.
+    // No id in head that base lacks: nothing was authored here, whether
+    // because only a pass was appended or because a clause was merely lost —
+    // this branch owes the spec, not a plan for it.
     expect(authoredAsPlan([member('open'), member('open')], false)).toBe(false);
 
     // c3: one member worked here is work done against the spec, whatever the
@@ -391,21 +392,46 @@ describe('authoredAsPlan', () => {
 });
 
 // c1: clause identity is the id `stampClauseIds` writes into the text, not
-// the wording — the worker's reading of how that module binds identity.
-describe('clauseIdsDiffer', () => {
+// the wording. Directional, not symmetric: pass 2 of the audit found that a
+// symmetric set-difference read a conflict marker over one bullet — losing a
+// clause without emptying the file — as authorship, the same misclassification
+// as the file-existence test it replaced. Only a head id absent from base is
+// evidence anything was authored; loss on its own, however it happened, is
+// refused.
+describe('headAddsClauseId', () => {
   const clause = (id: number, text: string): ProofClause => ({ id, text });
 
   it('is false when the id set matches, even though the wording changed — a typo fix is not authorship', () => {
-    expect(clauseIdsDiffer([clause(1, 'first'), clause(2, 'second')], [clause(1, 'first, fixed'), clause(2, 'second')])).toBe(false);
+    expect(headAddsClauseId([clause(1, 'first'), clause(2, 'second')], [clause(1, 'first, fixed'), clause(2, 'second')])).toBe(false);
   });
 
-  it('is true when a clause was added or removed, whatever order the ids appear in', () => {
-    expect(clauseIdsDiffer([clause(1, 'a'), clause(2, 'b')], [clause(2, 'b'), clause(1, 'a'), clause(3, 'c')])).toBe(true);
-    expect(clauseIdsDiffer([clause(1, 'a'), clause(2, 'b')], [clause(1, 'a')])).toBe(true);
+  it('is true when head carries a clause id base lacks, whatever order the ids appear in', () => {
+    expect(headAddsClauseId([clause(1, 'a'), clause(2, 'b')], [clause(2, 'b'), clause(1, 'a'), clause(3, 'c')])).toBe(true);
   });
 
-  it('is true against an absent base, whose empty clause list differs from any real deliverable', () => {
-    expect(clauseIdsDiffer([], [clause(1, 'a')])).toBe(true);
+  it('is true against an absent base, whose empty clause list has no id for head to lack', () => {
+    expect(headAddsClauseId([], [clause(1, 'a')])).toBe(true);
+  });
+
+  // Pass 2's exact reproduction: a conflict marker over the middle bullet of
+  // a longer list loses one clause without touching the others or emptying
+  // the file. No id in head is new, so the exemption is refused.
+  it('is false when head lost a clause from the middle of a longer list — corruption, not authorship', () => {
+    expect(headAddsClauseId([clause(1, 'a'), clause(2, 'b'), clause(3, 'c')], [clause(1, 'a'), clause(3, 'c')])).toBe(false);
+  });
+
+  // Pure deletion is refused along with corruption: it is not evidence of
+  // authorship either, and erring toward grading is the safe direction.
+  it('is false when head only dropped a clause and added none, even as a deliberate respec', () => {
+    expect(headAddsClauseId([clause(1, 'a'), clause(2, 'b')], [clause(1, 'a')])).toBe(false);
+  });
+
+  it('is true when a legitimate respec adds one clause to an otherwise unchanged set', () => {
+    expect(headAddsClauseId([clause(1, 'a'), clause(2, 'b')], [clause(1, 'a'), clause(2, 'b'), clause(3, 'c')])).toBe(true);
+  });
+
+  it('is false when the file is corrupted to zero clauses entirely, subsumed by the same rule rather than special-cased', () => {
+    expect(headAddsClauseId([clause(1, 'a'), clause(2, 'b')], [])).toBe(false);
   });
 });
 
@@ -430,7 +456,7 @@ describe('diffTouchesRegion', () => {
 // `branchStanding` itself is not called here for the same reason `decideSpec`
 // was pulled out of it — it cannot run without a repository — so these get
 // one directly.
-describe('specClausesDiffer and changedFiles, against a real repository', () => {
+describe('specAddsClauseId and changedFiles, against a real repository', () => {
   let dir: string;
   let originalCwd: string;
 
@@ -468,7 +494,7 @@ describe('specClausesDiffer and changedFiles, against a real repository', () => 
     write('specs/a-spec.md', specV1.replace('- [c2] second.', '- [c2] second.\n- [c3] third.'));
     commit('respec, adding a clause');
 
-    expect(specClausesDiffer(config(), 'main', git.resolveCommit('main'), 'a-spec')).toBe(true);
+    expect(specAddsClauseId(config(), 'main', git.resolveCommit('main'), 'a-spec')).toBe(true);
   });
 
   it('reads an appended audit pass as identical, the deliverable untouched (c1)', () => {
@@ -479,7 +505,7 @@ describe('specClausesDiffer and changedFiles, against a real repository', () => 
     write('specs/a-spec.md', `${specV1}\n## Audit passes\n\n### Pass 1 — 2026-01-01\n\n- base: \`x\`\n- head: \`y\`\n`);
     commit('audit pass appended, deliverable untouched');
 
-    expect(specClausesDiffer(config(), 'main', git.resolveCommit('main'), 'a-spec')).toBe(false);
+    expect(specAddsClauseId(config(), 'main', git.resolveCommit('main'), 'a-spec')).toBe(false);
   });
 
   it('reads a brand-new spec, absent from base, as differing (c1 folds the old file-existence case in)', () => {
@@ -489,19 +515,18 @@ describe('specClausesDiffer and changedFiles, against a real repository', () => 
     write('specs/a-spec.md', specV1);
     commit('author the spec');
 
-    expect(specClausesDiffer(config(), 'main', git.resolveCommit('main'), 'a-spec')).toBe(true);
+    expect(specAddsClauseId(config(), 'main', git.resolveCommit('main'), 'a-spec')).toBe(true);
   });
 
   it('is null when git cannot answer at all, rather than guessing (c6)', () => {
     commit('only commit');
-    expect(specClausesDiffer(config(), 'no-such-branch', null, 'a-spec')).toBe(null);
+    expect(specAddsClauseId(config(), 'no-such-branch', null, 'a-spec')).toBe(null);
   });
 
-  // Finding 1 (pass 1 audit): zero head clauses against a populated base
-  // parsed as "differs", which exempted a branch whose local copy was
-  // merely corrupted, not authored. A missing evidence read must refuse the
-  // exemption the same way an unresolvable base already does.
-  it('is null when the head copy parses to zero clauses against a populated base, rather than reading corruption as authorship', () => {
+  // Finding 1 (pass 1 audit): a spec file present but unreadable/corrupted
+  // parses to zero head clauses, which the directional rule refuses on its
+  // own — no id read from head can be new. Subsumed rather than special-cased.
+  it('is false when the head copy parses to zero clauses against a populated base, rather than reading corruption as authorship', () => {
     write('specs/a-spec.md', specV1);
     commit('base');
     spawnSync('git', ['checkout', '-q', '-b', 'feature'], { cwd: dir });
@@ -509,7 +534,33 @@ describe('specClausesDiffer and changedFiles, against a real repository', () => 
     write('specs/a-spec.md', 'not a spec document at all — no ## Deliverable heading survived.');
     commit('spec file corrupted on this branch');
 
-    expect(specClausesDiffer(config(), 'main', git.resolveCommit('main'), 'a-spec')).toBe(null);
+    expect(specAddsClauseId(config(), 'main', git.resolveCommit('main'), 'a-spec')).toBe(false);
+  });
+
+  // Pass 2 of the audit: a conflict marker over one bullet in the middle of
+  // a longer Proof list loses a clause without emptying the file or touching
+  // the others — the shape the zero-clause-only guard did not cover.
+  it('is false when the head copy loses one clause of several, mid-list, to partial corruption', () => {
+    const threeClauses = ['# a-spec', '', '## Deliverable', '', 'Promise.', '', 'Proof:', '', '- [c1] first.', '- [c2] second.', '- [c3] third.', ''].join('\n');
+    write('specs/a-spec.md', threeClauses);
+    commit('base, three clauses');
+    spawnSync('git', ['checkout', '-q', '-b', 'feature'], { cwd: dir });
+
+    write('specs/a-spec.md', threeClauses.replace('- [c2] second.\n', '<<<<<<< HEAD\n=======\n>>>>>>> branch\n'));
+    commit('conflict marker over the middle bullet, on this branch');
+
+    expect(specAddsClauseId(config(), 'main', git.resolveCommit('main'), 'a-spec')).toBe(false);
+  });
+
+  it('is true when a legitimate respec adds one clause, against a real repository', () => {
+    write('specs/a-spec.md', specV1);
+    commit('base, two clauses');
+    spawnSync('git', ['checkout', '-q', '-b', 'feature'], { cwd: dir });
+
+    write('specs/a-spec.md', `${specV1}- [c3] third.\n`);
+    commit('respec, adding one clause');
+
+    expect(specAddsClauseId(config(), 'main', git.resolveCommit('main'), 'a-spec')).toBe(true);
   });
 
   it('still reads a real, deliberate empty-Proof spec as identical to an equally empty base', () => {
@@ -520,7 +571,7 @@ describe('specClausesDiffer and changedFiles, against a real repository', () => 
     write('other.txt', 'x');
     commit('unrelated change');
 
-    expect(specClausesDiffer(config(), 'main', git.resolveCommit('main'), 'a-spec')).toBe(false);
+    expect(specAddsClauseId(config(), 'main', git.resolveCommit('main'), 'a-spec')).toBe(false);
   });
 
   it('reports only the paths this branch\'s own commits changed, not a later move of main', () => {
