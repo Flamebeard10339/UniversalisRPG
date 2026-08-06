@@ -131,3 +131,53 @@ Proof:
 - proof 5: met — decideSpec's "names the untouched reason distinctly from the plan reason" test asserts the specNote says a candidate "was not shown to be touched by this branch's diff" and does not say "is a plan this branch wrote" when the two reasons differ, so a reader can tell an untouched-spec skip from a plan skip without re-deriving the inference. Mutation-verified: collapsing the activeReason ternary to always report the plan wording killed 1 of 42 tests at scripts/tasks/mergeReady.test.ts scope, that same test.
 - proof 6: met — Both ends of the polarity are pinned: authoredAsPlan's own test asserts clausesDiffer=null returns false (git could not be asked, so the exemption does not widen), and the real-repository test "is null when git cannot answer at all, rather than guessing (c6)" points specClausesDiffer at an unresolvable base branch name and asserts it returns null rather than guessing true or false. Mutation-verified: deleting the `if (baseHead === null) return null` guard from specClausesDiffer killed 1 of 42 tests at scripts/tasks/mergeReady.test.ts scope, that same real-repository test.
 - proof 7: met — decideSpec's "drops a spec this branch never touched, and grades nothing else it has" test reproduces the exact regression named in the spec's own decision log (docs/events.jsonl, 2026-08-06 17:22:06Z on claude/spec-orchestration-corpus): a branch that only recorded a --spec note against a spec with an open member and an unchanged file is now dropped before grading rather than offered as a candidate to audit. diffTouchesRegion's own describe block covers exact-match, directory-containment, no-overlap and the null-diff fail-open case. Mutation-verified: forcing diffTouchesRegion to always return true killed 1 of 42 tests at scripts/tasks/mergeReady.test.ts scope, the "is false when nothing changed falls inside any region" case. I additionally re-ran the concrete note-only-branch scenario from the events.jsonl entry directly against specClausesDiffer/diffTouchesRegion outside the suite and confirmed the note-only spec is now excluded. See the two findings below for where this same touched-region idea still overshoots or undershoots on cases the clause itself does not cover.
+
+### Pass 2 — 2026-08-06
+
+- base: `a49a9b614c6cff533de973d9bceb9d18c4d42e94`
+- head: `e302c1dc03913725b9e98c1df6753608b6535a05`
+- proof 1: met — clauseIdsDiffer still compares only id sets, unaffected by wording. Re-ran the suite (51 tests,
+all green) and mutation-tested clauseIdsDiffer's own return line by forcing it to always return false. The
+real repository test tagged c1 in the suite (the one that appends only an audit pass and asserts the
+result reads as identical) did not catch this mutation on its own, because it only exercises the
+identical branch; the mutation only surfaces on the differing branch, so it escalated to file scope there
+(4 of 51 failing). I re-targeted a test that exercises the differing branch directly, "is true when a
+clause was added or removed, whatever order the ids appear in" in the clauseIdsDiffer describe block,
+which kills it alone, 1 of 51 failing, no escalation needed. clauseIdsDiffer itself is sound; see the
+findings below for a gap in the function this branch built on top of it to close pass 1's first finding.
+- proof 2: met — The same reproduction as pass 1 stands: "reads a spec as a plan only when its clauses differ from
+base and this branch worked none of its members" asserts true for open members with clausesDiffer true.
+Mutation: dropping the clausesDiffer===true conjunct from authoredAsPlan's return, leaving only the
+open-members half, is killed by that same named test alone, 1 of 51 failing, no escalation.
+- proof 3: met — Same named test as c2 loops in-progress, done, declined and unreviewed against clausesDiffer=true and
+asserts false in every case. Mutation: dropping the members.every(open) conjunct from authoredAsPlan,
+leaving only clausesDiffer===true, is killed by that same test alone, 1 of 51 failing, no escalation.
+- proof 4: met — "a single wrong classification costs only that spec, not the one behind it" pins the blast radius, and
+this branch's new touched-region filter in decideSpec is a plain array filter applied per candidate before
+grading, so a false negative on one candidate cannot suppress another. Mutation: replacing specToGrade's
+find(!authoredAsPlan) with an unconditional candidates[0] is killed by that named test alone, 1 of 51
+failing, no escalation.
+- proof 5: met — "names the untouched reason distinctly from the plan reason" asserts the new activeReason wording
+distinguishes an untouched skip from a plan skip. Mutation: collapsing the ternary to always report the
+plan wording is killed by that named test alone, 1 of 51 failing, no escalation.
+- proof 6: met — Both ends of the polarity still hold under the new question: authoredAsPlan's own assertion that
+clausesDiffer=null returns false, and the real repository test "is null when git cannot answer at all,
+rather than guessing (c6)" against an unresolvable base branch name. Mutation: deleting the
+baseHead-is-null guard at the top of specClausesDiffer is killed by that same real repository test alone,
+1 of 51 failing, no escalation.
+- proof 7: met — decideSpec's "drops a spec this branch never touched" test and the real repository branchStanding test
+"drops a spec whose diff never touched it and which carries only a note" both still hold, and this pass
+specifically attacked the boundary pass 1's second finding drew: branchWorkedOnMembers is false for a bare
+note or decision event (unit test, all four non-work op names checked), false for an event recorded on a
+different branch, false for an event naming a task id outside the member set, and true for a member
+re-pointed to a different spec since the event was written, because the match is by task id off the
+member's current spec pointer, not the event's own stored spec field. I read this against the source and
+it matches the unit tests already in the suite, all passing. Mutation: forcing diffTouchesRegion to always
+return true is killed by "is false when nothing changed falls inside any region" alone; forcing the
+fail-open null branch away is killed by "is true when the diff could not be read at all" alone, 1 of 51
+each, no escalation once targeted directly (the higher-level c7-tagged integration test alone escalated to
+file scope for the same reason as c1: it only exercises one branch of the condition). ORing out
+branchWorkedOnMembers entirely from touchedWriteRegion is killed by the branchStanding real repository
+test for finding 2 alone; dropping the WORK_OPS filter from branchWorkedOnMembers is killed by its own "is
+false for a bare note or decision" test alone. All at named-test scope, no escalation, once the test
+targeted actually exercises the branch the mutation touches.
