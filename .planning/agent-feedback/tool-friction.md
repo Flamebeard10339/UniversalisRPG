@@ -407,3 +407,34 @@ outside the fixtures its own tests happen to look at. Positive: this generalizes
 a clause claiming a boundary needs its boundary re-derived by hand every pass, because the
 adversarial case is exactly what the clause text cannot generate about itself.
 
+## 2026-08-06, auditing `a-clause-can-be-deferred-and-a-spec-can-carry-its-goal` (pass 1)
+
+### `mutate` needed a hand-built manifest again — no proof target resolved one — and every clause
+### KILLED at its own named-test scope; the real finding came from testing the reason requirement
+### as an attacker rather than as a reader of the tests that already exist
+
+`audit-prompt` wrote no manifest (`Mutation manifest: none — no proof target on this spec
+resolved to a test this brief could name`), same shape as prior passes on other specs: a `proof:
+vitest <file>` line names a file, not a test, so `mutationManifest` has nothing to resolve without
+a `--show`-style target. Building the seven-entry manifest by hand (one `find`/`replace` per
+clause, aimed by reading the diff rather than guessing) cost about ten minutes and all seven
+KILLED at their own named `it(...)` — no escalation to file or suite scope, which the brief
+specifically flagged as a defect pattern seen elsewhere this round. Positive result, first time
+this reads clean end to end.
+
+The finding that mattered came from doing what the brief asked rather than what the tests check:
+"try recording a deferral with an empty reason, with whitespace, through the interactive walk as
+well as the flag path." The tests only exercise a truly-empty `--evidence`; a whitespace-only one
+(`--evidence 1="   "`) sails through the flag/file path (untrimmed in `clauseScoped`) while the
+interactive walk correctly rejects it (`.trim() || null` already there). Reproducing this needed a
+disposable git fixture outside the test harness — `cliFixtures.ts`'s `fixture()` runs audit
+in-process against a temp dir but has no exposed way to pass a raw whitespace string through a
+shell-quoted flag from outside a `.test.ts` file, so I built a throwaway `git init` + `--store`/
+`--systems`/`--specs-dir`/`--branch` scratch repo by hand, mirroring the fixture's own shape, and
+ran the real CLI against it. `npm run inspect` was useful for a second thing: calling the real,
+unmodified `runMergeReady` directly with a stubbed `BranchStanding` to read c7's actual output
+line rather than trusting the unit test's assertion — but it only accepts plain JS (the source
+runs through `new Function`, not tsx's transform), so a first draft with TypeScript type
+annotations in the body failed with an unhelpful "neither an expression nor a body of statements"
+parse error before I dropped the annotations. Worth noting for the next pass that reaches for it.
+
