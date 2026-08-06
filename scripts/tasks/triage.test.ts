@@ -147,12 +147,15 @@ describe('tasks CLI', () => {
     });
   });
 
-  it('the menu is rendered from the action table, one entry per action', async () => {
+  // A golden string, not one derived from TRIAGE_ACTIONS: deriving the
+  // expectation from the same table the menu is rendered from would make
+  // this tautological (it could never fail from a reorder, since it checks
+  // the table against itself) — pass 1 caught exactly that shape of gap.
+  it('the menu keeps its pre-refactor key order: promote, defer, decline, redirect, ask', async () => {
     await fixture(async ({ tasks, triage }) => {
       tasks('add', 'menu check', '--id', 'menu-check', '--kind', 'finding', '--severity', 'low', '--deliverable', 'fix it');
       const result = await triage('s\n');
-      const expectedMenu = `${TRIAGE_ACTIONS.map((action) => `[${action.key}] ${action.label}`).join('   ')}   [s] skip   [q] save and quit`;
-      expect(result.stdout).toContain(expectedMenu);
+      expect(result.stdout).toContain('[1] promote   [2] defer   [3] decline   [4] redirect   [a] ask   [s] skip   [q] save and quit');
     });
   });
 
@@ -181,7 +184,7 @@ describe('tasks CLI', () => {
     });
   });
 
-  it('tasks ask records the question on the finding, files a triage event, and leaves the record in whatever state it was', () => {
+  it('tasks ask records the question on the finding, files a triage event, and leaves it unreviewed so the queue keeps offering it', () => {
     fixture(({ tasks }) => {
       tasks('add', 'needs context', '--id', 'needs-context', '--kind', 'finding', '--severity', 'high', '--evidence', 'the original evidence', '--deliverable', 'fix it');
       const result = tasks('ask', 'needs-context', '--question', 'which universe was this measured against?');
@@ -195,6 +198,19 @@ describe('tasks CLI', () => {
     });
   });
 
+  it('tasks ask refuses a closed record: a declined record is in no queue, so a question against it would land where nobody reads it', () => {
+    fixture(({ tasks }) => {
+      tasks('add', 'closed already', '--id', 'closed-already', '--kind', 'finding', '--severity', 'high', '--deliverable', 'fix it');
+      tasks('decline', 'closed-already', '--reason', 'closed for the refusal check');
+      const refused = tasks('ask', 'closed-already', '--question', 'still relevant?');
+      expect(refused.status).toBe(1);
+      expect(refused.stderr).toContain('it does not reopen a closed one');
+      const shown = tasks('show', 'closed-already').stdout;
+      expect(shown).toContain('declined');
+      expect(shown).not.toContain('triage asked');
+    });
+  });
+
   it("tasks redirect is the same operation as the walk's redirect: it files a triage event, not an edit one", () => {
     fixture(({ tasks }) => {
       tasks('add', 'wrong fix', '--id', 'wrong-fix', '--kind', 'finding', '--severity', 'high', '--deliverable', 'the wrong fix');
@@ -203,6 +219,17 @@ describe('tasks CLI', () => {
       expect(tasks('show', 'wrong-fix').stdout).toContain('deliverable: the right fix');
       expect(tasks('log', '--op', 'triage').stdout).toContain('redirected the deliverable to: the right fix');
       expect(tasks('log', '--op', 'edit').stdout).not.toContain('wrong-fix');
+    });
+  });
+
+  it('tasks redirect refuses a closed record, matching defer and promote rather than silently reopening it', () => {
+    fixture(({ tasks }) => {
+      tasks('add', 'closed fix', '--id', 'closed-fix', '--kind', 'finding', '--severity', 'high', '--deliverable', 'original fix');
+      tasks('decline', 'closed-fix', '--reason', 'closed for the refusal check');
+      const refused = tasks('redirect', 'closed-fix', '--deliverable', 'a new fix');
+      expect(refused.status).toBe(1);
+      expect(refused.stderr).toContain('it does not reopen a closed one');
+      expect(tasks('show', 'closed-fix').stdout).toContain('deliverable: original fix');
     });
   });
 
