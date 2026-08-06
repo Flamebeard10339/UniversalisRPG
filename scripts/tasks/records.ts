@@ -802,6 +802,14 @@ export function cmdPromote(args: Flags, usage: string): void {
   recordEvents(config, 'triage', promotions.map((promotion) => subjectOf(promotion.task, promotion.note)));
 }
 
+// promote, defer, redirect and ask all read or move a record still being
+// decided; none of them is how a closed one gets reopened, so all four
+// refuse a state outside this pair before writing anything. Reopening a
+// closed record instead, silently, would be worse than refusing it.
+function isReviewable(task: Task): boolean {
+  return task.state === 'unreviewed' || task.state === 'open';
+}
+
 // The non-interactive form of triage's defer, the inverse of promote: state
 // open, spec null, over one or more ids, filing the same wording the walk
 // records so the two routes cannot be told apart from the log.
@@ -816,7 +824,7 @@ export function cmdDefer(args: Flags, usage: string): void {
   const resolved = resolveTaskIds(args.positional, tasks);
   if (resolved === null) return;
   for (const task of resolved) {
-    if (task.state !== 'unreviewed' && task.state !== 'open') {
+    if (!isReviewable(task)) {
       console.error(`error: ${task.id} is ${task.state} — defer moves unreviewed or already-open records outside every spec, it does not reopen closed ones. Nothing was deferred`);
       process.exitCode = 1;
       return;
@@ -847,6 +855,13 @@ export function cmdRedirect(args: Flags, usage: string): void {
   const tasks = loadStore(config.storePath);
   const resolved = resolveTaskIds(args.positional, tasks);
   if (resolved === null) return;
+  for (const task of resolved) {
+    if (!isReviewable(task)) {
+      console.error(`error: ${task.id} is ${task.state} — redirect changes an open record's proposed fix, it does not reopen a closed one. Nothing was redirected`);
+      process.exitCode = 1;
+      return;
+    }
+  }
   const redirects: Array<{ task: Task; note: string }> = [];
   for (const task of resolved) {
     task.deliverable = deliverable;
@@ -859,9 +874,10 @@ export function cmdRedirect(args: Flags, usage: string): void {
 
 // The non-interactive form of triage's ask, the load-bearing action: the
 // question lands on the record's own evidence where the next agent reads it,
-// the record stays whatever state it already was — unreviewed, ordinarily,
-// so the queue keeps offering it — and the same `triage` event the walk
-// records is what makes a run's questions countable.
+// the record stays unreviewed so the queue keeps offering it, and the same
+// `triage` event the walk records is what makes a run's questions countable.
+// A closed record is in no queue, so asking against one would be a question
+// nobody is ever offered — refused for the same reason redirect is.
 export function cmdAsk(args: Flags, usage: string): void {
   const config = resolveConfig(args.flags);
   const question = args.flags.question;
@@ -873,6 +889,13 @@ export function cmdAsk(args: Flags, usage: string): void {
   const tasks = loadStore(config.storePath);
   const resolved = resolveTaskIds(args.positional, tasks);
   if (resolved === null) return;
+  for (const task of resolved) {
+    if (!isReviewable(task)) {
+      console.error(`error: ${task.id} is ${task.state} — ask leaves a record in the queue for the answer to be re-offered against, it does not reopen a closed one. Nothing was asked`);
+      process.exitCode = 1;
+      return;
+    }
+  }
   const asks: Array<{ task: Task; note: string }> = [];
   for (const task of resolved) {
     task.evidence = `${task.evidence ? `${task.evidence}\n\n` : ''}triage asked (${today()}): ${question}`;
