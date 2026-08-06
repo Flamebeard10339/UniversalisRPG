@@ -63,9 +63,13 @@ Proof:
   different record and each adding one, merge with zero conflicts through actual `git merge` — the
   scenario that conflicts today and the one this branch exists to fix.
   proof: vitest scripts/lib/taskStore.test.ts
-- [c5] The residual is named where a reader will hit it. Two branches inserting adjacent ids conflict
-  on one hunk with a new record on each side, and the resolution is to keep both; a test pins that
-  this is the *only* remaining conflict shape, so a future one cannot be mistaken for it.
+- [c5] The residual is named where a reader will hit it, and named correctly. The condition is that
+  two branches changed *adjacent lines* — measured by sweeping the separation: at zero records
+  between them the merge conflicts, at one or more it is clean. That covers three shapes, not one:
+  an insert beside an insert, an edit beside an insert, and a delete beside an insert. Only the
+  first resolves by keeping both sides; the other two need the edit reconciled, so a single stated
+  resolution would be wrong for two of the three. A test pins the adjacency boundary rather than one
+  shape, because the boundary is the property and the shapes are its instances.
   proof: vitest scripts/lib/taskStore.test.ts
 - [c6] A record written without the new field still parses and still sorts. A branch cut before this
   lands and merged after adds records that carry no ordinal, which is the parallel case this whole
@@ -99,6 +103,15 @@ Proof:
 - **Orchestration waits on this, and only this.** The three orchestration prerequisites this branch
   sits with all write elsewhere, and this one alone rewrites every line of the store, so it lands
   alone and before them rather than merging against itself.
+- **The adjacency residual is accepted, not fixed** — amended into c5 after pass 1 found the original
+  characterisation false. Line-based three-way merge conflicts when two sides touch adjacent lines;
+  that is a property of git, not of this store, and nothing short of a merge driver removes it. The
+  driver stays rejected for the reason above. What makes the residual tolerable is that ids carry
+  their spec's slug, so concurrent branches write into different neighbourhoods of the file — the
+  clustering visible at `docs/tasks.jsonl:559-563`, a task record immediately above its own audit's
+  four records, is intra-branch and therefore harmless. Records named from a generic title carry no
+  such prefix and can collide across branches; that is the honest exposure, and it is one small
+  conflict rather than a corrupted store.
 
 ## Open questions
 
