@@ -12,6 +12,13 @@ export interface Source {
 
 export interface Task {
   id: string;
+  // Where this record sat in the file the moment it was written, backfilled
+  // once from position because creation order cannot be read back out of
+  // anything else — 456 of 590 records predate the event log and only 134
+  // carry an `add` event. Null is a record a checkout cut before the
+  // backfill still adds after it landed; it sorts as the newest thing in the
+  // store, because that is what it is the moment it merges in.
+  seq: number | null;
   title: string;
   kind: Kind;
   state: State;
@@ -125,6 +132,7 @@ function nullableSource(record: Record<string, unknown>, where: string): Source 
 type KnownFields = Omit<Task, 'extra'>;
 const KNOWN_KEYS: ReadonlyArray<keyof KnownFields> = Object.keys({
   id: true,
+  seq: true,
   title: true,
   kind: true,
   state: true,
@@ -174,6 +182,12 @@ function normalizeTask(value: unknown, where: string): Task {
   const clause = value.clause ?? null;
   if (clause !== null && typeof clause !== 'number') throw new StoreError(`${where}: task ${JSON.stringify(id)} has non-numeric clause`);
 
+  // Absent the same way `clause` is: a record written before this field
+  // existed, or by a branch that still does not know it exists, is not
+  // malformed — it is a record with no opinion on its own position.
+  const seq = value.seq ?? null;
+  if (seq !== null && typeof seq !== 'number') throw new StoreError(`${where}: task ${JSON.stringify(id)} has non-numeric seq`);
+
   // Absent means the record has not said which side of the correction point
   // its grant is on, which is a third answer and not a default to either.
   const grant = value.grant ?? null;
@@ -181,6 +195,7 @@ function normalizeTask(value: unknown, where: string): Task {
 
   return {
     id,
+    seq,
     title: requireString(value, 'title', where),
     kind: kind as Kind,
     state: state as State,
@@ -215,6 +230,7 @@ function normalizeTask(value: unknown, where: string): Task {
 function renderTask(task: Task): string {
   const known: { [K in keyof KnownFields]: KnownFields[K] } = {
     id: task.id,
+    seq: task.seq,
     title: task.title,
     kind: task.kind,
     state: task.state,
@@ -301,11 +317,39 @@ export function loadStoreTolerantly(path: string = DEFAULT_STORE_PATH): Tolerate
   return parseStoreTolerantly(readFileSync(path, 'utf8'), path);
 }
 
-// One task per line, insertion order preserved and new tasks appended: what
-// changes is what moves, so concurrent branches usually merge clean.
+// One task per line, in id order — the file on disk is a function of the
+// record set alone, never of what order the caller happened to build it in.
+// A line only ever moves when the id set itself changes, so two branches
+// editing different records touch different lines and git's ordinary
+// three-way merge resolves them per record; the residual is two branches
+// each inserting a new, id-adjacent line, which lands at the same position
+// on both sides and conflicts once, in the shape a human resolves by keeping
+// both.
 export function saveStore(tasks: Task[], path: string = DEFAULT_STORE_PATH): void {
-  const body = tasks.map((task) => renderTask(task)).join('\n');
+  const sorted = [...tasks].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+  const body = sorted.map((task) => renderTask(task)).join('\n');
   writeFileSync(path, body.length > 0 ? `${body}\n` : '', 'utf8');
+}
+
+// The next position a newly created record takes. Both sides of a parallel
+// add compute this from what they can each see and neither sees the other,
+// so two branches can produce the same number — harmless, because `seq`
+// orders a queue and does not identify a record.
+export function nextSeq(tasks: Task[]): number {
+  return tasks.reduce((max, task) => (task.seq !== null && task.seq > max ? task.seq : max), 0) + 1;
+}
+
+// The one-time move from position to data, for a store where creation order
+// still lives only in where a line sits: a record with no `seq` takes one
+// from its position in the array given, in order, continuing after whatever
+// `seq` the store's other records already carry. A record that already has
+// one is left untouched, so this is idempotent — running it again once
+// every record carries `seq` changes nothing. Run once, by hand, over
+// `docs/tasks.jsonl` through `npm run inspect`; nothing in the ordinary
+// command surface calls it.
+export function backfillSeq(tasks: Task[]): Task[] {
+  let next = nextSeq(tasks);
+  return tasks.map((task) => (task.seq !== null ? task : { ...task, seq: next++ }));
 }
 
 const SEVERITY_RANK: Record<Severity, number> = { high: 0, medium: 1, low: 2 };
@@ -313,6 +357,13 @@ const SEVERITY_RANK: Record<Severity, number> = { high: 0, medium: 1, low: 2 };
 // Unset ranks last: every queue below sorts high before medium before low
 // before null, so this is the one comparator they all share.
 export const severityRank = (severity: Severity | null): number => (severity === null ? 3 : SEVERITY_RANK[severity]);
+
+// The tie-break every queue below shares once severity (or score) is equal:
+// oldest first. A null `seq` ranks after every number, because it can only
+// belong to a record a branch cut before the backfill added after — the
+// newest thing in the store the moment it merges in, whatever position it
+// happened to land at in its own branch's file.
+export const seqRank = (seq: number | null): number => (seq === null ? Number.POSITIVE_INFINITY : seq);
 
 export type RequirementStatus = 'waiting' | 'done' | 'declined' | 'missing';
 
@@ -363,17 +414,15 @@ export interface QueueFilter {
 }
 
 // Fix-now: open, a member of the given spec, and unblocked. Ties break by
-// file position, which is creation order for an append-only store.
+// `seq`, oldest first.
 export function fixNowQueue(tasks: Task[], spec: string | null, filter: QueueFilter = {}): Task[] {
   const byId = new Map(tasks.map((task) => [task.id, task]));
   return tasks
-    .map((task, index) => ({ task, index }))
-    .filter(({ task }) => task.state === 'open' && task.spec === spec)
-    .filter(({ task }) => !isBlocked(task, byId))
-    .filter(({ task }) => filter.system === undefined || task.system === filter.system)
-    .filter(({ task }) => filter.severity === undefined || task.severity === filter.severity)
-    .sort((a, b) => severityRank(a.task.severity) - severityRank(b.task.severity) || a.index - b.index)
-    .map(({ task }) => task);
+    .filter((task) => task.state === 'open' && task.spec === spec)
+    .filter((task) => !isBlocked(task, byId))
+    .filter((task) => filter.system === undefined || task.system === filter.system)
+    .filter((task) => filter.severity === undefined || task.severity === filter.severity)
+    .sort((a, b) => severityRank(a.severity) - severityRank(b.severity) || seqRank(a.seq) - seqRank(b.seq));
 }
 
 // The queue fixNowQueue cannot answer for: an in-progress record is held,
@@ -398,14 +447,12 @@ export function unreviewedFiledBy(tasks: Task[], spec: string): Task[] {
   return unreviewedQueue(tasks).filter((task) => task.source?.spec === spec);
 }
 
-// Severity first, then creation order: the shape `triage` walks the
-// unreviewed queue in.
+// Severity first, then `seq`: the shape `triage` walks the unreviewed queue
+// in.
 export function unreviewedQueue(tasks: Task[]): Task[] {
   return tasks
-    .map((task, index) => ({ task, index }))
-    .filter(({ task }) => task.state === 'unreviewed')
-    .sort((a, b) => severityRank(a.task.severity) - severityRank(b.task.severity) || a.index - b.index)
-    .map(({ task }) => task);
+    .filter((task) => task.state === 'unreviewed')
+    .sort((a, b) => severityRank(a.severity) - severityRank(b.severity) || seqRank(a.seq) - seqRank(b.seq));
 }
 
 export interface ListFilter {
@@ -471,21 +518,19 @@ export function matchesSearchTerm(haystack: string, term: string): boolean {
 // any of them the same way. Every filter given is ANDed together.
 export function listQueue(tasks: Task[], filter: ListFilter = {}): Task[] {
   return tasks
-    .map((task, index) => ({ task, index }))
-    .filter(({ task }) => {
+    .filter((task) => {
       if (filter.state !== undefined) return task.state === filter.state;
       if (filter.text !== undefined || filter.triggered) return true;
       return task.state === 'unreviewed' || task.state === 'open' || task.state === 'in-progress';
     })
-    .filter(({ task }) => filter.severity === undefined || task.severity === filter.severity)
-    .filter(({ task }) => filter.system === undefined || task.system === filter.system)
-    .filter(({ task }) => filter.spec === undefined || task.spec === filter.spec)
-    .filter(({ task }) => !filter.deferred || (task.state === 'open' && task.spec === null))
-    .filter(({ task }) => filter.kind === undefined || task.kind === filter.kind)
-    .filter(({ task }) => filter.text === undefined || matchesSearchTerm(SEARCHABLE(task), filter.text))
-    .filter(({ task }) => !filter.triggered || (task.state === 'declined' && task.trigger !== null))
-    .sort((a, b) => severityRank(a.task.severity) - severityRank(b.task.severity) || a.index - b.index)
-    .map(({ task }) => task);
+    .filter((task) => filter.severity === undefined || task.severity === filter.severity)
+    .filter((task) => filter.system === undefined || task.system === filter.system)
+    .filter((task) => filter.spec === undefined || task.spec === filter.spec)
+    .filter((task) => !filter.deferred || (task.state === 'open' && task.spec === null))
+    .filter((task) => filter.kind === undefined || task.kind === filter.kind)
+    .filter((task) => filter.text === undefined || matchesSearchTerm(SEARCHABLE(task), filter.text))
+    .filter((task) => !filter.triggered || (task.state === 'declined' && task.trigger !== null))
+    .sort((a, b) => severityRank(a.severity) - severityRank(b.severity) || seqRank(a.seq) - seqRank(b.seq));
 }
 
 // An id that resolves to nothing is a guess that missed, and the guess is
@@ -497,7 +542,7 @@ export function nearMatches(query: string, tasks: Task[], limit = 5): Task[] {
   const words = normalized.split(/[^a-z0-9]+/).filter((word) => word.length > 0);
   if (words.length === 0) return [];
   return tasks
-    .map((task, index) => {
+    .map((task) => {
       const id = task.id.toLowerCase();
       const idWords = new Set(id.split(/[^a-z0-9]+/));
       const title = task.title.toLowerCase();
@@ -507,10 +552,10 @@ export function nearMatches(query: string, tasks: Task[], limit = 5): Task[] {
         else if (id.includes(word)) score += 2;
         else if (title.includes(word)) score += 1;
       }
-      return { task, index, score };
+      return { task, score };
     })
     .filter((entry) => entry.score > 0)
-    .sort((a, b) => b.score - a.score || a.index - b.index)
+    .sort((a, b) => b.score - a.score || seqRank(a.task.seq) - seqRank(b.task.seq))
     .slice(0, limit)
     .map((entry) => entry.task);
 }
