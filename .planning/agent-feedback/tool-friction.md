@@ -791,3 +791,44 @@ here: the first `inspect` script reached for `await load('node:fs')`, which reso
 against the repo root as a file path and fails loudly (unlike pass 3's silent-`undefined` case) —
 switching to a top-level `await import('node:fs')` fixed it in one retry.
 
+## 2026-08-06, auditing `briefs-carry-the-lessons` (pass 1)
+
+`audit-prompt` cost nothing wrong this time: the "no manifest was written" line named the real
+reason (no proof target on this spec resolved to a test the brief could name) rather than a false
+warning, so no round was spent distrusting it — worth contrasting with the same day's other entry.
+Building the manifest by hand was cheap once one thing was found: for a proof target that is
+"does an array's contents reach printed output," mutating the *call site* (`printLessons(heading,
+WORKER_LESSONS)` to `printLessons(heading, [])`) is a one-line, always-unique find/replace, versus
+matching a whole multi-line array-literal block in `briefLessons.ts` itself, which is fragile to
+reformatting and easy to get wrong on quoting. The "drop one instruction" mutations did need the
+full multi-line object literal as `find` (four lines, exact indentation) — copied from a fresh
+`Read` rather than the git-diff view, which turned out to matter once (the diff view's leading `+`
+column is not part of the file). All eleven mutations killed at their own named-test or named-file
+scope with zero escalations, which is itself evidence for the branch's central claim: nineteen
+hardcoded per-instruction assertions really do catch both an emptied array and a single dropped
+entry, the two shapes the worker said it was deliberately avoiding making untestable. No tool
+produced a wrong answer this pass; the only real cost was manual — reading all nineteen printed
+instructions myself to judge action-orientation is not something any tool here does, and finding
+the one that fails (a fact with no imperative, buried among eighteen that pass) took a full close
+read rather than a grep.
+
+## 2026-08-06, auditing `briefs-carry-the-lessons` (pass 2)
+
+`mutate` refused two manifest entries on the first attempt with `test names a test by name, so
+tests must name the file it lives in` — the tool's own message named the fix exactly (a `test`
+field needs a sibling `tests` array naming its file), so the round cost one edit and one re-run
+rather than any guessing. Once both entries carried `tests`, all eight manifest mutations KILLED
+at their own named scope with zero escalation on the first clean run — the empty-array and
+drop-one shapes for c1-c4 and c6-c7 all still die exactly as pass 1 recorded, including the two
+new entries this pass added for the lines pass 1's own fix touched (the comment-rule pointer and
+the file-on-the-worker's-branch rewrite).
+
+c5 has no line to mutate — it asserts an *absence* — so `mutate` cannot check it at all; verifying
+it meant editing `briefLessons.ts` by hand four times (once per brief), reintroducing one narrative
+phrase from the pre-fix spec wording into each of the four lesson arrays in turn, and running that
+brief's own `-t "never prints the narrative evidence..."` test directly with `npx vitest run … -t
+…` between each edit and its revert. All four caught their own reintroduced narrative and none
+false-passed. This is the same shape as the "reading nineteen instructions by hand" half of c5
+that pass 1 already named — no tool here can check whether a printed sentence is an absence of
+narrative or an actionable imperative; both halves of c5 are read, not run.
+

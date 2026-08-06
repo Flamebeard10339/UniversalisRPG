@@ -85,3 +85,51 @@ describe('tasks plan-prompt', () => {
       expect(result.stdout).toContain('5. Dispatch a worker with one instruction: run `npm run tasks -- work-prompt <id>` and do what it says.');
     }));
 });
+
+// briefs-carry-the-lessons c3: the four planner instructions the
+// 2026-08-06 orchestrated run's contract-fault records paid for. Each is its
+// own test naming the literal text, not a loop over `PLANNER_LESSONS` itself
+// — a loop over the array under test would still pass with the array
+// emptied.
+describe('plan-prompt carries the lessons a prior run paid for', () => {
+  it('carries the state-the-invariant rule', () =>
+    fixture(({ tasks }) => {
+      const result = tasks('plan-prompt', 'demo-spec');
+      expect(result.stdout).toContain('State the invariant.');
+      expect(result.stdout).toContain('Offer instances as illustration, never as extent.');
+    }));
+
+  it('carries the guard-placement rule', () =>
+    fixture(({ tasks }) => {
+      const result = tasks('plan-prompt', 'demo-spec');
+      expect(result.stdout).toContain('When a clause requires a guard, name the point at which it must act.');
+      expect(result.stdout).toContain('Enforce where a value is assembled, not where it is read.');
+    }));
+
+  it('carries the who-else-computes-this rule', () =>
+    fixture(({ tasks }) => {
+      const result = tasks('plan-prompt', 'demo-spec');
+      expect(result.stdout).toContain('Ask who else computes this answer.');
+    }));
+
+  it('carries the name-what-the-worker-may-decide rule', () =>
+    fixture(({ tasks }) => {
+      const result = tasks('plan-prompt', 'demo-spec');
+      expect(result.stdout).toContain('Name what the worker may decide.');
+      expect(result.stdout).toContain('## Open questions');
+    }));
+});
+
+// c5, checked for plan-prompt: the same "instructions, not incidents" check
+// workPrompt.test.ts makes for the worker's lessons. A property proven for
+// one member of the family is not proven for the rest of it — this is what
+// would have let three of four briefs reacquire narrative text silently.
+describe('plan-prompt prints instructions, not the incidents that motivated them', () => {
+  it('never prints the narrative evidence behind a planner lesson', () =>
+    fixture(({ tasks }) => {
+      const result = tasks('plan-prompt', 'demo-spec');
+      expect(result.stdout).not.toContain('four call sites');
+      expect(result.stdout).not.toContain('a-branch-knows-which-spec-it-owes');
+      expect(result.stdout).not.toContain('HIGH findings');
+    }));
+});

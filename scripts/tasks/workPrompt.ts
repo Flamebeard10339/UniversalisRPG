@@ -5,6 +5,7 @@ import { clauseStandings, parseSpecDoc, type SpecDoc } from '../lib/specDoc';
 import { trackedFiles } from '../lib/sourceFiles';
 import { covers, normalizePath } from '../lib/systems';
 import { clausesOf, fixNowQueue, type Task } from '../lib/taskStore';
+import { printLessons, WORKER_LESSONS } from './briefLessons';
 import type { Flags } from './cli';
 import { readStore, resolveConfig, specFile, type Config } from './context';
 import { explainEmptyQueue } from './records';
@@ -215,4 +216,6 @@ export function cmdWorkPrompt(args: Flags, usage: string): void {
   printClauses(task, specDocFor(config, task.spec));
   console.log('');
   printObligations(task);
+  console.log('');
+  printLessons('What repeated rounds have already paid to learn — carry it forward:', WORKER_LESSONS);
 }
