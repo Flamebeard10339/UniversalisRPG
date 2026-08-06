@@ -3,6 +3,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { describe, expect, it, beforeEach, afterEach } from 'vitest';
+import type { TaskEvent } from '../lib/eventLog';
 import * as git from '../lib/git';
 import type { ProofClause } from '../lib/specDoc';
 import type { State, Task } from '../lib/taskStore';
@@ -10,6 +11,8 @@ import { allUsages } from './commands';
 import type { Config } from './context';
 import {
   authoredAsPlan,
+  branchStanding,
+  branchWorkedOnMembers,
   changedFiles,
   clauseIdsDiffer,
   decideSpec,
@@ -494,6 +497,32 @@ describe('specClausesDiffer and changedFiles, against a real repository', () => 
     expect(specClausesDiffer(config(), 'no-such-branch', null, 'a-spec')).toBe(null);
   });
 
+  // Finding 1 (pass 1 audit): zero head clauses against a populated base
+  // parsed as "differs", which exempted a branch whose local copy was
+  // merely corrupted, not authored. A missing evidence read must refuse the
+  // exemption the same way an unresolvable base already does.
+  it('is null when the head copy parses to zero clauses against a populated base, rather than reading corruption as authorship', () => {
+    write('specs/a-spec.md', specV1);
+    commit('base');
+    spawnSync('git', ['checkout', '-q', '-b', 'feature'], { cwd: dir });
+
+    write('specs/a-spec.md', 'not a spec document at all — no ## Deliverable heading survived.');
+    commit('spec file corrupted on this branch');
+
+    expect(specClausesDiffer(config(), 'main', git.resolveCommit('main'), 'a-spec')).toBe(null);
+  });
+
+  it('still reads a real, deliberate empty-Proof spec as identical to an equally empty base', () => {
+    const noProof = ['# a-spec', '', '## Deliverable', '', 'Nothing proven yet.', ''].join('\n');
+    write('specs/a-spec.md', noProof);
+    commit('base, no proof clauses');
+    spawnSync('git', ['checkout', '-q', '-b', 'feature'], { cwd: dir });
+    write('other.txt', 'x');
+    commit('unrelated change');
+
+    expect(specClausesDiffer(config(), 'main', git.resolveCommit('main'), 'a-spec')).toBe(false);
+  });
+
   it('reports only the paths this branch\'s own commits changed, not a later move of main', () => {
     write('specs/a-spec.md', specV1);
     commit('base');
@@ -512,6 +541,116 @@ describe('specClausesDiffer and changedFiles, against a real repository', () => 
 
   it('is null when there is no merge base to diff from', () => {
     expect(changedFiles(null)).toBe(null);
+  });
+});
+
+// Finding 2 (pass 1 audit): a declared `writes` grant is a forecast, and the
+// diff is only the stronger of two kinds of evidence for `touchedWriteRegion`
+// — a `start`/`stop`/`done` event against a member is the other.
+describe('branchWorkedOnMembers', () => {
+  const event = (overrides: Partial<TaskEvent> = {}): TaskEvent => ({ t: '2026-01-01T00:00:00Z', by: null, branch: 'feature', head: null, op: 'start', id: 'member-1', system: null, spec: 'a-spec', note: '', ...overrides });
+
+  it('is true for a start, stop or done event naming a member, from this branch', () => {
+    for (const op of ['start', 'stop', 'done']) {
+      expect(branchWorkedOnMembers([event({ op })], 'feature', new Set(['member-1']))).toBe(true);
+    }
+  });
+
+  it('is false for a bare note or decision — an annotation is not work', () => {
+    for (const op of ['note', 'decision', 'edit', 'add']) {
+      expect(branchWorkedOnMembers([event({ op })], 'feature', new Set(['member-1']))).toBe(false);
+    }
+  });
+
+  it('is false when the event is from a different branch, or names a task that is not a member', () => {
+    expect(branchWorkedOnMembers([event({ branch: 'other-branch' })], 'feature', new Set(['member-1']))).toBe(false);
+    expect(branchWorkedOnMembers([event({ id: 'not-a-member' })], 'feature', new Set(['member-1']))).toBe(false);
+  });
+
+  it('goes by the event\'s id, not its spec field, so a member re-pointed since the event was written still counts', () => {
+    expect(branchWorkedOnMembers([event({ id: 'member-1', spec: 'some-other-spec' })], 'feature', new Set(['member-1']))).toBe(true);
+  });
+});
+
+// `branchStanding` wires `decideSpec`'s facts to a real repository and a
+// real store — the seam both pass-1 findings lived in, and the one thing
+// calling the pieces separately cannot prove.
+describe('branchStanding, against a real repository', () => {
+  let dir: string;
+  let originalCwd: string;
+
+  beforeEach(() => {
+    originalCwd = process.cwd();
+    dir = mkdtempSync(path.join(os.tmpdir(), 'universalis-branchstanding-'));
+    spawnSync('git', ['init', '-q', '-b', 'main'], { cwd: dir });
+    spawnSync('git', ['config', 'user.email', 'test@example.com'], { cwd: dir });
+    spawnSync('git', ['config', 'user.name', 'Test'], { cwd: dir });
+    process.chdir(dir);
+  });
+
+  afterEach(() => {
+    process.chdir(originalCwd);
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  const write = (relPath: string, content: string): void => {
+    mkdirSync(path.dirname(path.join(dir, relPath)), { recursive: true });
+    writeFileSync(path.join(dir, relPath), content, 'utf8');
+  };
+  const commit = (message: string): void => {
+    spawnSync('git', ['add', '.'], { cwd: dir });
+    spawnSync('git', ['commit', '--no-verify', '-q', '-m', message], { cwd: dir });
+  };
+  const config = (): Config => ({ storePath: 'tasks.jsonl', eventsPath: 'events.jsonl', systemsPath: 'systems.json', specsDir: 'specs', branch: 'feature', actor: null });
+  const writeSystems = (): void => write('systems.json', JSON.stringify({ unowned: { note: '', paths: [] }, systems: [] }));
+  const writeStore = (task: Record<string, unknown>): void => write('tasks.jsonl', `${JSON.stringify({ requires: [], files: [], ...task })}\n`);
+  const writeEvent = (op: string, note: string): void => write('events.jsonl', `${JSON.stringify({ t: '2026-01-01T00:00:00Z', by: null, branch: 'feature', head: null, op, id: 'member-1', system: null, spec: 'a-spec', note })}\n`);
+
+  const specV1 = ['# a-spec', '', '## Deliverable', '', 'Promise.', '', 'Proof:', '', '- [c1] first.', '- [c2] second.', ''].join('\n');
+
+  it('keeps a spec whose diff never touched its declared writes, because a start event names its member (finding 2)', () => {
+    writeSystems();
+    write('specs/a-spec.md', specV1);
+    writeStore({ id: 'member-1', title: 'Member', kind: 'task', state: 'open', spec: 'a-spec', writes: ['impl.ts'] });
+    commit('base');
+    spawnSync('git', ['checkout', '-q', '-b', 'feature'], { cwd: dir });
+
+    // Real work landed outside the declared grant: impl.ts is untouched, and
+    // the branch's own diff carries only the event log entry below.
+    writeEvent('start', 'started member-1');
+    commit('start recorded, grant not yet corrected');
+
+    const standing = branchStanding(config(), 'main');
+    expect(standing.spec).toBe('a-spec');
+    expect(standing.specAuthoredHere).toBe(false);
+  });
+
+  it('drops a spec whose diff never touched it and which carries only a note — the bug c7 fixed stays fixed', () => {
+    writeSystems();
+    write('specs/a-spec.md', specV1);
+    writeStore({ id: 'member-1', title: 'Member', kind: 'task', state: 'open', spec: 'a-spec', writes: ['impl.ts'] });
+    commit('base');
+    spawnSync('git', ['checkout', '-q', '-b', 'feature'], { cwd: dir });
+
+    writeEvent('note', 'a passing observation, not work');
+    commit('note recorded');
+
+    expect(branchStanding(config(), 'main').spec).toBe(null);
+  });
+
+  it('does not exempt a branch whose local spec copy is corrupted, even though its diff touches the spec file (finding 1)', () => {
+    writeSystems();
+    write('specs/a-spec.md', specV1);
+    writeStore({ id: 'member-1', title: 'Member', kind: 'task', state: 'open', spec: 'a-spec', writes: ['impl.ts'] });
+    commit('base');
+    spawnSync('git', ['checkout', '-q', '-b', 'feature'], { cwd: dir });
+
+    write('specs/a-spec.md', 'garbled — no recognizable spec structure left.');
+    commit('spec corrupted on this branch');
+
+    const standing = branchStanding(config(), 'main');
+    expect(standing.spec).toBe('a-spec');
+    expect(standing.specAuthoredHere).toBe(false);
   });
 });
 

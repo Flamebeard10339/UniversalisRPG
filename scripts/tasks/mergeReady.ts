@@ -1,6 +1,7 @@
 import { spawn, spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { checkBytes, type ByteFinding } from '../lib/bytes';
+import { loadEvents, type TaskEvent } from '../lib/eventLog';
 import * as git from '../lib/git';
 import { trackedFiles } from '../lib/sourceFiles';
 import { clauseStandings, parseSpecDoc, type ProofClause, type SpecDoc } from '../lib/specDoc';
@@ -256,11 +257,13 @@ export interface SpecFacts {
   // first.
   written: string[];
   isPlan: (spec: string) => boolean;
-  // False for a spec this branch's diff never touched — recording a note
-  // against a spec is a store write, not work against it, and a candidate
-  // that fails this is dropped before it can be graded as either a plan or a
-  // debt. True when the question could not be asked at all: the exemption
-  // from being asked must not widen just because git had no answer.
+  // False for a spec this branch shows no real evidence of working — its
+  // diff never touched the spec's write region and no `start`/`stop`/`done`
+  // event names one of its members. Recording a note against a spec is a
+  // store write, not work against it, and a candidate that fails this is
+  // dropped before it can be graded as either a plan or a debt. True when
+  // the diff could not be read at all: the exemption from being asked must
+  // not widen just because git had no answer.
   touchedWriteRegion: (spec: string) => boolean;
 }
 
@@ -288,7 +291,7 @@ export function decideSpec(facts: SpecFacts): SpecDecision {
 // The reads a session was making by hand — `git status`, `git rev-parse`
 // plus `git merge-base`, `tasks spec show` twice — collected once so the
 // answer is a leg rather than a research task.
-function branchStanding(config: Config, baseBranch: string): BranchStanding {
+export function branchStanding(config: Config, baseBranch: string): BranchStanding {
   const status = spawnSync('git', ['status', '--porcelain'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
   const dirty = (status.stdout ?? '')
     .split('\n')
@@ -298,6 +301,7 @@ function branchStanding(config: Config, baseBranch: string): BranchStanding {
   const base = git.mergeBase(baseBranch);
   const baseHead = git.resolveCommit(baseBranch);
   const tasks = readStore(config);
+  const events = loadEvents(config.eventsPath).events;
   const active = resolveActiveSpec(config, tasks, undefined);
   const membersOf = (spec: string): Task[] => tasks.filter((task) => task.spec === spec);
   const changed = changedFiles(base);
@@ -307,7 +311,15 @@ function branchStanding(config: Config, baseBranch: string): BranchStanding {
     activeNote: active.note,
     written: specsWrittenFromBranch(config),
     isPlan: (spec) => authoredAsPlan(membersOf(spec), specClausesDiffer(config, baseBranch, baseHead, spec)),
-    touchedWriteRegion: (spec) => diffTouchesRegion(changed, [specFile(config, spec), ...membersOf(spec).flatMap((task) => task.writes)]),
+    // A declared `writes` grant is a forecast, and the diff is only the
+    // stronger of two kinds of evidence: a `start`/`stop`/`done` event
+    // against one of the spec's members is a record that work happened,
+    // even when it landed outside what the member declared.
+    touchedWriteRegion: (spec) => {
+      const members = membersOf(spec);
+      const region = [specFile(config, spec), ...members.flatMap((task) => task.writes)];
+      return diffTouchesRegion(changed, region) || branchWorkedOnMembers(events, config.branch, new Set(members.map((task) => task.id)));
+    },
   });
   const spec = decision.spec;
 
@@ -349,6 +361,18 @@ export function diffTouchesRegion(changed: string[] | null, region: string[]): b
   return changed === null || changed.some((file) => region.some((path) => pathsOverlap(file, path)));
 }
 
+const WORK_OPS = new Set(['start', 'stop', 'done']);
+
+// A `start`/`stop`/`done` event against a member is a record that work
+// happened, not an annotation of the spec — a bare `note` or `decision`
+// carries no such claim and must not count, however open the member still
+// reads. `id`, not `spec`: a member's own current spec pointer is what
+// `touchedWriteRegion` is asking about, not whichever spec the event was
+// filed under before any later re-pointing.
+export function branchWorkedOnMembers(events: TaskEvent[], branch: string, memberIds: Set<string>): boolean {
+  return events.some((event) => event.branch === branch && event.id !== null && memberIds.has(event.id) && WORK_OPS.has(event.op));
+}
+
 // `clauseIdsDiffer` needs both sides parsed: the base branch's copy of the
 // spec, read through git rather than the working tree, and this branch's.
 // Absent from base parses as no clauses, which differs from any real
@@ -358,7 +382,13 @@ export function specClausesDiffer(config: Config, baseBranch: string, baseHead: 
   if (baseHead === null) return null;
   const baseText = git.fileAt(baseBranch, specFile(config, spec));
   const baseClauses = baseText === null ? [] : parseSpecDoc(baseText).proofClauses;
-  return clauseIdsDiffer(baseClauses, readSpecDoc(config, spec)?.proofClauses ?? []);
+  const headClauses = readSpecDoc(config, spec)?.proofClauses ?? [];
+  // Zero head clauses against a populated base reads the same whether the
+  // file was genuinely emptied or is merely unreadable — missing evidence,
+  // not authorship, refused the same direction an unresolvable base already
+  // refuses the exemption.
+  if (headClauses.length === 0 && baseClauses.length > 0) return null;
+  return clauseIdsDiffer(baseClauses, headClauses);
 }
 
 function readSpecDoc(config: Config, spec: string): SpecDoc | null {
