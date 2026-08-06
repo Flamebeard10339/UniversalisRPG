@@ -18,6 +18,7 @@ const ready = (overrides: Partial<BranchStanding> = {}): BranchStanding => ({
   openMembers: [],
   unreviewedFindings: 0,
   outstandingClauses: [],
+  deferredClauses: [],
   auditPasses: 1,
   doctorWarnings: 0,
   ...overrides,
@@ -174,6 +175,20 @@ describe('runMergeReady, on this branch\'s standing', () => {
     const outstanding = await graded({ outstandingClauses: ['c2', 'c7'] });
     expect(outstanding.ok).toBe(false);
     expect(outstanding.body).toContain('2 outstanding after pass 1: c2, c7');
+  });
+
+  // c7: a branch that deferred its way to green says so in the same line
+  // that says green, rather than the clauses leg passing silently.
+  it('passes the clauses leg on a deferred clause, and names it in the same line that says pass', async () => {
+    const deferred = await graded({ deferredClauses: ['c3'] });
+    expect(deferred.ok).toBe(true);
+    expect(deferred.body).toContain('clauses        ok  pass — the latest of 1 pass(es) leaves no clause outstanding; deferred: c3');
+  });
+
+  it('names a deferred clause beside a real outstanding one, on a failing run', async () => {
+    const both = await graded({ outstandingClauses: ['c2'], deferredClauses: ['c3'] });
+    expect(both.ok).toBe(false);
+    expect(both.body).toContain('1 outstanding after pass 1: c2; deferred: c3');
   });
 
   it('carries doctor\'s warning count into the summary without changing what fails', async () => {

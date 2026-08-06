@@ -69,6 +69,10 @@ export interface BranchStanding {
   // Clause ids the spec's latest pass leaves outstanding, and whether a pass
   // has been recorded at all — ungraded is not the same as unmet.
   outstandingClauses: string[];
+  // Clause ids the latest pass recorded deferred — off `outstandingClauses`
+  // because they stop blocking the clauses leg, and named here so a branch
+  // that deferred its way to green says so in the same line that says green.
+  deferredClauses: string[];
   auditPasses: number;
   // How many issues `doctor` reported. Carried into the summary without
   // changing what fails: the count reached the summary line, the leg's
@@ -131,10 +135,16 @@ function standingLegs(standing: BranchStanding): LegResult[] {
   });
 
   const clausesOk = standing.auditPasses > 0 && standing.outstandingClauses.length === 0;
+  const deferredNote = standing.deferredClauses.length > 0 ? `; deferred: ${standing.deferredClauses.join(', ')}` : '';
   legs.push({
     name: 'clauses',
     ok: clausesOk,
-    detail: standing.auditPasses === 0 ? `${standing.spec} has no recorded audit pass` : clausesOk ? `pass — the latest of ${standing.auditPasses} pass(es) leaves no clause outstanding` : `${standing.outstandingClauses.length} outstanding after pass ${standing.auditPasses}: ${standing.outstandingClauses.join(', ')}`,
+    detail:
+      standing.auditPasses === 0
+        ? `${standing.spec} has no recorded audit pass`
+        : clausesOk
+          ? `pass — the latest of ${standing.auditPasses} pass(es) leaves no clause outstanding${deferredNote}`
+          : `${standing.outstandingClauses.length} outstanding after pass ${standing.auditPasses}: ${standing.outstandingClauses.join(', ')}${deferredNote}`,
     next: clausesOk ? undefined : standing.auditPasses === 0 ? `commission an auditor: npm run tasks -- audit-prompt ${standing.spec}` : 'npm run tasks -- next',
   });
 
@@ -306,7 +316,8 @@ function branchStanding(config: Config, baseBranch: string): BranchStanding {
     ...decision,
     openMembers: members.filter((task) => task.state !== 'done' && task.state !== 'declined').map((task) => task.id),
     unreviewedFindings: spec === null ? 0 : unreviewedFiledBy(tasks, spec).length,
-    outstandingClauses: doc === null ? [] : clauseStandings(doc.proofClauses, latest?.verdicts).filter((standing) => standing.status !== 'met').map((standing) => `c${standing.clause}`),
+    outstandingClauses: doc === null ? [] : clauseStandings(doc.proofClauses, latest?.verdicts).filter((standing) => standing.status !== 'met' && standing.status !== 'deferred').map((standing) => `c${standing.clause}`),
+    deferredClauses: doc === null ? [] : clauseStandings(doc.proofClauses, latest?.verdicts).filter((standing) => standing.status === 'deferred').map((standing) => `c${standing.clause}`),
     auditPasses: doc?.auditPasses.length ?? 0,
     doctorWarnings: doctorIssues(config, tasks).length,
   };
