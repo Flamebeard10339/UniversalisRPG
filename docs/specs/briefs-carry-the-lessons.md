@@ -234,3 +234,70 @@ way, by a human noticing a diff), it is tight relative to current usage (5 slots
 500), and the decision log for this pass records the exact reasoning for choosing 24 over a
 character count. The count-not-characters choice is right: a character budget would penalise a
 clearer, longer sentence over a shorter unclear one, which is the opposite of what c5 asks for.
+
+### Pass 2 — 2026-08-06
+
+- base: `87b3be62121351f4cbc7361112788fb008467afc`
+- head: `af7248a7987cb5b08bbab6e01f38aa4955697019`
+- proof 1: met — Independent re-check, pass 2. vitest scripts/tasks/workPrompt.test.ts still has one
+it() per worker instruction (comment-scarcity/CLAUDE.md pointer, mutation-is-proof,
+record-the-decision, file-what-you-notice), each a literal-substring assertion. Mutation-tested
+fresh: c1-worker-empty-array (call site in workPrompt.ts, WORKER_LESSONS to []) KILLED 4 of 7 at
+file scope; c1-worker-drop-comment-pointer (removed the rewritten first entry, the one pass 1
+found unmet and this pass's own commit changed) KILLED exactly the 1 named test
+("points at CLAUDE.md for the comment rule rather than re-deriving it") at named-test scope, no
+escalation. Manifest run: 8 killed, 0 survived, 0 errored.
+- proof 2: met — Independent re-check, pass 2. vitest scripts/tasks/audit.test.ts still has one it()
+per auditor instruction, five total, unchanged by this pass's fix (only WORKER_LESSONS[0] and
+ORCHESTRATOR_LESSONS[3] were rewritten). Re-ran c2-auditor-empty-array (call site in audit.ts,
+AUDITOR_LESSONS to []): KILLED 5 of 119 at file scope. Confirmed AUDITOR_LESSONS[0]'s three named
+false-proof forms still read as illustration ("for example") rather than extent, matching pass 1.
+- proof 3: met — Independent re-check, pass 2. vitest scripts/tasks/planPrompt.test.ts still has one
+it() per planner instruction, four total, unchanged by this pass's fix. Re-ran
+c3-planner-empty-array (call site in planPrompt.ts, PLANNER_LESSONS to []): KILLED 4 of 13 at
+file scope. planPrompt.test.ts also grew its own c5 narrative-exclusion test this pass — see c5's
+evidence below.
+- proof 4: met — Independent re-check, pass 2. `tasks orchestrate-prompt` still registered in
+commands.ts (cmdOrchestratePrompt), grepped docs/workflow.md and CLAUDE.md for "orchestrat" again
+— only the same unrelated citation. Mutation-tested fresh: c4-orchestrator-empty-array (call site
+in orchestratePrompt.ts, ORCHESTRATOR_LESSONS to []) KILLED 6 of 11 at file scope;
+c4-orchestrator-drop-file-on-worker-branch (removed the rewritten fourth entry — the exact one
+pass 1 found unmet) KILLED exactly the 1 named test ("carries the file-on-the-worker's-branch
+rule") at named-test scope, no escalation. This is the clause the pass-1 finding was filed
+against; the rewrite closes it and the test still discriminates.
+- proof 5: met — Read all nineteen printed instructions myself (title+body concatenated per line, the
+literal `printLessons` output format), independent of pass 1's read and of the worker's own
+"checked the other eighteen by hand" claim. All nineteen now name an action a reader can do
+differently: the four worker, five auditor and four planner entries were already actionable in
+pass 1 and are unchanged; the two entries this branch's fix touched are the ones that matter.
+WORKER_LESSONS[0] now reads "CLAUDE.md's `# Comments` section owns the comment rule — do not
+re-derive it here." plus "never describe another module's contract, and never write an audit
+finding's rationale into the source" — both an instruction (do not re-derive) and the two clauses
+restated as direct action. ORCHESTRATOR_LESSONS[3], the one pass 1 found unmet, now reads "File a
+record on the worker's branch, not the orchestrator's." plus "never hand a worker an id it cannot
+resolve in its own store; describe it in prose instead." — two imperatives where pass 1 found pure
+description with no verb at all. Separately verified the narrative-exclusion half of c5, which
+pass 1 only checked for work-prompt: this pass's own fix extended it to audit.test.ts,
+planPrompt.test.ts and orchestratePrompt.test.ts. Confirmed all four are real, not tautological —
+for each of the four briefs, hand-edited briefLessons.ts to reintroduce one narrative phrase from
+the pre-fix wording (e.g. added back "Eleven tests this run looked like proof and were not" to
+WORKER_LESSONS[1]'s body, "c2 of the clause-deferral spec consumed four passes..." to
+AUDITOR_LESSONS[2], "HIGH findings had this identical root..." to PLANNER_LESSONS[2], "Found
+twice, independently, by two auditors." to ORCHESTRATOR_LESSONS[4]), then ran that brief's own
+`npx vitest run <file> -t "never prints the narrative evidence..."` — all four failed on the
+reintroduced text and none of the assertions were vacuous (each named a specific string that only
+appears when narrative is present), reverted after each check, working tree confirmed clean by
+`git status --short` afterward.
+- proof 6: met — Independent re-check, pass 2. Grep confirms all four brief files still import
+printLessons from ./briefLessons and call it; the four lesson arrays are each declared exactly
+once. Re-ran c6-planPrompt-bypasses-shared-carrier (planPrompt.ts's printLessons call replaced
+with a hand-rolled console.log loop producing byte-identical output): the
+"renders through the same printLessons function" test in workPrompt.test.ts KILLED it at its own
+named-test scope, 1 failed of 20 across workPrompt.test.ts and planPrompt.test.ts together, no
+escalation — every content-level test in planPrompt.test.ts still passed against the bypass,
+confirming the carrier check is the only thing watching for this failure mode.
+- proof 7: met — Independent re-check, pass 2. MAX_LESSON_COUNT is still 24 in briefLessons.ts,
+checked against totalLessonCount() (still 19: 4 worker + 5 auditor + 4 planner + 6 orchestrator —
+this pass's fix rewrote two entries' text, not the counts) by audit.test.ts. Re-ran
+c7-budget-lowered-below-current-total (24 to 10): KILLED the named budget test at named-test
+scope, 1 failed of 119, no escalation.

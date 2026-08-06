@@ -812,3 +812,23 @@ instructions myself to judge action-orientation is not something any tool here d
 the one that fails (a fact with no imperative, buried among eighteen that pass) took a full close
 read rather than a grep.
 
+## 2026-08-06, auditing `briefs-carry-the-lessons` (pass 2)
+
+`mutate` refused two manifest entries on the first attempt with `test names a test by name, so
+tests must name the file it lives in` — the tool's own message named the fix exactly (a `test`
+field needs a sibling `tests` array naming its file), so the round cost one edit and one re-run
+rather than any guessing. Once both entries carried `tests`, all eight manifest mutations KILLED
+at their own named scope with zero escalation on the first clean run — the empty-array and
+drop-one shapes for c1-c4 and c6-c7 all still die exactly as pass 1 recorded, including the two
+new entries this pass added for the lines pass 1's own fix touched (the comment-rule pointer and
+the file-on-the-worker's-branch rewrite).
+
+c5 has no line to mutate — it asserts an *absence* — so `mutate` cannot check it at all; verifying
+it meant editing `briefLessons.ts` by hand four times (once per brief), reintroducing one narrative
+phrase from the pre-fix spec wording into each of the four lesson arrays in turn, and running that
+brief's own `-t "never prints the narrative evidence..."` test directly with `npx vitest run … -t
+…` between each edit and its revert. All four caught their own reintroduced narrative and none
+false-passed. This is the same shape as the "reading nineteen instructions by hand" half of c5
+that pass 1 already named — no tool here can check whether a printed sentence is an absence of
+narrative or an actionable imperative; both halves of c5 are read, not run.
+
