@@ -407,3 +407,38 @@ outside the fixtures its own tests happen to look at. Positive: this generalizes
 a clause claiming a boundary needs its boundary re-derived by hand every pass, because the
 adversarial case is exactly what the clause text cannot generate about itself.
 
+## `every-triage-action-has-a-non-interactive-form` pass 1, 2026-08-06
+
+`--args-from` rejected the pass file on the first attempt: `error: --question describes a finding,
+and no --finding has been opened yet`. The cause was invisible from the error alone. `parseAuditFile`
+treats any physical line starting with `--` as a new flag and everything else as a continuation of
+the value above it (`audit.ts`'s `parseAuditFile`) — so a reproduction snippet quoted inside a
+clause's own `--evidence` prose (`tasks ask x1` on one line, `--question q\`` wrapping onto the
+next) was silently read as an unrelated top-level flag, thirty lines away from any `--finding`. The
+fix cost one grep (`grep -n "^--"` over the pass file, to list every line the parser will actually
+treat as a flag-open) and a rewrite of two paragraphs to describe the repro in prose instead of
+literal command syntax. Same shape as the `nearestLine`/`visibleWhitespace` machinery `mutate`
+already has for its own find-text misses — `audit`'s free-text evidence fields have no equivalent
+guard, and a long paragraph is exactly where an author reaches for a backtick-quoted CLI example.
+Worth considering: `parseAuditFile` warning (not erroring past the point of no return) when a
+continuation line both starts with `--` and matches no known flag name, or documenting `grep -n
+"^--"` as the pre-flight check for anyone hand-writing a pass file with command examples in it.
+
+Six-entry mutation manifest (one per clause) all KILLED at their own named-test scope on the first
+run, no escalation — the strongest possible outcome from `mutate`, and it cost exactly one call.
+The `mutate` tool itself was otherwise friction-free: find-text, restore and the journal all worked
+as documented.
+
+The real finding came from going outside the manifest the brief's mechanical grading would have
+produced. Two adversarial checks the brief explicitly asked for by name — "a record in an
+unexpected state" for c4, and re-checking c6 "harder than the rest" — were not expressible as a
+single find/replace mutation, so they were run as direct CLI reproductions instead: decline a
+record, then ask a question against it (c4 — the record silently stays `declined`, never
+`unreviewed`, contradicting the clause's own text, and neither `defer` nor `promote`'s sibling
+guard exists on `ask`/`redirect`) and a hand-edited reorder of `TRIAGE_ACTIONS` run through `mutate`
+with no `tests` scope at all (c6 — SURVIVED the entire 1673-test suite, because the one
+order-touching test computes its expected string from the same table it is checking). Both were
+findable only by asking "what would a reviewer plausibly do that the six named tests do not
+describe", which the generated manifest cannot ask on its own — same lesson as the prior pass's
+note about adversarial-scenario construction living outside any tool here.
+

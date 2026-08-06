@@ -80,3 +80,75 @@ Proof:
   record; a batch may want both, and the shape is the worker's call once the table exists.
 - Whether the table lives in `triage.ts` or beside the record verbs in `records.ts`. Both routes
   import from wherever it lands; the layering is the worker's to judge against the existing split.
+
+## Audit passes
+
+### Pass 1 — 2026-08-06
+
+- base: `a49a9b614c6cff533de973d9bceb9d18c4d42e94`
+- head: `6eb10e324fd7946214160f08dc6f634de9d57ba6`
+- proof 1: met — Both the menu (`TRIAGE_ACTIONS.map(...).join(...)`, triage.ts:144) and the dispatch
+(`TRIAGE_ACTIONS.find((candidate) => candidate.key === answer)`, triage.ts:150) read from the same
+TRIAGE_ACTIONS array (triage.ts:95-101) rather than a literal if/else chain -- confirmed by reading
+the diff against the pre-refactor if/else (a49a9b6..621b1d5). Mutation-verified: inverting the match
+(`candidate.key === answer` -> `!==`, manifest entry c1-dispatch-invert) was KILLED at its own named
+test (triage.test.ts "triage promotes, defers and declines findings, saving after every decision"),
+1 failed of 17, no escalation to the file or whole suite needed.
+- proof 2: met — triage.test.ts's "every action in the table names a `tasks` verb that actually exists,
+so a table entry with no route fails here" iterates TRIAGE_ACTIONS and runs `tasks <verb> --help`
+per entry. Verified by doing exactly what the audit brief asked rather than reading the test: added
+a sixth entry `{ key: 'z', label: 'zonk', verb: 'nonexistent-verb', run: runAsk }` to the table
+(manifest entry c2-sixth-action-no-route) and confirmed this exact test catches it -- KILLED, 1
+failed of 17, at its own named-test scope, no escalation needed.
+- proof 3: met — cmdDefer (records.ts:820-836) sets state 'open'/spec null and files the identical note
+string 'deferred: opened outside every spec' that the walk's runDefer uses (triage.ts:48-52) -- same
+literal string in both files. Mutation-verified: changing the non-interactive wording to 'deferred:
+moved outside every spec' (manifest entry c3-defer-wording-drift) was KILLED at its own named test
+("tasks defer opens a record outside every spec..."), 1 failed of 17, no escalation. Also verified by
+direct execution: cmdDefer refuses a declined id with "it does not reopen closed ones" and, given a
+batch of two ids where one is declined, leaves the other (valid) id completely untouched -- the same
+all-or-nothing convention cmdPromote already uses. Calling defer twice on an already-open record
+succeeds both times (idempotent) and logs two separate, identically-worded triage events.
+- proof 4: unmet — Two of the three properties are solid and mutation-verified: appending (not replacing)
+evidence -- mutating the assignment from append to outright replacement (manifest entry
+c4-ask-overwrites-evidence) was KILLED at its own named test ("tasks ask records the question on the
+finding..."), 1 failed of 17, no escalation -- and a second `tasks ask` call on the same id correctly
+appends a second dated block rather than overwriting the first (verified by direct execution). The
+triage-event property also holds (see c5's evidence; the recordEvents call is shared). But the third
+property -- "leaves the record unreviewed so the queue keeps offering it" -- is not enforced and does
+not hold in general. cmdAsk (records.ts:865-884) never reads or checks task.state, unlike cmdDefer and
+cmdPromote which explicitly refuse to run on anything but an unreviewed-or-open record. Reproduced
+directly: add a finding, decline it with a reason, then ask a question against that same now-declined
+id. The ask command exits 0, appends the question to evidence, and files a triage event -- but showing
+the record afterward still reports state 'declined', not 'unreviewed'. unreviewedQueue will never re-offer
+this record, directly contradicting the clause's literal promise, and the caller receives no warning
+or error. This is not a hypothetical: an orchestrator batch-asking across ids it has not itself just
+pulled from the unreviewed queue (a stale id, a racing second run, an id typo that happens to resolve)
+hits this silently. `tasks redirect` has the identical missing guard, but c5 does not depend on state
+so it is unaffected; only c4's own claim is broken by it. See the filed HIGH finding for the fix.
+- proof 5: met — cmdRedirect (records.ts:839-858) files `recordEvents(config, 'triage', ...)`, matching
+the walk's runRedirect (triage.ts:66-76); `tasks log --op edit` never shows the id afterward and
+`tasks log --op triage` does, exactly as the existing test asserts. Mutation-verified independently:
+changing the op from 'triage' to 'edit' (manifest entry c5-redirect-files-edit-not-triage) was KILLED
+at its own named test ("tasks redirect is the same operation as the walk's redirect..."), 1 failed of
+17, no escalation. Also confirmed the property is state-independent (unlike c4): redirecting a
+declined record's deliverable still files a `triage` event, not an `edit` one, by direct execution.
+- proof 6: unmet — Three of the four named properties are solidly proven. Same keys and same
+persist-immediately behaviour: mutation entries c1-dispatch-invert and c6-walk-drops-persist (the
+latter deletes the common `saveStoreAndWarn`+`recordEvents` call on the walk's decision path) were
+both KILLED at the same named test ("triage promotes, defers and declines findings, saving after
+every decision"), 1 failed of 17 each, no escalation -- plus the existing tests already drive the
+walk with literal keystrokes ('1','2','3','4','a') independent of the table's own content. Same
+prompts: proven by the existing hardcoded-string test ("triage prompts read exactly as before the
+table refactor"), which asserts the literal "reason: ", "replacement deliverable: ", "question: "
+text, not anything derived from the table. But "same order" has zero coverage anywhere in the suite.
+The only order-touching test ("the menu is rendered from the action table") computes its expected
+string from TRIAGE_ACTIONS itself (`TRIAGE_ACTIONS.map((action) => ...).join(...)`), making it
+tautological -- it can never fail from a reorder, because it is checking the table against itself.
+Confirmed by mutation entry c6-menu-order-scrambled: swapped the array positions of the promote and
+redirect entries (keys and verbs left untouched) and ran it with no `tests` scope at all, i.e.
+directly against the whole 1673-test suite: SURVIVED, 0 failed of 1673. The shipped order does
+currently match the pre-refactor order (confirmed by reading the diff), so there is no live
+regression today, but the clause's own claim to be "provably behaviour-preserving" does not hold for
+this one property -- nothing in the suite, up to and including the whole suite, would catch a future
+silent reorder. See the filed MEDIUM finding for the fix.
