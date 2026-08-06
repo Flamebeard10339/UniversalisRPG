@@ -110,3 +110,73 @@ Proof:
 - Nine of the 134 records that do have an `add` event sit out of timestamp order in the file. Whether
   that is worth reconciling during the backfill, or is noise from records added and re-added, is the
   worker's call — the backfill takes file position either way, so nothing depends on the answer.
+
+## Audit passes
+
+### Pass 1 — 2026-08-06
+
+- base: `142374aadf157a2c6e7eb011b0aa266fb845b4d4`
+- head: `137245b58f98fb12b45c7bd672434587b9e0b27a`
+- proof 1: met — scripts/lib/taskStore.ts:328-331 saveStore sorts `[...tasks]` by id before writing. Test
+"writes records in id order, so the same record set produces byte-identical files regardless of
+build order" (scripts/lib/taskStore.test.ts:256) saves [x,y] and [y,x] to separate files and asserts
+byte-identical output. Mutation-killed: replacing the sort with `[...tasks]` (no sort) fails that
+exact test, 1 of 95 (`npm run mutate` manifest entry "c1").
+- proof 2: met — Diffed against the pre-branch file (142374a): the four sites it names — taskStore.ts:375
+(fixNowQueue), :407 (unreviewedQueue), :487 (listQueue), :513 (nearMatches) — each read
+`.map((task, index) => ...).sort(... a.index - b.index)` before this branch and `seqRank(a.seq) -
+seqRank(b.seq)` after. Each of the four has its own "breaks ties by seq, oldest first, regardless of
+array order" test in taskStore.test.ts (lines 657, 695, 778, 645). Mutation-killed: replacing
+seqRank's body with a constant `0` fails 6 of 95 tests file-wide (`npm run mutate` manifest entry
+"c2"). Also verified live: `tasks next` still returns the same answer it did before the branch on the
+real 590-record store (spot-checked via `npm run tasks -- next` — unchanged pick).
+- proof 3: met — Two layers of evidence. (1) Generic: "is a permutation: the same ids and the same fields
+aside from seq, whatever the store holds" (taskStore.test.ts:325) constructs three records with
+distinct fields and asserts backfillSeq changes only seq. Mutation-killed: making backfillSeq also
+mutate title on the way through fails that test, 1 of 95 (manifest entry "c3"). (2) Direct, against the
+real reorder commit f61c505 rather than a synthetic fixture: loaded docs/tasks.jsonl at f61c505^ and
+at f61c505 with parseStore and diffed them — 589 records both sides, identical id sets (no id only on
+one side), zero field mismatches on any record once seq is excluded from the comparison, and seq
+values in the "after" file are 1..589, all unique, none null. Script and output are in this pass's
+report to the coordinator; re-run with
+`git show f61c505^:docs/tasks.jsonl` / `git show f61c505:docs/tasks.jsonl` piped through parseStore
+and diffed by id.
+- proof 4: met — taskStore.test.ts:369 "two branches, one editing a record and adding a non-adjacent one, ...
+merge with zero conflicts" spawns real git (init/branch/commit/merge, no mocking), builds two branches
+from a 10-record base — one edits record 0 and inserts near the middle, the other edits record 9 and
+appends — and asserts `git merge` exits 0 with both edits and both new records present. Ran it: passes.
+I additionally re-derived the same scenario at varying gaps between an edited record and an unrelated
+insertion (adversarial script, not in this repo) and confirmed real `git merge` stays clean as long as
+at least one untouched line separates the two changes in the id-sorted file — consistent with the
+clause's claim for the non-adjacent case it names. CAVEAT, not a clause failure but a test-strength gap
+(see finding H1 below): mutation-testing this exact test by removing saveStore's sort survives at the
+test's own scope and is only caught when escalated to the whole file (killed there by the unrelated c1
+test) — because this test's branch arrays are hand-spliced already in id-sorted order, so the mutation
+doesn't change what they write. The behavioural claim is independently verified true by inspection and
+by my own adversarial re-run; the test as written does not, by itself, prove it.
+- proof 5: unmet — The named test (taskStore.test.ts:404) is real and passes: two branches each inserting a
+new record between the same two existing ids conflict once, in the shape described. But the clause's
+stronger claim — "a test pins that this is the *only* remaining conflict shape" — is false. I built an
+adversarial real-git-merge scenario (spawnSync git, same pattern as the shipped tests, not mocked):
+branch A edits an existing record (title change only, no id/position change); branch B inserts a new
+record whose id sorts immediately adjacent to the edited one (zero untouched lines between them once
+saveStore sorts by id) — merge exits 1, a real conflict, shaped as an edit on one side and an insert on
+the other, not two inserts. I then swept the gap between the edited line and the inserted line from 0
+to 6 untouched lines: gap=0 conflicts, gap>=1 merges clean (confirmed with the array's actual id used
+for `saveStore`'s sort, not the array-splice position, which is irrelevant since saveStore always
+re-sorts). I also confirmed a second new shape: one branch deletes a record while the other inserts a
+record adjacent to the deleted one — also conflicts. So the true residual is "any two changes whose
+lines land adjacent in the id-sorted file," which subsumes insert+insert but is not the same claim as
+"two branches inserting adjacent ids" and is not limited to a shape resolved by "keep both" — an
+edit+insert conflict must be resolved by reconciling the edit, which "keep both" does not describe.
+This is realistic, not contrived: ids in this store are hyphenated slugs that commonly share a prefix
+for related work (an audit's own finding ids are typically `<subject>-passN-...`), so a record being
+edited and a new record about the same subject are likely to sort next to each other. Filed as finding
+H1.
+- proof 6: met — normalizeTask reads `value.seq ?? null` (taskStore.ts:188) and seqRank treats null as
+Number.POSITIVE_INFINITY (taskStore.ts:366), so an absent seq parses without error and sorts last —
+"newest" — in every queue. Tests: "parses with seq null, from a line that never mentions the key" and
+"sorts as the newest record in a queue, ahead of nothing and behind everything numbered"
+(taskStore.test.ts:272-286). Mutation-killed: changing `value.seq ?? null` to `value.seq` (so an
+absent key reads as `undefined`, which then fails the `typeof seq !== 'number'` guard and throws)
+fails the "parses with seq null" test, 1 of 95 (manifest entry "c6").
