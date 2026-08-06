@@ -133,8 +133,8 @@ export interface PriorArt {
 const declaredPath = (entry: string): string => canonicalPath(entry.split(/[:#]/)[0]);
 
 // Live work first, because an open claim on a path is a collision and a
-// closed one is a precedent to read. Within a group, store order — which is
-// creation order for an append-only store.
+// closed one is a precedent to read. Within a group, store order — id order,
+// since saveStore canonicalizes on it.
 const STATE_RANK: Record<State, number> = { 'in-progress': 0, open: 1, unreviewed: 2, done: 3, declined: 4 };
 
 function pathMatches(task: Task, queries: string[]): PathMatch[] {
