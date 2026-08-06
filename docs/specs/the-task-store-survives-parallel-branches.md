@@ -193,3 +193,57 @@ Number.POSITIVE_INFINITY (taskStore.ts:366), so an absent seq parses without err
 (taskStore.test.ts:272-286). Mutation-killed: changing `value.seq ?? null` to `value.seq` (so an
 absent key reads as `undefined`, which then fails the `typeof seq !== 'number'` guard and throws)
 fails the "parses with seq null" test, 1 of 95 (manifest entry "c6").
+
+### Pass 2 — 2026-08-06
+
+- base: `142374aadf157a2c6e7eb011b0aa266fb845b4d4`
+- head: `9a59239c48b4054b35493cd49ae2ecc2227ecb81`
+- proof 1: met — Unchanged since pass 1: taskStore.ts:329 sorts `[...tasks]` by id before writing. Re-verified
+independently this pass with a fresh manifest (not pass 1's): replacing the sort with `[...tasks]` (no-op)
+against test "writes records in id order, so the same record set produces byte-identical files regardless
+of build order" (taskStore.test.ts:256), scoped to that test by name via `npm run mutate`. KILLED, 1 failed
+of 101, at the named test's own scope — no escalation needed.
+- proof 2: met — The four sites c2 names (fixNowQueue:375, unreviewedQueue:407, listQueue:487, nearMatches:513)
+all tie-break on seqRank(task.seq) instead of array index, confirmed by reading each. Independently
+mutation-verified all four this pass, each at its own named-test scope: (1) collapsing `seqRank` to a
+constant 0 against "breaks ties by seq, oldest first, regardless of array order" (matches the fixNowQueue,
+unreviewedQueue and listQueue tests by name) — KILLED, 2 failed of 101; (2) the same mutation against
+nearMatches's own "breaks a score tie by seq, oldest first, regardless of array order" — KILLED separately,
+1 failed of 101. Neither needed escalation past its own file. Also live-checked: `npm run tasks -- next`
+still returns the same pick on the real store as before the branch.
+- proof 3: met — backfillSeq (taskStore.ts) only ever adds `seq` to a record that lacked one, and the real
+reorder commit f61c505 is a verified permutation of the pre-branch store (589 ids both sides, zero
+non-seq field mismatches — reconfirmed this pass by re-running pass 1's diff-by-id script against
+`git show f61c505^:docs/tasks.jsonl` and `git show f61c505:docs/tasks.jsonl`). Mutation-verified this
+pass: making backfillSeq also append `!` to `title` on the way through, against test "is a permutation:
+the same ids and the same fields aside from seq, whatever the store holds" (taskStore.test.ts:325) —
+KILLED, 1 failed of 101, at the named test's own scope.
+- proof 4: met — Answers pass 1's medium finding directly. cae80b3 rebuilt this test's branch arrays with a
+content-keyed `scrambled()` shuffle before every `saveStore` call (taskStore.test.ts), replacing the old
+already-id-sorted hand splices pass 1 caught. Re-ran the exact mutation pass 1 used (disable saveStore's
+sort) via `npm run mutate`, scoped this time to only the test's own name — "two branches, one editing a
+record and adding a non-adjacent one, the other doing the same to a different record, merge with zero
+conflicts" — KILLED, 1 failed of 101, at that scope alone. Pass 1 needed escalation to the whole file for
+this same mutation; this pass does not. Also ran the test directly: still a real, unmocked git merge
+(spawnSync init/branch/commit/merge), still exits 0 with both edits and both new records present.
+- proof 5: met — Clause reworded (e3ea4b9) after pass 1's high finding, to claim adjacency of changed lines —
+not "two inserts" — as the general condition, with insert-insert, edit-insert and delete-insert as three
+named instances, only the first resolved by "keep both". taskStore.test.ts's "the adjacency boundary"
+describe block (cae80b3) sweeps all three shapes at gap 0 and gap 1 via it.each (6 cases), plus a dedicated
+insert-insert test asserting exactly one conflicting hunk resolved by keeping both. All branch arrays are
+built through the same scrambled() helper c4 uses, closing pass 1's mutation-gap finding for this test too.
+Mutation-verified: disabling saveStore's sort, scoped to `-t "merges clean"` (matches all 6 it.each cases,
+none else) — KILLED, 3 of 6 failed, 101 total, at that scope alone, no escalation.
+Adversarial re-check beyond the shipped tests, per this pass's brief: built a standalone real-git-merge
+harness (spawnSync, fresh repo per run, not reusing branches) covering shapes the clause does not name —
+edit-edit, delete-delete, delete-edit, edit-delete — sweeping gap 0/1/2, and separately the file's first and
+last record (no context on one side). Every shape conflicts at gap 0 and merges clean at gap>=1, both
+directions, both edges. The zero-vs-one-record boundary the clause claims holds outside the fixtures the
+shipped tests exercise, not just inside them.
+- proof 6: met — Unchanged since pass 1: normalizeTask reads `value.seq ?? null`, seqRank treats null as
+Number.POSITIVE_INFINITY (sorts last/newest). Re-verified this pass: changing `value.seq ?? null` to
+`value.seq` against "parses with seq null, from a line that never mentions the key" (taskStore.test.ts:272)
+— KILLED, 1 failed of 101, at the named test's own scope. Also confirmed all four production sites that
+construct a new Task literal (cmdAdd, cmdImport, buildFindingTask, the undelivered-clause literal) now call
+nextSeq(tasks), so no new record ships without an opinion on seq; tsc enforces this structurally since
+Task.seq is a required field.

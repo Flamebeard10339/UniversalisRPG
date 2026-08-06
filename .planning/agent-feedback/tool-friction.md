@@ -375,3 +375,35 @@ sort changes nothing they observe. Filed as a medium finding rather than reworki
 — the fix (build the arrays out of order, the way c1's own test does) is small, but it is the kind
 of change that should sit next to the clause it is proving, not be made by an auditor mid-pass.
 
+## 2026-08-06, auditing `the-task-store-survives-parallel-branches` (pass 2)
+
+### The generated tooling stayed clean two passes running; `mutate`'s escalation chain again
+### surfaced the one thing worth finding, this time in code the six clauses do not cover
+
+`audit-prompt`, `mutate` and `merge-ready` again ran with no wrong `file` guesses and no wall. A
+six-entry hand-built manifest (one per clause, each aimed at a named test) confirmed pass 1's
+mutation-gap finding is actually fixed: c4 and c5 both now KILL at their own named-test scope,
+where pass 1 caught them surviving to file scope. That took one `npm run mutate` call and cost
+nothing.
+
+The real finding this pass came from a second manifest built to check `orderIndependence.test.ts`
+— the new property test the spec's clauses do not name, covering the roadmap.ts/producers.ts
+seq-tie-break generalization a coordinator asked for mid-branch (137245b). Removing roadmap.ts's
+seq tie-break term SURVIVED all the way to the 1667-test whole suite; the equivalent producers.ts
+mutation was KILLED at its own named-test scope. Reading why: `roadmapView`'s `topics` sort runs
+on `listQueue`'s output, which is already seq-sorted, so JS's stable `Array.prototype.sort` makes
+the redundant tie-break unobservable — no test in the repo, existing or addable at that call site,
+can currently kill it without changing how `topics` composes with `listQueue`. `mutate` is what
+made this checkable in one command (a scoped manifest, escalate-on-survive) rather than a manual
+`git stash`-and-rerun loop; the reasoning about *why* it survives still had to be done by hand,
+same shape as pass 1's note about adversarial-scenario construction being outside any tool here.
+
+Two probes beyond the six clauses (this pass's own idea, not prompted by the brief) — my own
+standalone real-git-merge harness sweeping edit-edit, delete-delete, delete-edit and edit-delete
+adjacency, plus first/last-record file edges, none of which the shipped tests build — cost about
+15 minutes total (four throwaway `node -e` scripts, one bug in the first draft where "gap" was
+computed against the wrong index for an edit-shaped side) and confirmed c5's boundary claim holds
+outside the fixtures its own tests happen to look at. Positive: this generalizes pass 1's note —
+a clause claiming a boundary needs its boundary re-derived by hand every pass, because the
+adversarial case is exactly what the clause text cannot generate about itself.
+
