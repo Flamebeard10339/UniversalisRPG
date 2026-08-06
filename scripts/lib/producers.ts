@@ -1,6 +1,6 @@
 import type { TaskEvent } from './eventLog';
 import { allConcepts, canonicalPath, pathsOverlap, type Concept, type Manifest } from './systems';
-import type { State, Task } from './taskStore';
+import { seqRank, type State, type Task } from './taskStore';
 
 // "Does anything already do this?" — the question a worker is supposed to ask
 // before building, and the one the store could not answer. `produces` has
@@ -133,8 +133,7 @@ export interface PriorArt {
 const declaredPath = (entry: string): string => canonicalPath(entry.split(/[:#]/)[0]);
 
 // Live work first, because an open claim on a path is a collision and a
-// closed one is a precedent to read. Within a group, store order — which is
-// creation order for an append-only store.
+// closed one is a precedent to read. Within a group, seq — oldest first.
 const STATE_RANK: Record<State, number> = { 'in-progress': 0, open: 1, unreviewed: 2, done: 3, declined: 4 };
 
 function pathMatches(task: Task, queries: string[]): PathMatch[] {
@@ -152,10 +151,9 @@ export function priorArt(manifest: Manifest, tasks: Task[], paths: string[]): Pr
   const queries = paths.map(canonicalPath).filter((path) => path !== '');
 
   const claims = tasks
-    .map((task, index) => ({ task, index, on: pathMatches(task, queries) }))
+    .map((task) => ({ task, on: pathMatches(task, queries) }))
     .filter((entry) => entry.on.length > 0)
-    .sort((a, b) => STATE_RANK[a.task.state] - STATE_RANK[b.task.state] || a.index - b.index)
-    .map(({ task, on }) => ({ task, on }));
+    .sort((a, b) => STATE_RANK[a.task.state] - STATE_RANK[b.task.state] || seqRank(a.task.seq) - seqRank(b.task.seq));
 
   const concepts = allConcepts(manifest)
     .map(({ system, concept }) => ({ system: system.name, concept, on: queries.filter((query) => concept.paths.some((path) => pathsOverlap(path, query))) }))

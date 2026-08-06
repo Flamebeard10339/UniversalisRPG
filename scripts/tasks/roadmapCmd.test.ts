@@ -6,6 +6,7 @@ import { column, renderRoadmap } from './roadmapCmd';
 
 function task(overrides: Partial<Task> & { id: string }): Task {
   return {
+    seq: null,
     title: overrides.id,
     kind: 'task',
     state: 'open',

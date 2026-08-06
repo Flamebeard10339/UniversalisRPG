@@ -213,6 +213,7 @@
         "scripts/lib/architecture.test.ts",
         "scripts/lib/roadmap.ts",
         "scripts/lib/roadmap.test.ts",
+        "scripts/lib/orderIndependence.test.ts",
         "scripts/lib/bytes.ts",
         "scripts/lib/bytes.test.ts"
       ],
@@ -319,7 +320,13 @@
             "scripts/tasks/audit.ts"
           ],
           "note": "produced by brief-arrives-with-answers"
-
+        },
+        {
+          "name": "mergeable task store",
+          "paths": [
+            "scripts/lib/taskStore.ts"
+          ],
+          "note": "produced by the-task-store-survives-parallel-branches: id-sorted saveStore plus a seq field carrying creation order, so parallel branches merge per-record instead of colliding on tail-append"
         }
       ]
     },
