@@ -4,7 +4,7 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { tsxCli } from '../lib/tsxCli';
 import { parseManifest, refusalsFor } from '../mutate';
-import { auditArgsSkeleton, indexSuiteTitles, manifestNotes, mutationManifest, nextAfterPass, UNAIMED_FILE, UNRETARGETED, parseAuditArgs, parseAuditFile, parseCommitLog, slugStanding, slugStandingLines, toolLines, unresolvedTarget, type SlugStanding, type TargetResolution } from './audit';
+import { auditArgsSkeleton, hasVisibleContent, indexSuiteTitles, manifestNotes, mutationManifest, nextAfterPass, UNAIMED_FILE, UNRETARGETED, parseAuditArgs, parseAuditFile, parseCommitLog, slugStanding, slugStandingLines, toolLines, unresolvedTarget, type SlugStanding, type TargetResolution } from './audit';
 import { appendEvent, firstListedId, fixture, gitFixture, relevantFilesBlock, repoRoot, script, stepsBlock, type Run } from './cliFixtures';
 
 describe('tasks CLI', () => {
@@ -158,23 +158,48 @@ describe('tasks CLI', () => {
     });
   });
 
-  it('audit\'s interactive clause walk offers unknown as a third answer and leaves its evidence optional', () => {
+  it('audit\'s interactive clause walk offers unknown as a fourth answer and leaves its evidence optional', () => {
     fixture(({ dir }) => {
       const result = walkClauses(dir, 'unknown\n\nunmet\n\n');
       expect(result.status).toBe(0);
-      expect(result.stdout).toContain('met/unmet/unknown?');
+      expect(result.stdout).toContain('met/unmet/unknown/deferred?');
       const specText = readFileSync(path.join(dir, 'specs', 'demo-spec.md'), 'utf8');
       expect(specText).toContain('- proof 1: unknown\n');
       expect(specText).toContain('- proof 2: unmet\n');
     });
   });
 
-  it('audit\'s interactive clause walk re-asks rather than accepting an answer outside the three verdicts', () => {
+  it('audit\'s interactive clause walk re-asks rather than accepting an answer outside the four verdicts', () => {
     fixture(({ dir }) => {
       const result = walkClauses(dir, 'probably\nunknown\n\nunknown\n\n');
       expect(result.status).toBe(0);
-      expect(result.stdout).toContain('type "met", "unmet" or "unknown"');
+      expect(result.stdout).toContain('type "met", "unmet", "unknown" or "deferred"');
       expect(readFileSync(path.join(dir, 'specs', 'demo-spec.md'), 'utf8')).toContain('- proof 1: unknown');
+    });
+  });
+
+  it('audit\'s interactive clause walk holds a deferred verdict until a reason is typed, and it survives to the spec file', () => {
+    fixture(({ dir }) => {
+      const result = walkClauses(dir, 'deferred\n\nthe goal still holds without it\nmet\nread the diff\n');
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('reason (required for deferred)');
+      const specText = readFileSync(path.join(dir, 'specs', 'demo-spec.md'), 'utf8');
+      expect(specText).toContain('- proof 1: deferred — the goal still holds without it');
+      expect(specText).toContain('- proof 2: met — read the diff');
+    });
+  });
+
+  // The third route the visible-content guard has to hold on: a lone
+  // zero-width space typed at the prompt re-asks the same way a blank
+  // answer does, rather than being accepted as a truthy, unreadable reason.
+  it('audit\'s interactive clause walk re-asks on an invisible-only reason, and accepts once real content follows it', () => {
+    fixture(({ dir }) => {
+      const result = walkClauses(dir, 'deferred\n\n​\nreal reason\nmet\nread the diff\n');
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('reason (required for deferred)');
+      const specText = readFileSync(path.join(dir, 'specs', 'demo-spec.md'), 'utf8');
+      expect(specText).toContain('- proof 1: deferred — real reason');
+      expect(specText).toContain('- proof 2: met — read the diff');
     });
   });
 
@@ -428,7 +453,8 @@ describe('tasks CLI', () => {
       expect(result.stdout).toContain('latest verdict: unknown — nobody has graded this clause');
       expect(result.stdout).toContain('Latest audit pass: pass 1');
       expect(result.stdout).toContain('outstanding: c2 (unknown)');
-      expect(stepsBlock(result.stdout)).toContain('unknown — nobody looked. Recording unmet instead hides that nothing was verified.');
+      expect(stepsBlock(result.stdout)).toContain('unknown  — nobody looked. Recording unmet instead hides that nothing was verified.');
+      expect(stepsBlock(result.stdout)).toContain('deferred — you checked, it fails, and the goal above still holds without it.');
       expect(result.stdout).not.toMatch(/\d+\/\d+ met/);
     });
   });
@@ -794,6 +820,21 @@ describe('tasks CLI', () => {
     expect(parsed.findings[0].files).toEqual([]);
   });
 
+  // The clause-scoped `N=value` shape is assembled in one place — `clauseScoped`
+  // — regardless of which transport handed it the raw string, so a
+  // whitespace-only value is caught there rather than by every reader of the
+  // map it fills. Interior structure survives: only the outer whitespace goes.
+  it('trims a clause-scoped value\'s outer whitespace to nothing, but leaves interior lines and words alone', () => {
+    const whitespaceOnly = parseAuditArgs(['demo-spec', '--proof', '1=met', '--evidence', '1=   ']);
+    expect(whitespaceOnly.evidence.get(1)).toBe('');
+
+    const padded = parseAuditArgs(['demo-spec', '--proof', '1=met', '--evidence', '1=  checked directly  ']);
+    expect(padded.evidence.get(1)).toBe('checked directly');
+
+    const multiline = parseAuditArgs(['demo-spec', '--proof', '1=met', '--evidence', '1=\nfirst line\nsecond line\n']);
+    expect(multiline.evidence.get(1)).toBe('first line\nsecond line');
+  });
+
   it('--file on a proof clause carries multiple paths onto its undelivered task, and stays separate from a finding\'s own --file', async () => {
     await fixture(async ({ tasks, audit }) => {
       await audit(
@@ -859,6 +900,269 @@ describe('tasks CLI', () => {
       const undelivered = tasks('list', '--kind', 'undelivered', '--spec', 'demo-spec');
       expect((undelivered.stdout.match(/demo-spec-clause-1/g) ?? []).length).toBe(1);
       expect(undelivered.stdout).toContain('1 task(s)');
+    });
+  });
+});
+
+// c1-c4: `deferred` is a fourth verdict that costs a reason, does not count
+// as outstanding, and converts the clause into a tracked `undelivered`
+// record rather than deleting it.
+describe('a deferred clause', () => {
+  it('c2: is refused with no reason, and records nothing', async () => {
+    await fixture(async ({ tasks, dir, audit }) => {
+      const specPath = path.join(dir, 'specs', 'demo-spec.md');
+      const before = readFileSync(specPath, 'utf8');
+
+      const result = await audit('demo-spec', '--proof', '1=deferred', '--proof', '2=met', '--evidence', '2=clause 2 checked');
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain('clause 1 is deferred with no reason');
+      expect(readFileSync(specPath, 'utf8')).toBe(before);
+      expect(tasks('list', '--kind', 'undelivered').stdout).toContain('0 task(s)');
+    });
+  });
+
+  // Whitespace is not a reason: `--evidence N="   "` must be refused the same
+  // way no `--evidence` at all is, for both a deferral and a met claim —
+  // `clauseScoped` trims at the point the value is assembled, so every reader
+  // downstream sees the same absence rather than each having to re-check.
+  it('c2: whitespace-only evidence is refused the same way no evidence is, for met as well as deferred', async () => {
+    await fixture(async ({ tasks, dir, audit }) => {
+      const specPath = path.join(dir, 'specs', 'demo-spec.md');
+      const before = readFileSync(specPath, 'utf8');
+
+      const deferred = await audit('demo-spec', '--proof', '1=deferred', '--evidence', '1=   ', '--proof', '2=met', '--evidence', '2=clause 2 checked');
+      expect(deferred.status).toBe(1);
+      expect(deferred.stderr).toContain('clause 1 is deferred with no reason');
+
+      const met = await audit('demo-spec', '--proof', '1=met', '--evidence', '1=\t \t', '--proof', '2=met', '--evidence', '2=clause 2 checked');
+      expect(met.status).toBe(1);
+      expect(met.stderr).toContain('clause 1 is met with no evidence');
+
+      expect(readFileSync(specPath, 'utf8')).toBe(before);
+      expect(tasks('list', '--kind', 'undelivered').stdout).toContain('0 task(s)');
+    });
+  });
+
+  // The promise is "a reason a human can read", not "non-empty after
+  // `.trim()`" — `.trim()` strips Unicode whitespace only, so a lone
+  // zero-width or other invisible-format character survives it as a
+  // non-empty string that no reader can see. Several different such
+  // characters, not one, because a test that only tries the character
+  // `trim()` is documented to strip cannot tell "the guard checks
+  // visibility" apart from "the guard checks `.trim()`, which happens not
+  // to strip this one either."
+  it('c2: an invisible-only reason is refused, for several different invisible characters, not just whitespace', async () => {
+    await fixture(async ({ tasks, audit }) => {
+      const invisible = ['​', '‌', '‍', '­', '⁠', '﻿'];
+      for (const character of invisible) {
+        const deferred = await audit('demo-spec', '--proof', `1=deferred`, '--evidence', `1=${character}`, '--proof', '2=met', '--evidence', '2=clause 2 checked');
+        expect(deferred.stderr).toContain('clause 1 is deferred with no reason');
+
+        const met = await audit('demo-spec', '--proof', '1=met', '--evidence', `1=${character}${character}`, '--proof', '2=met', '--evidence', '2=clause 2 checked');
+        expect(met.stderr).toContain('clause 1 is met with no evidence');
+      }
+      expect(tasks('list', '--kind', 'undelivered').stdout).toContain('0 task(s)');
+    });
+  });
+
+  // A control character commands the renderer rather than rendering — ESC
+  // can open a live ANSI sequence that paints a later reader's terminal, BEL
+  // rings it — which is worse than an unreadable reason, not merely
+  // equivalent to one. Only NUL happens to be caught downstream by
+  // merge-ready's byte gate; BEL, ESC and DEL are not, so the guard has to
+  // refuse the whole category itself.
+  it('c2: a reason made only of control characters (NUL, BEL, ESC, DEL) is refused, not just invisible-format ones', async () => {
+    await fixture(async ({ tasks, audit }) => {
+      const control = ['\u0000', '\u0007', '\u001B', '\u007F'];
+      for (const character of control) {
+        const deferred = await audit('demo-spec', '--proof', `1=deferred`, '--evidence', `1=${character}`, '--proof', '2=met', '--evidence', '2=clause 2 checked');
+        expect(deferred.stderr).toContain('clause 1 is deferred with no reason');
+      }
+      expect(tasks('list', '--kind', 'undelivered').stdout).toContain('0 task(s)');
+    });
+  });
+
+  // `\p{Cf}` was a proxy for "occupies no space when rendered", and
+  // thirty-seven codepoints are default-ignorable while sitting in category
+  // Mn or Lo, so the proxy missed them: variation selectors (VS16, the
+  // ordinary emoji-presentation selector, among them), the combining
+  // grapheme joiner, the Hangul filler jamo, Khmer inherent vowel signs,
+  // Mongolian free variation selectors. `\p{Default_Ignorable_Code_Point}`
+  // is the property Unicode defines to mean exactly the sentence this guard
+  // states, rather than a general category standing in for it.
+  it('c2: a reason made only of default-ignorable characters outside category Cf is refused (VS16, CGJ, Hangul filler jamo, Khmer inherent vowel sign, Mongolian free variation selector)', async () => {
+    await fixture(async ({ tasks, audit }) => {
+      const defaultIgnorableOutsideCf = ['️️', '͏', 'ㅤ', '឴', '᠋'];
+      for (const reason of defaultIgnorableOutsideCf) {
+        const deferred = await audit('demo-spec', '--proof', '1=deferred', '--evidence', `1=${reason}`, '--proof', '2=met', '--evidence', '2=clause 2 checked');
+        expect(deferred.stderr).toContain('clause 1 is deferred with no reason');
+      }
+      expect(tasks('list', '--kind', 'undelivered').stdout).toContain('0 task(s)');
+    });
+  });
+
+  // Pass 3 evaluated and rejected these as candidates for further exclusion:
+  // each is visible — occupies space when rendered — even though it looks
+  // nothing like ordinary prose, and the guard must keep accepting all four.
+  // Locked in here so a future narrowing pass has something to break before
+  // it can land.
+  it('accepts a reason that is visible but unusual: one punctuation mark, a long run of one character, a lone combining mark, or an unpaired surrogate', async () => {
+    await fixture(async ({ audit }) => {
+      const legitimateButUgly = ['.', 'x'.repeat(80), '́', '\ud800'];
+      for (const reason of legitimateButUgly) {
+        const result = await audit('demo-spec', '--proof', '1=deferred', '--evidence', `1=${reason}`, '--proof', '2=met', '--evidence', '2=clause 2 checked');
+        expect(result.status).toBe(0);
+      }
+    });
+  });
+
+  // `Default_Ignorable_Code_Point` is broader than `Cf`, and broader is
+  // where over-strictness would come from — this is what pass 4 checked and
+  // reported clean, confirmed independently here rather than taken on
+  // faith. Multi-script prose, an emoji sequence with a real glyph, and a
+  // sequence of only joiners with no glyph at all are the three shapes that
+  // would tell the two properties apart if the swap had gone wrong.
+  it('does not over-exclude: multi-script prose and glyph-bearing emoji sequences are accepted, a string of bare joiners with none is refused', async () => {
+    await fixture(async ({ tasks, audit }) => {
+      const prose = ['原因', 'سبب', 'סיבה', 'कारण'];
+      for (const reason of prose) {
+        const result = await audit('demo-spec', '--proof', '1=deferred', '--evidence', `1=${reason}`, '--proof', '2=met', '--evidence', '2=clause 2 checked');
+        expect(result.status).toBe(0);
+      }
+
+      // A four-person family emoji and a rainbow flag: both are chains of
+      // default-ignorable ZERO WIDTH JOINERs threaded between real glyphs
+      // (people, a flag, a rainbow), and accept on the strength of those
+      // glyphs rather than the joiners.
+      const emoji = ['👨‍👩‍👧‍👦', '🏳️‍🌈'];
+      for (const reason of emoji) {
+        const result = await audit('demo-spec', '--proof', '1=deferred', '--evidence', `1=${reason}`, '--proof', '2=met', '--evidence', '2=clause 2 checked');
+        expect(result.status).toBe(0);
+      }
+
+      const bareJoiners = await audit('demo-spec', '--proof', '1=deferred', '--evidence', `1=${'‍'.repeat(3)}`, '--proof', '2=met', '--evidence', '2=clause 2 checked');
+      expect(bareJoiners.stderr).toContain('clause 1 is deferred with no reason');
+      // Every accepted deferral above reuses the one open undelivered
+      // record for clause 1; the refused bareJoiners attempt adds none.
+      expect(tasks('list', '--kind', 'undelivered').stdout).toContain('1 task(s)');
+    });
+  });
+
+  it('hasVisibleContent: true only when a character survives stripping whitespace, Default_Ignorable_Code_Point and control (Cc) characters', () => {
+    for (const invisible of [
+      '',
+      '   ',
+      '\t\n',
+      '​',
+      '‌',
+      '‍',
+      '­',
+      '⁠',
+      '﻿',
+      ' ​\t‍ ',
+      '\u0000',
+      '\u0007',
+      '\u001B',
+      '\u007F',
+      '️️',
+      '͏',
+      'ㅤ',
+      '឴',
+      '᠋',
+      '‍‍‍',
+    ]) {
+      expect(hasVisibleContent(invisible)).toBe(false);
+    }
+    expect(hasVisibleContent(null)).toBe(false);
+    for (const visible of ['x', ' x ', '​x​', 'a reason a human can read', '.', 'x'.repeat(80), '́', '\ud800', '原因', '👨‍👩‍👧‍👦', '🏳️‍🌈']) {
+      expect(hasVisibleContent(visible)).toBe(true);
+    }
+  });
+
+
+  // The fix has to survive the transport that motivated it: `--args-from`
+  // joins a continuation onto the flag's own line with a newline, and a
+  // multi-line reason must round-trip whole — only the block's own leading
+  // and trailing whitespace goes.
+  it('trims only the outer whitespace of a multi-line reason read from --args-from, keeping its interior lines intact', async () => {
+    await fixture(async ({ dir, tasks, audit }) => {
+      const passFile = path.join(dir, 'pass.txt');
+      writeFileSync(passFile, ['--proof 1=deferred', '--evidence 1=  the goal is served without it:', '  see the diff for the reasoning', '--proof 2=met', '--evidence 2=clause 2 checked'].join('\n'), 'utf8');
+      const result = await audit('demo-spec', '--args-from', passFile);
+      expect(result.status).toBe(0);
+
+      const specText = readFileSync(path.join(dir, 'specs', 'demo-spec.md'), 'utf8');
+      expect(specText).toContain('- proof 1: deferred — the goal is served without it:\n  see the diff for the reasoning');
+
+      expect(tasks('show', 'demo-spec-clause-1').stdout).toContain('the goal is served without it:');
+    });
+  });
+
+  it('c3/c4: is not outstanding, and converts into a tracked undelivered record with no spec — doctor accepts it', async () => {
+    await fixture(async ({ tasks, dir, audit }) => {
+      const result = await audit('demo-spec', '--proof', '1=deferred', '--evidence', '1=the goal is still served without it', '--proof', '2=met', '--evidence', '2=clause 2 checked');
+      expect(result.status).toBe(0);
+      expect(result.stdout).not.toContain('outstanding:');
+      expect(result.stdout).toContain('no clause outstanding');
+      expect(result.stdout).toContain('1 clause(s) deferred');
+
+      const specText = readFileSync(path.join(dir, 'specs', 'demo-spec.md'), 'utf8');
+      expect(specText).toContain('- proof 1: deferred — the goal is still served without it');
+
+      const standing = tasks('spec', 'show', 'demo-spec');
+      expect(standing.stdout).toContain('clause standing (latest pass 1): no clause outstanding');
+      expect(standing.stdout).toContain('[deferred]');
+
+      const undelivered = tasks('show', 'demo-spec-clause-1');
+      expect(undelivered.stdout).toContain('[undelivered/open/high]');
+      expect(undelivered.stdout).toContain('spec: (deferred)');
+      expect(undelivered.stdout).toContain('evidence: the goal is still served without it');
+
+      // Not lost: still findable in the general backlog, not folded into
+      // this spec's own member list.
+      expect(tasks('list', '--deferred').stdout).toContain('demo-spec-clause-1');
+      expect(tasks('spec', 'show', 'demo-spec').stdout).not.toContain('2 member(s)');
+
+      const doctor = tasks('doctor');
+      expect(doctor.status).toBe(0);
+      expect(doctor.stdout).toContain('0 error(s)');
+    });
+  });
+
+  it("names its owner in `spec show`, even though it left the spec's own membership", async () => {
+    await fixture(async ({ tasks, audit }) => {
+      await audit('demo-spec', '--proof', '1=deferred', '--evidence', '1=covered elsewhere', '--proof', '2=met', '--evidence', '2=clause 2 checked');
+      const shown = tasks('spec', 'show', 'demo-spec').stdout;
+      expect(shown).toContain('owed by: demo-spec-clause-1 (open)');
+    });
+  });
+});
+
+// c5/c6: a spec carries a goal, the brief prints it, and the step where
+// verdicts are assigned asks the question that licenses a deferral.
+describe("a spec's goal", () => {
+  it('c5: is printed by audit-prompt without opening the file', async () => {
+    await fixture(async ({ dir, tasks }) => {
+      const specPath = path.join(dir, 'specs', 'demo-spec.md');
+      writeFileSync(specPath, readFileSync(specPath, 'utf8').replace('## Decisions', '## Goal\n\nKeep the gate honest without losing the honest way to drop scope.\n\n## Decisions'), 'utf8');
+      const result = tasks('audit-prompt', 'demo-spec');
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('Goal: Keep the gate honest without losing the honest way to drop scope.');
+    });
+  });
+
+  it('says plainly that none is recorded, rather than staying silent, when the spec carries no ## Goal', async () => {
+    await fixture(async ({ tasks }) => {
+      const result = tasks('audit-prompt', 'demo-spec');
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('Goal: (none recorded');
+    });
+  });
+
+  it('c6: the step where verdicts are assigned asks whether the goal still holds before a clause is dropped', async () => {
+    await fixture(async ({ tasks }) => {
+      const result = tasks('audit-prompt', 'demo-spec');
+      expect(stepsBlock(result.stdout)).toContain('Ask this before recording unmet: does the goal still hold if this clause is never met?');
     });
   });
 });

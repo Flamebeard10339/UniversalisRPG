@@ -415,8 +415,10 @@ export function auditArgsSkeleton(slug: string, clauses: ProofClause[], pass: nu
     '# One flag per line. A line that does not open with -- continues the value above it,',
     '# which is how a clause\'s evidence can be a paragraph. `#` at column zero is a comment.',
     '',
-    '# met | unmet | unknown. `met` needs evidence the next pass can re-run and is refused',
-    '# without one; `unmet` means you checked and it fails; `unknown` means nobody looked.',
+    '# met | unmet | unknown | deferred. `met` needs evidence the next pass can re-run and is',
+    '# refused without one; `unmet` means you checked and it fails; `unknown` means nobody looked;',
+    '# `deferred` means you checked, it fails, and the goal this brief printed still holds without',
+    '# it — refused with no reason, and converts the clause into a tracked undelivered record.',
     '',
   ];
   for (const clause of clauses) {
@@ -589,6 +591,10 @@ export function cmdAuditPrompt(args: Flags, usage: string): void {
 
   console.log(`You are auditing ${slug} on branch ${config.branch}.`);
   console.log(`Spec: ${path_}`);
+  // Printed here, not left for step 1's full read, because it is what a
+  // deferred verdict is judged against — an auditor deciding that in step 3
+  // should not have had to open the file to find it.
+  console.log(`Goal: ${doc.goal ?? `(none recorded — add a \`## Goal\` line to ${path_}; a deferral has nothing to weigh against without one)`}`);
   console.log(`Diff range: ${base}..${head}`);
   const standing = slugStanding({
     slug,
@@ -620,9 +626,10 @@ export function cmdAuditPrompt(args: Flags, usage: string): void {
   console.log(`1. Read ${path_} in full. \`## Deliverable\` is the argument the clauses promise about, \`## Decisions\` are settled and not to be reopened, \`## Audit passes\` is what earlier passes found.`);
   console.log('2. Read the diff over the range above. Do not assume the implementation approach is correct; verify each clause independently.');
   console.log('3. Grade every clause under `Proof clauses:` below.');
-  console.log('     met     — you have evidence the next pass can re-run. The tool refuses met without one.');
-  console.log('     unmet   — you checked and it fails.');
-  console.log('     unknown — nobody looked. Recording unmet instead hides that nothing was verified.');
+  console.log('     met      — you have evidence the next pass can re-run. The tool refuses met without one.');
+  console.log('     unmet    — you checked and it fails.');
+  console.log('     unknown  — nobody looked. Recording unmet instead hides that nothing was verified.');
+  console.log('     deferred — you checked, it fails, and the goal above still holds without it. Ask this before recording unmet: does the goal still hold if this clause is never met? If yes, deferred is available — never a synonym for unmet. The tool refuses it with no reason, and converts the clause into a tracked undelivered record rather than dropping it.');
   console.log(`4. Mutation-test every clause carrying a proof target. Set each entry's \`file\` and \`find\` to the line that clause is about — that judgement is the whole exercise and nothing here makes it for you — then \`npm run mutate -- <it>\`.`);
   console.log(`     ${manifest.path ?? 'no manifest was written; see `Mutation manifest:` below for why'}`);
   console.log('5. Answer the regression question: is anything worse than before this branch? Clause-by-clause verification cannot see this — each clause looks fine in isolation. Diff the behavior, not the promise.');
@@ -734,11 +741,35 @@ const CONFIG_FLAG_NAMES = new Set(['store', 'systems', 'specs-dir', 'branch', 'a
 // The clause-scoped `N=value` shape --proof, --file and --evidence share
 // before any --finding opens. One parser for it: the two `--evidence`
 // branches used to each carve the `N=` prefix off by hand, and drifted.
+// The value is assembled here, so this is where it is trimmed: outer
+// whitespace only, never the interior, because `--args-from` joins a
+// continuation onto the line above it with a newline and a multi-line
+// reason must survive that untouched.
 function clauseScoped(raw: string): { clause: number; value: string } | null {
   const eq = raw.indexOf('=');
   if (eq <= 0) return null;
   const clause = Number(raw.slice(0, eq));
-  return Number.isFinite(clause) ? { clause, value: raw.slice(eq + 1) } : null;
+  return Number.isFinite(clause) ? { clause, value: raw.slice(eq + 1).trim() } : null;
+}
+
+// A reason must contain at least one character that occupies space when
+// rendered and does not command the renderer. Whitespace (`\s`) occupies
+// nothing; `Default_Ignorable_Code_Point` — the Unicode property that
+// defines "occupies no space when rendered", covering ZERO WIDTH SPACE and
+// its Cf kin plus the Mn/Lo outliers a general category alone misses
+// (variation selectors including VS16, COMBINING GRAPHEME JOINER, the
+// Hangul filler jamo, Khmer inherent vowel signs, Mongolian free variation
+// selectors) — renders nothing; category Cc (NUL, BEL, ESC, DEL and their
+// kin — control characters) commands the renderer rather than rendering, up
+// to and including painting colour codes or ringing a bell when the file is
+// later read. Everything else is a legitimate reason, however ugly: a
+// single punctuation mark, a long run of one character, a lone combining
+// mark, an unpaired surrogate (replaced by U+FFFD on write, visible by the
+// time it lands). This line is drawn and stays drawn — no further
+// exclusions.
+const VISIBLE_CHARACTER = /[^\s\p{Default_Ignorable_Code_Point}\p{Cc}]/u;
+export function hasVisibleContent(text: string | null): boolean {
+  return text !== null && VISIBLE_CHARACTER.test(text);
 }
 
 // Repeated --proof/--evidence/--finding flags need a dedicated scanner: the
@@ -860,7 +891,7 @@ function readAuditFile(raw: string[]): { argv: string[]; rest: string[]; errors:
 }
 
 export const AUDIT_USAGE =
-  `usage: tasks audit <spec> [--args-from <file>] [--base-branch main] [--actor <name>] [--proof N=met|unmet|unknown ...] [--evidence N="..." ... (required for every met clause)] [--file N=path:line ...] [--finding "..." --severity high|medium|low --system "<name>" --deliverable "..." --evidence "..." [--file path:line ...]]...  (a file of the same flags, one per line, with any unprefixed line continuing the value above it — which is how a pass carrying evidence specific enough to re-run gets past the command-line length limit. With no --proof flags and no findings, walks the clauses interactively; findings with no --proof flags are filed without recording a pass, so late findings never reset verdicts; a clause left ungraded is recorded unknown, never unmet)`;
+  `usage: tasks audit <spec> [--args-from <file>] [--base-branch main] [--actor <name>] [--proof N=met|unmet|unknown|deferred ...] [--evidence N="..." ... (required for every met or deferred clause)] [--file N=path:line ...] [--finding "..." --severity high|medium|low --system "<name>" --deliverable "..." --evidence "..." [--file path:line ...]]...  (a file of the same flags, one per line, with any unprefixed line continuing the value above it — which is how a pass carrying evidence specific enough to re-run gets past the command-line length limit. With no --proof flags and no findings, walks the clauses interactively; findings with no --proof flags are filed without recording a pass, so late findings never reset verdicts; a clause left ungraded is recorded unknown, never unmet; deferred converts a clause into a tracked undelivered record rather than dropping it, and is refused with no reason)`;
 
 // Stops at the first clause the answerer walks away from rather than
 // looping on an exhausted stdin, and the caller grades the rest `unknown` —
@@ -872,21 +903,29 @@ async function walkClausesInteractively(clauses: ProofClause[]): Promise<AuditVe
     console.log(`\nclause ${clause.id}: ${clause.text}`);
     let status: Verdict | null = null;
     while (status === null && !prompter.exhausted()) {
-      const answer = (await prompter.ask('met/unmet/unknown? ')).trim().toLowerCase();
+      const answer = (await prompter.ask('met/unmet/unknown/deferred? ')).trim().toLowerCase();
       if (VERDICTS.includes(answer as Verdict)) status = answer as Verdict;
-      else if (!prompter.exhausted()) console.log('type "met", "unmet" or "unknown"');
+      else if (!prompter.exhausted()) console.log('type "met", "unmet", "unknown" or "deferred"');
     }
     if (status === null) break;
-    // A met verdict is a completion claim, so it is held until the claim
-    // names something the next auditor can re-run; unmet and unknown claim
-    // nothing and an empty answer records nothing.
+    // A met verdict is a completion claim and a deferred one is a scope
+    // decision, so both are held until the claim names something the next
+    // pass can re-run; unmet and unknown claim nothing and an empty answer
+    // records nothing.
+    const needsReason = status === 'met' || status === 'deferred';
     let evidenceText: string | null = null;
-    while (evidenceText === null && !prompter.exhausted()) {
-      evidenceText = (await prompter.ask(status === 'met' ? 'evidence (required for met): ' : 'evidence (optional): ')).trim() || null;
-      if (status !== 'met') break;
-      if (evidenceText === null && !prompter.exhausted()) console.log('a met verdict needs evidence the next pass can re-run');
+    if (needsReason) {
+      let visible = false;
+      while (!visible && !prompter.exhausted()) {
+        const answer = (await prompter.ask(status === 'met' ? 'evidence (required for met): ' : 'reason (required for deferred): ')).trim();
+        visible = hasVisibleContent(answer);
+        if (visible) evidenceText = answer;
+        else if (!prompter.exhausted()) console.log(status === 'met' ? 'a met verdict needs evidence the next pass can re-run' : 'a deferred verdict needs a reason the next pass can re-run');
+      }
+      if (!visible) break;
+    } else {
+      evidenceText = (await prompter.ask('evidence (optional): ')).trim() || null;
     }
-    if (status === 'met' && evidenceText === null) break;
     verdicts.push({ clause: clause.id, status, evidence: evidenceText });
   }
   prompter.close();
@@ -1053,9 +1092,15 @@ export async function cmdAudit(args: Flags, usage: string): Promise<void> {
   const verdicts = clauseStandings(doc.proofClauses, graded);
   const ungraded = verdicts.filter((verdict) => verdict.status === 'unknown').map((verdict) => `c${verdict.clause}`);
 
-  const unevidenced = verdicts.filter((verdict) => verdict.status === 'met' && !verdict.evidence);
+  // `deferred` needs the same hold `met` does, for the opposite reason: `met`
+  // is a completion claim and `deferred` is a scope decision, and neither is
+  // recordable on a shrug. Without this, `deferred` would just be a cheaper
+  // way to say `unmet`.
+  const unevidenced = verdicts.filter((verdict) => (verdict.status === 'met' || verdict.status === 'deferred') && !hasVisibleContent(verdict.evidence));
   if (unevidenced.length > 0) {
-    console.error(`error: ${unevidenced.map((verdict) => `clause ${verdict.clause} is met with no evidence`).join('; ')} — pass --evidence N="..." naming what you checked, so the next pass can re-run it`);
+    console.error(
+      `error: ${unevidenced.map((verdict) => (verdict.status === 'met' ? `clause ${verdict.clause} is met with no evidence` : `clause ${verdict.clause} is deferred with no reason`)).join('; ')} — pass --evidence N="..." naming what you checked or why the goal still holds, so the next pass can re-run it`,
+    );
     process.exitCode = 1;
     return;
   }
@@ -1074,8 +1119,10 @@ export async function cmdAudit(args: Flags, usage: string): Promise<void> {
 
   const created: Array<{ task: Task; note: string }> = [];
   let undeliveredCreated = 0;
+  let deferredCreated = 0;
   for (const verdict of verdicts) {
-    if (verdict.status !== 'unmet') continue;
+    const deferred = verdict.status === 'deferred';
+    if (verdict.status !== 'unmet' && !deferred) continue;
     const baseId = `${slug}-clause-${verdict.clause}`;
     if (tasks.some((task) => task.id === baseId && task.state === 'open')) continue;
     const id = taken.has(baseId) ? `${baseId}-pass-${passNumber}` : baseId;
@@ -1083,12 +1130,18 @@ export async function cmdAudit(args: Flags, usage: string): Promise<void> {
     const undelivered: Task = {
       id,
       seq: nextSeq(tasks),
-      title: `Unmet deliverable clause ${verdict.clause}: ${clauseText}`,
+      title: `${deferred ? 'Deferred' : 'Unmet'} deliverable clause ${verdict.clause}: ${clauseText}`,
       kind: 'undelivered',
       state: 'open',
       severity: 'high',
       system: null,
-      spec: slug,
+      // A deferred clause converts rather than staying owed: `spec: null` is
+      // the store's existing shape for "tracked, not a member of any spec" —
+      // render already prints it as `(deferred)` — so the record leaves
+      // merge-ready's spec leg the same way it left the clauses leg, without
+      // a second field to say so. `source.spec` still names the spec it fell
+      // out of, which is where an owner search over that spec finds it.
+      spec: deferred ? null : slug,
       clause: verdict.clause,
       requires: [],
       writes: [],
@@ -1109,8 +1162,9 @@ export async function cmdAudit(args: Flags, usage: string): Promise<void> {
     };
     tasks.push(undelivered);
     taken.add(id);
-    created.push({ task: undelivered, note: `created by ${slug} pass ${passNumber} for unmet clause ${verdict.clause}` });
-    undeliveredCreated++;
+    created.push({ task: undelivered, note: `created by ${slug} pass ${passNumber} for ${deferred ? 'deferred' : 'unmet'} clause ${verdict.clause}` });
+    if (deferred) deferredCreated++;
+    else undeliveredCreated++;
   }
 
   let findingsCreated = 0;
@@ -1135,6 +1189,7 @@ export async function cmdAudit(args: Flags, usage: string): Promise<void> {
   console.log(`recorded pass ${passNumber} for ${slug}: ${outstandingSummary(verdicts)}`);
   if (text !== original) console.log(`tagged ${slug}'s proof clauses [cN] — the tag is the clause's identity, so keep it when you reword or reorder`);
   if (undeliveredCreated > 0) console.log(`${undeliveredCreated} undelivered task(s) created for unmet clauses`);
+  if (deferredCreated > 0) console.log(`${deferredCreated} clause(s) deferred — tracked as undelivered work with no spec, no longer outstanding against ${slug}`);
   if (ungraded.length > 0) console.log(`${ungraded.length} clause(s) recorded unknown — nobody graded them: ${ungraded.join(', ')}. No undelivered task was created, because an ungraded clause is not a broken promise`);
   if (findingsCreated > 0) console.log(`${findingsCreated} finding(s) recorded, unreviewed`);
   console.log(nextAfterPass(undeliveredCreated > 0 || ungraded.length > 0));

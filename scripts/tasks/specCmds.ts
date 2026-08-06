@@ -15,6 +15,10 @@ Proof:
 
 - <a checkable clause>
 
+## Goal
+
+<one line: what this branch is for, distinct from the paragraph above>
+
 ## Decisions
 
 ## Open questions
@@ -160,11 +164,14 @@ export function cmdSpecShow(args: Flags, usage: string): void {
 // Clause number to the members that promised it. An `undelivered` record is
 // a promise about its own clause and belongs here too — it is the one record
 // type that already carried the number, and leaving it out would report a
-// clause as unowned while a record about it sits open in the spec.
+// clause as unowned while a record about it sits open in the spec. A
+// deferred clause's `undelivered` record names no spec — that is what took
+// it off this spec's open-member count — so it is found by `source.spec`
+// instead, the same field that already says which pass produced it.
 export function clauseOwners(tasks: Task[], spec: string): Map<number, Task[]> {
   const owners = new Map<number, Task[]>();
   for (const task of tasks) {
-    if (task.spec !== spec) continue;
+    if (task.spec !== spec && !(task.kind === 'undelivered' && task.source?.spec === spec)) continue;
     for (const clause of clausesOf(task)) {
       owners.set(clause, [...(owners.get(clause) ?? []), task]);
     }

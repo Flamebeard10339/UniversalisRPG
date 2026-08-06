@@ -329,6 +329,14 @@
           "note": "produced by the-task-store-survives-parallel-branches: id-sorted saveStore plus a seq field carrying creation order, so parallel branches merge per-record instead of colliding on tail-append"
         },
         {
+          "name": "clause deferral",
+          "paths": [
+            "scripts/lib/specDoc.ts",
+            "scripts/tasks/audit.ts"
+          ],
+          "note": "produced by a-clause-can-be-deferred-and-a-spec-can-carry-its-goal"
+        },
+        {
           "name": "non-interactive triage",
           "paths": [
             "scripts/tasks/triage.ts",
