@@ -438,3 +438,34 @@ runs through `new Function`, not tsx's transform), so a first draft with TypeScr
 annotations in the body failed with an unhelpful "neither an expression nor a body of statements"
 parse error before I dropped the annotations. Worth noting for the next pass that reaches for it.
 
+## 2026-08-06, auditing `a-clause-can-be-deferred-and-a-spec-can-carry-its-goal` (pass 2)
+
+### The hand-built mutation manifest and `cliFixtures.ts`'s `fixture()` both paid off again; the
+### bypass this pass found lived one layer below where pass 1 stopped — inside `trim()` itself
+
+`audit-prompt` again wrote no manifest for the same reason as pass 1 (`proof:` names a file, not a
+test); building the seven-entry manifest by hand cost about ten minutes, reusing the exact
+`file`/`find` targets the brief's own proof text pointed at for six of the seven entries, and all
+seven KILLED at their own named `it(...)`, no escalation — a clean read both passes running.
+
+The brief's framing ("tabs, newlines, non-breaking or zero-width characters, a value that is only
+punctuation") was the whole finding: `clauseScoped`'s fix trims `String.prototype.trim()`, which
+strips ECMA-262 `WhiteSpace`/`LineTerminator` — that set happens to include NBSP (U+00A0) and BOM
+(U+FEFF), so those are closed for free — but not the Unicode zero-width/format family (U+200B
+zero-width space, U+200C/U+200D ZWNJ/ZWJ, U+00AD soft hyphen, U+2060 word joiner, U+200E LRM,
+U+180E). A bare zero-width space as `--evidence` trims to a one-character non-empty string and
+sails through the same `!verdict.evidence` check pass 1 found bypassed, indistinguishable from
+empty in a terminal, an editor, or the merged spec file. `node -e` one-liners found the character
+class in under five minutes (`"​".trim().length` is 1, not 0); confirming it against the real
+CLI needed three short scratch `.test.ts` files built on `cliFixtures.ts`'s `fixture()` and
+`auditWith()` (one per input route: direct flag, `--args-from` file, interactive walk piped
+through `auditWith`), each written, run once with `--reporter=verbose` to read the captured
+`console.log` output, then deleted — `fixture()`'s exposed `audit`/`auditWith` helpers made this
+faster than the git-scratch-repo route pass 1 needed, since the whitespace-string quoting problem
+pass 1 hit doesn't apply to a value that's a single non-ASCII character typed directly into a
+`.ts` file. `auditWith`'s first positional argument is the piped stdin, not part of `args`; passed
+no spec slug on the first attempt and got the command's own usage string back rather than a
+clause prompt, cost about two minutes to notice the fixture's calling convention (`args` needs
+`'demo-spec'` first, same as `audit`) from an adjacent passing test rather than from an error
+message naming the omission.
+
