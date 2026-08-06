@@ -753,3 +753,41 @@ one (duplicate ids masking new content under an existing id) is a real but narro
 the side the branch's own design already declares safe, and it did not need a filed finding because
 nothing downstream treats it as anything worse than "audit this spec you didn't need to."
 
+## 2026-08-06, auditing `a-clause-can-be-deferred-and-a-spec-can-carry-its-goal` (pass 5)
+
+### `audit-prompt` itself cost a round: its own WARNING was wrong, and believing it would have
+### thrown away the whole audit
+
+`audit-prompt` opened with "WARNING: this branch is working run-an-orchestrator-over-three-parallel-tasks,
+not a-clause-can-be-deferred-and-a-spec-can-carry-its-goal" and, following from that, refused to
+write a mutation manifest or an args skeleton and told step 7 to end with "Do not file a pass." Taken
+at face value this ends the audit before it starts — the brief's own instruction is "do exactly what
+it says." Checking it instead of trusting it cost roughly the first third of the session: `git diff
+--name-only` on the printed range, `git log -S` on the line that produces the warning, reading
+`mergeReady.ts`'s `decideSpec`/`touchedWriteRegion` and its doc comments, and finally running
+`npm run tasks -- merge-ready` directly, which resolves the same question correctly — "spec chosen
+by the gate: a-clause-can-be-deferred-and-a-spec-can-carry-its-goal — run-an-orchestrator-over-three-parallel-tasks
+was not shown to be touched by this branch's diff." Root cause: `docs/events.jsonl` carried one
+uncommitted `note` event, written during this branch's own merge-conflict resolution, misfiled under
+the orchestrator spec's id instead of left unspecced. `audit-prompt`'s `branchSpec` reads
+`resolveActiveSpec` directly (`scripts/tasks/audit.ts:602`) rather than routing through the
+`decideSpec` gate that `a-branch-knows-which-spec-it-owes` built specifically because the un-gated
+inference is unreliable — a fix that landed in `mergeReady.ts` and was never carried over to
+`audit.ts`, even though `audit.ts` had the older, known-unreliable version of the same check
+(`03a9ce9`, closed as its own finding before the gated version existed). Filed as a finding this
+pass rather than fixed, since it is not part of this spec's own `writes` grant. Worth naming
+plainly: a brief that tells its reader not to trust the diff, and to stop, is exactly the shape of
+failure an auditor has the least defense against, because the instruction to comply is also printed
+by the tool being distrusted.
+
+Once past that, the substantive audit was cheap: one hand-built seven-entry mutation manifest (no
+manifest could be generated automatically, for the same reason as above) killed all seven clauses at
+named-test scope on the first try, zero escalations. Closing c2 itself needed no new tool —
+`npm run inspect -- -` piped from a heredoc, calling `hasVisibleContent` directly against ~28
+boundary codepoints and then the real CLI's `--args-from` route against ~9 end-to-end cases via
+`scripts/tasks/cliFixtures.ts`'s `fixture()`/`audit()` helpers — was enough to independently confirm
+pass 4's argument rather than re-run it. One self-inflicted slip repeating pass 3's own retro note
+here: the first `inspect` script reached for `await load('node:fs')`, which resolves `node:fs`
+against the repo root as a file path and fails loudly (unlike pass 3's silent-`undefined` case) —
+switching to a top-level `await import('node:fs')` fixed it in one retry.
+
