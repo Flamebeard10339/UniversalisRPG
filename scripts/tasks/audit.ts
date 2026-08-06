@@ -7,7 +7,7 @@ import { harvestFiles, parseAuditDoc, systemForDoc } from '../lib/auditImport';
 import * as git from '../lib/git';
 import { appendAuditPass, clauseStandings, duplicateClauseIds, outstandingSummary, parseSpecDoc, stampClauseIds, VERDICTS, type AuditVerdict, type ProofClause, type Verdict } from '../lib/specDoc';
 import { priorArt } from '../lib/producers';
-import { loadStore, type Severity, type Task } from '../lib/taskStore';
+import { loadStore, nextSeq, type Severity, type Task } from '../lib/taskStore';
 import { architecture, ownership, printPriorArt } from './architectureCmds';
 import type { Flags } from './cli';
 import { readStore, recordEvents, type Config, refuseUnknownSpec, knownSpecs, reportUnknownSpec, resolveActiveSpec, resolveConfig, saveStoreAndWarn, slugify, specFile, subjectOf, today, uniqueId } from './context';
@@ -49,6 +49,7 @@ export function cmdImport(args: Flags, usage: string): void {
     }
     const task: Task = {
       id,
+      seq: nextSeq(tasks),
       title: finding.title,
       kind: 'finding',
       state: 'unreviewed',
@@ -892,10 +893,11 @@ async function walkClausesInteractively(clauses: ProofClause[]): Promise<AuditVe
   return verdicts;
 }
 
-function buildFindingTask(finding: AuditFinding, slug: string, pass: number, taken: Set<string>): Task {
+function buildFindingTask(finding: AuditFinding, slug: string, pass: number, taken: Set<string>, tasks: Task[]): Task {
   const id = uniqueId(slugify(`${slug}-pass${pass}-${finding.title}`), taken);
   return {
     id,
+    seq: nextSeq(tasks),
     title: finding.title,
     kind: 'finding',
     state: 'unreviewed',
@@ -988,7 +990,7 @@ export async function cmdAudit(args: Flags, usage: string): Promise<void> {
     const taken = new Set(tasks.map((task) => task.id));
     const created: Task[] = [];
     for (const finding of parsed.findings) {
-      const task = buildFindingTask(finding, slug, against, taken);
+      const task = buildFindingTask(finding, slug, against, taken, tasks);
       tasks.push(task);
       taken.add(task.id);
       created.push(task);
@@ -1080,6 +1082,7 @@ export async function cmdAudit(args: Flags, usage: string): Promise<void> {
     const clauseText = doc.proofClauses.find((clause) => clause.id === verdict.clause)?.text ?? '';
     const undelivered: Task = {
       id,
+      seq: nextSeq(tasks),
       title: `Unmet deliverable clause ${verdict.clause}: ${clauseText}`,
       kind: 'undelivered',
       state: 'open',
@@ -1112,7 +1115,7 @@ export async function cmdAudit(args: Flags, usage: string): Promise<void> {
 
   let findingsCreated = 0;
   for (const finding of parsed.findings) {
-    const task = buildFindingTask(finding, slug, passNumber, taken);
+    const task = buildFindingTask(finding, slug, passNumber, taken, tasks);
     tasks.push(task);
     taken.add(task.id);
     created.push({ task, note: `recorded unreviewed by ${slug} pass ${passNumber}: ${truncateLine(finding.title, 60)}` });

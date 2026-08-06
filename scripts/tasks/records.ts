@@ -16,6 +16,7 @@ import {
   listQueue,
   loadStore,
   matchesSearchTerm,
+  nextSeq,
   parseStore,
   requirementStates,
   SEARCH_FIELDS,
@@ -149,6 +150,7 @@ export function cmdAdd(args: Flags, usage: string): void {
 
   const task: Task = {
     id,
+    seq: nextSeq(tasks),
     title,
     kind,
     state,
