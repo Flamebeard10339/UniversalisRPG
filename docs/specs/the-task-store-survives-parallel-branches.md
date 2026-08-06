@@ -55,8 +55,9 @@ Proof:
   no longer read meaning out of where a line happens to sit.
   proof: vitest scripts/lib/taskStore.test.ts
 - [c3] The reorder commit changes no record. Parsed before and after, the two files carry the same
-  590 ids and, `seq` aside, field-for-field identical records — so the one commit that touches every
-  line is provably a permutation.
+  set of ids and, the new ordinal aside, field-for-field identical records — so the one commit that
+  touches every line is provably a permutation, checked against whatever the store holds rather than
+  against a count written into this clause.
   proof: vitest scripts/lib/taskStore.test.ts
 - [c4] The regression is a real merge, not a simulation of one. Two branches, each editing a
   different record and each adding one, merge with zero conflicts through actual `git merge` — the
