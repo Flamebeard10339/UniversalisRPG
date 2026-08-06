@@ -7,6 +7,7 @@ import type { Task } from './taskStore';
 function task(id: string, produces: string[], state: Task['state'] = 'done', paths: { writes?: string[]; files?: string[] } = {}): Task {
   return {
     id,
+    seq: null,
     title: id,
     kind: 'task',
     state,

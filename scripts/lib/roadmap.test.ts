@@ -4,6 +4,7 @@ import { listQueue, type Task } from './taskStore';
 
 function task(overrides: Partial<Task> & { id: string }): Task {
   return {
+    seq: null,
     title: overrides.id,
     kind: 'task',
     state: 'open',
