@@ -407,3 +407,33 @@ outside the fixtures its own tests happen to look at. Positive: this generalizes
 a clause claiming a boundary needs its boundary re-derived by hand every pass, because the
 adversarial case is exactly what the clause text cannot generate about itself.
 
+## 2026-08-06, auditing `a-branch-knows-which-spec-it-owes` (pass 1)
+
+### `audit-prompt`/`mutate`/`merge-ready` cost nothing; both real findings came from seams the
+### brief named explicitly and the shipped tests do not reach
+
+Pass 1, no prior standing, `git status` clean throughout, no wrong-`file` mutation refusals. Seven
+manifest entries, one per clause, each aimed at the exact return statement the clause's own vitest
+describe block already names — all seven KILLED at `scripts/tasks/mergeReady.test.ts` scope, none
+needed whole-suite escalation. Total mutate wall time was under two minutes for all seven.
+
+Both findings this pass came from doing exactly what the brief asked and nothing more —
+constructing the two seams it named ("a spec file that does not parse" and the c7
+diff-vs-write-region overshoot) with throwaway `.ts` scratch files inside the worktree, run
+directly with `tsx` against the exported functions (`specClausesDiffer`, `authoredAsPlan`,
+`changedFiles`, `diffTouchesRegion`) rather than through the CLI, then deleted before the tree was
+checked for cleanliness. That path exists because these functions were pulled out of
+`branchStanding` specifically so something could call them without a live repository — `decideSpec`
+already says as much in its own comment — but `branchStanding` itself (the function that actually
+wires `task.writes` into `touchedWriteRegion`) has no test at all, real-repo or unit. Both findings
+sit exactly there: in the wiring the pulled-apart functions make testable individually but that
+nothing recomposes and tests together. Confirming each took one temp git repo, four to eight lines
+of setup, and under a minute; nothing about constructing them needed a tool beyond `tsx` and `git
+init` in a scratch directory, but nothing in the suite would have surfaced either without being
+told which seam to check — same shape as the parallel-branches passes' note that the adversarial
+case is exactly what a clause's own text cannot generate about itself. The one new wrinkle here:
+both adversarial cases came from reading a sibling file (`workPrompt.ts`) for what the codebase
+itself says is a sanctioned state (grants may diverge from the diff), not from the diff under audit
+at all — worth remembering that "attack the seam" sometimes means reading one file over from the
+one that changed.
+
