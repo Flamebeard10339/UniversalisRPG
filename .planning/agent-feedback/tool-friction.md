@@ -469,3 +469,44 @@ clause prompt, cost about two minutes to notice the fixture's calling convention
 `'demo-spec'` first, same as `audit`) from an adjacent passing test rather than from an error
 message naming the omission.
 
+## 2026-08-06, auditing `a-clause-can-be-deferred-and-a-spec-can-carry-its-goal` (pass 3)
+
+### `npm run inspect` plus `cliFixtures.ts`'s `fixture()`, chained together, found the third gap in
+### under fifteen minutes; the mutation manifest cost the same ten minutes as the last two passes
+### for the same reason, and the one route to the real finding was checking a category the fix's
+### own commit message named but did not close
+
+`audit-prompt` again wrote no manifest for the same reason as passes 1 and 2 (`proof:` names a
+file, not a test); the seven-entry hand-built manifest, one clause reused verbatim from the prior
+passes' targets, cost about ten minutes and all eight mutations (seven clauses plus a second cut
+at c2's own regex) KILLED at their file's own scope with no escalation to the whole suite —
+`npm run mutate` backgrounds cleanly past its own 120s foreground timeout with no extra ceremony,
+which the first two passes did not need to lean on.
+
+The finding came from reading 01e04a1's own commit message as a spec rather than as an answer:
+it names "category Cf" three times and never mentions Cc (Control) at all, so the obvious next
+question was whether the fix's regex, `[^\s\p{Cf}]/u`, treats Cc the way it treats Cf. `npm run
+inspect` answered that in one call — a scratch `.js` file piped through `npm run inspect -- -`
+(stdin mode; the `"<expr>"` positional form does not accept a multi-line script) with `hasVisibleContent`
+imported via `load('scripts/tasks/audit.ts')`, testing a dozen candidate characters
+(control codes, an unpaired surrogate, a lone combining mark, RTL overrides, punctuation, a long
+run) against the exported function directly — no reimplementation, no fixture, answer in one shot:
+NUL/BEL/ESC/DEL/etc. all read `true`. `load()` only resolves specifiers relative to the repo root
+through its own loader, not Node's own `import()` — a first draft calling `await load('node:fs')`
+failed with `ERR_MODULE_NOT_FOUND` looking for a literal `node:fs` file under the repo root; plain
+`await import('node:fs')` works fine alongside `load()` in the same script and cost about a
+minute to switch to once the error made the distinction obvious.
+
+Confirming the live, three-route reproduction (not just the pure-function check) reused
+`cliFixtures.ts`'s `fixture()`/`audit()`/`auditWith()` exactly as pass 2's entry described,
+imported the same way through `npm run inspect -- -` rather than a throwaway `.test.ts` — faster
+than pass 1's scratch git repo and pass 2's three scratch test files, since one script could drive
+all three routes (flag, `--args-from` file, interactive walk) and the exhausted-prompter check in
+one process and print a single JSON object back. The one new thing worth a mutation entry rather
+than a prose note: the multi-line evidence values in this pass's own `--args-from` file could not
+contain a literal `--evidence "1=..."` example mid-sentence on its own line, since `parseAuditFile`
+reads any line starting with `--` as a new flag regardless of where in a paragraph it sits — writing
+the whole evidence block as one un-wrapped line per flag (no embedded newlines) sidestepped it, and
+the brief's own warning about this cost nothing since it was flagged before the first attempt
+rather than after the file was rejected.
+
