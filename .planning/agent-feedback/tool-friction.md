@@ -791,3 +791,24 @@ here: the first `inspect` script reached for `await load('node:fs')`, which reso
 against the repo root as a file path and fails loudly (unlike pass 3's silent-`undefined` case) —
 switching to a top-level `await import('node:fs')` fixed it in one retry.
 
+## 2026-08-06, auditing `briefs-carry-the-lessons` (pass 1)
+
+`audit-prompt` cost nothing wrong this time: the "no manifest was written" line named the real
+reason (no proof target on this spec resolved to a test the brief could name) rather than a false
+warning, so no round was spent distrusting it — worth contrasting with the same day's other entry.
+Building the manifest by hand was cheap once one thing was found: for a proof target that is
+"does an array's contents reach printed output," mutating the *call site* (`printLessons(heading,
+WORKER_LESSONS)` to `printLessons(heading, [])`) is a one-line, always-unique find/replace, versus
+matching a whole multi-line array-literal block in `briefLessons.ts` itself, which is fragile to
+reformatting and easy to get wrong on quoting. The "drop one instruction" mutations did need the
+full multi-line object literal as `find` (four lines, exact indentation) — copied from a fresh
+`Read` rather than the git-diff view, which turned out to matter once (the diff view's leading `+`
+column is not part of the file). All eleven mutations killed at their own named-test or named-file
+scope with zero escalations, which is itself evidence for the branch's central claim: nineteen
+hardcoded per-instruction assertions really do catch both an emptied array and a single dropped
+entry, the two shapes the worker said it was deliberately avoiding making untestable. No tool
+produced a wrong answer this pass; the only real cost was manual — reading all nineteen printed
+instructions myself to judge action-orientation is not something any tool here does, and finding
+the one that fails (a fact with no imperative, buried among eighteen that pass) took a full close
+read rather than a grep.
+

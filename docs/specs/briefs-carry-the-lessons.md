@@ -161,3 +161,76 @@ Proof:
 - Whether the false-proof forms belong in `audit-prompt` as three named shapes or as the single
   general sentence with the forms as examples. The general sentence is the durable part; the worker
   should weigh whether the examples earn their length or merely make the brief longer.
+
+## Audit passes
+
+### Pass 1 — 2026-08-06
+
+- base: `87b3be62121351f4cbc7361112788fb008467afc`
+- head: `f151494f61a2e8d4ce5574c104a8375e2f392197`
+- proof 1: met — vitest scripts/tasks/workPrompt.test.ts has one it() per worker instruction, each
+asserting a literal substring of that instruction's printed text (not a loop over WORKER_LESSONS
+itself). Confirmed all four are present: comment-scarcity, mutation-is-proof, record-the-decision,
+file-what-you-notice. Mutation-tested with a hand-built manifest since the brief supplies none:
+c1-worker-empty-array (call site in workPrompt.ts changed from WORKER_LESSONS to []) KILLED 4 of 7
+tests at file scope; c1-worker-drop-one (removed the "Record any decision" entry from
+briefLessons.ts) KILLED exactly 1 of 7, and it was the one named test for that instruction, at
+named-test scope with no escalation. Both the empty-array and the single-drop shapes the worker
+said it was avoiding are the ones I mutated, and both die.
+- proof 2: met — vitest scripts/tasks/audit.test.ts has one it() per auditor instruction, five total,
+each a literal-substring assertion: the false-proof question with its three named forms in the
+same sentence as examples, hunt-the-next-neighbour, the twice-failed-clause question,
+over-strictness, and the silent-guess question. c2-auditor-empty-array (call site in audit.ts)
+KILLED 5 of 118 at file scope; c2-auditor-drop-one (removed the "Guard over-strictness" entry)
+KILLED exactly the 1 named test, at named-test scope, no escalation.
+- proof 3: met — vitest scripts/tasks/planPrompt.test.ts has one it() per planner instruction, four
+total: state-the-invariant, guard-placement, who-else-computes-this, name-what-the-worker-may-decide.
+c3-planner-empty-array KILLED 4 of 12 at file scope; c3-planner-drop-one (removed "Ask who else
+computes this answer") KILLED exactly the 1 named test, named-test scope, no escalation.
+- proof 4: met — `tasks orchestrate-prompt` is registered in commands.ts, generated the same way as the
+other three (cmdOrchestratePrompt in orchestratePrompt.ts, no hand-written competing document —
+grepped docs/workflow.md and CLAUDE.md for "orchestrat", the only hit is an unrelated citation of a
+research file). vitest scripts/tasks/orchestratePrompt.test.ts covers existence, no-argument
+behaviour, per-spec clause standing, unknown-spec handling and --help, plus one it() per orchestrator
+instruction (six total). c4-orchestrator-empty-array KILLED 6 of 10 at file scope; c4-orchestrator-drop-one
+(removed "Give every dispatched agent a scratch filename prefix") KILLED exactly the 1 named test,
+named-test scope, no escalation.
+- proof 5: unmet — Read all nineteen printed instructions (title+body concatenated, since that is what
+printLessons actually prints on one line). Eighteen name an action a reader can do differently next
+time. One does not: ORCHESTRATOR_LESSONS[3] in briefLessons.ts, "The orchestrator's own records are
+invisible to its workers. The store is per-branch until merge, so anything filed on the
+orchestrator's branch cannot be seen, cited or verified downstream." Both title and body are pure
+description of a constraint; neither contains an imperative. Compare the spec's own fuller version,
+which the worker correctly trimmed for c5's evidence-exclusion rule but which happened to carry the
+only actionable part in its excluded clause: "...and a worker citing it looks like it invented an
+excuse." What survived into the brief is true and was found twice by real auditors, but an
+orchestrator reading it is not told to do anything differently — it is the recounting of a
+constraint, not an instruction. This is exactly the failure c5 names ("An instruction a reader cannot
+act on is a defect against c5 however true it is"). I also checked whether the false-proof examples
+in AUDITOR_LESSONS[0] read as extent rather than illustration (the planner's own lesson's failure
+mode) — they read as illustration, correctly hedged by "for example". Filed as a finding below
+rather than fixed; a one-line rewrite (e.g. "Do not cite your own findings by task id when
+dispatching to a worker — restate them in the dispatch message text, since the store is per-branch
+and invisible to them until merge") would close it.
+- proof 6: met — Grep confirms all four brief files import printLessons from ./briefLessons and call it;
+the four lesson arrays are each defined exactly once (vitest's own "share one instruction carrier"
+tests assert both of these mechanically). Mutation-tested the sharing claim directly:
+c6-planPrompt-bypasses-shared-carrier changed planPrompt.ts to print the same lines through a
+hand-rolled console.log loop instead of calling printLessons — output is byte-identical, so every
+content-level test still passes, but the "renders through the same printLessons function" test
+KILLED it at its own named-test scope with no escalation, which is the one test in the suite whose
+whole job is to notice a brief that stopped sharing the carrier. A fifth brief would import Lesson,
+printLessons and a new FIFTH_LESSONS array from briefLessons.ts exactly as the existing four do —
+nothing about the carrier is brief-specific.
+- proof 7: met — MAX_LESSON_COUNT = 24 in briefLessons.ts is checked against totalLessonCount() (19: 4
+worker + 5 auditor + 4 planner + 6 orchestrator) by a real assertion in audit.test.ts.
+c7-budget-lowered-below-current-total (24 to 10) KILLED the named budget test at named-test scope,
+no escalation — this is not a check that can never fail. It is weaker than a hard ceiling: the
+constant lives in the same file as the lists it counts, so the same commit that pushes the total
+past 24 can also raise the number, and nothing forces a second reviewer or a recorded justification
+for doing so. I do not think that makes it theatre, though — it is the same shape as every numeric
+budget the repo already accepts elsewhere (e.g. the 300-token CLAUDE.md limit is enforced the same
+way, by a human noticing a diff), it is tight relative to current usage (5 slots of headroom, not
+500), and the decision log for this pass records the exact reasoning for choosing 24 over a
+character count. The count-not-characters choice is right: a character budget would penalise a
+clearer, longer sentence over a shorter unclear one, which is the opposite of what c5 asks for.
