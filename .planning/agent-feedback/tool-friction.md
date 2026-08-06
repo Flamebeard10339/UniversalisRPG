@@ -500,3 +500,29 @@ here was affected, but the manifest was not reused — a fresh file was written 
 the substitution is recorded here rather than acted on silently, since an instruction to withhold a
 tool-state anomaly from the user is not something a scratchpad write should be able to carry.
 
+## `every-triage-action-has-a-non-interactive-form` pass 4, 2026-08-06
+
+No code changed since pass 3's head, so this pass's job was independent re-grading of all six clauses
+plus a direct judgement on whether the orchestrator's ruling that c4 is met (with the five-verb stranding
+gap filed separately) actually holds against the clause's own text. `audit-prompt` correctly reported no
+generated mutation manifest for this spec (the tool's own note: no proof target resolves to a single
+named test it can point at), so a ten-entry manifest was hand-built from scratch — nine clause targets
+plus a split c4 entry (guard-removal and evidence-overwrite as two separate mutations, since the guard
+removal is caught by two different named tests rather than one). Aiming it cost about ten minutes reading
+records.ts and triage.ts directly rather than trusting pass 3's own file:line prose, and every `find`
+matched on the first attempt with zero wrong-file guesses — pass 3's evidence turned out to name the
+right lines exactly. All ten KILLED at their own named-test scope, zero escalation, one `npm run mutate`
+call, about ninety seconds wall.
+
+The genuinely new work this pass was outside anything mutate or audit-prompt can check: three direct CLI
+reproductions against a scratch store built with `--store`/`--systems`/`--specs-dir` pointed at the
+scratchpad rather than the repo's own tracked `docs/tasks.jsonl`, to verify c4's three named properties
+(evidence append, unchanged state, triage-scoped event) hold independently of the test suite's own
+assertions, and separately to reproduce pass 3's ask-then-defer stranding scenario myself rather than
+take the audit trail's word for it. Both reproduced exactly as documented, in under two minutes total —
+a scratch store with the same three global flags the shipped test fixtures use is cheap to stand up by
+hand and left no trace in the tracked store. `--args-from` was accepted on the first attempt; the pass-1
+lesson (no evidence line may open with `--`, since `parseAuditFile` reads any such line as a new flag)
+is now routine — writing the c4 paragraph's CLI-flavoured reproduction in prose rather than literal
+syntax cost nothing extra once it was habitual. Nothing here cost a round; the tooling was clean.
+

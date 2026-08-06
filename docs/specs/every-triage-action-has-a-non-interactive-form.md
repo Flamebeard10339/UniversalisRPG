@@ -314,3 +314,90 @@ this pass: mutation entry c6-ask-drops-immediate-persist (deleting runAsk's own 
 also KILLED at its own named test scope, 1 failed of 21. All nine mutations run this pass (c1, c2,
 c3, c4, c5, c6-order, c6-walk, c6-redirect, c6-ask) KILLED at their own named-test scope with zero
 escalation to file or whole-suite level.
+
+### Pass 4 — 2026-08-06
+
+- base: `a49a9b614c6cff533de973d9bceb9d18c4d42e94`
+- head: `d8cb54785a340922946f3275c15c7b04b4bff2a5`
+- proof 1: met — Independent re-verification against the current head (d8cb547, unchanged since pass 3): the
+menu render and the dispatch in triage.ts both still read the TRIAGE_ACTIONS table rather than a literal
+if/else chain. This pass's own manifest (nine clause mutations plus a split c4 entry, ten total, written
+fresh rather than reused from an earlier pass) flipped the dispatch's equality check to an inequality and
+ran it through mutate; it was KILLED at its own named test, "triage promotes, defers and declines
+findings, saving after every decision," one of twenty one tests failing, with no escalation to the file
+or the whole suite. cmdPromote was rerouted through the shared isReviewable helper in an earlier round,
+but that change lives entirely inside records.ts and never touches triage.ts's table or dispatch, so it
+does not bear on this clause. Confirmed by reading the diff between the two commits directly as well as
+by the mutation result.
+- proof 2: met — Re-verified: the completeness test in triage.test.ts still iterates TRIAGE_ACTIONS and runs
+each entry's verb with a help flag, failing if any verb is not a real command. This pass's own mutation
+appended a sixth table entry naming a verb that does not exist as a tasks command; it was KILLED at its
+own named test, "every action in the table names a tasks verb that actually exists, so a table entry
+with no route fails here," one of twenty one tests failing, no escalation. Unchanged by any commit since
+pass 1.
+- proof 3: met — Re-verified: cmdDefer still sets state open and spec null and files the same wording the
+walk's runDefer uses. This pass's own mutation changed one word of the filed note text; it was KILLED at
+its own named test, "tasks defer opens a record outside every spec, the inverse of promote, filing the
+same wording the walk records," one of twenty one tests failing, no escalation. cmdDefer's guard now
+routes through the shared isReviewable helper rather than a duplicated inline check, confirmed by reading
+the diff to be behaviourally identical to the original inline condition (unreviewed or open admitted,
+everything else refused) — a mechanical refactor, not a semantic change, so nothing about defer's own
+promise moved.
+- proof 4: met — Agreeing with the orchestrator's ruling, on my own reading rather than by deference to it.
+The clause's three verbs (appends, leaves, records) all take ask itself as their grammatical subject —
+the clause is a description of what the ask command does, not a promise about what every other command
+in the store must not do to a record ask has touched. Re-read against that boundary, all three properties
+hold and are independently provable. I verified all three directly, from a fresh scratch store outside
+the repo's own tracked one so nothing here touched real data: adding a finding leaves it unreviewed by
+construction, then asking a question against it appended the dated question below the existing evidence
+text rather than replacing it (confirmed by reading the record back with show, where the original evidence
+sentence and the new question both appear); the record's own state field read unreviewed both immediately
+before and immediately after the ask, because cmdAsk's body never assigns task.state anywhere, so the
+property holds by construction and not by accident; and the event log's triage-scoped view listed the ask
+by its filed note text while the edit-scoped view listed nothing for that id, confirming the same op the
+walk records. Mutation-verified independently on this pass's own fresh manifest: deleting cmdAsk's guard
+entirely was KILLED across two of the file's tests at once (the closed-record refusal and the open-record
+refusal), two of twenty one failing with no escalation past the file; overwriting rather than appending
+the evidence assignment was KILLED at its own named test, one of twenty one failing, no escalation.
+Now the disagreement question, considered directly rather than assumed away: is the clause's purpose
+clause, the record stays unreviewed so the queue keeps offering it, secretly a promise that spans every
+other command in the store, not just ask's own body? I considered this seriously because the pass 3
+finding is real and I reproduced it myself on the same scratch store: asking a question against an
+unreviewed id, then deferring that same id, moves it to open with spec null, exits cleanly, and the
+question text is left sitting in evidence while the unreviewed listing no longer shows the id at all —
+nothing warns that a live question was just stranded. But I read this as a defect in defer (and promote,
+and the three pre-existing verbs decline, start and done), not in ask. The store carries no field that
+marks a record as waiting on an answered question; evidence is free text, and state carries no such
+marker. Closing the gap means teaching five verbs — three of which (decline, start, done) predate this
+spec entirely and were never part of its diff or its writes grant — to recognise and refuse or warn about
+a condition the data model does not yet represent. That is real work, correctly filed as its own high
+severity finding rather than folded into this clause by a fourth unmet verdict that would not change what
+ask's own code does. Grading c4 unmet a fourth time on the strength of a defect entirely inside promote
+and defer's bodies would be grading the deliverable's motivating goal rather than the clause's own text,
+which is exactly the scope-creep this repository's own clause-16 convention (a pass 2 finding is not
+something the spec already promised) warns against in the adjacent case. I do not believe this branch
+should merge with that high finding left unaddressed indefinitely, since it sits squarely inside the
+orchestrator batch workflow this spec exists to serve, but the mechanism for that is a human triage
+decision on the separately filed finding, not a fifth pass grading the same three properties unmet again.
+- proof 5: met — Re-verified: cmdRedirect still files a triage event rather than an edit one. This pass's own
+mutation changed the recorded op from triage to edit; it was KILLED at its own named test, "tasks
+redirect is the same operation as the walk's redirect: it files a triage event, not an edit one," one of
+twenty one tests failing, no escalation. Confirmed independently by direct execution on the scratch
+store: redirecting a record left it out of the edit-scoped log view and present in the triage-scoped one.
+This property does not depend on starting state, so ask's narrower unreviewed-only guard versus
+redirect's wider unreviewed-or-open one (via isReviewable) has no bearing on it.
+- proof 6: met — Re-audited all four sub-properties this pass rather than trusting pass 3's closure. Same
+keys and same prompts: the golden-string menu test and the hardcoded-prompt-string test are both
+unchanged since pass 2 and still assert literal text rather than deriving it from TRIAGE_ACTIONS, read
+directly. Same order: this pass's own mutation swapped the table positions of the promote and redirect
+entries, keys and verbs left untouched; KILLED at the golden-string test, one of twenty one failing, no
+escalation. Persist-immediately, checked as three separate properties rather than one green test: the
+shared save-and-record call on cmdTriage's common decision path (covering promote, defer and decline)
+was deleted by this pass's own mutation and KILLED at "triage promotes, defers and declines findings,
+saving after every decision," one of twenty one failing; runRedirect's own inline save, deleted, was
+KILLED at "triage redirect alone, with no later decision, persists the deliverable and files the triage
+event by itself," one of twenty one failing; runAsk's own inline save, deleted, was KILLED at "triage a
+records a question on the finding and leaves it unreviewed," one of twenty one failing. All four
+sub-mutations died at their own named-test scope with zero escalation, on a manifest built fresh for
+this pass rather than reused, so the isolation pass 3 added for redirect is confirmed to still hold and
+was not itself a fluke of that pass's particular manifest ordering.
