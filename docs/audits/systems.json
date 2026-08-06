@@ -336,6 +336,13 @@
             "scripts/tasks/commands.ts"
           ],
           "note": "produced by every-triage-action-has-a-non-interactive-form: tasks defer/redirect/ask, and the TRIAGE_ACTIONS table cmdTriage dispatches from"
+        },
+        {
+          "name": "spec ownership inference",
+          "paths": [
+            "scripts/tasks/mergeReady.ts"
+          ],
+          "note": "produced by a-branch-knows-which-spec-it-owes"
         }
       ]
     },
