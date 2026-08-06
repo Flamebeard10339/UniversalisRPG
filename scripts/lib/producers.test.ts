@@ -178,6 +178,13 @@ describe('priorArt', () => {
   it('answers with nothing for a path nothing has ever named', () => {
     expect(priorArt(manifest, tasks, ['src/grammar/parser.ts'])).toMatchObject({ concepts: [], claims: [] });
   });
+
+  it('breaks a same-state tie by seq, oldest first, regardless of array order', () => {
+    const second = { ...task('second', [], 'open', { writes: ['src/runtime/tied.ts'] }), seq: 2 };
+    const first = { ...task('first', [], 'open', { writes: ['src/runtime/tied.ts'] }), seq: 1 };
+    const art = priorArt(manifest, [second, first], ['src/runtime/tied.ts']);
+    expect(art.claims.map((claim) => claim.task.id)).toEqual(['first', 'second']);
+  });
 });
 
 function event(overrides: Partial<TaskEvent> = {}): TaskEvent {
