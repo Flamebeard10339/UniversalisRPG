@@ -65,6 +65,11 @@ Proof:
   way to green says so in the same output that says it is ready.
   proof: vitest scripts/tasks/mergeReady.test.ts
 
+## Goal
+
+Give a spec an honest way to drop scope without either blocking merge forever or silently rewriting
+its own contract.
+
 ## Decisions
 
 - **`deferred` is not a synonym for `unmet`.** `unmet` means the branch tried and failed and the gate
@@ -99,11 +104,19 @@ Proof:
 
 ## Open questions
 
-- Where the goal lives in the file — a `## Goal` heading, or a `Goal:` line inside `## Deliverable`.
-  The parser has to find it either way; the worker picks against how `parseSpecDoc` already reads
-  sections.
-- Whether a deferral should name the spec or task that picks the clause up. It would be useful and it
-  is often unknowable at the moment of deferring, so the worker should try leaving it optional and
-  record whether the resulting records read as orphaned.
-- Whether the generated `undelivered` record inherits the deferring branch's write grant. It has no
-  worker yet, so probably not, but `doctor`'s grant warnings will say.
+- **Decided: a `## Goal` heading**, not a `Goal:` line inside `## Deliverable`. `parseSpecDoc` already
+  finds every other section this way (`## Deliverable`, `## Decisions`, `## Audit passes`), so a
+  fifth section reuses `sectionText` rather than adding a second parse shape; `parseGoal` reads the
+  first non-blank line under it, so one line is what a reader — and the round-trip — gets.
+- **Decided: left optional, and it does not read as orphaned.** A deferred clause's `undelivered`
+  record gets `spec: null` rather than a new field naming a follow-up — the store already renders a
+  null spec as `(deferred)`, and `tasks list --deferred` already means exactly "open task, no spec".
+  Reusing that convention means the record surfaces in the general backlog and in `tasks list`'s
+  default queue the moment it is created, the same way any other deferred task does; `source.spec`
+  still names the spec it fell out of, which is what `spec show`'s owner lookup was widened
+  (`clauseOwners`) to read so the clause does not report owned by nobody. No orphan: two existing
+  queries already find it.
+- **Decided: no.** The record ships with `writes: []` and `grant: null`, identical to the unmet path's
+  undelivered record. `doctor`'s only grant warning fires on a non-null grant with an empty `writes`
+  list, so leaving both null avoids it rather than needing a special case — there was nothing to
+  inherit because the unmet path never set one either.
