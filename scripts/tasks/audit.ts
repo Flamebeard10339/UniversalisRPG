@@ -754,16 +754,20 @@ function clauseScoped(raw: string): { clause: number; value: string } | null {
 
 // A reason must contain at least one character that occupies space when
 // rendered and does not command the renderer. Whitespace (`\s`) occupies
-// nothing; category Cf (ZERO WIDTH SPACE and its kin — format characters
-// that render nothing) renders nothing; category Cc (NUL, BEL, ESC, DEL and
-// their kin — control characters) commands the renderer rather than
-// rendering, up to and including painting colour codes or ringing a bell
-// when the file is later read. Everything else is a legitimate reason,
-// however ugly: a single punctuation mark, a long run of one character, a
-// lone combining mark, an unpaired surrogate (replaced by U+FFFD on write,
-// visible by the time it lands). This line is drawn and stays drawn — no
-// further exclusions.
-const VISIBLE_CHARACTER = /[^\s\p{Cf}\p{Cc}]/u;
+// nothing; `Default_Ignorable_Code_Point` — the Unicode property that
+// defines "occupies no space when rendered", covering ZERO WIDTH SPACE and
+// its Cf kin plus the Mn/Lo outliers a general category alone misses
+// (variation selectors including VS16, COMBINING GRAPHEME JOINER, the
+// Hangul filler jamo, Khmer inherent vowel signs, Mongolian free variation
+// selectors) — renders nothing; category Cc (NUL, BEL, ESC, DEL and their
+// kin — control characters) commands the renderer rather than rendering, up
+// to and including painting colour codes or ringing a bell when the file is
+// later read. Everything else is a legitimate reason, however ugly: a
+// single punctuation mark, a long run of one character, a lone combining
+// mark, an unpaired surrogate (replaced by U+FFFD on write, visible by the
+// time it lands). This line is drawn and stays drawn — no further
+// exclusions.
+const VISIBLE_CHARACTER = /[^\s\p{Default_Ignorable_Code_Point}\p{Cc}]/u;
 export function hasVisibleContent(text: string | null): boolean {
   return text !== null && VISIBLE_CHARACTER.test(text);
 }

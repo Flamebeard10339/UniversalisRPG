@@ -982,6 +982,25 @@ describe('a deferred clause', () => {
     });
   });
 
+  // `\p{Cf}` was a proxy for "occupies no space when rendered", and
+  // thirty-seven codepoints are default-ignorable while sitting in category
+  // Mn or Lo, so the proxy missed them: variation selectors (VS16, the
+  // ordinary emoji-presentation selector, among them), the combining
+  // grapheme joiner, the Hangul filler jamo, Khmer inherent vowel signs,
+  // Mongolian free variation selectors. `\p{Default_Ignorable_Code_Point}`
+  // is the property Unicode defines to mean exactly the sentence this guard
+  // states, rather than a general category standing in for it.
+  it('c2: a reason made only of default-ignorable characters outside category Cf is refused (VS16, CGJ, Hangul filler jamo, Khmer inherent vowel sign, Mongolian free variation selector)', async () => {
+    await fixture(async ({ tasks, audit }) => {
+      const defaultIgnorableOutsideCf = ['️️', '͏', 'ㅤ', '឴', '᠋'];
+      for (const reason of defaultIgnorableOutsideCf) {
+        const deferred = await audit('demo-spec', '--proof', '1=deferred', '--evidence', `1=${reason}`, '--proof', '2=met', '--evidence', '2=clause 2 checked');
+        expect(deferred.stderr).toContain('clause 1 is deferred with no reason');
+      }
+      expect(tasks('list', '--kind', 'undelivered').stdout).toContain('0 task(s)');
+    });
+  });
+
   // Pass 3 evaluated and rejected these as candidates for further exclusion:
   // each is visible — occupies space when rendered — even though it looks
   // nothing like ordinary prose, and the guard must keep accepting all four.
@@ -997,15 +1016,69 @@ describe('a deferred clause', () => {
     });
   });
 
-  it('hasVisibleContent: true only when a character survives stripping whitespace, invisible-format (Cf) and control (Cc) characters', () => {
-    for (const invisible of ['', '   ', '\t\n', '​', '‌', '‍', '­', '⁠', '﻿', ' ​\t‍ ', '\u0000', '\u0007', '\u001B', '\u007F']) {
+  // `Default_Ignorable_Code_Point` is broader than `Cf`, and broader is
+  // where over-strictness would come from — this is what pass 4 checked and
+  // reported clean, confirmed independently here rather than taken on
+  // faith. Multi-script prose, an emoji sequence with a real glyph, and a
+  // sequence of only joiners with no glyph at all are the three shapes that
+  // would tell the two properties apart if the swap had gone wrong.
+  it('does not over-exclude: multi-script prose and glyph-bearing emoji sequences are accepted, a string of bare joiners with none is refused', async () => {
+    await fixture(async ({ tasks, audit }) => {
+      const prose = ['原因', 'سبب', 'סיבה', 'कारण'];
+      for (const reason of prose) {
+        const result = await audit('demo-spec', '--proof', '1=deferred', '--evidence', `1=${reason}`, '--proof', '2=met', '--evidence', '2=clause 2 checked');
+        expect(result.status).toBe(0);
+      }
+
+      // A four-person family emoji and a rainbow flag: both are chains of
+      // default-ignorable ZERO WIDTH JOINERs threaded between real glyphs
+      // (people, a flag, a rainbow), and accept on the strength of those
+      // glyphs rather than the joiners.
+      const emoji = ['👨‍👩‍👧‍👦', '🏳️‍🌈'];
+      for (const reason of emoji) {
+        const result = await audit('demo-spec', '--proof', '1=deferred', '--evidence', `1=${reason}`, '--proof', '2=met', '--evidence', '2=clause 2 checked');
+        expect(result.status).toBe(0);
+      }
+
+      const bareJoiners = await audit('demo-spec', '--proof', '1=deferred', '--evidence', `1=${'‍'.repeat(3)}`, '--proof', '2=met', '--evidence', '2=clause 2 checked');
+      expect(bareJoiners.stderr).toContain('clause 1 is deferred with no reason');
+      // Every accepted deferral above reuses the one open undelivered
+      // record for clause 1; the refused bareJoiners attempt adds none.
+      expect(tasks('list', '--kind', 'undelivered').stdout).toContain('1 task(s)');
+    });
+  });
+
+  it('hasVisibleContent: true only when a character survives stripping whitespace, Default_Ignorable_Code_Point and control (Cc) characters', () => {
+    for (const invisible of [
+      '',
+      '   ',
+      '\t\n',
+      '​',
+      '‌',
+      '‍',
+      '­',
+      '⁠',
+      '﻿',
+      ' ​\t‍ ',
+      '\u0000',
+      '\u0007',
+      '\u001B',
+      '\u007F',
+      '️️',
+      '͏',
+      'ㅤ',
+      '឴',
+      '᠋',
+      '‍‍‍',
+    ]) {
       expect(hasVisibleContent(invisible)).toBe(false);
     }
     expect(hasVisibleContent(null)).toBe(false);
-    for (const visible of ['x', ' x ', '​x​', 'a reason a human can read', '.', 'x'.repeat(80), '́', '\ud800']) {
+    for (const visible of ['x', ' x ', '​x​', 'a reason a human can read', '.', 'x'.repeat(80), '́', '\ud800', '原因', '👨‍👩‍👧‍👦', '🏳️‍🌈']) {
       expect(hasVisibleContent(visible)).toBe(true);
     }
   });
+
 
   // The fix has to survive the transport that motivated it: `--args-from`
   // joins a continuation onto the flag's own line with a newline, and a
