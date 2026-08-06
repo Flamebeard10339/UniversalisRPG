@@ -222,3 +222,56 @@ entries and none of them is the run's own push/no-push call; the task record its
 closedCommit null. The decision this clause asks for has not been made. This is the expected,
 almost-certain verdict per the audit assignment, and the useful output is the reading list handed
 back to the author separately.
+
+### Pass 2 — 2026-08-06
+
+- base: `52bd157676085e524113e8a210b8f5724707d011`
+- head: `52bd157676085e524113e8a210b8f5724707d011`
+- proof 1: met — Unchanged from pass 1 and re-read this session, not re-derived: three merge commits land the three
+branches serially on main (dd62522, d1ea434, 624890c), each preceded by its own worktree's audit history, and
+`tasks log --spec run-an-orchestrator-over-three-parallel-tasks` returns events from 14:14Z whose timestamps line
+up to the second with git commit times on the corresponding worker branches. This is a RATIFICATION PASS, not an
+independent re-audit: it re-grades exactly one clause (c7) on information that did not exist at pass 1, namely the
+author's decision, and carries pass 1's standing for the rest. Where it asserts met it says on what basis.
+- proof 2: unmet — Standing carried from pass 1, whose evidence is recorded above and is not restated here. Ratified as
+correct rather than deferred: the taxonomy drift is real, the entries genuinely mix the Deliverable's four classes
+with the two-axis scheme decided in 01c7b47 before the corpus started, and the honest disposition is that the run
+failed this clause as written. It is NOT deferred, because deferral means the goal survives without it and the
+goal here is a trustworthy measurement whose vocabulary a later reader can rely on. The record leaves the spec
+still owed rather than dropped, and becomes an input to the-workflow-records-what-cost-it-in-one-place-with-one-quer,
+which implements the two-axis model that displaced the four classes.
+- proof 3: unmet — Standing carried from pass 1 and ratified as the run's most valuable negative result. Deliberately NOT
+deferred: c4's zero-interruption count is only meaningful if c3 held, so deferring c3 would launder the headline
+measurement, which is the one thing this branch existed to keep honest. Added by this pass, and the reason the
+clause is a missing mechanism rather than a discipline failure: at 17:57Z the orchestrator had a worker blocked on
+a design question, and its only alternatives were to rule or to stall the worker until a planning session nobody
+had scheduled. Any orchestrator takes the first. The clause as written is unreachable until a blocking question
+has a third route, which is the friction channel's blocking axis over the `question` kind that exists in the Kind
+union and is used by zero records. Recorded as a standing precondition on the next run in the c7 ruling.
+- proof 4: met — Standing carried from pass 1, including its caveat: none of the note or decision entries describes
+pausing for or receiving author input mid-run, so structurally zero interruptions reached the author before the
+batch review. Pass 1's warning is ratified rather than softened. This clause must not be read without c3, because
+the clean count and the c3 violation are the same events seen from two sides.
+- proof 5: unmet — Standing carried from pass 1. Ratified as unmet rather than deferred for the same reason as c2: the
+experiment's honest result is that the silent-guess question was asked on one branch of three, on auditor
+initiative, before any brief asked for it. The capability now exists, since AUDITOR_LESSONS carries "Ask the
+silent-guess question explicitly" as of d63d440, but it landed at 16:57 local, after all three branches were
+already audited and closed, so it cannot make this run's clause met retroactively. The obligation transfers to the
+next run rather than being dropped.
+- proof 6: met — Upgraded from pass 1's source-inspection grading: pass 1 could not run the proof target because the
+shared node_modules was empty for its whole duration. This pass ran it. `npx vitest run
+scripts/tasks/orchestratePrompt.test.ts` passes, 1 file, 11 tests, 607ms. scripts/tasks/orchestratePrompt.ts and
+scripts/tasks/briefLessons.ts exist in the plan/work/audit-prompt family shape, and ORCHESTRATOR_LESSONS's six
+entries trace to named incidents in this run's own log. Recorded against the clause and not beyond it: the brief
+is generated, which is what c6 promises. Judgement on whether it is a GOOD brief is outside this clause and filed
+separately, since orchestrate-prompt carries the lessons but not the batch procedure the run learned.
+- proof 7: met — The clause asked for a recorded decision about whether the remaining backlog is pushed this way and
+what has to change first. Both halves are now recorded. `npm run tasks -- log --spec
+run-an-orchestrator-over-three-parallel-tasks --op decision` returns six entries, the sixth being the author's
+ruling at 2026-08-06T22:40:29Z: yes, in batches of three, gated on the friction channel landing first. The ruling
+carries its own basis (three tasks in 3.5 hours wall clock with zero author interruptions against a stated
+half-day-per-worker baseline) and two named preconditions: the friction channel must land first because the batch
+boundary is now a handoff and a fresh orchestrator inherits nothing queryable today, and a blocking design question
+must gain a route that is neither deciding it nor stalling the worker, which is c3's remedy. Pass 1 predicted this
+verdict would be unmet and named the reason correctly: the decision had not been made, and only the author could
+make it.
