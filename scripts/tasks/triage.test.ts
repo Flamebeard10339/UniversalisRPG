@@ -4,6 +4,7 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { tsxCli } from '../lib/tsxCli';
 import { fixture, repoRoot, script } from './cliFixtures';
+import { TRIAGE_ACTIONS } from './triage';
 
 describe('tasks CLI', () => {
   it('triage promotes, defers and declines findings, saving after every decision', async () => {
@@ -143,6 +144,83 @@ describe('tasks CLI', () => {
       expect(result.stdout).toContain('promoting a pass 2 finding, which extends what demo-spec owes');
       const shown = tasks('show', 'demo-spec-pass2-late-finding');
       expect(shown.stdout).toContain('spec: demo-spec');
+    });
+  });
+
+  it('the menu is rendered from the action table, one entry per action', async () => {
+    await fixture(async ({ tasks, triage }) => {
+      tasks('add', 'menu check', '--id', 'menu-check', '--kind', 'finding', '--severity', 'low', '--deliverable', 'fix it');
+      const result = await triage('s\n');
+      const expectedMenu = `${TRIAGE_ACTIONS.map((action) => `[${action.key}] ${action.label}`).join('   ')}   [s] skip   [q] save and quit`;
+      expect(result.stdout).toContain(expectedMenu);
+    });
+  });
+
+  it('every action in the table names a `tasks` verb that actually exists, so a table entry with no route fails here', () => {
+    fixture(({ tasks }) => {
+      for (const action of TRIAGE_ACTIONS) {
+        const result = tasks(action.verb, '--help');
+        expect(result.status, `\`tasks ${action.verb} --help\` (the ${action.label} action's non-interactive route)`).toBe(0);
+        expect(result.stdout).not.toContain('unknown command');
+      }
+    });
+  });
+
+  it('tasks defer opens a record outside every spec, the inverse of promote, filing the same wording the walk records', () => {
+    fixture(({ tasks }) => {
+      tasks('add', 'defer me', '--id', 'defer-me', '--kind', 'finding', '--severity', 'medium', '--deliverable', 'fix it');
+      const result = tasks('defer', 'defer-me');
+      expect(result.status).toBe(0);
+      expect(tasks('show', 'defer-me').stdout).toContain('spec: (deferred)');
+      expect(tasks('log', '--op', 'triage').stdout).toContain('deferred: opened outside every spec');
+
+      tasks('decline', 'defer-me', '--reason', 'closed for the refusal check');
+      const refused = tasks('defer', 'defer-me');
+      expect(refused.status).toBe(1);
+      expect(refused.stderr).toContain('it does not reopen closed ones');
+    });
+  });
+
+  it('tasks ask records the question on the finding, files a triage event, and leaves the record in whatever state it was', () => {
+    fixture(({ tasks }) => {
+      tasks('add', 'needs context', '--id', 'needs-context', '--kind', 'finding', '--severity', 'high', '--evidence', 'the original evidence', '--deliverable', 'fix it');
+      const result = tasks('ask', 'needs-context', '--question', 'which universe was this measured against?');
+      expect(result.status).toBe(0);
+      const shown = tasks('show', 'needs-context').stdout;
+      expect(shown).toContain('unreviewed');
+      expect(shown).toContain('the original evidence');
+      expect(shown).toContain('triage asked');
+      expect(shown).toContain('which universe was this measured against?');
+      expect(tasks('log', '--op', 'triage').stdout).toContain('asked for more information: which universe was this measured against?');
+    });
+  });
+
+  it("tasks redirect is the same operation as the walk's redirect: it files a triage event, not an edit one", () => {
+    fixture(({ tasks }) => {
+      tasks('add', 'wrong fix', '--id', 'wrong-fix', '--kind', 'finding', '--severity', 'high', '--deliverable', 'the wrong fix');
+      const result = tasks('redirect', 'wrong-fix', '--deliverable', 'the right fix');
+      expect(result.status).toBe(0);
+      expect(tasks('show', 'wrong-fix').stdout).toContain('deliverable: the right fix');
+      expect(tasks('log', '--op', 'triage').stdout).toContain('redirected the deliverable to: the right fix');
+      expect(tasks('log', '--op', 'edit').stdout).not.toContain('wrong-fix');
+    });
+  });
+
+  it('triage prompts read exactly as before the table refactor: "reason: ", "replacement deliverable: ", "question: "', async () => {
+    await fixture(async ({ tasks, triage }) => {
+      tasks('add', 'decline prompt', '--id', 'decline-prompt', '--kind', 'finding', '--severity', 'high', '--deliverable', 'fix it');
+      const declined = await triage('3\na reason\n');
+      expect(declined.stdout).toContain('reason: ');
+    });
+    await fixture(async ({ tasks, triage }) => {
+      tasks('add', 'redirect prompt', '--id', 'redirect-prompt', '--kind', 'finding', '--severity', 'high', '--deliverable', 'fix it');
+      const redirected = await triage('4\na new fix\n1\n');
+      expect(redirected.stdout).toContain('replacement deliverable: ');
+    });
+    await fixture(async ({ tasks, triage }) => {
+      tasks('add', 'ask prompt', '--id', 'ask-prompt', '--kind', 'finding', '--severity', 'high', '--deliverable', 'fix it');
+      const asked = await triage('a\na question\n');
+      expect(asked.stdout).toContain('question: ');
     });
   });
 });
