@@ -442,3 +442,29 @@ findable only by asking "what would a reviewer plausibly do that the six named t
 describe", which the generated manifest cannot ask on its own — same lesson as the prior pass's
 note about adversarial-scenario construction living outside any tool here.
 
+## `every-triage-action-has-a-non-interactive-form` pass 2, 2026-08-06
+
+This branch's own pass 1 found c4's guard was missing entirely and c6's order test was tautological.
+The fix (289868e, 73f214b) closed both readings literally — but the pass-1 finding text itself named
+the shape that survives it: "operate on a record regardless of its state" is not the same claim as
+"admit exactly the states the queue re-offers." isReviewable was written to the wrong boundary
+(unreviewed-or-open, borrowed correctly from promote/defer where open is a valid input) rather than
+ask's own boundary (unreviewed only, because that is the queue's own filter). Nine of ten manifest
+entries KILLED at their own named-test scope on the first `mutate` run; the discriminating move was
+building a tenth entry the brief did not name — deleting redirect's own inline save rather than the
+walk's common one — because pass 1's mutation had only ever targeted the shared path three actions
+share, never the two (redirect, ask) that persist themselves. It SURVIVED the whole 1675-test suite.
+Direct execution (defer a finding, then ask it) reproduced the c4 gap in under a minute once the
+right boundary was suspected; the suspicion itself came from re-reading isReviewable's own doc
+comment against unreviewedQueue's filter side by side, not from any tool.
+
+One thing worth naming since the brief asked for it explicitly: the smallest of the three findings
+this pass (isReviewable's comment claiming it guards promote when promote was never switched onto
+it) was found by treating "the branch changed a shared comment" as reason enough to check every name
+the comment lists against the diff, not by any test or tool surfacing it — a plain reading of one
+paragraph against one diff. No tool cost a round this pass; `--args-from` was accepted on the first
+attempt once every finding's long-form reproduction was moved into a separate `--evidence` block
+instead of folded into `--finding`'s own title line, which the command's own usage text says
+explicitly but is easy to miss when a finding's title is the most natural place to put the
+reproduction.
+
