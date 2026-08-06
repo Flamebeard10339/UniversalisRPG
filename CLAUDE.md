@@ -20,7 +20,7 @@ A file drifting toward heavy commenting is a design signal — read it as "this 
 
 Do not bloat CLAUDE.md with over 200 lines of instructions. 
 
-`.planning/.scratch.md` contains open thoughts. Vetted work, its state, and its archive all live in `docs/tasks.jsonl`, reached through `npm run tasks` — `tasks next` for what to work on, `tasks show <id>` for a task's full record. A branch's own spec lives at `docs/specs/<slug>.md`. `docs/workflow.md` is the end-to-end protocol every agent follows — decompose against disjoint `writes` grants, grade the set with `tasks plan` before dispatching it, and let a worker correct its own grant, and register what it produces, before it writes code. `.planning/agent-swarm-theory.md` holds what a planner owes the tree — read it before decomposing a finding list into worker chunks.
+`.planning/.scratch.md` contains open thoughts — gitignored, so it exists only in the main checkout and an agent in a worktree cannot read it. Vetted work, its state, and its archive all live in `docs/tasks.jsonl`, reached through `npm run tasks` — `tasks next` for what to work on, `tasks show <id>` for a task's full record. A branch's own spec lives at `docs/specs/<slug>.md`. `docs/workflow.md` is the end-to-end protocol every agent follows — decompose against disjoint `writes` grants, grade the set with `tasks plan` before dispatching it, and let a worker correct its own grant, and register what it produces, before it writes code. `.planning/agent-swarm-theory.md` holds what a planner owes the tree — read it before decomposing a finding list into worker chunks.
 
 # Wisdom that reduces audit issues
 - Enforce where a value is assembled, not where it is written
@@ -71,6 +71,6 @@ The auditor's brief is generated, never hand-written: `npm run tasks -- audit-pr
 - progress signals get lightweight UI acknowledgement (e.g. map tab flashing on location discovery)
 - record a regression as a `# test` section via `/create-test` rather than writing an ad-hoc script
 - the dev-only `window.__test` browser harness (batched checks via `window.__test.batch([...])`) was removed with the legacy GUI; pending the GUI rebuild, reintroduce it rather than reaching for ad-hoc `page.evaluate`/screenshot loops
-- manually clearing browser storage does not reliably give you a fresh state. Use `/cheat reset`
+- there is no browser storage to clear and no reset command: `play-cli` starts fresh every run, and a `# save` fixture is how a session starts anywhere else. `single-dev-mode` is where a reset lands once there is a store to reset
 
 
