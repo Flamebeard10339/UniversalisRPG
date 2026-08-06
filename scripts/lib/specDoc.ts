@@ -5,12 +5,15 @@ export interface ProofClause {
   proofTargets?: string[];
 }
 
-// `unmet` is "we checked and it fails"; `unknown` is "nobody looked". They
-// are different facts about a clause and no reader of this module may
-// collapse them.
-export type Verdict = 'met' | 'unmet' | 'unknown';
+// `unmet` is "we checked and it fails"; `unknown` is "nobody looked";
+// `deferred` is "we checked, it fails, and the spec's goal is still served
+// without it" — the honest way to drop scope, converted elsewhere into a
+// tracked `undelivered` record rather than deleted. They are different facts
+// about a clause and no reader of this module may collapse any of them,
+// least of all `deferred` into `unmet`.
+export type Verdict = 'met' | 'unmet' | 'unknown' | 'deferred';
 
-export const VERDICTS: readonly Verdict[] = ['met', 'unmet', 'unknown'];
+export const VERDICTS: readonly Verdict[] = ['met', 'unmet', 'unknown', 'deferred'];
 
 export interface AuditVerdict {
   clause: number;
@@ -28,6 +31,10 @@ export interface AuditPass {
 
 export interface SpecDoc {
   deliverableSection: string;
+  // One line, distinct from the deliverable prose: what the branch is *for*,
+  // which is what a deferred clause is judged against. Null when the spec
+  // carries no `## Goal` section.
+  goal: string | null;
   proofClauses: ProofClause[];
   auditPasses: AuditPass[];
 }
@@ -202,6 +209,20 @@ function parseAuditPasses(text: string): AuditPass[] {
   });
 }
 
+// The first non-blank line of `## Goal`, not the whole section: the
+// Deliverable's own prose is the argument, and a goal that could run past one
+// line would just be a second copy of it.
+function parseGoal(lines: string[]): string | null {
+  const section = sectionText(lines, '## Goal');
+  if (!section) return null;
+  const line = section.text
+    .split('\n')
+    .slice(1)
+    .map((entry) => entry.trim())
+    .find((entry) => entry !== '');
+  return line ?? null;
+}
+
 export function parseSpecDoc(rawText: string): SpecDoc {
   const text = lfOnly(rawText);
   const lines = text.split('\n');
@@ -209,6 +230,7 @@ export function parseSpecDoc(rawText: string): SpecDoc {
   const deliverableSection = deliverable ? deliverable.text : '';
   return {
     deliverableSection,
+    goal: parseGoal(lines),
     proofClauses: parseProofClauses(deliverableSection, auditedClauseIds(text)),
     auditPasses: parseAuditPasses(text),
   };
@@ -249,10 +271,14 @@ export function clauseStandings(clauses: ProofClause[], graded: AuditVerdict[] =
 
 // Completeness as names, never as a ratio or a bit: which clause is
 // outstanding is the actionable part, and each keeps its own status so
-// "nobody looked" is never read as "we checked and it fails".
+// "nobody looked" is never read as "we checked and it fails". `deferred`
+// joins `met` off this list for the same reason it stops blocking
+// merge-ready's clauses leg: it converted into a tracked `undelivered`
+// record, so nothing here is still waiting on it — a caller that wants to
+// say a deferral happened reads the verdict itself, not this summary.
 export function outstandingSummary(verdicts: AuditVerdict[]): string {
   if (verdicts.length === 0) return 'no clause to grade';
-  const outstanding = verdicts.filter((verdict) => verdict.status !== 'met');
+  const outstanding = verdicts.filter((verdict) => verdict.status !== 'met' && verdict.status !== 'deferred');
   if (outstanding.length === 0) return 'no clause outstanding';
   return `outstanding: ${outstanding.map((verdict) => `c${verdict.clause} (${verdict.status})`).join(', ')}`;
 }

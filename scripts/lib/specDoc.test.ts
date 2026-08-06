@@ -296,6 +296,20 @@ describe('appendAuditPass / renderAuditPass round trip', () => {
     expect(auditPasses[0].verdicts).toEqual([{ clause: 1, status: 'met', evidence: 'measured 70ms' }]);
   });
 
+  // c1: deferred is a fourth verdict, parsed, rendered and round-tripped
+  // like the other three.
+  it('round-trips a deferred verdict, with its reason, the same way a met one round-trips its evidence', () => {
+    const withPass = appendAuditPass(DOC, {
+      pass: 1,
+      date: '2026-08-06',
+      base: 'a',
+      head: 'b',
+      verdicts: [{ clause: 1, status: 'deferred', evidence: 'the goal is still served without it' }],
+    });
+    expect(withPass).toContain('- proof 1: deferred — the goal is still served without it');
+    expect(parseSpecDoc(withPass).auditPasses[0].verdicts).toEqual([{ clause: 1, status: 'deferred', evidence: 'the goal is still served without it' }]);
+  });
+
   it('round-trips an unknown verdict without turning it into unmet', () => {
     const withPass = appendAuditPass(DOC, {
       pass: 1,
@@ -345,8 +359,41 @@ describe('clauseStandings / outstandingSummary', () => {
     expect(outstandingSummary([{ clause: 1, status: 'met', evidence: 'measured' }])).toBe('no clause outstanding');
   });
 
+  // c3: a deferred clause converted into a tracked undelivered record, so it
+  // is off the outstanding list the same way met is — never grouped with the
+  // clauses still owed to this spec.
+  it('takes a deferred clause off the outstanding list, the same way a met one is', () => {
+    const summary = outstandingSummary([
+      { clause: 1, status: 'met', evidence: 'measured' },
+      { clause: 2, status: 'deferred', evidence: 'the goal still holds without it' },
+      { clause: 3, status: 'unmet', evidence: null },
+    ]);
+    expect(summary).toBe('outstanding: c3 (unmet)');
+  });
+
+  it('says nothing is outstanding when every clause is met or deferred', () => {
+    expect(outstandingSummary([{ clause: 1, status: 'deferred', evidence: 'covered elsewhere' }])).toBe('no clause outstanding');
+  });
+
   it('reports a spec with no clauses at all as having none to grade, not as complete', () => {
     expect(outstandingSummary([])).toBe('no clause to grade');
+  });
+});
+
+// c5: a spec carries a goal, one line, distinct from its clause list.
+describe('parseSpecDoc, the goal', () => {
+  it('reads the first non-blank line under ## Goal', () => {
+    const doc = '## Deliverable\n\nPromise.\n\n## Goal\n\nWhat this branch is for.\n\n## Decisions\n';
+    expect(parseSpecDoc(doc).goal).toBe('What this branch is for.');
+  });
+
+  it('is null when the spec carries no ## Goal section', () => {
+    expect(parseSpecDoc(DOC).goal).toBe(null);
+  });
+
+  it('takes only the first line, leaving anything past it out of the goal', () => {
+    const doc = '## Deliverable\n\nPromise.\n\n## Goal\n\nThe one-line goal.\nA second line that is not part of it.\n\n## Decisions\n';
+    expect(parseSpecDoc(doc).goal).toBe('The one-line goal.');
   });
 });
 
