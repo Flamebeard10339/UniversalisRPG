@@ -1,9 +1,11 @@
 import { spawn, spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { checkBytes, type ByteFinding } from '../lib/bytes';
+import { loadEvents, type TaskEvent } from '../lib/eventLog';
 import * as git from '../lib/git';
 import { trackedFiles } from '../lib/sourceFiles';
-import { clauseStandings, parseSpecDoc, type SpecDoc } from '../lib/specDoc';
+import { clauseStandings, parseSpecDoc, type ProofClause, type SpecDoc } from '../lib/specDoc';
+import { pathsOverlap } from '../lib/systems';
 import { unreviewedFiledBy, type Task } from '../lib/taskStore';
 import type { Flags } from './cli';
 import { DEFAULT_BRANCH, readStore, resolveActiveSpec, resolveConfig, specFile, specsWrittenFromBranch, type Config } from './context';
@@ -213,21 +215,31 @@ export async function runMergeReady(deps: MergeReadyDeps): Promise<boolean> {
   return false;
 }
 
-// A planning branch's output is a spec for a later branch, and the gate read
-// that spec as a debt: three members open because nobody had implemented them
-// and no audit pass because there was nothing yet to audit, both true and
-// neither a defect. Told apart from a contract by two facts nobody has to
-// declare — the file is absent from the base branch, so this branch wrote it,
-// and every member is still open, so nothing here was ever worked against it.
-// A spec authored and never decomposed is not a plan: nothing was promised to
-// a later branch until the work was named.
+// A planning branch's output is a spec for a later branch, told apart from a
+// contract by two facts nobody has to declare: this branch's head carries a
+// clause id the base branch does not, and every member is still open, so
+// nothing here was ever worked against it. A spec authored and never
+// decomposed is not a plan: nothing was promised to a later branch until the
+// work was named.
 //
-// `onBaseBranch` is null when git could not be asked — an unresolvable base
-// ref, no repository — and that reads as "not shown to be a plan" rather than
-// as "this branch wrote it". A gate whose exemption widens when its evidence
-// disappears is the wrong way round.
-export function authoredAsPlan(members: Task[], onBaseBranch: boolean | null): boolean {
-  return onBaseBranch === false && members.length > 0 && members.every((member) => member.state === 'open');
+// `headAddsClauseId` is null when git could not answer at all — an
+// unresolvable base ref, no repository — and that reads as "not shown to add
+// one" rather than as "this branch wrote it". A gate whose exemption widens
+// when its evidence disappears is the wrong way round.
+export function authoredAsPlan(members: Task[], headAddsClauseId: boolean | null): boolean {
+  return headAddsClauseId === true && members.length > 0 && members.every((member) => member.state === 'open');
+}
+
+// Clause identity is the id `stampClauseIds` writes into the text, not the
+// wording — rewording and reordering are exactly what stamping is for
+// leaving alone. Directional on purpose: authorship only ever *adds* an id,
+// so only a head id absent from base is evidence of it. Corruption of any
+// shape only ever removes ids, from one bullet to the whole file, so it can
+// never satisfy this on its own — and a respec that purely deletes a clause
+// is refused the exemption along with it, which is the safe direction.
+export function headAddsClauseId(base: ProofClause[], head: ProofClause[]): boolean {
+  const baseIds = new Set(base.map((clause) => clause.id));
+  return head.some((clause) => !baseIds.has(clause.id));
 }
 
 export interface SpecCandidate {
@@ -256,6 +268,14 @@ export interface SpecFacts {
   // first.
   written: string[];
   isPlan: (spec: string) => boolean;
+  // False for a spec this branch shows no real evidence of working — its
+  // diff never touched the spec's write region and no `start`/`stop`/`done`
+  // event names one of its members. Recording a note against a spec is a
+  // store write, not work against it, and a candidate that fails this is
+  // dropped before it can be graded as either a plan or a debt. True when
+  // the diff could not be read at all: the exemption from being asked must
+  // not widen just because git had no answer.
+  touchedWriteRegion: (spec: string) => boolean;
 }
 
 export type SpecDecision = Pick<BranchStanding, 'spec' | 'specNote' | 'specAuthoredHere'>;
@@ -267,11 +287,14 @@ export type SpecDecision = Pick<BranchStanding, 'spec' | 'specNote' | 'specAutho
 // green and `tsc` clean.
 export function decideSpec(facts: SpecFacts): SpecDecision {
   const ordered = facts.activeSpec === null ? [] : [facts.activeSpec, ...facts.written.filter((spec) => spec !== facts.activeSpec)];
-  const graded = specToGrade(ordered.map((spec) => ({ spec, authoredAsPlan: facts.isPlan(spec) })));
+  const touched = ordered.filter((spec) => facts.touchedWriteRegion(spec));
+  const graded = specToGrade(touched.map((spec) => ({ spec, authoredAsPlan: facts.isPlan(spec) })));
   if (graded === null) return { spec: null, specNote: null, specAuthoredHere: false };
+  if (graded.spec === facts.activeSpec) return { spec: graded.spec, specNote: facts.activeNote, specAuthoredHere: graded.authoredAsPlan };
+  const activeReason = facts.activeSpec !== null && !facts.touchedWriteRegion(facts.activeSpec) ? `${facts.activeSpec} was not shown to be touched by this branch's diff` : `${facts.activeSpec} is a plan this branch wrote`;
   return {
     spec: graded.spec,
-    specNote: graded.spec === facts.activeSpec ? facts.activeNote : `spec chosen by the gate: ${graded.spec} — ${facts.activeSpec} is a plan this branch wrote, and ${graded.spec} is a spec it owes`,
+    specNote: `spec chosen by the gate: ${graded.spec} — ${activeReason}, and ${graded.spec} is a spec it owes`,
     specAuthoredHere: graded.authoredAsPlan,
   };
 }
@@ -279,7 +302,7 @@ export function decideSpec(facts: SpecFacts): SpecDecision {
 // The reads a session was making by hand — `git status`, `git rev-parse`
 // plus `git merge-base`, `tasks spec show` twice — collected once so the
 // answer is a leg rather than a research task.
-function branchStanding(config: Config, baseBranch: string): BranchStanding {
+export function branchStanding(config: Config, baseBranch: string): BranchStanding {
   const status = spawnSync('git', ['status', '--porcelain'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
   const dirty = (status.stdout ?? '')
     .split('\n')
@@ -289,16 +312,25 @@ function branchStanding(config: Config, baseBranch: string): BranchStanding {
   const base = git.mergeBase(baseBranch);
   const baseHead = git.resolveCommit(baseBranch);
   const tasks = readStore(config);
+  const events = loadEvents(config.eventsPath).events;
   const active = resolveActiveSpec(config, tasks, undefined);
   const membersOf = (spec: string): Task[] => tasks.filter((task) => task.spec === spec);
+  const changed = changedFiles(base);
 
   const decision = decideSpec({
     activeSpec: active.spec,
     activeNote: active.note,
     written: specsWrittenFromBranch(config),
-    // Null when git cannot be asked at all, so `authoredAsPlan` can tell "the
-    // base branch does not have this file" from "there was no answer".
-    isPlan: (spec) => authoredAsPlan(membersOf(spec), baseHead === null ? null : git.fileAt(baseBranch, specFile(config, spec)) !== null),
+    isPlan: (spec) => authoredAsPlan(membersOf(spec), specAddsClauseId(config, baseBranch, baseHead, spec)),
+    // A declared `writes` grant is a forecast, and the diff is only the
+    // stronger of two kinds of evidence: a `start`/`stop`/`done` event
+    // against one of the spec's members is a record that work happened,
+    // even when it landed outside what the member declared.
+    touchedWriteRegion: (spec) => {
+      const members = membersOf(spec);
+      const region = [specFile(config, spec), ...members.flatMap((task) => task.writes)];
+      return diffTouchesRegion(changed, region) || branchWorkedOnMembers(events, config.branch, new Set(members.map((task) => task.id)));
+    },
   });
   const spec = decision.spec;
 
@@ -321,6 +353,51 @@ function branchStanding(config: Config, baseBranch: string): BranchStanding {
     auditPasses: doc?.auditPasses.length ?? 0,
     doctorWarnings: doctorIssues(config, tasks).length,
   };
+}
+
+// The paths this branch's own commits touched, relative to the merge base —
+// not `baseBranch`'s tip, which would also carry every commit landed there
+// since this branch forked. Null when there is no merge base to diff from.
+export function changedFiles(base: string | null): string[] | null {
+  if (base === null) return null;
+  const result = spawnSync('git', ['diff', '--name-only', `${base}..HEAD`], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
+  if (result.status !== 0) return null;
+  const text = result.stdout.trim();
+  return text === '' ? [] : text.split('\n');
+}
+
+// True when `changed` is unknown — the exemption `touchedWriteRegion` gates
+// must not widen just because the diff could not be read — or when some
+// changed path falls inside some region.
+export function diffTouchesRegion(changed: string[] | null, region: string[]): boolean {
+  return changed === null || changed.some((file) => region.some((path) => pathsOverlap(file, path)));
+}
+
+const WORK_OPS = new Set(['start', 'stop', 'done']);
+
+// A `start`/`stop`/`done` event against a member is a record that work
+// happened, not an annotation of the spec — a bare `note` or `decision`
+// carries no such claim and must not count, however open the member still
+// reads. `id`, not `spec`: a member's own current spec pointer is what
+// `touchedWriteRegion` is asking about, not whichever spec the event was
+// filed under before any later re-pointing.
+export function branchWorkedOnMembers(events: TaskEvent[], branch: string, memberIds: Set<string>): boolean {
+  return events.some((event) => event.branch === branch && event.id !== null && memberIds.has(event.id) && WORK_OPS.has(event.op));
+}
+
+// `headAddsClauseId` needs both sides parsed: the base branch's copy of the
+// spec, read through git rather than the working tree, and this branch's.
+// Absent from base parses as no clauses, so any head clause counts as new —
+// the same fact the old file-existence test captured, folded into the
+// comparison this one runs instead. A head that fails to parse at all — the
+// file missing, unreadable, or corrupted past recognition — reads the same
+// way: no clauses read, so nothing there can be new.
+export function specAddsClauseId(config: Config, baseBranch: string, baseHead: string | null, spec: string): boolean | null {
+  if (baseHead === null) return null;
+  const baseText = git.fileAt(baseBranch, specFile(config, spec));
+  const baseClauses = baseText === null ? [] : parseSpecDoc(baseText).proofClauses;
+  const headClauses = readSpecDoc(config, spec)?.proofClauses ?? [];
+  return headAddsClauseId(baseClauses, headClauses);
 }
 
 function readSpecDoc(config: Config, spec: string): SpecDoc | null {

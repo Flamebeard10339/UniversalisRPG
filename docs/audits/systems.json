@@ -335,6 +335,22 @@
             "scripts/tasks/audit.ts"
           ],
           "note": "produced by a-clause-can-be-deferred-and-a-spec-can-carry-its-goal"
+        },
+        {
+          "name": "non-interactive triage",
+          "paths": [
+            "scripts/tasks/triage.ts",
+            "scripts/tasks/records.ts",
+            "scripts/tasks/commands.ts"
+          ],
+          "note": "produced by every-triage-action-has-a-non-interactive-form: tasks defer/redirect/ask, and the TRIAGE_ACTIONS table cmdTriage dispatches from"
+        },
+        {
+          "name": "spec ownership inference",
+          "paths": [
+            "scripts/tasks/mergeReady.ts"
+          ],
+          "note": "produced by a-branch-knows-which-spec-it-owes"
         }
       ]
     },
