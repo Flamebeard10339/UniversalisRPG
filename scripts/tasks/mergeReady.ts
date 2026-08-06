@@ -3,7 +3,8 @@ import { readFileSync } from 'node:fs';
 import { checkBytes, type ByteFinding } from '../lib/bytes';
 import * as git from '../lib/git';
 import { trackedFiles } from '../lib/sourceFiles';
-import { clauseStandings, parseSpecDoc, type SpecDoc } from '../lib/specDoc';
+import { clauseStandings, parseSpecDoc, type ProofClause, type SpecDoc } from '../lib/specDoc';
+import { pathsOverlap } from '../lib/systems';
 import { unreviewedFiledBy, type Task } from '../lib/taskStore';
 import type { Flags } from './cli';
 import { DEFAULT_BRANCH, readStore, resolveActiveSpec, resolveConfig, specFile, specsWrittenFromBranch, type Config } from './context';
@@ -203,21 +204,30 @@ export async function runMergeReady(deps: MergeReadyDeps): Promise<boolean> {
   return false;
 }
 
-// A planning branch's output is a spec for a later branch, and the gate read
-// that spec as a debt: three members open because nobody had implemented them
-// and no audit pass because there was nothing yet to audit, both true and
-// neither a defect. Told apart from a contract by two facts nobody has to
-// declare — the file is absent from the base branch, so this branch wrote it,
-// and every member is still open, so nothing here was ever worked against it.
-// A spec authored and never decomposed is not a plan: nothing was promised to
-// a later branch until the work was named.
+// A planning branch's output is a spec for a later branch, told apart from a
+// contract by two facts nobody has to declare: this branch's parsed clause
+// list differs from the base branch's, and every member is still open, so
+// nothing here was ever worked against it. A spec authored and never
+// decomposed is not a plan: nothing was promised to a later branch until the
+// work was named.
 //
-// `onBaseBranch` is null when git could not be asked — an unresolvable base
-// ref, no repository — and that reads as "not shown to be a plan" rather than
-// as "this branch wrote it". A gate whose exemption widens when its evidence
-// disappears is the wrong way round.
-export function authoredAsPlan(members: Task[], onBaseBranch: boolean | null): boolean {
-  return onBaseBranch === false && members.length > 0 && members.every((member) => member.state === 'open');
+// `clausesDiffer` is null when git could not answer at all — an unresolvable
+// base ref, no repository — and that reads as "not shown to differ" rather
+// than as "this branch wrote it". A gate whose exemption widens when its
+// evidence disappears is the wrong way round.
+export function authoredAsPlan(members: Task[], clausesDiffer: boolean | null): boolean {
+  return clausesDiffer === true && members.length > 0 && members.every((member) => member.state === 'open');
+}
+
+// Clause identity is the id `stampClauseIds` writes into the text, not the
+// wording — rewording and reordering are exactly what stamping is for
+// leaving alone. So authorship is a change in the set of ids, not a diff of
+// the text: a spec whose clauses were merely reworded is not "authored here"
+// by this test, even though its bytes changed.
+export function clauseIdsDiffer(base: ProofClause[], head: ProofClause[]): boolean {
+  const baseIds = new Set(base.map((clause) => clause.id));
+  const headIds = new Set(head.map((clause) => clause.id));
+  return baseIds.size !== headIds.size || [...headIds].some((id) => !baseIds.has(id));
 }
 
 export interface SpecCandidate {
@@ -246,6 +256,12 @@ export interface SpecFacts {
   // first.
   written: string[];
   isPlan: (spec: string) => boolean;
+  // False for a spec this branch's diff never touched — recording a note
+  // against a spec is a store write, not work against it, and a candidate
+  // that fails this is dropped before it can be graded as either a plan or a
+  // debt. True when the question could not be asked at all: the exemption
+  // from being asked must not widen just because git had no answer.
+  touchedWriteRegion: (spec: string) => boolean;
 }
 
 export type SpecDecision = Pick<BranchStanding, 'spec' | 'specNote' | 'specAuthoredHere'>;
@@ -257,11 +273,14 @@ export type SpecDecision = Pick<BranchStanding, 'spec' | 'specNote' | 'specAutho
 // green and `tsc` clean.
 export function decideSpec(facts: SpecFacts): SpecDecision {
   const ordered = facts.activeSpec === null ? [] : [facts.activeSpec, ...facts.written.filter((spec) => spec !== facts.activeSpec)];
-  const graded = specToGrade(ordered.map((spec) => ({ spec, authoredAsPlan: facts.isPlan(spec) })));
+  const touched = ordered.filter((spec) => facts.touchedWriteRegion(spec));
+  const graded = specToGrade(touched.map((spec) => ({ spec, authoredAsPlan: facts.isPlan(spec) })));
   if (graded === null) return { spec: null, specNote: null, specAuthoredHere: false };
+  if (graded.spec === facts.activeSpec) return { spec: graded.spec, specNote: facts.activeNote, specAuthoredHere: graded.authoredAsPlan };
+  const activeReason = facts.activeSpec !== null && !facts.touchedWriteRegion(facts.activeSpec) ? `${facts.activeSpec} was not shown to be touched by this branch's diff` : `${facts.activeSpec} is a plan this branch wrote`;
   return {
     spec: graded.spec,
-    specNote: graded.spec === facts.activeSpec ? facts.activeNote : `spec chosen by the gate: ${graded.spec} — ${facts.activeSpec} is a plan this branch wrote, and ${graded.spec} is a spec it owes`,
+    specNote: `spec chosen by the gate: ${graded.spec} — ${activeReason}, and ${graded.spec} is a spec it owes`,
     specAuthoredHere: graded.authoredAsPlan,
   };
 }
@@ -281,14 +300,14 @@ function branchStanding(config: Config, baseBranch: string): BranchStanding {
   const tasks = readStore(config);
   const active = resolveActiveSpec(config, tasks, undefined);
   const membersOf = (spec: string): Task[] => tasks.filter((task) => task.spec === spec);
+  const changed = changedFiles(base);
 
   const decision = decideSpec({
     activeSpec: active.spec,
     activeNote: active.note,
     written: specsWrittenFromBranch(config),
-    // Null when git cannot be asked at all, so `authoredAsPlan` can tell "the
-    // base branch does not have this file" from "there was no answer".
-    isPlan: (spec) => authoredAsPlan(membersOf(spec), baseHead === null ? null : git.fileAt(baseBranch, specFile(config, spec)) !== null),
+    isPlan: (spec) => authoredAsPlan(membersOf(spec), specClausesDiffer(config, baseBranch, baseHead, spec)),
+    touchedWriteRegion: (spec) => diffTouchesRegion(changed, [specFile(config, spec), ...membersOf(spec).flatMap((task) => task.writes)]),
   });
   const spec = decision.spec;
 
@@ -310,6 +329,36 @@ function branchStanding(config: Config, baseBranch: string): BranchStanding {
     auditPasses: doc?.auditPasses.length ?? 0,
     doctorWarnings: doctorIssues(config, tasks).length,
   };
+}
+
+// The paths this branch's own commits touched, relative to the merge base —
+// not `baseBranch`'s tip, which would also carry every commit landed there
+// since this branch forked. Null when there is no merge base to diff from.
+export function changedFiles(base: string | null): string[] | null {
+  if (base === null) return null;
+  const result = spawnSync('git', ['diff', '--name-only', `${base}..HEAD`], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
+  if (result.status !== 0) return null;
+  const text = result.stdout.trim();
+  return text === '' ? [] : text.split('\n');
+}
+
+// True when `changed` is unknown — the exemption `touchedWriteRegion` gates
+// must not widen just because the diff could not be read — or when some
+// changed path falls inside some region.
+export function diffTouchesRegion(changed: string[] | null, region: string[]): boolean {
+  return changed === null || changed.some((file) => region.some((path) => pathsOverlap(file, path)));
+}
+
+// `clauseIdsDiffer` needs both sides parsed: the base branch's copy of the
+// spec, read through git rather than the working tree, and this branch's.
+// Absent from base parses as no clauses, which differs from any real
+// deliverable — the same fact the old file-existence test captured, folded
+// into the comparison this one runs instead.
+export function specClausesDiffer(config: Config, baseBranch: string, baseHead: string | null, spec: string): boolean | null {
+  if (baseHead === null) return null;
+  const baseText = git.fileAt(baseBranch, specFile(config, spec));
+  const baseClauses = baseText === null ? [] : parseSpecDoc(baseText).proofClauses;
+  return clauseIdsDiffer(baseClauses, readSpecDoc(config, spec)?.proofClauses ?? []);
 }
 
 function readSpecDoc(config: Config, spec: string): SpecDoc | null {
