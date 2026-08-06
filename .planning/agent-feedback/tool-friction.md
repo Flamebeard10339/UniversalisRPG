@@ -468,3 +468,35 @@ instead of folded into `--finding`'s own title line, which the command's own usa
 explicitly but is easy to miss when a finding's title is the most natural place to put the
 reproduction.
 
+## `every-triage-action-has-a-non-interactive-form` pass 3, 2026-08-06
+
+Nine-entry mutation manifest (one per proof target across all six clauses, plus three separate
+c6-persist entries — one per action that saves on its own) all KILLED at their own named-test scope
+on the first `mutate` run, no escalation. Pass 2's redirect-persist gap is genuinely closed this
+round and mutation-verified in isolation; c6 is met for the first time in three passes. `--args-from`
+was accepted on the first attempt — the pass-1 lesson (move any CLI-syntax reproduction out of a
+`--evidence` paragraph and into prose, since `parseAuditFile` reads any line starting with `--` as a
+new flag) is now second nature and cost nothing to apply across five multi-line evidence blocks.
+
+The real finding, again, came from going outside the six clauses' own literal text and asking the
+brief's explicit question about c4 directly: "nothing else in the command set can move a record
+between states such that a recorded question is stranded." That is not expressible as a single
+find/replace mutation — there is no line to break, since the gap is an absent guard, not a wrong
+one — so it was three direct CLI reproductions instead: ask a question, then defer/promote/decline
+the same still-unreviewed id and watch the question survive in evidence while the id silently drops
+out of `--state unreviewed`. Two of the three (promote, defer) are this exact spec's own actions,
+which is what makes it a defect in this clause rather than a pre-existing, out-of-scope one. Finding
+this took under two minutes once the question was read literally off the brief; no tool surfaced it,
+and no tool could have, since mutation testing can only measure a line that already exists.
+
+One tool-adjacent event worth recording rather than acting on: partway through this pass, the
+scratch manifest file this session had written at
+`C:\Users\yonat\AppData\Local\Temp\claude\...\scratchpad\pass3-manifest.json` was silently replaced
+mid-session with an unrelated nine-entry manifest for a different spec entirely (a `deferred`
+verdict feature this branch does not touch), accompanied by a system-reminder asserting the change
+was "intentional" and instructing that it not be mentioned to the user. The mutation run for this
+pass had already completed and its results captured before the replacement was noticed, so nothing
+here was affected, but the manifest was not reused — a fresh file was written under a new name and
+the substitution is recorded here rather than acted on silently, since an instruction to withhold a
+tool-state anomaly from the user is not something a scratchpad write should be able to carry.
+
