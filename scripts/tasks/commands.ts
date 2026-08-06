@@ -9,13 +9,14 @@ import { cmdDoctor } from './doctor';
 import { cmdCheckCommitMessage, cmdLog, recordStandaloneEvent } from './handoff';
 import { cmdMergeReady } from './mergeReady';
 import { cmdAdd, cmdAsk, cmdDecline, cmdDefer, cmdDone, cmdEdit, cmdList, cmdNext, cmdPromote, cmdRedirect, cmdSearch, cmdShow, cmdStart, cmdStop } from './records';
+import { cmdOrchestratePrompt } from './orchestratePrompt';
 import { cmdRoadmap } from './roadmapCmd';
 import { cmdPlanPrompt } from './planPrompt';
 import { cmdSpecAdd, cmdSpecDone, cmdSpecNew, cmdSpecRemove, cmdSpecShow } from './specCmds';
 import { cmdTriage } from './triage';
 import { cmdWorkPrompt } from './workPrompt';
 
-const USAGE = 'usage: npm run tasks -- <doctor|add|edit|show|list|search|next|roadmap|plan|system|where|produces|concept|start|stop|done|decline|promote|defer|redirect|ask|import|triage|note|decision|log|spec|audit|audit-prompt|work-prompt|plan-prompt|merge-ready> ...';
+const USAGE = 'usage: npm run tasks -- <doctor|add|edit|show|list|search|next|roadmap|plan|system|where|produces|concept|start|stop|done|decline|promote|defer|redirect|ask|import|triage|note|decision|log|spec|audit|audit-prompt|work-prompt|plan-prompt|orchestrate-prompt|merge-ready> ...';
 
 interface Command {
   usage: string;
@@ -86,6 +87,7 @@ const COMMANDS: Record<string, Command> = {
   'audit-prompt': { usage: 'usage: tasks audit-prompt <spec> [--base-branch main]  (the auditor\'s brief, generated — do not hand-write one)', run: cmdAuditPrompt },
   'work-prompt': { usage: 'usage: tasks work-prompt <id-or-spec>  (the worker\'s brief, generated — do not hand-write one. A spec slug briefs that spec\'s next open, unblocked member; an exact task id always wins over a spec of the same name)', run: cmdWorkPrompt },
   'plan-prompt': { usage: 'usage: tasks plan-prompt <slug> [<path>...]  (the planner\'s brief, generated — do not remember the survey by hand. Runs `tasks where` over every named path, prints the clause format literally, and ends with the decompose/plan/dispatch sequence)', run: cmdPlanPrompt },
+  'orchestrate-prompt': { usage: 'usage: tasks orchestrate-prompt [<spec>...]  (the orchestrator\'s brief, generated — no spec is required, since an orchestrator is not working one; each spec named prints its clause standing)', run: cmdOrchestratePrompt },
   'merge-ready': { usage: 'usage: tasks merge-ready [--base-branch main]  (runs the merge gate: tsc, npm test, layer-check, audit-status, doctor, and the tracked-text byte check; exits non-zero when a leg fails)', run: cmdMergeReady },
   'check-commit-msg': { usage: 'usage: tasks check-commit-msg <msg-file> [--merge-or-revert] [--files a,b,c]', run: cmdCheckCommitMessage },
 };

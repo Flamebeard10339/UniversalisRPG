@@ -9,6 +9,7 @@ import { appendAuditPass, clauseStandings, duplicateClauseIds, outstandingSummar
 import { priorArt } from '../lib/producers';
 import { loadStore, nextSeq, type Severity, type Task } from '../lib/taskStore';
 import { architecture, ownership, printPriorArt } from './architectureCmds';
+import { AUDITOR_LESSONS, printLessons } from './briefLessons';
 import type { Flags } from './cli';
 import { readStore, recordEvents, type Config, refuseUnknownSpec, knownSpecs, reportUnknownSpec, resolveActiveSpec, resolveConfig, saveStoreAndWarn, slugify, specFile, subjectOf, today, uniqueId } from './context';
 import { activePrompter } from './prompt';
@@ -650,6 +651,8 @@ export function cmdAuditPrompt(args: Flags, usage: string): void {
   console.log('');
   console.log('Look specifically for:');
   for (const item of AUDIT_CHECKLIST) console.log(`- ${item}`);
+  console.log('');
+  printLessons('What repeated passes had to learn the hard way — carry it forward:', AUDITOR_LESSONS);
   console.log('');
   console.log('You file findings; you never promote them. Triage is a separate step with a separate actor, and its rule differs by pass: a branch\'s own first-pass findings are promoted without a walk, so a HIGH you file here will be scheduled without anyone asking you again; from pass 2 on, promotion extends what the spec already owes and waits for a human. Say plainly which of yours you believe this branch must not merge without.');
   console.log('Every finding needs both halves: what is broken, and what fixing it would mean.');

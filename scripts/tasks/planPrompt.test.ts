@@ -85,3 +85,37 @@ describe('tasks plan-prompt', () => {
       expect(result.stdout).toContain('5. Dispatch a worker with one instruction: run `npm run tasks -- work-prompt <id>` and do what it says.');
     }));
 });
+
+// briefs-carry-the-lessons c3: the four planner instructions the
+// 2026-08-06 orchestrated run's contract-fault records paid for. Each is its
+// own test naming the literal text, not a loop over `PLANNER_LESSONS` itself
+// — a loop over the array under test would still pass with the array
+// emptied.
+describe('plan-prompt carries the lessons a prior run paid for', () => {
+  it('carries the state-the-invariant rule', () =>
+    fixture(({ tasks }) => {
+      const result = tasks('plan-prompt', 'demo-spec');
+      expect(result.stdout).toContain('State the invariant.');
+      expect(result.stdout).toContain('Offer instances as illustration, never as extent.');
+    }));
+
+  it('carries the guard-placement rule', () =>
+    fixture(({ tasks }) => {
+      const result = tasks('plan-prompt', 'demo-spec');
+      expect(result.stdout).toContain('When a clause requires a guard, name the point at which it must act.');
+      expect(result.stdout).toContain('Enforce where a value is assembled, not where it is read.');
+    }));
+
+  it('carries the who-else-computes-this rule', () =>
+    fixture(({ tasks }) => {
+      const result = tasks('plan-prompt', 'demo-spec');
+      expect(result.stdout).toContain('Ask who else computes this answer.');
+    }));
+
+  it('carries the name-what-the-worker-may-decide rule', () =>
+    fixture(({ tasks }) => {
+      const result = tasks('plan-prompt', 'demo-spec');
+      expect(result.stdout).toContain('Name what the worker may decide.');
+      expect(result.stdout).toContain('## Open questions');
+    }));
+});

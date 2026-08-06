@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { tsxCli } from '../lib/tsxCli';
 import { parseManifest, refusalsFor } from '../mutate';
 import { auditArgsSkeleton, hasVisibleContent, indexSuiteTitles, manifestNotes, mutationManifest, nextAfterPass, UNAIMED_FILE, UNRETARGETED, parseAuditArgs, parseAuditFile, parseCommitLog, slugStanding, slugStandingLines, toolLines, unresolvedTarget, type SlugStanding, type TargetResolution } from './audit';
+import { MAX_LESSON_COUNT, totalLessonCount } from './briefLessons';
 import { appendEvent, firstListedId, fixture, gitFixture, relevantFilesBlock, repoRoot, script, stepsBlock, type Run } from './cliFixtures';
 
 describe('tasks CLI', () => {
@@ -1801,5 +1802,56 @@ describe('an audit pass read from a file', () => {
       expect(result.status).toBe(1);
       expect(result.stderr).toContain('--args-from could not read');
     });
+  });
+});
+
+// briefs-carry-the-lessons c2: the five auditor instructions the
+// 2026-08-06 orchestrated run paid for, from fourteen audit passes. Each is
+// its own test naming the literal text, not a loop over `AUDITOR_LESSONS`
+// itself — a loop over the array under test would still pass with the array
+// emptied.
+describe('audit-prompt carries the lessons a prior run paid for', () => {
+  it('carries the false-proof-shape question, with its three named forms as examples', () =>
+    fixture(({ tasks }) => {
+      const result = tasks('audit-prompt', 'demo-spec');
+      expect(result.stdout).toContain('Ask what would have to break for a test to fail, and whether that is what the clause promises.');
+      expect(result.stdout).toContain('a fixture that performs a second operation whose side effect produces the asserted state');
+      expect(result.stdout).toContain('an expectation derived from the structure under test');
+      expect(result.stdout).toContain('a test written against the class the implementation is guaranteed to handle');
+    }));
+
+  it('carries the hunt-the-next-neighbour rule', () =>
+    fixture(({ tasks }) => {
+      const result = tasks('audit-prompt', 'demo-spec');
+      expect(result.stdout).toContain('Hunt the next neighbour, not confirmation of the last fix.');
+    }));
+
+  it('carries the rule-may-be-wrong question for a twice-failed clause', () =>
+    fixture(({ tasks }) => {
+      const result = tasks('audit-prompt', 'demo-spec');
+      expect(result.stdout).toContain('When a clause has failed twice, ask whether the rule is wrong rather than whether another instance exists.');
+    }));
+
+  it('carries the over-strictness guard', () =>
+    fixture(({ tasks }) => {
+      const result = tasks('audit-prompt', 'demo-spec');
+      expect(result.stdout).toContain('Guard over-strictness at least as hard as bypass.');
+    }));
+
+  it('carries the silent-guess question', () =>
+    fixture(({ tasks }) => {
+      const result = tasks('audit-prompt', 'demo-spec');
+      expect(result.stdout).toContain('Ask the silent-guess question explicitly.');
+      expect(result.stdout).toContain('Treat "none found" as real only if you looked.');
+    }));
+});
+
+// c7: the briefs do not grow without bound, checked rather than felt. The
+// budget is on the four lists' combined entry count, since an instruction is
+// the unit a later editor adds or cuts — not on a character count, which
+// would refuse a clearer sentence for being a longer one.
+describe('the four briefs stay within the lesson budget the spec sets', () => {
+  it('the combined lesson count this branch added is within the documented budget', () => {
+    expect(totalLessonCount()).toBeLessThanOrEqual(MAX_LESSON_COUNT);
   });
 });

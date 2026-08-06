@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { clauseStandings, outstandingSummary, parseSpecDoc } from '../lib/specDoc';
 import { printWhere } from './architectureCmds';
+import { PLANNER_LESSONS, printLessons } from './briefLessons';
 import type { Flags } from './cli';
 import { resolveConfig, specFile } from './context';
 
@@ -61,6 +62,8 @@ export function cmdPlanPrompt(args: Flags, usage: string): void {
   console.log('');
 
   console.log("Decide, deliberately, which capabilities this branch adds, extends, takes over or retires, and record that reasoning in this spec's `## Decisions` — a survey that finds an owner is a success: reuse it, or write down why a second one is right. A ruling above that argues against the approach you were about to take is a stop, not a data point to work around.");
+  console.log('');
+  printLessons('What repeated specs had to learn the hard way — carry it forward:', PLANNER_LESSONS);
   console.log('');
   console.log('Then:');
   console.log('3. Decompose into tasks whose `--writes` regions are disjoint: `tasks add "<title>" --writes <paths> --produces "<capability>" --requires <ids> --discharges c1,c2` — the number after `--discharges` is the one from the `[cN]` tag above.');
