@@ -8,14 +8,14 @@ import { cmdPlan, cmdConcept, cmdProduces, cmdSystem, cmdWhere } from './archite
 import { cmdDoctor } from './doctor';
 import { cmdCheckCommitMessage, cmdLog, recordStandaloneEvent } from './handoff';
 import { cmdMergeReady } from './mergeReady';
-import { cmdAdd, cmdDecline, cmdDone, cmdEdit, cmdList, cmdNext, cmdPromote, cmdSearch, cmdShow, cmdStart, cmdStop } from './records';
+import { cmdAdd, cmdAsk, cmdDecline, cmdDefer, cmdDone, cmdEdit, cmdList, cmdNext, cmdPromote, cmdRedirect, cmdSearch, cmdShow, cmdStart, cmdStop } from './records';
 import { cmdRoadmap } from './roadmapCmd';
 import { cmdPlanPrompt } from './planPrompt';
 import { cmdSpecAdd, cmdSpecDone, cmdSpecNew, cmdSpecRemove, cmdSpecShow } from './specCmds';
 import { cmdTriage } from './triage';
 import { cmdWorkPrompt } from './workPrompt';
 
-const USAGE = 'usage: npm run tasks -- <doctor|add|edit|show|list|search|next|roadmap|plan|system|where|produces|concept|start|stop|done|decline|promote|import|triage|note|decision|log|spec|audit|audit-prompt|work-prompt|plan-prompt|merge-ready> ...';
+const USAGE = 'usage: npm run tasks -- <doctor|add|edit|show|list|search|next|roadmap|plan|system|where|produces|concept|start|stop|done|decline|promote|defer|redirect|ask|import|triage|note|decision|log|spec|audit|audit-prompt|work-prompt|plan-prompt|merge-ready> ...';
 
 interface Command {
   usage: string;
@@ -73,6 +73,9 @@ const COMMANDS: Record<string, Command> = {
   done: { usage: `usage: tasks done <id>... [--commit <revspec>] ${ACTOR_USAGE}  (default: none — the closing commit does not exist yet when \`done\` runs; see \`tasks show\` for a derived one)`, run: cmdDone },
   decline: { usage: `usage: tasks decline <id>... --reason "..." [--trigger "..."] ${ACTOR_USAGE}  (several ids share the one reason and trigger; --trigger states a condition for revisiting, filed where \`tasks list --triggered\` finds it)`, run: cmdDecline },
   promote: { usage: `usage: tasks promote <id>... [--spec <slug>] ${ACTOR_USAGE}  (the non-interactive form of triage's promote: moves unreviewed or deferred records into the spec as open members)`, run: cmdPromote },
+  defer: { usage: `usage: tasks defer <id>... ${ACTOR_USAGE}  (the non-interactive form of triage's defer, the inverse of promote: opens unreviewed or already-open records outside every spec)`, run: cmdDefer },
+  redirect: { usage: `usage: tasks redirect <id>... --deliverable "..." ${ACTOR_USAGE}  (the non-interactive form of triage's redirect: replaces the deliverable, filing the same triage event the walk records)`, run: cmdRedirect },
+  ask: { usage: `usage: tasks ask <id>... --question "..." ${ACTOR_USAGE}  (the non-interactive form of triage's ask: appends the dated question to each record's evidence and leaves it unreviewed so the queue keeps offering it; refuses an id that is not already unreviewed rather than moving it back)`, run: cmdAsk },
   import: { usage: `usage: tasks import <audit-doc> ${ACTOR_USAGE}`, run: cmdImport },
   triage: { usage: `usage: tasks triage [--spec <slug>] ${ACTOR_USAGE}`, run: cmdTriage },
   note: { usage: `usage: tasks note "<one line>" [--id <id>] [--system "<name>"] [--spec <slug>] ${ACTOR_USAGE}  (appends to the event log; the store is untouched. A message starting with -- goes after a bare \`--\`)`, run: recordStandaloneEvent('note') },

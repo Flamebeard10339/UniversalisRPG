@@ -329,6 +329,15 @@
           "note": "produced by the-task-store-survives-parallel-branches: id-sorted saveStore plus a seq field carrying creation order, so parallel branches merge per-record instead of colliding on tail-append"
         },
         {
+          "name": "non-interactive triage",
+          "paths": [
+            "scripts/tasks/triage.ts",
+            "scripts/tasks/records.ts",
+            "scripts/tasks/commands.ts"
+          ],
+          "note": "produced by every-triage-action-has-a-non-interactive-form: tasks defer/redirect/ask, and the TRIAGE_ACTIONS table cmdTriage dispatches from"
+        },
+        {
           "name": "spec ownership inference",
           "paths": [
             "scripts/tasks/mergeReady.ts"

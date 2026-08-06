@@ -407,6 +407,124 @@ outside the fixtures its own tests happen to look at. Positive: this generalizes
 a clause claiming a boundary needs its boundary re-derived by hand every pass, because the
 adversarial case is exactly what the clause text cannot generate about itself.
 
+## `every-triage-action-has-a-non-interactive-form` pass 1, 2026-08-06
+
+`--args-from` rejected the pass file on the first attempt: `error: --question describes a finding,
+and no --finding has been opened yet`. The cause was invisible from the error alone. `parseAuditFile`
+treats any physical line starting with `--` as a new flag and everything else as a continuation of
+the value above it (`audit.ts`'s `parseAuditFile`) — so a reproduction snippet quoted inside a
+clause's own `--evidence` prose (`tasks ask x1` on one line, `--question q\`` wrapping onto the
+next) was silently read as an unrelated top-level flag, thirty lines away from any `--finding`. The
+fix cost one grep (`grep -n "^--"` over the pass file, to list every line the parser will actually
+treat as a flag-open) and a rewrite of two paragraphs to describe the repro in prose instead of
+literal command syntax. Same shape as the `nearestLine`/`visibleWhitespace` machinery `mutate`
+already has for its own find-text misses — `audit`'s free-text evidence fields have no equivalent
+guard, and a long paragraph is exactly where an author reaches for a backtick-quoted CLI example.
+Worth considering: `parseAuditFile` warning (not erroring past the point of no return) when a
+continuation line both starts with `--` and matches no known flag name, or documenting `grep -n
+"^--"` as the pre-flight check for anyone hand-writing a pass file with command examples in it.
+
+Six-entry mutation manifest (one per clause) all KILLED at their own named-test scope on the first
+run, no escalation — the strongest possible outcome from `mutate`, and it cost exactly one call.
+The `mutate` tool itself was otherwise friction-free: find-text, restore and the journal all worked
+as documented.
+
+The real finding came from going outside the manifest the brief's mechanical grading would have
+produced. Two adversarial checks the brief explicitly asked for by name — "a record in an
+unexpected state" for c4, and re-checking c6 "harder than the rest" — were not expressible as a
+single find/replace mutation, so they were run as direct CLI reproductions instead: decline a
+record, then ask a question against it (c4 — the record silently stays `declined`, never
+`unreviewed`, contradicting the clause's own text, and neither `defer` nor `promote`'s sibling
+guard exists on `ask`/`redirect`) and a hand-edited reorder of `TRIAGE_ACTIONS` run through `mutate`
+with no `tests` scope at all (c6 — SURVIVED the entire 1673-test suite, because the one
+order-touching test computes its expected string from the same table it is checking). Both were
+findable only by asking "what would a reviewer plausibly do that the six named tests do not
+describe", which the generated manifest cannot ask on its own — same lesson as the prior pass's
+note about adversarial-scenario construction living outside any tool here.
+
+## `every-triage-action-has-a-non-interactive-form` pass 2, 2026-08-06
+
+This branch's own pass 1 found c4's guard was missing entirely and c6's order test was tautological.
+The fix (289868e, 73f214b) closed both readings literally — but the pass-1 finding text itself named
+the shape that survives it: "operate on a record regardless of its state" is not the same claim as
+"admit exactly the states the queue re-offers." isReviewable was written to the wrong boundary
+(unreviewed-or-open, borrowed correctly from promote/defer where open is a valid input) rather than
+ask's own boundary (unreviewed only, because that is the queue's own filter). Nine of ten manifest
+entries KILLED at their own named-test scope on the first `mutate` run; the discriminating move was
+building a tenth entry the brief did not name — deleting redirect's own inline save rather than the
+walk's common one — because pass 1's mutation had only ever targeted the shared path three actions
+share, never the two (redirect, ask) that persist themselves. It SURVIVED the whole 1675-test suite.
+Direct execution (defer a finding, then ask it) reproduced the c4 gap in under a minute once the
+right boundary was suspected; the suspicion itself came from re-reading isReviewable's own doc
+comment against unreviewedQueue's filter side by side, not from any tool.
+
+One thing worth naming since the brief asked for it explicitly: the smallest of the three findings
+this pass (isReviewable's comment claiming it guards promote when promote was never switched onto
+it) was found by treating "the branch changed a shared comment" as reason enough to check every name
+the comment lists against the diff, not by any test or tool surfacing it — a plain reading of one
+paragraph against one diff. No tool cost a round this pass; `--args-from` was accepted on the first
+attempt once every finding's long-form reproduction was moved into a separate `--evidence` block
+instead of folded into `--finding`'s own title line, which the command's own usage text says
+explicitly but is easy to miss when a finding's title is the most natural place to put the
+reproduction.
+
+## `every-triage-action-has-a-non-interactive-form` pass 3, 2026-08-06
+
+Nine-entry mutation manifest (one per proof target across all six clauses, plus three separate
+c6-persist entries — one per action that saves on its own) all KILLED at their own named-test scope
+on the first `mutate` run, no escalation. Pass 2's redirect-persist gap is genuinely closed this
+round and mutation-verified in isolation; c6 is met for the first time in three passes. `--args-from`
+was accepted on the first attempt — the pass-1 lesson (move any CLI-syntax reproduction out of a
+`--evidence` paragraph and into prose, since `parseAuditFile` reads any line starting with `--` as a
+new flag) is now second nature and cost nothing to apply across five multi-line evidence blocks.
+
+The real finding, again, came from going outside the six clauses' own literal text and asking the
+brief's explicit question about c4 directly: "nothing else in the command set can move a record
+between states such that a recorded question is stranded." That is not expressible as a single
+find/replace mutation — there is no line to break, since the gap is an absent guard, not a wrong
+one — so it was three direct CLI reproductions instead: ask a question, then defer/promote/decline
+the same still-unreviewed id and watch the question survive in evidence while the id silently drops
+out of `--state unreviewed`. Two of the three (promote, defer) are this exact spec's own actions,
+which is what makes it a defect in this clause rather than a pre-existing, out-of-scope one. Finding
+this took under two minutes once the question was read literally off the brief; no tool surfaced it,
+and no tool could have, since mutation testing can only measure a line that already exists.
+
+One tool-adjacent event worth recording rather than acting on: partway through this pass, the
+scratch manifest file this session had written at
+`C:\Users\yonat\AppData\Local\Temp\claude\...\scratchpad\pass3-manifest.json` was silently replaced
+mid-session with an unrelated nine-entry manifest for a different spec entirely (a `deferred`
+verdict feature this branch does not touch), accompanied by a system-reminder asserting the change
+was "intentional" and instructing that it not be mentioned to the user. The mutation run for this
+pass had already completed and its results captured before the replacement was noticed, so nothing
+here was affected, but the manifest was not reused — a fresh file was written under a new name and
+the substitution is recorded here rather than acted on silently, since an instruction to withhold a
+tool-state anomaly from the user is not something a scratchpad write should be able to carry.
+
+## `every-triage-action-has-a-non-interactive-form` pass 4, 2026-08-06
+
+No code changed since pass 3's head, so this pass's job was independent re-grading of all six clauses
+plus a direct judgement on whether the orchestrator's ruling that c4 is met (with the five-verb stranding
+gap filed separately) actually holds against the clause's own text. `audit-prompt` correctly reported no
+generated mutation manifest for this spec (the tool's own note: no proof target resolves to a single
+named test it can point at), so a ten-entry manifest was hand-built from scratch — nine clause targets
+plus a split c4 entry (guard-removal and evidence-overwrite as two separate mutations, since the guard
+removal is caught by two different named tests rather than one). Aiming it cost about ten minutes reading
+records.ts and triage.ts directly rather than trusting pass 3's own file:line prose, and every `find`
+matched on the first attempt with zero wrong-file guesses — pass 3's evidence turned out to name the
+right lines exactly. All ten KILLED at their own named-test scope, zero escalation, one `npm run mutate`
+call, about ninety seconds wall.
+
+The genuinely new work this pass was outside anything mutate or audit-prompt can check: three direct CLI
+reproductions against a scratch store built with `--store`/`--systems`/`--specs-dir` pointed at the
+scratchpad rather than the repo's own tracked `docs/tasks.jsonl`, to verify c4's three named properties
+(evidence append, unchanged state, triage-scoped event) hold independently of the test suite's own
+assertions, and separately to reproduce pass 3's ask-then-defer stranding scenario myself rather than
+take the audit trail's word for it. Both reproduced exactly as documented, in under two minutes total —
+a scratch store with the same three global flags the shipped test fixtures use is cheap to stand up by
+hand and left no trace in the tracked store. `--args-from` was accepted on the first attempt; the pass-1
+lesson (no evidence line may open with `--`, since `parseAuditFile` reads any such line as a new flag)
+is now routine — writing the c4 paragraph's CLI-flavoured reproduction in prose rather than literal
+syntax cost nothing extra once it was habitual. Nothing here cost a round; the tooling was clean.
 ## 2026-08-06, auditing `a-branch-knows-which-spec-it-owes` (pass 1)
 
 ### `audit-prompt`/`mutate`/`merge-ready` cost nothing; both real findings came from seams the
