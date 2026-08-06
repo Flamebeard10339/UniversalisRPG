@@ -752,15 +752,18 @@ function clauseScoped(raw: string): { clause: number; value: string } | null {
   return Number.isFinite(clause) ? { clause, value: raw.slice(eq + 1).trim() } : null;
 }
 
-// The requirement is "a reason a human can read", not "non-empty after
-// `.trim()`" — `.trim()` strips Unicode whitespace only, so a lone
-// zero-width or other invisible-format character (Unicode category Cf:
-// ZERO WIDTH SPACE, ZERO WIDTH NON-JOINER, ZERO WIDTH JOINER, SOFT HYPHEN,
-// WORD JOINER, the byte-order mark, and their kin) survives it as a
-// non-empty, truthy string that no reader — terminal, editor or spec diff —
-// can see. This asks the question the requirement is actually about: does
-// the text contain a character someone would see.
-const VISIBLE_CHARACTER = /[^\s\p{Cf}]/u;
+// A reason must contain at least one character that occupies space when
+// rendered and does not command the renderer. Whitespace (`\s`) occupies
+// nothing; category Cf (ZERO WIDTH SPACE and its kin — format characters
+// that render nothing) renders nothing; category Cc (NUL, BEL, ESC, DEL and
+// their kin — control characters) commands the renderer rather than
+// rendering, up to and including painting colour codes or ringing a bell
+// when the file is later read. Everything else is a legitimate reason,
+// however ugly: a single punctuation mark, a long run of one character, a
+// lone combining mark, an unpaired surrogate (replaced by U+FFFD on write,
+// visible by the time it lands). This line is drawn and stays drawn — no
+// further exclusions.
+const VISIBLE_CHARACTER = /[^\s\p{Cf}\p{Cc}]/u;
 export function hasVisibleContent(text: string | null): boolean {
   return text !== null && VISIBLE_CHARACTER.test(text);
 }

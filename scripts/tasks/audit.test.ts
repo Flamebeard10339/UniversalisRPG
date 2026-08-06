@@ -965,12 +965,44 @@ describe('a deferred clause', () => {
     });
   });
 
-  it('hasVisibleContent: true only when a character survives stripping whitespace and Cf-category invisible formatting', () => {
-    for (const invisible of ['', '   ', '\t\n', '​', '‌', '‍', '­', '⁠', '﻿', ' ​\t‍ ']) {
+  // A control character commands the renderer rather than rendering — ESC
+  // can open a live ANSI sequence that paints a later reader's terminal, BEL
+  // rings it — which is worse than an unreadable reason, not merely
+  // equivalent to one. Only NUL happens to be caught downstream by
+  // merge-ready's byte gate; BEL, ESC and DEL are not, so the guard has to
+  // refuse the whole category itself.
+  it('c2: a reason made only of control characters (NUL, BEL, ESC, DEL) is refused, not just invisible-format ones', async () => {
+    await fixture(async ({ tasks, audit }) => {
+      const control = ['\u0000', '\u0007', '\u001B', '\u007F'];
+      for (const character of control) {
+        const deferred = await audit('demo-spec', '--proof', `1=deferred`, '--evidence', `1=${character}`, '--proof', '2=met', '--evidence', '2=clause 2 checked');
+        expect(deferred.stderr).toContain('clause 1 is deferred with no reason');
+      }
+      expect(tasks('list', '--kind', 'undelivered').stdout).toContain('0 task(s)');
+    });
+  });
+
+  // Pass 3 evaluated and rejected these as candidates for further exclusion:
+  // each is visible — occupies space when rendered — even though it looks
+  // nothing like ordinary prose, and the guard must keep accepting all four.
+  // Locked in here so a future narrowing pass has something to break before
+  // it can land.
+  it('accepts a reason that is visible but unusual: one punctuation mark, a long run of one character, a lone combining mark, or an unpaired surrogate', async () => {
+    await fixture(async ({ audit }) => {
+      const legitimateButUgly = ['.', 'x'.repeat(80), '́', '\ud800'];
+      for (const reason of legitimateButUgly) {
+        const result = await audit('demo-spec', '--proof', '1=deferred', '--evidence', `1=${reason}`, '--proof', '2=met', '--evidence', '2=clause 2 checked');
+        expect(result.status).toBe(0);
+      }
+    });
+  });
+
+  it('hasVisibleContent: true only when a character survives stripping whitespace, invisible-format (Cf) and control (Cc) characters', () => {
+    for (const invisible of ['', '   ', '\t\n', '​', '‌', '‍', '­', '⁠', '﻿', ' ​\t‍ ', '\u0000', '\u0007', '\u001B', '\u007F']) {
       expect(hasVisibleContent(invisible)).toBe(false);
     }
     expect(hasVisibleContent(null)).toBe(false);
-    for (const visible of ['x', ' x ', '​x​', 'a reason a human can read']) {
+    for (const visible of ['x', ' x ', '​x​', 'a reason a human can read', '.', 'x'.repeat(80), '́', '\ud800']) {
       expect(hasVisibleContent(visible)).toBe(true);
     }
   });
