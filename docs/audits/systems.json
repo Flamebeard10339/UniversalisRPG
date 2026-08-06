@@ -351,6 +351,14 @@
             "scripts/tasks/mergeReady.ts"
           ],
           "note": "produced by a-branch-knows-which-spec-it-owes"
+        },
+        {
+          "name": "orchestrator brief",
+          "paths": [
+            "scripts/tasks/orchestratePrompt.ts",
+            "scripts/tasks/briefLessons.ts"
+          ],
+          "note": "produced by briefs-carry-the-lessons"
         }
       ]
     },
