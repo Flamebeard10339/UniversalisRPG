@@ -801,3 +801,84 @@ export function cmdPromote(args: Flags, usage: string): void {
   saveStoreAndWarn(tasks, config);
   recordEvents(config, 'triage', promotions.map((promotion) => subjectOf(promotion.task, promotion.note)));
 }
+
+// The non-interactive form of triage's defer, the inverse of promote: state
+// open, spec null, over one or more ids, filing the same wording the walk
+// records so the two routes cannot be told apart from the log.
+export function cmdDefer(args: Flags, usage: string): void {
+  const config = resolveConfig(args.flags);
+  if (args.positional.length === 0) {
+    console.error(usage);
+    process.exitCode = 1;
+    return;
+  }
+  const tasks = loadStore(config.storePath);
+  const resolved = resolveTaskIds(args.positional, tasks);
+  if (resolved === null) return;
+  for (const task of resolved) {
+    if (task.state !== 'unreviewed' && task.state !== 'open') {
+      console.error(`error: ${task.id} is ${task.state} — defer moves unreviewed or already-open records outside every spec, it does not reopen closed ones. Nothing was deferred`);
+      process.exitCode = 1;
+      return;
+    }
+  }
+  const defers: Array<{ task: Task; note: string }> = [];
+  for (const task of resolved) {
+    task.state = 'open';
+    task.spec = null;
+    defers.push({ task, note: 'deferred: opened outside every spec' });
+    console.log(`deferred ${task.id}`);
+  }
+  saveStoreAndWarn(tasks, config);
+  recordEvents(config, 'triage', defers.map((defer) => subjectOf(defer.task, defer.note)));
+}
+
+// The non-interactive form of triage's redirect: the same operation as the
+// walk's, not merely the same effect. It files a `triage` event, not an
+// `edit` one, so `tasks log --op triage` shows a redirect however it was made.
+export function cmdRedirect(args: Flags, usage: string): void {
+  const config = resolveConfig(args.flags);
+  const deliverable = args.flags.deliverable;
+  if (args.positional.length === 0 || !deliverable) {
+    console.error(usage);
+    process.exitCode = 1;
+    return;
+  }
+  const tasks = loadStore(config.storePath);
+  const resolved = resolveTaskIds(args.positional, tasks);
+  if (resolved === null) return;
+  const redirects: Array<{ task: Task; note: string }> = [];
+  for (const task of resolved) {
+    task.deliverable = deliverable;
+    redirects.push({ task, note: `redirected the deliverable to: ${truncateLine(deliverable, 120)}` });
+    console.log(`redirected ${task.id}`);
+  }
+  saveStoreAndWarn(tasks, config);
+  recordEvents(config, 'triage', redirects.map((redirect) => subjectOf(redirect.task, redirect.note)));
+}
+
+// The non-interactive form of triage's ask, the load-bearing action: the
+// question lands on the record's own evidence where the next agent reads it,
+// the record stays whatever state it already was — unreviewed, ordinarily,
+// so the queue keeps offering it — and the same `triage` event the walk
+// records is what makes a run's questions countable.
+export function cmdAsk(args: Flags, usage: string): void {
+  const config = resolveConfig(args.flags);
+  const question = args.flags.question;
+  if (args.positional.length === 0 || !question) {
+    console.error(usage);
+    process.exitCode = 1;
+    return;
+  }
+  const tasks = loadStore(config.storePath);
+  const resolved = resolveTaskIds(args.positional, tasks);
+  if (resolved === null) return;
+  const asks: Array<{ task: Task; note: string }> = [];
+  for (const task of resolved) {
+    task.evidence = `${task.evidence ? `${task.evidence}\n\n` : ''}triage asked (${today()}): ${question}`;
+    asks.push({ task, note: `asked for more information: ${truncateLine(question, 120)}` });
+    console.log(`asked ${task.id}; it stays ${task.state} until the question is answered`);
+  }
+  saveStoreAndWarn(tasks, config);
+  recordEvents(config, 'triage', asks.map((ask) => subjectOf(ask.task, ask.note)));
+}
