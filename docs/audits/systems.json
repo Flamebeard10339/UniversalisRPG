@@ -213,6 +213,7 @@
         "scripts/lib/architecture.test.ts",
         "scripts/lib/roadmap.ts",
         "scripts/lib/roadmap.test.ts",
+        "scripts/lib/orderIndependence.test.ts",
         "scripts/lib/bytes.ts",
         "scripts/lib/bytes.test.ts"
       ],
