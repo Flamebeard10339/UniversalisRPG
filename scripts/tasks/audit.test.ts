@@ -158,23 +158,34 @@ describe('tasks CLI', () => {
     });
   });
 
-  it('audit\'s interactive clause walk offers unknown as a third answer and leaves its evidence optional', () => {
+  it('audit\'s interactive clause walk offers unknown as a fourth answer and leaves its evidence optional', () => {
     fixture(({ dir }) => {
       const result = walkClauses(dir, 'unknown\n\nunmet\n\n');
       expect(result.status).toBe(0);
-      expect(result.stdout).toContain('met/unmet/unknown?');
+      expect(result.stdout).toContain('met/unmet/unknown/deferred?');
       const specText = readFileSync(path.join(dir, 'specs', 'demo-spec.md'), 'utf8');
       expect(specText).toContain('- proof 1: unknown\n');
       expect(specText).toContain('- proof 2: unmet\n');
     });
   });
 
-  it('audit\'s interactive clause walk re-asks rather than accepting an answer outside the three verdicts', () => {
+  it('audit\'s interactive clause walk re-asks rather than accepting an answer outside the four verdicts', () => {
     fixture(({ dir }) => {
       const result = walkClauses(dir, 'probably\nunknown\n\nunknown\n\n');
       expect(result.status).toBe(0);
-      expect(result.stdout).toContain('type "met", "unmet" or "unknown"');
+      expect(result.stdout).toContain('type "met", "unmet", "unknown" or "deferred"');
       expect(readFileSync(path.join(dir, 'specs', 'demo-spec.md'), 'utf8')).toContain('- proof 1: unknown');
+    });
+  });
+
+  it('audit\'s interactive clause walk holds a deferred verdict until a reason is typed, and it survives to the spec file', () => {
+    fixture(({ dir }) => {
+      const result = walkClauses(dir, 'deferred\n\nthe goal still holds without it\nmet\nread the diff\n');
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('reason (required for deferred)');
+      const specText = readFileSync(path.join(dir, 'specs', 'demo-spec.md'), 'utf8');
+      expect(specText).toContain('- proof 1: deferred — the goal still holds without it');
+      expect(specText).toContain('- proof 2: met — read the diff');
     });
   });
 
@@ -428,7 +439,8 @@ describe('tasks CLI', () => {
       expect(result.stdout).toContain('latest verdict: unknown — nobody has graded this clause');
       expect(result.stdout).toContain('Latest audit pass: pass 1');
       expect(result.stdout).toContain('outstanding: c2 (unknown)');
-      expect(stepsBlock(result.stdout)).toContain('unknown — nobody looked. Recording unmet instead hides that nothing was verified.');
+      expect(stepsBlock(result.stdout)).toContain('unknown  — nobody looked. Recording unmet instead hides that nothing was verified.');
+      expect(stepsBlock(result.stdout)).toContain('deferred — you checked, it fails, and the goal above still holds without it.');
       expect(result.stdout).not.toMatch(/\d+\/\d+ met/);
     });
   });
@@ -859,6 +871,92 @@ describe('tasks CLI', () => {
       const undelivered = tasks('list', '--kind', 'undelivered', '--spec', 'demo-spec');
       expect((undelivered.stdout.match(/demo-spec-clause-1/g) ?? []).length).toBe(1);
       expect(undelivered.stdout).toContain('1 task(s)');
+    });
+  });
+});
+
+// c1-c4: `deferred` is a fourth verdict that costs a reason, does not count
+// as outstanding, and converts the clause into a tracked `undelivered`
+// record rather than deleting it.
+describe('a deferred clause', () => {
+  it('c2: is refused with no reason, and records nothing', async () => {
+    await fixture(async ({ tasks, dir, audit }) => {
+      const specPath = path.join(dir, 'specs', 'demo-spec.md');
+      const before = readFileSync(specPath, 'utf8');
+
+      const result = await audit('demo-spec', '--proof', '1=deferred', '--proof', '2=met', '--evidence', '2=clause 2 checked');
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain('clause 1 is deferred with no reason');
+      expect(readFileSync(specPath, 'utf8')).toBe(before);
+      expect(tasks('list', '--kind', 'undelivered').stdout).toContain('0 task(s)');
+    });
+  });
+
+  it('c3/c4: is not outstanding, and converts into a tracked undelivered record with no spec — doctor accepts it', async () => {
+    await fixture(async ({ tasks, dir, audit }) => {
+      const result = await audit('demo-spec', '--proof', '1=deferred', '--evidence', '1=the goal is still served without it', '--proof', '2=met', '--evidence', '2=clause 2 checked');
+      expect(result.status).toBe(0);
+      expect(result.stdout).not.toContain('outstanding:');
+      expect(result.stdout).toContain('no clause outstanding');
+      expect(result.stdout).toContain('1 clause(s) deferred');
+
+      const specText = readFileSync(path.join(dir, 'specs', 'demo-spec.md'), 'utf8');
+      expect(specText).toContain('- proof 1: deferred — the goal is still served without it');
+
+      const standing = tasks('spec', 'show', 'demo-spec');
+      expect(standing.stdout).toContain('clause standing (latest pass 1): no clause outstanding');
+      expect(standing.stdout).toContain('[deferred]');
+
+      const undelivered = tasks('show', 'demo-spec-clause-1');
+      expect(undelivered.stdout).toContain('[undelivered/open/high]');
+      expect(undelivered.stdout).toContain('spec: (deferred)');
+      expect(undelivered.stdout).toContain('evidence: the goal is still served without it');
+
+      // Not lost: still findable in the general backlog, not folded into
+      // this spec's own member list.
+      expect(tasks('list', '--deferred').stdout).toContain('demo-spec-clause-1');
+      expect(tasks('spec', 'show', 'demo-spec').stdout).not.toContain('2 member(s)');
+
+      const doctor = tasks('doctor');
+      expect(doctor.status).toBe(0);
+      expect(doctor.stdout).toContain('0 error(s)');
+    });
+  });
+
+  it("names its owner in `spec show`, even though it left the spec's own membership", async () => {
+    await fixture(async ({ tasks, audit }) => {
+      await audit('demo-spec', '--proof', '1=deferred', '--evidence', '1=covered elsewhere', '--proof', '2=met', '--evidence', '2=clause 2 checked');
+      const shown = tasks('spec', 'show', 'demo-spec').stdout;
+      expect(shown).toContain('owed by: demo-spec-clause-1 (open)');
+    });
+  });
+});
+
+// c5/c6: a spec carries a goal, the brief prints it, and the step where
+// verdicts are assigned asks the question that licenses a deferral.
+describe("a spec's goal", () => {
+  it('c5: is printed by audit-prompt without opening the file', async () => {
+    await fixture(async ({ dir, tasks }) => {
+      const specPath = path.join(dir, 'specs', 'demo-spec.md');
+      writeFileSync(specPath, readFileSync(specPath, 'utf8').replace('## Decisions', '## Goal\n\nKeep the gate honest without losing the honest way to drop scope.\n\n## Decisions'), 'utf8');
+      const result = tasks('audit-prompt', 'demo-spec');
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('Goal: Keep the gate honest without losing the honest way to drop scope.');
+    });
+  });
+
+  it('says plainly that none is recorded, rather than staying silent, when the spec carries no ## Goal', async () => {
+    await fixture(async ({ tasks }) => {
+      const result = tasks('audit-prompt', 'demo-spec');
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('Goal: (none recorded');
+    });
+  });
+
+  it('c6: the step where verdicts are assigned asks whether the goal still holds before a clause is dropped', async () => {
+    await fixture(async ({ tasks }) => {
+      const result = tasks('audit-prompt', 'demo-spec');
+      expect(stepsBlock(result.stdout)).toContain('Ask this before recording unmet: does the goal still hold if this clause is never met?');
     });
   });
 });
