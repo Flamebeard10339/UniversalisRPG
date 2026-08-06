@@ -241,15 +241,19 @@ describe('tasks CLI', () => {
 
   it('spec show --order lists dependencies before tasks that require them', () => {
     fixture(({ tasks }) => {
-      tasks('add', 'dependent task', '--id', 'dependent', '--spec', 'demo-spec');
-      tasks('add', 'blocker task', '--id', 'blocker', '--spec', 'demo-spec');
-      tasks('edit', 'dependent', '--requires', 'blocker');
+      // Ids chosen so the unordered listing — id order, since saveStore
+      // canonicalizes on id rather than on the order records were added —
+      // still violates the dependency order on its own, which is the
+      // premise `--order` exists to fix.
+      tasks('add', 'dependent task', '--id', 'a-dependent', '--spec', 'demo-spec');
+      tasks('add', 'blocker task', '--id', 'z-blocker', '--spec', 'demo-spec');
+      tasks('edit', 'a-dependent', '--requires', 'z-blocker');
 
       const unordered = tasks('spec', 'show', 'demo-spec');
-      expect(unordered.stdout.indexOf('dependent')).toBeLessThan(unordered.stdout.indexOf('blocker'));
+      expect(unordered.stdout.indexOf('a-dependent')).toBeLessThan(unordered.stdout.indexOf('z-blocker'));
 
       const ordered = tasks('spec', 'show', 'demo-spec', '--order');
-      expect(ordered.stdout.indexOf('blocker')).toBeLessThan(ordered.stdout.indexOf('dependent'));
+      expect(ordered.stdout.indexOf('z-blocker')).toBeLessThan(ordered.stdout.indexOf('a-dependent'));
     });
   });
 

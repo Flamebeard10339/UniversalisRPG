@@ -4,6 +4,7 @@ import { listQueue, type Task } from './taskStore';
 
 function task(overrides: Partial<Task> & { id: string }): Task {
   return {
+    seq: null,
     title: overrides.id,
     kind: 'task',
     state: 'open',
@@ -225,9 +226,12 @@ describe('roadmapView', () => {
     expect(ids(view.topics)).toEqual(['load-bearing', 'urgent-leaf']);
   });
 
-  it('breaks a fan-out tie by severity, then by store order', () => {
-    const view = roadmapView([task({ id: 'second-medium', severity: 'medium' }), task({ id: 'the-high', severity: 'high' }), task({ id: 'first-medium', severity: 'medium' })], noSpecFiles);
-    expect(ids(view.topics)).toEqual(['the-high', 'second-medium', 'first-medium']);
+  it('breaks a fan-out tie by severity, then by seq, oldest first, regardless of array order', () => {
+    const view = roadmapView(
+      [task({ id: 'second-medium', severity: 'medium', seq: 2 }), task({ id: 'the-high', severity: 'high', seq: 3 }), task({ id: 'first-medium', severity: 'medium', seq: 1 })],
+      noSpecFiles,
+    );
+    expect(ids(view.topics)).toEqual(['the-high', 'first-medium', 'second-medium']);
   });
 
   it('does not count a closed record as something a topic unblocks', () => {

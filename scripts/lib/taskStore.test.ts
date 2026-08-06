@@ -1,11 +1,13 @@
+import { spawnSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { describe, expect, it } from 'vitest';
-import { checkStore, claimSummary, COLD_CLAIM_DAYS, coldClaimIssues, coldClaims, dependencyCycles, fixNowQueue, isBlocked, KINDS, listQueue, loadStore, matchesSearchTerm, nearMatches, parseStore, parseStoreTolerantly, requirementStates, saveStore, StoreError, unreviewedQueue, waitingOn, type Task } from './taskStore';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { backfillSeq, checkStore, claimSummary, COLD_CLAIM_DAYS, coldClaimIssues, coldClaims, dependencyCycles, fixNowQueue, isBlocked, KINDS, listQueue, loadStore, matchesSearchTerm, nearMatches, nextSeq, parseStore, parseStoreTolerantly, requirementStates, saveStore, StoreError, unreviewedQueue, waitingOn, type Task } from './taskStore';
 
 function task(overrides: Partial<Task> & { id: string }): Task {
   return {
+    seq: null,
     title: overrides.id,
     kind: 'task',
     state: 'open',
@@ -120,6 +122,7 @@ describe('loadStore / saveStore', () => {
       expect(readFileSync(file, 'utf8')).toBe(
         `${JSON.stringify({
           id: 'legacy',
+          seq: null,
           title: 'legacy',
           kind: 'task',
           state: 'open',
@@ -228,7 +231,7 @@ describe('loadStore / saveStore', () => {
 
       saveStore(loadStore(file), file);
       const line = readFileSync(file, 'utf8').trim();
-      const canonicalKeys = ['id', 'title', 'kind', 'state', 'severity', 'system', 'spec', 'clause', 'discharges', 'requires', 'files', 'writes', 'grant', 'produces', 'deliverable', 'evidence', 'source', 'reason', 'trigger', 'closed', 'closedCommit', 'claimed', 'claimedBy'];
+      const canonicalKeys = ['id', 'seq', 'title', 'kind', 'state', 'severity', 'system', 'spec', 'clause', 'discharges', 'requires', 'files', 'writes', 'grant', 'produces', 'deliverable', 'evidence', 'source', 'reason', 'trigger', 'closed', 'closedCommit', 'claimed', 'claimedBy'];
       const keys = Object.keys(JSON.parse(line));
       expect(keys.slice(0, canonicalKeys.length)).toEqual(canonicalKeys);
       expect(keys.slice(canonicalKeys.length)).toEqual(['aField', 'mField', 'zField']);
@@ -242,6 +245,298 @@ describe('loadStore / saveStore', () => {
       const before = readFileSync(file, 'utf8');
       saveStore(loadStore(file), file);
       expect(readFileSync(file, 'utf8')).toBe(before);
+    });
+  });
+
+  // c1: the file on disk is a function of the record set alone. Two branches
+  // that build the same records in different orders — because each added
+  // its own record at the end of its own in-memory array — still write the
+  // same bytes, because saveStore sorts by id rather than trusting the
+  // order it was handed.
+  it('writes records in id order, so the same record set produces byte-identical files regardless of build order', () => {
+    withTmpDir((dir) => {
+      const fileA = path.join(dir, 'a.jsonl');
+      const fileB = path.join(dir, 'b.jsonl');
+      const x = task({ id: 'x-record', seq: 1 });
+      const y = task({ id: 'y-record', seq: 2 });
+      saveStore([x, y], fileA);
+      saveStore([y, x], fileB);
+      expect(readFileSync(fileA, 'utf8')).toBe(readFileSync(fileB, 'utf8'));
+      expect(readFileSync(fileA, 'utf8').split('\n')[0]).toContain('"x-record"');
+    });
+  });
+});
+
+// c6: a record written by a checkout that does not know `seq` exists yet is
+// not malformed, and it is not stuck at the front of every queue either.
+describe('a record with no seq', () => {
+  it('parses with seq null, from a line that never mentions the key', () => {
+    const line = JSON.stringify({ id: 'pre-existing', title: 'pre-existing', kind: 'task', state: 'open', severity: null, system: null, spec: null, requires: [], files: [] });
+    const [parsed] = parseStore(line, 'store');
+    expect(parsed.seq).toBeNull();
+    expect(checkStore([parsed], [], () => true)).toEqual([]);
+  });
+
+  it('sorts as the newest record in a queue, ahead of nothing and behind everything numbered', () => {
+    const numbered = task({ id: 'numbered', spec: 's', severity: 'high', seq: 1 });
+    const line = JSON.stringify({ id: 'no-seq', title: 'no-seq', kind: 'task', state: 'open', spec: 's', severity: 'high', system: null, requires: [], files: [] });
+    const [noSeq] = parseStore(line, 'store');
+    expect(fixNowQueue([noSeq, numbered], 's').map((t) => t.id)).toEqual(['numbered', 'no-seq']);
+  });
+});
+
+describe('nextSeq', () => {
+  it('is one past the highest seq the store already carries', () => {
+    expect(nextSeq([task({ id: 'a', seq: 3 }), task({ id: 'b', seq: 7 })])).toBe(8);
+  });
+
+  it('starts at 1 for an empty or seq-less store', () => {
+    expect(nextSeq([])).toBe(1);
+    expect(nextSeq([task({ id: 'a', seq: null })])).toBe(1);
+  });
+
+  it('ignores a null seq rather than letting it poison the max', () => {
+    expect(nextSeq([task({ id: 'a', seq: 5 }), task({ id: 'b', seq: null })])).toBe(6);
+  });
+});
+
+// c2/c3: the reorder commit converts file position into the `seq` field
+// without changing anything else about a record — a permutation, checked
+// generically against whatever tasks it is given rather than against a
+// count baked into the test.
+describe('backfillSeq', () => {
+  it('assigns seq from array position, in order, to every record that lacks one', () => {
+    const tasks = [task({ id: 'first' }), task({ id: 'second' }), task({ id: 'third' })];
+    expect(backfillSeq(tasks).map((t) => t.seq)).toEqual([1, 2, 3]);
+  });
+
+  it('continues after the highest seq already present, rather than restarting at 1', () => {
+    const tasks = [task({ id: 'already-numbered', seq: 5 }), task({ id: 'unnumbered-a' }), task({ id: 'unnumbered-b' })];
+    expect(backfillSeq(tasks).map((t) => t.seq)).toEqual([5, 6, 7]);
+  });
+
+  it('leaves a record that already carries seq untouched, so backfilling twice changes nothing', () => {
+    const tasks = [task({ id: 'a' }), task({ id: 'b' })];
+    const once = backfillSeq(tasks);
+    const twice = backfillSeq(once);
+    expect(twice).toEqual(once);
+  });
+
+  it('is a permutation: the same ids and the same fields aside from seq, whatever the store holds', () => {
+    const before = [
+      task({ id: 'b-record', title: 'B', severity: 'high', writes: ['scripts/a.ts'] }),
+      task({ id: 'a-record', title: 'A', discharges: [1, 2] }),
+      task({ id: 'c-record', title: 'C', requires: ['a-record'] }),
+    ];
+    const after = backfillSeq(before);
+
+    expect(new Set(after.map((t) => t.id))).toEqual(new Set(before.map((t) => t.id)));
+    for (const originalTask of before) {
+      const { seq: _beforeSeq, ...beforeRest } = originalTask;
+      const { seq: _afterSeq, ...afterRest } = after.find((t) => t.id === originalTask.id)!;
+      expect(afterRest).toEqual(beforeRest);
+    }
+  });
+});
+
+// c4/c5: a real git merge, not a simulation of one — the scenario this
+// branch exists to fix (c4), and the one residual it leaves named (c5).
+describe('parallel branches, merged for real', () => {
+  let dir: string;
+  let originalCwd: string;
+
+  beforeEach(() => {
+    originalCwd = process.cwd();
+    dir = mkdtempSync(path.join(os.tmpdir(), 'universalis-taskstore-merge-'));
+    spawnSync('git', ['init', '-q'], { cwd: dir });
+    spawnSync('git', ['config', 'user.email', 'test@example.com'], { cwd: dir });
+    spawnSync('git', ['config', 'user.name', 'Test'], { cwd: dir });
+    process.chdir(dir);
+  });
+
+  afterEach(() => {
+    process.chdir(originalCwd);
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  const storePath = (): string => path.join(dir, 'tasks.jsonl');
+  const git = (...args: string[]): { status: number | null; stdout: string } => spawnSync('git', args, { cwd: dir, encoding: 'utf8' });
+  const commit = (message: string): void => {
+    git('add', '.');
+    git('commit', '--no-verify', '-q', '-m', message);
+  };
+
+  // saveStore's whole point (c1) is that the file it writes does not depend
+  // on what order its caller handed it a record set in. That cuts both ways
+  // for a test: handing it an array already in id order cannot tell a
+  // working sort from a disabled one, because the write comes out identical
+  // either way. Pass 1's mutation testing caught exactly that gap here —
+  // both tests below used to hand-splice their branch arrays pre-sorted, so
+  // removing saveStore's sort survived at each test's own scope and was only
+  // noticed by escalating to the whole file.
+  //
+  // Two failed attempts before this one, both verified against the mutation
+  // manifest directly rather than assumed: `.reverse()` only flips
+  // direction, so adjacency — the thing these tests actually check — came
+  // out right by accident. A fixed-seed shuffle keyed on array length alone
+  // fixed that, but then always moved "the newly appended record" to the
+  // same output slot whenever two arrays it scrambled had equal length,
+  // which both branches' calls always do here — so the two branches'
+  // insertions still landed adjacent to each other by construction, sort or
+  // no sort. The seed below is keyed on the array's own ids, so two calls
+  // only scramble identically when they are given the same records.
+  function scrambled<T extends { id: string }>(items: readonly T[]): T[] {
+    const out = [...items];
+    let state = 0x2f6e2b1;
+    for (const char of out.map((item) => item.id).join(',')) state = (Math.imul(state ^ char.charCodeAt(0), 0x01000193) >>> 0) & 0x7fffffff;
+    for (let i = out.length - 1; i > 0; i--) {
+      state = (state * 1103515245 + 12345) & 0x7fffffff;
+      const j = state % (i + 1);
+      [out[i], out[j]] = [out[j], out[i]];
+    }
+    return out;
+  }
+
+  it('two branches, one editing a record and adding a non-adjacent one, the other doing the same to a different record, merge with zero conflicts', () => {
+    // Ten records, so the two touched regions (the first record and the
+    // last, edited and added-next-to on opposite branches) sit far enough
+    // apart that git's own diff context cannot see them as one hunk — the
+    // 590-record real store's ordinary shape, not the 2-line case where
+    // every line is within context of every other.
+    const base = Array.from({ length: 10 }, (_, i) => task({ id: `r-${String(i).padStart(2, '0')}`, seq: i + 1 }));
+    saveStore(scrambled(base), storePath());
+    commit('base: r-00 .. r-09');
+    git('branch', '-M', 'main');
+
+    git('checkout', '-q', '-b', 'branch-a');
+    const onA = [...base];
+    onA[0] = { ...onA[0], title: 'edited by A' };
+    onA.splice(5, 0, task({ id: 'r-04-mid', seq: 11 }));
+    saveStore(scrambled(onA), storePath());
+    commit('A edits r-00 and adds r-04-mid');
+
+    git('checkout', '-q', 'main');
+    git('checkout', '-q', '-b', 'branch-b');
+    const onB = [...base];
+    onB[onB.length - 1] = { ...onB[onB.length - 1], title: 'edited by B' };
+    onB.push(task({ id: 'zzz-b', seq: 11 }));
+    saveStore(scrambled(onB), storePath());
+    commit('B edits r-09 and adds zzz-b');
+
+    const merge = git('merge', '--no-edit', 'branch-a');
+    expect(merge.status).toBe(0);
+
+    const merged = loadStore(storePath());
+    expect(merged.map((t) => t.id).sort()).toEqual([...base.map((t) => t.id), 'r-04-mid', 'zzz-b'].sort());
+    expect(merged.find((t) => t.id === 'r-00')?.title).toBe('edited by A');
+    expect(merged.find((t) => t.id === 'r-09')?.title).toBe('edited by B');
+  });
+
+  // c5, amended after pass 1: the residual is adjacency of *changed lines*
+  // in the id-sorted file, not "two branches inserting adjacent ids" — that
+  // was one instance of a boundary, mistaken for the whole of it. Swept by
+  // pass 1 across three shapes (insert beside insert, edit beside insert,
+  // delete beside insert): zero untouched records between the two changes
+  // conflicts, one or more is clean, in every shape. What a test has to pin
+  // is the boundary, not any one shape at it.
+  describe('the adjacency boundary', () => {
+    const N = 12;
+    const buildBase = (): Task[] => Array.from({ length: N }, (_, i) => task({ id: `r-${String(i).padStart(2, '0')}`, seq: i + 1 }));
+
+    // Fixed comfortably inside the file, so both directions have real
+    // context on either side of it — the same reasoning the non-adjacent
+    // test above relies on for git's diff context not to merge two separate
+    // hunks into one by accident.
+    const CHANGE_INDEX = 5;
+
+    // One merge, for one shape at one gap. `shape` is what branch A does to
+    // the record at CHANGE_INDEX; branch B always inserts a new record
+    // immediately after whichever base record sits `gap` positions past it
+    // — gap 0 is adjacent to A's own change, gap 1 leaves exactly one
+    // untouched record between them.
+    function mergeStatus(shape: 'insert-insert' | 'edit-insert' | 'delete-insert', gap: number): number | null {
+      const base = buildBase();
+      saveStore(scrambled(base), storePath());
+      commit(`base: ${N} records`);
+      git('branch', '-M', 'main');
+
+      const changed = base[CHANGE_INDEX];
+      git('checkout', '-q', '-b', 'branch-a');
+      const onA =
+        shape === 'delete-insert'
+          ? base.filter((t) => t.id !== changed.id)
+          : shape === 'edit-insert'
+            ? base.map((t) => (t.id === changed.id ? { ...t, title: 'edited by A' } : t))
+            : [...base, task({ id: `${changed.id}-a-ins`, seq: 101 })];
+      saveStore(scrambled(onA), storePath());
+      commit(`A changes ${changed.id} (${shape})`);
+
+      git('checkout', '-q', 'main');
+      git('checkout', '-q', '-b', 'branch-b');
+      const insertAfter = base[CHANGE_INDEX + gap];
+      saveStore(scrambled([...base, task({ id: `${insertAfter.id}-ins`, seq: 102 })]), storePath());
+      commit(`B inserts beside ${insertAfter.id} (gap ${gap})`);
+
+      return git('merge', '--no-edit', 'branch-a').status;
+    }
+
+    it.each([
+      ['insert-insert', 0, false],
+      ['insert-insert', 1, true],
+      ['edit-insert', 0, false],
+      ['edit-insert', 1, true],
+      ['delete-insert', 0, false],
+      ['delete-insert', 1, true],
+    ] as const)('%s at gap %i merges clean: %s', (shape, gap, clean) => {
+      const status = mergeStatus(shape, gap);
+      if (clean) expect(status).toBe(0);
+      else expect(status).not.toBe(0);
+    });
+
+    // The one shape the pre-amendment clause named, kept as its own test
+    // because it is the only one of the three where "keep both" is actually
+    // the resolution — an edit or a deletion beside an insert needs that
+    // edit or deletion reconciled, which is exactly why a single stated
+    // resolution was wrong for two of the three shapes. The residual is
+    // accepted, not fixed (see the spec's Decisions), so this stops at
+    // showing the conflict and its shape rather than trying to remove it.
+    it('insert-insert at gap 0 conflicts on exactly one hunk carrying both new records, resolved by keeping both', () => {
+      const base = buildBase();
+      saveStore(scrambled(base), storePath());
+      commit(`base: ${N} records`);
+      git('branch', '-M', 'main');
+
+      const changed = base[CHANGE_INDEX];
+      git('checkout', '-q', '-b', 'branch-a');
+      saveStore(scrambled([...base, task({ id: `${changed.id}-a-ins`, seq: 101 })]), storePath());
+      commit(`A inserts beside ${changed.id}`);
+
+      git('checkout', '-q', 'main');
+      git('checkout', '-q', '-b', 'branch-b');
+      saveStore(scrambled([...base, task({ id: `${changed.id}-b-ins`, seq: 102 })]), storePath());
+      commit(`B inserts beside ${changed.id}`);
+
+      const merge = git('merge', '--no-edit', 'branch-a');
+      expect(merge.status).not.toBe(0);
+
+      const conflicted = readFileSync(storePath(), 'utf8');
+      // Exactly one conflict, and it is shaped as two new records on either
+      // side of the markers — not an edit against the base on either side.
+      expect((conflicted.match(/^<{7} /gm) ?? []).length).toBe(1);
+      expect(conflicted).toContain(`${changed.id}-a-ins`);
+      expect(conflicted).toContain(`${changed.id}-b-ins`);
+
+      const resolved = conflicted
+        .split('\n')
+        .filter((line) => !/^[<=>]{7}/.test(line))
+        .join('\n');
+      writeFileSync(storePath(), resolved, 'utf8');
+      git('add', '.');
+      commit('resolve by keeping both');
+
+      const merged = loadStore(storePath());
+      expect(merged.map((t) => t.id).sort()).toEqual([...base.map((t) => t.id), `${changed.id}-a-ins`, `${changed.id}-b-ins`].sort());
+      expect(checkStore(merged, [], () => true)).toEqual([]);
     });
   });
 });
@@ -447,6 +742,11 @@ describe('nearMatches', () => {
     const many = Array.from({ length: 20 }, (_, i) => task({ id: `shared-word-${i}` }));
     expect(nearMatches('shared', many)).toHaveLength(5);
   });
+
+  it('breaks a score tie by seq, oldest first, regardless of array order', () => {
+    const tied = [task({ id: 'shared-second', seq: 2 }), task({ id: 'shared-first', seq: 1 })];
+    expect(nearMatches('shared', tied).map((t) => t.id)).toEqual(['shared-first', 'shared-second']);
+  });
 });
 
 describe('fixNowQueue', () => {
@@ -455,9 +755,14 @@ describe('fixNowQueue', () => {
     expect(fixNowQueue(tasks, 's').map((t) => t.id)).toEqual(['high', 'medium', 'low', 'none']);
   });
 
-  it('breaks ties by creation order (file position)', () => {
-    const tasks = [task({ id: 'first', spec: 's', severity: 'high' }), task({ id: 'second', spec: 's', severity: 'high' })];
+  it('breaks ties by seq, oldest first, regardless of array order', () => {
+    const tasks = [task({ id: 'second', spec: 's', severity: 'high', seq: 2 }), task({ id: 'first', spec: 's', severity: 'high', seq: 1 })];
     expect(fixNowQueue(tasks, 's').map((t) => t.id)).toEqual(['first', 'second']);
+  });
+
+  it('ranks a null seq after every numbered one, as the newest thing in the store', () => {
+    const tasks = [task({ id: 'no-seq', spec: 's', severity: 'high', seq: null }), task({ id: 'numbered', spec: 's', severity: 'high', seq: 1 })];
+    expect(fixNowQueue(tasks, 's').map((t) => t.id)).toEqual(['numbered', 'no-seq']);
   });
 
   it('excludes tasks outside the given spec', () => {
@@ -486,6 +791,11 @@ describe('unreviewedQueue', () => {
   it('orders unreviewed findings by severity, ignoring everything else', () => {
     const tasks = [task({ id: 'a', state: 'unreviewed', severity: 'low' }), task({ id: 'b', state: 'open', severity: 'high' }), task({ id: 'c', state: 'unreviewed', severity: 'high' })];
     expect(unreviewedQueue(tasks).map((t) => t.id)).toEqual(['c', 'a']);
+  });
+
+  it('breaks a severity tie by seq, oldest first, regardless of array order', () => {
+    const tasks = [task({ id: 'second', state: 'unreviewed', severity: 'high', seq: 2 }), task({ id: 'first', state: 'unreviewed', severity: 'high', seq: 1 })];
+    expect(unreviewedQueue(tasks).map((t) => t.id)).toEqual(['first', 'second']);
   });
 });
 
@@ -566,8 +876,8 @@ describe('listQueue', () => {
     expect(listQueue(tasks).map((t) => t.id)).toEqual(['high-unreviewed', 'in-flight', 'low-open']);
   });
 
-  it('breaks ties by creation order (file position)', () => {
-    const tasks = [task({ id: 'first', state: 'open', severity: 'high' }), task({ id: 'second', state: 'open', severity: 'high' })];
+  it('breaks ties by seq, oldest first, regardless of array order', () => {
+    const tasks = [task({ id: 'second', state: 'open', severity: 'high', seq: 2 }), task({ id: 'first', state: 'open', severity: 'high', seq: 1 })];
     expect(listQueue(tasks).map((t) => t.id)).toEqual(['first', 'second']);
   });
 

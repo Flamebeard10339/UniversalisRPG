@@ -337,3 +337,73 @@ left no journal behind — `ls %TEMP%\universalis-mutate-*` found nothing afterw
 whole promise, measured in one command, and it is the first pass where running the generated
 artifact as-is was safe to do.
 
+## 2026-08-06, auditing `the-task-store-survives-parallel-branches` (pass 1)
+
+### The generated brief's tooling cost nothing this pass — the friction was all in constructing an
+### adversarial git-merge scenario by hand, outside anything the tool offers
+
+`audit-prompt`, `mutate` and `merge-ready` all ran clean on the first try, no wrong `file` guesses,
+no argv-length wall, no escaping round-trip. The one instruction ("run the diagnostic on this spec
+slug and do what it says") worked exactly as advertised.
+
+The real cost was outside the generated brief: the task asked whether c5's claim — "two branches
+inserting adjacent ids" is the *only* remaining conflict shape — actually holds, and answering that
+meant writing a standalone script that spawns real git (init/commit/branch/merge) to construct
+scenarios the shipped tests do not cover, then sweeping a parameter (the gap between an edited line
+and an inserted one) to find the actual boundary. That took four throwaway scripts and about the
+same wall-clock as the rest of the audit combined, because the first two attempts controlled the
+wrong variable (array-splice position instead of the id the record actually sorts by, since
+`saveStore` always re-sorts regardless of array order — the array position tells you nothing about
+where the line lands). There is no tool in this repo for "construct an adversarial merge and see
+what breaks" — `mutate` breaks a named line and asks whether a *named test* notices, which is a
+different question from "does the property the clause asserts actually hold at the boundary the
+shipped test doesn't visit." That gap is inherent to what a residual-boundary claim is: nobody can
+generate the adversarial case from the clause text, because the clause text is exactly the thing
+being checked. Worth naming anyway, since this is the second audit pass in this log where the
+generated tooling was clean and the real work was outside it (see `audit-brief-arrives-complete`
+pass 5's `recoveryStanding` probes) — the shape recurs, and `mutate` covers "did anyone test this
+line" but not "did anyone test this line under the case that breaks it."
+
+### Mutation testing caught something the brief's own instructions predicted but I did not expect
+### to actually see: two clause-proof tests surviving their own scope
+
+`mutate`'s escalation-chain warning (`"<a test>" -> <a file>` "is not that clause proving itself")
+is printed in every generated brief, so I expected to eventually hit it and treat it as boilerplate.
+This pass it fired for real, on two different clauses (c4, c5), for the same root cause: both
+tests hand-splice their branch arrays already in id-sorted order, so mutating away `saveStore`'s
+sort changes nothing they observe. Filed as a medium finding rather than reworking the tests myself
+— the fix (build the arrays out of order, the way c1's own test does) is small, but it is the kind
+of change that should sit next to the clause it is proving, not be made by an auditor mid-pass.
+
+## 2026-08-06, auditing `the-task-store-survives-parallel-branches` (pass 2)
+
+### The generated tooling stayed clean two passes running; `mutate`'s escalation chain again
+### surfaced the one thing worth finding, this time in code the six clauses do not cover
+
+`audit-prompt`, `mutate` and `merge-ready` again ran with no wrong `file` guesses and no wall. A
+six-entry hand-built manifest (one per clause, each aimed at a named test) confirmed pass 1's
+mutation-gap finding is actually fixed: c4 and c5 both now KILL at their own named-test scope,
+where pass 1 caught them surviving to file scope. That took one `npm run mutate` call and cost
+nothing.
+
+The real finding this pass came from a second manifest built to check `orderIndependence.test.ts`
+— the new property test the spec's clauses do not name, covering the roadmap.ts/producers.ts
+seq-tie-break generalization a coordinator asked for mid-branch (137245b). Removing roadmap.ts's
+seq tie-break term SURVIVED all the way to the 1667-test whole suite; the equivalent producers.ts
+mutation was KILLED at its own named-test scope. Reading why: `roadmapView`'s `topics` sort runs
+on `listQueue`'s output, which is already seq-sorted, so JS's stable `Array.prototype.sort` makes
+the redundant tie-break unobservable — no test in the repo, existing or addable at that call site,
+can currently kill it without changing how `topics` composes with `listQueue`. `mutate` is what
+made this checkable in one command (a scoped manifest, escalate-on-survive) rather than a manual
+`git stash`-and-rerun loop; the reasoning about *why* it survives still had to be done by hand,
+same shape as pass 1's note about adversarial-scenario construction being outside any tool here.
+
+Two probes beyond the six clauses (this pass's own idea, not prompted by the brief) — my own
+standalone real-git-merge harness sweeping edit-edit, delete-delete, delete-edit and edit-delete
+adjacency, plus first/last-record file edges, none of which the shipped tests build — cost about
+15 minutes total (four throwaway `node -e` scripts, one bug in the first draft where "gap" was
+computed against the wrong index for an edit-shaped side) and confirmed c5's boundary claim holds
+outside the fixtures its own tests happen to look at. Positive: this generalizes pass 1's note —
+a clause claiming a boundary needs its boundary re-derived by hand every pass, because the
+adversarial case is exactly what the clause text cannot generate about itself.
+

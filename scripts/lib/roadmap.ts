@@ -242,13 +242,10 @@ function entryOf(task: Task, byId: Map<string, Task>, index: Map<string, Task[]>
 
 export function roadmapView(tasks: Task[], readSpec: ReadSpec): RoadmapView {
   const byId = new Map(tasks.map((task) => [task.id, task]));
-  const order = new Map(tasks.map((task, index) => [task.id, index]));
   const index = liveWaiterIndex(tasks);
 
   const backlog = listQueue(tasks, { deferred: true, kind: 'task' }).map((task) => entryOf(task, byId, index));
-  const topics = backlog
-    .filter((entry) => entry.state === 'unspecced')
-    .sort((a, b) => b.unblocks.length - a.unblocks.length || severityRank(a.task.severity) - severityRank(b.task.severity) || (order.get(a.task.id) ?? 0) - (order.get(b.task.id) ?? 0));
+  const topics = backlog.filter((entry) => entry.state === 'unspecced').sort((a, b) => b.unblocks.length - a.unblocks.length || severityRank(a.task.severity) - severityRank(b.task.severity));
 
   const findings = listQueue(tasks, { state: 'open', kind: 'finding' });
   const perSystem = new Map<string, number>();
