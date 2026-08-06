@@ -782,7 +782,7 @@ export function cmdPromote(args: Flags, usage: string): void {
   // writes that never happened — resolveTaskIds's own contract, applied to
   // the state check it cannot make.
   for (const task of resolved) {
-    if (task.state !== 'unreviewed' && task.state !== 'open') {
+    if (!isReviewable(task)) {
       console.error(`error: ${task.id} is ${task.state} — promote moves unreviewed or deferred records into a spec, it does not reopen closed ones. Nothing was promoted`);
       process.exitCode = 1;
       return;
@@ -802,10 +802,9 @@ export function cmdPromote(args: Flags, usage: string): void {
   recordEvents(config, 'triage', promotions.map((promotion) => subjectOf(promotion.task, promotion.note)));
 }
 
-// promote, defer, redirect and ask all read or move a record still being
-// decided; none of them is how a closed one gets reopened, so all four
-// refuse a state outside this pair before writing anything. Reopening a
-// closed record instead, silently, would be worse than refusing it.
+// Not `done` or `declined`: the boundary a batch verb refuses to cross
+// silently, because reopening a closed record needs a human decision, not
+// a side effect of a write that reached it by id.
 function isReviewable(task: Task): boolean {
   return task.state === 'unreviewed' || task.state === 'open';
 }
@@ -876,8 +875,11 @@ export function cmdRedirect(args: Flags, usage: string): void {
 // question lands on the record's own evidence where the next agent reads it,
 // the record stays unreviewed so the queue keeps offering it, and the same
 // `triage` event the walk records is what makes a run's questions countable.
-// A closed record is in no queue, so asking against one would be a question
-// nobody is ever offered — refused for the same reason redirect is.
+// The record must already be `unreviewed`, not merely open: `unreviewedQueue`
+// re-offers only that state, so a question landed on an open record — a live
+// spec member — would still go nowhere. An open record is not moved back to
+// unreviewed to fix this either; that would pull it out of its spec as a
+// side effect of answering a question.
 export function cmdAsk(args: Flags, usage: string): void {
   const config = resolveConfig(args.flags);
   const question = args.flags.question;
@@ -890,8 +892,8 @@ export function cmdAsk(args: Flags, usage: string): void {
   const resolved = resolveTaskIds(args.positional, tasks);
   if (resolved === null) return;
   for (const task of resolved) {
-    if (!isReviewable(task)) {
-      console.error(`error: ${task.id} is ${task.state} — ask leaves a record in the queue for the answer to be re-offered against, it does not reopen a closed one. Nothing was asked`);
+    if (task.state !== 'unreviewed') {
+      console.error(`error: ${task.id} is ${task.state}, not unreviewed — ask only reaches a record still in the review queue, and does not move one back into it. Nothing was asked`);
       process.exitCode = 1;
       return;
     }
