@@ -510,3 +510,35 @@ the whole evidence block as one un-wrapped line per flag (no embedded newlines) 
 the brief's own warning about this cost nothing since it was flagged before the first attempt
 rather than after the file was rejected.
 
+## 2026-08-06, auditing `a-clause-can-be-deferred-and-a-spec-can-carry-its-goal` (pass 4)
+
+### `npm run inspect`'s stdin mode with `load()` found the fourth gap in one scan; the cost this
+### round was re-learning `--args-from`'s file format on the first attempt, a friction already
+### filed and still unfixed two passes later
+
+Verifying the Cc fix and hunting for a fifth gap both went through `npm run inspect -- -`
+piping a script that imports `hasVisibleContent` via `load('scripts/tasks/audit.ts')`, same as
+pass 3's entry describes — this pass added one step: instead of hand-picking candidate characters,
+it scanned U+0000 through U+2FFFF with `/\p{Default_Ignorable_Code_Point}/u` (confirmed supported
+by the same regex engine with no extra dependency) minus `/\s/u`, `/\p{Cf}/u` and `/\p{Cc}/u`, and
+printed the 37 codepoints left over. That one scan replaced what would otherwise have been another
+round of guessing individual characters by hand, and it is the reason this pass's finding is a
+single-line fix (`\p{Cf}` → `\p{Default_Ignorable_Code_Point}`) rather than a fourth exclusion
+bolted onto a growing list — the scan showed the *shape* of the gap (a whole Unicode property the
+sentence's three-category model doesn't cover), not just one more instance of it.
+
+The actual time cost was elsewhere: reproducing the live, three-route bypass through
+`cliFixtures.ts`'s `fixture()`/`audit()`/`auditWith()` needed an `--args-from` file, and the first
+attempt put the spec slug as the file's own first line (`demo-spec\n--proof 1=deferred\n...`),
+which `parseAuditFile` refuses as "a value line before any flag" — because the slug is a
+positional CLI argument, consumed before `--args-from` is even read, and can never live inside the
+file it names. This is exactly the friction pass 3's own commissioning round already filed as
+`audit-args-from-rejects-the-slug-on-the-file-s-first-line-wi` (still `unreviewed`, two passes
+later): the tool's error names the *shape* of the mistake ("a value line before any flag") but not
+*where the slug belongs instead*, so an agent who has not read that finding has to work it out from
+`AUDIT_USAGE`'s own text (`<spec>` is a separate bracket from `[--args-from <file>]`) rather than
+from the error it just got. Cost about two minutes to notice this time, against the roughly ten
+minutes it reportedly cost when it was first found — the finding sitting unreviewed doesn't compound
+the cost across audits of the *same* branch, since each pass re-derives it fresh from the same
+ambiguous error rather than inheriting the last pass's five minutes of debugging.
+
