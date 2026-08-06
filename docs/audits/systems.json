@@ -327,6 +327,13 @@
             "scripts/lib/taskStore.ts"
           ],
           "note": "produced by the-task-store-survives-parallel-branches: id-sorted saveStore plus a seq field carrying creation order, so parallel branches merge per-record instead of colliding on tail-append"
+        },
+        {
+          "name": "spec ownership inference",
+          "paths": [
+            "scripts/tasks/mergeReady.ts"
+          ],
+          "note": "produced by a-branch-knows-which-spec-it-owes"
         }
       ]
     },
