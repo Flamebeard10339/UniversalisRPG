@@ -72,6 +72,13 @@ Proof:
   polarity — `onBaseBranch` null means no answer, and a gate whose exemption widens when its evidence
   disappears is the wrong way round — survives the change of question.
   proof: vitest scripts/tasks/mergeReady.test.ts
+- [c7] A branch that merely *touched* a spec neither authored nor owes it. `specsWrittenFromBranch`
+  builds its candidates from store events carrying a spec field, so recording a note against a spec
+  is today enough to be asked to audit it — and if that spec's work is deliberately scheduled for
+  later, its open member makes the demand permanent. Authorship and debt are not exhaustive: the
+  third state is having left no work behind, and the discriminator is whether this branch's diff
+  touched the spec's write regions at all.
+  proof: vitest scripts/tasks/mergeReady.test.ts
 
 ## Decisions
 
