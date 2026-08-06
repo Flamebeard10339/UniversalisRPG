@@ -1,5 +1,5 @@
 import { clauseStandings, outstandingSummary, parseSpecDoc } from './specDoc';
-import { isBlocked, listQueue, requirementStates, seqRank, severityRank, waitingOn, type Task } from './taskStore';
+import { isBlocked, listQueue, requirementStates, severityRank, waitingOn, type Task } from './taskStore';
 
 // One vocabulary for the whole view, because each name asks for a different
 // person: `ready` wants an implementer, `unspecced` wants a planning session,
@@ -244,10 +244,12 @@ export function roadmapView(tasks: Task[], readSpec: ReadSpec): RoadmapView {
   const byId = new Map(tasks.map((task) => [task.id, task]));
   const index = liveWaiterIndex(tasks);
 
+  // `backlog` is already severity-then-seq ordered — listQueue's own sort —
+  // so ties here only ever need breaking on `unblocks.length` and severity;
+  // a third seqRank term would be inert, since a stable sort keeps whatever
+  // relative order backlog already carries whenever both compare equal.
   const backlog = listQueue(tasks, { deferred: true, kind: 'task' }).map((task) => entryOf(task, byId, index));
-  const topics = backlog
-    .filter((entry) => entry.state === 'unspecced')
-    .sort((a, b) => b.unblocks.length - a.unblocks.length || severityRank(a.task.severity) - severityRank(b.task.severity) || seqRank(a.task.seq) - seqRank(b.task.seq));
+  const topics = backlog.filter((entry) => entry.state === 'unspecced').sort((a, b) => b.unblocks.length - a.unblocks.length || severityRank(a.task.severity) - severityRank(b.task.severity));
 
   const findings = listQueue(tasks, { state: 'open', kind: 'finding' });
   const perSystem = new Map<string, number>();
