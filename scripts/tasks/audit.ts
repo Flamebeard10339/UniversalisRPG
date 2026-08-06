@@ -741,11 +741,16 @@ const CONFIG_FLAG_NAMES = new Set(['store', 'systems', 'specs-dir', 'branch', 'a
 // The clause-scoped `N=value` shape --proof, --file and --evidence share
 // before any --finding opens. One parser for it: the two `--evidence`
 // branches used to each carve the `N=` prefix off by hand, and drifted.
+// The value is assembled here, so this is where it is trimmed: outer
+// whitespace only, never the interior, because `--args-from` joins a
+// continuation onto the line above it with a newline and a multi-line
+// reason must survive that untouched. An all-whitespace value trims to
+// `''`, which every reader downstream already treats as absent.
 function clauseScoped(raw: string): { clause: number; value: string } | null {
   const eq = raw.indexOf('=');
   if (eq <= 0) return null;
   const clause = Number(raw.slice(0, eq));
-  return Number.isFinite(clause) ? { clause, value: raw.slice(eq + 1) } : null;
+  return Number.isFinite(clause) ? { clause, value: raw.slice(eq + 1).trim() } : null;
 }
 
 // Repeated --proof/--evidence/--finding flags need a dedicated scanner: the
@@ -1065,7 +1070,7 @@ export async function cmdAudit(args: Flags, usage: string): Promise<void> {
   // `deferred` needs the same hold `met` does, for the opposite reason: `met`
   // is a completion claim and `deferred` is a scope decision, and neither is
   // recordable on a shrug. Without this, `deferred` would just be a cheaper
-  // way to say `unmet`, which is the one thing c2 exists to refuse.
+  // way to say `unmet`.
   const unevidenced = verdicts.filter((verdict) => (verdict.status === 'met' || verdict.status === 'deferred') && !verdict.evidence);
   if (unevidenced.length > 0) {
     console.error(

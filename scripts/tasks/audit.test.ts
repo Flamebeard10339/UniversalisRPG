@@ -806,6 +806,21 @@ describe('tasks CLI', () => {
     expect(parsed.findings[0].files).toEqual([]);
   });
 
+  // The clause-scoped `N=value` shape is assembled in one place — `clauseScoped`
+  // — regardless of which transport handed it the raw string, so a
+  // whitespace-only value is caught there rather than by every reader of the
+  // map it fills. Interior structure survives: only the outer whitespace goes.
+  it('trims a clause-scoped value\'s outer whitespace to nothing, but leaves interior lines and words alone', () => {
+    const whitespaceOnly = parseAuditArgs(['demo-spec', '--proof', '1=met', '--evidence', '1=   ']);
+    expect(whitespaceOnly.evidence.get(1)).toBe('');
+
+    const padded = parseAuditArgs(['demo-spec', '--proof', '1=met', '--evidence', '1=  checked directly  ']);
+    expect(padded.evidence.get(1)).toBe('checked directly');
+
+    const multiline = parseAuditArgs(['demo-spec', '--proof', '1=met', '--evidence', '1=\nfirst line\nsecond line\n']);
+    expect(multiline.evidence.get(1)).toBe('first line\nsecond line');
+  });
+
   it('--file on a proof clause carries multiple paths onto its undelivered task, and stays separate from a finding\'s own --file', async () => {
     await fixture(async ({ tasks, audit }) => {
       await audit(
@@ -889,6 +904,46 @@ describe('a deferred clause', () => {
       expect(result.stderr).toContain('clause 1 is deferred with no reason');
       expect(readFileSync(specPath, 'utf8')).toBe(before);
       expect(tasks('list', '--kind', 'undelivered').stdout).toContain('0 task(s)');
+    });
+  });
+
+  // Whitespace is not a reason: `--evidence N="   "` must be refused the same
+  // way no `--evidence` at all is, for both a deferral and a met claim —
+  // `clauseScoped` trims at the point the value is assembled, so every reader
+  // downstream sees the same absence rather than each having to re-check.
+  it('c2: whitespace-only evidence is refused the same way no evidence is, for met as well as deferred', async () => {
+    await fixture(async ({ tasks, dir, audit }) => {
+      const specPath = path.join(dir, 'specs', 'demo-spec.md');
+      const before = readFileSync(specPath, 'utf8');
+
+      const deferred = await audit('demo-spec', '--proof', '1=deferred', '--evidence', '1=   ', '--proof', '2=met', '--evidence', '2=clause 2 checked');
+      expect(deferred.status).toBe(1);
+      expect(deferred.stderr).toContain('clause 1 is deferred with no reason');
+
+      const met = await audit('demo-spec', '--proof', '1=met', '--evidence', '1=\t \t', '--proof', '2=met', '--evidence', '2=clause 2 checked');
+      expect(met.status).toBe(1);
+      expect(met.stderr).toContain('clause 1 is met with no evidence');
+
+      expect(readFileSync(specPath, 'utf8')).toBe(before);
+      expect(tasks('list', '--kind', 'undelivered').stdout).toContain('0 task(s)');
+    });
+  });
+
+  // The fix has to survive the transport that motivated it: `--args-from`
+  // joins a continuation onto the flag's own line with a newline, and a
+  // multi-line reason must round-trip whole — only the block's own leading
+  // and trailing whitespace goes.
+  it('trims only the outer whitespace of a multi-line reason read from --args-from, keeping its interior lines intact', async () => {
+    await fixture(async ({ dir, tasks, audit }) => {
+      const passFile = path.join(dir, 'pass.txt');
+      writeFileSync(passFile, ['--proof 1=deferred', '--evidence 1=  the goal is served without it:', '  see the diff for the reasoning', '--proof 2=met', '--evidence 2=clause 2 checked'].join('\n'), 'utf8');
+      const result = await audit('demo-spec', '--args-from', passFile);
+      expect(result.status).toBe(0);
+
+      const specText = readFileSync(path.join(dir, 'specs', 'demo-spec.md'), 'utf8');
+      expect(specText).toContain('- proof 1: deferred — the goal is served without it:\n  see the diff for the reasoning');
+
+      expect(tasks('show', 'demo-spec-clause-1').stdout).toContain('the goal is served without it:');
     });
   });
 
