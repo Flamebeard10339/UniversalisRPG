@@ -17,9 +17,11 @@ measurement produced, and it is the whole of the problem.
 Sorting records by id removes it. The same scenario re-run against an id-sorted store merged with
 zero conflicts, both new records present and both edits applied — because sorting turns a line every
 branch writes into a position determined by the id, and three branches working three tasks file
-records under three different slugs. The residual is measured, not assumed: two branches inserting
-*adjacent* ids still conflict, once, in the shape where both sides are new records and the resolution
-is to keep both.
+records under three different slugs. The residual is measured, not assumed, and pass 1 corrected what
+that measurement said: the condition is not "two inserts" but **adjacency of changed lines**. Two
+branches that touch immediately neighbouring lines conflict — swept, the boundary sits between zero
+and one record of separation — and that covers an insert beside an insert, an edit beside an insert,
+and a delete beside an insert. Only the first resolves by keeping both sides.
 
 So the fix is a sort, and the branch is small. What makes it more than a one-line change is what the
 sort destroys. Four queues — `taskStore.ts:375`, `:407`, `:487`, `:513` — tie-break on array index,
@@ -39,7 +41,7 @@ written, applied to ordering.
 | ----------------------------------------------------------------- | ------------------------------------------- | ----- |
 | two branches edit different records                                | merges clean                                 | unchanged |
 | two branches each add a record                                     | **conflicts on the tail, every time**        | merges clean |
-| two branches add records with adjacent ids                         | conflicts                                    | conflicts once, union-shaped — documented, not fixed |
+| two branches change *adjacent lines*, in any of three shapes       | conflicts                                    | conflicts once — documented, not fixed; only insert-beside-insert resolves by keeping both |
 | two branches edit the same record                                  | conflicts                                    | unchanged, and correctly so |
 | `tasks next` picks between two tasks of equal severity             | oldest first, by file position               | oldest first, by a field that says so |
 | a branch cut before this lands adds a record, then merges          | merges                                       | merges; the record carries no `seq` and sorts as newest |
