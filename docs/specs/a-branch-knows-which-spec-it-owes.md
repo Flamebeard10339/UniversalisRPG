@@ -181,3 +181,70 @@ branchWorkedOnMembers entirely from touchedWriteRegion is killed by the branchSt
 test for finding 2 alone; dropping the WORK_OPS filter from branchWorkedOnMembers is killed by its own "is
 false for a bare note or decision" test alone. All at named-test scope, no escalation, once the test
 targeted actually exercises the branch the mutation touches.
+
+### Pass 3 — 2026-08-06
+
+- base: `a49a9b614c6cff533de973d9bceb9d18c4d42e94`
+- head: `7d0ebfead94eac6fdf1252e02371868cdfd80425`
+- proof 1: met — headAddsClauseId still compares only id sets (Set.has on base ids), unaffected by wording: "is
+false when the id set matches, even though the wording changed" pins that directly. Re-ran the full suite
+(57 tests, all green). Mutation-verified: forcing headAddsClauseId to always return false killed 3 of 57 at
+the headAddsClauseId describe-block scope, no escalation. I additionally stress-tested the direction rule
+against three cases the shipped tests do not name, via npm run inspect against the real module: wholesale
+clause-id renumbering (base {1,2,3}, head {11,12,13}, same text) reads as adding (true) -- correct, since
+this only ever grants the plan exemption when every member is still open, and an unworked spec is legitimately
+a plan whether its ids were renumbered or freshly authored; a duplicate id in head that collides with an
+existing base id and thereby hides genuinely new content reads as not-adding (false) -- a false negative, but
+on the side the branch's own stated design accepts ("erring toward grading is the safe direction"), and
+duplicate ids are independently visible as a doctor [error] line (context.ts specIssues/duplicateClauseIds)
+even though doctor's own contract is "reported, not enforced" so this does not block the gate. Neither case
+defeats c1's promise; both are direct, examined consequences of the id-only identity choice this spec's own
+Decisions section made explicit.
+- proof 2: met — The real-repository test "reads a respec as a differing clause set (c2)" and the added "is true
+when a legitimate respec adds one clause, against a real repository" both still pass. Mutation: dropping the
+headAddsClauseId===true conjunct from authoredAsPlan's return is killed by the authoredAsPlan describe block
+alone, 1 of 57 failing, no escalation. Checked the adversarial combination the brief asked for -- a branch
+that adds a clause and corrupts another in the same edit (base {1,2,3}, head {1,4}, i.e. c2 and c3 both lost,
+c4 added): headAddsClauseId reads this as true. That is not a promise violation: the clause's own documented
+philosophy is that authorship is graded on identity gained, not on what else was lost in the same edit, and a
+spec in this state can only reach the plan-exemption branch of authoredAsPlan at all when every member is
+still open -- meaning nothing was ever worked against the corrupted clause either, so there is no debt being
+hidden by granting the exemption here.
+- proof 3: met — The same authoredAsPlan describe block loops in-progress, done, declined and unreviewed against
+headAddsClauseId=true and asserts false in every case. Mutation: dropping the members.every(open) conjunct
+from authoredAsPlan, leaving only headAddsClauseId===true, is killed by that same block alone, 1 of 57
+failing, no escalation. This conjunct is untouched by this pass's rename/narrowing; re-verified rather than
+assumed carried over.
+- proof 4: met — specToGrade's "grades a spec the branch owes ahead of a plan it merely wrote" and decideSpec's "a
+single wrong classification costs only that spec, not the one behind it" both still pass, unaffected by this
+pass's change (which lives entirely inside isPlan's own evidence function, upstream of specToGrade). Mutation:
+replacing specToGrade's find(!authoredAsPlan) with an unconditional candidates[0] is killed by the specToGrade
+describe block alone, 2 of 57 failing, no escalation.
+- proof 5: met — decideSpec's "names the untouched reason distinctly from the plan reason" test still passes,
+unaffected by this pass's change to the clause-identity question feeding isPlan. Mutation: collapsing the
+activeReason ternary to always report the plan wording is killed by that same test alone, 1 of 57 failing, no
+escalation.
+- proof 6: met — Both ends of the polarity still hold: authoredAsPlan's own assertion that a null second argument
+returns false, and the real-repository test "is null when git cannot answer at all, rather than guessing
+(c6)" against an unresolvable base branch name. Mutation: deleting the `if (baseHead === null) return null`
+guard at the top of specAddsClauseId is killed by that same real-repository test alone, 1 of 57 failing, no
+escalation. This pass specifically retired the old "zero head clauses against a populated base -> null"
+special case as subsumed by the directional rule; I verified rather than trusted that this changed no
+observable verdict: specAddsClauseId has exactly one call site in the whole tree (grep confirms), inside the
+isPlan closure feeding authoredAsPlan, and authoredAsPlan only branches on `=== true` -- so null and false
+collapse to the identical outcome (not-a-plan) at every consumer that exists today, and npm run inspect
+against the live module confirms headAddsClauseId([],[]) now returns false where the old code's guard would
+have returned null for the populated-base case, with no reachable difference downstream. Separately confirmed
+the distinction the brief asked to protect stays real at the level that matters: an unresolvable base branch
+(baseHead === null, "cannot be asked at all") still returns null via the guard, while a base branch that
+resolves but has no such file at that revision (git.fileAt returns null for a genuinely new spec) correctly
+still folds into "no base clauses", which is required for c1's brand-new-spec case and is not the same fact as
+"could not be asked." The file-level ambiguity between "absent at that revision" and "some other git read
+failure" is a pre-existing property of git.fileAt shared by all three passes' code, not something this pass
+introduced or widened.
+- proof 7: met — decideSpec's "drops a spec this branch never touched" test and the real-repository branchStanding
+tests ("keeps a spec whose diff never touched its declared writes, because a start event names its member" and
+"drops a spec whose diff never touched it and which carries only a note") all still pass, untouched in
+substance by this pass, which only renamed the sibling clause-identity functions. Mutation: forcing
+diffTouchesRegion to always return true is killed by "is false when nothing changed falls inside any region"
+alone, 1 of 57 failing, no escalation.
