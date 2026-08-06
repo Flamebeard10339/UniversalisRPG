@@ -744,13 +744,25 @@ const CONFIG_FLAG_NAMES = new Set(['store', 'systems', 'specs-dir', 'branch', 'a
 // The value is assembled here, so this is where it is trimmed: outer
 // whitespace only, never the interior, because `--args-from` joins a
 // continuation onto the line above it with a newline and a multi-line
-// reason must survive that untouched. An all-whitespace value trims to
-// `''`, which every reader downstream already treats as absent.
+// reason must survive that untouched.
 function clauseScoped(raw: string): { clause: number; value: string } | null {
   const eq = raw.indexOf('=');
   if (eq <= 0) return null;
   const clause = Number(raw.slice(0, eq));
   return Number.isFinite(clause) ? { clause, value: raw.slice(eq + 1).trim() } : null;
+}
+
+// The requirement is "a reason a human can read", not "non-empty after
+// `.trim()`" — `.trim()` strips Unicode whitespace only, so a lone
+// zero-width or other invisible-format character (Unicode category Cf:
+// ZERO WIDTH SPACE, ZERO WIDTH NON-JOINER, ZERO WIDTH JOINER, SOFT HYPHEN,
+// WORD JOINER, the byte-order mark, and their kin) survives it as a
+// non-empty, truthy string that no reader — terminal, editor or spec diff —
+// can see. This asks the question the requirement is actually about: does
+// the text contain a character someone would see.
+const VISIBLE_CHARACTER = /[^\s\p{Cf}]/u;
+export function hasVisibleContent(text: string | null): boolean {
+  return text !== null && VISIBLE_CHARACTER.test(text);
 }
 
 // Repeated --proof/--evidence/--finding flags need a dedicated scanner: the
@@ -895,12 +907,18 @@ async function walkClausesInteractively(clauses: ProofClause[]): Promise<AuditVe
     // records nothing.
     const needsReason = status === 'met' || status === 'deferred';
     let evidenceText: string | null = null;
-    while (evidenceText === null && !prompter.exhausted()) {
-      evidenceText = (await prompter.ask(status === 'met' ? 'evidence (required for met): ' : status === 'deferred' ? 'reason (required for deferred): ' : 'evidence (optional): ')).trim() || null;
-      if (!needsReason) break;
-      if (evidenceText === null && !prompter.exhausted()) console.log(status === 'met' ? 'a met verdict needs evidence the next pass can re-run' : 'a deferred verdict needs a reason the next pass can re-run');
+    if (needsReason) {
+      let visible = false;
+      while (!visible && !prompter.exhausted()) {
+        const answer = (await prompter.ask(status === 'met' ? 'evidence (required for met): ' : 'reason (required for deferred): ')).trim();
+        visible = hasVisibleContent(answer);
+        if (visible) evidenceText = answer;
+        else if (!prompter.exhausted()) console.log(status === 'met' ? 'a met verdict needs evidence the next pass can re-run' : 'a deferred verdict needs a reason the next pass can re-run');
+      }
+      if (!visible) break;
+    } else {
+      evidenceText = (await prompter.ask('evidence (optional): ')).trim() || null;
     }
-    if (needsReason && evidenceText === null) break;
     verdicts.push({ clause: clause.id, status, evidence: evidenceText });
   }
   prompter.close();
@@ -1071,7 +1089,7 @@ export async function cmdAudit(args: Flags, usage: string): Promise<void> {
   // is a completion claim and `deferred` is a scope decision, and neither is
   // recordable on a shrug. Without this, `deferred` would just be a cheaper
   // way to say `unmet`.
-  const unevidenced = verdicts.filter((verdict) => (verdict.status === 'met' || verdict.status === 'deferred') && !verdict.evidence);
+  const unevidenced = verdicts.filter((verdict) => (verdict.status === 'met' || verdict.status === 'deferred') && !hasVisibleContent(verdict.evidence));
   if (unevidenced.length > 0) {
     console.error(
       `error: ${unevidenced.map((verdict) => (verdict.status === 'met' ? `clause ${verdict.clause} is met with no evidence` : `clause ${verdict.clause} is deferred with no reason`)).join('; ')} — pass --evidence N="..." naming what you checked or why the goal still holds, so the next pass can re-run it`,

@@ -4,7 +4,7 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { tsxCli } from '../lib/tsxCli';
 import { parseManifest, refusalsFor } from '../mutate';
-import { auditArgsSkeleton, indexSuiteTitles, manifestNotes, mutationManifest, nextAfterPass, UNAIMED_FILE, UNRETARGETED, parseAuditArgs, parseAuditFile, parseCommitLog, slugStanding, slugStandingLines, toolLines, unresolvedTarget, type SlugStanding, type TargetResolution } from './audit';
+import { auditArgsSkeleton, hasVisibleContent, indexSuiteTitles, manifestNotes, mutationManifest, nextAfterPass, UNAIMED_FILE, UNRETARGETED, parseAuditArgs, parseAuditFile, parseCommitLog, slugStanding, slugStandingLines, toolLines, unresolvedTarget, type SlugStanding, type TargetResolution } from './audit';
 import { appendEvent, firstListedId, fixture, gitFixture, relevantFilesBlock, repoRoot, script, stepsBlock, type Run } from './cliFixtures';
 
 describe('tasks CLI', () => {
@@ -185,6 +185,20 @@ describe('tasks CLI', () => {
       expect(result.stdout).toContain('reason (required for deferred)');
       const specText = readFileSync(path.join(dir, 'specs', 'demo-spec.md'), 'utf8');
       expect(specText).toContain('- proof 1: deferred — the goal still holds without it');
+      expect(specText).toContain('- proof 2: met — read the diff');
+    });
+  });
+
+  // The third route the visible-content guard has to hold on: a lone
+  // zero-width space typed at the prompt re-asks the same way a blank
+  // answer does, rather than being accepted as a truthy, unreadable reason.
+  it('audit\'s interactive clause walk re-asks on an invisible-only reason, and accepts once real content follows it', () => {
+    fixture(({ dir }) => {
+      const result = walkClauses(dir, 'deferred\n\n​\nreal reason\nmet\nread the diff\n');
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('reason (required for deferred)');
+      const specText = readFileSync(path.join(dir, 'specs', 'demo-spec.md'), 'utf8');
+      expect(specText).toContain('- proof 1: deferred — real reason');
       expect(specText).toContain('- proof 2: met — read the diff');
     });
   });
@@ -927,6 +941,38 @@ describe('a deferred clause', () => {
       expect(readFileSync(specPath, 'utf8')).toBe(before);
       expect(tasks('list', '--kind', 'undelivered').stdout).toContain('0 task(s)');
     });
+  });
+
+  // The promise is "a reason a human can read", not "non-empty after
+  // `.trim()`" — `.trim()` strips Unicode whitespace only, so a lone
+  // zero-width or other invisible-format character survives it as a
+  // non-empty string that no reader can see. Several different such
+  // characters, not one, because a test that only tries the character
+  // `trim()` is documented to strip cannot tell "the guard checks
+  // visibility" apart from "the guard checks `.trim()`, which happens not
+  // to strip this one either."
+  it('c2: an invisible-only reason is refused, for several different invisible characters, not just whitespace', async () => {
+    await fixture(async ({ tasks, audit }) => {
+      const invisible = ['​', '‌', '‍', '­', '⁠', '﻿'];
+      for (const character of invisible) {
+        const deferred = await audit('demo-spec', '--proof', `1=deferred`, '--evidence', `1=${character}`, '--proof', '2=met', '--evidence', '2=clause 2 checked');
+        expect(deferred.stderr).toContain('clause 1 is deferred with no reason');
+
+        const met = await audit('demo-spec', '--proof', '1=met', '--evidence', `1=${character}${character}`, '--proof', '2=met', '--evidence', '2=clause 2 checked');
+        expect(met.stderr).toContain('clause 1 is met with no evidence');
+      }
+      expect(tasks('list', '--kind', 'undelivered').stdout).toContain('0 task(s)');
+    });
+  });
+
+  it('hasVisibleContent: true only when a character survives stripping whitespace and Cf-category invisible formatting', () => {
+    for (const invisible of ['', '   ', '\t\n', '​', '‌', '‍', '­', '⁠', '﻿', ' ​\t‍ ']) {
+      expect(hasVisibleContent(invisible)).toBe(false);
+    }
+    expect(hasVisibleContent(null)).toBe(false);
+    for (const visible of ['x', ' x ', '​x​', 'a reason a human can read']) {
+      expect(hasVisibleContent(visible)).toBe(true);
+    }
   });
 
   // The fix has to survive the transport that motivated it: `--args-from`
