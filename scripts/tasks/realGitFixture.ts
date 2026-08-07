@@ -88,7 +88,7 @@ export function realGitRepo(run: (context: { dir: string; git: (...args: string[
 // .gitattributes — so the merge tests prove the lines actually shipped
 // rather than a copy of them written for the occasion.
 export function eventLogGitFixture(
-  run: (context: { dir: string; storePath: string; tasks: (...args: string[]) => Run; commit: (message: string) => string; git: (...args: string[]) => { status: number; stdout: string } }) => void,
+  run: (context: { dir: string; storePath: string; tasks: (...args: string[]) => Run; commit: (message: string) => void; git: (...args: string[]) => { status: number; stdout: string } }) => void,
 ): void {
   const dir = mkdtempSync(path.join(os.tmpdir(), 'universalis-event-log-'));
   try {
@@ -120,10 +120,10 @@ export function eventLogGitFixture(
       dir,
       storePath,
       tasks: (...args: string[]) => runInProcess([...args, ...globals]),
+      // -a, not add -A: every file these tests change is tracked from the
+      // initial commit, and one spawn per commit is half of two.
       commit: (message: string) => {
-        git('add', '-A');
-        git('commit', '--no-verify', '-m', message);
-        return git('rev-parse', 'HEAD').stdout;
+        git('commit', '--no-verify', '-am', message);
       },
       git,
     });

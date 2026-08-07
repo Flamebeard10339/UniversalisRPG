@@ -1,9 +1,7 @@
-import { spawnSync } from 'node:child_process';
 import { writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { tsxCli } from '../lib/tsxCli';
-import { fixture, repoRoot, script } from './cliFixtures';
+import { fixture, runInProcess, runInProcessAsync } from './cliFixtures';
 import { TRIAGE_ACTIONS } from './triage';
 
 describe('tasks CLI', () => {
@@ -139,17 +137,17 @@ describe('tasks CLI', () => {
     });
   });
 
-  it("triage promotes into the inferred spec when the branch matches no spec file", () => {
-    fixture(({ tasks, dir }) => {
+  // In-process with its own globals rather than through the context's
+  // helpers, because the branch this test is about is exactly the one the
+  // fixture pins.
+  it("triage promotes into the inferred spec when the branch matches no spec file", async () => {
+    await fixture(async ({ tasks, dir }) => {
       tasks('add', 'fix-now anchor', '--id', 'anchor', '--spec', 'demo-spec');
       tasks('add', 'a finding', '--id', 'a-finding', '--kind', 'finding', '--severity', 'high', '--deliverable', 'fix it');
-      const storePath = path.join(dir, 'tasks.jsonl');
-      const systemsPath = path.join(dir, 'systems.json');
-      const specsDir = path.join(dir, 'specs');
-      const globals = ['--store', storePath, '--systems', systemsPath, '--specs-dir', specsDir, '--branch', 'orphaned-branch'];
-      const result = spawnSync(process.execPath, [tsxCli, script, 'triage', ...globals], { cwd: repoRoot, encoding: 'utf8', input: '1\n' });
+      const globals = ['--store', path.join(dir, 'tasks.jsonl'), '--systems', path.join(dir, 'systems.json'), '--specs-dir', path.join(dir, 'specs'), '--branch', 'orphaned-branch'];
+      const result = await runInProcessAsync(['triage', ...globals], '1\n');
       expect(result.stdout).toContain('spec inferred from the store: demo-spec');
-      const shown = spawnSync(process.execPath, [tsxCli, script, 'show', 'a-finding', ...globals], { cwd: repoRoot, encoding: 'utf8' });
+      const shown = runInProcess(['show', 'a-finding', ...globals]);
       expect(shown.stdout).toContain('spec: demo-spec');
     });
   });

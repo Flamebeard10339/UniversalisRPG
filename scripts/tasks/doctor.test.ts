@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync
 import os from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { defaultStoreGitFixture, fixture, installDataGit, runInProcess, spawnTasks, type Run } from './cliFixtures';
+import { defaultStoreGitFixture, fixture, installDataGit, runInProcess, spawnTasks } from './cliFixtures';
 import { realDefaultStoreGitFixture } from './realGitFixture';
 
 describe('tasks CLI', () => {
@@ -81,12 +81,12 @@ describe('tasks CLI', () => {
   // behind, never for the session's own writes: measured six-for-six and
   // eight-for-eight across two recorded sessions, a warning on every write
   // is a warning nobody reads. Freshness is the store's pre-write mtime.
-  // Over real processes on purpose: the warning fires at most once per
-  // process, so an in-process run here would spend the flag the sibling
-  // warn-once test below depends on observing fresh.
+  // Only the write that warns is a real process: a silent write never sets
+  // the once-per-process flag, so the two silence observations run
+  // in-process without spending what the warn-once test below observes —
+  // and the warning observation spawns, so it cannot spend it either.
   it('default-store writes stay silent about their own dirtiness, and warn once over stale uncommitted state', () => {
-    realDefaultStoreGitFixture(({ dir }) => {
-      const tasks = (...args: string[]): Run => spawnTasks(dir, [...args, '--branch', 'demo-spec']);
+    realDefaultStoreGitFixture(({ dir, tasks }) => {
       // A write that itself dirties a clean store is the session acting on
       // purpose — no warning.
       const own = tasks('add', 'Dirty tracked task', '--id', 'dirty-tracked');
@@ -103,7 +103,7 @@ describe('tasks CLI', () => {
       const store = path.join(dir, 'docs', 'tasks.jsonl');
       const old = new Date(Date.now() - 40 * 60 * 1000);
       utimesSync(store, old, old);
-      const stale = tasks('add', 'Third task', '--id', 'third-task');
+      const stale = spawnTasks(dir, ['add', 'Third task', '--id', 'third-task', '--branch', 'demo-spec']);
       expect(stale.status).toBe(0);
       expect(stale.stderr).toContain('warning: docs/tasks.jsonl has uncommitted task-state changes from an earlier session');
     });
