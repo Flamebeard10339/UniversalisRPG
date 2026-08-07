@@ -864,3 +864,39 @@ mutable copy across concurrent agents — the risk this pass hit is exactly the 
 class the run's own worktree isolation was designed to avoid for the *task store*, just one layer
 down in the toolchain.
 
+
+## 2026-08-07, auditing `a-mutation-verdict-names-the-test-that-changed` (pass 1)
+
+The subject was `npm run mutate` itself, so step 4's instruction — aim a manifest and run the tool
+— is circular on its face: the thing being asked to prove the clauses is the thing the clauses are
+about. What resolved it was cheap and should be named as the standard move for a self-referential
+audit rather than reinvented: drive the mutation by hand (edit the line, `npx vitest run` the
+scope directly, read the failing test names out of vitest's own stderr, `git checkout --` the
+file, `git status --porcelain` for clean), then run `npm run mutate` over the identical manifest
+and check the two agree. Sixty lines of throwaway script; both passes agreed on all six entries.
+The agreement is corroboration, not proof, and only the hand-driven half is cited as evidence.
+
+The genuinely load-bearing step the brief does not ask for: capture what the tool *parses* before
+judging the parser. One `spawnSync` of vitest with stdout and stderr written to separate files,
+against a fixture built to be hostile (nested describes, `it.each`, a name containing ` > `, a
+150-character name, a `beforeAll` that throws), settled in one run what the reporter actually
+emits — stream, path separator, truncation, and whether a thrown hook prints a test-less FAIL
+line. Every one of the worker's recorded reporter decisions was checkable against that capture in
+seconds, and the highest-severity finding of this pass came out of the same capture aimed at a
+real repository file. Reading the parse and reasoning about vitest's format would have missed it.
+
+`npm run inspect -- -` with a body on stdin carried the whole second half of the audit: six
+adversarial scenarios driven through `runMutations` with injected `runTests`/`baselineFor`, plus
+feeding real captured streams to `tallyOf`. No file in the worktree, no `*.test.ts` to clean up.
+This is the tool working exactly as its own comment says it should; nothing to fix.
+
+Two real costs. `resolveVitest` is not exported in a form a scratch driver can call — reproducing
+it meant copying eight lines of `createRequire`/`package.json` `bin` resolution into the capture
+script, and the first attempt (`require.resolve('vitest/vitest.mjs')`) failed on package exports.
+A tiny exported `vitestCli()` would have saved two rounds. And `merge-ready` reports `base: main
+has moved past the merge base` as a FAIL, which is correct but arrives in the same block as the
+gates, so a reader has to know that one of the two red lines is a merge and not a defect.
+
+Cost of the pass itself, measured rather than estimated: `merge-ready` 43s for the whole gate,
+well inside the five-minute rule. `npm run mutate` over the six clause entries 97s against 56s for
+the same manifest under `main`'s `mutate.ts` — the +73% is the confirmation phase and is filed.
