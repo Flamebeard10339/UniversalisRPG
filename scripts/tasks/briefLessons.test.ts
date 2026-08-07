@@ -1,6 +1,8 @@
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { allLessons, AUDITOR_LESSONS, findLesson, indexLessons, ORCHESTRATOR_LESSONS, PLANNER_LESSONS, unknownLessonIds, WORKER_LESSONS, type Lesson } from './briefLessons';
-import { fixture } from './cliFixtures';
+import { fixture, repoRoot } from './cliFixtures';
 
 // The nineteen ids, written out here rather than read off the arrays, for the
 // same reason workPrompt.test.ts writes out the nineteen sentences: a list
@@ -113,6 +115,20 @@ describe('two lessons cannot share one id', () => {
   it('the nineteen shipped ids are distinct', () => {
     expect(new Set(allLessons().map((lesson) => lesson.id)).size).toBe(19);
   });
+
+  // Where the refusal fires decides how much it takes with it. Every `tasks`
+  // command imports this module transitively, so a refusal reached during
+  // import turns `doctor`, `list` and `next` — the three an agent reaches for
+  // when something is already wrong — into a stack trace. Asserted over the
+  // source because import-time behaviour is not observable from inside the
+  // module's own surface: this is the one call whose position is the point.
+  it('refuses a duplicated id only where a citation is being resolved, never at import', () => {
+    const callSites = readFileSync(path.join(repoRoot, 'scripts/tasks/briefLessons.ts'), 'utf8')
+      .split('\n')
+      .filter((line) => line.includes('indexLessons(') && !line.includes('function indexLessons('));
+    expect(callSites).not.toEqual([]);
+    for (const line of callSites) expect(line, line).toMatch(/^\s+\S/);
+  });
 });
 
 // An id nobody is shown is an id nobody cites. Looping over the arrays is
@@ -120,7 +136,7 @@ describe('two lessons cannot share one id', () => {
 // output rather than the arrays' contents, and the contents are pinned above
 // by literals, so an emptied array cannot make this pass vacuously.
 describe('every brief shows the ids of the lessons it prints', () => {
-  const showsItsIds = (stdout: string, lessons: Lesson[]) => {
+  const showsItsIds = (stdout: string, lessons: readonly Lesson[]) => {
     expect(lessons.length).toBeGreaterThan(0);
     expect(stdout).toContain('the bracketed id names the lesson');
     for (const lesson of lessons) expect(stdout, lesson.id).toContain(`[${lesson.id}] ${lesson.title}`);

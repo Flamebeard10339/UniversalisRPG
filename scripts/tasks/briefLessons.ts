@@ -11,18 +11,18 @@
 // to retire a lesson, delete it and let its citations resolve to nothing, and
 // never rename one in place or reuse a retired id for a different lesson.
 export interface Lesson {
-  id: string;
-  title: string;
-  body: string;
+  readonly id: string;
+  readonly title: string;
+  readonly body: string;
 }
 
-export function printLessons(heading: string, lessons: Lesson[]): void {
+export function printLessons(heading: string, lessons: readonly Lesson[]): void {
   console.log(heading);
   console.log('(the bracketed id names the lesson, and keeps naming it after the sentence is reworded)');
   for (const lesson of lessons) console.log(`- [${lesson.id}] ${lesson.title} ${lesson.body}`);
 }
 
-export const WORKER_LESSONS: Lesson[] = [
+export const WORKER_LESSONS: readonly Lesson[] = [
   {
     id: 'worker/comment-rule',
     title: "CLAUDE.md's `# Comments` section owns the comment rule — do not re-derive it here.",
@@ -45,7 +45,7 @@ export const WORKER_LESSONS: Lesson[] = [
   },
 ];
 
-export const AUDITOR_LESSONS: Lesson[] = [
+export const AUDITOR_LESSONS: readonly Lesson[] = [
   {
     id: 'auditor/false-proof-shape',
     title: 'Ask what would have to break for a test to fail, and whether that is what the clause promises.',
@@ -73,7 +73,7 @@ export const AUDITOR_LESSONS: Lesson[] = [
   },
 ];
 
-export const PLANNER_LESSONS: Lesson[] = [
+export const PLANNER_LESSONS: readonly Lesson[] = [
   {
     id: 'planner/state-the-invariant',
     title: 'State the invariant.',
@@ -96,7 +96,7 @@ export const PLANNER_LESSONS: Lesson[] = [
   },
 ];
 
-export const ORCHESTRATOR_LESSONS: Lesson[] = [
+export const ORCHESTRATOR_LESSONS: readonly Lesson[] = [
   {
     id: 'orchestrator/buffer-not-decider',
     title: 'The orchestrator is a buffer, not a decision-maker.',
@@ -148,10 +148,15 @@ export function indexLessons(lessons: readonly Lesson[]): Map<string, Lesson> {
   return index;
 }
 
-const LESSONS_BY_ID = indexLessons(allLessons());
+let citationIndex: Map<string, Lesson> | undefined;
+
+function lessonsById(): Map<string, Lesson> {
+  if (citationIndex === undefined) citationIndex = indexLessons(allLessons());
+  return citationIndex;
+}
 
 export function findLesson(id: string): Lesson | undefined {
-  return LESSONS_BY_ID.get(id);
+  return lessonsById().get(id);
 }
 
 export function unknownLessonIds(ids: readonly string[]): string[] {
