@@ -3,6 +3,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 import os from 'node:os';
 import path from 'node:path';
 import { install as installGit, realGit } from '../lib/git';
+import { initRealGitRepo, makeRealGitRepo } from '../lib/realGitRepo';
 import { isolateTmp, repoRoot, runInProcess, runInProcessAt, type Run } from './cliFixtures';
 
 // The real-repository forms of the fixtures in cliFixtures.ts, spawning
@@ -12,13 +13,9 @@ import { isolateTmp, repoRoot, runInProcess, runInProcessAt, type Run } from './
 // consumers is the set of tests paying for real git.
 
 export function realGitFixture(run: (context: { dir: string; commit: (message: string, files?: string[]) => string; tasks: (...args: string[]) => Run }) => void): void {
-  const dir = mkdtempSync(path.join(os.tmpdir(), 'universalis-git-fixture-'));
+  const dir = makeRealGitRepo('universalis-git-fixture-');
   const restoreTmp = isolateTmp(dir);
   try {
-    spawnSync('git', ['init', '-q'], { cwd: dir });
-    spawnSync('git', ['config', 'user.email', 'test@example.com'], { cwd: dir });
-    spawnSync('git', ['config', 'user.name', 'Test'], { cwd: dir });
-
     const specsDir = path.join(dir, 'specs');
     mkdirSync(specsDir);
     writeFileSync(path.join(specsDir, 'demo-spec.md'), '# Demo spec\n\n## Deliverable\n\nSomething this branch promises.\n\nProof:\n\n- The first clause holds.\n\n## Decisions\n\n## Open questions\n\nNone.\n', 'utf8');
@@ -28,7 +25,6 @@ export function realGitFixture(run: (context: { dir: string; commit: (message: s
     const globals = ['--store', storePath, '--systems', systemsPath, '--specs-dir', specsDir, '--branch', 'demo-spec'];
     spawnSync('git', ['add', '.'], { cwd: dir });
     spawnSync('git', ['commit', '--no-verify', '-m', 'Initial fixture\n\nA branch base exists.'], { cwd: dir, encoding: 'utf8' });
-    spawnSync('git', ['branch', '-M', 'main'], { cwd: dir });
     spawnSync('git', ['checkout', '-q', '-b', 'demo-spec'], { cwd: dir });
 
     run({
@@ -61,9 +57,7 @@ export function realGitRepo(run: (context: { dir: string; git: (...args: string[
   const restoreGit = installGit(realGit);
   const git = (...args: string[]): void => void spawnSync('git', args, { cwd: dir });
   try {
-    git('init', '-q', '-b', 'main');
-    git('config', 'user.email', 'test@example.com');
-    git('config', 'user.name', 'Test');
+    initRealGitRepo(dir);
     process.chdir(dir);
     run({
       dir,
@@ -96,9 +90,7 @@ export function eventLogGitFixture(
       const result = spawnSync('git', args, { cwd: dir, encoding: 'utf8' });
       return { status: result.status ?? 1, stdout: result.stdout.trim() };
     };
-    git('init', '-q');
-    git('config', 'user.email', 'test@example.com');
-    git('config', 'user.name', 'Test');
+    initRealGitRepo(dir);
 
     writeFileSync(path.join(dir, '.gitattributes'), readFileSync(path.join(repoRoot, '.gitattributes'), 'utf8'), 'utf8');
     const specsDir = path.join(dir, 'docs', 'specs');
@@ -113,7 +105,6 @@ export function eventLogGitFixture(
 
     git('add', '-A');
     git('commit', '--no-verify', '-m', 'Initial fixture\n\nA tracked store and log exist.');
-    git('branch', '-M', 'main');
     git('checkout', '-q', '-b', 'demo-spec');
 
     run({
@@ -133,12 +124,8 @@ export function eventLogGitFixture(
 }
 
 export function realDefaultStoreGitFixture(run: (context: { dir: string; tasks: (...args: string[]) => Run }) => void): void {
-  const dir = mkdtempSync(path.join(os.tmpdir(), 'universalis-default-store-'));
+  const dir = makeRealGitRepo('universalis-default-store-');
   try {
-    spawnSync('git', ['init', '-q'], { cwd: dir });
-    spawnSync('git', ['config', 'user.email', 'test@example.com'], { cwd: dir });
-    spawnSync('git', ['config', 'user.name', 'Test'], { cwd: dir });
-
     mkdirSync(path.join(dir, 'docs', 'specs'), { recursive: true });
     mkdirSync(path.join(dir, 'docs', 'audits'), { recursive: true });
     writeFileSync(path.join(dir, 'docs', 'specs', 'demo-spec.md'), '# Demo spec\n\n## Deliverable\n\nSomething this branch promises.\n\nProof:\n\n- The first clause holds.\n\n## Decisions\n\n## Open questions\n\nNone.\n', 'utf8');

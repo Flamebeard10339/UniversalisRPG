@@ -4,16 +4,14 @@ import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { branch, changedFiles, commitCount, commitLog, commitsTouching, diffStat, dirtyPaths, fileAt, head, install, isAncestor, lsFiles, mergeBase, mergeInProgress, parseCommitLog, resolveCommit, type GitFacts } from './git';
+import { makeRealGitRepo } from './realGitRepo';
 
 let dir: string;
 let originalCwd: string;
 
 beforeEach(() => {
   originalCwd = process.cwd();
-  dir = mkdtempSync(path.join(os.tmpdir(), 'universalis-git-'));
-  spawnSync('git', ['init', '-q'], { cwd: dir });
-  spawnSync('git', ['config', 'user.email', 'test@example.com'], { cwd: dir });
-  spawnSync('git', ['config', 'user.name', 'Test'], { cwd: dir });
+  dir = makeRealGitRepo('universalis-git-');
   process.chdir(dir);
 });
 
