@@ -304,17 +304,13 @@ function verdictOf(mutation: Mutation, scope: string, run: TestRun, baseline: Ba
   };
 }
 
-// Where a kill has to hold up. Files rather than the test names: a name is
-// matched by `-t` as a regex over the whole suite, and the file the run
-// already named is both narrower and exact.
+// Files rather than the test names they came from: `-t` takes a regex over the
+// whole suite, and the file the run already named is both narrower and exact.
 export const filesOf = (tests: readonly string[]): string[] => [...new Set(tests.map((name) => name.split(' > ')[0]))].sort();
 
-// The second observation. A failure that does not happen again, on the same
-// tree with the same mutant on disk, is a measurement that did not repeat —
-// which is the whole of what the escalation ladder was manufacturing out of
-// three slow tests and a contended run. Reported as its own verdict, never
-// resolved: the tool's job is to refuse to present it as fact, and what to do
-// about it is the auditor's call.
+// A failure that did not happen again, on the same tree with the same mutant on
+// disk, is reported and never resolved — the tool refuses to present it as
+// fact, and what to do about it is the auditor's.
 export function confirmKill(result: MutationResult, run: TestRun, baseline: Baseline | undefined, scope: string): MutationResult {
   const attributed = result.attributed ?? [];
   const before = new Set(baseline?.failures ?? []);
@@ -412,12 +408,10 @@ export function runMutations(mutations: readonly Mutation[], files: FileStore, r
   }
 
   // Every kill faces the same bar however wide the scope that produced it, so
-  // widening the scope cannot widen what counts as one. A kill found at the
-  // whole suite is re-measured against the files its named tests live in,
-  // which is where a failure that needed a contended run to appear stops
-  // appearing; a kill already found at that scope is measured there twice,
-  // which is the same manifest against the same tree reporting the same
-  // verdict or saying it did not.
+  // widening the scope cannot widen what counts as one. A kill found wider than
+  // its named tests' own files is re-measured there, where a failure that
+  // needed a contended run stops appearing; one already found there is measured
+  // twice, which is the same tree answering the same question.
   for (let index = 0; index < results.length; index++) {
     const found = results[index];
     if (found.verdict !== 'KILLED' || found.attributed === undefined) continue;
