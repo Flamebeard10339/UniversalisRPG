@@ -945,3 +945,53 @@ this branch pays the same few minutes to re-establish that. A `merge-ready` that
 failures it saw against the open findings would turn that into a line of output. Measured: the
 13-entry manifest 4m02s (two survivors each escalating to a whole-suite run), the single c6
 mutation 5m18s, `merge-ready` 4m10s.
+
+
+## 2026-08-07, auditing `resolve-forward-progress-guard` (pass 1)
+
+Second auditor on the same three-spec branch, so the `--branch <slug>` override and the empty
+`Mutation manifest:` section are already logged above and cost nothing here — being told in
+advance is what made them free, which is the argument for `audit-prompt` learning to say "this
+branch carries N specs" rather than for another entry about it. One thing the previous entry
+could not know: the pass file is named for the spec, not the branch, so three auditors sharing
+one temp directory cannot collide. The brief's line about the file being "yours if you have
+aimed it" reads as a warning about exactly that collision and is not one.
+
+The cost this pass actually paid was hang-screening. `npm run mutate` spawns vitest with no
+timeout, and the spec's own Decisions section records why that matters here: deleting the throw
+from `requireForwardProgress` makes `resolve()` spin synchronously, so vitest's per-test timeout
+cannot fire and the tool hangs holding a mutated tree. Every one of the 11 entries I ran had to
+be reasoned about first — "can this mutation only add throws, or can it remove one the loop's
+termination depends on?" — before it was safe to run. That screening is real work, it is
+invisible in the report, and it is what pushes an auditor toward scalings (`STALL_BOUND + 1`,
+`< now - 1`) and away from deletions. A per-mutation timeout would remove it outright: the
+restore-from-captured-bytes path already exists, and a killed child is exactly the case it was
+written for. Until then the constraint deserves to be in the brief's "how to read what mutate
+prints back" section, not only in one spec's Decisions.
+
+The move worth carrying forward: mutate a line in a PAIR, in opposite directions. Deleting the
+`requireBoundaryNotPast` call SURVIVED the whole suite; shifting its argument by one millisecond
+was KILLED. Either mutation alone gives a confident and wrong answer — deletion alone reads as
+"dead code", the shift alone reads as "fully covered". Together they say precisely what is true:
+the loop provably executes the call, and nothing observes whether it is there. That is the
+finding, and no single-mutation-per-line manifest could have produced it.
+
+Two smaller costs. `npm run inspect` takes a body of statements but not `import` declarations —
+the first attempt spent a round on "Cannot use import statement outside a module" before the
+usage text's `await load('src/runtime/runtime.ts')` form; the error names the symptom and not the
+fix, which is one line of message away from being free. And `merge-ready` still reports `npm test
+FAIL` with no hint that the one red test is filed and non-hermetic, which is the same tax the
+previous entry measured; I re-established it independently on purpose, and it took a targeted
+vitest run plus a `git diff --name-only main...<base>` to prove the test was green before this
+range and that this spec's three files are independently sufficient to redden it. Worth the
+minutes once per branch, not once per auditor.
+
+Measured this pass: `src/runtime/resolve.test.ts` 32 tests in 1.0s, which is why an 11-entry
+manifest scoped to it is cheap and why the four whole-suite escalations (one per survivor) are
+where the wall clock goes. `merge-ready` 1815 tests, one red. Two numbers the audit produced
+rather than consumed, both from `npm run inspect`: `resolve()` over a boundary-dense span is
+quadratic in active buffs — 500 buffs 34ms, 1000 buffs 133ms, 2000 buffs 653ms — which is
+pre-existing and belongs to `offline-progression`, not here; and the branch's switch from
+`Object.values` to `Object.entries` in that scan costs 637ms against 512ms over 2000 calls on
+2000 keys, i.e. real and immaterial at any count a session reaches. Measuring it was cheaper than
+arguing about it, and is the reason no performance finding was filed.

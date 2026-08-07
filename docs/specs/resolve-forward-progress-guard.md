@@ -104,3 +104,74 @@ Proof:
 ## Open questions
 
 None. The stall bound was the only one, and it is settled above.
+
+## Audit passes
+
+### Pass 1 — 2026-08-07
+
+- base: `b56ba3ee30365f83e10738189ac42d94bcad295c`
+- head: `a0a7059aa09ad19f6a1b379319fe093d7cb29cf0`
+- proof 1: met — Mutation-tested, manifest hand-written (no target resolved). Three kills, each a named test
+  re-run at its own file with the mutation still applied: STALL_BOUND 8 -> 0 is killed by
+  "lets a zero-length segment through when it consumes a completion at the current instant",
+  which is what proves resolve() really calls requireForwardProgress rather than merely importing
+  it; "if (stalls > STALL_BOUND)" -> "> STALL_BOUND + 1" is killed by "throws past the bound,
+  naming the boundary that held time, and not before it"; and the resource boundary's source
+  string replaced by a literal is killed by "reports a boundary that never advances instead of
+  spinning on it", which is the end-to-end half — resolve() throws RuntimeError, the message
+  carries "resource pool", and state.time is still 0. The spin fixture is a deliberately corrupt
+  state (a pool level of 0.5 milli-units, injected through a cast) and that is the right proof:
+  for any integer level >= 1 and any remainder in [0, 60000), msUntilEmpty's numerator is at most
+  -1 - remainder and its divisor negative, so emptyIn >= 1 — the stall is unreachable from
+  engine-produced state by construction, which is exactly why a guard rather than a fix is what
+  the clause promises. Its failure direction is safe: if the engine later rounds resource levels,
+  the test stops reproducing a stall and goes red, not quietly green. The pre-change hang is
+  verifiable by reading: with the boundary at state.time and no activeAction, resolveSegment
+  advances 0, applyDueBoundaries changes nothing, and while (0 < 5000) never terminates.
+  Residual filed as a finding: three of the four names the report can carry are asserted nowhere.
+- proof 2: met — "lets a zero-length segment through when it consumes a completion at the current
+  instant" passes on the unmutated tree and is KILLED by STALL_BOUND 8 -> 0, which is the
+  measurement that matters: the mill fixture genuinely produces a boundary at the current instant
+  that the guard counts as a stall, and the guard tolerates it. It is killed a second time by
+  requireBoundaryNotPast(boundary, before) -> (boundary, before + 1), i.e. by making the
+  not-past rule forbid a boundary at now, which is the over-strict form the Decisions section
+  refused. So the clause's two halves — a zero-length step is real here, and it is legal — are
+  each observed by a failing test rather than by the absence of one.
+- proof 3: met — Two mutations, in opposite directions. Deleting the reset ("if (after > before)
+  return 0;" made unreachable, so the counter becomes the total-iteration cap the Decisions
+  section refused) is KILLED by "resolves a span carrying far more boundaries than the stall
+  bound exactly as one with none" — which proves the span really carries more than STALL_BOUND
+  iterations, rather than the test asserting its own marker count. And removing the 20 markers
+  from that test entirely leaves every one of its expectations green (SURVIVED at whole-suite
+  scope), which proves 25 cooked-shrimp / no active buffs / t=25s is the no-marker result, so
+  "exactly as one with none" is what the assertion actually says and not a value read off the
+  marked run.
+- proof 4: met — The rule's direction is asserted: "if (boundary.at < now)" -> "< now - 1" is KILLED
+  by "rejects a boundary before the current instant". The loop provably executes the call every
+  iteration: "requireBoundaryNotPast(boundary, before)" -> "(boundary, before + 1)" is KILLED by
+  "lets a zero-length segment through when it consumes a completion at the current instant". The
+  check is at src/runtime/runtime.ts:365, inside the loop, not in a comment — read directly. I
+  also confirmed the claim it states is not vacuous but is unreachable from legitimate state:
+  every candidate but a buff expiry is built as state.time + Math.max(0, ...) or is toTime, which
+  resolve() already validates as >= state.time, and applyDueBoundaries deletes every buff with
+  expiresAt <= state.time before each nextBoundary call. So the check is a genuine invariant
+  assertion and cannot refuse legitimate input — no over-strictness regression. One residual,
+  filed as a finding and not a falsification of this clause: deleting the call site outright
+  survives the whole suite.
+- proof 5: unmet — Checked, and it fails on one conjunct. tsc, layer-check, audit-status, doctor, the
+  byte check and the tree check all pass (npm run tasks -- merge-ready). No authored content file
+  is touched anywhere in the range, and nextBoundary's selection logic is unchanged line for line
+  — the same comparisons in the same order, with the winner carried as an object instead of a
+  bare number — so no timing moves. But the suite does not pass: 1814 passed, 1 failed, and the
+  failure is scripts/tasks/audit.test.ts > "the brief answers ownership and prior art for every
+  path in its diff". I did not take the standing explanation on trust. The merge base b56ba3e is
+  main, so before this range the branch diff was empty and that test was green; the assertion
+  expects the heading "prior art on src/runtime/save.ts" and gets "prior art on
+  src/runtime/forwardProgress.ts, src/runtime/resolve.test.ts, src/runtime/runtime.ts,
+  src/runtime/save.test.ts, src/runtime/save.ts, src/runtime/session.test.ts:" because
+  audit-prompt builds that heading from a live git diff of the real repository. This spec's three
+  files are in that list and are independently sufficient to redden it — the other two specs'
+  files are too. So the cause is a hermeticity defect in the Task system's own fixture rather
+  than anything in this spec's logic, and two findings for it are already on file (I did not add
+  a third). The clause as written still does not hold, and recording it met would be recording a
+  suite state that does not exist.
