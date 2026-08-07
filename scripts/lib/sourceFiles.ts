@@ -1,6 +1,6 @@
-import { execFileSync } from 'node:child_process';
 import { readdirSync, statSync } from 'node:fs';
 import { join, normalize } from 'node:path';
+import * as git from './git';
 
 const SOURCE_EXTENSIONS = ['.ts', '.tsx'];
 const SKIPPED_DIRECTORIES = new Set(['node_modules', 'dist', 'android', '.git']);
@@ -14,10 +14,9 @@ export function posix(path: string): string {
 // it is how they drift. Throws when git does; a caller that can answer
 // around that catches it.
 export function trackedFiles(): string[] {
-  return execFileSync('git', ['ls-files'], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 })
-    .trim()
-    .split('\n')
-    .filter((file) => file !== '');
+  const files = git.lsFiles();
+  if (files === null) throw new Error('git ls-files failed — cannot enumerate tracked files');
+  return files;
 }
 
 export function sourceFiles(directory: string): string[] {

@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { branch, changedFiles, commitCount, commitLog, commitsTouching, diffStat, dirtyPaths, fileAt, head, install, isAncestor, mergeBase, mergeInProgress, parseCommitLog, resolveCommit, type GitFacts } from './git';
+import { branch, changedFiles, commitCount, commitLog, commitsTouching, diffStat, dirtyPaths, fileAt, head, install, isAncestor, lsFiles, mergeBase, mergeInProgress, parseCommitLog, resolveCommit, type GitFacts } from './git';
 
 let dir: string;
 let originalCwd: string;
@@ -206,6 +206,23 @@ describe('git seam', () => {
     ]);
   });
 
+  it('lsFiles lists tracked paths, not the working tree, and is null outside a repository', () => {
+    writeFileSync(path.join(dir, 'tracked.txt'), 'x', 'utf8');
+    spawnSync('git', ['add', '.'], { cwd: dir });
+    spawnSync('git', ['commit', '--no-verify', '-m', 'add tracked'], { cwd: dir });
+    writeFileSync(path.join(dir, 'untracked.txt'), 'x', 'utf8');
+    expect(lsFiles()).toEqual(['tracked.txt']);
+
+    const outside = mkdtempSync(path.join(os.tmpdir(), 'universalis-norepo-'));
+    process.chdir(outside);
+    try {
+      expect(lsFiles()).toBeNull();
+    } finally {
+      process.chdir(dir);
+      rmSync(outside, { recursive: true, force: true });
+    }
+  });
+
   it('commitsTouching walks the commits that changed one path, newest first', () => {
     writeFileSync(path.join(dir, 'walked.txt'), 'v1', 'utf8');
     spawnSync('git', ['add', '.'], { cwd: dir });
@@ -239,6 +256,7 @@ describe('git seam', () => {
       diffStat: () => 'sentinel-diffStat',
       commitLog: () => [{ sha: 'sentinel', subject: 'sentinel-subject', files: [] }],
       commitsTouching: () => ['sentinel-touching'],
+      lsFiles: () => ['sentinel-tracked.ts'],
     };
     const previous = install(sentinel);
     try {
@@ -255,6 +273,7 @@ describe('git seam', () => {
       expect(diffStat('a..b')).toBe('sentinel-diffStat');
       expect(commitLog('a..b')?.[0].subject).toBe('sentinel-subject');
       expect(commitsTouching('any.txt')).toEqual(['sentinel-touching']);
+      expect(lsFiles()).toEqual(['sentinel-tracked.ts']);
     } finally {
       install(previous);
     }

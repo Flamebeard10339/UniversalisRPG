@@ -3,7 +3,7 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { flagArities } from './tasks/cli';
 import { allUsages } from './tasks/commands';
-import { fixture } from './tasks/cliFixtures';
+import { enclosingGitFixture, fixture } from './tasks/cliFixtures';
 
 describe('tasks CLI', () => {
   it('prints help without treating --help or help as unknown commands', () => {
@@ -107,7 +107,7 @@ describe('tasks CLI', () => {
   // `spec` derived 3 from prose in its own usage line and went unnoticed
   // through two audits.
   it('refuses five junk arguments on every bounded command surface', () => {
-    fixture(({ tasks }) => {
+    enclosingGitFixture(({ tasks }) => {
       const unbounded = new Set(['spec add', 'spec remove', 'plan', 'done', 'decline', 'promote', 'plan-prompt', 'orchestrate-prompt']);
       const surfaces = [['doctor'], ['add'], ['edit'], ['show'], ['list'], ['search'], ['next'], ['start'], ['stop'], ['done'], ['decline'], ['promote'], ['import'], ['triage'], ['audit'], ['audit-prompt'], ['work-prompt'], ['plan-prompt'], ['orchestrate-prompt'], ['check-commit-msg'], ['plan'], ['spec'], ['spec', 'new'], ['spec', 'add'], ['spec', 'remove'], ['spec', 'show'], ['spec', 'done'], ['note'], ['decision'], ['log'], ['merge-ready']];
       for (const surface of surfaces) {

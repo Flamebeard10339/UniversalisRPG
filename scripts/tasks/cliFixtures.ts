@@ -176,6 +176,7 @@ const noRepositoryGit: GitFacts = {
   diffStat: () => null,
   commitLog: () => null,
   commitsTouching: () => null,
+  lsFiles: () => null,
 };
 
 interface TreeCommit {
@@ -274,6 +275,7 @@ class DataGit {
           .map((commit) => commit.sha)
           .reverse();
       },
+      lsFiles: () => [...this.commits[this.commits.length - 1].tree.keys()].sort(),
     };
   }
 

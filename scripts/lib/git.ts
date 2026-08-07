@@ -24,6 +24,7 @@ export interface GitFacts {
   diffStat(range: string): string | null;
   commitLog(range: string): Commit[] | null;
   commitsTouching(filePath: string): string[] | null;
+  lsFiles(): string[] | null;
 }
 
 // Every fact here is quiet and nullable: a failed git invocation
@@ -143,6 +144,10 @@ export const realGit: GitFacts = {
   commitsTouching(filePath) {
     return lines(run(['log', '--format=%H', '--', filePath]));
   },
+
+  lsFiles() {
+    return lines(run(['ls-files']));
+  },
 };
 
 let installed: GitFacts = realGit;
@@ -203,4 +208,8 @@ export function commitLog(range: string): Commit[] | null {
 
 export function commitsTouching(filePath: string): string[] | null {
   return installed.commitsTouching(filePath);
+}
+
+export function lsFiles(): string[] | null {
+  return installed.lsFiles();
 }

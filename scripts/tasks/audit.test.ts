@@ -7,7 +7,6 @@ import { parseManifest, refusalsFor } from '../mutate';
 import { auditArgsSkeleton, hasVisibleContent, indexSuiteTitles, manifestNotes, mutationManifest, nextAfterPass, UNAIMED_FILE, UNRETARGETED, parseAuditArgs, parseAuditFile, slugStanding, slugStandingLines, toolLines, unresolvedTarget, type SlugStanding, type TargetResolution } from './audit';
 import { MAX_LESSON_COUNT, totalLessonCount } from './briefLessons';
 import { appendEvent, enclosingGitFixture, firstListedId, fixture, gitFixture, relevantFilesBlock, repoRoot, script, stepsBlock, type Run } from './cliFixtures';
-import { realGitFixture } from './realGitFixture';
 
 describe('tasks CLI', () => {
   it('import parses H/M/L findings out of an audit doc into unreviewed tasks, and is idempotent on re-run', () => {
@@ -521,7 +520,7 @@ describe('tasks CLI', () => {
   // has had all along: what a dispatcher hand-writes is a copy of the record
   // that drifts from it, so the record renders itself.
   it('work-prompt names the task\'s deliverable, grant, requirements and clause standings', async () => {
-    await fixture(async ({ tasks, audit }) => {
+    await enclosingGitFixture(async ({ tasks, audit }) => {
       tasks('add', 'the dependency', '--id', 'dep', '--spec', 'demo-spec');
       tasks('done', 'dep');
       await audit('demo-spec', '--proof', '1=unmet', '--evidence', '1=it does not actually hold', '--proof', '2=met', '--evidence', '2=clause 2 checked');
@@ -1445,7 +1444,7 @@ describe('the brief arriving with the answers rather than the instructions', () 
   // Run against the checkout the suite happens to sit in, the branch's own
   // commits join that union and the section grows paths the test never named.
   it('the brief answers ownership and prior art for every path in its diff', () => {
-    realGitFixture(({ dir, commit, tasks }) => {
+    gitFixture(({ dir, commit, tasks }) => {
       writeFileSync(path.join(dir, 'systems.json'), JSON.stringify({ unowned: { note: '', paths: ['docs', '*.md'] }, systems: [{ name: 'Runtime', paths: ['src/runtime'], lastAudit: null, lastAuditDoc: null, note: null }] }), 'utf8');
       // One path from each half of the union: session.ts is in the diff and
       // on no record, save.ts is on a member task and not in the diff.

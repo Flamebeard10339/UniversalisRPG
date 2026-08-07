@@ -1,7 +1,7 @@
 import { readFileSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { fixture } from './cliFixtures';
+import { enclosingGitFixture, fixture } from './cliFixtures';
 import { realGitFixture } from './realGitFixture';
 
 describe('tasks CLI', () => {
@@ -70,7 +70,7 @@ describe('tasks CLI', () => {
 // the only part a fixture cannot exercise.
 describe('tasks system', () => {
   it('lists every declared system with counts derived from the tree', () =>
-    fixture(({ tasks }) => {
+    enclosingGitFixture(({ tasks }) => {
       const result = tasks('system');
       expect(result.status).toBe(0);
       expect(result.stdout).toContain('2 system(s) declared');
@@ -78,7 +78,7 @@ describe('tasks system', () => {
     }));
 
   it('opens one system, naming its dependencies and its unclaimed files', () =>
-    fixture(({ tasks }) => {
+    enclosingGitFixture(({ tasks }) => {
       const result = tasks('system', 'Runtime');
       expect(result.status).toBe(0);
       expect(result.stdout).toContain('depends on:');
@@ -89,7 +89,7 @@ describe('tasks system', () => {
   // over them, and the total is what a planner then had to go and look up by
   // hand before it could import anything.
   it('system names its exported surface instead of counting it', () =>
-    fixture(({ tasks }) => {
+    enclosingGitFixture(({ tasks }) => {
       const result = tasks('system', 'Runtime');
       expect(result.status).toBe(0);
       expect(result.stdout).toContain('exported surface, production modules only:');
@@ -98,7 +98,7 @@ describe('tasks system', () => {
     }));
 
   it('refuses a system the manifest does not declare, and says which exist', () =>
-    fixture(({ tasks }) => {
+    enclosingGitFixture(({ tasks }) => {
       const result = tasks('system', 'Nope');
       expect(result.status).toBe(1);
       expect(result.stderr).toContain('Runtime');
@@ -107,7 +107,7 @@ describe('tasks system', () => {
 
 describe('tasks where', () => {
   it('answers ownership, exports and cross-boundary imports for a file', () =>
-    fixture(({ tasks }) => {
+    enclosingGitFixture(({ tasks }) => {
       const result = tasks('where', 'src/runtime/save.ts');
       expect(result.status).toBe(0);
       expect(result.stdout).toContain('system:   Runtime');
@@ -115,7 +115,7 @@ describe('tasks where', () => {
     }));
 
   it('answers for a path no system owns rather than refusing', () =>
-    fixture(({ tasks }) => {
+    enclosingGitFixture(({ tasks }) => {
       const result = tasks('where', 'docs/workflow.md');
       expect(result.status).toBe(0);
       expect(result.stdout).toContain('declared unowned');
@@ -130,7 +130,7 @@ describe('tasks where', () => {
   // merged when its batched-chance rule was re-derived from scratch. So a
   // query that stops at live records answers the easy half.
   it('where names every task that has ever claimed the path, closed and declined ones included', () =>
-    fixture(({ tasks }) => {
+    enclosingGitFixture(({ tasks }) => {
       tasks('add', 'the save format pass', '--id', 'saves-v2', '--writes', 'src/runtime/save.ts');
       tasks('done', 'saves-v2');
       tasks('add', 'a save rewrite nobody wanted', '--id', 'save-rewrite', '--writes', 'src/runtime/save.ts');
@@ -143,7 +143,7 @@ describe('tasks where', () => {
     }));
 
   it('where resolves a directory grant against a path beneath it', () =>
-    fixture(({ tasks }) => {
+    enclosingGitFixture(({ tasks }) => {
       tasks('add', 'the travel pass', '--id', 'travel', '--writes', 'src/runtime');
       const result = tasks('where', 'src/runtime/save.ts');
       expect(result.status).toBe(0);
@@ -152,7 +152,7 @@ describe('tasks where', () => {
     }));
 
   it('where answers with the owning system, the concepts on the path and the produces claims naming them', () =>
-    fixture(({ tasks }) => {
+    enclosingGitFixture(({ tasks }) => {
       tasks('concept', 'Runtime', 'saves', '--paths', 'src/runtime/save.ts', '--note', 'from a produces claim');
       tasks('add', 'build the save migrator', '--id', 'migrator', '--writes', 'src/runtime/save.ts', '--produces', 'save migrator');
 
@@ -164,12 +164,12 @@ describe('tasks where', () => {
     }));
 
   it('where says outright that nothing has claimed a path, rather than printing an empty section', () =>
-    fixture(({ tasks }) => {
+    enclosingGitFixture(({ tasks }) => {
       expect(tasks('where', 'src/runtime/save.ts').stdout).toContain('nothing has claimed src/runtime/save.ts');
     }));
 
   it('where answers for a directory with the files under it and the whole surface they export', () =>
-    fixture(({ tasks }) => {
+    enclosingGitFixture(({ tasks }) => {
       const result = tasks('where', 'src/runtime');
       expect(result.status).toBe(0);
       expect(result.stdout).toMatch(/\d+ tracked file\(s\) under it/);
@@ -183,7 +183,7 @@ describe('tasks where', () => {
   // under labels a reader tells apart without reading the prose.
   describe('where surfaces rulings distinctly from claims', () => {
     it('finds a declined record by its reason text, naming the path or its basename, when writes/files name nothing', () =>
-      fixture(({ tasks }) => {
+      enclosingGitFixture(({ tasks }) => {
         tasks('add', 'shrink the save test', '--id', 'save-test-shrink', '--spec', 'perf-spec');
         tasks('decline', 'save-test-shrink', '--reason', 'save.test.ts is 16s of a 25s wall, and shrinking it further means faking the subprocess it tests');
 
@@ -195,7 +195,7 @@ describe('tasks where', () => {
       }));
 
     it('finds a decision event naming the path, distinct from a claim on writes/files', () =>
-      fixture(({ tasks }) => {
+      enclosingGitFixture(({ tasks }) => {
         tasks('decision', 'c5 ruled that src/runtime/save.test.ts stays as it is', '--spec', 'perf-spec');
 
         const result = tasks('where', 'src/runtime/save.test.ts');
@@ -206,7 +206,7 @@ describe('tasks where', () => {
       }));
 
     it('says outright that no ruling names the path, rather than an empty section', () =>
-      fixture(({ tasks }) => {
+      enclosingGitFixture(({ tasks }) => {
         const result = tasks('where', 'src/runtime/save.ts');
         expect(result.status).toBe(0);
         expect(result.stdout).toContain('no ruling names src/runtime/save.ts or its basename');
@@ -216,7 +216,7 @@ describe('tasks where', () => {
     // "if it becomes a problem we can return to it" names no path in prose,
     // but the record's own `files` already say what it was about.
     it('finds a declined record by its files when its reason names no path', () =>
-      fixture(({ tasks }) => {
+      enclosingGitFixture(({ tasks }) => {
         tasks('add', 'the width finding', '--id', 'width-finding', '--files', 'scripts/tasks/render.ts:100,scripts/tasks/roadmapCmd.test.ts:53');
         tasks('decline', 'width-finding', '--reason', 'If it becomes a problem we can return to it');
 
@@ -355,7 +355,7 @@ describe('a command that cannot work without the manifest', () => {
 
 describe('concept paths are stored in one spelling', () => {
   it('strips a trailing slash, so the concept claims files instead of nothing', () =>
-    fixture(({ tasks }) => {
+    enclosingGitFixture(({ tasks }) => {
       tasks('concept', 'Runtime', 'everything', '--paths', 'src/runtime/', '--note', 'probe');
       const shown = tasks('system', 'Runtime');
       expect(shown.stdout).toMatch(/everything — [1-9]\d* file\(s\)/);
