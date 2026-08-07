@@ -179,4 +179,20 @@ describe('a member key is owned by every kind that declares it', () => {
     const strip = module('mod', 'dependencies: base', '# entity base.beach', '-flags: discovered');
     expect(loadUniverse([shadow, strip]).namespace.has('flag', 'base.beach.discovered')).toBe(true);
   });
+
+  it('does not let a dialogue node hold an entity flag of the same key alive, because they are different kinds', () => {
+    const chat = module('base', '# entity chat', 'flags: greet', '# dialogue chat', 'owner = chat', 'node greet:', '  Hello.');
+    const strip = module('mod', 'dependencies: base', '# entity base.chat', '-flags: greet');
+    const registry = loadUniverse([chat, strip]);
+    expect(registry.namespace.has('flag', 'base.chat.greet')).toBe(false);
+    expect(registry.namespace.has('node', 'base.chat.greet')).toBe(true);
+  });
+
+  it('goes away when the module that added it is not the one that created the object', () => {
+    const door = module('base', '# entity door', 'flags: unlocked');
+    const adds = module('aaa-adds', 'dependencies: base', '# entity base.door', '+flags: sealed');
+    const cuts = module('zzz-cuts', 'dependencies: base', '# entity base.door', '-flags: sealed');
+    expect(loadUniverse([door, adds, cuts]).namespace.has('flag', 'base.door.sealed')).toBe(false);
+    expect(loadUniverse([door, adds]).namespace.has('flag', 'base.door.sealed')).toBe(true);
+  });
 });
