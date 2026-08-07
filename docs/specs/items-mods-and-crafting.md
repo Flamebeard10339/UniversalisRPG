@@ -34,8 +34,8 @@ Proof:
   naming the clause it rejected. A passive is always on and there is no moment at which a range could
   roll: rolling at allocation would put a per-position number in every saved instance, which is a
   second instancing story bought for nothing. The consequence is the property the rest of the branch
-  leans on — an allocated passive's contribution is a pure function of its declaration, so an
-  instance stores which positions are allocated and never what they are worth.
+  leans on: nothing is ever stored per position. An instance records which positions are allocated
+  and which mods each cluster carries, and every payload is derived from those two.
 - [c3] **Shapes are a closed, hard-coded catalogue** in `src/content`, named from the DSL and never
   authored in it. A shape declares numbered positions, the **undirected adjacency** between them, and
   which position each of the six hex edges touches; cycles are permitted, because an edge only says
@@ -47,6 +47,9 @@ Proof:
   passives. Positions are authored as `<position> <passive>` pairs, the `# entity` `stats:` shape —
   a list hydrated into a map, so it reads inline or one pair to a line. A position outside the
   shape's range, a position filled twice, or a passive that does not resolve is refused at load time.
+  It also declares `mod-slots:`, how many mods a cluster made from it may carry, defaulting to 1.
+  One is what every jewel ships with, not what the engine permits: the field exists so that raising
+  it is authoring rather than a change to the state model.
 - [c5] **An unfilled position is a node, not a gap.** It can be allocated, it costs a point, it
   conducts adjacency to whatever it touches, and it grants nothing. A jewel that fills two of twelve
   positions is a corridor the player pays ten points to cross, and that is a shape worth authoring
@@ -99,19 +102,38 @@ Proof:
 - [c14] Slotting and allocation are both permanent. A jewel is consumed when slotted, a filled slot
   refuses a second jewel, and no directive un-allocates a node or un-slots a jewel. The refusals are
   proved, not asserted: attempting each is a checked outcome, not an absence.
-- [c15] An item's contribution is the sum of the payloads of its allocated passives, computed by one
-  pure function of the instance, and it reaches combat through the same stat-bonus path an equipped
-  `+2 attack` already takes. A focused fixture proves that allocating one passive changes outgoing
-  damage, and that an instance the player is not wearing is inert.
-- [c16] An instance survives a reload with identical evaluated stats, and is repaired rather than
+- [c15] A **cluster mod** is applied to a cluster already standing in an item's plane, never to a
+  jewel in inventory. An `# item` declaring `cluster-mod:` names a percentage and a stat; using one
+  on a placed cluster consumes it and records the mod against that cluster. It is refused, with the
+  item intact, when the cluster is already at its `mod-slots:` capacity. Jewels therefore stay
+  stackable and uninstanced — the mod lives in state that `instanced-objects` already holds, and
+  there is no second instance table.
+- [c16] A cluster mod scales the **effect** of every payload naming its stat, in that cluster only.
+  A `+10 max-health` passive under a 25% health mod contributes `+12.5`, and a `+12% max-health`
+  passive under the same mod contributes `+15%` — effect scales magnitude in whichever channel the
+  payload already lands in, and does not move it between them. Two mods on one cluster compose by
+  multiplication, not addition, so 25% and 25% is `1.5625x` and never `1.5x`. The same passive
+  allocated in two clusters is worth two different amounts, which is the point: a mod is a property
+  of the cluster and stops at its edges.
+- [c17] The scaled payload is what the runtime reports, and it is not rounded per passive. A
+  position showing `+12.5 max-health` shows the number that reaches the fold, so any surface — the
+  CLI now, a tree view later — states the effective value rather than the declared one with a
+  footnote. Rounding, if a consumer wants it, happens where the stat is finally assembled, so four
+  scaled `+10`s are worth `50` and never `48`.
+- [c18] An item's contribution is the sum of the scaled payloads of its allocated passives, computed
+  by one pure function of the instance, and it reaches combat through the same stat-bonus path an
+  equipped `+2 attack` already takes. A focused fixture proves that allocating one passive changes
+  outgoing damage, that applying a mod to one cluster leaves an identical passive in another cluster
+  untouched, and that an instance the player is not wearing is inert.
+- [c19] An instance survives a reload with identical evaluated stats, and is repaired rather than
   broken when content moves underneath it: an instance whose template is gone is pruned, and a
   slotted jewel or allocated node whose declaration is gone is dropped with its point returned, so a
   loaded instance is never over its own budget. Permanence is a rule about what the player may do,
   not a promise that deleted content stays evaluable.
-- [c17] Growing an item is reachable through the directive surface every other play input goes
-  through, so a `# test` section records feeding, slotting and allocating — and each refusal in c8,
-  c12, c13 and c14 — and replays green over the shipped content.
-- [c18] `npm run tasks -- merge-ready` passes before the spec is marked done: tsc, tests,
+- [c20] Growing an item is reachable through the directive surface every other play input goes
+  through, so a `# test` section records feeding, slotting, allocating and applying a cluster mod —
+  and each refusal in c8, c12, c13, c14 and c15 — and replays green over the shipped content.
+- [c21] `npm run tasks -- merge-ready` passes before the spec is marked done: tsc, tests,
   layer-check, audit-status, doctor and the byte check in one invocation.
 
 ## Decisions
@@ -144,18 +166,18 @@ Proof:
 - **A passive is a section, and a position is a reference to one.** Passives share the global id
   space, so `hale` is authored once and named by every jewel that wants it. Inlining payloads into
   the jewel would have made the same passive a dozen unrelated declarations, and would have left the
-  sequel's "increased effect of *life* passives" with nothing stable to select over.
+  tag selector, when something tag-shaped needs one, with nothing stable to select over.
 - **A passive is a fixed number, because it is always on.** A range needs a moment to roll, and a
   passive has none: it is not acquired, it is allocated, and it applies from then on. Rolling at
   allocation would mean a saved instance carried a number per allocated position, and pruning,
   migration and the evaluation fold would all have to carry it too — a whole second instancing story
   for variance that belongs on the jewel, not on the passive. Keeping the payload fixed is what makes
-  an instance's state nothing but *which positions are allocated*. The sequel puts the variance back
-  where it can roll once, on the jewel, and scales the fixed payloads underneath it.
+  an instance's state a set of allocated positions and a handful of cluster mods, with no number
+  anywhere in it. Variance lives on the cluster mod, which is applied once and then fixed too.
 - **An unfilled position is a node that grants nothing, not an absent node.** It costs a point and
   conducts adjacency, which is what makes a sparse jewel a corridor rather than a defective one, and
-  makes "how much of this jewel is worth crossing" an authored decision. It also gives the sequel a
-  natural class to name without inventing one.
+  makes "how much of this jewel is worth crossing" an authored decision. An empty position has no
+  payload, so no cluster mod touches it: a corridor cannot be made worth crossing by an orb.
 - **Non-termination is structural, not an authoring discipline.** An earlier draft of this spec noted
   that allocation degenerates to "take everything" whenever the reachable tree is smaller than the
   point budget, and could only offer judgement as the safeguard. Requiring every cluster jewel to
@@ -223,15 +245,37 @@ Proof:
   clusters answers that structurally: a player reads a map and a branch, rather than inferring an
   offset relation from rolled directed edges. `docs/smithing/topology-probe.md` becomes history, a
   measurement of a design not taken.
-- **Rolled jewel modifiers are the sequel, and nothing is built ahead of them.** The branch after
-  this one gives a jewel instance rolled modifiers that scale its own cluster (`+10% increased effect
-  of physical passives`) with a curated downside as a second modifier of opposite sign — no new
-  mechanism, just an authored pair. It needs a scaling point between a passive's payload and the stat
-  fold, and passive tags for a modifier to name. This branch builds the tags, because a passive
-  carries tags the way every `# item` already does and they are how content is organised whether or
-  not anything selects over them. It does not build the scaling point: c15 already puts payload
-  evaluation in exactly one pure function, which is the only structural precondition the sequel has,
-  and an identity seam added now would be machinery with no caller.
+- **Cluster mods are applied to a placed cluster, never to a jewel in inventory.** That one choice is
+  what keeps jewels stackable and uninstanced: a mod recorded against a cluster lives in state the
+  item instance already holds, so there is no second instance table, no second prune rule and no
+  second save migration. Applying to inventory would have made every jewel an instance in order to
+  carry a property that only means anything once the jewel is somewhere — "increased effect of health
+  passives *in this cluster*" has no referent until there is a cluster.
+- **A mod selects by stat, not by tag.** The four shipped orbs name `max-health`, `attack`, `defense`
+  and `regeneration`, and a mod scales every payload clause naming its stat. Selecting by stat is
+  exact — `+12.5` is arithmetic on a number the passive already declares — where selecting by tag
+  needs a tag vocabulary agreed between whoever authors passives and whoever authors orbs. A tag
+  selector is the natural generalisation the moment something tag-shaped needs one (`poison` is not a
+  stat), and passives already carry tags for it; it is not built until then.
+- **Mods compose by multiplication, and the composition rule is pinned before it is observable.**
+  With `mod-slots: 1` everywhere, 25% and 25% never meet, so additive and multiplicative give the
+  same answer today. Pinning it now is the cheap moment: `1.5625x` rather than `1.5x` is a decision
+  about what a second mod slot means, and deciding it after content exists at capacity two would be
+  a balance change disguised as a bug fix.
+- **A mod stops at the cluster's edge, which is what makes it a crafting decision.** The same passive
+  allocated in two clusters is worth two different amounts, so an orb is spent on *which hexagon*,
+  and a dense single-stat cluster is worth more to it than a scattered one. A global multiplier
+  would have been a straight power gain with no decision attached to it.
+- **The effective value is what the runtime reports.** A position under a health mod is `+12.5
+  max-health`, not `+10` with an asterisk. Any surface then states what is true without computing it
+  itself, which is the difference between one answer and one answer per surface.
+- **Rounding happens where the stat is assembled, never per passive.** Four scaled `+10`s are worth
+  `50`, not `48`. Rounding each payload first loses two whole points to no purpose, and it is the
+  repository's own rule — enforce where a value is assembled, not where it is written.
+- **The remaining sequel is variance on the drop, not the mod machinery.** What is not built here is
+  a jewel arriving with a mod already on it, more than one mod slot, and selection by tag. Each is a
+  content or capacity change on top of what this branch ships, and none of them changes the state
+  model, which is the test of whether deferring them is honest.
 - **Reuse, not new systems.** Jewels are items, so drops, stacking and inventory are `droptables` and
   the existing item machinery. Instances are `instanced-objects`. Levels are `skill-levels-xp-events`.
   Payloads are tag clauses folded by `statRange`. The genuinely new code is the `# cluster-jewel`
@@ -261,7 +305,8 @@ inventing its own. The core survivability tier waits on none of them.
 
 ## Out of scope
 
-Rolled jewel modifiers and jewel instancing (the named sequel).
+Jewels that drop with a mod already rolled on them, more than one mod slot on any shipped jewel,
+mods that select by tag rather than by stat, and jewel instancing of any kind.
 Refund or respec of any kind. Jewels that edit an existing cluster rather than extend the plane, or
 that move one. Salvage, extraction, or transferring a plane between items. Keystone passives that
 change the shape of the combat formula. Any GUI: when a plane needs to be seen rather than computed,

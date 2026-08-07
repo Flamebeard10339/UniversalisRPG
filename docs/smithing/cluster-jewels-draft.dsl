@@ -105,10 +105,14 @@
 // Nothing new is needed for the untyped tier — statRange already folds these as
 // (base + added) x (1 + increased).
 //
-// A note the fold makes unavoidable: a percent passive is worth almost nothing
-// early. `+10% defense` on base 5 is half a point. Percent passives are therefore
-// late-tree by nature and should sit deep in a cluster or behind flat ones, which
-// is a placement fact rather than a balance number.
+// ADDED AND INCREASED ARE SEPARATED BY CLUSTER, not mixed inside one. A cluster is
+// either flat (`+15 max-health`) or percent-led (`+12% max-health` with a little
+// flat to stand on). The fold makes this the honest split: statRange computes
+// (base + added) x (1 + increased), so a percent passive is worth almost nothing
+// until flat ones have been stacked — `+10% defense` on base 5 is half a point.
+// Mixing both in one cluster hides that; separating them makes the order the
+// player must build in visible on the plane itself. Flat clusters come first, and
+// a percent cluster slotted early is a mistake you can see.
 
 // untyped: life
 # passive hale
@@ -137,6 +141,22 @@ armour, +2 defense
 # passive plated
 title: Plated
 armour, +3 defense
+
+# passive hardened
+title: Hardened
+armour, +10% defense
+
+# passive frenzied
+title: Frenzied
+speed, +10% attack-rate
+
+# passive deadly-precision
+title: Deadly Precision
+precision, +12% accuracy
+
+# passive evasive
+title: Evasive
+evasion, +15% evasion
 
 // untyped: offence
 # passive whetted
@@ -171,18 +191,10 @@ precision, +8 accuracy
 title: Quickstep
 evasion, +8 evasion
 
-# passive shadowstep
-title: Shadowstep
-evasion, +10 evasion
-
 // untyped: utility
 # passive fortune
 title: Fortune
 utility, +5 luck
-
-# passive windfall
-title: Windfall
-utility, +8 luck
 
 // --- archetype passives -------------------------------------------------------
 //
@@ -284,19 +296,20 @@ shape: ring
 open-connections: ne, se
 passives: 1 warded, 2 hale, 3 constitution, 5 hale, 6 mending
 
-// Utility, on a wheel so the hub is the cheap crossing. Sparse on purpose: this is
-// the jewel you slot for luck and for reach, not for power.
-# cluster-jewel wayfarers-charm
-title: Wayfarer's Charm
-examine: It has been lucky for several people, none of them for long.
+// THE INCREASED TREE. Mostly percent, with a little flat to stand on, and it is
+// worth nothing slotted early — which is the lesson the separation exists to
+// teach. Slotted behind Keen Edge and Stout Heart it multiplies both.
+# cluster-jewel tempered-will
+title: Tempered Will
+examine: It does not add. It insists.
 shape: wheel
 open-connections: e, se
-passives: 1 fortune, 4 windfall, 7 quickstep
+passives: 1 hale, 2 tempered-frame, 3 brutal, 4 hardened, 5 tempered-frame, 6 brutal, 7 fortune
 
 // --- berserker clusters -------------------------------------------------------
 
-// Ships today. Dense, aggressive, and the inner ring carries the percent passives
-// so they sit behind the flat ones that make them worth having.
+// ADDED. Ships today. Dense and flat — this is the jewel the archetype is built
+// on, and the one an attack orb is worth spending on.
 # cluster-jewel blood-frenzy
 title: Blood Frenzy
 examine: It does not get tired. That is the problem with it.
@@ -309,28 +322,28 @@ passives:
   4 flurry
   5 bloodlust
   6 swift-hands
-  7 reckless
-  10 brutal
+  7 goring-edge
+  10 flurry
   // 8, 9, 11 and 12 empty: the inner ring costs four points to cross and pays on
-  // two of them. Reaching `brutal` the short way round the outer ring is three
+  // two of them. Reaching position 10 the short way round the outer ring is three
   // points; the inner route is cheaper in payload and buys nothing. That is a
   // decision, and it is authored rather than simulated.
 
-// WAITS on combat-events. Slot layout and passives are settled; only `rising-fury`
-// is blocked, and the jewel loads today with position 7 empty.
-# cluster-jewel rising-fury
-title: Rising Fury
+// INCREASED, and WAITS on combat-events. Slot layout and passives are settled;
+// only `rising-fury` is blocked, and the jewel loads today with position 7 empty.
+# cluster-jewel wrath
+title: Wrath
 examine: Every blow lands harder than the one before it.
 shape: wheel
 open-connections: e
-passives: 1 goring-edge, 2 reckless, 4 bloodlust, 6 goring-edge
+passives: 1 goring-edge, 2 reckless, 4 frenzied, 6 reckless
 // once combat-events lands:  7 rising-fury
 
 // --- juggernaut clusters ------------------------------------------------------
 
-// Ships today. Twelve positions of mass, two exits, and `slow-and-certain` is the
-// curated downside in its authored form: a real passive with a real cost, which is
-// the same shape the sequel's rolled modifiers will take on the jewel itself.
+// ADDED. Ships today. Twelve positions of flat mass, two exits, and
+// `slow-and-certain` is the curated downside in its authored form: a real passive
+// with a real cost, which is the same shape a cluster mod's downside would take.
 # cluster-jewel iron-bulwark
 title: Iron Bulwark
 examine: Banding over banding, until the shape stops mattering.
@@ -344,21 +357,21 @@ passives:
   5 immovable
   6 iron-carapace
   7 slow-and-certain
-  10 tempered-frame
+  10 constitution
 
-// WAITS on combat-events. A ring so that the thorns passive, when it lands, sits
-// opposite the entry and costs three points either way round.
+// INCREASED, and WAITS on combat-events. A ring so that the thorns passive, when
+// it lands, sits opposite the entry and costs three points either way round.
 # cluster-jewel retribution
 title: Retribution
 examine: Striking it is its own punishment.
 shape: ring
 open-connections: ne, se
-passives: 1 warded, 2 iron-carapace, 3 plated, 5 immovable, 6 warded
+passives: 1 warded, 2 hardened, 3 tempered-frame, 5 hardened, 6 tempered-frame
 // once combat-events lands:  4 retribution
 
 // --- assassin clusters --------------------------------------------------------
 
-// Ships today. Precision and evasion, two exits.
+// ADDED. Ships today. Flat precision and evasion, two exits.
 # cluster-jewel wracking-blades
 title: Wracking Blades
 examine: Fast, accurate, and not interested in a long fight.
@@ -366,14 +379,15 @@ shape: ring
 open-connections: e, ne
 passives: 1 keen-eye, 2 wracking-blades, 3 silent-step, 4 marksman, 5 exposed-throat, 6 quickstep
 
-// WAITS on combat-events and buffs-generalized. One exit, deep: the poison hub is
-// the whole point of the jewel and costs two points to reach from any edge.
+// INCREASED, and WAITS on combat-events plus buffs-generalized. One exit, deep:
+// the poison hub is the whole point of the jewel and costs two points to reach
+// from any edge.
 # cluster-jewel creeping-rot
 title: Creeping Rot
 examine: The cut is the smallest part of it.
 shape: wheel
 open-connections: se
-passives: 1 wracking-blades, 3 exposed-throat, 5 silent-step
+passives: 1 keen-eye, 3 deadly-precision, 5 evasive
 // once the archetype tier lands:  7 envenom
 
 // --- travel clusters ----------------------------------------------------------
@@ -416,17 +430,17 @@ cluster-jewel: keen-edge
 title: Stout Heart Jewel
 cluster-jewel: stout-heart
 
-# item wayfarers-charm-jewel
-title: Wayfarer's Charm Jewel
-cluster-jewel: wayfarers-charm
+# item tempered-will-jewel
+title: Tempered Will Jewel
+cluster-jewel: tempered-will
 
 # item blood-frenzy-jewel
 title: Blood Frenzy Jewel
 cluster-jewel: blood-frenzy
 
-# item rising-fury-jewel
-title: Rising Fury Jewel
-cluster-jewel: rising-fury
+# item wrath-jewel
+title: Wrath Jewel
+cluster-jewel: wrath
 
 # item iron-bulwark-jewel
 title: Iron Bulwark Jewel
@@ -461,6 +475,40 @@ item-experience: 1000
 # item masters-whetstone
 title: Master's Whetstone
 item-experience: 10000
+
+
+// --- cluster mods -------------------------------------------------------------
+//
+// Four orbs, one per stat. Using one on a cluster ALREADY STANDING IN A PLANE
+// consumes it and records the mod against that cluster — never against a jewel in
+// inventory, which is what keeps jewels stackable and uninstanced. A mod scales the
+// effect of every payload naming its stat, in that cluster and nowhere else.
+//
+// Selection is by stat rather than by tag because these four map exactly onto four
+// stats and `+12.5` is then arithmetic on a number the passive already declares. A
+// tag selector is what `poison` will eventually need, and passives already carry
+// tags for it; it is not built until something needs it.
+//
+// Every jewel above has the default `mod-slots: 1`, so two mods never meet on one
+// cluster today. They compose by multiplication when they do — 25% and 25% is
+// 1.5625x, not 1.5x — and pinning that now is cheaper than deciding it once
+// content exists at capacity two.
+
+# item orb-of-vitality
+examine: A dull red bead. It beats, very slowly.
+cluster-mod: 25% max-health
+
+# item orb-of-the-edge
+examine: A sliver of something that was never blunt.
+cluster-mod: 25% attack
+
+# item orb-of-the-bulwark
+examine: Heavier than the hand expects.
+cluster-mod: 25% defense
+
+# item orb-of-renewal
+examine: Cool, and faintly wet, and it does not dry.
+cluster-mod: 25% regeneration
 
 # droptable rat-remains
 give: 1-3 rat-bone
@@ -534,3 +582,27 @@ passives: 1 mending, 2 tempered-frame
 // At max-level 40 the blade can eventually hold roughly two and a half double-rings
 // — and level 40 costs 194 whetstones, which is what makes a Master's Whetstone
 // worth ten of them.
+//
+// --- and then a mod ---
+//
+// The blade now carries Iron Bulwark in one hex with `immovable` (+25 max-health)
+// at positions 3 and 5, and Stout Heart in another with `hale` (+15) at 2 and 5 and
+// `constitution` (+20) at 3. The player has ONE Orb of Vitality.
+//
+//   on Iron Bulwark   two allocated max-health passives, 50 flat  ->  62.5
+//   on Stout Heart    three allocated max-health passives, 50 flat ->  62.5
+//
+// A dead heat, which is the interesting case: the orb is worth the same on both,
+// so the decision is about what each cluster will hold LATER, not what it holds
+// now. Had the player allocated only one arm of Stout Heart, the orb would be
+// worth half as much there. Spending it on Blood Frenzy — no max-health passive
+// anywhere in it — would be worth exactly nothing, and the runtime says so by
+// reporting the same numbers back.
+//
+// This is why a mod stops at the cluster edge. A global +25% health would be a
+// straight power gain with no decision attached; scoped to one hexagon it makes an
+// orb a question about which hexagon, and rewards having built a dense single-stat
+// cluster rather than a scattered one. It also gives the flat/percent separation
+// teeth: an orb on a flat cluster scales real numbers, and an orb on a percent
+// cluster scales percentages that are themselves worth little until the flat ones
+// exist. The orbs want the ADDED trees, which is a preference nobody authored.
