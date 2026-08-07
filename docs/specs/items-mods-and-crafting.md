@@ -25,32 +25,43 @@ forever.
 
 Proof:
 
-- [c1] `# cluster-jewel` is a section kind declaring one hexagon's worth of passives: nodes carrying
-  payloads in the tag-clause vocabulary items already use (`+6 attack`), joined by **undirected
-  adjacency** edges. Cycles are permitted and a ring of passives is a legitimate shape, because an
-  edge only says two nodes touch and nothing travels along one. What is refused at load time,
-  through the DSL's own error surface, is a node no path from the cluster's root reaches, since it
-  can never be allocated.
-- [c2] Every cluster jewel is authored in one orientation: its **root node** sits on the west edge,
-  its passives do whatever they do inside the hexagon, and between one and five outgoing jewel slots
-  sit on the five remaining edges, at most one to an edge. At least one is the structural guarantee
-  that the plane never runs out of somewhere to grow; five is what the geometry leaves once the root
-  has the west edge. A jewel declaring a second slot on one edge, or any slot on the west edge, is
-  refused at load time.
-- [c3] Rotation is determined, never chosen. Slotting a jewel through a slot on direction `d` places
+- [c1] `# passive` is a section kind, its ids in the same global space as every other section, its
+  body the tag-clause list `# item` already uses — bare words are tags and `+N stat` / `+N% stat` are
+  payloads, in one comma list. One declaration is referenced by any number of cluster jewels, which
+  is what lets a later modifier name a class of passives across all of them rather than inside one.
+- [c2] **Shapes are a closed, hard-coded catalogue** in `src/content`, named from the DSL and never
+  authored in it. A shape declares numbered positions, the **undirected adjacency** between them, and
+  which position each of the six hex edges touches; cycles are permitted, because an edge only says
+  two nodes touch and nothing travels along one. Naming a shape that does not exist fails at load
+  with an error listing the ones that do, the way `skill-levels-xp-events` closes its event list.
+  Because the set is closed, every shape's connectivity is proved once by a test over the catalogue
+  — there is no per-jewel reachability check, and no grammar for authoring topology.
+- [c3] `# cluster-jewel` names a shape, says which edges are open, and fills numbered positions with
+  passives. Positions are authored as `<position> <passive>` pairs, the `# entity` `stats:` shape —
+  a list hydrated into a map, so it reads inline or one pair to a line. A position outside the
+  shape's range, a position filled twice, or a passive that does not resolve is refused at load time.
+- [c4] **An unfilled position is a node, not a gap.** It can be allocated, it costs a point, it
+  conducts adjacency to whatever it touches, and it grants nothing. A jewel that fills two of twelve
+  positions is a corridor the player pays ten points to cross, and that is a shape worth authoring
+  rather than a jewel with parts missing.
+- [c5] `open-connections` names between one and five of the five non-root edges, each at most once.
+  At least one is the structural guarantee that the plane never runs out of somewhere to grow; five
+  is what the geometry leaves once the root has the west edge. Naming the west edge, or naming one
+  edge twice, is refused at load time.
+- [c6] Rotation is determined, never chosen. Slotting a jewel through a slot on direction `d` places
   its cluster in the neighbouring hex, whose shared edge with the parent is `opposite(d)`, and the
   jewel is rotated by exactly the amount that carries its root node's west edge onto that shared
   edge. Slotting through an east-facing slot is therefore the identity, through a west-facing slot a
   half turn, and every other edge a multiple of a sixth. The rotation is a function of the slot, so
   there is nothing for the player to decide and nothing to store beyond which edge was used.
-- [c4] Clusters occupy hexes addressed in axial coordinates on a pointy-top grid, whose six
+- [c7] Clusters occupy hexes addressed in axial coordinates on a pointy-top grid, whose six
   directions are `e`, `ne`, `nw`, `w`, `sw` and `se`. A jewel slot is an edge midpoint and is shared
   by exactly two hexes. A hex holds at most one cluster, so a slot may be filled only when the hex
   on its far side is empty; a slot facing an occupied hex is **blocked**, and both filling it and
   allocating it are refused. Two adjacent clusters are never joined by their shared edge — a
   connection exists only through a slot that was actually filled — so bare adjacency grants nothing
   that was not authored.
-- [c5] The origin is the general rule's degenerate case, not a special case beside it. An item base
+- [c8] The origin is the general rule's degenerate case, not a special case beside it. An item base
   occupies hex `(0, 0)` with a cluster that is never slotted and therefore never rotated: its root
   node is allocated from the start, costs no point, and is under no obligation to sit on the west
   edge, because the west-edge convention exists only to give slotting a defined rotation. By default
@@ -58,42 +69,42 @@ Proof:
   A base may instead declare a `cluster-jewel:` of its own for hex `(0, 0)`, so a unique weapon ships
   with authored passives and a slot layout of its choosing; the default is what that rule yields when
   nothing is declared.
-- [c6] A cluster jewel reaches the player as an ordinary item. An `# item` names one through
+- [c9] A cluster jewel reaches the player as an ordinary item. An `# item` names one through
   `cluster-jewel:` to become the droppable thing, so jewels drop through `droptables`, stack in
   inventory, and are carried by the existing item machinery with no second inventory and no second
   drop path. A `cluster-jewel:` naming an unknown declaration is a load-time reference error like
   every other reference in the language.
-- [c7] Instancing is **lazy**. `inventory[itemId]` keeps counting stacks until a jewel is slotted
+- [c10] Instancing is **lazy**. `inventory[itemId]` keeps counting stacks until a jewel is slotted
   into one; that single item then leaves the stack and becomes an instance carrying its plane, its
   allocations and its experience. Instances are the `instanced-objects` substrate and nothing else —
   no second instance table in `GameState`, no second prune rule, no second save migration.
-- [c8] Item experience has exactly one source. Consuming an item that declares `item-experience:`
+- [c11] Item experience has exactly one source. Consuming an item that declares `item-experience:`
   raises the target instance's experience by that amount, and no other event in the game changes it.
   An item's level is `skill-levels-xp-events`'s `level(X)`, imported rather than reimplemented —
   there is one level curve in this repository — and its passive points equal its level. An item base
   declares `max-level:`, defaulting to 99; feeding an item already at its maximum is refused with
   the consumed item intact, rather than silently absorbed.
-- [c9] Allocation is bounded by points and gated by adjacency. A passive or a jewel slot may be
+- [c12] Allocation is bounded by points and gated by adjacency. A passive or a jewel slot may be
   allocated when at least one of its neighbours is already allocated — a neighbour, not a parent,
   because the graph may contain cycles. The origin cluster's root is allocated from the start and is
   what every path is ultimately reachable from. Allocating with no point remaining, out of adjacency,
   or onto a blocked slot is refused and costs nothing.
-- [c10] Slotting and allocation are both permanent. A jewel is consumed when slotted, a filled slot
+- [c13] Slotting and allocation are both permanent. A jewel is consumed when slotted, a filled slot
   refuses a second jewel, and no directive un-allocates a node or un-slots a jewel. The refusals are
   proved, not asserted: attempting each is a checked outcome, not an absence.
-- [c11] An item's contribution is the sum of the payloads of its allocated passives, computed by one
+- [c14] An item's contribution is the sum of the payloads of its allocated passives, computed by one
   pure function of the instance, and it reaches combat through the same stat-bonus path an equipped
   `+2 attack` already takes. A focused fixture proves that allocating one passive changes outgoing
   damage, and that an instance the player is not wearing is inert.
-- [c12] An instance survives a reload with identical evaluated stats, and is repaired rather than
+- [c15] An instance survives a reload with identical evaluated stats, and is repaired rather than
   broken when content moves underneath it: an instance whose template is gone is pruned, and a
   slotted jewel or allocated node whose declaration is gone is dropped with its point returned, so a
   loaded instance is never over its own budget. Permanence is a rule about what the player may do,
   not a promise that deleted content stays evaluable.
-- [c13] Growing an item is reachable through the directive surface every other play input goes
-  through, so a `# test` section records feeding, slotting and allocating — and each refusal in c4,
-  c8, c9 and c10 — and replays green over the shipped content.
-- [c14] `npm run tasks -- merge-ready` passes before the spec is marked done: tsc, tests,
+- [c16] Growing an item is reachable through the directive surface every other play input goes
+  through, so a `# test` section records feeding, slotting and allocating — and each refusal in c7,
+  c11, c12 and c13 — and replays green over the shipped content.
+- [c17] `npm run tasks -- merge-ready` passes before the spec is marked done: tsc, tests,
   layer-check, audit-status, doctor and the byte check in one invocation.
 
 ## Decisions
@@ -114,8 +125,23 @@ Proof:
   directed and carried amplification along them, so a cycle was a feedback loop that had to be banned
   at load time. Here an edge asserts only that two nodes touch, and allocation asks for one allocated
   neighbour; a ring is then just a shape with two ways round it, and banning it would forbid a
-  perfectly good authored form for no reason. The one thing a graph can still get wrong is a node no
-  path reaches, which is why c1 checks reachability and not acyclicity.
+  perfectly good authored form for no reason.
+- **Topology is a closed catalogue, not a grammar.** An earlier draft let a jewel author its own nodes
+  and edges, which meant a grammar for adjacency, a per-jewel reachability check, and an unbounded
+  space of shapes to balance against. Naming one of a fixed set collapses all three: there is no
+  topology grammar, connectivity is a property of the catalogue proved once by a test rather than
+  re-checked per jewel, and a shape that plays badly is fixed in one place for every jewel using it.
+  It also makes the eventual GUI tractable, because a renderer needs to know how to draw six shapes
+  rather than an arbitrary graph. Adding a shape becomes a code change, which is the correct cost:
+  a new topology is a new thing to balance and to draw, not content.
+- **A passive is a section, and a position is a reference to one.** Passives share the global id
+  space, so `hale` is authored once and named by every jewel that wants it. Inlining payloads into
+  the jewel would have made the same passive a dozen unrelated declarations, and would have left the
+  sequel's "increased effect of *life* passives" with nothing stable to select over.
+- **An unfilled position is a node that grants nothing, not an absent node.** It costs a point and
+  conducts adjacency, which is what makes a sparse jewel a corridor rather than a defective one, and
+  makes "how much of this jewel is worth crossing" an authored decision. It also gives the sequel a
+  natural class to name without inventing one.
 - **Non-termination is structural, not an authoring discipline.** An earlier draft of this spec noted
   that allocation degenerates to "take everything" whenever the reachable tree is smaller than the
   point budget, and could only offer judgement as the safeguard. Requiring every cluster jewel to
@@ -187,14 +213,21 @@ Proof:
   this one gives a jewel instance rolled modifiers that scale its own cluster (`+10% increased effect
   of physical passives`) with a curated downside as a second modifier of opposite sign — no new
   mechanism, just an authored pair. It needs a scaling point between a passive's payload and the stat
-  fold, and passive tags for a modifier to name. This branch builds neither: c10 already puts payload
-  evaluation in exactly one pure function, which is the only structural precondition the sequel has.
-  An identity seam and unused tags added now would be machinery with no caller.
+  fold, and passive tags for a modifier to name. This branch builds the tags, because a passive
+  carries tags the way every `# item` already does and they are how content is organised whether or
+  not anything selects over them. It does not build the scaling point: c14 already puts payload
+  evaluation in exactly one pure function, which is the only structural precondition the sequel has,
+  and an identity seam added now would be machinery with no caller.
 - **Reuse, not new systems.** Jewels are items, so drops, stacking and inventory are `droptables` and
   the existing item machinery. Instances are `instanced-objects`. Levels are `skill-levels-xp-events`.
   Payloads are tag clauses folded by `statRange`. The genuinely new code is the `# cluster-jewel`
-  section kind, its load-time validation, the hex plane with its placement and blocking rules, the
-  allocation rules, and one evaluation fold.
+  section kind, the `# passive` section kind, the shape catalogue, their load-time validation, the
+  hex plane with its placement and blocking rules, the allocation rules, and one evaluation fold.
+- **The authoring trial is `docs/smithing/cluster-jewels-draft.dsl`**, written against the real
+  grammar rather than against an imagined one. Two constraints it found are already reflected above:
+  a block key must match `[a-z][a-z0-9 -]*`, so numbered positions cannot be block keys and are
+  authored as `<position> <passive>` pairs the way `# entity` authors `stats:`; and directions are
+  ids, so they are `ne` and not `NE`.
 - **No new system is declared.** The code this branch adds is owned by the systems that already own
   its paths — `src/grammar` and `src/content` by the DSL load path, `src/runtime` by Runtime.
 
@@ -227,12 +260,9 @@ required for the clauses above to be provable.
 - The directive spelling for the three verbs — feed, slot, allocate — is the worker's to choose,
   including whether feeding and slotting are one verb dispatching on what the consumed item declares
   or two. The clauses fix what each must do and refuse, not what it is called.
-- Whether a cluster jewel's passives are named in a namespace of their own or share the id space
-  every other section uses. Passive ids must be addressable by the allocate directive and by a saved
-  instance, and two jewels will both want a passive called `entry`.
-- Whether `slot:` is the right predicate for "can carry a plane". It is the cheapest one that exists
-  and it draws the line at equipment, but an item with a plane and no equip slot is not obviously
-  nonsense.
+- Which shapes the catalogue ships with. The trial uses `point`, `spindle`, `ring`, `wheel` and
+  `double-ring`, which cover the degenerate, the corridor, the cycle, the hub and the large cluster;
+  whether that set is right is a content judgement, and adding to it is a code change by design.
 - `skill-levels-xp-events` is itself blocked on `first-class-modals`. The level curve is one pure
   function; whichever of the two branches lands first should own it and the other import it, rather
   than either waiting on the other for arithmetic.
