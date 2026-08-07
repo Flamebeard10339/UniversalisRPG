@@ -84,9 +84,23 @@ Proof:
   one does not wait on this. They only meet in c3, which exists so the guard cannot become a bug in
   the feature that resolves the longest spans.
 
+- **The stall bound is the constant 8** (settled by the worker; the planner left it open). The
+  deepest same-instant cascade the engine can build today is *one*: whatever a zero-length segment
+  makes due, `applyDueBoundaries` consumes before the next `nextBoundary`, so the loop already
+  self-corrects after a single stall. 8 sits far above that and still reports a real spin in
+  microseconds. Deriving it from the number of distinct boundary sources was refused for the same
+  reason a total cap was: it makes the bound a function of how much content is loaded, so it has to
+  be re-justified every time content grows, and a bigger registry would buy a longer hang.
+- **The invariant is its own module.** `src/runtime/forwardProgress.ts` sits beside `units.ts`: both
+  rules are pure and a test must be able to call them, and `runtime.ts` is the barrel `src/ui`
+  imports, so its export surface stays the engine's API rather than growing two guards.
+- **Mutating the guard away hangs the suite, by construction.** `npm run mutate` spawns vitest with
+  no timeout, and a `resolve()` with the throw deleted spins synchronously — vitest's own timeout
+  cannot interrupt that. So the manifest aims at the stall count, at the boundary name in the
+  message, and at `STALL_BOUND = 0`; the last of those kills the legitimate-zero-length-step test
+  and is therefore the proof that `resolve()` really calls the guard. An auditor re-aiming the
+  manifest should keep that constraint.
+
 ## Open questions
 
-- What the stall bound is — two, ten, or derived from the number of distinct boundary sources — is
-  the worker's call once the region is read. c2 fixes that one stall is legal and c1 that an
-  unbounded run is not; the number between them is a judgement about how deep a same-instant cascade
-  can legitimately go.
+None. The stall bound was the only one, and it is settled above.
