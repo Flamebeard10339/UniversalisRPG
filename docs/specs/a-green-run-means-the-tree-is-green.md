@@ -21,9 +21,12 @@ Proof:
 - [c1] Every git read in the task system's production path goes through `scripts/lib/git.ts`. The five
   raw sites are `audit.ts:118`, `context.ts:80`, `mergeReady.ts:306`, `mergeReady.ts:363` and
   `records.ts:303`; a sixth, `handoff.ts`'s log walk, is named by `cl-l3-seam-remainder` and belongs
-  here. `scripts/audit-status.ts`, `scripts/lib/sourceFiles.ts` and `scripts/mutate.ts` are outside
-  the task system and are explicitly **not** in scope.
-  proof: `grep -rn "spawnSync('git'\|execFileSync('git'" scripts/tasks scripts/lib --include="*.ts" | grep -v "\.test\.ts" | grep -v "lib/git.ts"` returns nothing.
+  here. `scripts/audit-status.ts` and `scripts/mutate.ts` are outside the task system and are
+  explicitly **not** in scope; `scripts/lib/sourceFiles.ts` was scoped out with them and later
+  routed through the seam anyway by the pass-1 finding on audit-prompt's hermeticity.
+  `scripts/tasks/realGitFixture.ts` is the named real-git set c5 keeps, excluded the way
+  `lib/git.ts` is.
+  proof: `grep -rn "spawnSync('git'\|execFileSync('git'" scripts/tasks scripts/lib --include="*.ts" | grep -v "\.test\.ts" | grep -v "lib/git.ts" | grep -v "realGitFixture.ts"` returns nothing.
 - [c2] `scripts/lib/git.ts` has an install point, so a caller can supply git facts as data. The
   installed implementation is what the seam's own callers read; nothing reaches around it.
   proof: vitest `scripts/lib/git.test.ts`
