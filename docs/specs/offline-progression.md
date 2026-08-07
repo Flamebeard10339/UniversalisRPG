@@ -217,3 +217,85 @@ Proof:
 - proof 9: unknown — Nothing built, and nothing to survive. resolve() neither reads nor writes pendingModal before or after
   d9dd982 (grep -n pendingModal src/runtime/runtime.ts - no hits in the resolve path). src/runtime/session.test.ts
   has no reconciliation-with-outstanding-modal case because there is no reconciliation.
+
+### Pass 2 — 2026-08-07
+
+- base: `b56ba3ee30365f83e10738189ac42d94bcad295c`
+- head: `f69159b287ea5e8a8e89b3b146eceda237fb8c76`
+- proof 1: met — Carried forward and re-verified, not re-derived. git diff --name-only 007b8af..HEAD (pass 1's head to
+  pass 2's) touches only docs/, src/content/registry.ts and src/content/flags.test.ts - src/runtime/ is
+  byte-identical, so pass 1's six KILLED verdicts stand on unchanged bytes: c1-drain-cap-removed, c1-cap-off-by-one,
+  c1-rate-also-settling-the-pool-ignored and c1-wrapper-drain-unseen (each KILLED 1 of 37 in
+  src/runtime/runtime.test.ts), collapse-input-limit-term (KILLED 2 of 26) and collapse-non-repeating-term (KILLED 1
+  of 26). Re-ran the clause's four tests on f69159b: npx vitest run with a worker cap of 4 over
+  src/runtime/runtime.test.ts -t "a deterministic batch settles" - 4 passed, 33 skipped, 686ms.
+  NEW for this pass, the question pass 1 could not ask: whether 673d6a3 disturbed what c1 rests on. It does not, and
+  the argument is structural. c1's mechanism reads registry.resources and registry.dropTables (collectDrainSites,
+  runtime.ts:118-136); 673d6a3 rewrites reconcileMembers (registry.ts:628-641), which calls namespace.undeclare and
+  nothing else - it writes neither map. Its change is also monotone in the safe direction: the surviving set went
+  from per-kind to a union over every kind, and per-kind surviving is a subset of the union, so it undeclares
+  strictly fewer member keys than b56ba3e did. Fewer undeclares means fewer load-time unknown-flag throws, so a
+  resource whose on-empty results reference a flag is if anything more loadable, never less.
+  Full suite green on f69159b: 72 files, 1796 passed, 40.25s.
+- proof 2: unknown — Still not built and still not dispatched; member task declare-the-offline-span-cap-as-a-tuning-variable
+  is open. Re-verified on f69159b rather than copied from pass 1: a grep for offline over src/ and content/ returns
+  exactly one hit, the test title at src/runtime/resolve.test.ts:845 - no declaration, no accessor, no authored
+  variable. src/runtime/tuning.ts exports exactly four accessors (travelSecondsPerUnit:6, minDamage:14,
+  contestSpread:20, defaultActionDuration:29) and no fifth; src/runtime/tuning.test.ts, this clause's proof target,
+  has no offline case. Neither commit in this window (673d6a3, f69159b) touches tuning.ts.
+- proof 3: unknown — No reconciliation entry point exists. Re-verified on f69159b: src/runtime/session.ts exports
+  choiceToDirective, startSession, SAID_HEAD_KEPT, SAID_TAIL_KEPT, view, sessionResources, apply, beginAction, wait,
+  cancelAction, submitModal, applyDirective and runTest - nothing takes an elapsed span. The invariant the clause
+  promises to keep is intact but vacuously: a Date.now / performance.now sweep over src/ returns four hits, all in
+  src/runtime/resolve.test.ts (364, 366, 707, 709) measuring test wall clock, and none in shipped code. 673d6a3 is a
+  content-layer commit and adds no clock read. Nobody built or verified the clamp-and-call this clause is about.
+- proof 4: unknown — Recorded unknown, not met: the clause is about a load path in the presence of a reconciliation entry
+  point that does not exist, so a green tree is a structural pass rather than evidence. Negative checks re-verified
+  on f69159b: applyDirective's load case (src/runtime/session.ts:352-359) calls loadSave at :355 and resets
+  session.dialogue and session.logCursor at :356-357 only - no resolve(), no write to state.time; no non-test clock
+  read anywhere in src/ (see c3); content/tutorial-island.dsl is unchanged by both commits in this window, and
+  integration.test.ts over its shipped test sections is green inside the full 1796-passing run.
+  Pass 1's c4/c8 adjacency was chased to ground this pass and is NOT closed - the measurement is under c8. It does
+  not move this grade, and that is a result rather than a dodge: c4's promise is about state.time, and the adjacency
+  is about flag identity. The one sentence of c4 it touches - a save loads back to what was written or the feature
+  has corrupted it - is not violated by this feature, which has no code; the route is pre-existing on b56ba3e, lives
+  in the DSL load path, and is filed on two dangling-reference-on-field-edit records.
+- proof 5: unknown — Nothing built. There is no store, no store stamp and no span source; the spec's own Decisions record
+  that this waits on auto-save-export-and-load. Re-verified on f69159b: src/runtime/session.test.ts, this clause's
+  proof target, has no case naming a store write, a store stamp or an inert import - its only load case is the
+  stale-save warning at line 203. Neither commit in this window touches session.ts or session.test.ts.
+- proof 6: unknown — Nothing built. resolve() still throws on a backwards toTime at src/runtime/runtime.ts:410 and on a
+  non-integer at :411, and there is no entry point above it to clamp, so no negative-span case exists to grade. Both
+  guards are byte-identical to pass 1 - src/runtime/ is unchanged across 007b8af..HEAD.
+- proof 7: unknown — No offline directive. Re-verified on f69159b: applyDirective (src/runtime/session.ts:312-373) switches
+  on run, talk, choose, use, travel, craft, begin, assert, expect, load, cancel, wait, equip and unequip and nothing
+  else; the wait case at line 364, resolve(state, registry, state.time + secondsToMs(directive.seconds)), is the
+  grammar c7 would mirror. src/content/test.test.ts, this clause's proof target, has no offline case, and the
+  whole-tree grep for offline finds only resolve.test.ts:845.
+- proof 8: unknown — Recorded unknown, not met, for c4's reason: the stamp this clause rules on does not exist, so "the save
+  format is unchanged" is true of a tree never asked to change it. Format half re-verified on f69159b: git diff
+  --name-only b56ba3e..HEAD contains neither src/runtime/save.ts nor src/runtime/state.ts; SAVE_VERSION is still 6
+  (save.ts:8); no GameState field, no SaveDiff field and no envelope field is added by either commit in this window.
+  PASS 1'S ADJACENCY, RESOLVED AS FAR AS IT CAN BE WITHOUT A FIX. 673d6a3 does NOT close it and structurally cannot:
+  it rewrites reconcileMembers, which is retain-only and runs after merge (registry.ts:719), whereas the surviving
+  door is the remove branch at registry.ts:690 calling namespace.undeclare inline, whose prefix sweep at
+  namespace.ts:60-62 crosses EVERY kind. Measured on f69159b with npm run inspect, both variants, each writing a save
+  on the universe before the offending module and loading it after. (1) A location and an entity sharing an id, with
+  a remove of entity.base.beach in a dependent module: load SUCCEEDS, the location survives carrying flags
+  ["searched"], and both base.beach.searched AND the engine-owned base.beach.discovered leave the namespace. A save
+  holding {"flags":{"base.beach.searched":true}} loads to {} with the warning "Removed flags base.beach.searched
+  because its flag is not loaded." - which is false; the flag is on the surviving location in the registry.
+  (2) Remove-then-recreate (base declares entity door with flags: unlocked, mid removes it, late re-creates it with
+  +flags: bolted): load SUCCEEDS, registry.entities holds base.door carrying flags ["bolted"],
+  namespace.has("flag","base.door.bolted") is false, and the same save round-trip loses the flag with the same false
+  message. In both, the control load on the universe without the offending module returns zero warnings and keeps the
+  flag. Why this still does not make the clause unmet: the route is pre-existing on b56ba3e, untouched by this
+  branch, and owned by the DSL load path rather than by offline-progression. This branch moves it strictly in the
+  SAFE direction - per-kind surviving is a subset of the union, so 673d6a3 undeclares fewer member keys than b56ba3e
+  did and therefore prunes fewer flags, restoring saves b56ba3e wrongly damaged. No save that loaded correctly on
+  b56ba3e loads worse on f69159b. The residual exposure is this pass's one new finding plus two already-filed
+  dangling-reference-on-field-edit records, and belongs to whoever rules on the kind-agnostic member key.
+- proof 9: unknown — Nothing built, and nothing to survive. grep -n pendingModal src/runtime/runtime.ts returns no hits at
+  all, so resolve() neither reads nor writes it, before or after this window; src/runtime/ is byte-identical across
+  007b8af..HEAD. src/runtime/session.test.ts has no reconciliation-with-outstanding-modal case because there is no
+  reconciliation.
