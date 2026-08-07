@@ -375,10 +375,6 @@ interface ActionOwner {
   stats?: Record<string, unknown>;
 }
 
-// A `target:` is what makes an action a fight, and whatever is fought over is
-// measured by a `stats:` sheet. `# entitytype` is exempt because it is never an
-// actor: `inheritEntityTypeActions` copies its actions onto every entity naming
-// it, and that entity is where a sheet can be and where the rule bites.
 function fightingOwnerProblem(action: Action, kind: string, owner: ActionOwner, registry: Registry): string | undefined {
   if (action.target === undefined || kind === 'entitytype') return undefined;
   if (kind !== 'entity') return `target: ${action.target} makes this a fight, and only a # entity can carry the stats: a fighter is measured by`;
