@@ -1,42 +1,128 @@
 # archetype-mods
 
+Rewritten 2026-08-07 against the cluster vocabulary. The hold this spec was under is released: it
+carried no proof clauses on purpose, because what it promised depended on decisions `smithing` owned
+and an earlier draft got four of them wrong by guessing. `items-mods-and-crafting` has now settled
+what a declaration is, what an item base carries and how an effect is placed, so the clause set can
+be written.
+
+What changed underneath it: there is no `# mod` and no rolled graph. An item is a hex plane, a
+`# cluster-jewel` is one hexagon of `# passive` declarations, and an effect reaches the player by
+being allocated. The content this branch owes is unchanged in substance — the same four effects
+across the same three archetypes — and every section kind it names has moved.
+
 ## Deliverable
 
-**Held.** This spec has no proof clauses yet, on purpose: what it promises depends on decisions
-`smithing` owns, and an earlier draft got four of them wrong by guessing. What is settled is
-recorded below so the refinement starts from it rather than rediscovering it.
+The three archetypes, authored as content and nothing else. `combat-events` owes the primitives and
+carries the constraint that the runtime never names a fixture; this branch is the proof of that
+claim. If any of the four effects needs a resolver branch, a runtime identifier, or a special case
+anywhere below the DSL, the primitives were built for cases rather than for a shape and the failure
+belongs upstream, not here.
 
-The shape, as far as it is known: one `combat-expansion` mod authoring the archetype effects —
-assassin, berserker and thorns — as `# mod` declarations that roll onto items. No runtime change,
-no source diff. The branch fails if any effect needs a line of TypeScript, which is what makes
-authoring all of them the test that the primitives upstream were built for a shape rather than for
-a case.
+Proof:
+
+- [c1] Each of the four effects — rage, accelerated vigor, thorns, poison — is authored entirely as
+  `# passive` declarations placed into `# cluster-jewel` positions, using the primitives
+  `combat-events` and `buffs-generalized` ship. No archetype is a runtime concept, no archetype has
+  a code path, and none is innate: an effect reaches the player by being allocated on a plane and
+  by nothing else.
+- [c2] The constraint is checkable rather than asserted. No identifier in the shipped source is named
+  for any fixture this branch composes, and the command that shows it is the clause's proof. It
+  excludes tests deliberately: a test may use one of these words as an arbitrary content id with no
+  bearing on the runtime, which `src/content/references.test.ts:139` does today with `# stat rage`
+  while resolving references. The command is clean on the tree as it stands, so it is a real
+  regression check rather than one that starts red and gets weakened.
+  proof: command grep -rniE "\b(poison|rage|thorns|accelerated.?vigou?r)\b" src/ --include=*.ts --exclude=*.test.ts
+- [c3] **Rage** is a resource with a constant drain, granted on a landed swing and read as a counter:
+  `+N% attack per rage`. Its ceiling and its rate are what distinguish it from a stack count, and a
+  `# test` shows attack rising as rage accumulates and falling as it drains, with no other stat
+  moving.
+- [c4] **Accelerated vigor** is a chance-gated stacking buff. A wrapper from `droptables` gates the
+  grant, each stack pays its own payload through the existing fold, and `+N% <stat> per stack` reads
+  the stack count so that stacking improves what a stack is worth. A `# test` shows the two
+  contributions are separable: stacks alone, and stacks under the per-counter bonus.
+- [c5] **Thorns** is a persistent effect on `damage-taken` that damages the attacker. It is carried
+  by an actor rather than declared on an action, which is what lets a passive enemy have one, and a
+  `# test` proves an enemy carrying it damages a player who strikes it.
+- [c6] **Poison** is a timed debuff held by the struck actor, applied when a swing of the player's
+  lands. It is `buffs-generalized`'s mechanism with a sign and a duration, not a second one, and a
+  `# test` shows a struck enemy losing health after the swing that applied it and stopping when it
+  expires.
+- [c7] All four are **actor-carried persistent effects**, not action-declared hooks. A player-side
+  passive has no action of its own to hang `on hit:` on — the swing the player resolves is the
+  encounter's `fight:`, declared on the entity — so the trigger that reaches an allocated passive is
+  the actor-carried one. `on hit:` and `on hit self:` stay correct for an entity or an item that
+  declares a swinging action, and this branch authors none.
+- [c8] A persistent effect's results can name **the other party in the moment**. Thorns fires on
+  `damage-taken`, whose moment identifies the actor struck, and must damage the one who struck them;
+  poison fires when the player deals damage and must land on the target. Both are the same
+  requirement, and a fixture proves each direction rather than assuming one implies the other.
+- [c9] Archetype membership is a **tag on a passive and nothing more**. No `cluster-effect:`, no
+  selector, and no runtime lookup may name an archetype, because a modifier that scaled "berserker
+  passives" would be a class system arriving through the back door. Mechanical tags — `poison`,
+  `physical`, `life` — are the ones a future tag selector may read; archetype tags exist for authors
+  and for grouping, and c2's command is what keeps that honest.
+- [c10] The three archetypes ship as six cluster jewels, paired added-then-increased, matching the
+  trial in `docs/smithing/cluster-jewels-draft.dsl`. Each pair has one jewel whose passives are flat
+  and one whose passives are mostly percent, because `statRange` folds
+  `(base + added) x (1 + increased)` and the pairing is what makes flat-first a visible build order
+  rather than a thing a player has to be told.
+- [c11] All of it is one content module, `combat-expansion`, loaded through the machinery that
+  already exists. Nothing here proves the module store; that belongs to the store's own branch.
+- [c12] `npm run tasks -- merge-ready` passes before the spec is marked done.
 
 ## Decisions
 
-- **One mod, not three patch files.** A single `combat-expansion` houses all three archetypes.
-  There is no requirement that each archetype load independently, and inventing one would buy a
-  loader test nothing else asks for.
-- **Authoring only; the mod store is a dependency, not a subject.** An earlier draft made "the mod
-  portal carries them" a clause, which conflates authoring content with testing the store. This
-  branch depends on the mod-store implementation and exercises it incidentally; proving the store
-  belongs to the store's own branch.
-- **Every effect is a mod on an item. None is innate.** Rage's `on hit self:` is carried by an item
-  the player equipped, not by the character. There is no default archetype behaviour on a bare
-  character, and nothing here writes to the player as a starting condition.
-- **Item bases are not per archetype.** An earlier draft had each archetype carrying its own item
-  bases, which is backwards: a base like `bronze-sword` is one item capable of housing mods, and the
-  archetypes are mods that roll into it. That is why this branch depends on `smithing-skill` — the
-  base, the graph it carries, and the act of placing a mod are all that spec's.
-- **Archetypes surface nowhere in the game.** They are a design tool for grouping mods that reward
-  being taken together. A player never picks one; they equip items, the mods on those items roll,
-  and how the character performs in combat follows from which mods are in play. Nothing in the DSL,
-  the UI or the save should name an archetype as a thing the player has.
-- **Four effects across three archetypes.** Berserker carries both rage and accelerated vigor —
-  a resource with a ceiling and a rate, and a stack count with neither — because they exercise both
-  counter sources of one modifier shape.
+- **Carried forward unchanged from the held draft.** One `combat-expansion` module rather than three
+  patch files, since nothing requires an archetype to load independently. Authoring only, with the
+  module store a dependency and not a subject. Item bases are not per archetype — a base houses a
+  plane, and archetypes are jewels slotted into it. Archetypes surface nowhere as a thing the player
+  picks. Four effects across three archetypes, with berserker carrying both rage and accelerated
+  vigor because a resource has a ceiling and a rate while a stack count has neither, and one
+  `per <counter>` shape has to take both.
+- **"No effect is innate" survives the rewrite, and gets stricter.** Under the old design an effect
+  was a mod on an equipped item, which the player got by equipping. Under the cluster design it is a
+  passive that must additionally be *allocated*, which costs a point that could have gone elsewhere.
+  The archetype is therefore something a player spends toward rather than something they wear.
+- **The zero-source-diff test is replaced by a zero-archetype-diff test, and it is stronger.** The
+  held draft promised no runtime change at all. That was written when mods sat on items and items
+  already carried actions; passives are new and the seam that lets one carry a persistent effect is
+  generic machinery this branch may legitimately need. What was actually being protected is that the
+  runtime contains no *archetype*, and c2 states that as a command anyone can run — where "no source
+  diff" was a promise nobody could check without reading the whole diff.
+- **All four fixtures collapse to one trigger, and that is a finding rather than a preference.**
+  `combat-events`' fixture table assigns `on hit:` to poison, rage and accelerated vigor and a
+  persistent effect only to thorns. Writing the content against the cluster design shows that
+  assignment cannot hold: `on hit:` is declared on an action, the player's swing is the entity's
+  `fight:`, and an allocated passive owns no action. The actor-carried trigger is the only one that
+  reaches a passive, so it carries all four. This does not make `on hit:` wrong — it makes it the
+  tool for a thing that swings, which no passive is.
+- **Two-party results are a latent requirement in `combat-events`, not a new ask.** Thorns fires on
+  `damage-taken` and must damage the attacker, so results already had to be able to name the other
+  party or thorns would not work as that spec describes it. Poison needs the same in the opposite
+  direction. c8 names it once so it is decided rather than discovered twice.
+- **The tag rule is where a class system would have crept in.** Nothing prevents someone authoring
+  `+25% increased effect of berserker passives` once tag selectors exist, and that single line would
+  turn a grouping convenience into a build the player commits to. Ruling it out now costs nothing;
+  ruling it out after content exists costs the content.
+- **This branch does not extend the stat vocabulary.** Every payload uses stats that exist. A
+  passive that wants a stat reading another stat belongs to `per-grammar-dependent-stats`, and the
+  archetype content is authored to need none.
+
+## Out of scope
+
+Any fifth effect, and any archetype beyond the three. Rolled variance on a jewel and jewels that
+drop pre-modded, which `items-mods-and-crafting` names as its own sequel. Drop rates and where the
+archetype jewels appear in the world, beyond whatever one `# test` needs to reach them. Proving the
+module store. Any GUI.
 
 ## Open questions
 
-- The whole clause set. It is written after `smithing` settles what a mod declaration is, what an
-  item base carries, and how a mod is placed.
+- Whether `combat-events` states c8 itself or this branch asks for it. It is that branch's
+  primitive and its fixture table already implies it; the honest outcome is an amendment there
+  rather than a workaround here, and this spec should not be worked until that is settled.
+- Which cluster shapes the archetype jewels use. The trial picks `ring`, `wheel` and `double-ring`
+  per archetype; whether the signature passive sits on a hub two points from any edge or opposite
+  the entry three points either way round is a placement judgement and the worker may make it.
+- Whether accelerated vigor's chance wrapper is `1 in 20:` as `combat-events` writes it or something
+  looser. The gate belongs to whoever tunes it, and the clause fixes only that a wrapper gates it.
