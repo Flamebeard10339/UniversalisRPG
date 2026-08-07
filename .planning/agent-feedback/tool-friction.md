@@ -1178,3 +1178,86 @@ runs plus the isolation check, and the rest reading `runtime.ts`/`effects.ts`/`u
 enough to prove which mutations could not hang. That last part is unavoidable and correct — the
 spec's own Decisions section warns about it — but it is the reason a manifest is expensive to aim
 for this particular subject.
+
+## 2026-08-07 — dangling-reference-on-field-edit and offline-progression, passes 1 and 2 (six auditors, one shared worktree)
+
+Written by the orchestrator, not the auditors. That is itself the first entry.
+
+**The orchestrator suppressed step 8 six times and nearly lost every lesson below.** Three auditors
+per pass ran concurrently in ONE worktree, so each brief carried "do not write the tool-friction
+file; put it in your report instead" — the same override that kept them off `docs/tasks.jsonl` and
+the git index. Store writes and git writes genuinely must be serialised. This file must not: it is
+append-only prose, one dated section per pass, and two agents appending to it conflict no worse than
+two commits do. The override was applied to it by reflex because it sat in the same sentence as the
+real hazards. Everything here survived only because the orchestrator still had the reports in
+context when asked whether the lessons had persisted. The sibling session, which gave each auditor
+its own worktree, wrote its six entries normally.
+
+**`npx rg` fetches and executes an untrusted package.** An auditor typed `npx rg`; npm installed
+`rg@0.0.2` from the registry and ran it. It printed `README.md already exists. run with -f to
+overwrite` and returned nothing for three consecutive searches — output a scanner reads as "no
+matches", not as failure. In a read-only audit over a worktree two other auditors were reading, an
+arbitrary package executing with write access is a real hazard, and it was caught only because the
+auditor checked `git status` afterwards. Filed as a finding as well as recorded here.
+
+**Concurrent agents share one scratchpad path and silently overwrite each other's measurements.**
+Two pass-1 auditors wrote `scratchpad/perf.js` and `scratchpad/perf2.js`; both were clobbered
+mid-audit, one of them by a benchmark referencing a `scratchpad/before/src/` tree its author never
+created. No numbers were lost only because both had already captured them. A run that wrote then
+read would have measured another agent's code and reported it as its own. Pass 2's briefs added
+"write into your own private subdirectory", which worked — but nothing in the tooling suggests or
+enforces it.
+
+**`mutate` has no way to validate a manifest without running it.** It refuses a `find` that does not
+occur exactly once, but only after starting. Because the auditors were forbidden from running it,
+they hand-verified every `find` string — occurrence counts, indentation, a literal `\0`, and CRLF —
+with node one-liners and `sed | cat -A`. A `--check` that parses the manifest and reports occurrence
+counts per entry would have cost nothing and saved that in three separate passes. The orchestrator
+paid it too: one manifest's first target reported 0 occurrences purely from shell escaping of `\0`,
+and only re-verifying by `JSON.parse`ing the manifest itself showed the target was fine.
+
+**`mutate` escalating to the whole suite collides with the known subprocess-timeout flake.** Two
+mutations came back UNSTABLE — not KILLED, not SURVIVED — because `scripts/modportal.test.ts` timed
+out during whole-suite escalation and could not be attributed. Settling one of them took three runs
+and a re-scope to `tests: ["src"]`. The flake is filed; the compounding effect on `mutate`'s verdict
+ladder is worth knowing, because an UNSTABLE verdict costs a whole re-run and reads as neither
+evidence nor absence of it.
+
+**`audit-prompt` wrote no mutation manifest for either spec**, reporting "no proof target on this
+spec resolved to a test this brief could name" — while every clause carries `proof: vitest <file>`
+and those files exist. Step 4 then instructs the auditor to set each entry's `file` and `find`
+against a manifest that does not exist, so three auditors wrote one from scratch, including
+discovering the field names by reading `scripts/mutate.ts`. The message names what the tool did not
+do rather than which target failed to resolve, so none of them could tell a resolver bug from a
+deliberate refusal.
+
+**`audit-prompt` on a branch whose inferred spec is not the one being audited suppresses the pass
+file itself.** Auditing `offline-progression` from a branch inferred as
+`dangling-reference-on-field-edit` printed a WARNING and wrote neither manifest nor pass file. The
+warning is right; the consequence is that the pass-file format then exists nowhere the brief points
+to, and the auditor recovered it by reading `auditArgsSkeleton` in `scripts/tasks/audit.ts`.
+
+**The pass-file parser has one trap worth stating.** A continuation line beginning with `--`
+is parsed as a new flag. Evidence prose that wrapped before `--maxWorkers=4` silently truncated a
+clause's evidence; the fix was to reflow so no continuation line starts with a dash. Nothing warns.
+
+**`merge-ready` re-runs the full suite unconditionally** — 62s of its wall clock, immediately after
+the auditor had run the identical suite. There is no way to hand it a result it could trust.
+
+**Two findings' reproductions were not re-runnable as written.** Neither recorded its modules'
+`dependencies:` lines, and module load order is topological, so a pass-2 auditor's first two
+attempts put `# remove` after the re-creation and then hit "base is not this module or one of its
+dependencies". Three round-trips to reproduce a finding that claimed to be measured. A finding's
+evidence should carry the module sources verbatim.
+
+**`serializeSave` and `loadSave` disagree on shape.** `serializeSave` emits `{version, ...diff}`;
+`loadSave` wants `{version, diff}`, so round-tripping the repo's own save bytes fails with "save
+holds an unknown field: version" until reshaped by hand.
+
+**`npm run inspect` is the load-bearing tool of a concurrent audit, and worth protecting.** It
+answered every question `mutate` could not, left nothing on disk, and is safe to run while other
+agents read the tree — which `mutate` is not. One auditor ran sixteen load-path fixtures through it
+as stdin bodies; another used it for a 3972-universe fuzz and a before/after differential against
+`git archive` of the base tree. Every one of those would otherwise have been a scratch `*.test.ts`
+inside a worktree two other agents were reading. Recording it as friction avoided rather than
+friction met.
