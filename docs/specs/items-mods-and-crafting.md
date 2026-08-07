@@ -2,143 +2,182 @@
 
 Rewritten 2026-08-07. The previous design made an item a rolled directed graph of mod nodes whose
 payloads amplified and damped each other through a universe-wide resonance relation. It is replaced,
-not amended: an item is a **passive tree** grown by slotting orbs, and the graph, the resonance
-relation, and the research branch that gated them all go with it.
+not amended: an item is a **passive tree grown across a hex plane by slotting cluster jewels**, and
+the resonance graph, its universe-wide constants and the research branch that gated them all go with
+it.
 
 Renamed from `smithing` on 2026-08-04, superseding the `smithing-skill` task. The name survives the
 rewrite: there are items, there are modifiers, and crafting is the act of growing one into the other.
 
 ## Deliverable
 
-Every equippable item has one open orb socket. An orb dropped in the world is an authored bundle of
-passive nodes and further sockets; slotting it into an item hangs that bundle off the socket, and the
-sockets it brings can take orbs of their own. The tree that results grows without bound, but the
-player can light up only as much of it as the item's level affords — items gain experience by being
-fed experience orbs, and each level buys one passive point. Two scarcities, independent: how far the
-tree reaches is decided by the orbs you hold, how much of it burns is decided by the item's level.
+An item occupies one hexagon of an unbounded plane. Each of that hexagon's six edges can carry a
+**jewel slot** at its midpoint; a **cluster jewel** dropped in the world is an authored hexagon's
+worth of passives and further slots, and slotting one places its **cluster** in the empty hex on the
+far side of the slot. The clusters it brings carry slots of their own, so the plane fills outward
+without ever terminating. What the player can light up is bounded elsewhere: an item gains experience
+by being fed experience items, each level buys one passive point, and a level is spent on a passive
+or on opening a slot alike.
 
-Crafting is that growth. Which orb goes into which socket, and which branch the points walk down,
-are permanent decisions made before the next drop is known.
+Growth is therefore a plan in space, not a list. One cluster per hex, so a slot facing an occupied
+hex is dead — and because slotting is permanent, filling the wrong edge forecloses a direction
+forever.
 
 Proof:
 
-- [c1] `# orb` is a section kind declaring a passive tree. Its entries are nodes; a node carries a
-  payload in the tag-clause vocabulary items already use (`+6 attack`), names its parent through
-  `from:`, and may be marked as a socket. Parenthood is single-valued, so the declaration is a tree
-  by construction: exactly one node omits `from:` and is the bundle's root. A `from:` naming an
-  unknown node, a second rootless node, or a `from:` that closes a cycle is refused at load time
-  through the DSL's own error surface, not at evaluation.
-- [c2] An orb reaches the player as an ordinary item. An `# item` names one through `orb:` to become
-  the droppable thing, so orbs drop through `droptables`, stack in inventory, and are carried by the
-  existing item machinery with no second inventory and no second drop path. An `orb:` naming an
-  unknown orb is a load-time reference error like every other reference in the language.
-- [c3] An item template declaring `slot:` has exactly one root socket, and instancing is **lazy**.
-  `inventory[itemId]` keeps counting stacks until an orb is slotted into one; that single item then
-  leaves the stack and becomes an instance carrying its tree, its allocations and its xp. Instances
-  are the `instanced-objects` substrate and nothing else — no second instance table in `GameState`,
-  no second prune rule, no second save migration.
-- [c4] Item experience has exactly one source. Consuming an item that declares `item-experience:`
-  raises the target instance's xp by that amount, and no other event in the game changes it. Feeding
-  an item already at the cap is refused with the orb unconsumed, rather than silently clamped. The
-  cap is the tuning variable `item-experience-cap`, defaulting to 30000.
-- [c5] An item's level is `skill-levels-xp-events`'s `level(X)`, imported rather than reimplemented,
-  and its passive points equal its level. There is one level curve in this repository. At the
-  shipped defaults a 1000-xp orb is worth one point for each of the first five, and an item reaches
-  level 17 and 17 points on its thirtieth — the curve's doubling is what makes late orbs cost more
-  than early ones, and no separate diminishing-returns rule is added on top of it.
-- [c6] Allocation is bounded by points and gated by adjacency. A node may be allocated only when its
-  parent is already allocated, or when it is the root of an orb slotted into an allocated socket.
-  The item's own root socket needs no point and is available from the first drop; every socket a
-  slotted orb brings is an ordinary node that must be allocated before it can be filled. Allocating
-  with no point remaining, or out of adjacency, is refused and costs nothing.
-- [c7] Slotting and allocation are both permanent. An orb is consumed when slotted, a filled socket
-  refuses a second orb, and no directive un-allocates a node or un-slots an orb. The refusals are
+- [c1] `# cluster-jewel` is a section kind declaring one hexagon's worth of passives: nodes carrying
+  payloads in the tag-clause vocabulary items already use (`+6 attack`), joined by **undirected
+  adjacency** edges. Cycles are permitted and a ring of passives is a legitimate shape, because an
+  edge only says two nodes touch and nothing travels along one. What is refused at load time,
+  through the DSL's own error surface, is a node no path from the cluster's entry reaches, since it
+  can never be allocated.
+- [c2] A cluster jewel declares its outgoing jewel slots by direction in a local frame whose entry
+  edge is always west, and names the passive each slot attaches to. It must declare at least one,
+  which is the structural guarantee that the plane never runs out of somewhere to grow. Slotting
+  rotates that local frame onto the world edge it was slotted through, so a jewel is authored once
+  as "I came in from the west" and is placeable through any edge.
+- [c3] Clusters occupy hexes addressed in axial coordinates on a pointy-top grid, whose six
+  directions are `e`, `ne`, `nw`, `w`, `sw` and `se`. A jewel slot is an edge midpoint and is shared
+  by exactly two hexes. A hex holds at most one cluster, so a slot may be filled only when the hex
+  on its far side is empty; a slot facing an occupied hex is **blocked**, and both filling it and
+  allocating it are refused. Two adjacent clusters are never joined by their shared edge — a
+  connection exists only through a slot that was actually filled — so bare adjacency grants nothing
+  that was not authored.
+- [c4] The origin is the general rule's degenerate case, not a special case beside it. An item base
+  occupies hex `(0, 0)`; by default that hex holds a cluster with no passives and a single jewel slot
+  on its east edge, allocated from the start and costing no point. A base may instead declare a
+  `cluster-jewel:` of its own for hex `(0, 0)`, so a unique weapon ships with authored passives and a
+  slot layout of its choosing, and the default is what that rule yields when nothing is declared.
+- [c5] A cluster jewel reaches the player as an ordinary item. An `# item` names one through
+  `cluster-jewel:` to become the droppable thing, so jewels drop through `droptables`, stack in
+  inventory, and are carried by the existing item machinery with no second inventory and no second
+  drop path. A `cluster-jewel:` naming an unknown declaration is a load-time reference error like
+  every other reference in the language.
+- [c6] Instancing is **lazy**. `inventory[itemId]` keeps counting stacks until a jewel is slotted
+  into one; that single item then leaves the stack and becomes an instance carrying its plane, its
+  allocations and its experience. Instances are the `instanced-objects` substrate and nothing else —
+  no second instance table in `GameState`, no second prune rule, no second save migration.
+- [c7] Item experience has exactly one source. Consuming an item that declares `item-experience:`
+  raises the target instance's experience by that amount, and no other event in the game changes it.
+  An item's level is `skill-levels-xp-events`'s `level(X)`, imported rather than reimplemented —
+  there is one level curve in this repository — and its passive points equal its level. An item base
+  declares `max-level:`, defaulting to 99; feeding an item already at its maximum is refused with
+  the consumed item intact, rather than silently absorbed.
+- [c8] Allocation is bounded by points and gated by adjacency. A passive or a jewel slot may be
+  allocated when at least one of its neighbours is already allocated — a neighbour, not a parent,
+  because the graph may contain cycles. The origin slot is allocated from the start and is what every
+  path is ultimately reachable from. Allocating with no point remaining, out of adjacency, or onto a
+  blocked slot is refused and costs nothing.
+- [c9] Slotting and allocation are both permanent. A jewel is consumed when slotted, a filled slot
+  refuses a second jewel, and no directive un-allocates a node or un-slots a jewel. The refusals are
   proved, not asserted: attempting each is a checked outcome, not an absence.
-- [c8] An item's contribution is the sum of the payloads of its allocated nodes, computed by one pure
-  function of the instance, and it reaches combat through the same stat-bonus path an equipped
-  `+2 attack` already takes. A focused fixture proves that allocating one node changes outgoing
+- [c10] An item's contribution is the sum of the payloads of its allocated passives, computed by one
+  pure function of the instance, and it reaches combat through the same stat-bonus path an equipped
+  `+2 attack` already takes. A focused fixture proves that allocating one passive changes outgoing
   damage, and that an instance the player is not wearing is inert.
-- [c9] An instance survives a reload with identical evaluated stats, and is repaired rather than
+- [c11] An instance survives a reload with identical evaluated stats, and is repaired rather than
   broken when content moves underneath it: an instance whose template is gone is pruned, and a
-  slotted orb or allocated node whose declaration is gone is dropped from the tree with its point
-  returned, so a loaded instance is never over its own budget. Permanence is a rule about what the
-  player may do, not a promise that deleted content stays evaluable.
-- [c10] Growing a tree is reachable through the directive surface every other play input goes
-  through, so a `# test` section records feeding, slotting and allocating — and each refusal in c4,
-  c6 and c7 — and replays green over the shipped content.
-- [c11] `npm run tasks -- merge-ready` passes before the spec is marked done: tsc, tests,
+  slotted jewel or allocated node whose declaration is gone is dropped with its point returned, so a
+  loaded instance is never over its own budget. Permanence is a rule about what the player may do,
+  not a promise that deleted content stays evaluable.
+- [c12] Growing an item is reachable through the directive surface every other play input goes
+  through, so a `# test` section records feeding, slotting and allocating — and each refusal in c3,
+  c7, c8 and c9 — and replays green over the shipped content.
+- [c13] `npm run tasks -- merge-ready` passes before the spec is marked done: tsc, tests,
   layer-check, audit-status, doctor and the byte check in one invocation.
 
 ## Decisions
 
-- **The graph design is replaced because its balance was global and this one's is local.** Under
+- **The names are Path of Exile's, deliberately.** A *cluster jewel* is the droppable item, the
+  *cluster* is the hexagon of passives it places, a *jewel slot* is an edge midpoint that can receive
+  one, and a *passive* is a node carrying a payload. Borrowing the vocabulary of the system this is
+  modelled on costs nothing and stops four things that are not each other from all being called
+  "orbs" or "mods". "Mod" in this repository already means a content module (`src/content/modportal.ts`),
+  which is the collision the earlier draft was drifting toward.
+- **The graph design was replaced because its balance was global and this one's is local.** Under
   resonance, `gain`, `damp` and the offset set were universe-wide constants: an item that played
-  badly could only be fixed by moving numbers that moved every item at once. An orb's subtree is
-  authored, so an orb that is too strong is nerfed by editing that orb and nothing else changes.
-  That is the whole argument for the rewrite, and it is a property of where the numbers live rather
-  than of how large they are.
+  badly could only be fixed by moving numbers that moved every item at once. A cluster jewel's
+  passives are authored, so a jewel that is too strong is nerfed by editing that jewel and nothing
+  else changes. That is the whole argument for the rewrite, and it is a property of where the numbers
+  live rather than of how large they are.
+- **Edges are undirected adjacency, which is why cycles are free.** The retired design's edges were
+  directed and carried amplification along them, so a cycle was a feedback loop that had to be banned
+  at load time. Here an edge asserts only that two nodes touch, and allocation asks for one allocated
+  neighbour; a ring is then just a shape with two ways round it, and banning it would forbid a
+  perfectly good authored form for no reason. The one thing a graph can still get wrong is a node no
+  path reaches, which is why c1 checks reachability and not acyclicity.
+- **Non-termination is structural, not an authoring discipline.** An earlier draft of this spec noted
+  that allocation degenerates to "take everything" whenever the reachable tree is smaller than the
+  point budget, and could only offer judgement as the safeguard. Requiring every cluster jewel to
+  declare at least one outgoing slot removes the failure mode outright: the frontier can always be
+  pushed, so the plane is never smaller than the budget. What remains is a drop-economy question —
+  whether jewels arrive fast enough to keep the frontier ahead of the points — and that is content,
+  tunable per table.
+- **The hex plane exists so that growth is a plan rather than a list.** Without it, slotting is
+  bookkeeping: every jewel fits everywhere and the only question is which passives are strongest. One
+  cluster per hex makes direction matter, makes a slot facing an occupied hex dead, and makes a badly
+  chosen early jewel wall off a region permanently. That exclusion is the mechanic; a stranded slot
+  is what planning badly costs.
+- **Clusters connect only through a slot that was filled.** Two clusters that end up side by side
+  share an edge, and that edge grants nothing. The alternative — letting bare adjacency fuse two
+  authored graphs — would make power flow through geometry nobody authored, and would put the
+  balance back where the resonance relation had it. As a consequence the cluster-level structure is
+  a tree, since a cluster's every other edge faces either an empty hex or an occupied one, and cycles
+  live inside clusters where an author put them.
+- **Slot directions are relative to the entry edge, so there is no rotation to choose.** A jewel is
+  authored as "I came in from the west, and I offer slots east and north-east", and slotting rotates
+  that frame onto whichever edge it went through. Letting the player pick one of six rotations is a
+  real and interesting mechanic, and it is a later one: it doubles the placement decision before
+  there is anything playable to judge it against.
+- **The grid's offset axis is rows, not columns.** A hex with a due-east edge is pointy-topped, and
+  pointy-topped hexes tile in rows whose alternates are shifted by half — the offset lives on the row
+  index. The spec pins **axial** coordinates instead, which name the six neighbours as constant
+  deltas and need no odd/even case at all; the offset layout is then a rendering detail belonging to
+  whoever draws the plane, not a fact the runtime stores.
+- **Permanent, because permanence is where the decision lives.** The retired probe's clearest
+  transferable finding is that reversible placement is worth about 5% against an oracle and permanent
+  placement 24%. That argument is about irreversibility, not about graphs, so it survives the
+  redesign intact — and the hex plane sharpens it, because an irreversible placement now forecloses a
+  direction as well as a slot. A refund is the obvious later dial and changes no part of the state
+  model, which is why it can wait.
+- **`max-level: 99` is an "unbounded" sentinel; the curve is the brake.** On the shipped curve level
+  30 costs 90 experience items, level 50 costs 402, and level 99 costs 12,405 — nobody reaches the
+  default and nothing needs them to. The field earns its place at the other end, for a base that
+  wants a *low* ceiling: a starter sword capped at 10 is a starter sword forever, which is item
+  tiering expressed as one number on the base rather than as a second progression system. This
+  replaces the earlier draft's global experience cap, which was one number for every item and could
+  not say that.
+- **Item experience is fed, never earned.** One source means no per-instance subscription to combat
+  events, no question about what an unequipped or off-hand item accrues, and no dependency on
+  `combat-events` for the core tier. It also makes item progression a resource the player spends
+  rather than a timer they wait out.
+- **The experience grant is authored per item.** A greater experience item is a second `# item` with
+  a larger `item-experience:`, which is content, not code.
+- **What survives from the old work is the authoring trial, not the probe.**
+  `docs/smithing/mods-draft.dsl` found that health, defence, regeneration, evasion, attack and
+  attack-rate all fall out of the existing tag-clause vocabulary, and that `statRange` already folds
+  them as `(base + added) x (1 + increased)`. A payload is a payload wherever it sits, so that
+  finding transfers whole and the core tier needs no new stat maths. What it loses is the compounding
+  term the resonance graph supplied; nothing compounds here, and nothing needs to, because power
+  comes from extent rather than from interaction.
 - **`graph-based-items-research` is retired rather than answered.** It existed to decide whether the
   resonance graph's measured agency was real and, above all, *legible* — its own spec names
-  legibility as the load-bearing uncertainty and concedes no probe settles it. A tree answers that
-  question structurally: it is the most legible progression surface the genre has, and a player
-  reads a branch rather than inferring an offset relation from rolled edges. The premise the
-  research was gating no longer exists, so the gate is removed with it.
-  `docs/smithing/topology-probe.md` becomes history — a measurement of a design not taken.
-- **What survives from the old work is the authoring trial, not the probe.** `docs/smithing/mods-draft.dsl`
-  found that health, defence, regeneration, evasion, attack and attack-rate all fall out of the
-  existing tag-clause vocabulary, and that `statRange` already folds them as
-  `(base + added) x (1 + increased)`. A payload is a payload whether it sits in a graph node or a
-  tree node, so that finding transfers whole and the core tier still needs no new stat maths. What
-  it loses is the compounding term the graph supplied; the tree does not compound, and does not need
-  to, because its power comes from extent rather than from interaction.
-- **Two scarcities, deliberately independent.** Orbs held decide how far the tree reaches; item level
-  decides how much of it burns. This is what lets a tree be visibly enormous while the power it
-  grants stays bounded, and it is why the design tolerates unbounded growth without an unbounded
-  power curve. Collapsing them into one resource would make every orb a straight power gain and the
-  tree a display.
-- **The invariant that keeps allocation a decision: the reachable tree must always be larger than
-  the points available.** If an item's tree is smaller than its point budget, allocation degenerates
-  to "take everything" — a non-decision, which is exactly what the old research called a sort rather
-  than a strategy. Under the graph design this was a measured property; here it is an authoring
-  discipline and a tuning ratio, checked by judgement rather than by a gate. It is stated because it
-  is the thing that breaks first if orbs are authored small.
-- **Sockets cost a point, so depth competes with power.** A socket a slotted orb brings is an
-  ordinary node: reaching it and opening it spends from the same budget the payload nodes want. That
-  is the tension the mechanic runs on — a wide shallow tree of realised payloads against a narrow
-  deep one that reaches a better orb. The item's root socket is free because an item with no free
-  first socket has no on-ramp.
-- **Permanent, because permanence is where the decision lives.** The probe's clearest transferable
-  finding is that reversible placement is worth about 5% against an oracle and permanent placement
-  24%. That argument is about irreversibility, not about graphs, so it survives the redesign intact.
-  A refund orb is the obvious later dial and changes no part of the state model, which is why it can
-  wait.
-- **Item xp is fed, never earned.** One source means no per-instance subscription to combat events,
-  no question about what an unequipped or off-hand item accrues, and no dependency on
-  `combat-events` for the core tier. It also makes item progression a resource the player spends
-  rather than a timer they wait out, and makes the 17-point ceiling exact and reachable by anyone.
-- **One level curve, and this branch does not own it.** `skill-levels-xp-events` specifies
-  `level(X) = 1 + 10 x log2(1 + X x (r - 1) / 1000)` with `r = 2^(1/10)`, integer-arbitrated so
-  float never decides a level. Items use that function. Two curves in one repository would be two
-  things required to be kept in sync by hand.
-- **The 30000 cap is not a level threshold, and that is deliberate.** `T(17)` is 28303 and `T(18)` is
-  31335, so the thirtieth orb lands inside level 17 and a thirty-first cannot be fed. The player
-  experiences a whole number of orbs for a whole number of points; the remainder is invisible
-  because nothing can be spent to reach past it. If it reads badly in play, the cap is a tuning
-  variable and moves.
-- **The xp grant is authored per item, the cap is a tuning variable.** A greater experience orb is a
-  second `# item` with a larger `item-experience:`, which is content. How high any item may be taken
-  is one number for the whole universe, which is tuning. Neither is code.
-- **Rolled orb modifiers are the sequel, and nothing is built ahead of them.** The branch after this
-  one gives an orb instance rolled modifiers that scale its own subtree (`+10% increased effect of
-  physical passives`) with a curated downside as a second modifier of opposite sign — no new
-  mechanism, just an authored pair. It needs a scaling point between a node's payload and the stat
-  fold, and node tags for a modifier to name. This branch builds neither: c8 already puts payload
+  legibility as the load-bearing uncertainty and concedes no probe settles it. A plane of authored
+  clusters answers that structurally: a player reads a map and a branch, rather than inferring an
+  offset relation from rolled directed edges. `docs/smithing/topology-probe.md` becomes history, a
+  measurement of a design not taken.
+- **Rolled jewel modifiers are the sequel, and nothing is built ahead of them.** The branch after
+  this one gives a jewel instance rolled modifiers that scale its own cluster (`+10% increased effect
+  of physical passives`) with a curated downside as a second modifier of opposite sign — no new
+  mechanism, just an authored pair. It needs a scaling point between a passive's payload and the stat
+  fold, and passive tags for a modifier to name. This branch builds neither: c10 already puts payload
   evaluation in exactly one pure function, which is the only structural precondition the sequel has.
   An identity seam and unused tags added now would be machinery with no caller.
-- **Reuse, not new systems.** Orbs are items, so drops, stacking and inventory are `droptables` and
+- **Reuse, not new systems.** Jewels are items, so drops, stacking and inventory are `droptables` and
   the existing item machinery. Instances are `instanced-objects`. Levels are `skill-levels-xp-events`.
-  Payloads are tag clauses folded by `statRange`. The genuinely new code is the `# orb` section kind,
-  the tree's load-time validation, the allocation rules, and one evaluation fold.
+  Payloads are tag clauses folded by `statRange`. The genuinely new code is the `# cluster-jewel`
+  section kind, its load-time validation, the hex plane with its placement and blocking rules, the
+  allocation rules, and one evaluation fold.
 - **No new system is declared.** The code this branch adds is owned by the systems that already own
   its paths — `src/grammar` and `src/content` by the DSL load path, `src/runtime` by Runtime.
 
@@ -158,24 +197,24 @@ inventing its own. The core survivability tier waits on none of them.
 
 ## Out of scope
 
-Rolled orb modifiers and orb instancing (the named sequel). Refund or respec of any kind. Per-item
-experience caps. Orbs that edit an existing tree rather than extend it. Salvage, orb extraction, or
-moving a tree between items. Keystone nodes that change the shape of the combat formula. Any GUI:
-when a tree needs to be seen rather than computed, the cheap surface is a view in
-`scripts/play-cli.ts` beside the existing directives, and the real one is a consumer of `gui-rebuild`
-rather than a reason to reshape it. Each is a separate branch; none is required for the clauses above
-to be provable.
+Rolled jewel modifiers and jewel instancing (the named sequel). Player-chosen rotation when slotting.
+Refund or respec of any kind. Jewels that edit an existing cluster rather than extend the plane, or
+that move one. Salvage, extraction, or transferring a plane between items. Keystone passives that
+change the shape of the combat formula. Any GUI: when a plane needs to be seen rather than computed,
+the cheap surface is a view in `scripts/play-cli.ts` beside the existing directives, and the real one
+is a consumer of `gui-rebuild` rather than a reason to reshape it. Each is a separate branch; none is
+required for the clauses above to be provable.
 
 ## Open questions
 
 - The directive spelling for the three verbs — feed, slot, allocate — is the worker's to choose,
   including whether feeding and slotting are one verb dispatching on what the consumed item declares
   or two. The clauses fix what each must do and refuse, not what it is called.
-- Whether an orb's nodes are named in a namespace of their own or share the id space every other
-  section uses. Node ids must be addressable by the allocate directive and by a saved instance, and
-  two orbs will want a node called `root`.
-- Whether `slot:` is the right predicate for "can carry a tree". It is the cheapest one that exists
-  and it draws the line at equipment, but an item with a tree and no equip slot is not obviously
+- Whether a cluster jewel's passives are named in a namespace of their own or share the id space
+  every other section uses. Passive ids must be addressable by the allocate directive and by a saved
+  instance, and two jewels will both want a passive called `entry`.
+- Whether `slot:` is the right predicate for "can carry a plane". It is the cheapest one that exists
+  and it draws the line at equipment, but an item with a plane and no equip slot is not obviously
   nonsense.
 - `skill-levels-xp-events` is itself blocked on `first-class-modals`. The level curve is one pure
   function; whichever of the two branches lands first should own it and the other import it, rather
