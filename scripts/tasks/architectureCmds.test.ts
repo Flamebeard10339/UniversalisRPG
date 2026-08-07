@@ -1,7 +1,8 @@
 import { readFileSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { fixture, gitFixture } from './cliFixtures';
+import { fixture } from './cliFixtures';
+import { realGitFixture } from './realGitFixture';
 
 describe('tasks CLI', () => {
   it('grades a named dispatch set and answers at exit 0, refusing nothing', () => {
@@ -380,7 +381,7 @@ describe('concept paths are stored in one spelling', () => {
 // a file and asks where the thing it imports now lives.
 describe('the architecture queries, against a tracked file deleted from the working tree', () => {
   it('answers instead of dying on the missing file', () =>
-    gitFixture(({ dir, commit, tasks }) => {
+    realGitFixture(({ dir, commit, tasks }) => {
       writeFileSync(path.join(dir, 'kept.ts'), "import './gone';\nexport const kept = 1;\n", 'utf8');
       writeFileSync(path.join(dir, 'gone.ts'), 'export const gone = 1;\n', 'utf8');
       commit('Add two modules\n\nA base for the deletion below.');

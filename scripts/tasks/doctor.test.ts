@@ -5,6 +5,7 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { tsxCli } from '../lib/tsxCli';
 import { defaultStoreGitFixture, fixture, runInProcess, script, spawnTasks, type Run } from './cliFixtures';
+import { realDefaultStoreGitFixture } from './realGitFixture';
 
 describe('tasks CLI', () => {
   it('doctor reports an inconsistent store and still exits zero, because no disagreement may fail a build', () => {
@@ -85,7 +86,7 @@ describe('tasks CLI', () => {
   // process, so an in-process run here would spend the flag the sibling
   // warn-once test below depends on observing fresh.
   it('default-store writes stay silent about their own dirtiness, and warn once over stale uncommitted state', () => {
-    defaultStoreGitFixture(({ dir }) => {
+    realDefaultStoreGitFixture(({ dir }) => {
       const tasks = (...args: string[]): Run => spawnTasks(dir, [...args, '--branch', 'demo-spec']);
       // A write that itself dirties a clean store is the session acting on
       // purpose — no warning.
@@ -129,7 +130,7 @@ describe('tasks CLI', () => {
   // documented order of work, and an error that fires on the correct
   // workflow trains readers to skip errors.
   it('doctor reports a working-tree-only done mark as a warning naming the task, its committed state, and the risk', () => {
-    defaultStoreGitFixture(({ dir, tasks }) => {
+    realDefaultStoreGitFixture(({ dir, tasks }) => {
       tasks('add', 'closable task', '--id', 'closable');
       spawnSync('git', ['add', '.'], { cwd: dir });
       spawnSync('git', ['commit', '--no-verify', '-m', 'add closable task'], { cwd: dir, encoding: 'utf8' });
@@ -142,7 +143,7 @@ describe('tasks CLI', () => {
   });
 
   it('doctor reports a working-tree-only declined mark as a warning', () => {
-    defaultStoreGitFixture(({ dir, tasks }) => {
+    realDefaultStoreGitFixture(({ dir, tasks }) => {
       tasks('add', 'stale finding', '--id', 'stale', '--kind', 'finding', '--deliverable', 'fix it');
       spawnSync('git', ['add', '.'], { cwd: dir });
       spawnSync('git', ['commit', '--no-verify', '-m', 'add stale finding'], { cwd: dir, encoding: 'utf8' });
@@ -195,7 +196,7 @@ describe('tasks CLI', () => {
   // checks answer about a tree that does not exist yet — the exact state in
   // which a hand-resolved store most needs the store-only checks readable.
   it('doctor suspends the git-anchored checks during an unresolved merge, and the store-only checks still run', () => {
-    defaultStoreGitFixture(({ dir, tasks }) => {
+    realDefaultStoreGitFixture(({ dir, tasks }) => {
       // A working-tree-only close, which doctor would otherwise warn about.
       tasks('add', 'closable task', '--id', 'closable', '--requires', 'ghost-requirement');
       spawnSync('git', ['add', '.'], { cwd: dir });
@@ -225,7 +226,7 @@ describe('tasks CLI', () => {
   });
 
   it('doctor reports a working-tree-only in-progress transition as a warning, not an error', () => {
-    defaultStoreGitFixture(({ dir, tasks }) => {
+    realDefaultStoreGitFixture(({ dir, tasks }) => {
       tasks('add', 'startable task', '--id', 'startable');
       spawnSync('git', ['add', '.'], { cwd: dir });
       spawnSync('git', ['commit', '--no-verify', '-m', 'add startable task'], { cwd: dir, encoding: 'utf8' });

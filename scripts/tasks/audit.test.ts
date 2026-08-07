@@ -6,7 +6,8 @@ import { tsxCli } from '../lib/tsxCli';
 import { parseManifest, refusalsFor } from '../mutate';
 import { auditArgsSkeleton, hasVisibleContent, indexSuiteTitles, manifestNotes, mutationManifest, nextAfterPass, UNAIMED_FILE, UNRETARGETED, parseAuditArgs, parseAuditFile, slugStanding, slugStandingLines, toolLines, unresolvedTarget, type SlugStanding, type TargetResolution } from './audit';
 import { MAX_LESSON_COUNT, totalLessonCount } from './briefLessons';
-import { appendEvent, firstListedId, fixture, gitFixture, relevantFilesBlock, repoRoot, script, stepsBlock, type Run } from './cliFixtures';
+import { appendEvent, enclosingGitFixture, firstListedId, fixture, gitFixture, relevantFilesBlock, repoRoot, script, stepsBlock, type Run } from './cliFixtures';
+import { realGitFixture } from './realGitFixture';
 
 describe('tasks CLI', () => {
   it('import parses H/M/L findings out of an audit doc into unreviewed tasks, and is idempotent on re-run', () => {
@@ -372,7 +373,7 @@ describe('tasks CLI', () => {
   });
 
   it('audit-prompt prints a ready-to-use auditor prompt for a spec', async () => {
-    await fixture(async ({ dir, tasks, audit }) => {
+    await enclosingGitFixture(async ({ dir, tasks, audit }) => {
       writeFileSync(path.join(dir, 'specs', 'demo-spec.md'), '# Demo spec\n\n## Deliverable\n\nSomething this branch promises.\n\nProof:\n\n- [c1] The first clause holds.\n  proof: command node --version\n- [c2] The second clause holds.\n\n## Decisions\n\n## Open questions\n\nNone.\n', 'utf8');
       tasks('add', 'prove the runtime behavior', '--id', 'runtime-proof', '--spec', 'demo-spec', '--severity', 'high', '--system', 'Runtime', '--files', 'src/runtime/runtime.ts:1', '--deliverable', 'runtime behavior is proven');
       await audit('demo-spec', '--proof', '1=met', '--evidence', '1=measured directly', '--proof', '2=met', '--evidence', '2=clause 2 checked');
@@ -445,7 +446,7 @@ describe('tasks CLI', () => {
   });
 
   it('audit-prompt shows each clause its latest verdict, spelling out that unknown means nobody looked', async () => {
-    await fixture(async ({ tasks, audit }) => {
+    await enclosingGitFixture(async ({ tasks, audit }) => {
       await audit('demo-spec', '--proof', '1=met', '--evidence', '1=measured directly');
 
       const result = tasks('audit-prompt', 'demo-spec');
@@ -461,7 +462,7 @@ describe('tasks CLI', () => {
   });
 
   it('audit-prompt calls every clause unknown when no pass has been recorded', () => {
-    fixture(({ tasks }) => {
+    enclosingGitFixture(({ tasks }) => {
       const result = tasks('audit-prompt', 'demo-spec');
       expect(result.status).toBe(0);
       expect(result.stdout).toContain('Latest audit pass: none recorded');
@@ -1143,7 +1144,7 @@ describe('a deferred clause', () => {
 // verdicts are assigned asks the question that licenses a deferral.
 describe("a spec's goal", () => {
   it('c5: is printed by audit-prompt without opening the file', async () => {
-    await fixture(async ({ dir, tasks }) => {
+    await enclosingGitFixture(async ({ dir, tasks }) => {
       const specPath = path.join(dir, 'specs', 'demo-spec.md');
       writeFileSync(specPath, readFileSync(specPath, 'utf8').replace('## Decisions', '## Goal\n\nKeep the gate honest without losing the honest way to drop scope.\n\n## Decisions'), 'utf8');
       const result = tasks('audit-prompt', 'demo-spec');
@@ -1153,7 +1154,7 @@ describe("a spec's goal", () => {
   });
 
   it('says plainly that none is recorded, rather than staying silent, when the spec carries no ## Goal', async () => {
-    await fixture(async ({ tasks }) => {
+    await enclosingGitFixture(async ({ tasks }) => {
       const result = tasks('audit-prompt', 'demo-spec');
       expect(result.status).toBe(0);
       expect(result.stdout).toContain('Goal: (none recorded');
@@ -1161,7 +1162,7 @@ describe("a spec's goal", () => {
   });
 
   it('c6: the step where verdicts are assigned asks whether the goal still holds before a clause is dropped', async () => {
-    await fixture(async ({ tasks }) => {
+    await enclosingGitFixture(async ({ tasks }) => {
       const result = tasks('audit-prompt', 'demo-spec');
       expect(stepsBlock(result.stdout)).toContain('Ask this before recording unmet: does the goal still hold if this clause is never met?');
     });
@@ -1379,7 +1380,7 @@ describe('the brief arriving with the answers rather than the instructions', () 
   });
 
   it('offers no manifest at all in a brief that has just warned the diff is not this slugs', () => {
-    fixture(({ dir, tasks }) => {
+    enclosingGitFixture(({ dir, tasks }) => {
       writeFileSync(path.join(dir, 'specs', 'another-spec.md'), '# Another spec\n\n## Deliverable\n\nA promise made on some other branch.\n\nProof:\n\n- The other clause holds.\n\n## Decisions\n\n## Open questions\n\nNone.\n', 'utf8');
 
       const { stdout } = tasks('audit-prompt', 'another-spec');
@@ -1409,7 +1410,7 @@ describe('the brief arriving with the answers rather than the instructions', () 
   // first thing a clause is graded against — so the sections bought 41 lines
   // and changed no behaviour. Step 1 names the file and what is in it.
   it('sends the auditor to the spec file rather than reprinting its sections', () => {
-    fixture(({ dir, tasks }) => {
+    enclosingGitFixture(({ dir, tasks }) => {
       const specPath = path.join(dir, 'specs', 'demo-spec.md');
       writeFileSync(specPath, readFileSync(specPath, 'utf8').replace('## Decisions\n', '## Decisions\n\n- The seam stays where it is; moving it was measured and cost more.\n'), 'utf8');
 
@@ -1444,7 +1445,7 @@ describe('the brief arriving with the answers rather than the instructions', () 
   // Run against the checkout the suite happens to sit in, the branch's own
   // commits join that union and the section grows paths the test never named.
   it('the brief answers ownership and prior art for every path in its diff', () => {
-    gitFixture(({ dir, commit, tasks }) => {
+    realGitFixture(({ dir, commit, tasks }) => {
       writeFileSync(path.join(dir, 'systems.json'), JSON.stringify({ unowned: { note: '', paths: ['docs', '*.md'] }, systems: [{ name: 'Runtime', paths: ['src/runtime'], lastAudit: null, lastAuditDoc: null, note: null }] }), 'utf8');
       // One path from each half of the union: session.ts is in the diff and
       // on no record, save.ts is on a member task and not in the diff.
@@ -1471,7 +1472,7 @@ describe('the brief arriving with the answers rather than the instructions', () 
   // an auditor cannot act on: 42 of them closed. `tasks where` still lists
   // every one for a single path, which is the reader that wants them.
   it('counts the closed claims in the brief rather than listing them, and still lists them for one path', () => {
-    fixture(({ tasks }) => {
+    enclosingGitFixture(({ tasks }) => {
       tasks('add', 'A settled claim on the save file', '--id', 'settled-claim', '--system', 'Runtime', '--files', 'src/runtime/save.ts');
       tasks('done', 'settled-claim');
       tasks('add', 'An open claim on the save file', '--system', 'Runtime', '--files', 'src/runtime/save.ts');
@@ -1489,7 +1490,7 @@ describe('the brief arriving with the answers rather than the instructions', () 
   });
 
   it('says how to read what mutate prints back, beside the manifest rather than in its source', () => {
-    fixture(({ tasks }) => {
+    enclosingGitFixture(({ tasks }) => {
       const { stdout } = tasks('audit-prompt', 'demo-spec');
       expect(stdout).toContain('KILLED — that named test failed with the line broken');
       expect(stdout).toContain('SURVIVED — no test went from passing to failing');
@@ -1504,7 +1505,7 @@ describe('the brief arriving with the answers rather than the instructions', () 
   // is how `KILLED` came to be read as "the number went up" — which is the
   // reading every recorded pass in this repository has been taking on faith.
   it('says a verdict is attributed to a named test, not to a count', () => {
-    fixture(({ tasks }) => {
+    enclosingGitFixture(({ tasks }) => {
       const { stdout } = tasks('audit-prompt', 'demo-spec');
       expect(stdout).toContain('attributed to a named test, never to a count');
       expect(stdout).toContain('a row that names no test is not a kill');
@@ -1518,7 +1519,7 @@ describe('the brief arriving with the answers rather than the instructions', () 
   // its usage, one grepping `parseAuditFile`. The file removes the format
   // from the brief: the auditor opens it and fills in values.
   it('writes the pass file the auditor fills in, rather than describing its format', () => {
-    fixture(({ tasks }) => {
+    enclosingGitFixture(({ tasks }) => {
       const { stdout } = tasks('audit-prompt', 'demo-spec');
       const written = /\n {5}(\S*audit-demo-spec-pass1\.txt)\n/.exec(stdout);
       expect(written).not.toBeNull();
@@ -1530,7 +1531,7 @@ describe('the brief arriving with the answers rather than the instructions', () 
   });
 
   it('names one other spec to check the standing against, not every spec in the checkout', () => {
-    fixture(({ dir, tasks }) => {
+    enclosingGitFixture(({ dir, tasks }) => {
       for (const slug of ['another-spec', 'a-third-spec', 'a-fourth-spec']) {
         writeFileSync(path.join(dir, 'specs', `${slug}.md`), '# A spec\n\n## Deliverable\n\nElsewhere.\n\nProof:\n\n- It holds.\n', 'utf8');
       }
@@ -1577,7 +1578,7 @@ describe('the brief arriving with the answers rather than the instructions', () 
   };
 
   it('keeps an artifact the auditor has already worked on rather than overwriting it', () => {
-    fixture(({ dir, tasks }) => {
+    enclosingGitFixture(({ dir, tasks }) => {
       withResolvableTarget(dir);
       const first = tasks('audit-prompt', 'demo-spec');
       const passPath = /\n {5}(\S*audit-demo-spec-pass1\.txt)\n/.exec(first.stdout)![1];
@@ -1599,7 +1600,7 @@ describe('the brief arriving with the answers rather than the instructions', () 
   // measured against this pass's diff, read as this pass's kills. The pass
   // file was keyed to the pass from the start; the manifest was not.
   it('gives each pass its own manifest, so no pass inherits the one before it aimed', () => {
-    fixture(({ dir, tasks }) => {
+    enclosingGitFixture(({ dir, tasks }) => {
       withResolvableTarget(dir);
       const first = tasks('audit-prompt', 'demo-spec').stdout;
       expect(first).toContain('mutations-demo-spec-pass1.json');
@@ -1617,7 +1618,7 @@ describe('the brief arriving with the answers rather than the instructions', () 
   // file for recording a pass — against a diff whose clauses it had just
   // said these are not. That half writes tracked repo state.
   it('offers no pass file either, in a brief that has just warned the diff is not this slugs', () => {
-    fixture(({ dir, tasks }) => {
+    enclosingGitFixture(({ dir, tasks }) => {
       writeFileSync(path.join(dir, 'specs', 'another-spec.md'), '# Another spec\n\n## Deliverable\n\nElsewhere.\n\nProof:\n\n- [c1] It holds.\n', 'utf8');
 
       const { stdout } = tasks('audit-prompt', 'another-spec');
@@ -1656,7 +1657,7 @@ describe('the brief arriving with the answers rather than the instructions', () 
   });
 
   it('makes logging tool friction a numbered step rather than a line to skip', () => {
-    fixture(({ tasks }) => {
+    enclosingGitFixture(({ tasks }) => {
       const { stdout } = tasks('audit-prompt', 'demo-spec');
       // Of the two passes that had it as prose elsewhere in the brief, one
       // wrote nothing at all; the pass that had it as a step wrote it.
@@ -1679,7 +1680,7 @@ describe('the brief arriving with the answers rather than the instructions', () 
   });
 
   it('the brief names each tool an auditor may reach for, with the command that runs it', () => {
-    fixture(({ tasks }) => {
+    enclosingGitFixture(({ tasks }) => {
       const { stdout } = tasks('audit-prompt', 'demo-spec');
       // Pass 1 grepped package.json to find out what existed. Each of these
       // is the answer to a question an auditor asks, and a name with no
@@ -1697,7 +1698,7 @@ describe('the brief arriving with the answers rather than the instructions', () 
 // worse than one that is missing a feature, because the auditor cannot tell.
 describe('the slug audit-prompt is given and the branch it is run on', () => {
   it('a slug whose spec this branch does not own is reported rather than ranged silently against HEAD', () => {
-    fixture(({ dir, tasks }) => {
+    enclosingGitFixture(({ dir, tasks }) => {
       writeFileSync(path.join(dir, 'specs', 'another-spec.md'), '# Another spec\n\n## Deliverable\n\nA promise made on some other branch.\n\nProof:\n\n- The other clause holds.\n\n## Decisions\n\n## Open questions\n\nNone.\n', 'utf8');
 
       const result = tasks('audit-prompt', 'another-spec');
@@ -1826,7 +1827,7 @@ describe('an audit pass read from a file', () => {
 // emptied.
 describe('audit-prompt carries the lessons a prior run paid for', () => {
   it('carries the false-proof-shape question, with its three named forms as examples', () =>
-    fixture(({ tasks }) => {
+    enclosingGitFixture(({ tasks }) => {
       const result = tasks('audit-prompt', 'demo-spec');
       expect(result.stdout).toContain('Ask what would have to break for a test to fail, and whether that is what the clause promises.');
       expect(result.stdout).toContain('a fixture that performs a second operation whose side effect produces the asserted state');
@@ -1835,25 +1836,25 @@ describe('audit-prompt carries the lessons a prior run paid for', () => {
     }));
 
   it('carries the hunt-the-next-neighbour rule', () =>
-    fixture(({ tasks }) => {
+    enclosingGitFixture(({ tasks }) => {
       const result = tasks('audit-prompt', 'demo-spec');
       expect(result.stdout).toContain('Hunt the next neighbour, not confirmation of the last fix.');
     }));
 
   it('carries the rule-may-be-wrong question for a twice-failed clause', () =>
-    fixture(({ tasks }) => {
+    enclosingGitFixture(({ tasks }) => {
       const result = tasks('audit-prompt', 'demo-spec');
       expect(result.stdout).toContain('When a clause has failed twice, ask whether the rule is wrong rather than whether another instance exists.');
     }));
 
   it('carries the over-strictness guard', () =>
-    fixture(({ tasks }) => {
+    enclosingGitFixture(({ tasks }) => {
       const result = tasks('audit-prompt', 'demo-spec');
       expect(result.stdout).toContain('Guard over-strictness at least as hard as bypass.');
     }));
 
   it('carries the silent-guess question', () =>
-    fixture(({ tasks }) => {
+    enclosingGitFixture(({ tasks }) => {
       const result = tasks('audit-prompt', 'demo-spec');
       expect(result.stdout).toContain('Ask the silent-guess question explicitly.');
       expect(result.stdout).toContain('Treat "none found" as real only if you looked.');
@@ -1866,7 +1867,7 @@ describe('audit-prompt carries the lessons a prior run paid for', () => {
 // would have let three of four briefs reacquire narrative text silently.
 describe('audit-prompt prints instructions, not the incidents that motivated them', () => {
   it('never prints the narrative evidence behind an auditor lesson', () =>
-    fixture(({ tasks }) => {
+    enclosingGitFixture(({ tasks }) => {
       const result = tasks('audit-prompt', 'demo-spec');
       expect(result.stdout).not.toContain('clause-deferral spec');
       expect(result.stdout).not.toContain('consumed four passes');

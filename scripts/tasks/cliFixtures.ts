@@ -1,7 +1,9 @@
 import { spawnSync } from 'node:child_process';
-import { appendFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { appendFileSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { install as installGit, type Commit, type GitFacts } from '../lib/git';
 import { tsxCli } from '../lib/tsxCli';
 import { run as runTasks } from '../tasks';
 import { installPrompter, linePrompter } from './prompt';
@@ -87,7 +89,7 @@ export async function runInProcessAsync(args: string[], input = ''): Promise<Run
 // In-process, from inside the fixture's own directory: the commands that ask
 // git about their surroundings read cwd, which spawning used to set. Tests
 // in a file run one at a time, so the swap cannot interleave.
-function runInProcessAt(dir: string, args: string[]): Run {
+export function runInProcessAt(dir: string, args: string[]): Run {
   const cwd = process.cwd();
   process.chdir(dir);
   try {
@@ -142,7 +144,7 @@ export interface FixtureContext {
 // writing code deleted. `os.tmpdir()` answers from the environment on every
 // call, so pointing it at the fixture's own directory scopes the artifacts to
 // the test that generated them — in-process and spawned alike.
-function isolateTmp(dir: string): () => void {
+export function isolateTmp(dir: string): () => void {
   const names = ['TMPDIR', 'TEMP', 'TMP'] as const;
   const previous = names.map((name) => [name, process.env[name]] as const);
   const inside = path.join(dir, 'tmp');
@@ -156,10 +158,169 @@ function isolateTmp(dir: string): () => void {
   };
 }
 
+// What a command asking git about a directory that is not a repository gets:
+// the same nulls the real seam answers with outside a repo. Installed by
+// `fixture`, so a test that never declared a repository cannot quietly read
+// the one this suite happens to run inside.
+const noRepositoryGit: GitFacts = {
+  mergeBase: () => null,
+  head: () => null,
+  branch: () => null,
+  resolveCommit: () => null,
+  fileAt: () => null,
+  isAncestor: () => false,
+  commitCount: () => null,
+  mergeInProgress: () => false,
+  dirtyPaths: () => null,
+  changedFiles: () => null,
+  diffStat: () => null,
+  commitLog: () => null,
+  commitsTouching: () => null,
+};
+
+interface TreeCommit {
+  sha: string;
+  subject: string;
+  files: string[];
+  tree: Map<string, string>;
+}
+
+// Reads every file under the fixture directory, as `git add .` + commit
+// would have staged it. `tmp` is the fixture's isolated os.tmpdir(), which a
+// real repo would have committed too — excluded because nothing reads it
+// back through a revision and its churn is noise in every tree diff.
+function snapshotTree(root: string, at = root, tree = new Map<string, string>()): Map<string, string> {
+  for (const entry of readdirSync(at, { withFileTypes: true })) {
+    const full = path.join(at, entry.name);
+    if (at === root && entry.name === 'tmp') continue;
+    if (entry.isDirectory()) snapshotTree(root, full, tree);
+    else tree.set(path.relative(root, full).split(path.sep).join('/'), readFileSync(full, 'utf8'));
+  }
+  return tree;
+}
+
+function treeDiff(before: Map<string, string>, after: Map<string, string>): string[] {
+  const changed: string[] = [];
+  for (const [file, content] of after) if (before.get(file) !== content) changed.push(file);
+  for (const file of before.keys()) if (!after.has(file)) changed.push(file);
+  return changed.sort();
+}
+
+// Git facts answered from data: a linear history of directory snapshots,
+// commit-shaped enough for every read the seam exposes. `main` stays at the
+// first commit and `branchName` advances with each commit(), which is the
+// only topology the spawning fixtures ever built.
+class DataGit {
+  private commits: TreeCommit[] = [];
+
+  readonly facts: GitFacts;
+
+  constructor(
+    private readonly dir: string,
+    private readonly branchName: string,
+    initialMessage: string,
+  ) {
+    this.commit(initialMessage);
+    this.facts = {
+      mergeBase: (baseBranch) => {
+        const base = this.indexOf(baseBranch);
+        return base === null ? null : this.commits[Math.min(base, this.commits.length - 1)].sha;
+      },
+      head: () => this.commits[this.commits.length - 1].sha,
+      branch: () => this.branchName,
+      resolveCommit: (revspec) => {
+        const index = this.indexOf(revspec);
+        return index === null ? null : this.commits[index].sha;
+      },
+      fileAt: (rev, filePath) => {
+        const index = this.indexOf(rev);
+        if (index === null) return null;
+        return this.commits[index].tree.get(this.relative(filePath))?.trim() ?? null;
+      },
+      isAncestor: (ancestor, descendant) => {
+        const from = this.indexOf(ancestor);
+        const to = this.indexOf(descendant);
+        return from !== null && to !== null && from <= to;
+      },
+      commitCount: (range) => this.inRange(range)?.length ?? null,
+      mergeInProgress: () => false,
+      dirtyPaths: (pathspec) => {
+        const head = this.commits[this.commits.length - 1].tree;
+        const spec = pathspec === undefined ? null : this.relative(pathspec);
+        return treeDiff(head, snapshotTree(this.dir)).filter((file) => spec === null || file === spec || file.startsWith(`${spec}/`));
+      },
+      changedFiles: (range) => {
+        const commits = this.inRange(range);
+        if (commits === null) return null;
+        return [...new Set(commits.flatMap((commit) => commit.files))].sort();
+      },
+      diffStat: (range) => {
+        const commits = this.inRange(range);
+        if (commits === null) return null;
+        const files = [...new Set(commits.flatMap((commit) => commit.files))].sort();
+        return files.length === 0 ? '' : [...files.map((file) => ` ${file} | 1 +`), ` ${files.length} file(s) changed`].join('\n');
+      },
+      commitLog: (range) => {
+        const commits = this.inRange(range);
+        if (commits === null) return null;
+        return commits.map((commit): Commit => ({ sha: commit.sha.slice(0, 7), subject: commit.subject, files: commit.files })).reverse();
+      },
+      commitsTouching: (filePath) => {
+        const file = this.relative(filePath);
+        return this.commits
+          .filter((commit) => commit.files.includes(file))
+          .map((commit) => commit.sha)
+          .reverse();
+      },
+    };
+  }
+
+  commit(message: string): string {
+    const tree = snapshotTree(this.dir);
+    const previous = this.commits[this.commits.length - 1]?.tree ?? new Map<string, string>();
+    const sha = createHash('sha1').update(`${this.commits.length} ${message}`).digest('hex');
+    this.commits.push({ sha, subject: message.split('\n')[0], files: treeDiff(previous, tree), tree });
+    return sha;
+  }
+
+  private relative(filePath: string): string {
+    return path.relative(this.dir, path.resolve(filePath)).split(path.sep).join('/');
+  }
+
+  private indexOf(rev: string): number | null {
+    if (rev === 'HEAD' || rev === this.branchName) return this.commits.length - 1;
+    if (rev === 'main') return 0;
+    const index = this.commits.findIndex((commit) => commit.sha === rev || commit.sha.slice(0, 7) === rev);
+    return index === -1 ? null : index;
+  }
+
+  private inRange(range: string): TreeCommit[] | null {
+    const [from, to] = range.split('..');
+    const fromIndex = this.indexOf(from);
+    const toIndex = to === undefined ? this.commits.length - 1 : this.indexOf(to);
+    if (fromIndex === null || toIndex === null) return null;
+    return this.commits.slice(fromIndex + 1, toIndex + 1);
+  }
+}
+
 export function fixture(run: (context: FixtureContext) => void | Promise<void>): void | Promise<void> {
+  return fixtureWith(noRepositoryGit, run);
+}
+
+// The declared form of `fixture` for a test that resolves SHAs against the
+// repository the suite runs inside on purpose — `done --commit HEAD` against
+// a commit that must really exist. Every other test gets `fixture`, where
+// that read answers null.
+export function enclosingGitFixture(run: (context: FixtureContext) => void | Promise<void>): void | Promise<void> {
+  return fixtureWith(null, run);
+}
+
+function fixtureWith(gitFacts: GitFacts | null, run: (context: FixtureContext) => void | Promise<void>): void | Promise<void> {
   const dir = mkdtempSync(path.join(os.tmpdir(), 'universalis-tasks-'));
   const restoreTmp = isolateTmp(dir);
+  const restoreGit = gitFacts === null ? null : installGit(gitFacts);
   const cleanup = (): void => {
+    if (restoreGit !== null) installGit(restoreGit);
     restoreTmp();
     rmSync(dir, { recursive: true, force: true });
   };
@@ -204,45 +365,38 @@ export function fixture(run: (context: FixtureContext) => void | Promise<void>):
   cleanup();
 }
 
-// A dedicated git repo per test, distinct from `fixture`'s (which runs
-// non-audit commands in-process and spawns audit
-// against this repo's own real checkout) — a real diff range and
-// commit-message trailers need commits with exact, controlled content.
+// A dedicated history per test, distinct from `fixture`'s no-repository
+// answers — a controlled diff range and derived-commit walk need commits
+// with exact, known content, which DataGit answers from snapshots without
+// ever spawning git.
 export function gitFixture(run: (context: { dir: string; commit: (message: string, files?: string[]) => string; tasks: (...args: string[]) => Run }) => void): void {
   const dir = mkdtempSync(path.join(os.tmpdir(), 'universalis-git-fixture-'));
   const restoreTmp = isolateTmp(dir);
+  const specsDir = path.join(dir, 'specs');
+  mkdirSync(specsDir);
+  writeFileSync(path.join(specsDir, 'demo-spec.md'), '# Demo spec\n\n## Deliverable\n\nSomething this branch promises.\n\nProof:\n\n- The first clause holds.\n\n## Decisions\n\n## Open questions\n\nNone.\n', 'utf8');
+  const systemsPath = path.join(dir, 'systems.json');
+  writeFileSync(systemsPath, JSON.stringify({ unowned: { note: '', paths: ['docs', '*.md'] }, systems: [] }), 'utf8');
+  const storePath = path.join(dir, 'tasks.jsonl');
+  const globals = ['--store', storePath, '--systems', systemsPath, '--specs-dir', specsDir, '--branch', 'demo-spec'];
+  const data = new DataGit(dir, 'demo-spec', 'Initial fixture\n\nA branch base exists.');
+  const restoreGit = installGit(data.facts);
+  let fileSeq = 0;
   try {
-    spawnSync('git', ['init', '-q'], { cwd: dir });
-    spawnSync('git', ['config', 'user.email', 'test@example.com'], { cwd: dir });
-    spawnSync('git', ['config', 'user.name', 'Test'], { cwd: dir });
-
-    const specsDir = path.join(dir, 'specs');
-    mkdirSync(specsDir);
-    writeFileSync(path.join(specsDir, 'demo-spec.md'), '# Demo spec\n\n## Deliverable\n\nSomething this branch promises.\n\nProof:\n\n- The first clause holds.\n\n## Decisions\n\n## Open questions\n\nNone.\n', 'utf8');
-    const systemsPath = path.join(dir, 'systems.json');
-    writeFileSync(systemsPath, JSON.stringify({ unowned: { note: '', paths: ['docs', '*.md'] }, systems: [] }), 'utf8');
-    const storePath = path.join(dir, 'tasks.jsonl');
-    const globals = ['--store', storePath, '--systems', systemsPath, '--specs-dir', specsDir, '--branch', 'demo-spec'];
-    spawnSync('git', ['add', '.'], { cwd: dir });
-    spawnSync('git', ['commit', '--no-verify', '-m', 'Initial fixture\n\nA branch base exists.'], { cwd: dir, encoding: 'utf8' });
-    spawnSync('git', ['branch', '-M', 'main'], { cwd: dir });
-    spawnSync('git', ['checkout', '-q', '-b', 'demo-spec'], { cwd: dir });
-
     run({
       dir,
-      commit: (message: string, files: string[] = [`file-${Date.now()}-${Math.random().toString(36).slice(2)}.txt`]) => {
+      commit: (message: string, files: string[] = [`file-${(fileSeq += 1)}.txt`]) => {
         for (const file of files) {
           const target = path.join(dir, file);
           mkdirSync(path.dirname(target), { recursive: true });
           writeFileSync(target, 'x', 'utf8');
         }
-        spawnSync('git', ['add', '.'], { cwd: dir });
-        spawnSync('git', ['commit', '--no-verify', '-m', message], { cwd: dir, encoding: 'utf8' });
-        return spawnSync('git', ['rev-parse', 'HEAD'], { cwd: dir, encoding: 'utf8' }).stdout.trim();
+        return data.commit(message);
       },
       tasks: (...args: string[]) => runInProcessAt(dir, [...args, ...globals]),
     });
   } finally {
+    installGit(restoreGit);
     restoreTmp();
     rmSync(dir, { recursive: true, force: true });
   }
@@ -250,24 +404,20 @@ export function gitFixture(run: (context: { dir: string; commit: (message: strin
 
 export function defaultStoreGitFixture(run: (context: { dir: string; tasks: (...args: string[]) => Run }) => void): void {
   const dir = mkdtempSync(path.join(os.tmpdir(), 'universalis-default-store-'));
+  mkdirSync(path.join(dir, 'docs', 'specs'), { recursive: true });
+  mkdirSync(path.join(dir, 'docs', 'audits'), { recursive: true });
+  writeFileSync(path.join(dir, 'docs', 'specs', 'demo-spec.md'), '# Demo spec\n\n## Deliverable\n\nSomething this branch promises.\n\nProof:\n\n- The first clause holds.\n\n## Decisions\n\n## Open questions\n\nNone.\n', 'utf8');
+  writeFileSync(path.join(dir, 'docs', 'audits', 'systems.json'), JSON.stringify({ unowned: { note: '', paths: ['docs', '*.md'] }, systems: [] }), 'utf8');
+  writeFileSync(path.join(dir, 'docs', 'tasks.jsonl'), '', 'utf8');
+  const data = new DataGit(dir, 'main', 'Initial fixture\n\nA tracked task store exists.');
+  const restoreGit = installGit(data.facts);
   try {
-    spawnSync('git', ['init', '-q'], { cwd: dir });
-    spawnSync('git', ['config', 'user.email', 'test@example.com'], { cwd: dir });
-    spawnSync('git', ['config', 'user.name', 'Test'], { cwd: dir });
-
-    mkdirSync(path.join(dir, 'docs', 'specs'), { recursive: true });
-    mkdirSync(path.join(dir, 'docs', 'audits'), { recursive: true });
-    writeFileSync(path.join(dir, 'docs', 'specs', 'demo-spec.md'), '# Demo spec\n\n## Deliverable\n\nSomething this branch promises.\n\nProof:\n\n- The first clause holds.\n\n## Decisions\n\n## Open questions\n\nNone.\n', 'utf8');
-    writeFileSync(path.join(dir, 'docs', 'audits', 'systems.json'), JSON.stringify({ unowned: { note: '', paths: ['docs', '*.md'] }, systems: [] }), 'utf8');
-    writeFileSync(path.join(dir, 'docs', 'tasks.jsonl'), '', 'utf8');
-    spawnSync('git', ['add', '.'], { cwd: dir });
-    spawnSync('git', ['commit', '--no-verify', '-m', 'Initial fixture\n\nA tracked task store exists.'], { cwd: dir, encoding: 'utf8' });
-
     run({
       dir,
       tasks: (...args: string[]) => runInProcessAt(dir, [...args, '--branch', 'demo-spec']),
     });
   } finally {
+    installGit(restoreGit);
     rmSync(dir, { recursive: true, force: true });
   }
 }
