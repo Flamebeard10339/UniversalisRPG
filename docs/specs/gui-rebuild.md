@@ -86,6 +86,8 @@ The game becomes playable by a person on a phone, as a driver of the same surfac
   `auto-save-export-and-load` and `single-dev-mode` own storage and reset between them; a GUI that
   quietly wrote to `localStorage` would be a second answer to a question they are being planned to
   settle, and CLAUDE.md already records that there is no browser storage to clear.
+  `the-browser-save-store-adapter` is where the two meet: it requires this branch and
+  `auto-save-export-and-load`, and it is the only record that may put a slot in `localStorage`.
 - **Content is bundled at build time.** The browser has no filesystem and the app must start with no
   network, so the shipped DSL is imported by the build rather than fetched. Recorded because
   `public/content/` was deleted by an audit and re-adding it is the reflex.
