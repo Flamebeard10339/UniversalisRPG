@@ -61,14 +61,18 @@ Proof:
   with the dispatch it is supposed to control. A stored blocking flag and a derived one are two
   answers to one question, which is the defect this clause exists to refuse.
   proof: vitest scripts/tasks/friction.test.ts
-- [c4] A blocking question has a route that is neither deciding it nor stalling the worker, and it
-  names **who should decide it**. An agent can file one against the record it is working, address it
-  to the role whose decision would hold, name it where the dispatch machinery already reads, and
-  have exactly what depends on it halt while the rest proceeds; answering or dismissing it releases
-  the hold. The addressee is the point rather than a label on it: a question parked with no decider
-  is a stall with extra steps, and the run failed its own c3 because escalating had no destination.
-  Recorded as the remedy for `run-an-orchestrator-over-three-parallel-tasks` c3 — which is deferred
-  out of that spec, still unmet, and is this clause's real acceptance test.
+- [c4] **A question reaches its decider.** Every mechanism below serves that one property, and a
+  reader grading this clause grades the property — the list is how it is reached today, never its
+  extent. An agent can file a question against the record it is working and address it to the role
+  whose decision would hold; exactly what depends on it halts while the rest proceeds; answering or
+  dismissing it releases the hold; and **the addressee changes what the tooling does with it**, so
+  that a question addressed away from the worker is never handed back to one as work to implement.
+  A recorded decider that routes nothing is a label, and a question parked behind a label is a stall
+  with extra steps. Amended 2026-08-06 after an audit graded the enumeration and not the property;
+  the original text mixed the two, which is the error `PLANNER_LESSONS` names first.
+  Owned by two slices, and outstanding until both land. Recorded as the remedy for
+  `run-an-orchestrator-over-three-parallel-tasks` c3 — deferred out of that spec, still unmet, and
+  this clause's real acceptance test.
   proof: vitest scripts/tasks/friction.test.ts
 - [c5] Fault `nobody` is never counted as a defect. The query reports it, because a question nobody
   could have answered is real information about where knowledge was missing, and excludes it from
