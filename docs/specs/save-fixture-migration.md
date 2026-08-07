@@ -48,10 +48,16 @@ Proof:
   fixture as an input (`load:`) or a recording (`expect:`), names every recording it rewrote as
   needing regeneration with `/create-valid-test`, and reports any fixture no test references.
   proof: vitest scripts/migrate-saves.test.ts
-- [c6] The migration surface is content only. Bumping `SAVE_VERSION` alone reddens the
-  shipped-content fixture tests and nothing else — three failures in one file, down from the eight
-  across four measured before this branch — because the `{"version":6}` literals in `save.test.ts`,
-  `session.test.ts` and `play-cli.test.ts` are built from `SAVE_VERSION` instead of hardcoded.
+- [c6] The migration surface is content only. Bumping `SAVE_VERSION` alone reddens shipped-content
+  fixture tests and nothing else, and every one of them goes green once `npm run migrate-saves`
+  restamps content, with no source change. That property is the clause; the count moves with the
+  test set, as this branch's own later commits proved by moving it. Measured on the branch's final
+  state: five failures across two files — three in `src/runtime/integration.test.ts` replaying the
+  shipped fixtures, and two in `scripts/migrate-saves.test.ts` asserting that shipped content is
+  already at `SAVE_VERSION`. The eight across four measured before this branch included the
+  `{"version":6}` literals in `save.test.ts`, `session.test.ts` and `play-cli.test.ts`, which no
+  content migration could reach; they are built from `SAVE_VERSION` now, so a bump does not reach
+  them at all.
   proof: npm test
 
 ## Decisions
