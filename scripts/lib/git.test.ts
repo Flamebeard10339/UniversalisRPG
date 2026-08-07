@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { branch, changedFiles, commitCount, commitLog, commitsTouching, diffStat, dirtyPaths, fileAt, head, install, isAncestor, mergeBase, parseCommitLog, realGit, resolveCommit, type GitFacts } from './git';
+import { branch, changedFiles, commitCount, commitLog, commitsTouching, diffStat, dirtyPaths, fileAt, head, install, isAncestor, mergeBase, mergeInProgress, parseCommitLog, resolveCommit, type GitFacts } from './git';
 
 let dir: string;
 let originalCwd: string;
@@ -222,14 +222,39 @@ describe('git seam', () => {
 
   it('install swaps the implementation every exported read answers from, and hands back the one it replaced', () => {
     const sha = commit('real');
-    const fake: GitFacts = { ...realGit, head: () => 'answered-from-data', dirtyPaths: () => ['from-data.txt'] };
-    const previous = install(fake);
+    // A sentinel per method, so an export that reaches around the install
+    // point is caught by name rather than surviving because some other test
+    // happened to read it.
+    const sentinel: GitFacts = {
+      mergeBase: () => 'sentinel-mergeBase',
+      head: () => 'sentinel-head',
+      branch: () => 'sentinel-branch',
+      resolveCommit: () => 'sentinel-resolveCommit',
+      fileAt: () => 'sentinel-fileAt',
+      isAncestor: () => true,
+      commitCount: () => 424242,
+      mergeInProgress: () => true,
+      dirtyPaths: () => ['sentinel-dirty.txt'],
+      changedFiles: () => ['sentinel-changed.txt'],
+      diffStat: () => 'sentinel-diffStat',
+      commitLog: () => [{ sha: 'sentinel', subject: 'sentinel-subject', files: [] }],
+      commitsTouching: () => ['sentinel-touching'],
+    };
+    const previous = install(sentinel);
     try {
-      expect(head()).toBe('answered-from-data');
-      expect(dirtyPaths()).toEqual(['from-data.txt']);
-      // Not overridden, so the fake's spread of realGit still answers it —
-      // the exported function read the installed object either way.
-      expect(branch()).not.toBeNull();
+      expect(mergeBase('main')).toBe('sentinel-mergeBase');
+      expect(head()).toBe('sentinel-head');
+      expect(branch()).toBe('sentinel-branch');
+      expect(resolveCommit('HEAD')).toBe('sentinel-resolveCommit');
+      expect(fileAt('HEAD', 'any.txt')).toBe('sentinel-fileAt');
+      expect(isAncestor('a', 'b')).toBe(true);
+      expect(commitCount('a..b')).toBe(424242);
+      expect(mergeInProgress()).toBe(true);
+      expect(dirtyPaths()).toEqual(['sentinel-dirty.txt']);
+      expect(changedFiles('a..b')).toEqual(['sentinel-changed.txt']);
+      expect(diffStat('a..b')).toBe('sentinel-diffStat');
+      expect(commitLog('a..b')?.[0].subject).toBe('sentinel-subject');
+      expect(commitsTouching('any.txt')).toEqual(['sentinel-touching']);
     } finally {
       install(previous);
     }
