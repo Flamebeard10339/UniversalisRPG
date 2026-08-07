@@ -168,6 +168,16 @@ describe('c3: nothing is written until everything validates', () => {
     expect(readContent(directory)).toEqual(before);
   });
 
+  it('judges the bytes it will write, not the object they came from', () => {
+    const drops: ShapeChange = { writtenFor: SAVE_VERSION, declared: 'location left every save', moved: (body) => ({ ...body, location: undefined }) };
+
+    const report = migrate(one(BEHIND), drops);
+
+    expect(report.ok).toBe(true);
+    expect(report.files[0].text).toContain(`# save arrival\n{"version":${SAVE_VERSION}}\n`);
+    expect(report.files[0].text).not.toContain('"location"');
+  });
+
   it('catches a rewrite that survives the field table but names something the registry does not hold', () => {
     const invents: ShapeChange = { writtenFor: SAVE_VERSION, declared: 'inventory keys re-pointed at an item nobody declares', moved: (body) => ({ ...body, inventory: { 'probe-island.ghost': 1 } }) };
 

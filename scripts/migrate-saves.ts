@@ -56,7 +56,6 @@ interface Rewrite {
   fixture: Fixture;
   span: Span;
   text: string;
-  body: SaveBody;
 }
 
 const CREATE_VALID_TEST = '/create-valid-test';
@@ -102,7 +101,8 @@ function validationProblems(rewrites: readonly Rewrite[], registry: Registry): s
   for (const rewrite of rewrites) {
     let warnings;
     try {
-      warnings = loadSave(createGameState(), { version: SAVE_VERSION, diff: rewrite.body }, registry);
+      const { version, ...diff } = JSON.parse(rewrite.text) as { version: number } & SaveBody;
+      warnings = loadSave(createGameState(), { version, diff }, registry);
     } catch (error) {
       problems.push(`${rewrite.fixture.id}: ${(error as Error).message}`);
       continue;
@@ -149,7 +149,7 @@ export function migrate(files: readonly ContentFile[], change: ShapeChange | nul
         continue;
       }
       const body = change.moved(saved.diff, fixture);
-      rewrites.push({ fixture, span: section.body[0].span, text: JSON.stringify({ version: SAVE_VERSION, ...body }), body });
+      rewrites.push({ fixture, span: section.body[0].span, text: JSON.stringify({ version: SAVE_VERSION, ...body }) });
     }
   }
 
