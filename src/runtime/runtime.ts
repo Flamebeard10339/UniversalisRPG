@@ -37,7 +37,7 @@ import {
 } from './encounter';
 import { Action } from '../content/entity';
 import { actionKind } from '../grammar/action';
-import { Boundary, requireBoundaryNotPast, requireForwardProgress } from './forwardProgress';
+import { Boundary, BoundarySource, requireBoundaryNotPast, requireForwardProgress } from './forwardProgress';
 import { Item } from '../content/item';
 import { Recipe } from '../content/recipe';
 import { Registry } from '../content/registry';
@@ -105,13 +105,13 @@ function fightPlan(action: Action, state: GameState, registry: Registry): Determ
 
 
 function nextBoundary(state: GameState, registry: Registry, toTime: number): Boundary {
-  let boundary: Boundary = { at: toTime, source: 'the requested time' };
+  let boundary: Boundary = { at: toTime, source: { kind: 'requested' } };
   for (const [key, buff] of Object.entries(state.activeBuffs)) {
-    if (buff.expiresAt < boundary.at) boundary = { at: buff.expiresAt, source: `buff ${key}` };
+    if (buff.expiresAt < boundary.at) boundary = { at: buff.expiresAt, source: { kind: 'buff', buffKey: key } };
   }
   if (state.activeAction) {
     const active = state.activeAction;
-    const source = `action ${active.ownerRef}.${active.actionLabel}`;
+    const source: BoundarySource = { kind: 'action', ownerRef: active.ownerRef, actionLabel: active.actionLabel };
     const action = findActiveAction(active, registry);
     if (!resolvesPerAttempt(action)) {
       const { duration, attemptsToResolve, outcome } = fightPlan(action, state, registry);
@@ -140,7 +140,7 @@ function nextBoundary(state: GameState, registry: Registry, toTime: number): Bou
     if (current <= 0) continue;
     const emptyIn = msUntilEmpty(current, toMilliUnits(ratePerMinute), state.resourceRateRemainders[resource.id] ?? 0);
     const emptyInstant = state.time + emptyIn;
-    if (emptyInstant < boundary.at) boundary = { at: emptyInstant, source: `resource ${resource.id}` };
+    if (emptyInstant < boundary.at) boundary = { at: emptyInstant, source: { kind: 'resource', resourceId: resource.id } };
   }
   return boundary;
 }

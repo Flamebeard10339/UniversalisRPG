@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ActiveAction, armAction, craft, createGameState, GameState, initResources, PLAYER, resolve, RuntimeError, statValue, useAction } from './runtime';
-import { requireBoundaryNotPast, requireForwardProgress, STALL_BOUND } from './forwardProgress';
+import { Boundary, BoundarySource, boundarySourceName, requireBoundaryNotPast, requireForwardProgress, STALL_BOUND } from './forwardProgress';
 import { IMPLICIT_TARGET_FULL, newCadence } from './encounter';
 import { point } from '../grammar/range';
 import { loadModule, Registry } from '../content/registry';
@@ -871,7 +871,14 @@ start: ${start}
 });
 
 describe('resolve: forward progress', () => {
-  const stalled = { at: secondsToMs(4), source: 'resource pool' };
+  const stalled: Boundary = { at: secondsToMs(4), source: { kind: 'resource', resourceId: 'pool' } };
+
+  it('names every source a report can carry', () => {
+    expect(boundarySourceName({ kind: 'requested' })).toBe('the requested time');
+    expect(boundarySourceName({ kind: 'buff', buffKey: 'tide:seep-rate' })).toBe('buff tide:seep-rate');
+    expect(boundarySourceName({ kind: 'action', ownerRef: 'entity.mill', actionLabel: 'press' })).toBe('action entity.mill.press');
+    expect(boundarySourceName({ kind: 'resource', resourceId: 'pool' })).toBe('resource pool');
+  });
 
   it('counts a segment that leaves time where it was, and clears the count when time moves', () => {
     expect(requireForwardProgress(stalled, secondsToMs(4), secondsToMs(4), 0)).toBe(1);
@@ -888,9 +895,10 @@ describe('resolve: forward progress', () => {
   // What 2c2ccee/f9dfd72 claimed and left unchecked: on the integer scale a
   // boundary is at the current instant or after it, never before.
   it('rejects a boundary before the current instant', () => {
-    expect(() => requireBoundaryNotPast({ at: secondsToMs(4) - 1, source: 'buff tide:seep-rate' }, secondsToMs(4))).toThrow(RuntimeError);
-    expect(() => requireBoundaryNotPast({ at: secondsToMs(4) - 1, source: 'buff tide:seep-rate' }, secondsToMs(4))).toThrow(/buff tide:seep-rate/);
-    expect(() => requireBoundaryNotPast({ at: secondsToMs(4), source: 'buff tide:seep-rate' }, secondsToMs(4))).not.toThrow();
+    const tide: BoundarySource = { kind: 'buff', buffKey: 'tide:seep-rate' };
+    expect(() => requireBoundaryNotPast({ at: secondsToMs(4) - 1, source: tide }, secondsToMs(4))).toThrow(RuntimeError);
+    expect(() => requireBoundaryNotPast({ at: secondsToMs(4) - 1, source: tide }, secondsToMs(4))).toThrow(/buff tide:seep-rate/);
+    expect(() => requireBoundaryNotPast({ at: secondsToMs(4), source: tide }, secondsToMs(4))).not.toThrow();
   });
 
   // A rate slow enough that one milli-unit takes longer than a minute sends
