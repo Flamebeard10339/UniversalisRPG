@@ -1457,7 +1457,10 @@ describe('the brief arriving with the answers rather than the instructions', () 
       expect(result.status).toBe(0);
       expect(result.stdout).toContain('Who owns each changed path:');
       expect(result.stdout).toContain('- src/runtime/save.ts — Runtime');
-      expect(result.stdout).toContain('prior art on src/runtime/save.ts');
+      // The heading names every owned path at once, and the diff this brief
+      // reads is the enclosing repository's, so the assertion is that save.ts
+      // is among them rather than alone.
+      expect(result.stdout).toMatch(/prior art on [^\n]*src\/runtime\/save\.ts/);
       expect(result.stdout).toContain('An earlier claim on the save file');
       // The two queries this section is a batched answer to, so an auditor
       // who wants one path in full knows what to run.
