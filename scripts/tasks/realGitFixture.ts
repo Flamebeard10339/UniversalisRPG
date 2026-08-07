@@ -1,8 +1,8 @@
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { isolateTmp, runInProcessAt, type Run } from './cliFixtures';
+import { isolateTmp, repoRoot, runInProcess, runInProcessAt, type Run } from './cliFixtures';
 
 // The real-repository forms of the fixtures in cliFixtures.ts, spawning
 // actual git per call. Importing from this module is how a test declares it
@@ -46,6 +46,54 @@ export function realGitFixture(run: (context: { dir: string; commit: (message: s
     });
   } finally {
     restoreTmp();
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+// A git repo whose store sits at docs/tasks.jsonl, carrying this repo's own
+// .gitattributes — so the merge tests prove the lines actually shipped
+// rather than a copy of them written for the occasion.
+export function eventLogGitFixture(
+  run: (context: { dir: string; storePath: string; tasks: (...args: string[]) => Run; commit: (message: string) => string; git: (...args: string[]) => { status: number; stdout: string } }) => void,
+): void {
+  const dir = mkdtempSync(path.join(os.tmpdir(), 'universalis-event-log-'));
+  try {
+    const git = (...args: string[]): { status: number; stdout: string } => {
+      const result = spawnSync('git', args, { cwd: dir, encoding: 'utf8' });
+      return { status: result.status ?? 1, stdout: result.stdout.trim() };
+    };
+    git('init', '-q');
+    git('config', 'user.email', 'test@example.com');
+    git('config', 'user.name', 'Test');
+
+    writeFileSync(path.join(dir, '.gitattributes'), readFileSync(path.join(repoRoot, '.gitattributes'), 'utf8'), 'utf8');
+    const specsDir = path.join(dir, 'docs', 'specs');
+    mkdirSync(specsDir, { recursive: true });
+    writeFileSync(path.join(specsDir, 'demo-spec.md'), '# Demo spec\n\n## Deliverable\n\nSomething this branch promises.\n\nProof:\n\n- The first clause holds.\n\n## Decisions\n\n## Open questions\n\nNone.\n', 'utf8');
+    const systemsPath = path.join(dir, 'systems.json');
+    writeFileSync(systemsPath, JSON.stringify({ unowned: { note: '', paths: ['docs', '*.md'] }, systems: [{ name: 'Runtime', paths: ['src/runtime'], lastAudit: null, lastAuditDoc: null, note: null }] }), 'utf8');
+    const storePath = path.join(dir, 'docs', 'tasks.jsonl');
+    writeFileSync(storePath, '', 'utf8');
+    writeFileSync(path.join(dir, 'docs', 'events.jsonl'), '', 'utf8');
+    const globals = ['--store', storePath, '--systems', systemsPath, '--specs-dir', specsDir, '--branch', 'demo-spec'];
+
+    git('add', '-A');
+    git('commit', '--no-verify', '-m', 'Initial fixture\n\nA tracked store and log exist.');
+    git('branch', '-M', 'main');
+    git('checkout', '-q', '-b', 'demo-spec');
+
+    run({
+      dir,
+      storePath,
+      tasks: (...args: string[]) => runInProcess([...args, ...globals]),
+      commit: (message: string) => {
+        git('add', '-A');
+        git('commit', '--no-verify', '-m', message);
+        return git('rev-parse', 'HEAD').stdout;
+      },
+      git,
+    });
+  } finally {
     rmSync(dir, { recursive: true, force: true });
   }
 }
