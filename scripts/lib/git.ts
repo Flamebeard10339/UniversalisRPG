@@ -30,8 +30,12 @@ export interface GitFacts {
 // (unknown ref, no repo, detached HEAD) returns null/false instead of
 // throwing or leaking git's stderr, so every caller gets the same failure
 // behaviour and decides for itself how loud to be about it.
+// maxBuffer is sized for the largest read served — a whole-history log with
+// file lists — because overflowing it nulls status and truncates stdout, so
+// the quiet-null contract would turn "too much history" into answers like
+// "no commits in this range".
 function raw(args: string[]): string | null {
-  const result = spawnSync('git', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
+  const result = spawnSync('git', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], maxBuffer: 32 * 1024 * 1024 });
   if (result.status !== 0) return null;
   return result.stdout;
 }

@@ -78,6 +78,16 @@ describe('git seam', () => {
     expect(fileAt('HEAD', path.join(dir, 'tracked.txt'))).toBe('content');
   });
 
+  // Overflowing the subprocess buffer nulls the read, and null is this
+  // seam's word for "does not exist" — so a buffer sized under the answer
+  // would lie, not fail.
+  it('reads an answer larger than a default subprocess buffer, instead of nulling it', () => {
+    writeFileSync(path.join(dir, 'large.txt'), `${'x'.repeat(2 * 1024 * 1024)}\n`, 'utf8');
+    spawnSync('git', ['add', '.'], { cwd: dir });
+    spawnSync('git', ['commit', '--no-verify', '-m', 'add large'], { cwd: dir });
+    expect(fileAt('HEAD', 'large.txt')?.length).toBe(2 * 1024 * 1024);
+  });
+
   it('resolveCommit turns a revspec into the sha it means now, and is null for anything that is not a commit', () => {
     const first = commit('first');
     expect(resolveCommit('HEAD')).toBe(first);
