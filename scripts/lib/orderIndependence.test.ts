@@ -38,6 +38,8 @@ function task(overrides: Partial<Task> & { id: string; seq: number }): Task {
     files: [],
     writes: [],
     grant: null,
+    fault: null,
+    decider: null,
     produces: [],
     deliverable: null,
     evidence: null,

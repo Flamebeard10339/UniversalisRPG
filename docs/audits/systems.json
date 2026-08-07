@@ -359,6 +359,23 @@
             "scripts/tasks/briefLessons.ts"
           ],
           "note": "produced by briefs-carry-the-lessons"
+        },
+        {
+          "name": "record fault",
+          "paths": [
+            "scripts/lib/taskStore.ts",
+            "scripts/tasks/records.ts",
+            "scripts/tasks/audit.ts"
+          ],
+          "note": "produced by a-record-carries-its-fault-and-a-question-blocks-only-what-d"
+        },
+        {
+          "name": "blocking question",
+          "paths": [
+            "scripts/lib/taskStore.ts",
+            "scripts/tasks/records.ts"
+          ],
+          "note": "produced by a-record-carries-its-fault-and-a-question-blocks-only-what-d"
         }
       ]
     },

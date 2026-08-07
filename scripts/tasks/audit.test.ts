@@ -14,7 +14,7 @@ describe('tasks CLI', () => {
       const docPath = path.join(dir, 'runtime-2026-08-01.md');
       writeFileSync(docPath, ['## H1 — a real bug', 'src/runtime/save.ts:88 is where it lives.', '', '## L1 — a minor thing', 'body.'].join('\n'), 'utf8');
 
-      const first = tasks('import', docPath);
+      const first = tasks('import', docPath, '--fault', 'contract');
       expect(first.status).toBe(0);
       expect(first.stdout).toContain('imported 2 finding(s)');
 
@@ -23,7 +23,7 @@ describe('tasks CLI', () => {
       expect(shown.stdout).toContain('system: Runtime');
       expect(shown.stdout).toContain(`files: ${docPath}#H1`);
 
-      const second = tasks('import', docPath);
+      const second = tasks('import', docPath, '--fault', 'contract');
       expect(second.stdout).toContain('imported 0 finding(s)');
       expect(second.stdout).toContain('2 already present, skipped');
     });
@@ -72,7 +72,7 @@ describe('tasks CLI', () => {
       await audit('demo-spec', '--proof', '1=met', '--evidence', '1=clause 1 checked', '--proof', '2=met', '--evidence', '2=clause 2 checked');
       const before = readFileSync(specPath, 'utf8');
 
-      const result = await audit('demo-spec', '--finding', 'a late finding', '--severity', 'low', '--system', 'Runtime', '--deliverable', 'fix it', '--evidence', 'observed live');
+      const result = await audit('demo-spec', '--finding', 'a late finding', '--severity', 'low', '--fault', 'contract', '--system', 'Runtime', '--deliverable', 'fix it', '--evidence', 'observed live');
       expect(result.status).toBe(0);
       expect(result.stdout).toContain('no pass appended, so recorded clause verdicts stand');
       expect(readFileSync(specPath, 'utf8')).toBe(before);
@@ -234,7 +234,7 @@ describe('tasks CLI', () => {
 
   it('audit carries a --finding\'s --evidence onto the finding task, where triage reads it', async () => {
     await fixture(async ({ tasks, audit }) => {
-      await audit('demo-spec', '--proof', '1=met', '--evidence', '1=clause 1 checked', '--proof', '2=met', '--evidence', '2=clause 2 checked', '--finding', 'a real bug', '--severity', 'high', '--deliverable', 'guard the null case', '--evidence', 'save.ts:88 dereferences before the null check');
+      await audit('demo-spec', '--proof', '1=met', '--evidence', '1=clause 1 checked', '--proof', '2=met', '--evidence', '2=clause 2 checked', '--finding', 'a real bug', '--severity', 'high', '--fault', 'contract', '--deliverable', 'guard the null case', '--evidence', 'save.ts:88 dereferences before the null check');
       const shown = tasks('list', '--kind', 'finding', '--state', 'unreviewed');
       const id = firstListedId(shown.stdout);
       expect(tasks('show', id).stdout).toContain('evidence: save.ts:88 dereferences before the null check');
@@ -257,6 +257,8 @@ describe('tasks CLI', () => {
         'a separate bug',
         '--severity',
         'low',
+        '--fault',
+        'contract',
         '--deliverable',
         'fix the separate bug',
         '--evidence',
@@ -270,7 +272,7 @@ describe('tasks CLI', () => {
 
   it('clause-shaped evidence after a finding still goes to the clause rather than overwriting the finding', async () => {
     await fixture(async ({ tasks, audit }) => {
-      const result = await audit('demo-spec', '--proof', '1=met', '--evidence', '1=clause 1 checked', '--proof', '2=unmet', '--finding', 'some bug', '--severity', 'low', '--deliverable', 'fix it', '--evidence', 'broken here', '--evidence', '2=the clause did not hold');
+      const result = await audit('demo-spec', '--proof', '1=met', '--evidence', '1=clause 1 checked', '--proof', '2=unmet', '--finding', 'some bug', '--severity', 'low', '--fault', 'contract', '--deliverable', 'fix it', '--evidence', 'broken here', '--evidence', '2=the clause did not hold');
       expect(result.status).toBe(0);
       expect(tasks('show', 'demo-spec-clause-2').stdout).toContain('evidence: the clause did not hold');
       const id = firstListedId(tasks('list', '--kind', 'finding', '--state', 'unreviewed').stdout);
@@ -280,7 +282,7 @@ describe('tasks CLI', () => {
 
   it('audit refuses a second bare finding evidence instead of silently replacing the first', async () => {
     await fixture(async ({ tasks, audit }) => {
-      const result = await audit('demo-spec', '--proof', '1=met', '--evidence', '1=clause 1 checked', '--proof', '2=met', '--evidence', '2=clause 2 checked', '--finding', 'some bug', '--severity', 'low', '--deliverable', 'fix it', '--evidence', 'first evidence', '--evidence', 'replacement evidence');
+      const result = await audit('demo-spec', '--proof', '1=met', '--evidence', '1=clause 1 checked', '--proof', '2=met', '--evidence', '2=clause 2 checked', '--finding', 'some bug', '--severity', 'low', '--fault', 'contract', '--deliverable', 'fix it', '--evidence', 'first evidence', '--evidence', 'replacement evidence');
       expect(result.status).toBe(1);
       expect(result.stderr).toContain('already has evidence');
       expect(tasks('list', '--kind', 'finding').stdout).toContain('0 task(s)');
@@ -307,7 +309,7 @@ describe('tasks CLI', () => {
 
   it('audit carries a --finding\'s --deliverable onto the finding task it creates', async () => {
     await fixture(async ({ tasks, audit }) => {
-      await audit('demo-spec', '--proof', '1=met', '--evidence', '1=clause 1 checked', '--proof', '2=met', '--evidence', '2=clause 2 checked', '--finding', 'a real bug', '--severity', 'high', '--deliverable', 'guard the null case', '--evidence', 'null deref on an empty save');
+      await audit('demo-spec', '--proof', '1=met', '--evidence', '1=clause 1 checked', '--proof', '2=met', '--evidence', '2=clause 2 checked', '--finding', 'a real bug', '--severity', 'high', '--fault', 'contract', '--deliverable', 'guard the null case', '--evidence', 'null deref on an empty save');
       const shown = tasks('list', '--kind', 'finding', '--state', 'unreviewed');
       const id = firstListedId(shown.stdout);
       expect(tasks('show', id).stdout).toContain('deliverable: guard the null case');
@@ -770,6 +772,8 @@ describe('tasks CLI', () => {
         'a fresh bug',
         '--severity',
         'medium',
+        '--fault',
+        'tooling',
         '--system',
         'Runtime',
         '--deliverable',
@@ -817,7 +821,7 @@ describe('tasks CLI', () => {
   // to record any unknown flag's value as a file with no error.
   it('parseAuditArgs refuses an unknown flag after a --finding by name, instead of recording its value as a file', () => {
     const parsed = parseAuditArgs(['demo-spec', '--finding', 'a finding', '--severity', 'low', '--note', 'stray']);
-    expect(parsed.errors).toEqual(['unknown flag --note after --finding "a finding" — a finding takes --severity, --system, --deliverable, --evidence and --file']);
+    expect(parsed.errors).toEqual(['unknown flag --note after --finding "a finding" — a finding takes --severity, --system, --fault, --deliverable, --evidence and --file']);
     expect(parsed.findings[0].files).toEqual([]);
   });
 
@@ -856,6 +860,8 @@ describe('tasks CLI', () => {
         'unrelated finding',
         '--severity',
         'low',
+        '--fault',
+        'contract',
         '--deliverable',
         'unrelated fix',
         '--evidence',

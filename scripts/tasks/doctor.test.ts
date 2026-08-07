@@ -143,7 +143,7 @@ describe('tasks CLI', () => {
 
   it('doctor reports a working-tree-only declined mark as a warning', () => {
     defaultStoreGitFixture(({ dir, tasks }) => {
-      tasks('add', 'stale finding', '--id', 'stale', '--kind', 'finding', '--deliverable', 'fix it');
+      tasks('add', 'stale finding', '--id', 'stale', '--kind', 'finding', '--fault', 'tooling', '--deliverable', 'fix it');
       spawnSync('git', ['add', '.'], { cwd: dir });
       spawnSync('git', ['commit', '--no-verify', '-m', 'add stale finding'], { cwd: dir, encoding: 'utf8' });
 

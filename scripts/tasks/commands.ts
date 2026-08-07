@@ -8,7 +8,7 @@ import { cmdPlan, cmdConcept, cmdProduces, cmdSystem, cmdWhere } from './archite
 import { cmdDoctor } from './doctor';
 import { cmdCheckCommitMessage, cmdLog, recordStandaloneEvent } from './handoff';
 import { cmdMergeReady } from './mergeReady';
-import { cmdAdd, cmdAsk, cmdDecline, cmdDefer, cmdDone, cmdEdit, cmdList, cmdNext, cmdPromote, cmdRedirect, cmdSearch, cmdShow, cmdStart, cmdStop } from './records';
+import { cmdAdd, cmdAsk, cmdDecline, cmdDefer, cmdDone, cmdEdit, cmdList, cmdNext, cmdPromote, cmdQuestion, cmdRedirect, cmdSearch, cmdShow, cmdStart, cmdStop } from './records';
 import { cmdOrchestratePrompt } from './orchestratePrompt';
 import { cmdRoadmap } from './roadmapCmd';
 import { cmdPlanPrompt } from './planPrompt';
@@ -16,7 +16,7 @@ import { cmdSpecAdd, cmdSpecDone, cmdSpecNew, cmdSpecRemove, cmdSpecShow } from 
 import { cmdTriage } from './triage';
 import { cmdWorkPrompt } from './workPrompt';
 
-const USAGE = 'usage: npm run tasks -- <doctor|add|edit|show|list|search|next|roadmap|plan|system|where|produces|concept|start|stop|done|decline|promote|defer|redirect|ask|import|triage|note|decision|log|spec|audit|audit-prompt|work-prompt|plan-prompt|orchestrate-prompt|merge-ready> ...';
+const USAGE = 'usage: npm run tasks -- <doctor|add|question|edit|show|list|search|next|roadmap|plan|system|where|produces|concept|start|stop|done|decline|promote|defer|redirect|ask|import|triage|note|decision|log|spec|audit|audit-prompt|work-prompt|plan-prompt|orchestrate-prompt|merge-ready> ...';
 
 interface Command {
   usage: string;
@@ -46,11 +46,15 @@ const SPEC_USAGE = `usage: tasks spec <new|add|remove|show|done> ...  (\`tasks s
 const COMMANDS: Record<string, Command> = {
   doctor: { usage: `usage: tasks doctor [--fix] ${ACTOR_USAGE}`, run: cmdDoctor },
   add: {
-    usage: `usage: tasks add "<title>" [--kind task|finding|question] [--severity high|medium|low] [--system "<name>"] [--spec <slug>] [--discharges c3,c6] [--files a.ts:12,b.ts] [--requires id1,id2] [--writes src/a.ts,src/b/] [--grant forecast|commitment] [--produces \"policy module\"] [--deliverable "..." (required for --kind finding)] [--evidence "..."] [--id <id>] ${ACTOR_USAGE}`,
+    usage: `usage: tasks add "<title>" [--kind task|finding] [--fault tooling|contract|nobody (required for --kind finding)] [--severity high|medium|low] [--system "<name>"] [--spec <slug>] [--discharges c3,c6] [--files a.ts:12,b.ts] [--requires id1,id2] [--writes src/a.ts,src/b/] [--grant forecast|commitment] [--produces \"policy module\"] [--deliverable "..." (required for --kind finding)] [--evidence "..."] [--id <id>] ${ACTOR_USAGE}`,
     run: cmdAdd,
   },
+  question: {
+    usage: `usage: tasks question "<title>" --blocks id1,id2 --decider worker|planner|author --fault tooling|contract|nobody [--severity high|medium|low] [--system "<name>"] [--evidence "..."] ${ACTOR_USAGE}  (files a decision you should not make against the records it holds up, addressed to the role whose decision would hold. Nothing is stored as blocked: the question's id lands in each named record's requires, so \`tasks done\` on it once answered — or \`tasks decline\` once dismissed — releases exactly those and nothing else)`,
+    run: cmdQuestion,
+  },
   edit: {
-    usage: `usage: tasks edit <id> ["<new title>"] [--title "..."] [--deliverable "..."] [--evidence "..."] [--severity high|medium|low] [--system "<name>"] [--discharges c3,c6] [--files a.ts:12,b.ts] [--requires id1,id2] [--writes src/a.ts,src/b/] [--grant forecast|commitment] [--produces \"policy module\"] ${ACTOR_USAGE}  (content only: state, spec, kind and reason are moved by start/stop/done/decline/spec add, never by edit)`,
+    usage: `usage: tasks edit <id> ["<new title>"] [--title "..."] [--deliverable "..."] [--evidence "..."] [--severity high|medium|low] [--system "<name>"] [--fault tooling|contract|nobody] [--decider worker|planner|author] [--discharges c3,c6] [--files a.ts:12,b.ts] [--requires id1,id2] [--writes src/a.ts,src/b/] [--grant forecast|commitment] [--produces \"policy module\"] ${ACTOR_USAGE}  (content only: state, spec, kind and reason are moved by start/stop/done/decline/spec add, never by edit)`,
     run: cmdEdit,
   },
   show: { usage: 'usage: tasks show <id>', run: cmdShow },
@@ -77,7 +81,7 @@ const COMMANDS: Record<string, Command> = {
   defer: { usage: `usage: tasks defer <id>... ${ACTOR_USAGE}  (the non-interactive form of triage's defer, the inverse of promote: opens unreviewed or already-open records outside every spec)`, run: cmdDefer },
   redirect: { usage: `usage: tasks redirect <id>... --deliverable "..." ${ACTOR_USAGE}  (the non-interactive form of triage's redirect: replaces the deliverable, filing the same triage event the walk records)`, run: cmdRedirect },
   ask: { usage: `usage: tasks ask <id>... --question "..." ${ACTOR_USAGE}  (the non-interactive form of triage's ask: appends the dated question to each record's evidence and leaves it unreviewed so the queue keeps offering it; refuses an id that is not already unreviewed rather than moving it back)`, run: cmdAsk },
-  import: { usage: `usage: tasks import <audit-doc> ${ACTOR_USAGE}`, run: cmdImport },
+  import: { usage: `usage: tasks import <audit-doc> --fault tooling|contract|nobody ${ACTOR_USAGE}  (the migration path for legacy audit documents, which carry no fault of their own — the caller classifies the document)`, run: cmdImport },
   triage: { usage: `usage: tasks triage [--spec <slug>] ${ACTOR_USAGE}`, run: cmdTriage },
   note: { usage: `usage: tasks note "<one line>" [--id <id>] [--system "<name>"] [--spec <slug>] ${ACTOR_USAGE}  (appends to the event log; the store is untouched. A message starting with -- goes after a bare \`--\`)`, run: recordStandaloneEvent('note') },
   decision: { usage: `usage: tasks decision "<one line>" [--id <id>] [--system "<name>"] [--spec <slug>] ${ACTOR_USAGE}  (a decision is its own op, so \`tasks log --op decision\` needs no text matching. A message starting with -- goes after a bare \`--\`)`, run: recordStandaloneEvent('decision') },

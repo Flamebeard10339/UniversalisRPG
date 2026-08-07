@@ -20,6 +20,8 @@ function task(id: string, produces: string[], state: Task['state'] = 'done', pat
     writes: paths.writes ?? [],
     discharges: [],
     grant: null,
+    fault: null,
+    decider: null,
     produces,
     deliverable: null,
     evidence: null,

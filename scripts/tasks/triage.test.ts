@@ -9,9 +9,9 @@ import { TRIAGE_ACTIONS } from './triage';
 describe('tasks CLI', () => {
   it('triage promotes, defers and declines findings, saving after every decision', async () => {
     await fixture(async ({ tasks, triage }) => {
-      tasks('add', 'promote me', '--id', 'promote-me', '--kind', 'finding', '--severity', 'high', '--system', 'Runtime', '--evidence', 'evidence text', '--deliverable', 'fix it');
-      tasks('add', 'defer me', '--id', 'defer-me', '--kind', 'finding', '--severity', 'medium', '--deliverable', 'fix it');
-      tasks('add', 'decline me', '--id', 'decline-me', '--kind', 'finding', '--severity', 'low', '--deliverable', 'fix it');
+      tasks('add', 'promote me', '--id', 'promote-me', '--kind', 'finding', '--fault', 'tooling', '--severity', 'high', '--system', 'Runtime', '--evidence', 'evidence text', '--deliverable', 'fix it');
+      tasks('add', 'defer me', '--id', 'defer-me', '--kind', 'finding', '--fault', 'tooling', '--severity', 'medium', '--deliverable', 'fix it');
+      tasks('add', 'decline me', '--id', 'decline-me', '--kind', 'finding', '--fault', 'tooling', '--severity', 'low', '--deliverable', 'fix it');
 
       const result = await triage('1\n2\n3\nstale, superseded by later work\n');
       expect(result.status).toBe(0);
@@ -45,7 +45,7 @@ describe('tasks CLI', () => {
 
   it('triage shows a recorded deliverable next to its evidence', async () => {
     await fixture(async ({ tasks, triage }) => {
-      tasks('add', 'has a fix', '--id', 'has-a-fix', '--kind', 'finding', '--severity', 'high', '--evidence', 'broken thing', '--deliverable', 'the proposed repair');
+      tasks('add', 'has a fix', '--id', 'has-a-fix', '--kind', 'finding', '--fault', 'tooling', '--severity', 'high', '--evidence', 'broken thing', '--deliverable', 'the proposed repair');
       const result = await triage('s\n');
       expect(result.stdout).toContain('the proposed repair');
       expect(result.stdout).not.toContain('no proposed fix recorded');
@@ -55,7 +55,7 @@ describe('tasks CLI', () => {
   it('printEvidence wraps long text onto multiple indented lines, instead of one unbroken line, for both evidence and deliverable', async () => {
     await fixture(async ({ tasks, triage }) => {
       const longText = "loadSave gives activeAction, player and activeBuffs no check past isObject, so a body whose ids are all real but whose cadences is absent crashes the validator that exists to prevent it.";
-      tasks('add', 'checkSave crashes', '--id', 'checksave-crashes', '--kind', 'finding', '--severity', 'high', '--evidence', longText, '--deliverable', longText);
+      tasks('add', 'checkSave crashes', '--id', 'checksave-crashes', '--kind', 'finding', '--fault', 'tooling', '--severity', 'high', '--evidence', longText, '--deliverable', longText);
       const result = await triage('s\n');
       expect(result.stdout).not.toContain(longText);
 
@@ -67,7 +67,7 @@ describe('tasks CLI', () => {
 
   it('triage redirect replaces the deliverable, saves it, then re-asks for a decision on the same task', async () => {
     await fixture(async ({ tasks, triage }) => {
-      tasks('add', 'wrong fix', '--id', 'wrong-fix', '--kind', 'finding', '--severity', 'high', '--deliverable', 'the wrong fix');
+      tasks('add', 'wrong fix', '--id', 'wrong-fix', '--kind', 'finding', '--fault', 'tooling', '--severity', 'high', '--deliverable', 'the wrong fix');
       const result = await triage('4\nthe right fix\n1\n');
       expect(result.status).toBe(0);
       expect(result.stdout).toContain('0 unreviewed finding(s) left');
@@ -85,7 +85,7 @@ describe('tasks CLI', () => {
   // touching the store, is what actually proves redirect persists on its own.
   it('triage redirect alone — with no later decision — persists the deliverable and files the triage event by itself', async () => {
     await fixture(async ({ tasks, triage }) => {
-      tasks('add', 'wrong fix', '--id', 'wrong-fix-alone', '--kind', 'finding', '--severity', 'high', '--deliverable', 'the wrong fix');
+      tasks('add', 'wrong fix', '--id', 'wrong-fix-alone', '--kind', 'finding', '--fault', 'tooling', '--severity', 'high', '--deliverable', 'the wrong fix');
       const result = await triage('4\nthe right fix\nq\n');
       expect(result.status).toBe(0);
       const shown = tasks('show', 'wrong-fix-alone').stdout;
@@ -97,7 +97,7 @@ describe('tasks CLI', () => {
 
   it('triage redirect is cancelled by an empty response, leaving the deliverable and the queue unchanged', async () => {
     await fixture(async ({ tasks, triage }) => {
-      tasks('add', 'wrong fix', '--id', 'wrong-fix', '--kind', 'finding', '--severity', 'high', '--deliverable', 'original fix');
+      tasks('add', 'wrong fix', '--id', 'wrong-fix', '--kind', 'finding', '--fault', 'tooling', '--severity', 'high', '--deliverable', 'original fix');
       const result = await triage('4\n\ns\n');
       expect(result.stdout).toContain('empty — redirect cancelled');
       expect(result.stdout).toContain('1 unreviewed finding(s) left');
@@ -107,8 +107,8 @@ describe('tasks CLI', () => {
 
   it('triage quits early and leaves the rest unreviewed', async () => {
     await fixture(async ({ tasks, triage }) => {
-      tasks('add', 'first', '--id', 'first', '--kind', 'finding', '--severity', 'high', '--deliverable', 'fix it');
-      tasks('add', 'second', '--id', 'second', '--kind', 'finding', '--severity', 'low', '--deliverable', 'fix it');
+      tasks('add', 'first', '--id', 'first', '--kind', 'finding', '--fault', 'tooling', '--severity', 'high', '--deliverable', 'fix it');
+      tasks('add', 'second', '--id', 'second', '--kind', 'finding', '--fault', 'tooling', '--severity', 'low', '--deliverable', 'fix it');
 
       const result = await triage('q\n');
       expect(result.stdout).toContain('2 unreviewed finding(s) left');
@@ -118,7 +118,7 @@ describe('tasks CLI', () => {
 
   it('triage [a] records a question on the finding and leaves it unreviewed', async () => {
     await fixture(async ({ tasks, triage }) => {
-      tasks('add', 'needs context', '--id', 'needs-context', '--kind', 'finding', '--severity', 'high', '--evidence', 'the original evidence', '--deliverable', 'fix it');
+      tasks('add', 'needs context', '--id', 'needs-context', '--kind', 'finding', '--fault', 'tooling', '--severity', 'high', '--evidence', 'the original evidence', '--deliverable', 'fix it');
       const result = await triage('a\nwhich universe was this measured against?\n');
       expect(result.status).toBe(0);
       expect(result.stdout).toContain('it stays unreviewed until the question is answered');
@@ -132,7 +132,7 @@ describe('tasks CLI', () => {
 
   it('triage [a] with an empty question asks nothing and re-offers the same finding', async () => {
     await fixture(async ({ tasks, triage }) => {
-      tasks('add', 'needs context', '--id', 'needs-context', '--kind', 'finding', '--severity', 'high', '--evidence', 'original', '--deliverable', 'fix it');
+      tasks('add', 'needs context', '--id', 'needs-context', '--kind', 'finding', '--fault', 'tooling', '--severity', 'high', '--evidence', 'original', '--deliverable', 'fix it');
       const result = await triage('a\n\ns\n');
       expect(result.stdout).toContain('empty — nothing asked');
       expect(tasks('show', 'needs-context').stdout).not.toContain('triage asked');
@@ -142,7 +142,7 @@ describe('tasks CLI', () => {
   it("triage promotes into the inferred spec when the branch matches no spec file", () => {
     fixture(({ tasks, dir }) => {
       tasks('add', 'fix-now anchor', '--id', 'anchor', '--spec', 'demo-spec');
-      tasks('add', 'a finding', '--id', 'a-finding', '--kind', 'finding', '--severity', 'high', '--deliverable', 'fix it');
+      tasks('add', 'a finding', '--id', 'a-finding', '--kind', 'finding', '--fault', 'tooling', '--severity', 'high', '--deliverable', 'fix it');
       const storePath = path.join(dir, 'tasks.jsonl');
       const systemsPath = path.join(dir, 'systems.json');
       const specsDir = path.join(dir, 'specs');
@@ -157,7 +157,7 @@ describe('tasks CLI', () => {
   it('triage promotes a finding sourced from an audit pass 2 or later, saying that it extends the spec', async () => {
     await fixture(async ({ tasks, audit, triage }) => {
       await audit('demo-spec', '--proof', '1=met', '--evidence', '1=clause 1 checked', '--proof', '2=met', '--evidence', '2=clause 2 checked');
-      await audit('demo-spec', '--proof', '1=met', '--evidence', '1=clause 1 checked', '--proof', '2=met', '--evidence', '2=clause 2 checked', '--finding', 'late finding', '--severity', 'low', '--deliverable', 'fix it', '--evidence', 'seen late');
+      await audit('demo-spec', '--proof', '1=met', '--evidence', '1=clause 1 checked', '--proof', '2=met', '--evidence', '2=clause 2 checked', '--finding', 'late finding', '--severity', 'low', '--fault', 'contract', '--deliverable', 'fix it', '--evidence', 'seen late');
       const result = await triage('1\n');
       expect(result.stdout).toContain('promoting a pass 2 finding, which extends what demo-spec owes');
       const shown = tasks('show', 'demo-spec-pass2-late-finding');
@@ -171,7 +171,7 @@ describe('tasks CLI', () => {
   // the table against itself) — pass 1 caught exactly that shape of gap.
   it('the menu keeps its pre-refactor key order: promote, defer, decline, redirect, ask', async () => {
     await fixture(async ({ tasks, triage }) => {
-      tasks('add', 'menu check', '--id', 'menu-check', '--kind', 'finding', '--severity', 'low', '--deliverable', 'fix it');
+      tasks('add', 'menu check', '--id', 'menu-check', '--kind', 'finding', '--fault', 'tooling', '--severity', 'low', '--deliverable', 'fix it');
       const result = await triage('s\n');
       expect(result.stdout).toContain('[1] promote   [2] defer   [3] decline   [4] redirect   [a] ask   [s] skip   [q] save and quit');
     });
@@ -189,7 +189,7 @@ describe('tasks CLI', () => {
 
   it('tasks defer opens a record outside every spec, the inverse of promote, filing the same wording the walk records', () => {
     fixture(({ tasks }) => {
-      tasks('add', 'defer me', '--id', 'defer-me', '--kind', 'finding', '--severity', 'medium', '--deliverable', 'fix it');
+      tasks('add', 'defer me', '--id', 'defer-me', '--kind', 'finding', '--fault', 'tooling', '--severity', 'medium', '--deliverable', 'fix it');
       const result = tasks('defer', 'defer-me');
       expect(result.status).toBe(0);
       expect(tasks('show', 'defer-me').stdout).toContain('spec: (deferred)');
@@ -204,7 +204,7 @@ describe('tasks CLI', () => {
 
   it('tasks ask records the question on the finding, files a triage event, and leaves it unreviewed so the queue keeps offering it', () => {
     fixture(({ tasks }) => {
-      tasks('add', 'needs context', '--id', 'needs-context', '--kind', 'finding', '--severity', 'high', '--evidence', 'the original evidence', '--deliverable', 'fix it');
+      tasks('add', 'needs context', '--id', 'needs-context', '--kind', 'finding', '--fault', 'tooling', '--severity', 'high', '--evidence', 'the original evidence', '--deliverable', 'fix it');
       const result = tasks('ask', 'needs-context', '--question', 'which universe was this measured against?');
       expect(result.status).toBe(0);
       const shown = tasks('show', 'needs-context').stdout;
@@ -218,7 +218,7 @@ describe('tasks CLI', () => {
 
   it('tasks ask refuses a closed record: a declined record is in no queue, so a question against it would land where nobody reads it', () => {
     fixture(({ tasks }) => {
-      tasks('add', 'closed already', '--id', 'closed-already', '--kind', 'finding', '--severity', 'high', '--deliverable', 'fix it');
+      tasks('add', 'closed already', '--id', 'closed-already', '--kind', 'finding', '--fault', 'tooling', '--severity', 'high', '--deliverable', 'fix it');
       tasks('decline', 'closed-already', '--reason', 'closed for the refusal check');
       const refused = tasks('ask', 'closed-already', '--question', 'still relevant?');
       expect(refused.status).toBe(1);
@@ -234,7 +234,7 @@ describe('tasks CLI', () => {
   // record is exactly as unreachable by the queue as a closed one is.
   it('tasks ask refuses an open record too, not just a closed one — an already-open record is not in the review queue either', () => {
     fixture(({ tasks }) => {
-      tasks('add', 'deferred already', '--id', 'deferred-already', '--kind', 'finding', '--severity', 'high', '--deliverable', 'fix it');
+      tasks('add', 'deferred already', '--id', 'deferred-already', '--kind', 'finding', '--fault', 'tooling', '--severity', 'high', '--deliverable', 'fix it');
       tasks('defer', 'deferred-already');
       const refused = tasks('ask', 'deferred-already', '--question', 'still relevant?');
       expect(refused.status).toBe(1);
@@ -247,7 +247,7 @@ describe('tasks CLI', () => {
 
   it("tasks redirect is the same operation as the walk's redirect: it files a triage event, not an edit one", () => {
     fixture(({ tasks }) => {
-      tasks('add', 'wrong fix', '--id', 'wrong-fix', '--kind', 'finding', '--severity', 'high', '--deliverable', 'the wrong fix');
+      tasks('add', 'wrong fix', '--id', 'wrong-fix', '--kind', 'finding', '--fault', 'tooling', '--severity', 'high', '--deliverable', 'the wrong fix');
       const result = tasks('redirect', 'wrong-fix', '--deliverable', 'the right fix');
       expect(result.status).toBe(0);
       expect(tasks('show', 'wrong-fix').stdout).toContain('deliverable: the right fix');
@@ -258,7 +258,7 @@ describe('tasks CLI', () => {
 
   it('tasks redirect refuses a closed record, matching defer and promote rather than silently reopening it', () => {
     fixture(({ tasks }) => {
-      tasks('add', 'closed fix', '--id', 'closed-fix', '--kind', 'finding', '--severity', 'high', '--deliverable', 'original fix');
+      tasks('add', 'closed fix', '--id', 'closed-fix', '--kind', 'finding', '--fault', 'tooling', '--severity', 'high', '--deliverable', 'original fix');
       tasks('decline', 'closed-fix', '--reason', 'closed for the refusal check');
       const refused = tasks('redirect', 'closed-fix', '--deliverable', 'a new fix');
       expect(refused.status).toBe(1);
@@ -269,17 +269,17 @@ describe('tasks CLI', () => {
 
   it('triage prompts read exactly as before the table refactor: "reason: ", "replacement deliverable: ", "question: "', async () => {
     await fixture(async ({ tasks, triage }) => {
-      tasks('add', 'decline prompt', '--id', 'decline-prompt', '--kind', 'finding', '--severity', 'high', '--deliverable', 'fix it');
+      tasks('add', 'decline prompt', '--id', 'decline-prompt', '--kind', 'finding', '--fault', 'tooling', '--severity', 'high', '--deliverable', 'fix it');
       const declined = await triage('3\na reason\n');
       expect(declined.stdout).toContain('reason: ');
     });
     await fixture(async ({ tasks, triage }) => {
-      tasks('add', 'redirect prompt', '--id', 'redirect-prompt', '--kind', 'finding', '--severity', 'high', '--deliverable', 'fix it');
+      tasks('add', 'redirect prompt', '--id', 'redirect-prompt', '--kind', 'finding', '--fault', 'tooling', '--severity', 'high', '--deliverable', 'fix it');
       const redirected = await triage('4\na new fix\n1\n');
       expect(redirected.stdout).toContain('replacement deliverable: ');
     });
     await fixture(async ({ tasks, triage }) => {
-      tasks('add', 'ask prompt', '--id', 'ask-prompt', '--kind', 'finding', '--severity', 'high', '--deliverable', 'fix it');
+      tasks('add', 'ask prompt', '--id', 'ask-prompt', '--kind', 'finding', '--fault', 'tooling', '--severity', 'high', '--deliverable', 'fix it');
       const asked = await triage('a\na question\n');
       expect(asked.stdout).toContain('question: ');
     });
