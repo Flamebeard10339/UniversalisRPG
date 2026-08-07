@@ -74,10 +74,16 @@ Proof:
   `run-an-orchestrator-over-three-parallel-tasks` c3 — deferred out of that spec, still unmet, and
   this clause's real acceptance test.
   proof: vitest scripts/tasks/friction.test.ts
-- [c5] Fault `nobody` is never counted as a defect. The query reports it, because a question nobody
-  could have answered is real information about where knowledge was missing, and excludes it from
-  every count and rate presented as a defect measure. Reporting and counting are different acts and
-  this clause turns on the difference.
+- [c5] Fault `nobody` is never counted as a defect, and **absence of a fault is never read as one**.
+  The query reports `nobody`, because a question nobody could have answered is real information about
+  where knowledge was missing, and excludes it from every count and rate presented as a defect
+  measure. Reporting and counting are different acts and this clause turns on the difference. A
+  record predating the field is reported in its own **unclassified** bucket and excluded from those
+  same rates — never folded into `nobody`, which would look like a small convenience and would empty
+  the value of the meaning the whole axis depends on. Unclassified is a reported category, not a
+  fourth fault: fault stays exactly tooling, contract or nobody, and absence stays absence. They are
+  not backfilled — 76 live records carry no fault, the number falls as they close, and guessing one
+  for a record whose author is gone is how `nobody` becomes the catch-all.
   proof: vitest scripts/tasks/friction.test.ts
 - [c6] A record may name the lesson it breaches, by a handle that survives editing the lesson's own
   prose. Renaming or rewording an instruction must not orphan the records that cite it, and a
