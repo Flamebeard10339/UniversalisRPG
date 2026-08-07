@@ -477,38 +477,54 @@ title: Master's Whetstone
 item-experience: 10000
 
 
-// --- cluster mods -------------------------------------------------------------
+// --- cluster effects ----------------------------------------------------------
 //
 // Four orbs, one per stat. Using one on a cluster ALREADY STANDING IN A PLANE
-// consumes it and records the mod against that cluster — never against a jewel in
-// inventory, which is what keeps jewels stackable and uninstanced. A mod scales the
-// effect of every payload naming its stat, in that cluster and nowhere else.
+// consumes it and records the effect against that cluster — never against a jewel
+// in inventory, which is what keeps jewels stackable and uninstanced. An effect
+// scales every payload naming its stat, in that cluster and nowhere else.
+//
+// The field is `cluster-effect:` and not `cluster-mod:`. "Mod" says where the thing
+// lives and nothing about what it does, and this repository already spends that
+// word on content modules (src/content/modportal.ts). "Effect" says the operation:
+// it scales what a passive is WORTH, rather than granting a stat.
+//
+// The value is spelled `+25% max-health` on purpose. In this language `+N%` already
+// means "join an additive pool and multiply once" — statRange keeps fold.increased
+// as a running sum and applies it as (base + added) x (1 + increased). A cluster
+// effect composes by exactly that rule, one level up, so TWO 25% effects are 50%
+// and not 56.25%. One rule, in two places, carried by the syntax.
+//
+// What compounds is the fold, not the effects. An effect scales BOTH channels:
+// a +10 becomes +12.5 and a +10% becomes +12.5%. Those two then multiply each other
+// inside statRange, which is where the compounding a player feels comes from. So
+// the mechanic is multiplicative in its result and additive in its composition, and
+// both are true at once because they describe different operations.
+//
+// `more` is the word held in reserve. If a genuinely multiplicative modifier is
+// ever wanted — x1.25 per copy rather than joining a pool — that is Path of Exile's
+// name for it, and nothing here has spent it.
 //
 // Selection is by stat rather than by tag because these four map exactly onto four
 // stats and `+12.5` is then arithmetic on a number the passive already declares. A
 // tag selector is what `poison` will eventually need, and passives already carry
 // tags for it; it is not built until something needs it.
-//
-// Every jewel above has the default `mod-slots: 1`, so two mods never meet on one
-// cluster today. They compose by multiplication when they do — 25% and 25% is
-// 1.5625x, not 1.5x — and pinning that now is cheaper than deciding it once
-// content exists at capacity two.
 
 # item orb-of-vitality
 examine: A dull red bead. It beats, very slowly.
-cluster-mod: 25% max-health
+cluster-effect: +25% max-health
 
 # item orb-of-the-edge
 examine: A sliver of something that was never blunt.
-cluster-mod: 25% attack
+cluster-effect: +25% attack
 
 # item orb-of-the-bulwark
 examine: Heavier than the hand expects.
-cluster-mod: 25% defense
+cluster-effect: +25% defense
 
 # item orb-of-renewal
 examine: Cool, and faintly wet, and it does not dry.
-cluster-mod: 25% regeneration
+cluster-effect: +25% regeneration
 
 # droptable rat-remains
 give: 1-3 rat-bone
@@ -583,26 +599,46 @@ passives: 1 mending, 2 tempered-frame
 // — and level 40 costs 194 whetstones, which is what makes a Master's Whetstone
 // worth ten of them.
 //
-// --- and then a mod ---
+// --- and then an effect ---
 //
-// The blade now carries Iron Bulwark in one hex with `immovable` (+25 max-health)
-// at positions 3 and 5, and Stout Heart in another with `hale` (+15) at 2 and 5 and
-// `constitution` (+20) at 3. The player has ONE Orb of Vitality.
+// The arithmetic below is statRange's, not an idealisation of it: max-health has
+// base 30, `fold.increased` is a global additive pool, and the last step is
+// scaleRange(added, 1 + increased) where `added` STARTS at the base. A `+10%`
+// passive therefore multiplies the base and every other source alongside its own
+// cluster — it is not a local multiplier on its own jewel's flat node.
 //
-//   on Iron Bulwark   two allocated max-health passives, 50 flat  ->  62.5
-//   on Stout Heart    three allocated max-health passives, 50 flat ->  62.5
+// Take one cluster holding an allocated `+10 max-health` and an allocated
+// `+10% max-health`, with nothing else in play:
 //
-// A dead heat, which is the interesting case: the orb is worth the same on both,
-// so the decision is about what each cluster will hold LATER, not what it holds
-// now. Had the player allocated only one arm of Stout Heart, the orb would be
-// worth half as much there. Spending it on Blood Frenzy — no max-health passive
-// anywhere in it — would be worth exactly nothing, and the runtime says so by
-// reporting the same numbers back.
+//   no effect          (30 + 10)   x 1.10   = 44
+//   one 25% effect     (30 + 12.5) x 1.125  = 47.8125
+//   two 25% effects    (30 + 15)   x 1.15   = 51.75
 //
-// This is why a mod stops at the cluster edge. A global +25% health would be a
-// straight power gain with no decision attached; scoped to one hexagon it makes an
-// orb a question about which hexagon, and rewards having built a dense single-stat
-// cluster rather than a scattered one. It also gives the flat/percent separation
-// teeth: an orb on a flat cluster scales real numbers, and an orb on a percent
-// cluster scales percentages that are themselves worth little until the flat ones
-// exist. The orbs want the ADDED trees, which is a preference nobody authored.
+// The second line is the whole mechanic: the effect scales BOTH payloads — +10 to
+// +12.5 and +10% to +12.5% — and the fold then multiplies the two scaled channels
+// together. That product is the compounding a player feels.
+//
+// The third line is where the composition rule shows. Two effects pool additively
+// into 50%, giving +15 and +15%. Had they multiplied into 56.25% the answer would
+// be 52.75, and the difference grows with every slot. Additive is the rule because
+// `increased` already means additive-pool everywhere else in this codebase.
+//
+// (51.75 evaluates to 51.74999999999999 in floating point, so the test that pins
+// this compares with a tolerance. It is the one number that separates the two
+// rules, and an exact comparison would fail on it.)
+//
+// Now the choice. The blade carries Iron Bulwark in one hex — `immovable` (+25) at
+// positions 3 and 5 — and Stout Heart in another, `hale` (+15) at 2 and 5 with
+// `constitution` (+20) at 3. Both hold 50 flat max-health if fully allocated, so
+// one Orb of Vitality is worth the same on either, and the decision is about what
+// each cluster will hold LATER rather than what it holds now. Spent on Blood
+// Frenzy, which has no max-health passive anywhere in it, the orb is worth exactly
+// nothing — and the runtime says so by reporting back the same numbers.
+//
+// This is why an effect stops at the cluster edge. A global +25% health would be a
+// straight power gain with no decision attached; scoped to one hexagon it makes the
+// orb a question about WHICH hexagon, and rewards a dense single-stat cluster over
+// a scattered one. It also gives the flat/percent separation teeth: an orb on a
+// flat cluster scales numbers that are already worth something, while an orb on a
+// percent cluster scales percentages that are worth little until flat ones exist.
+// The orbs want the ADDED trees, which is a preference nobody authored.

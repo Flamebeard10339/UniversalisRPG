@@ -35,7 +35,7 @@ Proof:
   roll: rolling at allocation would put a per-position number in every saved instance, which is a
   second instancing story bought for nothing. The consequence is the property the rest of the branch
   leans on: nothing is ever stored per position. An instance records which positions are allocated
-  and which mods each cluster carries, and every payload is derived from those two.
+  and which effects each cluster carries, and every payload is derived from those two.
 - [c3] **Shapes are a closed, hard-coded catalogue** in `src/content`, named from the DSL and never
   authored in it. A shape declares numbered positions, the **undirected adjacency** between them, and
   which position each of the six hex edges touches; cycles are permitted, because an edge only says
@@ -47,9 +47,9 @@ Proof:
   passives. Positions are authored as `<position> <passive>` pairs, the `# entity` `stats:` shape —
   a list hydrated into a map, so it reads inline or one pair to a line. A position outside the
   shape's range, a position filled twice, or a passive that does not resolve is refused at load time.
-  It also declares `mod-slots:`, how many mods a cluster made from it may carry, defaulting to 1.
-  One is what every jewel ships with, not what the engine permits: the field exists so that raising
-  it is authoring rather than a change to the state model.
+  It also declares `mod-slots:`, how many cluster effects a cluster made from it may carry,
+  defaulting to 2. Two rather than one because a capacity of one makes the composition rule
+  unreachable, and a rule no content can exercise is a rule no test can hold to account.
 - [c5] **An unfilled position is a node, not a gap.** It can be allocated, it costs a point, it
   conducts adjacency to whatever it touches, and it grants nothing. A jewel that fills two of twelve
   positions is a corridor the player pays ten points to cross, and that is a shape worth authoring
@@ -102,38 +102,51 @@ Proof:
 - [c14] Slotting and allocation are both permanent. A jewel is consumed when slotted, a filled slot
   refuses a second jewel, and no directive un-allocates a node or un-slots a jewel. The refusals are
   proved, not asserted: attempting each is a checked outcome, not an absence.
-- [c15] A **cluster mod** is applied to a cluster already standing in an item's plane, never to a
-  jewel in inventory. An `# item` declaring `cluster-mod:` names a percentage and a stat; using one
-  on a placed cluster consumes it and records the mod against that cluster. It is refused, with the
+- [c15] A **cluster effect** is applied to a cluster already standing in an item's plane, never to a
+  jewel in inventory. An `# item` declaring `cluster-effect:` names a percentage and a stat; using
+  one on a placed cluster consumes it and records it against that cluster. It is refused, with the
   item intact, when the cluster is already at its `mod-slots:` capacity. Jewels therefore stay
-  stackable and uninstanced — the mod lives in state that `instanced-objects` already holds, and
+  stackable and uninstanced — the record lives in state that `instanced-objects` already holds, and
   there is no second instance table.
-- [c16] A cluster mod scales the **effect** of every payload naming its stat, in that cluster only.
-  A `+10 max-health` passive under a 25% health mod contributes `+12.5`, and a `+12% max-health`
-  passive under the same mod contributes `+15%` — effect scales magnitude in whichever channel the
-  payload already lands in, and does not move it between them. Two mods on one cluster compose by
-  multiplication, not addition, so 25% and 25% is `1.5625x` and never `1.5x`. The same passive
-  allocated in two clusters is worth two different amounts, which is the point: a mod is a property
-  of the cluster and stops at its edges.
-- [c17] The scaled payload is what the runtime reports, and it is not rounded per passive. A
+- [c16] A cluster effect scales the magnitude of every payload naming its stat, in that cluster only,
+  in whichever channel the payload already lands in and without moving it between them. Under a 25%
+  health effect a `+10 max-health` passive contributes `+12.5` and a `+10% max-health` passive
+  contributes `+12.5%`. **Effects on one cluster compose additively into one pool**, exactly as
+  `increased` already composes in `statRange`: two 25% effects are `1 + 0.25 + 0.25`, so the payloads
+  become `+15` and `+15%`, and never `1.25 x 1.25`. The compounding the player feels comes from the
+  fold multiplying the two scaled channels together, not from effects multiplying each other.
+- [c17] The worked case is pinned, because it is the one a reader will check. `max-health` has base
+  30. A cluster holding an allocated `+10 max-health` and an allocated `+10% max-health`, with
+  nothing else in play, evaluates through `(base + added) x (1 + increased)`:
+  `(30 + 10) x 1.10 = 44`. One 25% health effect makes it `(30 + 12.5) x 1.125 = 47.8125`. A second
+  makes it `(30 + 15) x 1.15 = 51.75` — not the `52.75` that multiplying the effects would give.
+  A test asserts these three numbers, and asserts them with a tolerance: the additive path evaluates
+  to `51.74999999999999` in binary floating point, so an exact comparison would fail on the one
+  number that distinguishes the two rules.
+- [c18] The same passive allocated in two clusters is worth two different amounts, because an effect
+  is a property of the cluster and stops at its edges. A payload's own `+N%` is not so scoped: it
+  joins the one global `increased` pool `statRange` already keeps, so it multiplies the stat's base
+  and every other source alongside its own cluster. Cluster effects add no channel and change no
+  arithmetic in `statRange`; they decide what a payload is worth before it is handed to it.
+- [c19] The scaled payload is what the runtime reports, and it is not rounded per passive. A
   position showing `+12.5 max-health` shows the number that reaches the fold, so any surface — the
   CLI now, a tree view later — states the effective value rather than the declared one with a
   footnote. Rounding, if a consumer wants it, happens where the stat is finally assembled, so four
   scaled `+10`s are worth `50` and never `48`.
-- [c18] An item's contribution is the sum of the scaled payloads of its allocated passives, computed
+- [c20] An item's contribution is the sum of the scaled payloads of its allocated passives, computed
   by one pure function of the instance, and it reaches combat through the same stat-bonus path an
   equipped `+2 attack` already takes. A focused fixture proves that allocating one passive changes
   outgoing damage, that applying a mod to one cluster leaves an identical passive in another cluster
   untouched, and that an instance the player is not wearing is inert.
-- [c19] An instance survives a reload with identical evaluated stats, and is repaired rather than
+- [c21] An instance survives a reload with identical evaluated stats, and is repaired rather than
   broken when content moves underneath it: an instance whose template is gone is pruned, and a
   slotted jewel or allocated node whose declaration is gone is dropped with its point returned, so a
   loaded instance is never over its own budget. Permanence is a rule about what the player may do,
   not a promise that deleted content stays evaluable.
-- [c20] Growing an item is reachable through the directive surface every other play input goes
+- [c22] Growing an item is reachable through the directive surface every other play input goes
   through, so a `# test` section records feeding, slotting, allocating and applying a cluster mod —
-  and each refusal in c8, c12, c13, c14 and c15 — and replays green over the shipped content.
-- [c21] `npm run tasks -- merge-ready` passes before the spec is marked done: tsc, tests,
+  and each refusal in c8, c12, c13, c14 and c17 — and replays green over the shipped content.
+- [c23] `npm run tasks -- merge-ready` passes before the spec is marked done: tsc, tests,
   layer-check, audit-status, doctor and the byte check in one invocation.
 
 ## Decisions
@@ -177,7 +190,7 @@ Proof:
 - **An unfilled position is a node that grants nothing, not an absent node.** It costs a point and
   conducts adjacency, which is what makes a sparse jewel a corridor rather than a defective one, and
   makes "how much of this jewel is worth crossing" an authored decision. An empty position has no
-  payload, so no cluster mod touches it: a corridor cannot be made worth crossing by an orb.
+  payload, so no cluster effect touches it: a corridor cannot be made worth crossing by an orb.
 - **Non-termination is structural, not an authoring discipline.** An earlier draft of this spec noted
   that allocation degenerates to "take everything" whenever the reachable tree is smaller than the
   point budget, and could only offer judgement as the safeguard. Requiring every cluster jewel to
@@ -257,11 +270,33 @@ Proof:
   needs a tag vocabulary agreed between whoever authors passives and whoever authors orbs. A tag
   selector is the natural generalisation the moment something tag-shaped needs one (`poison` is not a
   stat), and passives already carry tags for it; it is not built until then.
-- **Mods compose by multiplication, and the composition rule is pinned before it is observable.**
-  With `mod-slots: 1` everywhere, 25% and 25% never meet, so additive and multiplicative give the
-  same answer today. Pinning it now is the cheap moment: `1.5625x` rather than `1.5x` is a decision
-  about what a second mod slot means, and deciding it after content exists at capacity two would be
-  a balance change disguised as a bug fix.
+- **"Increased" already means additive-pool in this repository, and a cluster effect is the same word
+  one level up.** `statRange` keeps `fold.increased` as a running sum and applies it once as
+  `(base + added) x (1 + increased)`. A cluster effect composes the same way — two 25% effects are
+  50%, not 56.25% — so there is one rule to learn rather than two, and it is a rule the codebase
+  already enforces somewhere a reader can go and look at. Naming it anything else would have made
+  `+N%` mean additive in one place and multiplicative in another, which is the confusion worth
+  spending a rename to avoid.
+- **What compounds is the fold, not the effects.** This is the part that reads as contradictory and
+  is not. An effect scales *both* channels of the payloads it touches: a `+10` becomes `+12.5` and a
+  `+10%` becomes `+12.5%`. Those two then multiply each other inside `statRange`, which is where the
+  player's felt compounding comes from. So the mechanic is multiplicative in its result and additive
+  in its composition, and both halves are true at once because they are statements about different
+  operations.
+- **`more` is the word held in reserve.** If a genuinely multiplicative modifier is ever wanted — one
+  that stacks as `x1.25` per copy rather than joining a pool — Path of Exile's name for it is `more`,
+  and this repository has not spent that word on anything. Keeping `increased` honest is what leaves
+  it available.
+- **The field is `cluster-effect:`, not `cluster-mod:`.** "Mod" says where the thing lives and
+  nothing about what it does, and it collides with the content-module sense of the word that
+  `src/content/modportal.ts` already owns. "Effect" says the operation: it scales what a passive is
+  worth rather than granting a stat. The value is spelled `+25% max-health`, the same `+N%` token the
+  language already uses, precisely so that the additive-pool rule is carried by the syntax instead of
+  needing to be remembered separately.
+- **`mod-slots:` defaults to 2 so the composition rule is reachable.** At a capacity of one, two
+  effects never meet, additive and multiplicative give identical answers, and c17's third number
+  cannot be asserted by any test. A rule no content can exercise is a rule nothing holds to account,
+  which is a worse position than either answer.
 - **A mod stops at the cluster's edge, which is what makes it a crafting decision.** The same passive
   allocated in two clusters is worth two different amounts, so an orb is spent on *which hexagon*,
   and a dense single-stat cluster is worth more to it than a scattered one. A global multiplier
