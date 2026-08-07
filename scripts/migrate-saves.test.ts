@@ -58,6 +58,30 @@ title: Camp
 ${stamped(version, '"location":"probe-outpost.camp"')}
 `;
 
+const both = (version: number): string => `# info probe-both
+version: 1.0.0
+
+# location start
+title: Start
+starting
+
+# save recorded-then-replayed
+${stamped(version, '"location":"probe-both.start"')}
+
+# save replayed-then-recorded
+${stamped(version, '"location":"probe-both.start"')}
+
+# test records
+expect: recorded-then-replayed
+
+# test replays
+load: recorded-then-replayed
+load: replayed-then-recorded
+
+# test records-again
+expect: replayed-then-recorded
+`;
+
 const files = (...pairs: [string, string][]): ContentFile[] => pairs.map(([file, text]) => ({ path: file, text }));
 
 const one = (version: number): ContentFile[] => files(['island.dsl', at(version)]);
@@ -247,6 +271,18 @@ describe('c5: inputs and recordings are not confused', () => {
     const inputsOnly = at(BEHIND).replace('expect: carried', 'load: carried');
 
     expect(migrate(files(['island.dsl', inputsOnly]), nothingMoved).lines.join('\n')).not.toContain('/create-valid-test');
+  });
+
+  it('stays a recording when a # test loads what another one expects, whichever directive is read first', () => {
+    const report = migrate(files(['both.dsl', both(BEHIND)]), nothingMoved);
+
+    expect(report.lines).toContain(`both.dsl: probe-both.recorded-then-replayed — version ${BEHIND} rewritten to ${SAVE_VERSION} as recording`);
+    expect(report.lines).toContain(`both.dsl: probe-both.replayed-then-recorded — version ${BEHIND} rewritten to ${SAVE_VERSION} as recording`);
+
+    const regenerate = report.lines.find((line) => line.includes('/create-valid-test'));
+
+    expect(regenerate).toContain('probe-both.recorded-then-replayed');
+    expect(regenerate).toContain('probe-both.replayed-then-recorded');
   });
 
   it('reports a fixture no # test references', () => {
