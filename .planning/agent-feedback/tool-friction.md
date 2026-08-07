@@ -864,3 +864,55 @@ mutable copy across concurrent agents — the risk this pass hit is exactly the 
 class the run's own worktree isolation was designed to avoid for the *task store*, just one layer
 down in the toolchain.
 
+
+## 2026-08-06, auditing `the-workflow-records-what-cost-it-in-one-place` (pass 1)
+
+### The pass file is keyed on the spec slug alone, in the shared OS temp directory, so two auditors
+### of one spec on two branches write to the same path
+
+`audit-prompt` writes
+`%TEMP%/audit-<slug>-pass<n>.txt` and, when it already exists, prints "This file already exists and
+was left alone — it is the pass file from an earlier run of this brief, and yours if you have aimed
+it. Delete it to regenerate against the current diff." That sentence is true for a re-run of the same
+audit and wrong for the case that actually happened: a sibling audit of this same spec, on another
+branch, had already created it. The tool cannot tell the two apart, and the failure mode is silent —
+the second auditor either files the first one's half-written pass or deletes the first one's work.
+Neither is reported. Cost here was zero only because the orchestrator warned me by hand and I copied
+to an `fr-` prefixed name before filling anything in. Cheapest fix is to key the path on the branch as
+well as the slug, since `audit-prompt` already resolves the branch for its own first line.
+
+### `audit-prompt` still generates no mutation manifest, which is the branch's own headline
+### measurement, and it cost this pass about fifteen minutes
+
+Step 4 said "no manifest was written; see `Mutation manifest:` below for why", and the reason given
+was "no proof target on this spec resolved to a test this brief could name" — the `proof: vitest
+<file>` shape, which is every clause on this spec and, per the spec's own Deliverable, eight separate
+pass entries at roughly ten minutes each across the 2026-08-06 run. It is filed
+(`audit-prompt-generates-no-mutation-manifest-for-any-spec-who`, open). This pass paid it again:
+seventeen entries written by hand, aimed by reading the diff. That is not wasted work — aiming the
+manifest is the exercise — but writing the JSON scaffold around it is not, and the tool already knows
+the clause, the file and the test name.
+
+### `mutate` called a flake KILLED at the whole-suite rung, and named no test, so the false verdict
+### was only visible because I re-ran it
+
+Breaking `!DECIDERS.includes(decider as Decider)` reported `KILLED  2 failed of 1786` on the first
+run and `SURVIVED  0 failed of 1786` on an identical re-run; a third whole-suite run in the same
+session reported "1 test(s) were already failing before this mutation". `verdictOf` does subtract the
+baseline's failures, which handles a tree that is red every time and cannot handle a test that is red
+on one roll and green on the next. Two extra whole-suite runs, about six minutes, and it would have
+been zero if the KILLED line had named the two tests — neither of which is anywhere near the mutated
+line. Filed as a finding this pass, fault tooling, with naming the tests as the deliverable.
+
+### Small ones, one retry each
+
+`tasks roadmap` and the other read verbs refuse `--actor`, so a shell variable holding the common
+flags for a probe session has to be split into read and write halves. The refusal is clear and even
+lists which verbs take it. Separately, `--store` has to follow the subcommand, not precede it;
+`tasks --store X list` reports `unknown command: --store`, which is accurate and took one retry.
+
+### The node_modules hazard the previous pass recorded did not recur
+
+No install ran from this session, and `node_modules` was intact throughout. Recording the
+non-recurrence because the previous entry's cost was 40 minutes and a single observation is not a
+rate.
