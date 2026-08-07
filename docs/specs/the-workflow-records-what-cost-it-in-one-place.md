@@ -216,3 +216,58 @@ re-deriving it.
 - Whether the checked-and-clean marker of c7 is an event op or a record field. Adding to `EVENT_OPS`
   has precedent (`spec-defer`), and this is the one place the event log is a plausible home, since
   "who looked, when" is exactly what it answers well.
+
+## Audit passes
+
+### Pass 1 — 2026-08-07
+
+- base: `ea6262fada438d58a821ed0d43786fba52deac4f`
+- head: `2505bacf323ca85fb9e3756e90af3de42685a6b2`
+- proof 1: unknown — Not looked at, because there is nothing yet to look at. The member task that
+owns this clause, one-query-over-the-channel-and-the-second-place-retired, is open and BLOCKED.
+There is no `friction` verb (no scripts/tasks/friction.ts, no scripts/lib/friction*), and
+.planning/agent-feedback/tool-friction.md is still present at 65241 bytes. Recording unmet here
+would claim a verification nobody performed.
+- proof 2: unknown — Not looked at. No fault field exists on any record; scripts/lib carries no
+`fault` and no `breach`. Owned by a-record-carries-its-fault-and-a-question-blocks-only-what-d,
+which is open.
+- proof 3: unknown — Not looked at. The named proof, scripts/tasks/friction.test.ts, does not exist.
+Owned by a-record-carries-its-fault-and-a-question-blocks-only-what-d, which is open.
+- proof 4: unknown — Not looked at. No blocking-question route exists yet; the `question` kind the
+spec's Decisions section takes over still has zero records. Owned by
+a-record-carries-its-fault-and-a-question-blocks-only-what-d, which is open.
+- proof 5: unknown — Not looked at. There is no query to report or count anything, so there is nothing
+that could include or exclude fault `nobody`.
+- proof 6: met — Delivered by a-lesson-has-a-handle-that-survives-rewording-it, as an explicit `id`
+field on `Lesson` — the choice recorded as a decision against the record, with the reasoning that
+array-name-plus-index makes this clause's second half unimplementable rather than awkward, since
+after a reorder a stale citation still resolves to a different lesson. Re-derived rather than
+confirmed: I built my own fifteen-entry manifest aimed at every line the clause is about, not at
+the two survivors the worker reports fixing. Re-run it with
+`npm run mutate -- <manifest>` over scripts/tasks/briefLessons.ts. 13 killed, 2 survived, 0 errored.
+Both halves of the clause are pinned by mutations that die:
+lh-index-keys-on-prose (index.set keyed on lesson.title instead of lesson.id) KILLED 6;
+lh-an-id-silently-reworded ('auditor/next-neighbour' to 'auditor/next-neighbor', which is the
+orphaning event itself) KILLED 4 — nothing but the literal id lists held outside the arrays at
+briefLessons.test.ts:11-14 can catch that, and they do;
+lh-find-falls-back-to-a-suffix KILLED 3 and lh-find-normalises-case KILLED 2, so a dead citation
+cannot resolve to whatever is nearest;
+lh-unknown-reports-nothing KILLED 3, lh-unknown-decides-liveness-by-prefix KILLED 1 and
+lh-unknown-loses-dedupe KILLED 1, so the reporting half is real;
+lh-index-snapshot-narrowed KILLED 3, lh-all-lessons-drops-a-brief KILLED 4,
+lh-duplicate-refusal-removed KILLED 1;
+lh-printed-handle-derived-from-prose KILLED 4 and lh-brief-stops-printing-the-handle KILLED 4,
+which covers the third place the handle is computed — the bracket an agent actually reads and would
+cite. The two survivors are one boundary the clause does not turn on, filed as a finding below
+rather than graded against this clause: citation matching is pinned exact against case,
+truncation, suffix and prefix, and unpinned against whitespace and the empty string.
+- proof 7: unknown — Not looked at. No checked-and-clean marker exists in either candidate home — no new
+EVENT_OPS entry and no record field — and there is no query whose output the distinction could be
+readable in.
+- proof 8: unknown — Not looked at. No count is presented anywhere yet, so no denominator can accompany one.
+- proof 9: unknown — Not looked at as the clause is written. Nothing in this branch reads a fault, a
+breach or a count, but that is vacuous rather than verified: none of the three exists. Grading it
+met on an absent subject would be an assertion that cannot be false while the feature is missing,
+which is the shape this repository's own auditor lesson refuses. Noted for the pass that grades it
+for real: `merge-ready` gained no leg here, and the module-load refusal filed below is not a
+threshold over a fault, a breach or a count — the worker's recorded argument on that point is right.

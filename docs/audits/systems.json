@@ -366,6 +366,13 @@
             "scripts/tasks/briefLessons.ts"
           ],
           "note": "produced by briefs-carry-the-lessons"
+        },
+        {
+          "name": "lesson handle",
+          "paths": [
+            "scripts/tasks/briefLessons.ts"
+          ],
+          "note": "produced by a-lesson-has-a-handle-that-survives-rewording-it"
         }
       ]
     },
