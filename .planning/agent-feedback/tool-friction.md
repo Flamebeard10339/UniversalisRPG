@@ -1042,3 +1042,139 @@ in ~50s; full suite 1815 tests, one red, ~90s. `npm run probe -` with a heredoc 
 `max === undefined` arm being a silent hole — it is not, the schema refuses a resource without a
 max, so that arm only fires for a target naming no resource, which the reference check then
 reports properly. Cheapest measurement of the pass.
+
+### non-entity-action-owner-inherits-player-stats (pass 2, run concurrently in its own worktree)
+
+## 2026-08-07 — non-entity-action-owner-inherits-player-stats audit pass 2 (concurrent, worktree audit2)
+
+Cheap pass. Roughly 25 tool calls end to end, ~12 minutes of wall clock, and the only real cost
+was the two full test suites (43s each) and the mutation run (~2 min for 8 mutations across 7
+baseline scopes).
+
+**Audit tool.**
+- `audit-prompt` resolved the branch by the strict route and wrote the pass file without a
+  `--branch` flag, exactly as promised. The "Who owns each changed path" and prior-art sections
+  were the single most useful thing in the brief: `[unreviewed] ...-pass1-an-entit` showing up
+  under prior art on registry.ts is what let me recognise the pool-only residual on sight and
+  step around it instead of re-deriving and re-filing it. That section paid for itself.
+- `Mutation manifest: - none` cost me nothing this time only because the dispatch told me in
+  advance why. Standing cost is real: `resolveTarget` wires a target only for
+  `vitest <file> "<exact test name>"`, and all five clauses here write `proof: vitest <file>`.
+  Every clause on this spec is mutation-testable and none of them is wired. Hand-writing the
+  manifest took ~5 minutes; the harder part is that nothing in the brief tells an auditor which
+  line a clause is *about*, which is correct (that judgement is the exercise) but means the
+  "wired to the tests above" framing promises something the tool cannot deliver on this spec
+  shape. Either specs should be pushed toward quoted proof targets, or the brief should stop
+  describing a manifest it will not write.
+- The pass file's `#`-at-column-zero comment rule collided with DSL evidence: every error message
+  this spec produces starts `# item …` / `# location …`, which would be silently eaten as a
+  comment. I rewrote them as `... item …`. Small, but it makes the one system whose error
+  messages all begin with `#` awkward to quote in its own audit record. A `\#` escape, or
+  requiring the comment marker at column zero followed by a space, would fix it.
+- Goal line: the spec records none, so the brief printed the deferral warning and `deferred` was
+  unavailable as a weighed option. Did not bite (all clauses met) but it is a live gap.
+
+**Mutation tool.** Excellent this pass — 8/8 killed, every verdict attributed to a named test and
+re-confirmed at that test's own file. The named-test attribution is what let me trust the two new
+neighbour mutations (unwiring the call site; emptying entityTypeBase's inherited actions) rather
+than just re-running pass 1's four. Baseline pre-measurement of seven scopes cost ~40s before
+anything was written; worth it. No unrestored files, journal clean, `git status` empty after.
+
+**Probe and inspect.** `npm run probe -- - --each` over a 9-variant heredoc answered the whole
+over-strictness question in one call and was the highest-value tool of the pass. `inspect` cost
+me four round-trips to discover the fixture shape: `ModuleSource` is `{name, text}` not `{id,...}`,
+the namespace separator is `.` not `:`, the info id is on the header line (`# info base`) not an
+`id:` field, and the dependency field is `dependencies:` not `needs:`. Each was a one-line error
+and a re-run. A `--help` example showing one two-module `loadUniverse` call would have saved all
+four; this is the single cheapest fix available in this list.
+
+**Harness.** Bash tool resets cwd between calls — every command needed the absolute worktree path
+prefixed, and a compound `cd &&` silently produced NO OUTPUT AT ALL on one call (the
+`git diff --stat -- content/` + `--name-only` chain), which I initially misread as "content is
+untouched" rather than "the command did not run". That is a dangerous failure mode for an auditor:
+an empty diff and an unexecuted command look identical. Using `;` instead of `&&` after the `cd`
+fixed it. Worth a line in the auditor brief.
+
+**merge-ready.** One invocation, ~2 min, and its `npm test ok pass` doubled as my second
+independent full-suite run — which is what made the flake protocol a no-op (nothing failed, so
+nothing needed isolating). Its final two FAIL lines (`spec`: the held unreviewed finding;
+`clauses`: the c4 this pass clears) are both correct and both self-explanatory. No friction.
+
+### save-fixture-migration (pass 2, run concurrently in its own worktree)
+
+## 2026-08-07 — save-fixture-migration audit pass 2 (concurrent, worktree audit2-save-fixture-migration)
+
+**No mutation manifest was generated, and the brief said so honestly.** `resolveTarget` only wires a target written as `vitest <file> "<exact test name>"`; this spec writes `proof: vitest scripts/migrate-saves.test.ts` with no quoted name, so the brief printed "- none". Cost: I hand-wrote a 15-entry manifest and a 1-entry manifest in scratch. That is the right division of labour (aiming the mutation IS the exercise), but the brief could pay for itself by emitting a manifest *skeleton* with `file`/`find` blank and `tests` pre-filled from the proof target's file — the file half is mechanical, only `find` is judgement. Measured: roughly 12 minutes of this pass went into transcribing test names out of the source into the manifest, which the tool already knows.
+
+**mutate is excellent and the verdict format did its job.** 15 mutations, 15 KILLED, every one attributed to a named test and re-run at that test's own file. Two of them (`c3c`, `c5c`) were aimed specifically at fix-pass commits and killed, which is what let me certify the fixes rather than the clause text. Wall clock for the 15-entry run over one test file: ~3 min including 12 baseline measurements. The `all: true` c6 run: ~6 min for baseline + mutant + re-run scope.
+
+**The `all: true` baseline is where the flake costs money.** mutate's own whole-suite baseline reported "1 test(s) were already failing before this mutation" and its escalation walked into scripts/modportal.test.ts and scripts/tasks/handoff.test.ts — both flake-set files — so its kill line named a mixture of real and flaky failures with no way to tell them apart from the report. I could not use mutate's output for c6 at all; I re-did the measurement by hand (sed the constant, `npm test` to a log, `git checkout --`, grep the FAIL lines) to get the failure *names*, then ran the three suspects in isolation under the same mutation. Cost: ~15 extra minutes and three extra full-suite runs. The cheap fix is on mutate, not on the flake: when a whole-suite run is the scope, print the failing test names of the baseline and of the mutant side by side, so "1 already failing" is a name rather than a count. Today the number moves and the reader cannot see which name moved.
+
+**The isolation check paid for itself immediately.** 9 failed of 1822 under the bump looked like c6 was worse than the clause claims (it claims 5). Re-running scripts/modportal.test.ts + scripts/tasks/doctor.test.ts + scripts/tasks/handoff.test.ts alone under the *same* mutation gave 57/57, which is what made the 5 exact. Note for the flake finding: this run adds `scripts/tasks/doctor.test.ts` to the sighting list, and the set that tripped (modportal x2, doctor, handoff) was again not the set the previous sightings recorded.
+
+**Verifying c6's second half required editing two source files and could not be done with mutate.** "goes green once `npm run migrate-saves` restamps content" needs SAVE_VERSION bumped *and* SHAPE_CHANGE declared *and* the command actually run, before the suite means anything. mutate does one find/replace and restores; it cannot express "mutate, run a command, then measure". I did it by hand with an explicit `git checkout -- <three paths>` and a `git status --porcelain` after every step. That is a legitimate gap rather than a tool defect, but it is worth naming: a clause whose proof is "do X, then run a command, then the suite is green" has no tool, and this spec had one.
+
+**inspect's import base is relative to scripts/, not to the repo root.** `await import('./scripts/migrate-saves.ts')` resolved to `scripts/scripts/migrate-saves.ts`. The error message did say "Did you mean to import './migrate-saves.ts'?", which recovered it in one round trip — good failure message, but the base is surprising and is not in the brief's tool list.
+
+**Harness.** The Bash tool resets cwd between calls, so every command carried its own absolute `cd`; combined with heredocs into a Windows scratch path this cost two malformed-command retries. `npm run probe`/`inspect` also echo the full scratch path with a `***` redaction in the middle, so a reported path cannot be copy-pasted back into a command.
+
+**Total: ~70 minutes wall clock, of which ~35 was test execution (two full suites, the two mutate runs, the migrated-tree suite) and ~15 was recovering the c6 measurement from the flake.**
+
+### resolve-forward-progress-guard (pass 2, run concurrently in its own worktree)
+
+## 2026-08-07 — resolve-forward-progress-guard, audit pass 2
+
+Fourth audit in a row where `resolveTarget` wrote no manifest, for the same one-line reason: all
+three specs on this branch write `proof: vitest <file>` with no quoted test name, so the brief
+prints "- none" and step 4 — the step the brief itself calls "the whole exercise" — starts from
+zero. I hand-wrote three manifests (15 entries total). The gap is still one line wide: a
+`proof: vitest <file>` with no test name could resolve to the file and run the file as the scope,
+which is strictly better than refusing to write anything. As it stands the tool's one automated
+step is off for 100% of the specs an auditor actually meets.
+
+**What the manifest bought that reading could not, and what it cost.** Group A: 10 mutations of
+`src/runtime/forwardProgress.ts` and `runtime.ts`, all file-scoped, 8 baselines — about 2 minutes,
+10 killed by 5 distinct named tests. That is the cheap, high-yield shape. Group C: 4 mutations
+aimed at the source-wiring residual, 3 of which escalated to whole-suite — about 6 minutes, and it
+returned the pass's only real finding: two of the four boundary sources can be rewired to the wrong
+candidate with the whole suite green.
+
+**The flake cost me a verdict, not just a re-run.** This is the number worth carrying forward.
+mutate's own whole-suite baseline came back with **8 already-failing tests**, and the third wiring
+mutation returned UNSTABLE rather than SURVIVED purely because of that noise — a failure that did
+not reproduce on re-measurement. So under contention, whole-suite escalation does not merely cost
+four minutes, it can cost the answer. `npm test` itself: 3 full runs at one tree — 1 green
+1822/1822 (merge-ready's leg), 2 red on exactly `scripts/tasks.test.ts > "refuses five junk
+arguments on every bounded command surface"` with `Test timed out in 5000ms`. In isolation that
+file is 18/18 in **3.25s** and the single test passes twice at **3.69s / 3.71s**. The filed finding
+describes "fails once and passes twice"; with three auditors sharing the machine it is two-in-three,
+against a 5s timeout on work that takes 2.2s alone. The isolation check is what makes the
+distinction, and it took 40 seconds — cheap, and I would not have trusted the verdict without it.
+
+**Step 4's artifact is not cumulative.** The `--args-from` pass file has nowhere to put the
+manifest, so the manifest — the one durable product of the most expensive step — survives only as
+prose inside `--evidence N=`. Pass 3 will hand-write it again. A `--manifest <path>` flag that
+parked the JSON beside the spec would make each pass start from the last one's aim instead of from
+the source. Related and concrete: my first c3 mutation (`return 0` -> `return consecutiveStalls`)
+was the WRONG aim and the tool told me so correctly — it escalated and named a different test — but
+I only knew to re-aim because the brief explains that `"<a test>" -> <a file>` is not the clause
+proving itself. That paragraph earned its place; keep it.
+
+**Cheapest measurement of the pass, again `inspect`.** One call —
+`npm run inspect -- "[Object.is(Math.round(-0.0004*1000), -0), Math.ceil((60000*(1-1)-1-0)/Math.round(-0.0004*1000))]"`
+-> `[true, Infinity]` — killed a would-be finding about `msUntilEmpty` dividing by zero for a rate
+that rounds to zero milli-units. JS `Math.round` returns `-0` there, so the result is `+Infinity`
+and the candidate is never selected. Thirty seconds against what would otherwise have been a
+paragraph of reasoning I could not have trusted.
+
+**Noise in the brief.** `Goal: (none recorded — add a `## Goal` line …)` is printed as though it
+were this spec's omission. 7 of 50 specs have a `## Goal`. Either the field is a convention nobody
+adopted, in which case the nag should go, or it is required, in which case 43 specs need it — but
+telling one auditor about it mid-brief converts a repo-wide gap into per-pass noise, and the
+deferral route it gates is effectively unavailable for almost every spec.
+
+Wall clock for the pass: roughly 35 minutes, of which ~8 was mutation runs, ~6 was three full-suite
+runs plus the isolation check, and the rest reading `runtime.ts`/`effects.ts`/`units.ts` closely
+enough to prove which mutations could not hang. That last part is unavoidable and correct — the
+spec's own Decisions section warns about it — but it is the reason a manifest is expensive to aim
+for this particular subject.

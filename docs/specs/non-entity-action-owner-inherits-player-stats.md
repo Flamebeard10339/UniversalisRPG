@@ -191,3 +191,118 @@ exactly two things — `action.retaliates` and `action.target`, both grammar-par
 (src/runtime/encounter.ts participants/retaliationOf) is not restated in the load path: the check asks only whether
 a stat name appears on the owner's sheet, never who swings at whom.
 Re-run: `npm run layer-check`.
+
+### Pass 2 — 2026-08-07
+
+- base: `b56ba3ee30365f83e10738189ac42d94bcad295c`
+- head: `a8fdd0ee4ddf126f225b9404b98ec1c9a3c50b27`
+- proof 1: met — Mutation, hand-written manifest (no proof target resolved on this spec, so none was generated).
+  Two mutations of src/content/registry.ts, both KILLED and both re-confirmed at
+  src/content/references.test.ts with the mutant still on disk:
+  (1) `if (kind !== 'entity') return <the fight message>` -> `return undefined`, killed by
+  src/content/references.test.ts > "refuses a target: on an item or a location, which have nowhere to put a sheet";
+  (2) new this pass, aimed at the wiring rather than the rule body: at validateActionTable's only call,
+  `actionTableProblem(action) ?? fightingOwnerProblem(action, kind, owner, registry)` -> `actionTableProblem(action)`,
+  killed by that same named test. So deleting the whole check, not only breaking its body, is watched.
+  Reach re-derived from the runtime rather than carried from pass 1: findActionOwner (src/runtime/actions.ts:10) is
+  the only route by which anything becomes an encounter actor, and its five cases are entity, item, location,
+  recipe, travel; runtime.ts:436 calls `enterEncounter(active, objId, ...)` with objId parsed from that same
+  ownerRef, so an actor id is always the action owner's id. item and location reach the ban through
+  CONTENT_SECTION_MAPS, recipe through validateBuiltRegistry's recipeActions loop, and travel carries no target at
+  all (travelAction builds its Action from a label, a relocate result and a distance). The save route is closed too:
+  src/runtime/save.ts:127 rejects any `actors` key that is not in registry.entities as "unknown encounter actor", so
+  a save written before the ban cannot smuggle an item-id actor back in.
+  Both halves of "names the owner and the action" are present; probed, a location owner reports
+  `... location hall action "collapse": target: health makes this a fight, and only a ... entity can carry the
+  stats: a fighter is measured by`.
+  Silent-guess question asked rather than assumed: the ban does NOT mask a dangling target on a non-entity. Probed
+  an item whose action reads `target: helth` and the loader still reports
+  `... item lockpick action "pick" target: names an unknown resource: helth`, because reference pruning runs before
+  validateBuiltRegistry. Also checked that the refactor of validateActionTable's signature did not move any
+  pre-existing message: `# ${kind} ${id}` is byte-identical to the `where` string both call sites used to pass.
+  Re-run: `npx vitest run src/content/references.test.ts`, or `npm run mutate` on the two edits above.
+- proof 2: met — Five mutations, each KILLED by a different named test in src/content/references.test.ts and each
+  re-confirmed at that file with the mutant still applied:
+  (1) `if (max === undefined || owner.stats?.[max] !== undefined) return undefined` -> `if (true) return undefined`,
+  killed by "refuses an entity fought over a pool its own stats: does not measure";
+  (2) `const max = registry.resources.get(action.target)?.max` -> `const max = action.target`, killed by
+  "names the pool the resource is measured by, not the pool the action targets" — the resource-to-stat indirection
+  is watched, not merely the presence of a check;
+  (3) dropping `|| kind === 'entitytype'` from the early return, killed by
+  "exempts an entitytype and asks the entity that merges it instead";
+  (4) new this pass, aimed at the merged-not-authored reading from the other side: in entityTypeBase,
+  `const inherited = { id: entity.id, actions: structuredClone(template.actions ?? []) }` ->
+  `{ id: entity.id, actions: [] as Action[] }`, so the template's actions never reach the entity that merges it.
+  KILLED by that same entitytype test, which is what makes "the check runs on the merged entity" a measured fact
+  rather than a claim about where the code sits;
+  (5) dropping `if (action.retaliates) return undefined`, killed by
+  "exempts a retaliating action, whose target is not the owner pool".
+  Over-strictness guarded as hard as bypass, by probe (`npm run probe -- - --each` over a table of variants): an
+  entity declaring the pool as a range (`stats: max-health 6-10`) loads; declaring it as zero (`stats: max-health
+  0`) loads; a retaliating owner with no stats at all loads; an entitytype carrying the target loads alone and only
+  the entity merging it is refused. Cross-module patching checked separately with `npm run inspect` over
+  loadUniverse: a base module owning the target: action plus a dependent module supplying `stats: max-health 9`
+  loads in either source order, because the rule reads the built entity rather than a section as authored. And
+  entitytype has no `stats` field at all (src/content/entityType.ts: "Actions and nothing else. Stats stay on the
+  entity"), so there is no authoring shape in which a sheet is written where this rule refuses to look.
+  Ruling asked for by the fix pass, recorded here because the exemption is c2's: the comment deleted in 0578872 does
+  not earn a replacement. CLAUDE.md keeps a comment only when the fact is owned by this file, not derivable from
+  reading it, and expressible as neither a name, a type nor a test. "Stats stay on the entity" is owned by
+  src/content/entityType.ts and stated there; "the entity that merges it is checked instead" is derivable from
+  entityTypeBase in this same file and is stated by name in the test above; and mutation (4) makes breaking that
+  merge a failing test rather than a stale sentence. A comment naming entityTypeBase would restate both. Deleting
+  was the correct half of the two answers on offer.
+  Re-run: `npx vitest run src/content/references.test.ts`, or the five mutations above.
+- proof 3: met — Structural, and over the full range this time — pass 1 measured to 0aeaaf9c, head is now a8fdd0ee:
+  `git diff b56ba3ee..a8fdd0ee -- src/runtime/stats.ts src/runtime/encounter.ts` is empty, so statRange,
+  enterEncounter, participants and retaliationOf are byte-identical over the whole branch. The only src/runtime
+  production edit in the range is runtime.ts, and its entire diff is nextBoundary's Boundary/BoundarySource wiring
+  plus resolve()'s stall counter, from resolve-forward-progress-guard; it touches no stat lookup.
+  That the fallthrough is still live and still watched: mutating `?? registry.stats.get(statId)?.base` out of
+  statRange is KILLED, 7 failed of 18, named killers include src/runtime/stat.test.ts > statRange > "leaves an
+  unranged stat exactly where it was: base + added, then x (1 + increased)", re-run at src/runtime/stat.test.ts
+  with the mutation still applied and failing there too.
+  Carried forward from pass 1 rather than re-litigated, and still true: the ordering's second half — an actor's own
+  sheet beating the global base — is not watched by the named proof target. Swapping the two operands survives
+  src/runtime/stat.test.ts and dies only at whole-suite scope, which by the brief's rule is not this clause's
+  target proving itself. So c3's proof target covers the player's half of the clause only. Nothing about the
+  behaviour changed on this branch, so that is a coverage note about stat.test.ts and not a defect of this diff.
+  Re-run: `git diff b56ba3ee..a8fdd0ee -- src/runtime/stats.ts src/runtime/encounter.ts` (expect empty), and
+  `npx vitest run src/runtime/stat.test.ts`.
+- proof 4: met — Both halves now hold. Pass 1's unmet was the second half only, and its cause has been fixed.
+  Shipped content untouched: `git diff --name-only b56ba3ee..a8fdd0ee` lists no path under content/, and
+  tutorial-island.dsl's only target: lines sit on the melee-foe entitytype, whose sole namer giant-rat already
+  declares max-health 20.
+  The suite passes: 73 files, 1822 passed, 0 failed (`npx vitest run --reporter=dot`, 43s wall clock), and
+  `npm run tasks -- merge-ready` independently reports `npm test ok pass` in the same worktree — two full green
+  runs. The spawn-flake finding npm-test-flakes-on-three-slow-spawn-heavy-tests-under-full-s had nothing to
+  discriminate here, because no file failed at all and so no isolation re-run was owed.
+  Checked rather than assumed, since a green run bought by a weakened test would not discharge this clause: the red
+  test pass 1 recorded — scripts/tasks/audit.test.ts > "the brief answers ownership and prior art for every path in
+  its diff" — was fixed in fa315a0 by moving it off `fixture` (which builds an isolated store but leaves cwd on the
+  real checkout, so audit-prompt's `git diff base..head` absorbed whatever the development branch had committed)
+  onto `gitFixture`, which owns its own repo. Its assertion got stronger, not weaker:
+  `toContain('prior art on src/runtime/save.ts')` became `toContain('\nprior art on src/runtime/save.ts,
+  src/runtime/session.ts:\n')` — the whole heading rather than a prefix, so the union has to be exactly those two
+  paths. Its greenness therefore no longer depends on what any branch happens to have committed, which is what
+  makes this clause stably met rather than accidentally met.
+  One qualification, checked and dismissed rather than counted against the clause: two DSL fixtures inside
+  src/content/entityType.test.ts did have to gain a `stats:` line to keep loading (wolf max-health 14, dummy
+  max-health 6), because both inherit melee-foe's `fight:` and it carries target:. So "no migration" is true of
+  content/ and not of every DSL string in the repo. The assertion that changed with them,
+  `expect(dummy.stats).toEqual({})` -> `toEqual({ 'max-health': ... })`, costs no coverage: entitytype has no stats
+  field, so that assertion could never have caught a template leaking a sheet, and the property it looks like it
+  guarded is still asserted outright by src/runtime/encounter.test.ts:88 > "leaves an entity that declares nothing
+  with an empty sheet", which this branch does not touch.
+  Re-run: `npx vitest run --reporter=dot`, and `git diff --name-only b56ba3ee..a8fdd0ee` (expect nothing under
+  content/).
+- proof 5: met — `npm run tasks -- merge-ready` reports `layer-check ok pass` in this worktree.
+  Structurally, re-read this pass rather than carried: src/content/registry.ts's import block (lines 1-25) names
+  only ../grammar/* and ./* — nothing from src/runtime. fightingOwnerProblem reads exactly three things:
+  action.target and action.retaliates, both grammar-parsed Action fields (src/grammar/action.ts:39 and
+  BOOLEAN_ACTION_FLAGS at :46), and registry.resources.get(...).max, a content field (src/content/resource.ts).
+  The runtime rule the clause says must not be duplicated is which side of a fight reads which clause —
+  src/runtime/encounter.ts, where retaliationOf(actorId) picks the retaliating action and participants pairs
+  self/other. The load path restates none of it: it asks only whether a stat name appears on the owner's own sheet,
+  and treats `retaliates` as a bare exemption without ever asking who swings at whom.
+  Re-run: `npm run layer-check`.

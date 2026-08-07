@@ -175,3 +175,89 @@ None. The stall bound was the only one, and it is settled above.
   than anything in this spec's logic, and two findings for it are already on file (I did not add
   a third). The clause as written still does not hold, and recording it met would be recording a
   suite state that does not exist.
+
+### Pass 2 — 2026-08-07
+
+- base: `b56ba3ee30365f83e10738189ac42d94bcad295c`
+- head: `a8fdd0ee4ddf126f225b9404b98ec1c9a3c50b27`
+- proof 1: met — Re-measured with a hand-written manifest (no proof target resolves; all three specs on this
+branch write `proof: vitest <file>` with no quoted name). Three mutations, three DIFFERENT named
+kills, each re-run at its own file with the mutation still applied. `export const STALL_BOUND = 8;`
+-> `= 0;` is KILLED by "lets a zero-length segment through when it consumes a completion at the
+current instant" — that is the kill that proves resolve() really CALLS requireForwardProgress
+rather than importing it. `if (stalls > STALL_BOUND) {` -> `> STALL_BOUND + 1` is KILLED by
+"throws past the bound, naming the boundary that held time, and not before it", so the bound
+itself is watched and not merely "something eventually throws". And the naming half:
+"return `resource ${source.resourceId}`;" -> "return 'a boundary';" is KILLED by "reports a
+boundary that never advances instead of spinning on it", which is the end-to-end leg — resolve()
+throws RuntimeError, the message carries "resource pool", state.time is still 0. I re-derived the
+pre-change hang by reading rather than running it: with the boundary at state.time and no
+activeAction, resolveSegment advances 0, applyDueBoundaries changes nothing, and
+`while (state.time < toTimeMs)` never terminates — which is also why no mutation here aims at the
+throw itself. Reproduce: the manifest is 3 entries against src/runtime/forwardProgress.ts with
+tests ["src/runtime/resolve.test.ts"] and those three test names; `npm run mutate -- <it>`
+reported 10 killed, 0 survived on the batch it was part of.
+- proof 2: met — Both halves of the clause are observed by a failing test, in opposite directions. That a
+zero-length step is REAL in the mill fixture: `STALL_BOUND = 8` -> `= 0` is KILLED by "lets a
+zero-length segment through when it consumes a completion at the current instant" — if that
+fixture never produced a boundary at the current instant the guard would have nothing to count and
+the mutation would survive. That it is LEGAL: the over-strict direction,
+`requireBoundaryNotPast(boundary, before);` -> `requireBoundaryNotPast(boundary, before + 1);` in
+src/runtime/runtime.ts:365 — the "boundary must be strictly after now" rule the Decisions section
+refused — is KILLED by the same test. I also checked the guard cannot refuse legitimate input from
+the other side: resource levels are integer milli-units (initResources/addDelta/divideRateRemainder
+all produce integers), nextBoundary skips `current <= 0`, so msUntilEmpty's numerator is <= -1 and
+its divisor < 0, giving a strictly positive quotient whose ceil is >= 1 — emptyIn is never 0 or
+negative from engine-produced state. The one arm I could not read off that argument I measured:
+a rate small enough to round to zero milli-units gives Math.round(-0.0004*1000) === -0, so
+msUntilEmpty returns +Infinity, not a division-by-zero crash, and +Infinity is never selected
+(`npm run inspect -- "[Object.is(Math.round(-0.0004*1000), -0), Math.ceil((60000*(1-1)-1-0)/Math.round(-0.0004*1000))]"`
+-> [true, Infinity]). No over-strictness regression.
+- proof 3: met — The mutation that matters is the one that turns the consecutive-stall counter into the
+total-iteration cap the Decisions section refused: `if (after > before) return 0;` ->
+`if (after > before && after < before) return 0;` (the reset made unreachable) is KILLED by
+"resolves a span carrying far more boundaries than the stall bound exactly as one with none",
+re-run at src/runtime/resolve.test.ts with the mutation still applied. That kill also discharges
+the fixture's own premise without a second run: the test can only go red under a total cap if the
+span it builds really carries more than STALL_BOUND iterations, so the 20 markers are not an
+assertion about themselves. Worth recording as a near miss for the next pass: my first attempt at
+this clause, `return 0;` -> `return consecutiveStalls;`, is NOT the c3 mutation — it leaves the
+counter at 0 for a span that never stalls, so the 20-marker test stays green and the verdict
+escalated ("<that test>" -> the file, killed by a different unit test). Aim the reset's
+unreachability, not its return value. Pass 1's complementary measurement — deleting the 20 markers
+leaves every expectation in that test green — still stands and I did not re-run it.
+- proof 4: met — Pass 1's residual on this clause is closed and I verified the fix rather than the fix's
+report. The rule's threshold: `if (boundary.at < now) {` -> `< now - 1` is KILLED by "rejects a
+boundary before the current instant". The CALL SITE, which pass 1 found could be replaced with
+`void requireBoundaryNotPast;` with the whole suite green: that exact mutation of
+src/runtime/runtime.ts:365 is now KILLED by "rejects a boundary before the current instant through
+resolve, not only as a rule" (commit 87d11fd), re-run at its own file with the mutation still
+applied. The fixture is a `rate: -0.001` pool at a level of 0.5 injected through a cast, which
+makes msUntilEmpty return -29999, and the test asserts the exact message "resource pool put a
+boundary at -29999, before the current instant 0" — so removing the call cannot pass by throwing
+something else. The mutation is safe to re-run: with the check gone, advanceTime rejects the
+negative span, and the forward-progress guard still bounds the loop, so nothing hangs. The claim
+the check makes is a genuine invariant and not vacuous-by-over-strictness — see c2's evidence for
+why every candidate is >= state.time from engine-produced state.
+- proof 5: met — Pass 1 recorded this unmet for one reason only — a red scripts/tasks/audit.test.ts caused
+by the Task system's own non-hermetic fixture — and that is fixed (fa315a0, 0b50f17). At head
+a8fdd0e, `npm run tasks -- merge-ready` reports tsc / npm test / layer-check / audit-status /
+doctor / bytes / tree / base all pass; only the `clauses` leg fails, and it fails on pass 1's own
+outstanding c5, which filing this pass clears. No authored content file is touched anywhere in the
+range (`git diff --name-only b56ba3e..a8fdd0e` yields no `.dsl` and no content asset), so the
+shipped `# test` sections replay over unchanged bytes. No timing moves: nextBoundary's selection
+logic is unchanged comparison for comparison — every candidate is still `< boundary.at` in the same
+order — and the refactor only carries the winner as `{at, source}` instead of a bare number, so the
+selected instant is identical; the extra per-candidate object allocation is the only cost and it is
+not observable. THE SUITE FLAKE, and I ran the discriminating check rather than asserting it: of
+three full runs at this tree, one was green 1822/1822 (merge-ready's own leg) and two were red on
+exactly one test, scripts/tasks.test.ts > "refuses five junk arguments on every bounded command
+surface", failing as `Test timed out in 5000ms`. That file and that test are named in the filed
+finding npm-test-flakes-on-three-slow-spawn-heavy-tests-under-full-s. In isolation it passes:
+`npx vitest run scripts/tasks.test.ts` -> 18/18 in 3.25s, and `-t "refuses five junk arguments"`
+passes twice at 3.69s and 3.71s, against a 5s timeout it blew under contention. Nothing outside the
+four files that finding names failed, and nothing reproduced in isolation, so this is the flake and
+not a regression. Recording it: the rate is worse than the finding describes — two of three full
+runs red, and mutate's own whole-suite baseline had 8 already-failing tests — because three
+auditors are running concurrently on this machine. That is environmental, but it is the exact
+condition under which a real failure gets waved through.
