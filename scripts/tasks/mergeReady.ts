@@ -21,11 +21,7 @@ export interface Leg {
 
 export const LEGS: Leg[] = [
   { name: 'tsc', command: 'npx tsc --noEmit' },
-  // The timeout headroom is for this gate's own environment, not CI's: five
-  // legs share the machine here, and a per-test budget sized for an idle box
-  // failed healthy tests under that contention — measured twice on a clean
-  // tree. The assertions are unchanged; only the clock they race is.
-  { name: 'npm test', command: 'npm test -- --reporter=dot --testTimeout=20000' },
+  { name: 'npm test', command: 'npm test -- --reporter=dot' },
   { name: 'layer-check', command: 'npm run layer-check' },
   { name: 'audit-status', command: 'npm run audit-status' },
   { name: 'doctor', command: 'npm run tasks -- doctor' },
