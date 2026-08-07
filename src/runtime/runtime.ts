@@ -40,6 +40,7 @@ import { Action } from '../content/entity';
 import { actionKind } from '../grammar/action';
 import { ActionResult, nestedResults } from '../grammar/actionResult';
 import { isPoint } from '../grammar/range';
+import { Boundary, BoundarySource, requireBoundaryNotPast, requireForwardProgress } from './forwardProgress';
 import { Item } from '../content/item';
 import { Recipe } from '../content/recipe';
 import { Registry } from '../content/registry';
@@ -158,20 +159,22 @@ function completionsBeforeDrain(action: Action, state: GameState, registry: Regi
   return completions;
 }
 
-function nextBoundary(state: GameState, registry: Registry, toTime: number): number {
-  let boundary = toTime;
-  for (const buff of Object.values(state.activeBuffs)) {
-    if (buff.expiresAt < boundary) boundary = buff.expiresAt;
+function nextBoundary(state: GameState, registry: Registry, toTime: number): Boundary {
+  let boundary: Boundary = { at: toTime, source: { kind: 'requested' } };
+  for (const [key, buff] of Object.entries(state.activeBuffs)) {
+    if (buff.expiresAt < boundary.at) boundary = { at: buff.expiresAt, source: { kind: 'buff', buffKey: key } };
   }
   if (state.activeAction) {
-    const action = findActiveAction(state.activeAction, registry);
+    const active = state.activeAction;
+    const source: BoundarySource = { kind: 'action', ownerRef: active.ownerRef, actionLabel: active.actionLabel };
+    const action = findActiveAction(active, registry);
     if (!resolvesPerAttempt(action)) {
       const { duration, attemptsToResolve, outcome } = fightPlan(action, state, registry);
-      const player = playerCadence(state.activeAction);
+      const player = playerCadence(active);
       const inFlight = (attemptsToResolve - player.attemptsMade) * duration - player.progress;
       // Anything that must settle mid-batch caps the batch, and a single fight
       // is a batch of one.
-      const completions = state.activeAction.repeating
+      const completions = active.repeating
         ? Math.min(
             stopsOnOutcome(action, outcome) ? 1 : Infinity,
             inputLimit(action, state).completions,
@@ -182,7 +185,7 @@ function nextBoundary(state: GameState, registry: Registry, toTime: number): num
         // The fight in flight, plus the whole fights the cap leaves after it.
         const runway = inFlight + Math.max(0, completions - 1) * attemptsToResolve * duration;
         const capInstant = state.time + Math.max(0, runway);
-        if (capInstant < boundary) boundary = capInstant;
+        if (capInstant < boundary.at) boundary = { at: capInstant, source };
       }
     }
   }
@@ -194,7 +197,7 @@ function nextBoundary(state: GameState, registry: Registry, toTime: number): num
     if (current <= 0) continue;
     const emptyIn = msUntilEmpty(current, toMilliUnits(ratePerMinute), state.resourceRateRemainders[resource.id] ?? 0);
     const emptyInstant = state.time + emptyIn;
-    if (emptyInstant < boundary) boundary = emptyInstant;
+    if (emptyInstant < boundary.at) boundary = { at: emptyInstant, source: { kind: 'resource', resourceId: resource.id } };
   }
   return boundary;
 }
@@ -410,11 +413,15 @@ export function resolve(state: GameState, registry: Registry, toTimeMs: number):
   if (toTimeMs < state.time) throw new RuntimeError(`resolve: toTime (${toTimeMs}) must be >= state.time (${state.time})`);
   if (!Number.isInteger(toTimeMs)) throw new RuntimeError(`resolve: toTime must be an integer millisecond value, got ${toTimeMs}`);
   applyDueBoundaries(state, registry, state.time);
+  let consecutiveStalls = 0;
   while (state.time < toTimeMs) {
-    const segEnd = nextBoundary(state, registry, toTimeMs);
-    resolveSegment(state, registry, segEnd);
-    // At the instant reached, not segEnd: buffs may still have time left.
+    const before = state.time;
+    const boundary = nextBoundary(state, registry, toTimeMs);
+    requireBoundaryNotPast(boundary, before);
+    resolveSegment(state, registry, boundary.at);
+    // At the instant reached, not the boundary: buffs may still have time left.
     applyDueBoundaries(state, registry, state.time);
+    consecutiveStalls = requireForwardProgress(boundary, before, state.time, consecutiveStalls);
   }
 }
 

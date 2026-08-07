@@ -17,6 +17,7 @@
     "probe": "tsx scripts/probe.ts",
     "inspect": "tsx scripts/inspect.ts",
     "mutate": "tsx scripts/mutate.ts",
+    "migrate-saves": "tsx scripts/migrate-saves.ts",
     "session-timing": "tsx scripts/session-timing.ts",
     "contribution:issue": "tsx scripts/publish-local-changes.ts",
     "contribution:squash": "tsx scripts/squash-local-changes.ts",
