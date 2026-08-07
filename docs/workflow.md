@@ -120,6 +120,20 @@ Every command is `npm run tasks -- <verb>`. The record verbs (`show`, `edit`, `s
   Clause-by-clause verification cannot see a regression.
 - **Read a finding list's shape before promoting it.** Density in one file is a structural
   diagnosis; ask what single change retires the most of the list, and build that seam first.
+- **Independent audits parallelise; one task's workers still do not.** The ruling above is about
+  splitting one piece of work, and it stands. N audits over N specs are N pieces, and they run
+  concurrently on one condition: each auditor gets its own `git worktree`, because `npm run mutate`
+  rewrites source in place and a second auditor sharing that tree reads a mutant as its own
+  baseline. `audit-prompt` assumes one spec per branch and withholds the pass file and the manifest
+  when the spec it infers for the branch is not the slug asked for — so name each worktree's branch
+  after its spec and the strict route resolves it, needing no `--branch` override and printing
+  nothing false. The gate is in the brief alone; `tasks audit` files whatever it is handed.
+- **Filing is the one step that cannot be concurrent, and serialising it costs nothing.**
+  `docs/tasks.jsonl` is read-modify-write under no lock, so two `tasks audit` or `tasks add` calls
+  in flight lose records with no error raised. The pass file is already the hand-back artifact:
+  auditors fill theirs, one actor runs `--args-from` over each in turn. That is seconds against a
+  parallel run, and it is the only place cross-auditor duplicates are caught — parallel auditors
+  cannot read each other's filings the way a serial third one can.
 - **Persisting evidence is planner work.** Archive audit reports into `docs/audits/` before the
   session ends; the store is the record of note.
 - **A commit body scales with what the commit touches.** The contract asks for one line past the

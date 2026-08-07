@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ActiveAction, armAction, craft, createGameState, GameState, initResources, PLAYER, resolve, RuntimeError, statValue, useAction } from './runtime';
+import { Boundary, BoundarySource, boundarySourceName, requireBoundaryNotPast, requireForwardProgress, STALL_BOUND } from './forwardProgress';
 import { IMPLICIT_TARGET_FULL, newCadence } from './encounter';
 import { point } from '../grammar/range';
 import { loadModule, Registry } from '../content/registry';
@@ -116,6 +117,18 @@ chop:
   continuous
   ability: chop-power
   time: 1
+  give: 1 wood
+
+// A repeating action that is BOTH multi-attempt (ability, so 3 attempts a
+// completion) and input-limited (take:, so a finite completion count). That pair
+// is the only shape whose boundary can land on the current instant with a
+// completion still owed: the segment is zero-length and still does work.
+# entity mill
+press:
+  continuous
+  ability: chop-power
+  time: 1
+  take: 1 raw-shrimp
   give: 1 wood
 
 # stat max-vigor
@@ -854,5 +867,120 @@ start: ${start}
     // The accumulator is rate * dt, and this rate is already an implausible
     // 1000 units a minute: 1.44e13 against a 9.0e15 ceiling.
     expect(toMilliUnits(1000) * OFFLINE_CAP_MS).toBeLessThan(Number.MAX_SAFE_INTEGER / 100);
+  });
+});
+
+describe('resolve: forward progress', () => {
+  const stalled: Boundary = { at: secondsToMs(4), source: { kind: 'resource', resourceId: 'pool' } };
+
+  it('names every source a report can carry', () => {
+    expect(boundarySourceName({ kind: 'requested' })).toBe('the requested time');
+    expect(boundarySourceName({ kind: 'buff', buffKey: 'tide:seep-rate' })).toBe('buff tide:seep-rate');
+    expect(boundarySourceName({ kind: 'action', ownerRef: 'entity.mill', actionLabel: 'press' })).toBe('action entity.mill.press');
+    expect(boundarySourceName({ kind: 'resource', resourceId: 'pool' })).toBe('resource pool');
+  });
+
+  it('counts a segment that leaves time where it was, and clears the count when time moves', () => {
+    expect(requireForwardProgress(stalled, secondsToMs(4), secondsToMs(4), 0)).toBe(1);
+    expect(requireForwardProgress(stalled, secondsToMs(4), secondsToMs(4), 1)).toBe(2);
+    expect(requireForwardProgress(stalled, secondsToMs(4), secondsToMs(4) + 1, STALL_BOUND - 1)).toBe(0);
+  });
+
+  it('throws past the bound, naming the boundary that held time, and not before it', () => {
+    expect(() => requireForwardProgress(stalled, secondsToMs(4), secondsToMs(4), STALL_BOUND - 1)).not.toThrow();
+    expect(() => requireForwardProgress(stalled, secondsToMs(4), secondsToMs(4), STALL_BOUND)).toThrow(RuntimeError);
+    expect(() => requireForwardProgress(stalled, secondsToMs(4), secondsToMs(4), STALL_BOUND)).toThrow(/resource pool/);
+  });
+
+  // What 2c2ccee/f9dfd72 claimed and left unchecked: on the integer scale a
+  // boundary is at the current instant or after it, never before.
+  it('rejects a boundary before the current instant', () => {
+    const tide: BoundarySource = { kind: 'buff', buffKey: 'tide:seep-rate' };
+    expect(() => requireBoundaryNotPast({ at: secondsToMs(4) - 1, source: tide }, secondsToMs(4))).toThrow(RuntimeError);
+    expect(() => requireBoundaryNotPast({ at: secondsToMs(4) - 1, source: tide }, secondsToMs(4))).toThrow(/buff tide:seep-rate/);
+    expect(() => requireBoundaryNotPast({ at: secondsToMs(4), source: tide }, secondsToMs(4))).not.toThrow();
+  });
+
+  // A rate slow enough that one milli-unit takes longer than a minute sends
+  // msUntilEmpty negative for a level under one, so the pool asks to be emptied
+  // before the span started.
+  it('rejects a boundary before the current instant through resolve, not only as a rule', () => {
+    const registry = loadModule(`
+# stat seep-rate
+base: -0.001
+# stat seep-cap
+base: 10
+# flag dry
+# resource pool
+rate: seep-rate
+max: seep-cap
+start: 10
+on empty:
+  set: dry
+`);
+    const state = createGameState();
+    initResources(state, registry);
+    (state.resources as Record<string, number>)['pool'] = 0.5;
+
+    expect(() => resolve(state, registry, secondsToMs(5))).toThrow(RuntimeError);
+    expect(() => resolve(state, registry, secondsToMs(5))).toThrow('resource pool put a boundary at -29999, before the current instant 0');
+    expect(state.time).toBe(0);
+  });
+
+  // A pool level off the integer scale is what the ULP class looked like: the
+  // emptying instant rounds back onto now, so the boundary never moves and
+  // nothing consumes it. Before the guard this hung the process outright.
+  it('reports a boundary that never advances instead of spinning on it', () => {
+    const registry = loadModule(`
+# stat leak-rate
+base: -60
+# stat leak-cap
+base: 10
+# flag dry
+# resource pool
+rate: leak-rate
+max: leak-cap
+start: 10
+on empty:
+  set: dry
+`);
+    const state = createGameState();
+    initResources(state, registry);
+    (state.resources as Record<string, number>)['pool'] = 0.5;
+
+    expect(() => resolve(state, registry, secondsToMs(5))).toThrow(RuntimeError);
+    expect(() => resolve(state, registry, secondsToMs(5))).toThrow(/resource pool/);
+    expect(state.time).toBe(0);
+  });
+
+  it('lets a zero-length segment through when it consumes a completion at the current instant', () => {
+    const registry = loaded();
+    const state = createGameState('nowhere');
+    state.inventory['raw-shrimp'] = 1;
+    state.activeAction = { ownerRef: 'entity.mill', actionLabel: 'press', repeating: true, implicitTarget: IMPLICIT_TARGET_FULL - 3 * toMilliUnits(0.34), cadences: { [PLAYER]: { progress: 0, attemptsMade: 3 } } };
+
+    resolve(state, registry, secondsToMs(10));
+
+    expect(state.inventory['wood']).toBe(1);
+    expect(state.inventory['raw-shrimp']).toBe(0);
+    expect(state.activeAction).toBeNull();
+    expect(state.time).toBe(secondsToMs(10));
+  });
+
+  it('resolves a span carrying far more boundaries than the stall bound exactly as one with none', () => {
+    const registry = loaded();
+    const markers = 20;
+    expect(markers).toBeGreaterThan(STALL_BOUND);
+
+    const state = withCampfireCooking(registry, false);
+    for (let i = 1; i <= markers; i++) {
+      state.activeBuffs[`marker-${i}:cooking-rate`] = { statId: 'cooking-rate', amount: 0, kind: 'increased', expiresAt: secondsToMs(i) };
+    }
+
+    resolve(state, registry, secondsToMs(25));
+
+    expect(state.inventory['cooked-shrimp']).toBe(25);
+    expect(state.activeBuffs).toEqual({});
+    expect(state.time).toBe(secondsToMs(25));
   });
 });

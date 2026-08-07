@@ -6,7 +6,7 @@ import { createGameState } from '../src/runtime/runtime';
 import { loadModule } from '../src/content/registry';
 import { initialLocalChangesModule } from '../src/content/localChanges';
 import type { ModuleSource } from '../src/content/universe';
-import { serializeSave } from '../src/runtime/save';
+import { SAVE_VERSION, serializeSave } from '../src/runtime/save';
 import { beginAction, runTest, startSession, view } from '../src/runtime/session';
 import { handleCommand, liveTick, loadModportalSources, type AuthoringContext, type Recorder } from './play-cli';
 import { secondsToMs } from '../src/runtime/units';
@@ -27,7 +27,7 @@ open:
   give: 1 gold
 
 # save empty
-{"version":6}
+{"version":${SAVE_VERSION}}
 
 # test always-passes
 assert: time >= 0
@@ -522,7 +522,7 @@ describe('play-cli local DSL authoring', () => {
       '/dsl resource stamina max: local-changes.vigor',
       '/dsl recipe smelt in: local-changes.ore | out: local-changes.ingot',
       '/dsl dialogue npc-chat owner = local-changes.npc | node greet: |   Hello there.',
-      '/dsl save blank {"version":6}',
+      `/dsl save blank {"version":${SAVE_VERSION}}`,
       '/dsl test smoke assert: time >= 0',
       '/dsl remove item.local-changes.temporary',
     ];
@@ -532,19 +532,23 @@ describe('play-cli local DSL authoring', () => {
       expect(result.output[0], command).not.toMatch(/^Error:/);
     }
 
-    expect(fixture.session.registry.stats.has('local-changes.vigor')).toBe(true);
-    expect(fixture.session.registry.skills.has('local-changes.focus')).toBe(true);
-    expect(fixture.session.registry.items.has('local-changes.token')).toBe(true);
-    expect(fixture.session.registry.entities.has('local-changes.npc')).toBe(true);
-    expect(fixture.session.registry.locations.has('local-changes.grove')).toBe(true);
-    expect(fixture.session.registry.flags.has('local-changes.levered')).toBe(true);
-    expect(fixture.session.registry.variables.has('local-knob')).toBe(true);
-    expect(fixture.session.registry.resources.has('local-changes.stamina')).toBe(true);
-    expect(fixture.session.registry.recipes.has('local-changes.smelt')).toBe(true);
-    expect(fixture.session.registry.dialogues.has('local-changes.npc-chat')).toBe(true);
-    expect(fixture.session.registry.saves.has('local-changes.blank')).toBe(true);
-    expect(fixture.session.registry.tests.has('local-changes.smoke')).toBe(true);
-    expect(fixture.session.registry.items.has('local-changes.temporary')).toBe(false);
+    const registry = fixture.session.registry;
+
+    expect(registry.stats.get('local-changes.vigor')?.base).toEqual({ min: 10, max: 10 });
+    expect(registry.skills.get('local-changes.focus')?.['stat-id']).toBe('local-changes.vigor');
+    expect(registry.items.get('local-changes.token')?.title).toBe('Token');
+    expect(registry.entities.get('local-changes.npc')?.actions).toEqual([{ label: 'cheer', results: [{ kind: 'say', text: 'Hello.' }] }]);
+    expect(registry.locations.get('local-changes.grove')).toMatchObject({ x: 1, y: 0, entities: ['local-changes.npc'] });
+    expect(registry.flags.has('local-changes.levered')).toBe(true);
+    expect(registry.variables.get('local-knob')?.value).toBe(2);
+    expect(registry.resources.get('local-changes.stamina')?.max).toBe('local-changes.vigor');
+    expect(registry.recipes.get('local-changes.smelt')).toMatchObject({ in: [{ item: 'local-changes.ore' }], out: [{ item: 'local-changes.ingot' }] });
+    expect(registry.dialogues.get('local-changes.npc-chat')?.owner).toBe('local-changes.npc');
+    expect(registry.saves.get('local-changes.blank')).toEqual({ version: SAVE_VERSION, diff: {} });
+    expect(registry.tests.get('local-changes.smoke')?.directives).toMatchObject([{ kind: 'assert', condition: { operator: '>=' } }]);
+    expect(registry.items.has('local-changes.temporary')).toBe(false);
+
+    expect(runLocal(fixture, '/load local-changes.blank', current).recorded).toBe('load: local-changes.blank');
   });
 
   it('reports local authoring commands as unavailable when no authoring context is provided', () => {
