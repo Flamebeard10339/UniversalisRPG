@@ -12,8 +12,9 @@ was"*. Any caller that drops a task from the array removes it from the store on 
 `EVENT_OPS` has sixteen verbs — add, edit, start, stop, done, decline, triage, import, audit,
 spec-add, spec-remove, spec-defer, spec-done, doctor-fix, note, decision — and not one of them
 means *this record is no longer in the store*. `spec-remove` is the nearest miss and is about
-membership of a spec, not presence in the store. `doctor` cannot report the gap either: it fails on
-exactly one condition, a line that will not parse.
+membership of a spec, not presence in the store. `doctor` does not report the gap either — not
+because its single failure condition is wrong, but because nothing computes the gap for it to print.
+That distinction is c5, and it is what keeps this branch a reader rather than a gate.
 
 This has already happened, and the evidence is in the tree today. Four ids carry an `add` event and
 resolve to no store record:
@@ -74,9 +75,14 @@ Proof:
   are therefore outside what it can check — on every run, including a clean one. A run that finds
   no discrepancy prints the 495 it never examined rather than the word "reconciled".
   proof: vitest scripts/lib/eventLog.test.ts
-- [c5] `doctor` fails on an unexplained absence, its second failure condition, earned by the one
-  instance above and by nothing else. `doctor-fix` cannot repair it: a record the store lost is not
-  a record `doctor` may invent, so the action is to file the ruling, not to write the row back.
+- [c5] **`doctor` keeps exactly one failure condition.** An unexplained absence is named, counted and
+  printed on every run that finds one, and changes no exit code. Ruled by the author 2026-08-06,
+  refusing this clause's original form: one historical absence is the case for reporting it, not for
+  failing the build on the store's own history. `doctor-fix` cannot repair it either — a record the
+  store lost is not a record `doctor` may invent, so the action is to file the ruling, not to write
+  the row back. Written as a refusal rather than deleted, because a deleted clause leaves the gate
+  available to the next branch that finds the argument locally reasonable, and this exact gate was
+  proposed twice in one day from two independent directions.
   proof: vitest scripts/tasks/doctor.test.ts
 - [c6] The four live discrepancies are adjudicated in the store rather than left as the check's
   first output. The three probes take retroactive `remove` events naming them scratch;
@@ -106,14 +112,6 @@ from the log instead of by re-auditing the store.
 
 ## Open questions
 
-- **c5 needs the author's ruling before it is worked, and it is the one clause that is not the
-  author's to delegate.** It gives `doctor` a second failure condition, and CLAUDE.md states in two
-  places that `doctor` fails on exactly one — an unparseable line — and separately says to resist
-  adding gates because "a gate earns its place by preventing something that actually happened". The
-  spec argues the instance is `proof-targets-resolve` and that the rule is therefore satisfied. That
-  argument is coherent and it still changes a documented invariant, so it is ruled rather than
-  assumed. If the ruling is no, c1 through c4 and c6 stand unchanged and the reconciliation is a
-  read that reports rather than a leg that fails.
 - Whether the retroactive `remove` events in c6 are written by hand or by a one-shot command.
   Delegated: three events is small enough that the answer follows from how awkward the by-hand
   route turns out to be, which the worker will know and this session does not.
