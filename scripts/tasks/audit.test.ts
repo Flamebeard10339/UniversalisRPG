@@ -1490,12 +1490,25 @@ describe('the brief arriving with the answers rather than the instructions', () 
   it('says how to read what mutate prints back, beside the manifest rather than in its source', () => {
     fixture(({ tasks }) => {
       const { stdout } = tasks('audit-prompt', 'demo-spec');
-      expect(stdout).toContain('KILLED — the tests failed with the line broken');
-      expect(stdout).toContain('SURVIVED — the tests passed with the line broken');
+      expect(stdout).toContain('KILLED — that named test failed with the line broken');
+      expect(stdout).toContain('SURVIVED — no test went from passing to failing');
       expect(stdout).toContain('ERROR — the mutation did not build');
       // The column pass 2 called what made its headline measurable, and had
       // to reverse-engineer from scripts/mutate.ts to trust.
       expect(stdout).toContain('the scope column reports the chain it walked');
+    });
+  });
+
+  // A brief that lists the verdicts without saying what one is attributed to
+  // is how `KILLED` came to be read as "the number went up" — which is the
+  // reading every recorded pass in this repository has been taking on faith.
+  it('says a verdict is attributed to a named test, not to a count', () => {
+    fixture(({ tasks }) => {
+      const { stdout } = tasks('audit-prompt', 'demo-spec');
+      expect(stdout).toContain('attributed to a named test, never to a count');
+      expect(stdout).toContain('a row that names no test is not a kill');
+      expect(stdout).toContain('UNSTABLE');
+      expect(stdout).toContain('Widening the scope cannot widen what counts as a kill');
     });
   });
 

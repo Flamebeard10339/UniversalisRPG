@@ -323,10 +323,12 @@ export function toolLines(scripts: Record<string, string> | null): string[] {
 // rather than looked up. Both passes went to scripts/mutate.ts for it; pass 2
 // read the whole file.
 const MUTATE_VERDICTS = [
-  'KILLED — the tests failed with the line broken. That is the suite noticing, and the only verdict that proves anything.',
-  'SURVIVED — the tests passed with the line broken. Nothing was watching it; that is the finding.',
-  'ERROR — the mutation did not build, or no test ran. Says nothing about the suite; retarget and run it again.',
-  'Scope escalates: the one named `test`, then its `tests` file, then the whole suite — and the scope column reports the chain it walked. `"<a test>" -> <a file>` means that named test survived and something else killed it, which is not that clause proving itself.',
+  'A verdict is attributed to a named test, never to a count. A kill is one named test that passed on the unmutated tree and failed with the line broken — the row prints its name, and a row that names no test is not a kill.',
+  'KILLED — that named test failed with the line broken, and failed again when the run re-measured it with the mutation still applied at its own file. That second measurement is what makes it a fact rather than a number that moved.',
+  'SURVIVED — no test went from passing to failing. Nothing was watching that line; that is the finding.',
+  'UNSTABLE — a test failed with the line broken and did not fail again on the same tree with the same mutant. The measurement did not repeat, so it is neither proof nor a survivor. Read it as "this scope cannot answer", not as either verdict, and say so rather than re-running until it picks a side.',
+  'ERROR — the mutation did not build, no test ran, or the run\'s failures could not be named. Says nothing about the suite; retarget and run it again.',
+  'Scope escalates: the one named `test`, then its `tests` file, then the whole suite — and the scope column reports the chain it walked. `"<a test>" -> <a file>` means that named test survived and something else killed it, which is not that clause proving itself. Widening the scope cannot widen what counts as a kill: a wider run is judged on the same named tests, re-run at their own files, so an unrelated failure the whole suite happened to produce cannot become this clause\'s proof.',
 ];
 
 export interface Commit {
