@@ -89,6 +89,14 @@ describe('c1: the body, and nothing else', () => {
     expect(report.files[0].text).toBe(island(stamped(SAVE_VERSION, `${ARRIVAL},"rng":123`), stamped(SAVE_VERSION, `${CARRIED},"rng":123`), stamped(SAVE_VERSION, `${ORPHAN},"rng":123`)));
   });
 
+  it('lands on disk exactly the text it reported, byte for byte', () => {
+    const directory = scratch(['island.dsl', at(BEHIND)]);
+
+    writeMigration(migrate(readContent(directory), NO_FIELD_MOVED));
+
+    expect(readFileSync(path.join(directory, 'island.dsl'), 'utf8')).toBe(at(SAVE_VERSION));
+  });
+
   it('returns the shipped content unchanged when the only thing behind it is the version stamp', () => {
     const shipped = readFileSync('content/tutorial-island.dsl', 'utf8');
     const behind = shipped.replace(new RegExp(`\\{"version":${SAVE_VERSION},`, 'g'), `{"version":${BEHIND},`);
