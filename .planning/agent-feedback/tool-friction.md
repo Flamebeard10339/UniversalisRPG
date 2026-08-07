@@ -1306,3 +1306,29 @@ friction met.
   three `npm test`), ~5 minutes wall. Unavoidable and worth it: c7's residue moved from six tests
   over 2000ms to one-to-three, which is a number no static reading produces.
 - `merge-ready` again cost one invocation and reported exactly the two legs the pass was about.
+
+## 2026-08-07 — audit pass 3, a-green-run-means-the-tree-is-green (opus-auditor-p3)
+
+- `tasks audit --args-from` refused the whole file with "`--commit` describes a finding, and no
+  `--finding` has been opened yet" because one wrapped line of clause evidence happened to begin
+  with `--commit HEAD`. The continuation rule is "a line that does not open with `--`", and the
+  evidence a pass is asked to write quotes command lines and test names constantly, so any flag-like
+  token landing at column zero after a wrap is indistinguishable from a flag. Cost: one refused
+  filing and a scan of the file for stray `^--` lines. The error names the offending flag but not
+  the line number, and the flag it names does not exist in the file as a flag.
+- Three whole-suite mutation escalations cost ~9 minutes between them, and all three came back
+  SURVIVED — which is the point: they were re-measurements of pass 2's three unreviewed findings,
+  and confirming a survivor still survives is worth the wall clock. Narrow entries were nearly free;
+  the price is entirely in the escalation, and `mutate` spends it only where it must.
+- `mutate`'s `test` field taking a `-t` substring bit again, but only because pass 2 wrote it down
+  here — that note is what saved the round-trip. Worth keeping.
+- Measuring c7 and c8 cost five full suite runs (two `npx vitest run --reporter=json
+  --configLoader runner scripts`, three `npm test`), ~5 minutes wall. Third pass in a row to pay it,
+  third pass in a row where the number moved: c7's residue went six tests over 2000ms, then one to
+  three, now exactly one in both runs. A clause whose grade turns on a measurement nobody can cache
+  is expensive on purpose and cheap against the alternative.
+- Recording a clause `deferred` resolves the clause standing but leaves the `undelivered` record an
+  earlier pass created open, so `merge-ready`'s `spec` leg still fails on member tasks the `clauses`
+  leg now says are settled. Already filed as
+  `a-later-pass-grading-a-clause-deferred-cannot-convert-the-un`; this pass is its second sighting,
+  and c5 shows it is not specific to `deferred` — grading a clause `met` leaves the record open too.
