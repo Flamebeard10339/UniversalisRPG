@@ -211,6 +211,9 @@ function treeDiff(before: Map<string, string>, after: Map<string, string>): stri
 // commit-shaped enough for every read the seam exposes. `branchName`
 // advances with each commit(); `main` stays at the first commit until
 // fork() pins it where the head is now, the way checkout -b leaves it.
+// A null `initialMessage` leaves the history unborn: every revision read
+// answers null, as git does before a branch's first commit, while `status`
+// still reports the whole tree.
 class DataGit {
   private commits: TreeCommit[] = [];
 
@@ -221,15 +224,15 @@ class DataGit {
   constructor(
     private readonly dir: string,
     private readonly branchName: string,
-    initialMessage: string,
+    initialMessage: string | null,
   ) {
-    this.commit(initialMessage);
+    if (initialMessage !== null) this.commit(initialMessage);
     this.facts = {
       mergeBase: (baseBranch) => {
         const base = this.indexOf(baseBranch);
         return base === null ? null : this.commits[Math.min(base, this.commits.length - 1)].sha;
       },
-      head: () => this.commits[this.commits.length - 1].sha,
+      head: () => this.tip?.sha ?? null,
       branch: () => this.branchName,
       resolveCommit: (revspec) => {
         const index = this.indexOf(revspec);
@@ -248,7 +251,7 @@ class DataGit {
       commitCount: (range) => this.inRange(range)?.length ?? null,
       mergeInProgress: () => false,
       dirtyPaths: (pathspec) => {
-        const head = this.commits[this.commits.length - 1].tree;
+        const head = this.tip?.tree ?? new Map<string, string>();
         const spec = pathspec === undefined ? null : this.relative(pathspec);
         return treeDiff(head, snapshotTree(this.dir)).filter((file) => spec === null || file === spec || file.startsWith(`${spec}/`));
       },
@@ -269,14 +272,19 @@ class DataGit {
         return commits.map((commit): Commit => ({ sha: commit.sha.slice(0, 7), subject: commit.subject, files: commit.files })).reverse();
       },
       commitsTouching: (filePath) => {
+        if (this.tip === null) return null;
         const file = this.relative(filePath);
         return this.commits
           .filter((commit) => commit.files.includes(file))
           .map((commit) => commit.sha)
           .reverse();
       },
-      lsFiles: () => [...this.commits[this.commits.length - 1].tree.keys()].sort(),
+      lsFiles: () => (this.tip === null ? null : [...this.tip.tree.keys()].sort()),
     };
+  }
+
+  private get tip(): TreeCommit | null {
+    return this.commits[this.commits.length - 1] ?? null;
   }
 
   commit(message: string): string {
@@ -296,6 +304,7 @@ class DataGit {
   }
 
   private indexOf(rev: string): number | null {
+    if (this.commits.length === 0) return null;
     if (rev === 'HEAD' || rev === this.branchName) return this.commits.length - 1;
     if (rev === 'main') return this.mainTip;
     const index = this.commits.findIndex((commit) => commit.sha === rev || commit.sha.slice(0, 7) === rev);
@@ -424,13 +433,25 @@ export function gitFixture(run: (context: { dir: string; commit: (message: strin
 }
 
 export function defaultStoreGitFixture(run: (context: { dir: string; tasks: (...args: string[]) => Run }) => void): void {
+  defaultStoreFixtureWith('Initial fixture\n\nA tracked task store exists.', run);
+}
+
+// The same directory with nothing committed yet: what the checks anchored on
+// `HEAD` see before a branch's first commit. Declared apart from the fixture
+// above because which of the two a test wants is the whole subject of the
+// tests that reach for it.
+export function unbornDefaultStoreFixture(run: (context: { dir: string; tasks: (...args: string[]) => Run }) => void): void {
+  defaultStoreFixtureWith(null, run);
+}
+
+function defaultStoreFixtureWith(initialMessage: string | null, run: (context: { dir: string; tasks: (...args: string[]) => Run }) => void): void {
   const dir = mkdtempSync(path.join(os.tmpdir(), 'universalis-default-store-'));
   mkdirSync(path.join(dir, 'docs', 'specs'), { recursive: true });
   mkdirSync(path.join(dir, 'docs', 'audits'), { recursive: true });
   writeFileSync(path.join(dir, 'docs', 'specs', 'demo-spec.md'), '# Demo spec\n\n## Deliverable\n\nSomething this branch promises.\n\nProof:\n\n- The first clause holds.\n\n## Decisions\n\n## Open questions\n\nNone.\n', 'utf8');
   writeFileSync(path.join(dir, 'docs', 'audits', 'systems.json'), JSON.stringify({ unowned: { note: '', paths: ['docs', '*.md'] }, systems: [] }), 'utf8');
   writeFileSync(path.join(dir, 'docs', 'tasks.jsonl'), '', 'utf8');
-  const data = new DataGit(dir, 'main', 'Initial fixture\n\nA tracked task store exists.');
+  const data = new DataGit(dir, 'main', initialMessage);
   const restoreGit = installGit(data.facts);
   try {
     run({

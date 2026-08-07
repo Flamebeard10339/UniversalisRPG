@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync
 import os from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { defaultStoreGitFixture, fixture, installDataGit, runInProcess, spawnTasks } from './cliFixtures';
+import { defaultStoreGitFixture, fixture, installDataGit, runInProcess, spawnTasks, unbornDefaultStoreFixture } from './cliFixtures';
 import { realDefaultStoreGitFixture } from './realGitFixture';
 
 describe('tasks CLI', () => {
@@ -248,16 +248,46 @@ describe('tasks CLI', () => {
     });
   });
 
-  // An unborn HEAD answers every read null — git.test.ts proves that of the
-  // real seam — and `fixture` serves exactly those answers, so this needs no
-  // repository with zero commits built for it.
+  // The store must be the tracked default one for the comparison to be
+  // attempted at all: under any other `--store` the check returns before it
+  // reads HEAD, and a test written there passes without reaching the
+  // degradation it is named for.
   it('doctor degrades to no working-tree-comparison issue when there is no committed store (unborn HEAD)', () => {
-    fixture(({ tasks, dir }) => {
-      writeFileSync(path.join(dir, 'tasks.jsonl'), `${JSON.stringify({ id: 'a', title: 'a', kind: 'task', state: 'done', severity: null, system: null, spec: null, clause: null, requires: [], files: [], deliverable: null, evidence: null, source: null, reason: null, closed: '2026-08-01', closedCommit: null })}\n`, 'utf8');
+    unbornDefaultStoreFixture(({ tasks, dir }) => {
+      writeFileSync(path.join(dir, 'docs', 'tasks.jsonl'), `${JSON.stringify({ id: 'a', title: 'a', kind: 'task', state: 'done', severity: null, system: null, spec: null, clause: null, requires: [], files: [], deliverable: null, evidence: null, source: null, reason: null, closed: '2026-08-01', closedCommit: null })}\n`, 'utf8');
       const result = tasks('doctor');
       expect(result.status).toBe(0);
       expect(result.stdout).not.toContain('only in the working tree');
     });
+  });
+
+  // The other side of the same guard, and the reason it cannot be dropped as
+  // redundant: HEAD does carry this store, so without the guard the
+  // comparison runs and reports a close the branch never owed anyone.
+  it('doctor compares no store against HEAD but the tracked default, even when HEAD carries the path it was given', () => {
+    const dir = mkdtempSync(path.join(os.tmpdir(), 'universalis-aside-store-'));
+    const cwd = process.cwd();
+    const record = (state: string): string =>
+      `${JSON.stringify({ id: 'a', title: 'a', kind: 'task', state, severity: null, system: null, spec: null, clause: null, requires: [], files: [], deliverable: null, evidence: null, source: null, reason: null, closed: state === 'done' ? '2026-08-01' : null, closedCommit: null })}\n`;
+    mkdirSync(path.join(dir, 'docs', 'specs'), { recursive: true });
+    mkdirSync(path.join(dir, 'docs', 'audits'), { recursive: true });
+    writeFileSync(path.join(dir, 'docs', 'audits', 'systems.json'), JSON.stringify({ unowned: { note: '', paths: ['docs', '*.md'] }, systems: [] }), 'utf8');
+    writeFileSync(path.join(dir, 'docs', 'specs', 'demo-spec.md'), '# Demo spec\n\n## Deliverable\n\nX.\n\nProof:\n\n- It holds.\n\n## Decisions\n\n## Open questions\n\nNone.\n', 'utf8');
+    writeFileSync(path.join(dir, 'docs', 'tasks.jsonl'), '', 'utf8');
+    const aside = path.join(dir, 'docs', 'aside.jsonl');
+    writeFileSync(aside, record('open'), 'utf8');
+    const repo = installDataGit(dir, 'main');
+    try {
+      process.chdir(dir);
+      writeFileSync(aside, record('done'), 'utf8');
+      const result = runInProcess(['doctor', '--store', aside, '--branch', 'demo-spec']);
+      expect(result.status).toBe(0);
+      expect(result.stdout).not.toContain('only in the working tree');
+    } finally {
+      repo.uninstall();
+      process.chdir(cwd);
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 
   it('doctor warns when a done task names a closing commit not reachable from HEAD', () => {
