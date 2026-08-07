@@ -1,4 +1,4 @@
-# a-driver-renders-the-play-surface-and-cannot-extend-it
+# in-process-module-api
 
 ## Deliverable
 
@@ -54,7 +54,7 @@ Proof:
 
 ## Goal
 
-One play surface, reachable from below `ui`, that a driver can render and cannot extend.
+One in-process API for playing the game, below `ui`, that a driver renders and cannot extend.
 
 ## Decisions
 

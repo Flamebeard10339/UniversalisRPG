@@ -5,7 +5,7 @@
 `src/main.tsx` has rendered "Universalis — text-adventure GUI pending" since the legacy GUI was
 decommissioned, and `src/ui` does not exist. This branch builds the play surface's second driver: a
 React app over the command table and published view that
-`a-driver-renders-the-play-surface-and-cannot-extend-it` establishes, with no way to reach the
+`in-process-module-api` establishes, with no way to reach the
 runtime otherwise. Everything that makes the two drivers the same game is settled by then; what this
 branch owes is that the GUI is genuinely one of them and not a second engine wearing a UI.
 
