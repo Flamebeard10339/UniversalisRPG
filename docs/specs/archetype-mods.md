@@ -48,11 +48,12 @@ Proof:
   lands. It is `buffs-generalized`'s mechanism with a sign and a duration, not a second one, and a
   `# test` shows a struck enemy losing health after the swing that applied it and stopping when it
   expires.
-- [c7] All four are **actor-carried persistent effects**, not action-declared hooks. A player-side
-  passive has no action of its own to hang `on hit:` on — the swing the player resolves is the
-  encounter's `fight:`, declared on the entity — so the trigger that reaches an allocated passive is
-  the actor-carried one. `on hit:` and `on hit self:` stay correct for an entity or an item that
-  declares a swinging action, and this branch authors none.
+- [c7] All four are authored as **actor-carried persistent effects**, because a passive is carried by
+  whoever allocated it rather than written onto a swing. `on hit:` and `on hit self:` are the second
+  authoring route for the same moment, correct for a weapon or an entity that declares a swinging
+  action of its own; `combat-events`' fixture table describes that route, and this branch takes the
+  other one because the content it owes is passives. Neither is a lesser form of the other, and no
+  fixture needs both.
 - [c8] A persistent effect's results can name **the other party in the moment**. Thorns fires on
   `damage-taken`, whose moment identifies the actor struck, and must damage the one who struck them;
   poison fires when the player deals damage and must land on the target. Both are the same
@@ -90,13 +91,16 @@ Proof:
   generic machinery this branch may legitimately need. What was actually being protected is that the
   runtime contains no *archetype*, and c2 states that as a command anyone can run — where "no source
   diff" was a promise nobody could check without reading the whole diff.
-- **All four fixtures collapse to one trigger, and that is a finding rather than a preference.**
-  `combat-events`' fixture table assigns `on hit:` to poison, rage and accelerated vigor and a
-  persistent effect only to thorns. Writing the content against the cluster design shows that
-  assignment cannot hold: `on hit:` is declared on an action, the player's swing is the entity's
-  `fight:`, and an allocated passive owns no action. The actor-carried trigger is the only one that
-  reaches a passive, so it carries all four. This does not make `on hit:` wrong — it makes it the
-  tool for a thing that swings, which no passive is.
+- **All four fixtures take one trigger, and that is a consequence of c8 rather than a limitation of
+  `on hit:`.** An earlier draft of this spec claimed the fixture table could not hold, on the grounds
+  that a passive owns no action to declare a hook on. That conflated an action's *owner* with its
+  *actor*: `fight:` is authored under `# entity giant-rat`, but the player is who performs it — the
+  player has no `# entity` at all, and
+  `non-entity-action-owner-inherits-player-stats` records that the global `# stat` bases are their
+  sheet for exactly that reason. `on hit self:` on a `fight:` lands on the player and always would
+  have. What actually decides the question is c8: once a persistent effect's results can name the
+  other party, all four fixtures are expressible as persistent effects, and a passive carried by an
+  actor is the natural home for one. The choice is authoring convenience, not necessity.
 - **Two-party results are a latent requirement in `combat-events`, not a new ask.** Thorns fires on
   `damage-taken` and must damage the attacker, so results already had to be able to name the other
   party or thorns would not work as that spec describes it. Poison needs the same in the opposite
@@ -118,9 +122,10 @@ module store. Any GUI.
 
 ## Open questions
 
-- Whether `combat-events` states c8 itself or this branch asks for it. It is that branch's
-  primitive and its fixture table already implies it; the honest outcome is an amendment there
-  rather than a workaround here, and this spec should not be worked until that is settled.
+- Whether `combat-events` states c8 itself or this branch asks for it. It is that branch's primitive
+  and its own thorns fixture already requires it — an effect firing on `damage-taken` must reach the
+  attacker — so the honest outcome is one amendment there rather than a workaround here. This is the
+  single upstream question this branch waits on.
 - Which cluster shapes the archetype jewels use. The trial picks `ring`, `wheel` and `double-ring`
   per archetype; whether the signature passive sits on a hub two points from any edge or opposite
   the entry three points either way round is a placement judgement and the worker may make it.
