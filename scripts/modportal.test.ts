@@ -4,6 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { tsxCli } from './lib/tsxCli';
+import { run } from './modportal';
 
 const repoRoot = path.join(import.meta.dirname, '..');
 const script = path.join(repoRoot, 'scripts/modportal.ts');
@@ -15,8 +16,22 @@ interface Run {
 }
 
 function runModportal(args: string[]): Run {
-  const result = spawnSync(process.execPath, [tsxCli, script, ...args], { cwd: repoRoot, encoding: 'utf8' });
-  return { status: result.status ?? 1, stdout: result.stdout, stderr: result.stderr };
+  const stdout: string[] = [];
+  const stderr: string[] = [];
+  const originalLog = console.log;
+  const originalError = console.error;
+  const previousExitCode = process.exitCode;
+  process.exitCode = undefined;
+  console.log = (...values: unknown[]) => void stdout.push(`${values.map(String).join(' ')}\n`);
+  console.error = (...values: unknown[]) => void stderr.push(`${values.map(String).join(' ')}\n`);
+  try {
+    run(args);
+    return { status: process.exitCode === undefined ? 0 : Number(process.exitCode), stdout: stdout.join(''), stderr: stderr.join('') };
+  } finally {
+    console.log = originalLog;
+    console.error = originalError;
+    process.exitCode = previousExitCode;
+  }
 }
 
 function dsl(text: string): string {
@@ -234,5 +249,15 @@ describe('modportal CLI', () => {
       expect(synced.stdout).toContain('0 enabled, 1 available');
       expect(manifestOf(dir).intent).toEqual({ 9: false });
     });
+  });
+});
+
+// The one real process in this file, kept under the c5 named-handful rule:
+// only a spawn can prove the direct-execution guard hands argv to run().
+describe('the CLI entry, as a real process', () => {
+  it('prints usage and exits 1 when invoked with no arguments', () => {
+    const result = spawnSync(process.execPath, [tsxCli, script], { cwd: repoRoot, encoding: 'utf8' });
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('Usage: tsx scripts/modportal.ts');
   });
 });
