@@ -61,11 +61,14 @@ Proof:
   with the dispatch it is supposed to control. A stored blocking flag and a derived one are two
   answers to one question, which is the defect this clause exists to refuse.
   proof: vitest scripts/tasks/friction.test.ts
-- [c4] A blocking question has a route that is neither deciding it nor stalling the worker. An agent
-  can file one against the record it is working, name it where the dispatch machinery already reads,
-  and have exactly what depends on it halt while the rest proceeds; answering or dismissing it
-  releases the hold. Recorded as the remedy for `run-an-orchestrator-over-three-parallel-tasks`
-  c3 — which is deferred out of that spec, still unmet, and is this clause's real acceptance test.
+- [c4] A blocking question has a route that is neither deciding it nor stalling the worker, and it
+  names **who should decide it**. An agent can file one against the record it is working, address it
+  to the role whose decision would hold, name it where the dispatch machinery already reads, and
+  have exactly what depends on it halt while the rest proceeds; answering or dismissing it releases
+  the hold. The addressee is the point rather than a label on it: a question parked with no decider
+  is a stall with extra steps, and the run failed its own c3 because escalating had no destination.
+  Recorded as the remedy for `run-an-orchestrator-over-three-parallel-tasks` c3 — which is deferred
+  out of that spec, still unmet, and is this clause's real acceptance test.
   proof: vitest scripts/tasks/friction.test.ts
 - [c5] Fault `nobody` is never counted as a defect. The query reports it, because a question nobody
   could have answered is real information about where knowledge was missing, and excludes it from
@@ -128,6 +131,23 @@ re-deriving it.
   filed as records by this branch's planning rather than converted wholesale — a prose archive
   rewritten into structured records is a third copy of everything, which is what the branch exists
   to stop. Git holds every word.
+- **Decision placement, not attention scarcity — and it is why c4 has an addressee.** The question
+  this workflow answers for every decision is who decides it most durably. The author's time being
+  scarce is true and is a consequence, not the principle. A mechanical decision belongs to the
+  worker that just read the code, because routing it upward makes it both worse and slower; a
+  planning decision belongs to the planner-and-author pairing, because that pairing has the best
+  model of what is coming and its decisions are least likely to be rewritten. **The test is
+  durability: a decision made in the wrong place gets re-decided, and the re-decision is the cost.**
+  That measures whether the placement was right, where counting author interruptions only measures
+  whether the author was disturbed. `run-an-orchestrator-over-three-parallel-tasks` c3 is therefore
+  wrong as written and not merely unmet — "the orchestrator does not adjudicate" is a blanket
+  prohibition where a placement question was wanted, which is the same error as enumerating four
+  classes where two axes were wanted. Its own log carries the evidence, read the wrong way at the
+  time: the pass-1 spec-ownership ruling re-ruled at pass 2 ("I named a threshold where the case
+  wanted an invariant"), the c2 correction that named a dead-code site, and fix-the-neighbour three
+  for three. Every one is a decision that did not hold, and every one was made mid-run rather than
+  in planning. This branch does not build re-decision tracking; it makes the addressee recordable,
+  which is what any later measurement of durability would have to read.
 - **It reports, and the reporting is the product.** No gate, no threshold, no exit code. This is
   recorded as a clause (c9) rather than left as intent, because every previous measurement added
   here grew a gate within two branches, and CLAUDE.md's own account of the retired comment budget is
