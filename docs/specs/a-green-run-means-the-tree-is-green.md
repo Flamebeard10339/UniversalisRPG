@@ -24,9 +24,12 @@ Proof:
   here. `scripts/audit-status.ts` and `scripts/mutate.ts` are outside the task system and are
   explicitly **not** in scope; `scripts/lib/sourceFiles.ts` was scoped out with them and later
   routed through the seam anyway by the pass-1 finding on audit-prompt's hermeticity.
-  `scripts/tasks/realGitFixture.ts` is the named real-git set c5 keeps, excluded the way
-  `lib/git.ts` is.
-  proof: `grep -rn "spawnSync('git'\|execFileSync('git'" scripts/tasks scripts/lib --include="*.ts" | grep -v "\.test\.ts" | grep -v "lib/git.ts" | grep -v "realGitFixture.ts"` returns nothing.
+  Three passes each found one more file spawning `git` for tests — `realGitFixture.ts`, then
+  `sourceFiles.ts`, then `realGitRepo.ts` — and each was answered with one more exclusion, so the
+  rule is stated rather than listed: the production seam is `lib/git.ts`, and a module that spawns
+  a real `git` for tests is named `realGit*`. That name is the same declaration c5's named set is
+  read from, so a new one cannot be added without joining the set.
+  proof: `grep -rn "spawnSync('git'\|execFileSync('git'" scripts/tasks scripts/lib --include="*.ts" | grep -v "\.test\.ts" | grep -v "lib/git.ts" | grep -v "realGit"` returns nothing.
 - [c2] `scripts/lib/git.ts` has an install point, so a caller can supply git facts as data. The
   installed implementation is what the seam's own callers read; nothing reaches around it.
   proof: vitest `scripts/lib/git.test.ts`

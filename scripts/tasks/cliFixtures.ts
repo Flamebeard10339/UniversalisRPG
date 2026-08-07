@@ -233,7 +233,10 @@ class DataGit {
         return base === null ? null : this.commits[Math.min(base, this.commits.length - 1)].sha;
       },
       head: () => this.tip?.sha ?? null,
-      branch: () => this.branchName,
+      // Null on an unborn history: `rev-parse --abbrev-ref HEAD` fails
+      // before the first commit, where `ls-files` succeeds and answers
+      // empty, so the two disagree about what "nothing yet" looks like.
+      branch: () => (this.tip === null ? null : this.branchName),
       resolveCommit: (revspec) => {
         const index = this.indexOf(revspec);
         return index === null ? null : this.commits[index].sha;
@@ -279,7 +282,7 @@ class DataGit {
           .map((commit) => commit.sha)
           .reverse();
       },
-      lsFiles: () => (this.tip === null ? null : [...this.tip.tree.keys()].sort()),
+      lsFiles: () => [...(this.tip?.tree.keys() ?? [])].sort(),
     };
   }
 

@@ -3,7 +3,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import * as git from '../lib/git';
-import { defaultStoreGitFixture, enclosingGitFixture, fixture, gitFixture } from './cliFixtures';
+import { defaultStoreGitFixture, enclosingGitFixture, fixture, gitFixture, unbornDefaultStoreFixture } from './cliFixtures';
 
 // c3: which git a test reads is declared by the fixture it calls, and the
 // same read answers differently under each — not implied by which fields
@@ -90,6 +90,29 @@ describe('gitFixture answers git from the data its own commits built', () => {
         expect(git.fileAt(rev, 'tracked.txt')).toBe('first version');
         expect(git.fileAt('main', 'tracked.txt')).toBeNull();
         expect(git.dirtyPaths()).toEqual(['tracked.txt']);
+      } finally {
+        process.chdir(at);
+      }
+    });
+  });
+
+  // Answered against real git in scripts/lib/git.test.ts; asserted here
+  // because an unborn history is the one state where the reads disagree
+  // about what "nothing yet" means, and a fixture that gets it wrong hands
+  // its caller a null the real seam never produces.
+  it('the unborn form answers as git does before a first commit, which is not uniformly null', () => {
+    unbornDefaultStoreFixture(({ dir }) => {
+      const at = process.cwd();
+      process.chdir(dir);
+      try {
+        expect(git.head()).toBeNull();
+        expect(git.branch()).toBeNull();
+        expect(git.resolveCommit('HEAD')).toBeNull();
+        expect(git.fileAt('HEAD', 'docs/tasks.jsonl')).toBeNull();
+        // Not null: `ls-files` exits zero on an empty index, and
+        // `sourceFiles.trackedFiles` throws on a null the seam never gives.
+        expect(git.lsFiles()).toEqual([]);
+        expect(git.dirtyPaths('docs/tasks.jsonl')).toEqual(['docs/tasks.jsonl']);
       } finally {
         process.chdir(at);
       }

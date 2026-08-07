@@ -37,6 +37,19 @@ describe('git seam', () => {
     expect(head()).toBeNull();
   });
 
+  // The reads disagree here, which is why a fixture standing in for this
+  // state has to be checked against it: `rev-parse` fails before the first
+  // commit while `ls-files` succeeds on an empty index, so "nothing yet" is
+  // null from one and an empty list from the other.
+  it('an unborn HEAD is null from the revision reads and empty from ls-files, not uniformly null', () => {
+    writeFileSync(path.join(dir, 'untracked.txt'), 'x', 'utf8');
+    expect(branch()).toBeNull();
+    expect(resolveCommit('HEAD')).toBeNull();
+    expect(mergeBase('main')).toBeNull();
+    expect(lsFiles()).toEqual([]);
+    expect(dirtyPaths()).toEqual(['untracked.txt']);
+  });
+
   it('branch names the current branch, and is null outside a repo rather than throwing', () => {
     commit('first');
     spawnSync('git', ['checkout', '-q', '-b', 'named-branch'], { cwd: dir });
