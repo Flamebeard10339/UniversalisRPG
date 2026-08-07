@@ -98,3 +98,97 @@ Proof:
   c4 fixes that it must be declared, not what it receives.
 - Whether the command discovers content files by glob or by the module manifest is the worker's
   call once the region is read; c1 fixes the set it must cover, which is every `# save` in content.
+
+## Audit passes
+
+### Pass 1 — 2026-08-07
+
+- base: `b56ba3ee30365f83e10738189ac42d94bcad295c`
+- head: `b3fe25d5e4ee00237f2bb4c4f1613bc9a1870518`
+- proof 1: met — Byte identity attacked five ways with `npm run mutate` over a hand-written manifest, all KILLED and
+ each re-run at scripts/migrate-saves.test.ts with the mutant still applied. (a) `at = edit.span.end` ->
+ `+ 1` in splice() eats the newline after each body; (b) `text.slice(at, edit.span.start)` -> `- 1` eats
+ the byte before it; (c) `return out + text.slice(at)` -> `return out` drops everything after the last
+ fixture; (d) `JSON.stringify({ version: SAVE_VERSION, ...body })` -> `{ ...body, version: SAVE_VERSION }`
+ reorders one key; (e) `section.kind !== 'save'` -> `|| fixtures.length > 0` rewrites only the first save
+ of the run. (a)(b)(c) died on "restamps every # save body and reproduces the file byte for byte
+ otherwise"; (d)(e) died on "returns the shipped content unchanged when the only thing behind it is the
+ version stamp". (d) is the anti-vacuity check that matters: the shipped-content test downgrades the real
+ content/tutorial-island.dsl stamps by regex and asserts the migration reproduces the file exactly, so its
+ expectation is real authored bytes and not the implementation's own serializer — a single reordered key
+ in the emitted JSON reddens it, which it could not do if the expectation were derived from the code. It
+ also guards vacuity itself with `expect(behind).not.toBe(shipped)` and pins the rewrite count at 3. The
+ six-line note c1 names survives because that test compares the whole file, comments included. Disk is
+ asserted separately ("lands on disk exactly the text it reported, byte for byte") against the fixture
+ template rather than against itself, which is the hole b9a342f closed. Byte preservation also verified
+ outside the suite with `npm run inspect`: a CRLF file comes back CRLF throughout, and a body line with
+ two leading and three trailing spaces keeps all five, because splitSections' span covers the trimmed
+ text only. Re-run: the manifest is reproducible from this evidence; all five finds are unique strings in
+ scripts/migrate-saves.ts.
+- proof 2: met — `npm run mutate`: `if (saved.version === SAVE_VERSION) {` -> `if (saved.version === -1) {`
+ (removing the skip) KILLED by scripts/migrate-saves.test.ts > "skips a fixture already stamped
+ SAVE_VERSION rather than transforming it again", re-run at its own file with the mutant still applied.
+ The idempotence tests are not self-fulfilling: they run `addsRng`, a transform that is deliberately NOT
+ idempotent (`{...body, rng: 123}` applied twice would still read 123, but the skip is what stops the
+ second pass writing at all), and "changes no byte on disk when re-run over content it has already
+ migrated" reads the file back off disk twice and also asserts the transform did fire the first time
+ (`expect(migrated).toContain('"rng":123')`), so it cannot pass with a migrate that does nothing. Skipping
+ is keyed on the version stamp before the transform runs, so idempotence is a property of the stamp rather
+ than of whatever transform a bump happens to write.
+- proof 3: met — Two mutations, both KILLED and both re-run at scripts/migrate-saves.test.ts with the mutant
+ applied: `if (problems.length > 0) {` -> `> 99` (write anyway) died on "writes no file at all when one
+ rewritten fixture does not load"; deleting the prune-warning loop (`for (const warning of warnings)
+ problems.push(...)` -> `void warning`) died on "catches a rewrite that survives the field table but names
+ something the registry does not hold". The second is the one that matters, because it is the extra
+ strength the spec's Decisions claim validating-by-loading buys over restating checkSave's field table.
+ All-or-nothing is asserted across files, not just within one ("holds back a file whose own fixtures are
+ fine when another file has a bad one"), and on disk ("leaves every byte on disk alone when it refuses"
+ compares readContent before and after). Structurally, refused() hardcodes `files: []`, so main()'s
+ unconditional writeMigration cannot write a half-validated set — the invariant is at the assembly point,
+ not the write. Probed the boundary further with `npm run inspect`: a transform emitting NaN or Infinity is
+ caught (reported as "holds null"). One gap found and filed low, not blocking: validation runs on
+ rewrite.body, the in-memory object, rather than on JSON.parse(rewrite.text), the bytes that land — see
+ the finding on `undefined`.
+- proof 4: met — `npm run mutate`: `if (change === null) {` -> `if (change === null) change = NO_FIELD_MOVED;
+ if (change === undefined) {` — i.e. an unset transform silently read as "no field moved", which is exactly
+ the confusion c4 forbids — KILLED by scripts/migrate-saves.test.ts > "refuses an unset shape change",
+ re-run at its own file with the mutant applied. The distinction is asserted directly rather than implied
+ ("separates 'nothing moved' from 'nobody said', which is the whole point of declaring it" runs both
+ NO_FIELD_MOVED and null through migrate and asserts opposite `ok`), the declaration is printed on line 0
+ of every run, and the end-to-end refusal is exercised through a real subprocess that checks exit status 1
+ and the untouched bytes on disk. The clause as written is met. Its neighbour is not, and is filed medium:
+ nothing ties the declaration to the version it was written for, so a transform left behind by the previous
+ bump reads as this bump's declaration — and the subprocess test above is `it.skipIf(SHAPE_CHANGE !== null)`,
+ so it turns itself off in precisely that state.
+- proof 5: met — Two mutations, both KILLED and re-run at scripts/migrate-saves.test.ts with the mutant applied:
+ classifying `expect:` as 'input' died on "names every recording it rewrote as needing regeneration, and no
+ input"; deleting the `for (const fixture of fixtures) found.set(fixture.id, 'unreferenced')` seeding died
+ on "reports a fixture no # test references". The three classifications are asserted as three separate
+ printed lines over one fixture module carrying one `load:`, one `expect:` and one save no test names, and
+ the negative case is covered too ("asks for no regeneration when the run rewrote no recording" rewrites
+ the same module with `expect: carried` turned into `load: carried` and asserts /create-valid-test never
+ appears) — so the regeneration line cannot be unconditional. Classification is keyed on the qualified id
+ the registry's own tests resolved to, not a suffix match on the heading id, which is what makes the
+ nested-directory case correct: verified with `npm run inspect` over two subdirectories both holding
+ island.dsl, which classify and rewrite independently as alpha.here and beta.here. One survivor filed low:
+ the `&& found.get(directive.save) === 'unreferenced'` guard is the only thing making 'recording' beat
+ 'input' for a fixture a test both loads and expects, and no test reaches it.
+- proof 6: unmet — Measured, not taken on report. `npm run mutate` with `export const SAVE_VERSION = 6;` ->
+ `= 7;` and `all: true`: 6 failed of 1815 with 1 already failing before the mutation, so 5 new failures,
+ and mutate walked the re-run scope to [scripts/migrate-saves.test.ts, src/runtime/integration.test.ts] —
+ two files, not one. Two of the five are named in the kill line and are this branch's own new tests:
+ scripts/migrate-saves.test.ts > "returns the shipped content unchanged when the only thing behind it is
+ the version stamp" (its regex looks for `{"version":7,` in content still stamped 6, finds nothing, and
+ trips its own `expect(behind).not.toBe(shipped)` vacuity guard) and > "has nothing to do against shipped
+ content, which is already at SAVE_VERSION". The clause's stated count — "three failures in one file, down
+ from the eight across four" — is therefore false as of the branch's final state. It was true when it was
+ measured: the event log records it at 04:43 against commit 15da5f9, and commit ff1079c added
+ migrate-saves.test.ts at 00:59 the following, so the branch invalidated its own measurement afterwards.
+ The clause's qualitative half survives and should be preserved when this is corrected: all five failures
+ are shipped-content failures, and all five go green once `npm run migrate-saves` restamps content, so the
+ migration surface is still content only; and the causal half is verified independently — `grep '"version":[0-9]'`
+ over the tree returns only content/tutorial-island.dsl and src/content/serialize.test.ts, the latter kept
+ by the spec's own Decisions, and none of save.test.ts, session.test.ts or play-cli.test.ts reddens under
+ the bump. What is owed is a re-measure and a restated count, or a clause that stops pinning a number a
+ later commit on the same branch can falsify. Re-run: the manifest is one entry, find `export const
+ SAVE_VERSION = 6;` in src/runtime/save.ts, replace with 7, `all: true`.
