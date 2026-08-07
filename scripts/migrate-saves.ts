@@ -42,7 +42,6 @@ export const NO_FIELD_MOVED: ShapeChange = { declared: 'no field moved', moved: 
 export interface MigrationReport {
   lines: string[];
   ok: boolean;
-  // Empty whenever ok is false, so a caller cannot write a half-validated set.
   files: ContentFile[];
 }
 
@@ -61,16 +60,19 @@ function moduleSourceOf(file: ContentFile): ModuleSource {
   return { name: path.basename(file.path).replace(/\.[^.]*$/, ''), text: file.text };
 }
 
-function classify(registry: Registry): Map<string, Classification> {
+// Every fixture the run saw starts unreferenced and is upgraded by the tests
+// that name it, so a `# save` no `# test` reaches is reported rather than
+// simply absent from the classification.
+function classify(registry: Registry, fixtures: readonly Fixture[]): (id: string) => Classification {
   const found = new Map<string, Classification>();
-  for (const save of registry.saves.keys()) found.set(save, 'unreferenced');
+  for (const fixture of fixtures) found.set(fixture.id, 'unreferenced');
   for (const test of registry.tests.values()) {
     for (const directive of test.directives) {
       if (directive.kind === 'load' && found.get(directive.save) === 'unreferenced') found.set(directive.save, 'input');
       if (directive.kind === 'expect') found.set(directive.save, 'recording');
     }
   }
-  return found;
+  return (id) => found.get(id) ?? 'unreferenced';
 }
 
 function splice(text: string, edits: readonly Rewrite[]): string {
@@ -118,6 +120,7 @@ export function migrate(files: readonly ContentFile[], change: ShapeChange | nul
   }
 
   const namespaces = new Map(loaded.parsed.map((module) => [module.source, module.namespace]));
+  const fixtures: Fixture[] = [];
   const rewrites: Rewrite[] = [];
   const skipped: Fixture[] = [];
   const problems: string[] = [];
@@ -128,6 +131,7 @@ export function migrate(files: readonly ContentFile[], change: ShapeChange | nul
       if (section.kind !== 'save') continue;
       const { id, saved } = parseSaveSection(section);
       const fixture: Fixture = { id: qualify(namespace, id), file: file.path, version: saved.version };
+      fixtures.push(fixture);
       if (saved.version === SAVE_VERSION) {
         skipped.push(fixture);
         continue;
@@ -143,20 +147,20 @@ export function migrate(files: readonly ContentFile[], change: ShapeChange | nul
 
   problems.push(...validationProblems(rewrites, loaded.registry));
 
-  const classifications = classify(loaded.registry);
+  const classificationOf = classify(loaded.registry, fixtures);
   const lines = [`shape change: ${change.declared}`, `SAVE_VERSION ${SAVE_VERSION}`, ''];
 
-  for (const rewrite of rewrites) lines.push(`${rewrite.fixture.file}: ${rewrite.fixture.id} — version ${rewrite.fixture.version} rewritten to ${SAVE_VERSION} as ${classifications.get(rewrite.fixture.id) ?? 'unreferenced'}`);
+  for (const rewrite of rewrites) lines.push(`${rewrite.fixture.file}: ${rewrite.fixture.id} — version ${rewrite.fixture.version} rewritten to ${SAVE_VERSION} as ${classificationOf(rewrite.fixture.id)}`);
   for (const fixture of skipped) lines.push(`${fixture.file}: ${fixture.id} — already at ${SAVE_VERSION}, left untouched`);
 
-  const unreferenced = [...classifications].filter(([, kind]) => kind === 'unreferenced').map(([id]) => id);
+  const unreferenced = fixtures.filter((fixture) => classificationOf(fixture.id) === 'unreferenced').map((fixture) => fixture.id);
   if (unreferenced.length > 0) lines.push('', `No # test names these fixtures, so nothing replays them: ${unreferenced.join(', ')}`);
 
   if (problems.length > 0) {
     return refused([...lines, '', 'Wrote nothing: a rewritten fixture does not load against the registry.', ...problems]);
   }
 
-  const recordings = rewrites.filter((rewrite) => classifications.get(rewrite.fixture.id) === 'recording').map((rewrite) => rewrite.fixture.id);
+  const recordings = rewrites.filter((rewrite) => classificationOf(rewrite.fixture.id) === 'recording').map((rewrite) => rewrite.fixture.id);
   if (recordings.length > 0) {
     lines.push('', `These are recordings of a replay, and a shape migration only makes them loadable — it does not make them true. Regenerate each with ${CREATE_VALID_TEST}: ${recordings.join(', ')}`);
   }
