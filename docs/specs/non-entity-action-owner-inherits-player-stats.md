@@ -108,9 +108,21 @@ Proof:
   the `CONTENT_SECTION_MAPS` loop with the kind, the id and the section's own value in hand, which is
   everything both rules need. Adding a third traversal of every section to ask a fourth question
   about actions would be a parallel structure to keep in step with that one.
+- **The two synthetic owners are not symmetric, which answers the open question.** A recipe reaches
+  the check — `validateBuiltRegistry` walks `recipeActions` — and is banned there, but the grammar
+  refuses `target:` as an unknown recipe field before the ban is ever consulted, so the ban is total
+  and the message a recipe author sees is the grammar's. A travel action never reaches the check at
+  all: `travel` is in neither `CONTENT_SECTION_MAPS` nor `recipeActions`, and `travelAction` builds
+  its `Action` literally from a label, a `relocate` result and a distance, with no `target:` anywhere
+  it could come from. So travel is unreachable rather than refused, and `c1` holds over it vacuously.
+  Nothing was added to make either case reachable, because a load error nobody can provoke is a check
+  that has to be kept working for no reader.
+- **No concept was registered.** `the registry` already claims `src/content/registry.ts`, and these
+  are two more load-time rules inside the validation it names, not a second job for that file. A
+  second concept over one file is the signal that the file does two things, so registering one here
+  would spend that signal on a false positive. The `produces` forecast was cleared instead.
 
 ## Open questions
 
-- Whether `target:` on a `# recipe` or a `travel` action is reachable at all is left to the slice.
-  Both are synthetic owners built by `findActionOwner`, so the rule covers them by construction, but
-  whether an author can even write one decides if the error is reachable or merely total.
+None. The one this spec opened — whether `target:` on a `# recipe` or a `travel` action is reachable
+at all — is answered above, and the two synthetic owners turn out to differ.
