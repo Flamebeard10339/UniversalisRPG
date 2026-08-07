@@ -893,6 +893,32 @@ describe('resolve: forward progress', () => {
     expect(() => requireBoundaryNotPast({ at: secondsToMs(4), source: 'buff tide:seep-rate' }, secondsToMs(4))).not.toThrow();
   });
 
+  // A rate slow enough that one milli-unit takes longer than a minute sends
+  // msUntilEmpty negative for a level under one, so the pool asks to be emptied
+  // before the span started.
+  it('rejects a boundary before the current instant through resolve, not only as a rule', () => {
+    const registry = loadModule(`
+# stat seep-rate
+base: -0.001
+# stat seep-cap
+base: 10
+# flag dry
+# resource pool
+rate: seep-rate
+max: seep-cap
+start: 10
+on empty:
+  set: dry
+`);
+    const state = createGameState();
+    initResources(state, registry);
+    (state.resources as Record<string, number>)['pool'] = 0.5;
+
+    expect(() => resolve(state, registry, secondsToMs(5))).toThrow(RuntimeError);
+    expect(() => resolve(state, registry, secondsToMs(5))).toThrow('resource pool put a boundary at -29999, before the current instant 0');
+    expect(state.time).toBe(0);
+  });
+
   // A pool level off the integer scale is what the ULP class looked like: the
   // emptying instant rounds back onto now, so the boundary never moves and
   // nothing consumes it. Before the guard this hung the process outright.
