@@ -264,7 +264,7 @@ Proof:
   second save migration. Applying to inventory would have made every jewel an instance in order to
   carry a property that only means anything once the jewel is somewhere — "increased effect of health
   passives *in this cluster*" has no referent until there is a cluster.
-- **A mod selects by stat, not by tag.** The four shipped orbs name `max-health`, `attack`, `defense`
+- **A cluster effect selects by stat, not by tag.** The four orbs name `max-health`, `attack`, `defense`
   and `regeneration`, and a mod scales every payload clause naming its stat. Selecting by stat is
   exact — `+12.5` is arithmetic on a number the passive already declares — where selecting by tag
   needs a tag vocabulary agreed between whoever authors passives and whoever authors orbs. A tag
