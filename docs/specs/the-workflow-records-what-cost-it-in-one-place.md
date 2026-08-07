@@ -61,19 +61,29 @@ Proof:
   with the dispatch it is supposed to control. A stored blocking flag and a derived one are two
   answers to one question, which is the defect this clause exists to refuse.
   proof: vitest scripts/tasks/friction.test.ts
-- [c4] A blocking question has a route that is neither deciding it nor stalling the worker, and it
-  names **who should decide it**. An agent can file one against the record it is working, address it
-  to the role whose decision would hold, name it where the dispatch machinery already reads, and
-  have exactly what depends on it halt while the rest proceeds; answering or dismissing it releases
-  the hold. The addressee is the point rather than a label on it: a question parked with no decider
-  is a stall with extra steps, and the run failed its own c3 because escalating had no destination.
-  Recorded as the remedy for `run-an-orchestrator-over-three-parallel-tasks` c3 — which is deferred
-  out of that spec, still unmet, and is this clause's real acceptance test.
+- [c4] **A question reaches its decider.** Every mechanism below serves that one property, and a
+  reader grading this clause grades the property — the list is how it is reached today, never its
+  extent. An agent can file a question against the record it is working and address it to the role
+  whose decision would hold; exactly what depends on it halts while the rest proceeds; answering or
+  dismissing it releases the hold; and **the addressee changes what the tooling does with it**, so
+  that a question addressed away from the worker is never handed back to one as work to implement.
+  A recorded decider that routes nothing is a label, and a question parked behind a label is a stall
+  with extra steps. Amended 2026-08-06 after an audit graded the enumeration and not the property;
+  the original text mixed the two, which is the error `PLANNER_LESSONS` names first.
+  Owned by two slices, and outstanding until both land. Recorded as the remedy for
+  `run-an-orchestrator-over-three-parallel-tasks` c3 — deferred out of that spec, still unmet, and
+  this clause's real acceptance test.
   proof: vitest scripts/tasks/friction.test.ts
-- [c5] Fault `nobody` is never counted as a defect. The query reports it, because a question nobody
-  could have answered is real information about where knowledge was missing, and excludes it from
-  every count and rate presented as a defect measure. Reporting and counting are different acts and
-  this clause turns on the difference.
+- [c5] Fault `nobody` is never counted as a defect, and **absence of a fault is never read as one**.
+  The query reports `nobody`, because a question nobody could have answered is real information about
+  where knowledge was missing, and excludes it from every count and rate presented as a defect
+  measure. Reporting and counting are different acts and this clause turns on the difference. A
+  record predating the field is reported in its own **unclassified** bucket and excluded from those
+  same rates — never folded into `nobody`, which would look like a small convenience and would empty
+  the value of the meaning the whole axis depends on. Unclassified is a reported category, not a
+  fourth fault: fault stays exactly tooling, contract or nobody, and absence stays absence. They are
+  not backfilled — 76 live records carry no fault, the number falls as they close, and guessing one
+  for a record whose author is gone is how `nobody` becomes the catch-all.
   proof: vitest scripts/tasks/friction.test.ts
 - [c6] A record may name the lesson it breaches, by a handle that survives editing the lesson's own
   prose. Renaming or rewording an instruction must not orphan the records that cite it, and a
@@ -91,6 +101,44 @@ Proof:
 - [c9] Nothing gates on any of it. No leg of `merge-ready`, no CI check and no command's exit code
   reads a fault, a breach or a count. The channel is a report and refuses to become a threshold.
   proof: vitest scripts/tasks/mergeReady.test.ts
+- [c10] **A recurrence is a new observation, never an edit.** Recording that a friction happened
+  again appends an occurrence that carries its own note and names the record it recurs on; nothing
+  is incremented and no description is overwritten, so the count is derived from the occurrences and
+  cannot disagree with them. Two reasons, both already written down here. `.gitattributes` keeps the
+  store out of `merge=union` because two branches editing one record silently keep both copies under
+  one id — and a counter is a field concurrent branches edit by construction, whose correct
+  resolution is to add the two sides, which git cannot compute. And one description overwritten N
+  times loses what N observations each said: the nine mutation-manifest instances differed by spec,
+  by pass, and by what each cost. **Owned by two slices — the append and the derivation — and
+  outstanding until both land.**
+  proof: vitest scripts/tasks/friction.test.ts
+- [c11] **Filing a record shows what already claims the path it names, and never refuses.** The
+  prompt is by path and never by title, because a path is the same string for everyone while a title
+  is authored prose two agents will not choose alike — `priorArt` already reads every record's
+  `writes` and `files` in every state, so this is wiring, not a new query. Attaching an occurrence to
+  an existing record is available and deliberate; filing a new record stays the cheap default. That
+  asymmetry is the clause, not a preference: a duplicate is visible and cheap to triage, while a
+  wrong merge makes a distinct defect vanish and the count lie, so the tool must never make the
+  merge the path of least resistance — least of all for an agent that has just hit the friction and
+  is the worst placed to classify it.
+  proof: vitest scripts/tasks/friction.test.ts
+
+- [c12] **A lesson that keeps costing something surfaces as work for a planner, and nothing in the
+  tooling ever elevates it.** No count is compared to anything, anywhere in any code path. The
+  breach records are the flag: they dedupe by c11 and accumulate by c10, so one lesson holds one
+  record with N occurrences, and a planner reading N decides. The number is a reading aid for a
+  human and never a rule — a stated threshold has been the wrong instrument four times in this
+  repository inside one day, and a raw breach count is confounded by attention besides, which is why
+  c8's denominator is per-lesson and c7's marker is where it comes from. Written as a refusal
+  because the reasonable-sounding alternative is one `if` statement away and would look like
+  tidying.
+  proof: vitest scripts/tasks/friction.test.ts
+- [c13] **A lesson can be retired, and the retirement is recorded.** Removing an instruction is an
+  operation that says what left and why, not a deletion from an array — the same shape, one table
+  over, as a record leaving the store with nothing able to say that it did. Its citations become
+  reportable rather than silently resolving to nothing, which is c6's second half arriving at the
+  case that motivates it.
+  proof: vitest scripts/tasks/briefLessons.test.ts
 
 ## Goal
 

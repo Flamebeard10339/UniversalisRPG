@@ -1,4 +1,3 @@
-import { spawnSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { appendEvents, eventsPathFor, loadEvents, type EventOp, type TaskEvent } from '../lib/eventLog';
@@ -77,8 +76,8 @@ export function usesDefaultStore(config: Config): boolean {
 
 export function dirtyStoreIssue(config: Config): CheckIssue | null {
   if (!usesDefaultStore(config)) return null;
-  const result = spawnSync('git', ['status', '--porcelain', '--', config.storePath], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
-  if ((result.status ?? 1) !== 0 || result.stdout.trim() === '') return null;
+  const dirty = git.dirtyPaths(config.storePath);
+  if (dirty === null || dirty.length === 0) return null;
   return {
     level: 'warning',
     message: `${config.storePath} has uncommitted task-state changes; commit them before cleanup/reset, or another session may miss working-tree-only state`,

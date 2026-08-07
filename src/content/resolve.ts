@@ -1,7 +1,7 @@
 import { DISCOVERED } from './location';
 import { DslError } from '../grammar/parser';
 import { VISITS } from '../grammar/condition';
-import { listMembers } from '../grammar/section';
+import { isFieldEdits, listMembers } from '../grammar/section';
 import { NAMESPACED_KINDS, Namespace, qualify } from './namespace';
 import { ParsedModule } from './universe';
 import { ReferenceKind, visitSection } from './referenceSites';
@@ -55,20 +55,35 @@ function targetKey(module: ParsedModule, kind: string, id: string, namespace: Na
 // `<node>.visits` is how a condition asks how often a dialogue node has been
 // reached, so a flag by that name would be read as a node counter and resolve
 // against a node that does not exist.
-function declareFlag(namespace: Namespace, kind: string, id: string, name: string, where: string): void {
+function declareFlag(namespace: Namespace, kind: string, id: string, name: string, where: string): string {
   if (name === VISITS) throw new DslError(`${where} declares a flag named ${VISITS}, which the engine reads as a dialogue node's visit counter`);
-  namespace.declareMember('flag', kind, id, name);
+  return namespace.declareMember('flag', kind, id, name);
+}
+
+const addedMembers = (value: unknown): string[] => (isFieldEdits(value) ? value.ops.filter((op) => op.op === '+').flatMap((op) => op.values as string[]) : listMembers<string>(value));
+
+export interface MemberOwner {
+  id: string;
+  flags?: unknown;
+  nodes?: { name: string }[];
+}
+
+export interface Member {
+  kind: string;
+  key: string;
 }
 
 // What hangs under an object rather than beside it: the flags it owns, and the
 // nodes of a dialogue, whose visits the engine counts against the node's path.
-function declareMembers(namespace: Namespace, kind: string, value: { id: string; flags?: unknown; nodes?: { name: string }[] }): void {
-  if (kind === 'location') namespace.declareMember('flag', kind, value.id, DISCOVERED);
-  for (const flag of listMembers<string>(value.flags)) declareFlag(namespace, kind, value.id, flag, `# ${kind} ${value.id}`);
-  if (kind === 'dialogue') for (const node of value.nodes ?? []) namespace.declareMember('node', kind, value.id, node.name);
+export function declareMembers(namespace: Namespace, kind: string, value: MemberOwner): Member[] {
+  const declared: Member[] = [];
+  if (kind === 'location') declared.push({ kind: 'flag', key: namespace.declareMember('flag', kind, value.id, DISCOVERED) });
+  for (const flag of addedMembers(value.flags)) declared.push({ kind: 'flag', key: declareFlag(namespace, kind, value.id, flag, `# ${kind} ${value.id}`) });
+  if (kind === 'dialogue') for (const node of value.nodes ?? []) declared.push({ kind: 'node', key: namespace.declareMember('node', kind, value.id, node.name) });
+  return declared;
 }
 
-type Created = { kind: string; value: { id: string; flags?: unknown; nodes?: { name: string }[] } };
+type Created = { kind: string; value: MemberOwner };
 
 const createdSections = (module: ParsedModule): Created[] => module.sections.filter((section) => section.kind !== 'remove') as Created[];
 

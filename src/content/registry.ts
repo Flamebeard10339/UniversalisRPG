@@ -17,7 +17,7 @@ import { Recipe, recipeSchema } from './recipe';
 import { registryCapabilities, validateDialogueReferences, validateRecipeReferences, validateSectionReferences, validateTestReferences } from './references';
 import { ReferenceKind, Visit, visitAction, visitSection } from './referenceSites';
 import { Removal } from './removal';
-import { RESOLUTION_PASSES } from './resolve';
+import { declareMembers, Member, MemberOwner, RESOLUTION_PASSES } from './resolve';
 import { Resource, resourceSchema } from './resource';
 import { ParsedSave } from './saveSection';
 import { Authored, hydrateSection } from '../grammar/section';
@@ -370,14 +370,28 @@ function referencesLoaded(check: () => void): boolean {
   }
 }
 
+interface ActionOwner {
+  actions?: Action[];
+  stats?: Record<string, unknown>;
+}
+
+function fightingOwnerProblem(action: Action, kind: string, owner: ActionOwner, registry: Registry): string | undefined {
+  if (action.target === undefined || kind === 'entitytype') return undefined;
+  if (kind !== 'entity') return `target: ${action.target} makes this a fight, and only a # entity can carry the stats: a fighter is measured by`;
+  if (action.retaliates) return undefined;
+  const max = registry.resources.get(action.target)?.max;
+  if (max === undefined || owner.stats?.[max] !== undefined) return undefined;
+  return `target: ${action.target} is measured by ${max}, which stats: does not set`;
+}
+
 // The grammar refuses an unauthorable action, but an action can also be
 // ASSEMBLED — merged onto a template, patched across modules, or compiled from a
 // recipe — and none of those went through the grammar. Same rule, applied where
 // the section that owns the action can name itself.
-function validateActionTable(where: string, actions: readonly Action[] | undefined): void {
-  for (const action of actions ?? []) {
-    const problem = actionTableProblem(action);
-    if (problem) throw new DslError(`${where} ${actionProblem(action.label, problem)}`);
+function validateActionTable(kind: string, id: string, owner: ActionOwner, registry: Registry): void {
+  for (const action of owner.actions ?? []) {
+    const problem = actionTableProblem(action) ?? fightingOwnerProblem(action, kind, owner, registry);
+    if (problem) throw new DslError(`# ${kind} ${id} ${actionProblem(action.label, problem)}`);
   }
 }
 
@@ -575,7 +589,7 @@ function validateBuiltRegistry(registry: Registry, owners: ReadonlyMap<string, P
   for (const [kind, map] of CONTENT_SECTION_MAPS) {
     for (const [id, value] of registry[map] as ReadonlyMap<string, object>) {
       try {
-        validateActionTable(`# ${kind} ${id}`, (value as { actions?: Action[] }).actions);
+        validateActionTable(kind, id, value as ActionOwner, registry);
         validateSectionReferences(kind, id, value, registry);
       } catch (error) {
         if (!(error instanceof DslError)) throw error;
@@ -586,7 +600,7 @@ function validateBuiltRegistry(registry: Registry, owners: ReadonlyMap<string, P
 
   for (const [id, action] of registry.recipeActions) {
     try {
-      validateActionTable(`# recipe ${id}`, [action]);
+      validateActionTable('recipe', id, { actions: [action] }, registry);
     } catch (error) {
       if (!(error instanceof DslError)) throw error;
       return { module: sectionOwner(owners, 'recipe', id)!, stage: 'validate', error };
@@ -621,6 +635,26 @@ function validateBuiltRegistry(registry: Registry, owners: ReadonlyMap<string, P
   return null;
 }
 
+const wouldDeclare = (kind: string, value: MemberOwner): Member[] => declareMembers(new Namespace(), kind, value);
+
+const memberKey = (member: Member): string => `${member.kind}\0${member.key}`;
+
+function reconcileMembers(namespace: Namespace, merged: Map<string, Map<string, OwnedSection>>, declared: ReadonlyMap<string, Member[]>): void {
+  const survivingAcrossEveryKind = new Set<string>();
+  for (const [kind, byId] of merged) {
+    for (const section of byId.values()) {
+      for (const member of wouldDeclare(kind, section.value as MemberOwner)) survivingAcrossEveryKind.add(memberKey(member));
+    }
+  }
+  for (const [kind, byId] of merged) {
+    for (const id of byId.keys()) {
+      for (const member of declared.get(ownerKey(kind, id)) ?? []) {
+        if (!survivingAcrossEveryKind.has(memberKey(member))) namespace.undeclare(member.kind, member.key);
+      }
+    }
+  }
+}
+
 function compileModules(modules: readonly ParsedModule[]): { registry: Registry } | { failure: BuildFailure } {
   const registry = emptyRegistry();
 
@@ -628,6 +662,7 @@ function compileModules(modules: readonly ParsedModule[]): { registry: Registry 
   // object has every field filled in with defaults, so overlaying one would
   // silently reset everything the patch did not mention.
   const merged = new Map<string, Map<string, OwnedSection>>();
+  const declaredMembers = new Map<string, Member[]>();
   const owners = new Map<string, ParsedModule>();
   const namespace = registry.namespace;
   const loaded = new Set(modules.map((module) => module.info.id));
@@ -676,6 +711,9 @@ function compileModules(modules: readonly ParsedModule[]): { registry: Registry 
           byId.set(id, { kind: section.kind, value: mergeSection(section.kind, base, section.value), module });
           owners.set(ownerKey(section.kind, id), module);
           merged.set(section.kind, byId);
+          const declared = declaredMembers.get(ownerKey(section.kind, id)) ?? [];
+          declared.push(...wouldDeclare(section.kind, section.value as MemberOwner));
+          declaredMembers.set(ownerKey(section.kind, id), declared);
         }
       } catch (error) {
         if (!(error instanceof DslError)) throw error;
@@ -692,6 +730,7 @@ function compileModules(modules: readonly ParsedModule[]): { registry: Registry 
   const isTemplate = (kind: string): boolean => kind === 'entitytype';
   const templateFailure = mergePass(isTemplate) ?? mergePass((kind) => !isTemplate(kind));
   if (templateFailure) return { failure: templateFailure };
+  reconcileMembers(namespace, merged, declaredMembers);
   for (const [kind, byId] of merged) {
     for (const section of byId.values()) {
       try {

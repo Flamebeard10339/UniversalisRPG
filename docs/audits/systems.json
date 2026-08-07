@@ -101,6 +101,13 @@
             "src/runtime/rng.ts"
           ],
           "note": "runtime-2026-07-30 records rng as the one GameState number left as isNumber, so a fractional cursor collapses onto a fixed stream."
+        },
+        {
+          "name": "the resolve loop's forward-progress invariant",
+          "paths": [
+            "src/runtime/forwardProgress.ts"
+          ],
+          "note": "produced by resolve-forward-progress-guard: what a segment boundary is, that it is never before the current instant, and how many consecutive non-advancing segments resolve() tolerates before it reports a stall"
         }
       ]
     },
@@ -378,6 +385,8 @@
         "scripts/probe.test.ts",
         "scripts/mutate.ts",
         "scripts/mutate.test.ts",
+        "scripts/migrate-saves.ts",
+        "scripts/migrate-saves.test.ts",
         "scripts/inspect.ts",
         "scripts/inspect.test.ts",
         "scripts/audit-status.ts",
@@ -421,6 +430,20 @@
             "scripts/inspect.ts"
           ],
           "note": "produced by repo-resolved-evaluation; what npm run probe is for the DSL load path, for everything else"
+        },
+        {
+          "name": "save fixture migration",
+          "paths": [
+            "scripts/migrate-saves.ts"
+          ],
+          "note": "produced by save-fixture-migration; the one-shot shape rewrite of every # save fixture at a SAVE_VERSION bump, retired by save-migration-system's ladder"
+        },
+        {
+          "name": "git facts as data",
+          "paths": [
+            "scripts/lib/git.ts"
+          ],
+          "note": "produced by the-git-seam-is-the-only-way-the-task-system-reads-git"
         }
       ]
     },

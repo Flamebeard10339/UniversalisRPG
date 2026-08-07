@@ -84,6 +84,25 @@ describe('a heading creates or edits by its shape alone', () => {
   });
 });
 
+describe('a - op declares nothing', () => {
+  const RAT = module('base', '# entity rat', 'flags: alert');
+  const patch = (...lines: string[]) => module('mod', 'dependencies: base', '# entity base.rat', ...lines);
+
+  it('leaves a flag that never existed undeclared, so a reference to it fails the way any typo does', () => {
+    expect(() => loadUniverse([RAT, patch('-flags: ghost', 'poke:', '  requires: ghost')])).toThrow(/names an unknown flag: ghost/);
+  });
+
+  it('says nothing about a removal that matched nothing, when nothing refers to it', () => {
+    expect(loadUniverse([RAT, patch('-flags: ghost')]).entities.get('base.rat')!.flags).toEqual(['alert']);
+  });
+
+  it('still declares a name the same section adds after removing it, because the merge keeps it', () => {
+    const patched = loadUniverse([RAT, patch('-flags: bolted', '+flags: bolted', 'poke:', '  requires: bolted')]).entities.get('base.rat')!;
+    expect(patched.flags).toEqual(['alert', 'bolted']);
+    expect(patched.actions[0].requires).toEqual({ kind: 'reference', reference: { path: ['base', 'rat', 'bolted'] } });
+  });
+});
+
 describe('a ~ dependency is visible whichever way the module names sort', () => {
   const target = module('target', '# item gem');
   const referrer = (id: string, ...lines: string[]) => module(id, 'dependencies: ~ target', ...lines);

@@ -1,4 +1,4 @@
-import { spawn, spawnSync } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { checkBytes, type ByteFinding } from '../lib/bytes';
 import { loadEvents, type TaskEvent } from '../lib/eventLog';
@@ -21,11 +21,7 @@ export interface Leg {
 
 export const LEGS: Leg[] = [
   { name: 'tsc', command: 'npx tsc --noEmit' },
-  // The timeout headroom is for this gate's own environment, not CI's: five
-  // legs share the machine here, and a per-test budget sized for an idle box
-  // failed healthy tests under that contention — measured twice on a clean
-  // tree. The assertions are unchanged; only the clock they race is.
-  { name: 'npm test', command: 'npm test -- --reporter=dot --testTimeout=20000' },
+  { name: 'npm test', command: 'npm test -- --reporter=dot' },
   { name: 'layer-check', command: 'npm run layer-check' },
   { name: 'audit-status', command: 'npm run audit-status' },
   { name: 'doctor', command: 'npm run tasks -- doctor' },
@@ -303,11 +299,7 @@ export function decideSpec(facts: SpecFacts): SpecDecision {
 // plus `git merge-base`, `tasks spec show` twice — collected once so the
 // answer is a leg rather than a research task.
 export function branchStanding(config: Config, baseBranch: string): BranchStanding {
-  const status = spawnSync('git', ['status', '--porcelain'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
-  const dirty = (status.stdout ?? '')
-    .split('\n')
-    .map((line) => line.slice(3).trim())
-    .filter((line) => line.length > 0);
+  const dirty = git.dirtyPaths() ?? [];
 
   const base = git.mergeBase(baseBranch);
   const baseHead = git.resolveCommit(baseBranch);
@@ -360,10 +352,7 @@ export function branchStanding(config: Config, baseBranch: string): BranchStandi
 // since this branch forked. Null when there is no merge base to diff from.
 export function changedFiles(base: string | null): string[] | null {
   if (base === null) return null;
-  const result = spawnSync('git', ['diff', '--name-only', `${base}..HEAD`], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
-  if (result.status !== 0) return null;
-  const text = result.stdout.trim();
-  return text === '' ? [] : text.split('\n');
+  return git.changedFiles(`${base}..HEAD`);
 }
 
 // True when `changed` is unknown — the exemption `touchedWriteRegion` gates

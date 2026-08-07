@@ -34,6 +34,7 @@ export interface TestRun {
   // and not in `failed`, so a mutation that does not build looks like a clean
   // run of whatever else collected.
   filesFailed: number;
+  failures: string[];
   raw: string;
 }
 
@@ -43,6 +44,7 @@ export interface Baseline {
   failed: number;
   total: number;
   ran: number;
+  failures: string[];
 }
 
 // Looked up rather than handed over as a map, so a scope nobody reaches is never
@@ -51,7 +53,7 @@ export interface Baseline {
 // that, by asking before it writes.
 export type BaselineFor = (tests: readonly string[] | undefined, test?: string) => Baseline | undefined;
 
-export type Verdict = 'KILLED' | 'SURVIVED' | 'ERROR';
+export type Verdict = 'KILLED' | 'SURVIVED' | 'ERROR' | 'UNSTABLE';
 
 export interface MutationResult {
   name: string;
@@ -65,6 +67,10 @@ export interface MutationResult {
   unmeasured?: boolean;
   escalatedFrom?: string;
   baselineFailed?: number;
+  attributed?: string[];
+  unreproduced?: string[];
+  confirmedAt?: string;
+  flaked?: string[];
 }
 
 export interface MutationReport {
@@ -128,15 +134,42 @@ export function parseVitestTally(output: string): { failed: number; passed: numb
   return { failed: Number(/(\d+) failed/.exec(summary)?.[1] ?? 0), passed: Number(/(\d+) passed/.exec(summary)?.[1] ?? 0), total: Number(total[1]), filesFailed };
 }
 
+// The `Failed Tests` section, which is the only place a run says *which* test
+// failed. A line with no ` > ` is a file that never collected, named without a
+// test inside it, and is already reported as `filesFailed`. Colour codes are
+// stripped rather than assumed absent: they appear whenever a caller's
+// environment forces them, and a name carrying one matches nothing.
+//
+// Every printed line is kept, never a distinct set. Two tests can print one
+// name — an `it.each` name whose distinguishing part follows an embedded
+// newline prints identically up to it — and collapsing them breaks the
+// correspondence with the tally that `tallyOf` refuses on.
+export function parseFailedTests(output: string): string[] {
+  const named: string[] = [];
+  for (const match of output.replace(/\u001b\[[0-9;]*m/g, '').matchAll(/^\s*FAIL\s+(?:\|[^|\n]+\|\s+)?(\S+ > .*\S)\s*$/gm)) {
+    named.push(match[1]);
+  }
+  return named;
+}
+
 // Which stream the tally is read from is a decision, so it is data here rather
 // than a line inside the spawn wrapper where no test can reach it. vitest writes
 // its summary to stdout and its failure detail to stderr; a test printing a
-// tally-shaped line of its own must not be able to win.
+// tally-shaped line of its own must not be able to win, and the same reasoning
+// keeps the names off stdout.
 export function tallyOf(streams: { stdout: string; stderr: string }): TestRun {
   const raw = `${streams.stdout}${streams.stderr}`;
   const tally = parseVitestTally(streams.stdout);
   if (tally === null) throw new Error(`could not read a test tally out of the run\n${outputTail(raw)}`);
-  return { ...tally, raw };
+  const failures = parseFailedTests(streams.stderr);
+  // Fewer names than failures is the one direction that costs a verdict: a
+  // reporter this cannot read would attribute a kill to whatever it did name.
+  // More is ordinary — a suite whose hook threw is named here while its tests
+  // are counted as skipped rather than failed.
+  if (failures.length < tally.failed) {
+    throw new Error(`the run reported ${tally.failed} failing test(s) and named ${failures.length} of them, so no verdict could be attributed to a test\n${outputTail(raw)}`);
+  }
+  return { ...tally, failures, raw };
 }
 
 export function outputTail(raw: string, lines = 12): string {
@@ -247,13 +280,48 @@ function verdictOf(mutation: Mutation, scope: string, run: TestRun, baseline: Ba
   // otherwise read as a clean sweep of a suite that never assembled.
   if (run.filesFailed > 0 && run.failed === 0) return errored(`${run.filesFailed} test file(s) failed to collect — the mutation may not build`);
 
-  // Against the baseline's failures, not against zero. A tree that was already
-  // red would otherwise report every mutation as KILLED by tests that were
-  // failing before it was applied.
+  // Against the tests the baseline saw fail, not against how many. A count
+  // corrects for a tree that was already red; it cannot tell a test the
+  // mutation broke from a test that was going to fail during this run anyway.
   const wasFailing = baseline?.failed ?? 0;
-  const verdict: Verdict = run.failed > wasFailing ? 'KILLED' : 'SURVIVED';
+  const before = new Set(baseline?.failures ?? []);
+  const attributed = run.failures.filter((name) => !before.has(name));
+  if (attributed.length === 0 && run.failed > wasFailing) {
+    return errored(`${run.failed} test(s) failed against ${wasFailing} in this scope's baseline, and not one of them is a test the baseline saw pass — a count going up is not a kill`);
+  }
   const shortfall = baseline !== undefined && run.total < baseline.total ? baseline.total - run.total : undefined;
-  return { name: mutation.name, verdict, failed: run.failed, total: run.total, scope, shortfall, unmeasured: baseline === undefined, baselineFailed: wasFailing > 0 ? wasFailing : undefined };
+  // A test the baseline saw fail and this run saw pass changed in the one
+  // direction breaking a line cannot explain. Suppressed when tests stopped
+  // running, where the same shape means only that the mutation stopped
+  // collecting the file it was in.
+  const flaked = shortfall === undefined ? [...before].filter((name) => !run.failures.includes(name)) : [];
+  return {
+    name: mutation.name,
+    verdict: attributed.length > 0 ? 'KILLED' : 'SURVIVED',
+    failed: run.failed,
+    total: run.total,
+    scope,
+    attributed: attributed.length > 0 ? attributed : undefined,
+    flaked: flaked.length > 0 ? flaked : undefined,
+    shortfall,
+    unmeasured: baseline === undefined,
+    baselineFailed: wasFailing > 0 ? wasFailing : undefined,
+  };
+}
+
+// Files rather than the test names they came from: `-t` takes a regex over the
+// whole suite, and the file the run already named is both narrower and exact.
+export const filesOf = (tests: readonly string[]): string[] => [...new Set(tests.map((name) => name.split(' > ')[0]))].sort();
+
+// A failure that did not happen again, on the same tree with the same mutant on
+// disk, is reported and never resolved — the tool refuses to present it as
+// fact, and what to do about it is the auditor's.
+export function confirmKill(result: MutationResult, run: TestRun, baseline: Baseline | undefined, scope: string): MutationResult {
+  const attributed = result.attributed ?? [];
+  const before = new Set(baseline?.failures ?? []);
+  const again = attributed.filter((name) => run.failures.includes(name) && !before.has(name));
+  if (again.length > 0) return { ...result, attributed: again, confirmedAt: scope };
+  return { ...result, verdict: 'UNSTABLE', attributed: undefined, unreproduced: attributed, confirmedAt: scope };
 }
 
 const WHOLE_SUITE: readonly string[] | undefined = undefined;
@@ -344,6 +412,20 @@ export function runMutations(mutations: readonly Mutation[], files: FileStore, r
     }
   }
 
+  // Every kill faces the same bar however wide the scope that produced it, so
+  // widening the scope cannot widen what counts as one. A kill found wider than
+  // its named tests' own files is re-measured there, where a failure that
+  // needed a contended run stops appearing; one already found there is measured
+  // twice, which is the same tree answering the same question.
+  for (let index = 0; index < results.length; index++) {
+    const found = results[index];
+    if (found.verdict !== 'KILLED' || found.attributed === undefined) continue;
+    const rung: Pick<Mutation, 'tests' | 'test'> = { tests: filesOf(found.attributed) };
+    const baseline = baselineAt(rung);
+    const scope = scopeOf(rung);
+    results[index] = { ...around(mutations[index], scope, () => confirmKill(found, runTests(rung.tests, rung.test), baseline, scope)), escalatedFrom: found.escalatedFrom };
+  }
+
   // Not trust — proof. The restore above is the only thing standing between a
   // mutation run and a corrupted working tree, so the run reports whether it
   // actually happened.
@@ -375,7 +457,9 @@ export function runMutations(mutations: readonly Mutation[], files: FileStore, r
   return { results, refusals, unrestored, treeDelta, ok: unrestored.length === 0 && results.every((result) => result.verdict === 'KILLED') };
 }
 
-const ORDER: Record<Verdict, number> = { SURVIVED: 0, ERROR: 1, KILLED: 2 };
+const ORDER: Record<Verdict, number> = { SURVIVED: 0, UNSTABLE: 1, ERROR: 2, KILLED: 3 };
+
+const nameList = (names: readonly string[], limit = 2): string => (names.length <= limit ? names.join(', ') : `${names.slice(0, limit).join(', ')} and ${names.length - limit} more`);
 
 export function formatReport(report: MutationReport): string {
   // Indented per line, not per refusal: a refusal that quotes the file spans
@@ -389,15 +473,21 @@ export function formatReport(report: MutationReport): string {
     const shortfall = result.shortfall === undefined ? '' : `  (${result.shortfall} fewer tests ran than the unmutated baseline — they cannot have killed it)`;
     const unmeasured = result.unmeasured && result.verdict !== 'ERROR' ? '  (no baseline for this scope — the total is unchecked)' : '';
     const red = result.baselineFailed === undefined ? '' : `  (${result.baselineFailed} test(s) were already failing before this mutation)`;
+    const by = result.attributed === undefined ? '' : `  killed by ${nameList(result.attributed)}, re-run at [${result.confirmedAt}] with the mutation still applied and failing there too`;
+    const unreproduced = result.unreproduced === undefined ? '' : `  (${nameList(result.unreproduced)} failed here and was not attributable when re-measured at [${result.confirmedAt}] with the mutation still applied — the measurement did not repeat, so this is neither proof nor a survivor)`;
+    const flaked = result.flaked === undefined ? '' : `  (${nameList(result.flaked)} failed in this scope's own baseline and passed with the mutation applied — this scope did not report the same thing twice)`;
     const scope = result.escalatedFrom === undefined ? result.scope : `${result.escalatedFrom} -> ${result.scope}`;
-    const row = `${result.name.padEnd(width)}  ${result.verdict.padEnd(8)}  ${measured}  [${scope}]${shortfall}${unmeasured}${red}`;
+    const row = `${result.name.padEnd(width)}  ${result.verdict.padEnd(8)}  ${measured}  [${scope}]${by}${unreproduced}${shortfall}${unmeasured}${red}${flaked}`;
     return result.output === undefined || result.output === '' ? [row] : [row, ...result.output.split('\n').map((line) => `    | ${line}`)];
   });
 
   const survived = sorted.filter((result) => result.verdict === 'SURVIVED');
   const errored = sorted.filter((result) => result.verdict === 'ERROR').length;
-  lines.push('', `${sorted.length - survived.length - errored} killed, ${survived.length} survived, ${errored} errored`);
+  const unstable = sorted.filter((result) => result.verdict === 'UNSTABLE');
+  const killed = sorted.filter((result) => result.verdict === 'KILLED').length;
+  lines.push('', `${killed} killed, ${survived.length} survived, ${unstable.length} unstable, ${errored} errored`);
   if (survived.length > 0) lines.push(`A survivor is the finding: ${survived.map((result) => result.name).join(', ')} changed behaviour and its scope stayed green.`);
+  if (unstable.length > 0) lines.push(`An unstable verdict is neither: ${unstable.map((result) => result.name).join(', ')} produced a failure that did not happen again on the same tree, so nothing here is proof of anything.`);
   if (report.treeDelta !== undefined) {
     const { gained, lost } = report.treeDelta;
     if (gained.length === 0 && lost.length === 0) lines.push('The tree gained nothing and lost nothing while this run held it.');
@@ -427,6 +517,11 @@ const usage = [
   'that survives climbs automatically — a named test to its file, a file to the',
   'whole suite — so only the survivors pay for the wider runs. A SURVIVED verdict',
   'always names the widest scope it was measured against.',
+  '',
+  'A KILLED names the test that went from passing to failing, and is only',
+  'reported once that test has failed again with the mutation still on disk and',
+  'its own file as the scope. A failure that does not happen the second time is',
+  'UNSTABLE: not a kill, not a survivor, and not something to read as either.',
   '',
   'The mutated file is wrong on disk for as long as its tests take to run. Nothing',
   'else should be reading the tree during a run. If a run is killed outright, the',
@@ -708,7 +803,10 @@ function main(): void {
   // are escaped rather than read as a pattern.
   const runTests: RunTests = (tests, test) => {
     const name = test === undefined ? [] : ['-t', test.replace(/[$()*+.?[\\\]^{|}]/g, '\\$&')];
-    const result = spawnSync(process.execPath, [vitest.cli, 'run', '--configLoader', 'runner', ...(tests ?? []), ...name], { cwd: repoRoot, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+    // The failure detail is now what a verdict is attributed to, so the buffer
+    // it arrives in is sized for a whole suite going red rather than for the
+    // twelve lines a tail prints.
+    const result = spawnSync(process.execPath, [vitest.cli, 'run', '--configLoader', 'runner', ...(tests ?? []), ...name], { cwd: repoRoot, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'] });
     if (result.error) throw new Error(`the test command did not run: ${result.error.message}`);
     return tallyOf({ stdout: result.stdout ?? '', stderr: result.stderr ?? '' });
   };
@@ -732,7 +830,7 @@ function main(): void {
       console.error(`measuring the unmutated baseline for ${key}...`);
       try {
         const run = runTests(tests, test);
-        measured.set(key, { failed: run.failed, total: run.total, ran: run.failed + run.passed });
+        measured.set(key, { failed: run.failed, total: run.total, ran: run.failed + run.passed, failures: run.failures });
       } catch (error) {
         console.error(`  no baseline for ${key} — ${outputTail((error as Error).message, 1)}`);
         measured.set(key, undefined);

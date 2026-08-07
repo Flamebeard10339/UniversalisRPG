@@ -3,7 +3,7 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { flagArities } from './tasks/cli';
 import { allUsages } from './tasks/commands';
-import { fixture } from './tasks/cliFixtures';
+import { enclosingGitFixture, fixture } from './tasks/cliFixtures';
 
 describe('tasks CLI', () => {
   it('prints help without treating --help or help as unknown commands', () => {
@@ -105,21 +105,36 @@ describe('tasks CLI', () => {
   // that reads too high is silent — the command just keeps discarding. This
   // sweeps every surface rather than the ones somebody thought to check:
   // `spec` derived 3 from prose in its own usage line and went unnoticed
-  // through two audits.
+  // through two audits. The two prompts that take junk as paths and run the
+  // whole architecture survey over it are swept one per test, so each pays
+  // its own share of the test clock.
+  const junkArgs = ['j1', 'j2', 'j3', 'j4', 'j5'] as const;
+
   it('refuses five junk arguments on every bounded command surface', () => {
     fixture(({ tasks }) => {
-      const unbounded = new Set(['spec add', 'spec remove', 'plan', 'done', 'decline', 'promote', 'plan-prompt', 'orchestrate-prompt']);
-      const surfaces = [['doctor'], ['add'], ['edit'], ['show'], ['list'], ['search'], ['next'], ['start'], ['stop'], ['done'], ['decline'], ['promote'], ['import'], ['triage'], ['audit'], ['audit-prompt'], ['work-prompt'], ['plan-prompt'], ['orchestrate-prompt'], ['check-commit-msg'], ['plan'], ['spec'], ['spec', 'new'], ['spec', 'add'], ['spec', 'remove'], ['spec', 'show'], ['spec', 'done'], ['note'], ['decision'], ['log'], ['merge-ready']];
-      for (const surface of surfaces) {
+      const bounded: string[][] = [['doctor'], ['add'], ['edit'], ['show'], ['list'], ['search'], ['next'], ['start'], ['stop'], ['import'], ['triage'], ['audit'], ['audit-prompt'], ['work-prompt'], ['check-commit-msg'], ['spec'], ['spec', 'new'], ['spec', 'show'], ['spec', 'done'], ['note'], ['decision'], ['log'], ['merge-ready']];
+      for (const surface of bounded) {
         const name = surface.join(' ');
-        const result = tasks(...surface, 'j1', 'j2', 'j3', 'j4', 'j5');
-        if (unbounded.has(name)) {
-          expect(result.stderr, name).not.toContain('unexpected argument');
-          continue;
-        }
+        const result = tasks(...surface, ...junkArgs);
         expect(result.status, name).toBe(1);
         expect(result.stderr, name).toContain('unexpected argument');
       }
+    });
+  });
+
+  it('takes five junk arguments without an arity complaint on every unbounded surface', () => {
+    fixture(({ tasks }) => {
+      for (const surface of [['spec', 'add'], ['spec', 'remove'], ['plan'], ['done'], ['decline'], ['promote']]) {
+        const result = tasks(...surface, ...junkArgs);
+        expect(result.stderr, surface.join(' ')).not.toContain('unexpected argument');
+      }
+    });
+  });
+
+  it.each([['plan-prompt'], ['orchestrate-prompt']])('%s takes five junk arguments as paths and surveys them without an arity complaint', (prompt) => {
+    enclosingGitFixture(({ tasks }) => {
+      const result = tasks(prompt, ...junkArgs);
+      expect(result.stderr).not.toContain('unexpected argument');
     });
   });
 

@@ -3,8 +3,8 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync
 import os from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { tsxCli } from '../lib/tsxCli';
-import { defaultStoreGitFixture, fixture, runInProcess, script, spawnTasks, type Run } from './cliFixtures';
+import { defaultStoreGitFixture, fixture, installDataGit, runInProcess, spawnTasks, unbornDefaultStoreFixture } from './cliFixtures';
+import { realDefaultStoreGitFixture } from './realGitFixture';
 
 describe('tasks CLI', () => {
   it('doctor reports an inconsistent store and still exits zero, because no disagreement may fail a build', () => {
@@ -81,12 +81,12 @@ describe('tasks CLI', () => {
   // behind, never for the session's own writes: measured six-for-six and
   // eight-for-eight across two recorded sessions, a warning on every write
   // is a warning nobody reads. Freshness is the store's pre-write mtime.
-  // Over real processes on purpose: the warning fires at most once per
-  // process, so an in-process run here would spend the flag the sibling
-  // warn-once test below depends on observing fresh.
+  // Only the write that warns is a real process: a silent write never sets
+  // the once-per-process flag, so the two silence observations run
+  // in-process without spending what the warn-once test below observes —
+  // and the warning observation spawns, so it cannot spend it either.
   it('default-store writes stay silent about their own dirtiness, and warn once over stale uncommitted state', () => {
-    defaultStoreGitFixture(({ dir }) => {
-      const tasks = (...args: string[]): Run => spawnTasks(dir, [...args, '--branch', 'demo-spec']);
+    realDefaultStoreGitFixture(({ dir, tasks }) => {
       // A write that itself dirties a clean store is the session acting on
       // purpose — no warning.
       const own = tasks('add', 'Dirty tracked task', '--id', 'dirty-tracked');
@@ -103,7 +103,7 @@ describe('tasks CLI', () => {
       const store = path.join(dir, 'docs', 'tasks.jsonl');
       const old = new Date(Date.now() - 40 * 60 * 1000);
       utimesSync(store, old, old);
-      const stale = tasks('add', 'Third task', '--id', 'third-task');
+      const stale = spawnTasks(dir, ['add', 'Third task', '--id', 'third-task', '--branch', 'demo-spec']);
       expect(stale.status).toBe(0);
       expect(stale.stderr).toContain('warning: docs/tasks.jsonl has uncommitted task-state changes from an earlier session');
     });
@@ -129,7 +129,7 @@ describe('tasks CLI', () => {
   // documented order of work, and an error that fires on the correct
   // workflow trains readers to skip errors.
   it('doctor reports a working-tree-only done mark as a warning naming the task, its committed state, and the risk', () => {
-    defaultStoreGitFixture(({ dir, tasks }) => {
+    realDefaultStoreGitFixture(({ dir, tasks }) => {
       tasks('add', 'closable task', '--id', 'closable');
       spawnSync('git', ['add', '.'], { cwd: dir });
       spawnSync('git', ['commit', '--no-verify', '-m', 'add closable task'], { cwd: dir, encoding: 'utf8' });
@@ -142,7 +142,7 @@ describe('tasks CLI', () => {
   });
 
   it('doctor reports a working-tree-only declined mark as a warning', () => {
-    defaultStoreGitFixture(({ dir, tasks }) => {
+    realDefaultStoreGitFixture(({ dir, tasks }) => {
       tasks('add', 'stale finding', '--id', 'stale', '--kind', 'finding', '--deliverable', 'fix it');
       spawnSync('git', ['add', '.'], { cwd: dir });
       spawnSync('git', ['commit', '--no-verify', '-m', 'add stale finding'], { cwd: dir, encoding: 'utf8' });
@@ -160,17 +160,15 @@ describe('tasks CLI', () => {
   it('the dirty-store warning prints at most once per process, even across two stale writes', () => {
     const dir = mkdtempSync(path.join(os.tmpdir(), 'universalis-warn-once-'));
     const cwd = process.cwd();
+    mkdirSync(path.join(dir, 'docs'), { recursive: true });
+    const store = path.join(dir, 'docs', 'tasks.jsonl');
+    const record = (id: string): string =>
+      `${JSON.stringify({ id, title: id, kind: 'task', state: 'open', severity: null, system: null, spec: null, clause: null, requires: [], files: [], deliverable: null, evidence: null, source: null, reason: null, closed: null, closedCommit: null, claimed: null, claimedBy: null })}\n`;
+    writeFileSync(store, record('committed-task'), 'utf8');
+    // The install snapshots the baseline store, standing in for the commit
+    // that used to carry it.
+    const repo = installDataGit(dir);
     try {
-      spawnSync('git', ['init', '-q'], { cwd: dir });
-      spawnSync('git', ['config', 'user.email', 'test@example.com'], { cwd: dir });
-      spawnSync('git', ['config', 'user.name', 'Test'], { cwd: dir });
-      mkdirSync(path.join(dir, 'docs'), { recursive: true });
-      const store = path.join(dir, 'docs', 'tasks.jsonl');
-      const record = (id: string): string =>
-        `${JSON.stringify({ id, title: id, kind: 'task', state: 'open', severity: null, system: null, spec: null, clause: null, requires: [], files: [], deliverable: null, evidence: null, source: null, reason: null, closed: null, closedCommit: null, claimed: null, claimedBy: null })}\n`;
-      writeFileSync(store, record('committed-task'), 'utf8');
-      spawnSync('git', ['add', '.'], { cwd: dir });
-      spawnSync('git', ['commit', '--no-verify', '-m', 'store baseline'], { cwd: dir, encoding: 'utf8' });
       writeFileSync(store, record('committed-task') + record('left-behind'), 'utf8');
       const old = new Date(Date.now() - 40 * 60 * 1000);
       utimesSync(store, old, old);
@@ -186,6 +184,7 @@ describe('tasks CLI', () => {
       expect(second.status).toBe(0);
       expect(second.stderr).not.toContain('uncommitted task-state changes');
     } finally {
+      repo.uninstall();
       process.chdir(cwd);
       rmSync(dir, { recursive: true, force: true });
     }
@@ -195,14 +194,13 @@ describe('tasks CLI', () => {
   // checks answer about a tree that does not exist yet — the exact state in
   // which a hand-resolved store most needs the store-only checks readable.
   it('doctor suspends the git-anchored checks during an unresolved merge, and the store-only checks still run', () => {
-    defaultStoreGitFixture(({ dir, tasks }) => {
-      // A working-tree-only close, which doctor would otherwise warn about.
+    realDefaultStoreGitFixture(({ dir, tasks }) => {
       tasks('add', 'closable task', '--id', 'closable', '--requires', 'ghost-requirement');
       spawnSync('git', ['add', '.'], { cwd: dir });
       spawnSync('git', ['commit', '--no-verify', '-m', 'add closable'], { cwd: dir, encoding: 'utf8' });
-      tasks('done', 'closable');
 
-      // A conflicted merge in an unrelated file leaves MERGE_HEAD behind.
+      // The merge scenery is built while the store is clean, so the -a
+      // commits below cannot quietly carry the close this test is about.
       writeFileSync(path.join(dir, 'conflict.txt'), 'base\n', 'utf8');
       spawnSync('git', ['add', '.'], { cwd: dir });
       spawnSync('git', ['commit', '--no-verify', '-m', 'base'], { cwd: dir, encoding: 'utf8' });
@@ -212,6 +210,11 @@ describe('tasks CLI', () => {
       spawnSync('git', ['checkout', '-q', '-'], { cwd: dir });
       writeFileSync(path.join(dir, 'conflict.txt'), 'ours\n', 'utf8');
       spawnSync('git', ['commit', '--no-verify', '-am', 'our edit'], { cwd: dir, encoding: 'utf8' });
+
+      // The close stays working-tree-only through the conflicted merge, so
+      // the suspension is the only thing keeping its warning out of the
+      // report — remove it and the assertion below fails.
+      tasks('done', 'closable');
       spawnSync('git', ['merge', 'side'], { cwd: dir, encoding: 'utf8' });
 
       const result = tasks('doctor');
@@ -225,7 +228,7 @@ describe('tasks CLI', () => {
   });
 
   it('doctor reports a working-tree-only in-progress transition as a warning, not an error', () => {
-    defaultStoreGitFixture(({ dir, tasks }) => {
+    realDefaultStoreGitFixture(({ dir, tasks }) => {
       tasks('add', 'startable task', '--id', 'startable');
       spawnSync('git', ['add', '.'], { cwd: dir });
       spawnSync('git', ['commit', '--no-verify', '-m', 'add startable task'], { cwd: dir, encoding: 'utf8' });
@@ -245,22 +248,44 @@ describe('tasks CLI', () => {
     });
   });
 
+  // The store must be the tracked default one for the comparison to be
+  // attempted at all: under any other `--store` the check returns before it
+  // reads HEAD, and a test written there passes without reaching the
+  // degradation it is named for.
   it('doctor degrades to no working-tree-comparison issue when there is no committed store (unborn HEAD)', () => {
-    const dir = mkdtempSync(path.join(os.tmpdir(), 'universalis-no-commit-'));
-    try {
-      spawnSync('git', ['init', '-q'], { cwd: dir });
-      spawnSync('git', ['config', 'user.email', 'test@example.com'], { cwd: dir });
-      spawnSync('git', ['config', 'user.name', 'Test'], { cwd: dir });
-      mkdirSync(path.join(dir, 'docs', 'specs'), { recursive: true });
-      mkdirSync(path.join(dir, 'docs', 'audits'), { recursive: true });
-      writeFileSync(path.join(dir, 'docs', 'specs', 'demo-spec.md'), '# Demo spec\n\n## Deliverable\n\nX.\n\nProof:\n\n- clause.\n\n## Decisions\n\n## Open questions\n\nNone.\n', 'utf8');
-      writeFileSync(path.join(dir, 'docs', 'audits', 'systems.json'), JSON.stringify({ unowned: { note: '', paths: ['docs', '*.md'] }, systems: [] }), 'utf8');
+    unbornDefaultStoreFixture(({ tasks, dir }) => {
       writeFileSync(path.join(dir, 'docs', 'tasks.jsonl'), `${JSON.stringify({ id: 'a', title: 'a', kind: 'task', state: 'done', severity: null, system: null, spec: null, clause: null, requires: [], files: [], deliverable: null, evidence: null, source: null, reason: null, closed: '2026-08-01', closedCommit: null })}\n`, 'utf8');
-      // No commit at all — HEAD does not exist yet on this branch.
-      const result = spawnSync(process.execPath, [tsxCli, script, 'doctor', '--branch', 'demo-spec'], { cwd: dir, encoding: 'utf8' });
+      const result = tasks('doctor');
+      expect(result.status).toBe(0);
+      expect(result.stdout).not.toContain('only in the working tree');
+    });
+  });
+
+  // The other side of the same guard, and the reason it cannot be dropped as
+  // redundant: HEAD does carry this store, so without the guard the
+  // comparison runs and reports a close the branch never owed anyone.
+  it('doctor compares no store against HEAD but the tracked default, even when HEAD carries the path it was given', () => {
+    const dir = mkdtempSync(path.join(os.tmpdir(), 'universalis-aside-store-'));
+    const cwd = process.cwd();
+    const record = (state: string): string =>
+      `${JSON.stringify({ id: 'a', title: 'a', kind: 'task', state, severity: null, system: null, spec: null, clause: null, requires: [], files: [], deliverable: null, evidence: null, source: null, reason: null, closed: state === 'done' ? '2026-08-01' : null, closedCommit: null })}\n`;
+    mkdirSync(path.join(dir, 'docs', 'specs'), { recursive: true });
+    mkdirSync(path.join(dir, 'docs', 'audits'), { recursive: true });
+    writeFileSync(path.join(dir, 'docs', 'audits', 'systems.json'), JSON.stringify({ unowned: { note: '', paths: ['docs', '*.md'] }, systems: [] }), 'utf8');
+    writeFileSync(path.join(dir, 'docs', 'specs', 'demo-spec.md'), '# Demo spec\n\n## Deliverable\n\nX.\n\nProof:\n\n- It holds.\n\n## Decisions\n\n## Open questions\n\nNone.\n', 'utf8');
+    writeFileSync(path.join(dir, 'docs', 'tasks.jsonl'), '', 'utf8');
+    const aside = path.join(dir, 'docs', 'aside.jsonl');
+    writeFileSync(aside, record('open'), 'utf8');
+    const repo = installDataGit(dir, 'main');
+    try {
+      process.chdir(dir);
+      writeFileSync(aside, record('done'), 'utf8');
+      const result = runInProcess(['doctor', '--store', aside, '--branch', 'demo-spec']);
       expect(result.status).toBe(0);
       expect(result.stdout).not.toContain('only in the working tree');
     } finally {
+      repo.uninstall();
+      process.chdir(cwd);
       rmSync(dir, { recursive: true, force: true });
     }
   });
