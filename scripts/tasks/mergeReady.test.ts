@@ -678,6 +678,21 @@ describe('branchStanding, against repository facts', () => {
   const writeStore = (task: Record<string, unknown>): void => write('tasks.jsonl', `${JSON.stringify({ requires: [], files: [], ...task })}\n`);
   const writeEvent = (op: string, note: string): void => write('events.jsonl', `${JSON.stringify({ t: '2026-01-01T00:00:00Z', by: null, branch: 'feature', head: null, op, id: 'member-1', system: null, spec: 'a-spec', note })}\n`);
 
+  // The read that fills standing.dirty, asserted where it is assembled: the
+  // rendering of a dirty list was already covered against a hand-built
+  // standing object, which is exactly the coverage that let the read itself
+  // be blinded with the suite green.
+  it('reports the working tree\'s own uncommitted paths as dirty', () => {
+    writeSystems();
+    write('specs/a-spec.md', specV1);
+    commit('base');
+    repo.fork();
+
+    write('left-behind.txt', 'uncommitted');
+    const standing = branchStanding(config(), 'main');
+    expect(standing.dirty).toEqual(['left-behind.txt']);
+  });
+
   it('keeps a spec whose diff never touched its declared writes, because a start event names its member (finding 2)', () => {
     writeSystems();
     write('specs/a-spec.md', specV1);
