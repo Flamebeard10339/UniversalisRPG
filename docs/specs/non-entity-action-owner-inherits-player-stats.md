@@ -126,3 +126,68 @@ Proof:
 
 None. The one this spec opened — whether `target:` on a `# recipe` or a `travel` action is reachable
 at all — is answered above, and the two synthetic owners turn out to differ.
+
+## Audit passes
+
+### Pass 1 — 2026-08-07
+
+- base: `b56ba3ee30365f83e10738189ac42d94bcad295c`
+- head: `0aeaaf9c2fd6d625329d52dfae5e096a3c406fbb`
+- proof 1: met — Mutation, hand-written manifest (no proof target resolved, so none was generated): replacing
+`if (kind !== 'entity') return <message>` in src/content/registry.ts fightingOwnerProblem with `return undefined`
+is KILLED by src/content/references.test.ts > "refuses a target: on an item or a location, which have nowhere to
+put a sheet", re-run at src/content/references.test.ts with the mutant still applied and failing there too.
+The ban's reach was checked rather than assumed: only entity, item, location and entitytype carry an `actions`
+field (src/content/entity.ts, item.ts, location.ts), all four are in CONTENT_SECTION_MAPS; `recipeActions` is
+walked by its own loop in validateBuiltRegistry; and travel is unreachable — travelAction (src/runtime/actions.ts:44)
+builds its Action from a label, a relocate result and a distance, with no target: field to carry. The recipe half
+is refused earlier by the grammar, pinned by "has no authorable target: on a recipe for the ban to reach".
+Re-run: `npm run mutate` on the manifest above, or `npx vitest run src/content/references.test.ts`.
+- proof 2: met — Four mutations of src/content/registry.ts fightingOwnerProblem, each KILLED by a different named test in
+src/content/references.test.ts and each re-confirmed at that file with the mutant still applied:
+(1) `if (max === undefined || owner.stats?.[max] !== undefined) return undefined` -> `if (true) return undefined`
+    killed by "refuses an entity fought over a pool its own stats: does not measure";
+(2) `const max = registry.resources.get(action.target)?.max` -> `const max = action.target`
+    killed by "names the pool the resource is measured by, not the pool the action targets" — the resource->stat
+    indirection the clause names is watched, not just the presence of a check;
+(3) dropping `kind === 'entitytype'` from the early return
+    killed by "exempts an entitytype and asks the entity that merges it instead";
+(4) dropping `if (action.retaliates) return undefined`
+    killed by "exempts a retaliating action, whose target is not the owner pool".
+The merged-not-authored reading is verified by (3)'s test itself, which loads the template alone (no throw), then
+the same template plus a `# entity wisp` naming it (throws), then wisp with `stats: max-health 4` (no throw).
+`max === undefined` is not a silent hole: `# resource` requires a max: stat (probe: "# resource ichor requires a
+max: stat"), so that arm only fires for a target naming no resource at all, which validateSectionReferences then
+reports as "unknown resource" — the ordering the existing case ['target: health','target: helth'] pins.
+- proof 3: met — `git diff b56ba3ee..0aeaaf9c -- src/runtime/stats.ts src/runtime/encounter.ts` is empty: statRange and
+enterEncounter are byte-identical over the range, so no lookup and no fallthrough changed. The only src/runtime
+production edit in the range is runtime.ts, and its whole diff is resolve()'s boundary/stall wiring from
+resolve-forward-progress-guard — it touches no stat resolution. That the fallthrough is still live and still
+watched: mutating `?? registry.stats.get(statId)?.base` out of statRange is KILLED by src/runtime/stat.test.ts
+(7 of 18 failed, named killers include "leaves an unranged stat exactly where it was: base + added, then
+x (1 + increased)"), re-run at stat.test.ts with the mutant applied. Noted rather than counted against the clause:
+the second half of the ordering — an actor's own sheet beating the global base — is NOT watched by the named proof
+target. Swapping the two operands survives src/runtime/stat.test.ts and escalates to the whole suite, where
+cadence.test.ts > "reads each side damage off its own sheet" and 20 others kill it. Per the brief's rule that is
+not stat.test.ts proving itself, so c3's proof target covers the player's half of the clause only.
+- proof 4: unmet — Two halves; the first holds and the second does not. Shipped content is untouched:
+`git diff --stat b56ba3ee..0aeaaf9c -- content/` is empty, and content/tutorial-island.dsl's only `target:` lines
+(302, 310) sit on `# entitytype melee-foe`, whose sole namer `# entity giant-rat` already declares max-health 20 —
+so both new rules are satisfied by content as authored. The suite does not pass: `npx vitest run --reporter=dot`
+gives 1814 passed, 1 failed — scripts/tasks/audit.test.ts > "the brief answers ownership and prior art for every
+path in its diff". Recorded unmet because the clause as written says the whole suite passes and it does not.
+Attribution, checked rather than taken on trust: audit-prompt builds that heading from the live working tree's
+git diff filtered to system-owned paths (scripts/tasks/audit.ts printOwnership -> printPriorArt), and the heading
+the fixture actually printed is "prior art on src/runtime/forwardProgress.ts, src/runtime/resolve.test.ts,
+src/runtime/runtime.ts, src/runtime/save.test.ts, src/runtime/save.ts, src/runtime/session.test.ts". Every leaked
+path belongs to resolve-forward-progress-guard or save-fixture-migration; not one src/content path appears, so
+reverting this spec's three files (registry.ts, references.test.ts, entityType.test.ts) would leave the assertion
+failing exactly as it does now. This spec's work cannot be the cause. Two findings are already on file for that
+red test and no third was filed. c4 goes met the moment that hermeticity defect is fixed.
+- proof 5: met — `npm run tasks -- merge-ready` reports layer-check ok/pass. Structurally: src/content/registry.ts imports
+nothing from src/runtime (import block, lines 1-25, is grammar/ and content/ only), and fightingOwnerProblem reads
+exactly two things — `action.retaliates` and `action.target`, both grammar-parsed Action fields, and
+`registry.resources.get(...).max`, a content field. The runtime rule about which side of a fight reads which clause
+(src/runtime/encounter.ts participants/retaliationOf) is not restated in the load path: the check asks only whether
+a stat name appears on the owner's sheet, never who swings at whom.
+Re-run: `npm run layer-check`.

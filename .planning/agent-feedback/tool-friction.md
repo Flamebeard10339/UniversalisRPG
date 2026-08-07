@@ -995,3 +995,50 @@ pre-existing and belongs to `offline-progression`, not here; and the branch's sw
 `Object.values` to `Object.entries` in that scan costs 637ms against 512ms over 2000 calls on
 2000 keys, i.e. real and immaterial at any count a session reaches. Measuring it was cheaper than
 arguing about it, and is the reason no performance finding was filed.
+
+## 2026-08-07, auditing `non-entity-action-owner-inherits-player-stats` (pass 1)
+
+The third audit of one branch carrying three specs, and the first whose spec owns no
+`src/runtime` path — which turned the branch's one red test from a thing to re-litigate into a
+thing to measure. `audit-prompt`'s prior-art heading is built from the live working tree's diff
+filtered to system-owned paths, and the heading its own fixture printed was
+`prior art on src/runtime/forwardProgress.ts, resolve.test.ts, runtime.ts, save.test.ts,
+save.ts, session.test.ts`. Not one `src/content` path appears, because the fixture's manifest
+owns none — so attribution was a single grep rather than an argument: reverting this spec's three
+files leaves the assertion failing identically. Two prior entries had to reason about whether the
+red was theirs; this one could read the answer off the failure output. Cost: about four minutes,
+and worth stating as a technique — when a non-hermetic test leaks the tree, the leak itself is
+the attribution evidence.
+
+`resolveTarget` still resolves nothing for any of the three specs, because all three write
+`proof: vitest <file>` with no quoted test name. Third audit in a row hand-writing a manifest.
+The gap is one line wide: a `proof: vitest <file>` with no test name could resolve to the file and
+run the whole file as the scope, which is strictly better than "- none" and refusing to write a
+manifest. As it stands the tool's one automated step is off for every spec that does not know the
+undocumented quoting rule.
+
+What the manifest bought that reading could not. Five mutations of one 8-line function, each
+aimed at a different clause of the rule, all KILLED by five *different* named tests — including
+`const max = registry.resources.get(action.target)?.max` -> `const max = action.target`, which is
+the only one that proves the resource-to-stat indirection is watched rather than the mere presence
+of a check. Two more on `statRange`, which this branch does not touch, for c3's "nothing changed":
+deleting the global-base fallthrough is killed inside the named proof target, but *swapping* the
+two operands — an actor's own sheet losing to the global base, the exact asymmetry the spec is
+about — survives `src/runtime/stat.test.ts` and escalates to the whole suite. c3's proof target
+covers the player's half of its clause and not the entity's. That is a fact no amount of reading
+green tests produces, and it cost one 40-second run.
+
+The finding the clause-by-clause pass cannot reach came from `npm run inspect`, not from the diff:
+after this branch a `# entity` with `stats: max-health 5` and a `target: health` action loads
+clean and `statRange('attack', …, 'ghoul')` returns the player's 10. The branch closes one of the
+six stats shipped `melee-foe` reads. Every clause is honestly met and the deliverable's own
+sentence is discharged for a sixth of its subject — which is exactly the "the reproduction is
+always narrower than the property" lesson the brief prints, arriving from the other direction:
+here the *fix* was narrower than the property, and only asking the runtime a question caught it.
+
+Measured this pass: `src/content/references.test.ts` 41 tests, five mutations plus six baselines
+in ~50s; full suite 1815 tests, one red, ~90s. `npm run probe -` with a heredoc answered "is
+`max:` required on a `# resource`" in one call and killed a would-be finding about the
+`max === undefined` arm being a silent hole — it is not, the schema refuses a resource without a
+max, so that arm only fires for a target naming no resource, which the reference check then
+reports properly. Cheapest measurement of the pass.
