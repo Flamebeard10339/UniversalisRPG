@@ -95,6 +95,27 @@ Proof:
 - [c9] Nothing gates on any of it. No leg of `merge-ready`, no CI check and no command's exit code
   reads a fault, a breach or a count. The channel is a report and refuses to become a threshold.
   proof: vitest scripts/tasks/mergeReady.test.ts
+- [c10] **A recurrence is a new observation, never an edit.** Recording that a friction happened
+  again appends an occurrence that carries its own note and names the record it recurs on; nothing
+  is incremented and no description is overwritten, so the count is derived from the occurrences and
+  cannot disagree with them. Two reasons, both already written down here. `.gitattributes` keeps the
+  store out of `merge=union` because two branches editing one record silently keep both copies under
+  one id — and a counter is a field concurrent branches edit by construction, whose correct
+  resolution is to add the two sides, which git cannot compute. And one description overwritten N
+  times loses what N observations each said: the nine mutation-manifest instances differed by spec,
+  by pass, and by what each cost. **Owned by two slices — the append and the derivation — and
+  outstanding until both land.**
+  proof: vitest scripts/tasks/friction.test.ts
+- [c11] **Filing a record shows what already claims the path it names, and never refuses.** The
+  prompt is by path and never by title, because a path is the same string for everyone while a title
+  is authored prose two agents will not choose alike — `priorArt` already reads every record's
+  `writes` and `files` in every state, so this is wiring, not a new query. Attaching an occurrence to
+  an existing record is available and deliberate; filing a new record stays the cheap default. That
+  asymmetry is the clause, not a preference: a duplicate is visible and cheap to triage, while a
+  wrong merge makes a distinct defect vanish and the count lie, so the tool must never make the
+  merge the path of least resistance — least of all for an agent that has just hit the friction and
+  is the worst placed to classify it.
+  proof: vitest scripts/tasks/friction.test.ts
 
 ## Goal
 
