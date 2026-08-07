@@ -1,136 +1,182 @@
 # items-mods-and-crafting
 
-Renamed from `smithing` on 2026-08-04, and superseding the `smithing-skill` task. Neither old name
-described this: there is no skill here, no xp and no levels. An item is a graph, a mod is a payload
-placed into it, and crafting is the act of placing one.
+Rewritten 2026-08-07. The previous design made an item a rolled directed graph of mod nodes whose
+payloads amplified and damped each other through a universe-wide resonance relation. It is replaced,
+not amended: an item is a **passive tree** grown by slotting orbs, and the graph, the resonance
+relation, and the research branch that gated them all go with it.
 
-**Gated on `graph-based-items-research`.** Every clause below rests on the premise that placing mods
-into a graph gives the player real agency, which `docs/smithing/topology-probe.md` measures on a
-synthetic model. Whether that measurement is enough to build on is a question this spec cannot
-answer about itself, so it is asked separately and answered before any clause here is worked. A
-negative answer retires this spec rather than amending it.
+Renamed from `smithing` on 2026-08-04, superseding the `smithing-skill` task. The name survives the
+rewrite: there are items, there are modifiers, and crafting is the act of growing one into the other.
 
 ## Deliverable
 
-An item is a directed graph of mod nodes, not a list. A dropped weapon carries a rolled graph; a
-mod placed into a node is amplified or damped by the mods feeding it through that graph's edges;
-and the evaluated result enters combat through the stat-bonus path equipment already uses. Placing
-a mod is permanent, so the decision is which node to spend it on before the next drop is known.
+Every equippable item has one open orb socket. An orb dropped in the world is an authored bundle of
+passive nodes and further sockets; slotting it into an item hangs that bundle off the socket, and the
+sockets it brings can take orbs of their own. The tree that results grows without bound, but the
+player can light up only as much of it as the item's level affords — items gain experience by being
+fed experience orbs, and each level buys one passive point. Two scarcities, independent: how far the
+tree reaches is decided by the orbs you hold, how much of it burns is decided by the item's level.
 
-The parameters below are not invented here. They are the measured conclusions in
-`docs/smithing/topology-probe.md`. The probe that produced them lives on branch
-`smithing-topology-probe` under `scripts/smithing-probe`, reachable there through
-`npm run smithing-probe` and its siblings; the report travelled to main ahead of the code.
+Crafting is that growth. Which orb goes into which socket, and which branch the points walk down,
+are permanent decisions made before the next drop is known.
 
 Proof:
 
-- [c1] `# mod` is a section kind carrying a resonance `type:` and a payload authored in the tag-clause
-  vocabulary items already use (`+6 attack`). An `# item` names one through `mod:` to become the orb
-  that grants it, so orbs drop, stack, and are carried through the existing item machinery with no
-  second inventory.
-- [c2] `# resonance` declares the type names, the circulant offsets that resonate, and the gain and
-  damp magnitudes, once, for the whole universe. Loading content with an offset outside the type
-  count, or with a pair of offsets that would make one type feed another in both directions, is
-  refused at load time with the DSL's own error surface rather than at evaluation.
-- [c3] An `# item` template declares the band a drop may roll — `nodes: 3-5` and `indegree: 2-3` —
-  and a rolled graph is an oriented graph over those nodes: no bidirectional pair, no node without
-  an incident edge, in-degree within the band. A template whose band cannot be satisfied is refused
-  at load time.
-- [c4] A smithed weapon is an **instance**, not a count. Instances live in game state with their
-  rolled graph and their node placements, are saved and restored, survive a reload with identical
-  evaluated stats, and are pruned when their template or a placed mod's declaration goes away.
-  Stackable items are untouched: only templates declaring `nodes:` become instanced.
-- [c5] Evaluation is one pure function, lifted from `scripts/smithing-probe/arrangement.ts` on
-  branch `smithing-topology-probe` into `src/runtime`, and the probe imports it from there
-  afterwards rather than keeping a copy. Given a graph and its placements it returns a per-node
-  multiplier and a summed payload; conduction compounds across incoming edges and a damped
-  multiplier floors at zero.
-- [c6] The evaluated payload reaches combat through the same stat-bonus path an equipped `+2 attack`
-  already takes. A focused fixture proves that moving one mod between two nodes of the same item
-  changes outgoing damage, and that an unequipped instance is inert.
-- [c7] Smithing is reachable through the directive surface every other play input goes through, so a
-  `# test` section records it and replays green. Placing a mod consumes the orb, is refused on an
-  occupied node, and cannot be undone.
-- [c8] `npm run tasks -- merge-ready` passes before the spec is marked done. It is the whole merge
-  gate in one invocation — tsc, tests, layer-check, audit-status, doctor, byte check — and it
-  replaced the `tasks check --merge` this clause was originally written against.
+- [c1] `# orb` is a section kind declaring a passive tree. Its entries are nodes; a node carries a
+  payload in the tag-clause vocabulary items already use (`+6 attack`), names its parent through
+  `from:`, and may be marked as a socket. Parenthood is single-valued, so the declaration is a tree
+  by construction: exactly one node omits `from:` and is the bundle's root. A `from:` naming an
+  unknown node, a second rootless node, or a `from:` that closes a cycle is refused at load time
+  through the DSL's own error surface, not at evaluation.
+- [c2] An orb reaches the player as an ordinary item. An `# item` names one through `orb:` to become
+  the droppable thing, so orbs drop through `droptables`, stack in inventory, and are carried by the
+  existing item machinery with no second inventory and no second drop path. An `orb:` naming an
+  unknown orb is a load-time reference error like every other reference in the language.
+- [c3] An item template declaring `slot:` has exactly one root socket, and instancing is **lazy**.
+  `inventory[itemId]` keeps counting stacks until an orb is slotted into one; that single item then
+  leaves the stack and becomes an instance carrying its tree, its allocations and its xp. Instances
+  are the `instanced-objects` substrate and nothing else — no second instance table in `GameState`,
+  no second prune rule, no second save migration.
+- [c4] Item experience has exactly one source. Consuming an item that declares `item-experience:`
+  raises the target instance's xp by that amount, and no other event in the game changes it. Feeding
+  an item already at the cap is refused with the orb unconsumed, rather than silently clamped. The
+  cap is the tuning variable `item-experience-cap`, defaulting to 30000.
+- [c5] An item's level is `skill-levels-xp-events`'s `level(X)`, imported rather than reimplemented,
+  and its passive points equal its level. There is one level curve in this repository. At the
+  shipped defaults a 1000-xp orb is worth one point for each of the first five, and an item reaches
+  level 17 and 17 points on its thirtieth — the curve's doubling is what makes late orbs cost more
+  than early ones, and no separate diminishing-returns rule is added on top of it.
+- [c6] Allocation is bounded by points and gated by adjacency. A node may be allocated only when its
+  parent is already allocated, or when it is the root of an orb slotted into an allocated socket.
+  The item's own root socket needs no point and is available from the first drop; every socket a
+  slotted orb brings is an ordinary node that must be allocated before it can be filled. Allocating
+  with no point remaining, or out of adjacency, is refused and costs nothing.
+- [c7] Slotting and allocation are both permanent. An orb is consumed when slotted, a filled socket
+  refuses a second orb, and no directive un-allocates a node or un-slots an orb. The refusals are
+  proved, not asserted: attempting each is a checked outcome, not an absence.
+- [c8] An item's contribution is the sum of the payloads of its allocated nodes, computed by one pure
+  function of the instance, and it reaches combat through the same stat-bonus path an equipped
+  `+2 attack` already takes. A focused fixture proves that allocating one node changes outgoing
+  damage, and that an instance the player is not wearing is inert.
+- [c9] An instance survives a reload with identical evaluated stats, and is repaired rather than
+  broken when content moves underneath it: an instance whose template is gone is pruned, and a
+  slotted orb or allocated node whose declaration is gone is dropped from the tree with its point
+  returned, so a loaded instance is never over its own budget. Permanence is a rule about what the
+  player may do, not a promise that deleted content stays evaluable.
+- [c10] Growing a tree is reachable through the directive surface every other play input goes
+  through, so a `# test` section records feeding, slotting and allocating — and each refusal in c4,
+  c6 and c7 — and replays green over the shipped content.
+- [c11] `npm run tasks -- merge-ready` passes before the spec is marked done: tsc, tests,
+  layer-check, audit-status, doctor and the byte check in one invocation.
 
 ## Decisions
 
-- **Items are graphs because rings and lists measurably do not work.** On identical mods a ring
-  scores 41 and a transitive tournament 91 (F16). A ring gives every node in-degree 1, which caps a
-  mod's multiplier at `1 + gain` and leaves no way to target one mod (F1, F15). Max in-degree, not
-  edge count, is the quality axis, and it stops paying above about 4 (F17) — hence `indegree:` as a
-  band rather than an open number.
-- **Node count is progression, in-degree is rarity.** Bare power is linear in nodes at about 8 per
-  node; the graph's lift is geometric at `1.21^(nodes-2)`, so 3 nodes to 7 is 6.5x (F17). Early
-  items are mod-driven and late ones graph-driven, which onboards the mechanic for free.
-- **Conduction compounds, and the item's payload is summed rather than averaged.** Compounding is
-  what reaches 3.7x targeting against 2.5x additive (F15). Normalising by node count flattens an
-  edgeless item across sizes but costs the 6.5x band and does not shift value from mods to topology
-  — it scales both terms alike (F18). Both are one-line reversals if play disagrees.
-- **The resonance relation keeps a negative half.** Compared at matched power a signed relation
-  gives about 1.3x the arrangement spread and agency of a typeless one, and leaves 26-33% to the
-  obvious heuristic where typeless leaves 7% (F20). An unsigned relation behaves almost exactly like
-  having no types at all. The damping, not the paradox depth, is what makes placement a decision.
-- **Mod selection is a ranking and that is fine.** Which mods a build wants is a sort, not a
-  strategy (F2, F6). The strategy is placement under permanence, which is worth 24% against an
-  oracle where interchangeable slots are worth 5% (F14). This spec therefore spends its complexity
-  budget on the graph and none on making mod choice clever.
-- **No mod budget, and no capacity cost.** Leaving a node empty never wins under any tested
-  parameterisation (F3), so a budget would only exist to resurrect a goal already dropped.
-- **A smithed item is an instance, not a count** (2026-08-02). A drop carries a rolled graph and
-  the mods already placed in it, which cannot be represented by `inventory[itemId]`. This was
-  recorded as an open question and is now a decision; only templates declaring `nodes:` become
-  instanced, and stackable items keep their counts.
-- **The core survivability tier needs no runtime work and ships first.** The authoring trial in
-  `docs/smithing/mods-draft.dsl` found that health, defence, regeneration, evasion, attack and
-  attack-rate mods all fall out of the existing tag-clause vocabulary, and that `statRange` already
-  folds them as `(base + added) x (1 + increased)` — the flat/increased structure the probe
-  modelled. The graph supplies the compounding term the fold lacks. No new stat maths is required.
-- **Tier width is the dial between acquisition and crafting**, not a new mechanism. Narrow payload
-  bands make the topology dominate; wide ones make the drop dominate (F19).
-- The probe stays under `scripts/smithing-probe` and stays `unowned` in `docs/audits/systems.json`.
-  The code this spec adds is owned by the systems that already own its paths — `src/grammar` and
-  `src/content` by the DSL load path, `src/runtime` by Runtime — so no new system is declared.
-- The GUI is out of scope. When placement needs to be seen rather than computed, the cheap surface
-  is a crafting view in `scripts/play-cli.ts` beside the existing directives, not a GUI rebuild.
+- **The graph design is replaced because its balance was global and this one's is local.** Under
+  resonance, `gain`, `damp` and the offset set were universe-wide constants: an item that played
+  badly could only be fixed by moving numbers that moved every item at once. An orb's subtree is
+  authored, so an orb that is too strong is nerfed by editing that orb and nothing else changes.
+  That is the whole argument for the rewrite, and it is a property of where the numbers live rather
+  than of how large they are.
+- **`graph-based-items-research` is retired rather than answered.** It existed to decide whether the
+  resonance graph's measured agency was real and, above all, *legible* — its own spec names
+  legibility as the load-bearing uncertainty and concedes no probe settles it. A tree answers that
+  question structurally: it is the most legible progression surface the genre has, and a player
+  reads a branch rather than inferring an offset relation from rolled edges. The premise the
+  research was gating no longer exists, so the gate is removed with it.
+  `docs/smithing/topology-probe.md` becomes history — a measurement of a design not taken.
+- **What survives from the old work is the authoring trial, not the probe.** `docs/smithing/mods-draft.dsl`
+  found that health, defence, regeneration, evasion, attack and attack-rate all fall out of the
+  existing tag-clause vocabulary, and that `statRange` already folds them as
+  `(base + added) x (1 + increased)`. A payload is a payload whether it sits in a graph node or a
+  tree node, so that finding transfers whole and the core tier still needs no new stat maths. What
+  it loses is the compounding term the graph supplied; the tree does not compound, and does not need
+  to, because its power comes from extent rather than from interaction.
+- **Two scarcities, deliberately independent.** Orbs held decide how far the tree reaches; item level
+  decides how much of it burns. This is what lets a tree be visibly enormous while the power it
+  grants stays bounded, and it is why the design tolerates unbounded growth without an unbounded
+  power curve. Collapsing them into one resource would make every orb a straight power gain and the
+  tree a display.
+- **The invariant that keeps allocation a decision: the reachable tree must always be larger than
+  the points available.** If an item's tree is smaller than its point budget, allocation degenerates
+  to "take everything" — a non-decision, which is exactly what the old research called a sort rather
+  than a strategy. Under the graph design this was a measured property; here it is an authoring
+  discipline and a tuning ratio, checked by judgement rather than by a gate. It is stated because it
+  is the thing that breaks first if orbs are authored small.
+- **Sockets cost a point, so depth competes with power.** A socket a slotted orb brings is an
+  ordinary node: reaching it and opening it spends from the same budget the payload nodes want. That
+  is the tension the mechanic runs on — a wide shallow tree of realised payloads against a narrow
+  deep one that reaches a better orb. The item's root socket is free because an item with no free
+  first socket has no on-ramp.
+- **Permanent, because permanence is where the decision lives.** The probe's clearest transferable
+  finding is that reversible placement is worth about 5% against an oracle and permanent placement
+  24%. That argument is about irreversibility, not about graphs, so it survives the redesign intact.
+  A refund orb is the obvious later dial and changes no part of the state model, which is why it can
+  wait.
+- **Item xp is fed, never earned.** One source means no per-instance subscription to combat events,
+  no question about what an unequipped or off-hand item accrues, and no dependency on
+  `combat-events` for the core tier. It also makes item progression a resource the player spends
+  rather than a timer they wait out, and makes the 17-point ceiling exact and reachable by anyone.
+- **One level curve, and this branch does not own it.** `skill-levels-xp-events` specifies
+  `level(X) = 1 + 10 x log2(1 + X x (r - 1) / 1000)` with `r = 2^(1/10)`, integer-arbitrated so
+  float never decides a level. Items use that function. Two curves in one repository would be two
+  things required to be kept in sync by hand.
+- **The 30000 cap is not a level threshold, and that is deliberate.** `T(17)` is 28303 and `T(18)` is
+  31335, so the thirtieth orb lands inside level 17 and a thirty-first cannot be fed. The player
+  experiences a whole number of orbs for a whole number of points; the remainder is invisible
+  because nothing can be spent to reach past it. If it reads badly in play, the cap is a tuning
+  variable and moves.
+- **The xp grant is authored per item, the cap is a tuning variable.** A greater experience orb is a
+  second `# item` with a larger `item-experience:`, which is content. How high any item may be taken
+  is one number for the whole universe, which is tuning. Neither is code.
+- **Rolled orb modifiers are the sequel, and nothing is built ahead of them.** The branch after this
+  one gives an orb instance rolled modifiers that scale its own subtree (`+10% increased effect of
+  physical passives`) with a curated downside as a second modifier of opposite sign — no new
+  mechanism, just an authored pair. It needs a scaling point between a node's payload and the stat
+  fold, and node tags for a modifier to name. This branch builds neither: c8 already puts payload
+  evaluation in exactly one pure function, which is the only structural precondition the sequel has.
+  An identity seam and unused tags added now would be machinery with no caller.
+- **Reuse, not new systems.** Orbs are items, so drops, stacking and inventory are `droptables` and
+  the existing item machinery. Instances are `instanced-objects`. Levels are `skill-levels-xp-events`.
+  Payloads are tag clauses folded by `statRange`. The genuinely new code is the `# orb` section kind,
+  the tree's load-time validation, the allocation rules, and one evaluation fold.
+- **No new system is declared.** The code this branch adds is owned by the systems that already own
+  its paths — `src/grammar` and `src/content` by the DSL load path, `src/runtime` by Runtime.
+
+## Answered elsewhere
+
+The archetype tier — passives that react to being struck, poison a target, or read one stat off
+another — waits on branches that already own its vocabulary, and this spec names theirs rather than
+inventing its own. The core survivability tier waits on none of them.
+
+- **The combat event surface is `combat-events`**: an action declares `on hit:` and `on hit self:`,
+  and anything reacting to being struck is an actor-carried persistent effect subscribing to
+  `damage-taken`. Event names are the past-tense closed set `skill-levels-xp-events` owns.
+- **A debuff on an enemy has an owner: `buffs-generalized`**, which ends the `actorId === PLAYER`
+  gate around the modifier fold in `statRange`.
+- **A stat reading another stat is `per-grammar-dependent-stats`**, which adds a stat as the third
+  counter source after a resource level and a buff's stack count.
 
 ## Out of scope
 
-Graph-editing orbs (add, reverse, remove an edge), mod tiers as authored variants, drop tables and
-their pity weighting, salvage or mod transfer, keystone mods that change the shape of the combat
-formula, and any UI beyond the CLI. Each is a separate branch; none is required for the clauses
-above to be provable.
-
-## Answered since this spec was written
-
-Every gap the authoring trial found has become a specced branch. This spec names their vocabulary
-rather than inventing its own, and the archetype tier waits on them; the core survivability tier
-still waits on none of them.
-
-- **The combat event surface is `combat-events`.** The prediction that all three archetypes were
-  blocked on one primitive rather than three held. The settled spelling is *not* the
-  `on hit:` / `on hit-taken:` pair this spec first guessed: an action declares `on hit:` and
-  `on hit self:`, which fire on a landed swing and apply to the struck and the swinging actor
-  respectively, and either may be gated by a chance. What this spec called `on hit-taken:` is an
-  actor-carried **persistent effect** subscribing to the event `damage-taken`, because a passive
-  enemy has no action of its own to declare a hook on. Event names are the past-tense closed set
-  `skill-levels-xp-events` owns — `damage-dealt`, `damage-taken`, `missed`, `evaded`, `succeeded`,
-  `failed`, `escaped`, `restored <resource>`, `drained <resource>` — and a mod naming one uses that
-  list rather than a spelling of its own.
-- **A debuff on an enemy has an owner: `buffs-generalized`.** It ends the `actorId === PLAYER` gate
-  around the whole modifier fold in `statRange`, so a mod that poisons a target is expressible.
-- **Loot tables are `droptables`.** An orb can drop one time in forty rather than only being gated
-  behind a condition. The core tier can still ship on gated gives.
-- **A stat reading another stat is the one gap with no home yet.** `+1 attack per 10 defense` has no
-  grammar, and `statRange` folds each stat independently. `combat-events` introduces
-  `+N <stat> per <counter>` over a resource's level, and `buffs-generalized` adds a buff's stack
-  count as a second counter source — a stat would be the natural third, and that is where it should
-  land rather than in a form of its own.
+Rolled orb modifiers and orb instancing (the named sequel). Refund or respec of any kind. Per-item
+experience caps. Orbs that edit an existing tree rather than extend it. Salvage, orb extraction, or
+moving a tree between items. Keystone nodes that change the shape of the combat formula. Any GUI:
+when a tree needs to be seen rather than computed, the cheap surface is a view in
+`scripts/play-cli.ts` beside the existing directives, and the real one is a consumer of `gui-rebuild`
+rather than a reason to reshape it. Each is a separate branch; none is required for the clauses above
+to be provable.
 
 ## Open questions
-- The probe's combat model is a synthetic Path-of-Exile miniature with per-tag additive `increased`
-  pools and compounding `more` multipliers. The shipped stat vocabulary is much smaller, so the
-  measured magnitudes transfer but the archetype findings (F6, F8) do not until the real stat set
-  supports tags. Nothing in the clauses above depends on them.
+
+- The directive spelling for the three verbs — feed, slot, allocate — is the worker's to choose,
+  including whether feeding and slotting are one verb dispatching on what the consumed item declares
+  or two. The clauses fix what each must do and refuse, not what it is called.
+- Whether an orb's nodes are named in a namespace of their own or share the id space every other
+  section uses. Node ids must be addressable by the allocate directive and by a saved instance, and
+  two orbs will want a node called `root`.
+- Whether `slot:` is the right predicate for "can carry a tree". It is the cheapest one that exists
+  and it draws the line at equipment, but an item with a tree and no equip slot is not obviously
+  nonsense.
+- `skill-levels-xp-events` is itself blocked on `first-class-modals`. The level curve is one pure
+  function; whichever of the two branches lands first should own it and the other import it, rather
+  than either waiting on the other for arithmetic.
