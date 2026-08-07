@@ -123,6 +123,23 @@ Proof:
   is the worst placed to classify it.
   proof: vitest scripts/tasks/friction.test.ts
 
+- [c12] **A lesson that keeps costing something surfaces as work for a planner, and nothing in the
+  tooling ever elevates it.** No count is compared to anything, anywhere in any code path. The
+  breach records are the flag: they dedupe by c11 and accumulate by c10, so one lesson holds one
+  record with N occurrences, and a planner reading N decides. The number is a reading aid for a
+  human and never a rule — a stated threshold has been the wrong instrument four times in this
+  repository inside one day, and a raw breach count is confounded by attention besides, which is why
+  c8's denominator is per-lesson and c7's marker is where it comes from. Written as a refusal
+  because the reasonable-sounding alternative is one `if` statement away and would look like
+  tidying.
+  proof: vitest scripts/tasks/friction.test.ts
+- [c13] **A lesson can be retired, and the retirement is recorded.** Removing an instruction is an
+  operation that says what left and why, not a deletion from an array — the same shape, one table
+  over, as a record leaving the store with nothing able to say that it did. Its citations become
+  reportable rather than silently resolving to nothing, which is c6's second half arriving at the
+  case that motivates it.
+  proof: vitest scripts/tasks/briefLessons.test.ts
+
 ## Goal
 
 Make what the workflow costs countable in one place, so a fresh orchestrator inherits it instead of
