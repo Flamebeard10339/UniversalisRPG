@@ -69,6 +69,16 @@ One play surface, reachable from below `ui`, that a driver can render and cannot
   definition site (c1), derived help (c2), no driver-side state access (c4). The behavioural half —
   one scripted session replayed through both drivers landing on byte-identical state — belongs to
   `gui-rebuild`, because that is where a second driver exists to compare against.
+- **The surface is an in-process API, and nothing more than that.** It is a module both drivers link
+  against in one bundle: no envelope, no serialization, no version field, no compatibility contract.
+  There is no consumer outside this repository, and a boundary nothing crosses is machinery to
+  maintain for free. It is also not a new API — `session.ts` is the one CLAUDE.md already designates,
+  and this branch closes the two ways it leaks: the command set sits above it where a second driver
+  cannot reach, and `GameState` passes through it.
+- **Parsing a line is separable from dispatching a command.** c1's "argument shape" is the seam: the
+  REPL turns a typed line into a command and its arguments, and a driver with typed arguments in
+  hand dispatches without going near the parser. A GUI that assembled command strings to hand back
+  to a parser would be stringly-typed at the one boundary this branch exists to make precise.
 - **The collision window is chosen, not ignored.** `tasks where` reports five open specs writing
   `scripts/play-cli.ts` and six writing `src/runtime/session.ts`: the "plan concentrated in one
   file" report. This branch lands immediately after `first-class-modals`, the largest claimant on
