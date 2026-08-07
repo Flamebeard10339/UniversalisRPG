@@ -208,7 +208,7 @@ export function fixture(run: (context: FixtureContext) => void | Promise<void>):
 // non-audit commands in-process and spawns audit
 // against this repo's own real checkout) — a real diff range and
 // commit-message trailers need commits with exact, controlled content.
-export function gitFixture(run: (context: { dir: string; commit: (message: string) => string; tasks: (...args: string[]) => Run }) => void): void {
+export function gitFixture(run: (context: { dir: string; commit: (message: string, files?: string[]) => string; tasks: (...args: string[]) => Run }) => void): void {
   const dir = mkdtempSync(path.join(os.tmpdir(), 'universalis-git-fixture-'));
   const restoreTmp = isolateTmp(dir);
   try {
@@ -230,8 +230,12 @@ export function gitFixture(run: (context: { dir: string; commit: (message: strin
 
     run({
       dir,
-      commit: (message: string) => {
-        writeFileSync(path.join(dir, `file-${Date.now()}-${Math.random().toString(36).slice(2)}.txt`), 'x', 'utf8');
+      commit: (message: string, files: string[] = [`file-${Date.now()}-${Math.random().toString(36).slice(2)}.txt`]) => {
+        for (const file of files) {
+          const target = path.join(dir, file);
+          mkdirSync(path.dirname(target), { recursive: true });
+          writeFileSync(target, 'x', 'utf8');
+        }
         spawnSync('git', ['add', '.'], { cwd: dir });
         spawnSync('git', ['commit', '--no-verify', '-m', message], { cwd: dir, encoding: 'utf8' });
         return spawnSync('git', ['rev-parse', 'HEAD'], { cwd: dir, encoding: 'utf8' }).stdout.trim();
