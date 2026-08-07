@@ -4,7 +4,8 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { tsxCli } from '../lib/tsxCli';
 import { TERMINAL_WIDTH } from './render';
-import { ageClaim, appendEvent, fixture, gitFixture, repoRoot, runInProcess, script, today } from './cliFixtures';
+import { ageClaim, appendEvent, enclosingGitFixture, fixture, gitFixture, repoRoot, runInProcess, script, today } from './cliFixtures';
+import { realGitFixture } from './realGitFixture';
 
 describe('tasks CLI', () => {
   it('adds a task and shows it back', () => {
@@ -793,7 +794,7 @@ describe('tasks CLI', () => {
   });
 
   it('done resolves a --commit revspec to a full SHA reachable from HEAD before storing it', () => {
-    fixture(({ tasks, dir }) => {
+    enclosingGitFixture(({ tasks, dir }) => {
       const head = spawnSync('git', ['rev-parse', 'HEAD'], { cwd: repoRoot, encoding: 'utf8' }).stdout.trim();
       tasks('add', 'anchored task', '--id', 'anchored');
       const closed = tasks('done', 'anchored', '--commit', head.slice(0, 12));
@@ -814,7 +815,7 @@ describe('tasks CLI', () => {
   });
 
   it('done records a --commit that resolves but is not reachable from HEAD, and warns rather than refusing', () => {
-    gitFixture(({ dir, commit, tasks }) => {
+    realGitFixture(({ dir, commit, tasks }) => {
       tasks('add', 'anchored task', '--id', 'anchored');
       commit('add anchored task');
       spawnSync('git', ['checkout', '-q', '-b', 'stray'], { cwd: dir });

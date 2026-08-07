@@ -1,4 +1,3 @@
-import { spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -9,6 +8,8 @@ import type { ProofClause } from '../lib/specDoc';
 import type { State, Task } from '../lib/taskStore';
 import { allUsages } from './commands';
 import type { Config } from './context';
+import { installDataGit } from './cliFixtures';
+import { realGitRepo } from './realGitFixture';
 import {
   authoredAsPlan,
   branchStanding,
@@ -467,24 +468,26 @@ describe('diffTouchesRegion', () => {
   });
 });
 
-// The two functions that turn a real repository into the facts above.
+const specV1 = ['# a-spec', '', '## Deliverable', '', 'Promise.', '', 'Proof:', '', '- [c1] first.', '- [c2] second.', ''].join('\n');
+
+// The two functions that turn repository facts into the decisions above.
 // `branchStanding` itself is not called here for the same reason `decideSpec`
-// was pulled out of it — it cannot run without a repository — so these get
-// one directly.
-describe('specAddsClauseId and changedFiles, against a real repository', () => {
+// was pulled out of it — it cannot run without those facts — so these get a
+// snapshot-backed history directly.
+describe('specAddsClauseId and changedFiles, against repository facts', () => {
   let dir: string;
   let originalCwd: string;
+  let repo: ReturnType<typeof installDataGit>;
 
   beforeEach(() => {
     originalCwd = process.cwd();
     dir = mkdtempSync(path.join(os.tmpdir(), 'universalis-mergeready-'));
-    spawnSync('git', ['init', '-q', '-b', 'main'], { cwd: dir });
-    spawnSync('git', ['config', 'user.email', 'test@example.com'], { cwd: dir });
-    spawnSync('git', ['config', 'user.name', 'Test'], { cwd: dir });
+    repo = installDataGit(dir);
     process.chdir(dir);
   });
 
   afterEach(() => {
+    repo.uninstall();
     process.chdir(originalCwd);
     rmSync(dir, { recursive: true, force: true });
   });
@@ -494,17 +497,14 @@ describe('specAddsClauseId and changedFiles, against a real repository', () => {
     writeFileSync(path.join(dir, relPath), content, 'utf8');
   };
   const commit = (message: string): void => {
-    spawnSync('git', ['add', '.'], { cwd: dir });
-    spawnSync('git', ['commit', '--no-verify', '-q', '-m', message], { cwd: dir });
+    repo.commit(message);
   };
   const config = (): Config => ({ storePath: 'tasks.jsonl', eventsPath: 'events.jsonl', systemsPath: 'systems.json', specsDir: 'specs', branch: 'feature', actor: null });
-
-  const specV1 = ['# a-spec', '', '## Deliverable', '', 'Promise.', '', 'Proof:', '', '- [c1] first.', '- [c2] second.', ''].join('\n');
 
   it('reads a respec as a differing clause set (c2)', () => {
     write('specs/a-spec.md', specV1);
     commit('base');
-    spawnSync('git', ['checkout', '-q', '-b', 'feature'], { cwd: dir });
+    repo.fork();
 
     write('specs/a-spec.md', specV1.replace('- [c2] second.', '- [c2] second.\n- [c3] third.'));
     commit('respec, adding a clause');
@@ -515,7 +515,7 @@ describe('specAddsClauseId and changedFiles, against a real repository', () => {
   it('reads an appended audit pass as identical, the deliverable untouched (c1)', () => {
     write('specs/a-spec.md', specV1);
     commit('base');
-    spawnSync('git', ['checkout', '-q', '-b', 'feature'], { cwd: dir });
+    repo.fork();
 
     write('specs/a-spec.md', `${specV1}\n## Audit passes\n\n### Pass 1 — 2026-01-01\n\n- base: \`x\`\n- head: \`y\`\n`);
     commit('audit pass appended, deliverable untouched');
@@ -526,7 +526,7 @@ describe('specAddsClauseId and changedFiles, against a real repository', () => {
   it('reads a brand-new spec, absent from base, as differing (c1 folds the old file-existence case in)', () => {
     write('README.md', 'placeholder');
     commit('base, no spec yet');
-    spawnSync('git', ['checkout', '-q', '-b', 'feature'], { cwd: dir });
+    repo.fork();
     write('specs/a-spec.md', specV1);
     commit('author the spec');
 
@@ -544,7 +544,7 @@ describe('specAddsClauseId and changedFiles, against a real repository', () => {
   it('is false when the head copy parses to zero clauses against a populated base, rather than reading corruption as authorship', () => {
     write('specs/a-spec.md', specV1);
     commit('base');
-    spawnSync('git', ['checkout', '-q', '-b', 'feature'], { cwd: dir });
+    repo.fork();
 
     write('specs/a-spec.md', 'not a spec document at all — no ## Deliverable heading survived.');
     commit('spec file corrupted on this branch');
@@ -559,7 +559,7 @@ describe('specAddsClauseId and changedFiles, against a real repository', () => {
     const threeClauses = ['# a-spec', '', '## Deliverable', '', 'Promise.', '', 'Proof:', '', '- [c1] first.', '- [c2] second.', '- [c3] third.', ''].join('\n');
     write('specs/a-spec.md', threeClauses);
     commit('base, three clauses');
-    spawnSync('git', ['checkout', '-q', '-b', 'feature'], { cwd: dir });
+    repo.fork();
 
     write('specs/a-spec.md', threeClauses.replace('- [c2] second.\n', '<<<<<<< HEAD\n=======\n>>>>>>> branch\n'));
     commit('conflict marker over the middle bullet, on this branch');
@@ -570,7 +570,7 @@ describe('specAddsClauseId and changedFiles, against a real repository', () => {
   it('is true when a legitimate respec adds one clause, against a real repository', () => {
     write('specs/a-spec.md', specV1);
     commit('base, two clauses');
-    spawnSync('git', ['checkout', '-q', '-b', 'feature'], { cwd: dir });
+    repo.fork();
 
     write('specs/a-spec.md', `${specV1}- [c3] third.\n`);
     commit('respec, adding one clause');
@@ -582,32 +582,39 @@ describe('specAddsClauseId and changedFiles, against a real repository', () => {
     const noProof = ['# a-spec', '', '## Deliverable', '', 'Nothing proven yet.', ''].join('\n');
     write('specs/a-spec.md', noProof);
     commit('base, no proof clauses');
-    spawnSync('git', ['checkout', '-q', '-b', 'feature'], { cwd: dir });
+    repo.fork();
     write('other.txt', 'x');
     commit('unrelated change');
 
     expect(specAddsClauseId(config(), 'main', git.resolveCommit('main'), 'a-spec')).toBe(false);
   });
 
-  it('reports only the paths this branch\'s own commits changed, not a later move of main', () => {
-    write('specs/a-spec.md', specV1);
-    commit('base');
-    spawnSync('git', ['checkout', '-q', '-b', 'feature'], { cwd: dir });
-    write('src/impl.ts', 'x');
-    commit('implement');
-
-    expect(changedFiles(git.mergeBase('main'))).toEqual(['src/impl.ts']);
-
-    spawnSync('git', ['checkout', '-q', 'main'], { cwd: dir });
-    write('unrelated.txt', 'y');
-    commit('main moves on');
-    spawnSync('git', ['checkout', '-q', 'feature'], { cwd: dir });
-    expect(changedFiles(git.mergeBase('main'))).toEqual(['src/impl.ts']);
-  });
-
   it('is null when there is no merge base to diff from', () => {
     expect(changedFiles(null)).toBe(null);
   });
+});
+
+// The residual real-git case: what stays fixed here is the merge base's
+// position while main moves on after the fork — a fact about git's history
+// graph, not about any commit's content, so a snapshot history cannot
+// stand in for it.
+describe('changedFiles when main moves after the fork, against real git', () => {
+  it('reports only the paths this branch\'s own commits changed, not a later move of main', () =>
+    realGitRepo(({ git: sh, write, commit }) => {
+      write('specs/a-spec.md', specV1);
+      commit('base');
+      sh('checkout', '-q', '-b', 'feature');
+      write('src/impl.ts', 'x');
+      commit('implement');
+
+      expect(changedFiles(git.mergeBase('main'))).toEqual(['src/impl.ts']);
+
+      sh('checkout', '-q', 'main');
+      write('unrelated.txt', 'y');
+      commit('main moves on');
+      sh('checkout', '-q', 'feature');
+      expect(changedFiles(git.mergeBase('main'))).toEqual(['src/impl.ts']);
+    }));
 });
 
 // Finding 2 (pass 1 audit): a declared `writes` grant is a forecast, and the
@@ -638,23 +645,23 @@ describe('branchWorkedOnMembers', () => {
   });
 });
 
-// `branchStanding` wires `decideSpec`'s facts to a real repository and a
+// `branchStanding` wires `decideSpec`'s facts to a repository history and a
 // real store — the seam both pass-1 findings lived in, and the one thing
 // calling the pieces separately cannot prove.
-describe('branchStanding, against a real repository', () => {
+describe('branchStanding, against repository facts', () => {
   let dir: string;
   let originalCwd: string;
+  let repo: ReturnType<typeof installDataGit>;
 
   beforeEach(() => {
     originalCwd = process.cwd();
     dir = mkdtempSync(path.join(os.tmpdir(), 'universalis-branchstanding-'));
-    spawnSync('git', ['init', '-q', '-b', 'main'], { cwd: dir });
-    spawnSync('git', ['config', 'user.email', 'test@example.com'], { cwd: dir });
-    spawnSync('git', ['config', 'user.name', 'Test'], { cwd: dir });
+    repo = installDataGit(dir);
     process.chdir(dir);
   });
 
   afterEach(() => {
+    repo.uninstall();
     process.chdir(originalCwd);
     rmSync(dir, { recursive: true, force: true });
   });
@@ -664,22 +671,34 @@ describe('branchStanding, against a real repository', () => {
     writeFileSync(path.join(dir, relPath), content, 'utf8');
   };
   const commit = (message: string): void => {
-    spawnSync('git', ['add', '.'], { cwd: dir });
-    spawnSync('git', ['commit', '--no-verify', '-q', '-m', message], { cwd: dir });
+    repo.commit(message);
   };
   const config = (): Config => ({ storePath: 'tasks.jsonl', eventsPath: 'events.jsonl', systemsPath: 'systems.json', specsDir: 'specs', branch: 'feature', actor: null });
   const writeSystems = (): void => write('systems.json', JSON.stringify({ unowned: { note: '', paths: [] }, systems: [] }));
   const writeStore = (task: Record<string, unknown>): void => write('tasks.jsonl', `${JSON.stringify({ requires: [], files: [], ...task })}\n`);
   const writeEvent = (op: string, note: string): void => write('events.jsonl', `${JSON.stringify({ t: '2026-01-01T00:00:00Z', by: null, branch: 'feature', head: null, op, id: 'member-1', system: null, spec: 'a-spec', note })}\n`);
 
-  const specV1 = ['# a-spec', '', '## Deliverable', '', 'Promise.', '', 'Proof:', '', '- [c1] first.', '- [c2] second.', ''].join('\n');
+  // The read that fills standing.dirty, asserted where it is assembled: the
+  // rendering of a dirty list was already covered against a hand-built
+  // standing object, which is exactly the coverage that let the read itself
+  // be blinded with the suite green.
+  it('reports the working tree\'s own uncommitted paths as dirty', () => {
+    writeSystems();
+    write('specs/a-spec.md', specV1);
+    commit('base');
+    repo.fork();
+
+    write('left-behind.txt', 'uncommitted');
+    const standing = branchStanding(config(), 'main');
+    expect(standing.dirty).toEqual(['left-behind.txt']);
+  });
 
   it('keeps a spec whose diff never touched its declared writes, because a start event names its member (finding 2)', () => {
     writeSystems();
     write('specs/a-spec.md', specV1);
     writeStore({ id: 'member-1', title: 'Member', kind: 'task', state: 'open', spec: 'a-spec', writes: ['impl.ts'] });
     commit('base');
-    spawnSync('git', ['checkout', '-q', '-b', 'feature'], { cwd: dir });
+    repo.fork();
 
     // Real work landed outside the declared grant: impl.ts is untouched, and
     // the branch's own diff carries only the event log entry below.
@@ -696,7 +715,7 @@ describe('branchStanding, against a real repository', () => {
     write('specs/a-spec.md', specV1);
     writeStore({ id: 'member-1', title: 'Member', kind: 'task', state: 'open', spec: 'a-spec', writes: ['impl.ts'] });
     commit('base');
-    spawnSync('git', ['checkout', '-q', '-b', 'feature'], { cwd: dir });
+    repo.fork();
 
     writeEvent('note', 'a passing observation, not work');
     commit('note recorded');
@@ -709,7 +728,7 @@ describe('branchStanding, against a real repository', () => {
     write('specs/a-spec.md', specV1);
     writeStore({ id: 'member-1', title: 'Member', kind: 'task', state: 'open', spec: 'a-spec', writes: ['impl.ts'] });
     commit('base');
-    spawnSync('git', ['checkout', '-q', '-b', 'feature'], { cwd: dir });
+    repo.fork();
 
     write('specs/a-spec.md', 'garbled — no recognizable spec structure left.');
     commit('spec corrupted on this branch');

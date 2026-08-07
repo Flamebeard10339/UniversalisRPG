@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { clauseStandings, outstandingSummary, parseSpecDoc } from '../lib/specDoc';
-import { printWhere } from './architectureCmds';
+import { architecture, printWhere } from './architectureCmds';
 import { PLANNER_LESSONS, printLessons } from './briefLessons';
 import type { Flags } from './cli';
 import { resolveConfig, specFile } from './context';
@@ -50,10 +50,11 @@ export function cmdPlanPrompt(args: Flags, usage: string): void {
   if (paths.length === 0) {
     console.log(`No paths were named on this command line. Naming none is not the same as surveying nothing: rerun as \`tasks plan-prompt ${slug} <path>...\` once you have even a provisional guess at the regions this branch touches — the survey is what the guess is for.`);
   } else {
+    const arch = architecture(config);
     for (const target of paths) {
       console.log('');
       console.log(`--- ${target} ---`);
-      printWhere(config, target);
+      printWhere(config, target, arch);
     }
   }
   console.log('');

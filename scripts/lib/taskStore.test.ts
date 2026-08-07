@@ -3,6 +3,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { makeRealGitRepo } from './realGitRepo';
 import { backfillSeq, checkStore, claimSummary, COLD_CLAIM_DAYS, coldClaimIssues, coldClaims, dependencyCycles, fixNowQueue, isBlocked, KINDS, listQueue, loadStore, matchesSearchTerm, nearMatches, nextSeq, parseStore, parseStoreTolerantly, requirementStates, saveStore, StoreError, unreviewedQueue, waitingOn, type Task } from './taskStore';
 
 function task(overrides: Partial<Task> & { id: string }): Task {
@@ -347,10 +348,7 @@ describe('parallel branches, merged for real', () => {
 
   beforeEach(() => {
     originalCwd = process.cwd();
-    dir = mkdtempSync(path.join(os.tmpdir(), 'universalis-taskstore-merge-'));
-    spawnSync('git', ['init', '-q'], { cwd: dir });
-    spawnSync('git', ['config', 'user.email', 'test@example.com'], { cwd: dir });
-    spawnSync('git', ['config', 'user.name', 'Test'], { cwd: dir });
+    dir = makeRealGitRepo('universalis-taskstore-merge-');
     process.chdir(dir);
   });
 

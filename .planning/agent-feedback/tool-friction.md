@@ -1261,3 +1261,74 @@ as stdin bodies; another used it for a 3972-universe fuzz and a before/after dif
 `git archive` of the base tree. Every one of those would otherwise have been a scratch `*.test.ts`
 inside a worktree two other agents were reading. Recording it as friction avoided rather than
 friction met.
+
+## 2026-08-07 — audit pass 1, a-green-run-means-the-tree-is-green (opus-auditor-p1)
+
+- `npm run mutate` could not return a single KILLED verdict. 22 of the 24 entries I aimed broke a
+  test and every one came back ERROR: `parseFailedTests` cannot read vitest's project-qualified
+  `FAIL  |tools| <file> > <suite> > <test>` line, which is what two configured projects make it
+  print. Cost: two full manifest runs (~13 and ~9 minutes) plus a throwaway failing test to
+  confirm the reporter format, and every "met" verdict in this pass had to be justified from
+  failure text read by eye out of an ERROR row. Filed HIGH. This is step 4 of the brief the tool
+  itself generates, and no auditor on any spec can currently satisfy it as written.
+- `audit-prompt` printed "no manifest was written" for step 4 and then step 4 told me to aim one
+  anyway. Aiming it by hand was the right instruction, but the brief spends a line saying the tool
+  declined rather than a line saying what a good entry looks like; the format had to be read out of
+  `parseManifest` in `scripts/mutate.ts`. Already filed as
+  `audit-prompt-generates-no-mutation-manifest-for-any-spec-who`.
+- Measuring c7 and c8 honestly cost five full suite runs (two `npx vitest run --reporter=json
+  scripts` and three `npm test`), about 5 minutes of wall clock, and that was the cheapest way to
+  check a measurement the branch had recorded rather than asserted. Worth it: the re-run disagreed
+  with the record, which is the finding.
+- `npm run tasks -- merge-ready` was the one leg of this that cost nothing to trust: one invocation,
+  every gate, and the only failure was the pass I was about to file.
+
+## 2026-08-07 — audit pass 2, a-green-run-means-the-tree-is-green (opus-auditor-p2)
+
+- `audit-prompt` run from the main checkout answered about the wrong tree, and answered
+  confidently. The branch lives in `.claude/worktrees/<slug>`; run from `C:/…/UniversalisRPG` the
+  brief printed `Diff range: 431ab07..431ab07`, "Commits in this range: none", "Diff stat: (none)",
+  every clause `unknown`, no pass-1 record, and step 7 as "do not file a pass — nothing relates this
+  slug to this branch". Every one of those is a true statement about the checkout it was run in and
+  a false statement about the audit I was commissioned for. Cost: one wasted brief and the ~2
+  minutes to notice `git worktree list` explained it. The branch name is in the command line; a
+  brief that cannot find the slug's commits could say "this slug is checked out at <path>" instead
+  of concluding the branch has no diff.
+- `mutate`'s `test` field takes a vitest `-t` substring, but the brief, the usage text and the
+  survivor rows all print names in `file > suite > test` form. Copying a name out of a survivor row
+  into a manifest is refused with "no test named … ran in <file>", which reads as "you aimed at a
+  test that does not exist" rather than "drop the suite prefix". Cost: one refused manifest run.
+- `mutate` itself was the whole value of this pass and worked exactly as documented — pass 1's
+  `|tools|` fix has landed, and 17 of 22 entries came back KILLED with a named test and a
+  re-measurement. The five survivors are five of the six findings I filed; four of them are lines
+  no reading of the diff would have flagged. Two manifest runs, ~11 and ~8 minutes.
+- Measuring c7 and c8 again cost five full suite runs (two `npx vitest run --reporter=json scripts`,
+  three `npm test`), ~5 minutes wall. Unavoidable and worth it: c7's residue moved from six tests
+  over 2000ms to one-to-three, which is a number no static reading produces.
+- `merge-ready` again cost one invocation and reported exactly the two legs the pass was about.
+
+## 2026-08-07 — audit pass 3, a-green-run-means-the-tree-is-green (opus-auditor-p3)
+
+- `tasks audit --args-from` refused the whole file with "`--commit` describes a finding, and no
+  `--finding` has been opened yet" because one wrapped line of clause evidence happened to begin
+  with `--commit HEAD`. The continuation rule is "a line that does not open with `--`", and the
+  evidence a pass is asked to write quotes command lines and test names constantly, so any flag-like
+  token landing at column zero after a wrap is indistinguishable from a flag. Cost: one refused
+  filing and a scan of the file for stray `^--` lines. The error names the offending flag but not
+  the line number, and the flag it names does not exist in the file as a flag.
+- Three whole-suite mutation escalations cost ~9 minutes between them, and all three came back
+  SURVIVED — which is the point: they were re-measurements of pass 2's three unreviewed findings,
+  and confirming a survivor still survives is worth the wall clock. Narrow entries were nearly free;
+  the price is entirely in the escalation, and `mutate` spends it only where it must.
+- `mutate`'s `test` field taking a `-t` substring bit again, but only because pass 2 wrote it down
+  here — that note is what saved the round-trip. Worth keeping.
+- Measuring c7 and c8 cost five full suite runs (two `npx vitest run --reporter=json
+  --configLoader runner scripts`, three `npm test`), ~5 minutes wall. Third pass in a row to pay it,
+  third pass in a row where the number moved: c7's residue went six tests over 2000ms, then one to
+  three, now exactly one in both runs. A clause whose grade turns on a measurement nobody can cache
+  is expensive on purpose and cheap against the alternative.
+- Recording a clause `deferred` resolves the clause standing but leaves the `undelivered` record an
+  earlier pass created open, so `merge-ready`'s `spec` leg still fails on member tasks the `clauses`
+  leg now says are settled. Already filed as
+  `a-later-pass-grading-a-clause-deferred-cannot-convert-the-un`; this pass is its second sighting,
+  and c5 shows it is not specific to `deferred` — grading a clause `met` leaves the record open too.

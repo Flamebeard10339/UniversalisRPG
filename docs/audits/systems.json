@@ -430,6 +430,13 @@
             "scripts/migrate-saves.ts"
           ],
           "note": "produced by save-fixture-migration; the one-shot shape rewrite of every # save fixture at a SAVE_VERSION bump, retired by save-migration-system's ladder"
+        },
+        {
+          "name": "git facts as data",
+          "paths": [
+            "scripts/lib/git.ts"
+          ],
+          "note": "produced by the-git-seam-is-the-only-way-the-task-system-reads-git"
         }
       ]
     },

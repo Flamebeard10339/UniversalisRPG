@@ -1,6 +1,7 @@
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { LISTABLE_MOD_LABELS, materializeApprovedModIssue, planModportalSync } from '../src/content/modportal';
 import type { ApprovedModIssue, MaterializedMod, ModportalEntry, ModportalManifest, ModTier } from '../src/content/modportal';
 import { formatModuleDiagnostic, loadUniverseWithDiagnostics } from '../src/content/registry';
@@ -21,6 +22,14 @@ interface Args {
   contentFiles: string[];
 }
 
+// The in-process exit: `run` turns it into an exit code, so a test driving
+// `run(args)` directly never has its own process killed under it.
+class ExitSignal extends Error {
+  constructor(readonly code: number) {
+    super(`exit ${code}`);
+  }
+}
+
 function usage(): never {
   console.error(
     [
@@ -31,7 +40,7 @@ function usage(): never {
       'off; only mod-auto-enabled defaults on, and only if the enabled set still loads with it.',
     ].join('\n'),
   );
-  process.exit(1);
+  throw new ExitSignal(1);
 }
 
 function splitFiles(value: string): string[] {
@@ -105,7 +114,7 @@ function issuesFromGitHub(args: Args, label: string): unknown[] {
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error);
     console.error(`Could not read ${label} issues with gh: ${detail}`);
-    process.exit(1);
+    throw new ExitSignal(1);
   }
   const parsed = JSON.parse(output) as unknown;
   return Array.isArray(parsed) ? parsed : [parsed];
@@ -215,7 +224,7 @@ function toggle(args: Args, enabled: boolean): void {
   const entry = findEntry(manifest, args.target!);
   if (!entry) {
     console.error(`No mod matches ${args.target}`);
-    process.exit(1);
+    throw new ExitSignal(1);
   }
   entry.enabled = enabled;
   if (enabled) {
@@ -223,7 +232,7 @@ function toggle(args: Args, enabled: boolean): void {
     if (diagnostics.length > 0) {
       for (const diagnostic of diagnostics) console.error(diagnostic);
       console.error(`Left ${entry.moduleId} switched off: enabling it would stop ${args.cacheDir} loading.`);
-      process.exit(1);
+      throw new ExitSignal(1);
     }
     delete entry.diagnostics;
   }
@@ -242,20 +251,34 @@ function show(args: Args): void {
   const entry = findEntry(manifest, args.target!);
   if (!entry) {
     console.error(`No mod matches ${args.target}`);
-    process.exit(1);
+    throw new ExitSignal(1);
   }
   const { text, warning } = readEntryText(cachePath(args), entry);
   if (text === undefined) {
     console.error(warning!);
-    process.exit(1);
+    throw new ExitSignal(1);
   }
   console.log(text.trimEnd());
 }
 
-const args = parseArgs(process.argv.slice(2));
-if (args.command === 'sync') sync(args);
-else if (args.command === 'list') list(args);
-else if (args.command === 'enable') toggle(args, true);
-else if (args.command === 'disable') toggle(args, false);
-else if (args.command === 'sources') sources(args);
-else show(args);
+export function run(argv: string[]): void {
+  try {
+    const args = parseArgs(argv);
+    if (args.command === 'sync') sync(args);
+    else if (args.command === 'list') list(args);
+    else if (args.command === 'enable') toggle(args, true);
+    else if (args.command === 'disable') toggle(args, false);
+    else if (args.command === 'sources') sources(args);
+    else show(args);
+  } catch (error) {
+    if (error instanceof ExitSignal) {
+      process.exitCode = error.code;
+      return;
+    }
+    throw error;
+  }
+}
+
+if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  run(process.argv.slice(2));
+}
