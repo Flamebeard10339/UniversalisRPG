@@ -43,13 +43,14 @@ const MODULE = [
   '',
   '# entity wolf',
   'type: melee-foe',
-  'stats: attack 9',
+  'stats: attack 9, max-health 14',
   'howl:',
   '  instant',
   '  say: It howls.',
   '',
   '# entity dummy',
   'type: melee-foe',
+  'stats: max-health 6',
   '-bite:',
 ].join('\n');
 
@@ -93,7 +94,7 @@ describe('an entity inheriting an action template', () => {
     const registry = loadModule(MODULE);
     expect(registry.entities.get('rat')!.stats['attack']).toEqual({ min: 4, max: 4 });
     expect(registry.entities.get('wolf')!.stats['attack']).toEqual({ min: 9, max: 9 });
-    expect(registry.entities.get('dummy')!.stats).toEqual({});
+    expect(registry.entities.get('dummy')!.stats).toEqual({ 'max-health': { min: 6, max: 6 } });
   });
 
   // Two entities holding one Action object would be walked once per entity by

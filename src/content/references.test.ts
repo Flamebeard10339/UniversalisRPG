@@ -209,6 +209,46 @@ ${line}
   });
 });
 
+describe('whatever is fought over declares the pool it is fought over', () => {
+  const withStrawAction = (...lines: string[]) => loading('examine: A fistful of straw.', ['examine: A fistful of straw.', 'smash:', ...lines].join('\n'));
+  const withShedAction = (...lines: string[]) => loading('# location shed\nx: 1, y: 0', ['# location shed', 'x: 1, y: 0', 'collapse:', ...lines].join('\n'));
+
+  it('refuses a target: on an item or a location, which have nowhere to put a sheet', () => {
+    expect(withStrawAction('  target: health', '  ability: attack')).toThrow(/# item straw action "smash": target: health makes this a fight, and only a # entity can carry the stats: a fighter is measured by/);
+    expect(withShedAction('  target: health', '  ability: attack')).toThrow(/# location shed action "collapse": target: health makes this a fight/);
+  });
+
+  it('leaves an item or a location action that opens no fight alone', () => {
+    expect(withStrawAction('  ability: attack', '  say: Straw everywhere.')).not.toThrow();
+    expect(withShedAction('  say: It groans.')).not.toThrow();
+  });
+
+  it('refuses an entity fought over a pool its own stats: does not measure', () => {
+    expect(loading('stats: max-health 12, dr 2', 'stats: dr 2')).toThrow(/# entity training-dummy action "strike": target: health is measured by max-health, which stats: does not set/);
+  });
+
+  it('names the pool the resource is measured by, not the pool the action targets', () => {
+    const module = VALID.replace('max: max-health', 'max: vigour').replace('# stat max-health', '# stat vigour').replace('stats: max-health 12, dr 2', 'stats: dr 2');
+    expect(() => loadModule(module)).toThrow(/action "strike": target: health is measured by vigour, which stats: does not set/);
+    expect(() => loadModule(module.replace('stats: dr 2', 'stats: vigour 12, dr 2'))).not.toThrow();
+  });
+
+  it('exempts a retaliating action, whose target is not the owner pool', () => {
+    expect(() => loadModule(`${VALID}\n# entity ghost\nhaunt:\n  retaliates\n  time: 1\n  target: health\n`)).not.toThrow();
+  });
+
+  it('exempts an entitytype and asks the entity that merges it instead', () => {
+    const template = `${VALID}\n# entitytype melee-foe\nfight:\n  time: 1\n  target: health\n`;
+    expect(() => loadModule(template)).not.toThrow();
+    expect(() => loadModule(`${template}\n# entity wisp\ntype: melee-foe\n`)).toThrow(/# entity wisp action "fight": target: health is measured by max-health, which stats: does not set/);
+    expect(() => loadModule(`${template}\n# entity wisp\ntype: melee-foe\nstats: max-health 4\n`)).not.toThrow();
+  });
+
+  it('has no authorable target: on a recipe for the ban to reach', () => {
+    expect(() => loadModule(`${VALID}\n# recipe weave\ntarget: health\nout: 1 straw\n`)).toThrow(/unknown recipe field: target/);
+  });
+});
+
 describe('a skill names the stat it raises', () => {
   it('checks stat-id like any other reference, though nothing reads it yet', () => {
     expect(loading('stat-id: attack', 'stat-id: attak')).toThrow(/# skill brawling stat-id: names an unknown stat: attak/);

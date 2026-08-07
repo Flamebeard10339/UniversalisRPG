@@ -370,14 +370,32 @@ function referencesLoaded(check: () => void): boolean {
   }
 }
 
+interface ActionOwner {
+  actions?: Action[];
+  stats?: Record<string, unknown>;
+}
+
+// A `target:` is what makes an action a fight, and whatever is fought over is
+// measured by a `stats:` sheet. `# entitytype` is exempt because it is never an
+// actor: `inheritEntityTypeActions` copies its actions onto every entity naming
+// it, and that entity is where a sheet can be and where the rule bites.
+function fightingOwnerProblem(action: Action, kind: string, owner: ActionOwner, registry: Registry): string | undefined {
+  if (action.target === undefined || kind === 'entitytype') return undefined;
+  if (kind !== 'entity') return `target: ${action.target} makes this a fight, and only a # entity can carry the stats: a fighter is measured by`;
+  if (action.retaliates) return undefined;
+  const max = registry.resources.get(action.target)?.max;
+  if (max === undefined || owner.stats?.[max] !== undefined) return undefined;
+  return `target: ${action.target} is measured by ${max}, which stats: does not set`;
+}
+
 // The grammar refuses an unauthorable action, but an action can also be
 // ASSEMBLED — merged onto a template, patched across modules, or compiled from a
 // recipe — and none of those went through the grammar. Same rule, applied where
 // the section that owns the action can name itself.
-function validateActionTable(where: string, actions: readonly Action[] | undefined): void {
-  for (const action of actions ?? []) {
-    const problem = actionTableProblem(action);
-    if (problem) throw new DslError(`${where} ${actionProblem(action.label, problem)}`);
+function validateActionTable(kind: string, id: string, owner: ActionOwner, registry: Registry): void {
+  for (const action of owner.actions ?? []) {
+    const problem = actionTableProblem(action) ?? fightingOwnerProblem(action, kind, owner, registry);
+    if (problem) throw new DslError(`# ${kind} ${id} ${actionProblem(action.label, problem)}`);
   }
 }
 
@@ -575,7 +593,7 @@ function validateBuiltRegistry(registry: Registry, owners: ReadonlyMap<string, P
   for (const [kind, map] of CONTENT_SECTION_MAPS) {
     for (const [id, value] of registry[map] as ReadonlyMap<string, object>) {
       try {
-        validateActionTable(`# ${kind} ${id}`, (value as { actions?: Action[] }).actions);
+        validateActionTable(kind, id, value as ActionOwner, registry);
         validateSectionReferences(kind, id, value, registry);
       } catch (error) {
         if (!(error instanceof DslError)) throw error;
@@ -586,7 +604,7 @@ function validateBuiltRegistry(registry: Registry, owners: ReadonlyMap<string, P
 
   for (const [id, action] of registry.recipeActions) {
     try {
-      validateActionTable(`# recipe ${id}`, [action]);
+      validateActionTable('recipe', id, { actions: [action] }, registry);
     } catch (error) {
       if (!(error instanceof DslError)) throw error;
       return { module: sectionOwner(owners, 'recipe', id)!, stage: 'validate', error };
