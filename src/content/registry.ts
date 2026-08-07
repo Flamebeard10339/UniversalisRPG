@@ -626,11 +626,16 @@ const wouldDeclare = (kind: string, value: MemberOwner): Member[] => declareMemb
 const memberKey = (member: Member): string => `${member.kind}\0${member.key}`;
 
 function reconcileMembers(namespace: Namespace, merged: Map<string, Map<string, OwnedSection>>, declared: ReadonlyMap<string, Member[]>): void {
+  const survivingAcrossEveryKind = new Set<string>();
   for (const [kind, byId] of merged) {
-    for (const [id, section] of byId) {
-      const surviving = new Set(wouldDeclare(kind, section.value as MemberOwner).map(memberKey));
+    for (const section of byId.values()) {
+      for (const member of wouldDeclare(kind, section.value as MemberOwner)) survivingAcrossEveryKind.add(memberKey(member));
+    }
+  }
+  for (const [kind, byId] of merged) {
+    for (const id of byId.keys()) {
       for (const member of declared.get(ownerKey(kind, id)) ?? []) {
-        if (!surviving.has(memberKey(member))) namespace.undeclare(member.kind, member.key);
+        if (!survivingAcrossEveryKind.has(memberKey(member))) namespace.undeclare(member.kind, member.key);
       }
     }
   }

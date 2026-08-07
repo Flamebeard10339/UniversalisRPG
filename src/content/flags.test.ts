@@ -162,3 +162,21 @@ describe('a flag a field edit takes away', () => {
     expect(registry.namespace.has('flag', 'base.beach.discovered')).toBe(true);
   });
 });
+
+describe('a member key is owned by every kind that declares it', () => {
+  const twins = module('base', '# location beach', 'x: 0, y: 0', 'flags: searched', 'search:', '  set: searched', '# entity beach', 'flags: searched');
+
+  it('keeps the location its flag when an entity of the same id edits that flag away', () => {
+    const strip = module('mod', 'dependencies: base', '# entity base.beach', '-flags: searched');
+    const registry = loadUniverse([twins, strip]);
+    expect(registry.entities.get('base.beach')!.flags).toEqual([]);
+    expect(registry.locations.get('base.beach')!.flags).toEqual(['searched']);
+    expect(registry.namespace.has('flag', 'base.beach.searched')).toBe(true);
+  });
+
+  it('keeps a location discoverable when an entity of the same id edits discovered away', () => {
+    const shadow = module('base', '# location beach', 'x: 0, y: 0', 'starting', '# entity beach', 'flags: discovered');
+    const strip = module('mod', 'dependencies: base', '# entity base.beach', '-flags: discovered');
+    expect(loadUniverse([shadow, strip]).namespace.has('flag', 'base.beach.discovered')).toBe(true);
+  });
+});
