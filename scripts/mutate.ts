@@ -139,10 +139,15 @@ export function parseVitestTally(output: string): { failed: number; passed: numb
 // test inside it, and is already reported as `filesFailed`. Colour codes are
 // stripped rather than assumed absent: they appear whenever a caller's
 // environment forces them, and a name carrying one matches nothing.
+//
+// Every printed line is kept, never a distinct set. Two tests can print one
+// name — an `it.each` name whose distinguishing part follows an embedded
+// newline prints identically up to it — and collapsing them breaks the
+// correspondence with the tally that `tallyOf` refuses on.
 export function parseFailedTests(output: string): string[] {
   const named: string[] = [];
   for (const match of output.replace(/\u001b\[[0-9;]*m/g, '').matchAll(/^\s*FAIL\s+(\S+ > .*\S)\s*$/gm)) {
-    if (!named.includes(match[1])) named.push(match[1]);
+    named.push(match[1]);
   }
   return named;
 }
