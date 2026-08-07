@@ -6,6 +6,7 @@ import {
   findActiveAction,
   FightOutcome,
   inputLimit,
+  outcomeResults,
   parseOwnerRef,
   requiresMet,
   resolvesPerAttempt,
@@ -37,6 +38,8 @@ import {
 } from './encounter';
 import { Action } from '../content/entity';
 import { actionKind } from '../grammar/action';
+import { ActionResult, nestedResults } from '../grammar/actionResult';
+import { isPoint } from '../grammar/range';
 import { Item } from '../content/item';
 import { Recipe } from '../content/recipe';
 import { Registry } from '../content/registry';
@@ -103,6 +106,58 @@ function fightPlan(action: Action, state: GameState, registry: Registry): Determ
 }
 
 
+// The pools with an `on empty:` that a completion's results drain. A drain
+// written plainly among them takes the same amount every completion and can be
+// planned ahead; one drawn from a range or reached through a wrapper cannot,
+// and caps the batch at a single completion instead.
+interface DrainSites {
+  milliPerCompletion: Map<string, number>;
+  unplannable: Set<string>;
+}
+
+function collectDrainSites(results: readonly ActionResult[], registry: Registry, sites: DrainSites, nested: boolean, tables: Set<string>): void {
+  for (const result of results) {
+    if (result.kind === 'pool') {
+      const resource = registry.resources.get(result.resource);
+      if (!resource || resource.onEmpty.length === 0 || result.delta.min >= 0) continue;
+      if (nested || !isPoint(result.delta)) sites.unplannable.add(result.resource);
+      else sites.milliPerCompletion.set(result.resource, (sites.milliPerCompletion.get(result.resource) ?? 0) + toMilliUnits(-result.delta.min));
+      continue;
+    }
+    if (result.kind === 'roll') {
+      if (tables.has(result.table)) continue;
+      tables.add(result.table);
+      const table = registry.dropTables.get(result.table);
+      if (table) collectDrainSites(table.results, registry, sites, true, tables);
+      continue;
+    }
+    for (const group of nestedResults(result)) collectDrainSites(group, registry, sites, true, tables);
+  }
+}
+
+// How many completions a batch may plan before one of them empties a pool: the
+// deterministic counterpart of `drainedAPool`, which returns the per-attempt
+// path to the instant it ran out. A pool the same segment also settles by rate
+// caps at one completion, because a rate is integrated over the whole segment
+// and only a one-completion segment puts the two at the same instant.
+function completionsBeforeDrain(action: Action, state: GameState, registry: Registry, outcome: FightOutcome): number {
+  const sites: DrainSites = { milliPerCompletion: new Map(), unplannable: new Set() };
+  collectDrainSites(outcomeResults(action, outcome), registry, sites, false, new Set());
+
+  let completions = Infinity;
+  for (const resourceId of sites.unplannable) {
+    if ((state.resources[resourceId] ?? 0) > 0) completions = 1;
+  }
+  for (const [resourceId, milliPerCompletion] of sites.milliPerCompletion) {
+    const current = state.resources[resourceId] ?? 0;
+    if (current <= 0) continue;
+    const rate = registry.resources.get(resourceId)!.rate;
+    const alsoRated = rate !== undefined && statValue(rate, state, registry) < 0;
+    completions = Math.min(completions, alsoRated ? 1 : Math.ceil(current / milliPerCompletion));
+  }
+  return completions;
+}
+
 function nextBoundary(state: GameState, registry: Registry, toTime: number): number {
   let boundary = toTime;
   for (const buff of Object.values(state.activeBuffs)) {
@@ -113,19 +168,21 @@ function nextBoundary(state: GameState, registry: Registry, toTime: number): num
     if (!resolvesPerAttempt(action)) {
       const { duration, attemptsToResolve, outcome } = fightPlan(action, state, registry);
       const player = playerCadence(state.activeAction);
-      const remainingAttempts = attemptsToResolve - player.attemptsMade;
-      // One that stops on its outcome must land the segment on its completion.
-      if (state.activeAction.repeating && !stopsOnOutcome(action, outcome)) {
-        const limit = inputLimit(action, state).completions;
-        if (Number.isFinite(limit)) {
-          // The fight in flight, plus (limit - 1) whole fights after it.
-          const runway = remainingAttempts * duration - player.progress + Math.max(0, limit - 1) * attemptsToResolve * duration;
-          const limitInstant = state.time + Math.max(0, runway);
-          if (limitInstant < boundary) boundary = limitInstant;
-        }
-      } else {
-        const completionInstant = state.time + Math.max(0, remainingAttempts * duration - player.progress);
-        if (completionInstant < boundary) boundary = completionInstant;
+      const inFlight = (attemptsToResolve - player.attemptsMade) * duration - player.progress;
+      // Anything that must settle mid-batch caps the batch, and a single fight
+      // is a batch of one.
+      const completions = state.activeAction.repeating
+        ? Math.min(
+            stopsOnOutcome(action, outcome) ? 1 : Infinity,
+            inputLimit(action, state).completions,
+            completionsBeforeDrain(action, state, registry, outcome),
+          )
+        : 1;
+      if (Number.isFinite(completions)) {
+        // The fight in flight, plus the whole fights the cap leaves after it.
+        const runway = inFlight + Math.max(0, completions - 1) * attemptsToResolve * duration;
+        const capInstant = state.time + Math.max(0, runway);
+        if (capInstant < boundary) boundary = capInstant;
       }
     }
   }
@@ -344,13 +401,11 @@ function applyDueBoundaries(state: GameState, registry: Registry, at: number): v
   }
 }
 
-// Associative, as resolve.test.ts proves. Three accepted limitations: an
-// `on full` handler mutating a rate-referenced stat is not; a pool already
+// Associative, as resolve.test.ts proves. Two accepted limitations: an
+// `on full` handler mutating a rate-referenced stat is not; and a pool already
 // saturated in its rate's direction is not, because settling it clamps the rate
 // away and drops the carried remainder, so where the span is cut decides how
-// much it wasted; and a DETERMINISTIC repeating action still applies its whole
-// batch at segment granularity, so a pool its results drain fires `on empty`
-// late. `drainedAPool` closes that only for the per-attempt path.
+// much it wasted.
 export function resolve(state: GameState, registry: Registry, toTimeMs: number): void {
   if (toTimeMs < state.time) throw new RuntimeError(`resolve: toTime (${toTimeMs}) must be >= state.time (${state.time})`);
   if (!Number.isInteger(toTimeMs)) throw new RuntimeError(`resolve: toTime must be an integer millisecond value, got ${toTimeMs}`);
