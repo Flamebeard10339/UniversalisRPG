@@ -50,7 +50,8 @@ Proof:
   proof: vitest scripts/migrate-saves.test.ts
 - [c6] The migration surface is content only. Bumping `SAVE_VERSION` alone reddens shipped-content
   fixture tests and nothing else, and every one of them goes green once `npm run migrate-saves`
-  restamps content, with no source change. That property is the clause; the count moves with the
+  restamps content, once that bump has declared its shape change — the one line of source c4 makes
+  mandatory, and the whole of what a bump costs outside content. That property is the clause; the count moves with the
   test set, as this branch's own later commits proved by moving it. Measured on the branch's final
   state: five failures across two files — three in `src/runtime/integration.test.ts` replaying the
   shipped fixtures, and two in `scripts/migrate-saves.test.ts` asserting that shipped content is

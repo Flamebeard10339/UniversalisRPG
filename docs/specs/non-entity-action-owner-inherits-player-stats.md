@@ -99,6 +99,17 @@ Proof:
   own stat sheet." So the rule is enforced on the merged entity, where a sheet can exist, and the
   template is left alone. Checking sections as authored rather than as merged would fail the tutorial
   on its first load. The template's comment is the contract; c2 is that contract enforced.
+- **The rule is pool-only on purpose, and the rest of the sheet is still inherited.** c2 requires the
+  stat a targeted resource's `max:` reads and nothing else, so an entity declaring `stats: max-health 5`
+  and fighting with `ability: attack`, `dr: defense`, `accuracy:` and `rate:` still takes the player's
+  numbers for those four, silently, and loads clean. That is a real gap, not an oversight, and it is
+  scoped out here because closing it at load time would require the load path to know which side of a
+  fight reads which clause — the runtime rule c5 exists to keep out of `src/content`. The remaining half
+  belongs to a runtime guard where the fight is assembled, or falls out of making the player an entity;
+  both are already routed to `result-application-seam` and `buffs-generalized`. An author reads the rule
+  from the load error itself, which names the pool and the stat it wanted, and from `# entitytype
+  melee-foe`'s own comment that a foe naming it supplies its own stat sheet — which remains the contract
+  this branch only half-enforces.
 - **This branch is a ban, which is the cheapest thing to carry through a redesign.** Whether an
   action stays owned by an entity at all is under discussion, and if actions are divorced from
   entities these two rules lose their subject. That is an argument for landing them, not against: a
