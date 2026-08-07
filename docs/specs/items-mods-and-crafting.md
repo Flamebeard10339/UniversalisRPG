@@ -351,9 +351,10 @@ required for the clauses above to be provable.
 
 ## Open questions
 
-- The directive spelling for the three verbs — feed, slot, allocate — is the worker's to choose,
-  including whether feeding and slotting are one verb dispatching on what the consumed item declares
-  or two. The clauses fix what each must do and refuse, not what it is called.
+- The directive spelling for the four verbs — feed, slot, allocate, apply an effect — is the worker's
+  to choose, including whether feeding, slotting and applying are one verb dispatching on what the
+  consumed item declares or three. All three consume an item against a target on the plane, so one
+  verb is plausible. The clauses fix what each must do and refuse, not what it is called.
 - Which shapes the catalogue ships with. The trial uses `point`, `spindle`, `ring`, `wheel` and
   `double-ring`, which cover the degenerate, the corridor, the cycle, the hub and the large cluster;
   whether that set is right is a content judgement, and adding to it is a code change by design.
