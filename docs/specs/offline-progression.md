@@ -136,3 +136,84 @@ Proof:
 - `first-class-modals` also forecasts writing `session.ts` and `test.ts`. Both grants are forecasts
   and neither side has read the region, so `tasks plan` grades it a note rather than a defect — but
   if that branch starts first, `offline:` and its directive spelling touch the same `applyDirective`.
+
+## Audit passes
+
+### Pass 1 — 2026-08-07
+
+- base: `b56ba3ee30365f83e10738189ac42d94bcad295c`
+- head: `007b8afedbe51c101c8dd168ca79f01c8b2f9a4e`
+- proof 1: met — Mutation-measured, not asserted. Four mutations over the cap in src/runtime/runtime.ts, each KILLED by a
+  named test in src/runtime/runtime.test.ts that passed unmutated and failed with the line broken, re-measured at its
+  own file: c1-drain-cap-removed (completionsBeforeDrain -> Infinity) and c1-cap-off-by-one (Math.ceil(current /
+  milliPerCompletion) -> +1) both die on "banks the third grind and no more over a 200s span, one-shot or split at 3s
+  or 10s"; c1-rate-also-settling-the-pool-ignored (the "< 0" sign in alsoRated inverted) dies on "reads a rate settling
+  the same pool, which crosses zero a grind before the results alone would"; c1-wrapper-drain-unseen (the nestedResults
+  recursion deleted) dies on "walks a drain it cannot plan - one drawn from a selector - a completion at a time". The
+  contingency this evidence carried on its first draft - drop to unmet if either of the first two survived - is
+  DISCHARGED: both were KILLED, 1 of 37.
+  Re-run with: npx vitest run --maxWorkers=4 src/runtime/runtime.test.ts -t "a deterministic batch settles" (4 green;
+  full suite 1794/1794 at --maxWorkers=4, 41s).
+  The tests are falsifiable, not structural: src/runtime/runtime.test.ts:445-601 pins ABSOLUTE outcomes before
+  comparing splits - grindstone banks 3 trophies / vigor 0 / activeAction null / exactly one "Your vigor gutters out."
+  at t=200s, and agrees one-shot with [3,200], [10,200], [1,2,3,4,200], [2.5,7.5,60,200]. The pre-fix reading of that
+  same fixture was 200 / 3 / 10 for those splits (d9dd982's message), so every assertion was false before this commit.
+  Mechanism: runtime.ts:143-159 completionsBeforeDrain over 109-136 collectDrainSites, consumed at 174-186.
+  On the branch collapse the worker claimed was "exactly reproduced": re-derived rather than trusted, and it holds -
+  with the drain term at Infinity the new Math.min is algebraically identical to the two branches it replaced, on all
+  three shapes. (repeating && !stopsOnOutcome) reduces to min(Infinity, limit) = limit, including limit=0 and
+  limit=Infinity; (repeating && stopsOnOutcome) reduces to 1 and runway = inFlight + max(0,0)*... = the old
+  else-branch expression; (!repeating) likewise reduces to 1. inFlight is the old "remainingAttempts * duration -
+  player.progress" character-for-character. EMPIRICALLY, two of those three shapes are covered and one is not:
+  collapse-input-limit-term was KILLED 2 of 26 (resolve.test.ts "also holds when the action is input-limited partway
+  through" AND "wait(1_000_000) with only 28 raw-shrimp ... quickly") and collapse-non-repeating-term KILLED 1 of 26
+  (resolve.test.ts "grants a slow meal's buff on the armed path as well as the instant one"), but
+  collapse-stops-on-outcome-term SURVIVED the whole suite, 0 failed of 1794. See the F5 finding on this pass: the
+  evidence points at an equivalent mutant rather than an unwatched line, because fightBatch (src/runtime/actions.ts:130-133)
+  caps a stops-on-outcome batch at one completion independently. Either way, no part of this clause's grade rests on
+  that term, and the first draft of this evidence line was wrong to cite all three shapes as covered.
+  Also verified, since the new code sets a boundary where the old left one unbounded: resolve() cannot spin. For a
+  repeating action inFlight >= duration - progress > 0 whenever duration > 0, and duration <= 0 on a repeating action
+  throws at runtime.ts:208 under both readings.
+- proof 2: unknown — Not built and not looked at by anyone; recorded unknown rather than unmet because the member task
+  declare-the-offline-span-cap-as-a-tuning-variable is still open and was never dispatched. What was checked, so the
+  next pass does not repeat it: grep -rn "offline" src/ content/ finds only a test title at resolve.test.ts:845;
+  src/runtime/tuning.ts exports travelSecondsPerUnit, minDamage, contestSpread, defaultActionDuration and no fifth
+  accessor; src/runtime/tuning.test.ts (this clause's proof target) has no offline case. Nothing in d9dd982 touches
+  tuning.ts.
+- proof 3: unknown — No reconciliation entry point exists. src/runtime/session.ts exports startSession, view, apply, wait,
+  beginAction, cancelAction, submitModal, applyDirective, runTest and nothing that takes an elapsed span. The
+  invariant the clause promises to keep is intact today but vacuously: grep -rn "Date.now|performance.now" src/
+  --include=*.ts excluding tests returns nothing, and src/runtime/state.ts:41 still carries "The one seam through
+  which simulated time advances; nothing reads a real clock." d9dd982 adds no clock read. Nobody built or verified
+  the clamp-and-call this clause is about.
+- proof 4: unknown — Recorded unknown, not met: the clause is about a feature that does not exist, so a green tree proves
+  nothing about it. The negative check that WAS run, so the next pass need not: applyDirective's "load:" case
+  (src/runtime/session.ts:352-359) calls loadSave and resets dialogue/logCursor only - no resolve(), no time write;
+  src/runtime/save.ts is not in this branch's diff at all; content/tutorial-island.dsl is unchanged, and
+  integration.test.ts over its shipped "# test" sections passes byte-identical (full suite 1794/1794 at
+  --maxWorkers=4). So d9dd982 does NOT violate this clause - but nothing has been verified about the load path in
+  the presence of a reconciliation entry point, because there is none.
+- proof 5: unknown — Nothing built. There is no store stamp, no store, and no span source: the spec's own Decisions record
+  that this waits on auto-save-export-and-load. src/runtime/session.test.ts (this clause's proof target) has no case
+  naming a store write or an inert import; its only "load:" case is line 203, a stale-save warning.
+- proof 6: unknown — Nothing built. resolve() still throws on a backwards toTime (src/runtime/runtime.ts:410) and there is
+  no entry point above it to clamp, so no negative-span case exists to grade. d9dd982 leaves both guards at
+  runtime.ts:410-411 untouched.
+- proof 7: unknown — No "offline:" directive. src/runtime/session.ts:315-373 switches on run/talk/choose/use/travel/craft/
+  begin/assert/expect/load/cancel/wait/equip/unequip and nothing else; "wait:" (line 364) is the grammar it would
+  mirror. src/content/test.test.ts, this clause's proof target, has no offline case.
+- proof 8: unknown — Recorded unknown, not met, for the same reason as c4: the stamp this clause rules on does not exist, so
+  "the save format is unchanged" is true of a tree that was never asked to change it. The negative check: this
+  branch's diff (git diff --name-only b56ba3e..HEAD) does not include src/runtime/save.ts or src/runtime/state.ts;
+  d9dd982 adds no GameState field, no SaveDiff field, no envelope field and no SAVE_VERSION change - its runtime.ts
+  hunk is confined to nextBoundary and two new module-private helpers. src/runtime/save.test.ts passes unchanged.
+  ADJACENCY the next pass should not lose, raised by this auditor but owned by the dangling-reference-on-field-edit
+  finding: loadSave prunes fields holding no registry id (src/runtime/save.ts:49, prune: "holds no registry id") and
+  warns, the behaviour save.test.ts:235 pins for mod.gem/mod.flag. A flag key wrongly undeclared at load is therefore
+  a flag id a previously-valid save loses on load, with a warning rather than an error - which is the failure mode
+  this clause exists to forbid, arriving from a direction the clause did not anticipate. "No GameState field changed"
+  and "a save loads back to what was written" are not the same promise.
+- proof 9: unknown — Nothing built, and nothing to survive. resolve() neither reads nor writes pendingModal before or after
+  d9dd982 (grep -n pendingModal src/runtime/runtime.ts - no hits in the resolve path). src/runtime/session.test.ts
+  has no reconciliation-with-outstanding-modal case because there is no reconciliation.
