@@ -900,3 +900,48 @@ gates, so a reader has to know that one of the two red lines is a merge and not 
 Cost of the pass itself, measured rather than estimated: `merge-ready` 43s for the whole gate,
 well inside the five-minute rule. `npm run mutate` over the six clause entries 97s against 56s for
 the same manifest under `main`'s `mutate.ts` — the +73% is the confirmation phase and is filed.
+
+
+## 2026-08-07, auditing `save-fixture-migration` (pass 1)
+
+Three specs landed on one branch and `audit-prompt` infers one spec per branch, so the brief for
+two of the three refuses to write its pass file and mutation manifest. The `--branch <slug>`
+override is what unblocks it, and it then prints a branch name that is false. That is survivable
+once you are told; nothing in the brief says it, and a pass filed with the override would record
+the wrong branch in the event log. Filing without the flag and briefing with it is the working
+shape — worth making `audit-prompt` able to say "this branch carries N specs" instead.
+
+Step 4 had nothing to run: all six clauses write `proof: vitest <file>` with no quoted test name,
+and `resolveTarget` only wires a target written as `vitest <file> "<exact test name>"`, so the
+manifest section printed `- none` for every clause. The step is still the whole exercise, so the
+manifest was hand-written. The cost is not the writing — it is that a spec author has no signal
+that the proof line they wrote will resolve to nothing until an auditor three commits later finds
+an empty manifest section. `tasks plan`, or `spec show`, could say "this proof target resolves to
+no test" at the moment the clause is written, which is the only moment it is cheap to fix.
+
+What the hand-written manifest bought, and the argument for keeping step 4 binding even with no
+generated one: 13 mutations, 11 killed, 2 survived, and both survivors are filed findings. Neither
+was reachable by asking "is this line covered" — both came from asking what the clause promises
+that the code merely happens to do. The sharper of the two is a test that disables itself in the
+failure state (`it.skipIf(SHAPE_CHANGE !== null)` is the only end-to-end refusal test, and it
+skips exactly when the value it guards is wrong). A survivor is the finding, but a survivor whose
+scope walked to the whole suite and came back green because the test *skipped* rather than passed
+is invisible in the report — there is already a finding on the shortfall check missing skips, and
+this pass is a second, independent instance of it.
+
+Cheap and load-bearing, worth naming as the standard move: measure the clause instead of trusting
+the number in it. c6 states a count ("three failures in one file"). Driving the bump through
+`npm run mutate` with `all: true` rather than by hand cost one command and produced the whole
+answer — 6 of 1815 with the pre-existing red subtracted, and the re-run scope column naming the
+two files. The count was correct when the event log recorded it and false by the time the branch
+ended, because a later commit *on the same branch* added two tests coupled to shipped content. A
+clause that pins a measurement can be falsified by its own branch, and only re-measuring finds it.
+
+Costs. `npm run inspect` resolves its dynamic `import()` relative to `scripts/`, not the repo
+root, so `./scripts/migrate-saves.ts` fails and `./migrate-saves.ts` works; the error does suggest
+the fix, which saved the round trip. `merge-ready` was 4m10s all in and reports `npm test` FAIL
+with no indication that the single red test is a known, filed, non-hermetic one — every auditor on
+this branch pays the same few minutes to re-establish that. A `merge-ready` that could name the
+failures it saw against the open findings would turn that into a line of output. Measured: the
+13-entry manifest 4m02s (two survivors each escalating to a whole-suite run), the single c6
+mutation 5m18s, `merge-ready` 4m10s.
