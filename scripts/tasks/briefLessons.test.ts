@@ -103,6 +103,69 @@ describe('a citation naming no live lesson is reported', () => {
   });
 });
 
+// c6 as one property rather than a list of axes it happens to have been
+// checked on. Two things are claimed here and both are stated over a
+// generated table rather than over hand-picked inputs, because every axis
+// nobody thought of is the one a later edit reverses: a citation resolves
+// only to the lesson whose id it *is*, character for character, and every
+// citation that resolves to nothing comes back from the reporting function
+// unchanged. Deciding that a value is not a citation at all — the empty
+// string a missing store field arrives as — is the assembling caller's
+// judgement and never this module's, so nothing here is exempt from being
+// reported.
+describe('a citation is matched exactly as given, and every one is accounted for', () => {
+  const liveIds = [...WORKER_IDS, ...AUDITOR_IDS, ...PLANNER_IDS, ...ORCHESTRATOR_IDS];
+
+  const perturbed = (id: string): string[] => [
+    ` ${id}`,
+    `${id} `,
+    ` ${id} `,
+    `\t${id}\t`,
+    `${id}\n`,
+    `\u00a0${id}`,
+    id.toUpperCase(),
+    id.slice(0, -1),
+    id.slice(1),
+    `${id}s`,
+    `x${id}`,
+    id.replace('/', ''),
+    id.replace('/', '-'),
+  ];
+
+  const blank = ['', ' ', '   ', '\t', '\n', ' \n ', '\u00a0'];
+  // A citation is a key in nothing but a Map: an index on a plain object
+  // answers these with inherited members, which is a resolution to a lesson
+  // that does not exist rather than a report that none does.
+  const inherited = ['__proto__', 'constructor', 'toString', 'hasOwnProperty', 'valueOf'];
+  const shaped = ['worker', 'worker/', '/', 'planner/gone'];
+
+  const live = new Set(liveIds);
+  const dead = [...new Set([...liveIds.flatMap(perturbed), ...blank, ...inherited, ...shaped])].filter((citation) => !live.has(citation));
+
+  it('covers both inputs the survivors were found on, among the rest', () => {
+    expect(dead).toContain(' worker/mutation-proof ');
+    expect(dead).toContain('');
+    expect(dead.length).toBeGreaterThan(150);
+  });
+
+  it('never answers with a lesson whose id is not the citation', () => {
+    for (const citation of [...liveIds, ...dead]) {
+      const lesson = findLesson(citation);
+      if (lesson !== undefined) expect(lesson.id, JSON.stringify(citation)).toBe(citation);
+    }
+    expect(liveIds.filter((id) => findLesson(id) !== undefined)).toHaveLength(19);
+  });
+
+  it('resolves nothing for a citation differing from a live id by so much as one character', () => {
+    for (const citation of dead) expect(findLesson(citation), JSON.stringify(citation)).toBeUndefined();
+  });
+
+  it('reports every citation it does not resolve, verbatim and in the order cited', () => {
+    expect(unknownLessonIds([...liveIds, ...dead])).toEqual(dead);
+  });
+});
+
+
 // One id, two lessons, is a citation that names both — the failure the whole
 // mechanism is for. Refused where the ids become keys, which is the only
 // point at which uniqueness is a property at all, so no reader has to check.
