@@ -29,61 +29,71 @@ Proof:
   payloads in the tag-clause vocabulary items already use (`+6 attack`), joined by **undirected
   adjacency** edges. Cycles are permitted and a ring of passives is a legitimate shape, because an
   edge only says two nodes touch and nothing travels along one. What is refused at load time,
-  through the DSL's own error surface, is a node no path from the cluster's entry reaches, since it
+  through the DSL's own error surface, is a node no path from the cluster's root reaches, since it
   can never be allocated.
-- [c2] A cluster jewel declares its outgoing jewel slots by direction in a local frame whose entry
-  edge is always west, and names the passive each slot attaches to. It must declare at least one,
-  which is the structural guarantee that the plane never runs out of somewhere to grow. Slotting
-  rotates that local frame onto the world edge it was slotted through, so a jewel is authored once
-  as "I came in from the west" and is placeable through any edge.
-- [c3] Clusters occupy hexes addressed in axial coordinates on a pointy-top grid, whose six
+- [c2] Every cluster jewel is authored in one orientation: its **root node** sits on the west edge,
+  its passives do whatever they do inside the hexagon, and between one and five outgoing jewel slots
+  sit on the five remaining edges, at most one to an edge. At least one is the structural guarantee
+  that the plane never runs out of somewhere to grow; five is what the geometry leaves once the root
+  has the west edge. A jewel declaring a second slot on one edge, or any slot on the west edge, is
+  refused at load time.
+- [c3] Rotation is determined, never chosen. Slotting a jewel through a slot on direction `d` places
+  its cluster in the neighbouring hex, whose shared edge with the parent is `opposite(d)`, and the
+  jewel is rotated by exactly the amount that carries its root node's west edge onto that shared
+  edge. Slotting through an east-facing slot is therefore the identity, through a west-facing slot a
+  half turn, and every other edge a multiple of a sixth. The rotation is a function of the slot, so
+  there is nothing for the player to decide and nothing to store beyond which edge was used.
+- [c4] Clusters occupy hexes addressed in axial coordinates on a pointy-top grid, whose six
   directions are `e`, `ne`, `nw`, `w`, `sw` and `se`. A jewel slot is an edge midpoint and is shared
   by exactly two hexes. A hex holds at most one cluster, so a slot may be filled only when the hex
   on its far side is empty; a slot facing an occupied hex is **blocked**, and both filling it and
   allocating it are refused. Two adjacent clusters are never joined by their shared edge — a
   connection exists only through a slot that was actually filled — so bare adjacency grants nothing
   that was not authored.
-- [c4] The origin is the general rule's degenerate case, not a special case beside it. An item base
-  occupies hex `(0, 0)`; by default that hex holds a cluster with no passives and a single jewel slot
-  on its east edge, allocated from the start and costing no point. A base may instead declare a
-  `cluster-jewel:` of its own for hex `(0, 0)`, so a unique weapon ships with authored passives and a
-  slot layout of its choosing, and the default is what that rule yields when nothing is declared.
-- [c5] A cluster jewel reaches the player as an ordinary item. An `# item` names one through
+- [c5] The origin is the general rule's degenerate case, not a special case beside it. An item base
+  occupies hex `(0, 0)` with a cluster that is never slotted and therefore never rotated: its root
+  node is allocated from the start, costs no point, and is under no obligation to sit on the west
+  edge, because the west-edge convention exists only to give slotting a defined rotation. By default
+  that cluster is a single jewel slot on the east edge and nothing else, which is the item's on-ramp.
+  A base may instead declare a `cluster-jewel:` of its own for hex `(0, 0)`, so a unique weapon ships
+  with authored passives and a slot layout of its choosing; the default is what that rule yields when
+  nothing is declared.
+- [c6] A cluster jewel reaches the player as an ordinary item. An `# item` names one through
   `cluster-jewel:` to become the droppable thing, so jewels drop through `droptables`, stack in
   inventory, and are carried by the existing item machinery with no second inventory and no second
   drop path. A `cluster-jewel:` naming an unknown declaration is a load-time reference error like
   every other reference in the language.
-- [c6] Instancing is **lazy**. `inventory[itemId]` keeps counting stacks until a jewel is slotted
+- [c7] Instancing is **lazy**. `inventory[itemId]` keeps counting stacks until a jewel is slotted
   into one; that single item then leaves the stack and becomes an instance carrying its plane, its
   allocations and its experience. Instances are the `instanced-objects` substrate and nothing else —
   no second instance table in `GameState`, no second prune rule, no second save migration.
-- [c7] Item experience has exactly one source. Consuming an item that declares `item-experience:`
+- [c8] Item experience has exactly one source. Consuming an item that declares `item-experience:`
   raises the target instance's experience by that amount, and no other event in the game changes it.
   An item's level is `skill-levels-xp-events`'s `level(X)`, imported rather than reimplemented —
   there is one level curve in this repository — and its passive points equal its level. An item base
   declares `max-level:`, defaulting to 99; feeding an item already at its maximum is refused with
   the consumed item intact, rather than silently absorbed.
-- [c8] Allocation is bounded by points and gated by adjacency. A passive or a jewel slot may be
+- [c9] Allocation is bounded by points and gated by adjacency. A passive or a jewel slot may be
   allocated when at least one of its neighbours is already allocated — a neighbour, not a parent,
-  because the graph may contain cycles. The origin slot is allocated from the start and is what every
-  path is ultimately reachable from. Allocating with no point remaining, out of adjacency, or onto a
-  blocked slot is refused and costs nothing.
-- [c9] Slotting and allocation are both permanent. A jewel is consumed when slotted, a filled slot
+  because the graph may contain cycles. The origin cluster's root is allocated from the start and is
+  what every path is ultimately reachable from. Allocating with no point remaining, out of adjacency,
+  or onto a blocked slot is refused and costs nothing.
+- [c10] Slotting and allocation are both permanent. A jewel is consumed when slotted, a filled slot
   refuses a second jewel, and no directive un-allocates a node or un-slots a jewel. The refusals are
   proved, not asserted: attempting each is a checked outcome, not an absence.
-- [c10] An item's contribution is the sum of the payloads of its allocated passives, computed by one
+- [c11] An item's contribution is the sum of the payloads of its allocated passives, computed by one
   pure function of the instance, and it reaches combat through the same stat-bonus path an equipped
   `+2 attack` already takes. A focused fixture proves that allocating one passive changes outgoing
   damage, and that an instance the player is not wearing is inert.
-- [c11] An instance survives a reload with identical evaluated stats, and is repaired rather than
+- [c12] An instance survives a reload with identical evaluated stats, and is repaired rather than
   broken when content moves underneath it: an instance whose template is gone is pruned, and a
   slotted jewel or allocated node whose declaration is gone is dropped with its point returned, so a
   loaded instance is never over its own budget. Permanence is a rule about what the player may do,
   not a promise that deleted content stays evaluable.
-- [c12] Growing an item is reachable through the directive surface every other play input goes
-  through, so a `# test` section records feeding, slotting and allocating — and each refusal in c3,
-  c7, c8 and c9 — and replays green over the shipped content.
-- [c13] `npm run tasks -- merge-ready` passes before the spec is marked done: tsc, tests,
+- [c13] Growing an item is reachable through the directive surface every other play input goes
+  through, so a `# test` section records feeding, slotting and allocating — and each refusal in c4,
+  c8, c9 and c10 — and replays green over the shipped content.
+- [c14] `npm run tasks -- merge-ready` passes before the spec is marked done: tsc, tests,
   layer-check, audit-status, doctor and the byte check in one invocation.
 
 ## Decisions
@@ -124,11 +134,18 @@ Proof:
   balance back where the resonance relation had it. As a consequence the cluster-level structure is
   a tree, since a cluster's every other edge faces either an empty hex or an occupied one, and cycles
   live inside clusters where an author put them.
-- **Slot directions are relative to the entry edge, so there is no rotation to choose.** A jewel is
-  authored as "I came in from the west, and I offer slots east and north-east", and slotting rotates
-  that frame onto whichever edge it went through. Letting the player pick one of six rotations is a
-  real and interesting mechanic, and it is a later one: it doubles the placement decision before
-  there is anything playable to judge it against.
+- **One authored orientation, and rotation follows from the slot.** Every jewel is written the same
+  way — root on the west edge, passives inside, outgoing slots on the other five — and slotting
+  rotates it by whatever carries that root onto the edge it entered through. There is no rotation to
+  choose and none to store: the slot's direction determines it, so an author never thinks about
+  orientation and a save records only which edge was used. This is why the west edge is reserved
+  rather than merely conventional; a jewel that could offer a slot there would have two candidate
+  roots and no defined rotation.
+- **Between one and five outgoing slots, at most one to an edge.** The lower bound is the
+  non-termination guarantee. The upper bound is not a rule so much as what the hexagon has left once
+  the root has the west edge, and stating it as a range is how the count reads as a design axis: a
+  one-slot jewel is a corridor, a five-slot jewel is a junction that opens the plane in every
+  remaining direction and is correspondingly rare.
 - **The grid's offset axis is rows, not columns.** A hex with a due-east edge is pointy-topped, and
   pointy-topped hexes tile in rows whose alternates are shifted by half — the offset lives on the row
   index. The spec pins **axial** coordinates instead, which name the six neighbours as constant
@@ -197,7 +214,7 @@ inventing its own. The core survivability tier waits on none of them.
 
 ## Out of scope
 
-Rolled jewel modifiers and jewel instancing (the named sequel). Player-chosen rotation when slotting.
+Rolled jewel modifiers and jewel instancing (the named sequel).
 Refund or respec of any kind. Jewels that edit an existing cluster rather than extend the plane, or
 that move one. Salvage, extraction, or transferring a plane between items. Keystone passives that
 change the shape of the combat formula. Any GUI: when a plane needs to be seen rather than computed,
