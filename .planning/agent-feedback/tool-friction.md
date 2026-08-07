@@ -1261,3 +1261,24 @@ as stdin bodies; another used it for a 3972-universe fuzz and a before/after dif
 `git archive` of the base tree. Every one of those would otherwise have been a scratch `*.test.ts`
 inside a worktree two other agents were reading. Recording it as friction avoided rather than
 friction met.
+
+## 2026-08-07 — audit pass 1, a-green-run-means-the-tree-is-green (opus-auditor-p1)
+
+- `npm run mutate` could not return a single KILLED verdict. 22 of the 24 entries I aimed broke a
+  test and every one came back ERROR: `parseFailedTests` cannot read vitest's project-qualified
+  `FAIL  |tools| <file> > <suite> > <test>` line, which is what two configured projects make it
+  print. Cost: two full manifest runs (~13 and ~9 minutes) plus a throwaway failing test to
+  confirm the reporter format, and every "met" verdict in this pass had to be justified from
+  failure text read by eye out of an ERROR row. Filed HIGH. This is step 4 of the brief the tool
+  itself generates, and no auditor on any spec can currently satisfy it as written.
+- `audit-prompt` printed "no manifest was written" for step 4 and then step 4 told me to aim one
+  anyway. Aiming it by hand was the right instruction, but the brief spends a line saying the tool
+  declined rather than a line saying what a good entry looks like; the format had to be read out of
+  `parseManifest` in `scripts/mutate.ts`. Already filed as
+  `audit-prompt-generates-no-mutation-manifest-for-any-spec-who`.
+- Measuring c7 and c8 honestly cost five full suite runs (two `npx vitest run --reporter=json
+  scripts` and three `npm test`), about 5 minutes of wall clock, and that was the cheapest way to
+  check a measurement the branch had recorded rather than asserted. Worth it: the re-run disagreed
+  with the record, which is the finding.
+- `npm run tasks -- merge-ready` was the one leg of this that cost nothing to trust: one invocation,
+  every gate, and the only failure was the pass I was about to file.

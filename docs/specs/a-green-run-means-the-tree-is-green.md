@@ -117,3 +117,106 @@ None. Two decisions are delegated to the worker and are not questions for the pl
 - **Which tests stay on real git** — c5 requires the set be named and small, not which members it
   has. `handoff.test.ts`'s log-walk cases are the likeliest keepers, since a commit-message walk over
   a synthesised log proves less than one over a real one; that is an observation, not an instruction.
+
+## Audit passes
+
+### Pass 1 — 2026-08-07
+
+- base: `431ab07c20636f38fb66e094e28be1398e2d6798`
+- head: `80de4d2a93058353266b8bcac6f748e64ad07717`
+- proof 1: met — All five named production sites are routed through the seam and none was replaced by
+another raw read. Verified against the base tree by replaying the clause's grep over
+`git ls-tree -r --name-only 431ab07`: it returned audit.ts:118, context.ts:80, mergeReady.ts:302,
+mergeReady.ts:359, records.ts:303 (plus sourceFiles.ts:17); the same grep at 80de4d2 returns none of
+them. handoff.ts's log walk does not exist at either end of the range, so the clause's "sixth" site
+was already discharged. `scripts/tasks.ts` carries no raw git either. The grep as literally written
+still returns text, all of it out of the clause's substance: sourceFiles.ts:17 (named out of scope by
+the clause, and filed as c1-s-proof-grep-sweeps-scripts-lib-and-so-always-catches-sou) and 17 lines
+in the branch's own new scripts/tasks/realGitFixture.ts, a test fixture that is deliberately real per
+c5 and is filed separately in this pass. Mutation, `npm run mutate` over an aimed manifest: breaking
+context.ts:79 broke 3 tests in doctor.test.ts (doctor.test.ts:178, the warn-once case); breaking
+records.ts:302 broke records.test.ts:860 (the derived closingCommit case); breaking audit.ts:117 broke
+2 tests in audit.test.ts (audit.test.ts:1458, the ownership case). Those three are kills, but `mutate`
+reported them ERROR rather than KILLED, because its parseFailedTests regex cannot read vitest's
+project-prefixed `FAIL |tools| <file> > <test>` line — filed HIGH in this pass, and the failing tests
+above are read out of mutate's own printed failure detail. The fourth aimed entry, breaking
+mergeReady.ts:302 (`git.dirtyPaths() ?? []` to `[]`), SURVIVED at whole-suite scope, 0 failed of 1855
+— filed as its own finding.
+- proof 2: met — `install(facts)` at scripts/lib/git.ts:147 swaps a module-level `installed: GitFacts` and
+returns the previous one, and all thirteen exported reads delegate to `installed`, read line by line.
+`realGit` is the default. Mutation: deleting `installed = facts;` (git.ts:148) failed
+`scripts/lib/git.test.ts > git seam > install swaps the implementation every exported read answers
+from, and hands back the one it replaced` — that test is named verbatim in mutate's output. Rebinding
+the `head` export to `realGit.head()` failed the same named test. Rebinding `commitLog` failed
+`scripts/tasks/cliFixtures.test.ts > gitFixture answers git from the data its own commits built >
+changedFiles and commitLog carry what each commit touched, newest first`; rebinding `mergeBase` failed
+2 tests in cliFixtures.test.ts (cliFixtures.test.ts:63). All four reported ERROR rather than KILLED for
+the tool reason filed HIGH in this pass. The one hole: rebinding the `diffStat` export to `realGit`
+SURVIVED at whole-suite scope, 0 failed of 1855, so "nothing reaches around it" is unproven for that
+export — filed as its own finding.
+- proof 3: met — Five declared forms, each visible at the call site: `fixture` (installs `noRepositoryGit`,
+every fact null/false), `enclosingGitFixture` (installs nothing, so the enclosing checkout answers),
+`gitFixture` and `defaultStoreGitFixture` and `installDataGit` (install `DataGit`, a snapshot history),
+and the four functions in scripts/tasks/realGitFixture.ts (real `git` in a temp repo, declared by the
+import). scripts/tasks/cliFixtures.test.ts proves the difference behaviourally rather than by
+inspection: `done --commit HEAD` is refused under `fixture` and accepted under `enclosingGitFixture`,
+in one test. Mutation: swapping `fixture` to `fixtureWith(null, ...)` broke 2 tests in
+cliFixtures.test.ts (cliFixtures.test.ts:32) and swapping `enclosingGitFixture` to
+`fixtureWith(noRepositoryGit, ...)` broke 2 (cliFixtures.test.ts:37), so neither declaration is
+decorative. Both reported ERROR for the tool reason filed HIGH here. One git read escapes the
+declaration — `trackedFiles()` in scripts/lib/sourceFiles.ts spawns real `git ls-files` against
+process cwd under every fixture — which is filed as its own finding rather than graded against this
+clause, since c1 puts that file explicitly out of scope.
+- proof 4: met — `grep -n "spawnSync('git'" scripts/tasks/cliFixtures.ts` returns nothing (exit 1); the
+file's only `spawnSync` is `spawnTasks`, which spawns node, not git. Both fixtures build a `DataGit`
+and install it. Mutation proves the data is what answers rather than a repository somewhere: changing
+`DataGit`'s `head` from the last commit to the first broke cliFixtures.test.ts:62 (`commit() advances
+HEAD and main stays at the branch base`), reported ERROR for the tool reason filed HIGH here.
+- proof 5: met — The named set is declared by import: scripts/tasks/realGitFixture.ts exports exactly four
+fixtures — realGitFixture, realGitRepo, eventLogGitFixture, realDefaultStoreGitFixture — and the six
+files' import lines are the whole membership list (architectureCmds 1 call, audit 1, records 1,
+mergeReady 1, handoff 4, doctor 5 plus 1 spawnTasks). Nothing is left over: every other case in those
+files now runs on `fixture`, `enclosingGitFixture`, `gitFixture` or `installDataGit`. Mutation proves
+the converted cases still reach their old assertions rather than passing vacuously: breaking
+`DataGit.fork()` broke 4 tests across mergeReady.test.ts and cliFixtures.test.ts
+(mergeReady.test.ts:708), and blanking `specAddsClauseId`'s base read broke 3 in mergeReady.test.ts
+(mergeReady.test.ts:695) — both the exact cases that used to build a repo per case. Both reported
+ERROR for the tool reason filed HIGH here. One converted case does not carry its own name: removing
+doctor.ts:49's `git.mergeInProgress() ? [] :` suspension SURVIVED, so `doctor suspends the git-anchored
+checks during an unresolved merge` cannot fail on the property it is named for — filed as its own
+finding.
+- proof 6: met — `export function run(argv: string[])` at scripts/modportal.ts:265, with the six
+`process.exit(1)` calls replaced by a thrown `ExitSignal` that `run` converts to `process.exitCode`, so
+a caller driving `run` in-process is not killed. `runModportal` in scripts/modportal.test.ts calls
+`run(args)` and captures console; exactly one spawn is left, labelled in a describe block of its own as
+the c5-rule keeper, and it is the only thing that can prove the direct-execution guard. Mutation:
+forcing the ExitSignal code to 0 broke 4 tests in modportal.test.ts (modportal.test.ts:260 among them),
+and replacing the direct-execution guard with `false` broke modportal.test.ts:260 — so the kept spawn
+earns its place. Both reported ERROR for the tool reason filed HIGH here. Measured cost: the file no
+longer appears anywhere in the slowest 15 tests of `npx vitest run --reporter=json scripts`.
+- proof 7: unmet — Measured twice with the clause's own proof command
+(`npx vitest run --reporter=json --configLoader runner scripts`), on the branch tip 80de4d2 on the
+same idle 24-thread machine the spec was measured on (loadavg 0, 14GB free, nothing else running).
+Run one: 1245 tests green, five
+assertionResults over 2000ms — 3224ms handoff.test.ts `beats git log -S`, 3197ms doctor.test.ts
+`default-store writes stay silent about their own dirtiness`, 3068ms tasks.test.ts `refuses five junk
+arguments on every bounded command surface`, 2284ms triage.test.ts `triage promotes into the inferred
+spec when the branch matches no spec file`, 2017ms mergeReady.test.ts `reports only the paths this
+branch's own commits changed`. Run two: six over 2000ms, worst 3389ms, same five plus 2032ms
+taskStore.test.ts. The clause asks for none. This is a large improvement on the 4794ms the clause
+records as the starting worst, but headroom is the stated property and 3389ms against vitest's 5000ms
+default is 1.48x, below the 2x the clause itself calls insufficient — and the measured contention
+multipliers in the clause (2.1x to 4.9x) are what turns that into a timeout. Graded unmet rather than
+deferred because the goal is that a green run means the tree is green, and a test with 1.48x headroom
+on a 5000ms clock is the exact mechanism the deliverable names. Re-runnable: the command above, on any
+idle machine.
+- proof 8: met — vite.config.ts at 80de4d2 carries neither `maxWorkers` nor a `testTimeout` override on the
+`tools` project, so every route runs vitest's 5000ms default at full worker count — read directly, and
+`npm run tasks -- merge-ready` runs `npm test` with no clock flag. Reproduced the measurement
+independently on the branch tip, three consecutive runs on a clean tree, no other work on the machine:
+exit 0 / 74 files / 1855 of 1855 passed, three times, at 28.7s, 29.7s and 29.1s wall. Same verdict
+three times, and the verdict is green. The worker's own record on
+the-suite-is-deterministic-with-no-worker-cap-measured reports 26.7s / 26.6s / 26.2s for the same
+three-run shape, which my slower absolute numbers are consistent with under an agent harness. The c7
+half of that same record understates its residue, which is filed separately and does not touch this
+clause's measurement.
