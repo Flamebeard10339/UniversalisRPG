@@ -1,4 +1,4 @@
-import { execFileSync, spawnSync } from 'node:child_process';
+import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -110,20 +110,11 @@ export function resolveDiffRange(baseBranch: string, emit: (line: string) => voi
   return { base, head };
 }
 
-// A read of the repository the brief is being generated in. Null is "this
-// checkout could not answer", which every caller here renders rather than
-// throwing over — a brief missing its diff stat is worth more than no brief.
-function gitRead(args: string[]): string | null {
-  try {
-    return execFileSync('git', args, { encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 });
-  } catch {
-    return null;
-  }
-}
-
+// Null from the seam is "this checkout could not answer", which every caller
+// here renders rather than throwing over — a brief missing its diff stat is
+// worth more than no brief.
 function diffChangedFiles(range: string): string[] {
-  const output = gitRead(['diff', '--name-only', range])?.trim() ?? '';
-  return output === '' ? [] : output.split('\n');
+  return git.changedFiles(range) ?? [];
 }
 
 // `tasks where`, run once over the whole path list rather than once per path
@@ -330,30 +321,6 @@ const MUTATE_VERDICTS = [
   'ERROR — the mutation did not build, no test ran, or the run\'s failures could not be named. Says nothing about the suite; retarget and run it again.',
   'Scope escalates: the one named `test`, then its `tests` file, then the whole suite — and the scope column reports the chain it walked. `"<a test>" -> <a file>` means that named test survived and something else killed it, which is not that clause proving itself. Widening the scope cannot widen what counts as a kill: a wider run is judged on the same named tests, re-run at their own files, so an unrelated failure the whole suite happened to produce cannot become this clause\'s proof.',
 ];
-
-export interface Commit {
-  sha: string;
-  subject: string;
-  files: string[];
-}
-
-// `%x00` opens each record, so a subject containing a newline cannot be read
-// as the start of the file list under it.
-export function parseCommitLog(raw: string): Commit[] {
-  return raw
-    .split('\0')
-    .map((record) => record.replace(/^\n+/, '').trimEnd())
-    .filter((record) => record !== '')
-    .map((record) => {
-      const [header, ...files] = record.split('\n');
-      const space = header.indexOf(' ');
-      return {
-        sha: space === -1 ? header : header.slice(0, space),
-        subject: space === -1 ? '' : header.slice(space + 1),
-        files: files.map((file) => file.trim()).filter((file) => file !== ''),
-      };
-    });
-}
 
 export interface MutationEntry {
   name: string;
@@ -666,12 +633,12 @@ export function cmdAuditPrompt(args: Flags, usage: string): void {
   for (const line of MUTATE_VERDICTS) console.log(`- ${line}`);
   console.log('');
   console.log('Commits in this range:');
-  const commits = parseCommitLog(gitRead(['log', '--format=%x00%h %s', '--name-only', `${base}..${head}`]) ?? '');
+  const commits = git.commitLog(`${base}..${head}`) ?? [];
   if (commits.length === 0) console.log('- none');
   for (const commit of commits) console.log(`- ${commit.sha} ${commit.subject}\n    ${commit.files.join(', ') || 'no files'}`);
   console.log('');
   console.log('Diff stat:');
-  console.log(gitRead(['diff', '--stat', `${base}..${head}`])?.trimEnd() || '(none)');
+  console.log(git.diffStat(`${base}..${head}`) || '(none)');
   console.log('');
   console.log('Relevant files:');
   if (relevantFiles.length === 0) console.log('- none');

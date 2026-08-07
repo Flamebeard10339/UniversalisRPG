@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { branch, commitCount, fileAt, head, isAncestor, mergeBase, resolveCommit } from './git';
+import { branch, changedFiles, commitCount, commitLog, commitsTouching, diffStat, dirtyPaths, fileAt, head, install, isAncestor, mergeBase, parseCommitLog, realGit, resolveCommit, type GitFacts } from './git';
 
 let dir: string;
 let originalCwd: string;
@@ -131,5 +131,98 @@ describe('git seam', () => {
   it('commitCount returns null for an unresolvable range, instead of throwing', () => {
     commit('a');
     expect(commitCount('no-such-ref..HEAD')).toBeNull();
+  });
+
+  it('dirtyPaths lists what the working tree changed, and [] means clean', () => {
+    commit('first');
+    expect(dirtyPaths()).toEqual([]);
+    writeFileSync(path.join(dir, 'untracked.txt'), 'x', 'utf8');
+    expect(dirtyPaths()).toEqual(['untracked.txt']);
+  });
+
+  it('dirtyPaths narrows to a pathspec, so one file\'s dirtiness is answerable alone', () => {
+    commit('first');
+    writeFileSync(path.join(dir, 'one.txt'), 'x', 'utf8');
+    writeFileSync(path.join(dir, 'two.txt'), 'x', 'utf8');
+    expect(dirtyPaths('one.txt')).toEqual(['one.txt']);
+  });
+
+  it('dirtyPaths is null outside a repository, not an empty clean answer', () => {
+    const outside = mkdtempSync(path.join(os.tmpdir(), 'universalis-norepo-'));
+    process.chdir(outside);
+    try {
+      expect(dirtyPaths()).toBeNull();
+    } finally {
+      process.chdir(dir);
+      rmSync(outside, { recursive: true, force: true });
+    }
+  });
+
+  it('changedFiles names what a range touched, [] for an empty range, null for a bad one', () => {
+    const base = commit('base');
+    writeFileSync(path.join(dir, 'changed.txt'), 'x', 'utf8');
+    spawnSync('git', ['add', '.'], { cwd: dir });
+    spawnSync('git', ['commit', '--no-verify', '-m', 'change'], { cwd: dir });
+    expect(changedFiles(`${base}..HEAD`)).toEqual(['changed.txt']);
+    expect(changedFiles(`${base}..${base}`)).toEqual([]);
+    expect(changedFiles('no-such-ref..HEAD')).toBeNull();
+  });
+
+  it('diffStat renders a range\'s stat, and is null for a range git cannot answer', () => {
+    const base = commit('base');
+    writeFileSync(path.join(dir, 'changed.txt'), 'x', 'utf8');
+    spawnSync('git', ['add', '.'], { cwd: dir });
+    spawnSync('git', ['commit', '--no-verify', '-m', 'change'], { cwd: dir });
+    expect(diffStat(`${base}..HEAD`)).toContain('changed.txt');
+    expect(diffStat('no-such-ref..HEAD')).toBeNull();
+  });
+
+  it('commitLog returns a range\'s commits as data, files attached to their own commit', () => {
+    const base = commit('base');
+    writeFileSync(path.join(dir, 'named.txt'), 'x', 'utf8');
+    spawnSync('git', ['add', '.'], { cwd: dir });
+    spawnSync('git', ['commit', '--no-verify', '-m', 'the subject'], { cwd: dir });
+    const commits = commitLog(`${base}..HEAD`);
+    expect(commits).toHaveLength(1);
+    expect(commits?.[0].subject).toBe('the subject');
+    expect(commits?.[0].files).toEqual(['named.txt']);
+    expect(commitLog('no-such-ref..HEAD')).toBeNull();
+  });
+
+  it('reads a commit log whose subject spans lines without losing the files under it', () => {
+    expect(parseCommitLog('\0abc1234 a subject\nwith a second line\nsrc/one.ts\n\0def5678 another\nsrc/two.ts\n')).toEqual([
+      { sha: 'abc1234', subject: 'a subject', files: ['with a second line', 'src/one.ts'] },
+      { sha: 'def5678', subject: 'another', files: ['src/two.ts'] },
+    ]);
+  });
+
+  it('commitsTouching walks the commits that changed one path, newest first', () => {
+    writeFileSync(path.join(dir, 'walked.txt'), 'v1', 'utf8');
+    spawnSync('git', ['add', '.'], { cwd: dir });
+    spawnSync('git', ['commit', '--no-verify', '-m', 'first touch'], { cwd: dir });
+    const first = spawnSync('git', ['rev-parse', 'HEAD'], { cwd: dir, encoding: 'utf8' }).stdout.trim();
+    commit('unrelated');
+    writeFileSync(path.join(dir, 'walked.txt'), 'v2', 'utf8');
+    spawnSync('git', ['add', '.'], { cwd: dir });
+    spawnSync('git', ['commit', '--no-verify', '-m', 'second touch'], { cwd: dir });
+    const second = spawnSync('git', ['rev-parse', 'HEAD'], { cwd: dir, encoding: 'utf8' }).stdout.trim();
+    expect(commitsTouching('walked.txt')).toEqual([second, first]);
+    expect(commitsTouching('never-touched.txt')).toEqual([]);
+  });
+
+  it('install swaps the implementation every exported read answers from, and hands back the one it replaced', () => {
+    const sha = commit('real');
+    const fake: GitFacts = { ...realGit, head: () => 'answered-from-data', dirtyPaths: () => ['from-data.txt'] };
+    const previous = install(fake);
+    try {
+      expect(head()).toBe('answered-from-data');
+      expect(dirtyPaths()).toEqual(['from-data.txt']);
+      // Not overridden, so the fake's spread of realGit still answers it —
+      // the exported function read the installed object either way.
+      expect(branch()).not.toBeNull();
+    } finally {
+      install(previous);
+    }
+    expect(head()).toBe(sha);
   });
 });

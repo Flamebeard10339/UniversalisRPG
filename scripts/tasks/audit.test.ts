@@ -4,7 +4,7 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { tsxCli } from '../lib/tsxCli';
 import { parseManifest, refusalsFor } from '../mutate';
-import { auditArgsSkeleton, hasVisibleContent, indexSuiteTitles, manifestNotes, mutationManifest, nextAfterPass, UNAIMED_FILE, UNRETARGETED, parseAuditArgs, parseAuditFile, parseCommitLog, slugStanding, slugStandingLines, toolLines, unresolvedTarget, type SlugStanding, type TargetResolution } from './audit';
+import { auditArgsSkeleton, hasVisibleContent, indexSuiteTitles, manifestNotes, mutationManifest, nextAfterPass, UNAIMED_FILE, UNRETARGETED, parseAuditArgs, parseAuditFile, slugStanding, slugStandingLines, toolLines, unresolvedTarget, type SlugStanding, type TargetResolution } from './audit';
 import { MAX_LESSON_COUNT, totalLessonCount } from './briefLessons';
 import { appendEvent, firstListedId, fixture, gitFixture, relevantFilesBlock, repoRoot, script, stepsBlock, type Run } from './cliFixtures';
 
@@ -1401,15 +1401,6 @@ describe('the brief arriving with the answers rather than the instructions', () 
       expect(result.stdout).toMatch(/- [0-9a-f]{7,} A commit on demo-spec, after branching from main\.\n {4}file-[^\n]+\.txt/);
       expect(result.stdout).toContain('Diff stat:');
     });
-  });
-
-  // A subject carrying a newline used to be indistinguishable from the file
-  // list under it, which would have attributed one commit's files to another.
-  it('reads a commit log whose subject spans lines without losing the files under it', () => {
-    expect(parseCommitLog('\0abc1234 a subject\nwith a second line\nsrc/one.ts\n\0def5678 another\nsrc/two.ts\n')).toEqual([
-      { sha: 'abc1234', subject: 'a subject', files: ['with a second line', 'src/one.ts'] },
-      { sha: 'def5678', subject: 'another', files: ['src/two.ts'] },
-    ]);
   });
 
   // The brief carried the deliverable prose and the `## Decisions` section
