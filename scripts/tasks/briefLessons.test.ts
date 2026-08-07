@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { allLessons, AUDITOR_LESSONS, findLesson, indexLessons, ORCHESTRATOR_LESSONS, PLANNER_LESSONS, unknownLessonIds, WORKER_LESSONS, type Lesson } from './briefLessons';
-import { fixture, repoRoot } from './cliFixtures';
+import { enclosingGitFixture, fixture, repoRoot } from './cliFixtures';
 
 // The nineteen ids, written out here rather than read off the arrays, for the
 // same reason workPrompt.test.ts writes out the nineteen sentences: a list
@@ -211,8 +211,10 @@ describe('every brief shows the ids of the lessons it prints', () => {
       showsItsIds(tasks('work-prompt', 'a-member').stdout, WORKER_LESSONS);
     }));
 
+  // The auditor's brief is the one of the four that refuses to print without a
+  // merge base, so it takes the declared exception the other three do not need.
   it('audit-prompt shows the auditor its ids', () =>
-    fixture(({ tasks }) => {
+    enclosingGitFixture(({ tasks }) => {
       showsItsIds(tasks('audit-prompt', 'demo-spec').stdout, AUDITOR_LESSONS);
     }));
 
