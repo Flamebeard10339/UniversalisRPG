@@ -3,8 +3,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync
 import os from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { tsxCli } from '../lib/tsxCli';
-import { defaultStoreGitFixture, fixture, runInProcess, script, spawnTasks, type Run } from './cliFixtures';
+import { defaultStoreGitFixture, fixture, installDataGit, runInProcess, spawnTasks, type Run } from './cliFixtures';
 import { realDefaultStoreGitFixture } from './realGitFixture';
 
 describe('tasks CLI', () => {
@@ -161,17 +160,15 @@ describe('tasks CLI', () => {
   it('the dirty-store warning prints at most once per process, even across two stale writes', () => {
     const dir = mkdtempSync(path.join(os.tmpdir(), 'universalis-warn-once-'));
     const cwd = process.cwd();
+    mkdirSync(path.join(dir, 'docs'), { recursive: true });
+    const store = path.join(dir, 'docs', 'tasks.jsonl');
+    const record = (id: string): string =>
+      `${JSON.stringify({ id, title: id, kind: 'task', state: 'open', severity: null, system: null, spec: null, clause: null, requires: [], files: [], deliverable: null, evidence: null, source: null, reason: null, closed: null, closedCommit: null, claimed: null, claimedBy: null })}\n`;
+    writeFileSync(store, record('committed-task'), 'utf8');
+    // The install snapshots the baseline store, standing in for the commit
+    // that used to carry it.
+    const repo = installDataGit(dir);
     try {
-      spawnSync('git', ['init', '-q'], { cwd: dir });
-      spawnSync('git', ['config', 'user.email', 'test@example.com'], { cwd: dir });
-      spawnSync('git', ['config', 'user.name', 'Test'], { cwd: dir });
-      mkdirSync(path.join(dir, 'docs'), { recursive: true });
-      const store = path.join(dir, 'docs', 'tasks.jsonl');
-      const record = (id: string): string =>
-        `${JSON.stringify({ id, title: id, kind: 'task', state: 'open', severity: null, system: null, spec: null, clause: null, requires: [], files: [], deliverable: null, evidence: null, source: null, reason: null, closed: null, closedCommit: null, claimed: null, claimedBy: null })}\n`;
-      writeFileSync(store, record('committed-task'), 'utf8');
-      spawnSync('git', ['add', '.'], { cwd: dir });
-      spawnSync('git', ['commit', '--no-verify', '-m', 'store baseline'], { cwd: dir, encoding: 'utf8' });
       writeFileSync(store, record('committed-task') + record('left-behind'), 'utf8');
       const old = new Date(Date.now() - 40 * 60 * 1000);
       utimesSync(store, old, old);
@@ -187,6 +184,7 @@ describe('tasks CLI', () => {
       expect(second.status).toBe(0);
       expect(second.stderr).not.toContain('uncommitted task-state changes');
     } finally {
+      repo.uninstall();
       process.chdir(cwd);
       rmSync(dir, { recursive: true, force: true });
     }
@@ -246,24 +244,16 @@ describe('tasks CLI', () => {
     });
   });
 
+  // An unborn HEAD answers every read null — git.test.ts proves that of the
+  // real seam — and `fixture` serves exactly those answers, so this needs no
+  // repository with zero commits built for it.
   it('doctor degrades to no working-tree-comparison issue when there is no committed store (unborn HEAD)', () => {
-    const dir = mkdtempSync(path.join(os.tmpdir(), 'universalis-no-commit-'));
-    try {
-      spawnSync('git', ['init', '-q'], { cwd: dir });
-      spawnSync('git', ['config', 'user.email', 'test@example.com'], { cwd: dir });
-      spawnSync('git', ['config', 'user.name', 'Test'], { cwd: dir });
-      mkdirSync(path.join(dir, 'docs', 'specs'), { recursive: true });
-      mkdirSync(path.join(dir, 'docs', 'audits'), { recursive: true });
-      writeFileSync(path.join(dir, 'docs', 'specs', 'demo-spec.md'), '# Demo spec\n\n## Deliverable\n\nX.\n\nProof:\n\n- clause.\n\n## Decisions\n\n## Open questions\n\nNone.\n', 'utf8');
-      writeFileSync(path.join(dir, 'docs', 'audits', 'systems.json'), JSON.stringify({ unowned: { note: '', paths: ['docs', '*.md'] }, systems: [] }), 'utf8');
-      writeFileSync(path.join(dir, 'docs', 'tasks.jsonl'), `${JSON.stringify({ id: 'a', title: 'a', kind: 'task', state: 'done', severity: null, system: null, spec: null, clause: null, requires: [], files: [], deliverable: null, evidence: null, source: null, reason: null, closed: '2026-08-01', closedCommit: null })}\n`, 'utf8');
-      // No commit at all — HEAD does not exist yet on this branch.
-      const result = spawnSync(process.execPath, [tsxCli, script, 'doctor', '--branch', 'demo-spec'], { cwd: dir, encoding: 'utf8' });
+    fixture(({ tasks, dir }) => {
+      writeFileSync(path.join(dir, 'tasks.jsonl'), `${JSON.stringify({ id: 'a', title: 'a', kind: 'task', state: 'done', severity: null, system: null, spec: null, clause: null, requires: [], files: [], deliverable: null, evidence: null, source: null, reason: null, closed: '2026-08-01', closedCommit: null })}\n`, 'utf8');
+      const result = tasks('doctor');
       expect(result.status).toBe(0);
       expect(result.stdout).not.toContain('only in the working tree');
-    } finally {
-      rmSync(dir, { recursive: true, force: true });
-    }
+    });
   });
 
   it('doctor warns when a done task names a closing commit not reachable from HEAD', () => {

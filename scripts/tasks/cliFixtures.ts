@@ -207,11 +207,13 @@ function treeDiff(before: Map<string, string>, after: Map<string, string>): stri
 }
 
 // Git facts answered from data: a linear history of directory snapshots,
-// commit-shaped enough for every read the seam exposes. `main` stays at the
-// first commit and `branchName` advances with each commit(), which is the
-// only topology the spawning fixtures ever built.
+// commit-shaped enough for every read the seam exposes. `branchName`
+// advances with each commit(); `main` stays at the first commit until
+// fork() pins it where the head is now, the way checkout -b leaves it.
 class DataGit {
   private commits: TreeCommit[] = [];
+
+  private mainTip = 0;
 
   readonly facts: GitFacts;
 
@@ -283,13 +285,17 @@ class DataGit {
     return sha;
   }
 
+  fork(): void {
+    this.mainTip = this.commits.length - 1;
+  }
+
   private relative(filePath: string): string {
     return path.relative(this.dir, path.resolve(filePath)).split(path.sep).join('/');
   }
 
   private indexOf(rev: string): number | null {
     if (rev === 'HEAD' || rev === this.branchName) return this.commits.length - 1;
-    if (rev === 'main') return 0;
+    if (rev === 'main') return this.mainTip;
     const index = this.commits.findIndex((commit) => commit.sha === rev || commit.sha.slice(0, 7) === rev);
     return index === -1 ? null : index;
   }
@@ -301,6 +307,19 @@ class DataGit {
     if (fromIndex === null || toIndex === null) return null;
     return this.commits.slice(fromIndex + 1, toIndex + 1);
   }
+}
+
+// For direct-library tests that need a repository's shape — a base, a fork,
+// branch commits — without one: the same snapshot-backed facts gitFixture
+// installs, handed to a test that builds its history by hand.
+export function installDataGit(dir: string, branch = 'feature'): { commit: (message: string) => string; fork: () => void; uninstall: () => void } {
+  const data = new DataGit(dir, branch, 'Repo initialised\n\nA base exists.');
+  const previous = installGit(data.facts);
+  return {
+    commit: (message: string) => data.commit(message),
+    fork: () => data.fork(),
+    uninstall: () => void installGit(previous),
+  };
 }
 
 export function fixture(run: (context: FixtureContext) => void | Promise<void>): void | Promise<void> {

@@ -2,6 +2,7 @@ import { spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { install as installGit, realGit } from '../lib/git';
 import { isolateTmp, repoRoot, runInProcess, runInProcessAt, type Run } from './cliFixtures';
 
 // The real-repository forms of the fixtures in cliFixtures.ts, spawning
@@ -46,6 +47,39 @@ export function realGitFixture(run: (context: { dir: string; commit: (message: s
     });
   } finally {
     restoreTmp();
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+// A bare real repository on main, chdir'd into for the callback with the
+// real seam pinned — for direct-library tests whose subject is git's own
+// semantics (a merge base that stays put while main moves on) rather than
+// facts a snapshot can carry.
+export function realGitRepo(run: (context: { dir: string; git: (...args: string[]) => void; write: (relPath: string, content: string) => void; commit: (message: string) => void }) => void): void {
+  const dir = mkdtempSync(path.join(os.tmpdir(), 'universalis-real-git-'));
+  const cwd = process.cwd();
+  const restoreGit = installGit(realGit);
+  const git = (...args: string[]): void => void spawnSync('git', args, { cwd: dir });
+  try {
+    git('init', '-q', '-b', 'main');
+    git('config', 'user.email', 'test@example.com');
+    git('config', 'user.name', 'Test');
+    process.chdir(dir);
+    run({
+      dir,
+      git,
+      write: (relPath: string, content: string) => {
+        mkdirSync(path.dirname(path.join(dir, relPath)), { recursive: true });
+        writeFileSync(path.join(dir, relPath), content, 'utf8');
+      },
+      commit: (message: string) => {
+        git('add', '.');
+        git('commit', '--no-verify', '-q', '-m', message);
+      },
+    });
+  } finally {
+    installGit(restoreGit);
+    process.chdir(cwd);
     rmSync(dir, { recursive: true, force: true });
   }
 }
