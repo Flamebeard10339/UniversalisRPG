@@ -133,3 +133,66 @@ describe('a flag across module boundaries', () => {
     expect(() => loadUniverse([doomed, wrecker])).toThrow(/names an unknown flag: doomed.door.unlocked/);
   });
 });
+
+describe('a flag a field edit takes away', () => {
+  const BASE = module('base', '# entity door', 'flags: unlocked');
+  const cut = (id: string): ModuleSource => module(id, 'dependencies: base', '# entity base.door', '-flags: unlocked');
+  const wants = (id: string): ModuleSource => module(id, 'dependencies: base', '# entity gull', 'squawk:', '  requires: base.door.unlocked');
+  const dangles = /names an unknown flag: base.door.unlocked/;
+
+  it('goes away with the value, so a reference the edit stranded no longer resolves', () => {
+    expect(() => loadUniverse([BASE, cut('mod'), wants('watcher')])).toThrow(dangles);
+  });
+
+  it('fails whichever module names it first, because what survives is decided at merge', () => {
+    expect(() => loadUniverse([BASE, cut('aaa-cut'), wants('zzz-wants')])).toThrow(dangles);
+    expect(() => loadUniverse([BASE, wants('aaa-wants'), cut('zzz-cut')])).toThrow(dangles);
+  });
+
+  it('stays when a + in the same section puts it back, because the merged section is what is asked', () => {
+    const readd = module('mod', 'dependencies: base', '# entity base.door', '-flags: unlocked', '+flags: unlocked', '# entity gull', 'squawk:', '  requires: base.door.unlocked');
+    expect(loadUniverse([BASE, readd]).entities.get('base.door')!.flags).toEqual(['unlocked']);
+  });
+
+  it('leaves discovered alone when a location edits its flags, because a location owns a member it never lists', () => {
+    const shore = module('base', '# location beach', 'x: 0, y: 0', 'flags: searched');
+    const strip = module('mod', 'dependencies: base', '# location base.beach', '-flags: searched', '# entity gull', 'squawk:', '  requires: base.beach.discovered');
+    const registry = loadUniverse([shore, strip]);
+    expect(registry.locations.get('base.beach')!.flags).toEqual([]);
+    expect(registry.namespace.has('flag', 'base.beach.discovered')).toBe(true);
+  });
+});
+
+describe('a member key is owned by every kind that declares it', () => {
+  const twins = module('base', '# location beach', 'x: 0, y: 0', 'flags: searched', 'search:', '  set: searched', '# entity beach', 'flags: searched');
+
+  it('keeps the location its flag when an entity of the same id edits that flag away', () => {
+    const strip = module('mod', 'dependencies: base', '# entity base.beach', '-flags: searched');
+    const registry = loadUniverse([twins, strip]);
+    expect(registry.entities.get('base.beach')!.flags).toEqual([]);
+    expect(registry.locations.get('base.beach')!.flags).toEqual(['searched']);
+    expect(registry.namespace.has('flag', 'base.beach.searched')).toBe(true);
+  });
+
+  it('keeps a location discoverable when an entity of the same id edits discovered away', () => {
+    const shadow = module('base', '# location beach', 'x: 0, y: 0', 'starting', '# entity beach', 'flags: discovered');
+    const strip = module('mod', 'dependencies: base', '# entity base.beach', '-flags: discovered');
+    expect(loadUniverse([shadow, strip]).namespace.has('flag', 'base.beach.discovered')).toBe(true);
+  });
+
+  it('does not let a dialogue node hold an entity flag of the same key alive, because they are different kinds', () => {
+    const chat = module('base', '# entity chat', 'flags: greet', '# dialogue chat', 'owner = chat', 'node greet:', '  Hello.');
+    const strip = module('mod', 'dependencies: base', '# entity base.chat', '-flags: greet');
+    const registry = loadUniverse([chat, strip]);
+    expect(registry.namespace.has('flag', 'base.chat.greet')).toBe(false);
+    expect(registry.namespace.has('node', 'base.chat.greet')).toBe(true);
+  });
+
+  it('goes away when the module that added it is not the one that created the object', () => {
+    const door = module('base', '# entity door', 'flags: unlocked');
+    const adds = module('aaa-adds', 'dependencies: base', '# entity base.door', '+flags: sealed');
+    const cuts = module('zzz-cuts', 'dependencies: base', '# entity base.door', '-flags: sealed');
+    expect(loadUniverse([door, adds, cuts]).namespace.has('flag', 'base.door.sealed')).toBe(false);
+    expect(loadUniverse([door, adds]).namespace.has('flag', 'base.door.sealed')).toBe(true);
+  });
+});

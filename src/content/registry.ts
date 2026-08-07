@@ -17,7 +17,7 @@ import { Recipe, recipeSchema } from './recipe';
 import { registryCapabilities, validateDialogueReferences, validateRecipeReferences, validateSectionReferences, validateTestReferences } from './references';
 import { ReferenceKind, Visit, visitAction, visitSection } from './referenceSites';
 import { Removal } from './removal';
-import { RESOLUTION_PASSES } from './resolve';
+import { declareMembers, Member, MemberOwner, RESOLUTION_PASSES } from './resolve';
 import { Resource, resourceSchema } from './resource';
 import { ParsedSave } from './saveSection';
 import { Authored, hydrateSection } from '../grammar/section';
@@ -635,6 +635,26 @@ function validateBuiltRegistry(registry: Registry, owners: ReadonlyMap<string, P
   return null;
 }
 
+const wouldDeclare = (kind: string, value: MemberOwner): Member[] => declareMembers(new Namespace(), kind, value);
+
+const memberKey = (member: Member): string => `${member.kind}\0${member.key}`;
+
+function reconcileMembers(namespace: Namespace, merged: Map<string, Map<string, OwnedSection>>, declared: ReadonlyMap<string, Member[]>): void {
+  const survivingAcrossEveryKind = new Set<string>();
+  for (const [kind, byId] of merged) {
+    for (const section of byId.values()) {
+      for (const member of wouldDeclare(kind, section.value as MemberOwner)) survivingAcrossEveryKind.add(memberKey(member));
+    }
+  }
+  for (const [kind, byId] of merged) {
+    for (const id of byId.keys()) {
+      for (const member of declared.get(ownerKey(kind, id)) ?? []) {
+        if (!survivingAcrossEveryKind.has(memberKey(member))) namespace.undeclare(member.kind, member.key);
+      }
+    }
+  }
+}
+
 function compileModules(modules: readonly ParsedModule[]): { registry: Registry } | { failure: BuildFailure } {
   const registry = emptyRegistry();
 
@@ -642,6 +662,7 @@ function compileModules(modules: readonly ParsedModule[]): { registry: Registry 
   // object has every field filled in with defaults, so overlaying one would
   // silently reset everything the patch did not mention.
   const merged = new Map<string, Map<string, OwnedSection>>();
+  const declaredMembers = new Map<string, Member[]>();
   const owners = new Map<string, ParsedModule>();
   const namespace = registry.namespace;
   const loaded = new Set(modules.map((module) => module.info.id));
@@ -690,6 +711,9 @@ function compileModules(modules: readonly ParsedModule[]): { registry: Registry 
           byId.set(id, { kind: section.kind, value: mergeSection(section.kind, base, section.value), module });
           owners.set(ownerKey(section.kind, id), module);
           merged.set(section.kind, byId);
+          const declared = declaredMembers.get(ownerKey(section.kind, id)) ?? [];
+          declared.push(...wouldDeclare(section.kind, section.value as MemberOwner));
+          declaredMembers.set(ownerKey(section.kind, id), declared);
         }
       } catch (error) {
         if (!(error instanceof DslError)) throw error;
@@ -706,6 +730,7 @@ function compileModules(modules: readonly ParsedModule[]): { registry: Registry 
   const isTemplate = (kind: string): boolean => kind === 'entitytype';
   const templateFailure = mergePass(isTemplate) ?? mergePass((kind) => !isTemplate(kind));
   if (templateFailure) return { failure: templateFailure };
+  reconcileMembers(namespace, merged, declaredMembers);
   for (const [kind, byId] of merged) {
     for (const section of byId.values()) {
       try {
