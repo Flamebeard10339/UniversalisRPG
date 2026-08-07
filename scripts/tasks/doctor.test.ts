@@ -195,13 +195,12 @@ describe('tasks CLI', () => {
   // which a hand-resolved store most needs the store-only checks readable.
   it('doctor suspends the git-anchored checks during an unresolved merge, and the store-only checks still run', () => {
     realDefaultStoreGitFixture(({ dir, tasks }) => {
-      // A working-tree-only close, which doctor would otherwise warn about.
       tasks('add', 'closable task', '--id', 'closable', '--requires', 'ghost-requirement');
       spawnSync('git', ['add', '.'], { cwd: dir });
       spawnSync('git', ['commit', '--no-verify', '-m', 'add closable'], { cwd: dir, encoding: 'utf8' });
-      tasks('done', 'closable');
 
-      // A conflicted merge in an unrelated file leaves MERGE_HEAD behind.
+      // The merge scenery is built while the store is clean, so the -a
+      // commits below cannot quietly carry the close this test is about.
       writeFileSync(path.join(dir, 'conflict.txt'), 'base\n', 'utf8');
       spawnSync('git', ['add', '.'], { cwd: dir });
       spawnSync('git', ['commit', '--no-verify', '-m', 'base'], { cwd: dir, encoding: 'utf8' });
@@ -211,6 +210,11 @@ describe('tasks CLI', () => {
       spawnSync('git', ['checkout', '-q', '-'], { cwd: dir });
       writeFileSync(path.join(dir, 'conflict.txt'), 'ours\n', 'utf8');
       spawnSync('git', ['commit', '--no-verify', '-am', 'our edit'], { cwd: dir, encoding: 'utf8' });
+
+      // The close stays working-tree-only through the conflicted merge, so
+      // the suspension is the only thing keeping its warning out of the
+      // report — remove it and the assertion below fails.
+      tasks('done', 'closable');
       spawnSync('git', ['merge', 'side'], { cwd: dir, encoding: 'utf8' });
 
       const result = tasks('doctor');
