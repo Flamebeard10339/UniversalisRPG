@@ -66,6 +66,17 @@ describe('an id survives editing the lesson it names', () => {
 // back as an answer, because the caller that cannot tell "no such lesson"
 // from "nothing to say" is the caller that drops it.
 describe('a citation naming no live lesson is reported', () => {
+  it('resolves an id no lesson carries to nothing, rather than to whatever is nearest', () => {
+    expect(findLesson('worker/retired-in-a-later-branch')).toBeUndefined();
+    expect(findLesson('')).toBeUndefined();
+  });
+
+  it('resolves an id that only resembles a live one to nothing', () => {
+    expect(findLesson('worker/mutation-proofs')).toBeUndefined();
+    expect(findLesson('mutation-proof')).toBeUndefined();
+    expect(findLesson('WORKER/MUTATION-PROOF')).toBeUndefined();
+  });
+
   it('reports an id no lesson carries and stays silent about the ones that resolve', () => {
     expect(unknownLessonIds(['worker/mutation-proof', 'worker/retired-in-a-later-branch', 'auditor/silent-guess'])).toEqual(['worker/retired-in-a-later-branch']);
   });
@@ -75,6 +86,10 @@ describe('a citation naming no live lesson is reported', () => {
     const index = indexLessons(retired);
     expect(index.has('auditor/next-neighbour')).toBe(false);
     expect(index.size).toBe(18);
+  });
+
+  it('reports a citation that only resembles a live id, rather than counting it as resolved', () => {
+    expect(unknownLessonIds(['worker/mutation-proo', 'WORKER/MUTATION-PROOF', 'mutation-proof', 'worker/'])).toEqual(['worker/mutation-proo', 'WORKER/MUTATION-PROOF', 'mutation-proof', 'worker/']);
   });
 
   it('reports each unknown id once however many records cite it', () => {

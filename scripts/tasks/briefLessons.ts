@@ -155,7 +155,7 @@ export function findLesson(id: string): Lesson | undefined {
 }
 
 export function unknownLessonIds(ids: readonly string[]): string[] {
-  return [...new Set(ids)].filter((id) => !LESSONS_BY_ID.has(id));
+  return [...new Set(ids)].filter((id) => findLesson(id) === undefined);
 }
 
 export function totalLessonCount(): number {
