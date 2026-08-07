@@ -6,7 +6,7 @@ import { createGameState } from '../src/runtime/runtime';
 import { loadModule } from '../src/content/registry';
 import { initialLocalChangesModule } from '../src/content/localChanges';
 import type { ModuleSource } from '../src/content/universe';
-import { serializeSave } from '../src/runtime/save';
+import { SAVE_VERSION, serializeSave } from '../src/runtime/save';
 import { beginAction, runTest, startSession, view } from '../src/runtime/session';
 import { handleCommand, liveTick, loadModportalSources, type AuthoringContext, type Recorder } from './play-cli';
 import { secondsToMs } from '../src/runtime/units';
@@ -27,7 +27,7 @@ open:
   give: 1 gold
 
 # save empty
-{"version":6}
+{"version":${SAVE_VERSION}}
 
 # test always-passes
 assert: time >= 0
@@ -522,7 +522,7 @@ describe('play-cli local DSL authoring', () => {
       '/dsl resource stamina max: local-changes.vigor',
       '/dsl recipe smelt in: local-changes.ore | out: local-changes.ingot',
       '/dsl dialogue npc-chat owner = local-changes.npc | node greet: |   Hello there.',
-      '/dsl save blank {"version":6}',
+      `/dsl save blank {"version":${SAVE_VERSION}}`,
       '/dsl test smoke assert: time >= 0',
       '/dsl remove item.local-changes.temporary',
     ];
