@@ -808,6 +808,13 @@ describe('mutate: attributing a verdict to a test', () => {
     expect(parseFailedTests(output)).toEqual(['scripts/a.test.ts > outer > fails on purpose', 'scripts/b.test.ts > outer > parametrised 2']);
   });
 
+  // With projects configured, vitest qualifies every FAIL line with the
+  // project's name — the form this repo's own two-project config prints.
+  it('reads a name behind the |project| prefix, and still takes a prefixed never-collected file for none', () => {
+    const output = [' FAIL  |tools| scripts/a.test.ts [ scripts/a.test.ts ]', ' FAIL  |tools| scripts/a.test.ts > outer > fails on purpose', ' FAIL  |app| src/b.test.tsx > outer > renders'].join('\n');
+    expect(parseFailedTests(output)).toEqual(['scripts/a.test.ts > outer > fails on purpose', 'src/b.test.tsx > outer > renders']);
+  });
+
   it('reads a name a colouring terminal wrapped in escape codes', () => {
     expect(parseFailedTests(' \u001b[41m FAIL \u001b[0m scripts/a.test.ts > outer > coloured\n')).toEqual(['scripts/a.test.ts > outer > coloured']);
   });

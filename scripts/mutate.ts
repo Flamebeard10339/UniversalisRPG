@@ -146,7 +146,7 @@ export function parseVitestTally(output: string): { failed: number; passed: numb
 // correspondence with the tally that `tallyOf` refuses on.
 export function parseFailedTests(output: string): string[] {
   const named: string[] = [];
-  for (const match of output.replace(/\u001b\[[0-9;]*m/g, '').matchAll(/^\s*FAIL\s+(\S+ > .*\S)\s*$/gm)) {
+  for (const match of output.replace(/\u001b\[[0-9;]*m/g, '').matchAll(/^\s*FAIL\s+(?:\|[^|\n]+\|\s+)?(\S+ > .*\S)\s*$/gm)) {
     named.push(match[1]);
   }
   return named;
