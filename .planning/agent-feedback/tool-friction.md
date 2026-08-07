@@ -864,3 +864,52 @@ mutable copy across concurrent agents — the risk this pass hit is exactly the 
 class the run's own worktree isolation was designed to avoid for the *task store*, just one layer
 down in the toolchain.
 
+
+## 2026-08-06, auditing `the-workflow-records-what-cost-it-in-one-place` (pass 1)
+
+Three costs, all measured rather than felt.
+
+**The pass file is keyed on the spec slug alone, in the shared OS temp directory.** Step 7 of the
+brief prints `C:\Users\yonat\AppData\Local\Temp\audit-<slug>-pass1.txt`, and it printed the same
+path a sibling branch auditing the same spec would be handed. Two branches audit one spec whenever
+a spec has more than one member, which is the normal case — this spec has three. Nothing in the
+generated brief warns about it and nothing in the filename distinguishes the auditor, so the
+second one to write wins silently and the first files the other's verdicts. Avoided here only
+because the dispatch carried a hand-written instruction to copy the file to an `lh-` prefixed name
+first, which is the orchestrator paying per dispatch for something the tool knows at generation
+time. The same hazard is already a shipped lesson (`orchestrator/scratch-prefix`, "concurrent
+agents share one directory and can overwrite each other's mutation manifests") — the tool teaches
+the rule in the brief and then breaks it in the same brief's step 7. Cheapest fix: put the branch
+name in the path, since `audit-prompt` already resolves it to print the diff range.
+
+**The manifest step is the one the brief cannot do and the one it says least about.** Step 4 said
+"no manifest was written; see `Mutation manifest:` below for why", and the reason given was that
+no proof target resolved to a test the brief could name — even though c6's proof target,
+`vitest scripts/tasks/briefLessons.test.ts`, names a file that exists in this diff and has 20
+tests in it. So the brief declined to aim a manifest at the one clause in scope that was
+mutation-testable, and writing the fifteen entries by hand was about 25 minutes, the largest single
+block of this pass. The eight clauses whose targets genuinely do not resolve are unbuilt, and the
+brief cannot tell that apart from a target it simply did not try to resolve; it reports both as
+the same silence. Worth noting the neighbour: this is the same defect the spec's own Deliverable
+section names as the run's largest repeated cost ("a mutation manifest that never generates,
+because `proof: vitest <file>` names a file where `mutationManifest` needs a test") — still
+unfixed, hit again here, and this is the ninth recorded instance.
+
+**What the manifest bought, for the record on whether hand-writing it was worth 25 minutes.**
+13 killed, 2 survived, 0 errored over 15 entries. Both survivors are findings this pass filed and
+neither was reachable by reading the code — one of them, `unknownLessonIds` silently dropping an
+empty citation, is invisible precisely because the sibling function *is* tested on that input.
+Verdict: worth it, and the argument for generating the manifest is not that it saves the writing
+but that an auditor who spent 25 minutes on setup files fewer entries than one who spent none.
+
+**Cheap and worth keeping.** `npm run tasks -- merge-ready` answered all seven legs in one call and
+correctly separated the three mechanical FAILs (base drift, two open members, no recorded pass)
+from the code legs, all green. Checking whether the `base` FAIL staled the diff range took one
+`git log HEAD..main` and cost nothing: two commits, one event-log line, no code. `tasks show` on
+the member task carried the worker's recorded decisions in full, which is the reason point 3 of
+this dispatch could be judged rather than guessed — the decision note argued the case and named
+the alternative, so the audit's job was to test the argument rather than reconstruct it.
+
+**node_modules survived this pass.** The previous entry's HIGH finding held: nothing here ran an
+install, the junction stayed populated for the whole audit, and every `npm run` call worked. One
+data point that the rule works when it is carried in the dispatch; it is still carried by hand.
