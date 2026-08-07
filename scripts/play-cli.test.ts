@@ -532,19 +532,23 @@ describe('play-cli local DSL authoring', () => {
       expect(result.output[0], command).not.toMatch(/^Error:/);
     }
 
-    expect(fixture.session.registry.stats.has('local-changes.vigor')).toBe(true);
-    expect(fixture.session.registry.skills.has('local-changes.focus')).toBe(true);
-    expect(fixture.session.registry.items.has('local-changes.token')).toBe(true);
-    expect(fixture.session.registry.entities.has('local-changes.npc')).toBe(true);
-    expect(fixture.session.registry.locations.has('local-changes.grove')).toBe(true);
-    expect(fixture.session.registry.flags.has('local-changes.levered')).toBe(true);
-    expect(fixture.session.registry.variables.has('local-knob')).toBe(true);
-    expect(fixture.session.registry.resources.has('local-changes.stamina')).toBe(true);
-    expect(fixture.session.registry.recipes.has('local-changes.smelt')).toBe(true);
-    expect(fixture.session.registry.dialogues.has('local-changes.npc-chat')).toBe(true);
-    expect(fixture.session.registry.saves.has('local-changes.blank')).toBe(true);
-    expect(fixture.session.registry.tests.has('local-changes.smoke')).toBe(true);
-    expect(fixture.session.registry.items.has('local-changes.temporary')).toBe(false);
+    const registry = fixture.session.registry;
+
+    expect(registry.stats.get('local-changes.vigor')?.base).toEqual({ min: 10, max: 10 });
+    expect(registry.skills.get('local-changes.focus')?.['stat-id']).toBe('local-changes.vigor');
+    expect(registry.items.get('local-changes.token')?.title).toBe('Token');
+    expect(registry.entities.get('local-changes.npc')?.actions).toEqual([{ label: 'cheer', results: [{ kind: 'say', text: 'Hello.' }] }]);
+    expect(registry.locations.get('local-changes.grove')).toMatchObject({ x: 1, y: 0, entities: ['local-changes.npc'] });
+    expect(registry.flags.has('local-changes.levered')).toBe(true);
+    expect(registry.variables.get('local-knob')?.value).toBe(2);
+    expect(registry.resources.get('local-changes.stamina')?.max).toBe('local-changes.vigor');
+    expect(registry.recipes.get('local-changes.smelt')).toMatchObject({ in: [{ item: 'local-changes.ore' }], out: [{ item: 'local-changes.ingot' }] });
+    expect(registry.dialogues.get('local-changes.npc-chat')?.owner).toBe('local-changes.npc');
+    expect(registry.saves.get('local-changes.blank')).toEqual({ version: SAVE_VERSION, diff: {} });
+    expect(registry.tests.get('local-changes.smoke')?.directives).toMatchObject([{ kind: 'assert', condition: { operator: '>=' } }]);
+    expect(registry.items.has('local-changes.temporary')).toBe(false);
+
+    expect(runLocal(fixture, '/load local-changes.blank', current).recorded).toBe('load: local-changes.blank');
   });
 
   it('reports local authoring commands as unavailable when no authoring context is provided', () => {
