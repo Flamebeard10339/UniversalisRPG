@@ -371,6 +371,8 @@
         "scripts/probe.test.ts",
         "scripts/mutate.ts",
         "scripts/mutate.test.ts",
+        "scripts/migrate-saves.ts",
+        "scripts/migrate-saves.test.ts",
         "scripts/inspect.ts",
         "scripts/inspect.test.ts",
         "scripts/audit-status.ts",
@@ -414,6 +416,13 @@
             "scripts/inspect.ts"
           ],
           "note": "produced by repo-resolved-evaluation; what npm run probe is for the DSL load path, for everything else"
+        },
+        {
+          "name": "save fixture migration",
+          "paths": [
+            "scripts/migrate-saves.ts"
+          ],
+          "note": "produced by save-fixture-migration; the one-shot shape rewrite of every # save fixture at a SAVE_VERSION bump, retired by save-migration-system's ladder"
         }
       ]
     },
