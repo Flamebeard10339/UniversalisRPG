@@ -1282,3 +1282,27 @@ friction met.
   with the record, which is the finding.
 - `npm run tasks -- merge-ready` was the one leg of this that cost nothing to trust: one invocation,
   every gate, and the only failure was the pass I was about to file.
+
+## 2026-08-07 — audit pass 2, a-green-run-means-the-tree-is-green (opus-auditor-p2)
+
+- `audit-prompt` run from the main checkout answered about the wrong tree, and answered
+  confidently. The branch lives in `.claude/worktrees/<slug>`; run from `C:/…/UniversalisRPG` the
+  brief printed `Diff range: 431ab07..431ab07`, "Commits in this range: none", "Diff stat: (none)",
+  every clause `unknown`, no pass-1 record, and step 7 as "do not file a pass — nothing relates this
+  slug to this branch". Every one of those is a true statement about the checkout it was run in and
+  a false statement about the audit I was commissioned for. Cost: one wasted brief and the ~2
+  minutes to notice `git worktree list` explained it. The branch name is in the command line; a
+  brief that cannot find the slug's commits could say "this slug is checked out at <path>" instead
+  of concluding the branch has no diff.
+- `mutate`'s `test` field takes a vitest `-t` substring, but the brief, the usage text and the
+  survivor rows all print names in `file > suite > test` form. Copying a name out of a survivor row
+  into a manifest is refused with "no test named … ran in <file>", which reads as "you aimed at a
+  test that does not exist" rather than "drop the suite prefix". Cost: one refused manifest run.
+- `mutate` itself was the whole value of this pass and worked exactly as documented — pass 1's
+  `|tools|` fix has landed, and 17 of 22 entries came back KILLED with a named test and a
+  re-measurement. The five survivors are five of the six findings I filed; four of them are lines
+  no reading of the diff would have flagged. Two manifest runs, ~11 and ~8 minutes.
+- Measuring c7 and c8 again cost five full suite runs (two `npx vitest run --reporter=json scripts`,
+  three `npm test`), ~5 minutes wall. Unavoidable and worth it: c7's residue moved from six tests
+  over 2000ms to one-to-three, which is a number no static reading produces.
+- `merge-ready` again cost one invocation and reported exactly the two legs the pass was about.
