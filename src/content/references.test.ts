@@ -207,6 +207,15 @@ ${line}
     expect(test('use: entity.training-dummy.strke')).toThrow(/# test walk use: names an unknown entity action: strke/);
     expect(test('use: entity.training-dummy.strike')).not.toThrow();
   });
+
+  // The other way a name stops meaning something between authoring and merge:
+  // `# remove` takes the object, a `-field:` edit takes one member of it, and
+  // this walk is what sees either of them.
+  it('rejects a flag a -field: edit took away, and accepts the same reference without the edit', () => {
+    const owned = ['# entity crab', 'flags: shy', '# entity gull', 'squawk:', '  requires: crab.shy'].join('\n');
+    expect(() => loadModule(`${VALID}\n${owned}\n`)).not.toThrow();
+    expect(() => loadModule(`${VALID}\n${owned}\n# entity crab\n-flags: shy\n`)).toThrow(/# entity gull action "squawk" requires: names an unknown flag: crab.shy/);
+  });
 });
 
 describe('a skill names the stat it raises', () => {

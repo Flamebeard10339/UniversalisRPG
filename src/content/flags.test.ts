@@ -133,3 +133,32 @@ describe('a flag across module boundaries', () => {
     expect(() => loadUniverse([doomed, wrecker])).toThrow(/names an unknown flag: doomed.door.unlocked/);
   });
 });
+
+describe('a flag a field edit takes away', () => {
+  const BASE = module('base', '# entity door', 'flags: unlocked');
+  const cut = (id: string): ModuleSource => module(id, 'dependencies: base', '# entity base.door', '-flags: unlocked');
+  const wants = (id: string): ModuleSource => module(id, 'dependencies: base', '# entity gull', 'squawk:', '  requires: base.door.unlocked');
+  const dangles = /names an unknown flag: base.door.unlocked/;
+
+  it('goes away with the value, so a reference the edit stranded no longer resolves', () => {
+    expect(() => loadUniverse([BASE, cut('mod'), wants('watcher')])).toThrow(dangles);
+  });
+
+  it('fails whichever module names it first, because what survives is decided at merge', () => {
+    expect(() => loadUniverse([BASE, cut('aaa-cut'), wants('zzz-wants')])).toThrow(dangles);
+    expect(() => loadUniverse([BASE, wants('aaa-wants'), cut('zzz-cut')])).toThrow(dangles);
+  });
+
+  it('stays when a + in the same section puts it back, because the merged section is what is asked', () => {
+    const readd = module('mod', 'dependencies: base', '# entity base.door', '-flags: unlocked', '+flags: unlocked', '# entity gull', 'squawk:', '  requires: base.door.unlocked');
+    expect(loadUniverse([BASE, readd]).entities.get('base.door')!.flags).toEqual(['unlocked']);
+  });
+
+  it('leaves discovered alone when a location edits its flags, because a location owns a member it never lists', () => {
+    const shore = module('base', '# location beach', 'x: 0, y: 0', 'flags: searched');
+    const strip = module('mod', 'dependencies: base', '# location base.beach', '-flags: searched', '# entity gull', 'squawk:', '  requires: base.beach.discovered');
+    const registry = loadUniverse([shore, strip]);
+    expect(registry.locations.get('base.beach')!.flags).toEqual([]);
+    expect(registry.namespace.has('flag', 'base.beach.discovered')).toBe(true);
+  });
+});
