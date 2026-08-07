@@ -5,9 +5,11 @@ import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { SAVE_VERSION } from '../src/runtime/save';
 import { tsxCli } from './lib/tsxCli';
-import { NO_FIELD_MOVED, SHAPE_CHANGE, migrate, readContent, writeMigration, type ContentFile, type ShapeChange } from './migrate-saves';
+import { SHAPE_CHANGE, isStaleDeclaration, migrate, noFieldMoved, readContent, writeMigration, type ContentFile, type ShapeChange } from './migrate-saves';
 
 const BEHIND = SAVE_VERSION - 1;
+
+const nothingMoved = noFieldMoved(SAVE_VERSION);
 
 const stamped = (version: number, rest: string): string => `{"version":${version},${rest}}`;
 
@@ -60,7 +62,7 @@ const files = (...pairs: [string, string][]): ContentFile[] => pairs.map(([file,
 
 const one = (version: number): ContentFile[] => files(['island.dsl', at(version)]);
 
-const addsRng: ShapeChange = { declared: 'rng became a field every save carries', moved: (body) => ({ ...body, rng: 123 }) };
+const addsRng: ShapeChange = { writtenFor: SAVE_VERSION, declared: 'rng became a field every save carries', moved: (body) => ({ ...body, rng: 123 }) };
 
 const temporary: string[] = [];
 
@@ -77,7 +79,7 @@ afterEach(() => {
 
 describe('c1: the body, and nothing else', () => {
   it('restamps every # save body and reproduces the file byte for byte otherwise', () => {
-    const report = migrate(one(BEHIND), NO_FIELD_MOVED);
+    const report = migrate(one(BEHIND), nothingMoved);
 
     expect(report.ok).toBe(true);
     expect(report.files).toEqual([{ path: 'island.dsl', text: at(SAVE_VERSION) }]);
@@ -92,7 +94,7 @@ describe('c1: the body, and nothing else', () => {
   it('lands on disk exactly the text it reported, byte for byte', () => {
     const directory = scratch(['island.dsl', at(BEHIND)]);
 
-    writeMigration(migrate(readContent(directory), NO_FIELD_MOVED));
+    writeMigration(migrate(readContent(directory), nothingMoved));
 
     expect(readFileSync(path.join(directory, 'island.dsl'), 'utf8')).toBe(at(SAVE_VERSION));
   });
@@ -102,7 +104,7 @@ describe('c1: the body, and nothing else', () => {
     const behind = shipped.replace(new RegExp(`\\{"version":${SAVE_VERSION},`, 'g'), `{"version":${BEHIND},`);
     expect(behind).not.toBe(shipped);
 
-    const report = migrate(files(['content/tutorial-island.dsl', behind]), NO_FIELD_MOVED);
+    const report = migrate(files(['content/tutorial-island.dsl', behind]), nothingMoved);
 
     expect(report.lines.filter((line) => line.includes(`version ${BEHIND} rewritten`))).toHaveLength(3);
     expect(report.files[0].text).toBe(shipped);
@@ -140,7 +142,7 @@ describe('c2: running it twice is running it once', () => {
 });
 
 describe('c3: nothing is written until everything validates', () => {
-  const breaksCarried: ShapeChange = { declared: 'a transform that got one fixture wrong', moved: (body, fixture) => (fixture.id === 'probe-island.carried' ? { ...body, time: 'potato' } : body) };
+  const breaksCarried: ShapeChange = { writtenFor: SAVE_VERSION, declared: 'a transform that got one fixture wrong', moved: (body, fixture) => (fixture.id === 'probe-island.carried' ? { ...body, time: 'potato' } : body) };
 
   it('writes no file at all when one rewritten fixture does not load', () => {
     const report = migrate(one(BEHIND), breaksCarried);
@@ -167,7 +169,7 @@ describe('c3: nothing is written until everything validates', () => {
   });
 
   it('catches a rewrite that survives the field table but names something the registry does not hold', () => {
-    const invents: ShapeChange = { declared: 'inventory keys re-pointed at an item nobody declares', moved: (body) => ({ ...body, inventory: { 'probe-island.ghost': 1 } }) };
+    const invents: ShapeChange = { writtenFor: SAVE_VERSION, declared: 'inventory keys re-pointed at an item nobody declares', moved: (body) => ({ ...body, inventory: { 'probe-island.ghost': 1 } }) };
 
     const report = migrate(one(BEHIND), invents);
 
@@ -187,18 +189,37 @@ describe('c4: a bump has to state what it did to the shape', () => {
   });
 
   it('separates "nothing moved" from "nobody said", which is the whole point of declaring it', () => {
-    expect(migrate(one(BEHIND), NO_FIELD_MOVED).ok).toBe(true);
+    expect(migrate(one(BEHIND), nothingMoved).ok).toBe(true);
     expect(migrate(one(BEHIND), null).ok).toBe(false);
   });
 
   it('names what it did at the top of every run', () => {
     expect(migrate(one(BEHIND), addsRng).lines[0]).toBe(`shape change: ${addsRng.declared}`);
   });
+
+  it('refuses a declaration an earlier bump wrote, the same way it refuses an unset one', () => {
+    const left = migrate(one(BEHIND), { ...addsRng, writtenFor: BEHIND });
+    const unset = migrate(one(BEHIND), null);
+
+    expect(left.ok).toBe(false);
+    expect(left.files).toEqual([]);
+    expect(left.lines.join('\n')).toContain(`written for SAVE_VERSION ${BEHIND}, not ${SAVE_VERSION}`);
+    expect(left.lines.slice(1)).toEqual(unset.lines.slice(1));
+  });
+
+  it('separates "this bump said so" from "the last bump did", which no fixture version can tell apart', () => {
+    expect(migrate(one(BEHIND), { ...addsRng, writtenFor: SAVE_VERSION }).ok).toBe(true);
+    expect(migrate(one(BEHIND), { ...addsRng, writtenFor: BEHIND }).ok).toBe(false);
+  });
+
+  it('ships no declaration that is already stale, so the next bump starts from a refusal', () => {
+    expect(isStaleDeclaration(SHAPE_CHANGE)).toBe(false);
+  });
 });
 
 describe('c5: inputs and recordings are not confused', () => {
   it('classifies each fixture by the # test that names it', () => {
-    const lines = migrate(one(BEHIND), NO_FIELD_MOVED).lines;
+    const lines = migrate(one(BEHIND), nothingMoved).lines;
 
     expect(lines).toContain(`island.dsl: probe-island.arrival — version ${BEHIND} rewritten to ${SAVE_VERSION} as input`);
     expect(lines).toContain(`island.dsl: probe-island.carried — version ${BEHIND} rewritten to ${SAVE_VERSION} as recording`);
@@ -206,7 +227,7 @@ describe('c5: inputs and recordings are not confused', () => {
   });
 
   it('names every recording it rewrote as needing regeneration, and no input', () => {
-    const regenerate = migrate(one(BEHIND), NO_FIELD_MOVED).lines.find((line) => line.includes('/create-valid-test'));
+    const regenerate = migrate(one(BEHIND), nothingMoved).lines.find((line) => line.includes('/create-valid-test'));
 
     expect(regenerate).toContain('probe-island.carried');
     expect(regenerate).not.toContain('probe-island.arrival');
@@ -215,11 +236,11 @@ describe('c5: inputs and recordings are not confused', () => {
   it('asks for no regeneration when the run rewrote no recording', () => {
     const inputsOnly = at(BEHIND).replace('expect: carried', 'load: carried');
 
-    expect(migrate(files(['island.dsl', inputsOnly]), NO_FIELD_MOVED).lines.join('\n')).not.toContain('/create-valid-test');
+    expect(migrate(files(['island.dsl', inputsOnly]), nothingMoved).lines.join('\n')).not.toContain('/create-valid-test');
   });
 
   it('reports a fixture no # test references', () => {
-    expect(migrate(one(BEHIND), NO_FIELD_MOVED).lines.join('\n')).toContain('No # test names these fixtures, so nothing replays them: probe-island.orphan');
+    expect(migrate(one(BEHIND), nothingMoved).lines.join('\n')).toContain('No # test names these fixtures, so nothing replays them: probe-island.orphan');
   });
 });
 
@@ -235,13 +256,13 @@ describe('the command seam', () => {
     }
   };
 
-  it.skipIf(SHAPE_CHANGE !== null)('exits non-zero and writes nothing while no bump has declared a shape change', () => {
-    const directory = scratch(['island.dsl', at(BEHIND)]);
+  it('exits non-zero, says it wrote nothing, and leaves the directory it was given alone', () => {
+    const directory = scratch(['island.dsl', at(BEHIND)], ['does-not-load.dsl', '# info broken\nversion: 1.0.0\n\n# nonsense thing\ntitle: X\n']);
 
     const result = run([directory]);
 
     expect(result.status).toBe(1);
-    expect(result.out).toContain('SHAPE_CHANGE');
+    expect(result.out).toContain('Refused: no file was written.');
     expect(readFileSync(path.join(directory, 'island.dsl'), 'utf8')).toBe(at(BEHIND));
   });
 

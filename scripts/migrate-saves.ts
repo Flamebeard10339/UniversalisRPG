@@ -25,6 +25,7 @@ export interface Fixture {
 }
 
 export interface ShapeChange {
+  writtenFor: number;
   // Printed by every run, so the diff it produced is readable beside what its
   // author said it would do.
   declared: string;
@@ -34,10 +35,14 @@ export interface ShapeChange {
 // Written by the branch that bumps SAVE_VERSION and deleted by the one after
 // it; `git log -p` on this file is the history of every bump's shape change.
 // null is "nobody said", not "nothing moved" — migrate refuses it, and a bump
-// that moved no field says so with NO_FIELD_MOVED.
+// that moved no field says so with noFieldMoved.
 export const SHAPE_CHANGE: ShapeChange | null = null;
 
-export const NO_FIELD_MOVED: ShapeChange = { declared: 'no field moved', moved: (body) => body };
+export const noFieldMoved = (writtenFor: number): ShapeChange => ({ writtenFor, declared: 'no field moved', moved: (body) => body });
+
+export function isStaleDeclaration(change: ShapeChange | null): boolean {
+  return change !== null && change.writtenFor !== SAVE_VERSION;
+}
 
 export interface MigrationReport {
   lines: string[];
@@ -87,8 +92,10 @@ function splice(text: string, edits: readonly Rewrite[]): string {
 }
 
 function refused(lines: string[]): MigrationReport {
-  return { lines, ok: false, files: [] };
+  return { lines: [...lines, '', 'Refused: no file was written.'], ok: false, files: [] };
 }
+
+const declareIt = `Set SHAPE_CHANGE in scripts/migrate-saves.ts, stamped writtenFor: ${SAVE_VERSION} as a literal — noFieldMoved(${SAVE_VERSION}) if the bump moved no field a fixture holds, and one of your own if it did.`;
 
 function validationProblems(rewrites: readonly Rewrite[], registry: Registry): string[] {
   const problems: string[] = [];
@@ -107,10 +114,11 @@ function validationProblems(rewrites: readonly Rewrite[], registry: Registry): s
 
 export function migrate(files: readonly ContentFile[], change: ShapeChange | null): MigrationReport {
   if (change === null) {
-    return refused([
-      `No shape change is declared, so this run cannot say what the bump to SAVE_VERSION ${SAVE_VERSION} did to the fixtures.`,
-      'Set SHAPE_CHANGE in scripts/migrate-saves.ts — to NO_FIELD_MOVED if the bump moved no field a fixture holds, and to one of your own if it did.',
-    ]);
+    return refused([`No shape change is declared, so this run cannot say what the bump to SAVE_VERSION ${SAVE_VERSION} did to the fixtures.`, declareIt]);
+  }
+
+  if (isStaleDeclaration(change)) {
+    return refused([`The declared shape change was written for SAVE_VERSION ${change.writtenFor}, not ${SAVE_VERSION}, so it is an earlier bump's and cannot say what this one did to the fixtures.`, declareIt]);
   }
 
   const sources = files.map(moduleSourceOf);
@@ -157,7 +165,7 @@ export function migrate(files: readonly ContentFile[], change: ShapeChange | nul
   if (unreferenced.length > 0) lines.push('', `No # test names these fixtures, so nothing replays them: ${unreferenced.join(', ')}`);
 
   if (problems.length > 0) {
-    return refused([...lines, '', 'Wrote nothing: a rewritten fixture does not load against the registry.', ...problems]);
+    return refused([...lines, '', 'A rewritten fixture does not load against the registry.', ...problems]);
   }
 
   const recordings = rewrites.filter((rewrite) => classificationOf(rewrite.fixture.id) === 'recording').map((rewrite) => rewrite.fixture.id);
