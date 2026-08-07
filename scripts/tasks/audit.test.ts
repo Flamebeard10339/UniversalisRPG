@@ -1448,16 +1448,26 @@ describe('the brief arriving with the answers rather than the instructions', () 
     });
   });
 
+  // In a repo of its own, because the paths this section answers over are
+  // the union of the member tasks' files and a real `git diff base..head`.
+  // Run against the checkout the suite happens to sit in, the branch's own
+  // commits join that union and the section grows paths the test never named.
   it('the brief answers ownership and prior art for every path in its diff', () => {
-    fixture(({ tasks }) => {
+    gitFixture(({ dir, commit, tasks }) => {
+      writeFileSync(path.join(dir, 'systems.json'), JSON.stringify({ unowned: { note: '', paths: ['docs', '*.md'] }, systems: [{ name: 'Runtime', paths: ['src/runtime'], lastAudit: null, lastAuditDoc: null, note: null }] }), 'utf8');
+      // One path from each half of the union: session.ts is in the diff and
+      // on no record, save.ts is on a member task and not in the diff.
+      commit('Touch the session file on demo-spec.', ['src/runtime/session.ts']);
       tasks('add', 'An earlier claim on the save file', '--system', 'Runtime', '--files', 'src/runtime/save.ts:88');
       tasks('add', 'The task under audit', '--spec', 'demo-spec', '--files', 'src/runtime/save.ts');
 
       const result = tasks('audit-prompt', 'demo-spec');
       expect(result.status).toBe(0);
-      expect(result.stdout).toContain('Who owns each changed path:');
-      expect(result.stdout).toContain('- src/runtime/save.ts — Runtime');
-      expect(result.stdout).toContain('prior art on src/runtime/save.ts');
+      expect(result.stdout).toContain('Who owns each changed path:\n- src/runtime/save.ts — Runtime\n- src/runtime/session.ts — Runtime\n');
+      // The whole heading, not a prefix of it: the joined path list is the
+      // section's answer to "which paths did you ask about", and a
+      // `toContain` on one name cannot tell two paths from twenty.
+      expect(result.stdout).toContain('\nprior art on src/runtime/save.ts, src/runtime/session.ts:\n');
       expect(result.stdout).toContain('An earlier claim on the save file');
       // The two queries this section is a batched answer to, so an auditor
       // who wants one path in full knows what to run.
