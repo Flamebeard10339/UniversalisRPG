@@ -1346,7 +1346,7 @@ describe('a read that resolves a spec only where it uses one', () => {
       tasks('add', 'a member', '--id', 'a-member', '--spec', 'demo-spec');
       tasks('add', 'elsewhere', '--id', 'elsewhere');
       appendEvent(dir, { branch: 'claude/generated-2f9a11', spec: 'demo-spec', id: 'a-member' });
-      const result = runInProcess(['next', ...args(), '--branch', 'claude/generated-2f9a11']);
+      const result = runInProcess(['next', ...args(['--branch', 'claude/generated-2f9a11'])]);
       // The store still has one open spec — demo-spec, via a-member — so the
       // candidate is named, but as a refusal, not as an inference the event
       // log drove: the note says "not given", never "inferred from the event
@@ -1363,7 +1363,7 @@ describe('a read that resolves a spec only where it uses one', () => {
     fixture(({ tasks, dir, args }) => {
       tasks('add', 'a member', '--id', 'a-member', '--spec', 'demo-spec');
       appendEvent(dir, { branch: 'main', spec: 'demo-spec', id: 'a-member' });
-      const result = runInProcess(['next', ...args(), '--branch', 'main']);
+      const result = runInProcess(['next', ...args(['--branch', 'main'])]);
       expect(result.status).toBe(0);
       expect(result.stdout).toContain('no active spec for this branch');
     });
@@ -1389,10 +1389,10 @@ describe('a read that resolves a spec only where it uses one', () => {
     fixture(({ tasks, dir, args }) => {
       tasks('add', 'a finding', '--id', 'a-finding', '--kind', 'finding', '--fault', 'tooling', '--severity', 'high', '--deliverable', 'fix it');
       appendEvent(dir, { branch: 'claude/generated-2f9a11', spec: 'demo-spec' });
-      const result = runInProcess(['promote', 'a-finding', ...args(), '--branch', 'claude/generated-2f9a11']);
+      const result = runInProcess(['promote', 'a-finding', ...args(['--branch', 'claude/generated-2f9a11'])]);
       expect(result.status).toBe(1);
       expect(result.stderr).toContain('no active spec to promote into — pass --spec');
-      const shown = runInProcess(['show', 'a-finding', ...args(), '--branch', 'claude/generated-2f9a11']);
+      const shown = runInProcess(['show', 'a-finding', ...args(['--branch', 'claude/generated-2f9a11'])]);
       expect(shown.stdout).not.toContain('spec: demo-spec');
       expect(shown.stdout).toContain('[finding/unreviewed');
     });

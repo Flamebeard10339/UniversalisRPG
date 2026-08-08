@@ -1,7 +1,7 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { flagArities, positionalArity } from './tasks/cli';
+import { flagArities, positionalArity, type FlagArity } from './tasks/cli';
 import { allUsages, everyVerb } from './tasks/commands';
 import { enclosingGitFixture, fixture } from './tasks/cliFixtures';
 
@@ -178,6 +178,56 @@ describe('tasks CLI', () => {
         expect(arities.get(name), `--${name} in: ${usage.split('\n')[0]}`).toBe('boolean');
       }
     }
+  });
+
+  // The declarative half of a usage string: what is left once every
+  // parenthetical is removed. Written here rather than imported, so the
+  // property is checked against the text a reader sees rather than against
+  // the scanner that produced the vocabulary.
+  function outsideParentheses(usage: string): string {
+    let depth = 0;
+    let declared = '';
+    for (const char of usage) {
+      if (char === '(') depth++;
+      else if (char === ')') depth--;
+      else if (depth === 0) declared += char;
+    }
+    return declared;
+  }
+
+  // The other half of the same sweep: a flag is accepted because the usage
+  // declares it, never because its prose mentions it. `list` accepted
+  // `--trigger` — `decline`'s flag, named only in `list`'s trailing note —
+  // discarded the value, answered the whole unfiltered list at exit 0, and
+  // then advertised the flag by name on its own refusal path.
+  it('accepts only the flags every usage string declares, never one its prose mentions', () => {
+    const registry = everyVerb();
+    expect(registry.length).toBeGreaterThan(30);
+    for (const [name, usage] of registry) {
+      const declared = outsideParentheses(usage);
+      for (const flag of flagArities(usage).keys()) {
+        expect(new RegExp(`--${flag}(?![a-z0-9-])`).test(declared), `--${flag} in \`${name}\``).toBe(true);
+      }
+    }
+    const flagsOf = (verb: string): Map<string, FlagArity> => flagArities(registry.find(([name]) => name === verb)![1]);
+    expect(flagsOf('list').has('trigger')).toBe(false);
+    expect(flagsOf('decline').has('trigger')).toBe(true);
+    expect(flagsOf('decision').has('op')).toBe(false);
+    expect(flagsOf('log').has('op')).toBe(true);
+  });
+
+  // `audit` is the one verb whose flags genuinely repeat — a pass carries a
+  // --proof per clause and a --finding per finding, and `--args-from` is the
+  // only filing route for a branch audit. That is declared by the `...` its
+  // usage already writes, so nothing beside the usage string has to be kept
+  // in step with it; everywhere else a flag is given once, which is what
+  // makes `--state open --state declined` a refusal rather than a plausible,
+  // complete-looking answer built from the last value.
+  it('reads repetition off the ... a usage string writes, which only tasks audit does', () => {
+    const repeated = everyVerb()
+      .map(([name, usage]) => [name, [...flagArities(usage)].filter(([, arity]) => arity === 'repeated').map(([flag]) => flag)] as const)
+      .filter(([, flags]) => flags.length > 0);
+    expect(repeated).toEqual([['audit', ['proof', 'evidence', 'file', 'finding', 'severity', 'system', 'fault', 'deliverable']]]);
   });
 
   it('leaves a command whose usage ends in ... unbounded', () => {
