@@ -41,8 +41,9 @@ Two ordering properties changed with no visible output: every queue tie-breaks `
   flag so tsc makes every new check choose. **`doctor` exits non-zero on `dangling` alone.** The
   live store has zero, so the CI leg is green today and is a real check tomorrow.
 - **`docs/tasks.jsonl.lock` and `docs/tasks.jsonl.<pid>.tmp`** exist for microseconds during a
-  write and are `.gitignore`d. A leftover means a process was killed mid-write; the lock is broken
-  automatically after 30 s.
+  write and are `.gitignore`d. A leftover means a process was killed mid-write. The lock is broken
+  automatically, but only for a writer arriving more than 30 s later — every write before that
+  refuses after a 5 s wait and blames a holder that is not there. That gap is a deferred finding.
 - **`misfiledSystem`** (pure, in `taskStore.ts`) and **`pathOwner`** (`context.ts`, the manifest
   half of `systemNames`) are the H4 comparison. It runs at `add`/`edit` and in `doctor`, warns
   only, and skips closed records — asking those turned one answer into 137.
