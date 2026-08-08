@@ -1,7 +1,8 @@
 import { readFileSync } from 'node:fs';
 import { ManifestError } from '../lib/systems';
 import { StoreError } from '../lib/taskStore';
-import { AUDIT_USAGE, cmdAudit, cmdAuditPrompt, cmdImport } from './audit';
+import { AUDIT_USAGE, cmdAudit, cmdImport } from './audit';
+import { cmdAuditPrompt } from './auditPrompt';
 import { flagArities, parseArgs, positionalArity, type Flags } from './cli';
 import { ACTOR_USAGE, flushSkippedStoreLines, GLOBAL_USAGE } from './context';
 import { cmdPlan, cmdConcept, cmdProduces, cmdSystem, cmdWhere } from './architectureCmds';

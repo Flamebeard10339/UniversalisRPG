@@ -72,7 +72,7 @@ describe('work-prompt prints instructions, not the incidents that motivated them
 // real rather than a coincidence of current wording.
 describe('the four briefs share one instruction carrier', () => {
   it('work-prompt, audit-prompt, plan-prompt and orchestrate-prompt all render their lessons through the same printLessons function', () => {
-    for (const file of ['scripts/tasks/workPrompt.ts', 'scripts/tasks/audit.ts', 'scripts/tasks/planPrompt.ts', 'scripts/tasks/orchestratePrompt.ts']) {
+    for (const file of ['scripts/tasks/workPrompt.ts', 'scripts/tasks/auditPrompt.ts', 'scripts/tasks/planPrompt.ts', 'scripts/tasks/orchestratePrompt.ts']) {
       const text = readFileSync(path.join(repoRoot, file), 'utf8');
       expect(text, file).toContain('printLessons(');
       expect(text, file).toMatch(/import \{[^}]*printLessons[^}]*\} from '\.\/briefLessons'/);

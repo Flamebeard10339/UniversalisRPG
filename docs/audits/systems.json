@@ -317,14 +317,14 @@
         {
           "name": "proof target resolution",
           "paths": [
-            "scripts/tasks/audit.ts"
+            "scripts/tasks/auditPrompt.ts"
           ],
           "note": "produced by targets-resolve-across-files"
         },
         {
           "name": "generated auditor brief",
           "paths": [
-            "scripts/tasks/audit.ts"
+            "scripts/tasks/auditPrompt.ts"
           ],
           "note": "produced by brief-arrives-with-answers"
         },
@@ -339,9 +339,10 @@
           "name": "clause deferral",
           "paths": [
             "scripts/lib/specDoc.ts",
-            "scripts/tasks/audit.ts"
+            "scripts/tasks/audit.ts",
+            "scripts/tasks/auditPrompt.ts"
           ],
-          "note": "produced by a-clause-can-be-deferred-and-a-spec-can-carry-its-goal"
+          "note": "produced by a-clause-can-be-deferred-and-a-spec-can-carry-its-goal: its wording is the pass-file skeleton (auditPrompt.ts) and its behaviour is the interactive walk (audit.ts)"
         },
         {
           "name": "non-interactive triage",
