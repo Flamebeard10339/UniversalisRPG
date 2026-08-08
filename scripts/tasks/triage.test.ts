@@ -128,6 +128,17 @@ describe('tasks CLI', () => {
     });
   });
 
+  it('triage warns, naming the question, when a later session promotes a record that still carries a live question from an earlier one', async () => {
+    await fixture(async ({ tasks, triage }) => {
+      tasks('add', 'needs context', '--id', 'needs-context', '--kind', 'finding', '--fault', 'tooling', '--severity', 'high', '--deliverable', 'fix it');
+      await triage('a\nwhich universe was this measured against?\n');
+      const result = await triage('1\n');
+      expect(result.stdout).toContain('warning: this record has a live, unanswered question');
+      expect(result.stdout).toContain('which universe was this measured against?');
+      expect(tasks('show', 'needs-context').stdout).toContain('spec: demo-spec');
+    });
+  });
+
   it('triage [a] with an empty question asks nothing and re-offers the same finding', async () => {
     await fixture(async ({ tasks, triage }) => {
       tasks('add', 'needs context', '--id', 'needs-context', '--kind', 'finding', '--fault', 'tooling', '--severity', 'high', '--evidence', 'original', '--deliverable', 'fix it');
